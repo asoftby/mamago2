@@ -1,0 +1,15 @@
+// Prisma ORM 7 schema (no datasource url here)
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Healthcheck {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+}

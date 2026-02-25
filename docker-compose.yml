@@ -1,0 +1,16 @@
+services:
+  db:
+    image: postgres:16
+    container_name: mamago2_db
+    restart: always
+    environment:
+      POSTGRES_USER: mamago
+      POSTGRES_PASSWORD: mamago
+      POSTGRES_DB: mamago2
+    ports:
+      - "5433:5432"
+    volumes:
+      - mamago2_pg:/var/lib/postgresql/data
+
+volumes:
+  mamago2_pg:
