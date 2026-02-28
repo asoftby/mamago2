@@ -1,0 +1,68 @@
+// src/server/discovery/getActivityFeed.ts
+
+import prisma from "@/lib/prisma";
+import { DiscoveryState } from "@/lib/discovery/urlState";
+
+export async function getActivityFeed(citySlug: string, state: DiscoveryState) {
+  // 1. Find city
+  const city = await prisma.city.findUnique({
+    where: { slug: citySlug },
+  });
+
+  if (!city) {
+    return null;
+  }
+
+  // 2. Build where clause
+  const where: any = {
+    cityId: city.id,
+  };
+
+  // Intent filtering (future implementation, e.g. category based)
+  // For now, assume 'go' shows all, or map intent to categories.
+  if (state.intent === "edu") {
+    // example: where.category = "education"
+  }
+
+  // Context Filters
+  // filters: { age: ['0-3', '3-5'], when: ['weekend'] }
+  // We need to find activities that have ActivityFilterOption with:
+  // filterDefinition.slug = key AND filterOption.value IN values
+  
+  if (Object.keys(state.filters).length > 0) {
+    where.AND = Object.entries(state.filters).map(([key, values]) => ({
+      filterOptions: {
+        some: {
+          filterOption: {
+            filter: { slug: key },
+            value: { in: values },
+          },
+        },
+      },
+    }));
+  }
+
+  // 3. Fetch activities
+  const activities = await prisma.activity.findMany({
+    where,
+    orderBy: { createdAt: "desc" },
+    take: 20, // Pagination later
+    include: {
+      metroStation: true,
+      filterOptions: {
+        include: {
+          filterOption: {
+            include: {
+              filter: true
+            }
+          }
+        }
+      }
+    }
+  });
+
+  return {
+    city,
+    activities,
+  };
+}

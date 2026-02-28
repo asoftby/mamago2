@@ -1,15 +1,154 @@
 // Prisma ORM 7 schema (no datasource url here)
 
 generator client {
-  provider = "prisma-client"
-  output   = "../src/generated/prisma"
+  provider = "prisma-client-js"
 }
 
 datasource db {
   provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 model Healthcheck {
   id        String   @id @default(cuid())
   createdAt DateTime @default(now())
+}
+
+enum UiPlacement {
+  PRIMARY
+  SECONDARY
+  HIDDEN
+}
+
+model SignalDefinition {
+  id        String   @id @default(cuid())
+  slug      String   @unique
+  title     String
+  order     Int      @default(0)
+  isActive  Boolean  @default(true)
+  options   SignalOption[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model SignalOption {
+  id           String           @id @default(cuid())
+  definitionId String
+  label        String
+  value        String
+  order        Int              @default(0)
+  isActive     Boolean          @default(true)
+
+  definition   SignalDefinition @relation(fields: [definitionId], references: [id], onDelete: Cascade)
+
+  @@unique([definitionId, value])
+  @@index([definitionId, isActive, order])
+}
+
+model FilterDefinition {
+  id        String   @id @default(cuid())
+  slug      String   @unique
+  title     String
+  type      String   // single | multi
+  ui        String   // tabs | dropdown | multi_tabs
+  order     Int      @default(0) // Legacy, can be removed or mapped to orderIndex
+  orderIndex Int     @default(0)
+  placement UiPlacement @default(PRIMARY)
+  isActive  Boolean  @default(true)
+  options   FilterOption[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model FilterOption {
+  id        String   @id @default(cuid())
+  filterId  String
+  label     String
+  value     String
+  order     Int      @default(0) // Legacy
+  orderIndex Int     @default(0)
+  isActive  Boolean  @default(true)
+
+  filter    FilterDefinition @relation(fields: [filterId], references: [id], onDelete: Cascade)
+  activityFilterOptions ActivityFilterOption[]
+
+  @@unique([filterId, value])
+  @@index([filterId, isActive, order])
+}
+
+model City {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  lat       Float?
+  lng       Float?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  districts District[]
+  metroStations MetroStation[]
+  @@index([slug])
+}
+
+model District {
+  id        String   @id @default(cuid())
+  cityId    String
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  city City @relation(fields: [cityId], references: [id], onDelete: Cascade)
+
+  @@unique([cityId, name])
+  @@index([cityId])
+}
+
+model MetroStation {
+  id        String   @id @default(cuid())
+  cityId    String
+  name      String
+  lat       Float
+  lng       Float
+
+  osmType   String
+  osmId     String
+  source    String   @default("OSM")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  city City @relation(fields: [cityId], references: [id], onDelete: Cascade)
+  activities Activity[]
+
+  @@unique([cityId, osmType, osmId])
+  @@unique([cityId, name])
+  @@index([cityId])
+}
+
+model Activity {
+  id             String   @id @default(cuid())
+  name           String
+  description    String?
+  cityId         String?
+  metroStationId String?
+
+  metroStation   MetroStation? @relation(fields: [metroStationId], references: [id])
+  filterOptions  ActivityFilterOption[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ActivityFilterOption {
+  id             String       @id @default(cuid())
+  activityId     String
+  filterOptionId String
+
+  activity       Activity     @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  filterOption   FilterOption @relation(fields: [filterOptionId], references: [id], onDelete: Cascade)
+
+  @@unique([activityId, filterOptionId])
+  @@index([filterOptionId])
 }

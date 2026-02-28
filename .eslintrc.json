@@ -1,0 +1,17 @@
+{
+  "extends": ["next/core-web-vitals", "eslint:recommended"],
+  "rules": {},
+  "overrides": [
+    {
+      "files": [
+        "src/components/activity/**/*.{ts,tsx}",
+        "src/components/city/**/*.{ts,tsx}",
+        "src/app/**/*.{ts,tsx}"
+      ],
+      "rules": {
+        "max-len": ["warn", { "code": 140 }],
+        "@typescript-eslint/no-explicit-any": "warn"
+      }
+    }
+  ]
+}
