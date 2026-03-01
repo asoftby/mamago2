@@ -1,6 +1,26 @@
 {
   "extends": ["next/core-web-vitals", "eslint:recommended"],
-  "rules": {},
+  "rules": {
+    "no-restricted-imports": [
+      "error",
+      {
+        "paths": [
+          {
+            "name": "@/components/navigation/IntentTabs",
+            "message": "Please use '@/components/city/IntentTabs' instead."
+          },
+          {
+            "name": "@/components/discovery/IntentTabs",
+            "message": "Please use '@/components/city/IntentTabs' instead."
+          },
+          {
+            "name": "@/components/filters/FilterControl",
+            "message": "Please use '@/features/filters' (canonical) instead."
+          }
+        ]
+      }
+    ]
+  },
   "overrides": [
     {
       "files": [

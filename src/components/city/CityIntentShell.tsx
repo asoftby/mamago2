@@ -2,7 +2,7 @@
 
 import { Container } from "@/components/ui/Container";
 import { BreakingNewsRow } from "@/components/news/BreakingNewsRow";
-import { IntentTabs } from "@/components/city/IntentTabs";
+import { IntentTabs } from ".";
 import { ActivityCard } from "@/components/activity/ActivityCard";
 import { MINSK_ACTIVITIES } from "@/mocks/activities.minsk";
 import { Intent } from "@/lib/intent";
