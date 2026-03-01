@@ -47,3 +47,4 @@ prisma.config.ts.bak
 *.db
 *.db-journal
 
+mamago2/
