@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
   Popover,
-  PopoverContent,
+  PopoverPanelContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
 
@@ -95,8 +95,8 @@ export function PillPopoverSelect({
           </div>
         </Button>
       </PopoverTrigger>
-      <PopoverContent 
-        className="w-[var(--radix-popover-trigger-width)] min-w-[320px] max-w-[720px] p-6 rounded-3xl shadow-xl bg-background border border-border/60" 
+      <PopoverPanelContent 
+        className="p-6 bg-background" 
         align="start"
       >
         <div className="flex flex-col gap-4">
@@ -140,7 +140,7 @@ export function PillPopoverSelect({
             </div>
           )}
         </div>
-      </PopoverContent>
+      </PopoverPanelContent>
     </Popover>
   );
 }

@@ -83,15 +83,15 @@ export function BreakingNewsRow({ items, onAllClickHref = "#", className }: Brea
   return (
     <div className={cn("space-y-4 py-6", className)}>
       {/* Header */}
-      <div className="flex items-center justify-between px-1">
+      <div className="flex items-center gap-3 px-1">
         <h2 className="text-2xl font-semibold tracking-tight text-foreground">
           Breaking News
         </h2>
         <Link 
           href={onAllClickHref} 
-          className="text-sm font-medium text-muted-foreground hover:text-primary hover:underline transition-colors"
+          className="group flex h-8 w-8 items-center justify-center rounded-full bg-muted transition-colors hover:bg-primary hover:text-primary-foreground"
         >
-          все новости ↗
+           <ArrowRight className="h-4 w-4" />
         </Link>
       </div>
 

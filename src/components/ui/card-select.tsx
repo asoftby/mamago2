@@ -6,9 +6,11 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
   Popover,
-  PopoverContent,
+  PopoverPanelContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { MobileSelectSheet } from "@/components/filters/MobileSelectSheet";
 
 export interface CardSelectOption {
   value: string;
@@ -25,6 +27,7 @@ interface CardSelectProps {
   disabled?: boolean;
   className?: string;
   variant?: "card" | "pill";
+  uiMode?: "mobile" | "desktop";
 }
 
 export function CardSelect({
@@ -37,8 +40,16 @@ export function CardSelect({
   disabled = false,
   className,
   variant = "card",
+  uiMode,
 }: CardSelectProps) {
   const [open, setOpen] = React.useState(false);
+  const [isClient, setIsClient] = React.useState(false);
+  const isMobileQuery = useIsMobile();
+  const isMobile = uiMode ? uiMode === "mobile" : isMobileQuery;
+  
+  React.useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   const selectedOption = options.find((opt) => opt.value === value);
 
@@ -67,14 +78,13 @@ export function CardSelect({
         value && "border-primary bg-primary/5"
       );
 
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
+  const trigger = (
         <Button
           variant="outline"
           role="combobox"
           aria-expanded={open}
           disabled={disabled}
+          onClick={isClient && isMobile ? () => setOpen(true) : undefined}
           className={cn(pillStyles, className)}
         >
           {isPill ? (
@@ -134,9 +144,34 @@ export function CardSelect({
             </>
           )}
         </Button>
+  );
+
+  if (isClient && isMobile) {
+    return (
+      <>
+        {trigger}
+        <MobileSelectSheet
+          open={open}
+          onOpenChange={setOpen}
+          title={label || placeholder}
+          options={options}
+          selectedValues={value ? [value] : []}
+          onSelect={handleSelect}
+          onClear={() => onChange(null)}
+          isMulti={false}
+          placeholderSearch="Поиск..."
+        />
+      </>
+    );
+  }
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        {trigger}
       </PopoverTrigger>
-      <PopoverContent 
-        className="w-[var(--radix-popover-trigger-width)] min-w-[320px] max-w-[720px] min-h-[350px] h-auto overflow-y-auto p-4 rounded-3xl shadow-xl bg-background border border-border/60" 
+      <PopoverPanelContent 
+        className="min-h-[350px] h-auto bg-background" 
         align="start"
       >
         <div className="flex flex-col gap-1">
@@ -178,7 +213,7 @@ export function CardSelect({
             </div>
           )}
         </div>
-      </PopoverContent>
+      </PopoverPanelContent>
     </Popover>
   );
 }

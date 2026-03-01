@@ -2,6 +2,7 @@
 
 import { useRef, useEffect, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname, useParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { IconCompass, IconPalette, IconParty, IconBookOpen } from "@/components/ui/icons";
@@ -51,6 +52,7 @@ export function IntentTabs({ className }: { className?: string }) {
         {INTENT_ITEMS.map((tab, index) => {
           const isActive = index === safeActiveIndex;
           const Icon = TAB_ICONS[tab.id];
+          const isKuda = tab.id === "kuda";
           
           return (
             <Link
@@ -59,16 +61,31 @@ export function IntentTabs({ className }: { className?: string }) {
               ref={(el) => { tabsRef.current[index] = el; }}
               scroll={false} // Prevent full page scroll reset
               className={cn(
-                "flex min-w-[90px] flex-col items-center justify-center gap-1 px-4 transition-colors duration-200 select-none",
+                "group flex min-w-[90px] flex-col items-center justify-center gap-1 px-4 transition-colors duration-200 select-none",
                 isActive ? "text-neutral-900" : "text-neutral-400 hover:text-neutral-600"
               )}
             >
-              <Icon 
-                className={cn(
-                  "transition-all duration-300",
-                  isActive ? "h-[30px] w-[30px] opacity-100" : "h-6 w-6 opacity-60"
-                )} 
-              />
+              {isKuda ? (
+                <div className="relative h-[28px] w-[28px] flex items-center justify-center">
+                  <Image 
+                    src="/compas.webp" 
+                    alt="Куда пойти" 
+                    width={28} 
+                    height={28} 
+                    className={cn(
+                      "object-contain transition-transform duration-200 group-hover:scale-105",
+                      isActive && "drop-shadow-[0_6px_12px_rgba(239,135,89,0.35)]"
+                    )}
+                  />
+                </div>
+              ) : (
+                <Icon 
+                  className={cn(
+                    "transition-all duration-300",
+                    isActive ? "h-[30px] w-[30px] opacity-100" : "h-6 w-6 opacity-60"
+                  )} 
+                />
+              )}
               <Label 
                 as="span"
                 className={cn(

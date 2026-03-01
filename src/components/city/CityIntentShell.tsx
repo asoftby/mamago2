@@ -7,7 +7,7 @@ import { ActivityCard } from "@/components/activity/ActivityCard";
 import { MINSK_ACTIVITIES } from "@/mocks/activities.minsk";
 import { Intent } from "@/lib/intent";
 import { H1 } from "@/components/ui/typography";
-import { FilterRowUI } from "@/components/discovery/FilterRowUI";
+import { DiscoveryFilters } from "@/features/filters/discovery/DiscoveryFilters";
 
 // Mock data (in a real app this would come from a server loader based on city/intent)
 const BREAKING_NEWS = [
@@ -61,7 +61,7 @@ export function CityIntentShell({
           {(intent === 'kuda' || intent === 'classes' || intent === 'birthday') && (
             <div className="py-2">
               <div className="mt-4">
-                <FilterRowUI 
+                <DiscoveryFilters 
                   ageOptions={(definitions.find((d:any) => d.slug === "age")?.options ?? []).map((o:any) => ({ value: o.value, label: o.label }))}
                   metroOptions={metroOptions}
                   districtOptions={districtOptions}

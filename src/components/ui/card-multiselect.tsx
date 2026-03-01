@@ -6,9 +6,11 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
   Popover,
-  PopoverContent,
+  PopoverPanelContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { MobileSelectSheet } from "@/components/filters/MobileSelectSheet";
 
 export interface CardMultiSelectOption {
   value: string;
@@ -26,6 +28,7 @@ interface CardMultiSelectProps {
   maxSelected?: number;
   className?: string;
   variant?: "card" | "pill";
+  uiMode?: "mobile" | "desktop";
 }
 
 export function CardMultiSelect({
@@ -39,8 +42,16 @@ export function CardMultiSelect({
   maxSelected,
   className,
   variant = "card",
+  uiMode,
 }: CardMultiSelectProps) {
   const [open, setOpen] = React.useState(false);
+  const [isClient, setIsClient] = React.useState(false);
+  const isMobileQuery = useIsMobile();
+  const isMobile = uiMode ? uiMode === "mobile" : isMobileQuery;
+  
+  React.useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   const selectedOptions = options.filter((opt) => values.includes(opt.value));
   
@@ -90,14 +101,13 @@ export function CardMultiSelect({
         values.length > 0 && "border-primary bg-primary/5"
       );
 
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
+  const trigger = (
         <Button
           variant="outline"
           role="combobox"
           aria-expanded={open}
           disabled={disabled}
+          onClick={isClient && isMobile ? () => setOpen(true) : undefined}
           className={cn(pillStyles, className)}
         >
           {isPill ? (
@@ -157,9 +167,35 @@ export function CardMultiSelect({
             </>
           )}
         </Button>
+  );
+
+  if (isClient && isMobile) {
+    return (
+      <>
+        {trigger}
+        <MobileSelectSheet
+          open={open}
+          onOpenChange={setOpen}
+          title={label || placeholder}
+          options={options}
+          selectedValues={values}
+          onSelect={toggle}
+          onClear={() => onChange([])}
+          isMulti={true}
+          maxSelected={maxSelected}
+          placeholderSearch="Поиск..."
+        />
+      </>
+    );
+  }
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        {trigger}
       </PopoverTrigger>
-      <PopoverContent 
-        className="w-[var(--radix-popover-trigger-width)] min-w-[320px] max-w-[720px] min-h-[350px] h-auto overflow-y-auto p-4 rounded-3xl shadow-xl bg-background border border-border/60" 
+      <PopoverPanelContent 
+        className="min-h-[350px] h-auto bg-background" 
         align="start"
       >
         <div className="flex flex-col gap-1">
@@ -202,7 +238,7 @@ export function CardMultiSelect({
             </div>
           )}
         </div>
-      </PopoverContent>
+      </PopoverPanelContent>
     </Popover>
   );
 }

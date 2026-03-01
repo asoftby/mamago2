@@ -2,6 +2,7 @@
 
 import { useRef, useEffect, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname, useParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { IconCompass, IconPalette, IconParty, IconBookOpen } from "@/components/ui/icons";
@@ -14,6 +15,12 @@ const TAB_ICONS = {
   classes: IconPalette,
   birthday: IconParty,
   journal: IconBookOpen,
+};
+
+const TAB_IMAGES: Record<string, string> = {
+  kuda: "/compas.webp",
+  classes: "/paint.webp",
+  birthday: "/hb.webp",
 };
 
 export function IntentTabs({ className, citySlug }: { className?: string; citySlug?: string }) {
@@ -47,10 +54,11 @@ export function IntentTabs({ className, citySlug }: { className?: string; citySl
 
   return (
     <div className={cn("relative w-full bg-background z-10", className)}>
-      <div className="flex h-12 w-full max-w-screen-xl mx-auto overflow-x-auto no-scrollbar relative pointer-events-auto">
+      <div className="flex w-full max-w-screen-xl mx-auto overflow-x-auto no-scrollbar relative pointer-events-auto py-[10px]">
         {INTENT_ITEMS.map((tab, index) => {
           const isActive = index === safeActiveIndex;
           const Icon = TAB_ICONS[tab.id];
+          const imageSrc = TAB_IMAGES[tab.id];
           
           return (
             <Link
@@ -59,20 +67,35 @@ export function IntentTabs({ className, citySlug }: { className?: string; citySl
               ref={(el) => { tabsRef.current[index] = el; }}
               scroll={false} // Prevent full page scroll reset
               className={cn(
-                "flex min-w-[80px] flex-col items-center justify-center gap-0.5 px-3 transition-colors duration-200 select-none",
+                "group flex min-w-[80px] flex-col items-center justify-center gap-0.5 px-3 transition-colors duration-200 select-none",
                 isActive ? "text-neutral-900" : "text-neutral-400 hover:text-neutral-600"
               )}
             >
-              <Icon 
-                className={cn(
-                  "transition-all duration-300",
-                  isActive ? "h-6 w-6 opacity-100" : "h-5 w-5 opacity-60"
-                )} 
-              />
+              {imageSrc ? (
+                <div className="relative h-[48px] w-[48px] flex items-center justify-center">
+                  <Image 
+                    src={imageSrc}
+                    alt={tab.label}
+                    width={48} 
+                    height={48} 
+                    className={cn(
+                      "object-contain transition-transform duration-200 group-hover:scale-105",
+                      isActive && "drop-shadow-[0_4px_8px_rgba(239,135,89,0.35)]"
+                    )}
+                  />
+                </div>
+              ) : (
+                <Icon 
+                  className={cn(
+                    "transition-all duration-300",
+                    isActive ? "h-6 w-6 opacity-100" : "h-5 w-5 opacity-60"
+                  )} 
+                />
+              )}
               <Label 
                 as="span"
                 className={cn(
-                  "text-[11px] leading-none whitespace-nowrap transition-all duration-300 normal-case tracking-normal text-current",
+                  "text-[13px] leading-none whitespace-nowrap transition-all duration-300 normal-case tracking-normal text-current",
                   isActive ? "font-bold text-neutral-900" : "font-medium text-neutral-400"
                 )}
               >

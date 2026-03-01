@@ -11,7 +11,8 @@
     "dev:webpack": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "ui:audit": "node scripts/ui-usage-audit.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
@@ -32,6 +33,7 @@
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-hook-form": "^7.71.2",
+    "react-responsive": "^10.0.1",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.5.0",
     "vaul": "^1.1.2",

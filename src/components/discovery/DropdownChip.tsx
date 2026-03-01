@@ -96,7 +96,7 @@ export function DropdownChip({
           </div>
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[220px] p-0" align="start">
+      <PopoverContent className="w-[220px] p-0 max-h-[60vh] overflow-y-auto" align="start">
         <Command>
           <CommandInput placeholder={`Поиск ${label.toLowerCase()}...`} />
           <CommandList>

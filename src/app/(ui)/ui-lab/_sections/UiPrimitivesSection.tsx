@@ -1,0 +1,202 @@
+"use client";
+
+import React from "react";
+import { DemoSection } from "../_components/DemoSection";
+import { InventoryGrid } from "../_components/InventoryGrid";
+import { RenderSafe } from "../_components/RenderSafe";
+
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Separator } from "@/components/ui/separator";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Surface } from "@/components/ui/surface";
+import { Container } from "@/components/ui/Container";
+import { Section } from "@/components/ui/Section";
+import { H1, H2, H3, Body, BodyMuted } from "@/components/ui/typography";
+import { PrimaryButton } from "@/components/ui/PrimaryButton";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { WhenSelect } from "@/components/ui/when-select";
+import { CardSelect } from "@/components/ui/card-select";
+import { CardMultiSelect } from "@/components/ui/card-multiselect";
+import { UiActivityCard } from "@/components/ui/activity-card";
+import { FavoriteButton } from "@/components/ui/FavoriteButton";
+import { Chip } from "@/components/ui/Chip";
+import { ChipsRow } from "@/components/ui/chips-row";
+import { MediaCover } from "@/components/ui/media-cover";
+
+export function UiPrimitivesSection() {
+  return (
+    <DemoSection title="UI Primitives" description="Core building blocks from src/components/ui">
+      <InventoryGrid>
+        <RenderSafe title="Button" file="src/components/ui/button.tsx">
+          <div className="flex gap-2 flex-wrap">
+            <Button>Default</Button>
+            <Button variant="secondary">Secondary</Button>
+            <Button variant="outline">Outline</Button>
+            <Button variant="ghost">Ghost</Button>
+            <Button variant="destructive">Destructive</Button>
+          </div>
+        </RenderSafe>
+
+        <RenderSafe title="PrimaryButton" file="src/components/ui/PrimaryButton.tsx">
+          <PrimaryButton>Primary Action</PrimaryButton>
+        </RenderSafe>
+
+        <RenderSafe title="Badge" file="src/components/ui/badge.tsx">
+          <div className="flex gap-2">
+            <Badge>Default</Badge>
+            <Badge variant="secondary">Secondary</Badge>
+            <Badge variant="outline">Outline</Badge>
+            <Badge variant="destructive">Destructive</Badge>
+          </div>
+        </RenderSafe>
+
+        <RenderSafe title="Input" file="src/components/ui/input.tsx">
+          <Input placeholder="Type something..." />
+        </RenderSafe>
+
+        <RenderSafe title="Checkbox" file="src/components/ui/checkbox.tsx">
+          <div className="flex items-center space-x-2">
+            <Checkbox id="terms" />
+            <label
+              htmlFor="terms"
+              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+            >
+              Accept terms
+            </label>
+          </div>
+        </RenderSafe>
+
+        <RenderSafe title="Separator" file="src/components/ui/separator.tsx">
+          <div className="space-y-1">
+            <div className="text-sm">Above</div>
+            <Separator />
+            <div className="text-sm">Below</div>
+          </div>
+        </RenderSafe>
+
+        <RenderSafe title="Typography" file="src/components/ui/typography.tsx">
+          <div className="space-y-2">
+            <H1>Heading 1</H1>
+            <H2>Heading 2</H2>
+            <H3>Heading 3</H3>
+            <Body>Body text</Body>
+            <BodyMuted>Muted body text</BodyMuted>
+          </div>
+        </RenderSafe>
+
+        <RenderSafe title="Card" file="src/components/ui/card.tsx">
+          <Card>
+            <CardHeader>
+              <CardTitle>Card Title</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p>Card Content</p>
+            </CardContent>
+          </Card>
+        </RenderSafe>
+
+        <RenderSafe title="Surface" file="src/components/ui/surface.tsx">
+          <Surface className="p-4">Surface Content</Surface>
+        </RenderSafe>
+
+        <RenderSafe title="Container" file="src/components/ui/Container.tsx">
+          <div className="border border-dashed p-2">
+            <Container>Container Content</Container>
+          </div>
+        </RenderSafe>
+
+        <RenderSafe title="Section" file="src/components/ui/Section.tsx">
+          <Section title="Section Title" action={<Button size="sm">Action</Button>}>
+            Section Content
+          </Section>
+        </RenderSafe>
+
+        <RenderSafe title="ScrollArea" file="src/components/ui/scroll-area.tsx">
+          <ScrollArea className="h-[100px] w-full rounded-md border p-4">
+            Scrollable Content...
+          </ScrollArea>
+        </RenderSafe>
+
+        <RenderSafe title="WhenSelect" file="src/components/ui/when-select.tsx">
+          <WhenSelect uiMode="desktop" />
+        </RenderSafe>
+
+        <RenderSafe title="CardSelect" file="src/components/ui/card-select.tsx">
+          <CardSelect 
+            label="Demo Select" 
+            options={[{value: '1', label: 'Option 1'}, {value: '2', label: 'Option 2'}]}
+            value={null}
+            onChange={() => {}}
+            uiMode="desktop"
+          />
+        </RenderSafe>
+
+        <RenderSafe title="CardMultiSelect" file="src/components/ui/card-multiselect.tsx">
+          <CardMultiSelect 
+            label="Demo Multi" 
+            options={[{value: '1', label: 'Option 1'}, {value: '2', label: 'Option 2'}]}
+            values={[]}
+            onChange={() => {}}
+            uiMode="desktop"
+          />
+        </RenderSafe>
+
+        <RenderSafe title="FavoriteButton" file="src/components/ui/FavoriteButton.tsx">
+           <div className="flex gap-4">
+             <FavoriteButton initialLiked={false} />
+             <FavoriteButton initialLiked={true} />
+           </div>
+        </RenderSafe>
+
+        <RenderSafe title="Chip" file="src/components/ui/Chip.tsx">
+          <div className="flex gap-2">
+            <Chip>Default</Chip>
+            <Chip active>Active</Chip>
+          </div>
+        </RenderSafe>
+
+        <RenderSafe title="ChipsRow" file="src/components/ui/chips-row.tsx">
+          <ChipsRow 
+            items={[
+                {id: '1', label: 'Chip 1'}, 
+                {id: '2', label: 'Chip 2', active: true}
+            ]} 
+          />
+        </RenderSafe>
+
+        <RenderSafe title="MediaCover" file="src/components/ui/media-cover.tsx">
+           <div className="h-32 w-24 relative">
+             <MediaCover imageUrl="https://picsum.photos/seed/ui-lab/200/300" />
+           </div>
+        </RenderSafe>
+
+        <RenderSafe title="UiActivityCard" file="src/components/ui/activity-card.tsx">
+           <UiActivityCard 
+             href="#"
+             title="Demo Activity"
+             subtitle="Subtitle"
+             imageUrl="https://picsum.photos/seed/act/400/300"
+             rating={4.8}
+             meta="$$"
+           />
+        </RenderSafe>
+
+        {/* Listed only due to prop complexity or context needs */}
+        <RenderSafe title="IconButton" file="src/components/ui/IconButton.tsx" listedOnly />
+        <RenderSafe title="MultiSelectTab" file="src/components/ui/multiselect-tab.tsx" listedOnly />
+        <RenderSafe title="PillPopoverSelect" file="src/components/ui/pill-popover-select.tsx" listedOnly />
+        <RenderSafe title="Popover" file="src/components/ui/popover.tsx" listedOnly />
+        <RenderSafe title="Sheet" file="src/components/ui/sheet.tsx" listedOnly />
+        <RenderSafe title="Dialog" file="src/components/ui/dialog.tsx" listedOnly />
+        <RenderSafe title="Command" file="src/components/ui/command.tsx" listedOnly />
+        <RenderSafe title="Sonner" file="src/components/ui/sonner.tsx" listedOnly />
+        <RenderSafe title="Select" file="src/components/ui/select.tsx" listedOnly />
+        <RenderSafe title="Icons" file="src/components/ui/icons.tsx" listedOnly />
+
+      </InventoryGrid>
+    </DemoSection>
+  );
+}
