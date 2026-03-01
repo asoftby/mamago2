@@ -12,7 +12,12 @@ export function NewsSection() {
     <DemoSection title="News Components" description="src/components/news">
       <InventoryGrid>
         <RenderSafe title="BreakingNewsRow" file="src/components/news/BreakingNewsRow.tsx">
-           <BreakingNewsRow items={[{ id: '1', title: 'News', slug: 'news' }]} />
+           <BreakingNewsRow items={[{ 
+             id: '1', 
+             title: 'News', 
+             imageUrl: 'https://picsum.photos/seed/news/200/200',
+             timeAgo: '2h ago'
+           }]} />
         </RenderSafe>
       </InventoryGrid>
     </DemoSection>

@@ -9,7 +9,7 @@ import { MobileFilterSheet } from "@/components/discovery/MobileFilterSheet";
 import { WhenSelect } from "@/components/ui/when-select";
 import { CardSelect } from "@/components/ui/card-select";
 import { CardMultiSelect } from "@/components/ui/card-multiselect";
-import { X } from "lucide-react";
+import { X, SlidersHorizontal } from "lucide-react";
 
 // Define Option type locally or import
 type Option = { value: string; label: string };
@@ -187,7 +187,9 @@ export function DiscoveryFilters({
              when: draft.dateFrom ? (draft.dateTo ? { from: new Date(draft.dateFrom), to: new Date(draft.dateTo) } : new Date(draft.dateFrom)) : null,
              age: draft.age,
              metro: draft.metro,
-             district: draft.district
+             district: draft.district,
+             dateFrom: draft.dateFrom,
+             dateTo: draft.dateTo
           }}
           draft={draft}
           setDraft={setDraft}

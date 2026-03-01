@@ -8,8 +8,8 @@ type Intent = keyof typeof INTENT_FILTERS;
 
 const INTENTS: { id: Intent; label: string }[] = [
   { id: "go", label: "Куда пойти" },
-  { id: "edu", label: "Занятия" },
-  { id: "bday", label: "День рождения" },
+  { id: "classes", label: "Занятия" },
+  { id: "birthday", label: "День рождения" },
   // { id: "journal", label: "Журнал" }, // Можно добавить позже
 ];
 

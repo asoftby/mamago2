@@ -1,4 +1,4 @@
-import { FilterDef } from '../types';
+import type { FilterDef } from "./types";
 
 export function getFilterSummary(def: FilterDef, value: string | string[] | null): string {
   // If empty, return label/placeholder
@@ -8,14 +8,14 @@ export function getFilterSummary(def: FilterDef, value: string | string[] | null
 
   if (def.mode === 'single') {
     const val = value as string;
-    const opt = def.options.find(o => o.value === val);
+    const opt = def.options.find((o) => o.value === val);
     return opt ? opt.label : val;
   } else {
     // multi
     const vals = value as string[];
     // Find labels for all selected values
     const labels = vals.map(v => {
-      const opt = def.options.find(o => o.value === v);
+      const opt = def.options.find((o) => o.value === v);
       return opt ? opt.label : v;
     });
 

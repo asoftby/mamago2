@@ -23,6 +23,7 @@ type WhenSelectProps = {
   className?: string;
   variant?: "default" | "embedded";
   uiMode?: "mobile" | "desktop";
+  trigger?: React.ReactNode;
 };
 
 function ruMonthAbbr(m: number) {
@@ -50,7 +51,7 @@ function getWeekendRange(now: Date) {
   return [saturday, sunday];
 }
 
-export function WhenSelect({ label = "Когда идем", value, onChange, className, variant = "default", uiMode }: WhenSelectProps) {
+export function WhenSelect({ label = "Когда идем", value, onChange, className, variant = "default", uiMode, trigger }: WhenSelectProps) {
   const [isClient, setIsClient] = React.useState(false);
   const isMobileQuery = useIsMobile();
   const isMobile = uiMode ? uiMode === "mobile" : isMobileQuery;
@@ -449,7 +450,7 @@ export function WhenSelect({ label = "Когда идем", value, onChange, cla
     return (
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetTrigger asChild>
-          {triggerButton}
+          {trigger || triggerButton}
         </SheetTrigger>
         <SheetContent 
           side="bottom" 
@@ -522,7 +523,7 @@ export function WhenSelect({ label = "Когда идем", value, onChange, cla
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        {triggerButton}
+        {trigger || triggerButton}
       </PopoverTrigger>
       <PopoverPanelContent 
         className="w-[720px] min-h-[350px] h-auto bg-card pb-[30px]" 

@@ -29,6 +29,7 @@ interface CardMultiSelectProps {
   className?: string;
   variant?: "card" | "pill";
   uiMode?: "mobile" | "desktop";
+  trigger?: React.ReactNode;
 }
 
 export function CardMultiSelect({
@@ -43,6 +44,7 @@ export function CardMultiSelect({
   className,
   variant = "card",
   uiMode,
+  trigger: customTrigger,
 }: CardMultiSelectProps) {
   const [open, setOpen] = React.useState(false);
   const [isClient, setIsClient] = React.useState(false);
@@ -172,7 +174,7 @@ export function CardMultiSelect({
   if (isClient && isMobile) {
     return (
       <>
-        {trigger}
+        {customTrigger || trigger}
         <MobileSelectSheet
           open={open}
           onOpenChange={setOpen}
@@ -192,7 +194,7 @@ export function CardMultiSelect({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        {trigger}
+        {customTrigger || trigger}
       </PopoverTrigger>
       <PopoverPanelContent 
         className="min-h-[350px] h-auto bg-background" 

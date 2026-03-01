@@ -16,11 +16,12 @@ export function ActivitySection() {
              activity={{
                id: 'demo-feature',
                title: 'Feature Activity',
-               images: ['https://picsum.photos/seed/feat/400/300'],
-               category: { id: 'c1', name: 'Cat', slug: 'cat' },
-               ageRange: { min: 3, max: 10 },
-               price: { amount: 10, currency: 'BYN' },
-               location: { address: 'Minsk' }
+               image: 'https://picsum.photos/seed/feat/400/300',
+               ageFrom: 3,
+               priceMin: 10,
+               currency: 'BYN',
+               badge: 'New',
+               rating: 4.5
              }} 
            />
         </RenderSafe>
