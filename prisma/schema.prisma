@@ -16,16 +16,17 @@ model Healthcheck {
 
 // Authentication models
 model User {
-  id           String    @id @default(cuid())
-  email        String    @unique
+  id           String @id @default(cuid())
+  email        String @unique
   passwordHash String
-  role         String    @default("USER") // USER | BUSINESS_OWNER | MODERATOR | ADMIN
-  
-  sessions     Session[]
-  
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-  
+  role         String @default("USER") // USER | BUSINESS_OWNER | MODERATOR | ADMIN
+
+  sessions Session[]
+  business Business? // One business per owner (MVP)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@index([email])
 }
 
@@ -34,11 +35,11 @@ model Session {
   userId    String
   tokenHash String   @unique
   expiresAt DateTime
-  
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   createdAt DateTime @default(now())
-  
+
   @@index([userId])
   @@index([tokenHash])
   @@index([expiresAt])
@@ -51,57 +52,57 @@ enum UiPlacement {
 }
 
 model SignalDefinition {
-  id        String   @id @default(cuid())
-  slug      String   @unique
-  title     String
-  order     Int      @default(0)
-  isActive  Boolean  @default(true)
-  options   SignalOption[]
+  id       String         @id @default(cuid())
+  slug     String         @unique
+  title    String
+  order    Int            @default(0)
+  isActive Boolean        @default(true)
+  options  SignalOption[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
 
 model SignalOption {
-  id           String           @id @default(cuid())
+  id           String  @id @default(cuid())
   definitionId String
   label        String
   value        String
-  order        Int              @default(0)
-  isActive     Boolean          @default(true)
+  order        Int     @default(0)
+  isActive     Boolean @default(true)
 
-  definition   SignalDefinition @relation(fields: [definitionId], references: [id], onDelete: Cascade)
+  definition SignalDefinition @relation(fields: [definitionId], references: [id], onDelete: Cascade)
 
   @@unique([definitionId, value])
   @@index([definitionId, isActive, order])
 }
 
 model FilterDefinition {
-  id        String   @id @default(cuid())
-  slug      String   @unique
-  title     String
-  type      String   // single | multi
-  ui        String   // tabs | dropdown | multi_tabs
-  order     Int      @default(0) // Legacy, can be removed or mapped to orderIndex
-  orderIndex Int     @default(0)
-  placement UiPlacement @default(PRIMARY)
-  isActive  Boolean  @default(true)
-  options   FilterOption[]
+  id         String         @id @default(cuid())
+  slug       String         @unique
+  title      String
+  type       String // single | multi
+  ui         String // tabs | dropdown | multi_tabs
+  order      Int            @default(0) // Legacy, can be removed or mapped to orderIndex
+  orderIndex Int            @default(0)
+  placement  UiPlacement    @default(PRIMARY)
+  isActive   Boolean        @default(true)
+  options    FilterOption[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
 
 model FilterOption {
-  id        String   @id @default(cuid())
-  filterId  String
-  label     String
-  value     String
-  order     Int      @default(0) // Legacy
+  id         String  @id @default(cuid())
+  filterId   String
+  label      String
+  value      String
+  order      Int     @default(0) // Legacy
   orderIndex Int     @default(0)
-  isActive  Boolean  @default(true)
+  isActive   Boolean @default(true)
 
-  filter    FilterDefinition @relation(fields: [filterId], references: [id], onDelete: Cascade)
+  filter                FilterDefinition       @relation(fields: [filterId], references: [id], onDelete: Cascade)
   activityFilterOptions ActivityFilterOption[]
 
   @@unique([filterId, value])
@@ -117,8 +118,10 @@ model City {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  districts District[]
+  districts     District[]
   metroStations MetroStation[]
+  places        Place[]        @relation("PlaceCity") // Business Cabinet relation
+
   @@index([slug])
 }
 
@@ -129,28 +132,30 @@ model District {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  city City @relation(fields: [cityId], references: [id], onDelete: Cascade)
+  city   City    @relation(fields: [cityId], references: [id], onDelete: Cascade)
+  places Place[] @relation("PlaceDistrict") // Business Cabinet relation
 
   @@unique([cityId, name])
   @@index([cityId])
 }
 
 model MetroStation {
-  id        String   @id @default(cuid())
-  cityId    String
-  name      String
-  lat       Float
-  lng       Float
+  id     String @id @default(cuid())
+  cityId String
+  name   String
+  lat    Float
+  lng    Float
 
-  osmType   String
-  osmId     String
-  source    String   @default("OSM")
+  osmType String
+  osmId   String
+  source  String @default("OSM")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  city City @relation(fields: [cityId], references: [id], onDelete: Cascade)
+  city       City       @relation(fields: [cityId], references: [id], onDelete: Cascade)
   activities Activity[]
+  places     Place[]    @relation("PlaceMetro") // Business Cabinet relation
 
   @@unique([cityId, osmType, osmId])
   @@unique([cityId, name])
@@ -158,27 +163,146 @@ model MetroStation {
 }
 
 model Activity {
-  id             String   @id @default(cuid())
+  id             String  @id @default(cuid())
   name           String
   description    String?
   cityId         String?
   metroStationId String?
 
-  metroStation   MetroStation? @relation(fields: [metroStationId], references: [id])
-  filterOptions  ActivityFilterOption[]
+  metroStation  MetroStation?          @relation(fields: [metroStationId], references: [id])
+  filterOptions ActivityFilterOption[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
 
 model ActivityFilterOption {
-  id             String       @id @default(cuid())
+  id             String @id @default(cuid())
   activityId     String
   filterOptionId String
 
-  activity       Activity     @relation(fields: [activityId], references: [id], onDelete: Cascade)
-  filterOption   FilterOption @relation(fields: [filterOptionId], references: [id], onDelete: Cascade)
+  activity     Activity     @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  filterOption FilterOption @relation(fields: [filterOptionId], references: [id], onDelete: Cascade)
 
   @@unique([activityId, filterOptionId])
   @@index([filterOptionId])
+}
+
+// ============================================
+// BUSINESS CABINET MODELS
+// ============================================
+
+// Enums for Business Cabinet
+enum OfferKind {
+  EVENT
+  SERVICE
+}
+
+enum OfferStatus {
+  DRAFT
+  PENDING
+  PUBLISHED
+  REJECTED
+}
+
+// Business entity
+model Business {
+  id          String @id @default(cuid())
+  name        String
+  ownerUserId String @unique // One business per owner (MVP)
+
+  owner  User    @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+  places Place[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([ownerUserId])
+}
+
+// Place entity
+model Place {
+  id         String  @id @default(cuid())
+  businessId String
+  title      String
+  address    String
+  cityId     String
+  lat        Float?
+  lng        Float?
+  metroId    String?
+  districtId String?
+  phone      String?
+  website    String?
+  coverImage String?
+
+  business Business      @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  // Foreign keys only - do NOT add reverse relations to City/MetroStation/District models
+  city     City          @relation(fields: [cityId], references: [id], name: "PlaceCity")
+  metro    MetroStation? @relation(fields: [metroId], references: [id], name: "PlaceMetro")
+  district District?     @relation(fields: [districtId], references: [id], name: "PlaceDistrict")
+  offers   Offer[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([businessId])
+  @@index([cityId])
+}
+
+// Offer entity (EVENT or SERVICE)
+model Offer {
+  id          String    @id @default(cuid())
+  placeId     String
+  kind        OfferKind
+  title       String
+  description String?
+  coverImage  String?
+  priceFrom   Float?
+  priceText   String?
+
+  // Age range in months (easier filtering + indexing than string array)
+  ageMinMonths Int?
+  ageMaxMonths Int?
+
+  // Date fields (required for EVENT, must be null for SERVICE)
+  // Validation enforced at application level
+  dateFrom DateTime?
+  dateTo   DateTime?
+
+  // Promo attributes (NOT separate entity)
+  promoTitle       String?
+  promoDescription String?
+  promoUntil       DateTime?
+
+  // Status workflow
+  status          OfferStatus @default(DRAFT)
+  publishedAt     DateTime?
+  rejectionReason String?
+
+  place  Place   @relation(fields: [placeId], references: [id], onDelete: Cascade)
+  boosts Boost[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([placeId])
+  @@index([status])
+  @@index([kind])
+  @@index([dateFrom])
+  @@index([ageMinMonths, ageMaxMonths])
+}
+
+// Boost entity (ranking modifier only)
+model Boost {
+  id      String   @id @default(cuid())
+  offerId String
+  startAt DateTime
+  endAt   DateTime
+
+  offer Offer @relation(fields: [offerId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([offerId])
+  @@index([startAt, endAt])
 }
