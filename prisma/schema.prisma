@@ -14,6 +14,36 @@ model Healthcheck {
   createdAt DateTime @default(now())
 }
 
+// Authentication models
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  passwordHash String
+  role         String    @default("USER") // USER | BUSINESS_OWNER | MODERATOR | ADMIN
+  
+  sessions     Session[]
+  
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  
+  @@index([email])
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  tokenHash String   @unique
+  expiresAt DateTime
+  
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  createdAt DateTime @default(now())
+  
+  @@index([userId])
+  @@index([tokenHash])
+  @@index([expiresAt])
+}
+
 enum UiPlacement {
   PRIMARY
   SECONDARY
