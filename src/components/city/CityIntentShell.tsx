@@ -7,7 +7,7 @@ import { ActivityCard } from "@/components/activity/ActivityCard";
 import { MINSK_ACTIVITIES } from "@/mocks/activities.minsk";
 import { Intent } from "@/lib/intent";
 import { H1 } from "@/components/ui/typography";
-import { DiscoveryFilters } from "@/features/filters/discovery/DiscoveryFilters";
+import { DiscoveryFilters } from "@/features/discovery/filters/DiscoveryFilters";
 
 // Mock data (in a real app this would come from a server loader based on city/intent)
 const BREAKING_NEWS = [

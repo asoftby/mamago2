@@ -24,6 +24,13 @@ type WhenSelectProps = {
   variant?: "default" | "embedded";
   uiMode?: "mobile" | "desktop";
   trigger?: React.ReactNode;
+  placeholder?: string;
+  disabled?: boolean;
+  loading?: boolean;
+  errorText?: string;
+  open?: boolean;
+  defaultOpen?: boolean;
+  onOpenChange?: (open: boolean) => void;
 };
 
 function ruMonthAbbr(m: number) {
@@ -51,18 +58,40 @@ function getWeekendRange(now: Date) {
   return [saturday, sunday];
 }
 
-export function WhenSelect({ label = "Когда идем", value, onChange, className, variant = "default", uiMode, trigger }: WhenSelectProps) {
+export function WhenSelect({
+  label = "Когда идем",
+  value,
+  onChange,
+  className,
+  variant = "default",
+  uiMode,
+  trigger,
+  placeholder = "Выберите...",
+  disabled = false,
+  loading = false,
+  errorText,
+  open: openProp,
+  defaultOpen,
+  onOpenChange,
+}: WhenSelectProps) {
   const [isClient, setIsClient] = React.useState(false);
   const isMobileQuery = useIsMobile();
   const isMobile = uiMode ? uiMode === "mobile" : isMobileQuery;
+  const isControlled = value !== undefined;
   
   React.useEffect(() => {
     setIsClient(true);
   }, []);
 
   // If embedded, we ignore internal open state and render content directly
-  const [open, setOpen] = React.useState(false);
-  const [selected, setSelected] = React.useState<WhenValue>(value ?? null);
+  const [openUncontrolled, setOpenUncontrolled] = React.useState(defaultOpen ?? false);
+  const open = openProp ?? openUncontrolled;
+  const setOpen = (v: boolean) => {
+    onOpenChange?.(v);
+    if (openProp === undefined) setOpenUncontrolled(v);
+  };
+  const [selectedState, setSelectedState] = React.useState<WhenValue>(value ?? null);
+  const selected: WhenValue = isControlled ? (value ?? null) : selectedState;
   const [pendingFrom, setPendingFrom] = React.useState<Date | null>(null);
   const [pendingTo, setPendingTo] = React.useState<Date | null>(null);
   const [activePreset, setActivePreset] = React.useState<"today" | "tomorrow" | "weekend" | null>(null);
@@ -75,10 +104,6 @@ export function WhenSelect({ label = "Когда идем", value, onChange, cla
     return t;
   }, [now]);
   const [weekStart, weekEnd] = React.useMemo(() => getWeekendRange(now), [now]);
-
-  React.useEffect(() => {
-    setSelected(value ?? null);
-  }, [value]);
 
   // Sync pending with selected when opening or if embedded
   React.useEffect(() => {
@@ -130,27 +155,26 @@ export function WhenSelect({ label = "Когда идем", value, onChange, cla
   const daysInMonth = new Date(year, month + 1, 0).getDate();
 
   const weekendRangeText = formatRange(weekStart, weekEnd);
+  const effectiveValue: WhenValue = (open || variant === "embedded")
+    ? ((pendingFrom || pendingTo)
+        ? (pendingFrom && pendingTo ? { from: pendingFrom, to: pendingTo } : pendingFrom)
+        : selected)
+    : selected;
   const displayText = (() => {
-    if (pendingFrom && pendingTo) {
-      return formatRange(pendingFrom, pendingTo);
+    if (effectiveValue && typeof effectiveValue === "object" && "from" in effectiveValue && "to" in effectiveValue) {
+      return formatRange(effectiveValue.from, effectiveValue.to);
     }
-    if (pendingFrom) {
-      return `${formatDateAbbr(pendingFrom)}`;
+    if (effectiveValue instanceof Date) {
+      return formatDateAbbr(effectiveValue);
     }
-    if (selected && typeof selected === "object" && "from" in selected && "to" in selected) {
-      return formatRange(selected.from, selected.to);
-    }
-    if (selected instanceof Date) {
-      return formatDateAbbr(selected);
-    }
-    if (selected === "today") return `Сегодня • ${formatDateAbbr(today)}`;
-    if (selected === "tomorrow") return `Завтра • ${formatDateAbbr(tomorrow)}`;
-    if (selected === "weekend") return `Эти выходные • ${weekendRangeText}`;
-    return "Выберите...";
+    if (effectiveValue === "today") return `Сегодня • ${formatDateAbbr(today)}`;
+    if (effectiveValue === "tomorrow") return `Завтра • ${formatDateAbbr(tomorrow)}`;
+    if (effectiveValue === "weekend") return `Эти выходные • ${weekendRangeText}`;
+    return placeholder;
   })();
 
   const setVal = (v: WhenValue) => {
-    setSelected(v);
+    if (!isControlled) setSelectedState(v);
     onChange?.(v);
     if (!isMobile) {
       setOpen(false);
@@ -178,25 +202,26 @@ export function WhenSelect({ label = "Когда идем", value, onChange, cla
   const handleMobileApply = () => {
     if (pendingFrom && pendingTo) {
       const range = { from: pendingFrom, to: pendingTo };
-      setSelected(range);
-      onChange?.(range);
+      setVal(range);
     } else if (pendingFrom) {
-      setSelected(pendingFrom);
-      onChange?.(pendingFrom);
+      setVal(pendingFrom);
     }
     setOpen(false);
   };
 
-  const handleMobileReset = () => {
+  const clearAllInternal = () => {
     setPendingFrom(null);
     setPendingTo(null);
     setActivePreset(null);
-    setSelected(null);
-    onChange?.(null);
+  };
+  const handleMobileReset = () => {
+    clearAllInternal();
+    setVal(null);
   };
 
   const handleClear = (e: React.MouseEvent) => {
     e.stopPropagation();
+    clearAllInternal();
     setVal(null);
   };
 
@@ -240,14 +265,23 @@ export function WhenSelect({ label = "Когда идем", value, onChange, cla
       className={cn(
         "gap-2 whitespace-nowrap text-sm disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive shadow-xs hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50 has-[>svg]:px-3 h-auto min-h-[56px] w-full justify-between rounded-full border bg-background px-5 py-3 hover:bg-muted/30 transition-all flex items-center text-left font-normal",
         value && "border-primary bg-primary/5",
+        errorText && "aria-invalid",
         className
       )}
+      aria-invalid={!!errorText}
+      disabled={disabled || loading}
     >
       <div className="flex flex-col gap-0.5 min-w-0 flex-1">
         <span className="text-xs text-muted-foreground font-medium truncate">{label}</span>
         <span className="text-sm truncate text-muted-foreground">{displayText}</span>
       </div>
       <div className="flex items-center gap-2 shrink-0 ml-2">
+        {loading && (
+          <svg className="h-4 w-4 animate-spin opacity-60" viewBox="0 0 24 24" fill="none">
+            <circle cx="12" cy="12" r="10" stroke="currentColor" strokeOpacity="0.25" strokeWidth="4" />
+            <path d="M22 12a10 10 0 0 1-10 10" stroke="currentColor" strokeWidth="4" />
+          </svg>
+        )}
         {selected && (
           <div
             role="button"
@@ -258,7 +292,7 @@ export function WhenSelect({ label = "Когда идем", value, onChange, cla
             <X className="h-4 w-4" />
           </div>
         )}
-        <svg className="h-4 w-4 opacity-50" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+        <svg className={cn("h-4 w-4 opacity-50 transition-transform", open && "rotate-180")} viewBox="0 0 24 24" fill="none" stroke="currentColor">
           <path d="m6 9 6 6 6-6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       </div>
@@ -266,7 +300,7 @@ export function WhenSelect({ label = "Когда идем", value, onChange, cla
   );
 
   const renderCalendar = () => (
-    <div className="space-y-3 pb-24">
+    <div className="space-y-4 pb-4">
       <div className="flex items-center justify-between px-1">
         <button
           className="h-8 w-8 rounded-full hover:bg-muted/40 flex items-center justify-center"
@@ -369,37 +403,35 @@ export function WhenSelect({ label = "Когда идем", value, onChange, cla
           </div>
         </button>
       </div>
-      <div className="space-y-3">
+      <div className="flex flex-col gap-4">
         {renderCalendar()}
         {(pendingFrom || pendingTo) && (
-          <div className="flex items-center justify-end gap-2 pt-2">
-            <button
-              className="h-9 px-4 rounded-full border hover:bg-muted/40 text-sm"
+          <div className="flex items-center justify-end gap-2 pt-1">
+            <Button
+              variant="secondary"
+              size="sm"
               onClick={() => {
                 setPendingFrom(null);
                 setPendingTo(null);
               }}
             >
               Сбросить
-            </button>
-            <button
-              className="h-9 px-4 rounded-full bg-primary text-primary-foreground text-sm hover:bg-primary/90"
+            </Button>
+            <Button
+              variant="default"
+              size="sm"
               onClick={() => {
                 if (pendingFrom && pendingTo) {
                   const range: RangeValue = { from: pendingFrom, to: pendingTo };
-                  setSelected(range);
-                  onChange?.(range);
-                  setOpen(false);
+                  setVal(range);
                 } else if (pendingFrom) {
-                  setSelected(pendingFrom);
-                  onChange?.(pendingFrom);
-                  setOpen(false);
+                  setVal(pendingFrom);
                 }
               }}
               disabled={!pendingFrom}
             >
               Применить
-            </button>
+            </Button>
           </div>
         )}
       </div>
@@ -526,7 +558,7 @@ export function WhenSelect({ label = "Когда идем", value, onChange, cla
         {trigger || triggerButton}
       </PopoverTrigger>
       <PopoverPanelContent 
-        className="w-[720px] min-h-[350px] h-auto bg-card pb-[30px]" 
+        className="w-[720px] min-h-[350px] h-auto max-h-[80vh] overflow-auto bg-card p-6" 
         align="start"
       >
         {desktopContent}

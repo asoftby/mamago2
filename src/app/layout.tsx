@@ -4,8 +4,9 @@ import "./globals.css";
 import { Sonner } from "@/components/ui/sonner";
 
 const manrope = Manrope({
-  variable: "--font-manrope",
-  subsets: ["latin"],
+  subsets: ["latin", "cyrillic"],
+  display: "swap",
+  preload: true,
 });
 
 const geistMono = Geist_Mono({
@@ -26,7 +27,7 @@ export default function RootLayout({
   return (
     <html lang="ru">
       <body
-        className={`${manrope.variable} ${geistMono.variable} antialiased font-sans min-h-screen bg-background text-foreground`}
+        className={`${manrope.className} ${geistMono.variable} antialiased font-sans min-h-screen bg-background text-foreground`}
       >
         {children}
         <Sonner />

@@ -120,8 +120,23 @@ export function UiPrimitivesSection() {
           </ScrollArea>
         </RenderSafe>
 
-        <RenderSafe title="WhenSelect" file="src/components/ui/when-select.tsx">
-          <WhenSelect uiMode="desktop" />
+        <RenderSafe title="WhenSelect (Desktop) — States" file="src/components/ui/when-select.tsx">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <WhenSelect uiMode="desktop" />
+            <WhenSelect uiMode="desktop" value="today" />
+            <WhenSelect uiMode="desktop" disabled />
+            <WhenSelect uiMode="desktop" loading />
+            <WhenSelect uiMode="desktop" errorText="Ошибка загрузки дат" />
+          </div>
+        </RenderSafe>
+        <RenderSafe title="WhenSelect (Mobile) — States" file="src/components/ui/when-select.tsx">
+          <div className="grid gap-4 max-w-sm">
+            <WhenSelect uiMode="mobile" />
+            <WhenSelect uiMode="mobile" value="tomorrow" />
+            <WhenSelect uiMode="mobile" disabled />
+            <WhenSelect uiMode="mobile" loading />
+            <WhenSelect uiMode="mobile" errorText="Ошибка загрузки дат" />
+          </div>
         </RenderSafe>
 
         <RenderSafe title="CardSelect" file="src/components/ui/card-select.tsx">

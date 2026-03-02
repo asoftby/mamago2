@@ -6,7 +6,7 @@ import { InventoryGrid } from "../_components/InventoryGrid";
 import { RenderSafe } from "../_components/RenderSafe";
 
 import { FilterPill } from "@/features/filters/ui/FilterPill";
-import { DiscoveryFilters } from "@/features/filters/discovery/DiscoveryFilters";
+import { DiscoveryFilters } from "@/features/discovery/filters/DiscoveryFilters";
 import { FilterBar } from "@/features/filters/components/FilterBar";
 import { minskActivitiesFilters } from "@/features/filters/presets/minskActivitiesFilters";
 
@@ -22,10 +22,15 @@ export function FiltersSection() {
           </div>
         </RenderSafe>
 
-        <RenderSafe title="DiscoveryFilters (Feature)" file="src/features/filters/discovery/DiscoveryFilters.tsx">
-           <div className="p-4 border rounded">
-             <DiscoveryFilters forceUIMode="desktop" />
-           </div>
+        <RenderSafe title="DiscoveryFilters (Feature) - Desktop" file="src/features/discovery/filters/DiscoveryFilters.tsx">
+          <div className="p-4 border rounded">
+            <DiscoveryFilters variant="desktop" />
+          </div>
+        </RenderSafe>
+        <RenderSafe title="DiscoveryFilters (Feature) - Mobile" file="src/features/discovery/filters/DiscoveryFilters.tsx">
+          <div className="p-4 border rounded max-w-sm">
+            <DiscoveryFilters variant="mobile" />
+          </div>
         </RenderSafe>
 
         <RenderSafe title="FilterBar (Feature)" file="src/features/filters/components/FilterBar.tsx">
