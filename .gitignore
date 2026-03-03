@@ -67,3 +67,6 @@ VERIFICATION_*.md
 GRP_*.md
 PRISMA_*.md
 USER_PROFILE_*.md
+
+# prisma local scripts
+prisma/scripts/
