@@ -49,3 +49,21 @@ prisma.config.ts.bak
 
 mamago2/
 mamago2/
+
+# local ai / drafts
+.kiro/
+
+# local scripts
+*.sh
+
+# local notes
+BUSINESS_*.md
+SMS_*.md
+PHONE_*.md
+AUTH_*.md
+START_HERE_*.md
+UNP_*.md
+VERIFICATION_*.md
+GRP_*.md
+PRISMA_*.md
+USER_PROFILE_*.md
