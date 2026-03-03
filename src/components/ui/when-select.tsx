@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/sheet";
 import { X, ChevronLeft, ChevronRight } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useHydrated } from "@/hooks/use-hydrated";
 import { Button } from "@/components/ui/button";
 
 type RangeValue = { from: Date; to: Date };
@@ -75,8 +76,11 @@ export function WhenSelect({
   onOpenChange,
 }: WhenSelectProps) {
   const [isClient, setIsClient] = React.useState(false);
+  const hydrated = useHydrated();
   const isMobileQuery = useIsMobile();
-  const isMobile = uiMode ? uiMode === "mobile" : isMobileQuery;
+  // Gate mobile detection until after hydration to prevent SSR/CSR mismatch
+  // During SSR and first render, always use desktop variant (Popover)
+  const isMobile = uiMode ? uiMode === "mobile" : (hydrated && isMobileQuery);
   const isControlled = value !== undefined;
   
   React.useEffect(() => {
@@ -478,7 +482,8 @@ export function WhenSelect({
     );
   }
 
-  if (isClient && isMobile) {
+  // Render mobile variant (Sheet) only after hydration
+  if (isMobile) {
     return (
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetTrigger asChild>

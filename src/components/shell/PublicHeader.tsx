@@ -21,12 +21,20 @@ export function PublicHeader() {
 
         {/* Right: Actions */}
         <div className="flex items-center gap-1 md:gap-2">
+          <Link
+            href="/business-entry"
+            className="hidden md:inline-flex items-center px-3 py-1.5 text-sm font-medium text-primary hover:text-primary/80 hover:bg-primary/5 rounded-md transition-colors"
+          >
+            Для бизнеса
+          </Link>
           <IconButton label="Поиск" className="hover:bg-muted">
             <IconSearch className="h-5 w-5" />
           </IconButton>
-          <IconButton label="Профиль" className="hover:bg-muted">
-            <IconUser className="h-5 w-5" />
-          </IconButton>
+          <Link href="/profile-entry">
+            <IconButton label="Профиль" className="hover:bg-muted">
+              <IconUser className="h-5 w-5" />
+            </IconButton>
+          </Link>
         </div>
       </Container>
     </header>

@@ -7,13 +7,12 @@ import { createSession, setSessionCookie } from "@/lib/auth/session";
 const registerSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8),
-  role: z.enum(["USER", "BUSINESS_OWNER"]).optional().default("USER"),
 });
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { email, password, role } = registerSchema.parse(body);
+    const { email, password } = registerSchema.parse(body);
 
     // Check if user already exists
     const existingUser = await prisma.user.findUnique({
@@ -35,7 +34,6 @@ export async function POST(request: NextRequest) {
       data: {
         email,
         passwordHash,
-        role,
       },
     });
 

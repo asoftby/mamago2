@@ -10,6 +10,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useHydrated } from "@/hooks/use-hydrated";
 import { MobileSelectSheet } from "@/components/filters/MobileSelectSheet";
 
 export interface CardMultiSelectOption {
@@ -48,8 +49,10 @@ export function CardMultiSelect({
 }: CardMultiSelectProps) {
   const [open, setOpen] = React.useState(false);
   const [isClient, setIsClient] = React.useState(false);
+  const hydrated = useHydrated();
   const isMobileQuery = useIsMobile();
-  const isMobile = uiMode ? uiMode === "mobile" : isMobileQuery;
+  // Gate mobile detection until after hydration to prevent SSR/CSR mismatch
+  const isMobile = uiMode ? uiMode === "mobile" : (hydrated && isMobileQuery);
   
   React.useEffect(() => {
     setIsClient(true);
@@ -109,7 +112,7 @@ export function CardMultiSelect({
           role="combobox"
           aria-expanded={open}
           disabled={disabled}
-          onClick={isClient && isMobile ? () => setOpen(true) : undefined}
+          onClick={isMobile ? () => setOpen(true) : undefined}
           className={cn(pillStyles, className)}
         >
           {isPill ? (
@@ -171,7 +174,7 @@ export function CardMultiSelect({
         </Button>
   );
 
-  if (isClient && isMobile) {
+  if (isMobile) {
     return (
       <>
         {customTrigger || trigger}

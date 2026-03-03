@@ -21,13 +21,24 @@ model User {
   passwordHash String
   role         String @default("USER") // USER | BUSINESS_OWNER | MODERATOR | ADMIN
 
-  sessions Session[]
-  business Business? // One business per owner (MVP)
+  resetToken        String?
+  resetTokenExpires DateTime?
+
+  phoneE164       String?   @unique
+  phoneVerifiedAt DateTime?
+
+  sessions                     Session[]
+  business                     Business? // One business per owner (MVP)
+  children                     Child[]
+  phoneOtps                    PhoneOtp[]
+  reviewedBusinessVerifications BusinessVerificationLog[] @relation("ReviewedBy")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([email])
+  @@index([resetToken])
+  @@index([phoneE164])
 }
 
 model Session {
@@ -43,6 +54,41 @@ model Session {
   @@index([userId])
   @@index([tokenHash])
   @@index([expiresAt])
+}
+
+model PhoneOtp {
+  id         String   @id @default(cuid())
+  userId     String
+  phoneE164  String
+  purpose    String
+  codeHash   String
+  expiresAt  DateTime
+  lastSentAt DateTime
+  attempts   Int      @default(0)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, phoneE164, purpose])
+  @@index([userId, purpose])
+  @@index([phoneE164, purpose])
+}
+
+model Child {
+  id        String   @id @default(cuid())
+  name      String
+  birthDate DateTime
+  interests String?
+  parentId  String
+
+  parent User @relation(fields: [parentId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([parentId])
 }
 
 enum UiPlacement {
@@ -205,19 +251,69 @@ enum OfferStatus {
   REJECTED
 }
 
+enum BusinessStatus {
+  DRAFT
+  PENDING_VERIFICATION
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
+}
+
+enum BusinessVerificationStatus {
+  DRAFT
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 // Business entity
 model Business {
-  id          String @id @default(cuid())
+  id          String         @id @default(cuid())
   name        String
-  ownerUserId String @unique // One business per owner (MVP)
+  ownerUserId String         @unique // One business per owner (MVP)
+  
+  // Onboarding fields
+  unp         String?
+  legalName   String?
+  phone       String?
+  status      BusinessStatus @default(DRAFT)
 
-  owner  User    @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
-  places Place[]
+  // Verification fields
+  verificationStatus BusinessVerificationStatus @default(DRAFT)
+  submittedAt        DateTime?
+  reviewedAt         DateTime?
+  reviewedByUserId   String?
+  reviewNote         String?
+  approvedAt         DateTime?
+  rejectedAt         DateTime?
+
+  owner            User                        @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+  places           Place[]
+  verificationLogs BusinessVerificationLog[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([ownerUserId])
+  @@index([status])
+  @@index([verificationStatus])
+}
+
+// Business verification audit log
+model BusinessVerificationLog {
+  id               String                        @id @default(cuid())
+  businessId       String
+  statusFrom       BusinessVerificationStatus
+  statusTo         BusinessVerificationStatus
+  note             String?
+  reviewedByUserId String?
+
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  reviewedBy User?    @relation(fields: [reviewedByUserId], references: [id], onDelete: SetNull, name: "ReviewedBy")
+
+  createdAt DateTime @default(now())
+
+  @@index([businessId, createdAt])
 }
 
 // Place entity

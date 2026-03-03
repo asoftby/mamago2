@@ -30,12 +30,15 @@ export async function createSession(userId: string): Promise<string> {
  */
 export async function setSessionCookie(token: string): Promise<void> {
   const cookieStore = await cookies();
+  const cookieDomain = process.env.NEXT_PUBLIC_COOKIE_DOMAIN;
+  
   cookieStore.set(SESSION_COOKIE_NAME, token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: process.env.NODE_ENV !== "development",
     sameSite: "lax",
     maxAge: SESSION_DURATION / 1000,
     path: "/",
+    ...(cookieDomain && { domain: cookieDomain }),
   });
 }
 

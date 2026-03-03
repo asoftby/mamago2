@@ -12,7 +12,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "ui:audit": "node scripts/ui-usage-audit.mjs"
+    "ui:audit": "node scripts/ui-usage-audit.mjs",
+    "cleanup:otp": "tsx src/scripts/cleanupPhoneOtps.ts",
+    "backfill:verification": "tsx prisma/scripts/backfillVerificationStatus.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
