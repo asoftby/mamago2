@@ -31,6 +31,8 @@ interface CardMultiSelectProps {
   variant?: "card" | "pill";
   uiMode?: "mobile" | "desktop";
   trigger?: React.ReactNode;
+  applyMode?: "instant" | "manual"; // New: manual mode requires Apply button
+  closeOnApply?: boolean; // New: close dropdown after Apply (default true for manual)
 }
 
 export function CardMultiSelect({
@@ -46,6 +48,8 @@ export function CardMultiSelect({
   variant = "card",
   uiMode,
   trigger: customTrigger,
+  applyMode = "instant",
+  closeOnApply = true,
 }: CardMultiSelectProps) {
   const [open, setOpen] = React.useState(false);
   const [isClient, setIsClient] = React.useState(false);
@@ -54,13 +58,25 @@ export function CardMultiSelect({
   // Gate mobile detection until after hydration to prevent SSR/CSR mismatch
   const isMobile = uiMode ? uiMode === "mobile" : (hydrated && isMobileQuery);
   
+  // Draft values for manual mode
+  const [draftValues, setDraftValues] = React.useState<string[]>(values);
+  
+  // Sync draft with props when dropdown opens or values change externally
+  React.useEffect(() => {
+    if (open || applyMode === "instant") {
+      setDraftValues(values);
+    }
+  }, [open, values, applyMode]);
+  
   React.useEffect(() => {
     setIsClient(true);
   }, []);
 
-  const selectedOptions = options.filter((opt) => values.includes(opt.value));
+  // Use draft values in manual mode, actual values in instant mode
+  const effectiveValues = applyMode === "manual" ? draftValues : values;
+  const selectedOptions = options.filter((opt) => effectiveValues.includes(opt.value));
   
-  // Calculate display label
+  // Calculate display label (always use actual values for trigger, not draft)
   let valueLabel: string | null = null;
   if (values.length === 0) {
     valueLabel = null;
@@ -74,21 +90,44 @@ export function CardMultiSelect({
     valueLabel = `${firstLabel} +${values.length - 1}`;
   }
 
-  const isSelected = (val: string) => values.includes(val);
-  const isMaxReached = maxSelected !== undefined && values.length >= maxSelected;
+  const isSelected = (val: string) => effectiveValues.includes(val);
+  const isMaxReached = maxSelected !== undefined && effectiveValues.length >= maxSelected;
 
   const toggle = (val: string) => {
-    if (isSelected(val)) {
-      onChange(values.filter((v) => v !== val));
+    if (applyMode === "manual") {
+      // Manual mode: update draft only
+      if (isSelected(val)) {
+        setDraftValues(effectiveValues.filter((v) => v !== val));
+      } else {
+        if (isMaxReached) return;
+        setDraftValues([...effectiveValues, val]);
+      }
     } else {
-      if (isMaxReached) return;
-      onChange([...values, val]);
+      // Instant mode: call onChange immediately
+      if (isSelected(val)) {
+        onChange(values.filter((v) => v !== val));
+      } else {
+        if (isMaxReached) return;
+        onChange([...values, val]);
+      }
+    }
+  };
+
+  const handleApply = () => {
+    onChange(draftValues);
+    if (closeOnApply) {
+      setOpen(false);
     }
   };
 
   const handleClear = (e?: React.MouseEvent) => {
     e?.stopPropagation();
-    onChange([]);
+    if (applyMode === "manual") {
+      setDraftValues([]);
+      onChange([]);
+    } else {
+      onChange([]);
+    }
     setOpen(false);
   };
 
@@ -200,49 +239,101 @@ export function CardMultiSelect({
         {customTrigger || trigger}
       </PopoverTrigger>
       <PopoverPanelContent 
-        className="min-h-[350px] h-auto bg-background" 
+        className="bg-background p-0 w-[320px]"
         align="start"
       >
-        <div className="flex flex-col gap-1">
-          {options.map((option) => {
-            const selected = isSelected(option.value);
-            const itemDisabled = !selected && isMaxReached;
+        {applyMode === "manual" ? (
+          // Manual mode: scrollable list + conditional sticky footer
+          <div className="relative max-h-[70vh] w-full">
+            {/* Scrollable options list */}
+            <div className={cn(
+              "overflow-auto",
+              draftValues.length > 0 ? "pb-16" : "pb-1"
+            )}>
+              <div className="p-1">
+                {options.map((option) => {
+                  const selected = isSelected(option.value);
+                  const itemDisabled = !selected && isMaxReached;
 
-            return (
-              <button
-                key={option.value}
-                type="button"
-                disabled={itemDisabled}
-                onClick={() => toggle(option.value)}
-                className={cn(
-                  "w-full text-left px-4 py-3 rounded-xl transition-all hover:bg-muted/40",
-                  "flex items-center justify-between",
-                  selected && "bg-primary/5 text-primary font-medium",
-                  itemDisabled && "opacity-50 cursor-not-allowed"
-                )}
-              >
-                <span className="text-sm">{option.label}</span>
-                {selected && (
-                  <Check className="h-4 w-4 text-primary shrink-0" />
-                )}
-              </button>
-            );
-          })}
-          
-          {allowClear && values.length > 0 && (
-            <div className="pt-2 border-t mt-2 flex justify-between items-center px-2">
-                <span className="text-xs text-muted-foreground">Выбрано: {values.length}</span>
-                <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    onClick={() => onChange([])}
-                    className="text-muted-foreground hover:text-foreground h-9 px-4 rounded-full"
-                >
-                    Сбросить все
-                </Button>
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      disabled={itemDisabled}
+                      onClick={() => toggle(option.value)}
+                      className={cn(
+                        "w-full text-left px-4 py-3 rounded-xl transition-all hover:bg-muted/40",
+                        "flex items-center justify-between",
+                        selected && "bg-primary/5 text-primary font-medium",
+                        itemDisabled && "opacity-50 cursor-not-allowed"
+                      )}
+                    >
+                      <span className="text-sm">{option.label}</span>
+                      {selected && (
+                        <Check className="h-4 w-4 text-primary shrink-0" />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
-          )}
-        </div>
+            
+            {/* Sticky footer - only show when selections exist */}
+            {draftValues.length > 0 && (
+              <div className="sticky bottom-0 left-0 right-0 border-t bg-background/95 backdrop-blur p-3">
+                <Button 
+                  onClick={handleApply}
+                  className="w-full rounded-full"
+                  size="default"
+                >
+                  Применить
+                </Button>
+              </div>
+            )}
+          </div>
+        ) : (
+          // Instant mode: original layout
+          <div className="flex flex-col gap-1 p-1">
+            {options.map((option) => {
+              const selected = isSelected(option.value);
+              const itemDisabled = !selected && isMaxReached;
+
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  disabled={itemDisabled}
+                  onClick={() => toggle(option.value)}
+                  className={cn(
+                    "w-full text-left px-4 py-3 rounded-xl transition-all hover:bg-muted/40",
+                    "flex items-center justify-between",
+                    selected && "bg-primary/5 text-primary font-medium",
+                    itemDisabled && "opacity-50 cursor-not-allowed"
+                  )}
+                >
+                  <span className="text-sm">{option.label}</span>
+                  {selected && (
+                    <Check className="h-4 w-4 text-primary shrink-0" />
+                  )}
+                </button>
+              );
+            })}
+            
+            {allowClear && values.length > 0 && (
+              <div className="pt-2 border-t mt-2 flex justify-between items-center px-2">
+                  <span className="text-xs text-muted-foreground">Выбрано: {values.length}</span>
+                  <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={() => onChange([])}
+                      className="text-muted-foreground hover:text-foreground h-9 px-4 rounded-full"
+                  >
+                      Сбросить все
+                  </Button>
+              </div>
+            )}
+          </div>
+        )}
       </PopoverPanelContent>
     </Popover>
   );

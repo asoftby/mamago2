@@ -9,6 +9,13 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum Role {
+  USER
+  BUSINESS_OWNER
+  MODERATOR
+  ADMIN
+}
+
 model Healthcheck {
   id        String   @id @default(cuid())
   createdAt DateTime @default(now())
@@ -19,7 +26,7 @@ model User {
   id           String @id @default(cuid())
   email        String @unique
   passwordHash String
-  role         String @default("USER") // USER | BUSINESS_OWNER | MODERATOR | ADMIN
+  role         Role   @default(USER)
 
   resetToken        String?
   resetTokenExpires DateTime?
@@ -30,6 +37,8 @@ model User {
   sessions                     Session[]
   business                     Business? // One business per owner (MVP)
   children                     Child[]
+  ideas                        Idea[]
+  planItems                    PlanItem[]
   phoneOtps                    PhoneOtp[]
   reviewedBusinessVerifications BusinessVerificationLog[] @relation("ReviewedBy")
 
@@ -89,6 +98,38 @@ model Child {
   updatedAt DateTime @updatedAt
 
   @@index([parentId])
+}
+
+// User saved ideas (activities they want to remember)
+model Idea {
+  id         String @id @default(cuid())
+  userId     String
+  activityId String
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([userId, activityId])
+  @@index([userId])
+}
+
+// User plan items (activities scheduled for specific dates)
+model PlanItem {
+  id         String    @id @default(cuid())
+  userId     String
+  activityId String?
+  date       String // YYYY-MM-DD format
+  startsAt   DateTime? // Optional specific time
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  activity Activity? @relation(fields: [activityId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, date])
+  @@index([userId])
+  @@index([activityId])
 }
 
 enum UiPlacement {
@@ -215,11 +256,45 @@ model Activity {
   cityId         String?
   metroStationId String?
 
+  // Business ownership (optional - can be created by business or admin)
+  businessId String?
+  createdBy  String? // userId who created it
+
+  // Display fields
+  coverImageUrl String?
+  priceFrom     Float?
+  currency      String? @default("BYN")
+  ageLabel      String? // e.g., "6+", "3-7 лет"
+
+  // Age range in months (for filtering)
+  ageMinMonths Int?
+  ageMaxMonths Int?
+
   metroStation  MetroStation?          @relation(fields: [metroStationId], references: [id])
   filterOptions ActivityFilterOption[]
+  sessions      ActivitySession[]
+  planItems     PlanItem[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([ageMinMonths, ageMaxMonths])
+  @@index([businessId])
+  @@index([cityId])
+}
+
+// Activity sessions (specific dates/times when activity happens)
+model ActivitySession {
+  id         String   @id @default(cuid())
+  activityId String
+  startsAt   DateTime
+
+  activity Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([activityId])
+  @@index([startsAt])
 }
 
 model ActivityFilterOption {
@@ -331,6 +406,10 @@ model Place {
   website    String?
   coverImage String?
 
+  // Age range in months (for filtering)
+  ageMinMonths Int?
+  ageMaxMonths Int?
+
   business Business      @relation(fields: [businessId], references: [id], onDelete: Cascade)
   // Foreign keys only - do NOT add reverse relations to City/MetroStation/District models
   city     City          @relation(fields: [cityId], references: [id], name: "PlaceCity")
@@ -343,6 +422,7 @@ model Place {
 
   @@index([businessId])
   @@index([cityId])
+  @@index([ageMinMonths, ageMaxMonths])
 }
 
 // Offer entity (EVENT or SERVICE)

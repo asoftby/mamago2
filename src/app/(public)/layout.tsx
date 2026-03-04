@@ -1,5 +1,5 @@
 import React from "react";
-import { PublicHeader } from "@/components/shell/PublicHeader";
+import { SiteHeader } from "@/components/site/header";
 import { PublicFooter } from "@/components/shell/PublicFooter";
 
 export default function PublicGroupLayout({
@@ -9,7 +9,7 @@ export default function PublicGroupLayout({
 }) {
   return (
     <>
-      <PublicHeader />
+      <SiteHeader />
       <main className="min-h-[calc(100vh-64px)]">
         {children}
       </main>

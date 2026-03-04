@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { getSessionToken, validateSession } from "./session";
-import type { User } from "@prisma/client";
+import type { User, Role } from "@prisma/client";
 
 /**
  * Get the current authenticated user (returns null if not authenticated)
@@ -30,7 +30,7 @@ export async function requireUser(): Promise<User> {
  * Require specific role (redirects to login or throws error)
  */
 export async function requireRole(
-  allowedRoles: string[]
+  allowedRoles: Role[]
 ): Promise<User> {
   const user = await requireUser();
   
@@ -44,7 +44,7 @@ export async function requireRole(
 /**
  * Check if user has role
  */
-export async function hasRole(role: string): Promise<boolean> {
+export async function hasRole(role: Role): Promise<boolean> {
   const user = await getCurrentUser();
   return user?.role === role;
 }

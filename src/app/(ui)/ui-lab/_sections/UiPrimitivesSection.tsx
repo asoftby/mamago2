@@ -20,7 +20,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { WhenSelect } from "@/components/ui/when-select";
 import { CardSelect } from "@/components/ui/card-select";
 import { CardMultiSelect } from "@/components/ui/card-multiselect";
-import { UiActivityCard } from "@/components/ui/activity-card";
+import { ActivityCard } from "@/components/activity/ActivityCard";
 import { FavoriteButton } from "@/components/ui/FavoriteButton";
 import { Chip } from "@/components/ui/Chip";
 import { ChipsRow } from "@/components/ui/chips-row";
@@ -188,15 +188,27 @@ export function UiPrimitivesSection() {
            </div>
         </RenderSafe>
 
-        <RenderSafe title="UiActivityCard" file="src/components/ui/activity-card.tsx">
-           <UiActivityCard 
-             href="#"
-             title="Demo Activity"
-             subtitle="Subtitle"
-             imageUrl="https://picsum.photos/seed/act/400/300"
-             rating={4.8}
-             meta="$$"
-           />
+        <RenderSafe title="ActivityCard (Portrait)" file="src/components/activity/ActivityCard.tsx">
+          <div className="grid grid-cols-2 gap-4 max-w-md">
+            <ActivityCard 
+              id="demo-place"
+              title="Семейное кафе «Андерсон»"
+              image="https://picsum.photos/seed/place/400/500"
+              badge="Популярное"
+              age="0+"
+              dateLabel="10:00–22:00"
+              priceLabel="от 30 BYN"
+              rating={4.8}
+            />
+            <ActivityCard 
+              id="demo-event"
+              title="Жаночы дзень"
+              image="https://picsum.photos/seed/event/400/500"
+              age="0+"
+              dateLabel="8 марта"
+              priceLabel="Минск • Дукорский маёнтак"
+            />
+          </div>
         </RenderSafe>
 
         {/* Listed only due to prop complexity or context needs */}

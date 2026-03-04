@@ -48,26 +48,31 @@ function SubmitButton({ disabled }: { disabled?: boolean }) {
   );
 }
 
-export function OnboardingForm() {
+export function OnboardingForm({ initialData }: { initialData?: any }) {
   const [state, formAction] = useActionState(createBusinessAction, { ok: true });
   
   // UNP lookup state
-  const [unp, setUnp] = useState("");
-  const [legalName, setLegalName] = useState("");
-  const [isLegalNameTouched, setIsLegalNameTouched] = useState(false);
+  const [unp, setUnp] = useState(initialData?.unp || "");
+  const [legalName, setLegalName] = useState(initialData?.legalName || "");
+  const [isLegalNameTouched, setIsLegalNameTouched] = useState(!!initialData?.legalName);
   const [isLookupLoading, setIsLookupLoading] = useState(false);
   const [lookupError, setLookupError] = useState("");
   
   // Phone verification state
-  const [phone, setPhone] = useState("");
-  const [phoneE164, setPhoneE164] = useState("");
-  const [isPhoneVerified, setIsPhoneVerified] = useState(false);
+  const [phone, setPhone] = useState(initialData?.phone || "");
+  const [phoneE164, setPhoneE164] = useState(initialData?.phone || "");
+  const [isPhoneVerified, setIsPhoneVerified] = useState(!!initialData?.phone);
   
   const lookupTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Load draft on mount
+  // Load draft on mount (only if no initialData)
   useEffect(() => {
+    if (initialData) {
+      // Skip draft loading if we have initial data from database
+      return;
+    }
+
     const draft = loadDraft();
     if (draft) {
       console.log("📋 Loading draft:", draft);
@@ -85,7 +90,7 @@ export function OnboardingForm() {
         setPhoneE164(draft.phoneE164);
       }
     }
-  }, []);
+  }, [initialData]);
 
   // Debounced save helper
   const debouncedSave = (data: Parameters<typeof saveDraft>[0]) => {

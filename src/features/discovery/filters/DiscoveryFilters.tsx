@@ -1,6 +1,5 @@
 "use client";
 
-import React from "react";
 import type { ComponentProps } from "react";
 import { DiscoveryFilters as LegacyDiscoveryFilters } from "@/features/filters/discovery/DiscoveryFilters";
 
@@ -16,7 +15,7 @@ export function DiscoveryFilters({ variant = "auto", className, onChange, ...res
   const forceUIMode =
     variant === "desktop" ? "desktop" : variant === "mobile" ? "mobile" : undefined;
 
-  return <LegacyDiscoveryFilters {...rest} forceUIMode={forceUIMode} />;
+  return <LegacyDiscoveryFilters {...rest} forceUIMode={forceUIMode} onChange={onChange} />;
 }
 
 export default DiscoveryFilters;

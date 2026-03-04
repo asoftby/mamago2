@@ -34,16 +34,23 @@ type WhenSelectProps = {
   onOpenChange?: (open: boolean) => void;
 };
 
+// Safe date validation helper
+function isValidDate(d: any): d is Date {
+  return d instanceof Date && !Number.isNaN(d.getTime());
+}
+
 function ruMonthAbbr(m: number) {
   const names = ["янв.", "фев.", "мар.", "апр.", "май", "июн.", "июл.", "авг.", "сен.", "окт.", "ноя.", "дек."];
   return names[m] || "";
 }
 
 function formatDateAbbr(d: Date) {
+  if (!isValidDate(d)) return "";
   return `${d.getDate()} ${ruMonthAbbr(d.getMonth())}`;
 }
 
 function formatRange(from: Date, to: Date) {
+  if (!isValidDate(from) || !isValidDate(to)) return "";
   if (from.getFullYear() === to.getFullYear() && from.getMonth() === to.getMonth()) {
     return `${from.getDate()}–${to.getDate()} ${ruMonthAbbr(from.getMonth())}`;
   }
@@ -117,6 +124,14 @@ export function WhenSelect({
         setPendingTo(null);
         setActivePreset(null);
       } else if (selected instanceof Date) {
+        // Validate date before using
+        if (!isValidDate(selected)) {
+          setPendingFrom(null);
+          setPendingTo(null);
+          setActivePreset(null);
+          return;
+        }
+        
         setPendingFrom(selected);
         setPendingTo(null);
         // Check if matches today/tomorrow
@@ -128,6 +143,14 @@ export function WhenSelect({
           setActivePreset(null);
         }
       } else if (typeof selected === 'object' && 'from' in selected) {
+        // Validate range dates before using
+        if (!isValidDate(selected.from) || !isValidDate(selected.to)) {
+          setPendingFrom(null);
+          setPendingTo(null);
+          setActivePreset(null);
+          return;
+        }
+        
         setPendingFrom(selected.from);
         setPendingTo(selected.to);
         // Check if matches weekend
@@ -159,21 +182,43 @@ export function WhenSelect({
   const daysInMonth = new Date(year, month + 1, 0).getDate();
 
   const weekendRangeText = formatRange(weekStart, weekEnd);
+  
+  // For internal calendar/sheet UI, use effectiveValue (includes draft)
   const effectiveValue: WhenValue = (open || variant === "embedded")
     ? ((pendingFrom || pendingTo)
         ? (pendingFrom && pendingTo ? { from: pendingFrom, to: pendingTo } : pendingFrom)
         : selected)
     : selected;
+  
+  // For trigger display, ALWAYS use committed value (props.value), not draft
   const displayText = (() => {
-    if (effectiveValue && typeof effectiveValue === "object" && "from" in effectiveValue && "to" in effectiveValue) {
-      return formatRange(effectiveValue.from, effectiveValue.to);
+    const displayValue = selected; // Use committed value for display
+    
+    if (displayValue && typeof displayValue === "object" && "from" in displayValue && "to" in displayValue) {
+      // Validate range dates
+      if (!isValidDate(displayValue.from) || !isValidDate(displayValue.to)) {
+        return placeholder;
+      }
+      return formatRange(displayValue.from, displayValue.to) || placeholder;
     }
-    if (effectiveValue instanceof Date) {
-      return formatDateAbbr(effectiveValue);
+    if (displayValue instanceof Date) {
+      // Validate single date
+      if (!isValidDate(displayValue)) {
+        return placeholder;
+      }
+      return formatDateAbbr(displayValue) || placeholder;
     }
-    if (effectiveValue === "today") return `Сегодня • ${formatDateAbbr(today)}`;
-    if (effectiveValue === "tomorrow") return `Завтра • ${formatDateAbbr(tomorrow)}`;
-    if (effectiveValue === "weekend") return `Эти выходные • ${weekendRangeText}`;
+    if (displayValue === "today") {
+      const formatted = formatDateAbbr(today);
+      return formatted ? `Сегодня • ${formatted}` : "Сегодня";
+    }
+    if (displayValue === "tomorrow") {
+      const formatted = formatDateAbbr(tomorrow);
+      return formatted ? `Завтра • ${formatted}` : "Завтра";
+    }
+    if (displayValue === "weekend") {
+      return weekendRangeText ? `Эти выходные • ${weekendRangeText}` : "Эти выходные";
+    }
     return placeholder;
   })();
 
@@ -223,8 +268,7 @@ export function WhenSelect({
     setVal(null);
   };
 
-  const handleClear = (e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleClear = () => {
     clearAllInternal();
     setVal(null);
   };
@@ -286,15 +330,27 @@ export function WhenSelect({
             <path d="M22 12a10 10 0 0 1-10 10" stroke="currentColor" strokeWidth="4" />
           </svg>
         )}
-        {selected && (
-          <div
+        {selected && !loading && (
+          <span
             role="button"
             tabIndex={0}
-            onClick={handleClear}
-            className="rounded-full p-0.5 hover:bg-black/10 transition-colors pointer-events-auto"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              handleClear();
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                e.stopPropagation();
+                handleClear();
+              }
+            }}
+            className="rounded-full p-0.5 hover:bg-black/10 dark:hover:bg-white/10 transition-colors cursor-pointer"
+            aria-label="Сбросить"
           >
             <X className="h-4 w-4" />
-          </div>
+          </span>
         )}
         <svg className={cn("h-4 w-4 opacity-50 transition-transform", open && "rotate-180")} viewBox="0 0 24 24" fill="none" stroke="currentColor">
           <path d="m6 9 6 6 6-6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />

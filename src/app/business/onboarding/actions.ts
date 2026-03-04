@@ -43,11 +43,11 @@ export async function createBusinessAction(
   if (existing) {
     // If business exists, check status and redirect accordingly
     if (existing.status === "PENDING_VERIFICATION" || existing.status === "PENDING_REVIEW") {
-      redirect("/business/pending");
+      redirect("/business/verification");
     } else if (existing.status === "APPROVED") {
       redirect("/business/dashboard");
     } else if (existing.status === "REJECTED") {
-      redirect("/business/pending");
+      redirect("/business/verification");
     }
     redirect("/business/dashboard");
   }
@@ -109,7 +109,7 @@ export async function createBusinessAction(
 
     // Handle Prisma unique constraint error (P2002)
     if (e && typeof e === "object" && "code" in e && e.code === "P2002") {
-      redirect("/business/pending");
+      redirect("/business/verification");
     }
 
     // Generic error
@@ -120,7 +120,7 @@ export async function createBusinessAction(
     };
   }
 
-  // Success - redirect to pending page
-  revalidatePath("/business/pending");
-  redirect("/business/pending");
+  // Success - redirect to verification page
+  revalidatePath("/business/verification");
+  redirect("/business/verification");
 }

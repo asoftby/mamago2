@@ -7,6 +7,7 @@ import { PrimaryButton } from "@/components/ui/PrimaryButton";
 import { IconButton } from "@/components/ui/IconButton";
 import { IconHeart, IconShare, IconClose } from "@/components/ui/icons";
 import { isFavorite as checkIsFavorite, toggleFavorite } from "@/lib/favorites";
+import { formatRuShortDayMonth } from "@/lib/formatters/date";
 import { MINSK_ACTIVITIES } from "@/mocks/activities.minsk";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -43,7 +44,7 @@ export default function ActivityPage({ params }: ActivityPageProps) {
 
   // Compute display labels
   const dateLabel = activity?.dateStart 
-    ? new Date(activity.dateStart).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })
+    ? formatRuShortDayMonth(activity.dateStart)
     : activity?.workingHours;
     
   const priceLabel = activity?.priceMin === 0 

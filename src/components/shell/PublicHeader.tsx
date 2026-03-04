@@ -1,41 +1,70 @@
 import Link from "next/link";
+import Image from "next/image";
 import { Container } from "@/components/ui/Container";
-import { IconButton } from "@/components/ui/IconButton";
-import { IconSearch, IconUser, IconChevronDown } from "@/components/ui/icons";
+import { IconSearch, IconHeart } from "@/components/ui/icons";
+import { cn } from "@/lib/utils";
 
 export function PublicHeader() {
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/90 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <Container className="flex h-14 items-center justify-between">
-        {/* Left: Logo */}
-        <Link href="/minsk" className="flex items-center gap-2 font-bold text-xl tracking-tight hover:opacity-80 transition-opacity">
-          <span className="text-primary">mama</span>
-          <span>Go</span>
-        </Link>
+      <Container className="max-w-[1400px]">
+        <nav className="grid grid-cols-[auto,minmax(0,520px),auto] items-center gap-6 h-16" role="navigation" aria-label="Главная навигация">
+          {/* LEFT: Logo + City */}
+          <div className="flex items-center gap-5">
+            <Link href="/minsk" className="flex-shrink-0 hover:opacity-80 transition-opacity">
+              <Image
+                src="/favico_mamago.webp"
+                alt="MamaGo"
+                width={100}
+                height={100}
+                priority
+                className="h-10 w-auto"
+              />
+            </Link>
+            <Link
+              href="/minsk"
+              className={cn(
+                "text-sm font-medium whitespace-nowrap",
+                "border-b border-dashed border-border",
+                "hover:border-foreground transition-colors"
+              )}
+            >
+              Минск
+            </Link>
+          </div>
 
-        {/* Center: City Selector (Desktop only for now, or adaptable) */}
-        <div className="hidden md:flex items-center gap-1 px-3 py-1.5 rounded-full hover:bg-muted/50 cursor-pointer transition-colors text-sm font-medium">
-          <span>Минск</span>
-          <IconChevronDown className="h-4 w-4 text-muted-foreground" />
-        </div>
-
-        {/* Right: Actions */}
-        <div className="flex items-center gap-1 md:gap-2">
+          {/* CENTER: Search Trigger */}
           <Link
-            href="/business-entry"
-            className="hidden md:inline-flex items-center px-3 py-1.5 text-sm font-medium text-primary hover:text-primary/80 hover:bg-primary/5 rounded-md transition-colors"
+            href="/minsk"
+            className={cn(
+              "flex items-center gap-2 w-full",
+              "px-4 py-2 rounded-full",
+              "border border-border bg-background",
+              "hover:border-foreground transition-colors",
+              "text-sm text-muted-foreground"
+            )}
           >
-            Для бизнеса
+            <IconSearch className="h-4 w-4 flex-shrink-0" />
+            <span className="truncate">Найти событие</span>
           </Link>
-          <IconButton label="Поиск" className="hover:bg-muted">
-            <IconSearch className="h-5 w-5" />
-          </IconButton>
-          <Link href="/profile-entry">
-            <IconButton label="Профиль" className="hover:bg-muted">
-              <IconUser className="h-5 w-5" />
-            </IconButton>
-          </Link>
-        </div>
+
+          {/* RIGHT: Saved + Profile */}
+          <div className="flex items-center gap-4 justify-self-end">
+            <Link
+              href="/me"
+              className="hover:text-primary transition-colors flex-shrink-0"
+              aria-label="Сохранённое"
+            >
+              <IconHeart className="h-5 w-5" />
+            </Link>
+            <Link
+              href="/me"
+              className="text-sm font-medium hover:text-primary transition-colors whitespace-nowrap"
+            >
+              Профиль
+            </Link>
+          </div>
+        </nav>
       </Container>
     </header>
   );

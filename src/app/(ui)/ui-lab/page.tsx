@@ -7,6 +7,8 @@ import { CitySection } from "./_sections/CitySection";
 import { ActivitySection } from "./_sections/ActivitySection";
 import { NewsSection } from "./_sections/NewsSection";
 import { ShellSection } from "./_sections/ShellSection";
+import { PlanCardSection } from "./_sections/PlanCardSection";
+import { HeaderSection } from "./_sections/HeaderSection";
 
 export default function UiLabPage() {
   if (process.env.NODE_ENV === "production") {
@@ -32,6 +34,7 @@ export default function UiLabPage() {
         </header>
 
         <main className="space-y-16 pb-32">
+          <HeaderSection />
           <UiPrimitivesSection />
           <FiltersSection />
           <DiscoverySection />
@@ -40,6 +43,7 @@ export default function UiLabPage() {
           <ActivitySection />
           <NewsSection />
           <ShellSection />
+          <PlanCardSection />
         </main>
       </div>
     </div>

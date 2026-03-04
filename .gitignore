@@ -70,3 +70,4 @@ USER_PROFILE_*.md
 
 # prisma local scripts
 prisma/scripts/
+.vscode/

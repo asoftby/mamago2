@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
+import { getCurrentUser } from "@/lib/auth/server";
 import { LoginForm } from "./LoginForm";
 
 export default async function LoginPage({
@@ -6,6 +8,12 @@ export default async function LoginPage({
 }: {
   searchParams: Promise<{ reset?: string; from?: string; next?: string }>;
 }) {
+  // Check if already authenticated
+  const user = await getCurrentUser();
+  if (user && user.role === "USER") {
+    redirect("/me/plan");
+  }
+
   const params = await searchParams;
   const showResetSuccess = params?.reset === "success";
   const from = params?.from;

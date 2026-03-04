@@ -1,19 +1,25 @@
 import { useState, useMemo, useCallback } from 'react';
 import { useSearchParams, useRouter, usePathname, ReadonlyURLSearchParams } from 'next/navigation';
+import { whenLabel } from './whenLabel';
+import { AGE_GROUPS } from '@/features/filters/age/ageGroups';
+
+export type WhenPreset = "TODAY" | "TOMORROW" | "WEEKEND" | null;
 
 export type DiscoveryFilters = {
   dateFrom: string | null;
   dateTo: string | null;
+  whenPreset: WhenPreset;
   age: string[];
-  metro: string[];
+  metro: string | null; // Changed from array to single value
   district: string | null;
 };
 
 export const defaultFilters: DiscoveryFilters = {
   dateFrom: null,
   dateTo: null,
+  whenPreset: null,
   age: [],
-  metro: [],
+  metro: null, // Changed from [] to null
   district: null,
 };
 
@@ -46,13 +52,38 @@ export function parseAppliedFromUrl(searchParams: ReadonlyURLSearchParams): Disc
   }
 
   const age = searchParams.get("age")?.split(",").filter(Boolean) || [];
-  const metro = searchParams.get("metro")?.split(",").filter(Boolean) || [];
+  
+  // Sanitize age values - only keep valid age group IDs
+  const validAgeIds = new Set(AGE_GROUPS.map(g => g.value));
+  const sanitizedAge = age.filter(id => validAgeIds.has(id));
+  
+  // Legacy mapping for backward compatibility (optional)
+  const legacyAgeMap: Record<string, string> = {
+    "0+": "0-1",
+    "6+": "5-7",
+    "12+": "12-14",
+  };
+  
+  const mappedAge = sanitizedAge.map(id => legacyAgeMap[id] || id);
+  
+  // Metro is now single value - support backward compat with comma-separated (take first)
+  const metroParam = searchParams.get("metro");
+  const metro = metroParam ? (metroParam.includes(",") ? metroParam.split(",")[0] : metroParam) : null;
+  
   const district = searchParams.get("district") || null;
+  
+  // Parse whenPreset from URL if present
+  const presetParam = searchParams.get("preset");
+  let whenPreset: WhenPreset = null;
+  if (presetParam === "TODAY" || presetParam === "TOMORROW" || presetParam === "WEEKEND") {
+    whenPreset = presetParam;
+  }
 
   return {
     dateFrom: dFrom || null,
     dateTo: dTo || null,
-    age,
+    whenPreset,
+    age: mappedAge,
     metro,
     district,
   };
@@ -75,12 +106,15 @@ function writeAppliedToUrl(
   params.delete("dateFrom"); // ensure we use 'from' consistently or stick to one. Spec said "from" or "dateFrom". Let's use "from".
   params.delete("dateTo");
 
+  // When Preset
+  if (next.whenPreset) params.set("preset", next.whenPreset); else params.delete("preset");
+
   // Age
   if (next.age.length > 0) params.set("age", next.age.join(","));
   else params.delete("age");
 
-  // Metro
-  if (next.metro.length > 0) params.set("metro", next.metro.join(","));
+  // Metro (now single value)
+  if (next.metro) params.set("metro", next.metro);
   else params.delete("metro");
 
   // District
@@ -180,29 +214,25 @@ export function useDiscoveryFilters() {
     const isDirty =
       !!filters.dateFrom ||
       !!filters.dateTo ||
+      !!filters.whenPreset ||
       filters.age.length > 0 ||
-      filters.metro.length > 0 ||
+      !!filters.metro ||
       !!filters.district;
 
     const activeCount =
-      (filters.dateFrom || filters.dateTo ? 1 : 0) +
+      (filters.dateFrom || filters.dateTo || filters.whenPreset ? 1 : 0) +
       (filters.age.length > 0 ? 1 : 0) +
-      (filters.metro.length > 0 ? 1 : 0) +
+      (filters.metro ? 1 : 0) +
       (filters.district ? 1 : 0);
 
-    const dateLabel = filters.dateFrom
-      ? filters.dateTo
-        ? `${new Date(filters.dateFrom).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })} - ${new Date(filters.dateTo).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}`
-        : new Date(filters.dateFrom).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })
-      : "Когда идём";
+    // Date label with preset support
+    const dateLabel = whenLabel(filters);
 
     const ageLabel = filters.age.length > 0 
       ? filters.age.length === 1 ? filters.age[0] : `Возраст: ${filters.age.length}`
       : "Возраст";
 
-    const metroLabel = filters.metro.length > 0
-      ? filters.metro.length === 1 ? filters.metro[0] : `Метро: ${filters.metro.length}`
-      : "Метро";
+    const metroLabel = filters.metro || "Метро";
 
     const districtLabel = filters.district || "Район";
 

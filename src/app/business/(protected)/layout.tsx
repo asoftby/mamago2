@@ -25,7 +25,7 @@ export default async function ProtectedBusinessLayout({
   // 3. Check business verification status - redirect to pending if not approved
   const verificationStatus = getEffectiveVerificationStatus(business);
   if (verificationStatus !== "APPROVED") {
-    redirect("/business/pending");
+    redirect("/business/verification");
   }
 
   return (

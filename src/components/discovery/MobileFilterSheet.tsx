@@ -38,6 +38,9 @@ type MobileFilterSheetProps = {
   onApply?: (filters: any) => void;
 };
 
+import { formatRuShortDayMonth } from "@/lib/formatters/date";
+import { whenLabel } from "@/features/filters/discovery/whenLabel";
+
 export function MobileFilterSheet({
   open,
   onOpenChange,
@@ -58,13 +61,7 @@ export function MobileFilterSheet({
 
   // Helper to format date label
   const getDateLabel = () => {
-    if (draft.dateFrom) {
-        if (draft.dateTo) {
-            return `${new Date(draft.dateFrom).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })} - ${new Date(draft.dateTo).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}`;
-        }
-        return new Date(draft.dateFrom).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
-    }
-    return "Выберите...";
+    return whenLabel(draft);
   };
 
   // Helper for multi select labels
@@ -123,11 +120,14 @@ export function MobileFilterSheet({
   // MobileDateSheet uses WhenSelect internally which handles strings/dates.
   // But draft.dateFrom is ISO string. WhenSelect expects Date object for custom ranges?
   // Let's pass what WhenSelect supports.
-  const whenValue = draft.dateFrom 
-    ? draft.dateTo 
-        ? { from: new Date(draft.dateFrom), to: new Date(draft.dateTo) } 
-        : new Date(draft.dateFrom)
-    : null;
+  const whenValue = draft.whenPreset === "TODAY" ? "today"
+    : draft.whenPreset === "TOMORROW" ? "tomorrow"
+    : draft.whenPreset === "WEEKEND" ? "weekend"
+    : (draft.dateFrom 
+        ? (draft.dateTo 
+            ? { from: new Date(draft.dateFrom), to: new Date(draft.dateTo) } 
+            : new Date(draft.dateFrom))
+        : null);
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -149,9 +149,9 @@ export function MobileFilterSheet({
                <TriggerButton 
                  label="Когда идем" 
                  valueLabel={getDateLabel()} 
-                 isActive={!!draft.dateFrom}
+                 isActive={!!draft.dateFrom || !!draft.whenPreset}
                  onClick={() => setDateSheetOpen(true)}
-                 onClear={() => setDraft({ dateFrom: null, dateTo: null })}
+                 onClear={() => setDraft({ dateFrom: null, dateTo: null, whenPreset: null })}
                />
                <MobileDateSheet 
                  open={dateSheetOpen}
@@ -160,13 +160,23 @@ export function MobileFilterSheet({
                  onChange={(val: any) => {
                      // Convert back to store format
                      if (!val) {
-                         setDraft({ dateFrom: null, dateTo: null });
+                         setDraft({ dateFrom: null, dateTo: null, whenPreset: null });
                      } else if (typeof val === 'string') {
-                         setDraft({ dateFrom: val, dateTo: null });
+                         // Handle preset strings
+                         if (val === 'today') {
+                             setDraft({ whenPreset: "TODAY", dateFrom: null, dateTo: null });
+                         } else if (val === 'tomorrow') {
+                             setDraft({ whenPreset: "TOMORROW", dateFrom: null, dateTo: null });
+                         } else if (val === 'weekend') {
+                             setDraft({ whenPreset: "WEEKEND", dateFrom: null, dateTo: null });
+                         } else {
+                             // Assume it's a date string
+                             setDraft({ whenPreset: null, dateFrom: val, dateTo: null });
+                         }
                      } else if (val instanceof Date) {
-                         setDraft({ dateFrom: val.toISOString(), dateTo: null });
+                         setDraft({ whenPreset: null, dateFrom: val.toISOString().split('T')[0], dateTo: null });
                      } else if ('from' in val) {
-                         setDraft({ dateFrom: val.from.toISOString(), dateTo: val.to.toISOString() });
+                         setDraft({ whenPreset: null, dateFrom: val.from.toISOString().split('T')[0], dateTo: val.to.toISOString().split('T')[0] });
                      }
                  }}
                />
@@ -203,24 +213,23 @@ export function MobileFilterSheet({
             <div className="w-full">
                <TriggerButton 
                  label="Метро"
-                 valueLabel={getMultiLabel(draft.metro, metroOptions, "Любое")}
-                 isActive={draft.metro.length > 0}
+                 valueLabel={getSingleLabel(draft.metro, metroOptions, "Любое")}
+                 isActive={!!draft.metro}
                  onClick={() => setMetroSheetOpen(true)}
-                 onClear={() => setDraft({ metro: [] })}
+                 onClear={() => setDraft({ metro: null })}
                />
                <MobileSelectSheet
                  open={metroSheetOpen}
                  onOpenChange={setMetroSheetOpen}
                  title="Метро"
                  options={metroOptions}
-                 selectedValues={draft.metro}
+                 selectedValues={draft.metro ? [draft.metro] : []}
                  onSelect={(val) => {
-                     const exists = draft.metro.includes(val);
-                     if (exists) setDraft({ metro: draft.metro.filter(v => v !== val) });
-                     else setDraft({ metro: [...draft.metro, val] });
+                     setDraft({ metro: val });
+                     setMetroSheetOpen(false); // Single select closes
                  }}
-                 onClear={() => setDraft({ metro: [] })}
-                 isMulti={true}
+                 onClear={() => setDraft({ metro: null })}
+                 isMulti={false}
                  placeholderSearch="Поиск метро..."
                />
             </div>

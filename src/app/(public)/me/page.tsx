@@ -1,12 +1,23 @@
 import { redirect } from "next/navigation";
-import Link from "next/link";
 import { getCurrentUser } from "@/lib/auth/server";
 import { prisma } from "@/lib/prisma";
-import { getMyBusiness } from "@/server/business/getMyBusiness";
-import { AddChildForm } from "./AddChildForm";
-import { LogoutButton } from "./LogoutButton";
+import {
+  listPlanItemsByWeek,
+  groupPlanItemsByDate,
+  getCurrentWeekStart,
+} from "@/server/services/plan.service";
+import { Container } from "@/components/ui/Container";
+import { MeHeaderCard } from "@/features/me/components/MeHeaderCard";
+import { ChildrenCard } from "@/features/me/components/ChildrenCard";
+import { PlanCard } from "@/features/me/components/PlanCard";
 
-export default async function ProfilePage() {
+type PageProps = {
+  searchParams: Promise<{ date?: string }>;
+};
+
+export default async function MePage({ searchParams }: PageProps) {
+  const params = await searchParams;
+  
   // Check authentication
   const user = await getCurrentUser();
   if (!user) {
@@ -19,103 +30,35 @@ export default async function ProfilePage() {
     orderBy: { createdAt: "desc" },
   });
 
-  // Check if user has business
-  const business = await getMyBusiness(user.id);
+  // Load plan items for current week
+  const weekStart = getCurrentWeekStart();
+  const planItems = await listPlanItemsByWeek(user.id, weekStart);
+  const planItemsByDate = groupPlanItemsByDate(planItems);
 
-  // Calculate age from birthDate
-  function calculateAge(birthDate: Date): string {
-    const today = new Date();
-    const birth = new Date(birthDate);
-    const years = today.getFullYear() - birth.getFullYear();
-    const months = today.getMonth() - birth.getMonth();
-    
-    if (years === 0) {
-      return `${months} мес.`;
-    } else if (months < 0) {
-      return `${years - 1} лет`;
-    } else {
-      return `${years} лет`;
-    }
-  }
+  // Generate week dates for display
+  const weekDates = Array.from({ length: 7 }, (_, i) => {
+    const date = new Date(weekStart);
+    date.setDate(date.getDate() + i);
+    return date.toISOString().split("T")[0];
+  });
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8 px-4">
-      <div className="max-w-4xl mx-auto space-y-6">
-        {/* Profile Header */}
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-start justify-between mb-4">
-            <h1 className="text-3xl font-bold text-gray-900">
-              Мой профиль
-            </h1>
-            <LogoutButton />
-          </div>
-          
-          <div className="space-y-3">
-            <div>
-              <span className="text-sm font-medium text-gray-700">Email: </span>
-              <span className="text-gray-900">{user.email}</span>
-            </div>
+    <div className="min-h-screen bg-background py-8">
+      <Container className="max-w-4xl">
+        <div className="space-y-6">
+          {/* User Header */}
+          <MeHeaderCard email={user.email} />
 
-            {business && (
-              <div>
-                <span className="text-sm font-medium text-gray-700">Бизнес: </span>
-                <Link
-                  href="/business"
-                  className="text-primary hover:underline font-medium transition-colors"
-                >
-                  {business.name} →
-                </Link>
-              </div>
-            )}
-          </div>
+          {/* Children */}
+          <ChildrenCard children={children} />
+
+          {/* Plan */}
+          <PlanCard
+            weekDates={weekDates}
+            planItemsByDate={planItemsByDate}
+          />
         </div>
-
-        {/* Children Section */}
-        <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">
-            Мои дети
-          </h2>
-
-          {children.length > 0 ? (
-            <div className="space-y-3 mb-6">
-              {children.map((child) => (
-                <div
-                  key={child.id}
-                  className="border border-gray-200 rounded-md p-4"
-                >
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <h3 className="font-semibold text-gray-900">
-                        {child.name}
-                      </h3>
-                      <p className="text-sm text-gray-600">
-                        {calculateAge(child.birthDate)} • {new Date(child.birthDate).toLocaleDateString("ru-RU")}
-                      </p>
-                      {child.interests && (
-                        <p className="text-sm text-gray-700 mt-2">
-                          <span className="font-medium">Интересы:</span> {child.interests}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-gray-600 mb-6">
-              У вас пока нет добавленных детей
-            </p>
-          )}
-
-          {/* Add Child Form */}
-          <div className="border-t border-gray-200 pt-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">
-              Добавить ребёнка
-            </h3>
-            <AddChildForm />
-          </div>
-        </div>
-      </div>
+      </Container>
     </div>
   );
 }

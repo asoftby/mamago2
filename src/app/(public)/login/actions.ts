@@ -20,8 +20,19 @@ export async function loginAction(
   const next = String(formData.get("next") ?? "");
 
   try {
-    const { sessionToken } = await loginUser(email, password);
+    const { sessionToken, user } = await loginUser(email, password);
     await setSessionCookie(sessionToken);
+
+    // Success - redirect based on role and parameters
+    if (next) {
+      redirect(next);
+    } else if (from === "business") {
+      redirect("/business-entry");
+    } else if (user.role === "USER") {
+      redirect("/me/plan");
+    } else {
+      redirect("/minsk");
+    }
   } catch (e) {
     // Handle Zod validation errors
     if (e instanceof ZodError) {
@@ -47,14 +58,5 @@ export async function loginAction(
       ok: false,
       message: "Не удалось войти. Попробуйте ещё раз.",
     };
-  }
-
-  // Success - redirect based on from and next parameters
-  if (next) {
-    redirect(next);
-  } else if (from === "business") {
-    redirect("/business-entry");
-  } else {
-    redirect("/minsk");
   }
 }

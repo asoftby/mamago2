@@ -18,8 +18,17 @@ export async function registerAction(
   const from = String(formData.get("from") ?? "");
 
   try {
-    const { sessionToken } = await registerUser(email, password);
+    const { sessionToken, user } = await registerUser(email, password);
     await setSessionCookie(sessionToken);
+
+    // Success - redirect based on from parameter and role
+    if (from === "business") {
+      redirect("/business-entry");
+    } else if (user.role === "USER") {
+      redirect("/me/plan");
+    } else {
+      redirect("/minsk");
+    }
   } catch (e) {
     // Handle Zod validation errors
     if (e instanceof ZodError) {
@@ -45,12 +54,5 @@ export async function registerAction(
       ok: false,
       message: "Не удалось создать аккаунт. Попробуйте ещё раз.",
     };
-  }
-
-  // Success - redirect based on from parameter
-  if (from === "business") {
-    redirect("/business-entry");
-  } else {
-    redirect("/minsk");
   }
 }

@@ -17,22 +17,20 @@ const BREAKING_NEWS = [
   { id:"n4", title:"Гастрофест: сет за 14 BYN — успейте на выходных", imageUrl:"https://picsum.photos/seed/bn4/800/600", timeAgo:"4 недели назад" },
   { id:"n5", title:"Светлое кафе у вокзала с ретро-авто", imageUrl:"https://picsum.photos/seed/bn5/800/600", timeAgo:"1 месяц назад" },
   { id:"n6", title:"Впервые в Беларуси: премия для детских проектов", imageUrl:"https://picsum.photos/seed/bn6/800/600", timeAgo:"1 месяц назад" },
+  { id:"n7", title:"Открылся новый детский центр развития в Уручье", imageUrl:"https://picsum.photos/seed/bn7/800/600", timeAgo:"2 дня назад" },
+  { id:"n8", title:"Мастер-классы по робототехнике для детей 6-12 лет", imageUrl:"https://picsum.photos/seed/bn8/800/600", timeAgo:"5 дней назад" },
+  { id:"n9", title:"Семейный фестиваль «Краски лета» в парке Челюскинцев", imageUrl:"https://picsum.photos/seed/bn9/800/600", timeAgo:"1 неделя назад" },
+  { id:"n10", title:"Бесплатные занятия йогой для мам с малышами", imageUrl:"https://picsum.photos/seed/bn10/800/600", timeAgo:"2 недели назад" },
 ];
 
 interface CityIntentShellProps {
   city: string;
   intent: Intent;
-  definitions?: any[];
-  metroOptions?: any[];
-  districtOptions?: any[];
 }
 
 export function CityIntentShell({ 
   city, 
   intent,
-  definitions = [],
-  metroOptions = [],
-  districtOptions = []
 }: CityIntentShellProps) {
   
   // Filter activities based on intent (mock logic)
@@ -61,18 +59,14 @@ export function CityIntentShell({
           {(intent === 'kuda' || intent === 'classes' || intent === 'birthday') && (
             <div className="py-2">
               <div className="mt-4">
-                <DiscoveryFilters 
-                  ageOptions={(definitions.find((d:any) => d.slug === "age")?.options ?? []).map((o:any) => ({ value: o.value, label: o.label }))}
-                  metroOptions={metroOptions}
-                  districtOptions={districtOptions}
-                />
+                <DiscoveryFilters citySlug={city} />
               </div>
             </div>
           )}
         </div>
 
         {/* Activity Feed */}
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-6 grid-cols-2 md:grid-cols-4">
           {filteredActivities.map((activity) => (
             <ActivityCard key={activity.id} activity={activity} />
           ))}

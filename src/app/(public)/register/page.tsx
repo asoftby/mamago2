@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
+import { getCurrentUser } from "@/lib/auth/server";
 import { RegisterForm } from "./RegisterForm";
 
 export default async function RegisterPage({
@@ -6,6 +8,12 @@ export default async function RegisterPage({
 }: {
   searchParams: Promise<{ from?: string; intent?: string }>;
 }) {
+  // Check if already authenticated
+  const user = await getCurrentUser();
+  if (user && user.role === "USER") {
+    redirect("/me/plan");
+  }
+
   // Await searchParams in Next.js 16
   const params = await searchParams;
   const from = params?.from;
