@@ -5,6 +5,7 @@
  * SINGLE SOURCE OF TRUTH: verificationStatus
  * - DRAFT: Not submitted
  * - PENDING: Under review
+ * - NEEDS_INFO: Requires clarification from owner
  * - APPROVED: Verified, can publish
  * - REJECTED: Rejected, can resubmit
  */
@@ -46,6 +47,7 @@ export function getEffectiveVerificationStatus(business: {
     const validStatuses: BusinessVerificationStatus[] = [
       "DRAFT",
       "PENDING",
+      "NEEDS_INFO",
       "APPROVED",
       "REJECTED",
     ];

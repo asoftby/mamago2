@@ -29,6 +29,11 @@ export default async function BusinessVerificationPage() {
   // Get effective verification status
   const verificationStatus = getEffectiveVerificationStatus(business);
 
+  // DRAFT → redirect to onboarding
+  if (verificationStatus === "DRAFT") {
+    redirect("/business/onboarding");
+  }
+
   // If approved, redirect to dashboard
   if (verificationStatus === "APPROVED") {
     redirect("/business/dashboard");
@@ -49,8 +54,8 @@ export default async function BusinessVerificationPage() {
   });
 
   const isPending = verificationStatus === "PENDING";
+  const isNeedsInfo = verificationStatus === "NEEDS_INFO";
   const isRejected = verificationStatus === "REJECTED";
-  const isDraft = verificationStatus === "DRAFT";
 
   // Get last moderator comment from logs or business.reviewNote
   const lastLog = verificationLogs[0];
@@ -102,31 +107,6 @@ export default async function BusinessVerificationPage() {
                 </li>
               </ul>
             </div>
-          </>
-        )}
-
-        {/* DRAFT Status */}
-        {isDraft && (
-          <>
-            <div className="text-center mb-8">
-              <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-100 rounded-full mb-4">
-                <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                </svg>
-              </div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">
-                Завершите профиль
-              </h1>
-              <p className="text-gray-600">
-                Заполните все обязательные поля и отправьте заявку на проверку
-              </p>
-            </div>
-
-            <Link href="/business/onboarding">
-              <PrimaryButton className="w-full">
-                Перейти к заполнению профиля
-              </PrimaryButton>
-            </Link>
           </>
         )}
 
@@ -182,6 +162,58 @@ export default async function BusinessVerificationPage() {
           </>
         )}
 
+        {/* NEEDS_INFO Status */}
+        {isNeedsInfo && (
+          <>
+            <div className="text-center mb-8">
+              <div className="inline-flex items-center justify-center w-16 h-16 bg-yellow-100 rounded-full mb-4">
+                <svg className="w-8 h-8 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+              <h1 className="text-3xl font-bold text-gray-900 mb-2">
+                Требуется уточнение данных
+              </h1>
+              <p className="text-gray-600">
+                Модератор запросил дополнительную информацию
+              </p>
+            </div>
+
+            {/* Moderator Comment - REQUIRED for NEEDS_INFO */}
+            {moderatorComment && (
+              <div className="bg-yellow-50 border border-yellow-200 rounded-md p-6 mb-6">
+                <h2 className="text-lg font-semibold text-yellow-900 mb-3">
+                  Комментарий модератора
+                </h2>
+                <p className="text-sm text-yellow-800 whitespace-pre-wrap">
+                  {moderatorComment}
+                </p>
+                {lastReviewDate && (
+                  <p className="text-xs text-yellow-600 mt-3">
+                    {new Date(lastReviewDate).toLocaleString("ru-RU")}
+                  </p>
+                )}
+              </div>
+            )}
+
+            <div className="bg-blue-50 border border-blue-200 rounded-md p-6 mb-6">
+              <h2 className="text-lg font-semibold text-blue-900 mb-3">
+                Что делать?
+              </h2>
+              <p className="text-sm text-blue-800 mb-4">
+                Пожалуйста, внесите необходимые изменения в данные и отправьте заявку повторно.
+                Обратите внимание на комментарий модератора выше.
+              </p>
+            </div>
+
+            <Link href="/business/onboarding">
+              <PrimaryButton className="w-full">
+                Исправить данные
+              </PrimaryButton>
+            </Link>
+          </>
+        )}
+
         {/* Business Data Summary */}
         <div className="mt-8 border-t pt-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">
@@ -213,9 +245,13 @@ export default async function BusinessVerificationPage() {
             <div>
               <span className="text-sm font-medium text-gray-700">Статус:</span>{" "}
               <span className={`text-sm font-medium ${
-                isPending ? "text-yellow-600" : isRejected ? "text-red-600" : "text-blue-600"
+                isPending ? "text-yellow-600" : 
+                isNeedsInfo ? "text-yellow-600" : 
+                "text-red-600"
               }`}>
-                {isPending ? "На проверке" : isRejected ? "Отклонено" : "Черновик"}
+                {isPending ? "На проверке" : 
+                 isNeedsInfo ? "Требуется уточнение" : 
+                 "Отклонено"}
               </span>
             </div>
           </div>

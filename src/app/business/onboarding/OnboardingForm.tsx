@@ -48,8 +48,14 @@ function SubmitButton({ disabled }: { disabled?: boolean }) {
   );
 }
 
-export function OnboardingForm({ initialData }: { initialData?: any }) {
-  const [state, formAction] = useActionState(createBusinessAction, { ok: true });
+export function OnboardingForm({ 
+  initialData,
+  isPhoneVerifiedInitial = false 
+}: { 
+  initialData?: any;
+  isPhoneVerifiedInitial?: boolean;
+}) {
+  const [state, formAction] = useActionState(createBusinessAction, null);
   
   // UNP lookup state
   const [unp, setUnp] = useState(initialData?.unp || "");
@@ -58,10 +64,10 @@ export function OnboardingForm({ initialData }: { initialData?: any }) {
   const [isLookupLoading, setIsLookupLoading] = useState(false);
   const [lookupError, setLookupError] = useState("");
   
-  // Phone verification state
+  // Phone verification state - use prop as source of truth
   const [phone, setPhone] = useState(initialData?.phone || "");
   const [phoneE164, setPhoneE164] = useState(initialData?.phone || "");
-  const [isPhoneVerified, setIsPhoneVerified] = useState(!!initialData?.phone);
+  const [isPhoneVerified, setIsPhoneVerified] = useState(isPhoneVerifiedInitial);
   
   const lookupTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -188,10 +194,10 @@ export function OnboardingForm({ initialData }: { initialData?: any }) {
 
   // Clear draft on successful submission
   useEffect(() => {
-    if (state.ok) {
+    if (state?.ok) {
       // Form was submitted successfully (will redirect)
       clearDraft();
-      console.log("✅ Draft cleared after successful submission");
+      console.log("Draft cleared after successful submission");
     }
   }, [state]);
 
@@ -230,7 +236,7 @@ export function OnboardingForm({ initialData }: { initialData?: any }) {
         {lookupError && (
           <p className="mt-1 text-xs text-amber-600">{lookupError}</p>
         )}
-        {!state.ok && state.fieldErrors?.unp && (
+        {state && !state.ok && state.fieldErrors?.unp && (
           <p className="mt-1 text-sm text-red-600">
             {state.fieldErrors.unp[0]}
           </p>
@@ -259,7 +265,7 @@ export function OnboardingForm({ initialData }: { initialData?: any }) {
           className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary focus:border-primary"
           placeholder="ООО 'Детский центр Радуга'"
         />
-        {!state.ok && state.fieldErrors?.legalName && (
+        {state && !state.ok && state.fieldErrors?.legalName && (
           <p className="mt-1 text-sm text-red-600">
             {state.fieldErrors.legalName[0]}
           </p>
@@ -293,22 +299,33 @@ export function OnboardingForm({ initialData }: { initialData?: any }) {
           Пример: +375291234567 или 375291234567
         </p>
         
-        {!state.ok && state.fieldErrors?.phone && (
+        {state && !state.ok && state.fieldErrors?.phone && (
           <p className="mt-1 text-sm text-red-600">
             {state.fieldErrors.phone[0]}
           </p>
         )}
       </div>
 
-      {/* OTP Verification */}
-      <div>
-        <PhoneOtpVerify
-          phoneE164={phoneE164}
-          onVerified={handlePhoneVerified}
-        />
-      </div>
+      {/* Phone Verification Status */}
+      {isPhoneVerified ? (
+        <div className="bg-green-50 border border-green-200 rounded-md p-3 flex items-center gap-2">
+          <svg className="w-5 h-5 text-green-600 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+          </svg>
+          <span className="text-sm font-medium text-green-800">
+            Номер телефона подтвержден
+          </span>
+        </div>
+      ) : (
+        <div>
+          <PhoneOtpVerify
+            phoneE164={phoneE164}
+            onVerified={handlePhoneVerified}
+          />
+        </div>
+      )}
 
-      {!state.ok && state.message && !state.fieldErrors && (
+      {state && !state.ok && state.message && !state.fieldErrors && (
         <div className="bg-red-50 border border-red-200 rounded-md p-4">
           <p className="text-sm text-red-800">{state.message}</p>
         </div>

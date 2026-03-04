@@ -337,6 +337,7 @@ enum BusinessStatus {
 enum BusinessVerificationStatus {
   DRAFT
   PENDING
+  NEEDS_INFO
   APPROVED
   REJECTED
 }
@@ -361,6 +362,7 @@ model Business {
   reviewNote         String?
   approvedAt         DateTime?
   rejectedAt         DateTime?
+  isVerified         Boolean                    @default(false)
 
   owner            User                        @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
   places           Place[]

@@ -1,97 +1,73 @@
 /**
  * Business Verification Guard
- * Single source of truth for business verification gating logic
+ * SINGLE SOURCE OF TRUTH for business verification gating logic
  * Server-only - do not import in client components
+ * 
+ * CANONICAL STATUS: Business.verificationStatus (BusinessVerificationStatus enum)
+ * - DRAFT: Not submitted, can edit
+ * - PENDING: Under review, read-only
+ * - APPROVED: Verified, full access
+ * - REJECTED: Rejected, can view reason and resubmit
  */
 
 import { BusinessVerificationStatus } from "@prisma/client";
 
 /**
- * Get the target route based on verification status
- * This is the single source of truth for status-to-route mapping
- */
-export function getBusinessGateTarget(
-  status: BusinessVerificationStatus
-): "/business/onboarding" | "/business/verification" | "/business/dashboard" {
-  switch (status) {
-    case "DRAFT":
-      // New business or incomplete profile
-      return "/business/onboarding";
-    
-    case "PENDING":
-      // Under review - show status page
-      return "/business/verification";
-    
-    case "REJECTED":
-      // Rejected - can view status or edit
-      // Default to verification page (shows rejection reason)
-      return "/business/verification";
-    
-    case "APPROVED":
-      // Approved - full access to dashboard
-      return "/business/dashboard";
-    
-    default:
-      // Fallback to onboarding for unknown statuses
-      return "/business/onboarding";
-  }
-}
-
-/**
- * Determine if access should be allowed or redirected
+ * Enforce business access control based on verification status
  * Returns null if access is allowed, or redirect path if should redirect
+ * 
+ * ROUTING RULES:
+ * - DRAFT: Only /business/onboarding allowed
+ * - PENDING: Only /business/verification allowed (read-only)
+ * - REJECTED: Both /business/verification and /business/onboarding allowed
+ * - APPROVED: /business/dashboard and all cabinet routes allowed
  */
 export function enforceBusinessAccess(
   requestedPath: string,
   status: BusinessVerificationStatus
 ): string | null {
-  const targetRoute = getBusinessGateTarget(status);
-
-  // Normalize paths for comparison
-  const normalizedRequested = requestedPath.split("?")[0]; // Remove query params
-  const normalizedTarget = targetRoute.split("?")[0];
+  // Normalize path (remove query params and trailing slash)
+  const normalizedPath = requestedPath.split("?")[0].replace(/\/$/, "");
 
   // Define route categories
-  const isOnboarding = normalizedRequested.startsWith("/business/onboarding");
-  const isVerification = normalizedRequested.startsWith("/business/verification");
-  const isDashboard = normalizedRequested.startsWith("/business/dashboard");
-  const isCabinet = normalizedRequested.startsWith("/business/") && 
-                    !isOnboarding && 
-                    !isVerification &&
-                    normalizedRequested !== "/business";
+  const isOnboarding = normalizedPath.startsWith("/business/onboarding");
+  const isVerification = normalizedPath.startsWith("/business/verification");
+  const isDashboard = normalizedPath.startsWith("/business/dashboard");
+  const isPending = normalizedPath === "/business/pending"; // Legacy redirect route
+  const isCabinetRoute = normalizedPath.startsWith("/business/") && 
+                         !isOnboarding && 
+                         !isVerification &&
+                         !isDashboard &&
+                         !isPending &&
+                         normalizedPath !== "/business";
 
   // DRAFT: Only allow onboarding
   if (status === "DRAFT") {
-    if (isOnboarding) return null; // Allow
+    if (isOnboarding) return null; // Allow editing
     return "/business/onboarding"; // Redirect to onboarding
   }
 
-  // PENDING: Only allow verification page (read-only)
+  // PENDING: Only allow verification page (read-only status)
   if (status === "PENDING") {
-    if (isVerification) return null; // Allow
-    if (isOnboarding) return "/business/verification"; // Block editing
-    return "/business/verification"; // Redirect to verification
+    if (isVerification || isPending) return null; // Allow viewing status
+    return "/business/verification"; // Redirect to verification (blocks editing)
   }
 
-  // REJECTED: Allow verification and onboarding (for fixing)
+  // REJECTED: Allow verification (to see reason) and onboarding (to fix)
   if (status === "REJECTED") {
-    if (isVerification || isOnboarding) return null; // Allow both
-    return "/business/verification"; // Redirect to verification (shows rejection reason)
+    if (isVerification || isOnboarding || isPending) return null; // Allow both
+    return "/business/verification"; // Default to verification (shows rejection reason)
   }
 
-  // APPROVED: Allow dashboard and cabinet, redirect verification/onboarding
+  // APPROVED: Allow dashboard and all cabinet routes
   if (status === "APPROVED") {
-    if (isDashboard || isCabinet) return null; // Allow
+    if (isDashboard || isCabinetRoute) return null; // Allow full access
     if (isOnboarding || isVerification) return "/business/dashboard"; // Redirect to dashboard
     return null; // Allow other routes
   }
 
-  // Default: redirect to target route
-  if (normalizedRequested === normalizedTarget) {
-    return null; // Already on correct route
-  }
-  
-  return targetRoute;
+  // Fallback: redirect to onboarding for unknown statuses
+  return "/business/onboarding";
 }
 
 /**

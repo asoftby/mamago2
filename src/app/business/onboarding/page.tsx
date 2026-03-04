@@ -19,13 +19,19 @@ export default async function OnboardingPage() {
   const existingBusiness = await getMyBusiness(user.id);
   
   if (existingBusiness) {
-    // Allow editing if DRAFT, PENDING, or REJECTED
-    // Only redirect to dashboard if APPROVED
     const verificationStatus = getEffectiveVerificationStatus(existingBusiness);
+    
+    // APPROVED → dashboard
     if (verificationStatus === "APPROVED") {
       redirect("/business/dashboard");
     }
-    // Otherwise, allow editing (DRAFT, PENDING, REJECTED can edit and resubmit)
+    
+    // PENDING → verification page
+    if (verificationStatus === "PENDING") {
+      redirect("/business/verification");
+    }
+    
+    // DRAFT or REJECTED → stay here to edit
   }
 
   // 3. Render onboarding form
@@ -53,17 +59,6 @@ export default async function OnboardingPage() {
             </div>
           )}
 
-          {isEditing && verificationStatus === "PENDING" && (
-            <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4">
-              <h2 className="text-lg font-semibold text-yellow-900 mb-2">
-                Заявка на проверке
-              </h2>
-              <p className="text-yellow-700 text-sm">
-                Вы можете редактировать данные, но потребуется повторная отправка на проверку.
-              </p>
-            </div>
-          )}
-
           {!isEditing && (
             <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
               <h2 className="text-lg font-semibold text-blue-900 mb-2">
@@ -76,23 +71,10 @@ export default async function OnboardingPage() {
             </div>
           )}
 
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-gray-900">
-              Current User
-            </h3>
-            <div className="bg-gray-50 rounded-md p-4 space-y-2">
-              <div className="text-sm">
-                <span className="font-medium text-gray-700">Email:</span>{" "}
-                <span className="text-gray-900">{user.email}</span>
-              </div>
-              <div className="text-sm">
-                <span className="font-medium text-gray-700">Role:</span>{" "}
-                <span className="text-gray-900">{user.role}</span>
-              </div>
-            </div>
-          </div>
-
-          <OnboardingForm initialData={existingBusiness} />
+          <OnboardingForm 
+            initialData={existingBusiness}
+            isPhoneVerifiedInitial={!!user.phoneVerifiedAt}
+          />
         </div>
       </div>
     </div>

@@ -37,9 +37,9 @@ export async function POST(request: NextRequest) {
 
     // Create session
     const token = await createSession(user.id);
-    await setSessionCookie(token);
-
-    return NextResponse.json({
+    
+    // Create response with user data
+    const response = NextResponse.json({
       success: true,
       user: {
         id: user.id,
@@ -47,6 +47,11 @@ export async function POST(request: NextRequest) {
         role: user.role,
       },
     });
+    
+    // Set session cookie on response
+    setSessionCookie(response, token);
+
+    return response;
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(

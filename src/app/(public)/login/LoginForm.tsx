@@ -1,32 +1,87 @@
 "use client";
 
-import { useActionState } from "react";
-import { useFormStatus } from "react-dom";
-import { loginAction } from "./actions";
+import { useState, FormEvent } from "react";
+import { useRouter } from "next/navigation";
 import { PrimaryButton } from "@/components/ui/PrimaryButton";
 
-function SubmitButton() {
-  const { pending } = useFormStatus();
-
-  return (
-    <PrimaryButton
-      type="submit"
-      disabled={pending}
-      className="w-full"
-    >
-      {pending ? "Вход..." : "Войти"}
-    </PrimaryButton>
-  );
-}
-
 export function LoginForm({ from, next }: { from?: string; next?: string }) {
-  const [state, formAction] = useActionState(loginAction, { ok: true });
+  const router = useRouter();
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError(null);
+    setFieldErrors({});
+
+    const formData = new FormData(e.currentTarget);
+    const email = formData.get("email") as string;
+    const password = formData.get("password") as string;
+
+    try {
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "same-origin",
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        if (response.status === 401 || response.status === 400) {
+          setError(data.error || "Неверный email или пароль");
+        } else {
+          setError("Произошла ошибка. Попробуйте ещё раз.");
+        }
+        setIsLoading(false);
+        return;
+      }
+
+      // Success - determine redirect target
+      let targetPath = "/minsk"; // default
+
+      // Priority 1: from parameter
+      if (from) {
+        if (from === "admin") {
+          targetPath = "/admin";
+        } else if (from === "business") {
+          targetPath = "/business";
+        } else if (from === "public") {
+          targetPath = "/minsk";
+        } else {
+          targetPath = from; // use as-is if it's a path
+        }
+      } 
+      // Priority 2: next parameter
+      else if (next) {
+        targetPath = next;
+      }
+      // Priority 3: detect from host
+      else {
+        const host = window.location.host;
+        if (host.startsWith("admin.")) {
+          targetPath = "/admin";
+        } else if (host.startsWith("business.")) {
+          targetPath = "/business";
+        }
+      }
+
+      // Redirect
+      router.replace(targetPath);
+    } catch (err) {
+      console.error("Login error:", err);
+      setError("Не удалось подключиться к серверу");
+      setIsLoading(false);
+    }
+  };
 
   return (
-    <form action={formAction} className="space-y-6">
-      <input type="hidden" name="from" value={from || ""} />
-      <input type="hidden" name="next" value={next || ""} />
-      
+    <form onSubmit={handleSubmit} className="space-y-6">
       <div>
         <label
           htmlFor="email"
@@ -40,12 +95,13 @@ export function LoginForm({ from, next }: { from?: string; next?: string }) {
           name="email"
           required
           autoComplete="email"
-          className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          disabled={isLoading}
+          className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
           placeholder="your@email.com"
         />
-        {!state.ok && state.fieldErrors?.email && (
+        {fieldErrors.email && (
           <p className="mt-1 text-sm text-red-600">
-            {state.fieldErrors.email[0]}
+            {fieldErrors.email}
           </p>
         )}
       </div>
@@ -63,23 +119,30 @@ export function LoginForm({ from, next }: { from?: string; next?: string }) {
           name="password"
           required
           autoComplete="current-password"
-          className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          disabled={isLoading}
+          className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
           placeholder="Введите пароль"
         />
-        {!state.ok && state.fieldErrors?.password && (
+        {fieldErrors.password && (
           <p className="mt-1 text-sm text-red-600">
-            {state.fieldErrors.password[0]}
+            {fieldErrors.password}
           </p>
         )}
       </div>
 
-      {!state.ok && state.message && (
+      {error && (
         <div className="bg-red-50 border border-red-200 rounded-md p-4">
-          <p className="text-sm text-red-800">{state.message}</p>
+          <p className="text-sm text-red-800">{error}</p>
         </div>
       )}
 
-      <SubmitButton />
+      <PrimaryButton
+        type="submit"
+        disabled={isLoading}
+        className="w-full"
+      >
+        {isLoading ? "Вход..." : "Войти"}
+      </PrimaryButton>
     </form>
   );
 }

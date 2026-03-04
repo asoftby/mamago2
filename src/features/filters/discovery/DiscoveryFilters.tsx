@@ -95,6 +95,125 @@ export function DiscoveryFilters({
     onChange?.();
   }, [applied.dateFrom, applied.dateTo, applied.whenPreset, applied.age, applied.metro, applied.district, onChange]);
 
+  // --- Mobile Pill Label & Value Computation ---
+  const MONTHS_RU = ["янв.", "фев.", "мар.", "апр.", "май", "июн.", "июл.", "авг.", "сен.", "окт.", "ноя.", "дек."];
+  
+  const fmtShortRu = (dateStr: string): string => {
+    try {
+      const d = new Date(dateStr);
+      const day = d.getDate();
+      const month = MONTHS_RU[d.getMonth()];
+      return `${day} ${month}`;
+    } catch {
+      return dateStr;
+    }
+  };
+  
+  const buildWhenLabel = (): string | null => {
+    if (applied.whenPreset === "TODAY") return "Сегодня";
+    if (applied.whenPreset === "TOMORROW") return "Завтра";
+    if (applied.whenPreset === "WEEKEND") return "На выходных";
+    
+    if (!applied.dateFrom) return null;
+    
+    if (applied.dateTo && applied.dateFrom !== applied.dateTo) {
+      // Range
+      try {
+        const from = new Date(applied.dateFrom);
+        const to = new Date(applied.dateTo);
+        const fromDay = from.getDate();
+        const toDay = to.getDate();
+        const fromMonth = from.getMonth();
+        const toMonth = to.getMonth();
+        const fromYear = from.getFullYear();
+        const toYear = to.getFullYear();
+        
+        if (fromYear === toYear && fromMonth === toMonth) {
+          // Same month: "5–9 мар."
+          return `${fromDay}–${toDay} ${MONTHS_RU[fromMonth]}`;
+        } else {
+          // Different months: "5 мар.–15 апр."
+          return `${fmtShortRu(applied.dateFrom)}–${fmtShortRu(applied.dateTo)}`;
+        }
+      } catch {
+        return fmtShortRu(applied.dateFrom);
+      }
+    }
+    
+    // Single date
+    return fmtShortRu(applied.dateFrom);
+  };
+  
+  // Check if any other category besides age is active
+  const whenActive = !!(applied.whenPreset || applied.dateFrom);
+  const ageActive = (applied.age?.length ?? 0) > 0;
+  const metroActive = !!applied.metro;
+  const districtActive = !!applied.district;
+  
+  const otherCategoriesActive = whenActive || metroActive || districtActive;
+  
+  const buildAgeLabel = (): string | null => {
+    if (applied.age.length === 0) return null;
+    
+    // Resolve age labels
+    const ageLabels = applied.age
+      .map(ageValue => {
+        const option = ageOptions.find(opt => opt.value === ageValue);
+        return option ? option.label : ageValue;
+      });
+    
+    if (otherCategoriesActive) {
+      // Age + other categories: show first age + count
+      // "9–12 лет +1" if 2 ages, "9–12 лет +2" if 3 ages
+      if (ageLabels.length === 1) {
+        return ageLabels[0];
+      }
+      return `${ageLabels[0]} +${ageLabels.length - 1}`;
+    } else {
+      // ONLY age is active: show up to 2 labels
+      if (ageLabels.length === 1) {
+        return ageLabels[0];
+      } else if (ageLabels.length === 2) {
+        return `${ageLabels[0]}, ${ageLabels[1]}`;
+      } else {
+        // 3+ ages: show first two + count
+        return `${ageLabels[0]}, ${ageLabels[1]} +${ageLabels.length - 2}`;
+      }
+    }
+  };
+  
+  const resolveOptionLabel = (options: Option[], value: string | null): string | null => {
+    if (!value) return null;
+    const option = options.find(opt => opt.value === value);
+    return option ? option.label : value;
+  };
+  
+  // Build category labels
+  const whenLabel = buildWhenLabel();
+  const ageLabel = buildAgeLabel();
+  const metroLabel = resolveOptionLabel(metroOptions, applied.metro);
+  const districtLabel = resolveOptionLabel(districtOptions, applied.district);
+  
+  // Build ordered list of active categories (stable priority)
+  const cats = [
+    whenLabel ? { key: "when", label: whenLabel } : null,
+    ageLabel ? { key: "age", label: ageLabel } : null,
+    metroLabel ? { key: "metro", label: metroLabel } : null,
+    districtLabel ? { key: "district", label: districtLabel } : null,
+  ].filter((c): c is { key: string; label: string } => c !== null);
+  
+  // Show max 2 categories
+  const visible = cats.slice(0, 2);
+  const hiddenCount = cats.length - visible.length;
+  
+  // Compute mobile pill label and value
+  const mobilePillLabel = cats.length > 0 ? "Выбрано" : "Фильтры";
+  const mobilePillValue = (() => {
+    if (cats.length === 0) return "Выберите...";
+    const base = visible.map(v => v.label).join(", ");
+    return hiddenCount > 0 ? `${base} +${hiddenCount}` : base;
+  })();
+
   // Prepare "When" value for WhenSelect trigger/open state:
   // - If preset selected -> pass string ('today' | 'tomorrow' | 'weekend')
   // - Else if dates -> pass Date or {from,to}
@@ -188,29 +307,16 @@ export function DiscoveryFilters({
   };
 
   if (isMobile) {
-    // Mobile Trigger (Single button)
-    const activeCount = derived.activeCount;
-
     return (
       <div className="flex items-center gap-3 pb-2 w-full">
         <FilterFieldPill 
-          label="Фильтры"
-          value={activeCount > 0 ? `${activeCount}` : "Выберите..."}
-          selected={activeCount > 0}
+          label={mobilePillLabel}
+          value={mobilePillValue}
+          selected={cats.length > 0}
           onClick={() => setSheetOpen(true)}
           className="flex-1"
           rightIcon={<SlidersHorizontal className="h-4 w-4 opacity-50" />}
         />
-        
-        {derived.isDirty && (
-          <button
-            onClick={actions.resetAll}
-            className="flex h-10 w-10 items-center justify-center rounded-full border bg-background hover:bg-muted/30 transition-all text-muted-foreground hover:text-foreground shrink-0"
-            title="Сбросить все"
-          >
-            <X className="h-5 w-5" />
-          </button>
-        )}
 
         <MobileFilterSheet
           open={sheetOpen}

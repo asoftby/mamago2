@@ -37,6 +37,7 @@ type BusinessDetail = {
 const STATUS_LABELS: Record<string, string> = {
   DRAFT: "Черновик",
   PENDING: "На проверке",
+  NEEDS_INFO: "Требуется уточнение",
   APPROVED: "Одобрено",
   REJECTED: "Отклонено",
 };
@@ -107,6 +108,43 @@ export function BusinessVerificationSidePanel({
       onActionComplete("APPROVED");
     } catch (err) {
       alert(err instanceof Error ? err.message : "Ошибка одобрения");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleNeedsInfo = async () => {
+    if (!note || note.trim().length === 0) {
+      alert("Укажите, какие данные требуется уточнить");
+      return;
+    }
+
+    if (!confirm("Запросить уточнение данных?")) {
+      return;
+    }
+
+    setActionLoading(true);
+
+    try {
+      const res = await fetch(
+        `/api/admin/business-verification/${businessId}/needs-info`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ note }),
+        }
+      );
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Ошибка запроса");
+      }
+
+      alert("Запрошено уточнение данных");
+      onActionComplete("NEEDS_INFO");
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Ошибка запроса");
     } finally {
       setActionLoading(false);
     }
@@ -316,8 +354,10 @@ export function BusinessVerificationSidePanel({
                         htmlFor="note"
                         className="block text-sm font-medium text-gray-700 mb-2"
                       >
-                        Примечание (необязательно для одобрения, обязательно для
-                        отклонения)
+                        Комментарий модератора
+                        <span className="text-gray-500 text-xs ml-2">
+                          (обязателен для уточнения и отклонения)
+                        </span>
                       </label>
                       <textarea
                         id="note"
@@ -325,21 +365,28 @@ export function BusinessVerificationSidePanel({
                         onChange={(e) => setNote(e.target.value)}
                         rows={4}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary focus:border-primary"
-                        placeholder="Укажите причину отклонения или комментарий..."
+                        placeholder="Укажите причину отклонения или что требуется уточнить..."
                       />
                     </div>
-                    <div className="flex gap-3">
+                    <div className="flex flex-col gap-3">
+                      <button
+                        onClick={handleNeedsInfo}
+                        disabled={actionLoading}
+                        className="w-full px-4 py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                      >
+                        {actionLoading ? "Обработка..." : "Уточнить данные"}
+                      </button>
                       <button
                         onClick={handleApprove}
                         disabled={actionLoading}
-                        className="flex-1 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                        className="w-full px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
                       >
                         {actionLoading ? "Обработка..." : "Одобрить"}
                       </button>
                       <button
                         onClick={handleReject}
                         disabled={actionLoading}
-                        className="flex-1 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                        className="w-full px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
                       >
                         {actionLoading ? "Обработка..." : "Отклонить"}
                       </button>

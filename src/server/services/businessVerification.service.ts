@@ -9,7 +9,7 @@ import { BusinessVerificationStatus } from "@prisma/client";
 
 /**
  * Submit business for verification
- * Allowed only if status is DRAFT or REJECTED
+ * Allowed only if status is DRAFT, REJECTED, or NEEDS_INFO
  */
 export async function submitForVerification(
   businessId: string,
@@ -30,7 +30,8 @@ export async function submitForVerification(
 
   if (
     business.verificationStatus !== "DRAFT" &&
-    business.verificationStatus !== "REJECTED"
+    business.verificationStatus !== "REJECTED" &&
+    business.verificationStatus !== "NEEDS_INFO"
   ) {
     throw new Error(
       `Cannot submit from status: ${business.verificationStatus}`
@@ -108,6 +109,7 @@ export async function approve(
         reviewNote: note || null,
         approvedAt: now,
         rejectedAt: null,
+        isVerified: true,
       },
     }),
 
@@ -168,6 +170,66 @@ export async function reject(
         reviewNote: note,
         approvedAt: null,
         rejectedAt: now,
+      },
+    }),
+
+    // Create log entry
+    prisma.businessVerificationLog.create({
+      data: {
+        businessId,
+        statusFrom,
+        statusTo,
+        note,
+        reviewedByUserId: actorUserId,
+      },
+    }),
+  ]);
+}
+
+/**
+ * Request more information from business owner
+ * Allowed only if status is PENDING
+ * Note is required
+ */
+export async function needsInfo(
+  businessId: string,
+  actorUserId: string,
+  note: string
+): Promise<void> {
+  if (!note || note.trim().length === 0) {
+    throw new Error("Comment is required for NEEDS_INFO status");
+  }
+
+  const business = await prisma.business.findUnique({
+    where: { id: businessId },
+    select: { verificationStatus: true },
+  });
+
+  if (!business) {
+    throw new Error("Business not found");
+  }
+
+  if (business.verificationStatus !== "PENDING") {
+    throw new Error(
+      `Cannot request info from status: ${business.verificationStatus}`
+    );
+  }
+
+  const now = new Date();
+  const statusFrom = business.verificationStatus;
+  const statusTo: BusinessVerificationStatus = "NEEDS_INFO";
+
+  await prisma.$transaction([
+    // Update business status
+    prisma.business.update({
+      where: { id: businessId },
+      data: {
+        verificationStatus: statusTo,
+        reviewedAt: now,
+        reviewedByUserId: actorUserId,
+        reviewNote: note,
+        approvedAt: null,
+        rejectedAt: null,
       },
     }),
 

@@ -1,9 +1,10 @@
 import { cookies } from "next/headers";
+import type { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { generateToken, hashToken } from "./crypto";
+import { SESSION_COOKIE_NAME, getAuthCookieOptions } from "./cookie";
 import type { User } from "@prisma/client";
 
-const SESSION_COOKIE_NAME = "mg_session";
 const SESSION_DURATION = 30 * 24 * 60 * 60 * 1000; // 30 days
 
 /**
@@ -26,24 +27,20 @@ export async function createSession(userId: string): Promise<string> {
 }
 
 /**
- * Set session cookie
+ * Set session cookie on NextResponse (for Route Handlers)
+ * CRITICAL: In Route Handlers, cookies must be set on the response object
  */
-export async function setSessionCookie(token: string): Promise<void> {
-  const cookieStore = await cookies();
-  const cookieDomain = process.env.NEXT_PUBLIC_COOKIE_DOMAIN;
+export function setSessionCookie(res: NextResponse, token: string): void {
+  const cookieOptions = getAuthCookieOptions();
   
-  cookieStore.set(SESSION_COOKIE_NAME, token, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV !== "development",
-    sameSite: "lax",
-    maxAge: SESSION_DURATION / 1000,
-    path: "/",
-    ...(cookieDomain && { domain: cookieDomain }),
+  res.cookies.set(SESSION_COOKIE_NAME, token, {
+    ...cookieOptions,
+    maxAge: SESSION_DURATION / 1000, // Convert to seconds
   });
 }
 
 /**
- * Get session token from cookie
+ * Get session token from cookie (read-only, works in Server Components and Route Handlers)
  */
 export async function getSessionToken(): Promise<string | null> {
   const cookieStore = await cookies();
@@ -52,11 +49,17 @@ export async function getSessionToken(): Promise<string | null> {
 }
 
 /**
- * Delete session cookie
+ * Delete session cookie on NextResponse (for Route Handlers)
+ * CRITICAL: Must use same domain as setSessionCookie for proper deletion
  */
-export async function deleteSessionCookie(): Promise<void> {
-  const cookieStore = await cookies();
-  cookieStore.delete(SESSION_COOKIE_NAME);
+export function deleteSessionCookie(res: NextResponse): void {
+  const cookieOptions = getAuthCookieOptions();
+  
+  // Set cookie with maxAge: 0 to delete it
+  res.cookies.set(SESSION_COOKIE_NAME, "", {
+    ...cookieOptions,
+    maxAge: 0,
+  });
 }
 
 /**

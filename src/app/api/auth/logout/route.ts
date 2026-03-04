@@ -14,34 +14,22 @@ export async function POST(request: NextRequest) {
       await deleteSession(token);
     }
 
-    // Delete session cookie
-    await deleteSessionCookie();
-
-    // Redirect to public homepage
-    // If on business subdomain, redirect to public domain
-    // Otherwise redirect to / (which will redirect to /minsk via middleware)
-    const host = request.headers.get("host") || "";
-    const isBusinessHost = host.startsWith("business.localhost") || host.startsWith("business.mamago.by");
+    // Always redirect to / on same domain (no subdomain logic for localhost)
+    const redirectUrl = new URL("/", request.url);
     
-    let redirectUrl: URL;
-    if (isBusinessHost) {
-      // Redirect to public domain
-      const publicBase = process.env.NEXT_PUBLIC_APP_URL || 
-        (host.startsWith("business.localhost") 
-          ? `http://localhost:3000`
-          : "https://mamago.by");
-      redirectUrl = new URL("/", publicBase);
-    } else {
-      // Redirect to / on same domain
-      redirectUrl = new URL("/", request.url);
-    }
+    // Create redirect response
+    const response = NextResponse.redirect(redirectUrl, 303);
     
-    // Use 303 See Other for POST->GET redirect (standard for form submissions)
-    return NextResponse.redirect(redirectUrl, 303);
+    // Delete session cookie on response
+    deleteSessionCookie(response);
+    
+    return response;
   } catch (error) {
     console.error("Logout error:", error);
-    // Even on error, redirect to homepage (user likely wants to leave anyway)
+    // Even on error, redirect to homepage
     const redirectUrl = new URL("/", request.url);
-    return NextResponse.redirect(redirectUrl, 303);
+    const response = NextResponse.redirect(redirectUrl, 303);
+    deleteSessionCookie(response);
+    return response;
   }
 }
