@@ -29,6 +29,6 @@
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts",
     "**/*.mts"
-  ],
-  "exclude": ["node_modules", ".next", "mamago2__trash"]
+, "src/app/business/(protected)/places/new/CreatePlaceRedirect.tsx.DISABLED"  ],
+  "exclude": ["node_modules", ".next", "mamago2__trash", "scripts"]
 }

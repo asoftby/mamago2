@@ -201,3 +201,20 @@
     @apply text-lg md:text-xl font-semibold tracking-tight leading-snug text-foreground;
   }
 }
+
+
+/* Map Center Pin Pulse Animation */
+@keyframes mg-pulse {
+  0% {
+    transform: translate(-50%, -50%) scale(0.6);
+    opacity: 0.35;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(1.6);
+    opacity: 0;
+  }
+}
+
+.animate-mg-pulse {
+  animation: mg-pulse 1200ms cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}

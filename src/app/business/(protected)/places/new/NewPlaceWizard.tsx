@@ -1,0 +1,646 @@
+"use client";
+
+import { useState, useCallback, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
+import { WizardHeaderNew } from "../[id]/edit/components/WizardHeaderNew";
+import { Step1Profile } from "../[id]/edit/steps/Step1Profile";
+import { Step2Location } from "../[id]/edit/steps/Step2Location";
+import { Step3Photos } from "../[id]/edit/steps/Step3Photos";
+import { Step4Contacts } from "../[id]/edit/steps/Step4Contacts";
+import { SaveDraftDialog } from "./components/SaveDraftDialog";
+import { isMeaningfulDraft } from "./utils/isMeaningfulDraft";
+import { AlertCircle, X } from "lucide-react";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import type { Place, PlaceImage } from "@prisma/client";
+import { ContentStatus, PlaceKind } from "@prisma/client";
+import {
+  getStepStatus,
+  canGoToNextStep,
+  canGoToPrevStep,
+  canGoToStep,
+} from "../[id]/edit/utils/stepValidation";
+import { useWizardSession } from "@/hooks/useWizardSession";
+import { useLocalAutosave } from "@/hooks/useLocalAutosave";
+
+// Client-side getCurrentUser
+async function getCurrentUser() {
+  try {
+    const res = await fetch("/api/auth/me");
+    if (!res.ok) return null;
+    return await res.json();
+  } catch (error) {
+    console.error("Get current user error:", error);
+    return null;
+  }
+}
+
+interface PlaceWithImages extends Place {
+  images: PlaceImage[];
+}
+
+// Local draft state (no DB record yet)
+interface LocalDraft {
+  // Step 1
+  title: string;
+  category: string;
+  shortDesc: string;
+  description: string | null;
+  ageTags: string[];
+  visitFormats: string[];
+  activityTypes: string[];
+  
+  // Step 2
+  lat: number | null;
+  lng: number | null;
+  googlePlaceId: string | null;
+  formattedAddr: string | null;
+  addressJson: any | null;
+  customAddress: string | null;
+  cityId: string | null;
+  districtAutoId: string | null;
+  districtManualId: string | null;
+  metroAutoId: string | null;
+  metroAutoDistanceM: number | null;
+  metroManualId: string | null;
+  metroManualDistanceM: number | null;
+  
+  // Step 3 (temp media tracking)
+  logoMediaId: string | null;
+  logoUrl: string | null;
+  galleryMediaIds: string[];
+  galleryUrls: string[];
+  
+  // Step 4
+  phone: string | null;
+  website: string | null;
+  instagramHandle: string | null;
+  instagramUrl: string | null;
+  
+  // Hierarchy
+  placeKind: PlaceKind;
+  floor: string | null;
+  unit: string | null;
+}
+
+export function NewPlaceWizard() {
+  const router = useRouter();
+  const [currentStep, setCurrentStep] = useState(1);
+  const [isSaving, setIsSaving] = useState(false);
+  const [createRequestId] = useState(() => crypto.randomUUID());
+  const [user, setUser] = useState<any>(null);
+  
+  // Wizard session for temp media uploads
+  const { wizardSessionId, isLoaded: sessionLoaded, clearSession } = useWizardSession({
+    userId: user?.id,
+    wizardType: "place",
+  });
+  
+  // Client-side city resolution
+  const resolveCityIdClient = useCallback(async (lat: number, lng: number, addressJson: any) => {
+    try {
+      console.log("[NewPlaceWizard] Enriching location on client...", { lat, lng, hasAddressJson: !!addressJson });
+      
+      // Call full enrichment API
+      const response = await fetch("/api/geo/enrich-location", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ lat, lng, addressJson }),
+      });
+      
+      if (response.ok) {
+        const result = await response.json();
+        console.log("[NewPlaceWizard] ✅ Enrichment result:", result);
+        
+        // Update localDraft with all enriched data
+        setLocalDraft((prev) => ({
+          ...prev,
+          cityId: result.cityId || prev.cityId,
+          districtAutoId: result.districtAutoId || null,
+          metroAutoId: result.metroAutoId || null,
+          metroAutoDistanceM: result.metroAutoDistanceM || null,
+        }));
+      } else {
+        console.log("[NewPlaceWizard] ⚠️ Could not enrich location");
+      }
+    } catch (error) {
+      console.error("[NewPlaceWizard] Location enrichment error:", error);
+    }
+  }, []);
+  
+  // Leave confirmation state
+  const [showLeaveDialog, setShowLeaveDialog] = useState(false);
+  const pendingNavigationRef = useRef<string | null>(null);
+  const isNavigatingRef = useRef(false);
+  
+  // Local state for new place (no DB record yet)
+  const [localDraft, setLocalDraft] = useState<LocalDraft>({
+    // Step 1
+    title: "",
+    category: "other",
+    shortDesc: "",
+    description: null,
+    ageTags: [],
+    visitFormats: [],
+    activityTypes: [],
+    
+    // Step 2
+    lat: null,
+    lng: null,
+    googlePlaceId: null,
+    formattedAddr: null,
+    addressJson: null,
+    customAddress: null,
+    cityId: null,
+    districtAutoId: null,
+    districtManualId: null,
+    metroAutoId: null,
+    metroAutoDistanceM: null,
+    metroManualId: null,
+    metroManualDistanceM: null,
+    
+    // Step 3 (temp media)
+    logoMediaId: null,
+    logoUrl: null,
+    galleryMediaIds: [],
+    galleryUrls: [],
+    
+    // Step 4
+    phone: null,
+    website: null,
+    instagramHandle: null,
+    instagramUrl: null,
+    
+    // Hierarchy
+    placeKind: PlaceKind.STANDALONE,
+    floor: null,
+    unit: null,
+  });
+
+  // Local autosave (no DB writes)
+  const autosaveKey = `placeWizard:${user?.id}:${wizardSessionId}`;
+  const { save: saveLocal, restore: restoreLocal, clear: clearLocal, lastSaved } = useLocalAutosave<LocalDraft>({
+    key: autosaveKey,
+    debounceMs: 500,
+    onSave: () => {
+      console.log("[NewPlaceWizard] Local autosave complete");
+    },
+  });
+
+  // Load user
+  useEffect(() => {
+    getCurrentUser().then(setUser);
+  }, []);
+
+  // Restore from localStorage on mount
+  useEffect(() => {
+    if (!sessionLoaded || !user) return;
+
+    const restored = restoreLocal();
+    if (restored) {
+      console.log("[NewPlaceWizard] Restored draft from localStorage");
+      setLocalDraft(restored);
+      toast.success("Восстановлен несохранённый черновик");
+    }
+  }, [sessionLoaded, user, restoreLocal]);
+
+  // Auto-save to localStorage on changes
+  useEffect(() => {
+    if (!sessionLoaded || !user) return;
+    
+    saveLocal(localDraft);
+  }, [localDraft, sessionLoaded, user, saveLocal]);
+  
+  // Compute if draft has meaningful changes
+  const shouldConfirmLeave = isMeaningfulDraft(localDraft);
+
+  // Native beforeunload warning (for tab close/refresh)
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (shouldConfirmLeave && !isNavigatingRef.current) {
+        e.preventDefault();
+        e.returnValue = "У вас есть несохранённые изменения. Вы уверены, что хотите покинуть страницу?";
+        return e.returnValue;
+      }
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [shouldConfirmLeave]);
+
+  const handleUpdate = useCallback((updates: Partial<LocalDraft>) => {
+    setLocalDraft((prev) => ({ ...prev, ...updates }));
+    
+    // If location data updated, try to resolve cityId immediately
+    if (updates.lat && updates.lng && updates.addressJson) {
+      resolveCityIdClient(updates.lat, updates.lng, updates.addressJson);
+    }
+  }, []);
+  
+  // Handle back/close navigation with confirmation
+  const handleNavigateAway = useCallback((destination: string) => {
+    if (shouldConfirmLeave && !isNavigatingRef.current) {
+      // Show custom dialog
+      pendingNavigationRef.current = destination;
+      setShowLeaveDialog(true);
+    } else {
+      // Navigate immediately
+      isNavigatingRef.current = true;
+      router.push(destination);
+    }
+  }, [shouldConfirmLeave, router]);
+  
+  const handleSaveDraftFromDialog = async () => {
+    const destination = pendingNavigationRef.current || "/business/places";
+    const success = await saveDraft(destination);
+    
+    if (success) {
+      setShowLeaveDialog(false);
+      pendingNavigationRef.current = null;
+    }
+  };
+  
+  const handleDiscardFromDialog = async () => {
+    const destination = pendingNavigationRef.current || "/business/places";
+    
+    // Delete temp media session
+    try {
+      await fetch(`/api/business/temp-media/session/${wizardSessionId}`, {
+        method: "DELETE",
+      });
+      console.log("[NewPlaceWizard] Deleted temp media session");
+    } catch (error) {
+      console.error("[NewPlaceWizard] Failed to delete temp media (non-fatal):", error);
+    }
+    
+    // Clear local autosave and session
+    clearLocal();
+    await clearSession();
+    
+    isNavigatingRef.current = true;
+    setShowLeaveDialog(false);
+    pendingNavigationRef.current = null;
+    router.push(destination);
+  };
+
+  const saveDraft = useCallback(async (navigateTo?: string) => {
+    if (!localDraft.title || !localDraft.category || !localDraft.shortDesc) {
+      toast.error("Заполните обязательные поля: название, категория, краткое описание");
+      return false;
+    }
+
+    setIsSaving(true);
+    try {
+      console.log("[NewPlaceWizard] Creating place (DRAFT) with sessionId:", wizardSessionId);
+      
+      const res = await fetch("/api/business/places", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          createRequestId,
+          status: "DRAFT",
+          data: {
+            ...localDraft,
+            wizardSessionId, // Attach temp media
+          },
+        }),
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({ error: "Unknown error" }));
+        console.error("[NewPlaceWizard] Create failed:", errorData);
+        throw new Error(errorData.message || errorData.error || "Failed to create");
+      }
+
+      const { place } = await res.json();
+      
+      console.log("[NewPlaceWizard] Place created successfully:", place.id);
+      
+      // Clear local autosave and session
+      clearLocal();
+      await clearSession();
+      
+      // Delete temp media session (already attached to place)
+      try {
+        await fetch(`/api/business/temp-media/session/${wizardSessionId}`, {
+          method: "DELETE",
+        });
+      } catch (cleanupError) {
+        console.error("[NewPlaceWizard] Temp media cleanup error (non-fatal):", cleanupError);
+      }
+      
+      toast.success("Черновик сохранён");
+      
+      // Mark as navigating to prevent beforeunload
+      isNavigatingRef.current = true;
+      
+      // Navigate to specified location or edit page
+      if (navigateTo) {
+        router.push(navigateTo);
+      } else {
+        router.push(`/business/places/${place.id}/edit?step=${currentStep}`);
+      }
+      
+      return true;
+    } catch (error) {
+      console.error("[NewPlaceWizard] Create error:", error);
+      toast.error(error instanceof Error ? error.message : "Ошибка создания");
+      return false;
+    } finally {
+      setIsSaving(false);
+    }
+  }, [localDraft, createRequestId, wizardSessionId, currentStep, router, clearLocal, clearSession]);
+
+  const submitForModeration = useCallback(async () => {
+    // Validate all required fields
+    if (!localDraft.title || !localDraft.category || !localDraft.shortDesc) {
+      toast.error("Заполните обязательные поля на шаге 1");
+      return false;
+    }
+
+    if (!localDraft.lat || !localDraft.lng) {
+      toast.error("Укажите местоположение на шаге 2");
+      return false;
+    }
+
+    setIsSaving(true);
+    try {
+      console.log("[NewPlaceWizard] Submitting place (PENDING) with sessionId:", wizardSessionId);
+      
+      const res = await fetch("/api/business/places", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          createRequestId,
+          status: "PENDING",
+          data: {
+            ...localDraft,
+            wizardSessionId, // Attach temp media
+          },
+        }),
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({ error: "Unknown error" }));
+        console.error("[NewPlaceWizard] Submit failed:", errorData);
+        throw new Error(errorData.message || errorData.error || "Failed to submit");
+      }
+
+      const { place } = await res.json();
+      
+      console.log("[NewPlaceWizard] Place submitted successfully:", place.id);
+      
+      // Clear local autosave and session
+      clearLocal();
+      await clearSession();
+      
+      // Delete temp media session (already attached to place)
+      try {
+        await fetch(`/api/business/temp-media/session/${wizardSessionId}`, {
+          method: "DELETE",
+        });
+      } catch (cleanupError) {
+        console.error("[NewPlaceWizard] Temp media cleanup error (non-fatal):", cleanupError);
+      }
+      
+      toast.success("Место отправлено на модерацию");
+      
+      // Mark as navigating to prevent beforeunload
+      isNavigatingRef.current = true;
+      
+      // Redirect to places list
+      router.push("/business/places?status=PENDING");
+      return true;
+    } catch (error) {
+      console.error("[NewPlaceWizard] Submit error:", error);
+      toast.error(error instanceof Error ? error.message : "Ошибка отправки");
+      return false;
+    } finally {
+      setIsSaving(false);
+    }
+  }, [localDraft, createRequestId, wizardSessionId, router, clearLocal, clearSession]);
+
+  const handleStepClick = (targetStep: number) => {
+    // Create mock place for validation
+    const mockPlaceForValidation = {
+      id: "new",
+      ownerUserId: "new",
+      status: ContentStatus.DRAFT,
+      createRequestId,
+      ...localDraft,
+      logoImageId: localDraft.logoMediaId,
+      images: [],
+      locationSource: localDraft.googlePlaceId ? ("GOOGLE" as const) : ("MANUAL" as const),
+      countryCode: null,
+      parentPlaceId: null,
+      unitLabel: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    } as unknown as PlaceWithImages;
+    
+    if (!canGoToStep(targetStep, currentStep, mockPlaceForValidation)) {
+      return;
+    }
+    setCurrentStep(targetStep);
+  };
+
+  const handleNext = () => {
+    if (currentStep === 4) {
+      // Last step - submit for moderation
+      submitForModeration();
+    } else if (canGoToNextStep(currentStep, mockPlace)) {
+      setCurrentStep(currentStep + 1);
+    } else {
+      toast.error("Заполните обязательные поля для продолжения");
+    }
+  };
+
+  const handlePrev = () => {
+    if (canGoToPrevStep(currentStep)) {
+      setCurrentStep(currentStep - 1);
+    }
+  };
+
+  // Create a mock place object for step components compatibility
+  const mockPlace = {
+    id: "new",
+    ownerUserId: user?.id || "new",
+    status: ContentStatus.DRAFT,
+    createRequestId,
+    title: localDraft.title,
+    category: localDraft.category,
+    shortDesc: localDraft.shortDesc,
+    description: localDraft.description,
+    ageTags: localDraft.ageTags,
+    visitFormats: localDraft.visitFormats,
+    activityTypes: localDraft.activityTypes,
+    lat: localDraft.lat,
+    lng: localDraft.lng,
+    googlePlaceId: localDraft.googlePlaceId,
+    formattedAddr: localDraft.formattedAddr,
+    addressJson: localDraft.addressJson,
+    customAddress: localDraft.customAddress,
+    cityId: localDraft.cityId,
+    districtAutoId: localDraft.districtAutoId,
+    districtManualId: localDraft.districtManualId,
+    metroAutoId: localDraft.metroAutoId,
+    metroAutoDistanceM: localDraft.metroAutoDistanceM,
+    metroManualId: localDraft.metroManualId,
+    metroManualDistanceM: localDraft.metroManualDistanceM,
+    phone: localDraft.phone,
+    website: localDraft.website,
+    instagramHandle: localDraft.instagramHandle,
+    instagramUrl: localDraft.instagramUrl,
+    placeKind: localDraft.placeKind,
+    floor: localDraft.floor,
+    unit: localDraft.unit,
+    // Map temp media to PlaceImage format for validation
+    logoImageId: localDraft.logoMediaId,
+    images: [
+      // Include logo if exists
+      ...(localDraft.logoUrl ? [{
+        id: localDraft.logoMediaId || "temp-logo",
+        placeId: "new",
+        kind: "LOGO" as const,
+        url: localDraft.logoUrl,
+        width: null,
+        height: null,
+        blurhash: null,
+        sortOrder: -1,
+        createdAt: new Date(),
+      }] : []),
+      // Include gallery images
+      ...localDraft.galleryUrls.map((url, index) => ({
+        id: localDraft.galleryMediaIds[index] || `temp-${index}`,
+        placeId: "new",
+        kind: "GALLERY" as const,
+        url,
+        width: null,
+        height: null,
+        blurhash: null,
+        sortOrder: index,
+        createdAt: new Date(),
+      })),
+    ],
+    locationSource: localDraft.googlePlaceId ? ("GOOGLE" as const) : ("MANUAL" as const),
+    countryCode: null,
+    parentPlaceId: null,
+    unitLabel: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  } as unknown as PlaceWithImages;
+
+  const canGoNext = currentStep === 4 ? true : canGoToNextStep(currentStep, mockPlace);
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <WizardHeaderNew
+        currentStep={currentStep}
+        totalSteps={4}
+        status={ContentStatus.DRAFT}
+        isSaving={isSaving}
+        isDirty={shouldConfirmLeave}
+        lastSaved={lastSaved}
+        onStepClick={handleStepClick}
+        onSaveDraft={() => saveDraft()}
+        canGoNext={canGoNext}
+        getStepStatus={(step) => getStepStatus(step, currentStep, mockPlace)}
+        place={mockPlace}
+      />
+
+      <div className="max-w-4xl mx-auto px-4 py-8">
+        {/* Info banner */}
+        <div className="mb-6 bg-blue-50 border-l-4 border-blue-400 p-4 rounded-md">
+          <div className="flex items-start">
+            <AlertCircle className="w-5 h-5 text-blue-600 mt-0.5 mr-3 flex-shrink-0" />
+            <div>
+              <h3 className="text-sm font-semibold text-blue-800 mb-1">
+                Новое место
+              </h3>
+              <p className="text-sm text-blue-700">
+                Заполните информацию о месте. Место будет создано в базе данных только после нажатия "Сохранить черновик" или "Отправить на модерацию".
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Unsaved Changes Warning */}
+        {shouldConfirmLeave && (
+          <div className="mb-6 bg-amber-50 border-l-4 border-amber-400 p-4 rounded-md">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <AlertCircle className="w-5 h-5 text-amber-600 mr-3 flex-shrink-0" />
+                <p className="text-sm font-medium text-amber-800">
+                  Место ещё не создано. Нажмите "Сохранить черновик" для создания.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {currentStep === 1 && (
+          <Step1Profile
+            place={mockPlace}
+            onUpdate={handleUpdate}
+            onNext={handleNext}
+            canNext={canGoNext}
+          />
+        )}
+
+        {currentStep === 2 && (
+          <Step2Location
+            place={mockPlace}
+            onUpdate={handleUpdate}
+            onPrev={handlePrev}
+            onNext={handleNext}
+            canNext={canGoNext}
+          />
+        )}
+
+        {currentStep === 3 && sessionLoaded && (
+          <Step3Photos
+            place={mockPlace}
+            images={mockPlace.images}
+            wizardSessionId={wizardSessionId}
+            onUpdate={handleUpdate}
+            onPrev={handlePrev}
+            onNext={handleNext}
+            canNext={canGoNext}
+          />
+        )}
+
+        {currentStep === 4 && (
+          <Step4Contacts
+            place={mockPlace}
+            onUpdate={handleUpdate}
+            onPrev={handlePrev}
+            onSubmit={submitForModeration}
+            isSaving={isSaving}
+          />
+        )}
+      </div>
+      
+      {/* Close button */}
+      <div className="fixed top-4 right-4 z-50">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => handleNavigateAway("/business/places")}
+          className="rounded-full"
+          title="Закрыть"
+        >
+          <X className="h-5 w-5" />
+        </Button>
+      </div>
+      
+      {/* Save Draft Confirmation Dialog */}
+      <SaveDraftDialog
+        open={showLeaveDialog}
+        onOpenChange={setShowLeaveDialog}
+        onSaveDraft={handleSaveDraftFromDialog}
+        onDiscard={handleDiscardFromDialog}
+        isSaving={isSaving}
+      />
+    </div>
+  );
+}

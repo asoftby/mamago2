@@ -34,13 +34,19 @@ model User {
   phoneE164       String?   @unique
   phoneVerifiedAt DateTime?
 
-  sessions                     Session[]
-  business                     Business? // One business per owner (MVP)
-  children                     Child[]
-  ideas                        Idea[]
-  planItems                    PlanItem[]
-  phoneOtps                    PhoneOtp[]
+  sessions                      Session[]
+  business                      Business? // One business per owner (MVP)
+  children                      Child[]
+  ideas                         Idea[]
+  planItems                     PlanItem[]
+  phoneOtps                     PhoneOtp[]
   reviewedBusinessVerifications BusinessVerificationLog[] @relation("ReviewedBy")
+  places                        Place[]                   @relation("PlaceOwner")
+  moderationLogs                ModerationLog[]           @relation("ModerationReviewer")
+  activities                    Activity[]                @relation("ActivityOwner")
+  placeClaimRequests            PlaceClaimRequest[]       @relation("ClaimRequester")
+  reviewedPlaceClaimRequests    PlaceClaimRequest[]       @relation("ClaimReviewer")
+  tempMedia                     TempMedia[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -202,25 +208,43 @@ model City {
   slug      String   @unique
   lat       Float?
   lng       Float?
+  
+  // Google Places matching
+  googleName  String? // Primary Google name (e.g., "Minsk")
+  googleNames Json?   // Alternative names array for matching
+  
+  // City center for coordinate-based resolution
+  centerLat Float?
+  centerLng Float?
+  radiusKm  Float?  // Search radius for coordinate-based city matching (e.g., 40 for Minsk)
+  
+  // Metro configuration
+  hasMetro          Boolean @default(false)
+  metroMaxDistanceM Int?    // Max distance to show metro (e.g., 2500 for Minsk)
+  
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   districts     District[]
   metroStations MetroStation[]
-  places        Place[]        @relation("PlaceCity") // Business Cabinet relation
+  places        Place[]        @relation("PlaceCity")
 
   @@index([slug])
+  @@index([googleName])
 }
 
 model District {
   id        String   @id @default(cuid())
   cityId    String
   name      String
+  centerLat Float? // Centroid latitude for MVP geo enrichment
+  centerLng Float? // Centroid longitude for MVP geo enrichment
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  city   City    @relation(fields: [cityId], references: [id], onDelete: Cascade)
-  places Place[] @relation("PlaceDistrict") // Business Cabinet relation
+  city                City    @relation(fields: [cityId], references: [id], onDelete: Cascade)
+  placesAutoAssigned  Place[] @relation("PlaceDistrictAuto")
+  placesManualPicked  Place[] @relation("PlaceDistrictManual")
 
   @@unique([cityId, name])
   @@index([cityId])
@@ -240,9 +264,10 @@ model MetroStation {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  city       City       @relation(fields: [cityId], references: [id], onDelete: Cascade)
-  activities Activity[]
-  places     Place[]    @relation("PlaceMetro") // Business Cabinet relation
+  city               City       @relation(fields: [cityId], references: [id], onDelete: Cascade)
+  activities         Activity[]
+  placesAutoAssigned Place[]    @relation("PlaceMetroAuto")
+  placesManualPicked Place[]    @relation("PlaceMetroManual")
 
   @@unique([cityId, osmType, osmId])
   @@unique([cityId, name])
@@ -250,37 +275,86 @@ model MetroStation {
 }
 
 model Activity {
-  id             String  @id @default(cuid())
-  name           String
-  description    String?
+  id     String       @id @default(cuid())
+  placeId String?     // Required for EVENT/PERMANENT/COURSE/OFFER; nullable for ROUTE
+  
+  // Activity classification
+  type   ActivityType
+  status ContentStatus @default(DRAFT)
+  
+  // Basic info
+  title       String
+  shortDesc   String
+  description String?
+  
+  // Age targeting
+  ageTags String[] // e.g., ["0-3", "3-7", "7-12"]
+  
+  // Schedule
+  scheduleMode      ScheduleMode
+  scheduleJson      Json? // Payload depends on scheduleMode
+  nextOccurrenceAt  DateTime? // Denormalized for "Today/Tomorrow/Weekend/Week" queries
+  
+  // Pricing (optional)
+  priceFrom    Float?
+  priceTo      Float?
+  priceText    String? // e.g., "от 50 BYN", "бесплатно"
+  currency     String? @default("BYN")
+  
+  // Images
+  coverImageId String?
+  
+  // Business ownership
+  ownerUserId String
+  
+  // Legacy fields (keep for backward compatibility, will migrate later)
   cityId         String?
   metroStationId String?
-
-  // Business ownership (optional - can be created by business or admin)
-  businessId String?
-  createdBy  String? // userId who created it
-
-  // Display fields
-  coverImageUrl String?
-  priceFrom     Float?
-  currency      String? @default("BYN")
-  ageLabel      String? // e.g., "6+", "3-7 лет"
-
-  // Age range in months (for filtering)
-  ageMinMonths Int?
-  ageMaxMonths Int?
-
+  businessId     String?
+  createdBy      String?
+  coverImageUrl  String?
+  ageLabel       String?
+  ageMinMonths   Int?
+  ageMaxMonths   Int?
+  
+  // Relations
+  place         Place?                 @relation("PlaceActivities", fields: [placeId], references: [id], onDelete: Restrict)
+  owner         User                   @relation(fields: [ownerUserId], references: [id], onDelete: Cascade, name: "ActivityOwner")
   metroStation  MetroStation?          @relation(fields: [metroStationId], references: [id])
   filterOptions ActivityFilterOption[]
   sessions      ActivitySession[]
   planItems     PlanItem[]
-
+  images        ActivityImage[]
+  
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
+  
+  @@index([placeId])
+  @@index([type])
+  @@index([status])
+  @@index([scheduleMode])
+  @@index([nextOccurrenceAt])
+  @@index([ownerUserId])
   @@index([ageMinMonths, ageMaxMonths])
   @@index([businessId])
   @@index([cityId])
+}
+
+// Activity images
+model ActivityImage {
+  id         String @id @default(cuid())
+  activityId String
+  url        String
+  width      Int?
+  height     Int?
+  blurhash   String?
+  sortOrder  Int    @default(0)
+  
+  activity Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  
+  createdAt DateTime @default(now())
+  
+  @@index([activityId, sortOrder])
 }
 
 // Activity sessions (specific dates/times when activity happens)
@@ -342,17 +416,77 @@ enum BusinessVerificationStatus {
   REJECTED
 }
 
+// Content status (unified for Place, Activity, etc.)
+enum ContentStatus {
+  DRAFT
+  PENDING
+  PUBLISHED
+  NEEDS_CHANGES
+  REJECTED
+}
+
+// Activity type (determines section classification)
+enum ActivityType {
+  EVENT         // Разовое мероприятие → "Куда пойти"
+  PERMANENT     // Постоянное место → "Куда пойти" + "Всегда рядом"
+  COURSE        // Курс/занятие → "Занятия"
+  ROUTE         // Маршрут (без привязки к месту) → "Куда пойти"
+  OFFER         // Предложение для ДР → "Куда пойти" (для будущего конструктора ДР)
+}
+
+// Schedule mode (how activity repeats)
+enum ScheduleMode {
+  ONE_TIME    // Одна дата/время (EVENT)
+  MULTI_DATE  // Несколько конкретных дат (EVENT)
+  RECURRING   // Повторяющееся расписание (COURSE, PERMANENT)
+  ON_DEMAND   // По запросу (PERMANENT, COURSE)
+  ALWAYS      // Всегда доступно (PERMANENT)
+}
+
+// Location source for Place
+enum LocationSource {
+  GOOGLE
+  MANUAL
+}
+
+// Place image kind
+enum PlaceImageKind {
+  LOGO
+  GALLERY
+}
+
+// Place kind (hierarchy support)
+enum PlaceKind {
+  STANDALONE // Обычное отдельное место
+  COMPLEX    // Торговый центр / парк / большой объект
+  UNIT       // Точка внутри комплекса (павильон, островок)
+}
+
+// Moderation entity type (polymorphic)
+enum ModerationEntityType {
+  PLACE
+  ACTIVITY
+}
+
+// Moderation action
+enum ModerationAction {
+  SUBMIT
+  APPROVE
+  NEEDS_CHANGES
+  REJECT
+}
+
 // Business entity
 model Business {
-  id          String         @id @default(cuid())
+  id          String @id @default(cuid())
   name        String
-  ownerUserId String         @unique // One business per owner (MVP)
-  
+  ownerUserId String @unique // One business per owner (MVP)
+
   // Onboarding fields
-  unp         String?
-  legalName   String?
-  phone       String?
-  status      BusinessStatus @default(DRAFT)
+  unp       String?
+  legalName String?
+  phone     String?
+  status    BusinessStatus @default(DRAFT)
 
   // Verification fields
   verificationStatus BusinessVerificationStatus @default(DRAFT)
@@ -364,8 +498,7 @@ model Business {
   rejectedAt         DateTime?
   isVerified         Boolean                    @default(false)
 
-  owner            User                        @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
-  places           Place[]
+  owner            User                      @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
   verificationLogs BusinessVerificationLog[]
 
   createdAt DateTime @default(now())
@@ -378,7 +511,7 @@ model Business {
 
 // Business verification audit log
 model BusinessVerificationLog {
-  id               String                        @id @default(cuid())
+  id               String                     @id @default(cuid())
   businessId       String
   statusFrom       BusinessVerificationStatus
   statusTo         BusinessVerificationStatus
@@ -393,38 +526,194 @@ model BusinessVerificationLog {
   @@index([businessId, createdAt])
 }
 
-// Place entity
+// Place entity (location/venue profile)
 model Place {
-  id         String  @id @default(cuid())
-  businessId String
-  title      String
-  address    String
-  cityId     String
-  lat        Float?
-  lng        Float?
-  metroId    String?
-  districtId String?
-  phone      String?
-  website    String?
-  coverImage String?
+  id          String        @id @default(cuid())
+  ownerUserId String
+  status      ContentStatus @default(DRAFT)
 
-  // Age range in months (for filtering)
-  ageMinMonths Int?
-  ageMaxMonths Int?
+  // Idempotency key for creation (prevents duplicate places)
+  createRequestId String?
 
-  business Business      @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  // Foreign keys only - do NOT add reverse relations to City/MetroStation/District models
-  city     City          @relation(fields: [cityId], references: [id], name: "PlaceCity")
-  metro    MetroStation? @relation(fields: [metroId], references: [id], name: "PlaceMetro")
-  district District?     @relation(fields: [districtId], references: [id], name: "PlaceDistrict")
-  offers   Offer[]
+  // Required fields for submission
+  title     String
+  category  String // e.g., "cafe", "museum", "park"
+  shortDesc String // Short description for cards
+
+  // Optional SEO description
+  description String?
+
+  // Logo image (required for publish, validated at API level)
+  logoImageId String?
+
+  // Google Places data
+  googlePlaceId  String? // Allow multiple businesses to add same Google place
+  lat            Float?
+  lng            Float?
+  formattedAddr  String?
+  addressJson    Json? // Full Google address components
+  countryCode    String?
+  cityId         String?
+  locationSource LocationSource @default(MANUAL)
+  customAddress  String? // For MANUAL location source
+
+  // Geo enrichment (district & metro)
+  districtAutoId      String? // Auto-determined district
+  districtManualId    String? // User-selected district (overrides auto)
+  metroAutoId         String? // Auto-determined nearest metro
+  metroAutoDistanceM  Int?    // Distance to auto metro in meters
+  metroManualId       String? // User-selected metro (overrides auto)
+  metroManualDistanceM Int?   // Distance to manual metro in meters
+
+  // Hierarchy support (Complex → Units)
+  placeKind     PlaceKind @default(STANDALONE)
+  parentPlaceId String?
+  unitLabel     String? // e.g., "2 этаж, павильон A12"
+  floor         String? // e.g., "2"
+  unit          String? // e.g., "A12"
+
+  // Contact information
+  phone           String?
+  website         String?
+  instagramHandle String?
+  instagramUrl    String?
+
+  // Tags (arrays)
+  ageTags       String[] // e.g., ["0-3", "3-7", "7-12"]
+  visitFormats  String[] // e.g., ["indoor", "outdoor", "online"]
+  activityTypes String[] // e.g., ["sports", "arts", "education"]
+
+  // Relations
+  owner          User          @relation(fields: [ownerUserId], references: [id], onDelete: Cascade, name: "PlaceOwner")
+  city           City?         @relation(fields: [cityId], references: [id], name: "PlaceCity")
+  districtAuto   District?     @relation(fields: [districtAutoId], references: [id], onDelete: SetNull, name: "PlaceDistrictAuto")
+  districtManual District?     @relation(fields: [districtManualId], references: [id], onDelete: SetNull, name: "PlaceDistrictManual")
+  metroAuto      MetroStation? @relation(fields: [metroAutoId], references: [id], onDelete: SetNull, name: "PlaceMetroAuto")
+  metroManual    MetroStation? @relation(fields: [metroManualId], references: [id], onDelete: SetNull, name: "PlaceMetroManual")
+  parentPlace    Place?        @relation("PlaceHierarchy", fields: [parentPlaceId], references: [id], onDelete: Restrict)
+  children       Place[]       @relation("PlaceHierarchy")
+  images         PlaceImage[]
+  offers         Offer[]
+  activities     Activity[]          @relation("PlaceActivities")
+  claimRequests  PlaceClaimRequest[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@index([businessId])
+  @@index([ownerUserId])
+  @@index([status])
   @@index([cityId])
-  @@index([ageMinMonths, ageMaxMonths])
+  @@index([googlePlaceId]) // Index for performance (not unique - multiple businesses can add same place)
+  @@index([parentPlaceId])
+  @@index([placeKind])
+  @@index([districtAutoId])
+  @@index([districtManualId])
+  @@index([metroAutoId])
+  @@index([metroManualId])
+  @@unique([ownerUserId, createRequestId]) // Prevent duplicate creation with same request ID
+}
+
+// Place claim request (user requests ownership of existing place)
+model PlaceClaimRequest {
+  id               String   @id @default(cuid())
+  placeId          String
+  userId           String
+  businessId       String?
+  status           String   @default("PENDING") // PENDING | APPROVED | REJECTED
+  note             String?
+  reviewedAt       DateTime?
+  reviewedByUserId String?
+
+  place      Place  @relation(fields: [placeId], references: [id], onDelete: Cascade)
+  user       User   @relation(fields: [userId], references: [id], onDelete: Cascade, name: "ClaimRequester")
+  reviewedBy User?  @relation(fields: [reviewedByUserId], references: [id], onDelete: SetNull, name: "ClaimReviewer")
+
+  createdAt DateTime @default(now())
+
+  @@index([placeId, status])
+  @@index([userId, createdAt])
+  @@index([status])
+}
+
+// Place images (logo and gallery)
+model PlaceImage {
+  id        String         @id @default(cuid())
+  placeId   String
+  kind      PlaceImageKind
+  url       String
+  width     Int?
+  height    Int?
+  blurhash  String?
+  sortOrder Int            @default(0)
+
+  place Place @relation(fields: [placeId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([placeId, kind, sortOrder])
+}
+
+// Temporary media for wizard sessions (before Place creation)
+enum TempMediaKind {
+  PLACE_LOGO
+  PLACE_GALLERY
+  ACTIVITY_COVER
+  ACTIVITY_GALLERY
+}
+
+enum TempMediaStatus {
+  TEMP      // Uploaded but not attached to entity
+  ATTACHED  // Attached to entity (Place/Activity)
+  DELETED   // Marked for deletion
+}
+
+model TempMedia {
+  id               String          @id @default(cuid())
+  ownerUserId      String
+  wizardSessionId  String          // UUID for wizard session
+  
+  // File metadata
+  url              String
+  width            Int?
+  height           Int?
+  blurhash         String?
+  mimeType         String?
+  sizeBytes        Int?
+  
+  // Classification
+  kind             TempMediaKind
+  sortOrder        Int             @default(0)
+  status           TempMediaStatus @default(TEMP)
+  
+  // Attachment (set when entity is created)
+  placeId          String?
+  activityId       String?
+  
+  owner            User            @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+  
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  
+  @@index([ownerUserId, wizardSessionId, status])
+  @@index([wizardSessionId, kind, sortOrder])
+  @@index([status, createdAt]) // For cleanup jobs
+}
+
+// Unified moderation log (polymorphic for Place, Activity, etc.)
+model ModerationLog {
+  id               String               @id @default(cuid())
+  entityType       ModerationEntityType
+  entityId         String
+  action           ModerationAction
+  message          String?
+  reviewedByUserId String?
+
+  reviewedBy User? @relation(fields: [reviewedByUserId], references: [id], onDelete: SetNull, name: "ModerationReviewer")
+
+  createdAt DateTime @default(now())
+
+  @@index([entityType, entityId, createdAt])
+  @@index([reviewedByUserId])
 }
 
 // Offer entity (EVENT or SERVICE)
