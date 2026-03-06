@@ -43,13 +43,41 @@ export default async function EditPlacePage({
     redirect("/business/places");
   }
 
-  // Get latest moderation message if status is NEEDS_CHANGES or REJECTED
+  // Get active revision if Place is PUBLISHED
+  let activeRevision = null;
+  if (place.status === "PUBLISHED") {
+    activeRevision = await prisma.placeRevision.findFirst({
+      where: {
+        placeId: place.id,
+        status: {
+          in: ["DRAFT", "PENDING", "NEEDS_REVISION"],
+        },
+      },
+      include: {
+        images: {
+          orderBy: { sortOrder: "asc" },
+        },
+      },
+    });
+  }
+
+  // Get latest moderation message
   let moderationMessage: string | null = null;
-  if (place.status === "NEEDS_CHANGES" || place.status === "REJECTED") {
+  if (place.status === "NEEDS_REVISION" || place.status === "REJECTED") {
     moderationMessage = await getLatestModerationMessage("PLACE", place.id);
+  } else if (activeRevision && (activeRevision.status === "NEEDS_REVISION")) {
+    // Get moderation message from revision
+    moderationMessage = activeRevision.moderatorComment;
   }
 
   const step = parseInt(stepParam || "1", 10);
 
-  return <PlaceWizard place={place} initialStep={step} moderationMessage={moderationMessage} />;
+  return (
+    <PlaceWizard
+      place={place}
+      initialStep={step}
+      moderationMessage={moderationMessage}
+      activeRevision={activeRevision}
+    />
+  );
 }

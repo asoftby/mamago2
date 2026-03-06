@@ -24,7 +24,7 @@ export default async function BusinessDashboardPage() {
     <div className="space-y-6">
       {/* Verification Status Banner */}
       <VerificationBanner
-        status={business.verificationStatus}
+        status={business.verificationStatus as any}
         reviewNote={business.reviewNote}
       />
 
@@ -70,7 +70,7 @@ export default async function BusinessDashboardPage() {
       </div>
 
       {/* Quick Actions - Gated by verification status */}
-      <RequireVerifiedBusiness status={business.verificationStatus}>
+      <RequireVerifiedBusiness status={business.verificationStatus as any}>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Link
             href="/business/places"

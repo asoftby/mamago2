@@ -42,11 +42,15 @@ model User {
   phoneOtps                     PhoneOtp[]
   reviewedBusinessVerifications BusinessVerificationLog[] @relation("ReviewedBy")
   places                        Place[]                   @relation("PlaceOwner")
+  moderatedPlaces               Place[]                   @relation("PlaceModerator")
+  archivedPlaces                Place[]                   @relation("PlaceArchiver")
+  placeRevisions                PlaceRevision[]           @relation("PlaceRevisionReviewer")
   moderationLogs                ModerationLog[]           @relation("ModerationReviewer")
   activities                    Activity[]                @relation("ActivityOwner")
   placeClaimRequests            PlaceClaimRequest[]       @relation("ClaimRequester")
   reviewedPlaceClaimRequests    PlaceClaimRequest[]       @relation("ClaimReviewer")
   tempMedia                     TempMedia[]
+  notifications                 Notification[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -227,7 +231,8 @@ model City {
 
   districts     District[]
   metroStations MetroStation[]
-  places        Place[]        @relation("PlaceCity")
+  places        Place[]          @relation("PlaceCity")
+  placeRevisions PlaceRevision[] @relation("PlaceRevisionCity")
 
   @@index([slug])
   @@index([googleName])
@@ -421,7 +426,7 @@ enum ContentStatus {
   DRAFT
   PENDING
   PUBLISHED
-  NEEDS_CHANGES
+  NEEDS_REVISION  // Renamed from NEEDS_CHANGES for consistency
   REJECTED
 }
 
@@ -462,6 +467,15 @@ enum PlaceKind {
   UNIT       // Точка внутри комплекса (павильон, островок)
 }
 
+// Place revision status (for post-publication edits)
+enum PlaceRevisionStatus {
+  DRAFT
+  PENDING
+  NEEDS_REVISION
+  APPROVED
+  REJECTED
+}
+
 // Moderation entity type (polymorphic)
 enum ModerationEntityType {
   PLACE
@@ -472,7 +486,7 @@ enum ModerationEntityType {
 enum ModerationAction {
   SUBMIT
   APPROVE
-  NEEDS_CHANGES
+  NEEDS_REVISION  // Renamed from NEEDS_CHANGES for consistency
   REJECT
 }
 
@@ -583,8 +597,21 @@ model Place {
   visitFormats  String[] // e.g., ["indoor", "outdoor", "online"]
   activityTypes String[] // e.g., ["sports", "arts", "education"]
 
+  // Moderation metadata
+  moderatorComment      String?   // Explanation of required fixes
+  moderationReviewedAt  DateTime? // When moderation was completed
+  moderatedByUserId     String?   // Admin/moderator who reviewed
+  revisionRequestedAt   DateTime? // When NEEDS_REVISION was assigned
+  revisionResubmittedAt DateTime? // When business resubmitted after fixes
+
+  // Archive metadata (soft delete)
+  archivedAt       DateTime? // When place was archived
+  archivedByUserId String?   // User who archived (owner or admin)
+
   // Relations
+  archivedBy     User?         @relation(fields: [archivedByUserId], references: [id], onDelete: SetNull, name: "PlaceArchiver")
   owner          User          @relation(fields: [ownerUserId], references: [id], onDelete: Cascade, name: "PlaceOwner")
+  moderatedBy    User?         @relation(fields: [moderatedByUserId], references: [id], onDelete: SetNull, name: "PlaceModerator")
   city           City?         @relation(fields: [cityId], references: [id], name: "PlaceCity")
   districtAuto   District?     @relation(fields: [districtAutoId], references: [id], onDelete: SetNull, name: "PlaceDistrictAuto")
   districtManual District?     @relation(fields: [districtManualId], references: [id], onDelete: SetNull, name: "PlaceDistrictManual")
@@ -596,6 +623,7 @@ model Place {
   offers         Offer[]
   activities     Activity[]          @relation("PlaceActivities")
   claimRequests  PlaceClaimRequest[]
+  revisions      PlaceRevision[]     // Post-publication edit revisions
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -610,7 +638,106 @@ model Place {
   @@index([districtManualId])
   @@index([metroAutoId])
   @@index([metroManualId])
+  @@index([moderatedByUserId])
+  @@index([archivedByUserId])
+  @@index([archivedAt])
+  @@index([status, revisionRequestedAt]) // For filtering expired revisions
   @@unique([ownerUserId, createRequestId]) // Prevent duplicate creation with same request ID
+}
+
+// Place revision (post-publication edits)
+// Stores pending changes to published Places
+// Only one active revision (DRAFT/PENDING/NEEDS_REVISION) per Place allowed
+model PlaceRevision {
+  id        String               @id @default(cuid())
+  placeId   String
+  status    PlaceRevisionStatus  @default(DRAFT)
+
+  // Moderation metadata
+  moderatorComment      String?   // Admin feedback
+  submittedAt           DateTime? // When submitted for moderation
+  reviewedAt            DateTime? // When admin reviewed
+  reviewedByUserId      String?   // Admin who reviewed
+  revisionRequestedAt   DateTime? // When NEEDS_REVISION assigned
+  revisionResubmittedAt DateTime? // When resubmitted after fixes
+
+  // Snapshot of editable Place fields
+  // These fields mirror the Place model for fields that can be edited post-publication
+  title     String?
+  category  String?
+  shortDesc String?
+  description String?
+  logoImageId String?
+
+  // Location data
+  googlePlaceId  String?
+  lat            Float?
+  lng            Float?
+  formattedAddr  String?
+  addressJson    Json?
+  countryCode    String?
+  cityId         String?
+  locationSource LocationSource?
+  customAddress  String?
+
+  // Geo enrichment
+  districtAutoId       String?
+  districtManualId     String?
+  metroAutoId          String?
+  metroAutoDistanceM   Int?
+  metroManualId        String?
+  metroManualDistanceM Int?
+
+  // Hierarchy
+  placeKind     PlaceKind?
+  parentPlaceId String?
+  unitLabel     String?
+  floor         String?
+  unit          String?
+
+  // Contacts
+  phone           String?
+  website         String?
+  instagramHandle String?
+  instagramUrl    String?
+
+  // Tags
+  ageTags       String[]
+  visitFormats  String[]
+  activityTypes String[]
+
+  // Relations
+  place      Place                 @relation(fields: [placeId], references: [id], onDelete: Cascade)
+  reviewedBy User?                 @relation(fields: [reviewedByUserId], references: [id], onDelete: SetNull, name: "PlaceRevisionReviewer")
+  city       City?                 @relation(fields: [cityId], references: [id], name: "PlaceRevisionCity")
+  images     PlaceRevisionImage[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([placeId, status])
+  @@index([status])
+  @@index([reviewedByUserId])
+  @@index([status, revisionRequestedAt]) // For filtering expired revisions
+  @@index([placeId, createdAt])
+}
+
+// Place revision images (snapshots for revision)
+model PlaceRevisionImage {
+  id         String         @id @default(cuid())
+  revisionId String
+  kind       PlaceImageKind
+  url        String
+  width      Int?
+  height     Int?
+  blurhash   String?
+  sortOrder  Int            @default(0)
+
+  revision PlaceRevision @relation(fields: [revisionId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([revisionId, kind, sortOrder])
 }
 
 // Place claim request (user requests ownership of existing place)
@@ -697,6 +824,43 @@ model TempMedia {
   @@index([ownerUserId, wizardSessionId, status])
   @@index([wizardSessionId, kind, sortOrder])
   @@index([status, createdAt]) // For cleanup jobs
+}
+
+// Notification system
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  type      NotificationType
+  title     String
+  message   String
+  
+  // Entity reference (polymorphic)
+  entityType String? // PLACE, ACTIVITY, etc.
+  entityId   String?
+  
+  // Delivery status
+  isRead    Boolean  @default(false)
+  readAt    DateTime?
+  
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  createdAt DateTime @default(now())
+  
+  @@index([userId, isRead, createdAt])
+  @@index([entityType, entityId])
+}
+
+enum NotificationType {
+  PLACE_APPROVED
+  PLACE_NEEDS_CHANGES
+  PLACE_REJECTED
+  PLACE_UPDATE_APPROVED
+  PLACE_UPDATE_NEEDS_REVISION
+  PLACE_UPDATE_REJECTED
+  ACTIVITY_APPROVED
+  ACTIVITY_NEEDS_CHANGES
+  ACTIVITY_REJECTED
+  SYSTEM
 }
 
 // Unified moderation log (polymorphic for Place, Activity, etc.)

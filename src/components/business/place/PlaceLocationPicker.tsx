@@ -29,6 +29,7 @@ interface PlaceLocationPickerProps {
     metroManualDistanceM?: number | null;
   } | null;
   onUpdate?: (updates: any) => void;
+  disabled?: boolean;
 }
 
 type DuplicatePlace = {
@@ -51,6 +52,7 @@ export function PlaceLocationPicker({
   placeId,
   initialLocation,
   onUpdate,
+  disabled = false,
 }: PlaceLocationPickerProps) {
   
   // State
@@ -499,13 +501,14 @@ export function PlaceLocationPicker({
         <div className="mt-2 space-y-2">
           <PlaceSearchInput
             onPlaceSelect={handlePlaceSelect}
-            disabled={isSaving}
+            disabled={isSaving || disabled}
             initialValue={location?.address || initialLocation?.formattedAddr || ""}
           />
           <button
             type="button"
             onClick={() => setIsMapModalOpen(true)}
-            className="text-sm text-blue-600 hover:text-blue-700 hover:underline"
+            disabled={disabled}
+            className="text-sm text-blue-600 hover:text-blue-700 hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Выбрать точку на карте
           </button>
@@ -540,7 +543,7 @@ export function PlaceLocationPicker({
               value={districtShown || ""}
               onChange={(e) => handleDistrictChange(e.target.value)}
               className="mt-2 w-full rounded-md border border-input bg-background px-3 py-2"
-              disabled={districts.length === 0}
+              disabled={districts.length === 0 || disabled}
             >
               <option value="">Не выбрано</option>
               {districts.map((d) => (
@@ -558,7 +561,8 @@ export function PlaceLocationPicker({
                   <button
                     type="button"
                     onClick={handleResetDistrict}
-                    className="text-blue-600 hover:underline"
+                    disabled={disabled}
+                    className="text-blue-600 hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Сбросить
                   </button>
@@ -579,7 +583,7 @@ export function PlaceLocationPicker({
               value={metroShown || ""}
               onChange={(e) => handleMetroChange(e.target.value)}
               className="mt-2 w-full rounded-md border border-input bg-background px-3 py-2"
-              disabled={metroStations.length === 0}
+              disabled={metroStations.length === 0 || disabled}
             >
               <option value="">Не выбрано</option>
               {metroStations.map((m) => (
@@ -604,7 +608,8 @@ export function PlaceLocationPicker({
                   <button
                     type="button"
                     onClick={handleResetMetro}
-                    className="text-blue-600 hover:underline"
+                    disabled={disabled}
+                    className="text-blue-600 hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Сбросить
                   </button>
@@ -707,6 +712,7 @@ export function PlaceLocationPicker({
               id="inside-complex"
               checked={isInsideComplex}
               onCheckedChange={(checked) => setIsInsideComplex(checked === true)}
+              disabled={disabled}
             />
             <label
               htmlFor="inside-complex"
@@ -726,6 +732,7 @@ export function PlaceLocationPicker({
                   value={floor}
                   onChange={(e) => setFloor(e.target.value)}
                   placeholder="Например: 2"
+                  disabled={disabled}
                 />
               </div>
 
@@ -736,6 +743,7 @@ export function PlaceLocationPicker({
                   value={unit}
                   onChange={(e) => setUnit(e.target.value)}
                   placeholder="Например: A12"
+                  disabled={disabled}
                 />
               </div>
             </div>
@@ -750,13 +758,14 @@ export function PlaceLocationPicker({
               onChange={(e) => setHowToFind(e.target.value)}
               placeholder="Дополнительные указания для посетителей"
               rows={3}
+              disabled={disabled}
             />
           </div>
 
           {/* Save Details Button */}
           <Button
             onClick={handleSaveDetails}
-            disabled={isSaving}
+            disabled={isSaving || disabled}
             variant="outline"
             className="w-full"
           >

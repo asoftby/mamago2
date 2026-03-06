@@ -16,7 +16,7 @@ export default async function ProfileEntryPage() {
   const host = headersList.get("host") || "localhost:3000";
 
   // For BUSINESS_OWNER, check business status
-  let businessStatus: "DRAFT" | "PENDING" | "REJECTED" | "APPROVED" | null = null;
+  let businessStatus: "DRAFT" | "PENDING" | "REJECTED" | "APPROVED" | "NEEDS_INFO" | null = null;
   if (user.role === "BUSINESS_OWNER") {
     const business = await getMyBusiness(user.id);
     businessStatus = business?.verificationStatus || null;

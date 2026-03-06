@@ -49,7 +49,7 @@ export async function POST(
     if (
       activity.status !== ContentStatus.DRAFT &&
       activity.status !== ContentStatus.REJECTED &&
-      activity.status !== ContentStatus.NEEDS_CHANGES
+      activity.status !== ContentStatus.NEEDS_REVISION
     ) {
       return NextResponse.json(
         { error: `Cannot submit from status: ${activity.status}` },

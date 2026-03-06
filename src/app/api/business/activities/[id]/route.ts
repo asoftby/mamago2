@@ -57,11 +57,12 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     }
 
     const body = await request.json();
-    const { name, description, cityId, coverImageUrl, priceFrom, currency, ageLabel, sessions } =
+    const { title, shortDesc, description, cityId, coverImageUrl, priceFrom, currency, ageLabel, sessions } =
       body;
 
     const activity = await updateActivity(id, {
-      name,
+      title,
+      shortDesc,
       description,
       cityId,
       coverImageUrl,

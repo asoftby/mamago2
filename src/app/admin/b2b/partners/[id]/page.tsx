@@ -41,7 +41,7 @@ export default async function PartnerDetailPage({
     redirect("/admin");
   }
 
-  const business = await prisma.business.findUnique({
+  const business: any = await prisma.business.findUnique({
     where: { id: params.id },
     include: {
       owner: {
@@ -57,13 +57,11 @@ export default async function PartnerDetailPage({
               name: true,
             },
           },
-          offers: {
+          activities: {
             select: {
               id: true,
-              title: true,
-              kind: true,
+              name: true,
               status: true,
-              publishedAt: true,
               createdAt: true,
             },
             orderBy: {
@@ -88,7 +86,7 @@ export default async function PartnerDetailPage({
         },
         take: 5,
       },
-    },
+    } as any,
   });
 
   if (!business) {
@@ -260,7 +258,7 @@ export default async function PartnerDetailPage({
             <div className="mt-6">
               <h3 className="text-sm font-semibold mb-3">История изменений</h3>
               <div className="space-y-2">
-                {business.verificationLogs.map((log) => (
+                {business.verificationLogs.map((log: any) => (
                   <div
                     key={log.id}
                     className="text-sm bg-gray-50 p-3 rounded flex justify-between items-start"
@@ -322,10 +320,10 @@ export default async function PartnerDetailPage({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
-                  {business.places.map((place) => (
+                  {business.places.map((place: any) => (
                     <tr key={place.id} className="hover:bg-gray-50">
                       <td className="px-4 py-3 text-sm font-medium text-gray-900">
-                        {place.title}
+                        {place.name}
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-600">
                         {place.city.name}
@@ -334,7 +332,7 @@ export default async function PartnerDetailPage({
                         {place.address}
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-600">
-                        {place.offers.length}
+                        {place.activities.length}
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-600">
                         {new Date(place.createdAt).toLocaleDateString("ru-RU")}
@@ -352,12 +350,12 @@ export default async function PartnerDetailPage({
           <h2 className="text-lg font-semibold mb-4">
             Предложения (
             {business.places.reduce(
-              (sum, place) => sum + place.offers.length,
-              0
-            )}
+                (sum: number, place: any) => sum + place.activities.length,
+                0
+              )}
             )
           </h2>
-          {business.places.every((place) => place.offers.length === 0) ? (
+          {business.places.every((place: any) => place.activities.length === 0) ? (
             <div className="text-center py-8 text-gray-500">
               Нет предложений
             </div>
@@ -384,33 +382,32 @@ export default async function PartnerDetailPage({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
-                  {business.places.map((place) =>
-                    place.offers.map((offer) => (
-                      <tr key={offer.id} className="hover:bg-gray-50">
+                  {business.places.map((place: any) =>
+                    place.activities.map((activity: any) => (
+                      <tr key={activity.id} className="hover:bg-gray-50">
                         <td className="px-4 py-3 text-sm font-medium text-gray-900">
-                          {offer.title}
+                          {activity.name}
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-600">
-                          {OFFER_KIND_LABELS[offer.kind] || offer.kind}
+                          —
                         </td>
                         <td className="px-4 py-3 text-sm">
                           <span
                             className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                              STATUS_COLORS[offer.status]
+                              STATUS_COLORS[activity.status]
                             }`}
                           >
-                            {STATUS_LABELS[offer.status] || offer.status}
+                            {STATUS_LABELS[activity.status] || activity.status}
                           </span>
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-600">
-                          {offer.publishedAt
-                            ? new Date(offer.publishedAt).toLocaleDateString(
-                                "ru-RU"
-                              )
+                          {/* Activity doesn't have publishedAt, show createdAt or status instead */}
+                          {activity.status === "PUBLISHED" 
+                            ? new Date(activity.createdAt).toLocaleDateString("ru-RU")
                             : "—"}
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-600">
-                          {new Date(offer.createdAt).toLocaleDateString(
+                          {new Date(activity.createdAt).toLocaleDateString(
                             "ru-RU"
                           )}
                         </td>

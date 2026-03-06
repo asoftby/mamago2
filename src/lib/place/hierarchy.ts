@@ -33,7 +33,7 @@ export function isStandalone(place: Place): boolean {
  * Returns information about existing place and recommended action
  */
 export async function checkDuplicatePlace(googlePlaceId: string) {
-  const existing = await prisma.place.findUnique({
+  const existing = await prisma.place.findFirst({
     where: { googlePlaceId },
     select: {
       id: true,

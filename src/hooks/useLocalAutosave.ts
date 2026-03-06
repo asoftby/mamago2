@@ -22,7 +22,7 @@ export function useLocalAutosave<T>({
 }: UseLocalAutosaveOptions<T>) {
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
-  const timeoutRef = useRef<NodeJS.Timeout>();
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Save to localStorage
   const save = useCallback(

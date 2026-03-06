@@ -17,9 +17,10 @@ interface ValidationError {
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const user = await getCurrentUser();
     if (!user || user.role !== "BUSINESS_OWNER") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -27,7 +28,7 @@ export async function POST(
 
     // Get place with images
     const place = await prisma.place.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         images: true,
       },
@@ -42,11 +43,11 @@ export async function POST(
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    // Check current status (can only submit from DRAFT, REJECTED, NEEDS_CHANGES)
+    // Check current status (can only submit from DRAFT, REJECTED, NEEDS_REVISION)
     if (
       place.status !== ContentStatus.DRAFT &&
       place.status !== ContentStatus.REJECTED &&
-      place.status !== ContentStatus.NEEDS_CHANGES
+      place.status !== ContentStatus.NEEDS_REVISION
     ) {
       return NextResponse.json(
         { error: `Cannot submit from status: ${place.status}` },
@@ -128,11 +129,11 @@ export async function POST(
     }
 
     // All validations passed - submit for moderation
-    await submitPlace(params.id, user.id);
+    await submitPlace(id, user.id);
 
     // Fetch updated place
     const updatedPlace = await prisma.place.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         images: {
           orderBy: { sortOrder: "asc" },

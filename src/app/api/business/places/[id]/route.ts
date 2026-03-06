@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
+import { getActiveRevision } from "@/server/services/placeRevision.service";
 
 export async function GET(
   request: NextRequest,
@@ -90,7 +91,16 @@ export async function GET(
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    return NextResponse.json({ place });
+    // Get active revision if Place is published
+    let activeRevision = null;
+    if (place.status === "PUBLISHED") {
+      activeRevision = await getActiveRevision(place.id);
+    }
+
+    return NextResponse.json({ 
+      place,
+      activeRevision,
+    });
   } catch (error) {
     console.error("[place-get] ❌ Error:", error);
     console.error("[place-get] Stack:", error instanceof Error ? error.stack : "No stack");
@@ -129,7 +139,10 @@ export async function PATCH(
     // Check ownership
     const existing = await prisma.place.findUnique({
       where: { id },
-      select: { ownerUserId: true },
+      select: { 
+        ownerUserId: true,
+        status: true,
+      },
     });
 
     if (!existing) {
@@ -143,6 +156,17 @@ export async function PATCH(
       return NextResponse.json(
         { error: "FORBIDDEN", message: "You don't have access to this place" },
         { status: 403 }
+      );
+    }
+
+    // If Place is PUBLISHED, edits must go through PlaceRevision
+    if (existing.status === "PUBLISHED") {
+      return NextResponse.json(
+        { 
+          error: "PUBLISHED_PLACE_REQUIRES_REVISION",
+          message: "Published places must be edited through revisions. Use /api/business/places/[id]/revision endpoint."
+        },
+        { status: 400 }
       );
     }
 

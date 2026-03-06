@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { ZodError } from "zod";
 import { registerUser, AuthError } from "@/server/auth/register";
-import { setSessionCookie } from "@/lib/auth/session";
+import { setSessionCookieAction } from "@/lib/auth/session";
 
 type ActionState =
   | { ok: true }
@@ -19,7 +19,7 @@ export async function registerAction(
 
   try {
     const { sessionToken, user } = await registerUser(email, password);
-    await setSessionCookie(sessionToken);
+    await setSessionCookieAction(sessionToken);
 
     // Success - redirect based on from parameter and role
     if (from === "business") {

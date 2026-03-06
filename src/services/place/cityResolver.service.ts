@@ -112,7 +112,7 @@ async function resolveCityByCoordinates(
     console.log(`[cityResolver] Checking ${cities.length} cities`);
 
     // Find nearest city within its radius
-    let nearestCity: { id: string; name: string; distance: number } | null = null;
+    let nearestCity: { cityId: string; cityName: string; distance: number } | null = null;
 
     for (const city of cities) {
       if (city.centerLat === null || city.centerLng === null || city.radiusKm === null) continue;

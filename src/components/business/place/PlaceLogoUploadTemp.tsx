@@ -14,12 +14,14 @@ interface PlaceLogoUploadTempProps {
   wizardSessionId: string;
   currentLogoUrl?: string | null;
   onUploadComplete?: (mediaId: string, url: string) => void;
+  disabled?: boolean;
 }
 
 export function PlaceLogoUploadTemp({
   wizardSessionId,
   currentLogoUrl,
   onUploadComplete,
+  disabled = false,
 }: PlaceLogoUploadTempProps) {
   const [preview, setPreview] = useState<string | null>(currentLogoUrl || null);
   const [isUploading, setIsUploading] = useState(false);
@@ -104,6 +106,7 @@ export function PlaceLogoUploadTemp({
   };
 
   const handleClick = () => {
+    if (disabled) return;
     const input = document.createElement("input");
     input.type = "file";
     input.accept = "image/png,image/jpeg,image/webp";
@@ -120,7 +123,7 @@ export function PlaceLogoUploadTemp({
     e.preventDefault();
     setIsDragging(false);
 
-    if (isUploading) return;
+    if (isUploading || disabled) return;
 
     const file = e.dataTransfer.files[0];
     if (file) {
@@ -130,7 +133,7 @@ export function PlaceLogoUploadTemp({
 
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
-    if (!isUploading) {
+    if (!isUploading && !disabled) {
       setIsDragging(true);
     }
   };
@@ -141,13 +144,14 @@ export function PlaceLogoUploadTemp({
   };
 
   const handleRemove = () => {
+    if (disabled) return;
     setPreview(null);
     // TODO: Call DELETE API to mark temp media as deleted
   };
 
   return (
     <div
-      onClick={!isUploading ? handleClick : undefined}
+      onClick={!isUploading && !disabled ? handleClick : undefined}
       onDrop={handleDrop}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
@@ -155,7 +159,7 @@ export function PlaceLogoUploadTemp({
         border-2 border-dashed rounded-xl p-10 text-center cursor-pointer
         transition-colors
         ${isDragging ? "border-primary bg-primary/5" : "border-gray-300"}
-        ${isUploading ? "opacity-50 cursor-not-allowed" : "hover:bg-muted"}
+        ${isUploading || disabled ? "opacity-50 cursor-not-allowed" : "hover:bg-muted"}
       `}
     >
       {isUploading ? (

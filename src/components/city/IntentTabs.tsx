@@ -18,9 +18,10 @@ const TAB_ICONS = {
 };
 
 const TAB_IMAGES: Record<string, string> = {
-  kuda: "/compas.webp",
-  classes: "/paint.webp",
-  birthday: "/hb.webp",
+  kuda: "/compass.svg",
+  classes: "/palette.svg",
+  birthday: "/hb.svg",
+  journal: "/mag.svg",
 };
 
 export function IntentTabs({ className, citySlug }: { className?: string; citySlug?: string }) {
@@ -79,7 +80,8 @@ export function IntentTabs({ className, citySlug }: { className?: string; citySl
                     width={48} 
                     height={48} 
                     className={cn(
-                      "object-contain transition-transform duration-200 group-hover:scale-105",
+                      "object-contain transition-transform duration-200 group-hover:scale-105 mb-[5px]",
+                      isActive ? "scale-100" : "scale-[0.75]",
                       isActive && "drop-shadow-[0_4px_8px_rgba(239,135,89,0.35)]"
                     )}
                   />

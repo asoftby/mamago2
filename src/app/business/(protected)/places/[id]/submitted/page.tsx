@@ -7,8 +7,10 @@ import Link from "next/link";
 
 export default async function PlaceSubmittedPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ revision?: string }>;
 }) {
   const user = await getCurrentUser();
 
@@ -17,6 +19,8 @@ export default async function PlaceSubmittedPage({
   }
 
   const { id } = await params;
+  const { revision } = await searchParams;
+  const isRevision = revision === "true";
 
   const place = await prisma.place.findUnique({
     where: { id },
@@ -36,32 +40,34 @@ export default async function PlaceSubmittedPage({
     redirect("/business/places");
   }
 
+  // Determine content based on scenario
+  const isNewSubmission = place.status === "PENDING" && !isRevision;
+  const isRevisionSubmission = isRevision;
+
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
       <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-8 text-center">
         <div className="mb-6">
-          {place.status === "PENDING" ? (
-            <Clock className="h-16 w-16 text-amber-500 mx-auto" />
-          ) : (
-            <CheckCircle2 className="h-16 w-16 text-green-500 mx-auto" />
-          )}
+          <Clock className="h-16 w-16 text-amber-500 mx-auto" />
         </div>
 
         <h1 className="text-2xl font-bold mb-2">
-          {place.status === "PENDING"
-            ? "Место отправлено на проверку"
-            : "Место создано"}
+          {isRevisionSubmission
+            ? "Изменения отправлены на модерацию"
+            : "Публикация отправлена на модерацию"}
         </h1>
 
         <p className="text-muted-foreground mb-6">
-          {place.status === "PENDING"
-            ? "Мы проверим информацию и свяжемся с вами в течение 24 часов"
-            : "Ваше место успешно создано"}
+          {isRevisionSubmission
+            ? "Обновлённая публикация отправлена на повторную проверку. После одобрения изменения появятся на сайте."
+            : "Мы проверим публикацию и сообщим вам, когда она появится на сайте."}
         </p>
 
         <div className="space-y-3">
           <Button asChild className="w-full" size="lg">
-            <Link href="/business/places">Мои места</Link>
+            <Link href={isRevisionSubmission ? `/business/places/${id}/edit` : "/business/places"}>
+              {isRevisionSubmission ? "Вернуться к публикации" : "Перейти к списку мест"}
+            </Link>
           </Button>
 
           <Button asChild variant="outline" className="w-full" size="lg">

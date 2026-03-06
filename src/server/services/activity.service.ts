@@ -1,8 +1,9 @@
 import { prisma } from "@/lib/prisma";
-import type { Activity, ActivitySession } from "@prisma/client";
+import type { Activity, ActivitySession, ActivityType, ScheduleMode } from "@prisma/client";
 
 export type CreateActivityInput = {
-  name: string;
+  title: string;
+  shortDesc: string;
   description?: string;
   cityId: string;
   coverImageUrl?: string;
@@ -12,10 +13,13 @@ export type CreateActivityInput = {
   businessId?: string;
   createdBy: string;
   sessions?: Date[]; // Array of session start times
+  type: ActivityType;
+  scheduleMode: ScheduleMode;
 };
 
 export type UpdateActivityInput = {
-  name?: string;
+  title?: string;
+  shortDesc?: string;
   description?: string;
   cityId?: string;
   coverImageUrl?: string;
@@ -35,11 +39,12 @@ export type ActivityWithSessions = Activity & {
 export async function createActivity(
   input: CreateActivityInput
 ): Promise<ActivityWithSessions> {
-  const { sessions, ...activityData } = input;
+  const { sessions, createdBy, ...activityData } = input;
 
   const activity = await prisma.activity.create({
     data: {
       ...activityData,
+      owner: { connect: { id: createdBy } },
       sessions: sessions
         ? {
             create: sessions.map((startsAt) => ({ startsAt })),
@@ -53,7 +58,7 @@ export async function createActivity(
     },
   });
 
-  return activity;
+  return activity as ActivityWithSessions;
 }
 
 /**
@@ -91,7 +96,7 @@ export async function updateActivity(
     },
   });
 
-  return activity;
+  return activity as ActivityWithSessions;
 }
 
 /**
@@ -107,7 +112,7 @@ export async function getActivityById(
         orderBy: { startsAt: "asc" },
       },
     },
-  });
+  }) as ActivityWithSessions | null;
 }
 
 /**
@@ -124,7 +129,7 @@ export async function listBusinessActivities(
       },
     },
     orderBy: { createdAt: "desc" },
-  });
+  }) as ActivityWithSessions[];
 }
 
 /**

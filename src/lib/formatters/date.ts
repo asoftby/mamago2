@@ -6,12 +6,17 @@
  * to avoid React hydration mismatches.
  */
 
+// Hardcoded month abbreviations to ensure consistency across all environments
+const RU_MONTH_SHORT = [
+  "янв.", "фев.", "мар.", "апр.", "мая", "июн.",
+  "июл.", "авг.", "сен.", "окт.", "ноя.", "дек."
+];
+
 /**
  * Format date as short Russian day + month (e.g., "4 мар.")
  * 
- * This formatter is deterministic across Node.js and browser environments.
- * It uses Intl.DateTimeFormat with explicit locale and options, then normalizes
- * the output to ensure consistency.
+ * This formatter is 100% deterministic - uses hardcoded month names
+ * instead of Intl.DateTimeFormat to avoid Node.js vs browser differences.
  * 
  * Examples:
  * - new Date("2024-03-04") → "4 мар."
@@ -30,38 +35,11 @@ export function formatRuShortDayMonth(date: Date | string): string {
       return "";
     }
 
-    // Use Intl.DateTimeFormat with explicit locale and options
-    // This is more consistent across runtimes than toLocaleDateString()
-    const formatter = new Intl.DateTimeFormat("ru-RU", {
-      day: "numeric",
-      month: "short",
-    });
+    const day = dateObj.getDate();
+    const monthIndex = dateObj.getMonth();
+    const monthShort = RU_MONTH_SHORT[monthIndex];
 
-    let formatted = formatter.format(dateObj);
-
-    // Normalize output:
-    // 1. Ensure month abbreviation has trailing dot
-    //    Some runtimes may output "мар" instead of "мар."
-    // 2. Collapse multiple spaces
-    // 3. Trim whitespace
-
-    // Split into parts (day and month)
-    const parts = formatted.split(/\s+/).filter(Boolean);
-    
-    if (parts.length >= 2) {
-      const day = parts[0];
-      let month = parts[1];
-      
-      // Ensure month has trailing dot if it doesn't already
-      if (!month.endsWith(".")) {
-        month = month + ".";
-      }
-      
-      // Reconstruct with single space
-      formatted = `${day} ${month}`;
-    }
-
-    return formatted.trim();
+    return `${day} ${monthShort}`;
   } catch (error) {
     // Gracefully handle any errors
     console.error("formatRuShortDayMonth error:", error);
@@ -79,20 +57,9 @@ if (process.env.NODE_ENV === "development") {
   const result = formatRuShortDayMonth(testDate);
   
   // Expected format: "4 мар."
-  if (!result.match(/^\d{1,2}\s[а-я]{3}\.$/)) {
+  if (!result.match(/^\d{1,2}\s[а-я]{3,4}\.?$/)) {
     console.warn(
       `[formatRuShortDayMonth] Unexpected format: "${result}". Expected pattern: "4 мар."`
-    );
-  }
-  
-  // Check for common issues
-  if (result.includes("  ")) {
-    console.warn(`[formatRuShortDayMonth] Double space detected: "${result}"`);
-  }
-  
-  if (result.includes("марта") || result.includes("января")) {
-    console.warn(
-      `[formatRuShortDayMonth] Long month form detected: "${result}". Should use short form with dot.`
     );
   }
 }

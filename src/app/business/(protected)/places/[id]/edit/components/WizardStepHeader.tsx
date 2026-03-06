@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, Send } from "lucide-react";
+import { ChevronLeft, ChevronRight, Send, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface WizardStepHeaderProps {
@@ -15,6 +15,7 @@ interface WizardStepHeaderProps {
   nextLabel?: string;
   isLastStep?: boolean;
   isSaving?: boolean;
+  isPending?: boolean;
   className?: string;
 }
 
@@ -29,6 +30,7 @@ export function WizardStepHeader({
   nextLabel = "Далее",
   isLastStep = false,
   isSaving = false,
+  isPending = false,
   className,
 }: WizardStepHeaderProps) {
   return (
@@ -60,14 +62,16 @@ export function WizardStepHeader({
             onClick={onNext}
             disabled={!canNext || isSaving}
             size="default"
+            variant={isPending ? "secondary" : "default"}
             className={cn(
-              isLastStep && "bg-green-600 hover:bg-green-700"
+              isLastStep && !isPending && "bg-green-600 hover:bg-green-700"
             )}
           >
+            {isPending && <Clock className="h-4 w-4 mr-1" />}
             {nextLabel}
-            {isLastStep ? (
+            {isLastStep && !isPending ? (
               <Send className="h-4 w-4 ml-1" />
-            ) : (
+            ) : !isPending && (
               <ChevronRight className="h-4 w-4 ml-1" />
             )}
           </Button>

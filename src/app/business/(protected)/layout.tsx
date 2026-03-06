@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/server";
 import { getMyBusiness } from "@/server/business/getMyBusiness";
 import { getEffectiveVerificationStatus } from "@/server/services/businessStatusMap";
+import { NotificationBell } from "@/components/business/notifications/NotificationBell";
 
 export default async function ProtectedBusinessLayout({
   children,
@@ -60,6 +61,7 @@ export default async function ProtectedBusinessLayout({
               </nav>
             </div>
             <div className="flex items-center space-x-4">
+              <NotificationBell />
               <span className="text-sm text-gray-600">{user.email}</span>
               <form action="/api/auth/logout" method="POST">
                 <button

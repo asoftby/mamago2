@@ -41,15 +41,15 @@ export default async function BusinessActivitiesPage() {
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1">
                       <h2 className="text-xl font-semibold text-foreground mb-2">
-                        {activity.name}
+                        {activity.title}
                       </h2>
-                      {activity.description && (
+                        {activity.shortDesc && (
                         <Body className="text-muted-foreground mb-3">
-                          {activity.description}
+                          {activity.shortDesc}
                         </Body>
                       )}
                       <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
-                        {activity.ageLabel && <span>Возраст: {activity.ageLabel}</span>}
+                        {activity.ageMinMonths !== null && <span>Возраст: {Math.floor(activity.ageMinMonths / 12)}+</span>}
                         {activity.priceFrom !== null && (
                           <span>
                             от {activity.priceFrom} {activity.currency}

@@ -124,17 +124,19 @@ export async function approvePlace(
 }
 
 /**
- * Request changes for a Place
- * Changes status from PENDING to NEEDS_CHANGES
+ * Request changes for a Place (initial moderation)
+ * Changes status from PENDING to NEEDS_REVISION
  * Message is required
+ * 
+ * Note: For post-publication edits, use PlaceRevision flow instead
  */
-export async function needsChangesPlace(
+export async function needsRevisionPlace(
   placeId: string,
   reviewedByUserId: string,
   message: string
 ): Promise<void> {
   if (!message || message.trim().length === 0) {
-    throw new Error("Message is required for NEEDS_CHANGES status");
+    throw new Error("Message is required for NEEDS_REVISION status");
   }
 
   const place = await prisma.place.findUnique({
@@ -155,7 +157,7 @@ export async function needsChangesPlace(
     prisma.place.update({
       where: { id: placeId },
       data: {
-        status: "NEEDS_CHANGES",
+        status: "NEEDS_REVISION",
       },
     }),
 
@@ -164,7 +166,7 @@ export async function needsChangesPlace(
       data: {
         entityType: "PLACE",
         entityId: placeId,
-        action: "NEEDS_CHANGES",
+        action: "NEEDS_REVISION",
         message,
         reviewedByUserId,
       },
@@ -222,8 +224,10 @@ export async function rejectPlace(
 }
 
 /**
- * Submit a Place for moderation
- * Changes status from DRAFT or NEEDS_CHANGES to PENDING
+ * Submit a Place for initial moderation
+ * Changes status from DRAFT, NEEDS_REVISION, or REJECTED to PENDING
+ * 
+ * Note: For post-publication edits, use PlaceRevision flow instead
  */
 export async function submitPlace(
   placeId: string,
@@ -244,19 +248,27 @@ export async function submitPlace(
 
   if (
     place.status !== "DRAFT" &&
-    place.status !== "NEEDS_CHANGES" &&
+    place.status !== "NEEDS_REVISION" &&
     place.status !== "REJECTED"
   ) {
     throw new Error(`Cannot submit from status: ${place.status}`);
+  }
+
+  // Prepare update data
+  const updateData: any = {
+    status: "PENDING",
+  };
+
+  // If resubmitting after NEEDS_REVISION, set revisionResubmittedAt
+  if (place.status === "NEEDS_REVISION") {
+    updateData.revisionResubmittedAt = new Date();
   }
 
   await prisma.$transaction([
     // Update place status
     prisma.place.update({
       where: { id: placeId },
-      data: {
-        status: "PENDING",
-      },
+      data: updateData,
     }),
 
     // Log moderation action
@@ -265,7 +277,9 @@ export async function submitPlace(
         entityType: "PLACE",
         entityId: placeId,
         action: "SUBMIT",
-        message: "Submitted for moderation",
+        message: place.status === "NEEDS_REVISION" 
+          ? "Resubmitted after revision" 
+          : "Submitted for moderation",
         reviewedByUserId: null,
       },
     }),
@@ -318,16 +332,16 @@ export async function approveActivity(
 
 /**
  * Request changes for an Activity
- * Changes status from PENDING to NEEDS_CHANGES
+ * Changes status from PENDING to NEEDS_REVISION
  * Message is required
  */
-export async function needsChangesActivity(
+export async function needsRevisionActivity(
   activityId: string,
   reviewedByUserId: string,
   message: string
 ): Promise<void> {
   if (!message || message.trim().length === 0) {
-    throw new Error("Message is required for NEEDS_CHANGES status");
+    throw new Error("Message is required for NEEDS_REVISION status");
   }
 
   const activity = await prisma.activity.findUnique({
@@ -348,7 +362,7 @@ export async function needsChangesActivity(
     prisma.activity.update({
       where: { id: activityId },
       data: {
-        status: "NEEDS_CHANGES",
+        status: "NEEDS_REVISION",
       },
     }),
 
@@ -357,7 +371,7 @@ export async function needsChangesActivity(
       data: {
         entityType: "ACTIVITY",
         entityId: activityId,
-        action: "NEEDS_CHANGES",
+        action: "NEEDS_REVISION",
         message,
         reviewedByUserId,
       },

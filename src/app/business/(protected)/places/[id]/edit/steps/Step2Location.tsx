@@ -10,15 +10,16 @@ interface Step2LocationProps {
   onPrev: () => void;
   onNext: () => void;
   canNext: boolean;
+  isEditable?: boolean;
 }
 
-export function Step2Location({ place, onUpdate, onPrev, onNext, canNext }: Step2LocationProps) {
+export function Step2Location({ place, onUpdate, onPrev, onNext, canNext, isEditable = true }: Step2LocationProps) {
   const hasLocation = place.lat !== null && place.lng !== null;
 
   const initialLocation = hasLocation
     ? {
-        lat: place.lat,
-        lng: place.lng,
+        lat: place.lat!,
+        lng: place.lng!,
         formattedAddr: place.formattedAddr || undefined,
         cityId: place.cityId || undefined,
         districtAutoId: place.districtAutoId || undefined,
@@ -44,6 +45,7 @@ export function Step2Location({ place, onUpdate, onPrev, onNext, canNext }: Step
         placeId={place.id} 
         initialLocation={initialLocation}
         onUpdate={onUpdate}
+        disabled={!isEditable}
       />
     </div>
   );

@@ -40,6 +40,19 @@ export function setSessionCookie(res: NextResponse, token: string): void {
 }
 
 /**
+ * Set session cookie in Server Actions
+ */
+export async function setSessionCookieAction(token: string): Promise<void> {
+  const cookieStore = await cookies();
+  const cookieOptions = getAuthCookieOptions();
+  
+  cookieStore.set(SESSION_COOKIE_NAME, token, {
+    ...cookieOptions,
+    maxAge: SESSION_DURATION / 1000, // Convert to seconds
+  });
+}
+
+/**
  * Get session token from cookie (read-only, works in Server Components and Route Handlers)
  */
 export async function getSessionToken(): Promise<string | null> {

@@ -21,7 +21,7 @@ export function useAutosave(
 ) {
   const { onSuccess, onError, debounceMs = 500 } = options;
   const [isUpdating, setIsUpdating] = useState(false);
-  const timeoutRef = useRef<NodeJS.Timeout>();
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const updatePlace = useCallback(
     async (updates: Partial<Place>) => {

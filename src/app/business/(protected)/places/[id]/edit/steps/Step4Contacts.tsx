@@ -13,6 +13,9 @@ interface Step4ContactsProps {
   onPrev: () => void;
   onSubmit: () => void;
   isSaving?: boolean;
+  isRevisionMode?: boolean;
+  revisionStatus?: string | null;
+  isEditable?: boolean;
 }
 
 export function Step4Contacts({
@@ -21,10 +24,21 @@ export function Step4Contacts({
   onPrev,
   onSubmit,
   isSaving = false,
+  isRevisionMode = false,
+  revisionStatus = null,
+  isEditable = true,
 }: Step4ContactsProps) {
   const [phone, setPhone] = useState(place.phone || "");
   const [website, setWebsite] = useState(place.website || "");
   const [instagram, setInstagram] = useState(place.instagramHandle || "");
+
+  // Check if currently pending moderation
+  const isPending = isRevisionMode 
+    ? revisionStatus === "PENDING"
+    : place.status === "PENDING";
+
+  // Button text changes based on pending state
+  const buttonText = isPending ? "⏳ На модерации" : "Отправить на модерацию";
 
   const handlePhoneChange = (value: string) => {
     setPhone(value);
@@ -60,10 +74,11 @@ export function Step4Contacts({
         subtitle="Как с вами связаться"
         onBack={onPrev}
         onNext={onSubmit}
-        canNext={true}
-        nextLabel="Отправить на модерацию"
+        canNext={!isPending && !isSaving}
+        nextLabel={buttonText}
         isLastStep={true}
         isSaving={isSaving}
+        isPending={isPending}
       />
 
       {/* Phone */}
@@ -76,6 +91,7 @@ export function Step4Contacts({
           onChange={(e) => handlePhoneChange(e.target.value)}
           placeholder="+375 29 123-45-67"
           className="mt-2"
+          disabled={!isEditable}
         />
       </div>
 
@@ -89,6 +105,7 @@ export function Step4Contacts({
           onChange={(e) => handleWebsiteChange(e.target.value)}
           placeholder="https://example.com"
           className="mt-2"
+          disabled={!isEditable}
         />
       </div>
 
@@ -102,6 +119,7 @@ export function Step4Contacts({
             onChange={(e) => handleInstagramChange(e.target.value)}
             placeholder="@username или ссылка"
             className="flex-1"
+            disabled={!isEditable}
           />
           {instagram && (
             <Button

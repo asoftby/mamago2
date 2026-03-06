@@ -12,6 +12,7 @@ interface Step1ProfileProps {
   onUpdate: (updates: Partial<Place>) => void;
   onNext: () => void;
   canNext: boolean;
+  isEditable?: boolean;
 }
 
 const CATEGORIES = [
@@ -30,7 +31,7 @@ const AGE_TAGS = ["0-3", "3-7", "7-12", "12+"];
 const VISIT_FORMATS = ["indoor", "outdoor", "online"];
 const ACTIVITY_TYPES = ["sports", "arts", "education", "entertainment", "food"];
 
-export function Step1Profile({ place, onUpdate, onNext, canNext }: Step1ProfileProps) {
+export function Step1Profile({ place, onUpdate, onNext, canNext, isEditable = true }: Step1ProfileProps) {
   const [title, setTitle] = useState(place.title);
   const [category, setCategory] = useState(place.category);
   const [shortDesc, setShortDesc] = useState(place.shortDesc);
@@ -102,6 +103,7 @@ export function Step1Profile({ place, onUpdate, onNext, canNext }: Step1ProfileP
           onChange={(e) => handleTitleChange(e.target.value)}
           placeholder="Например: Кофейня на Ленина"
           className="mt-2"
+          disabled={!isEditable}
         />
       </div>
 
@@ -113,6 +115,7 @@ export function Step1Profile({ place, onUpdate, onNext, canNext }: Step1ProfileP
           value={category}
           onChange={(e) => handleCategoryChange(e.target.value)}
           className="mt-2 w-full rounded-md border border-input bg-background px-3 py-2"
+          disabled={!isEditable}
         >
           {CATEGORIES.map((cat) => (
             <option key={cat.value} value={cat.value}>
@@ -132,6 +135,7 @@ export function Step1Profile({ place, onUpdate, onNext, canNext }: Step1ProfileP
           placeholder="Краткое описание для карточки"
           className="mt-2"
           maxLength={100}
+          disabled={!isEditable}
         />
         <p className="text-xs text-muted-foreground mt-1">
           {shortDesc.length}/100 символов
@@ -148,6 +152,7 @@ export function Step1Profile({ place, onUpdate, onNext, canNext }: Step1ProfileP
           placeholder="Подробное описание для поисковых систем"
           className="mt-2"
           rows={showFullDescription ? 10 : 4}
+          disabled={!isEditable}
         />
         <div className="flex items-center justify-between mt-1">
           <p className="text-xs text-muted-foreground">
@@ -173,12 +178,13 @@ export function Step1Profile({ place, onUpdate, onNext, canNext }: Step1ProfileP
             <button
               key={tag}
               type="button"
-              onClick={() => toggleAgeTag(tag)}
+              onClick={() => isEditable && toggleAgeTag(tag)}
+              disabled={!isEditable}
               className={`px-3 py-1 rounded-full text-sm border transition-colors ${
                 ageTags.includes(tag)
                   ? "bg-primary text-primary-foreground border-primary"
                   : "bg-background border-input hover:border-primary"
-              }`}
+              } ${!isEditable ? "opacity-50 cursor-not-allowed" : ""}`}
             >
               {tag}
             </button>
@@ -194,12 +200,13 @@ export function Step1Profile({ place, onUpdate, onNext, canNext }: Step1ProfileP
             <button
               key={format}
               type="button"
-              onClick={() => toggleVisitFormat(format)}
+              onClick={() => isEditable && toggleVisitFormat(format)}
+              disabled={!isEditable}
               className={`px-3 py-1 rounded-full text-sm border transition-colors ${
                 visitFormats.includes(format)
                   ? "bg-primary text-primary-foreground border-primary"
                   : "bg-background border-input hover:border-primary"
-              }`}
+              } ${!isEditable ? "opacity-50 cursor-not-allowed" : ""}`}
             >
               {format}
             </button>
@@ -215,12 +222,13 @@ export function Step1Profile({ place, onUpdate, onNext, canNext }: Step1ProfileP
             <button
               key={type}
               type="button"
-              onClick={() => toggleActivityType(type)}
+              onClick={() => isEditable && toggleActivityType(type)}
+              disabled={!isEditable}
               className={`px-3 py-1 rounded-full text-sm border transition-colors ${
                 activityTypes.includes(type)
                   ? "bg-primary text-primary-foreground border-primary"
                   : "bg-background border-input hover:border-primary"
-              }`}
+              } ${!isEditable ? "opacity-50 cursor-not-allowed" : ""}`}
             >
               {type}
             </button>

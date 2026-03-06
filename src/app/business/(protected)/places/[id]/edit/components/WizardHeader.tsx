@@ -22,7 +22,7 @@ export function WizardHeader({
     DRAFT: "Черновик",
     PENDING: "На модерации",
     PUBLISHED: "Опубликовано",
-    NEEDS_CHANGES: "Требует изменений",
+    NEEDS_REVISION: "Требует изменений",
     REJECTED: "Отклонено",
   };
 

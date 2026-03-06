@@ -14,6 +14,7 @@ interface Step3PhotosProps {
   onPrev: () => void;
   onNext: () => void;
   canNext: boolean;
+  isEditable?: boolean;
 }
 
 export function Step3Photos({ 
@@ -23,7 +24,8 @@ export function Step3Photos({
   onUpdate, 
   onPrev, 
   onNext, 
-  canNext 
+  canNext,
+  isEditable = true,
 }: Step3PhotosProps) {
   const logoImage = images.find((img) => img.kind === "LOGO");
   const galleryImages = images.filter((img) => img.kind === "GALLERY");
@@ -72,6 +74,7 @@ export function Step3Photos({
           wizardSessionId={wizardSessionId}
           currentLogoUrl={logoImage?.url}
           onUploadComplete={handleLogoUploadComplete}
+          disabled={!isEditable}
         />
       </div>
 
@@ -82,6 +85,7 @@ export function Step3Photos({
           wizardSessionId={wizardSessionId}
           initialImages={initialGalleryItems}
           onImagesChange={handleGalleryImagesChange}
+          disabled={!isEditable}
         />
       </div>
     </div>

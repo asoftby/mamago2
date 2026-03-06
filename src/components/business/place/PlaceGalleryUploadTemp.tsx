@@ -23,12 +23,14 @@ interface PlaceGalleryUploadTempProps {
   wizardSessionId: string;
   initialImages?: GalleryItem[];
   onImagesChange?: (images: GalleryItem[]) => void;
+  disabled?: boolean;
 }
 
 export function PlaceGalleryUploadTemp({
   wizardSessionId,
   initialImages = [],
   onImagesChange,
+  disabled = false,
 }: PlaceGalleryUploadTempProps) {
   const [images, setImages] = useState<GalleryItem[]>(initialImages);
   const [isDragging, setIsDragging] = useState(false);
@@ -142,6 +144,7 @@ export function PlaceGalleryUploadTemp({
   };
 
   const handleClick = () => {
+    if (disabled) return;
     const input = document.createElement("input");
     input.type = "file";
     input.accept = "image/png,image/jpeg,image/webp";
@@ -159,6 +162,8 @@ export function PlaceGalleryUploadTemp({
     e.preventDefault();
     setIsDragging(false);
 
+    if (disabled) return;
+
     const files = e.dataTransfer.files;
     if (files && files.length > 0) {
       handleFilesSelect(files);
@@ -167,7 +172,9 @@ export function PlaceGalleryUploadTemp({
 
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
-    setIsDragging(true);
+    if (!disabled) {
+      setIsDragging(true);
+    }
   };
 
   const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
@@ -176,6 +183,7 @@ export function PlaceGalleryUploadTemp({
   };
 
   const handleRemove = async (imageId: string) => {
+    if (disabled) return;
     // Optimistic update
     setImages((prev) => prev.filter((img) => img.id !== imageId));
 
@@ -199,7 +207,7 @@ export function PlaceGalleryUploadTemp({
     <div className="space-y-4">
       {/* Upload Zone */}
       <div
-        onClick={handleClick}
+        onClick={!disabled ? handleClick : undefined}
         onDrop={handleDrop}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
@@ -207,7 +215,7 @@ export function PlaceGalleryUploadTemp({
           border-2 border-dashed rounded-xl p-8 text-center cursor-pointer
           transition-colors
           ${isDragging ? "border-primary bg-primary/5" : "border-gray-300"}
-          hover:bg-muted
+          ${disabled ? "opacity-50 cursor-not-allowed" : "hover:bg-muted"}
         `}
       >
         <div className="space-y-3">

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
-import { needsChangesPlace } from "@/server/services/moderation.service";
+import { needsRevisionPlace } from "@/server/services/moderation.service";
 
 /**
  * POST /api/admin/places/[id]/needs-changes
@@ -34,7 +34,7 @@ export async function POST(
       );
     }
 
-    await needsChangesPlace(placeId, user.id, message);
+    await needsRevisionPlace(placeId, user.id, message);
 
     return NextResponse.json({ success: true });
   } catch (error) {

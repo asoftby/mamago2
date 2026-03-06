@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import { getMyBusiness } from "@/server/business/getMyBusiness";
 import { createActivity, listBusinessActivities } from "@/server/services/activity.service";
+import { ActivityType, ScheduleMode } from "@prisma/client";
 
 export async function GET(request: NextRequest) {
   try {
@@ -40,18 +41,33 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { name, description, cityId, coverImageUrl, priceFrom, currency, ageLabel, sessions } =
-      body;
+    const { 
+      title, 
+      shortDesc, 
+      description, 
+      cityId, 
+      coverImageUrl, 
+      priceFrom, 
+      currency, 
+      ageLabel, 
+      sessions,
+      type = ActivityType.EVENT,
+      scheduleMode = ScheduleMode.ONE_TIME
+    } = body;
 
-    if (!name || !cityId) {
+    // Use name as title if title is missing (backward compat)
+    const finalTitle = title || body.name;
+
+    if (!finalTitle || !cityId) {
       return NextResponse.json(
-        { error: "name and cityId are required" },
+        { error: "title and cityId are required" },
         { status: 400 }
       );
     }
 
     const activity = await createActivity({
-      name,
+      title: finalTitle,
+      shortDesc: shortDesc || description || "",
       description,
       cityId,
       coverImageUrl,
@@ -61,6 +77,8 @@ export async function POST(request: NextRequest) {
       businessId: business.id,
       createdBy: user.id,
       sessions: sessions ? sessions.map((s: string) => new Date(s)) : undefined,
+      type,
+      scheduleMode,
     });
 
     return NextResponse.json({ success: true, activity });

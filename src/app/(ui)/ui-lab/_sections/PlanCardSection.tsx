@@ -79,7 +79,7 @@ export function PlanCardSection() {
   const emptyPlanItems: Record<string, PlanItemWithActivity[]> = {};
 
   // State 2: Week with 1 item
-  const singleItemPlanItems: Record<string, PlanItemWithActivity[]> = {
+  const singleItemPlanItems: Record<string, any[]> = {
     [weekDates[2]]: [
       {
         id: "plan1",
@@ -94,7 +94,7 @@ export function PlanCardSection() {
   };
 
   // State 3: Week with multiple items
-  const multipleItemsPlanItems: Record<string, PlanItemWithActivity[]> = {
+  const multipleItemsPlanItems: Record<string, any[]> = {
     [weekDates[1]]: [
       {
         id: "plan2",

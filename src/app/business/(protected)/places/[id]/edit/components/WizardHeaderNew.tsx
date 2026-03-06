@@ -5,6 +5,7 @@ import { Check, Loader2, Save } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { PlaceStatusBadge } from "@/components/business/place/PlaceStatusBadge";
 import { computePlaceDraftCompletion } from "../utils/computeCompletion";
 
 interface PlaceWithImages extends Place {
@@ -23,6 +24,8 @@ interface WizardHeaderNewProps {
   canGoNext: boolean;
   getStepStatus: (step: number) => "done" | "current" | "available" | "locked";
   place: PlaceWithImages;
+  hasActiveRevision?: boolean;
+  revisionStatus?: string;
 }
 
 const STEP_LABELS = ["Профиль", "Локация", "Фото", "Контакты"];
@@ -39,16 +42,10 @@ export function WizardHeaderNew({
   canGoNext,
   getStepStatus,
   place,
+  hasActiveRevision,
+  revisionStatus,
 }: WizardHeaderNewProps) {
   const completion = computePlaceDraftCompletion(place);
-
-  const statusLabels: Record<ContentStatus, string> = {
-    DRAFT: "Черновик",
-    PENDING: "На модерации",
-    PUBLISHED: "Опубликовано",
-    NEEDS_CHANGES: "Требует изменений",
-    REJECTED: "Отклонено",
-  };
 
   const handleStepClick = (step: number) => {
     const stepStatus = getStepStatus(step);
@@ -64,13 +61,17 @@ export function WizardHeaderNew({
   return (
     <div className="sticky top-0 z-50 bg-white border-b shadow-sm">
       <div className="max-w-4xl mx-auto px-4 py-4">
-        {/* Top row: Title, Status, Save button, Save indicator */}
+        {/* Top row: Title, Status Badge, Save button, Save indicator */}
         <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-4">
-            <h1 className="text-lg font-semibold">Создание места</h1>
-            <span className="text-sm text-muted-foreground">
-              {statusLabels[status]}
-            </span>
+          <div className="flex items-center gap-3">
+            <h1 className="text-lg font-semibold">
+              {place.title || "Создание места"}
+            </h1>
+            <PlaceStatusBadge
+              status={status}
+              hasActiveRevision={hasActiveRevision}
+              revisionStatus={revisionStatus}
+            />
           </div>
 
           <div className="flex items-center gap-3">

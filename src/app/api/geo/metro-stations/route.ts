@@ -1,5 +1,6 @@
 /**
  * GET /api/geo/metro-stations?cityId=xxx
+ * GET /api/geo/metro-stations?citySlug=minsk
  * Get all metro stations for a city
  */
 
@@ -10,16 +11,35 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const cityId = searchParams.get("cityId");
+    const citySlug = searchParams.get("citySlug");
 
-    if (!cityId) {
+    if (!cityId && !citySlug) {
       return NextResponse.json(
-        { error: "cityId is required" },
+        { error: "cityId or citySlug is required" },
         { status: 400 }
       );
     }
 
+    // Resolve cityId from slug if needed
+    let resolvedCityId = cityId;
+    if (!resolvedCityId && citySlug) {
+      const city = await prisma.city.findUnique({
+        where: { slug: citySlug },
+        select: { id: true },
+      });
+      
+      if (!city) {
+        return NextResponse.json(
+          { error: `City not found: ${citySlug}` },
+          { status: 404 }
+        );
+      }
+      
+      resolvedCityId = city.id;
+    }
+
     const stations = await prisma.metroStation.findMany({
-      where: { cityId },
+      where: { cityId: resolvedCityId! },
       orderBy: { name: "asc" },
       select: {
         id: true,
@@ -27,7 +47,7 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    return NextResponse.json({ stations });
+    return NextResponse.json({ metroStations: stations });
   } catch (error) {
     console.error("Get metro stations error:", error);
     return NextResponse.json(

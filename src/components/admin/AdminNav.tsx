@@ -23,6 +23,13 @@ interface NavSection {
 
 const NAV_SECTIONS: NavSection[] = [
   {
+    title: "Moderation",
+    items: [
+      { label: "Queue", href: adminPath("/moderation/queue") },
+      { label: "Places", href: adminPath("/moderation/places") },
+    ],
+  },
+  {
     title: "B2B",
     items: [
       { label: "Заявки", href: adminPath("/b2b/requests") },

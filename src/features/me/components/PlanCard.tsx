@@ -128,7 +128,7 @@ function PlanItemMiniCard({ item }: PlanItemMiniCardProps) {
         {activity?.coverImageUrl ? (
           <img
             src={activity.coverImageUrl}
-            alt={activity.name}
+            alt={activity.title}
             className="w-full h-full object-cover"
           />
         ) : (
@@ -140,7 +140,7 @@ function PlanItemMiniCard({ item }: PlanItemMiniCardProps) {
       <div className="flex-1 min-w-0">
         {activity ? (
           <>
-            <Body className="font-medium line-clamp-2 mb-1">{activity.name}</Body>
+            <Body className="font-medium line-clamp-2 mb-1">{activity.title}</Body>
             <Caption className="text-muted-foreground">
               {item.startsAt ? formatTime(item.startsAt) : "В любое время"}
             </Caption>

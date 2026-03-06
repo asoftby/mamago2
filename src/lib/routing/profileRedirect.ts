@@ -12,7 +12,7 @@ import type { Role } from "@prisma/client";
 export function getProfileDestination(params: {
   host: string;
   role: Role;
-  businessStatus?: "DRAFT" | "PENDING" | "REJECTED" | "APPROVED" | null;
+  businessStatus?: "DRAFT" | "PENDING" | "REJECTED" | "APPROVED" | "NEEDS_INFO" | null;
 }): string {
   const { host, role, businessStatus } = params;
 
