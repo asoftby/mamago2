@@ -12,6 +12,7 @@ import { formatDistance } from "@/lib/formatDistance";
 import { formatDistanceToNow } from "date-fns";
 import { ru } from "date-fns/locale";
 import { toast } from "sonner";
+import { formatAgeKeys } from "@/lib/config/ages";
 
 const STATUS_CONFIG = {
   DRAFT: { label: "Черновик", variant: "secondary" as const, className: "" },
@@ -244,7 +245,7 @@ export function PlaceModerationView({ place }: PlaceModerationViewProps) {
                 {place.ageTags.length > 0 && (
                   <div>
                     <span className="text-sm font-medium text-gray-600">Возраст: </span>
-                    <span className="text-sm text-gray-700">{place.ageTags.join(", ")}</span>
+                    <span className="text-sm text-gray-700">{formatAgeKeys(place.ageTags)}</span>
                   </div>
                 )}
                 {place.visitFormats.length > 0 && (
@@ -331,7 +332,7 @@ export function PlaceModerationView({ place }: PlaceModerationViewProps) {
 
               <Button
                 onClick={() => handleModerate("NEEDS_REVISION")}
-                disabled={isSubmitting}
+                disabled={isSubmitting || !comment.trim()}
                 variant="outline"
                 className="w-full"
               >

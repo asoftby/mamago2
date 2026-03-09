@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { X } from "lucide-react";
+import { formatAgeKeys } from "@/lib/config/ages";
 
 type PlaceDetail = {
   id: string;
@@ -378,7 +379,7 @@ export function PlaceModerationSidePanel({
                           Возраст:
                         </span>{" "}
                         <span className="text-sm text-gray-900">
-                          {place.ageTags.join(", ")}
+                          {formatAgeKeys(place.ageTags)}
                         </span>
                       </div>
                     )}

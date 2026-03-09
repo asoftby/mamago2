@@ -1,28 +1,217 @@
+/**
+ * Place Revision Moderation View
+ * Shows diff between published Place and pending revision
+ */
+
 "use client";
 
-import { useState } from "react";
-import Image from "next/image";
+import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { MapPin, Navigation, Phone, Globe, Instagram, ArrowLeft, ArrowRight } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { ArrowLeft, MapPin, Navigation } from "lucide-react";
 import { formatDistance } from "@/lib/formatDistance";
 import { formatDistanceToNow } from "date-fns";
 import { ru } from "date-fns/locale";
 import { toast } from "sonner";
+import {
+  compareFields,
+  compareImages,
+  generateDiffSummary,
+  getChangedFields,
+} from "@/lib/moderation/diffUtils";
+import { DiffSummary } from "./moderation/DiffSummary";
+import { FieldDiff } from "./moderation/FieldDiff";
+import { ImageDiff } from "./moderation/ImageDiff";
+import { MicroEditHistory } from "./moderation/MicroEditHistory";
 
 interface PlaceRevisionModerationViewProps {
-  place: any;
-  revision: any;
+  place: any; // Published Place
+  revision: any; // Pending PlaceRevision
 }
 
-export function PlaceRevisionModerationView({ place, revision }: PlaceRevisionModerationViewProps) {
+export function PlaceRevisionModerationView({
+  place,
+  revision,
+}: PlaceRevisionModerationViewProps) {
   const router = useRouter();
   const [comment, setComment] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [microEdits, setMicroEdits] = useState<any[]>([]);
+  const [displayTitle, setDisplayTitle] = useState<string>(place.title);
+  const [hasDuplicates, setHasDuplicates] = useState<boolean>(false);
 
-  const handleModerate = async (action: "APPROVE" | "NEEDS_REVISION" | "REJECT") => {
+  // Fetch micro-edits for this place
+  useEffect(() => {
+    const fetchMicroEdits = async () => {
+      try {
+        const response = await fetch(`/api/admin/places/${place.id}/micro-edit`);
+        if (response.ok) {
+          const data = await response.json();
+          setMicroEdits(data.edits || []);
+        }
+      } catch (error) {
+        console.error("Failed to fetch micro-edits:", error);
+      }
+    };
+
+    fetchMicroEdits();
+  }, [place.id]);
+
+  // Fetch display title and duplicate info
+  useEffect(() => {
+    const fetchDisplayInfo = async () => {
+      try {
+        const response = await fetch(`/api/admin/places/${place.id}/display-info`);
+        if (response.ok) {
+          const data = await response.json();
+          setDisplayTitle(data.displayTitle);
+          setHasDuplicates(data.hasDuplicates);
+        }
+      } catch (error) {
+        console.error("Failed to fetch display info:", error);
+      }
+    };
+
+    fetchDisplayInfo();
+  }, [place.id]);
+
+  // Compute diff
+  const diff = useMemo(() => {
+    // DEBUG: Log raw data for investigation
+    console.log("[PlaceRevisionModerationView] Computing diff:", {
+      placeId: place.id,
+      placeTitle: place.title,
+      placeUpdatedAt: place.updatedAt,
+      revisionId: revision.id,
+      revisionTitle: revision.title,
+      revisionStatus: revision.status,
+      revisionCreatedAt: revision.createdAt,
+      revisionSubmittedAt: revision.submittedAt,
+    });
+
+    // Field configuration for comparison
+    const fieldConfig = [
+      { field: "title" as const, label: "Название" },
+      { field: "shortDesc" as const, label: "Краткое описание" },
+      { field: "description" as const, label: "Полное описание" },
+      { field: "category" as const, label: "Категория" },
+      { field: "formattedAddr" as const, label: "Адрес" },
+      { field: "customAddress" as const, label: "Дополнительный адрес" },
+      { field: "phone" as const, label: "Телефон" },
+      { field: "website" as const, label: "Веб-сайт" },
+      { field: "instagramHandle" as const, label: "Instagram" },
+      { field: "ageTags" as const, label: "Возрастные группы" },
+      { field: "visitFormats" as const, label: "Форматы посещения" },
+      { field: "activityTypes" as const, label: "Типы активностей" },
+    ];
+
+    // Prepare data for comparison
+    // IMPORTANT: Revision fields can be null (meaning "not changed")
+    // For diff, we need to compare actual values, not null-coalesced values
+    // If revision field is null, it means no change was made to that field
+    
+    const oldData = {
+      title: place.title,
+      shortDesc: place.shortDesc,
+      description: place.description,
+      category: place.category,
+      formattedAddr: place.formattedAddr,
+      customAddress: place.customAddress,
+      phone: place.phone,
+      website: place.website,
+      instagramHandle: place.instagramHandle,
+      ageTags: place.ageTags,
+      visitFormats: place.visitFormats,
+      activityTypes: place.activityTypes,
+    };
+
+    // For newData, use revision value if it exists (not null), otherwise use place value
+    // This correctly handles the case where revision.field === null means "unchanged"
+    const newData = {
+      title: revision.title !== null ? revision.title : place.title,
+      shortDesc: revision.shortDesc !== null ? revision.shortDesc : place.shortDesc,
+      description: revision.description !== null ? revision.description : place.description,
+      category: revision.category !== null ? revision.category : place.category,
+      formattedAddr: revision.formattedAddr !== null ? revision.formattedAddr : place.formattedAddr,
+      customAddress: revision.customAddress !== null ? revision.customAddress : place.customAddress,
+      phone: revision.phone !== null ? revision.phone : place.phone,
+      website: revision.website !== null ? revision.website : place.website,
+      instagramHandle: revision.instagramHandle !== null ? revision.instagramHandle : place.instagramHandle,
+      ageTags: revision.ageTags.length > 0 ? revision.ageTags : place.ageTags,
+      visitFormats: revision.visitFormats.length > 0 ? revision.visitFormats : place.visitFormats,
+      activityTypes: revision.activityTypes.length > 0 ? revision.activityTypes : place.activityTypes,
+    };
+
+    // DEBUG: Log comparison data
+    console.log("[PlaceRevisionModerationView] Comparison data:", {
+      oldData,
+      newData,
+    });
+
+    // Compare fields
+    const allFieldChanges = compareFields(oldData, newData, fieldConfig);
+    const changedFields = getChangedFields(allFieldChanges);
+
+    // Compare images
+    const imageChanges = compareImages(place.images || [], revision.images || []);
+
+    // Generate summary
+    const summary = generateDiffSummary(changedFields, imageChanges);
+
+    // DEBUG: Log results
+    console.log("[PlaceRevisionModerationView] Diff results:", {
+      totalFields: allFieldChanges.length,
+      changedFields: changedFields.length,
+      changedFieldNames: changedFields.map(c => c.field),
+      addedPhotos: imageChanges.added.length,
+      removedPhotos: imageChanges.removed.length,
+      totalChanges: summary.totalChanges,
+    });
+
+    return {
+      allFieldChanges,
+      changedFields,
+      imageChanges,
+      summary,
+    };
+  }, [place, revision]);
+
+  // Location info (from revision if changed, otherwise from place)
+  const displayAddress =
+    revision.formattedAddr ?? place.formattedAddr ?? revision.customAddress ?? place.customAddress ?? "Адрес не указан";
+  
+  const districtName =
+    revision.districtManual?.name ??
+    place.districtManual?.name ??
+    revision.districtAuto?.name ??
+    place.districtAuto?.name;
+  
+  const metroName =
+    revision.metroManual?.name ??
+    place.metroManual?.name ??
+    revision.metroAuto?.name ??
+    place.metroAuto?.name;
+  
+  const metroDistance =
+    revision.metroManualDistanceM ??
+    place.metroManualDistanceM ??
+    revision.metroAutoDistanceM ??
+    place.metroAutoDistanceM;
+
+  const cityHasMetro = place.city?.hasMetro ?? false;
+  const metroMaxDistance = place.city?.metroMaxDistanceM ?? 2500;
+
+  const shouldShowMetro =
+    metroName &&
+    metroDistance !== null &&
+    cityHasMetro &&
+    metroDistance <= metroMaxDistance;
+
+  const handleModerate = async (
+    action: "APPROVE" | "NEEDS_REVISION" | "REJECT"
+  ) => {
     if ((action === "NEEDS_REVISION" || action === "REJECT") && !comment.trim()) {
       toast.error("Пожалуйста, укажите причину");
       return;
@@ -30,18 +219,33 @@ export function PlaceRevisionModerationView({ place, revision }: PlaceRevisionMo
 
     setIsSubmitting(true);
     try {
-      const response = await fetch(`/api/admin/moderation/revisions/${revision.id}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action,
-          comment: comment.trim() || null,
-        }),
-      });
+      const response = await fetch(
+        `/api/admin/moderation/places/${place.id}/revision`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            revisionId: revision.id,
+            action,
+            comment: comment.trim() || null,
+          }),
+        }
+      );
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || error.message || "Failed to moderate");
+        const text = await response.text();
+        let error;
+        try {
+          error = JSON.parse(text);
+        } catch {
+          error = { message: text || "Failed to moderate" };
+        }
+        console.error("Moderation failed:", {
+          status: response.status,
+          statusText: response.statusText,
+          error,
+        });
+        throw new Error(error.message || error.error || "Failed to moderate");
       }
 
       toast.success("Модерация завершена");
@@ -55,39 +259,6 @@ export function PlaceRevisionModerationView({ place, revision }: PlaceRevisionMo
     }
   };
 
-  // Helper to check if field changed
-  const hasChanged = (field: string) => {
-    const placeValue = (place as any)[field];
-    const revisionValue = (revision as any)[field];
-    
-    if (placeValue === revisionValue) return false;
-    if (placeValue == null && revisionValue == null) return false;
-    
-    return true;
-  };
-
-  // Helper to render comparison row
-  const ComparisonRow = ({ label, placeValue, revisionValue, changed }: {
-    label: string;
-    placeValue: React.ReactNode;
-    revisionValue: React.ReactNode;
-    changed: boolean;
-  }) => (
-    <div className={`grid grid-cols-2 gap-4 p-4 rounded-lg ${changed ? "bg-yellow-50 border border-yellow-200" : "bg-gray-50"}`}>
-      <div>
-        <div className="text-xs font-medium text-gray-500 mb-2">{label} (Current)</div>
-        <div className="text-sm text-gray-900">{placeValue || <span className="text-gray-400">—</span>}</div>
-      </div>
-      <div>
-        <div className="text-xs font-medium text-gray-500 mb-2 flex items-center gap-2">
-          {label} (New)
-          {changed && <ArrowRight className="w-3 h-3 text-yellow-600" />}
-        </div>
-        <div className="text-sm text-gray-900 font-medium">{revisionValue || <span className="text-gray-400">—</span>}</div>
-      </div>
-    </div>
-  );
-
   return (
     <div className="max-w-7xl mx-auto">
       {/* Header */}
@@ -99,170 +270,92 @@ export function PlaceRevisionModerationView({ place, revision }: PlaceRevisionMo
           <ArrowLeft className="w-4 h-4" />
           Back to queue
         </Link>
-        <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-bold text-gray-900">Place Update Moderation</h1>
-          <Badge variant="default" className="bg-amber-600">UPDATE</Badge>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">
+              Place Update Moderation
+            </h1>
+            <p className="text-sm text-gray-600 mt-1">
+              {revision.title ?? place.title}
+            </p>
+          </div>
+          <Badge className="bg-amber-100 text-amber-800 border-amber-200">
+            Revision Pending
+          </Badge>
         </div>
-        <p className="text-gray-600 mt-1">
-          Review changes to published Place
-        </p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* LEFT COLUMN: Comparison View */}
+        {/* LEFT COLUMN: Changes */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Title */}
-          <ComparisonRow
-            label="Title"
-            placeValue={place.title}
-            revisionValue={revision.title}
-            changed={hasChanged("title")}
-          />
+          {/* Summary */}
+          <DiffSummary summary={diff.summary} />
 
-          {/* Short Description */}
-          {(place.shortDesc || revision.shortDesc) && (
-            <ComparisonRow
-              label="Short Description"
-              placeValue={place.shortDesc}
-              revisionValue={revision.shortDesc}
-              changed={hasChanged("shortDesc")}
-            />
-          )}
-
-          {/* Description */}
-          {(place.description || revision.description) && (
-            <ComparisonRow
-              label="Description"
-              placeValue={<div className="whitespace-pre-wrap">{place.description}</div>}
-              revisionValue={<div className="whitespace-pre-wrap">{revision.description}</div>}
-              changed={hasChanged("description")}
-            />
-          )}
-
-          {/* Address */}
-          <ComparisonRow
-            label="Address"
-            placeValue={place.formattedAddr || place.customAddress}
-            revisionValue={revision.formattedAddr || revision.customAddress}
-            changed={hasChanged("formattedAddr") || hasChanged("customAddress")}
-          />
-
-          {/* Coordinates */}
-          {(place.lat || revision.lat) && (
-            <ComparisonRow
-              label="Coordinates"
-              placeValue={place.lat && place.lng ? `${place.lat.toFixed(6)}, ${place.lng.toFixed(6)}` : null}
-              revisionValue={revision.lat && revision.lng ? `${revision.lat.toFixed(6)}, ${revision.lng.toFixed(6)}` : null}
-              changed={hasChanged("lat") || hasChanged("lng")}
-            />
-          )}
-
-          {/* Phone */}
-          {(place.phone || revision.phone) && (
-            <ComparisonRow
-              label="Phone"
-              placeValue={place.phone}
-              revisionValue={revision.phone}
-              changed={hasChanged("phone")}
-            />
-          )}
-
-          {/* Website */}
-          {(place.website || revision.website) && (
-            <ComparisonRow
-              label="Website"
-              placeValue={place.website ? <a href={place.website} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">{place.website}</a> : null}
-              revisionValue={revision.website ? <a href={revision.website} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">{revision.website}</a> : null}
-              changed={hasChanged("website")}
-            />
-          )}
-
-          {/* Instagram */}
-          {(place.instagramHandle || revision.instagramHandle) && (
-            <ComparisonRow
-              label="Instagram"
-              placeValue={place.instagramHandle ? `@${place.instagramHandle}` : null}
-              revisionValue={revision.instagramHandle ? `@${revision.instagramHandle}` : null}
-              changed={hasChanged("instagramHandle")}
-            />
-          )}
-
-          {/* Images Comparison */}
-          {(place.images.length > 0 || revision.images.length > 0) && (
-            <div className={`p-4 rounded-lg ${
-              place.images.length !== revision.images.length ? "bg-yellow-50 border border-yellow-200" : "bg-gray-50"
-            }`}>
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Images</h3>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <div className="text-xs font-medium text-gray-500 mb-2">Current ({place.images.length})</div>
-                  <div className="grid grid-cols-2 gap-2">
-                    {place.images.map((image: any) => (
-                      <div key={image.id} className="relative aspect-square rounded-lg overflow-hidden bg-gray-100">
-                        <Image src={image.url} alt="" fill className="object-cover" />
-                        {image.kind === "LOGO" && (
-                          <span className="absolute top-1 left-1 bg-blue-600 text-white text-xs px-2 py-0.5 rounded">
-                            Logo
-                          </span>
-                        )}
-                      </div>
-                    ))}
-                  </div>
+          {/* No changes message */}
+          {diff.summary.totalChanges === 0 && (
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-6">
+              <div className="flex items-start gap-3">
+                <div className="flex-shrink-0">
+                  <svg className="w-6 h-6 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
                 </div>
                 <div>
-                  <div className="text-xs font-medium text-gray-500 mb-2 flex items-center gap-2">
-                    New ({revision.images.length})
-                    {place.images.length !== revision.images.length && (
-                      <ArrowRight className="w-3 h-3 text-yellow-600" />
-                    )}
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    {revision.images.map((image: any) => (
-                      <div key={image.id} className="relative aspect-square rounded-lg overflow-hidden bg-gray-100">
-                        <Image src={image.url} alt="" fill className="object-cover" />
-                        {image.kind === "LOGO" && (
-                          <span className="absolute top-1 left-1 bg-blue-600 text-white text-xs px-2 py-0.5 rounded">
-                            Logo
-                          </span>
-                        )}
-                      </div>
-                    ))}
-                  </div>
+                  <h3 className="text-sm font-semibold text-amber-900 mb-1">
+                    Изменения не обнаружены
+                  </h3>
+                  <p className="text-sm text-amber-700">
+                    Опубликованная версия места уже совпадает с данными в revision. 
+                    Возможно, изменения были применены ранее, или revision был создан без изменений.
+                  </p>
+                  <p className="text-sm text-amber-700 mt-2">
+                    Вы можете одобрить revision (это закроет его без изменений) или отклонить.
+                  </p>
                 </div>
               </div>
             </div>
           )}
 
-          {/* Tags Comparison */}
-          {(place.ageTags?.length > 0 || revision.ageTags?.length > 0 ||
-            place.visitFormats?.length > 0 || revision.visitFormats?.length > 0 ||
-            place.activityTypes?.length > 0 || revision.activityTypes?.length > 0) && (
-            <div className="p-4 rounded-lg bg-gray-50">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Tags</h3>
-              <div className="space-y-3">
-                {(place.ageTags?.length > 0 || revision.ageTags?.length > 0) && (
-                  <ComparisonRow
-                    label="Age Tags"
-                    placeValue={place.ageTags?.join(", ")}
-                    revisionValue={revision.ageTags?.join(", ")}
-                    changed={JSON.stringify(place.ageTags) !== JSON.stringify(revision.ageTags)}
-                  />
+          {/* Changed Fields */}
+          {diff.changedFields.length > 0 && (
+            <div>
+              <h2 className="text-xl font-semibold text-gray-900 mb-4">
+                Изменённые поля
+              </h2>
+              <div className="space-y-4">
+                {diff.changedFields.map((change) => (
+                  <FieldDiff key={change.field} change={change} />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Image Changes */}
+          {(diff.imageChanges.added.length > 0 ||
+            diff.imageChanges.removed.length > 0) && (
+            <ImageDiff changes={diff.imageChanges} />
+          )}
+
+          {/* Location Info (if relevant) */}
+          {(districtName || shouldShowMetro) && (
+            <div className="border border-gray-200 rounded-lg p-4 bg-white">
+              <h3 className="text-sm font-semibold text-gray-900 mb-3">
+                Местоположение
+              </h3>
+              <p className="text-sm text-gray-700 mb-3">{displayAddress}</p>
+              <div className="flex items-center gap-3 flex-wrap">
+                {districtName && (
+                  <span className="inline-flex items-center gap-1 px-3 py-1 text-sm font-medium text-gray-700 bg-gray-100 rounded">
+                    <MapPin className="w-4 h-4" />
+                    {districtName}
+                  </span>
                 )}
-                {(place.visitFormats?.length > 0 || revision.visitFormats?.length > 0) && (
-                  <ComparisonRow
-                    label="Visit Formats"
-                    placeValue={place.visitFormats?.join(", ")}
-                    revisionValue={revision.visitFormats?.join(", ")}
-                    changed={JSON.stringify(place.visitFormats) !== JSON.stringify(revision.visitFormats)}
-                  />
-                )}
-                {(place.activityTypes?.length > 0 || revision.activityTypes?.length > 0) && (
-                  <ComparisonRow
-                    label="Activity Types"
-                    placeValue={place.activityTypes?.join(", ")}
-                    revisionValue={revision.activityTypes?.join(", ")}
-                    changed={JSON.stringify(place.activityTypes) !== JSON.stringify(revision.activityTypes)}
-                  />
+
+                {shouldShowMetro && (
+                  <span className="inline-flex items-center gap-1 px-3 py-1 text-sm font-medium text-blue-700 bg-blue-50 rounded">
+                    <Navigation className="w-4 h-4" />
+                    {metroName} • {formatDistance(metroDistance)}
+                  </span>
                 )}
               </div>
             </div>
@@ -272,29 +365,15 @@ export function PlaceRevisionModerationView({ place, revision }: PlaceRevisionMo
         {/* RIGHT COLUMN: Moderation Panel (Sticky) */}
         <div className="lg:col-span-1">
           <div className="sticky top-6 border border-gray-200 rounded-lg p-6 bg-white shadow-sm">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Moderation</h3>
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">
+              Moderation
+            </h3>
 
             {/* Revision Info */}
             <div className="space-y-3 mb-6 pb-6 border-b">
               <div>
                 <span className="text-sm font-medium text-gray-600">Type:</span>
-                <div className="mt-1">
-                  <Badge variant="default" className="bg-amber-600">Place Update</Badge>
-                </div>
-              </div>
-
-              <div>
-                <span className="text-sm font-medium text-gray-600">Place Status:</span>
-                <div className="mt-1">
-                  <Badge variant="default">Published</Badge>
-                </div>
-              </div>
-
-              <div>
-                <span className="text-sm font-medium text-gray-600">Revision Status:</span>
-                <div className="mt-1">
-                  <Badge variant="outline" className="bg-gray-100 text-gray-700 border-gray-200">Pending</Badge>
-                </div>
+                <p className="text-sm text-gray-900 mt-1">Place Update</p>
               </div>
 
               {place.city && (
@@ -306,18 +385,63 @@ export function PlaceRevisionModerationView({ place, revision }: PlaceRevisionMo
 
               {place.owner.business && (
                 <div>
-                  <span className="text-sm font-medium text-gray-600">Business:</span>
-                  <p className="text-sm text-gray-900 mt-1">{place.owner.business.name}</p>
+                  <span className="text-sm font-medium text-gray-600">
+                    Business:
+                  </span>
+                  <p className="text-sm text-gray-900 mt-1">
+                    {place.owner.business.name}
+                  </p>
                 </div>
               )}
 
               <div>
-                <span className="text-sm font-medium text-gray-600">Submitted:</span>
+                <span className="text-sm font-medium text-gray-600">
+                  Submitted:
+                </span>
                 <p className="text-sm text-gray-900 mt-1">
-                  {revision.submittedAt ? formatDistanceToNow(revision.submittedAt, { addSuffix: true, locale: ru }) : "—"}
+                  {revision.submittedAt
+                    ? formatDistanceToNow(revision.submittedAt, {
+                        addSuffix: true,
+                        locale: ru,
+                      })
+                    : "—"}
                 </p>
               </div>
+
+              <div>
+                <span className="text-sm font-medium text-gray-600">
+                  Changes:
+                </span>
+                <p className="text-sm text-gray-900 mt-1">
+                  {diff.summary.totalChanges} total
+                </p>
+              </div>
+
+              {/* Display Title Info */}
+              <div>
+                <span className="text-sm font-medium text-gray-600">
+                  Public Display:
+                </span>
+                <p className="text-sm text-gray-900 mt-1 font-medium">
+                  {displayTitle}
+                </p>
+                {hasDuplicates && (
+                  <p className="text-xs text-amber-600 mt-1">
+                    ⚠️ Title conflicts with other places in this city. Address added for disambiguation.
+                  </p>
+                )}
+              </div>
             </div>
+
+            {/* Micro-Edit History */}
+            {microEdits.length > 0 && (
+              <div className="mb-6 pb-6 border-b">
+                <h4 className="text-sm font-medium text-gray-700 mb-3">
+                  Редакторские правки
+                </h4>
+                <MicroEditHistory edits={microEdits} />
+              </div>
+            )}
 
             {/* Moderator Comment */}
             <div className="mb-6">
@@ -331,6 +455,9 @@ export function PlaceRevisionModerationView({ place, revision }: PlaceRevisionMo
                 className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm min-h-[100px] focus:outline-none focus:ring-2 focus:ring-blue-500"
                 disabled={isSubmitting}
               />
+              <p className="text-xs text-gray-500 mt-1">
+                Для ссылки на фото используйте: "Фото №1", "Фото №2" и т.д.
+              </p>
             </div>
 
             {/* Action Buttons */}
@@ -340,16 +467,16 @@ export function PlaceRevisionModerationView({ place, revision }: PlaceRevisionMo
                 disabled={isSubmitting}
                 className="w-full bg-green-600 hover:bg-green-700"
               >
-                {isSubmitting ? "Processing..." : "Approve Changes"}
+                {isSubmitting ? "Processing..." : diff.summary.totalChanges === 0 ? "Approve (No Changes)" : "Approve Changes"}
               </Button>
 
               <Button
                 onClick={() => handleModerate("NEEDS_REVISION")}
-                disabled={isSubmitting}
+                disabled={isSubmitting || !comment.trim()}
                 variant="outline"
                 className="w-full"
               >
-                Needs Revision
+                Request Changes
               </Button>
 
               <Button
@@ -358,15 +485,19 @@ export function PlaceRevisionModerationView({ place, revision }: PlaceRevisionMo
                 variant="destructive"
                 className="w-full"
               >
-                Reject Changes
+                Reject Update
               </Button>
             </div>
 
-            {/* Info Note */}
-            <div className="mt-4 p-3 bg-blue-50 rounded-md">
-              <p className="text-xs text-blue-800">
-                <strong>Note:</strong> Approving will copy the changes to the live Place. The current version remains visible until approval.
-              </p>
+            {/* View Published Place Link */}
+            <div className="mt-4 pt-4 border-t">
+              <Link
+                href={`/places/${place.slug || place.id}`}
+                target="_blank"
+                className="text-sm text-blue-600 hover:text-blue-700 hover:underline"
+              >
+                View published place →
+              </Link>
             </div>
           </div>
         </div>

@@ -188,7 +188,7 @@ export async function getOrCreatePlaceRevision(
  */
 export async function savePlaceRevisionDraft(
   revisionId: string,
-  data: PlaceRevisionData,
+  data: PlaceRevisionData & { wizardSessionId?: string },
   businessUserId: string
 ) {
   // Get revision with ownership check
@@ -217,16 +217,56 @@ export async function savePlaceRevisionDraft(
     );
   }
 
+  // Extract wizardSessionId if provided
+  const { wizardSessionId, ...revisionData } = data;
+
   // Filter out fields that don't exist in PlaceRevision model
+  // PlaceRevision uses logoImageId, not logoMediaId
+  // PlaceRevision doesn't have galleryMediaIds, galleryUrls, or other temp media fields
   const {
-    // Remove fields that don't exist in PlaceRevision
+    // Remove temp media fields (used in wizard but not in revision model)
+    logoMediaId,
+    logoUrl,
     galleryMediaIds,
     galleryUrls,
+    // Remove any other fields that might come from Place but don't exist in PlaceRevision
+    ownerUserId,
+    status,
+    createRequestId,
+    moderatorComment,
+    moderationReviewedAt,
+    moderatedByUserId,
+    revisionRequestedAt,
+    revisionResubmittedAt,
+    archivedAt,
+    archivedByUserId,
+    createdAt,
+    updatedAt,
+    // Remove relation fields that shouldn't be in data
+    images,
     ...validData
-  } = data as any;
+  } = revisionData as any;
 
-  // Update revision
-  return prisma.placeRevision.update({
+  // Log what we're filtering out for debugging
+  const filteredFields = {
+    logoMediaId,
+    logoUrl,
+    galleryMediaIds,
+    galleryUrls,
+    ownerUserId,
+    status,
+    createRequestId,
+    images: images ? `${images.length} images` : undefined,
+  };
+  const hasFilteredFields = Object.values(filteredFields).some(v => v !== undefined);
+  if (hasFilteredFields) {
+    console.log("[PlaceRevision] Filtered out invalid fields:", 
+      Object.fromEntries(Object.entries(filteredFields).filter(([_, v]) => v !== undefined))
+    );
+  }
+
+  // Update revision with only valid PlaceRevision fields
+  const updatedRevision = await prisma.placeRevision.update({
     where: { id: revisionId },
     data: validData,
     include: {
@@ -235,6 +275,94 @@ export async function savePlaceRevisionDraft(
       },
     },
   });
+
+  // Attach temp media if wizardSessionId provided
+  if (wizardSessionId) {
+    console.log("[PlaceRevision] Attaching temp media from session:", wizardSessionId);
+    
+    try {
+      // Get all temp media for this session
+      const tempMedia = await prisma.tempMedia.findMany({
+        where: {
+          ownerUserId: businessUserId,
+          wizardSessionId,
+          status: "TEMP",
+        },
+        orderBy: [
+          { kind: "asc" },
+          { sortOrder: "asc" },
+        ],
+      });
+
+      console.log(`[PlaceRevision] Found ${tempMedia.length} temp media items`);
+
+      if (tempMedia.length > 0) {
+        // Delete existing revision images (we're replacing them)
+        await prisma.placeRevisionImage.deleteMany({
+          where: { revisionId },
+        });
+
+        // Convert temp media to PlaceRevisionImages
+        const revisionImages = await Promise.all(
+          tempMedia.map(async (media) => {
+            const kind = media.kind === "PLACE_LOGO" ? "LOGO" : "GALLERY";
+            
+            return prisma.placeRevisionImage.create({
+              data: {
+                revisionId,
+                kind,
+                url: media.url,
+                width: media.width,
+                height: media.height,
+                blurhash: media.blurhash,
+                sortOrder: media.sortOrder,
+              },
+            });
+          })
+        );
+
+        // Update logoImageId if logo was uploaded
+        const logoImage = revisionImages.find((img) => img.kind === "LOGO");
+        if (logoImage) {
+          await prisma.placeRevision.update({
+            where: { id: revisionId },
+            data: { logoImageId: logoImage.id },
+          });
+          console.log("[PlaceRevision] Set logoImageId:", logoImage.id);
+        }
+
+        // Mark temp media as attached
+        await prisma.tempMedia.updateMany({
+          where: {
+            ownerUserId: businessUserId,
+            wizardSessionId,
+            status: "TEMP",
+          },
+          data: {
+            status: "ATTACHED",
+            // Note: We don't set placeId here since these are attached to revision
+          },
+        });
+
+        console.log(`[PlaceRevision] Attached ${revisionImages.length} images to revision`);
+
+        // Reload revision with new images
+        return prisma.placeRevision.findUnique({
+          where: { id: revisionId },
+          include: {
+            images: {
+              orderBy: { sortOrder: "asc" },
+            },
+          },
+        });
+      }
+    } catch (attachError) {
+      console.error("[PlaceRevision] Failed to attach temp media (non-fatal):", attachError);
+      // Continue - revision is saved, images can be uploaded later
+    }
+  }
+
+  return updatedRevision;
 }
 
 /**
@@ -411,6 +539,18 @@ export async function approvePlaceRevision(
   } catch (notificationError) {
     console.error("Failed to create notification:", notificationError);
     // Don't fail the approval if notification fails
+  }
+
+  // Auto-resolve improvement request if this revision was linked to one
+  if (revision.improvementRequestId) {
+    try {
+      const { autoResolveImprovementRequestOnApproval } = await import("./improvementRequest.service");
+      await autoResolveImprovementRequestOnApproval(revisionId);
+      console.log(`[PlaceRevision] Auto-resolved improvement request: ${revision.improvementRequestId}`);
+    } catch (improvementError) {
+      console.error("Failed to auto-resolve improvement request:", improvementError);
+      // Don't fail the approval if improvement request resolution fails
+    }
   }
 }
 

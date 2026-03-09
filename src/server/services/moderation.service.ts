@@ -121,6 +121,11 @@ export async function approvePlace(
       },
     }),
   ]);
+  
+  // Assign slug after publication (outside transaction)
+  // This also recalculates slugs for duplicates if needed
+  const { assignSlugOnPublish } = await import("@/lib/slug/placeSlugService");
+  await assignSlugOnPublish(placeId);
 }
 
 /**
