@@ -51,6 +51,9 @@ model User {
   reviewedPlaceClaimRequests    PlaceClaimRequest[]       @relation("ClaimReviewer")
   tempMedia                     TempMedia[]
   notifications                 Notification[]
+  contentEdits                  ContentEditLog[]          @relation("ContentEditor")
+  createdImprovementRequests    ImprovementRequest[]      @relation("ImprovementRequestCreator")
+  assignedImprovementRequests   ImprovementRequest[]      @relation("ImprovementRequestAssignee")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -490,6 +493,34 @@ enum ModerationAction {
   REJECT
 }
 
+// Content edit type (for micro-edits)
+enum ContentEditType {
+  TYPO
+  PUNCTUATION
+  FORMATTING
+  CAPITALIZATION
+  PHONE_NORMALIZATION
+  LINK_NORMALIZATION
+  WHITESPACE_CLEANUP
+  OTHER
+}
+
+// Improvement request status
+enum ImprovementRequestStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CANCELLED
+}
+
+// Improvement request severity
+enum ImprovementSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
 // Business entity
 model Business {
   id          String @id @default(cuid())
@@ -546,6 +577,10 @@ model Place {
   ownerUserId String
   status      ContentStatus @default(DRAFT)
 
+  // SEO-friendly URL slug
+  slug String? @unique
+  slugUpdatedAt DateTime? // Track when slug was last changed
+
   // Idempotency key for creation (prevents duplicate places)
   createRequestId String?
 
@@ -553,6 +588,9 @@ model Place {
   title     String
   category  String // e.g., "cafe", "museum", "park"
   shortDesc String // Short description for cards
+
+  // Short address for disambiguation (e.g., "Ратомская, 7")
+  shortAddress String?
 
   // Optional SEO description
   description String?
@@ -608,6 +646,9 @@ model Place {
   archivedAt       DateTime? // When place was archived
   archivedByUserId String?   // User who archived (owner or admin)
 
+  // Improvement request tracking
+  hasActiveImprovementRequests Boolean @default(false)
+
   // Relations
   archivedBy     User?         @relation(fields: [archivedByUserId], references: [id], onDelete: SetNull, name: "PlaceArchiver")
   owner          User          @relation(fields: [ownerUserId], references: [id], onDelete: Cascade, name: "PlaceOwner")
@@ -624,6 +665,7 @@ model Place {
   activities     Activity[]          @relation("PlaceActivities")
   claimRequests  PlaceClaimRequest[]
   revisions      PlaceRevision[]     // Post-publication edit revisions
+  slugHistory    PlaceSlugHistory[]  // Historical slugs for redirects
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -652,6 +694,9 @@ model PlaceRevision {
   id        String               @id @default(cuid())
   placeId   String
   status    PlaceRevisionStatus  @default(DRAFT)
+
+  // Link to improvement request (if this revision is in response to one)
+  improvementRequestId String?
 
   // Moderation metadata
   moderatorComment      String?   // Admin feedback
@@ -760,6 +805,20 @@ model PlaceClaimRequest {
   @@index([placeId, status])
   @@index([userId, createdAt])
   @@index([status])
+}
+
+// Place slug history (for SEO-friendly redirects)
+// Stores old slugs when a place's slug changes
+model PlaceSlugHistory {
+  id        String   @id @default(cuid())
+  placeId   String
+  slug      String   @unique // Old slug that should redirect to current place
+  createdAt DateTime @default(now())
+
+  place Place @relation(fields: [placeId], references: [id], onDelete: Cascade)
+
+  @@index([placeId])
+  @@index([slug])
 }
 
 // Place images (logo and gallery)
@@ -878,6 +937,56 @@ model ModerationLog {
 
   @@index([entityType, entityId, createdAt])
   @@index([reviewedByUserId])
+}
+
+// Content edit log (micro-edits by moderators)
+model ContentEditLog {
+  id          String          @id @default(cuid())
+  entityType  String          // "PLACE", "ACTIVITY", etc. (string for flexibility)
+  entityId    String
+  moderatorId String
+  fieldName   String
+  oldValue    String?
+  newValue    String?
+  editType    ContentEditType
+  comment     String?
+
+  moderator User @relation(fields: [moderatorId], references: [id], onDelete: Cascade, name: "ContentEditor")
+
+  createdAt DateTime @default(now())
+
+  @@index([entityType, entityId, createdAt])
+  @@index([moderatorId, createdAt])
+  @@index([editType])
+}
+
+// Improvement request (post-publication quality control)
+model ImprovementRequest {
+  id                    String                    @id @default(cuid())
+  entityType            String                    // "PLACE", "ACTIVITY", etc.
+  entityId              String
+  createdByModeratorId  String
+  assignedToUserId      String
+  status                ImprovementRequestStatus  @default(OPEN)
+  severity              ImprovementSeverity       @default(MEDIUM)
+  title                 String
+  description           String
+  requestedChanges      Json?
+  dueAt                 DateTime?
+  resolvedAt            DateTime?
+  resolvedByRevisionId  String?
+
+  createdByModerator User @relation(fields: [createdByModeratorId], references: [id], onDelete: Cascade, name: "ImprovementRequestCreator")
+  assignedToUser     User @relation(fields: [assignedToUserId], references: [id], onDelete: Cascade, name: "ImprovementRequestAssignee")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([entityType, entityId, status])
+  @@index([assignedToUserId, status, createdAt])
+  @@index([createdByModeratorId, createdAt])
+  @@index([status, severity])
+  @@index([dueAt])
 }
 
 // Offer entity (EVENT or SERVICE)

@@ -22,6 +22,8 @@ import { toast } from "sonner";
 interface PlaceCardData {
   id: string;
   title: string;
+  shortAddress?: string | null;
+  displayTitle?: string; // Optional pre-computed display title
   status: ContentStatus;
   formattedAddr: string | null;
   customAddress: string | null;
@@ -131,7 +133,7 @@ export function PlaceCardHorizontal({ place, onDelete, onArchive, onUnarchive }:
     : place.status;
   
   // Get display values
-  const displayTitle = place.title || "Без названия";
+  const displayTitle = place.displayTitle || place.title || "Без названия";
   const displayAddress = place.formattedAddr || place.customAddress || "Локация не задана";
   
   // Calculate days since revision request

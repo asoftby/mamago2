@@ -83,7 +83,7 @@ export function BreakingNewsRow({ items, onAllClickHref = "#", className }: Brea
   return (
     <div className={cn("space-y-4 py-6", className)}>
       {/* Header */}
-      <div className="flex items-center gap-3 px-1">
+      <div className="flex items-center gap-3 px-4 sm:px-0">
         <h2 className="text-2xl font-semibold tracking-tight text-foreground">
           Breaking News
         </h2>
