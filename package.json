@@ -15,7 +15,13 @@
     "ui:audit": "node scripts/ui-usage-audit.mjs",
     "bootstrap:admin": "tsx scripts/bootstrap-admin.ts",
     "cleanup:otp": "tsx src/scripts/cleanupPhoneOtps.ts",
-    "backfill:verification": "tsx prisma/scripts/backfillVerificationStatus.ts"
+    "backfill:verification": "tsx prisma/scripts/backfillVerificationStatus.ts",
+    "backfill:place-slugs": "tsx scripts/backfill-place-slugs.ts",
+    "db:backup": "bash scripts/db/backup.sh",
+    "db:backup:sql": "bash scripts/db/backup-sql.sh",
+    "db:backups": "bash scripts/db/list-backups.sh",
+    "db:restore": "bash scripts/db/restore.sh",
+    "db:backup:pre": "bash scripts/db/backup.sh"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
