@@ -18,6 +18,7 @@ import {
 } from "./utils/stepValidation";
 import { toast } from "sonner";
 import { useWizardSession } from "@/hooks/useWizardSession";
+import { Badge } from "@/components/ui/badge";
 
 interface PlaceWithImages extends Place {
   images: PlaceImage[];
@@ -41,6 +42,9 @@ export function PlaceWizard({ place: initialPlace, initialStep, moderationMessag
   const [isDirty, setIsDirty] = useState(false);
   const [pendingChanges, setPendingChanges] = useState<Partial<Place>>({});
 
+  // Improvement requests
+  const [improvementRequests, setImprovementRequests] = useState<any[]>([]);
+
   // Debug: log moderation data
   console.log("[PlaceWizard] Moderation data:", {
     placeStatus: place.status,
@@ -55,6 +59,25 @@ export function PlaceWizard({ place: initialPlace, initialStep, moderationMessag
     userId: initialPlace.ownerUserId,
     wizardType: "place",
   });
+
+  // Fetch improvement requests for this place
+  useEffect(() => {
+    const fetchImprovementRequests = async () => {
+      try {
+        const response = await fetch(`/api/business/places/${place.id}/improvement-requests`);
+        if (response.ok) {
+          const data = await response.json();
+          setImprovementRequests(data.requests || []);
+        }
+      } catch (error) {
+        console.error("Failed to fetch improvement requests:", error);
+      }
+    };
+
+    if (place.status === "PUBLISHED") {
+      fetchImprovementRequests();
+    }
+  }, [place.id, place.status]);
 
   // Determine if place is locked for editing (under review)
   // For published places, check revision status
@@ -144,7 +167,10 @@ export function PlaceWizard({ place: initialPlace, initialStep, moderationMessag
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             revisionId: revision.id,
-            data: pendingChanges,
+            data: {
+              ...pendingChanges,
+              wizardSessionId, // Include wizardSessionId for temp media attachment
+            },
           }),
         });
 
@@ -167,6 +193,11 @@ export function PlaceWizard({ place: initialPlace, initialStep, moderationMessag
         const revisionData = await res.json();
         updatedData = revisionData.revision;
         console.log("[PlaceWizard] Revision saved successfully");
+        
+        // Update place with revision images (important for photo persistence)
+        if (updatedData.images) {
+          setPlace((prev) => ({ ...prev, images: updatedData.images }));
+        }
       } else {
         // Draft/needs_revision/rejected places can be edited directly
         res = await fetch(`/api/business/places/${place.id}`, {
@@ -437,6 +468,52 @@ export function PlaceWizard({ place: initialPlace, initialStep, moderationMessag
       />
 
       <div className="max-w-4xl mx-auto px-4 py-8">
+        {/* Improvement Request Banner */}
+        {place.status === "PUBLISHED" && improvementRequests.length > 0 && (
+          <div className="mb-6 bg-amber-50 border-l-4 border-amber-400 p-4 rounded-md">
+            <div className="flex items-start">
+              <AlertCircle className="w-5 h-5 text-amber-600 mt-0.5 mr-3 flex-shrink-0" />
+              <div className="flex-1">
+                <h3 className="text-sm font-semibold text-amber-800 mb-2">
+                  Требуется доработка опубликованного контента
+                </h3>
+                <p className="text-sm text-amber-700 mb-3">
+                  Модератор запросил улучшения для этого места. Внесите изменения и отправьте на проверку.
+                </p>
+                <div className="space-y-2">
+                  {improvementRequests.map((request: any) => (
+                    <div key={request.id} className="bg-white rounded p-3 border border-amber-200">
+                      <div className="flex items-start justify-between mb-1">
+                        <span className="font-medium text-sm text-gray-900">
+                          {request.title}
+                        </span>
+                        <Badge className={
+                          request.severity === "CRITICAL" ? "bg-red-100 text-red-800" :
+                          request.severity === "HIGH" ? "bg-orange-100 text-orange-800" :
+                          request.severity === "MEDIUM" ? "bg-yellow-100 text-yellow-800" :
+                          "bg-blue-100 text-blue-800"
+                        }>
+                          {request.severity === "CRITICAL" ? "Критическая" :
+                           request.severity === "HIGH" ? "Высокая" :
+                           request.severity === "MEDIUM" ? "Средняя" : "Низкая"}
+                        </Badge>
+                      </div>
+                      <p className="text-xs text-gray-700 whitespace-pre-wrap">
+                        {request.description}
+                      </p>
+                      {request.dueAt && (
+                        <p className="text-xs text-amber-700 mt-2">
+                          Срок: {new Date(request.dueAt).toLocaleDateString("ru-RU")}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Locked for Moderation Banner */}
         {isLocked && (
           <div className="mb-6 bg-blue-50 border-l-4 border-blue-400 p-4 rounded-md">

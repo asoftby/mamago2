@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { Place } from "@prisma/client";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { WizardStepHeader } from "../components/WizardStepHeader";
+import { AGE_OPTIONS } from "@/lib/config/ages";
 
 interface Step1ProfileProps {
   place: Place;
@@ -27,7 +28,6 @@ const CATEGORIES = [
   { value: "other", label: "Другое" },
 ];
 
-const AGE_TAGS = ["0-3", "3-7", "7-12", "12+"];
 const VISIT_FORMATS = ["indoor", "outdoor", "online"];
 const ACTIVITY_TYPES = ["sports", "arts", "education", "entertainment", "food"];
 
@@ -40,6 +40,16 @@ export function Step1Profile({ place, onUpdate, onNext, canNext, isEditable = tr
   const [ageTags, setAgeTags] = useState<string[]>(place.ageTags || []);
   const [visitFormats, setVisitFormats] = useState<string[]>(place.visitFormats || []);
   const [activityTypes, setActivityTypes] = useState<string[]>(place.activityTypes || []);
+
+  useEffect(() => {
+    setTitle(place.title);
+    setCategory(place.category);
+    setShortDesc(place.shortDesc);
+    setDescription(place.description || "");
+    setAgeTags(place.ageTags || []);
+    setVisitFormats(place.visitFormats || []);
+    setActivityTypes(place.activityTypes || []);
+  }, [place.title, place.category, place.shortDesc, place.description, place.ageTags, place.visitFormats, place.activityTypes]);
 
   const handleTitleChange = (value: string) => {
     setTitle(value);
@@ -94,7 +104,6 @@ export function Step1Profile({ place, onUpdate, onNext, canNext, isEditable = tr
         canNext={canNext}
       />
 
-      {/* Title */}
       <div>
         <Label htmlFor="title">Название *</Label>
         <Input
@@ -107,7 +116,50 @@ export function Step1Profile({ place, onUpdate, onNext, canNext, isEditable = tr
         />
       </div>
 
-      {/* Category */}
+      <div>
+        <Label htmlFor="shortDesc">Короткое описание *</Label>
+        <Input
+          id="shortDesc"
+          value={shortDesc}
+          onChange={(e) => handleShortDescChange(e.target.value)}
+          placeholder="Краткое описание для карточки"
+          className="mt-2"
+          maxLength={100}
+          disabled={!isEditable}
+        />
+        <p className="text-xs text-muted-foreground mt-1">
+          {shortDesc.length}/100 символов
+        </p>
+      </div>
+
+      <div>
+        <Label htmlFor="description">Описание *</Label>
+        <Textarea
+          id="description"
+          value={description}
+          onChange={(e) => handleDescriptionChange(e.target.value)}
+          placeholder="Подробное описание места"
+          className="mt-2"
+          rows={showFullDescription ? 10 : 4}
+          maxLength={5000}
+          disabled={!isEditable}
+        />
+        <div className="flex items-center justify-between mt-1">
+          <p className="text-xs text-muted-foreground">
+            {description.length}/5000 символов
+          </p>
+          {!showFullDescription && description.length > 200 && (
+            <button
+              type="button"
+              onClick={() => setShowFullDescription(true)}
+              className="text-xs text-primary hover:underline"
+            >
+              Показать полностью
+            </button>
+          )}
+        </div>
+      </div>
+
       <div>
         <Label htmlFor="category">Категория *</Label>
         <select
@@ -125,98 +177,8 @@ export function Step1Profile({ place, onUpdate, onNext, canNext, isEditable = tr
         </select>
       </div>
 
-      {/* Short description */}
       <div>
-        <Label htmlFor="shortDesc">Короткое описание *</Label>
-        <Input
-          id="shortDesc"
-          value={shortDesc}
-          onChange={(e) => handleShortDescChange(e.target.value)}
-          placeholder="Краткое описание для карточки"
-          className="mt-2"
-          maxLength={100}
-          disabled={!isEditable}
-        />
-        <p className="text-xs text-muted-foreground mt-1">
-          {shortDesc.length}/100 символов
-        </p>
-      </div>
-
-      {/* Full description */}
-      <div>
-        <Label htmlFor="description">Полное описание (SEO)</Label>
-        <Textarea
-          id="description"
-          value={description}
-          onChange={(e) => handleDescriptionChange(e.target.value)}
-          placeholder="Подробное описание для поисковых систем"
-          className="mt-2"
-          rows={showFullDescription ? 10 : 4}
-          disabled={!isEditable}
-        />
-        <div className="flex items-center justify-between mt-1">
-          <p className="text-xs text-muted-foreground">
-            {description.length} символов
-          </p>
-          {!showFullDescription && description.length > 200 && (
-            <button
-              type="button"
-              onClick={() => setShowFullDescription(true)}
-              className="text-xs text-primary hover:underline"
-            >
-              Показать полностью
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Age tags */}
-      <div>
-        <Label>Возраст</Label>
-        <div className="flex flex-wrap gap-2 mt-2">
-          {AGE_TAGS.map((tag) => (
-            <button
-              key={tag}
-              type="button"
-              onClick={() => isEditable && toggleAgeTag(tag)}
-              disabled={!isEditable}
-              className={`px-3 py-1 rounded-full text-sm border transition-colors ${
-                ageTags.includes(tag)
-                  ? "bg-primary text-primary-foreground border-primary"
-                  : "bg-background border-input hover:border-primary"
-              } ${!isEditable ? "opacity-50 cursor-not-allowed" : ""}`}
-            >
-              {tag}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Visit formats */}
-      <div>
-        <Label>Формат посещения</Label>
-        <div className="flex flex-wrap gap-2 mt-2">
-          {VISIT_FORMATS.map((format) => (
-            <button
-              key={format}
-              type="button"
-              onClick={() => isEditable && toggleVisitFormat(format)}
-              disabled={!isEditable}
-              className={`px-3 py-1 rounded-full text-sm border transition-colors ${
-                visitFormats.includes(format)
-                  ? "bg-primary text-primary-foreground border-primary"
-                  : "bg-background border-input hover:border-primary"
-              } ${!isEditable ? "opacity-50 cursor-not-allowed" : ""}`}
-            >
-              {format}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Activity types */}
-      <div>
-        <Label>Типы активностей</Label>
+        <Label>Типы активностей *</Label>
         <div className="flex flex-wrap gap-2 mt-2">
           {ACTIVITY_TYPES.map((type) => (
             <button
@@ -234,6 +196,57 @@ export function Step1Profile({ place, onUpdate, onNext, canNext, isEditable = tr
             </button>
           ))}
         </div>
+        <p className="text-xs text-muted-foreground mt-1">
+          Выберите хотя бы один тип активности
+        </p>
+      </div>
+
+      <div>
+        <Label>Возраст *</Label>
+        <div className="flex flex-wrap gap-2 mt-2">
+          {AGE_OPTIONS.map((ageOption) => (
+            <button
+              key={ageOption.key}
+              type="button"
+              onClick={() => isEditable && toggleAgeTag(ageOption.key)}
+              disabled={!isEditable}
+              className={`px-3 py-1 rounded-full text-sm border transition-colors ${
+                ageTags.includes(ageOption.key)
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "bg-background border-input hover:border-primary"
+              } ${!isEditable ? "opacity-50 cursor-not-allowed" : ""}`}
+            >
+              {ageOption.shortLabel}
+            </button>
+          ))}
+        </div>
+        <p className="text-xs text-muted-foreground mt-1">
+          Выберите хотя бы один возрастной диапазон
+        </p>
+      </div>
+
+      <div>
+        <Label>Формат посещения *</Label>
+        <div className="flex flex-wrap gap-2 mt-2">
+          {VISIT_FORMATS.map((format) => (
+            <button
+              key={format}
+              type="button"
+              onClick={() => isEditable && toggleVisitFormat(format)}
+              disabled={!isEditable}
+              className={`px-3 py-1 rounded-full text-sm border transition-colors ${
+                visitFormats.includes(format)
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "bg-background border-input hover:border-primary"
+              } ${!isEditable ? "opacity-50 cursor-not-allowed" : ""}`}
+            >
+              {format}
+            </button>
+          ))}
+        </div>
+        <p className="text-xs text-muted-foreground mt-1">
+          Выберите хотя бы один формат посещения
+        </p>
       </div>
     </div>
   );

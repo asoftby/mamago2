@@ -13,6 +13,7 @@ import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
 import { ContentStatus, PlaceKind, LocationSource } from "@prisma/client";
 import { updatePlaceLocation } from "@/services/place/placeLocation.service";
+import { extractShortAddress, generatePlaceSlugWithContext } from "@/lib/placeDisplayTitle";
 
 export async function POST(request: NextRequest) {
   try {
@@ -61,6 +62,19 @@ export async function POST(request: NextRequest) {
 
     console.log("[places/POST] Creating place for user:", user.id, "title:", data.title, "status:", status);
 
+    // Extract short address from formatted address
+    const shortAddress = extractShortAddress(data.formattedAddr);
+    console.log("[places/POST] Extracted shortAddress:", shortAddress);
+
+    // Generate unique slug with city context
+    const slug = await generatePlaceSlugWithContext(
+      prisma,
+      data.title,
+      shortAddress,
+      data.cityId || null
+    );
+    console.log("[places/POST] Generated slug:", slug);
+
     // Determine location source
     const locationSource: LocationSource = data.googlePlaceId ? "GOOGLE" : "MANUAL";
 
@@ -70,9 +84,11 @@ export async function POST(request: NextRequest) {
         ownerUserId: user.id,
         createRequestId,
         status: status as ContentStatus,
+        slug, // Add SEO-friendly slug
         
         // Step 1 fields
         title: data.title,
+        shortAddress, // Add short address for disambiguation
         category: data.category,
         shortDesc: data.shortDesc,
         description: data.description || null,
@@ -280,7 +296,11 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    return NextResponse.json({ places });
+    // Enrich places with displayTitle
+    const { enrichPlacesWithDisplayTitle } = await import("@/lib/placeHelpers");
+    const enrichedPlaces = await enrichPlacesWithDisplayTitle(prisma, places);
+
+    return NextResponse.json({ places: enrichedPlaces });
   } catch (error) {
     console.error("List places error:", error);
     return NextResponse.json(

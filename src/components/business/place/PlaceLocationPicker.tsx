@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -27,6 +27,9 @@ interface PlaceLocationPickerProps {
     metroAutoDistanceM?: number | null;
     metroManualId?: string | null;
     metroManualDistanceM?: number | null;
+    // Names from enrichment API (for display before stations are loaded)
+    districtName?: string | null;
+    metroName?: string | null;
   } | null;
   onUpdate?: (updates: any) => void;
   disabled?: boolean;
@@ -83,6 +86,27 @@ export function PlaceLocationPicker({
   const [metroManualId, setMetroManualId] = useState<string | null>(initialLocation?.metroManualId || null);
   const [metroManualDistanceM, setMetroManualDistanceM] = useState<number | null>(initialLocation?.metroManualDistanceM || null);
 
+  // Sync geo enrichment state when initialLocation changes (e.g., after enrichment API call)
+  useEffect(() => {
+    if (initialLocation) {
+      if (initialLocation.cityId !== undefined) setCityId(initialLocation.cityId);
+      if (initialLocation.districtAutoId !== undefined) setDistrictAutoId(initialLocation.districtAutoId);
+      if (initialLocation.districtManualId !== undefined) setDistrictManualId(initialLocation.districtManualId);
+      if (initialLocation.metroAutoId !== undefined) setMetroAutoId(initialLocation.metroAutoId);
+      if (initialLocation.metroAutoDistanceM !== undefined) setMetroAutoDistanceM(initialLocation.metroAutoDistanceM);
+      if (initialLocation.metroManualId !== undefined) setMetroManualId(initialLocation.metroManualId);
+      if (initialLocation.metroManualDistanceM !== undefined) setMetroManualDistanceM(initialLocation.metroManualDistanceM);
+    }
+  }, [
+    initialLocation?.cityId,
+    initialLocation?.districtAutoId,
+    initialLocation?.districtManualId,
+    initialLocation?.metroAutoId,
+    initialLocation?.metroAutoDistanceM,
+    initialLocation?.metroManualId,
+    initialLocation?.metroManualDistanceM,
+  ]);
+
   // Options for selects
   const [districts, setDistricts] = useState<Array<{ id: string; name: string }>>([]);
   const [metroStations, setMetroStations] = useState<Array<{ id: string; name: string }>>([]);
@@ -101,14 +125,10 @@ export function PlaceLocationPicker({
   const [isMapModalOpen, setIsMapModalOpen] = useState(false);
 
   // Load districts and metro stations when cityId is available
-  useEffect(() => {
-    if (cityId) {
-      loadGeoOptions();
-    }
-  }, [cityId]);
-
-  const loadGeoOptions = async () => {
+  const loadGeoOptions = useCallback(async () => {
     if (!cityId) return;
+
+    console.log("[PlaceLocationPicker] Loading geo options for cityId:", cityId);
 
     try {
       const [districtsRes, metroRes] = await Promise.all([
@@ -119,16 +139,45 @@ export function PlaceLocationPicker({
       if (districtsRes.ok) {
         const data = await districtsRes.json();
         setDistricts(data.districts || []);
+        console.log("[PlaceLocationPicker] Loaded", data.districts?.length || 0, "districts");
       }
 
       if (metroRes.ok) {
         const data = await metroRes.json();
-        setMetroStations(data.stations || []);
+        setMetroStations(data.metroStations || []);
+        console.log("[PlaceLocationPicker] Loaded", data.metroStations?.length || 0, "metro stations");
       }
     } catch (err) {
       console.error("[PlaceLocationPicker] Load geo options error:", err);
     }
-  };
+  }, [cityId]);
+
+  useEffect(() => {
+    if (cityId) {
+      console.log("[PlaceLocationPicker] cityId changed, loading options:", cityId);
+      loadGeoOptions();
+    }
+  }, [cityId, loadGeoOptions]);
+
+  // Load single metro station by ID if we have metroAutoId but no stations loaded
+  useEffect(() => {
+    const loadMetroStation = async () => {
+      if (metroAutoId && metroStations.length === 0 && cityId) {
+        console.log("[PlaceLocationPicker] Loading single metro station:", metroAutoId);
+        try {
+          const res = await fetch(`/api/geo/metro-stations?cityId=${cityId}`);
+          if (res.ok) {
+            const data = await res.json();
+            setMetroStations(data.metroStations || []);
+            console.log("[PlaceLocationPicker] Loaded", data.metroStations?.length || 0, "metro stations");
+          }
+        } catch (err) {
+          console.error("[PlaceLocationPicker] Load metro station error:", err);
+        }
+      }
+    };
+    loadMetroStation();
+  }, [metroAutoId, metroStations.length, cityId]);
 
   // Check duplicates whenever location changes
   useEffect(() => {
@@ -583,9 +632,13 @@ export function PlaceLocationPicker({
               value={metroShown || ""}
               onChange={(e) => handleMetroChange(e.target.value)}
               className="mt-2 w-full rounded-md border border-input bg-background px-3 py-2"
-              disabled={metroStations.length === 0 || disabled}
+              disabled={disabled}
             >
               <option value="">Не выбрано</option>
+              {/* Show currently selected metro even if stations not loaded yet */}
+              {metroShown && metroStations.length === 0 && initialLocation?.metroName && (
+                <option value={metroShown}>{initialLocation.metroName}</option>
+              )}
               {metroStations.map((m) => (
                 <option key={m.id} value={m.id}>
                   {m.name}
@@ -647,7 +700,7 @@ export function PlaceLocationPicker({
             <div className="text-sm">
               <span className="text-gray-600">Метро:</span>{" "}
               <span className="text-gray-900">
-                {metroManualId || metroAutoId}
+                {metroStations.find(m => m.id === (metroManualId || metroAutoId))?.name || (metroManualId || metroAutoId)}
                 {metroDistanceShown !== null && ` · ${formatDistance(metroDistanceShown)}`}
                 {metroManualId && " (выбрано вручную)"}
                 {!metroManualId && metroAutoId && " (автоматически)"}
@@ -675,7 +728,11 @@ export function PlaceLocationPicker({
             <div className="text-sm">
               <span className="text-blue-700">Метро:</span>{" "}
               <span className="text-blue-900 font-medium">
-                {metroStations.find(m => m.id === metroAutoId)?.name || metroAutoId}
+                {/* Show name from enrichment API if available, otherwise try to find in loaded stations */}
+                {initialLocation?.metroName || 
+                 (metroStations.length > 0 
+                   ? (metroStations.find(m => m.id === metroAutoId)?.name || metroAutoId)
+                   : metroAutoId)}
                 {metroAutoDistanceM !== null && ` · ${formatDistance(metroAutoDistanceM)}`}
               </span>
             </div>

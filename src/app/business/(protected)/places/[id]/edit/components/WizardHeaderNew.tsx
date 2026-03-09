@@ -1,12 +1,14 @@
 "use client";
 
 import { ContentStatus, type Place, type PlaceImage } from "@prisma/client";
-import { Check, Loader2, Save } from "lucide-react";
+import { Check, Loader2, Save, ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { PlaceStatusBadge } from "@/components/business/place/PlaceStatusBadge";
 import { computePlaceDraftCompletion } from "../utils/computeCompletion";
+import { getPlacePublicUrl } from "@/lib/placePublicUrl";
+import Link from "next/link";
 
 interface PlaceWithImages extends Place {
   images: PlaceImage[];
@@ -46,6 +48,7 @@ export function WizardHeaderNew({
   revisionStatus,
 }: WizardHeaderNewProps) {
   const completion = computePlaceDraftCompletion(place);
+  const publicUrl = getPlacePublicUrl(place);
 
   const handleStepClick = (step: number) => {
     const stepStatus = getStepStatus(step);
@@ -61,9 +64,9 @@ export function WizardHeaderNew({
   return (
     <div className="sticky top-0 z-50 bg-white border-b shadow-sm">
       <div className="max-w-4xl mx-auto px-4 py-4">
-        {/* Top row: Title, Status Badge, Save button, Save indicator */}
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-3">
+        {/* Top row: Title, Status Badge, Public Link, Save button, Save indicator */}
+        <div className="flex items-center justify-between mb-4 gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
             <h1 className="text-lg font-semibold">
               {place.title || "Создание места"}
             </h1>
@@ -72,6 +75,18 @@ export function WizardHeaderNew({
               hasActiveRevision={hasActiveRevision}
               revisionStatus={revisionStatus}
             />
+            {/* Public URL link - only for published places with slug */}
+            {publicUrl && (
+              <Link
+                href={publicUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <ExternalLink className="h-4 w-4" />
+                <span className="hidden sm:inline">Открыть на сайте</span>
+              </Link>
+            )}
           </div>
 
           <div className="flex items-center gap-3">

@@ -9,6 +9,23 @@ import { useState, useEffect } from "react";
 import { Upload, X, Loader2, GripVertical } from "lucide-react";
 import { useImageUpload } from "@/hooks/useImageUpload";
 import { toast } from "sonner";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  rectSortingStrategy,
+  useSortable,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 export interface GalleryItem {
   id: string;
@@ -26,6 +43,90 @@ interface PlaceGalleryUploadTempProps {
   disabled?: boolean;
 }
 
+// Sortable Image Item Component
+function SortableImageItem({
+  image,
+  index,
+  onRemove,
+  disabled,
+}: {
+  image: GalleryItem;
+  index: number;
+  onRemove: (id: string) => void;
+  disabled: boolean;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: image.id, disabled: disabled || image.status !== "done" });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="relative aspect-square rounded-lg overflow-hidden bg-gray-100 group"
+    >
+      {image.status === "uploading" ? (
+        <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
+          <Loader2 className="h-8 w-8 text-primary animate-spin" />
+        </div>
+      ) : image.status === "error" ? (
+        <div className="absolute inset-0 flex items-center justify-center bg-red-50">
+          <p className="text-xs text-red-600">Ошибка</p>
+        </div>
+      ) : (
+        <>
+          <img
+            src={image.url}
+            alt={`Gallery ${index + 1}`}
+            className="w-full h-full object-cover"
+          />
+          
+          {/* Remove button */}
+          <button
+            onClick={() => onRemove(image.id)}
+            className="absolute top-2 right-2 p-1.5 bg-red-600 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-700 z-10"
+            type="button"
+          >
+            <X className="h-4 w-4" />
+          </button>
+
+          {/* Drag handle */}
+          <div
+            {...attributes}
+            {...listeners}
+            className="absolute top-2 left-2 p-1.5 bg-black/50 text-white rounded opacity-0 group-hover:opacity-100 transition-opacity cursor-move z-10"
+          >
+            <GripVertical className="h-4 w-4" />
+          </div>
+
+          {/* Photo number badge */}
+          <div className="absolute bottom-2 left-2 px-2 py-1 bg-black/70 text-white text-xs font-medium rounded">
+            Фото {index + 1}
+          </div>
+
+          {/* Cover badge for first image */}
+          {index === 0 && (
+            <div className="absolute bottom-2 right-2 px-2 py-1 bg-primary text-white text-xs rounded">
+              Главное
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 export function PlaceGalleryUploadTemp({
   wizardSessionId,
   initialImages = [],
@@ -40,6 +141,67 @@ export function PlaceGalleryUploadTemp({
     maxWidthOrHeight: 1920,
     quality: 0.9,
   });
+
+  // Setup drag and drop sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8, // 8px movement required to start drag
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  // Handle drag end
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (over && active.id !== over.id) {
+      setImages((items) => {
+        const oldIndex = items.findIndex((item) => item.id === active.id);
+        const newIndex = items.findIndex((item) => item.id === over.id);
+
+        const reordered = arrayMove(items, oldIndex, newIndex);
+        
+        // Update sortOrder on server for all affected images
+        updateSortOrder(reordered);
+        
+        return reordered;
+      });
+    }
+  };
+
+  // Update sortOrder on server
+  const updateSortOrder = async (reorderedImages: GalleryItem[]) => {
+    try {
+      // Only update images that are "done" (have real IDs)
+      const updates = reorderedImages
+        .filter((img) => img.status === "done")
+        .map((img, index) => ({
+          id: img.id,
+          sortOrder: index,
+        }));
+
+      if (updates.length === 0) return;
+
+      const response = await fetch("/api/business/temp-media/reorder", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          wizardSessionId,
+          updates,
+        }),
+      });
+
+      if (!response.ok) {
+        console.error("Failed to update sort order");
+      }
+    } catch (error) {
+      console.error("Sort order update error:", error);
+    }
+  };
 
   // Only call onImagesChange when images actually change (not on mount)
   useEffect(() => {
@@ -101,6 +263,7 @@ export function PlaceGalleryUploadTemp({
             mimeType: file.type,
             sizeBytes: file.size,
             kind: "PLACE_GALLERY",
+            sortOrder: images.length + i, // Maintain order based on current images + upload index
           }),
         });
 
@@ -231,54 +394,27 @@ export function PlaceGalleryUploadTemp({
         </div>
       </div>
 
-      {/* Gallery Grid */}
+      {/* Gallery Grid with Drag and Drop */}
       {images.length > 0 && (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {images.map((image, index) => (
-            <div
-              key={image.id}
-              className="relative aspect-square rounded-lg overflow-hidden bg-gray-100 group"
-            >
-              {image.status === "uploading" ? (
-                <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
-                  <Loader2 className="h-8 w-8 text-primary animate-spin" />
-                </div>
-              ) : image.status === "error" ? (
-                <div className="absolute inset-0 flex items-center justify-center bg-red-50">
-                  <p className="text-xs text-red-600">Ошибка</p>
-                </div>
-              ) : (
-                <>
-                  <img
-                    src={image.url}
-                    alt={`Gallery ${index + 1}`}
-                    className="w-full h-full object-cover"
-                  />
-                  
-                  {/* Remove button */}
-                  <button
-                    onClick={() => handleRemove(image.id)}
-                    className="absolute top-2 right-2 p-1.5 bg-red-600 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-700"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-
-                  {/* Drag handle (for future reordering) */}
-                  <div className="absolute top-2 left-2 p-1.5 bg-black/50 text-white rounded opacity-0 group-hover:opacity-100 transition-opacity cursor-move">
-                    <GripVertical className="h-4 w-4" />
-                  </div>
-
-                  {/* Cover badge for first image */}
-                  {index === 0 && (
-                    <div className="absolute bottom-2 left-2 px-2 py-1 bg-primary text-white text-xs rounded">
-                      Обложка
-                    </div>
-                  )}
-                </>
-              )}
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEnd}
+        >
+          <SortableContext items={images.map((img) => img.id)} strategy={rectSortingStrategy}>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              {images.map((image, index) => (
+                <SortableImageItem
+                  key={image.id}
+                  image={image}
+                  index={index}
+                  onRemove={handleRemove}
+                  disabled={disabled}
+                />
+              ))}
             </div>
-          ))}
-        </div>
+          </SortableContext>
+        </DndContext>
       )}
     </div>
   );

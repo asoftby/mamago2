@@ -72,9 +72,15 @@ export default async function EditPlacePage({
 
   const step = parseInt(stepParam || "1", 10);
 
+  // If there's an active revision, use its images instead of place images
+  // This ensures the wizard shows draft photos, not published photos
+  const placeForWizard = activeRevision
+    ? { ...place, images: activeRevision.images }
+    : place;
+
   return (
     <PlaceWizard
-      place={place}
+      place={placeForWizard}
       initialStep={step}
       moderationMessage={moderationMessage}
       activeRevision={activeRevision}

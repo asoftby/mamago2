@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { WizardHeaderNew } from "../[id]/edit/components/WizardHeaderNew";
 import { Step1Profile } from "../[id]/edit/steps/Step1Profile";
@@ -65,6 +65,10 @@ interface LocalDraft {
   metroManualId: string | null;
   metroManualDistanceM: number | null;
   
+  // UI-only fields (not saved to DB, just for display)
+  _districtName?: string | null;
+  _metroName?: string | null;
+  
   // Step 3 (temp media tracking)
   logoMediaId: string | null;
   logoUrl: string | null;
@@ -112,13 +116,16 @@ export function NewPlaceWizard() {
         const result = await response.json();
         console.log("[NewPlaceWizard] ✅ Enrichment result:", result);
         
-        // Update localDraft with all enriched data
+        // Update localDraft with all enriched data INCLUDING names
         setLocalDraft((prev) => ({
           ...prev,
           cityId: result.cityId || prev.cityId,
           districtAutoId: result.districtAutoId || null,
           metroAutoId: result.metroAutoId || null,
           metroAutoDistanceM: result.metroAutoDistanceM || null,
+          // Store names for display (not in schema, just for UI)
+          _districtName: result.districtName || null,
+          _metroName: result.metroName || null,
         }));
       } else {
         console.log("[NewPlaceWizard] ⚠️ Could not enrich location");
@@ -178,7 +185,8 @@ export function NewPlaceWizard() {
   });
 
   // Local autosave (no DB writes)
-  const autosaveKey = `placeWizard:${user?.id}:${wizardSessionId}`;
+  // Use fixed key for new places (not session-specific) to avoid orphaned data
+  const autosaveKey = `placeWizard:new:${user?.id}`;
   const { save: saveLocal, restore: restoreLocal, clear: clearLocal, lastSaved } = useLocalAutosave<LocalDraft>({
     key: autosaveKey,
     debounceMs: 500,
@@ -196,20 +204,25 @@ export function NewPlaceWizard() {
   useEffect(() => {
     if (!sessionLoaded || !user) return;
 
-    const restored = restoreLocal();
-    if (restored) {
-      console.log("[NewPlaceWizard] Restored draft from localStorage");
-      setLocalDraft(restored);
-      toast.success("Восстановлен несохранённый черновик");
-    }
-  }, [sessionLoaded, user, restoreLocal]);
+    // IMPORTANT: Don't restore automatically - localStorage might contain old data
+    // Only restore if user explicitly wants to (we'll add a prompt later if needed)
+    // For now, always start with a clean slate
+    console.log("[NewPlaceWizard] Starting with clean form (not restoring from localStorage)");
+    clearLocal();
+  }, [sessionLoaded, user, clearLocal]);
 
-  // Auto-save to localStorage on changes
+  // Auto-save to localStorage on changes (only if meaningful)
   useEffect(() => {
     if (!sessionLoaded || !user) return;
     
-    saveLocal(localDraft);
-  }, [localDraft, sessionLoaded, user, saveLocal]);
+    // Only save if there's meaningful data to avoid polluting localStorage
+    if (isMeaningfulDraft(localDraft)) {
+      saveLocal(localDraft);
+    } else {
+      // Clear localStorage if draft becomes empty
+      clearLocal();
+    }
+  }, [localDraft, sessionLoaded, user, saveLocal, clearLocal]);
   
   // Compute if draft has meaningful changes
   const shouldConfirmLeave = isMeaningfulDraft(localDraft);
@@ -229,13 +242,29 @@ export function NewPlaceWizard() {
   }, [shouldConfirmLeave]);
 
   const handleUpdate = useCallback((updates: Partial<LocalDraft>) => {
-    setLocalDraft((prev) => ({ ...prev, ...updates }));
+    console.log("[NewPlaceWizard] handleUpdate called with:", updates);
     
-    // If location data updated, try to resolve cityId immediately
-    if (updates.lat && updates.lng && updates.addressJson) {
-      resolveCityIdClient(updates.lat, updates.lng, updates.addressJson);
-    }
-  }, []);
+    setLocalDraft((prev) => {
+      const newDraft = { ...prev, ...updates };
+      
+      // If location data updated, try to resolve cityId immediately
+      const hasNewLocation = updates.lat !== undefined && updates.lng !== undefined;
+      const hasAddressJson = updates.addressJson !== undefined || newDraft.addressJson !== null;
+      
+      if (hasNewLocation && newDraft.lat && newDraft.lng) {
+        console.log("[NewPlaceWizard] Location updated, triggering enrichment", {
+          lat: newDraft.lat,
+          lng: newDraft.lng,
+          hasAddressJson,
+        });
+        // Trigger enrichment asynchronously (don't wait)
+        // Use addressJson from updates or existing draft
+        resolveCityIdClient(newDraft.lat, newDraft.lng, newDraft.addressJson);
+      }
+      
+      return newDraft;
+    });
+  }, [resolveCityIdClient]);
   
   // Handle back/close navigation with confirmation
   const handleNavigateAway = useCallback((destination: string) => {
@@ -353,8 +382,12 @@ export function NewPlaceWizard() {
 
   const submitForModeration = useCallback(async () => {
     // Validate all required fields
-    if (!localDraft.title || !localDraft.category || !localDraft.shortDesc) {
-      toast.error("Заполните обязательные поля на шаге 1");
+    if (!localDraft.title || !localDraft.category || !localDraft.shortDesc || 
+        !localDraft.description || 
+        !localDraft.ageTags || localDraft.ageTags.length === 0 ||
+        !localDraft.visitFormats || localDraft.visitFormats.length === 0 ||
+        !localDraft.activityTypes || localDraft.activityTypes.length === 0) {
+      toast.error("Заполните все обязательные поля на шаге 1");
       return false;
     }
 
@@ -462,7 +495,7 @@ export function NewPlaceWizard() {
   };
 
   // Create a mock place object for step components compatibility
-  const mockPlace = {
+  const mockPlace = useMemo(() => ({
     id: "new",
     ownerUserId: user?.id || "new",
     status: ContentStatus.DRAFT,
@@ -494,6 +527,9 @@ export function NewPlaceWizard() {
     placeKind: localDraft.placeKind,
     floor: localDraft.floor,
     unit: localDraft.unit,
+    // Enrichment names for display (not in Place schema)
+    _districtName: localDraft._districtName,
+    _metroName: localDraft._metroName,
     // Map temp media to PlaceImage format for validation
     logoImageId: localDraft.logoMediaId,
     images: [
@@ -528,7 +564,7 @@ export function NewPlaceWizard() {
     unitLabel: null,
     createdAt: new Date(),
     updatedAt: new Date(),
-  } as unknown as PlaceWithImages;
+  } as unknown as PlaceWithImages), [user?.id, createRequestId, localDraft]);
 
   const canGoNext = currentStep === 4 ? true : canGoToNextStep(currentStep, mockPlace);
 

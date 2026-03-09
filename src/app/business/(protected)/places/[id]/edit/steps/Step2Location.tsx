@@ -28,6 +28,9 @@ export function Step2Location({ place, onUpdate, onPrev, onNext, canNext, isEdit
         metroAutoDistanceM: place.metroAutoDistanceM || undefined,
         metroManualId: place.metroManualId || undefined,
         metroManualDistanceM: place.metroManualDistanceM || undefined,
+        // Pass enrichment names if available (from NewPlaceWizard)
+        districtName: (place as any)._districtName || undefined,
+        metroName: (place as any)._metroName || undefined,
       }
     : null;
 

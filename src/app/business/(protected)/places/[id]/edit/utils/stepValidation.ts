@@ -6,10 +6,18 @@ interface PlaceWithImages extends Place {
 
 /**
  * Validate Step 1: Profile
- * Required: title, category, shortDesc
+ * Required: title, category, shortDesc, description, ageTags, visitFormats, activityTypes
  */
 export function validateStep1(place: Place): boolean {
-  return !!(place.title && place.category && place.shortDesc);
+  return !!(
+    place.title &&
+    place.category &&
+    place.shortDesc &&
+    place.description &&
+    place.ageTags && place.ageTags.length > 0 &&
+    place.visitFormats && place.visitFormats.length > 0 &&
+    place.activityTypes && place.activityTypes.length > 0
+  );
 }
 
 /**
