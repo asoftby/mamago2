@@ -1,3 +1,5 @@
+import { AGE_OPTIONS } from "@/lib/config/ages";
+
 export type AgeRange = { minMonths: number; maxMonths: number | null };
 
 export type AgeDef = {
@@ -9,6 +11,10 @@ export type AgeDef = {
   maxMonths: number | null;
 };
 
+/**
+ * Age definitions with grouping for UI display
+ * Built from canonical AGE_OPTIONS
+ */
 export const AGE_DEFS: AgeDef[] = [
   // 👶 Малыши
   { value: "0-1", label: "0–1 год", group: "👶 Малыши", order: 10, minMonths: 0, maxMonths: 12 },

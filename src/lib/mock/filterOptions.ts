@@ -1,8 +1,16 @@
+// DEPRECATED: Use AGE_OPTIONS from @/lib/config/ages instead
+// This is kept for backward compatibility only
 export const AGE_OPTIONS = [
-  { id: "0-3", label: "0–3" },
-  { id: "3-5", label: "3–5" },
-  { id: "6-8", label: "6–8" },
-  { id: "9-12", label: "9–12" },
+  { id: "0-1", label: "0–1 год" },
+  { id: "1-3", label: "1–3 года" },
+  { id: "3-5", label: "3–5 лет" },
+  { id: "5-7", label: "5–7 лет" },
+  { id: "7-9", label: "7–9 лет" },
+  { id: "9-12", label: "9–12 лет" },
+  { id: "12-14", label: "12–14 лет" },
+  { id: "14-16", label: "14–16 лет" },
+  { id: "16-18", label: "16–18 лет" },
+  { id: "18+", label: "18+" },
 ];
 
 export const DISTRICT_OPTIONS = [

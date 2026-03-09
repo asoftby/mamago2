@@ -4,14 +4,13 @@ import { DiscoveryFilters } from "@/features/filters/discovery/DiscoveryFilters"
 import { FilterPill } from "@/features/filters/ui/FilterPill";
 import { useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { AGE_OPTIONS } from "@/lib/config/ages";
 
-// Mock options for the lab
-const AGE_OPTIONS = [
-  { value: "0-1", label: "0-1 год" },
-  { value: "1-3", label: "1-3 года" },
-  { value: "3-5", label: "3-5 лет" },
-  { value: "6-9", label: "6-9 лет" },
-];
+// Mock options for the lab - using canonical age options
+const AGE_OPTIONS_FOR_LAB = AGE_OPTIONS.map(opt => ({ 
+  value: opt.key, 
+  label: opt.label 
+}));
 
 const METRO_OPTIONS = [
   { value: "uruchie", label: "Уручье" },
@@ -59,7 +58,7 @@ export default function IdentityFiltersClient() {
         <div className="p-6 border rounded-xl bg-card">
           <DiscoveryFilters 
             forceUIMode="desktop"
-            ageOptions={AGE_OPTIONS}
+            ageOptions={AGE_OPTIONS_FOR_LAB}
             metroOptions={METRO_OPTIONS}
             districtOptions={DISTRICT_OPTIONS}
           />
@@ -75,7 +74,7 @@ export default function IdentityFiltersClient() {
         <div className="p-6 border rounded-xl bg-card max-w-sm mx-auto sm:mx-0">
           <DiscoveryFilters 
             forceUIMode="mobile"
-            ageOptions={AGE_OPTIONS}
+            ageOptions={AGE_OPTIONS_FOR_LAB}
             metroOptions={METRO_OPTIONS}
             districtOptions={DISTRICT_OPTIONS}
           />
