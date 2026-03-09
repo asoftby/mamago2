@@ -76,3 +76,9 @@ prisma/scripts/
 .ai/
 .tmp/
 notes/
+
+# Database backups (local only)
+backups/
+
+public/uploads/
+*.blob
