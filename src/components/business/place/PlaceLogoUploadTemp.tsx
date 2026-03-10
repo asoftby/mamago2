@@ -5,7 +5,7 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Upload, X, Loader2 } from "lucide-react";
 import { useImageUpload } from "@/hooks/useImageUpload";
 import { toast } from "sonner";
@@ -26,6 +26,8 @@ export function PlaceLogoUploadTemp({
   const [preview, setPreview] = useState<string | null>(currentLogoUrl || null);
   const [isUploading, setIsUploading] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [isLoadingSession, setIsLoadingSession] = useState(true);
+  const hasRestoredTempMedia = useRef(false); // Track if temp media was restored (use ref to avoid re-renders)
 
   const { uploadImage } = useImageUpload({
     maxSizeMB: 5,
@@ -33,11 +35,53 @@ export function PlaceLogoUploadTemp({
     quality: 0.9,
   });
 
+  // Load temp media from session on mount
   useEffect(() => {
-    if (currentLogoUrl) {
+    const loadTempMedia = async () => {
+      if (!wizardSessionId) {
+        setIsLoadingSession(false);
+        if (currentLogoUrl) {
+          setPreview(currentLogoUrl);
+        }
+        return;
+      }
+
+      try {
+        const response = await fetch(`/api/business/temp-media?wizardSessionId=${wizardSessionId}`);
+        if (response.ok) {
+          const { media } = await response.json();
+          const logoMedia = media.find((m: any) => m.kind === "PLACE_LOGO");
+          
+          if (logoMedia) {
+            console.log("[PlaceLogoUploadTemp] Restored logo from session:", logoMedia.url);
+            setPreview(logoMedia.url);
+            hasRestoredTempMedia.current = true; // Mark that temp media was restored
+            // Don't call onUploadComplete here - it causes infinite loop
+            // onUploadComplete is only for new uploads, not for restoration
+          } else if (currentLogoUrl) {
+            console.log("[PlaceLogoUploadTemp] No temp logo, using current logo");
+            setPreview(currentLogoUrl);
+          }
+        }
+      } catch (error) {
+        console.error("[PlaceLogoUploadTemp] Failed to load temp media:", error);
+        if (currentLogoUrl) {
+          setPreview(currentLogoUrl);
+        }
+      } finally {
+        setIsLoadingSession(false);
+      }
+    };
+
+    loadTempMedia();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wizardSessionId]); // Only run when wizardSessionId changes
+
+  useEffect(() => {
+    if (currentLogoUrl && !isLoadingSession) {
       setPreview(currentLogoUrl);
     }
-  }, [currentLogoUrl]);
+  }, [currentLogoUrl, isLoadingSession]);
 
   const handleFileSelect = async (file: File) => {
     // Validate file type
@@ -91,10 +135,22 @@ export function PlaceLogoUploadTemp({
 
       const { media } = await response.json();
       
-      console.log("[PlaceLogoUploadTemp] Upload complete:", media.id);
+      console.log("[PlaceLogoUploadTemp] Upload complete:", {
+        mediaId: media.id,
+        url: uploadedImage.url,
+        isRealUpload: true,
+        hasRestoredBefore: hasRestoredTempMedia.current,
+      });
       
       setPreview(uploadedImage.url);
-      onUploadComplete?.(media.id, uploadedImage.url);
+      
+      // This is a real upload (not restoration), so call onUploadComplete
+      if (onUploadComplete) {
+        console.log("[PlaceLogoUploadTemp] Calling onUploadComplete");
+        onUploadComplete(media.id, uploadedImage.url);
+      } else {
+        console.warn("[PlaceLogoUploadTemp] onUploadComplete is not defined!");
+      }
       
       toast.success("Логотип загружен");
     } catch (error) {

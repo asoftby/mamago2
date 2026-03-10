@@ -1,9 +1,17 @@
 /**
- * Create new Place - local state wizard (no DB record until save)
+ * Create new Place - unified wizard
  */
 
-import { NewPlaceWizard } from "./NewPlaceWizard";
+import { redirect } from "next/navigation";
+import { getCurrentUser } from "@/lib/auth/server";
+import { PlaceWizard } from "@/components/business/wizard/place/PlaceWizard";
 
-export default function NewPlacePage() {
-  return <NewPlaceWizard />;
+export default async function NewPlacePage() {
+  const user = await getCurrentUser();
+  
+  if (!user || user.role !== "BUSINESS_OWNER") {
+    redirect("/business/login");
+  }
+
+  return <PlaceWizard mode="create" userId={user.id} />;
 }

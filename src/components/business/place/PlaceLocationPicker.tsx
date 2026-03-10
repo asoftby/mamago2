@@ -11,7 +11,6 @@ import { PlaceSearchInput } from "./PlaceSearchInput";
 import { PlaceMapPreview } from "./PlaceMapPreview";
 import { PlaceMapModal } from "./PlaceMapModal";
 import { PlaceDuplicateBlock } from "./PlaceDuplicateBlock";
-import { toast } from "sonner";
 import { formatDistance } from "@/lib/formatDistance";
 
 interface PlaceLocationPickerProps {
@@ -210,10 +209,6 @@ export function PlaceLocationPicker({
       formattedAddr: data.formattedAddr,
       addressJson: data.addressJson,
     });
-
-    toast.success("📍 Точка обновлена по адресу", {
-      duration: 1500,
-    });
   };
 
   const handleMapConfirm = async (data: {
@@ -344,12 +339,12 @@ export function PlaceLocationPicker({
         });
         
         if (response.status === 409 && errorData.error === "DUPLICATE_GOOGLE_PLACE_ID") {
-          toast.error("Это место уже существует в системе");
+          console.error("Это место уже существует в системе");
           throw new Error(errorData.message || "Место уже существует");
         }
         
         const errorMessage = errorData.message || errorData.error || "Failed to save";
-        toast.error(`Ошибка: ${errorMessage}`);
+        console.error(`Ошибка: ${errorMessage}`);
         throw new Error(errorMessage);
       }
 
@@ -396,9 +391,7 @@ export function PlaceLocationPicker({
       setIsSaved(true);
       setError(null);
       
-      toast.success("Запрос отправлен. Мы свяжемся после проверки.", {
-        duration: 3000,
-      });
+      console.log("Запрос отправлен. Мы свяжемся после проверки.");
       
       setTimeout(() => setIsSaved(false), 3000);
     } catch (err) {
@@ -455,7 +448,7 @@ export function PlaceLocationPicker({
     // Pass to parent for manual save
     onUpdate?.({ districtManualId: newValue });
     
-    toast.success("Район обновлён (не сохранено)", { duration: 1500 });
+    // Silent update - no toast notifications
   };
 
   const handleMetroChange = (value: string) => {
@@ -465,7 +458,7 @@ export function PlaceLocationPicker({
     // Pass to parent for manual save
     onUpdate?.({ metroManualId: newValue });
     
-    toast.success("Метро обновлено (не сохранено)", { duration: 1500 });
+    // Silent update - no toast notifications
   };
 
   const handleResetDistrict = () => {
@@ -474,7 +467,7 @@ export function PlaceLocationPicker({
     // Pass to parent for manual save
     onUpdate?.({ districtManualId: null });
     
-    toast.success("Район сброшен (не сохранено)", { duration: 1500 });
+    // Silent update - no toast notifications
   };
 
   const handleResetMetro = () => {
@@ -484,7 +477,7 @@ export function PlaceLocationPicker({
     // Pass to parent for manual save
     onUpdate?.({ metroManualId: null });
     
-    toast.success("Метро сброшено (не сохранено)", { duration: 1500 });
+    // Silent update - no toast notifications
   };
 
   // Computed values

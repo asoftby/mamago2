@@ -3,8 +3,6 @@
  * Builds public-facing URLs for places
  */
 
-import { ContentStatus } from "@prisma/client";
-
 /**
  * Get public URL for a place
  * Returns null if place is not published or has no slug
@@ -13,7 +11,7 @@ import { ContentStatus } from "@prisma/client";
  * @returns Public URL or null
  */
 export function getPlacePublicUrl(place: {
-  status: ContentStatus;
+  status: string;
   slug: string | null;
 }): string | null {
   // Only published places have public URLs
@@ -36,7 +34,7 @@ export function getPlacePublicUrl(place: {
  * @returns true if place has public URL
  */
 export function hasPlacePublicUrl(place: {
-  status: ContentStatus;
+  status: string;
   slug: string | null;
 }): boolean {
   return place.status === "PUBLISHED" && !!place.slug;

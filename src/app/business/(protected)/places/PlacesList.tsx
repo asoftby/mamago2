@@ -126,7 +126,7 @@ export function PlacesList({ places: initialPlaces, currentView }: PlacesListPro
             onClick={() => handleViewChange("active")}
             className={`px-4 py-2 font-medium transition-colors ${
               currentView === "active"
-                ? "text-blue-600 border-b-2 border-blue-600"
+                ? "text-primary border-b-2 border-primary"
                 : "text-gray-600 hover:text-gray-900"
             }`}
           >
@@ -136,7 +136,7 @@ export function PlacesList({ places: initialPlaces, currentView }: PlacesListPro
             onClick={() => handleViewChange("archived")}
             className={`px-4 py-2 font-medium transition-colors ${
               currentView === "archived"
-                ? "text-blue-600 border-b-2 border-blue-600"
+                ? "text-primary border-b-2 border-primary"
                 : "text-gray-600 hover:text-gray-900"
             }`}
           >
@@ -179,7 +179,7 @@ export function PlacesList({ places: initialPlaces, currentView }: PlacesListPro
           onClick={() => handleViewChange("active")}
           className={`px-4 py-2 font-medium transition-colors ${
             currentView === "active"
-              ? "text-blue-600 border-b-2 border-blue-600"
+              ? "text-primary border-b-2 border-primary"
               : "text-gray-600 hover:text-gray-900"
           }`}
         >
@@ -189,7 +189,7 @@ export function PlacesList({ places: initialPlaces, currentView }: PlacesListPro
           onClick={() => handleViewChange("archived")}
           className={`px-4 py-2 font-medium transition-colors ${
             currentView === "archived"
-              ? "text-blue-600 border-b-2 border-blue-600"
+              ? "text-primary border-b-2 border-primary"
               : "text-gray-600 hover:text-gray-900"
           }`}
         >

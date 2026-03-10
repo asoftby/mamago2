@@ -5,7 +5,7 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Upload, X, Loader2, GripVertical } from "lucide-react";
 import { useImageUpload } from "@/hooks/useImageUpload";
 import { toast } from "sonner";
@@ -76,54 +76,108 @@ function SortableImageItem({
       style={style}
       className="relative aspect-square rounded-lg overflow-hidden bg-gray-100 group"
     >
-      {image.status === "uploading" ? (
-        <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
-          <Loader2 className="h-8 w-8 text-primary animate-spin" />
-        </div>
-      ) : image.status === "error" ? (
-        <div className="absolute inset-0 flex items-center justify-center bg-red-50">
-          <p className="text-xs text-red-600">Ошибка</p>
-        </div>
-      ) : (
-        <>
-          <img
-            src={image.url}
-            alt={`Gallery ${index + 1}`}
-            className="w-full h-full object-cover"
-          />
-          
-          {/* Remove button */}
-          <button
-            onClick={() => onRemove(image.id)}
-            className="absolute top-2 right-2 p-1.5 bg-red-600 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-700 z-10"
-            type="button"
-          >
-            <X className="h-4 w-4" />
-          </button>
-
-          {/* Drag handle */}
-          <div
-            {...attributes}
-            {...listeners}
-            className="absolute top-2 left-2 p-1.5 bg-black/50 text-white rounded opacity-0 group-hover:opacity-100 transition-opacity cursor-move z-10"
-          >
-            <GripVertical className="h-4 w-4" />
-          </div>
-
-          {/* Photo number badge */}
-          <div className="absolute bottom-2 left-2 px-2 py-1 bg-black/70 text-white text-xs font-medium rounded">
-            Фото {index + 1}
-          </div>
-
-          {/* Cover badge for first image */}
-          {index === 0 && (
-            <div className="absolute bottom-2 right-2 px-2 py-1 bg-primary text-white text-xs rounded">
-              Главное
-            </div>
-          )}
-        </>
-      )}
+      <ImageItemContent 
+        image={image} 
+        index={index} 
+        onRemove={onRemove} 
+        showDragHandle={true}
+        dragHandleProps={{ ...attributes, ...listeners }}
+      />
     </div>
+  );
+}
+
+function StaticImageItem({
+  image,
+  index,
+  onRemove,
+  disabled,
+}: {
+  image: GalleryItem;
+  index: number;
+  onRemove: (id: string) => void;
+  disabled: boolean;
+}) {
+  return (
+    <div className="relative aspect-square rounded-lg overflow-hidden bg-gray-100 group">
+      <ImageItemContent 
+        image={image} 
+        index={index} 
+        onRemove={onRemove} 
+        showDragHandle={false}
+      />
+    </div>
+  );
+}
+
+function ImageItemContent({
+  image,
+  index,
+  onRemove,
+  showDragHandle,
+  dragHandleProps,
+}: {
+  image: GalleryItem;
+  index: number;
+  onRemove: (id: string) => void;
+  showDragHandle: boolean;
+  dragHandleProps?: any;
+}) {
+  if (image.status === "uploading") {
+    return (
+      <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
+        <Loader2 className="h-8 w-8 text-primary animate-spin" />
+      </div>
+    );
+  }
+
+  if (image.status === "error") {
+    return (
+      <div className="absolute inset-0 flex items-center justify-center bg-red-50">
+        <p className="text-xs text-red-600">Ошибка</p>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <img
+        src={image.url}
+        alt={`Gallery ${index + 1}`}
+        className="w-full h-full object-cover"
+      />
+      
+      {/* Remove button */}
+      <button
+        onClick={() => onRemove(image.id)}
+        className="absolute top-2 right-2 p-1.5 bg-red-600 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-700 z-10"
+        type="button"
+      >
+        <X className="h-4 w-4" />
+      </button>
+
+      {/* Drag handle - only show on client */}
+      {showDragHandle && (
+        <div
+          {...dragHandleProps}
+          className="absolute top-2 left-2 p-1.5 bg-black/50 text-white rounded opacity-0 group-hover:opacity-100 transition-opacity cursor-move z-10"
+        >
+          <GripVertical className="h-4 w-4" />
+        </div>
+      )}
+
+      {/* Photo number badge */}
+      <div className="absolute bottom-2 left-2 px-2 py-1 bg-black/70 text-white text-xs font-medium rounded">
+        Фото {index + 1}
+      </div>
+
+      {/* Cover badge for first image */}
+      {index === 0 && (
+        <div className="absolute bottom-2 right-2 px-2 py-1 bg-primary text-white text-xs rounded">
+          Главное
+        </div>
+      )}
+    </>
   );
 }
 
@@ -135,12 +189,80 @@ export function PlaceGalleryUploadTemp({
 }: PlaceGalleryUploadTempProps) {
   const [images, setImages] = useState<GalleryItem[]>(initialImages);
   const [isDragging, setIsDragging] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
+  const [isLoadingSession, setIsLoadingSession] = useState(true);
+  const hasRestoredTempMedia = useRef(false); // Track if temp media was restored (use ref to avoid re-renders)
 
   const { uploadImage } = useImageUpload({
     maxSizeMB: 5,
     maxWidthOrHeight: 1920,
     quality: 0.9,
   });
+
+  // Load temp media from session on mount
+  useEffect(() => {
+    const loadTempMedia = async () => {
+      if (!wizardSessionId) {
+        setIsLoadingSession(false);
+        if (initialImages.length > 0) {
+          setImages(initialImages);
+        }
+        return;
+      }
+
+      try {
+        const response = await fetch(`/api/business/temp-media?wizardSessionId=${wizardSessionId}`);
+        if (response.ok) {
+          const { media } = await response.json();
+          const galleryMedia = media
+            .filter((m: any) => m.kind === "PLACE_GALLERY")
+            .sort((a: any, b: any) => a.sortOrder - b.sortOrder)
+            .map((m: any) => ({
+              id: m.id,
+              url: m.url,
+              width: m.width ?? undefined,
+              height: m.height ?? undefined,
+              blurhash: m.blurhash || undefined,
+              status: "done" as const,
+            }));
+          
+          if (galleryMedia.length > 0) {
+            console.log("[PlaceGalleryUploadTemp] Restored", galleryMedia.length, "temp images from session");
+            // Merge: existing images + new temp media
+            const mergedImages = [...initialImages, ...galleryMedia];
+            setImages(mergedImages);
+            hasRestoredTempMedia.current = true; // Mark that temp media was restored
+          } else if (initialImages.length > 0) {
+            console.log("[PlaceGalleryUploadTemp] No temp media, using", initialImages.length, "initial images");
+            setImages(initialImages);
+          }
+        }
+      } catch (error) {
+        console.error("[PlaceGalleryUploadTemp] Failed to load temp media:", error);
+        if (initialImages.length > 0) {
+          setImages(initialImages);
+        }
+      } finally {
+        setIsLoadingSession(false);
+      }
+    };
+
+    loadTempMedia();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wizardSessionId]); // Only run when wizardSessionId changes, not when initialImages changes
+
+  // Mark as initialized after first render
+  useEffect(() => {
+    if (!isLoadingSession) {
+      setIsInitialized(true);
+    }
+  }, [isLoadingSession]);
+
+  // Mark as mounted to enable drag-and-drop after hydration
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   // Setup drag and drop sensors
   const sensors = useSensors(
@@ -203,12 +325,40 @@ export function PlaceGalleryUploadTemp({
     }
   };
 
-  // Only call onImagesChange when images actually change (not on mount)
+  // Only call onImagesChange when images actually change (not on mount or temp media restoration)
   useEffect(() => {
+    // Skip if not initialized or still loading session
+    if (!isInitialized || isLoadingSession) {
+      return;
+    }
+    
+    // Skip if temp media was just restored (restoration, not user change)
+    if (hasRestoredTempMedia.current) {
+      console.log("[PlaceGalleryUploadTemp] Skipping onImagesChange - temp media restoration");
+      hasRestoredTempMedia.current = false; // Reset flag
+      return;
+    }
+    
     // Filter to only "done" images for parent state
     const doneImages = images.filter(img => img.status === "done");
-    onImagesChange?.(doneImages);
-  }, [images]); // Remove onImagesChange from deps to prevent loop
+    
+    // Compare with initialImages to detect real changes
+    const initialIds = initialImages.map(img => img.id).sort().join(',');
+    const currentIds = doneImages.map(img => img.id).sort().join(',');
+    
+    // Only notify parent if there's a real change from initial state
+    if (initialIds !== currentIds) {
+      console.log("[PlaceGalleryUploadTemp] Real change detected:", {
+        initialCount: initialImages.length,
+        currentCount: doneImages.length,
+        initialIds,
+        currentIds,
+      });
+      onImagesChange?.(doneImages);
+    } else {
+      console.log("[PlaceGalleryUploadTemp] No change from initial state, skipping onImagesChange");
+    }
+  }, [images, isInitialized, initialImages, isLoadingSession]); // Remove tempMediaLoaded from deps
 
   const handleFilesSelect = async (files: FileList | File[]) => {
     const fileArray = Array.from(files);
@@ -396,15 +546,33 @@ export function PlaceGalleryUploadTemp({
 
       {/* Gallery Grid with Drag and Drop */}
       {images.length > 0 && (
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCenter}
-          onDragEnd={handleDragEnd}
-        >
-          <SortableContext items={images.map((img) => img.id)} strategy={rectSortingStrategy}>
+        <>
+          {isMounted ? (
+            // Client-side: Full drag-and-drop functionality
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
+            >
+              <SortableContext items={images.map((img) => img.id)} strategy={rectSortingStrategy}>
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                  {images.map((image, index) => (
+                    <SortableImageItem
+                      key={image.id}
+                      image={image}
+                      index={index}
+                      onRemove={handleRemove}
+                      disabled={disabled}
+                    />
+                  ))}
+                </div>
+              </SortableContext>
+            </DndContext>
+          ) : (
+            // Server-side: Static grid without drag-and-drop
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
               {images.map((image, index) => (
-                <SortableImageItem
+                <StaticImageItem
                   key={image.id}
                   image={image}
                   index={index}
@@ -413,8 +581,8 @@ export function PlaceGalleryUploadTemp({
                 />
               ))}
             </div>
-          </SortableContext>
-        </DndContext>
+          )}
+        </>
       )}
     </div>
   );

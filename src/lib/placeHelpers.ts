@@ -12,6 +12,8 @@ import { getPlaceDisplayTitle } from "./placeDisplayTitle";
 export async function enrichPlaceWithDisplayTitle<T extends {
   id: string;
   title: string;
+  formattedAddr: string | null;
+  customAddress: string | null;
   shortAddress: string | null;
   cityId: string | null;
 }>(
@@ -21,6 +23,8 @@ export async function enrichPlaceWithDisplayTitle<T extends {
   const displayTitle = await getPlaceDisplayTitle(prisma, {
     id: place.id,
     title: place.title,
+    formattedAddr: place.formattedAddr,
+    customAddress: place.customAddress,
     shortAddress: place.shortAddress,
     cityId: place.cityId,
   });
@@ -37,6 +41,8 @@ export async function enrichPlaceWithDisplayTitle<T extends {
 export async function enrichPlacesWithDisplayTitle<T extends {
   id: string;
   title: string;
+  formattedAddr: string | null;
+  customAddress: string | null;
   shortAddress: string | null;
   cityId: string | null;
 }>(

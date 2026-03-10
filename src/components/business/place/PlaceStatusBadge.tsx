@@ -16,12 +16,14 @@ const STATUS_CONFIG = {
     label: "Черновик",
     icon: FileText,
     variant: "secondary" as const,
+    className: "",
     tooltip: "Место сохранено как черновик. Завершите заполнение и отправьте на модерацию.",
   },
   PENDING: {
     label: "На модерации",
     icon: Clock,
     variant: "secondary" as const,
+    className: "",
     tooltip: "Публикация проверяется модератором. После проверки она появится на сайте.",
   },
   PUBLISHED: {
@@ -42,6 +44,7 @@ const STATUS_CONFIG = {
     label: "Отклонено",
     icon: AlertTriangle,
     variant: "destructive" as const,
+    className: "",
     tooltip: "Публикация отклонена модератором. Проверьте комментарии и создайте новую публикацию.",
   },
 };
@@ -51,11 +54,13 @@ const REVISION_STATUS_CONFIG = {
     label: "На модерации",
     icon: Clock,
     variant: "secondary" as const,
+    className: "",
     tooltip: "Изменения отправлены на проверку модератора. После одобрения они появятся на сайте.",
   },
   NEEDS_REVISION: {
     label: "Правки к изменениям",
     icon: AlertTriangle,
+    variant: "destructive" as const,
     className: "bg-orange-100 text-orange-800 border-orange-200",
     tooltip: "Модератор запросил правки к вашим изменениям. Исправьте и отправьте повторно.",
   },

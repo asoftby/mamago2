@@ -61,10 +61,31 @@ export default async function PlacesPage({
       })
     : [];
 
-  // Map revisions to places
+  // Fetch active improvement requests for all places
+  const allPlaceIds = places.map(p => p.id);
+  const improvementRequests = allPlaceIds.length > 0
+    ? await prisma.improvementRequest.findMany({
+        where: {
+          entityType: "PLACE",
+          entityId: { in: allPlaceIds },
+          status: { in: ["OPEN", "IN_PROGRESS"] },
+        },
+        select: {
+          id: true,
+          entityId: true,
+          status: true,
+          severity: true,
+          title: true,
+          dueAt: true,
+        },
+      })
+    : [];
+
+  // Map revisions and improvement requests to places
   const placesWithRevisions = places.map(place => ({
     ...place,
     activeRevision: activeRevisions.find(r => r.placeId === place.id) || null,
+    improvementRequests: improvementRequests.filter(ir => ir.entityId === place.id),
   }));
 
   return (

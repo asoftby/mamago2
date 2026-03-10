@@ -8,16 +8,20 @@ import { useState, useEffect, useCallback } from "react";
 interface WizardSessionOptions {
   userId?: string;
   wizardType: "place" | "activity" | "offer";
+  entityId?: string; // placeId, activityId, etc. for editing existing entities
 }
 
-export function useWizardSession({ userId, wizardType }: WizardSessionOptions) {
+export function useWizardSession({ userId, wizardType, entityId }: WizardSessionOptions) {
   const [wizardSessionId, setWizardSessionId] = useState<string>("");
   const [isLoaded, setIsLoaded] = useState(false);
 
   // Generate storage key for session ID
   const getSessionKey = useCallback(() => {
-    return `${wizardType}WizardSessionId${userId ? `:${userId}` : ""}`;
-  }, [wizardType, userId]);
+    const parts = [wizardType, "WizardSessionId"];
+    if (userId) parts.push(userId);
+    if (entityId) parts.push(entityId);
+    return parts.join(":");
+  }, [wizardType, userId, entityId]);
 
   // Initialize or restore session
   useEffect(() => {

@@ -1,35 +1,50 @@
 /**
- * Place Wizard - Edit Place in 4 steps
+ * Place Wizard - Edit Place (unified)
  */
 
 import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
-import { PlaceWizard } from "./PlaceWizard";
-import { getLatestModerationMessage } from "@/server/services/moderation.service";
+import { PlaceWizard } from "@/components/business/wizard/place/PlaceWizard";
+import { canEditPlace } from "@/lib/permissions/placeEditPermissions";
 
 export default async function EditPlacePage({
   params,
-  searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ step?: string }>;
 }) {
   const user = await getCurrentUser();
 
-  if (!user || user.role !== "BUSINESS_OWNER") {
+  if (!user) {
     redirect("/login");
   }
 
   const { id } = await params;
-  const { step: stepParam } = await searchParams;
 
-  // Get place with images
+  // Get place with images and opening hours
   const place = await prisma.place.findUnique({
     where: { id },
     include: {
       images: {
         orderBy: { sortOrder: "asc" },
+      },
+      openingHours: {
+        include: {
+          rules: {
+            include: {
+              intervals: {
+                orderBy: { sortOrder: "asc" },
+              },
+            },
+          },
+          exceptions: {
+            include: {
+              intervals: {
+                orderBy: { sortOrder: "asc" },
+              },
+            },
+          },
+        },
       },
     },
   });
@@ -38,9 +53,17 @@ export default async function EditPlacePage({
     notFound();
   }
 
-  // Check ownership
-  if (place.ownerUserId !== user.id) {
-    redirect("/business/places");
+  // Check edit permissions
+  if (!canEditPlace(user, {
+    placeId: place.id,
+    ownerUserId: place.ownerUserId,
+    status: place.status,
+  })) {
+    if (user.role === "BUSINESS_OWNER") {
+      redirect("/business/places");
+    } else {
+      redirect("/login");
+    }
   }
 
   // Get active revision if Place is PUBLISHED
@@ -57,33 +80,45 @@ export default async function EditPlacePage({
         images: {
           orderBy: { sortOrder: "asc" },
         },
+        openingHours: {
+          include: {
+            rules: {
+              include: {
+                intervals: {
+                  orderBy: { sortOrder: "asc" },
+                },
+              },
+            },
+            exceptions: {
+              include: {
+                intervals: {
+                  orderBy: { sortOrder: "asc" },
+                },
+              },
+            },
+          },
+        },
       },
     });
   }
 
-  // Get latest moderation message
-  let moderationMessage: string | null = null;
-  if (place.status === "NEEDS_REVISION" || place.status === "REJECTED") {
-    moderationMessage = await getLatestModerationMessage("PLACE", place.id);
-  } else if (activeRevision && (activeRevision.status === "NEEDS_REVISION")) {
-    // Get moderation message from revision
-    moderationMessage = activeRevision.moderatorComment;
-  }
-
-  const step = parseInt(stepParam || "1", 10);
-
-  // If there's an active revision, use its images instead of place images
-  // This ensures the wizard shows draft photos, not published photos
+  // If there's an active revision, use its data
   const placeForWizard = activeRevision
-    ? { ...place, images: activeRevision.images }
+    ? { 
+        ...place, 
+        images: activeRevision.images,
+        placeGroupId: activeRevision.placeGroupId !== undefined 
+          ? activeRevision.placeGroupId 
+          : place.placeGroupId,
+        openingHours: activeRevision.openingHours || place.openingHours,
+      }
     : place;
 
   return (
     <PlaceWizard
+      mode="edit"
       place={placeForWizard}
-      initialStep={step}
-      moderationMessage={moderationMessage}
-      activeRevision={activeRevision}
+      userId={user.id}
     />
   );
 }
