@@ -9,6 +9,9 @@ import { NewsSection } from "./_sections/NewsSection";
 import { ShellSection } from "./_sections/ShellSection";
 import { PlanCardSection } from "./_sections/PlanCardSection";
 import { HeaderSection } from "./_sections/HeaderSection";
+import { PlaceCardSection } from "./_sections/PlaceCardSection";
+import { OpeningHoursSection } from "./_sections/OpeningHoursSection";
+import { DateTimePickerSection } from "./_sections/DateTimePickerSection";
 
 export default function UiLabPage() {
   if (process.env.NODE_ENV === "production") {
@@ -44,6 +47,9 @@ export default function UiLabPage() {
           <NewsSection />
           <ShellSection />
           <PlanCardSection />
+          <PlaceCardSection />
+          <OpeningHoursSection />
+          <DateTimePickerSection />
         </main>
       </div>
     </div>

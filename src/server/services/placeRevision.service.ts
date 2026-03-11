@@ -6,6 +6,7 @@
 
 import prisma from "@/lib/prisma";
 import { PlaceRevisionStatus, LocationSource, PlaceKind } from "@prisma/client";
+import type { PlaceImage, PlaceRevisionImage, TempMedia, OpeningHoursRule, OpeningHoursInterval, Prisma } from "../types";
 import {
   notifyPlaceUpdateApproved,
   notifyPlaceUpdateNeedsRevision,
@@ -48,6 +49,7 @@ export interface PlaceRevisionData {
   ageTags?: string[];
   visitFormats?: string[];
   activityTypes?: string[];
+  placeGroupId?: string | null;
 }
 
 /**
@@ -160,9 +162,10 @@ export async function getOrCreatePlaceRevision(
       ageTags: place.ageTags,
       visitFormats: place.visitFormats,
       activityTypes: place.activityTypes,
+      placeGroupId: place.placeGroupId,
       // Copy images
       images: {
-        create: place.images.map((img) => ({
+        create: place.images.map((img: PlaceImage) => ({
           kind: img.kind,
           url: img.url,
           width: img.width,
@@ -304,7 +307,7 @@ export async function savePlaceRevisionDraft(
 
         // Convert temp media to PlaceRevisionImages
         const revisionImages = await Promise.all(
-          tempMedia.map(async (media) => {
+          tempMedia.map(async (media: TempMedia) => {
             const kind = media.kind === "PLACE_LOGO" ? "LOGO" : "GALLERY";
             
             return prisma.placeRevisionImage.create({
@@ -322,7 +325,7 @@ export async function savePlaceRevisionDraft(
         );
 
         // Update logoImageId if logo was uploaded
-        const logoImage = revisionImages.find((img) => img.kind === "LOGO");
+        const logoImage = revisionImages.find((img: PlaceRevisionImage) => img.kind === "LOGO");
         if (logoImage) {
           await prisma.placeRevision.update({
             where: { id: revisionId },
@@ -368,10 +371,12 @@ export async function savePlaceRevisionDraft(
 /**
  * Submit revision for moderation
  * Changes status from DRAFT or NEEDS_REVISION to PENDING
+ * Automatically links to active improvement requests if any exist
  */
 export async function submitPlaceRevisionForModeration(
   revisionId: string,
-  businessUserId: string
+  businessUserId: string,
+  wizardSessionId?: string
 ) {
   // Get revision with ownership check
   const revision = await prisma.placeRevision.findUnique({
@@ -379,6 +384,7 @@ export async function submitPlaceRevisionForModeration(
     include: {
       place: {
         select: {
+          id: true,
           ownerUserId: true,
         },
       },
@@ -399,6 +405,86 @@ export async function submitPlaceRevisionForModeration(
     );
   }
 
+  // Check for THE active improvement request for this place (only one can exist)
+  const activeImprovementRequest = await prisma.improvementRequest.findFirst({
+    where: {
+      entityType: "PLACE",
+      entityId: revision.place.id,
+      status: {
+        in: ["OPEN", "IN_PROGRESS"],
+      },
+    },
+    orderBy: {
+      createdAt: "desc", // Safety: get most recent if legacy data has multiple
+    },
+  });
+
+  // Convert temp media to PlaceRevisionImage if wizardSessionId provided
+  if (wizardSessionId) {
+    // Get temp media for this session
+    const tempMedia = await prisma.tempMedia.findMany({
+      where: {
+        wizardSessionId,
+        status: "TEMP", // Only get temp media that hasn't been attached yet
+      },
+      orderBy: {
+        sortOrder: "asc",
+      },
+    });
+
+    if (tempMedia.length > 0) {
+      console.log(`[submitPlaceRevisionForModeration] Found ${tempMedia.length} temp media items to convert`);
+
+      // Delete existing revision images (they will be replaced with temp media)
+      await prisma.placeRevisionImage.deleteMany({
+        where: { revisionId },
+      });
+
+      // Convert temp media to PlaceRevisionImage
+      for (const media of tempMedia) {
+        await prisma.placeRevisionImage.create({
+          data: {
+            revisionId,
+            kind: media.kind === "PLACE_LOGO" ? "LOGO" : "GALLERY",
+            url: media.url,
+            width: media.width,
+            height: media.height,
+            blurhash: media.blurhash,
+            sortOrder: media.sortOrder,
+          },
+        });
+      }
+
+      // Update revision.logoImageId if there's a logo
+      const logoImage = await prisma.placeRevisionImage.findFirst({
+        where: {
+          revisionId,
+          kind: "LOGO",
+        },
+      });
+
+      if (logoImage) {
+        await prisma.placeRevision.update({
+          where: { id: revisionId },
+          data: { logoImageId: logoImage.id },
+        });
+      }
+
+      // Mark temp media as attached (or delete them)
+      await prisma.tempMedia.updateMany({
+        where: {
+          wizardSessionId,
+          status: "TEMP",
+        },
+        data: {
+          status: "ATTACHED",
+        },
+      });
+
+      console.log(`[submitPlaceRevisionForModeration] Converted ${tempMedia.length} temp media items to PlaceRevisionImage`);
+    }
+  }
+
   // Prepare update data
   const updateData: any = {
     status: "PENDING",
@@ -410,15 +496,33 @@ export async function submitPlaceRevisionForModeration(
     updateData.revisionResubmittedAt = new Date();
   }
 
-  // Update revision
-  return prisma.placeRevision.update({
-    where: { id: revisionId },
-    data: updateData,
-    include: {
-      images: {
-        orderBy: { sortOrder: "asc" },
+  // Link to improvement request if one exists
+  if (activeImprovementRequest) {
+    updateData.improvementRequestId = activeImprovementRequest.id;
+  }
+
+  // Update revision and improvement request in a transaction
+  return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+    // Update revision
+    const updatedRevision = await tx.placeRevision.update({
+      where: { id: revisionId },
+      data: updateData,
+      include: {
+        images: {
+          orderBy: { sortOrder: "asc" },
+        },
       },
-    },
+    });
+
+    // Update improvement request status to IN_PROGRESS if linked
+    if (activeImprovementRequest) {
+      await tx.improvementRequest.update({
+        where: { id: activeImprovementRequest.id },
+        data: { status: "IN_PROGRESS" },
+      });
+    }
+
+    return updatedRevision;
   });
 }
 
@@ -438,6 +542,24 @@ export async function approvePlaceRevision(
       images: {
         orderBy: { sortOrder: "asc" },
       },
+      openingHours: {
+        include: {
+          rules: {
+            include: {
+              intervals: {
+                orderBy: { sortOrder: "asc" },
+              },
+            },
+          },
+          exceptions: {
+            include: {
+              intervals: {
+                orderBy: { sortOrder: "asc" },
+              },
+            },
+          },
+        },
+      },
     },
   });
 
@@ -450,7 +572,47 @@ export async function approvePlaceRevision(
   }
 
   // Copy revision data to Place in a transaction
-  await prisma.$transaction(async (tx) => {
+  await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+    // Handle opening hours if present in revision
+    let newOpeningHoursId = revision.place.openingHoursId;
+    
+    if (revision.openingHours) {
+      // Create a copy of revision opening hours for the main place
+      const { mapToCreatePayload } = await import("@/lib/openingHours");
+      
+      // Map revision opening hours to create payload
+      const openingHoursData = {
+        mode: revision.openingHours.mode,
+        timezone: revision.openingHours.timezone,
+        note: revision.openingHours.note || undefined,
+        rules: revision.openingHours.rules.map((rule: OpeningHoursRule & { intervals: OpeningHoursInterval[] }) => ({
+          dayOfWeek: rule.dayOfWeek,
+          isOpen: rule.isOpen,
+          allDay: rule.allDay,
+          intervals: rule.intervals.map((interval: OpeningHoursInterval) => ({
+            startTime: interval.startTime,
+            endTime: interval.endTime,
+          })),
+        })),
+      };
+
+      const createPayload = mapToCreatePayload(openingHoursData);
+      
+      // Delete old opening hours if exists
+      if (revision.place.openingHoursId) {
+        await tx.openingHours.delete({
+          where: { id: revision.place.openingHoursId },
+        });
+      }
+
+      // Create new opening hours for place
+      const newOpeningHours = await tx.openingHours.create({
+        data: createPayload,
+      });
+
+      newOpeningHoursId = newOpeningHours.id;
+    }
+
     // Update Place with revision data
     await tx.place.update({
       where: { id: revision.placeId },
@@ -487,6 +649,8 @@ export async function approvePlaceRevision(
         ageTags: revision.ageTags,
         visitFormats: revision.visitFormats,
         activityTypes: revision.activityTypes,
+        placeGroupId: revision.placeGroupId ?? revision.place.placeGroupId,
+        openingHoursId: newOpeningHoursId, // Update opening hours
       },
     });
 
@@ -496,7 +660,7 @@ export async function approvePlaceRevision(
     });
 
     await tx.placeImage.createMany({
-      data: revision.images.map((img) => ({
+      data: revision.images.map((img: PlaceRevisionImage) => ({
         placeId: revision.placeId,
         kind: img.kind,
         url: img.url,
@@ -544,8 +708,8 @@ export async function approvePlaceRevision(
   // Auto-resolve improvement request if this revision was linked to one
   if (revision.improvementRequestId) {
     try {
-      const { autoResolveImprovementRequestOnApproval } = await import("./improvementRequest.service");
-      await autoResolveImprovementRequestOnApproval(revisionId);
+      const { resolveImprovementRequest } = await import("./improvementRequest.service");
+      await resolveImprovementRequest(revision.improvementRequestId, revisionId);
       console.log(`[PlaceRevision] Auto-resolved improvement request: ${revision.improvementRequestId}`);
     } catch (improvementError) {
       console.error("Failed to auto-resolve improvement request:", improvementError);

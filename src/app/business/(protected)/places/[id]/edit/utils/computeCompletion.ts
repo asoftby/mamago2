@@ -1,6 +1,19 @@
-import type { Place, PlaceImage } from "@prisma/client";
+import type { Place } from "@prisma/client";
 
-interface PlaceWithImages extends Place {
+interface PlaceImage {
+  id: string;
+  createdAt: Date;
+  url: string;
+  width: number | null;
+  height: number | null;
+  blurhash: string | null;
+  kind: any;
+  sortOrder: number;
+  placeId?: string;
+  revisionId?: string;
+}
+
+interface PlaceWithImages extends Omit<Place, 'images'> {
   images: PlaceImage[];
 }
 

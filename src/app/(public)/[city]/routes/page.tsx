@@ -5,14 +5,14 @@ interface PageProps {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }
 
-export default async function JournalPage({ params, searchParams }: PageProps) {
+export default async function RoutesPage({ params, searchParams }: PageProps) {
   const { city: citySlug } = await params;
   const resolvedSearchParams = await searchParams;
 
   return (
     <CityShell
       citySlug={citySlug}
-      intent="journal"
+      intent="routes"
       searchParams={resolvedSearchParams}
     />
   );

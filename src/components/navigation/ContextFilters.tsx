@@ -20,12 +20,12 @@ const KUDA_FILTERS = [
   { id: "age", label: "Возраст" },
 ];
 
-// Mock filters for 'journal'
-const JOURNAL_TOPICS = [
-  { id: "development", label: "Развитие" },
-  { id: "psychology", label: "Психология" },
-  { id: "selections", label: "Подборки" },
-  { id: "reviews", label: "Обзоры" },
+// Mock filters for 'routes'
+const ROUTES_TOPICS = [
+  { id: "walking", label: "Пешие прогулки" },
+  { id: "parks", label: "Парки" },
+  { id: "historical", label: "Исторические" },
+  { id: "family", label: "Семейные" },
 ];
 
 export function ContextFilters({ currentIntent, className }: ContextFiltersProps) {
@@ -57,10 +57,10 @@ export function ContextFilters({ currentIntent, className }: ContextFiltersProps
     );
   }
 
-  if (currentIntent === 'journal') {
+  if (currentIntent === 'routes') {
     return (
       <div className={cn("flex gap-2 overflow-x-auto pb-2 -mx-4 px-4 sm:mx-0 sm:px-0 scrollbar-hide", className)}>
-        {JOURNAL_TOPICS.map((topic) => (
+        {ROUTES_TOPICS.map((topic) => (
           <Chip key={topic.id} active={false} onClick={() => {}} className="whitespace-nowrap">
             {topic.label}
           </Chip>

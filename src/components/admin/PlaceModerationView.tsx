@@ -4,15 +4,16 @@ import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ContentStatus } from "@prisma/client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { MapPin, Navigation, Phone, Globe, Instagram, ArrowLeft } from "lucide-react";
+import { MapPin, Navigation, Phone, Globe, Instagram, ArrowLeft, ExternalLink } from "lucide-react";
 import { formatDistance } from "@/lib/formatDistance";
 import { formatDistanceToNow } from "date-fns";
 import { ru } from "date-fns/locale";
 import { toast } from "sonner";
 import { formatAgeKeys } from "@/lib/config/ages";
+import { getPlacePublicUrl } from "@/lib/placePublicUrl";
+import { PlaceDangerZone } from "@/components/admin/moderation/PlaceDangerZone";
 
 const STATUS_CONFIG = {
   DRAFT: { label: "Черновик", variant: "secondary" as const, className: "" },
@@ -347,6 +348,40 @@ export function PlaceModerationView({ place }: PlaceModerationViewProps) {
               >
                 Reject
               </Button>
+            </div>
+
+            {/* View Place Actions */}
+            <div className="mt-6 pt-4 border-t space-y-2">
+              {/* Primary CTA: Public place page */}
+              {getPlacePublicUrl(place) ? (
+                <a
+                  href={getPlacePublicUrl(place)!}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700"
+                >
+                  <ExternalLink className="w-4 h-4" />
+                  Открыть на сайте
+                </a>
+              ) : (
+                <div className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 bg-gray-100 text-gray-500 text-sm font-medium rounded-md cursor-not-allowed">
+                  <ExternalLink className="w-4 h-4" />
+                  Не опубликовано
+                </div>
+              )}
+              
+              {/* Secondary CTA: Admin technical access */}
+              <a
+                href={`/admin/places/${place.id}`}
+                className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 text-sm font-medium rounded-md hover:bg-gray-50"
+              >
+                Открыть в админке
+              </a>
+            </div>
+
+            {/* Danger Zone */}
+            <div className="mt-6 pt-4 border-t">
+              <PlaceDangerZone placeId={place.id} placeTitle={place.title} />
             </div>
           </div>
         </div>

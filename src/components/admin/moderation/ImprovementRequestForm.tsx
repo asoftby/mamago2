@@ -12,6 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { DateTimePicker } from "@/components/ui/date-time-picker";
 import { toast } from "sonner";
 
 interface ImprovementRequestFormProps {
@@ -34,7 +35,8 @@ export function ImprovementRequestForm({
   const [severity, setSeverity] = useState<string>("MEDIUM");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [dueAt, setDueAt] = useState("");
+  const [dueDate, setDueDate] = useState<Date | null>(null);
+  const [dueTime, setDueTime] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -47,6 +49,15 @@ export function ImprovementRequestForm({
     setIsSubmitting(true);
 
     try {
+      // Combine date and time into ISO string if both are provided
+      let dueAtISO: string | null = null;
+      if (dueDate && dueTime) {
+        const [hours, minutes] = dueTime.split(':').map(Number);
+        const combinedDate = new Date(dueDate);
+        combinedDate.setHours(hours, minutes, 0, 0);
+        dueAtISO = combinedDate.toISOString();
+      }
+
       const response = await fetch(`/api/admin/places/${placeId}/improvement-request`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -54,7 +65,7 @@ export function ImprovementRequestForm({
           severity,
           title: title.trim(),
           description: description.trim(),
-          dueAt: dueAt || null,
+          dueAt: dueAtISO,
         }),
       });
 
@@ -68,7 +79,8 @@ export function ImprovementRequestForm({
       // Reset form
       setTitle("");
       setDescription("");
-      setDueAt("");
+      setDueDate(null);
+      setDueTime(null);
       setSeverity("MEDIUM");
 
       if (onSuccess) {
@@ -84,13 +96,17 @@ export function ImprovementRequestForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <div>
+      <div className="w-full sm:w-1/2 lg:w-[30%]">
         <Label htmlFor="severity">Критичность *</Label>
         <Select value={severity} onValueChange={setSeverity}>
-          <SelectTrigger id="severity">
+          <SelectTrigger 
+            id="severity" 
+            className="w-full justify-between text-left"
+            style={{ height: '80px', backgroundColor: 'white' }}
+          >
             <SelectValue />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent className="bg-white">
             {SEVERITY_OPTIONS.map((option) => (
               <SelectItem key={option.value} value={option.value}>
                 <div>
@@ -130,15 +146,19 @@ export function ImprovementRequestForm({
 
       <div>
         <Label htmlFor="dueAt">Срок выполнения (опционально)</Label>
-        <Input
-          id="dueAt"
-          type="date"
-          value={dueAt}
-          onChange={(e) => setDueAt(e.target.value)}
+        <DateTimePicker
+          value={dueDate}
+          time={dueTime}
+          onDateChange={setDueDate}
+          onTimeChange={setDueTime}
+          labels={{
+            time: "Время дедлайна",
+            placeholder: "Выберите время"
+          }}
         />
       </div>
 
-      <Button type="submit" disabled={isSubmitting}>
+      <Button type="submit" disabled={isSubmitting || !title.trim() || !description.trim()}>
         {isSubmitting ? "Создание..." : "Создать запрос"}
       </Button>
     </form>

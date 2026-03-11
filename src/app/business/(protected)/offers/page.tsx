@@ -1,11 +1,71 @@
-export default function OffersPage() {
+import { getCurrentUser } from "@/lib/auth/server";
+import { redirect } from "next/navigation";
+import prisma from "@/lib/prisma";
+import { OffersList } from "./OffersList";
+
+interface SearchParams {
+  view?: "active" | "archived";
+}
+
+export default async function OffersPage({
+  searchParams,
+}: {
+  searchParams: Promise<SearchParams>;
+}) {
+  const user = await getCurrentUser();
+  
+  if (!user || user.role !== "BUSINESS_OWNER") {
+    redirect("/business/login");
+  }
+
+  // Verify user has a business
+  const business = await prisma.business.findUnique({
+    where: { ownerUserId: user.id },
+  });
+
+  if (!business) {
+    console.warn(`User ${user.email} has BUSINESS_OWNER role but no Business entity`);
+    redirect("/business/onboarding");
+  }
+
+  const params = await searchParams;
+  const view = params.view || "active";
+
+  // Fetch offers for user's places
+  const userPlaces = await prisma.place.findMany({
+    where: { ownerUserId: user.id },
+    select: { id: true },
+  });
+
+  const placeIds = userPlaces.map(p => p.id);
+
+  const offers = placeIds.length > 0
+    ? await prisma.offer.findMany({
+        where: {
+          placeId: { in: placeIds },
+        },
+        include: {
+          place: {
+            select: {
+              id: true,
+              title: true,
+            },
+          },
+        },
+        orderBy: { createdAt: "desc" },
+      })
+    : [];
+
   return (
-    <div className="bg-white rounded-lg shadow p-6">
-      <h2 className="text-2xl font-bold text-gray-900 mb-4">Offers (stub)</h2>
-      <p className="text-gray-600">
-        This is a placeholder for the Offers management page. Full implementation
-        coming in Phase 3.
-      </p>
+    <div className="max-w-5xl mx-auto p-6">
+      <div className="mb-6">
+        <h1 className="text-3xl font-bold text-gray-900">Мои предложения</h1>
+        <p className="text-gray-600 mt-2">
+          Управляйте вашими предложениями и специальными акциями
+        </p>
+      </div>
+
+      <OffersList offers={offers} currentView={view} />
     </div>
   );
 }

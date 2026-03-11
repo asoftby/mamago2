@@ -585,34 +585,6 @@ export function NewPlaceWizard() {
       />
 
       <div className="max-w-4xl mx-auto px-4 py-8">
-        {/* Info banner */}
-        <div className="mb-6 bg-blue-50 border-l-4 border-blue-400 p-4 rounded-md">
-          <div className="flex items-start">
-            <AlertCircle className="w-5 h-5 text-blue-600 mt-0.5 mr-3 flex-shrink-0" />
-            <div>
-              <h3 className="text-sm font-semibold text-blue-800 mb-1">
-                Новое место
-              </h3>
-              <p className="text-sm text-blue-700">
-                Заполните информацию о месте. Место будет создано в базе данных только после нажатия "Сохранить черновик" или "Отправить на модерацию".
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Unsaved Changes Warning */}
-        {shouldConfirmLeave && (
-          <div className="mb-6 bg-amber-50 border-l-4 border-amber-400 p-4 rounded-md">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <AlertCircle className="w-5 h-5 text-amber-600 mr-3 flex-shrink-0" />
-                <p className="text-sm font-medium text-amber-800">
-                  Место ещё не создано. Нажмите "Сохранить черновик" для создания.
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
 
         {currentStep === 1 && (
           <Step1Profile

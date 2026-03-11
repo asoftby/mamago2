@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
-export type IntentType = 'kuda' | 'classes' | 'birthday' | 'journal';
+export type IntentType = 'kuda' | 'classes' | 'birthday' | 'routes';
 
 const STORAGE_KEY = 'mamago:last_intent';
 
@@ -16,14 +16,14 @@ export function useIntent(defaultIntent: IntentType = 'kuda') {
   useEffect(() => {
     // 1. Check URL first
     const urlIntent = searchParams.get('intent');
-    if (urlIntent && ['kuda', 'classes', 'birthday', 'journal'].includes(urlIntent)) {
+    if (urlIntent && ['kuda', 'classes', 'birthday', 'routes'].includes(urlIntent)) {
       setIntent(urlIntent as IntentType);
       return;
     }
     
     // 2. Check localStorage if no URL param
     const storedIntent = localStorage.getItem(STORAGE_KEY);
-    if (storedIntent && ['kuda', 'classes', 'birthday', 'journal'].includes(storedIntent)) {
+    if (storedIntent && ['kuda', 'classes', 'birthday', 'routes'].includes(storedIntent)) {
       setIntent(storedIntent as IntentType);
     }
   }, []); // Run once on mount
@@ -59,7 +59,7 @@ export function useIntent(defaultIntent: IntentType = 'kuda') {
   // Listen to URL changes (e.g. back button)
   useEffect(() => {
     const urlIntent = searchParams.get('intent');
-    if (urlIntent && ['kuda', 'classes', 'birthday', 'journal'].includes(urlIntent)) {
+    if (urlIntent && ['kuda', 'classes', 'birthday', 'routes'].includes(urlIntent)) {
       setIntent(urlIntent as IntentType);
     } else if (!urlIntent && intent !== defaultIntent) {
       // If URL has no intent but state has non-default, it might mean we navigated back to default

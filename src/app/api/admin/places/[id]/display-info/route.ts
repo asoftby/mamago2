@@ -22,6 +22,8 @@ export async function GET(
       select: {
         id: true,
         title: true,
+        formattedAddr: true,
+        customAddress: true,
         shortAddress: true,
         cityId: true,
       },

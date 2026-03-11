@@ -15,9 +15,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Trash2, MapPin, Navigation, Archive, ArchiveRestore } from "lucide-react";
+import { Trash2, MapPin, Navigation, Archive, ArchiveRestore, AlertTriangle, Pencil } from "lucide-react";
 import { formatDistance } from "@/lib/formatDistance";
 import { toast } from "sonner";
+import { Badge } from "@/components/ui/badge";
+import { calculateUrgency } from "@/lib/improvementRequest/urgency";
 
 interface PlaceCardData {
   id: string;
@@ -30,6 +32,7 @@ interface PlaceCardData {
   moderatorComment: string | null;
   revisionRequestedAt: Date | null;
   archivedAt?: Date | null;
+  hasActiveImprovementRequests?: boolean;
   city: {
     hasMetro: boolean;
     metroMaxDistanceM: number | null;
@@ -59,6 +62,13 @@ interface PlaceCardData {
     moderatorComment: string | null;
     revisionRequestedAt: Date | null;
   } | null;
+  improvementRequests?: Array<{
+    id: string;
+    status: string;
+    severity: string;
+    title: string;
+    dueAt: Date | null;
+  }>;
 }
 
 interface PlaceCardHorizontalProps {
@@ -131,6 +141,39 @@ export function PlaceCardHorizontal({ place, onDelete, onArchive, onUnarchive }:
   const displayStatus = hasActiveRevision && place.status === "PUBLISHED"
     ? place.activeRevision!.status
     : place.status;
+  
+  // Check for active improvement requests
+  const activeImprovementRequests = place.improvementRequests?.filter(
+    req => req.status === "OPEN" || req.status === "IN_PROGRESS"
+  ) || [];
+  
+  const hasActiveImprovementRequest = activeImprovementRequests.length > 0 || place.hasActiveImprovementRequests;
+  
+  // Calculate most urgent improvement request
+  let mostUrgentRequest = null;
+  let mostUrgentUrgency = null;
+  
+  if (activeImprovementRequests.length > 0) {
+    // Sort by urgency and severity
+    const sorted = [...activeImprovementRequests].sort((a, b) => {
+      const urgencyA = calculateUrgency(a.dueAt);
+      const urgencyB = calculateUrgency(b.dueAt);
+      
+      if (urgencyA?.level === "overdue" && urgencyB?.level !== "overdue") return -1;
+      if (urgencyA?.level !== "overdue" && urgencyB?.level === "overdue") return 1;
+      if (urgencyA?.urgent && !urgencyB?.urgent) return -1;
+      if (!urgencyA?.urgent && urgencyB?.urgent) return 1;
+      
+      const severityOrder = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3 };
+      const severityA = severityOrder[a.severity as keyof typeof severityOrder] ?? 4;
+      const severityB = severityOrder[b.severity as keyof typeof severityOrder] ?? 4;
+      
+      return severityA - severityB;
+    });
+    
+    mostUrgentRequest = sorted[0];
+    mostUrgentUrgency = calculateUrgency(mostUrgentRequest.dueAt);
+  }
   
   // Get display values
   const displayTitle = place.displayTitle || place.title || "Без названия";
@@ -250,7 +293,7 @@ export function PlaceCardHorizontal({ place, onDelete, onArchive, onUnarchive }:
           
           {/* Status badge - always show for non-archived places */}
           {!place.archivedAt && (
-            <div className="mt-2">
+            <div className="mt-2 flex items-center gap-2 flex-wrap">
               <span className={`inline-flex items-center px-2 py-1 text-xs font-medium rounded ${
                 place.status === "DRAFT"
                   ? "bg-gray-100 text-gray-700"
@@ -264,6 +307,28 @@ export function PlaceCardHorizontal({ place, onDelete, onArchive, onUnarchive }:
               }`}>
                 {statusConfig.label}
               </span>
+              
+              {/* Improvement Request Indicator */}
+              {hasActiveImprovementRequest && mostUrgentUrgency && (
+                <Badge 
+                  variant="outline" 
+                  className={`${
+                    mostUrgentUrgency.level === "overdue" 
+                      ? "bg-red-50 text-red-700 border-red-300" 
+                      : mostUrgentUrgency.urgent
+                      ? "bg-orange-50 text-orange-700 border-orange-300"
+                      : "bg-amber-50 text-amber-700 border-amber-300"
+                  } flex items-center gap-1`}
+                >
+                  <AlertTriangle className="w-3 h-3" />
+                  {mostUrgentUrgency.level === "overdue" 
+                    ? "Просрочено" 
+                    : mostUrgentUrgency.urgent
+                    ? "Требуются исправления"
+                    : "Нужны правки"
+                  }
+                </Badge>
+              )}
             </div>
           )}
           
@@ -318,21 +383,17 @@ export function PlaceCardHorizontal({ place, onDelete, onArchive, onUnarchive }:
             </span>
           )}
 
-          {/* Primary Action Button (acts as status indicator) */}
-          {!place.archivedAt && (
-            <Button
-              asChild={displayStatus !== "PENDING"}
-              disabled={displayStatus === "PENDING"}
-              size="sm"
-            >
-              {displayStatus === "PENDING" ? (
-                <span>{hasActiveRevision ? "На проверке" : statusConfig.action}</span>
-              ) : (
-                <Link href={`/business/places/${place.id}/edit`}>
-                  {statusConfig.action}
-                </Link>
-              )}
-            </Button>
+          {/* Edit Action (icon button) */}
+          {!place.archivedAt && displayStatus !== "PENDING" && (
+            <Link href={`/business/places/${place.id}/edit`}>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <Pencil className="w-4 h-4" />
+              </Button>
+            </Link>
           )}
 
           {/* Unarchive Action */}

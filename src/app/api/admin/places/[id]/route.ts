@@ -1,78 +1,104 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
-import { getModerationLogs } from "@/server/services/moderation.service";
 
 /**
- * GET /api/admin/places/[id]
- * Get Place details for moderation
- * Admin/Moderator only
+ * DELETE /api/admin/places/[id]
+ * Delete a place and all related data (admin only)
  */
-export async function GET(
+export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const user = await getCurrentUser();
-
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!user || user.role !== "ADMIN") {
+      return NextResponse.json(
+        { error: "Unauthorized: Admin access required" },
+        { status: 403 }
+      );
     }
 
-    if (user.role !== "ADMIN" && user.role !== "MODERATOR") {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
+    const { id } = await params;
 
-    const { id: placeId } = await params;
-
+    // Check if place exists
     const place = await prisma.place.findUnique({
-      where: { id: placeId },
-      include: {
-        owner: {
-          select: {
-            id: true,
-            email: true,
-            phoneE164: true,
-            createdAt: true,
-          },
-        },
-        city: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
-        parentPlace: {
-          select: {
-            id: true,
-            title: true,
-          },
-        },
-        images: {
-          orderBy: {
-            sortOrder: "asc",
-          },
-        },
-      },
+      where: { id },
+      select: { id: true, title: true },
     });
 
     if (!place) {
       return NextResponse.json({ error: "Place not found" }, { status: 404 });
     }
 
-    // Get moderation logs
-    const moderationLogs = await getModerationLogs("PLACE", placeId);
+    // Delete place and all related data in a transaction
+    await prisma.$transaction(async (tx) => {
+      // Delete place images
+      await tx.placeImage.deleteMany({
+        where: { placeId: id },
+      });
+
+      // Delete place revision images
+      const revisions = await tx.placeRevision.findMany({
+        where: { placeId: id },
+        select: { id: true },
+      });
+
+      for (const revision of revisions) {
+        await tx.placeRevisionImage.deleteMany({
+          where: { revisionId: revision.id },
+        });
+      }
+
+      // Delete place revisions (this will cascade delete opening hours)
+      await tx.placeRevision.deleteMany({
+        where: { placeId: id },
+      });
+
+      // Delete improvement requests
+      await tx.improvementRequest.deleteMany({
+        where: {
+          entityType: "PLACE",
+          entityId: id,
+        },
+      });
+
+      // Delete moderation logs
+      await tx.moderationLog.deleteMany({
+        where: {
+          entityType: "PLACE",
+          entityId: id,
+        },
+      });
+
+      // Delete place opening hours if exists
+      const placeWithOpeningHours = await tx.place.findUnique({
+        where: { id },
+        select: { openingHoursId: true },
+      });
+
+      if (placeWithOpeningHours?.openingHoursId) {
+        await tx.openingHours.delete({
+          where: { id: placeWithOpeningHours.openingHoursId },
+        });
+      }
+
+      // Finally, delete the place itself
+      await tx.place.delete({
+        where: { id },
+      });
+    });
+
+    console.log(`[Admin] Place deleted: ${place.title} (${id}) by ${user.email}`);
 
     return NextResponse.json({
-      place: {
-        ...place,
-        moderationLogs,
-      },
+      success: true,
+      message: "Place deleted successfully",
     });
-  } catch (error) {
-    console.error("Error fetching place:", error);
+  } catch (error: any) {
+    console.error("[API] Delete place error:", error);
     return NextResponse.json(
-      { error: "Failed to fetch place" },
+      { error: error.message || "Failed to delete place" },
       { status: 500 }
     );
   }

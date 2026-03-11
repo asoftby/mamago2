@@ -1,0 +1,225 @@
+/**
+ * API endpoint for Place Opening Hours
+ * GET - Get opening hours for a place
+ * PUT - Update opening hours for a place
+ */
+
+import { NextRequest, NextResponse } from "next/server";
+import { getCurrentUser } from "@/lib/auth/server";
+import prisma from "@/lib/prisma";
+import {
+  mapToCreatePayload,
+  mapToUpdatePayload,
+  validateOpeningHours,
+} from "@/lib/openingHours";
+import type { OpeningHoursData } from "@/components/openingHours";
+
+/**
+ * GET /api/business/places/[id]/opening-hours
+ * Get opening hours for a place
+ */
+export async function GET(
+  req: NextRequest,
+  context: { params: Promise<{ id: string }> }
+) {
+  try {
+    const user = await getCurrentUser();
+    if (!user || user.role !== "BUSINESS_OWNER") {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { id: placeId } = await context.params;
+
+    // Get place with opening hours
+    const place = await prisma.place.findUnique({
+      where: { id: placeId },
+      include: {
+        openingHours: {
+          include: {
+            rules: {
+              include: {
+                intervals: {
+                  orderBy: { sortOrder: "asc" },
+                },
+              },
+            },
+            exceptions: {
+              include: {
+                intervals: {
+                  orderBy: { sortOrder: "asc" },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!place) {
+      return NextResponse.json({ error: "Place not found" }, { status: 404 });
+    }
+
+    // Check ownership
+    if (place.ownerUserId !== user.id) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    return NextResponse.json({
+      openingHours: place.openingHours,
+    });
+  } catch (error) {
+    console.error("[GET /api/business/places/[id]/opening-hours] Error:", error);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * PUT /api/business/places/[id]/opening-hours
+ * Update opening hours for a place
+ */
+export async function PUT(
+  req: NextRequest,
+  context: { params: Promise<{ id: string }> }
+) {
+  try {
+    const user = await getCurrentUser();
+    if (!user || user.role !== "BUSINESS_OWNER") {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { id: placeId } = await context.params;
+    const body = await req.json();
+    const { data } = body as { data: OpeningHoursData | null };
+
+    // Get place
+    const place = await prisma.place.findUnique({
+      where: { id: placeId },
+      select: {
+        id: true,
+        ownerUserId: true,
+        openingHoursId: true,
+        status: true, // Add status to check if place is published
+      },
+    });
+
+    if (!place) {
+      return NextResponse.json({ error: "Place not found" }, { status: 404 });
+    }
+
+    // Check ownership
+    if (place.ownerUserId !== user.id) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    // For published places, opening hours should be saved to revision instead
+    if (place.status === "PUBLISHED") {
+      return NextResponse.json(
+        { 
+          error: "Cannot edit opening hours for published place directly. Use revision API instead.",
+          code: "USE_REVISION_API"
+        },
+        { status: 400 }
+      );
+    }
+
+    // If data is null, delete existing opening hours
+    if (!data) {
+      if (place.openingHoursId) {
+        await prisma.openingHours.delete({
+          where: { id: place.openingHoursId },
+        });
+
+        await prisma.place.update({
+          where: { id: placeId },
+          data: { openingHoursId: null },
+        });
+      }
+
+      return NextResponse.json({
+        success: true,
+        openingHours: null,
+      });
+    }
+
+    // Validate data
+    const validation = validateOpeningHours(data);
+    if (!validation.valid) {
+      return NextResponse.json(
+        {
+          error: "Validation failed",
+          errors: validation.errors,
+        },
+        { status: 400 }
+      );
+    }
+
+    let openingHours;
+
+    if (place.openingHoursId) {
+      // Update existing opening hours
+      const updatePayload = mapToUpdatePayload(data);
+      openingHours = await prisma.openingHours.update({
+        where: { id: place.openingHoursId },
+        data: updatePayload,
+        include: {
+          rules: {
+            include: {
+              intervals: {
+                orderBy: { sortOrder: "asc" },
+              },
+            },
+          },
+          exceptions: {
+            include: {
+              intervals: {
+                orderBy: { sortOrder: "asc" },
+              },
+            },
+          },
+        },
+      });
+    } else {
+      // Create new opening hours
+      const createPayload = mapToCreatePayload(data);
+      openingHours = await prisma.openingHours.create({
+        data: createPayload,
+        include: {
+          rules: {
+            include: {
+              intervals: {
+                orderBy: { sortOrder: "asc" },
+              },
+            },
+          },
+          exceptions: {
+            include: {
+              intervals: {
+                orderBy: { sortOrder: "asc" },
+              },
+            },
+          },
+        },
+      });
+
+      // Link to place
+      await prisma.place.update({
+        where: { id: placeId },
+        data: { openingHoursId: openingHours.id },
+      });
+    }
+
+    return NextResponse.json({
+      success: true,
+      openingHours,
+    });
+  } catch (error) {
+    console.error("[PUT /api/business/places/[id]/opening-hours] Error:", error);
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Internal server error" },
+      { status: 500 }
+    );
+  }
+}

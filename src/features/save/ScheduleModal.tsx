@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { PrimaryButton } from "@/components/ui/PrimaryButton";
 import { IconClose } from "@/components/ui/icons";
+import { getTodayStart } from "@/lib/date/getTodayStart";
 
 type Session = {
   date: string; // YYYY-MM-DD
@@ -32,6 +33,8 @@ export function ScheduleModal({
   const [isLoading, setIsLoading] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [customDate, setCustomDate] = useState("");
+  
+  const minDate = getTodayStart().toISOString().split('T')[0];
 
   if (!isOpen) return null;
 
@@ -216,6 +219,7 @@ export function ScheduleModal({
                     type="date"
                     value={customDate}
                     onChange={(e) => setCustomDate(e.target.value)}
+                    min={minDate}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary focus:border-primary"
                   />
                 </div>

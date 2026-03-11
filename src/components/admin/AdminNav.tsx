@@ -30,6 +30,12 @@ const NAV_SECTIONS: NavSection[] = [
     ],
   },
   {
+    title: "Users",
+    items: [
+      { label: "Пользователи", href: adminPath("/users") },
+    ],
+  },
+  {
     title: "B2B",
     items: [
       { label: "Заявки", href: adminPath("/b2b/requests") },

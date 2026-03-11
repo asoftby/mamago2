@@ -13,7 +13,8 @@ import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
 import { ContentStatus, PlaceKind, LocationSource } from "@prisma/client";
 import { updatePlaceLocation } from "@/services/place/placeLocation.service";
-import { extractShortAddress, generatePlaceSlugWithContext } from "@/lib/placeDisplayTitle";
+import { extractStreetName } from "@/lib/slug/slugUtils";
+import { generatePlaceSlug } from "@/lib/slug/placeSlugService";
 
 export async function POST(request: NextRequest) {
   try {
@@ -63,17 +64,12 @@ export async function POST(request: NextRequest) {
     console.log("[places/POST] Creating place for user:", user.id, "title:", data.title, "status:", status);
 
     // Extract short address from formatted address
-    const shortAddress = extractShortAddress(data.formattedAddr);
+    const shortAddress = extractStreetName(data.formattedAddr || "");
     console.log("[places/POST] Extracted shortAddress:", shortAddress);
 
-    // Generate unique slug with city context
-    const slug = await generatePlaceSlugWithContext(
-      prisma,
-      data.title,
-      shortAddress,
-      data.cityId || null
-    );
-    console.log("[places/POST] Generated slug:", slug);
+    // Slug will be generated on publish, not on creation
+    const slug = null;
+    console.log("[places/POST] Slug will be generated on publish");
 
     // Determine location source
     const locationSource: LocationSource = data.googlePlaceId ? "GOOGLE" : "MANUAL";

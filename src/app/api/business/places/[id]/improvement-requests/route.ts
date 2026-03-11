@@ -9,7 +9,7 @@ import { prisma } from "@/lib/prisma";
  */
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const user = await getCurrentUser();
@@ -17,9 +17,11 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 
+    const { id } = await params;
+
     // Verify ownership
     const place = await prisma.place.findUnique({
-      where: { id: params.id },
+      where: { id },
       select: { ownerUserId: true },
     });
 
@@ -36,7 +38,7 @@ export async function GET(
 
     const requests = await listImprovementRequestsForEntity(
       "PLACE",
-      params.id,
+      id,
       includeResolved
     );
 

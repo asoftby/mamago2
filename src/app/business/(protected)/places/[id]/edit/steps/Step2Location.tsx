@@ -1,7 +1,8 @@
 "use client";
 
-import type { Place } from "@prisma/client";
+import type { Place } from "../types";
 import { PlaceLocationPicker } from "@/components/business/place/PlaceLocationPicker";
+import { PlaceGroupSelector } from "@/components/business/place/PlaceGroupSelector";
 import { WizardStepHeader } from "../components/WizardStepHeader";
 
 interface Step2LocationProps {
@@ -34,6 +35,11 @@ export function Step2Location({ place, onUpdate, onPrev, onNext, canNext, isEdit
       }
     : null;
 
+  const handleGroupIdChange = (groupId: string | null) => {
+    // Update place state with new groupId
+    onUpdate({ placeGroupId: groupId });
+  };
+
   return (
     <div className="space-y-8">
       <WizardStepHeader
@@ -42,6 +48,8 @@ export function Step2Location({ place, onUpdate, onPrev, onNext, canNext, isEdit
         onBack={onPrev}
         onNext={onNext}
         canNext={canNext}
+        currentStep={2}
+        totalSteps={6}
       />
 
       <PlaceLocationPicker 
@@ -50,6 +58,17 @@ export function Step2Location({ place, onUpdate, onPrev, onNext, canNext, isEdit
         onUpdate={onUpdate}
         disabled={!isEditable}
       />
+
+      {/* Place Group Selector - shown after location is set */}
+      {hasLocation && (
+        <PlaceGroupSelector
+          currentPlaceId={place.id}
+          ownerUserId={place.ownerUserId}
+          currentGroupId={place.placeGroupId}
+          onGroupIdChange={handleGroupIdChange}
+          disabled={!isEditable}
+        />
+      )}
     </div>
   );
 }

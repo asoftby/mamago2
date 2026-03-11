@@ -29,7 +29,7 @@ const OFFER_KIND_LABELS: Record<string, string> = {
 export default async function PartnerDetailPage({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
   const user = await getCurrentUser();
 
@@ -41,36 +41,15 @@ export default async function PartnerDetailPage({
     redirect("/admin");
   }
 
+  const { id } = await params;
+
   const business: any = await prisma.business.findUnique({
-    where: { id: params.id },
+    where: { id },
     include: {
       owner: {
         select: {
           email: true,
           phoneE164: true,
-        },
-      },
-      places: {
-        include: {
-          city: {
-            select: {
-              name: true,
-            },
-          },
-          activities: {
-            select: {
-              id: true,
-              name: true,
-              status: true,
-              createdAt: true,
-            },
-            orderBy: {
-              createdAt: "desc",
-            },
-          },
-        },
-        orderBy: {
-          createdAt: "desc",
         },
       },
       verificationLogs: {
@@ -92,6 +71,34 @@ export default async function PartnerDetailPage({
   if (!business) {
     notFound();
   }
+
+  // Get places for this business owner
+  const places = await prisma.place.findMany({
+    where: {
+      ownerUserId: business.ownerUserId,
+    },
+    include: {
+      city: {
+        select: {
+          name: true,
+        },
+      },
+      activities: {
+        select: {
+          id: true,
+          title: true,
+          status: true,
+          createdAt: true,
+        },
+        orderBy: {
+          createdAt: "desc",
+        },
+      },
+    },
+    orderBy: {
+      createdAt: "desc",
+    },
+  });
 
   return (
     <div className="max-w-6xl">
@@ -293,9 +300,9 @@ export default async function PartnerDetailPage({
         {/* Places */}
         <div className="bg-white border rounded-lg p-6">
           <h2 className="text-lg font-semibold mb-4">
-            Места ({business.places.length})
+            Места ({places.length})
           </h2>
-          {business.places.length === 0 ? (
+          {places.length === 0 ? (
             <div className="text-center py-8 text-gray-500">Нет мест</div>
           ) : (
             <div className="overflow-x-auto">
@@ -320,16 +327,16 @@ export default async function PartnerDetailPage({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
-                  {business.places.map((place: any) => (
+                  {places.map((place: any) => (
                     <tr key={place.id} className="hover:bg-gray-50">
                       <td className="px-4 py-3 text-sm font-medium text-gray-900">
-                        {place.name}
+                        {place.title}
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-600">
-                        {place.city.name}
+                        {place.city?.name || "-"}
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-600">
-                        {place.address}
+                        {place.formattedAddr || place.customAddress || "-"}
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-600">
                         {place.activities.length}
@@ -349,13 +356,13 @@ export default async function PartnerDetailPage({
         <div className="bg-white border rounded-lg p-6">
           <h2 className="text-lg font-semibold mb-4">
             Предложения (
-            {business.places.reduce(
+            {places.reduce(
                 (sum: number, place: any) => sum + place.activities.length,
                 0
               )}
             )
           </h2>
-          {business.places.every((place: any) => place.activities.length === 0) ? (
+          {places.every((place: any) => place.activities.length === 0) ? (
             <div className="text-center py-8 text-gray-500">
               Нет предложений
             </div>
@@ -382,11 +389,11 @@ export default async function PartnerDetailPage({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
-                  {business.places.map((place: any) =>
+                  {places.map((place: any) =>
                     place.activities.map((activity: any) => (
                       <tr key={activity.id} className="hover:bg-gray-50">
                         <td className="px-4 py-3 text-sm font-medium text-gray-900">
-                          {activity.name}
+                          {activity.title}
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-600">
                           —

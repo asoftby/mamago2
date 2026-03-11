@@ -196,11 +196,23 @@ export function generateDiffSummary(
 /**
  * Format value for display
  * @param value - The value to format
- * @param field - Optional field name for special formatting (e.g., "ageTags")
+ * @param field - Optional field name for special formatting (e.g., "ageTags", "placeGroupId")
  */
 export function formatValue(value: any, field?: string): string {
-  if (value === null || value === undefined) return "—";
-  if (typeof value === "string") return value || "—";
+  if (value === null || value === undefined) {
+    // Special case for placeGroupId: null means "not in a group"
+    if (field === "placeGroupId") {
+      return "Отдельное место (не в сети)";
+    }
+    return "—";
+  }
+  if (typeof value === "string") {
+    // Special case for placeGroupId: show ID (will be enhanced with names in component)
+    if (field === "placeGroupId") {
+      return `В сети (ID: ${value})`;
+    }
+    return value || "—";
+  }
   if (typeof value === "number") return value.toString();
   if (typeof value === "boolean") return value ? "Да" : "Нет";
   if (Array.isArray(value)) {

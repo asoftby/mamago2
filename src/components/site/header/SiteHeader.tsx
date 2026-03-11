@@ -1,3 +1,5 @@
+"use client";
+
 import { SiteHeaderDesktop } from "./SiteHeader.desktop";
 import { SiteHeaderMobile } from "./SiteHeader.mobile";
 

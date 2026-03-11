@@ -3,37 +3,36 @@
 import { useRef, useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { usePathname, useParams } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { IconCompass, IconPalette, IconParty, IconBookOpen } from "@/components/ui/icons";
-import { INTENT_ITEMS, getIntentFromPath, getCityFromPath } from "@/lib/intent";
+import { IconCompass, IconPalette, IconParty, IconMap } from "@/components/ui/icons";
+import { Intent } from "@/lib/intent";
 import { Label } from "@/components/ui/typography";
+import { DISCOVERY_INTENT_ITEMS } from "@/lib/discovery/discoveryIntentConfig";
 
-// Map INTENT_ITEMS to tabs with icons
+// Map intent IDs to icons (fallback if no image)
 const TAB_ICONS = {
   kuda: IconCompass,
   classes: IconPalette,
   birthday: IconParty,
-  journal: IconBookOpen,
+  routes: IconMap,
 };
 
-const TAB_IMAGES: Record<string, string> = {
-  kuda: "/compass.svg",
-  classes: "/palette.svg",
-  birthday: "/hb.svg",
-  journal: "/mag.svg",
-};
+interface DiscoveryIntentTabsProps {
+  city: string;
+  currentIntent: Intent;
+  className?: string;
+}
 
-export function IntentTabs({ className, citySlug }: { className?: string; citySlug?: string }) {
-  const pathname = usePathname();
-  const city = citySlug || getCityFromPath(pathname);
-  const currentIntent = getIntentFromPath(pathname);
-  
+export function DiscoveryIntentTabs({ 
+  city, 
+  currentIntent, 
+  className 
+}: DiscoveryIntentTabsProps) {
   const [indicatorStyle, setIndicatorStyle] = useState<{ left: number; width: number }>({ left: 0, width: 0 });
   const tabsRef = useRef<(HTMLAnchorElement | null)[]>([]);
 
   // Find active index based on current intent
-  const activeIndex = INTENT_ITEMS.findIndex(item => item.id === currentIntent);
+  const activeIndex = DISCOVERY_INTENT_ITEMS.findIndex(item => item.id === currentIntent);
   const safeActiveIndex = activeIndex === -1 ? 0 : activeIndex;
 
   useEffect(() => {
@@ -51,20 +50,19 @@ export function IntentTabs({ className, citySlug }: { className?: string; citySl
         inline: "center"
       });
     }
-  }, [safeActiveIndex, pathname]); // Recalculate on path change
+  }, [safeActiveIndex, currentIntent]);
 
   return (
     <div className={cn("relative w-full bg-background z-10", className)}>
       <div className="flex w-full max-w-screen-xl mx-auto overflow-x-auto no-scrollbar relative pointer-events-auto py-[10px]">
-        {INTENT_ITEMS.map((tab, index) => {
+        {DISCOVERY_INTENT_ITEMS.map((intentConfig, index) => {
           const isActive = index === safeActiveIndex;
-          const Icon = TAB_ICONS[tab.id];
-          const imageSrc = TAB_IMAGES[tab.id];
+          const Icon = TAB_ICONS[intentConfig.id];
           
           return (
             <Link
-              key={tab.id}
-              href={tab.href(city)}
+              key={intentConfig.id}
+              href={intentConfig.href(city)}
               ref={(el) => { tabsRef.current[index] = el; }}
               scroll={false} // Prevent full page scroll reset
               className={cn(
@@ -72,11 +70,11 @@ export function IntentTabs({ className, citySlug }: { className?: string; citySl
                 isActive ? "text-neutral-900" : "text-neutral-400 hover:text-neutral-600"
               )}
             >
-              {imageSrc ? (
+              {intentConfig.image ? (
                 <div className="relative h-[48px] w-[48px] flex items-center justify-center">
                   <Image 
-                    src={imageSrc}
-                    alt={tab.label}
+                    src={intentConfig.image}
+                    alt={intentConfig.label}
                     width={48} 
                     height={48} 
                     className={cn(
@@ -101,7 +99,7 @@ export function IntentTabs({ className, citySlug }: { className?: string; citySl
                   isActive ? "font-bold text-neutral-900" : "font-medium text-neutral-400"
                 )}
               >
-                {tab.label}
+                {intentConfig.label}
               </Label>
             </Link>
           );

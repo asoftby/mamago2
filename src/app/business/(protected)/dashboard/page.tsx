@@ -4,6 +4,7 @@ import { getMyBusiness } from "@/server/business/getMyBusiness";
 import Link from "next/link";
 import { VerificationBanner } from "@/components/business/VerificationBanner";
 import { RequireVerifiedBusiness } from "@/components/business/RequireVerifiedBusiness";
+import { ImprovementRequestsWidget } from "@/components/business/dashboard/ImprovementRequestsWidget";
 
 export default async function BusinessDashboardPage() {
   // Auth guard
@@ -27,6 +28,11 @@ export default async function BusinessDashboardPage() {
         status={business.verificationStatus as any}
         reviewNote={business.reviewNote}
       />
+
+      {/* Improvement Requests Widget */}
+      <RequireVerifiedBusiness status={business.verificationStatus as any}>
+        <ImprovementRequestsWidget />
+      </RequireVerifiedBusiness>
 
       {/* Dashboard Header */}
       <div className="bg-white rounded-lg shadow p-6">
@@ -86,6 +92,19 @@ export default async function BusinessDashboardPage() {
           </Link>
 
           <Link
+            href="/business/events"
+            className="bg-white rounded-lg shadow p-6 hover:shadow-md transition-shadow"
+          >
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">События</h3>
+            <p className="text-gray-600 text-sm mb-4">
+              Создание и управление событиями
+            </p>
+            <span className="text-primary hover:text-primary/80 text-sm font-medium">
+              Перейти к событиям →
+            </span>
+          </Link>
+
+          <Link
             href="/business/offers"
             className="bg-white rounded-lg shadow p-6 hover:shadow-md transition-shadow"
           >
@@ -97,14 +116,6 @@ export default async function BusinessDashboardPage() {
               Перейти к предложениям →
             </span>
           </Link>
-
-          <div className="bg-white rounded-lg shadow p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Аналитика</h3>
-            <p className="text-gray-600 text-sm mb-4">
-              Отслеживание эффективности
-            </p>
-            <span className="text-gray-400 text-sm font-medium">Скоро</span>
-          </div>
         </div>
       </RequireVerifiedBusiness>
     </div>

@@ -20,7 +20,7 @@ export async function POST(
     }
 
     const body = await request.json();
-    const { revisionId } = body;
+    const { revisionId, wizardSessionId } = body;
 
     if (!revisionId) {
       return NextResponse.json(
@@ -33,7 +33,8 @@ export async function POST(
     try {
       const submittedRevision = await submitPlaceRevisionForModeration(
         revisionId,
-        user.id
+        user.id,
+        wizardSessionId // Pass wizard session ID for temp media conversion
       );
       return NextResponse.json({
         success: true,

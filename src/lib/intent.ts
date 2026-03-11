@@ -1,4 +1,6 @@
-export type Intent = "kuda" | "classes" | "birthday" | "journal";
+import { DISCOVERY_INTENT_CONFIG, DISCOVERY_INTENT_ITEMS } from "@/lib/discovery/discoveryIntentConfig";
+
+export type Intent = "kuda" | "classes" | "birthday" | "routes";
 
 export interface IntentItem {
   id: Intent;
@@ -6,28 +8,12 @@ export interface IntentItem {
   href: (city: string) => string;
 }
 
-export const INTENT_ITEMS: IntentItem[] = [
-  {
-    id: "kuda",
-    label: "Куда пойти",
-    href: (city) => `/${city}`,
-  },
-  {
-    id: "classes",
-    label: "Занятия",
-    href: (city) => `/${city}/classes`,
-  },
-  {
-    id: "birthday",
-    label: "ДР",
-    href: (city) => `/${city}/birthday`,
-  },
-  {
-    id: "journal",
-    label: "Журнал",
-    href: (city) => `/${city}/journal`,
-  },
-];
+// Export the intent items from the centralized config
+export const INTENT_ITEMS: IntentItem[] = DISCOVERY_INTENT_ITEMS.map(config => ({
+  id: config.id,
+  label: config.label,
+  href: config.href,
+}));
 
 export function getIntentFromPath(pathname: string | null): Intent {
   if (!pathname) return "kuda";
@@ -43,7 +29,7 @@ export function getIntentFromPath(pathname: string | null): Intent {
   
   if (potentialIntent === "classes") return "classes";
   if (potentialIntent === "birthday") return "birthday";
-  if (potentialIntent === "journal") return "journal";
+  if (potentialIntent === "routes") return "routes";
   
   return "kuda";
 }

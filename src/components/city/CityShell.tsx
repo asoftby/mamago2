@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import prisma from "@/lib/prisma";
-import { CityIntentShell } from "./CityIntentShell";
+import { CityDiscoveryShell } from "./CityDiscoveryShell";
 import { Intent } from "@/lib/intent";
 
 interface CityShellProps {
@@ -18,7 +18,7 @@ export async function CityShell({ citySlug, intent, searchParams }: CityShellPro
   // This reduces server-side data fetching and improves performance
   
   return (
-    <CityIntentShell 
+    <CityDiscoveryShell 
       city={citySlug} 
       intent={intent}
     />

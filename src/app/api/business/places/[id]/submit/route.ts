@@ -26,11 +26,25 @@ export async function POST(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Get place with images
+    // Get place with images and opening hours
     const place = await prisma.place.findUnique({
       where: { id },
       include: {
         images: true,
+        openingHours: {
+          include: {
+            rules: {
+              include: {
+                intervals: true,
+              },
+            },
+            exceptions: {
+              include: {
+                intervals: true,
+              },
+            },
+          },
+        },
       },
     });
 
@@ -118,6 +132,13 @@ export async function POST(
       console.warn(`Place ${place.id} has no gallery images`);
     }
 
+    // Optional: opening hours (not required for submission)
+    if (place.openingHours) {
+      console.log(`Place ${place.id} has opening hours: ${place.openingHours.mode}`);
+    } else {
+      console.log(`Place ${place.id} has no opening hours (optional)`);
+    }
+
     // If validation failed, return errors
     if (missing.length > 0) {
       const response: ValidationError = {
@@ -131,12 +152,30 @@ export async function POST(
     // All validations passed - submit for moderation
     await submitPlace(id, user.id);
 
-    // Fetch updated place
+    // Fetch updated place with opening hours
     const updatedPlace = await prisma.place.findUnique({
       where: { id },
       include: {
         images: {
           orderBy: { sortOrder: "asc" },
+        },
+        openingHours: {
+          include: {
+            rules: {
+              include: {
+                intervals: {
+                  orderBy: { sortOrder: "asc" },
+                },
+              },
+            },
+            exceptions: {
+              include: {
+                intervals: {
+                  orderBy: { sortOrder: "asc" },
+                },
+              },
+            },
+          },
         },
       },
     });

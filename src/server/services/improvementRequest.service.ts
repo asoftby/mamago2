@@ -14,7 +14,50 @@ interface CreateImprovementRequestParams {
 }
 
 /**
+ * Get active improvement request for an entity
+ * Active = OPEN or IN_PROGRESS status
+ * Returns null if no active request exists
+ */
+export async function getActiveImprovementRequestForEntity(
+  entityType: string,
+  entityId: string
+) {
+  const activeRequest = await prisma.improvementRequest.findFirst({
+    where: {
+      entityType,
+      entityId,
+      status: {
+        in: [ImprovementRequestStatus.OPEN, ImprovementRequestStatus.IN_PROGRESS],
+      },
+    },
+    include: {
+      createdByModerator: {
+        select: {
+          id: true,
+          email: true,
+          role: true,
+        },
+      },
+      assignedToUser: {
+        select: {
+          id: true,
+          email: true,
+          role: true,
+        },
+      },
+    },
+    orderBy: {
+      createdAt: "desc", // Get most recent if somehow multiple exist (legacy data)
+    },
+  });
+
+  return activeRequest;
+}
+
+/**
  * Create an improvement request for a published entity
+ * ENFORCES: Only ONE active improvement request per entity
+ * If an active request already exists, throws an error
  */
 export async function createImprovementRequest(params: CreateImprovementRequestParams) {
   const {
@@ -28,6 +71,18 @@ export async function createImprovementRequest(params: CreateImprovementRequestP
     requestedChanges,
     dueAt,
   } = params;
+
+  // CRITICAL: Check if an active improvement request already exists
+  const existingActiveRequest = await getActiveImprovementRequestForEntity(
+    entityType,
+    entityId
+  );
+
+  if (existingActiveRequest) {
+    throw new Error(
+      `ACTIVE_REQUEST_EXISTS: An active improvement request already exists for this ${entityType.toLowerCase()} (ID: ${existingActiveRequest.id}). Please resolve or cancel the existing request before creating a new one.`
+    );
+  }
 
   // Create the improvement request
   const request = await prisma.improvementRequest.create({

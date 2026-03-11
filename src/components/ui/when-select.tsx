@@ -359,82 +359,92 @@ export function WhenSelect({
     </button>
   );
 
-  const renderCalendar = () => (
-    <div className="space-y-4 pb-4">
-      <div className="flex items-center justify-between px-1">
-        <button
-          className="h-8 w-8 rounded-full hover:bg-muted/40 flex items-center justify-center"
-          onClick={() => {
-            const nm = month - 1;
-            if (nm < 0) {
-              setMonth(11);
-              setYear((y) => y - 1);
-            } else setMonth(nm);
-          }}
-          aria-label="Prev"
-        >
-          <ChevronLeft className="h-4 w-4" />
-        </button>
-        <div className="text-base font-semibold">
-          {new Date(year, month, 1).toLocaleDateString("ru-RU", { month: "long", year: "numeric" })}
-        </div>
-        <button
-          className="h-8 w-8 rounded-full hover:bg-muted/40 flex items-center justify-center"
-          onClick={() => {
-            const nm = month + 1;
-            if (nm > 11) {
-              setMonth(0);
-              setYear((y) => y + 1);
-            } else setMonth(nm);
-          }}
-          aria-label="Next"
-        >
-          <ChevronRight className="h-4 w-4" />
-        </button>
-      </div>
-      <div className="grid grid-cols-7 text-center text-xs text-muted-foreground">
-        {["п", "в", "с", "ч", "п", "с", "в"].map((w, i) => (
-          <div key={i} className="py-1">
-            {w}
+  const renderCalendar = () => {
+    // Create today at midnight for accurate past date comparison
+    const todayStart = new Date(now);
+    todayStart.setHours(0, 0, 0, 0);
+    
+    return (
+      <div className="space-y-4 pb-4">
+        <div className="flex items-center justify-between px-1">
+          <button
+            className="h-8 w-8 rounded-full hover:bg-muted/40 flex items-center justify-center"
+            onClick={() => {
+              const nm = month - 1;
+              if (nm < 0) {
+                setMonth(11);
+                setYear((y) => y - 1);
+              } else setMonth(nm);
+            }}
+            aria-label="Prev"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </button>
+          <div className="text-base font-semibold">
+            {new Date(year, month, 1).toLocaleDateString("ru-RU", { month: "long", year: "numeric" })}
           </div>
-        ))}
+          <button
+            className="h-8 w-8 rounded-full hover:bg-muted/40 flex items-center justify-center"
+            onClick={() => {
+              const nm = month + 1;
+              if (nm > 11) {
+                setMonth(0);
+                setYear((y) => y + 1);
+              } else setMonth(nm);
+            }}
+            aria-label="Next"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </button>
+        </div>
+        <div className="grid grid-cols-7 text-center text-xs text-muted-foreground">
+          {["п", "в", "с", "ч", "п", "с", "в"].map((w, i) => (
+            <div key={i} className="py-1">
+              {w}
+            </div>
+          ))}
+        </div>
+        <div className="grid grid-cols-7 gap-1">
+          {Array.from({ length: startOffset }).map((_, i) => (
+            <div key={`e-${i}`} className="h-9" />
+          ))}
+          {Array.from({ length: daysInMonth }).map((_, i) => {
+            const d = new Date(year, month, i + 1);
+            const isPast = d < todayStart;
+            const isToday =
+              d.getDate() === now.getDate() &&
+              d.getMonth() === now.getMonth() &&
+              d.getFullYear() === now.getFullYear();
+            const isInPendingRange =
+              pendingFrom &&
+              pendingTo &&
+              d >= pendingFrom &&
+              d <= pendingTo;
+            const isPendingStart = pendingFrom && d.getTime() === pendingFrom.getTime();
+            const isPendingEnd = pendingTo && d.getTime() === pendingTo.getTime();
+            return (
+              <button
+                key={i}
+                className={cn(
+                  "h-9 rounded-full text-sm transition-colors",
+                  isPast && "opacity-50 text-muted-foreground cursor-not-allowed pointer-events-none",
+                  !isPast && "hover:bg-muted/40",
+                  isToday && !isPast && "text-foreground font-semibold",
+                  isInPendingRange && !isPast && "bg-muted",
+                  isPendingStart && !isPast && "bg-primary/20",
+                  isPendingEnd && !isPast && "bg-primary/30"
+                )}
+                onClick={() => !isPast && handleDateClick(d)}
+                disabled={isPast}
+              >
+                {i + 1}
+              </button>
+            );
+          })}
+        </div>
       </div>
-      <div className="grid grid-cols-7 gap-1">
-        {Array.from({ length: startOffset }).map((_, i) => (
-          <div key={`e-${i}`} className="h-9" />
-        ))}
-        {Array.from({ length: daysInMonth }).map((_, i) => {
-          const d = new Date(year, month, i + 1);
-          const isToday =
-            d.getDate() === now.getDate() &&
-            d.getMonth() === now.getMonth() &&
-            d.getFullYear() === now.getFullYear();
-          const isInPendingRange =
-            pendingFrom &&
-            pendingTo &&
-            d >= pendingFrom &&
-            d <= pendingTo;
-          const isPendingStart = pendingFrom && d.getTime() === pendingFrom.getTime();
-          const isPendingEnd = pendingTo && d.getTime() === pendingTo.getTime();
-          return (
-            <button
-              key={i}
-              className={cn(
-                "h-9 rounded-full text-sm hover:bg-muted/40 transition-colors",
-                isToday && "text-foreground font-semibold",
-                isInPendingRange && "bg-muted",
-                isPendingStart && "bg-primary/20",
-                isPendingEnd && "bg-primary/30"
-              )}
-              onClick={() => handleDateClick(d)}
-            >
-              {i + 1}
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
+    );
+  };
 
   const desktopContent = (
     <div className="grid grid-cols-2 gap-4">

@@ -4,29 +4,35 @@ import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import type { Place } from "@prisma/client";
+import type { Place } from "../types";
 import { WizardStepHeader } from "../components/WizardStepHeader";
 
 interface Step4ContactsProps {
   place: Place;
   onUpdate: (updates: Partial<Place>) => void;
   onPrev: () => void;
-  onSubmit: () => void;
+  onNext?: () => void;
+  onSubmit?: () => void;
+  canNext?: boolean;
   isSaving?: boolean;
   isRevisionMode?: boolean;
   revisionStatus?: string | null;
   isEditable?: boolean;
+  hasChanges?: boolean;
 }
 
 export function Step4Contacts({
   place,
   onUpdate,
   onPrev,
+  onNext,
   onSubmit,
+  canNext: canNextProp,
   isSaving = false,
   isRevisionMode = false,
   revisionStatus = null,
   isEditable = true,
+  hasChanges = true,
 }: Step4ContactsProps) {
   const [phone, setPhone] = useState(place.phone || "");
   const [website, setWebsite] = useState(place.website || "");
@@ -37,8 +43,15 @@ export function Step4Contacts({
     ? revisionStatus === "PENDING"
     : place.status === "PENDING";
 
-  // Button text changes based on pending state
-  const buttonText = isPending ? "⏳ На модерации" : "Отправить на модерацию";
+  // Button should be disabled if pending OR no changes
+  const isSubmitDisabled = isPending || !hasChanges;
+
+  // Button text changes based on state
+  const buttonText = isPending 
+    ? "⏳ На модерации" 
+    : !hasChanges
+    ? "Нет изменений"
+    : "Отправить на модерацию";
 
   const handlePhoneChange = (value: string) => {
     setPhone(value);
@@ -73,12 +86,15 @@ export function Step4Contacts({
         title="Контакты"
         subtitle="Как с вами связаться"
         onBack={onPrev}
-        onNext={onSubmit}
-        canNext={!isPending && !isSaving}
-        nextLabel={buttonText}
-        isLastStep={true}
+        onNext={onNext || onSubmit}
+        canNext={canNextProp !== undefined ? canNextProp : (!isSubmitDisabled && !isSaving)}
+        nextLabel={onNext ? "Далее" : buttonText}
+        isLastStep={!onNext}
         isSaving={isSaving}
         isPending={isPending}
+        hasNoChanges={!hasChanges}
+        currentStep={4}
+        totalSteps={6}
       />
 
       {/* Phone */}

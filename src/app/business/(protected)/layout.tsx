@@ -53,6 +53,12 @@ export default async function ProtectedBusinessLayout({
                   Places
                 </Link>
                 <Link
+                  href="/business/events"
+                  className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
+                >
+                  Events
+                </Link>
+                <Link
                   href="/business/offers"
                   className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
                 >

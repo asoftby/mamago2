@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { PrimaryButton } from "@/components/ui/PrimaryButton";
+import { getTodayStart } from "@/lib/date/getTodayStart";
 
 export type ActivityFormData = {
   name: string;
@@ -45,6 +46,8 @@ export function ActivityForm({
   const [newSessionTime, setNewSessionTime] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  const minDate = getTodayStart().toISOString().split('T')[0];
 
   const handleAddSession = () => {
     if (!newSessionDate) return;
@@ -264,6 +267,7 @@ export function ActivityForm({
                 id="sessionDate"
                 value={newSessionDate}
                 onChange={(e) => setNewSessionDate(e.target.value)}
+                min={minDate}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
               />
             </div>

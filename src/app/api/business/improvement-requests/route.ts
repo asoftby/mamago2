@@ -4,7 +4,7 @@ import { listActiveImprovementRequestsForBusiness } from "@/server/services/impr
 
 /**
  * GET /api/business/improvement-requests
- * List active improvement requests for the current business owner
+ * List all active improvement requests for the business owner
  */
 export async function GET(req: NextRequest) {
   try {
@@ -15,7 +15,22 @@ export async function GET(req: NextRequest) {
 
     const requests = await listActiveImprovementRequestsForBusiness(user.id);
 
-    return NextResponse.json({ requests });
+    // Group by place for easier consumption
+    const requestsByPlace = requests.reduce((acc: any, request: any) => {
+      if (request.entityType === "PLACE") {
+        if (!acc[request.entityId]) {
+          acc[request.entityId] = [];
+        }
+        acc[request.entityId].push(request);
+      }
+      return acc;
+    }, {});
+
+    return NextResponse.json({ 
+      requests,
+      requestsByPlace,
+      totalCount: requests.length,
+    });
   } catch (error: any) {
     console.error("[API] List business improvement requests error:", error);
     return NextResponse.json(

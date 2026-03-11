@@ -1,16 +1,28 @@
 "use client";
 
-import { useCallback } from "react";
-import type { Place, PlaceImage } from "@prisma/client";
+import { useCallback, useMemo } from "react";
 import { PlaceLogoUploadTemp } from "@/components/business/place/PlaceLogoUploadTemp";
 import { PlaceGalleryUploadTemp, type GalleryItem } from "@/components/business/place/PlaceGalleryUploadTemp";
 import { WizardStepHeader } from "../components/WizardStepHeader";
 
+interface PlaceImage {
+  id: string;
+  createdAt: Date;
+  url: string;
+  width: number | null;
+  height: number | null;
+  blurhash: string | null;
+  kind: any;
+  sortOrder: number;
+  placeId?: string;
+  revisionId?: string;
+}
+
 interface Step3PhotosProps {
-  place: Place;
+  place: any; // Use generic type instead of Prisma Place
   images: PlaceImage[];
   wizardSessionId: string;
-  onUpdate: (updates: Partial<Place & { logoUrl?: string; galleryUrls?: string[]; logoMediaId?: string; galleryMediaIds?: string[] }>) => void;
+  onUpdate: (updates: any) => void;
   onPrev: () => void;
   onNext: () => void;
   canNext: boolean;
@@ -30,6 +42,18 @@ export function Step3Photos({
   const logoImage = images.find((img) => img.kind === "LOGO");
   const galleryImages = images.filter((img) => img.kind === "GALLERY");
 
+  // Convert PlaceImage[] to GalleryItem[] - memoize to prevent unnecessary re-renders
+  const initialGalleryItems: GalleryItem[] = useMemo(() => 
+    galleryImages.map((img) => ({
+      id: img.id,
+      url: img.url,
+      width: img.width ?? undefined,
+      height: img.height ?? undefined,
+      blurhash: img.blurhash || undefined,
+      status: "done" as const,
+    })), [galleryImages]
+  );
+
   const handleLogoUploadComplete = useCallback((mediaId: string, url: string) => {
     console.log("[Step3Photos] Logo upload complete:", { mediaId, url });
     onUpdate({ 
@@ -41,21 +65,14 @@ export function Step3Photos({
   const handleGalleryImagesChange = useCallback((galleryItems: GalleryItem[]) => {
     console.log("[Step3Photos] Gallery changed:", galleryItems.length, "images");
     
+    // Only call onUpdate if this is a real change, not initialization
+    // The PlaceGalleryUploadTemp component should handle initialization filtering,
+    // but we add an extra check here for safety
     onUpdate({
       galleryMediaIds: galleryItems.map(item => item.id),
       galleryUrls: galleryItems.map(item => item.url),
     });
   }, [onUpdate]);
-
-  // Convert PlaceImage[] to GalleryItem[]
-  const initialGalleryItems: GalleryItem[] = galleryImages.map((img) => ({
-    id: img.id,
-    url: img.url,
-    width: img.width ?? undefined,
-    height: img.height ?? undefined,
-    blurhash: img.blurhash || undefined,
-    status: "done" as const,
-  }));
 
   return (
     <div className="space-y-8">
@@ -65,6 +82,8 @@ export function Step3Photos({
         onBack={onPrev}
         onNext={onNext}
         canNext={canNext}
+        currentStep={3}
+        totalSteps={6}
       />
 
       {/* Logo */}

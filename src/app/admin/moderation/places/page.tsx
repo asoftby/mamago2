@@ -110,13 +110,24 @@ function PlacesTable({ places }: { places: Awaited<ReturnType<typeof getPlaces>>
           {places.map((place) => {
             const statusConfig = STATUS_CONFIG[place.status] || STATUS_CONFIG.DRAFT;
             
+            // Extract street and house number from formattedAddr or customAddress
+            const fullAddress = place.formattedAddr || place.customAddress || "";
+            const addressParts = fullAddress.split(",").map(p => p.trim());
+            // Try to get street and house (usually first part before city)
+            const streetAddress = addressParts[0] || "";
+            
             return (
               <tr key={place.id} className="hover:bg-gray-50">
                 <td className="px-4 py-3 text-sm font-medium text-gray-900">
                   {place.title}
                 </td>
                 <td className="px-4 py-3 text-sm text-gray-600">
-                  {place.city?.name || "-"}
+                  <div>
+                    <div className="font-medium">{place.city?.name || "-"}</div>
+                    {streetAddress && (
+                      <div className="text-xs text-gray-500 mt-0.5">{streetAddress}</div>
+                    )}
+                  </div>
                 </td>
                 <td className="px-4 py-3 text-sm text-gray-600">
                   {place.owner.business?.name || place.owner.email}

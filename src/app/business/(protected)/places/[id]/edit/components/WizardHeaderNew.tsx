@@ -1,16 +1,29 @@
 "use client";
 
-import { ContentStatus, type Place, type PlaceImage } from "@prisma/client";
-import { Check, Loader2, Save, ExternalLink } from "lucide-react";
+import { ContentStatus, type Place } from "@prisma/client";
+import { ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
 import { PlaceStatusBadge } from "@/components/business/place/PlaceStatusBadge";
 import { computePlaceDraftCompletion } from "../utils/computeCompletion";
 import { getPlacePublicUrl } from "@/lib/placePublicUrl";
+import { AutoSaveStatus } from "@/components/business/wizard/AutoSaveStatus";
+import { StepIndicator } from "@/components/business/wizard/StepIndicator";
 import Link from "next/link";
 
-interface PlaceWithImages extends Place {
+interface PlaceImage {
+  id: string;
+  createdAt: Date;
+  url: string;
+  width: number | null;
+  height: number | null;
+  blurhash: string | null;
+  kind: any;
+  sortOrder: number;
+  placeId?: string;
+  revisionId?: string;
+}
+
+interface PlaceWithImages extends Omit<Place, 'images'> {
   images: PlaceImage[];
 }
 
@@ -24,13 +37,15 @@ interface WizardHeaderNewProps {
   onStepClick: (step: number) => void;
   onSaveDraft?: () => void;
   canGoNext: boolean;
-  getStepStatus: (step: number) => "done" | "current" | "available" | "locked";
+  getStepStatus: (step: number) => "current" | "completed" | "incomplete";
   place: PlaceWithImages;
   hasActiveRevision?: boolean;
   revisionStatus?: string;
+  saveError?: string | null;
 }
 
-const STEP_LABELS = ["Профиль", "Локация", "Фото", "Контакты"];
+// All 6 steps including review
+const STEP_LABELS = ["Профиль", "Локация", "Фото", "Контакты", "Режим работы", "Проверка"];
 
 export function WizardHeaderNew({
   currentStep,
@@ -46,25 +61,20 @@ export function WizardHeaderNew({
   place,
   hasActiveRevision,
   revisionStatus,
+  saveError,
 }: WizardHeaderNewProps) {
   const completion = computePlaceDraftCompletion(place);
   const publicUrl = getPlacePublicUrl(place);
 
-  const handleStepClick = (step: number) => {
-    const stepStatus = getStepStatus(step);
-    
-    if (stepStatus === "locked") {
-      toast.error(`Заполните обязательные поля на шаге "${STEP_LABELS[currentStep - 1]}"`);
-      return;
-    }
-    
-    onStepClick(step);
+  // Map step status to new simplified naming
+  const mapStepStatus = (step: number) => {
+    return getStepStatus(step);
   };
 
   return (
     <div className="sticky top-0 z-50 bg-white border-b shadow-sm">
       <div className="max-w-4xl mx-auto px-4 py-4">
-        {/* Top row: Title, Status Badge, Public Link, Save button, Save indicator */}
+        {/* Top row: Title, Status Badge, Public Link, Save Status */}
         <div className="flex items-center justify-between mb-4 gap-3">
           <div className="flex items-center gap-3 flex-wrap">
             <h1 className="text-lg font-semibold">
@@ -89,91 +99,28 @@ export function WizardHeaderNew({
             )}
           </div>
 
-          <div className="flex items-center gap-3">
-            {/* Save Draft Button */}
-            {onSaveDraft && (
-              <Button
-                onClick={onSaveDraft}
-                disabled={!isDirty || isSaving}
-                variant="outline"
-                size="sm"
-                className={cn(
-                  "transition-all",
-                  isDirty && !isSaving && "border-primary text-primary hover:bg-primary/10"
-                )}
-              >
-                {isSaving ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Сохранение...
-                  </>
-                ) : (
-                  <>
-                    <Save className="h-4 w-4 mr-2" />
-                    Сохранить черновик
-                  </>
-                )}
-              </Button>
-            )}
-
-            {/* Save Status Indicator */}
-            <div className="flex items-center gap-2 text-sm min-w-[120px]">
-              {isSaving ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                  <span className="text-muted-foreground">Сохраняю...</span>
-                </>
-              ) : isDirty ? (
-                <span className="text-amber-600 font-medium">Не сохранено</span>
-              ) : lastSaved ? (
-                <>
-                  <Check className="h-4 w-4 text-green-600" />
-                  <span className="text-muted-foreground">
-                    {formatTime(lastSaved)}
-                  </span>
-                </>
-              ) : null}
-            </div>
+          <div className="flex items-center gap-4">
+            {/* Silent autosave - only show errors */}
+            <AutoSaveStatus
+              isSaving={isSaving}
+              isDirty={isDirty}
+              lastSaved={lastSaved}
+              error={saveError}
+            />
           </div>
         </div>
 
-        {/* Middle row: Clickable steps */}
-        <div className="flex items-center gap-2">
-          {STEP_LABELS.map((label, index) => {
-            const stepNumber = index + 1;
-            const stepStatus = getStepStatus(stepNumber);
-            const isCurrent = stepNumber === currentStep;
-            const isDone = stepStatus === "done";
-            const isLocked = stepStatus === "locked";
-
-            return (
-              <button
-                key={stepNumber}
-                onClick={() => handleStepClick(stepNumber)}
-                disabled={isLocked}
-                className={cn(
-                  "flex-1 px-3 py-2 text-sm font-medium rounded-lg transition-all",
-                  "border border-transparent",
-                  isCurrent && "bg-primary text-primary-foreground shadow-sm",
-                  isDone && !isCurrent && "bg-green-50 text-green-700 hover:bg-green-100",
-                  !isCurrent && !isDone && !isLocked && "text-muted-foreground hover:bg-muted",
-                  isLocked && "text-muted-foreground/50 cursor-not-allowed opacity-50"
-                )}
-              >
-                <div className="flex items-center justify-center gap-2">
-                  {isDone && !isCurrent && (
-                    <Check className="h-4 w-4" />
-                  )}
-                  <span className="hidden sm:inline">{label}</span>
-                  <span className="sm:hidden">{stepNumber}</span>
-                </div>
-              </button>
-            );
-          })}
-        </div>
+        {/* Middle row: All 6 steps */}
+        <StepIndicator
+          steps={STEP_LABELS}
+          currentStep={currentStep}
+          getStepStatus={mapStepStatus}
+          onStepClick={onStepClick}
+          className="mb-3"
+        />
 
         {/* Progress bar */}
-        <div className="flex items-center gap-2 mt-3">
+        <div className="flex items-center gap-2">
           <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
             <div
               className="h-full bg-primary transition-all duration-300"
@@ -187,24 +134,4 @@ export function WizardHeaderNew({
       </div>
     </div>
   );
-}
-
-function formatTime(date: Date): string {
-  const now = new Date();
-  const diff = now.getTime() - date.getTime();
-  const seconds = Math.floor(diff / 1000);
-
-  if (seconds < 60) {
-    return "только что";
-  }
-
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) {
-    return `${minutes} мин назад`;
-  }
-
-  return date.toLocaleTimeString("ru-RU", {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
 }

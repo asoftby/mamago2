@@ -10,7 +10,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, MapPin, Navigation } from "lucide-react";
+import { ArrowLeft, MapPin, Navigation, ExternalLink } from "lucide-react";
 import { formatDistance } from "@/lib/formatDistance";
 import { formatDistanceToNow } from "date-fns";
 import { ru } from "date-fns/locale";
@@ -25,6 +25,10 @@ import { DiffSummary } from "./moderation/DiffSummary";
 import { FieldDiff } from "./moderation/FieldDiff";
 import { ImageDiff } from "./moderation/ImageDiff";
 import { MicroEditHistory } from "./moderation/MicroEditHistory";
+import { PlaceGroupDiff } from "./moderation/PlaceGroupDiff";
+import { OpeningHoursDiff } from "./moderation/OpeningHoursDiff";
+import { getPlacePublicUrl } from "@/lib/placePublicUrl";
+import { PlaceDangerZone } from "./moderation/PlaceDangerZone";
 
 interface PlaceRevisionModerationViewProps {
   place: any; // Published Place
@@ -105,6 +109,7 @@ export function PlaceRevisionModerationView({
       { field: "ageTags" as const, label: "Возрастные группы" },
       { field: "visitFormats" as const, label: "Форматы посещения" },
       { field: "activityTypes" as const, label: "Типы активностей" },
+      { field: "placeGroupId" as const, label: "Принадлежность к сети" },
     ];
 
     // Prepare data for comparison
@@ -125,6 +130,7 @@ export function PlaceRevisionModerationView({
       ageTags: place.ageTags,
       visitFormats: place.visitFormats,
       activityTypes: place.activityTypes,
+      placeGroupId: place.placeGroupId,
     };
 
     // For newData, use revision value if it exists (not null), otherwise use place value
@@ -142,6 +148,7 @@ export function PlaceRevisionModerationView({
       ageTags: revision.ageTags.length > 0 ? revision.ageTags : place.ageTags,
       visitFormats: revision.visitFormats.length > 0 ? revision.visitFormats : place.visitFormats,
       activityTypes: revision.activityTypes.length > 0 ? revision.activityTypes : place.activityTypes,
+      placeGroupId: revision.placeGroupId !== undefined ? revision.placeGroupId : place.placeGroupId,
     };
 
     // DEBUG: Log comparison data
@@ -157,8 +164,62 @@ export function PlaceRevisionModerationView({
     // Compare images
     const imageChanges = compareImages(place.images || [], revision.images || []);
 
+    // Compare opening hours
+    const oldOpeningHours = place.openingHours;
+    const newOpeningHours = revision.openingHours;
+    
+    let openingHoursChange: { 
+      changeType: "added" | "removed" | "modified" | null;
+      oldOpeningHours: any;
+      newOpeningHours: any;
+    } = {
+      changeType: null,
+      oldOpeningHours: null,
+      newOpeningHours: null,
+    };
+
+    if (!oldOpeningHours && newOpeningHours) {
+      // Opening hours added
+      openingHoursChange = {
+        changeType: "added",
+        oldOpeningHours: null,
+        newOpeningHours,
+      };
+    } else if (oldOpeningHours && !newOpeningHours) {
+      // Opening hours removed
+      openingHoursChange = {
+        changeType: "removed",
+        oldOpeningHours,
+        newOpeningHours: null,
+      };
+    } else if (oldOpeningHours && newOpeningHours) {
+      // Check if opening hours are different
+      const isModified = 
+        oldOpeningHours.mode !== newOpeningHours.mode ||
+        oldOpeningHours.note !== newOpeningHours.note ||
+        oldOpeningHours.timezone !== newOpeningHours.timezone ||
+        JSON.stringify(oldOpeningHours.rules) !== JSON.stringify(newOpeningHours.rules) ||
+        JSON.stringify(oldOpeningHours.exceptions) !== JSON.stringify(newOpeningHours.exceptions);
+
+      if (isModified) {
+        openingHoursChange = {
+          changeType: "modified",
+          oldOpeningHours,
+          newOpeningHours,
+        };
+      }
+    }
+
     // Generate summary
-    const summary = generateDiffSummary(changedFields, imageChanges);
+    // Include opening hours change in changedFields count
+    const changedFieldsCount = changedFields.length + (openingHoursChange.changeType ? 1 : 0);
+    
+    const baseSummary = generateDiffSummary(changedFields, imageChanges);
+    const summary = {
+      ...baseSummary,
+      changedFields: changedFieldsCount, // Override with count that includes opening hours
+      totalChanges: changedFieldsCount + baseSummary.addedPhotos + baseSummary.removedPhotos,
+    };
 
     // DEBUG: Log results
     console.log("[PlaceRevisionModerationView] Diff results:", {
@@ -167,6 +228,7 @@ export function PlaceRevisionModerationView({
       changedFieldNames: changedFields.map(c => c.field),
       addedPhotos: imageChanges.added.length,
       removedPhotos: imageChanges.removed.length,
+      openingHoursChangeType: openingHoursChange.changeType,
       totalChanges: summary.totalChanges,
     });
 
@@ -174,6 +236,7 @@ export function PlaceRevisionModerationView({
       allFieldChanges,
       changedFields,
       imageChanges,
+      openingHoursChange,
       summary,
     };
   }, [place, revision]);
@@ -323,9 +386,21 @@ export function PlaceRevisionModerationView({
                 Изменённые поля
               </h2>
               <div className="space-y-4">
-                {diff.changedFields.map((change) => (
-                  <FieldDiff key={change.field} change={change} />
-                ))}
+                {diff.changedFields.map((change) => {
+                  // Use special component for placeGroupId
+                  if (change.field === "placeGroupId") {
+                    return (
+                      <PlaceGroupDiff
+                        key={change.field}
+                        oldGroupId={change.oldValue}
+                        newGroupId={change.newValue}
+                        placeId={place.id}
+                        changeType={change.changeType}
+                      />
+                    );
+                  }
+                  return <FieldDiff key={change.field} change={change} />;
+                })}
               </div>
             </div>
           )}
@@ -334,6 +409,20 @@ export function PlaceRevisionModerationView({
           {(diff.imageChanges.added.length > 0 ||
             diff.imageChanges.removed.length > 0) && (
             <ImageDiff changes={diff.imageChanges} />
+          )}
+
+          {/* Opening Hours Changes */}
+          {diff.openingHoursChange.changeType && (
+            <div>
+              <h2 className="text-xl font-semibold text-gray-900 mb-4">
+                Режим работы
+              </h2>
+              <OpeningHoursDiff
+                oldOpeningHours={diff.openingHoursChange.oldOpeningHours}
+                newOpeningHours={diff.openingHoursChange.newOpeningHours}
+                changeType={diff.openingHoursChange.changeType}
+              />
+            </div>
           )}
 
           {/* Location Info (if relevant) */}
@@ -489,15 +578,38 @@ export function PlaceRevisionModerationView({
               </Button>
             </div>
 
-            {/* View Published Place Link */}
-            <div className="mt-4 pt-4 border-t">
-              <Link
-                href={`/places/${place.slug || place.id}`}
-                target="_blank"
-                className="text-sm text-blue-600 hover:text-blue-700 hover:underline"
+            {/* View Published Place Actions */}
+            <div className="mt-6 pt-4 border-t space-y-2">
+              {/* Primary CTA: Public place page */}
+              {getPlacePublicUrl(place) ? (
+                <a
+                  href={getPlacePublicUrl(place)!}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700"
+                >
+                  <ExternalLink className="w-4 h-4" />
+                  Открыть на сайте
+                </a>
+              ) : (
+                <div className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 bg-gray-100 text-gray-500 text-sm font-medium rounded-md cursor-not-allowed">
+                  <ExternalLink className="w-4 h-4" />
+                  Не опубликовано
+                </div>
+              )}
+              
+              {/* Secondary CTA: Admin technical access */}
+              <a
+                href={`/admin/places/${place.id}`}
+                className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 text-sm font-medium rounded-md hover:bg-gray-50"
               >
-                View published place →
-              </Link>
+                Открыть в админке
+              </a>
+            </div>
+
+            {/* Danger Zone */}
+            <div className="mt-6 pt-4 border-t">
+              <PlaceDangerZone placeId={place.id} placeTitle={place.title} />
             </div>
           </div>
         </div>

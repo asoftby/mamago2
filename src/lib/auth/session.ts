@@ -98,7 +98,49 @@ export async function validateSession(
     return null;
   }
 
-  return session.user;
+  const user = session.user;
+
+  // Check user status
+  if (user.status === "BANNED") {
+    // Delete session for banned users
+    await prisma.session.delete({ where: { id: session.id } });
+    return null;
+  }
+
+  if (user.status === "SUSPENDED") {
+    if (user.suspendedUntil && user.suspendedUntil > new Date()) {
+      // Still suspended
+      await prisma.session.delete({ where: { id: session.id } });
+      return null;
+    } else {
+      // Suspension expired, auto-unban
+      await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          status: "ACTIVE",
+          statusReason: null,
+          suspendedUntil: null,
+        },
+      });
+      user.status = "ACTIVE";
+      user.statusReason = null;
+      user.suspendedUntil = null;
+    }
+  }
+
+  // Update lastLoginAt (throttled to once per hour to avoid excessive writes)
+  const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+  if (!user.lastLoginAt || user.lastLoginAt < oneHourAgo) {
+    // Fire and forget - don't await
+    prisma.user.update({
+      where: { id: user.id },
+      data: { lastLoginAt: new Date() },
+    }).catch(() => {
+      // Ignore errors
+    });
+  }
+
+  return user;
 }
 
 /**
