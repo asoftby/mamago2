@@ -53,8 +53,8 @@ export function DiscoveryIntentTabs({
   }, [safeActiveIndex, currentIntent]);
 
   return (
-    <div className={cn("relative w-full bg-background z-10", className)}>
-      <div className="flex w-full max-w-screen-xl mx-auto overflow-x-auto no-scrollbar relative pointer-events-auto py-[10px]">
+    <div className={cn("relative w-full bg-transparent z-10", className)}>
+      <div className="flex w-full justify-center overflow-x-auto no-scrollbar relative pointer-events-auto">
         {DISCOVERY_INTENT_ITEMS.map((intentConfig, index) => {
           const isActive = index === safeActiveIndex;
           const Icon = TAB_ICONS[intentConfig.id];
@@ -71,16 +71,16 @@ export function DiscoveryIntentTabs({
               )}
             >
               {intentConfig.image ? (
-                <div className="relative h-[48px] w-[48px] flex items-center justify-center">
+                <div className="relative h-[40px] w-[40px] flex items-center justify-center">
                   <Image 
                     src={intentConfig.image}
                     alt={intentConfig.label}
-                    width={48} 
-                    height={48} 
+                    width={40} 
+                    height={40} 
                     className={cn(
-                      "object-contain transition-transform duration-200 group-hover:scale-105 mb-[5px]",
-                      isActive ? "scale-100" : "scale-[0.75]",
-                      isActive && "drop-shadow-[0_4px_8px_rgba(239,135,89,0.35)]"
+                      "object-contain transition-transform duration-200 group-hover:scale-105",
+                      isActive ? "scale-100" : "scale-[0.8]",
+                      isActive && "drop-shadow-[0_2px_4px_rgba(239,135,89,0.25)]"
                     )}
                   />
                 </div>
@@ -88,14 +88,14 @@ export function DiscoveryIntentTabs({
                 <Icon 
                   className={cn(
                     "transition-all duration-300",
-                    isActive ? "h-6 w-6 opacity-100" : "h-5 w-5 opacity-60"
+                    isActive ? "h-5 w-5 opacity-100" : "h-4 w-4 opacity-60"
                   )} 
                 />
               )}
               <Label 
                 as="span"
                 className={cn(
-                  "text-[13px] leading-none whitespace-nowrap transition-all duration-300 normal-case tracking-normal text-current",
+                  "text-[12px] leading-none whitespace-nowrap transition-all duration-300 normal-case tracking-normal text-current mb-[7px]",
                   isActive ? "font-bold text-neutral-900" : "font-medium text-neutral-400"
                 )}
               >
@@ -107,7 +107,7 @@ export function DiscoveryIntentTabs({
         
         {/* Animated Indicator */}
         <div
-          className="absolute bottom-0 h-[2px] rounded-full bg-[#EF8759] transition-all duration-300 ease-out"
+          className="absolute bottom-0 h-[4px] rounded-full bg-[#EF8759] transition-all duration-300 ease-out"
           style={{
             left: `${indicatorStyle.left}px`,
             width: `${indicatorStyle.width}px`

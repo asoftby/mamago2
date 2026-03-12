@@ -7,9 +7,7 @@ export function SiteHeader() {
   return (
     <>
       {/* Desktop Header (md and up) */}
-      <div className="hidden md:block">
-        <SiteHeaderDesktop />
-      </div>
+      <SiteHeaderDesktop />
 
       {/* Mobile Header (below md) */}
       <div className="block md:hidden">

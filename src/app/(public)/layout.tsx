@@ -1,6 +1,8 @@
 import React from "react";
 import { SiteHeader } from "@/components/site/header";
 import { PublicFooter } from "@/components/shell/PublicFooter";
+import { RefinementFiltersProvider } from "@/contexts/RefinementFiltersContext";
+import { RefinementFiltersModalGlobal } from "@/components/discovery/RefinementFiltersModalGlobal";
 
 export default function PublicGroupLayout({
   children,
@@ -8,12 +10,17 @@ export default function PublicGroupLayout({
   children: React.ReactNode;
 }) {
   return (
-    <>
-      <SiteHeader />
-      <main className="min-h-[calc(100vh-64px)]">
-        {children}
-      </main>
-      <PublicFooter />
-    </>
+    <RefinementFiltersProvider>
+      <div className="min-h-screen flex flex-col">
+        <SiteHeader />
+        <main className="flex-1">
+          {children}
+        </main>
+        <PublicFooter />
+        
+        {/* Global Modal */}
+        <RefinementFiltersModalGlobal />
+      </div>
+    </RefinementFiltersProvider>
   );
 }

@@ -1,12 +1,11 @@
 "use client";
 
 import { Container } from "@/components/ui/Container";
-import { DiscoveryIntentTabs } from "@/components/city/DiscoveryIntentTabs";
 import { ActivityCard } from "@/components/activity/ActivityCard";
 import { MINSK_ACTIVITIES } from "@/mocks/activities.minsk";
 import { Intent } from "@/lib/intent";
 import { H1 } from "@/components/ui/typography";
-import { DiscoveryFilters } from "@/features/discovery/filters/DiscoveryFilters";
+import { RefinementFiltersButton } from "@/components/discovery/RefinementFiltersButton";
 import { DISCOVERY_INTENT_CONFIG } from "@/lib/discovery/discoveryIntentConfig";
 import { formatCityTitle } from "@/lib/city/cityDisplayNames";
 
@@ -31,21 +30,17 @@ export function CityDiscoveryShell({
 
   return (
     <main className="min-h-screen bg-background pb-20">
-      <Container className="pt-4 space-y-6">
-        {/* Navigation & Filters */}
+      <Container className="pt-6 space-y-6">
+        {/* Page Title & Filters */}
         <div className="space-y-4">
-          <div className="text-xs text-red-500">SHELL_V3: {intent}</div>
-          <DiscoveryIntentTabs city={city} currentIntent={intent} />
-          <H1 className="px-1 mt-[30px]">
+          <H1 className="px-1">
             {pageTitle}
           </H1>
           
-          {/* Filters - only show if intent supports them */}
+          {/* Refinement Filters Button - only show if intent supports them */}
           {intentConfig.hasFilters && (
             <div className="py-2">
-              <div className="mt-4">
-                <DiscoveryFilters citySlug={city} />
-              </div>
+              <RefinementFiltersButton intent={intent} />
             </div>
           )}
         </div>
