@@ -10,8 +10,8 @@ interface Position {
   containerWidth: number;
 }
 
-export function useDropdownPosition<T extends HTMLElement>(
-  triggerRef: RefObject<T | null>,
+export function useDropdownPosition(
+  triggerRef: RefObject<HTMLElement | null>,
   isOpen: boolean
 ): Position {
   const [position, setPosition] = useState<Position>({ 
@@ -52,12 +52,11 @@ export function useDropdownPosition<T extends HTMLElement>(
 
     updatePosition();
 
-    // Update position on scroll and resize
-    window.addEventListener("scroll", updatePosition, { passive: true });
+    // Only update position on resize, not on scroll
+    // Scroll handling is now done in DesktopSearchControl to close panels
     window.addEventListener("resize", updatePosition);
 
     return () => {
-      window.removeEventListener("scroll", updatePosition);
       window.removeEventListener("resize", updatePosition);
     };
   }, [isOpen, triggerRef]);

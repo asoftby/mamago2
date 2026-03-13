@@ -31,15 +31,15 @@ export function CityDiscoveryShell({
   return (
     <main className="min-h-screen bg-background pb-20">
       <Container className="pt-6 space-y-6">
-        {/* Page Title & Filters */}
+        {/* Page Title */}
         <div className="space-y-4">
           <H1 className="px-1">
             {pageTitle}
           </H1>
           
-          {/* Refinement Filters Button - only show if intent supports them */}
+          {/* Refinement Filters Button - only show on desktop */}
           {intentConfig.hasFilters && (
-            <div className="py-2">
+            <div className="py-2 hidden md:block">
               <RefinementFiltersButton intent={intent} />
             </div>
           )}

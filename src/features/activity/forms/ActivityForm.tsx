@@ -118,7 +118,7 @@ export function ActivityForm({
           id="name"
           value={formData.name}
           onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-          className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary focus:border-primary"
+          className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary focus:border-primary text-base"
           placeholder="Название мероприятия"
           required
         />
@@ -134,7 +134,7 @@ export function ActivityForm({
           value={formData.description}
           onChange={(e) => setFormData({ ...formData, description: e.target.value })}
           rows={4}
-          className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary focus:border-primary"
+          className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary focus:border-primary text-base"
           placeholder="Расскажите о мероприятии"
         />
       </div>
@@ -148,7 +148,7 @@ export function ActivityForm({
           id="cityId"
           value={formData.cityId}
           onChange={(e) => setFormData({ ...formData, cityId: e.target.value })}
-          className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary focus:border-primary"
+          className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary focus:border-primary text-base"
           required
         >
           {cities.map((city) => (
@@ -169,7 +169,7 @@ export function ActivityForm({
           id="coverImageUrl"
           value={formData.coverImageUrl}
           onChange={(e) => setFormData({ ...formData, coverImageUrl: e.target.value })}
-          className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary focus:border-primary"
+          className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary focus:border-primary text-base"
           placeholder="https://example.com/image.jpg"
         />
       </div>
@@ -192,7 +192,7 @@ export function ActivityForm({
             }
             min="0"
             step="0.01"
-            className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary focus:border-primary"
+            className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary focus:border-primary text-base"
             placeholder="0.00"
           />
         </div>
@@ -204,7 +204,7 @@ export function ActivityForm({
             id="currency"
             value={formData.currency}
             onChange={(e) => setFormData({ ...formData, currency: e.target.value })}
-            className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary focus:border-primary"
+            className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary focus:border-primary text-base"
           >
             <option value="BYN">BYN</option>
             <option value="USD">USD</option>
@@ -224,7 +224,7 @@ export function ActivityForm({
           id="ageLabel"
           value={formData.ageLabel}
           onChange={(e) => setFormData({ ...formData, ageLabel: e.target.value })}
-          className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary focus:border-primary"
+          className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary focus:border-primary text-base"
           placeholder="Например: 6+, 3-7 лет"
         />
       </div>
@@ -268,7 +268,7 @@ export function ActivityForm({
                 value={newSessionDate}
                 onChange={(e) => setNewSessionDate(e.target.value)}
                 min={minDate}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md text-base"
               />
             </div>
             <div>
@@ -280,7 +280,7 @@ export function ActivityForm({
                 id="sessionTime"
                 value={newSessionTime}
                 onChange={(e) => setNewSessionTime(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md text-base"
               />
             </div>
           </div>

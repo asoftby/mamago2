@@ -344,24 +344,27 @@ export function PlaceWizard({ mode, place, userId, onComplete }: PlaceWizardProp
       {/* Header */}
       <div className="bg-white border-b sticky top-0 z-10">
         <div className="max-w-4xl mx-auto px-6 py-4">
-          <div className="flex items-center justify-between mb-4">
-            <div>
+          <div className="mb-4">
+            <div className="flex items-center justify-between mb-2">
               <h1 className="text-2xl font-bold">
                 {mode === "create" ? "Новое место" : "Редактирование места"}
               </h1>
-              <p className="text-sm text-muted-foreground mt-1">
+              {lastSaved && (
+                <div className="text-xs text-muted-foreground">
+                  Сохранено {lastSaved.toLocaleTimeString()}
+                </div>
+              )}
+            </div>
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-muted-foreground">
                 Шаг {currentStep} из {TOTAL_STEPS}: {getStepLabel(currentStep)}
               </p>
+              <CompletionProgress data={formData} />
             </div>
-            {lastSaved && (
-              <div className="text-xs text-muted-foreground">
-                Сохранено {lastSaved.toLocaleTimeString()}
-              </div>
-            )}
           </div>
           
-          {/* Step Progress with Completion */}
-          <div className="space-y-1">
+          {/* Step Progress with Navigation */}
+          <div className="space-y-3">
             <div className="flex gap-2">
               {WIZARD_STEPS.map((step) => (
                 <button
@@ -378,7 +381,52 @@ export function PlaceWizard({ mode, place, userId, onComplete }: PlaceWizardProp
                 />
               ))}
             </div>
-            <CompletionProgress data={formData} />
+            
+            {/* Navigation Buttons */}
+            <div className="flex items-center justify-between pt-2">
+              <div>
+                {canPrev && (
+                  <Button
+                    variant="outline"
+                    onClick={handlePrev}
+                    disabled={isSaving || isSubmitting}
+                  >
+                    <ChevronLeft className="w-4 h-4 mr-2" />
+                    Назад
+                  </Button>
+                )}
+              </div>
+
+              <div className="flex gap-3">
+                {isReviewStep ? (
+                  <>
+                    <Button
+                      variant="outline"
+                      onClick={handleSaveDraft}
+                      disabled={isSaving || isSubmitting}
+                    >
+                      <Save className="w-4 h-4 mr-2" />
+                      {isSaving ? "Сохранение..." : "Сохранить черновик"}
+                    </Button>
+                    <Button
+                      onClick={handleSubmit}
+                      disabled={!stepValidation.isValid || isSubmitting || isSaving}
+                    >
+                      <Send className="w-4 h-4 mr-2" />
+                      {isSubmitting ? "Отправка..." : "Отправить на модерацию"}
+                    </Button>
+                  </>
+                ) : (
+                  <Button
+                    onClick={handleNext}
+                    disabled={!canNext || isSaving || isSubmitting}
+                  >
+                    Далее
+                    <ChevronRight className="w-4 h-4 ml-2" />
+                  </Button>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -387,52 +435,6 @@ export function PlaceWizard({ mode, place, userId, onComplete }: PlaceWizardProp
       <div className="max-w-4xl mx-auto px-6 py-8">
         <div className="bg-white rounded-lg border p-8">
           {renderStep()}
-        </div>
-
-        {/* Navigation */}
-        <div className="mt-6 flex items-center justify-between">
-          <div>
-            {canPrev && (
-              <Button
-                variant="outline"
-                onClick={handlePrev}
-                disabled={isSaving || isSubmitting}
-              >
-                <ChevronLeft className="w-4 h-4 mr-2" />
-                Назад
-              </Button>
-            )}
-          </div>
-
-          <div className="flex gap-3">
-            {isReviewStep ? (
-              <>
-                <Button
-                  variant="outline"
-                  onClick={handleSaveDraft}
-                  disabled={isSaving || isSubmitting}
-                >
-                  <Save className="w-4 h-4 mr-2" />
-                  {isSaving ? "Сохранение..." : "Сохранить черновик"}
-                </Button>
-                <Button
-                  onClick={handleSubmit}
-                  disabled={!stepValidation.isValid || isSubmitting || isSaving}
-                >
-                  <Send className="w-4 h-4 mr-2" />
-                  {isSubmitting ? "Отправка..." : "Отправить на модерацию"}
-                </Button>
-              </>
-            ) : (
-              <Button
-                onClick={handleNext}
-                disabled={!canNext || isSaving || isSubmitting}
-              >
-                Далее
-                <ChevronRight className="w-4 h-4 ml-2" />
-              </Button>
-            )}
-          </div>
         </div>
       </div>
     </div>

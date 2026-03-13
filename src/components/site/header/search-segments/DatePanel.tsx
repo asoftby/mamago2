@@ -1,9 +1,15 @@
 "use client";
 
-import { Calendar, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { WhenSelect } from "@/components/ui/when-select";
-import { useFilterUpdater } from "./filterUtils";
+
+// Helper function to convert Date to YYYY-MM-DD in local timezone
+function formatDateToLocal(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
 
 interface DatePanelProps {
   onClose: () => void;
@@ -12,34 +18,71 @@ interface DatePanelProps {
 }
 
 export function DatePanel({ onClose, applied, actions }: DatePanelProps) {
-  const { updateFilters } = useFilterUpdater();
-  
   const handleWhenChange = (val: any) => {
     let patch: any = {};
     if (!val) {
       patch = { dateFrom: null, dateTo: null, whenPreset: null };
     } else if (typeof val === 'string') {
       if (val === 'today') {
-        patch = { whenPreset: "TODAY", dateFrom: null, dateTo: null };
+        // Если уже выбрано "Сегодня", отжимаем кнопку
+        if (applied.whenPreset === "TODAY") {
+          patch = { dateFrom: null, dateTo: null, whenPreset: null };
+        } else {
+          patch = { whenPreset: "TODAY", dateFrom: null, dateTo: null };
+        }
       } else if (val === 'tomorrow') {
-        patch = { whenPreset: "TOMORROW", dateFrom: null, dateTo: null };
+        // Если уже выбрано "Завтра", отжимаем кнопку
+        if (applied.whenPreset === "TOMORROW") {
+          patch = { dateFrom: null, dateTo: null, whenPreset: null };
+        } else {
+          patch = { whenPreset: "TOMORROW", dateFrom: null, dateTo: null };
+        }
       } else if (val === 'weekend') {
-        patch = { whenPreset: "WEEKEND", dateFrom: null, dateTo: null };
+        // Если уже выбраны "Выходные", отжимаем кнопку
+        if (applied.whenPreset === "WEEKEND") {
+          patch = { dateFrom: null, dateTo: null, whenPreset: null };
+        } else {
+          patch = { whenPreset: "WEEKEND", dateFrom: null, dateTo: null };
+        }
       } else {
         patch = { whenPreset: null, dateFrom: val, dateTo: null };
       }
     } else if (val instanceof Date) {
-      patch = { whenPreset: null, dateFrom: val.toISOString().split('T')[0], dateTo: null };
+      // Проверяем, соответствует ли выбранная дата пресетам
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+      
+      if (val.getTime() === today.getTime()) {
+        patch = { whenPreset: "TODAY", dateFrom: null, dateTo: null };
+      } else if (val.getTime() === tomorrow.getTime()) {
+        patch = { whenPreset: "TOMORROW", dateFrom: null, dateTo: null };
+      } else {
+        patch = { whenPreset: null, dateFrom: formatDateToLocal(val), dateTo: null };
+      }
     } else if ('from' in val) {
-      patch = { 
-        whenPreset: null,
-        dateFrom: val.from.toISOString().split('T')[0], 
-        dateTo: val.to.toISOString().split('T')[0] 
-      };
+      // Проверяем, соответствует ли выбранный интервал выходным
+      const now = new Date();
+      const day = now.getDay() === 0 ? 7 : now.getDay();
+      const saturday = new Date(now.getFullYear(), now.getMonth(), now.getDate() + (6 - day));
+      const sunday = new Date(now.getFullYear(), now.getMonth(), now.getDate() + (7 - day));
+      
+      if (val.from.getTime() === saturday.getTime() && val.to.getTime() === sunday.getTime()) {
+        patch = { whenPreset: "WEEKEND", dateFrom: null, dateTo: null };
+      } else {
+        patch = { 
+          whenPreset: null,
+          dateFrom: formatDateToLocal(val.from), 
+          dateTo: formatDateToLocal(val.to) 
+        };
+      }
     }
     
-    updateFilters(patch);
-    onClose();
+    // Always use setDraft from actions (works for both desktop and mobile)
+    actions.setDraft(patch);
+    
+    // Не закрываем панель автоматически - пользователь может выбрать другие параметры
+    // onClose();
   };
 
   // Prepare value for WhenSelect
@@ -71,41 +114,36 @@ export function DatePanel({ onClose, applied, actions }: DatePanelProps) {
   return (
     <div className="bg-white rounded-2xl border border-gray-200 shadow-lg overflow-hidden">
       <div className="p-6">
-        {/* Quick Options */}
+        {/* Quick Options - без заголовка и иконок */}
         <div className="mb-6">
-          <h3 className="text-sm font-medium text-gray-900 mb-3">Быстрый выбор</h3>
           <div className="grid grid-cols-3 gap-3">
             {quickOptions.map((option) => (
               <button
                 key={option.id}
                 onClick={() => handleWhenChange(option.value)}
                 className={cn(
-                  "flex flex-col items-center gap-2 p-4 rounded-xl border transition-colors",
+                  "flex items-center justify-center p-3 rounded-xl border transition-colors text-sm font-medium",
                   applied.whenPreset === option.id.toUpperCase()
                     ? "border-[#EF8759] bg-[#EF8759]/5 text-[#EF8759]"
                     : "border-gray-200 hover:border-gray-300 hover:bg-gray-50"
                 )}
               >
-                <Clock className="h-5 w-5" />
-                <span className="text-sm font-medium">{option.label}</span>
+                {option.label}
               </button>
             ))}
           </div>
         </div>
 
-        {/* Calendar */}
+        {/* Calendar - без границы */}
         <div>
-          <h3 className="text-sm font-medium text-gray-900 mb-3">Выбрать дату</h3>
-          <div className="border border-gray-200 rounded-xl overflow-hidden">
-            <WhenSelect
-              value={whenValue}
-              onChange={handleWhenChange}
-              uiMode="desktop"
-              label=""
-              className="border-0 rounded-none"
-              variant="embedded"
-            />
-          </div>
+          <WhenSelect
+            value={whenValue}
+            onChange={handleWhenChange}
+            uiMode="desktop"
+            label=""
+            className="border-0"
+            variant="embedded"
+          />
         </div>
       </div>
     </div>

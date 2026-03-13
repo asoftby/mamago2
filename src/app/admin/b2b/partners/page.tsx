@@ -33,11 +33,16 @@ export default async function PartnersPage() {
   });
 
   return (
-    <div>
-      <h1 className="text-2xl font-bold mb-6">Контрагенты</h1>
-      <p className="text-gray-600 mb-6">
-        Список верифицированных бизнесов
-      </p>
+    <div className="p-6 md:p-4 space-y-6">
+      {/* AdminPageHeader */}
+      <div>
+        <h1 className="text-2xl md:text-xl font-bold text-gray-900">Контрагенты</h1>
+        <p className="text-sm text-gray-600 mt-1">
+          Список верифицированных бизнесов
+        </p>
+      </div>
+      
+      {/* AdminPageContent */}
       <PartnersTable businesses={businesses} />
     </div>
   );

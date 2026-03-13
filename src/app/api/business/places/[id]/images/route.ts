@@ -9,7 +9,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
-import { PlaceImageKind } from "@prisma/client";
+import { PlaceImageKind, MediaEntityType } from "@prisma/client";
+import { attachMediaToEntity } from "@/lib/media/mediaRegistry";
 
 /**
  * POST - Add image to place
@@ -93,6 +94,25 @@ export async function POST(
         sortOrder: finalSortOrder,
       },
     });
+
+    // Register usage in media library
+    try {
+      const mediaAsset = await prisma.mediaAsset.findUnique({
+        where: { storageKey: url },
+      });
+
+      if (mediaAsset) {
+        await attachMediaToEntity({
+          mediaId: mediaAsset.id,
+          entityType: MediaEntityType.PLACE,
+          entityId: placeId,
+          field: kind === "LOGO" ? "logo" : "gallery",
+        });
+      }
+    } catch (mediaError) {
+      console.error("Failed to register media usage:", mediaError);
+      // Don't fail the request if media registration fails
+    }
 
     // If LOGO, update place.logoImageId
     if (kind === "LOGO") {

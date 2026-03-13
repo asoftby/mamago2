@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useSearchParams, useRouter, usePathname, ReadonlyURLSearchParams } from 'next/navigation';
 import { whenLabel } from './whenLabel';
 import { AGE_GROUPS } from '@/features/filters/age/ageGroups';
@@ -12,6 +12,7 @@ export type DiscoveryFilters = {
   age: string[];
   metro: string | null; // Changed from array to single value
   district: string | null;
+  nearby: boolean; // Track "Поблизости" selection
 };
 
 export const defaultFilters: DiscoveryFilters = {
@@ -21,6 +22,7 @@ export const defaultFilters: DiscoveryFilters = {
   age: [],
   metro: null, // Changed from [] to null
   district: null,
+  nearby: false,
 };
 
 export type OpenKey = "date" | "age" | "metro" | "district" | null;
@@ -28,6 +30,8 @@ export type OpenKey = "date" | "age" | "metro" | "district" | null;
 // --- Utilities ---
 
 export function parseAppliedFromUrl(searchParams: ReadonlyURLSearchParams): DiscoveryFilters {
+  console.log('🔍 parseAppliedFromUrl - searchParams:', searchParams.toString());
+  
   const dateFrom = searchParams.get("from") || searchParams.get("dateFrom") || searchParams.get("when"); // Fallback for old 'when' if any
   // Wait, old implementation used 'when' param with comma for ranges.
   // New spec: "from" param (or "dateFrom"), "to" param (or "dateTo")
@@ -72,6 +76,9 @@ export function parseAppliedFromUrl(searchParams: ReadonlyURLSearchParams): Disc
   
   const district = searchParams.get("district") || null;
   
+  // Parse nearby from URL
+  const nearby = searchParams.get("nearby") === "true";
+  
   // Parse whenPreset from URL if present
   const presetParam = searchParams.get("preset");
   let whenPreset: WhenPreset = null;
@@ -79,14 +86,19 @@ export function parseAppliedFromUrl(searchParams: ReadonlyURLSearchParams): Disc
     whenPreset = presetParam;
   }
 
-  return {
+  const result = {
     dateFrom: dFrom || null,
     dateTo: dTo || null,
     whenPreset,
     age: mappedAge,
     metro,
     district,
+    nearby,
   };
+  
+  console.log('🔍 parseAppliedFromUrl - result:', result);
+  
+  return result;
 }
 
 function writeAppliedToUrl(
@@ -121,6 +133,10 @@ function writeAppliedToUrl(
   if (next.district) params.set("district", next.district);
   else params.delete("district");
 
+  // Nearby
+  if (next.nearby) params.set("nearby", "true");
+  else params.delete("nearby");
+
   const queryString = params.toString();
   const url = queryString ? `${pathname}?${queryString}` : pathname;
 
@@ -138,29 +154,50 @@ export function useDiscoveryFilters() {
   // 1. Applied state (Derived from URL)
   const applied = useMemo(() => parseAppliedFromUrl(searchParams), [searchParams]);
 
-  // 2. Draft state (Local)
+  // 2. Draft state (Local) - Initialize from applied
   const [draft, setDraftState] = useState<DiscoveryFilters>(applied);
   const [openKey, setOpenKey] = useState<OpenKey>(null);
 
-  // Initialize draft from applied when opening a specific key
-  // Or just whenever applied changes? No, draft should be stable while editing.
-  // But if we close without applying, we want draft to reset.
-  // We'll handle that in `beginDraft` or `close`.
+  // Sync draft with applied when URL changes (but not when draft is being edited)
+  useEffect(() => {
+    if (!openKey) {
+      setDraftState(applied);
+    }
+  }, [applied, openKey]);
   
   const beginDraft = useCallback((key: OpenKey) => {
+    console.log('🔄 beginDraft called with key:', key);
+    console.log('🔄 Current applied state:', applied);
     // Reset draft to current applied state before opening
     setDraftState(applied);
     setOpenKey(key);
+    console.log('🔄 Draft state set to applied');
   }, [applied]);
 
   const setDraft = useCallback((patch: Partial<DiscoveryFilters>) => {
-    setDraftState(prev => ({ ...prev, ...patch }));
+    console.log('✏️ setDraft called with patch:', patch);
+    setDraftState(prev => {
+      const newState = { ...prev, ...patch };
+      console.log('✏️ Draft state updated from:', prev);
+      console.log('✏️ Draft state updated to:', newState);
+      return newState;
+    });
   }, []);
 
   const actions = useMemo(() => ({
     apply: () => {
+      console.log('🎯 actions.apply called');
+      console.log('🎯 Current draft:', draft);
+      console.log('🎯 Current pathname:', pathname);
+      console.log('🎯 Current searchParams:', searchParams.toString());
+      
       writeAppliedToUrl(router, pathname, searchParams, draft, "replace");
       setOpenKey(null);
+      
+      console.log('🎯 writeAppliedToUrl called, openKey set to null');
+    },
+    setDraft: (patch: Partial<DiscoveryFilters>) => {
+      setDraft(patch);
     },
     resetAll: () => {
       // Clear all
@@ -197,7 +234,7 @@ export function useDiscoveryFilters() {
       setOpenKey(null);
       setDraftState(applied); // Revert draft
     }
-  }), [router, pathname, searchParams, draft, applied]);
+  }), [router, pathname, searchParams, draft, applied, setDraft]);
 
   const derived = useMemo(() => {
     // We use DRAFT for dirty check if open? Or applied?
@@ -217,13 +254,15 @@ export function useDiscoveryFilters() {
       !!filters.whenPreset ||
       filters.age.length > 0 ||
       !!filters.metro ||
-      !!filters.district;
+      !!filters.district ||
+      filters.nearby;
 
     const activeCount =
       (filters.dateFrom || filters.dateTo || filters.whenPreset ? 1 : 0) +
       (filters.age.length > 0 ? 1 : 0) +
       (filters.metro ? 1 : 0) +
-      (filters.district ? 1 : 0);
+      (filters.district ? 1 : 0) +
+      (filters.nearby ? 1 : 0);
 
     // Date label with preset support
     const dateLabel = whenLabel(filters);

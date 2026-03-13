@@ -44,17 +44,23 @@ export async function compressImage(
       initialQuality: quality,
     });
 
+    // Preserve original filename (browser-image-compression creates "blob" name)
+    const finalFile = new File([compressedFile], file.name, {
+      type: compressedFile.type,
+      lastModified: Date.now(),
+    });
+
     // Get image dimensions
-    const dimensions = await getImageDimensions(compressedFile);
+    const dimensions = await getImageDimensions(finalFile);
 
     // Generate blurhash
-    const blurhash = await generateBlurhash(compressedFile);
+    const blurhash = await generateBlurhash(finalFile);
 
     // Generate preview data URL
-    const preview = await fileToDataURL(compressedFile);
+    const preview = await fileToDataURL(finalFile);
 
     return {
-      file: compressedFile,
+      file: finalFile,
       width: dimensions.width,
       height: dimensions.height,
       blurhash,
@@ -228,7 +234,7 @@ export function validateImageFile(
     allowedTypes?: string[];
   }
 ): { valid: boolean; error?: string } {
-  const { maxSizeMB = 10, allowedTypes = ["image/jpeg", "image/png", "image/webp", "image/avif"] } =
+  const { maxSizeMB = 10, allowedTypes = ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"] } =
     options || {};
 
   // Check file type

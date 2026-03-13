@@ -43,6 +43,30 @@ const NAV_SECTIONS: NavSection[] = [
     ],
   },
   {
+    title: "Billing",
+    items: [
+      { label: "Overview", href: adminPath("/billing") },
+      { label: "Транзакции", href: adminPath("/billing/transactions") },
+      { label: "Балансы", href: adminPath("/billing/businesses") },
+      { label: "Тарифы", href: adminPath("/billing/plans") },
+    ],
+  },
+  {
+    title: "Commercial",
+    items: [
+      { label: "Overview", href: adminPath("/commercial") },
+      { label: "Договоры", href: adminPath("/commercial/contracts") },
+      { label: "Размещения", href: adminPath("/commercial/placements") },
+      { label: "Услуги", href: adminPath("/commercial/service-placements") },
+    ],
+  },
+  {
+    title: "Content",
+    items: [
+      { label: "Медиатека", href: adminPath("/media") },
+    ],
+  },
+  {
     title: "Discovery",
     items: [
       { label: "Signals", href: adminPath("/taxonomy/signals") },

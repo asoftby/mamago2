@@ -107,136 +107,146 @@ export function BusinessVerificationRequestsPage({
   };
 
   return (
-    <div>
-      <h1 className="text-2xl font-bold mb-6">Заявки на верификацию</h1>
-
-      {/* Status tabs */}
-      <div className="flex gap-2 mb-6 border-b">
-        {["PENDING", "APPROVED", "REJECTED", "DRAFT"].map((status) => (
-          <button
-            key={status}
-            onClick={() => handleStatusChange(status)}
-            className={`px-4 py-2 font-medium border-b-2 transition-colors ${
-              activeStatus === status
-                ? "border-primary text-primary"
-                : "border-transparent text-gray-600 hover:text-gray-900"
-            }`}
-          >
-            {STATUS_LABELS[status]}
-          </button>
-        ))}
+    <div className="p-6 md:p-4 space-y-6">
+      {/* AdminPageHeader */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl md:text-xl font-bold">Заявки на верификацию</h1>
+        </div>
       </div>
 
-      {/* Loading state */}
-      {loading && (
-        <div className="text-center py-8 text-gray-500">Загрузка...</div>
-      )}
-
-      {/* Error state */}
-      {error && (
-        <div className="bg-red-50 border border-red-200 rounded-md p-4 text-red-800">
-          {error}
+      {/* AdminPageToolbar - Status tabs */}
+      <div className="border-b border-gray-200 -mx-6 md:mx-0 px-6 md:px-0">
+        <div className="flex gap-2 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {["PENDING", "APPROVED", "REJECTED", "DRAFT"].map((status) => (
+            <button
+              key={status}
+              onClick={() => handleStatusChange(status)}
+              className={`px-4 py-2 font-medium border-b-2 transition-colors whitespace-nowrap text-sm ${
+                activeStatus === status
+                  ? "border-primary text-primary"
+                  : "border-transparent text-gray-600 hover:text-gray-900"
+              }`}
+            >
+              {STATUS_LABELS[status]}
+            </button>
+          ))}
         </div>
-      )}
+      </div>
 
-      {/* Empty state */}
-      {!loading && !error && businesses.length === 0 && (
-        <div className="text-center py-8 text-gray-500">
-          Нет бизнесов со статусом "{STATUS_LABELS[activeStatus]}"
-        </div>
-      )}
+      {/* AdminPageContent */}
+      <div>
+        {/* Loading state */}
+        {loading && (
+          <div className="text-center py-8 text-gray-500">Загрузка...</div>
+        )}
 
-      {/* Business list */}
-      {!loading && !error && businesses.length > 0 && (
-        <div className="bg-white rounded-lg shadow overflow-hidden">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Бизнес
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Владелец
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  УНП
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Статус
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Дата подачи
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Действия
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {businesses.map((business) => (
-                <tr 
-                  key={business.id} 
-                  className={`hover:bg-gray-50 cursor-pointer ${
-                    openBusinessId === business.id ? 'bg-blue-50' : ''
-                  }`}
-                  onClick={() => handleOpenBusiness(business.id)}
-                >
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-gray-900">
-                      {business.name}
-                    </div>
-                    {business.legalName && (
-                      <div className="text-sm text-gray-500">
-                        {business.legalName}
-                      </div>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">
-                      {business.owner.email}
-                    </div>
-                    {business.owner.phoneE164 && (
-                      <div className="text-sm text-gray-500">
-                        {business.owner.phoneE164}
-                      </div>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {business.unp || "—"}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span
-                      className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                        STATUS_COLORS[business.verificationStatus]
-                      }`}
-                    >
-                      {STATUS_LABELS[business.verificationStatus]}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {business.submittedAt
-                      ? new Date(business.submittedAt).toLocaleDateString(
-                          "ru-RU"
-                        )
-                      : "—"}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleOpenBusiness(business.id);
-                      }}
-                      className="text-primary hover:text-primary/80"
-                    >
-                      Подробнее
-                    </button>
-                  </td>
+        {/* Error state */}
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-md p-4 text-red-800">
+            {error}
+          </div>
+        )}
+
+        {/* Empty state */}
+        {!loading && !error && businesses.length === 0 && (
+          <div className="text-center py-8 text-gray-500">
+            Нет бизнесов со статусом "{STATUS_LABELS[activeStatus]}"
+          </div>
+        )}
+
+        {/* Business list */}
+        {!loading && !error && businesses.length > 0 && (
+          <div className="border border-gray-200 rounded-lg overflow-hidden">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 border-b border-gray-200">
+                <tr>
+                  <th className="px-6 py-3 text-left font-medium text-gray-700">
+                    Бизнес
+                  </th>
+                  <th className="px-6 py-3 text-left font-medium text-gray-700">
+                    Владелец
+                  </th>
+                  <th className="px-6 py-3 text-left font-medium text-gray-700">
+                    УНП
+                  </th>
+                  <th className="px-6 py-3 text-left font-medium text-gray-700">
+                    Статус
+                  </th>
+                  <th className="px-6 py-3 text-left font-medium text-gray-700">
+                    Дата подачи
+                  </th>
+                  <th className="px-6 py-3 text-left font-medium text-gray-700">
+                    Действия
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {businesses.map((business) => (
+                  <tr 
+                    key={business.id} 
+                    className={`hover:bg-gray-50 cursor-pointer ${
+                      openBusinessId === business.id ? 'bg-blue-50' : ''
+                    }`}
+                    onClick={() => handleOpenBusiness(business.id)}
+                  >
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="font-medium text-gray-900">
+                        {business.name}
+                      </div>
+                      {business.legalName && (
+                        <div className="text-gray-500">
+                          {business.legalName}
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-gray-900">
+                        {business.owner.email}
+                      </div>
+                      {business.owner.phoneE164 && (
+                        <div className="text-gray-500">
+                          {business.owner.phoneE164}
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-gray-900">
+                      {business.unp || "—"}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span
+                        className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                          STATUS_COLORS[business.verificationStatus]
+                        }`}
+                      >
+                        {STATUS_LABELS[business.verificationStatus]}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-gray-500">
+                      {business.submittedAt
+                        ? new Date(business.submittedAt).toLocaleDateString(
+                            "ru-RU"
+                          )
+                        : "—"}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap font-medium">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenBusiness(business.id);
+                        }}
+                        className="text-primary hover:text-primary/80"
+                      >
+                        Подробнее
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
 
       {/* Side Panel */}
       {openBusinessId && (

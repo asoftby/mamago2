@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, RefObject } from "react";
 import { Search, MapPin, Calendar, Users, X } from "lucide-react";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
@@ -39,7 +39,7 @@ export function DesktopSearchControl({
   const dateRef = useRef<HTMLButtonElement>(null);
   const ageRef = useRef<HTMLButtonElement>(null);
   
-  const { applied, actions, derived } = useDiscoveryFilters();
+  const { applied, draft, actions, derived, beginDraft } = useDiscoveryFilters();
   const { options: apiOptions, error } = useDiscoveryFilterOptions(citySlug);
   
   // Fallback options if API fails
@@ -49,10 +49,13 @@ export function DesktopSearchControl({
     categories: []
   };
   
+  // Use draft for display when panels are open, applied otherwise
+  const displayFilters = activeSegment ? draft : applied;
+  
   // Calculate positions for each dropdown
-  const locationPosition = useDropdownPosition(locationRef, activeSegment === "location");
-  const datePosition = useDropdownPosition(dateRef, activeSegment === "date");
-  const agePosition = useDropdownPosition(ageRef, activeSegment === "age");
+  const locationPosition = useDropdownPosition(locationRef as RefObject<HTMLElement | null>, activeSegment === "location");
+  const datePosition = useDropdownPosition(dateRef as RefObject<HTMLElement | null>, activeSegment === "date");
+  const agePosition = useDropdownPosition(ageRef as RefObject<HTMLElement | null>, activeSegment === "age");
   
   // Close panel when clicking outside
   useEffect(() => {
@@ -81,6 +84,22 @@ export function DesktopSearchControl({
     if (activeSegment) {
       document.addEventListener("mousedown", handleClickOutside);
       return () => document.removeEventListener("mousedown", handleClickOutside);
+    }
+  }, [activeSegment, onClose, onCollapse]);
+
+  // Close panels on scroll
+  useEffect(() => {
+    const handleScroll = () => {
+      if (activeSegment) {
+        setActiveSegment(null);
+        onClose?.();
+        onCollapse?.();
+      }
+    };
+
+    if (activeSegment) {
+      window.addEventListener("scroll", handleScroll, { passive: true });
+      return () => window.removeEventListener("scroll", handleScroll);
     }
   }, [activeSegment, onClose, onCollapse]);
 
@@ -126,27 +145,39 @@ export function DesktopSearchControl({
   // Build location display text
   const getLocationText = () => {
     if (searchText.trim()) return searchText;
-    if (applied.district) {
-      const district = safeApiOptions.districts.find(d => d.value === applied.district);
-      return district?.label || applied.district;
+    
+    const parts = [];
+    
+    // Always show city first
+    parts.push(getCityDisplayName(citySlug));
+    
+    // Add nearby if selected
+    if (displayFilters.nearby) {
+      parts.push("Поблизости");
     }
-    if (applied.metro) {
-      const metro = safeApiOptions.metros.find(m => m.value === applied.metro);
-      return metro?.label || applied.metro;
+    
+    // Add metro or district (mutually exclusive with nearby)
+    if (displayFilters.metro) {
+      const metro = safeApiOptions.metros.find(m => m.value === displayFilters.metro);
+      parts.push(metro?.label || displayFilters.metro);
+    } else if (displayFilters.district) {
+      const district = safeApiOptions.districts.find(d => d.value === displayFilters.district);
+      parts.push(district?.label || displayFilters.district);
     }
-    return getCityDisplayName(citySlug);
+    
+    return parts.join(" • ");
   };
 
   // Build date display text
   const getDateText = () => {
-    if (applied.whenPreset === "TODAY") return "Сегодня";
-    if (applied.whenPreset === "TOMORROW") return "Завтра";
-    if (applied.whenPreset === "WEEKEND") return "Выходные";
+    if (displayFilters.whenPreset === "TODAY") return "Сегодня";
+    if (displayFilters.whenPreset === "TOMORROW") return "Завтра";
+    if (displayFilters.whenPreset === "WEEKEND") return "Выходные";
     
-    if (applied.dateFrom) {
-      const fromDate = new Date(applied.dateFrom);
-      if (applied.dateTo && applied.dateFrom !== applied.dateTo) {
-        const toDate = new Date(applied.dateTo);
+    if (displayFilters.dateFrom) {
+      const fromDate = new Date(displayFilters.dateFrom);
+      if (displayFilters.dateTo && displayFilters.dateFrom !== displayFilters.dateTo) {
+        const toDate = new Date(displayFilters.dateTo);
         const fromDay = fromDate.getDate();
         const toDay = toDate.getDate();
         const fromMonth = fromDate.getMonth();
@@ -171,9 +202,9 @@ export function DesktopSearchControl({
 
   // Build age display text
   const getAgeText = () => {
-    if (applied.age.length === 0) return "С кем";
+    if (displayFilters.age.length === 0) return "С кем";
     
-    const ageLabels = applied.age.map(ageValue => {
+    const ageLabels = displayFilters.age.map(ageValue => {
       const group = AGE_GROUPS.find(g => g.value === ageValue);
       return group ? group.label : ageValue;
     });
@@ -184,10 +215,11 @@ export function DesktopSearchControl({
   };
 
   const handleSearch = () => {
+    // Apply draft filters to URL
+    actions.apply();
     // Close any open panels
     setActiveSegment(null);
-    // In a real app, this would trigger search/navigation
-    console.log("Search triggered with filters:", applied, "and text:", searchText);
+    console.log("Search triggered - filters applied to URL");
   };
 
   const handleClearAll = () => {
@@ -206,22 +238,52 @@ export function DesktopSearchControl({
     }
     if (e.key === "Escape") {
       setActiveSegment(null);
+      actions.close(); // Revert draft on escape
     }
   };
 
+  // Handle opening a segment - initialize draft
+  const handleSegmentClick = (segment: string) => {
+    if (activeSegment === segment) {
+      setActiveSegment(null);
+      actions.close(); // Revert draft when closing
+    } else {
+      beginDraft(segment as any);
+      setActiveSegment(segment);
+    }
+  };
+
+  // Clear handlers for each segment
+  const handleClearLocation = () => {
+    actions.setDraft({ nearby: false, metro: null, district: null });
+  };
+
+  const handleClearDate = () => {
+    actions.setDraft({ dateFrom: null, dateTo: null, whenPreset: null });
+  };
+
+  const handleClearAge = () => {
+    actions.setDraft({ age: [] });
+  };
+
+  // Check if filters are active
+  const hasLocationFilter = !!(displayFilters.nearby || displayFilters.metro || displayFilters.district);
+  const hasDateFilter = !!(displayFilters.dateFrom || displayFilters.dateTo || displayFilters.whenPreset);
+  const hasAgeFilter = !!(displayFilters.age && displayFilters.age.length > 0);
+
   return (
     <div ref={containerRef} className={cn("relative w-full flex items-center gap-3", className)}>
-      {/* Main Search Control - Transforms between full and compact */}
+      {/* Search Control - Renders appropriate state based on isCompact prop */}
       <div 
         data-search-container
         className={cn(
-          "relative bg-white rounded-full border border-gray-200 shadow-sm hover:shadow-md transition-all duration-150 ease-out flex-1",
-          isCompact && "cursor-pointer" // Make clickable when compact
+          "relative bg-white rounded-full border border-gray-200 shadow-sm hover:shadow-md flex-1 overflow-hidden",
+          "transition-[box-shadow] duration-300 ease-out",
+          isCompact && "cursor-pointer"
         )}
-        onClick={isCompact ? onExpand : undefined} // Expand when compact and clicked
+        onClick={isCompact ? onExpand : undefined}
       >
         {isCompact ? (
-          // COMPACT STATE: Simple summary button
           <CompactSearchButton 
             citySlug={citySlug}
             applied={applied}
@@ -229,28 +291,33 @@ export function DesktopSearchControl({
             currentIntent={currentIntent}
           />
         ) : (
-          // FULL STATE: Complete search form
           <FullSearchForm 
             activeSegment={activeSegment}
-            setActiveSegment={setActiveSegment}
+            onSegmentClick={handleSegmentClick}
             getLocationText={getLocationText}
             getDateText={getDateText}
             getAgeText={getAgeText}
             locationRef={locationRef}
             dateRef={dateRef}
             ageRef={ageRef}
+            onClearLocation={handleClearLocation}
+            onClearDate={handleClearDate}
+            onClearAge={handleClearAge}
+            hasLocationFilter={hasLocationFilter}
+            hasDateFilter={hasDateFilter}
+            hasAgeFilter={hasAgeFilter}
           />
         )}
       </div>
 
-      {/* Clear All Button - Only in full state */}
-      {!isCompact && derived.isDirty && (
+      {/* Go Button - Only in full state, on the right */}
+      {!isCompact && (
         <button
-          onClick={handleClearAll}
-          className="flex items-center justify-center w-10 h-10 bg-white hover:bg-gray-50 border border-gray-200 hover:border-gray-300 rounded-full transition-all duration-200 shadow-sm"
-          aria-label="Очистить все фильтры"
+          onClick={handleSearch}
+          className="flex items-center justify-center w-[64px] h-[64px] bg-[#EF8759] hover:bg-[#e67c4f] text-white font-semibold rounded-full transition-colors duration-200 shadow-sm flex-shrink-0"
+          aria-label="Применить фильтры"
         >
-          <X className="h-4 w-4 text-gray-400 hover:text-gray-600 transition-colors" />
+          Go
         </button>
       )}
 
@@ -264,8 +331,8 @@ export function DesktopSearchControl({
                 style={{
                   position: "absolute",
                   top: locationPosition.top + 8,
-                  left: locationPosition.containerLeft, // Use container left instead of segment left
-                  width: locationPosition.containerWidth, // Use full container width
+                  left: locationPosition.containerLeft,
+                  width: locationPosition.containerWidth,
                   zIndex: 9999,
                 }}
               >
@@ -273,8 +340,11 @@ export function DesktopSearchControl({
                   citySlug={citySlug}
                   searchText={searchText}
                   onSearchTextChange={setSearchText}
-                  onClose={() => setActiveSegment(null)}
-                  applied={applied}
+                  onClose={() => {
+                    setActiveSegment(null);
+                    actions.close(); // Revert draft when closing
+                  }}
+                  applied={draft}
                   actions={actions}
                   apiOptions={safeApiOptions}
                 />
@@ -289,14 +359,17 @@ export function DesktopSearchControl({
                 style={{
                   position: "absolute",
                   top: datePosition.top + 8,
-                  left: datePosition.containerLeft, // Use container left instead of segment left
-                  width: datePosition.containerWidth, // Use full container width
+                  left: datePosition.containerLeft,
+                  width: datePosition.containerWidth,
                   zIndex: 9999,
                 }}
               >
                 <DatePanel
-                  onClose={() => setActiveSegment(null)}
-                  applied={applied}
+                  onClose={() => {
+                    setActiveSegment(null);
+                    actions.close(); // Revert draft when closing
+                  }}
+                  applied={draft}
                   actions={actions}
                 />
               </div>
@@ -310,14 +383,17 @@ export function DesktopSearchControl({
                 style={{
                   position: "absolute",
                   top: agePosition.top + 8,
-                  left: agePosition.containerLeft, // Use container left instead of segment left
-                  width: agePosition.containerWidth, // Use full container width
+                  left: agePosition.containerLeft,
+                  width: agePosition.containerWidth,
                   zIndex: 9999,
                 }}
               >
                 <AgePanel
-                  onClose={() => setActiveSegment(null)}
-                  applied={applied}
+                  onClose={() => {
+                    setActiveSegment(null);
+                    actions.close(); // Revert draft when closing
+                  }}
+                  applied={draft}
                   actions={actions}
                 />
               </div>
@@ -336,6 +412,7 @@ export function DesktopSearchControl({
       )}
     </div>
   );
+}
 
 // Compact Search Button Component
 function CompactSearchButton({ 
@@ -359,7 +436,7 @@ function CompactSearchButton({
 
   // Get current intent config and icon
   const intentConfig = DISCOVERY_INTENT_CONFIG[currentIntent as keyof typeof DISCOVERY_INTENT_CONFIG];
-  const FallbackIcon = INTENT_ICONS[currentIntent as keyof typeof INTENT_ICONS];
+  const FallbackIcon = INTENT_ICONS[currentIntent as keyof typeof INTENT_ICONS] || IconCompass;
 
   // Format city display name
   const getCityDisplayName = (slug: string) => {
@@ -377,15 +454,21 @@ function CompactSearchButton({
   // Build summary text
   const parts = [];
   
-  // Location
-  if (applied.district) {
-    const district = safeApiOptions.districts.find((d: any) => d.value === applied.district);
-    parts.push(district?.label || applied.district);
-  } else if (applied.metro) {
+  // Location - Always show city first
+  parts.push(getCityDisplayName(citySlug));
+  
+  // Add nearby if selected
+  if (applied.nearby) {
+    parts.push("Поблизости");
+  }
+  
+  // Add metro or district (mutually exclusive with nearby)
+  if (applied.metro) {
     const metro = safeApiOptions.metros.find((m: any) => m.value === applied.metro);
     parts.push(metro?.label || applied.metro);
-  } else {
-    parts.push(getCityDisplayName(citySlug));
+  } else if (applied.district) {
+    const district = safeApiOptions.districts.find((d: any) => d.value === applied.district);
+    parts.push(district?.label || applied.district);
   }
 
   // Date
@@ -414,7 +497,7 @@ function CompactSearchButton({
 
   return (
     <div className="flex items-center gap-3 px-6 py-3 w-full">
-      {/* Intent Icon instead of Search - Увеличена на 30% от оригинала */}
+      {/* Intent Icon - Reduced by 35% */}
       <div className="flex-shrink-0">
         {intentConfig?.image ? (
           <Image 
@@ -438,85 +521,132 @@ function CompactSearchButton({
 // Full Search Form Component
 function FullSearchForm({
   activeSegment,
-  setActiveSegment,
+  onSegmentClick,
   getLocationText,
   getDateText,
   getAgeText,
   locationRef,
   dateRef,
-  ageRef
+  ageRef,
+  onClearLocation,
+  onClearDate,
+  onClearAge,
+  hasLocationFilter,
+  hasDateFilter,
+  hasAgeFilter,
 }: {
   activeSegment: string | null;
-  setActiveSegment: (segment: string | null) => void;
+  onSegmentClick: (segment: string) => void;
   getLocationText: () => string;
   getDateText: () => string;
   getAgeText: () => string;
-  locationRef: React.RefObject<HTMLButtonElement>;
-  dateRef: React.RefObject<HTMLButtonElement>;
-  ageRef: React.RefObject<HTMLButtonElement>;
+  locationRef: React.RefObject<HTMLButtonElement | null>;
+  dateRef: React.RefObject<HTMLButtonElement | null>;
+  ageRef: React.RefObject<HTMLButtonElement | null>;
+  onClearLocation: () => void;
+  onClearDate: () => void;
+  onClearAge: () => void;
+  hasLocationFilter: boolean;
+  hasDateFilter: boolean;
+  hasAgeFilter: boolean;
 }) {
   return (
     <div className="flex items-center">
-      {/* Location Segment */}
+      {/* Location Segment - Reduced by 35% */}
       <button
         ref={locationRef}
-        onClick={() => setActiveSegment(activeSegment === "location" ? null : "location")}
+        onClick={() => onSegmentClick("location")}
         className={cn(
-          "flex-1 flex items-center gap-3 px-6 py-4 rounded-l-full hover:bg-gray-50 transition-colors overflow-hidden",
+          "flex-1 flex items-center gap-3 px-6 py-4 rounded-l-full hover:bg-gray-50 transition-colors overflow-hidden relative group",
           activeSegment === "location" && "bg-gray-50"
         )}
       >
         <MapPin className="h-4 w-4 text-gray-400 flex-shrink-0" />
-        <div className="flex flex-col items-start min-w-0">
+        <div className="flex flex-col items-start min-w-0 flex-1">
           <span className="text-xs font-medium text-gray-900">Куда</span>
           <span className="text-sm text-gray-600 truncate w-full text-left">
             {getLocationText()}
           </span>
         </div>
+        {hasLocationFilter && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onClearLocation();
+            }}
+            className="flex items-center justify-center w-5 h-5 rounded-full bg-gray-200 hover:bg-gray-300 transition-colors flex-shrink-0 opacity-0 group-hover:opacity-100"
+            aria-label="Очистить местоположение"
+          >
+            <X className="h-3 w-3 text-gray-600" />
+          </button>
+        )}
       </button>
 
       {/* Divider */}
       <div className="w-px h-8 bg-gray-200" />
 
-      {/* Date Segment */}
+      {/* Date Segment - Reduced by 35% */}
       <button
         ref={dateRef}
-        onClick={() => setActiveSegment(activeSegment === "date" ? null : "date")}
+        onClick={() => onSegmentClick("date")}
         className={cn(
-          "flex-1 flex items-center gap-3 px-6 py-4 hover:bg-gray-50 transition-colors overflow-hidden",
+          "flex-1 flex items-center gap-3 px-6 py-4 hover:bg-gray-50 transition-colors overflow-hidden relative group",
           activeSegment === "date" && "bg-gray-50"
         )}
       >
         <Calendar className="h-4 w-4 text-gray-400 flex-shrink-0" />
-        <div className="flex flex-col items-start min-w-0">
+        <div className="flex flex-col items-start min-w-0 flex-1">
           <span className="text-xs font-medium text-gray-900">Когда</span>
           <span className="text-sm text-gray-600 truncate w-full text-left">
             {getDateText()}
           </span>
         </div>
+        {hasDateFilter && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onClearDate();
+            }}
+            className="flex items-center justify-center w-5 h-5 rounded-full bg-gray-200 hover:bg-gray-300 transition-colors flex-shrink-0 opacity-0 group-hover:opacity-100"
+            aria-label="Очистить дату"
+          >
+            <X className="h-3 w-3 text-gray-600" />
+          </button>
+        )}
       </button>
 
       {/* Divider */}
       <div className="w-px h-8 bg-gray-200" />
 
-      {/* Age Segment */}
+      {/* Age Segment - Reduced by 35% */}
       <button
         ref={ageRef}
-        onClick={() => setActiveSegment(activeSegment === "age" ? null : "age")}
+        onClick={() => onSegmentClick("age")}
         className={cn(
-          "flex-1 flex items-center gap-3 px-6 py-4 rounded-r-full hover:bg-gray-50 transition-colors overflow-hidden",
+          "flex-1 flex items-center gap-3 px-6 py-4 rounded-r-full hover:bg-gray-50 transition-colors overflow-hidden relative group",
           activeSegment === "age" && "bg-gray-50"
         )}
       >
         <Users className="h-4 w-4 text-gray-400 flex-shrink-0" />
-        <div className="flex flex-col items-start min-w-0">
+        <div className="flex flex-col items-start min-w-0 flex-1">
           <span className="text-xs font-medium text-gray-900">С кем</span>
           <span className="text-sm text-gray-600 truncate w-full text-left">
             {getAgeText()}
           </span>
         </div>
+        {hasAgeFilter && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onClearAge();
+            }}
+            className="flex items-center justify-center w-5 h-5 rounded-full bg-gray-200 hover:bg-gray-300 transition-colors flex-shrink-0 opacity-0 group-hover:opacity-100"
+            aria-label="Очистить возраст"
+          >
+            <X className="h-3 w-3 text-gray-600" />
+          </button>
+        )}
       </button>
     </div>
   );
-}
 }

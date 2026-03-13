@@ -83,6 +83,7 @@ model User {
   performedModerationActions    UserModerationAction[]    @relation("ModeratorUser")
   auditLogs                     AuditLog[]                @relation("AuditTarget")
   performedAudits               AuditLog[]                @relation("AuditActor")
+  uploadedMediaAssets           MediaAsset[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -595,6 +596,13 @@ model Business {
 
   owner            User                      @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
   verificationLogs BusinessVerificationLog[]
+  billingAccount   BillingAccount?
+
+  // Commercial layer relations
+  contracts              BusinessContract[]
+  placements             BusinessPlacement[]
+  servicePlacements      BusinessServicePlacement[]
+  commercialNotifications CommercialNotification[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -835,9 +843,9 @@ model PlaceRevision {
   // Relations
   place        Place                @relation(fields: [placeId], references: [id], onDelete: Cascade)
   openingHours OpeningHours?        @relation(fields: [openingHoursId], references: [id], onDelete: SetNull, name: "PlaceRevisionOpeningHours")
-  reviewedBy User?                @relation(fields: [reviewedByUserId], references: [id], onDelete: SetNull, name: "PlaceRevisionReviewer")
-  city       City?                @relation(fields: [cityId], references: [id], name: "PlaceRevisionCity")
-  images     PlaceRevisionImage[]
+  reviewedBy   User?                @relation(fields: [reviewedByUserId], references: [id], onDelete: SetNull, name: "PlaceRevisionReviewer")
+  city         City?                @relation(fields: [cityId], references: [id], name: "PlaceRevisionCity")
+  images       PlaceRevisionImage[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1077,14 +1085,14 @@ model ImprovementRequest {
 
 // User moderation action history
 model UserModerationAction {
-  id         String                    @id @default(cuid())
-  userId     String
-  actionType UserModerationActionType
-  reason     String // Required: why this action was taken
-  note       String? // Optional additional details
+  id          String                   @id @default(cuid())
+  userId      String
+  actionType  UserModerationActionType
+  reason      String // Required: why this action was taken
+  note        String? // Optional additional details
   createdById String
-  expiresAt  DateTime? // For SUSPEND actions
-  metadata   Json? // Flexible additional context
+  expiresAt   DateTime? // For SUSPEND actions
+  metadata    Json? // Flexible additional context
 
   user      User @relation("TargetUser", fields: [userId], references: [id], onDelete: Cascade)
   createdBy User @relation("ModeratorUser", fields: [createdById], references: [id])
@@ -1130,11 +1138,11 @@ model OpeningHours {
   timezone String           @default("Europe/Minsk")
   note     String? // Optional note (e.g., "Закрыто на ремонт до 15 марта")
 
-  rules           OpeningHoursRule[]
-  exceptions      OpeningHoursException[]
-  places          Place[]
-  offers          Offer[]
-  placeRevisions  PlaceRevision[]    @relation("PlaceRevisionOpeningHours")
+  rules          OpeningHoursRule[]
+  exceptions     OpeningHoursException[]
+  places         Place[]
+  offers         Offer[]
+  placeRevisions PlaceRevision[]         @relation("PlaceRevisionOpeningHours")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1265,4 +1273,621 @@ model Boost {
 
   @@index([offerId])
   @@index([startAt, endAt])
+}
+
+// ============================================================================
+// BILLING FOUNDATION
+// ============================================================================
+
+// Billing Account Status
+enum BillingAccountStatus {
+  ACTIVE // Normal operation
+  SUSPENDED // Temporarily disabled (e.g., payment issues)
+  CLOSED // Permanently closed
+}
+
+// Plan billing interval
+enum PlanInterval {
+  MONTH
+  YEAR
+}
+
+// Subscription status
+enum SubscriptionStatus {
+  ACTIVE // Currently active and paid
+  PAST_DUE // Payment failed, grace period
+  CANCELED // Canceled, will not renew
+  EXPIRED // Ended and not renewed
+  TRIALING // In trial period
+}
+
+// Transaction types (ledger-based)
+enum BillingTransactionType {
+  SUBSCRIPTION_CHARGE // Initial subscription charge
+  SUBSCRIPTION_RENEWAL // Recurring subscription renewal
+  DEPOSIT_TOPUP // Manual deposit addition
+  LEAD_CHARGE // Charge for a lead/inquiry
+  PROMOTION_CHARGE // Charge for promotion/boost
+  FEATURE_CHARGE // Charge for additional feature
+  REFUND // Money returned to customer
+  BONUS_CREDIT // Promotional credit
+  MANUAL_ADJUSTMENT // Admin manual adjustment
+  CORRECTION // Error correction
+}
+
+// Transaction status
+enum BillingTransactionStatus {
+  PENDING // Transaction initiated
+  SUCCEEDED // Successfully completed
+  FAILED // Failed to process
+  CANCELED // Canceled before completion
+  REVERSED // Reversed after completion
+}
+
+// Reference type for transactions
+enum BillingReferenceType {
+  NONE // No specific reference
+  SUBSCRIPTION // Related to subscription
+  PLAN // Related to plan
+  LEAD // Related to lead/inquiry
+  PROMOTION // Related to promotion
+  OFFER // Related to offer
+  EVENT // Related to event
+  PLACE // Related to place
+  REQUEST // Related to improvement request
+  MANUAL // Manual admin action
+}
+
+// Payment method type
+enum PaymentMethodType {
+  CARD // Credit/debit card
+  BANK_TRANSFER // Bank transfer
+  CASH // Cash payment
+  MANUAL // Manual/admin entry
+}
+
+// Billing Account (one per Business)
+model BillingAccount {
+  id         String               @id @default(cuid())
+  businessId String               @unique
+  status     BillingAccountStatus @default(ACTIVE)
+
+  // Deposit balance (snapshot field for quick access)
+  // Source of truth is BillingTransaction ledger
+  depositBalance Decimal @default(0) @db.Decimal(10, 2)
+
+  // Currency (BYN for MVP)
+  currency String @default("BYN")
+
+  // Thresholds and limits
+  lowBalanceThreshold Decimal @default(20) @db.Decimal(10, 2)
+  creditLimit         Decimal @default(0) @db.Decimal(10, 2)
+
+  // Status tracking
+  suspendedAt     DateTime?
+  suspendedReason String?
+  closedAt        DateTime?
+  closedReason    String?
+
+  // Relations
+  business       Business             @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  subscriptions  Subscription[]
+  paymentMethods PaymentMethod[]
+  transactions   BillingTransaction[]
+  disputes       BillingDispute[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([businessId])
+  @@index([status])
+  @@index([depositBalance])
+}
+
+// Plan (subscription tier)
+model Plan {
+  id          String  @id @default(cuid())
+  code        String  @unique // e.g., "business_basic", "business_pro"
+  name        String // Display name
+  description String?
+
+  // Pricing
+  price    Decimal      @db.Decimal(10, 2)
+  currency String       @default("BYN")
+  interval PlanInterval @default(MONTH)
+
+  // Features and limits
+  maxPlaces        Int     @default(0) // 0 = unlimited
+  maxOffers        Int     @default(0)
+  maxEvents        Int     @default(0)
+  storiesPerMonth  Int     @default(0)
+  hasPriorityBoost Boolean @default(false)
+  hasLeadAccess    Boolean @default(false)
+  hasAnalytics     Boolean @default(false)
+
+  // Status
+  isActive  Boolean @default(true)
+  isVisible Boolean @default(true) // Show in public pricing
+
+  // Relations
+  subscriptions Subscription[]
+  placements    BusinessPlacement[] // Commercial placements using this plan
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([code])
+  @@index([isActive, isVisible])
+}
+
+// Subscription (business subscription to a plan)
+model Subscription {
+  id               String @id @default(cuid())
+  billingAccountId String
+  planId           String
+
+  status SubscriptionStatus @default(ACTIVE)
+
+  // Billing cycle
+  currentPeriodStart DateTime
+  currentPeriodEnd   DateTime
+
+  // Renewal settings
+  autoRenew         Boolean   @default(true)
+  cancelAtPeriodEnd Boolean   @default(false)
+  canceledAt        DateTime?
+  cancelReason      String?
+
+  // Trial
+  trialStart DateTime?
+  trialEnd   DateTime?
+
+  // Metadata
+  metadata Json? // Flexible field for additional data
+
+  // Relations
+  billingAccount BillingAccount       @relation(fields: [billingAccountId], references: [id], onDelete: Cascade)
+  plan           Plan                 @relation(fields: [planId], references: [id], onDelete: Restrict)
+  transactions   BillingTransaction[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([billingAccountId])
+  @@index([planId])
+  @@index([status])
+  @@index([currentPeriodEnd])
+}
+
+// Payment Method
+model PaymentMethod {
+  id               String            @id @default(cuid())
+  billingAccountId String
+  type             PaymentMethodType @default(CARD)
+
+  // Card details (if type = CARD)
+  cardBrand       String? // e.g., "Visa", "Mastercard"
+  cardLast4       String?
+  cardExpiryMonth Int?
+  cardExpiryYear  Int?
+
+  // Bank transfer details (if type = BANK_TRANSFER)
+  bankName         String?
+  bankAccountLast4 String?
+
+  // Status
+  isDefault Boolean @default(false)
+  isActive  Boolean @default(true)
+
+  // External provider reference (for future Stripe integration)
+  providerType String? // e.g., "stripe", "bepaid"
+  providerId   String? // External ID
+
+  // Relations
+  billingAccount BillingAccount       @relation(fields: [billingAccountId], references: [id], onDelete: Cascade)
+  transactions   BillingTransaction[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([billingAccountId])
+  @@index([isDefault, isActive])
+}
+
+// Billing Transaction (ledger-based, source of truth)
+model BillingTransaction {
+  id               String                   @id @default(cuid())
+  billingAccountId String
+  type             BillingTransactionType
+  status           BillingTransactionStatus @default(PENDING)
+
+  // Amount (positive = credit, negative = debit)
+  amount   Decimal @db.Decimal(10, 2)
+  currency String  @default("BYN")
+
+  // Description
+  description String
+
+  // When transaction occurred (can differ from createdAt for backdated entries)
+  occurredAt DateTime @default(now())
+
+  // Reference to related entity
+  referenceType BillingReferenceType @default(NONE)
+  referenceId   String?
+
+  // Parent transaction (for refunds, corrections, reversals)
+  parentTransactionId String?
+
+  // Payment method used
+  paymentMethodId String?
+
+  // Subscription reference (if applicable)
+  subscriptionId String?
+
+  // Metadata snapshot (preserve context even if related entities change)
+  metadata Json?
+
+  // Failure details
+  failureReason String?
+  failureCode   String?
+
+  // Relations
+  billingAccount    BillingAccount       @relation(fields: [billingAccountId], references: [id], onDelete: Cascade)
+  paymentMethod     PaymentMethod?       @relation(fields: [paymentMethodId], references: [id], onDelete: SetNull)
+  subscription      Subscription?        @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+  parentTransaction BillingTransaction?  @relation("TransactionHierarchy", fields: [parentTransactionId], references: [id], onDelete: SetNull)
+  childTransactions BillingTransaction[] @relation("TransactionHierarchy")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([billingAccountId, occurredAt])
+  @@index([type])
+  @@index([status])
+  @@index([referenceType, referenceId])
+  @@index([parentTransactionId])
+  @@index([subscriptionId])
+}
+
+// Billing Dispute (foundation for future dispute management)
+model BillingDispute {
+  id               String  @id @default(cuid())
+  billingAccountId String
+  transactionId    String?
+
+  reason      String
+  description String?
+  status      String  @default("OPEN") // OPEN, INVESTIGATING, RESOLVED, CLOSED
+
+  // Resolution
+  resolvedAt       DateTime?
+  resolution       String?
+  resolvedByUserId String?
+
+  // Relations
+  billingAccount BillingAccount @relation(fields: [billingAccountId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([billingAccountId])
+  @@index([status])
+}
+
+// ============================================================================
+// COMMERCIAL LAYER
+// ============================================================================
+// Separate domain layer for B2B commercial control:
+// - Contracts (legal foundation)
+// - Placements (commercial access rights)
+// - Service placements (time-limited features)
+// - Commercial notifications (expiration alerts)
+//
+// This is NOT part of billing. This is commercial/legal layer.
+
+// Contract status
+enum ContractStatus {
+  DRAFT // Contract being prepared
+  ACTIVE // Contract in effect
+  EXPIRING // Contract ending soon
+  EXPIRED // Contract ended
+  TERMINATED // Contract terminated early
+}
+
+// Contract type
+enum ContractType {
+  MASTER // Main contract
+  ADDENDUM // Addition to existing contract
+  OFFER // Commercial offer
+  APPENDIX // Appendix to contract
+}
+
+// Placement status
+enum PlacementStatus {
+  ACTIVE // Placement active
+  EXPIRING // Ending soon
+  EXPIRED // Ended
+  PAUSED // Temporarily paused
+  CANCELED // Canceled
+}
+
+// Placement source
+enum PlacementSourceType {
+  SUBSCRIPTION // From billing subscription
+  MANUAL // Manually granted
+  PROMO_PACKAGE // From promo package
+  BONUS // Bonus placement
+}
+
+// Service entity type
+enum ServiceEntityType {
+  PLACE // Place promotion
+  EVENT // Event promotion
+  OFFER // Offer promotion
+  STORY // Story placement
+  PROMO // General promo
+}
+
+// Commercial notification type
+enum CommercialNotificationType {
+  CONTRACT_EXPIRING // Contract ending soon
+  CONTRACT_EXPIRED // Contract ended
+  PLACEMENT_EXPIRING // Placement ending soon
+  PLACEMENT_EXPIRED // Placement ended
+  SERVICE_EXPIRING // Service ending soon
+  SERVICE_EXPIRED // Service ended
+}
+
+// Commercial notification status
+enum CommercialNotificationStatus {
+  PENDING // Not sent yet
+  SENT // Sent to business
+  READ // Read by business
+  DISMISSED // Dismissed by business
+}
+
+// Business Contract (legal foundation)
+model BusinessContract {
+  id             String         @id @default(cuid())
+  businessId     String
+  contractNumber String         @unique
+  type           ContractType
+  status         ContractStatus @default(DRAFT)
+
+  // Contract dates
+  signedAt DateTime?
+  startsAt DateTime
+  endsAt   DateTime
+
+  // Renewal
+  autoRenew     Boolean @default(false)
+  renewalTerms  String? // Terms for renewal
+  renewalPeriod Int? // Days for renewal period
+
+  // Document
+  documentUrl String?
+
+  // Notes
+  notes String?
+
+  // Relations
+  business                Business                   @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  commercialNotifications CommercialNotification[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([businessId])
+  @@index([status])
+  @@index([endsAt])
+  @@index([status, endsAt])
+}
+
+// Business Placement (commercial access rights)
+model BusinessPlacement {
+  id         String              @id @default(cuid())
+  businessId String
+  sourceType PlacementSourceType
+  status     PlacementStatus     @default(ACTIVE)
+
+  // Plan reference (if from subscription)
+  planId String?
+
+  // Placement period
+  startsAt   DateTime
+  endsAt     DateTime
+  graceUntil DateTime? // Grace period after expiration
+
+  // Notes
+  notes String?
+
+  // Relations
+  business                Business                   @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  plan                    Plan?                      @relation(fields: [planId], references: [id], onDelete: SetNull)
+  commercialNotifications CommercialNotification[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([businessId])
+  @@index([status])
+  @@index([endsAt])
+  @@index([businessId, status])
+}
+
+// Business Service Placement (time-limited commercial features)
+model BusinessServicePlacement {
+  id         String            @id @default(cuid())
+  businessId String
+  entityType ServiceEntityType
+  entityId   String? // ID of Place/Event/Offer/etc
+
+  status PlacementStatus @default(ACTIVE)
+
+  // Service period
+  startsAt DateTime
+  endsAt   DateTime
+
+  // Notes
+  notes String?
+
+  // Relations
+  business                Business                   @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  commercialNotifications CommercialNotification[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([businessId])
+  @@index([entityType, entityId])
+  @@index([endsAt])
+  @@index([status])
+  @@index([businessId, status])
+}
+
+// Commercial Notification (expiration alerts)
+model CommercialNotification {
+  id         String                        @id @default(cuid())
+  businessId String
+  type       CommercialNotificationType
+  status     CommercialNotificationStatus @default(PENDING)
+
+  // Content
+  title   String
+  message String
+
+  // Related entities
+  relatedContractId          String?
+  relatedPlacementId         String?
+  relatedServicePlacementId  String?
+
+  // Scheduling
+  scheduledFor DateTime
+  sentAt       DateTime?
+  readAt       DateTime?
+  dismissedAt  DateTime?
+
+  // Relations
+  business                Business                    @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  relatedContract         BusinessContract?           @relation(fields: [relatedContractId], references: [id], onDelete: SetNull)
+  relatedPlacement        BusinessPlacement?          @relation(fields: [relatedPlacementId], references: [id], onDelete: SetNull)
+  relatedServicePlacement BusinessServicePlacement?   @relation(fields: [relatedServicePlacementId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  @@index([businessId])
+  @@index([type])
+  @@index([scheduledFor])
+  @@index([status])
+  @@index([businessId, status])
+}
+
+// ============================================================================
+// MEDIA LIBRARY
+// ============================================================================
+
+enum MediaAssetKind {
+  IMAGE
+  VIDEO
+  DOCUMENT
+}
+
+enum MediaAssetStatus {
+  ACTIVE
+  ORPHANED
+  ARCHIVED
+  DELETED
+  BLOCKED
+}
+
+enum MediaSourceType {
+  ADMIN_UPLOAD
+  BUSINESS_UPLOAD
+  USER_UPLOAD
+  SYSTEM_GENERATED
+  MIGRATED
+}
+
+enum MediaEntityType {
+  PLACE
+  EVENT
+  OFFER
+  ROUTE
+  ARTICLE
+  USER
+  STORY
+  BUSINESS
+  OTHER
+}
+
+// Media Asset - central registry for all media files
+model MediaAsset {
+  id String @id @default(cuid())
+
+  // Classification
+  kind   MediaAssetKind
+  status MediaAssetStatus @default(ACTIVE)
+
+  // File info
+  filename     String
+  originalName String
+  mimeType     String
+  extension    String
+  sizeBytes    Int
+
+  // Media dimensions
+  width        Int?
+  height       Int?
+  durationSec  Float?
+
+  // Storage
+  storageKey String  @unique
+  publicUrl  String?
+  checksum   String?
+
+  // Metadata
+  alt     String?
+  title   String?
+  caption String?
+
+  // Source tracking
+  sourceType    MediaSourceType
+  uploadedById  String?
+  uploadedBy    User?           @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+
+  // Relations
+  usages MediaUsage[]
+
+  // Timestamps
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([kind])
+  @@index([status])
+  @@index([sourceType])
+  @@index([createdAt])
+  @@index([uploadedById])
+  @@index([checksum])
+}
+
+// Media Usage - tracks where media is used
+model MediaUsage {
+  id String @id @default(cuid())
+
+  // Media reference
+  mediaId String
+  media   MediaAsset @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+
+  // Entity reference
+  entityType MediaEntityType
+  entityId   String
+  field      String // e.g., "cover", "gallery", "avatar", "logo"
+
+  // Timestamps
+  createdAt DateTime @default(now())
+
+  @@index([mediaId])
+  @@index([entityType, entityId])
+  @@index([entityType, entityId, field])
 }

@@ -17,13 +17,13 @@ export function PlacesFilters({ cities }: { cities: { id: string; name: string }
   };
 
   return (
-    <div className="mb-6 flex gap-4">
-      <div>
+    <div className="flex flex-col md:flex-row gap-3">
+      <div className="flex-1">
         <label className="block text-sm font-medium text-gray-700 mb-1">
           Status
         </label>
         <select
-          className="border border-gray-300 rounded-md px-3 py-2 text-sm"
+          className="w-full h-10 border border-gray-300 rounded-md px-3 text-sm"
           value={searchParams.get("status") || ""}
           onChange={(e) => handleFilterChange("status", e.target.value)}
         >
@@ -36,12 +36,12 @@ export function PlacesFilters({ cities }: { cities: { id: string; name: string }
         </select>
       </div>
 
-      <div>
+      <div className="flex-1">
         <label className="block text-sm font-medium text-gray-700 mb-1">
           City
         </label>
         <select
-          className="border border-gray-300 rounded-md px-3 py-2 text-sm"
+          className="w-full h-10 border border-gray-300 rounded-md px-3 text-sm"
           value={searchParams.get("cityId") || ""}
           onChange={(e) => handleFilterChange("cityId", e.target.value)}
         >

@@ -11,10 +11,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
-import { ContentStatus, PlaceKind, LocationSource } from "@prisma/client";
+import { ContentStatus, PlaceKind, LocationSource, MediaEntityType } from "@prisma/client";
 import { updatePlaceLocation } from "@/services/place/placeLocation.service";
 import { extractStreetName } from "@/lib/slug/slugUtils";
 import { generatePlaceSlug } from "@/lib/slug/placeSlugService";
+import { attachMediaToEntity } from "@/lib/media/mediaRegistry";
 
 export async function POST(request: NextRequest) {
   try {
@@ -151,7 +152,7 @@ export async function POST(request: NextRequest) {
           tempMedia.map(async (media) => {
             const kind = media.kind === "PLACE_LOGO" ? "LOGO" : "GALLERY";
             
-            return prisma.placeImage.create({
+            const placeImage = await prisma.placeImage.create({
               data: {
                 placeId: place.id,
                 kind,
@@ -162,6 +163,26 @@ export async function POST(request: NextRequest) {
                 sortOrder: media.sortOrder,
               },
             });
+
+            // Register usage in media library
+            try {
+              const mediaAsset = await prisma.mediaAsset.findUnique({
+                where: { storageKey: media.url },
+              });
+
+              if (mediaAsset) {
+                await attachMediaToEntity({
+                  mediaId: mediaAsset.id,
+                  entityType: MediaEntityType.PLACE,
+                  entityId: place.id,
+                  field: kind === "LOGO" ? "logo" : "gallery",
+                });
+              }
+            } catch (mediaError) {
+              console.error("Failed to register media usage:", mediaError);
+            }
+
+            return placeImage;
           })
         );
 

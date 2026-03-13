@@ -3,6 +3,7 @@
 import { useRef, useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { IconCompass, IconPalette, IconParty, IconMap } from "@/components/ui/icons";
 import { Intent } from "@/lib/intent";
@@ -18,7 +19,7 @@ const TAB_ICONS = {
 };
 
 interface DiscoveryIntentTabsProps {
-  city: string;
+  city: string | null;
   currentIntent: Intent;
   className?: string;
 }
@@ -30,10 +31,63 @@ export function DiscoveryIntentTabs({
 }: DiscoveryIntentTabsProps) {
   const [indicatorStyle, setIndicatorStyle] = useState<{ left: number; width: number }>({ left: 0, width: 0 });
   const tabsRef = useRef<(HTMLAnchorElement | null)[]>([]);
+  const searchParams = useSearchParams();
+  const [isClient, setIsClient] = useState(false);
+
+  // Detect client-side mount
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   // Find active index based on current intent
   const activeIndex = DISCOVERY_INTENT_ITEMS.findIndex(item => item.id === currentIntent);
   const safeActiveIndex = activeIndex === -1 ? 0 : activeIndex;
+  
+  // Build URL with filters preserved (same logic as mobile)
+  const buildUrlWithFilters = (intentId: string) => {
+    // City is guaranteed to be non-null here due to early return
+    if (!city) return '#';
+    
+    const intentConfig = DISCOVERY_INTENT_ITEMS.find(item => item.id === intentId);
+    if (!intentConfig) return '#';
+    
+    const baseUrl = intentConfig.href(city);
+    const currentFilters = searchParams.toString();
+    
+    // Only access localStorage on client side
+    if (!isClient) {
+      // Server-side: return clean URLs
+      return baseUrl;
+    }
+    
+    // Save current filters to localStorage if we're leaving 'kuda' intent
+    if (currentIntent === 'kuda' && intentId !== 'kuda' && currentFilters) {
+      try {
+        localStorage.setItem(`filters_kuda_${city}`, currentFilters);
+      } catch (e) {
+        // Ignore localStorage errors
+      }
+    }
+    
+    // If going TO 'kuda', restore saved filters
+    if (intentId === 'kuda') {
+      try {
+        const savedFilters = localStorage.getItem(`filters_kuda_${city}`);
+        if (savedFilters) {
+          return `${baseUrl}?${savedFilters}`;
+        }
+      } catch (e) {
+        // Ignore localStorage errors
+      }
+      // If no saved filters, use current filters if we're already on kuda
+      if (currentIntent === 'kuda' && currentFilters) {
+        return `${baseUrl}?${currentFilters}`;
+      }
+    }
+    
+    // For other intents, return clean URL without filters
+    return baseUrl;
+  };
 
   useEffect(() => {
     const currentTab = tabsRef.current[safeActiveIndex];
@@ -52,6 +106,11 @@ export function DiscoveryIntentTabs({
     }
   }, [safeActiveIndex, currentIntent]);
 
+  // If no city, don't render tabs (after all hooks)
+  if (!city) {
+    return null;
+  }
+
   return (
     <div className={cn("relative w-full bg-transparent z-10", className)}>
       <div className="flex w-full justify-center overflow-x-auto no-scrollbar relative pointer-events-auto">
@@ -62,7 +121,7 @@ export function DiscoveryIntentTabs({
           return (
             <Link
               key={intentConfig.id}
-              href={intentConfig.href(city)}
+              href={buildUrlWithFilters(intentConfig.id)}
               ref={(el) => { tabsRef.current[index] = el; }}
               scroll={false} // Prevent full page scroll reset
               className={cn(

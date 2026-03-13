@@ -1,0 +1,42 @@
+"use client";
+
+import Link from "next/link";
+import { cn } from "@/lib/utils";
+
+interface SidebarSubItemProps {
+  href: string;
+  label: string;
+  isActive: boolean;
+  onClick?: () => void;
+  count?: number;
+}
+
+export function SidebarSubItem({ href, label, isActive, onClick, count }: SidebarSubItemProps) {
+  const handleClick = (e: React.MouseEvent) => {
+    // Call onClick immediately before navigation
+    if (onClick) {
+      onClick();
+    }
+  };
+
+  return (
+    <Link
+      href={href}
+      onClick={handleClick}
+      className={cn(
+        "flex items-center justify-between px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-150",
+        "ml-11",
+        isActive
+          ? "bg-blue-50 text-blue-700"
+          : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+      )}
+    >
+      <span>{label}</span>
+      {count !== undefined && count > 0 && (
+        <span className="flex items-center justify-center min-w-[20px] h-5 px-1.5 bg-red-500 text-white text-xs font-semibold rounded-full">
+          {count > 99 ? '99+' : count}
+        </span>
+      )}
+    </Link>
+  );
+}

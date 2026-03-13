@@ -82,31 +82,31 @@ function PlacesTable({ places }: { places: Awaited<ReturnType<typeof getPlaces>>
   }
 
   return (
-    <div className="border rounded-lg overflow-hidden">
-      <table className="w-full">
-        <thead className="bg-gray-50 border-b">
+    <div className="border border-gray-200 rounded-lg overflow-hidden">
+      <table className="w-full text-sm">
+        <thead className="bg-gray-50 border-b border-gray-200">
           <tr>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th className="px-4 py-3 text-left font-medium text-gray-700">
               Name
             </th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th className="px-4 py-3 text-left font-medium text-gray-700">
               City
             </th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th className="px-4 py-3 text-left font-medium text-gray-700">
               Business
             </th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th className="px-4 py-3 text-left font-medium text-gray-700">
               Status
             </th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th className="px-4 py-3 text-left font-medium text-gray-700">
               Created
             </th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th className="px-4 py-3 text-left font-medium text-gray-700">
               Actions
             </th>
           </tr>
         </thead>
-        <tbody className="bg-white divide-y divide-gray-200">
+        <tbody className="divide-y divide-gray-200">
           {places.map((place) => {
             const statusConfig = STATUS_CONFIG[place.status] || STATUS_CONFIG.DRAFT;
             
@@ -118,10 +118,10 @@ function PlacesTable({ places }: { places: Awaited<ReturnType<typeof getPlaces>>
             
             return (
               <tr key={place.id} className="hover:bg-gray-50">
-                <td className="px-4 py-3 text-sm font-medium text-gray-900">
+                <td className="px-4 py-3 font-medium text-gray-900">
                   {place.title}
                 </td>
-                <td className="px-4 py-3 text-sm text-gray-600">
+                <td className="px-4 py-3 text-gray-600">
                   <div>
                     <div className="font-medium">{place.city?.name || "-"}</div>
                     {streetAddress && (
@@ -129,18 +129,18 @@ function PlacesTable({ places }: { places: Awaited<ReturnType<typeof getPlaces>>
                     )}
                   </div>
                 </td>
-                <td className="px-4 py-3 text-sm text-gray-600">
+                <td className="px-4 py-3 text-gray-600">
                   {place.owner.business?.name || place.owner.email}
                 </td>
-                <td className="px-4 py-3 text-sm">
+                <td className="px-4 py-3">
                   <Badge variant={statusConfig.variant} className={statusConfig.className}>
                     {statusConfig.label}
                   </Badge>
                 </td>
-                <td className="px-4 py-3 text-sm text-gray-600">
+                <td className="px-4 py-3 text-gray-600">
                   {formatDistanceToNow(place.createdAt, { addSuffix: true, locale: ru })}
                 </td>
-                <td className="px-4 py-3 text-sm">
+                <td className="px-4 py-3">
                   <Link
                     href={`/admin/moderation/places/${place.id}`}
                     className="text-blue-600 hover:text-blue-800 font-medium"
@@ -170,16 +170,21 @@ export default async function PlacesListPage({
   ]);
 
   return (
-    <div className="max-w-7xl">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Places</h1>
-        <p className="text-gray-600 mt-1">
-          All places submitted by businesses
-        </p>
+    <div className="p-6 md:p-4 space-y-6">
+      {/* AdminPageHeader */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl md:text-xl font-bold">Places</h1>
+          <p className="text-sm text-gray-600 mt-1">
+            All places submitted by businesses
+          </p>
+        </div>
       </div>
 
+      {/* AdminPageToolbar */}
       <PlacesFilters cities={cities} />
 
+      {/* AdminPageContent */}
       <Suspense fallback={<div>Loading...</div>}>
         <PlacesTable places={places} />
       </Suspense>

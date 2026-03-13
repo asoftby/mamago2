@@ -108,15 +108,21 @@ export default function SignalsPage() {
   };
 
   return (
-    <div className="space-y-8 max-w-5xl mx-auto p-6">
+    <div className="p-6 md:p-4 space-y-6">
+      {/* AdminPageHeader */}
       <div className="flex items-center justify-between">
-        <H1>Taxonomy: Signals</H1>
+        <div>
+          <h1 className="text-2xl md:text-xl font-bold text-gray-900">Taxonomy: Signals</h1>
+        </div>
       </div>
+
+      {/* AdminPageContent */}
+      <div className="space-y-6">
 
       {/* Create New Signal */}
       <Card>
         <CardHeader>
-          <CardTitle>Create New Signal</CardTitle>
+          <CardTitle className="text-base font-semibold">Create New Signal</CardTitle>
         </CardHeader>
         <CardContent className="flex gap-4 items-end">
           <div className="grid gap-2 flex-1">
@@ -143,9 +149,9 @@ export default function SignalsPage() {
       </Card>
 
       {/* Signals List */}
-      <div className="grid gap-6">
+      <div className="space-y-4">
         {loading ? (
-          <div>Loading...</div>
+          <div className="text-sm text-gray-600">Loading...</div>
         ) : (
           signals.map((signal) => (
             <SignalCard
@@ -159,6 +165,7 @@ export default function SignalsPage() {
             />
           ))
         )}
+      </div>
       </div>
     </div>
   );
@@ -201,7 +208,7 @@ function SignalCard({
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-xl font-bold font-mono text-muted-foreground">
+        <CardTitle className="text-base font-semibold font-mono text-gray-600">
           {signal.slug}
         </CardTitle>
         <div className="flex items-center gap-2">
@@ -241,8 +248,8 @@ function SignalCard({
         </div>
 
         {/* Options Section */}
-        <div className="border rounded-lg p-4 bg-muted/30 space-y-4">
-          <H3 className="text-sm font-semibold uppercase text-muted-foreground">Options</H3>
+        <div className="border border-gray-200 rounded-lg p-4 bg-gray-50 space-y-4">
+          <h3 className="text-sm font-semibold text-gray-700">Options</h3>
           
           <div className="space-y-2">
             {signal.options.map((opt) => (

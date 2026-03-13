@@ -1,13 +1,36 @@
 /**
  * POST /api/upload
- * Upload image to storage (local filesystem for now, can be replaced with S3/R2)
+ * Upload image to storage with strict processing pipeline
+ * 
+ * Features:
+ * - Accepts JPEG, PNG, WebP, HEIC, HEIF
+ * - Converts all to WebP
+ * - Generates responsive sizes
+ * - Auto-orients based on EXIF
+ * - Automatically registers in MediaAsset registry
  */
 
 import { NextRequest, NextResponse } from "next/server";
+
+// Force Node.js runtime for sharp support
+export const runtime = 'nodejs';
+
+// Set max duration for processing (30 seconds)
+export const maxDuration = 30;
+
+// Note: Body size limit is configured in next.config.ts
+// For App Router, use: experimental.serverActions.bodySizeLimit
 import { getCurrentUser } from "@/lib/auth/server";
 import { writeFile, mkdir } from "fs/promises";
 import { join } from "path";
 import { existsSync } from "fs";
+import { registerUploadedMedia } from "@/lib/media/mediaRegistry";
+import { MediaSourceType } from "@prisma/client";
+import {
+  processImage,
+  generateProcessedFilename,
+  DEFAULT_IMAGE_CONFIG,
+} from "@/lib/media/imageProcessor";
 
 export async function POST(req: NextRequest) {
   try {
@@ -24,65 +47,131 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "No file provided" }, { status: 400 });
     }
 
-    // Validate file type
-    const allowedTypes = ["image/jpeg", "image/png", "image/webp", "image/avif"];
-    if (!allowedTypes.includes(file.type)) {
+    // STEP 1: Log incoming file details
+    console.log("📥 [UPLOAD] Incoming file:", {
+      name: file.name,
+      type: file.type,
+      size: file.size,
+      sizeKB: (file.size / 1024).toFixed(2) + " KB",
+    });
+
+    // Convert file to buffer
+    const bytes = await file.arrayBuffer();
+    const buffer = Buffer.from(bytes);
+    
+    // STEP 2: Log buffer conversion and detect actual format
+    // Check magic bytes for HEIC/HEIF (starts with "ftyp")
+    const magicBytes = buffer.slice(4, 8).toString('ascii');
+    const isLikelyHEIC = magicBytes === 'ftyp' || 
+                         buffer.slice(8, 12).toString('ascii') === 'heic' ||
+                         buffer.slice(8, 12).toString('ascii') === 'mif1';
+    
+    console.log("📦 [UPLOAD] Buffer created:", {
+      bufferSize: buffer.length,
+      matches: buffer.length === file.size,
+      magicBytes: magicBytes,
+      isLikelyHEIC: isLikelyHEIC,
+    });
+    
+    // Override MIME type if we detect HEIC by magic bytes
+    let actualMimeType = file.type;
+    if (isLikelyHEIC && !file.type.includes('heic') && !file.type.includes('heif')) {
+      console.log("⚠️  [UPLOAD] Detected HEIC by magic bytes, overriding MIME type");
+      actualMimeType = 'image/heic';
+    }
+
+    // STEP 3: Process image through strict pipeline
+    console.log("🔄 [UPLOAD] Starting image processing with MIME type:", actualMimeType);
+    let processedImageSet;
+    try {
+      processedImageSet = await processImage(
+        buffer,
+        actualMimeType,
+        DEFAULT_IMAGE_CONFIG
+      );
+      console.log("✅ [UPLOAD] Image processed successfully:", {
+        originalFormat: processedImageSet.originalMimeType,
+        masterSize: processedImageSet.master.size,
+        masterDimensions: `${processedImageSet.master.width}x${processedImageSet.master.height}`,
+        responsiveSizes: Object.keys(processedImageSet.sizes),
+      });
+    } catch (processingError: any) {
+      console.error("❌ [UPLOAD] Processing failed:", {
+        error: processingError.message,
+        stack: processingError.stack,
+        fileType: file.type,
+        fileName: file.name,
+      });
       return NextResponse.json(
-        { error: "Invalid file type. Allowed: JPEG, PNG, WebP, AVIF" },
+        { error: processingError.message },
         { status: 400 }
       );
     }
 
-    // Validate file size (10MB max)
-    const maxSize = 10 * 1024 * 1024; // 10MB
-    if (file.size > maxSize) {
-      return NextResponse.json(
-        { error: "File too large. Max size: 10MB" },
-        { status: 400 }
-      );
-    }
-
-    // Generate unique filename
-    const timestamp = Date.now();
-    const randomStr = Math.random().toString(36).substring(2, 15);
-    const extension = file.name.split(".").pop() || "webp";
-    const filename = `${timestamp}-${randomStr}.${extension}`;
-
-    // Create upload directory if it doesn't exist
+    // Create upload directory
     const uploadDir = join(process.cwd(), "public", "uploads");
     if (!existsSync(uploadDir)) {
       await mkdir(uploadDir, { recursive: true });
     }
 
-    // Save file
-    const bytes = await file.arrayBuffer();
-    const buffer = Buffer.from(bytes);
-    const filepath = join(uploadDir, filename);
-    await writeFile(filepath, buffer);
+    // Save master image (WebP)
+    const masterFilename = generateProcessedFilename(file.name);
+    const masterPath = join(uploadDir, masterFilename);
+    await writeFile(masterPath, processedImageSet.master.buffer);
+    const masterUrl = `/uploads/${masterFilename}`;
 
-    // Return public URL
-    const url = `/uploads/${filename}`;
+    // Save responsive sizes
+    const responsiveSizes: Record<string, string> = {};
+    for (const [sizeName, sizeData] of Object.entries(processedImageSet.sizes)) {
+      if (sizeData) {
+        const sizeFilename = generateProcessedFilename(file.name, sizeName);
+        const sizePath = join(uploadDir, sizeFilename);
+        await writeFile(sizePath, sizeData.buffer);
+        responsiveSizes[sizeName] = `/uploads/${sizeFilename}`;
+      }
+    }
+
+    // Register in media library
+    try {
+      let sourceType = MediaSourceType.USER_UPLOAD;
+      if (user.role === "ADMIN") {
+        sourceType = MediaSourceType.ADMIN_UPLOAD;
+      } else if (user.business) {
+        sourceType = MediaSourceType.BUSINESS_UPLOAD;
+      }
+
+      await registerUploadedMedia({
+        filename: masterFilename,
+        originalName: file.name,
+        mimeType: "image/webp", // All processed images are WebP
+        sizeBytes: processedImageSet.master.size,
+        width: processedImageSet.master.width,
+        height: processedImageSet.master.height,
+        storageKey: masterUrl,
+        publicUrl: masterUrl,
+        sourceType,
+        uploadedById: user.id,
+      });
+    } catch (mediaError) {
+      console.error("Failed to register media in library:", mediaError);
+    }
 
     return NextResponse.json({
-      url,
-      filename,
-      size: file.size,
-      type: file.type,
+      url: masterUrl,
+      filename: masterFilename,
+      size: processedImageSet.master.size,
+      width: processedImageSet.master.width,
+      height: processedImageSet.master.height,
+      format: "webp",
+      originalFormat: processedImageSet.originalMimeType,
+      responsiveSizes,
+      processed: true,
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Upload error:", error);
     return NextResponse.json(
-      { error: "Failed to upload file" },
+      { error: error.message || "Failed to upload file" },
       { status: 500 }
     );
   }
 }
-
-// Configure max file size for Next.js
-export const config = {
-  api: {
-    bodyParser: {
-      sizeLimit: "10mb",
-    },
-  },
-};

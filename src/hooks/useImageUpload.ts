@@ -50,40 +50,114 @@ export function useImageUpload(options?: UseImageUploadOptions) {
 
         setProgress(20);
 
-        // Compress image
-        const compressed = await compressImage(file, {
-          maxSizeMB: options?.maxSizeMB,
-          maxWidthOrHeight: options?.maxWidthOrHeight,
-          quality: options?.quality,
+        // Skip client-side compression for HEIC/HEIF (not supported by browser-image-compression)
+        // Server will handle these formats with sharp
+        // Check both MIME type and file extension (macOS sometimes sends wrong MIME type)
+        const fileExtension = file.name.split('.').pop()?.toLowerCase();
+        const isHEIC = 
+          file.type === "image/heic" || 
+          file.type === "image/heif" ||
+          fileExtension === "heic" ||
+          fileExtension === "heif";
+        
+        console.log("🔍 [CLIENT] File details:", {
+          name: file.name,
+          type: file.type,
+          extension: fileExtension,
+          size: file.size,
+          isHEIC,
         });
+        
+        let fileToUpload: File;
+        let imageWidth = 0;
+        let imageHeight = 0;
+        let blurhash = "";
+        let preview = "";
+
+        if (isHEIC) {
+          console.log("📸 [CLIENT] HEIC/HEIF detected, skipping client compression");
+          fileToUpload = file;
+          // Server will provide dimensions after processing
+        } else {
+          console.log("🔄 [CLIENT] Compressing with browser-image-compression");
+          // Compress image for other formats
+          const compressed = await compressImage(file, {
+            maxSizeMB: options?.maxSizeMB,
+            maxWidthOrHeight: options?.maxWidthOrHeight,
+            quality: options?.quality,
+          });
+          fileToUpload = compressed.file;
+          imageWidth = compressed.width;
+          imageHeight = compressed.height;
+          blurhash = compressed.blurhash;
+          preview = compressed.preview;
+        }
 
         setProgress(50);
 
         // Upload to server
         const formData = new FormData();
-        formData.append("file", compressed.file);
+        formData.append("file", fileToUpload);
 
         const response = await fetch("/api/upload", {
           method: "POST",
           body: formData,
         });
 
-        if (!response.ok) {
-          const data = await response.json();
-          throw new Error(data.error || "Upload failed");
+        const responseStatus = response.status;
+        const responseStatusText = response.statusText;
+        const responseOk = response.ok;
+        const responseHeaders = Object.fromEntries(response.headers.entries());
+        
+        console.log("📡 [CLIENT] Server response:", {
+          status: responseStatus,
+          statusText: responseStatusText,
+          ok: responseOk,
+          headers: responseHeaders,
+        });
+
+        if (!responseOk) {
+          const contentType = response.headers.get("content-type");
+          let errorMessage = `Upload failed: HTTP ${responseStatus} ${responseStatusText}`;
+          
+          try {
+            // Read response body once
+            const responseText = await response.text();
+            console.log("📄 [CLIENT] Raw response body:", responseText);
+            
+            if (contentType?.includes("application/json") && responseText) {
+              try {
+                const errorData = JSON.parse(responseText);
+                console.log("✅ [CLIENT] Parsed JSON error:", errorData);
+                errorMessage = errorData.error || errorData.message || errorMessage;
+              } catch (jsonError) {
+                console.error("❌ [CLIENT] JSON parse failed, using raw text");
+                errorMessage = responseText || errorMessage;
+              }
+            } else {
+              errorMessage = responseText || errorMessage;
+            }
+          } catch (readError) {
+            console.error("❌ [CLIENT] Failed to read response:", readError);
+          }
+          
+          console.error("❌ [CLIENT] Upload failed with message:", errorMessage);
+          
+          throw new Error(errorMessage);
         }
 
         const uploadData = await response.json();
+        console.log("✅ [CLIENT] Upload successful:", uploadData);
 
         setProgress(100);
 
         const uploadedImage: UploadedImage = {
           id: `temp-${Date.now()}`, // Temporary ID
           url: uploadData.url,
-          width: compressed.width,
-          height: compressed.height,
-          blurhash: compressed.blurhash,
-          preview: compressed.preview,
+          width: uploadData.width || imageWidth,
+          height: uploadData.height || imageHeight,
+          blurhash: blurhash,
+          preview: preview || uploadData.url,
         };
 
         options?.onUploadComplete?.(uploadedImage);

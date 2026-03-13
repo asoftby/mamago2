@@ -36,17 +36,14 @@ export async function fetchDiscoveryFilters(
       fetch("/api/discovery/filters", {
         method: "GET",
         headers: { "Content-Type": "application/json" },
-        next: { revalidate: 300 }, // 5 minutes
       }),
       fetch(`/api/geo/metro-stations?citySlug=${citySlug}`, {
         method: "GET",
         headers: { "Content-Type": "application/json" },
-        next: { revalidate: 300 },
       }),
       fetch(`/api/geo/districts?citySlug=${citySlug}`, {
         method: "GET",
         headers: { "Content-Type": "application/json" },
-        next: { revalidate: 300 },
       }),
     ]);
 
@@ -137,7 +134,7 @@ export async function fetchDiscoveryFilters(
  * Client-side hook for fetching filter options
  * Use this in client components
  */
-export function useDiscoveryFilterOptions(citySlug: string = "minsk") {
+export function useDiscoveryFilterOptions(citySlug: string | null = "minsk") {
   const [options, setOptions] = React.useState<DiscoveryFilterOptions>({
     ages: [],
     metros: [],
@@ -153,11 +150,60 @@ export function useDiscoveryFilterOptions(citySlug: string = "minsk") {
       try {
         setLoading(true);
         setError(null);
-        const data = await fetchDiscoveryFilters(citySlug);
+        
+        // If no city slug, return empty options
+        if (!citySlug) {
+          if (mounted) {
+            setOptions({
+              ages: [],
+              metros: [],
+              districts: [],
+            });
+            setLoading(false);
+          }
+          return;
+        }
+        
+        // Simple client-side fetch without server-specific options
+        const [metroResponse, districtsResponse] = await Promise.all([
+          fetch(`/api/geo/metro-stations?citySlug=${citySlug}`),
+          fetch(`/api/geo/districts?citySlug=${citySlug}`),
+        ]);
+
+        if (!metroResponse.ok || !districtsResponse.ok) {
+          throw new Error("Failed to fetch filter options");
+        }
+
+        const [metroData, districtsData] = await Promise.all([
+          metroResponse.json(),
+          districtsResponse.json(),
+        ]);
+
+        // Transform metro stations
+        const metros: FilterOption[] = (metroData.metroStations || []).map((station: any) => ({
+          id: station.id,
+          value: station.id,
+          label: station.name,
+        }));
+
+        // Transform districts
+        const districts: FilterOption[] = (districtsData.districts || []).map((district: any) => ({
+          id: district.id,
+          value: district.id,
+          label: district.name,
+        }));
+        
+        const data = {
+          ages: [], // Skip ages for now to simplify
+          metros,
+          districts,
+        };
+        
         if (mounted) {
           setOptions(data);
         }
       } catch (err) {
+        console.error('useDiscoveryFilterOptions - error:', err);
         if (mounted) {
           setError(err instanceof Error ? err : new Error("Unknown error"));
         }

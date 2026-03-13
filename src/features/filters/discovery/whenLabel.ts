@@ -53,17 +53,27 @@ export function whenLabel(filters: {
   // parse safely into Date at start of day:
   if (!filters.dateFrom && !filters.dateTo) return "Выберите…";
   
+  // Validate dates before parsing
+  const isValidDate = (dateStr: string | null): boolean => {
+    if (!dateStr) return false;
+    const d = new Date(dateStr);
+    return !isNaN(d.getTime());
+  };
+  
   if (filters.dateFrom && filters.dateTo && filters.dateFrom === filters.dateTo) {
+    if (!isValidDate(filters.dateFrom)) return "Выберите…";
     return fmtDay(new Date(filters.dateFrom));
   }
   
   if (filters.dateFrom && filters.dateTo) {
+    if (!isValidDate(filters.dateFrom) || !isValidDate(filters.dateTo)) return "Выберите…";
     const a = new Date(filters.dateFrom);
     const b = new Date(filters.dateTo);
     return `${fmtDay(a)} – ${fmtDay(b)}`;
   }
   
   if (filters.dateFrom) {
+    if (!isValidDate(filters.dateFrom)) return "Выберите…";
     return fmtDay(new Date(filters.dateFrom));
   }
   

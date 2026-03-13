@@ -100,7 +100,7 @@ export function PhoneInputByMask({
       onChange={handleChange}
       onKeyDown={handleKeyDown}
       disabled={disabled}
-      className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary focus:border-primary disabled:bg-gray-100 disabled:cursor-not-allowed"
+      className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary focus:border-primary disabled:bg-gray-100 disabled:cursor-not-allowed text-base"
       placeholder="+375 (29) 123-45-67"
     />
   );

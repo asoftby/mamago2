@@ -96,7 +96,7 @@ export function LoginForm({ from, next }: { from?: string; next?: string }) {
           required
           autoComplete="email"
           disabled={isLoading}
-          className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+          className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed text-base"
           placeholder="your@email.com"
         />
         {fieldErrors.email && (
@@ -120,7 +120,7 @@ export function LoginForm({ from, next }: { from?: string; next?: string }) {
           required
           autoComplete="current-password"
           disabled={isLoading}
-          className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+          className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed text-base"
           placeholder="Введите пароль"
         />
         {fieldErrors.password && (

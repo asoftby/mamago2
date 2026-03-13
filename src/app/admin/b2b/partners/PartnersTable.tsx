@@ -36,55 +36,53 @@ export function PartnersTable({ businesses }: PartnersTableProps) {
   });
 
   return (
-    <div className="space-y-4">
-      {/* Search */}
-      <div className="flex items-center gap-2 max-w-md">
-        <div className="relative flex-1">
+    <div className="space-y-6">
+      {/* AdminPageToolbar */}
+      <div className="flex flex-col md:flex-row gap-3 md:items-center md:justify-between">
+        <div className="relative flex-1 md:max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
           <Input
             type="text"
             placeholder="Поиск по названию, УНП, email..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
+            className="h-10 pl-10"
           />
+        </div>
+        <div className="text-sm text-gray-600">
+          Найдено: {filteredBusinesses.length} из {businesses.length}
         </div>
       </div>
 
-      {/* Results count */}
-      <div className="text-sm text-gray-600">
-        Найдено: {filteredBusinesses.length} из {businesses.length}
-      </div>
-
       {/* Table */}
-      <div className="border rounded-lg overflow-hidden">
-        <table className="w-full">
-          <thead className="bg-gray-50 border-b">
+      <div className="border border-gray-200 rounded-lg overflow-hidden">
+        <table className="w-full text-sm">
+          <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-4 py-3 text-left font-medium text-gray-700">
                 Название
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-4 py-3 text-left font-medium text-gray-700">
                 УНП
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-4 py-3 text-left font-medium text-gray-700">
                 Email владельца
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-4 py-3 text-left font-medium text-gray-700">
                 Телефон
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-4 py-3 text-left font-medium text-gray-700">
                 Обновлено
               </th>
-              <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-4 py-3 text-right font-medium text-gray-700">
                 Действия
               </th>
             </tr>
           </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
+          <tbody className="divide-y divide-gray-200">
             {filteredBusinesses.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
+                <td colSpan={6} className="px-4 py-8 text-center text-gray-600">
                   {searchQuery
                     ? "Ничего не найдено"
                     : "Нет верифицированных бизнесов"}
@@ -93,24 +91,24 @@ export function PartnersTable({ businesses }: PartnersTableProps) {
             ) : (
               filteredBusinesses.map((business) => (
                 <tr key={business.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 text-sm font-medium text-gray-900">
+                  <td className="px-4 py-3 font-medium text-gray-900">
                     {business.name}
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-600">
+                  <td className="px-4 py-3 text-gray-600">
                     {business.unp || "—"}
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-600">
+                  <td className="px-4 py-3 text-gray-600">
                     {business.owner.email}
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-600">
+                  <td className="px-4 py-3 text-gray-600">
                     {business.owner.phoneE164 || "—"}
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-600">
+                  <td className="px-4 py-3 text-gray-600">
                     {new Date(business.updatedAt).toLocaleDateString("ru-RU")}
                   </td>
-                  <td className="px-4 py-3 text-sm text-right">
+                  <td className="px-4 py-3 text-right">
                     <Link href={`/admin/b2b/partners/${business.id}`}>
-                      <Button variant="outline" size="sm">
+                      <Button variant="outline" size="sm" className="h-8">
                         Открыть
                       </Button>
                     </Link>

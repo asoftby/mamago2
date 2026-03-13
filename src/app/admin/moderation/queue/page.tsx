@@ -113,7 +113,7 @@ async function getQueueItems(): Promise<QueueItem[]> {
 function QueueTable({ items }: { items: QueueItem[] }) {
   if (items.length === 0) {
     return (
-      <div className="text-center py-12 text-gray-500 border rounded-lg bg-white">
+      <div className="text-center py-12 text-gray-500 border border-gray-200 rounded-lg bg-white">
         <p className="text-lg font-medium mb-2">Очередь пуста</p>
         <p className="text-sm">Нет мест или изменений, ожидающих модерации</p>
       </div>
@@ -121,34 +121,34 @@ function QueueTable({ items }: { items: QueueItem[] }) {
   }
 
   return (
-    <div className="border rounded-lg overflow-hidden bg-white">
-      <table className="w-full">
-        <thead className="bg-gray-50 border-b">
+    <div className="border border-gray-200 rounded-lg overflow-hidden">
+      <table className="w-full text-sm">
+        <thead className="bg-gray-50 border-b border-gray-200">
           <tr>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th className="px-4 py-3 text-left font-medium text-gray-700">
               Type
             </th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th className="px-4 py-3 text-left font-medium text-gray-700">
               Title
             </th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th className="px-4 py-3 text-left font-medium text-gray-700">
               City
             </th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th className="px-4 py-3 text-left font-medium text-gray-700">
               Business
             </th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th className="px-4 py-3 text-left font-medium text-gray-700">
               Submitted
             </th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th className="px-4 py-3 text-left font-medium text-gray-700">
               Actions
             </th>
           </tr>
         </thead>
-        <tbody className="bg-white divide-y divide-gray-200">
+        <tbody className="divide-y divide-gray-200">
           {items.map((item) => (
             <tr key={`${item.type}-${item.id}`} className="hover:bg-gray-50">
-              <td className="px-4 py-3 text-sm">
+              <td className="px-4 py-3">
                 {item.type === "PLACE" ? (
                   <div className="flex items-center gap-2">
                     <FileText className="w-4 h-4 text-blue-600" />
@@ -161,19 +161,19 @@ function QueueTable({ items }: { items: QueueItem[] }) {
                   </div>
                 )}
               </td>
-              <td className="px-4 py-3 text-sm font-medium text-gray-900">
+              <td className="px-4 py-3 font-medium text-gray-900">
                 {item.title}
               </td>
-              <td className="px-4 py-3 text-sm text-gray-600">
+              <td className="px-4 py-3 text-gray-600">
                 {item.cityName || "-"}
               </td>
-              <td className="px-4 py-3 text-sm text-gray-600">
+              <td className="px-4 py-3 text-gray-600">
                 {item.businessName}
               </td>
-              <td className="px-4 py-3 text-sm text-gray-600">
+              <td className="px-4 py-3 text-gray-600">
                 {formatDistanceToNow(item.submittedAt, { addSuffix: true, locale: ru })}
               </td>
-              <td className="px-4 py-3 text-sm">
+              <td className="px-4 py-3">
                 <Link
                   href={`/admin/moderation/places/${item.id}${item.type === "PLACE_UPDATE" ? "?mode=revision" : ""}`}
                   className="text-blue-600 hover:text-blue-800 font-medium"
@@ -193,14 +193,18 @@ export default async function ModerationQueuePage() {
   const items = await getQueueItems();
 
   return (
-    <div className="max-w-7xl">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Moderation Queue</h1>
-        <p className="text-gray-600 mt-1">
-          Places and updates pending review ({items.length} items)
-        </p>
+    <div className="p-6 md:p-4 space-y-6">
+      {/* AdminPageHeader */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl md:text-xl font-bold text-gray-900">Moderation Queue</h1>
+          <p className="text-sm text-gray-600 mt-1">
+            Places and updates pending review ({items.length} items)
+          </p>
+        </div>
       </div>
 
+      {/* AdminPageContent */}
       <Suspense fallback={<div>Loading...</div>}>
         <QueueTable items={items} />
       </Suspense>

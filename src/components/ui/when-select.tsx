@@ -59,10 +59,8 @@ function formatRange(from: Date, to: Date) {
 
 function getWeekendRange(now: Date) {
   const day = now.getDay() === 0 ? 7 : now.getDay();
-  const saturday = new Date(now);
-  saturday.setDate(now.getDate() + (6 - day));
-  const sunday = new Date(saturday);
-  sunday.setDate(saturday.getDate() + 1);
+  const saturday = new Date(now.getFullYear(), now.getMonth(), now.getDate() + (6 - day));
+  const sunday = new Date(now.getFullYear(), now.getMonth(), now.getDate() + (7 - day));
   return [saturday, sunday];
 }
 
@@ -134,10 +132,14 @@ export function WhenSelect({
         
         setPendingFrom(selected);
         setPendingTo(null);
-        // Check if matches today/tomorrow
-        if (selected.getDate() === today.getDate() && selected.getMonth() === today.getMonth() && selected.getFullYear() === today.getFullYear()) {
+        
+        // Check if matches today/tomorrow with proper date comparison
+        const todayDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+        const tomorrowDate = new Date(tomorrow.getFullYear(), tomorrow.getMonth(), tomorrow.getDate());
+        
+        if (selected.getTime() === todayDate.getTime()) {
           setActivePreset("today");
-        } else if (selected.getDate() === tomorrow.getDate() && selected.getMonth() === tomorrow.getMonth() && selected.getFullYear() === tomorrow.getFullYear()) {
+        } else if (selected.getTime() === tomorrowDate.getTime()) {
           setActivePreset("tomorrow");
         } else {
           setActivePreset(null);
@@ -153,8 +155,12 @@ export function WhenSelect({
         
         setPendingFrom(selected.from);
         setPendingTo(selected.to);
-        // Check if matches weekend
-        if (selected.from.getDate() === weekStart.getDate() && selected.from.getMonth() === weekStart.getMonth() && selected.to.getDate() === weekEnd.getDate() && selected.to.getMonth() === weekEnd.getMonth()) {
+        
+        // Check if matches weekend with proper date comparison
+        const weekStartDate = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate());
+        const weekEndDate = new Date(weekEnd.getFullYear(), weekEnd.getMonth(), weekEnd.getDate());
+        
+        if (selected.from.getTime() === weekStartDate.getTime() && selected.to.getTime() === weekEndDate.getTime()) {
           setActivePreset("weekend");
         } else {
           setActivePreset(null);
@@ -225,12 +231,24 @@ export function WhenSelect({
   const setVal = (v: WhenValue) => {
     if (!isControlled) setSelectedState(v);
     onChange?.(v);
-    if (!isMobile) {
+    // Не закрываем автоматически в embedded режиме (используется в панелях фильтров)
+    if (!isMobile && variant !== "embedded") {
       setOpen(false);
     }
   };
 
   const handleMobilePreset = (type: "today" | "tomorrow" | "weekend") => {
+    // Если пресет уже активен, отжимаем его
+    if (activePreset === type) {
+      setActivePreset(null);
+      setPendingFrom(null);
+      setPendingTo(null);
+      if (variant === "embedded") {
+        onChange?.(null);
+      }
+      return;
+    }
+    
     setActivePreset(type);
     if (type === "today") {
       setPendingFrom(today);
@@ -274,36 +292,80 @@ export function WhenSelect({
   };
 
   const handleDateClick = (d: Date) => {
-    setActivePreset(null);
+    // Нормализуем дату к полуночи для корректного сравнения
+    const clickedDate = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    
+    // Проверяем, соответствует ли выбранная дата пресетам
+    const now = new Date();
+    const todayDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const tomorrowDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+    
     let newFrom = pendingFrom;
     let newTo = pendingTo;
+    let newActivePreset: "today" | "tomorrow" | "weekend" | null = null;
 
     if (!pendingFrom) {
-      newFrom = d;
+      // Первый клик - выбираем дату
+      newFrom = clickedDate;
       newTo = null;
+      
+      // Проверяем пресеты для одиночной даты
+      if (clickedDate.getTime() === todayDate.getTime()) {
+        newActivePreset = "today";
+      } else if (clickedDate.getTime() === tomorrowDate.getTime()) {
+        newActivePreset = "tomorrow";
+      }
     } else if (pendingFrom && !pendingTo) {
-      if (d < pendingFrom) {
-        newFrom = d;
+      // Второй клик - выбираем диапазон или новую дату
+      if (clickedDate < pendingFrom) {
+        newFrom = clickedDate;
         newTo = null;
+        newActivePreset = null;
+        
+        // Проверяем пресеты для новой одиночной даты
+        if (clickedDate.getTime() === todayDate.getTime()) {
+          newActivePreset = "today";
+        } else if (clickedDate.getTime() === tomorrowDate.getTime()) {
+          newActivePreset = "tomorrow";
+        }
       } else {
-        newTo = d;
+        newTo = clickedDate;
+        
+        // Проверяем, соответствует ли диапазон выходным
+        const day = now.getDay() === 0 ? 7 : now.getDay();
+        const saturday = new Date(now.getFullYear(), now.getMonth(), now.getDate() + (6 - day));
+        const sunday = new Date(now.getFullYear(), now.getMonth(), now.getDate() + (7 - day));
+        
+        if (pendingFrom.getTime() === saturday.getTime() && clickedDate.getTime() === sunday.getTime()) {
+          newActivePreset = "weekend";
+        }
       }
     } else {
-      newFrom = d;
+      // Третий клик - начинаем заново
+      newFrom = clickedDate;
       newTo = null;
+      newActivePreset = null;
+      
+      // Проверяем пресеты для новой одиночной даты
+      if (clickedDate.getTime() === todayDate.getTime()) {
+        newActivePreset = "today";
+      } else if (clickedDate.getTime() === tomorrowDate.getTime()) {
+        newActivePreset = "tomorrow";
+      }
     }
 
     setPendingFrom(newFrom);
     setPendingTo(newTo);
+    setActivePreset(newActivePreset);
 
     if (variant === "embedded") {
-        if (newFrom && newTo) {
-            onChange?.({ from: newFrom, to: newTo });
-        } else if (newFrom) {
-            onChange?.(newFrom);
-        } else {
-            onChange?.(null);
-        }
+      if (newFrom && newTo) {
+        onChange?.({ from: newFrom, to: newTo });
+      } else if (newFrom) {
+        onChange?.(newFrom);
+      } else {
+        onChange?.(null);
+      }
     }
   };
 
@@ -415,13 +477,38 @@ export function WhenSelect({
               d.getDate() === now.getDate() &&
               d.getMonth() === now.getMonth() &&
               d.getFullYear() === now.getFullYear();
+            const isTomorrow =
+              d.getDate() === tomorrow.getDate() &&
+              d.getMonth() === tomorrow.getMonth() &&
+              d.getFullYear() === tomorrow.getFullYear();
+            
+            // Нормализуем даты для корректного сравнения (убираем время)
+            const normalizedD = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+            const normalizedPendingFrom = pendingFrom ? new Date(pendingFrom.getFullYear(), pendingFrom.getMonth(), pendingFrom.getDate()) : null;
+            const normalizedPendingTo = pendingTo ? new Date(pendingTo.getFullYear(), pendingTo.getMonth(), pendingTo.getDate()) : null;
+            
+            // Исправляем логику для выходных - проверяем диапазон, а не только точные даты
+            const isWeekendDay = 
+              activePreset === "weekend" && 
+              normalizedPendingFrom && 
+              normalizedPendingTo && 
+              normalizedD >= normalizedPendingFrom && 
+              normalizedD <= normalizedPendingTo;
+            
             const isInPendingRange =
-              pendingFrom &&
-              pendingTo &&
-              d >= pendingFrom &&
-              d <= pendingTo;
-            const isPendingStart = pendingFrom && d.getTime() === pendingFrom.getTime();
-            const isPendingEnd = pendingTo && d.getTime() === pendingTo.getTime();
+              normalizedPendingFrom &&
+              normalizedPendingTo &&
+              normalizedD >= normalizedPendingFrom &&
+              normalizedD <= normalizedPendingTo;
+            const isPendingStart = normalizedPendingFrom && normalizedD.getTime() === normalizedPendingFrom.getTime();
+            const isPendingEnd = normalizedPendingTo && normalizedD.getTime() === normalizedPendingTo.getTime();
+            
+            // Определяем, активна ли дата из-за пресета
+            const isPresetActive = 
+              (activePreset === "today" && isToday) ||
+              (activePreset === "tomorrow" && isTomorrow) ||
+              (activePreset === "weekend" && isWeekendDay);
+            
             return (
               <button
                 key={i}
@@ -430,9 +517,13 @@ export function WhenSelect({
                   isPast && "opacity-50 text-muted-foreground cursor-not-allowed pointer-events-none",
                   !isPast && "hover:bg-muted/40",
                   isToday && !isPast && "text-foreground font-semibold",
-                  isInPendingRange && !isPast && "bg-muted",
-                  isPendingStart && !isPast && "bg-primary/20",
-                  isPendingEnd && !isPast && "bg-primary/30"
+                  // Стандартная заливка для диапазона
+                  isInPendingRange && !isPast && !isPresetActive && "bg-muted",
+                  // Заливка для начала и конца диапазона
+                  isPendingStart && !isPast && !isPresetActive && "bg-primary/20",
+                  isPendingEnd && !isPast && !isPresetActive && "bg-primary/30",
+                  // Специальная заливка для пресетов (такая же как у кнопок)
+                  isPresetActive && !isPast && "border-[#EF8759] bg-[#EF8759]/5 text-[#EF8759] font-medium"
                 )}
                 onClick={() => !isPast && handleDateClick(d)}
                 disabled={isPast}
@@ -511,38 +602,7 @@ export function WhenSelect({
   if (variant === "embedded") {
     return (
       <div className={cn("flex flex-col gap-4", className)}>
-        {/* Presets Row */}
-        <div className="flex gap-2 overflow-x-auto pb-2 -mx-4 px-4 scrollbar-hide shrink-0">
-          <button 
-            onClick={() => handleMobilePreset("today")} 
-            className={cn(
-              "px-4 py-2 rounded-full border text-sm font-medium whitespace-nowrap active:scale-95 transition-transform",
-              activePreset === "today" ? "bg-primary text-primary-foreground border-primary" : "bg-background"
-            )}
-          >
-            Сегодня
-          </button>
-          <button 
-            onClick={() => handleMobilePreset("tomorrow")} 
-            className={cn(
-              "px-4 py-2 rounded-full border text-sm font-medium whitespace-nowrap active:scale-95 transition-transform",
-              activePreset === "tomorrow" ? "bg-primary text-primary-foreground border-primary" : "bg-background"
-            )}
-          >
-            Завтра
-          </button>
-          <button 
-            onClick={() => handleMobilePreset("weekend")} 
-            className={cn(
-              "px-4 py-2 rounded-full border text-sm font-medium whitespace-nowrap active:scale-95 transition-transform",
-              activePreset === "weekend" ? "bg-primary text-primary-foreground border-primary" : "bg-background"
-            )}
-          >
-            На выходных
-          </button>
-        </div>
-
-        {/* Calendar */}
+        {/* Calendar - убираем дублирующиеся кнопки пресетов */}
         {renderCalendar()}
       </div>
     );

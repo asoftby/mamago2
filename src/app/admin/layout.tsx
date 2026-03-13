@@ -1,37 +1,40 @@
 import React from "react";
-import Link from "next/link";
-import { AdminNav } from "@/components/admin/AdminNav";
-import { AdminUserMenu } from "@/components/admin/AdminUserMenu";
+import { AdminHeader } from "@/components/admin/AdminHeader";
+import { AdminSidebar } from "@/components/admin/AdminSidebar";
 import { getCurrentUser } from "@/lib/auth/server";
+import { redirect } from "next/navigation";
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const user = await getCurrentUser();
 
+  // Require authentication for admin
+  if (!user) {
+    redirect("/login?from=admin");
+  }
+
+  // Require ADMIN role
+  if (user.role !== "ADMIN") {
+    redirect("/");
+  }
+
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      <div className="flex min-h-screen">
-        <aside className="w-60 border-r p-4 flex flex-col">
-          <div className="font-semibold text-lg mb-6">mamaGo Admin</div>
-          
-          <div className="flex-1">
-            <AdminNav />
+    <div className="min-h-screen bg-gray-50">
+      {/* Global Header */}
+      <AdminHeader userEmail={user.email || undefined} />
+
+      {/* Two-column layout: Sidebar + Content */}
+      <div className="flex min-h-[calc(100vh-4rem)]">
+        {/* Left Sidebar - Hidden on mobile */}
+        <div className="hidden lg:block bg-white border-r border-gray-200">
+          <AdminSidebar />
+        </div>
+
+        {/* Right Content Area */}
+        <main className="flex-1 w-full lg:w-auto">
+          <div className="max-w-[1400px] mx-auto">
+            {children}
           </div>
-
-          {user ? (
-            <AdminUserMenu email={user.email} />
-          ) : (
-            <div className="border-t pt-4 mt-auto">
-              <Link
-                href="/login?from=admin"
-                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-              >
-                Войти
-              </Link>
-            </div>
-          )}
-        </aside>
-
-        <main className="flex-1 p-6">{children}</main>
+        </main>
       </div>
     </div>
   );
