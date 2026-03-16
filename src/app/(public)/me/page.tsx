@@ -36,11 +36,47 @@ export default async function MePage({ searchParams }: PageProps) {
       break;
   }
 
-  // Fetch children
-  const children = await prisma.child.findMany({
+  // Fetch children with interests using separate queries to avoid TypeScript issues
+  const childrenRaw = await prisma.child.findMany({
     where: { parentId: user.id },
     orderBy: { createdAt: "desc" },
   });
+
+  // Fetch interests separately if there are children
+  const childIds = childrenRaw.map(child => child.id);
+  
+  let systemInterestsData: any[] = [];
+  let customInterestsData: any[] = [];
+  
+  if (childIds.length > 0) {
+    // Use raw queries to avoid TypeScript issues
+    systemInterestsData = await prisma.$queryRaw`
+      SELECT "childId", "interestSlug" 
+      FROM "ChildInterest" 
+      WHERE "childId" = ANY(${childIds})
+    `;
+    
+    customInterestsData = await prisma.$queryRaw`
+      SELECT "childId", "label" 
+      FROM "ChildCustomInterest" 
+      WHERE "childId" = ANY(${childIds})
+    `;
+  }
+
+  // Transform the data to match expected interface
+  const children = childrenRaw.map(child => ({
+    id: child.id,
+    name: child.name,
+    birthDate: child.birthDate,
+    systemInterests: systemInterestsData
+      .filter((interest: any) => interest.childId === child.id)
+      .map((interest: any) => ({ interestSlug: interest.interestSlug })),
+    customInterests: customInterestsData
+      .filter((interest: any) => interest.childId === child.id)
+      .map((interest: any) => ({ label: interest.label })),
+  }));
+
+  console.log("Loaded children from database:", JSON.stringify(children, null, 2));
 
   // Load plan items for current week
   const weekStart = getCurrentWeekStart();

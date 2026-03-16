@@ -134,15 +134,51 @@ model Child {
   id        String   @id @default(cuid())
   name      String
   birthDate DateTime
-  interests String?
+  interests String? // Legacy field - will be deprecated
   parentId  String
 
   parent User @relation(fields: [parentId], references: [id], onDelete: Cascade)
+
+  // New interest relationships
+  systemInterests ChildInterest[]
+  customInterests ChildCustomInterest[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([parentId])
+}
+
+// System interests for children (predefined categories)
+model ChildInterest {
+  id           String @id @default(cuid())
+  childId      String
+  interestSlug String // e.g., "sport", "music", "art"
+  source       String @default("SYSTEM") // Always "SYSTEM" for this model
+
+  child Child @relation(fields: [childId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([childId, interestSlug])
+  @@index([childId])
+  @@index([interestSlug])
+}
+
+// Custom interests for children (user-defined)
+model ChildCustomInterest {
+  id             String  @id @default(cuid())
+  childId        String
+  label          String  // User-entered text, e.g., "динозавры"
+  normalizedSlug String? // Future: normalized version for matching
+  status         String  @default("RAW") // RAW, NORMALIZED, etc.
+
+  child Child @relation(fields: [childId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([childId])
+  @@index([normalizedSlug])
 }
 
 // User saved ideas (activities they want to remember)
@@ -336,10 +372,11 @@ model Activity {
   nextOccurrenceAt DateTime? // Denormalized for "Today/Tomorrow/Weekend/Week" queries
 
   // Pricing (optional)
-  priceFrom Float?
-  priceTo   Float?
-  priceText String? // e.g., "от 50 BYN", "бесплатно"
-  currency  String? @default("BYN")
+  priceFrom    Float?
+  priceTo      Float?
+  priceText    String? // e.g., "от 50 BYN", "бесплатно"
+  priceDetails String? // Optional price breakdown (e.g., "Дети — 30 BYN\nВзрослые — 50 BYN")
+  currency     String? @default("BYN")
 
   // Images
   coverImageId String?
@@ -365,6 +402,7 @@ model Activity {
   sessions      ActivitySession[]
   planItems     PlanItem[]
   images        ActivityImage[]
+  venue         EventVenue?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -395,6 +433,46 @@ model ActivityImage {
   createdAt DateTime @default(now())
 
   @@index([activityId, sortOrder])
+}
+
+// Event Venue - stores location information for events
+// Separates event location from Place catalog
+model EventVenue {
+  id         String           @id @default(cuid())
+  activityId String           @unique
+  kind       EventVenueKind
+  
+  // Reference to existing Place (if kind = PLACE)
+  placeId    String?
+  
+  // Location details (populated from Place or entered manually)
+  title       String?
+  addressLine String?
+  cityId      String?
+  lat         Float?
+  lng         Float?
+  note        String? // For MOBILE or TBD - additional info
+  
+  // Metadata
+  source     String? // "place", "manual", "geocoded"
+  
+  activity   Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  place      Place?   @relation(fields: [placeId], references: [id], onDelete: SetNull)
+  
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  
+  @@index([activityId])
+  @@index([placeId])
+  @@index([kind])
+}
+
+enum EventVenueKind {
+  PLACE    // Linked to existing Place
+  MANUAL   // User entered address manually
+  MOBILE   // Traveling event (client's location)
+  TBD      // Location to be announced
+  ONLINE   // Online event (future)
 }
 
 // Activity sessions (specific dates/times when activity happens)
@@ -732,6 +810,7 @@ model Place {
   claimRequests  PlaceClaimRequest[]
   revisions      PlaceRevision[] // Post-publication edit revisions
   slugHistory    PlaceSlugHistory[] // Historical slugs for redirects
+  eventVenues    EventVenue[] // Events using this place as venue
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

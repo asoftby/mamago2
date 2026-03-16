@@ -30,8 +30,6 @@ export type OpenKey = "date" | "age" | "metro" | "district" | null;
 // --- Utilities ---
 
 export function parseAppliedFromUrl(searchParams: ReadonlyURLSearchParams): DiscoveryFilters {
-  console.log('🔍 parseAppliedFromUrl - searchParams:', searchParams.toString());
-  
   const dateFrom = searchParams.get("from") || searchParams.get("dateFrom") || searchParams.get("when"); // Fallback for old 'when' if any
   // Wait, old implementation used 'when' param with comma for ranges.
   // New spec: "from" param (or "dateFrom"), "to" param (or "dateTo")
@@ -86,7 +84,7 @@ export function parseAppliedFromUrl(searchParams: ReadonlyURLSearchParams): Disc
     whenPreset = presetParam;
   }
 
-  const result = {
+  return {
     dateFrom: dFrom || null,
     dateTo: dTo || null,
     whenPreset,
@@ -95,10 +93,6 @@ export function parseAppliedFromUrl(searchParams: ReadonlyURLSearchParams): Disc
     district,
     nearby,
   };
-  
-  console.log('🔍 parseAppliedFromUrl - result:', result);
-  
-  return result;
 }
 
 function writeAppliedToUrl(
@@ -166,35 +160,19 @@ export function useDiscoveryFilters() {
   }, [applied, openKey]);
   
   const beginDraft = useCallback((key: OpenKey) => {
-    console.log('🔄 beginDraft called with key:', key);
-    console.log('🔄 Current applied state:', applied);
-    // Reset draft to current applied state before opening
-    setDraftState(applied);
+    // Just open the panel - don't reset draft
+    // Draft should already be in sync with applied from the useEffect above
     setOpenKey(key);
-    console.log('🔄 Draft state set to applied');
-  }, [applied]);
+  }, []);
 
   const setDraft = useCallback((patch: Partial<DiscoveryFilters>) => {
-    console.log('✏️ setDraft called with patch:', patch);
-    setDraftState(prev => {
-      const newState = { ...prev, ...patch };
-      console.log('✏️ Draft state updated from:', prev);
-      console.log('✏️ Draft state updated to:', newState);
-      return newState;
-    });
+    setDraftState(prev => ({ ...prev, ...patch }));
   }, []);
 
   const actions = useMemo(() => ({
     apply: () => {
-      console.log('🎯 actions.apply called');
-      console.log('🎯 Current draft:', draft);
-      console.log('🎯 Current pathname:', pathname);
-      console.log('🎯 Current searchParams:', searchParams.toString());
-      
       writeAppliedToUrl(router, pathname, searchParams, draft, "replace");
       setOpenKey(null);
-      
-      console.log('🎯 writeAppliedToUrl called, openKey set to null');
     },
     setDraft: (patch: Partial<DiscoveryFilters>) => {
       setDraft(patch);

@@ -5,6 +5,7 @@ import { ZodError } from "zod";
 import { loginUser } from "@/server/auth/login";
 import { AuthError } from "@/server/auth/register";
 import { setSessionCookieAction } from "@/lib/auth/session";
+import { getPostAuthRedirect } from "@/lib/auth/postAuthRedirect";
 
 type ActionState =
   | { ok: true }
@@ -16,23 +17,13 @@ export async function loginAction(
 ): Promise<ActionState> {
   const email = String(formData.get("email") ?? "");
   const password = String(formData.get("password") ?? "");
-  const from = String(formData.get("from") ?? "");
-  const next = String(formData.get("next") ?? "");
 
   try {
     const { sessionToken, user } = await loginUser(email, password);
     await setSessionCookieAction(sessionToken);
 
-    // Success - redirect based on role and parameters
-    if (next) {
-      redirect(next);
-    } else if (from === "business") {
-      redirect("/business-entry");
-    } else if (user.role === "USER") {
-      redirect("/me/plan");
-    } else {
-      redirect("/minsk");
-    }
+    // Success - redirect to unified post-auth destination
+    redirect(getPostAuthRedirect());
   } catch (e) {
     // Handle Zod validation errors
     if (e instanceof ZodError) {

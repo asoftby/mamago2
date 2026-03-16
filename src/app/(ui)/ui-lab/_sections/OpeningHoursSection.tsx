@@ -1,10 +1,12 @@
 "use client";
 
-import React, { useState } from "react";
+import { useState } from "react";
 import { OpeningHoursEditor, OpeningHoursPreview } from "@/components/openingHours";
 import { getOpeningStatus } from "@/server/services/openingHours";
 import type { OpeningHoursData } from "@/components/openingHours";
 import type { OpeningHoursWithRelations } from "@/server/services/openingHours/openingHours.types";
+import { ComponentMetaCard } from "@/components/ui-lab/ComponentMetaCard";
+import { getComponentMeta } from "@/components/ui-lab/registry";
 
 /**
  * Convert UI data to server format for preview
@@ -42,59 +44,57 @@ export function OpeningHoursSection() {
   const serverData = editorData ? convertToServerFormat(editorData) : null;
   const status = serverData ? getOpeningStatus(serverData, new Date()) : null;
 
+  const componentMeta = getComponentMeta("opening-hours-preview", "ui-lab");
+
   return (
-    <div className="space-y-8">
-      <div>
-        <h2 className="text-2xl font-bold mb-2">OpeningHours Components</h2>
-        <p className="text-muted-foreground">
-          Компоненты для редактирования и отображения режима работы
-        </p>
-      </div>
+    <section id="opening-hours" className="space-y-8">
+      {componentMeta && (
+        <ComponentMetaCard {...componentMeta}>
+          <div className="space-y-8">
+            {/* Editor */}
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-xl font-semibold mb-2">OpeningHoursEditor</h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Controlled component для редактирования режима работы. Поддерживает 4 режима:
+                  WEEKLY, ALWAYS_OPEN, BY_APPOINTMENT, TEMPORARILY_CLOSED.
+                </p>
+              </div>
 
-      {/* Editor */}
-      <div className="space-y-4">
-        <div>
-          <h3 className="text-xl font-semibold mb-2">OpeningHoursEditor</h3>
-          <p className="text-sm text-muted-foreground mb-4">
-            Controlled component для редактирования режима работы. Поддерживает 4 режима:
-            WEEKLY, ALWAYS_OPEN, BY_APPOINTMENT, TEMPORARILY_CLOSED.
-          </p>
-        </div>
+              <div className="border rounded-lg p-6 bg-card">
+                <OpeningHoursEditor
+                  value={editorData}
+                  onChange={setEditorData}
+                  timezone="Europe/Minsk"
+                />
+              </div>
+            </div>
 
-        <div className="border rounded-lg p-6 bg-card">
-          <OpeningHoursEditor
-            value={editorData}
-            onChange={setEditorData}
-            timezone="Europe/Minsk"
-          />
-        </div>
-      </div>
+            {/* Preview */}
+            {serverData && status && (
+              <div className="space-y-4">
+                <div>
+                  <h3 className="text-xl font-semibold mb-2">OpeningHoursPreview</h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Компонент для отображения текущего статуса и недельного графика.
+                    Использует server-side функцию getOpeningStatus для расчета статуса.
+                  </p>
+                </div>
 
-      {/* Preview */}
-      {serverData && status && (
-        <div className="space-y-4">
-          <div>
-            <h3 className="text-xl font-semibold mb-2">OpeningHoursPreview</h3>
-            <p className="text-sm text-muted-foreground mb-4">
-              Компонент для отображения текущего статуса и недельного графика.
-              Использует server-side функцию getOpeningStatus для расчета статуса.
-            </p>
-          </div>
+                <OpeningHoursPreview
+                  openingHours={serverData}
+                  status={status}
+                />
+              </div>
+            )}
 
-          <OpeningHoursPreview
-            openingHours={serverData}
-            status={status}
-          />
-        </div>
-      )}
+            {/* Examples */}
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-xl font-semibold mb-2">Примеры состояний</h3>
+              </div>
 
-      {/* Examples */}
-      <div className="space-y-4">
-        <div>
-          <h3 className="text-xl font-semibold mb-2">Примеры состояний</h3>
-        </div>
-
-        <div className="grid gap-4">
+              <div className="grid gap-4">
           {/* Example 1: WEEKLY mode */}
           <div className="border rounded-lg p-4">
             <h4 className="font-medium mb-2">1. Недельный график (WEEKLY)</h4>
@@ -274,41 +274,41 @@ export function OpeningHoursSection() {
               )}
             />
           </div>
-        </div>
-      </div>
+                </div>
+              </div>
 
-      {/* Props documentation */}
-      <div className="space-y-4">
-        <div>
-          <h3 className="text-xl font-semibold mb-2">Props интерфейсы</h3>
-        </div>
+              {/* Props documentation */}
+              <div className="space-y-4">
+                <div>
+                  <h3 className="text-xl font-semibold mb-2">Props интерфейсы</h3>
+                </div>
 
-        <div className="space-y-4">
-          <div className="border rounded-lg p-4 bg-muted/50">
-            <h4 className="font-mono text-sm font-medium mb-2">OpeningHoursEditor</h4>
-            <pre className="text-xs overflow-x-auto">
+                <div className="space-y-4">
+                  <div className="border rounded-lg p-4 bg-muted/50">
+                    <h4 className="font-mono text-sm font-medium mb-2">OpeningHoursEditor</h4>
+                    <pre className="text-xs overflow-x-auto">
 {`interface OpeningHoursEditorProps {
   value: OpeningHoursData | null;
   onChange: (value: OpeningHoursData) => void;
   timezone?: string; // default: "Europe/Minsk"
 }`}
-            </pre>
-          </div>
+                    </pre>
+                  </div>
 
-          <div className="border rounded-lg p-4 bg-muted/50">
-            <h4 className="font-mono text-sm font-medium mb-2">OpeningHoursPreview</h4>
-            <pre className="text-xs overflow-x-auto">
+                  <div className="border rounded-lg p-4 bg-muted/50">
+                    <h4 className="font-mono text-sm font-medium mb-2">OpeningHoursPreview</h4>
+                    <pre className="text-xs overflow-x-auto">
 {`interface OpeningHoursPreviewProps {
   openingHours: OpeningHoursWithRelations;
   status: OpeningStatus;
   className?: string;
 }`}
-            </pre>
-          </div>
+                    </pre>
+                  </div>
 
-          <div className="border rounded-lg p-4 bg-muted/50">
-            <h4 className="font-mono text-sm font-medium mb-2">OpeningHoursData</h4>
-            <pre className="text-xs overflow-x-auto">
+                  <div className="border rounded-lg p-4 bg-muted/50">
+                    <h4 className="font-mono text-sm font-medium mb-2">OpeningHoursData</h4>
+                    <pre className="text-xs overflow-x-auto">
 {`interface OpeningHoursData {
   mode: OpeningHoursMode;
   timezone: string;
@@ -327,10 +327,14 @@ interface TimeInterval {
   startTime: string; // "HH:MM"
   endTime: string;   // "HH:MM"
 }`}
-            </pre>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
+                    </pre>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </ComponentMetaCard>
+        )}
+      </section>
+    );
+  }
+

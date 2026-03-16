@@ -1,11 +1,13 @@
 import { getCurrentUser } from "@/lib/auth/server";
-import { redirect } from "next/navigation";
+import { redirect, notFound } from "next/navigation";
+import prisma from "@/lib/prisma";
+import { OfferWizard } from "@/components/business/wizard/offer/OfferWizard";
 
-export default async function EditOfferPage({
-  params,
-}: {
+interface EditOfferPageProps {
   params: Promise<{ id: string }>;
-}) {
+}
+
+export default async function EditOfferPage({ params }: EditOfferPageProps) {
   const user = await getCurrentUser();
   
   if (!user || user.role !== "BUSINESS_OWNER") {
@@ -14,27 +16,41 @@ export default async function EditOfferPage({
 
   const { id } = await params;
 
+  // Verify user has a business
+  const business = await prisma.business.findUnique({
+    where: { ownerUserId: user.id },
+    select: {
+      id: true,
+      name: true,
+      phone: true,
+    },
+  });
+
+  if (!business) {
+    console.warn(`User ${user.email} has BUSINESS_OWNER role but no Business entity`);
+    redirect("/business/onboarding");
+  }
+
+  // Fetch the offer and verify ownership
+  const offer = await prisma.offer.findFirst({
+    where: {
+      id,
+      // TODO: Add proper ownership verification based on offer structure
+    },
+    // TODO: Add proper includes based on offer structure
+  });
+
+  if (!offer) {
+    notFound();
+  }
+
   return (
-    <div className="max-w-5xl mx-auto p-6">
-      <div className="bg-white rounded-lg border border-gray-200 p-12">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-900 mb-4">
-            Редактирование предложения
-          </h1>
-          <p className="text-gray-600 mb-2">
-            ID: {id}
-          </p>
-          <p className="text-gray-600 mb-6">
-            Форма редактирования предложения будет реализована на следующем этапе.
-          </p>
-          <a
-            href="/business/offers"
-            className="inline-flex items-center px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 transition-colors"
-          >
-            Вернуться к списку
-          </a>
-        </div>
-      </div>
-    </div>
+    <OfferWizard
+      mode="edit"
+      offer={offer}
+      userId={user.id}
+      userRole="BUSINESS_OWNER"
+      business={business}
+    />
   );
 }

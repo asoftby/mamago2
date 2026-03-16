@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, RefObject } from "react";
-import { Search, MapPin, Calendar, Users, X } from "lucide-react";
+import { MapPin, Calendar, Users, X } from "lucide-react";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
 import { useDiscoveryFilters } from "@/features/filters/discovery/filters.store";
@@ -39,8 +39,8 @@ export function DesktopSearchControl({
   const dateRef = useRef<HTMLButtonElement>(null);
   const ageRef = useRef<HTMLButtonElement>(null);
   
-  const { applied, draft, actions, derived, beginDraft } = useDiscoveryFilters();
-  const { options: apiOptions, error } = useDiscoveryFilterOptions(citySlug);
+  const { applied, draft, actions, beginDraft, openKey } = useDiscoveryFilters();
+  const { options: apiOptions } = useDiscoveryFilterOptions(citySlug);
   
   // Fallback options if API fails
   const safeApiOptions = apiOptions || {
@@ -49,8 +49,9 @@ export function DesktopSearchControl({
     categories: []
   };
   
-  // Use draft for display when panels are open, applied otherwise
-  const displayFilters = activeSegment ? draft : applied;
+  // Use draft for visual feedback in form fields (shows immediate changes)
+  // Use applied for URL state (only changes when "Go" is clicked)
+  const formDisplayFilters = draft;
   
   // Calculate positions for each dropdown
   const locationPosition = useDropdownPosition(locationRef as RefObject<HTMLElement | null>, activeSegment === "location");
@@ -75,25 +76,25 @@ export function DesktopSearchControl({
         }
       }
       
-      // Click is outside - close the panel and collapse expanded header
+      // Click is outside - close the panel only
       setActiveSegment(null);
-      onClose?.();
-      onCollapse?.(); // Also collapse the expanded header
+      actions.close(); // Revert draft
+      // Don't call onClose or onCollapse - parent handles its own collapse logic
     };
 
     if (activeSegment) {
       document.addEventListener("mousedown", handleClickOutside);
       return () => document.removeEventListener("mousedown", handleClickOutside);
     }
-  }, [activeSegment, onClose, onCollapse]);
+  }, [activeSegment, onClose, onCollapse, actions]);
 
   // Close panels on scroll
   useEffect(() => {
     const handleScroll = () => {
       if (activeSegment) {
         setActiveSegment(null);
-        onClose?.();
-        onCollapse?.();
+        actions.close(); // Revert draft
+        // Don't call onClose or onCollapse - parent handles its own collapse logic
       }
     };
 
@@ -101,7 +102,7 @@ export function DesktopSearchControl({
       window.addEventListener("scroll", handleScroll, { passive: true });
       return () => window.removeEventListener("scroll", handleScroll);
     }
-  }, [activeSegment, onClose, onCollapse]);
+  }, [activeSegment, actions]);
 
   // Close expanded header when clicking outside (even when no panels are open)
   useEffect(() => {
@@ -152,17 +153,17 @@ export function DesktopSearchControl({
     parts.push(getCityDisplayName(citySlug));
     
     // Add nearby if selected
-    if (displayFilters.nearby) {
+    if (formDisplayFilters.nearby) {
       parts.push("Поблизости");
     }
     
     // Add metro or district (mutually exclusive with nearby)
-    if (displayFilters.metro) {
-      const metro = safeApiOptions.metros.find(m => m.value === displayFilters.metro);
-      parts.push(metro?.label || displayFilters.metro);
-    } else if (displayFilters.district) {
-      const district = safeApiOptions.districts.find(d => d.value === displayFilters.district);
-      parts.push(district?.label || displayFilters.district);
+    if (formDisplayFilters.metro) {
+      const metro = safeApiOptions.metros.find(m => m.value === formDisplayFilters.metro);
+      parts.push(metro?.label || formDisplayFilters.metro);
+    } else if (formDisplayFilters.district) {
+      const district = safeApiOptions.districts.find(d => d.value === formDisplayFilters.district);
+      parts.push(district?.label || formDisplayFilters.district);
     }
     
     return parts.join(" • ");
@@ -170,14 +171,14 @@ export function DesktopSearchControl({
 
   // Build date display text
   const getDateText = () => {
-    if (displayFilters.whenPreset === "TODAY") return "Сегодня";
-    if (displayFilters.whenPreset === "TOMORROW") return "Завтра";
-    if (displayFilters.whenPreset === "WEEKEND") return "Выходные";
+    if (formDisplayFilters.whenPreset === "TODAY") return "Сегодня";
+    if (formDisplayFilters.whenPreset === "TOMORROW") return "Завтра";
+    if (formDisplayFilters.whenPreset === "WEEKEND") return "Выходные";
     
-    if (displayFilters.dateFrom) {
-      const fromDate = new Date(displayFilters.dateFrom);
-      if (displayFilters.dateTo && displayFilters.dateFrom !== displayFilters.dateTo) {
-        const toDate = new Date(displayFilters.dateTo);
+    if (formDisplayFilters.dateFrom) {
+      const fromDate = new Date(formDisplayFilters.dateFrom);
+      if (formDisplayFilters.dateTo && formDisplayFilters.dateFrom !== formDisplayFilters.dateTo) {
+        const toDate = new Date(formDisplayFilters.dateTo);
         const fromDay = fromDate.getDate();
         const toDay = toDate.getDate();
         const fromMonth = fromDate.getMonth();
@@ -202,9 +203,9 @@ export function DesktopSearchControl({
 
   // Build age display text
   const getAgeText = () => {
-    if (displayFilters.age.length === 0) return "С кем";
+    if (formDisplayFilters.age.length === 0) return "С кем";
     
-    const ageLabels = displayFilters.age.map(ageValue => {
+    const ageLabels = formDisplayFilters.age.map(ageValue => {
       const group = AGE_GROUPS.find(g => g.value === ageValue);
       return group ? group.label : ageValue;
     });
@@ -219,17 +220,6 @@ export function DesktopSearchControl({
     actions.apply();
     // Close any open panels
     setActiveSegment(null);
-    console.log("Search triggered - filters applied to URL");
-  };
-
-  const handleClearAll = () => {
-    // Clear all filters
-    actions.resetAll();
-    // Clear search text
-    setSearchText("");
-    // Close any open panels
-    setActiveSegment(null);
-    console.log("All filters cleared");
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -266,10 +256,10 @@ export function DesktopSearchControl({
     actions.setDraft({ age: [] });
   };
 
-  // Check if filters are active
-  const hasLocationFilter = !!(displayFilters.nearby || displayFilters.metro || displayFilters.district);
-  const hasDateFilter = !!(displayFilters.dateFrom || displayFilters.dateTo || displayFilters.whenPreset);
-  const hasAgeFilter = !!(displayFilters.age && displayFilters.age.length > 0);
+  // Check if filters are active (use formDisplayFilters for visual feedback)
+  const hasLocationFilter = !!(formDisplayFilters.nearby || formDisplayFilters.metro || formDisplayFilters.district);
+  const hasDateFilter = !!(formDisplayFilters.dateFrom || formDisplayFilters.dateTo || formDisplayFilters.whenPreset);
+  const hasAgeFilter = !!(formDisplayFilters.age && formDisplayFilters.age.length > 0);
 
   return (
     <div ref={containerRef} className={cn("relative w-full flex items-center gap-3", className)}>
@@ -569,16 +559,25 @@ function FullSearchForm({
           </span>
         </div>
         {hasLocationFilter && (
-          <button
+          <div
+            role="button"
+            tabIndex={0}
             onClick={(e) => {
               e.stopPropagation();
               onClearLocation();
             }}
-            className="flex items-center justify-center w-5 h-5 rounded-full bg-gray-200 hover:bg-gray-300 transition-colors flex-shrink-0 opacity-0 group-hover:opacity-100"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.stopPropagation();
+                e.preventDefault();
+                onClearLocation();
+              }
+            }}
+            className="flex items-center justify-center w-5 h-5 rounded-full bg-gray-200 hover:bg-gray-300 transition-colors flex-shrink-0 opacity-0 group-hover:opacity-100 cursor-pointer"
             aria-label="Очистить местоположение"
           >
             <X className="h-3 w-3 text-gray-600" />
-          </button>
+          </div>
         )}
       </button>
 
@@ -602,16 +601,25 @@ function FullSearchForm({
           </span>
         </div>
         {hasDateFilter && (
-          <button
+          <div
+            role="button"
+            tabIndex={0}
             onClick={(e) => {
               e.stopPropagation();
               onClearDate();
             }}
-            className="flex items-center justify-center w-5 h-5 rounded-full bg-gray-200 hover:bg-gray-300 transition-colors flex-shrink-0 opacity-0 group-hover:opacity-100"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.stopPropagation();
+                e.preventDefault();
+                onClearDate();
+              }
+            }}
+            className="flex items-center justify-center w-5 h-5 rounded-full bg-gray-200 hover:bg-gray-300 transition-colors flex-shrink-0 opacity-0 group-hover:opacity-100 cursor-pointer"
             aria-label="Очистить дату"
           >
             <X className="h-3 w-3 text-gray-600" />
-          </button>
+          </div>
         )}
       </button>
 
@@ -635,16 +643,25 @@ function FullSearchForm({
           </span>
         </div>
         {hasAgeFilter && (
-          <button
+          <div
+            role="button"
+            tabIndex={0}
             onClick={(e) => {
               e.stopPropagation();
               onClearAge();
             }}
-            className="flex items-center justify-center w-5 h-5 rounded-full bg-gray-200 hover:bg-gray-300 transition-colors flex-shrink-0 opacity-0 group-hover:opacity-100"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.stopPropagation();
+                e.preventDefault();
+                onClearAge();
+              }
+            }}
+            className="flex items-center justify-center w-5 h-5 rounded-full bg-gray-200 hover:bg-gray-300 transition-colors flex-shrink-0 opacity-0 group-hover:opacity-100 cursor-pointer"
             aria-label="Очистить возраст"
           >
             <X className="h-3 w-3 text-gray-600" />
-          </button>
+          </div>
         )}
       </button>
     </div>

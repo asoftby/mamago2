@@ -22,14 +22,12 @@ function SubmitButton({ buttonText }: { buttonText: string }) {
 
 export function RegisterForm({ from, buttonText = "Создать аккаунт", intent = "personal" }: { from?: string; buttonText?: string; intent?: string }) {
   const [state, formAction] = useActionState(registerAction, { ok: true });
-  const isBusiness = from === "business";
 
   // Check if error is "email already exists"
   const isEmailExists = !state.ok && state.message?.includes("уже зарегистрирован");
 
   return (
     <form action={formAction} className="space-y-6">
-      <input type="hidden" name="from" value={from || ""} />
       
       <div>
         <label
@@ -83,7 +81,7 @@ export function RegisterForm({ from, buttonText = "Создать аккаунт
           <p className="text-sm text-red-800 mb-2">{state.message}</p>
           {isEmailExists && (
             <Link
-              href={`/login?from=${from || ""}${isBusiness ? "&next=/business/onboarding" : ""}`}
+              href={`/login?from=${from || ""}`}
               className="inline-block mt-2 text-sm font-medium text-blue-600 hover:text-blue-700"
             >
               Войдите, чтобы продолжить →

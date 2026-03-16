@@ -30,7 +30,7 @@ export function ChipsRow({
               disabled={it.disabled}
               onClick={it.onClick}
               className={cn(
-                "h-11 px-5 rounded-full border bg-background",
+                "h-[2.75rem] px-5 rounded-full border bg-background",
                 "text-sm font-medium text-foreground",
                 "transition-colors",
                 "disabled:opacity-50 disabled:pointer-events-none",

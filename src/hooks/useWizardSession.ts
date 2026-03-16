@@ -7,8 +7,8 @@ import { useState, useEffect, useCallback } from "react";
 
 interface WizardSessionOptions {
   userId?: string;
-  wizardType: "place" | "activity" | "offer";
-  entityId?: string; // placeId, activityId, etc. for editing existing entities
+  wizardType: "place" | "activity" | "offer" | "event";
+  entityId?: string; // placeId, activityId, eventId, etc. for editing existing entities
 }
 
 export function useWizardSession({ userId, wizardType, entityId }: WizardSessionOptions) {

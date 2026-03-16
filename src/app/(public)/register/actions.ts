@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { ZodError } from "zod";
 import { registerUser, AuthError } from "@/server/auth/register";
 import { setSessionCookieAction } from "@/lib/auth/session";
+import { getPostAuthRedirect } from "@/lib/auth/postAuthRedirect";
 
 type ActionState =
   | { ok: true }
@@ -15,20 +16,13 @@ export async function registerAction(
 ): Promise<ActionState> {
   const email = String(formData.get("email") ?? "");
   const password = String(formData.get("password") ?? "");
-  const from = String(formData.get("from") ?? "");
 
   try {
     const { sessionToken, user } = await registerUser(email, password);
     await setSessionCookieAction(sessionToken);
 
-    // Success - redirect based on from parameter and role
-    if (from === "business") {
-      redirect("/business-entry");
-    } else if (user.role === "USER") {
-      redirect("/me/plan");
-    } else {
-      redirect("/minsk");
-    }
+    // Success - redirect to unified post-auth destination
+    redirect(getPostAuthRedirect());
   } catch (e) {
     // Handle Zod validation errors
     if (e instanceof ZodError) {

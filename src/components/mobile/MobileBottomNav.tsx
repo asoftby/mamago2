@@ -33,7 +33,7 @@ export function MobileBottomNav() {
       isActive: pathname.startsWith("/me") && !pathname.startsWith("/me/profile")
     },
     {
-      href: "/account",
+      href: "/profile",
       icon: User,
       label: "Профиль",
       isActive: pathname.startsWith("/me/profile") || pathname.startsWith("/business") || pathname.startsWith("/admin")

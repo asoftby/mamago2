@@ -3,6 +3,7 @@
 import { useState, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { PrimaryButton } from "@/components/ui/PrimaryButton";
+import { getPostAuthRedirect } from "@/lib/auth/postAuthRedirect";
 
 export function LoginForm({ from, next }: { from?: string; next?: string }) {
   const router = useRouter();
@@ -42,36 +43,8 @@ export function LoginForm({ from, next }: { from?: string; next?: string }) {
         return;
       }
 
-      // Success - determine redirect target
-      let targetPath = "/minsk"; // default
-
-      // Priority 1: from parameter
-      if (from) {
-        if (from === "admin") {
-          targetPath = "/admin";
-        } else if (from === "business") {
-          targetPath = "/business";
-        } else if (from === "public") {
-          targetPath = "/minsk";
-        } else {
-          targetPath = from; // use as-is if it's a path
-        }
-      } 
-      // Priority 2: next parameter
-      else if (next) {
-        targetPath = next;
-      }
-      // Priority 3: detect from host
-      else {
-        const host = window.location.host;
-        if (host.startsWith("admin.")) {
-          targetPath = "/admin";
-        } else if (host.startsWith("business.")) {
-          targetPath = "/business";
-        }
-      }
-
-      // Redirect
+      // Success - redirect to unified post-auth destination
+      const targetPath = getPostAuthRedirect();
       router.replace(targetPath);
     } catch (err) {
       console.error("Login error:", err);

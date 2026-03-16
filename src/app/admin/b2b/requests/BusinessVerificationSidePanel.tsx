@@ -191,7 +191,7 @@ export function BusinessVerificationSidePanel({
     <>
       {/* Overlay */}
       <div
-        className="fixed inset-0 bg-black bg-opacity-50 z-40"
+        className="fixed inset-0 bg-black/20 z-40"
         onClick={onClose}
       />
 

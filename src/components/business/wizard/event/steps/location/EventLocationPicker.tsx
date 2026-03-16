@@ -1,0 +1,555 @@
+"use client";
+
+import { useState, useEffect, useCallback } from "react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Loader2, CheckCircle2, AlertCircle, MapPinIcon } from "lucide-react";
+import { EventLocationSearchInput } from "./EventLocationSearchInput";
+import { EventLocationMapPreview } from "./EventLocationMapPreview";
+import { EventLocationMapModal } from "./EventLocationMapModal";
+import { formatDistance } from "@/lib/formatDistance";
+import { loadDistricts, loadMetroStations, enrichEventLocation } from "./eventLocationUtils";
+import type { EventFormData } from "../../types";
+
+interface EventLocationPickerProps {
+  data: EventFormData;
+  onChange: (updates: Partial<EventFormData>) => void;
+  disabled?: boolean;
+}
+
+export function EventLocationPicker({
+  data,
+  onChange,
+  disabled = false,
+}: EventLocationPickerProps) {
+  
+  // State
+  const [isSaving, setIsSaving] = useState(false);
+  const [isSaved, setIsSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  
+  // Check if location is set
+  const hasLocation = data.lat !== null && data.lng !== null;
+
+  // Sync geo enrichment state
+  const cityId = data.city;
+  const districtAutoId = data.districtAutoId;
+  const districtManualId = data.districtManualId;
+  const metroAutoId = data.metroAutoId;
+  const metroAutoDistanceM = data.metroAutoDistanceM;
+  const metroManualId = data.metroManualId;
+  const metroManualDistanceM = data.metroManualDistanceM;
+
+  // Options for selects
+  const [districts, setDistricts] = useState<Array<{ id: string; name: string }>>([]);
+  const [metroStations, setMetroStations] = useState<Array<{ id: string; name: string }>>([]);
+
+  // Details state
+  const [isInsideComplex, setIsInsideComplex] = useState(false);
+  const [floor, setFloor] = useState("");
+  const [unit, setUnit] = useState("");
+  const [howToFind, setHowToFind] = useState("");
+
+  // Modal state
+  const [isMapModalOpen, setIsMapModalOpen] = useState(false);
+
+  // Load districts and metro stations when cityId is available
+  const loadGeoOptions = useCallback(async () => {
+    if (!cityId) return;
+
+    console.log("[EventLocationPicker] Loading geo options for cityId:", cityId);
+
+    try {
+      const [districtsRes, metroRes] = await Promise.all([
+        loadDistricts(cityId),
+        loadMetroStations(cityId),
+      ]);
+
+      setDistricts(districtsRes);
+      setMetroStations(metroRes);
+      console.log("[EventLocationPicker] Loaded", districtsRes.length, "districts and", metroRes.length, "metro stations");
+      
+      // If no data loaded and we're in development, show mock data
+      if (process.env.NODE_ENV === "development" && districtsRes.length === 0 && metroRes.length === 0) {
+        console.log("[EventLocationPicker] No data from API, using mock data for development");
+        setDistricts([
+          { id: "district-1", name: "Центральный" },
+          { id: "district-2", name: "Советский" },
+          { id: "district-3", name: "Первомайский" },
+        ]);
+        setMetroStations([
+          { id: "metro-1", name: "Площадь Победы" },
+          { id: "metro-2", name: "Октябрьская" },
+          { id: "metro-3", name: "Немига" },
+        ]);
+      }
+    } catch (err) {
+      console.error("[EventLocationPicker] Load geo options error:", err);
+      
+      // Fallback to mock data in development
+      if (process.env.NODE_ENV === "development") {
+        console.log("[EventLocationPicker] API error, using mock data for development");
+        setDistricts([
+          { id: "district-1", name: "Центральный" },
+          { id: "district-2", name: "Советский" },
+          { id: "district-3", name: "Первомайский" },
+        ]);
+        setMetroStations([
+          { id: "metro-1", name: "Площадь Победы" },
+          { id: "metro-2", name: "Октябрьская" },
+          { id: "metro-3", name: "Немига" },
+        ]);
+      }
+    }
+  }, [cityId]);
+
+  useEffect(() => {
+    if (cityId) {
+      console.log("[EventLocationPicker] cityId changed, loading options:", cityId);
+      loadGeoOptions();
+    }
+  }, [cityId, loadGeoOptions]);
+
+  // Load single metro station by ID if we have metroAutoId but no stations loaded
+  useEffect(() => {
+    const loadMetroStation = async () => {
+      if (metroAutoId && metroStations.length === 0 && cityId) {
+        console.log("[EventLocationPicker] Loading single metro station:", metroAutoId);
+        try {
+          const stations = await loadMetroStations(cityId);
+          setMetroStations(stations);
+          console.log("[EventLocationPicker] Loaded", stations.length, "metro stations");
+        } catch (err) {
+          console.error("[EventLocationPicker] Load metro station error:", err);
+        }
+      }
+    };
+    loadMetroStation();
+  }, [metroAutoId, metroStations.length, cityId]);
+
+  const handlePlaceSelect = async (placeData: {
+    googlePlaceId: string;
+    lat: number;
+    lng: number;
+    formattedAddr: string;
+    addressJson: any[];
+  }) => {
+    setIsSaving(true);
+    
+    try {
+      // Set location source to MANUAL for address input
+      onChange({
+        locationSource: "MANUAL",
+        venueKind: "MANUAL",
+        placeId: null,
+        venueName: placeData.formattedAddr.split(',')[0] || "Выбранное место",
+        address: placeData.formattedAddr,
+        lat: placeData.lat,
+        lng: placeData.lng,
+        source: "ADDRESS_INPUT",
+      });
+
+      // Only enrich with district/metro if locationSource is MANUAL
+      // Do NOT overwrite place-derived data
+      const enrichment = await enrichEventLocation({
+        lat: placeData.lat,
+        lng: placeData.lng,
+        cityId: undefined, // Let API resolve cityId
+        formattedAddr: placeData.formattedAddr,
+        addressJson: placeData.addressJson,
+      });
+
+      // Update enrichment data and city
+      if (enrichment) {
+        onChange({
+          city: enrichment.cityId || "minsk", // Store UUID or fallback to slug
+          districtAutoId: enrichment.districtAutoId,
+          metroAutoId: enrichment.metroAutoId,
+          metroAutoDistanceM: enrichment.metroAutoDistanceM,
+          districtName: enrichment.districtName,
+          metroName: enrichment.metroName,
+        });
+      }
+
+      setIsSaved(true);
+      setTimeout(() => setIsSaved(false), 3000);
+    } catch (err) {
+      console.error("[EventLocationPicker] Place select error:", err);
+      setError(err instanceof Error ? err.message : "Ошибка выбора места");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleMapConfirm = async (mapData: {
+    lat: number;
+    lng: number;
+  }) => {
+    setIsSaving(true);
+    
+    try {
+      // Set location source to MANUAL for map picker
+      onChange({
+        locationSource: "MANUAL",
+        venueKind: "MANUAL",
+        placeId: null,
+        venueName: "Выбранная точка на карте",
+        address: `Координаты: ${mapData.lat.toFixed(6)}, ${mapData.lng.toFixed(6)}`,
+        lat: mapData.lat,
+        lng: mapData.lng,
+        source: "MAP_PICKER",
+      });
+
+      // Only enrich with district/metro if locationSource is MANUAL
+      const enrichment = await enrichEventLocation({
+        lat: mapData.lat,
+        lng: mapData.lng,
+        cityId: undefined, // Let API resolve cityId
+      });
+
+      // Update enrichment data and city
+      if (enrichment) {
+        onChange({
+          city: enrichment.cityId || "minsk", // Store UUID or fallback to slug
+          districtAutoId: enrichment.districtAutoId,
+          metroAutoId: enrichment.metroAutoId,
+          metroAutoDistanceM: enrichment.metroAutoDistanceM,
+          districtName: enrichment.districtName,
+          metroName: enrichment.metroName,
+        });
+      }
+
+      setIsSaved(true);
+      setTimeout(() => setIsSaved(false), 3000);
+    } catch (err) {
+      console.error("[EventLocationPicker] Map confirm error:", err);
+      setError(err instanceof Error ? err.message : "Ошибка выбора места на карте");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDistrictChange = (value: string) => {
+    const newValue = value === "" ? null : value;
+    onChange({ 
+      districtManualId: newValue,
+      // Update legacy field for backward compatibility
+      district: newValue ? (districts.find(d => d.id === newValue)?.name || newValue) : "",
+    });
+  };
+
+  const handleMetroChange = (value: string) => {
+    const newValue = value === "" ? null : value;
+    onChange({ 
+      metroManualId: newValue,
+      // Update legacy field for backward compatibility
+      metro: newValue ? (metroStations.find(m => m.id === newValue)?.name || newValue) : "",
+    });
+  };
+
+  const handleResetDistrict = () => {
+    onChange({ 
+      districtManualId: null,
+      district: districtAutoId ? (data.districtName || districtAutoId) : "",
+    });
+  };
+
+  const handleResetMetro = () => {
+    onChange({ 
+      metroManualId: null,
+      metroManualDistanceM: null,
+      metro: metroAutoId ? (data.metroName || metroAutoId) : "",
+    });
+  };
+
+  // Computed values
+  const districtShown = districtManualId ?? districtAutoId;
+  const metroShown = metroManualId ?? metroAutoId;
+  const metroDistanceShown = metroManualId ? metroManualDistanceM : metroAutoDistanceM;
+
+  return (
+    <div className="space-y-6">
+      {/* Debug Panel (dev-only) */}
+      {process.env.NODE_ENV === "development" && (
+        <div className="rounded-lg border border-yellow-300 bg-yellow-50 p-4">
+          <h4 className="text-xs font-semibold text-yellow-900 mb-2">🔍 Debug: Event Geo Data</h4>
+          <pre className="text-xs text-yellow-800 overflow-auto">
+            {JSON.stringify(
+              {
+                locationSource: data.locationSource || null,
+                placeId: data.placeId || null,
+                lat: data.lat || null,
+                lng: data.lng || null,
+                cityId: cityId || null,
+                districtAutoId: districtAutoId || null,
+                districtManualId: districtManualId || null,
+                metroAutoId: metroAutoId || null,
+                metroAutoDistanceM: metroAutoDistanceM || null,
+                metroManualId: metroManualId || null,
+                metroManualDistanceM: metroManualDistanceM || null,
+                selectsVisible: !!(hasLocation && cityId),
+                readOnlyVisible: !!(hasLocation && !cityId && (districtAutoId || districtManualId || metroAutoId || metroManualId)),
+              },
+              null,
+              2
+            )}
+          </pre>
+        </div>
+      )}
+
+      {/* Status indicators */}
+      {(isSaving || isSaved || error) && (
+        <div className="flex items-center gap-2">
+          {isSaving && (
+            <div className="flex items-center gap-2 text-sm text-gray-600">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              <span>Сохраняю...</span>
+            </div>
+          )}
+          {isSaved && (
+            <div className="flex items-center gap-2 text-sm text-green-600">
+              <CheckCircle2 className="h-3 w-3" />
+              <span>Сохранено</span>
+            </div>
+          )}
+          {error && (
+            <div className="flex items-center gap-2 text-sm text-red-600">
+              <AlertCircle className="h-3 w-3" />
+              <span>{error}</span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Search Input */}
+      <div>
+        <Label>Адрес или название места</Label>
+        <div className="mt-2 space-y-2">
+          <EventLocationSearchInput
+            onPlaceSelect={handlePlaceSelect}
+            disabled={isSaving || disabled}
+            initialValue={data.address || ""}
+            placeholder="Детский центр Песочница или Притыцкого 12"
+          />
+          <button
+            type="button"
+            onClick={() => setIsMapModalOpen(true)}
+            disabled={disabled}
+            className="text-sm text-blue-600 hover:text-blue-700 hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Выбрать точку на карте
+          </button>
+        </div>
+      </div>
+
+      {/* Map Preview (only show if location is set) */}
+      {hasLocation && (
+        <div>
+          <Label>Выбранное местоположение</Label>
+          <div className="mt-2 space-y-2">
+            <EventLocationMapPreview
+              lat={data.lat!}
+              lng={data.lng!}
+              onOpenMap={() => setIsMapModalOpen(true)}
+            />
+            <p className="text-sm text-gray-600">
+              Выбрано: {data.address || `${data.lat!.toFixed(6)}, ${data.lng!.toFixed(6)}`}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* District & Metro (only show if location is set and cityId available) */}
+      {hasLocation && cityId && (
+        <div className="space-y-4">
+          {/* Location Source Indicator */}
+          {data.locationSource === "PLACE" && data.placeId && (
+            <div className="rounded-lg border border-blue-200 bg-blue-50 p-3">
+              <div className="flex items-center gap-2 text-sm text-blue-800">
+                <MapPinIcon className="w-4 h-4" />
+                <span className="font-medium">Данные из места:</span>
+                <span>{data.venueName}</span>
+              </div>
+              <p className="text-xs text-blue-700 mt-1">
+                Район и метро взяты из настроек места. Вы можете изменить их вручную при необходимости.
+              </p>
+            </div>
+          )}
+
+          {/* District Select */}
+          <div>
+            <Label htmlFor="district">Район</Label>
+            <select
+              id="district"
+              value={districtShown || ""}
+              onChange={(e) => handleDistrictChange(e.target.value)}
+              className="mt-2 w-full rounded-md border border-input bg-background px-3 py-2"
+              disabled={districts.length === 0 || disabled}
+            >
+              <option value="">Не выбрано</option>
+              {districts.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.name}
+                </option>
+              ))}
+            </select>
+            
+            {/* Helper text */}
+            <div className="mt-1 text-xs text-muted-foreground">
+              {districtManualId ? (
+                <div className="flex items-center justify-between">
+                  <span>Вы выбрали вручную</span>
+                  <button
+                    type="button"
+                    onClick={handleResetDistrict}
+                    disabled={disabled}
+                    className="text-blue-600 hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Сбросить
+                  </button>
+                </div>
+              ) : districtAutoId ? (
+                <span>Определено автоматически</span>
+              ) : (
+                <span>Не удалось определить автоматически — выберите вручную</span>
+              )}
+            </div>
+          </div>
+
+          {/* Metro Select */}
+          <div>
+            <Label htmlFor="metro">Метро</Label>
+            <select
+              id="metro"
+              value={metroShown || ""}
+              onChange={(e) => handleMetroChange(e.target.value)}
+              className="mt-2 w-full rounded-md border border-input bg-background px-3 py-2"
+              disabled={disabled}
+            >
+              <option value="">Не выбрано</option>
+              {/* Show currently selected metro even if stations not loaded yet */}
+              {metroShown && metroStations.length === 0 && data.metroName && (
+                <option value={metroShown}>{data.metroName}</option>
+              )}
+              {metroStations.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.name}
+                </option>
+              ))}
+            </select>
+            
+            {/* Distance display */}
+            {metroShown && metroDistanceShown !== null && (
+              <p className="mt-1 text-sm text-gray-700">
+                Расстояние: {formatDistance(metroDistanceShown)}
+              </p>
+            )}
+            
+            {/* Helper text */}
+            <div className="mt-1 text-xs text-muted-foreground">
+              {metroManualId ? (
+                <div className="flex items-center justify-between">
+                  <span>Вы выбрали вручную</span>
+                  <button
+                    type="button"
+                    onClick={handleResetMetro}
+                    disabled={disabled}
+                    className="text-blue-600 hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Сбросить
+                  </button>
+                </div>
+              ) : metroAutoId ? (
+                <span>Определено автоматически</span>
+              ) : (
+                <span>Не удалось определить автоматически — выберите вручную</span>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Read-only display when location exists but cityId is missing */}
+      {hasLocation && !cityId && (districtAutoId || districtManualId || metroAutoId || metroManualId) && (
+        <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-2">
+          <h4 className="text-sm font-medium text-gray-900">Район и метро</h4>
+          <p className="text-xs text-gray-600 mb-3">
+            Данные сохранены, но редактирование недоступно (отсутствует cityId)
+          </p>
+          
+          {(districtAutoId || districtManualId) && (
+            <div className="text-sm">
+              <span className="text-gray-600">Район:</span>{" "}
+              <span className="text-gray-900">
+                {districtManualId || districtAutoId}
+                {districtManualId && " (выбрано вручную)"}
+                {!districtManualId && districtAutoId && " (автоматически)"}
+              </span>
+            </div>
+          )}
+          
+          {(metroAutoId || metroManualId) && (
+            <div className="text-sm">
+              <span className="text-gray-600">Метро:</span>{" "}
+              <span className="text-gray-900">
+                {metroStations.find(m => m.id === (metroManualId || metroAutoId))?.name || (metroManualId || metroAutoId)}
+                {metroDistanceShown !== null && ` · ${formatDistance(metroDistanceShown)}`}
+                {metroManualId && " (выбрано вручную)"}
+                {!metroManualId && metroAutoId && " (автоматически)"}
+              </span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Read-only display for enriched data (always show when available) */}
+      {hasLocation && (districtAutoId || metroAutoId) && (
+        <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 space-y-2">
+          <h4 className="text-sm font-medium text-blue-900">📍 Определено автоматически</h4>
+          
+          {districtAutoId && (
+            <div className="text-sm">
+              <span className="text-blue-700">Район:</span>{" "}
+              <span className="text-blue-900 font-medium">
+                {data.districtName || 
+                 (districts.find(d => d.id === districtAutoId)?.name) || 
+                 districtAutoId}
+              </span>
+            </div>
+          )}
+          
+          {metroAutoId && (
+            <div className="text-sm">
+              <span className="text-blue-700">Метро:</span>{" "}
+              <span className="text-blue-900 font-medium">
+                {data.metroName || 
+                 (metroStations.length > 0 
+                   ? (metroStations.find(m => m.id === metroAutoId)?.name || metroAutoId)
+                   : metroAutoId)}
+                {metroAutoDistanceM !== null && ` · ${formatDistance(metroAutoDistanceM)}`}
+              </span>
+            </div>
+          )}
+          
+          {!districtAutoId && !metroAutoId && (
+            <p className="text-xs text-blue-700">
+              Метро/район определим после выбора точки
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Map Modal */}
+      <EventLocationMapModal
+        isOpen={isMapModalOpen}
+        onClose={() => setIsMapModalOpen(false)}
+        initialLat={data.lat}
+        initialLng={data.lng}
+        onConfirm={handleMapConfirm}
+      />
+    </div>
+  );
+}

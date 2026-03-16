@@ -1,40 +1,68 @@
+import { redirect, notFound } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/server";
-import { redirect } from "next/navigation";
+import { EventWizard } from "@/components/business/wizard/event/EventWizard";
+import { prisma } from "@/lib/prisma";
+// import { prisma } from "@/lib/prisma";
 
-export default async function EditEventPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
+export const metadata = {
+  title: "Редактирование события | MamaGo Business",
+  description: "Редактирование события",
+};
+
+interface EditEventPageProps {
+  params: {
+    id: string;
+  };
+}
+
+export default async function EditEventPage({ params }: EditEventPageProps) {
   const user = await getCurrentUser();
-  
+
   if (!user || user.role !== "BUSINESS_OWNER") {
     redirect("/business/login");
   }
 
-  const { id } = await params;
+  // Get user's business profile
+  const business = await prisma.business.findUnique({
+    where: { ownerUserId: user.id },
+    select: {
+      id: true,
+      name: true,
+      legalName: true,
+      phone: true,
+    },
+  });
+
+  // TODO: Fetch event from database
+  // const event = await prisma.event.findUnique({
+  //   where: { id: params.id },
+  //   include: { ... }
+  // });
+
+  // if (!event) {
+  //   notFound();
+  // }
+
+  // TODO: Check ownership/permissions
 
   return (
-    <div className="max-w-5xl mx-auto p-6">
-      <div className="bg-white rounded-lg border border-gray-200 p-12">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-900 mb-4">
-            Редактирование мероприятия
-          </h1>
-          <p className="text-gray-600 mb-2">
-            ID: {id}
-          </p>
-          <p className="text-gray-600 mb-6">
-            Форма редактирования мероприятия будет реализована на следующем этапе.
-          </p>
-          <a
-            href="/business/events"
-            className="inline-flex items-center px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 transition-colors"
-          >
-            Вернуться к списку
-          </a>
-        </div>
-      </div>
-    </div>
+    <EventWizard
+      mode="edit"
+      // event={event}
+      userId={user.id}
+      userRole={user.role}
+      business={business ? {
+        id: business.id,
+        name: business.name,
+        description: business.legalName || undefined,
+        phone: business.phone || undefined,
+      } : {
+        // Fallback mock business for development
+        id: "mock-business-1",
+        name: "Мой бизнес",
+        description: "Описание бизнеса",
+        phone: "+375 29 123 45 67",
+      }}
+    />
   );
 }

@@ -1,5 +1,7 @@
 import { PlanCard } from "@/features/me/components/PlanCard";
 import type { PlanItemWithActivity } from "@/server/services/plan.service";
+import { ComponentMetaCard } from "@/components/ui-lab/ComponentMetaCard";
+import { getComponentMeta } from "@/components/ui-lab/registry";
 
 // Mock data for demonstrations
 const mockActivity1 = {
@@ -139,61 +141,60 @@ export function PlanCardSection() {
     ],
   };
 
+  const componentMeta = getComponentMeta("plan-card", "ui-lab");
+
   return (
     <section id="plan-card" className="space-y-8">
-      <div>
-        <h2 className="text-3xl font-bold tracking-tight mb-2">PlanCard</h2>
-        <p className="text-muted-foreground">
-          Premium week strip with day pills, mini-cards, and interactive states.
-        </p>
-      </div>
+      {componentMeta && (
+        <ComponentMetaCard {...componentMeta}>
+          <div className="space-y-12">
+            {/* State 1: Empty Week */}
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-xl font-semibold mb-1">Empty Week</h3>
+                <p className="text-sm text-muted-foreground">
+                  No plan items. Shows empty state with CTA.
+                </p>
+              </div>
+              <PlanCard
+                weekDates={weekDates}
+                planItemsByDate={emptyPlanItems}
+                selectedDate={todayStr}
+              />
+            </div>
 
-      <div className="space-y-12">
-        {/* State 1: Empty Week */}
-        <div className="space-y-4">
-          <div>
-            <h3 className="text-xl font-semibold mb-1">Empty Week</h3>
-            <p className="text-sm text-muted-foreground">
-              No plan items. Shows empty state with CTA.
-            </p>
-          </div>
-          <PlanCard
-            weekDates={weekDates}
-            planItemsByDate={emptyPlanItems}
-            selectedDate={todayStr}
-          />
-        </div>
+            {/* State 2: Week with 1 Item */}
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-xl font-semibold mb-1">Week with 1 Item</h3>
+                <p className="text-sm text-muted-foreground">
+                  Single plan item on Wednesday. Shows footer hint to add more.
+                </p>
+              </div>
+              <PlanCard
+                weekDates={weekDates}
+                planItemsByDate={singleItemPlanItems}
+                selectedDate={weekDates[2]}
+              />
+            </div>
 
-        {/* State 2: Week with 1 Item */}
-        <div className="space-y-4">
-          <div>
-            <h3 className="text-xl font-semibold mb-1">Week with 1 Item</h3>
-            <p className="text-sm text-muted-foreground">
-              Single plan item on Wednesday. Shows footer hint to add more.
-            </p>
+            {/* State 3: Week with Multiple Items */}
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-xl font-semibold mb-1">Week with Multiple Items</h3>
+                <p className="text-sm text-muted-foreground">
+                  Multiple items across different days. Shows scenario button, item indicators, and mini-cards.
+                </p>
+              </div>
+              <PlanCard
+                weekDates={weekDates}
+                planItemsByDate={multipleItemsPlanItems}
+                selectedDate={weekDates[3]}
+              />
+            </div>
           </div>
-          <PlanCard
-            weekDates={weekDates}
-            planItemsByDate={singleItemPlanItems}
-            selectedDate={weekDates[2]}
-          />
-        </div>
-
-        {/* State 3: Week with Multiple Items */}
-        <div className="space-y-4">
-          <div>
-            <h3 className="text-xl font-semibold mb-1">Week with Multiple Items</h3>
-            <p className="text-sm text-muted-foreground">
-              Multiple items across different days. Shows scenario button, item indicators, and mini-cards.
-            </p>
-          </div>
-          <PlanCard
-            weekDates={weekDates}
-            planItemsByDate={multipleItemsPlanItems}
-            selectedDate={weekDates[3]}
-          />
-        </div>
-      </div>
+        </ComponentMetaCard>
+      )}
     </section>
   );
 }

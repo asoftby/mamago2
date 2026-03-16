@@ -157,8 +157,22 @@ export default function ActivityPage({ params }: ActivityPageProps) {
           </div>
 
           {priceLabel && (
-            <div className="text-2xl font-semibold text-primary">
-              {priceLabel}
+            <div className="space-y-3">
+              <div className="text-2xl font-semibold text-primary">
+                {priceLabel}
+              </div>
+              
+              {/* Price Details - if available */}
+              {activity.priceDetails && (
+                <div className="bg-muted/50 rounded-lg p-4 border border-border/50">
+                  <div className="text-sm font-medium text-foreground mb-2">
+                    Стоимость
+                  </div>
+                  <div className="text-sm text-muted-foreground whitespace-pre-line leading-relaxed">
+                    {activity.priceDetails}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -171,6 +185,16 @@ export default function ActivityPage({ params }: ActivityPageProps) {
           {/* CTA Button */}
           <div className="pt-6">
             <PrimaryButton className="w-full md:w-auto md:min-w-[300px] text-lg h-14 rounded-2xl shadow-lg shadow-primary/20">
+              {/* 
+                In real app, CTA label should be auto-determined from participationMode:
+                - info-only → "Подробнее"
+                - simple-booking → "Записаться"
+                - time-slots → "Выбрать время"
+                - external-link → "Купить билет"
+                - request → "Оставить заявку"
+                
+                Use: getCtaLabelFromParticipationMode(activity.participationMode)
+              */}
               Купить билет
             </PrimaryButton>
           </div>

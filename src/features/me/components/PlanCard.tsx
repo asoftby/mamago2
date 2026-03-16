@@ -7,7 +7,6 @@ import { H2, Body, BodyMuted, Caption } from "@/components/ui/typography";
 import { Button } from "@/components/ui/button";
 import { PrimaryButton } from "@/components/ui/PrimaryButton";
 import { cn } from "@/lib/utils";
-import { formatRuShortDayMonth } from "@/lib/formatters/date";
 import type { PlanItemWithActivity } from "@/server/services/plan.service";
 
 type PlanCardProps = {
@@ -162,13 +161,23 @@ function DaySection({
 }) {
   const date = new Date(dateStr);
   const weekday = date.toLocaleDateString("ru-RU", { weekday: "long" });
-  const shortDate = formatRuShortDayMonth(date);
+  const day = date.getDate();
+  
+  // Russian months in genitive case (used with day numbers)
+  const monthsGenitive = [
+    "января", "февраля", "марта", "апреля", "мая", "июня",
+    "июля", "августа", "сентября", "октября", "ноября", "декабря"
+  ];
+  const month = monthsGenitive[date.getMonth()];
+  
+  // Capitalize first letter of weekday
+  const capitalizedWeekday = weekday.charAt(0).toUpperCase() + weekday.slice(1);
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <Body className="font-semibold capitalize">
-          На {weekday}, {shortDate}
+        <Body className="font-semibold">
+          {capitalizedWeekday}, {day} {month}
         </Body>
         {items.length > 0 && (
           <Link href={`/me/day/${dateStr}`}>

@@ -22,6 +22,10 @@ export function SiteHeaderDesktop() {
   const currentIntent = getIntentFromPath(pathname);
   const currentCity = getCityFromPath(pathname);
   
+  // For pages without city context (like /register, /profile), use default city for navigation
+  const displayCity = currentCity || "minsk";
+  const shouldShowIntentTabs = true; // Always show intent tabs
+  
   // Check if we're on an intent page that should show filters
   const shouldShowFilters = currentIntent && currentCity;
 
@@ -73,9 +77,21 @@ export function SiteHeaderDesktop() {
       const target = event.target as Element;
       const header = document.querySelector('header');
       
-      if (header && !header.contains(target)) {
-        setIsExpanded(false);
+      // Check if click is inside header
+      if (header && header.contains(target)) {
+        return;
       }
+      
+      // Check if click is inside any portal panel (filter dropdowns)
+      const portalPanels = document.querySelectorAll('[data-portal-panel]');
+      for (const panel of portalPanels) {
+        if (panel.contains(target)) {
+          return;
+        }
+      }
+      
+      // Click is outside - collapse
+      setIsExpanded(false);
     };
 
     document.addEventListener('mousedown', handleClickOutside);
@@ -162,10 +178,12 @@ export function SiteHeaderDesktop() {
                 )}
                 style={{ transform: 'translateZ(0)', backfaceVisibility: 'hidden' }}
               >
-                <DiscoveryIntentTabs 
-                  city={currentCity} 
-                  currentIntent={currentIntent}
-                />
+                {shouldShowIntentTabs && (
+                  <DiscoveryIntentTabs 
+                    city={displayCity} 
+                    currentIntent={currentIntent}
+                  />
+                )}
               </div>
 
               {/* Layer 2: Compact Search - Slides up and fades in */}
@@ -183,7 +201,7 @@ export function SiteHeaderDesktop() {
                 <div className="w-full max-w-[600px] flex items-center gap-3">
                   <div className="flex-1">
                     <DesktopSearchControl 
-                      citySlug={currentCity}
+                      citySlug={displayCity}
                       isCompact={true}
                       onExpand={() => setIsExpanded(true)}
                       onCollapse={() => setIsExpanded(false)}
@@ -209,7 +227,7 @@ export function SiteHeaderDesktop() {
               </Link>
               
               <Link
-                href="/account"
+                href="/profile"
                 className="flex items-center justify-center w-[39px] h-[39px] bg-white border border-gray-200 rounded-full hover:bg-gray-50 hover:border-gray-300 transition-colors duration-200 shadow-sm"
                 aria-label="Профіль"
               >
@@ -243,7 +261,7 @@ export function SiteHeaderDesktop() {
             >
               <div className="w-full max-w-[850px]">
                 <DesktopSearchControl 
-                  citySlug={currentCity}
+                  citySlug={displayCity}
                   isCompact={false}
                   onExpand={() => setIsExpanded(true)}
                   onCollapse={() => setIsExpanded(false)}

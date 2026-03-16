@@ -1,0 +1,435 @@
+// Event Wizard Validation
+
+import type { EventFormData } from "./types";
+import { isRichTextMeaningful, getRichTextLength } from "@/lib/richtext/utils";
+import { DRAFT_REQUIRED, SUBMIT_REQUIRED } from "./types";
+
+export interface ValidationResult {
+  isValid: boolean;
+  isComplete: boolean;
+  errors: string[];
+  warnings: string[];
+}
+
+/**
+ * Validate for draft save (soft validation)
+ */
+export function validateForDraft(data: EventFormData): ValidationResult {
+  const errors: string[] = [];
+  
+  if (!data.title || data.title.trim().length === 0) {
+    errors.push("Укажите название события");
+  }
+  
+  if (data.categories.length === 0) {
+    errors.push("Выберите хотя бы одну категорию");
+  }
+  
+  return {
+    isValid: errors.length === 0,
+    isComplete: errors.length === 0,
+    errors,
+    warnings: [],
+  };
+}
+
+/**
+ * Validate a specific step
+ */
+export function validateStep(step: number, data: EventFormData): ValidationResult {
+  switch (step) {
+    case 1:
+      return validateStep1(data);
+    case 2:
+      return validateStep2(data);
+    case 3:
+      return validateStep3(data);
+    case 4:
+      return validateStep4(data);
+    case 5:
+      return validateStep5(data);
+    case 6:
+      return validateStep6(data);
+    case 7:
+      return validateStep7(data);
+    case 8:
+      return validateStep8(data);
+    case 9:
+      return validateForSubmit(data);
+    default:
+      return { isValid: true, isComplete: true, errors: [], warnings: [] };
+  }
+}
+
+/**
+ * Step 1: Basics
+ */
+function validateStep1(data: EventFormData): ValidationResult {
+  const errors: string[] = [];
+  const warnings: string[] = [];
+
+  if (!data.title || data.title.trim().length < 3) {
+    errors.push("Название должно содержать минимум 3 символа");
+  }
+
+  if (!data.activityType) {
+    warnings.push("Выберите тип активности");
+  }
+
+  if (data.categories.length === 0) {
+    errors.push("Выберите хотя бы одну категорию");
+  }
+
+  if (data.ageGroups.length === 0) {
+    warnings.push("Выберите возраст");
+  }
+
+  // Cinema-specific validation
+  if (data.categories.includes("Кино")) {
+    if (data.cinemaTrailerUrl && !isValidUrl(data.cinemaTrailerUrl)) {
+      errors.push("Некорректная ссылка на трейлер");
+    }
+  }
+
+  const isComplete = 
+    data.title.trim().length >= 3 &&
+    !!data.activityType &&
+    data.categories.length > 0 &&
+    data.ageGroups.length > 0;
+
+  return {
+    isValid: errors.length === 0,
+    isComplete,
+    errors,
+    warnings,
+  };
+}
+
+/**
+ * Step 2: Location (EventVenue)
+ */
+export function validateStep2(data: EventFormData): ValidationResult {
+  const errors: string[] = [];
+  const warnings: string[] = [];
+
+  if (!data.venueKind) {
+    errors.push("Выберите способ указания локации");
+  } else {
+    if (data.venueKind === "PLACE") {
+      if (!data.placeId) {
+        errors.push("Выберите место проведения");
+      }
+    } else if (data.venueKind === "MANUAL") {
+      if (!data.venueName || data.venueName.trim().length === 0) {
+        errors.push("Укажите название площадки");
+      }
+      if (!data.address || data.address.trim().length === 0) {
+        errors.push("Укажите адрес");
+      }
+      if (!data.city || data.city.trim().length === 0) {
+        errors.push("Укажите город");
+      }
+    }
+    // MOBILE and TBD don't require additional fields
+  }
+
+  const isComplete = Boolean(
+    data.venueKind &&
+    (data.venueKind === "PLACE" ? data.placeId : true) &&
+    (data.venueKind === "MANUAL" ? (data.venueName.trim() && data.address.trim() && data.city.trim()) : true)
+  );
+
+  return {
+    isValid: errors.length === 0,
+    isComplete,
+    errors,
+    warnings,
+  };
+}
+
+/**
+ * Step 3: Description
+ */
+function validateStep3(data: EventFormData): ValidationResult {
+  const errors: string[] = [];
+  const warnings: string[] = [];
+
+  // Validate fullDescription (now HTML from TipTap)
+  if (!isRichTextMeaningful(data.fullDescription)) {
+    errors.push("Описание обязательно для заполнения");
+  } else {
+    const textLength = getRichTextLength(data.fullDescription);
+    if (textLength < 20) {
+      errors.push("Описание должно содержать минимум 20 символов");
+    }
+  }
+
+  const isComplete = isRichTextMeaningful(data.fullDescription) && 
+    getRichTextLength(data.fullDescription) >= 20;
+
+  return {
+    isValid: errors.length === 0,
+    isComplete,
+    errors,
+    warnings,
+  };
+}
+
+/**
+ * Step 4: Media
+ */
+function validateStep4(data: EventFormData): ValidationResult {
+  const errors: string[] = [];
+  const warnings: string[] = [];
+
+  if (!data.coverImage) {
+    errors.push("Загрузите главное изображение");
+  }
+
+  if (data.reelsUrl && !isValidUrl(data.reelsUrl)) {
+    errors.push("Некорректная ссылка на видео");
+  }
+
+  if (data.gallery.length === 0) {
+    warnings.push("Рекомендуется добавить фотографии в галерею");
+  }
+
+  const isComplete = !!data.coverImage;
+
+  return {
+    isValid: errors.length === 0,
+    isComplete,
+    errors,
+    warnings,
+  };
+}
+
+/**
+ * Step 5: Schedule
+ * MVP: all dates use common time
+ */
+function validateStep5(data: EventFormData): ValidationResult {
+  const errors: string[] = [];
+  const warnings: string[] = [];
+
+  if (data.dates.length === 0) {
+    errors.push("Добавьте хотя бы одну дату проведения");
+  }
+
+  // Validate time if not all day
+  if (!data.allDay) {
+    if (!data.startTime) {
+      errors.push("Укажите время начала");
+    }
+    if (!data.endTime) {
+      errors.push("Укажите время окончания");
+    }
+    if (data.startTime && data.endTime && data.startTime >= data.endTime) {
+      errors.push("Время окончания должно быть позже времени начала");
+    }
+  }
+
+  // Recurring validation
+  if (data.repeatEnabled) {
+    if (!data.repeatUnit) {
+      errors.push("Выберите частоту повторения");
+    }
+    if (!data.repeatUntil) {
+      errors.push("Укажите дату окончания повторений");
+    }
+  }
+
+  const isComplete = 
+    data.dates.length > 0 &&
+    Boolean(data.allDay || (data.startTime && data.endTime));
+
+  return {
+    isValid: errors.length === 0,
+    isComplete,
+    errors,
+    warnings,
+  };
+}
+
+/**
+ * Step 6: Pricing & Participation
+ */
+function validateStep6(data: EventFormData): ValidationResult {
+  const errors: string[] = [];
+  const warnings: string[] = [];
+
+  // Validate pricing mode
+  if (!data.pricingMode) {
+    errors.push("Выберите режим стоимости");
+  } else {
+    // If paid, validate price
+    if ((data.pricingMode === "fixed" || data.pricingMode === "from")) {
+      if (!data.price || data.price.trim().length === 0) {
+        errors.push("Укажите стоимость");
+      }
+    }
+  }
+
+  // Validate participation mode
+  if (!data.participationMode) {
+    errors.push("Выберите формат участия");
+  } else {
+    // Validate based on participation mode
+    if (data.participationMode === "external-link") {
+      if (!data.ticketLink || data.ticketLink.trim().length === 0) {
+        errors.push("Укажите ссылку на покупку билетов");
+      } else if (!isValidUrl(data.ticketLink)) {
+        errors.push("Некорректная ссылка на покупку билетов");
+      }
+    }
+
+    if (data.participationMode === "simple-booking") {
+      if (!data.simpleBookingDate) {
+        errors.push("Укажите дату события для записи");
+      }
+      if (!data.simpleBookingTime) {
+        warnings.push("Рекомендуется указать время события");
+      }
+    }
+
+    if (data.participationMode === "time-slots") {
+      const hasSlots = data.timeSlots?.dates?.some(d => d.slots.length > 0);
+      if (!hasSlots) {
+        errors.push("Добавьте хотя бы одну дату со слотами");
+      }
+    }
+  }
+
+  // Validate CTA type - removed, now auto-determined from participationMode
+
+  const isComplete = Boolean(
+    data.pricingMode &&
+    ((data.pricingMode === "fixed" || data.pricingMode === "from") ? data.price?.trim() : true) &&
+    data.participationMode &&
+    (data.participationMode === "external-link" ? data.ticketLink?.trim() : true) &&
+    (data.participationMode === "simple-booking" ? data.simpleBookingDate : true) &&
+    (data.participationMode === "time-slots" ? data.timeSlots?.dates?.some(d => d.slots.length > 0) : true)
+  );
+
+  return {
+    isValid: errors.length === 0,
+    isComplete,
+    errors,
+    warnings,
+  };
+}
+
+/**
+ * Step 7: Contacts (optional step)
+ */
+function validateStep7(data: EventFormData): ValidationResult {
+  const errors: string[] = [];
+  const warnings: string[] = [];
+
+  if (data.phone && !isValidPhone(data.phone)) {
+    errors.push("Некорректный номер телефона");
+  }
+
+  if (data.website && !isValidUrl(data.website)) {
+    errors.push("Некорректная ссылка на сайт");
+  }
+
+  // Validate social links
+  data.socialLinks.forEach((link, index) => {
+    if (!link.url || link.url.trim().length === 0) {
+      errors.push(`Соцсеть ${index + 1}: не указана ссылка`);
+    } else if (!isValidUrl(link.url)) {
+      errors.push(`Соцсеть ${index + 1}: некорректная ссылка`);
+    }
+  });
+
+  // Step 7 is optional, so always complete
+  const isComplete = true;
+
+  return {
+    isValid: errors.length === 0,
+    isComplete,
+    errors,
+    warnings,
+  };
+}
+
+/**
+ * Step 8: Organizer
+ */
+function validateStep8(data: EventFormData): ValidationResult {
+  const errors: string[] = [];
+  const warnings: string[] = [];
+
+  if (!data.organizerName || data.organizerName.trim().length < 2) {
+    errors.push("Укажите название организатора");
+  }
+
+  // Validate based on organizer mode
+  if (data.organizerMode === "existing" && !data.organizerId) {
+    errors.push("Выберите организатора из списка");
+  }
+
+  if (data.organizerPhone && !isValidPhone(data.organizerPhone)) {
+    warnings.push("Проверьте формат номера телефона");
+  }
+
+  if (data.organizerWebsite && !isValidUrl(data.organizerWebsite)) {
+    warnings.push("Проверьте формат веб-сайта");
+  }
+
+  if (!data.organizerDescription || data.organizerDescription.trim().length === 0) {
+    warnings.push("Рекомендуется добавить описание организатора");
+  }
+
+  const isComplete = data.organizerName.trim().length >= 2 && 
+    (data.organizerMode !== "existing" || !!data.organizerId);
+
+  return {
+    isValid: errors.length === 0,
+    isComplete,
+    errors,
+    warnings,
+  };
+}
+
+/**
+ * Final validation for submit (strict)
+ */
+export function validateForSubmit(data: EventFormData): ValidationResult {
+  const allErrors: string[] = [];
+  const allWarnings: string[] = [];
+
+  // Validate all required steps
+  for (let step = 1; step <= 8; step++) {
+    const result = validateStep(step, data);
+    if (!result.isComplete) {
+      allErrors.push(`Шаг ${step}: не заполнены обязательные поля`);
+    }
+    allErrors.push(...result.errors);
+    allWarnings.push(...result.warnings);
+  }
+
+  return {
+    isValid: allErrors.length === 0,
+    isComplete: allErrors.length === 0,
+    errors: allErrors,
+    warnings: allWarnings,
+  };
+}
+
+// Helper functions
+function isValidUrl(url: string): boolean {
+  try {
+    new URL(url);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function isValidPhone(phone: string): boolean {
+  // Basic phone validation
+  const phoneRegex = /^[\d\s\+\-\(\)]+$/;
+  return phoneRegex.test(phone) && phone.replace(/\D/g, "").length >= 9;
+}

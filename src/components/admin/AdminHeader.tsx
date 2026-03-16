@@ -62,7 +62,7 @@ export function AdminHeader({ userEmail }: AdminHeaderProps) {
       {/* Menu Items */}
       <div className="py-2">
         <a 
-          href="/account" 
+          href="/profile" 
           className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors"
           onClick={() => setProfileSheetOpen(false)}
         >

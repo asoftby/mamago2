@@ -11,6 +11,10 @@ import { ListsQueuesSection } from "./_sections/ListsQueuesSection";
 import { StatesSection } from "./_sections/StatesSection";
 import { FormsSection } from "./_sections/FormsSection";
 import { OverlaysSection } from "./_sections/OverlaysSection";
+import { EventScheduleSection } from "./_sections/EventScheduleSection";
+import { BookingModuleSection } from "./_sections/BookingModuleSection";
+import { ScheduleEditorSection } from "./_sections/ScheduleEditorSection";
+import { ActivityFormBuilderSection } from "./_sections/ActivityFormBuilderSection";
 
 export default function AdminUILabPage() {
   return (
@@ -40,6 +44,10 @@ export default function AdminUILabPage() {
         <StatesSection />
         <FormsSection />
         <OverlaysSection />
+        <EventScheduleSection />
+        <BookingModuleSection />
+        <ScheduleEditorSection />
+        <ActivityFormBuilderSection />
       </div>
     </div>
   );

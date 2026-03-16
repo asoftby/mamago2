@@ -328,7 +328,7 @@ export function PlaceWizard({ mode, place, userId, onComplete }: PlaceWizardProp
       case 5:
         return <Step5OpeningHours {...commonProps} />;
       case 6:
-        return <Step6Review data={formData} isSubmitting={isSubmitting} />;
+        return <Step6Review data={formData} isSubmitting={isSubmitting} onGoToStep={handleGoToStep} />;
       default:
         return null;
     }

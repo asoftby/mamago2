@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { DateTimePicker } from "@/components/ui/date-time-picker";
 import { Card } from "@/components/ui/card";
+import { ComponentMetaCard } from "@/components/ui-lab/ComponentMetaCard";
+import { getComponentMeta } from "@/components/ui-lab/registry";
 
 export function DateTimePickerSection() {
   const [date1, setDate1] = useState<Date | null>(null);
@@ -26,18 +28,16 @@ export function DateTimePickerSection() {
   const [date7, setDate7] = useState<Date | null>(null);
   const [time7, setTime7] = useState<string | null>(null);
 
-  return (
-    <section className="space-y-8">
-      <div>
-        <h2 className="text-2xl font-bold mb-2">DateTimePicker</h2>
-        <p className="text-muted-foreground">
-          Универсальный компонент для выбора даты и времени. Используется в backoffice, формах модерации и внутренних инструментах.
-        </p>
-      </div>
+  const componentMeta = getComponentMeta("date-time-picker", "ui-lab");
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Example 1: Default State */}
-        <Card className="p-6">
+  return (
+    <section id="date-time-picker" className="space-y-8">
+      {componentMeta && (
+        <ComponentMetaCard {...componentMeta}>
+          <div className="space-y-8">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              {/* Example 1: Default State */}
+              <Card className="p-6">
           <h3 className="text-lg font-semibold mb-4">Дефолтное состояние</h3>
           <p className="text-sm text-muted-foreground mb-4">
             Без выбранной даты и времени
@@ -294,6 +294,9 @@ function MyForm() {
           </div>
         </div>
       </Card>
+          </div>
+        </ComponentMetaCard>
+      )}
     </section>
   );
 }

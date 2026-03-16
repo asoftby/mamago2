@@ -14,7 +14,7 @@ export default async function AdminContractsPage() {
     redirect("/login");
   }
 
-  let contracts = [];
+  let contracts: any[] = [];
   let error = null;
 
   try {
@@ -133,7 +133,7 @@ export default async function AdminContractsPage() {
                       </div>
                     </td>
                     <td className="py-3 px-4 text-gray-700">
-                      {contractTypeLabels[contract.type]}
+                      {contractTypeLabels[contract.type as keyof typeof contractTypeLabels]}
                     </td>
                     <td className="py-3 px-4 text-center">
                       <ContractStatusBadge status={contract.status} />

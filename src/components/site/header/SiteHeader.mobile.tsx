@@ -20,6 +20,10 @@ export function SiteHeaderMobile() {
   const currentIntent = getIntentFromPath(pathname);
   const currentCity = getCityFromPath(pathname);
   
+  // For pages without city context (like /register, /profile), use default city for navigation
+  const displayCity = currentCity || "minsk";
+  const displayIntent = currentIntent || "kuda";
+  
   // Check if we're on a discovery page (has intent)
   const isDiscoveryPage = currentIntent !== null && currentCity !== null;
   const intentConfig = currentIntent ? DISCOVERY_INTENT_CONFIG[currentIntent] : null;
@@ -37,8 +41,8 @@ export function SiteHeaderMobile() {
               <div className="flex-1">
                 <MobileSearchEntry 
                   onSearchClick={() => setIsSearchSheetOpen(true)}
-                  citySlug={currentCity || "minsk"}
-                  currentIntent={currentIntent || "kuda"}
+                  citySlug={displayCity}
+                  currentIntent={displayIntent}
                 />
               </div>
               
@@ -49,22 +53,21 @@ export function SiteHeaderMobile() {
             </div>
           </div>
 
-          {/* Intent Tabs - only show on discovery pages and hide when scrolled */}
-          {isDiscoveryPage && currentCity && (
-            <div 
-              className={cn(
-                "py-2 transition-all duration-300 ease-in-out overflow-hidden",
-                isScrolled 
-                  ? "max-h-0 py-0 opacity-0 pointer-events-none" 
-                  : "max-h-[100px] opacity-100"
-              )}
-            >
-              <MobileIntentTabs 
-                city={currentCity} 
-                currentIntent={currentIntent}
-              />
-            </div>
-          )}
+          {/* Intent Tabs - show on all pages but hide when scrolled on non-discovery pages */}
+          <div 
+            className={cn(
+              "py-2 transition-all duration-300 ease-in-out overflow-hidden",
+              // Hide tabs when scrolled on non-discovery pages, always show on discovery pages
+              (!isDiscoveryPage && isScrolled) || (isDiscoveryPage && isScrolled)
+                ? "max-h-0 py-0 opacity-0 pointer-events-none" 
+                : "max-h-[100px] opacity-100"
+            )}
+          >
+            <MobileIntentTabs 
+              city={displayCity} 
+              currentIntent={currentIntent}
+            />
+          </div>
         </div>
       </header>
 
@@ -72,8 +75,8 @@ export function SiteHeaderMobile() {
       <MobileSearchSheet 
         isOpen={isSearchSheetOpen}
         onClose={() => setIsSearchSheetOpen(false)}
-        citySlug={currentCity || "minsk"}
-        currentIntent={currentIntent || "kuda"}
+        citySlug={displayCity}
+        currentIntent={displayIntent}
       />
     </>
   );

@@ -64,7 +64,7 @@ export function BusinessHeader({ userEmail }: BusinessHeaderProps) {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-64 bg-white">
               <DropdownMenuItem asChild>
-                <a href="/account" className="flex items-center gap-3 px-4 py-3 cursor-pointer">
+                <a href="/profile" className="flex items-center gap-3 px-4 py-3 cursor-pointer">
                   <UserCircle className="w-5 h-5 text-gray-600" />
                   <span>Профиль</span>
                 </a>

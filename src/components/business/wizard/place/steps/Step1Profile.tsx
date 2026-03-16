@@ -1,9 +1,11 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { ChevronDown } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { ChipsRow, type ChipItem } from "@/components/ui/chips-row";
 import { AGE_OPTIONS } from "@/lib/config/ages";
 import { PLACE_CATEGORIES, VISIT_FORMATS, ACTIVITY_TYPES } from "../config";
 import type { PlaceFormData } from "../types";
@@ -94,20 +96,23 @@ export function Step1Profile({ data, onChange, isEditable = true }: Step1Profile
 
       <div>
         <Label htmlFor="category">Категория *</Label>
-        <select
-          id="category"
-          value={category}
-          onChange={(e) => handleCategoryChange(e.target.value)}
-          className="mt-2 w-full rounded-md border border-input bg-background px-3 py-2"
-          disabled={!isEditable}
-        >
-          <option value="">Выберите категорию</option>
-          {PLACE_CATEGORIES.map((cat) => (
-            <option key={cat.value} value={cat.value}>
-              {cat.label}
-            </option>
-          ))}
-        </select>
+        <div className="relative mt-2">
+          <select
+            id="category"
+            value={category}
+            onChange={(e) => handleCategoryChange(e.target.value)}
+            className="h-[2.75rem] w-full rounded-md border border-input bg-background px-3 py-2 pr-10 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 appearance-none"
+            disabled={!isEditable}
+          >
+            <option value="">Выберите категорию</option>
+            {PLACE_CATEGORIES.map((cat) => (
+              <option key={cat.value} value={cat.value}>
+                {cat.label}
+              </option>
+            ))}
+          </select>
+          <ChevronDown className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+        </div>
       </div>
 
       <div>
@@ -156,22 +161,16 @@ export function Step1Profile({ data, onChange, isEditable = true }: Step1Profile
 
       <div>
         <Label>Возраст *</Label>
-        <div className="flex flex-wrap gap-2 mt-2">
-          {AGE_OPTIONS.map((ageOption) => (
-            <button
-              key={ageOption.key}
-              type="button"
-              onClick={() => isEditable && toggleAgeTag(ageOption.key)}
-              disabled={!isEditable}
-              className={`px-3 py-1 rounded-full text-sm border transition-colors ${
-                ageTags.includes(ageOption.key)
-                  ? "bg-primary text-primary-foreground border-primary"
-                  : "bg-background border-input hover:border-primary"
-              } ${!isEditable ? "opacity-50 cursor-not-allowed" : ""}`}
-            >
-              {ageOption.shortLabel}
-            </button>
-          ))}
+        <div className="mt-2">
+          <ChipsRow
+            items={AGE_OPTIONS.map((ageOption): ChipItem => ({
+              id: ageOption.key,
+              label: ageOption.shortLabel,
+              active: ageTags.includes(ageOption.key),
+              disabled: !isEditable,
+              onClick: () => isEditable && toggleAgeTag(ageOption.key),
+            }))}
+          />
         </div>
         <p className="text-xs text-muted-foreground mt-1">
           Выберите хотя бы один возрастной диапазон
@@ -180,22 +179,16 @@ export function Step1Profile({ data, onChange, isEditable = true }: Step1Profile
 
       <div>
         <Label>Формат посещения *</Label>
-        <div className="flex flex-wrap gap-2 mt-2">
-          {VISIT_FORMATS.map((format) => (
-            <button
-              key={format}
-              type="button"
-              onClick={() => isEditable && toggleVisitFormat(format)}
-              disabled={!isEditable}
-              className={`px-3 py-1 rounded-full text-sm border transition-colors ${
-                visitFormats.includes(format)
-                  ? "bg-primary text-primary-foreground border-primary"
-                  : "bg-background border-input hover:border-primary"
-              } ${!isEditable ? "opacity-50 cursor-not-allowed" : ""}`}
-            >
-              {format}
-            </button>
-          ))}
+        <div className="mt-2">
+          <ChipsRow
+            items={VISIT_FORMATS.map((format): ChipItem => ({
+              id: format,
+              label: format,
+              active: visitFormats.includes(format),
+              disabled: !isEditable,
+              onClick: () => isEditable && toggleVisitFormat(format),
+            }))}
+          />
         </div>
         <p className="text-xs text-muted-foreground mt-1">
           Выберите хотя бы один формат посещения
@@ -204,22 +197,16 @@ export function Step1Profile({ data, onChange, isEditable = true }: Step1Profile
 
       <div>
         <Label>Типы активностей *</Label>
-        <div className="flex flex-wrap gap-2 mt-2">
-          {ACTIVITY_TYPES.map((type) => (
-            <button
-              key={type}
-              type="button"
-              onClick={() => isEditable && toggleActivityType(type)}
-              disabled={!isEditable}
-              className={`px-3 py-1 rounded-full text-sm border transition-colors ${
-                activityTypes.includes(type)
-                  ? "bg-primary text-primary-foreground border-primary"
-                  : "bg-background border-input hover:border-primary"
-              } ${!isEditable ? "opacity-50 cursor-not-allowed" : ""}`}
-            >
-              {type}
-            </button>
-          ))}
+        <div className="mt-2">
+          <ChipsRow
+            items={ACTIVITY_TYPES.map((type): ChipItem => ({
+              id: type,
+              label: type,
+              active: activityTypes.includes(type),
+              disabled: !isEditable,
+              onClick: () => isEditable && toggleActivityType(type),
+            }))}
+          />
         </div>
         <p className="text-xs text-muted-foreground mt-1">
           Выберите хотя бы один тип активности

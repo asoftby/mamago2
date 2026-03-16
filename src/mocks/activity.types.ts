@@ -17,6 +17,7 @@ export interface ActivityMock {
   ageTo: number;   // 16
   priceMin?: number;
   priceMax?: number;
+  priceDetails?: string; // Optional price breakdown (e.g., "Дети — 30 BYN\nВзрослые — 50 BYN")
   currency: 'BYN';
   
   // Локация
