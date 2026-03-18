@@ -13,8 +13,9 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, ExternalLink, Mail } from "lucide-react";
+import { PlaceFormData } from "@/components/business/wizard/place/types";
+import { ContentStatus, PlaceKind } from "@prisma/client";
 import Link from "next/link";
-import type { PlaceFormData } from "@/components/business/wizard/place/types";
 
 export default async function PlaceModerationPage({
   params,
@@ -169,6 +170,9 @@ export default async function PlaceModerationPage({
 
       // Map place to form data for completion calculation
       const placeFormData: PlaceFormData = {
+        id: place.id,
+        ownerUserId: place.ownerUserId,
+        status: place.status as ContentStatus,
         title: place.title,
         category: place.category,
         shortDesc: place.shortDesc,
@@ -178,11 +182,21 @@ export default async function PlaceModerationPage({
         visitFormats: place.visitFormats || [],
         lat: place.lat,
         lng: place.lng,
+        googlePlaceId: place.googlePlaceId,
         formattedAddr: place.formattedAddr,
+        addressJson: place.addressJson,
+        customAddress: place.customAddress,
         cityId: place.cityId,
+        districtAutoId: place.districtAutoId,
+        districtManualId: place.districtManualId,
+        metroAutoId: place.metroAutoId,
+        metroAutoDistanceM: place.metroAutoDistanceM,
+        metroManualId: place.metroManualId,
+        metroManualDistanceM: place.metroManualDistanceM,
         phone: place.phone,
         website: place.website,
         instagramHandle: place.instagramHandle,
+        instagramUrl: place.instagramUrl,
         logoImageId: place.logoImageId,
         logoUrl: place.images.find(img => img.kind === "LOGO")?.url || null,
         images: place.images.map(img => ({
@@ -190,18 +204,30 @@ export default async function PlaceModerationPage({
           url: img.url,
           kind: img.kind as "LOGO" | "GALLERY",
           order: img.sortOrder,
+          width: img.width || 0,
+          height: img.height || 0,
+          blurhash: img.blurhash || null,
+          sortOrder: img.sortOrder,
         })),
+        openingHoursId: place.openingHoursId,
         openingHoursData: place.openingHours ? {
           mode: place.openingHours.mode as any,
+          timezone: place.openingHours.timezone || "Europe/Minsk",
           rules: place.openingHours.rules?.map(rule => ({
             dayOfWeek: rule.dayOfWeek,
             isOpen: rule.isOpen,
+            allDay: rule.allDay || false,
             intervals: rule.intervals?.map(int => ({
               startTime: int.startTime,
               endTime: int.endTime,
             })) || [],
           })) || [],
         } : null,
+        placeKind: place.placeKind as PlaceKind,
+        floor: place.floor,
+        unit: place.unit,
+        createdAt: place.createdAt,
+        updatedAt: place.updatedAt,
       };
 
       const STATUS_LABELS: Record<string, { label: string; color: string }> = {
@@ -286,7 +312,18 @@ export default async function PlaceModerationPage({
               {/* Right Column - Moderation Sidebar */}
               <div>
                 <PlaceModerationSidebar
-                  place={place}
+                  place={{
+                    id: place.id,
+                    title: place.title,
+                    status: place.status,
+                    slug: place.slug,
+                    formattedAddr: place.formattedAddr,
+                    owner: place.owner,
+                    city: place.city ? {
+                      id: parseInt(place.city.id),
+                      name: place.city.name,
+                    } : null,
+                  }}
                   placeFormData={placeFormData}
                   publicUrl={publicUrl}
                 />

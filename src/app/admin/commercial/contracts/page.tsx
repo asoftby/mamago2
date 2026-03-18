@@ -6,6 +6,7 @@ import Link from "next/link";
 import { format } from "date-fns";
 import { ru } from "date-fns/locale";
 import { FileText, CheckCircle } from "lucide-react";
+import type { ContractStatus } from "@prisma/client";
 
 export default async function AdminContractsPage() {
   const user = await getCurrentUser();
@@ -14,13 +15,24 @@ export default async function AdminContractsPage() {
     redirect("/login");
   }
 
-  let contracts: any[] = [];
+  let contracts: Array<{
+    id: string;
+    businessId: string;
+    contractNumber: string;
+    type: string;
+    status: ContractStatus;
+    signedAt: Date | null;
+    startsAt: Date;
+    endsAt: Date;
+    autoRenew: boolean;
+    business: { name: string };
+  }> = [];
   let error = null;
 
   try {
     contracts = await getContracts();
-  } catch (e: any) {
-    error = e.message;
+  } catch (e) {
+    error = e instanceof Error ? e.message : 'Unknown error';
     console.error("Contracts fetch error:", e);
   }
 

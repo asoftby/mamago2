@@ -14,7 +14,7 @@ async function testEventWizardUI() {
   console.log("🧪 Testing Event Wizard UI Flow\n");
 
   // Simulate user filling out the wizard
-  let formData: EventFormData = getDefaultFormData();
+  const formData: EventFormData = getDefaultFormData();
   
   console.log("📝 Simulating user input...\n");
 

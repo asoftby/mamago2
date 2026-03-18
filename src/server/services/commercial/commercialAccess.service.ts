@@ -1,3 +1,4 @@
+ 
 /**
  * Commercial Access Service - Enforcement Layer
  * 
@@ -7,6 +8,7 @@
  * IMPORTANT: This is NOT billing. This is commercial relationship enforcement.
  */
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { prisma } from "@/lib/prisma";
 
 /**

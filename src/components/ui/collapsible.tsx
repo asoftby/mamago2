@@ -62,9 +62,8 @@ const CollapsibleTrigger = React.forwardRef<HTMLButtonElement, CollapsibleTrigge
     if (asChild && React.isValidElement(children)) {
       return React.cloneElement(children, {
         ...props,
-        ref,
         onClick: handleClick,
-      });
+      } as React.HTMLAttributes<HTMLElement>);
     }
 
     return (

@@ -110,9 +110,11 @@ function WeekStrip({
 
 function PlanItemMiniCard({ item }: PlanItemMiniCardProps) {
   const activity = item.activity;
+  const displayTitle = activity?.title ?? item.title ?? "Активность";
+  const displayImage = activity?.coverImageUrl ?? item.coverImageUrl ?? null;
 
   const formatTime = (dateTime: Date) => {
-    return dateTime.toLocaleTimeString("ru-RU", {
+    return new Date(dateTime).toLocaleTimeString("ru-RU", {
       hour: "2-digit",
       minute: "2-digit",
     });
@@ -124,10 +126,10 @@ function PlanItemMiniCard({ item }: PlanItemMiniCardProps) {
       className="p-4 flex gap-3 hover:bg-muted/80 transition-colors"
     >
       <div className="w-14 h-14 rounded-lg bg-muted flex-shrink-0 overflow-hidden">
-        {activity?.coverImageUrl ? (
+        {displayImage ? (
           <img
-            src={activity.coverImageUrl}
-            alt={activity.title}
+            src={displayImage}
+            alt={displayTitle}
             className="w-full h-full object-cover"
           />
         ) : (
@@ -137,16 +139,10 @@ function PlanItemMiniCard({ item }: PlanItemMiniCardProps) {
         )}
       </div>
       <div className="flex-1 min-w-0">
-        {activity ? (
-          <>
-            <Body className="font-medium line-clamp-2 mb-1">{activity.title}</Body>
-            <Caption className="text-muted-foreground">
-              {item.startsAt ? formatTime(item.startsAt) : "В любое время"}
-            </Caption>
-          </>
-        ) : (
-          <BodyMuted className="text-sm">Activity ID: {item.activityId}</BodyMuted>
-        )}
+        <Body className="font-medium line-clamp-2 mb-1">{displayTitle}</Body>
+        <Caption className="text-muted-foreground">
+          {item.startsAt ? formatTime(item.startsAt) : "В любое время"}
+        </Caption>
       </div>
     </Surface>
   );

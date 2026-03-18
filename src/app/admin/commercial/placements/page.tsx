@@ -14,8 +14,8 @@ export default async function AdminPlacementsPage() {
     redirect("/login");
   }
 
-  let placements = [];
-  let error = null;
+  let placements: unknown[] = [];
+  let error: string | null = null;
 
   try {
     placements = await getPlacements();
@@ -99,7 +99,7 @@ export default async function AdminPlacementsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {placements.map((placement) => {
+              {(placements as any[]).map((placement) => {
                 const daysUntilEnd = Math.ceil(
                   (placement.endsAt.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)
                 );
@@ -122,7 +122,7 @@ export default async function AdminPlacementsPage() {
                       </Link>
                     </td>
                     <td className="py-3 px-4 text-gray-700">
-                      {sourceTypeLabels[placement.sourceType]}
+                      {sourceTypeLabels[placement.sourceType as keyof typeof sourceTypeLabels]}
                     </td>
                     <td className="py-3 px-4">
                       {placement.plan ? (

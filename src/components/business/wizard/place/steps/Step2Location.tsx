@@ -32,7 +32,7 @@ export function Step2Location({ data, onChange, isEditable = true }: Step2Locati
   return (
     <div className="space-y-6">
       <PlaceLocationPicker 
-        placeId={data.id} 
+        placeId={data.id || ""} 
         initialLocation={initialLocation}
         onUpdate={onChange}
         disabled={!isEditable}

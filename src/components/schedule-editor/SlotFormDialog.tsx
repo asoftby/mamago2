@@ -34,20 +34,24 @@ export function SlotFormDialog({
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (slot) {
-      setFormData({
-        startTime: slot.startTime,
-        endTime: slot.endTime,
-        capacity: slot.capacity,
-      });
-    } else {
-      setFormData({
-        startTime: "10:00",
+    const updateFormData = () => {
+      if (slot) {
+        setFormData({
+          startTime: slot.startTime,
+          endTime: slot.endTime,
+          capacity: slot.capacity,
+        });
+      } else {
+        setFormData({
+          startTime: "10:00",
         endTime: "11:00",
         capacity: 6,
       });
     }
     setError(null);
+    };
+    
+    requestAnimationFrame(updateFormData);
   }, [slot, isOpen]);
 
   // Check if time slots overlap

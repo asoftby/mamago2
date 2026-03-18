@@ -117,7 +117,7 @@ export function ScheduleEditor({ value, onChange, className }: ScheduleEditorPro
     }
 
     const newDate: ScheduleDate = {
-      id: `date-${Date.now()}`,
+      id: `date-${Math.random().toString(36).substr(2, 9)}`,
       isoDate,
       label: formatDateLabel(date),
       slots: [],

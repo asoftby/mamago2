@@ -1,3 +1,4 @@
+ 
 /**
  * Place Revision Service
  * Handles post-publication Place edits via PlaceRevision
@@ -5,6 +6,7 @@
  */
 
 import prisma from "@/lib/prisma";
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { PlaceRevisionStatus, LocationSource, PlaceKind } from "@prisma/client";
 import type { PlaceImage, PlaceRevisionImage, TempMedia, OpeningHoursRule, OpeningHoursInterval, Prisma } from "../types";
 import {

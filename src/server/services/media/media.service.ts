@@ -200,7 +200,7 @@ export async function recalculateMediaUsageStatus(id: string) {
   }
 
   // Don't change status if archived, deleted, or blocked
-  if ([MediaAssetStatus.ARCHIVED, MediaAssetStatus.DELETED, MediaAssetStatus.BLOCKED].includes(media.status)) {
+  if (["ARCHIVED", "DELETED", "BLOCKED"].includes(media.status)) {
     return media;
   }
 

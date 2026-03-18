@@ -81,7 +81,7 @@ export function getActionCenterData(): ActionCenterItem[] {
       title: "Просроченные запросы на улучшение",
       count: 3,
       link: "/admin/moderation/places", // No dedicated improvement requests page yet
-      severity: "critical",
+      severity: "high",
     },
     {
       id: "3",
@@ -97,7 +97,7 @@ export function getActionCenterData(): ActionCenterItem[] {
       title: "Критические уведомления",
       count: 2,
       link: "/admin/moderation/queue", // Use moderation queue as fallback
-      severity: "critical",
+      severity: "high",
     },
   ];
 }
@@ -173,7 +173,7 @@ export function getNeedsAttentionData(): NeedsAttentionItem[] {
       title: "Запрос #IR-2024-045",
       description: "Просрочен на 3 дня",
       link: "/admin/moderation/places",
-      severity: "critical",
+      severity: "high",
     },
     {
       id: "4",

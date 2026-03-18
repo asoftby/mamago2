@@ -64,12 +64,14 @@ async function testCompleteFlow() {
     
     const childIds = childrenRaw.map(c => c.id);
     
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const systemInterestsData: any[] = await prisma.$queryRaw`
       SELECT "childId", "interestSlug" 
       FROM "ChildInterest" 
       WHERE "childId" = ANY(${childIds})
     `;
     
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const customInterestsData: any[] = await prisma.$queryRaw`
       SELECT "childId", "label" 
       FROM "ChildCustomInterest" 
@@ -81,10 +83,14 @@ async function testCompleteFlow() {
       name: child.name,
       birthDate: child.birthDate,
       systemInterests: systemInterestsData
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .filter((interest: any) => interest.childId === child.id)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .map((interest: any) => ({ interestSlug: interest.interestSlug })),
       customInterests: customInterestsData
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .filter((interest: any) => interest.childId === child.id)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .map((interest: any) => ({ label: interest.label })),
     }));
     
@@ -123,9 +129,11 @@ async function testCompleteFlow() {
     console.log("\n🗑️ Testing child deletion...");
     
     // Check interests before deletion
+     
     const interestsBefore = await prisma.$queryRaw`
       SELECT COUNT(*) as count FROM "ChildInterest" WHERE "childId" = ${child.id}
     ` as any[];
+     
     const customInterestsBefore = await prisma.$queryRaw`
       SELECT COUNT(*) as count FROM "ChildCustomInterest" WHERE "childId" = ${child.id}
     ` as any[];
@@ -138,9 +146,12 @@ async function testCompleteFlow() {
     });
     
     // Check interests after deletion
+     
     const interestsAfter = await prisma.$queryRaw`
       SELECT COUNT(*) as count FROM "ChildInterest" WHERE "childId" = ${child.id}
     ` as any[];
+     
+     
     const customInterestsAfter = await prisma.$queryRaw`
       SELECT COUNT(*) as count FROM "ChildCustomInterest" WHERE "childId" = ${child.id}
     ` as any[];

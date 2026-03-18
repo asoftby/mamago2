@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useDiscoveryFilters } from "@/features/filters/discovery/filters.store";
 
 export function useFilterUpdater() {

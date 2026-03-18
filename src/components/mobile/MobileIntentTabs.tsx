@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useEffect } from "react";
+import { useRef, useState, useEffect, Suspense } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useSearchParams } from "next/navigation";
@@ -23,7 +23,7 @@ interface MobileIntentTabsProps {
   className?: string;
 }
 
-export function MobileIntentTabs({ 
+function MobileIntentTabsContent({ 
   city, 
   currentIntent, 
   className 
@@ -151,5 +151,12 @@ export function MobileIntentTabs({
         })}
       </div>
     </div>
+  );
+}
+export function MobileIntentTabs(props: MobileIntentTabsProps) {
+  return (
+    <Suspense fallback={<div className="h-[60px] w-full" />}>
+      <MobileIntentTabsContent {...props} />
+    </Suspense>
   );
 }

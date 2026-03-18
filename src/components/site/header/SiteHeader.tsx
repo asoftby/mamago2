@@ -1,14 +1,14 @@
 "use client";
 
-import { SiteHeaderDesktop } from "./SiteHeader.desktop";
+import { SiteHeaderShell } from "./SiteHeaderShell";
 import { SiteHeaderMobile } from "./SiteHeader.mobile";
 
 export function SiteHeader() {
   return (
     <>
-      {/* Desktop Header (lg and up) */}
-      <div className="hidden lg:block sticky top-0 z-[100]">
-        <SiteHeaderDesktop />
+      {/* Desktop Header (lg and up) - Stable architecture: fixed height + SearchSurface */}
+      <div className="hidden lg:block">
+        <SiteHeaderShell />
       </div>
 
       {/* Mobile Header (below lg, includes tablets) */}

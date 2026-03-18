@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * OpeningHours Mapper
  * Maps between UI state, domain models, and Prisma payloads

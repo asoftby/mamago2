@@ -84,7 +84,7 @@ export async function POST(
         id: params.id,
       },
       data: {
-        status: ContentStatus.PENDING_REVIEW,
+        status: ContentStatus.PENDING,
       },
     });
 

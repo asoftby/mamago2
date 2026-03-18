@@ -21,7 +21,7 @@ const MOCK_BUSINESS: BusinessProfile = {
   description: "Развивающие занятия и мероприятия для детей",
   phone: "+375 29 123 45 67",
   website: "https://solnyshko.by",
-  logoUrl: null,
+  logoUrl: undefined,
 };
 
 export function Step8Organizer({ data, onChange, isEditable, userRole }: Step8OrganizerProps) {

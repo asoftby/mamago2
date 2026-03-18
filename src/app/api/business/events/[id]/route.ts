@@ -32,7 +32,7 @@ export async function GET(
           select: {
             id: true,
             title: true,
-            address: true,
+            formattedAddr: true,
             city: true,
           },
         },

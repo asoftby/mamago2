@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
         ageTags: body.ageTags || [],
         
         // Schedule
-        scheduleMode: ScheduleMode.SPECIFIC_DATES,
+        scheduleMode: ScheduleMode.MULTI_DATE,
         scheduleJson: body.scheduleJson || {},
         
         // Pricing
@@ -106,7 +106,7 @@ export async function GET(request: NextRequest) {
         images: true,
         sessions: {
           orderBy: {
-            startAt: "asc",
+            startsAt: "asc",
           },
           take: 1,
         },

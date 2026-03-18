@@ -65,7 +65,7 @@ export function SiteHeaderMobile() {
           >
             <MobileIntentTabs 
               city={displayCity} 
-              currentIntent={currentIntent}
+              currentIntent={currentIntent || "kuda"}
             />
           </div>
         </div>

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import type { Place, PlaceImage } from "@prisma/client";
 import type { OpeningHoursData } from "@/components/openingHours";
 

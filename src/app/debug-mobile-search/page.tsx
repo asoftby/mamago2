@@ -1,11 +1,12 @@
 "use client";
 
+import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { useDiscoveryFilters } from "@/features/filters/discovery/filters.store";
 import { useDiscoveryFilterOptions } from "@/features/filters/discovery/filters.api";
 import { AGE_GROUPS } from "@/features/filters/age/ageGroups";
 
-export default function DebugMobileSearchPage() {
+function DebugContent() {
   const searchParams = useSearchParams();
   const { applied } = useDiscoveryFilters();
   const { options: apiOptions } = useDiscoveryFilterOptions("minsk");
@@ -129,5 +130,12 @@ export default function DebugMobileSearchPage() {
         </div>
       </div>
     </div>
+  );
+}
+export default function DebugMobileSearchPage() {
+  return (
+    <Suspense fallback={<div className="p-8">Loading debug info...</div>}>
+      <DebugContent />
+    </Suspense>
   );
 }

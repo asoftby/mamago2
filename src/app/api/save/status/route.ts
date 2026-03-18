@@ -24,20 +24,20 @@ export async function GET(request: NextRequest) {
     const isIdea = await hasIdea(user.id, activityId);
 
     // Check if in plan
-    const planItemCount = await prisma.planItem.count({
-      where: {
-        userId: user.id,
-        activityId,
-      },
+    const planItem = await prisma.planItem.findFirst({
+      where: { userId: user.id, activityId },
+      select: { id: true, date: true, startsAt: true },
+      orderBy: { createdAt: "asc" },
     });
 
-    const isSaved = isIdea || planItemCount > 0;
+    const isSaved = isIdea || !!planItem;
 
     return NextResponse.json({
       isSaved,
       isIdea,
-      inPlan: planItemCount > 0,
-      planItemCount,
+      inPlan: !!planItem,
+      planDate: planItem?.date ?? null,
+      planStartsAt: planItem?.startsAt ?? null,
     });
   } catch (error) {
     console.error("Check save status error:", error);

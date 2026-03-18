@@ -30,7 +30,11 @@ export default async function NewOfferPage() {
       mode="create"
       userId={user.id}
       userRole="BUSINESS_OWNER"
-      business={business}
+      business={{
+        id: business.id,
+        name: business.name,
+        phone: business.phone || undefined,
+      }}
     />
   );
 }

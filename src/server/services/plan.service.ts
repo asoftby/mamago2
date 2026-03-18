@@ -1,26 +1,53 @@
 import { prisma } from "@/lib/prisma";
-import type { Prisma } from "@prisma/client";
 
-export type PlanItemWithActivity = Prisma.PlanItemGetPayload<{
-  include: { activity: true };
-}>;
+export type PlanItemWithActivity = {
+  id: string;
+  userId: string;
+  activityId: string | null;
+  date: string;
+  startsAt: Date | null;
+  title: string | null;
+  coverImageUrl: string | null;
+  createdAt: Date;
+  activity: {
+    id: string;
+    title: string;
+    type: string;
+    coverImageUrl: string | null;
+    ageLabel: string | null;
+  } | null;
+};
 
 /**
- * Add an activity to user's plan for a specific date
+ * Add or update an activity in user's plan for a specific date.
+ * If the same activity already exists in the plan (any date), updates the date.
+ * Prevents duplicate plan entries for the same activity.
  */
 export async function addPlanItem(
   userId: string,
   activityId: string,
   date: string, // YYYY-MM-DD format
-  startsAt?: Date
-): Promise<Prisma.PlanItemGetPayload<{}>> {
+  startsAt?: Date,
+  title?: string,
+  coverImageUrl?: string
+): Promise<{ id: string }> {
+  // Check if this activity is already in the plan
+  const existing = await prisma.planItem.findFirst({
+    where: { userId, activityId },
+    select: { id: true },
+  });
+
+  if (existing) {
+    return await prisma.planItem.update({
+      where: { id: existing.id },
+      data: { date, startsAt: startsAt ?? null, title: title ?? null, coverImageUrl: coverImageUrl ?? null },
+      select: { id: true },
+    });
+  }
+
   return await prisma.planItem.create({
-    data: {
-      userId,
-      activityId,
-      date,
-      startsAt: startsAt || null,
-    },
+    data: { userId, activityId, date, startsAt: startsAt ?? null, title: title ?? null, coverImageUrl: coverImageUrl ?? null },
+    select: { id: true },
   });
 }
 
@@ -41,36 +68,35 @@ export async function removePlanItem(
 
 /**
  * List plan items for a specific week
- * @param userId - User ID
- * @param weekStartDate - Start date of the week (YYYY-MM-DD format, should be Monday)
- * @returns Plan items for the 7-day period starting from weekStartDate
  */
 export async function listPlanItemsByWeek(
   userId: string,
   weekStartDate: string
 ): Promise<PlanItemWithActivity[]> {
-  // Calculate end date (6 days after start)
   const startDate = new Date(weekStartDate);
   const endDate = new Date(startDate);
   endDate.setDate(endDate.getDate() + 6);
-  
   const endDateStr = endDate.toISOString().split("T")[0];
 
   return await prisma.planItem.findMany({
-    where: {
-      userId,
-      date: {
-        gte: weekStartDate,
-        lte: endDateStr,
-      },
-    },
+    where: { userId, date: { gte: weekStartDate, lte: endDateStr } },
     include: {
-      activity: true,
+      activity: { select: { id: true, title: true, type: true, coverImageUrl: true, ageLabel: true } },
     },
-    orderBy: [
-      { date: "asc" },
-      { startsAt: "asc" },
-    ],
+    orderBy: [{ date: "asc" }, { startsAt: "asc" }],
+  });
+}
+
+/**
+ * List ALL plan items for a user, grouped-ready (for /me/plan page)
+ */
+export async function listAllPlanItems(userId: string): Promise<PlanItemWithActivity[]> {
+  return await prisma.planItem.findMany({
+    where: { userId },
+    include: {
+      activity: { select: { id: true, title: true, type: true, coverImageUrl: true, ageLabel: true } },
+    },
+    orderBy: [{ date: "asc" }, { startsAt: "asc" }],
   });
 }
 
@@ -82,12 +108,9 @@ export async function listPlanItemsByDate(
   date: string
 ): Promise<PlanItemWithActivity[]> {
   return await prisma.planItem.findMany({
-    where: {
-      userId,
-      date,
-    },
+    where: { userId, date },
     include: {
-      activity: true,
+      activity: { select: { id: true, title: true, type: true, coverImageUrl: true, ageLabel: true } },
     },
     orderBy: { startsAt: "asc" },
   });

@@ -45,26 +45,30 @@ export function OfferWizard({ mode, offer, userId, userRole, business, onComplet
       return getDefaultFormData();
     }
     
-    // Create mode: try to restore from localStorage (client-side only)
-    if (mode === "create" && typeof window !== "undefined") {
+    // Always start with defaults to prevent hydration mismatch
+    // localStorage restoration happens in useEffect
+    return getDefaultFormData();
+  });
+  
+  // Restore from localStorage after hydration to prevent mismatch
+  useEffect(() => {
+    if (mode === "create") {
       try {
         const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
         if (saved) {
           const parsed = JSON.parse(saved);
           const defaults = getDefaultFormData();
           
-          return {
+          setFormData({
             ...defaults,
             ...parsed,
-          };
+          });
         }
       } catch (e) {
         console.error("Failed to restore draft:", e);
       }
     }
-    
-    return getDefaultFormData();
-  });
+  }, [mode]);
   
   const [isSaving, setIsSaving] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);

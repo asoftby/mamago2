@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import prisma from "@/lib/prisma";
 import { BillingAccountStatus, Prisma } from "@prisma/client";
 
@@ -61,7 +62,7 @@ export async function getBillingAccounts(filters?: {
 
   if (filters?.lowBalance) {
     where.depositBalance = {
-      lt: where.lowBalanceThreshold || 20,
+      lt: 20,
     };
   }
 

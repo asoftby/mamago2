@@ -84,6 +84,7 @@ model User {
   auditLogs                     AuditLog[]                @relation("AuditTarget")
   performedAudits               AuditLog[]                @relation("AuditActor")
   uploadedMediaAssets           MediaAsset[]
+  routes                        Route[]      @relation("RouteAuthor")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -203,6 +204,10 @@ model PlanItem {
   date       String // YYYY-MM-DD format
   startsAt   DateTime? // Optional specific time
 
+  // Denormalized display fields (for mock/external activities)
+  title         String?
+  coverImageUrl String?
+
   user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   activity Activity? @relation(fields: [activityId], references: [id], onDelete: SetNull)
 
@@ -304,6 +309,7 @@ model City {
   metroStations  MetroStation[]
   places         Place[]         @relation("PlaceCity")
   placeRevisions PlaceRevision[] @relation("PlaceRevisionCity")
+  routes         Route[]
 
   @@index([slug])
   @@index([googleName])
@@ -811,6 +817,7 @@ model Place {
   revisions      PlaceRevision[] // Post-publication edit revisions
   slugHistory    PlaceSlugHistory[] // Historical slugs for redirects
   eventVenues    EventVenue[] // Events using this place as venue
+  routeStops     RouteStop[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1969,4 +1976,90 @@ model MediaUsage {
   @@index([mediaId])
   @@index([entityType, entityId])
   @@index([entityType, entityId, field])
+}
+
+// ============================================================================
+// ROUTES MODULE
+// ============================================================================
+
+enum RouteStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum RouteVisibility {
+  PRIVATE
+  UNLISTED
+  PUBLIC
+}
+
+enum BudgetLevel {
+  FREE
+  LOW
+  MEDIUM
+  HIGH
+}
+
+// Route — unified model for editorial and UGC routes
+// Editorial: authorId = null, status = PUBLISHED, visibility = PUBLIC
+// UGC: authorId = userId, status = DRAFT/PUBLISHED, visibility = PRIVATE/UNLISTED/PUBLIC
+model Route {
+  id    String @id @default(cuid())
+  slug  String @unique
+
+  title      String
+  ageTags    String[] // e.g., ["0-3", "3-7"] — same pattern as Activity/Place
+  budgetLevel BudgetLevel @default(LOW)
+
+  // Auto-derived from stops
+  cityId        String?
+  coverImageUrl String? // Auto: first stop photo, or first available
+
+  // Authorship — null = editorial (mamaGo team)
+  authorId String?
+
+  status     RouteStatus     @default(DRAFT)
+  visibility RouteVisibility @default(PRIVATE)
+
+  // Relations
+  author User?       @relation(fields: [authorId], references: [id], onDelete: SetNull, name: "RouteAuthor")
+  city   City?       @relation(fields: [cityId], references: [id], onDelete: SetNull)
+  stops  RouteStop[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, visibility])
+  @@index([authorId])
+  @@index([cityId])
+  @@index([slug])
+}
+
+model RouteStop {
+  id      String @id @default(cuid())
+  routeId String
+  order   Int
+
+  // Location — either linked Place or manual address
+  placeId     String?
+  lat         Float?
+  lng         Float?
+  address     String?     // fallback address string
+  customTitle String?     // human-readable step label for GOOGLE / MANUAL_PIN stops
+
+  // Author note — required, short
+  note String
+
+  // Photo — optional, first stop photo becomes route cover
+  photoUrl String?
+
+  route Route  @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  place Place? @relation(fields: [placeId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([routeId, order])
+  @@index([placeId])
 }

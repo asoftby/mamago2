@@ -43,7 +43,9 @@ export function RefinementFiltersButtonCompact({
 
   return (
     <button
+      type="button"
       onClick={handleClick}
+      aria-label="Фильтры — нажмите, чтобы раскрыть и настроить"
       className={cn(
         // Match compact search form height exactly (py-3 + border)
         "inline-flex items-center gap-2 px-4 py-3 rounded-full border border-gray-200 bg-white hover:bg-gray-50 transition-all duration-200 text-sm font-semibold text-gray-800 hover:text-gray-900 shadow-sm hover:shadow-md hover:border-gray-300 hover:scale-[1.02] active:scale-[0.98]",

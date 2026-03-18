@@ -100,31 +100,53 @@ export default async function PartnerDetailPage({
     },
   });
 
+  // Get events for this business owner
+  const events = await prisma.activity.findMany({
+    where: {
+      ownerUserId: business.ownerUserId,
+      type: "EVENT",
+    },
+    select: {
+      id: true,
+      title: true,
+      status: true,
+      scheduleMode: true,
+      nextOccurrenceAt: true,
+      priceFrom: true,
+      priceTo: true,
+      priceText: true,
+      createdAt: true,
+      place: {
+        select: { title: true },
+      },
+    },
+    orderBy: {
+      createdAt: "desc",
+    },
+  });
+
   return (
-    <div className="max-w-6xl">
+    <div className="p-6 md:p-4 space-y-6">
       {/* Header */}
-      <div className="mb-6">
+      <div>
         <Link href="/admin/b2b/partners">
-          <Button variant="ghost" size="sm">
+          <Button variant="ghost" size="sm" className="-ml-2 mb-2">
             <ArrowLeft className="mr-2 h-4 w-4" />
             Назад к списку
           </Button>
         </Link>
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl md:text-xl font-bold text-gray-900">{business.name}</h1>
+          <span
+            className={`px-3 py-1 rounded-full text-sm font-medium ${
+              STATUS_COLORS[business.verificationStatus]
+            }`}
+          >
+            {STATUS_LABELS[business.verificationStatus] ||
+              business.verificationStatus}
+          </span>
+        </div>
       </div>
-
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold">{business.name}</h1>
-        <span
-          className={`px-3 py-1 rounded-full text-sm font-medium ${
-            STATUS_COLORS[business.verificationStatus]
-          }`}
-        >
-          {STATUS_LABELS[business.verificationStatus] ||
-            business.verificationStatus}
-        </span>
-      </div>
-
-      <div className="space-y-6">
         {/* Основная информация */}
         <div className="bg-white border rounded-lg p-6">
           <h2 className="text-lg font-semibold mb-4">Основная информация</h2>
@@ -298,7 +320,7 @@ export default async function PartnerDetailPage({
         </div>
 
         {/* Places */}
-        <div className="bg-white border rounded-lg p-6">
+        <div className="bg-white border border-gray-200 rounded-lg p-6">
           <h2 className="text-lg font-semibold mb-4">
             Места ({places.length})
           </h2>
@@ -306,44 +328,24 @@ export default async function PartnerDetailPage({
             <div className="text-center py-8 text-gray-500">Нет мест</div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50 border-b">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      Название
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      Город
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      Адрес
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      Предложений
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      Создано
-                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Название</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Город</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Адрес</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Предложений</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Создано</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
                   {places.map((place: any) => (
                     <tr key={place.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-3 text-sm font-medium text-gray-900">
-                        {place.title}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-600">
-                        {place.city?.name || "-"}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-600">
-                        {place.formattedAddr || place.customAddress || "-"}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-600">
-                        {place.activities.length}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-600">
-                        {new Date(place.createdAt).toLocaleDateString("ru-RU")}
-                      </td>
+                      <td className="px-4 py-3 font-medium text-gray-900">{place.title}</td>
+                      <td className="px-4 py-3 text-gray-600">{place.city?.name || "—"}</td>
+                      <td className="px-4 py-3 text-gray-600">{place.formattedAddr || place.customAddress || "—"}</td>
+                      <td className="px-4 py-3 text-gray-600">{place.activities.length}</td>
+                      <td className="px-4 py-3 text-gray-600">{new Date(place.createdAt).toLocaleDateString("ru-RU")}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -353,71 +355,33 @@ export default async function PartnerDetailPage({
         </div>
 
         {/* Offers */}
-        <div className="bg-white border rounded-lg p-6">
+        <div className="bg-white border border-gray-200 rounded-lg p-6">
           <h2 className="text-lg font-semibold mb-4">
-            Предложения (
-            {places.reduce(
-                (sum: number, place: any) => sum + place.activities.length,
-                0
-              )}
-            )
+            Предложения ({places.reduce((sum: number, place: any) => sum + place.activities.length, 0)})
           </h2>
           {places.every((place: any) => place.activities.length === 0) ? (
-            <div className="text-center py-8 text-gray-500">
-              Нет предложений
-            </div>
+            <div className="text-center py-8 text-gray-500">Нет предложений</div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50 border-b">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      Название
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      Тип
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      Статус
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      Опубликовано
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      Создано
-                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Название</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Статус</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Создано</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
                   {places.map((place: any) =>
                     place.activities.map((activity: any) => (
                       <tr key={activity.id} className="hover:bg-gray-50">
-                        <td className="px-4 py-3 text-sm font-medium text-gray-900">
-                          {activity.title}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-gray-600">
-                          —
-                        </td>
-                        <td className="px-4 py-3 text-sm">
-                          <span
-                            className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                              STATUS_COLORS[activity.status]
-                            }`}
-                          >
+                        <td className="px-4 py-3 font-medium text-gray-900">{activity.title}</td>
+                        <td className="px-4 py-3">
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${STATUS_COLORS[activity.status]}`}>
                             {STATUS_LABELS[activity.status] || activity.status}
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-sm text-gray-600">
-                          {/* Activity doesn't have publishedAt, show createdAt or status instead */}
-                          {activity.status === "PUBLISHED" 
-                            ? new Date(activity.createdAt).toLocaleDateString("ru-RU")
-                            : "—"}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-gray-600">
-                          {new Date(activity.createdAt).toLocaleDateString(
-                            "ru-RU"
-                          )}
-                        </td>
+                        <td className="px-4 py-3 text-gray-600">{new Date(activity.createdAt).toLocaleDateString("ru-RU")}</td>
                       </tr>
                     ))
                   )}
@@ -426,7 +390,53 @@ export default async function PartnerDetailPage({
             </div>
           )}
         </div>
-      </div>
+
+        {/* Events */}
+        <div className="bg-white border border-gray-200 rounded-lg p-6">
+          <h2 className="text-lg font-semibold mb-4">
+            События ({events.length})
+          </h2>
+          {events.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">Нет событий</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Название</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Место</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Статус</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ближайшая дата</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Цена</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Создано</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {events.map((event: any) => (
+                    <tr key={event.id} className="hover:bg-gray-50">
+                      <td className="px-4 py-3 font-medium text-gray-900">{event.title}</td>
+                      <td className="px-4 py-3 text-gray-600">{event.place?.title || "—"}</td>
+                      <td className="px-4 py-3">
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${STATUS_COLORS[event.status]}`}>
+                          {STATUS_LABELS[event.status] || event.status}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-gray-600">
+                        {event.nextOccurrenceAt
+                          ? new Date(event.nextOccurrenceAt).toLocaleDateString("ru-RU")
+                          : "—"}
+                      </td>
+                      <td className="px-4 py-3 text-gray-600">
+                        {event.priceText || (event.priceFrom != null ? `от ${event.priceFrom} BYN` : "—")}
+                      </td>
+                      <td className="px-4 py-3 text-gray-600">{new Date(event.createdAt).toLocaleDateString("ru-RU")}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
     </div>
   );
 }

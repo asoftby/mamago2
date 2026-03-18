@@ -7,8 +7,8 @@ import { cn } from "@/lib/utils";
 import { MediaCover } from "@/components/ui/media-cover";
 import { Badge } from "@/components/ui/badge";
 import { H3, Caption } from "@/components/ui/typography";
-import { Heart } from "lucide-react";
-import { SaveToPlanModal, SaveScenario, SaveToPlanResult } from "./SaveToPlanModal";
+import { SaveHeart } from "@/features/save/SaveHeart";
+import { SaveToPlanResult } from "./SaveToPlanModal";
 import { formatRuShortDayMonth } from "@/lib/formatters/date";
 
 type DomainActivity = {
@@ -52,8 +52,6 @@ type AdapterProps =
 export function ActivityCard(props: AdapterProps) {
   const params = useParams() as { city?: string };
   const city = params?.city || "minsk";
-  const [modalOpen, setModalOpen] = React.useState(false);
-  const [scenario, setScenario] = React.useState<SaveScenario | null>(null);
 
   const base =
     "activity" in props
@@ -110,72 +108,9 @@ export function ActivityCard(props: AdapterProps) {
     .filter(Boolean)
     .join(" • ");
 
-  const handleHeartClick = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-
-    if (!base.saveMeta) return;
-
-    // Build scenario based on saveMeta
-    const { title, dateISO, dateLabel, timeSlots, timeLabel } = base.saveMeta;
-
-    if (dateISO && dateLabel) {
-      const slotsCount = timeSlots?.length ?? 0;
-      
-      if (slotsCount === 0 && timeLabel) {
-        // Case A: Single date + single time
-        setScenario({
-          kind: "confirm",
-          title,
-          dateLabel,
-          timeLabel,
-          dateISO,
-          slotId: null,
-        });
-      } else if (slotsCount === 1 && timeSlots) {
-        // Case A: Single date + single slot
-        setScenario({
-          kind: "confirm",
-          title,
-          dateLabel,
-          timeLabel: timeSlots[0].label,
-          dateISO,
-          slotId: timeSlots[0].id,
-        });
-      } else if (slotsCount > 1 && timeSlots) {
-        // Case B: Multiple time slots
-        setScenario({
-          kind: "timeslots",
-          title,
-          dateLabel,
-          dateISO,
-          slots: timeSlots,
-        });
-      } else {
-        // Case C: Date but no time info
-        setScenario({
-          kind: "quickdate",
-          title,
-        });
-      }
-    } else {
-      // Case C: No date/time
-      setScenario({
-        kind: "quickdate",
-        title,
-      });
-    }
-
-    setModalOpen(true);
-  };
-
-  const handleModalConfirm = (result: SaveToPlanResult) => {
-    base.onSaveResult?.(result);
-  };
-
   return (
-    <>
-      <Link href={href} className={cn("group block select-none", base.className)}>
+    <div className={cn("group relative select-none", base.className)}>
+      <Link href={href} className="block">
         <MediaCover imageUrl={base.image} ratio="4/5">
           {base.badges?.length > 0 && (
             <div className="absolute top-3 left-3 z-10 flex gap-2">
@@ -188,15 +123,6 @@ export function ActivityCard(props: AdapterProps) {
                 </Badge>
               ))}
             </div>
-          )}
-          {base.saveMeta && (
-            <button
-              onClick={handleHeartClick}
-              className="absolute top-3 right-3 z-10 w-9 h-9 rounded-full bg-white/90 backdrop-blur-sm shadow-sm border border-border/20 flex items-center justify-center hover:bg-white transition-colors"
-              aria-label="Сохранить"
-            >
-              <Heart className="w-5 h-5 text-foreground" />
-            </button>
           )}
         </MediaCover>
 
@@ -215,14 +141,16 @@ export function ActivityCard(props: AdapterProps) {
         </div>
       </Link>
 
-      {scenario && (
-        <SaveToPlanModal
-          open={modalOpen}
-          onOpenChange={setModalOpen}
-          scenario={scenario}
-          onConfirm={handleModalConfirm}
-        />
+      {/* SaveHeart is outside <Link> to prevent click bubbling into navigation */}
+      {base.saveMeta && (
+        <div className="absolute top-3 right-3 z-10">
+          <SaveHeart
+            activityId={base.id}
+            activityTitle={base.title}
+            coverImageUrl={base.image}
+          />
+        </div>
       )}
-    </>
+    </div>
   );
 }

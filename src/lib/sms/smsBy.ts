@@ -1,45 +1,46 @@
 /**
- * SMS.BY sendQuickSms client
- * Single responsibility: send SMS via SMS.BY API
+ * SMS.BY sendQuickSms client (app.sms.by API v1)
+ *
+ * Correct request format: POST form-encoded with alphaname_id.
+ * JSON body does NOT work — returns "ошибка в буквенном имени".
  */
 
 interface SendQuickSmsParams {
-  phoneDigits: string; // Digits only, no + prefix
+  phoneDigits: string; // Digits only, no + prefix, e.g. "375447777405"
   message: string;
 }
 
-interface SmsByResponse {
-  sms_id?: string;
-  status?: string;
+export interface SmsByResponse {
+  sms_id?: number;
+  status?: string;   // "NEW" = queued successfully
+  parts?: number;
+  balance?: number;
+  currency?: string;
   error?: string;
   message?: string;
 }
 
-/**
- * Send SMS via SMS.BY sendQuickSms endpoint
- * @param params - Phone digits and message
- * @returns Parsed JSON response
- * @throws Error with readable message if sending fails
- */
 export async function sendQuickSms({
   phoneDigits,
   message,
 }: SendQuickSmsParams): Promise<SmsByResponse> {
-  // Validate inputs
   if (!phoneDigits || phoneDigits.length < 7) {
     throw new Error("Неверный формат телефона");
   }
-
   if (!message || message.trim().length === 0) {
     throw new Error("Сообщение не может быть пустым");
   }
 
   const token = process.env.SMS_BY_TOKEN;
-  if (!token || token === "YOUR_TOKEN_HERE") {
+  if (!token || token === "YOUR_TOKEN_HERE" || token === "your_sms_by_token_here") {
     throw new Error("SMS_BY_TOKEN не настроен");
   }
 
-  // Prepare URL-encoded body
+  const baseUrl = process.env.SMS_BY_BASE_URL ?? "https://app.sms.by";
+  const url = `${baseUrl}/api/v1/sendQuickSms`;
+
+  // IMPORTANT: must be form-encoded, not JSON.
+  // JSON body causes "ошибка в буквенном имени" (alphaname error).
   const body = new URLSearchParams({
     token,
     phone: phoneDigits,
@@ -47,48 +48,31 @@ export async function sendQuickSms({
     alphaname_id: "4720",
   });
 
-  const baseUrl = process.env.SMS_BY_BASE_URL ?? "https://app.sms.by";
-  const url = `${baseUrl}/api/v1/sendQuickSms`;
+  console.log(`[smsBy] sending to ${phoneDigits.slice(0, 6)}... via ${url}`);
 
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8" },
+    body,
+  });
+
+  const responseText = await res.text();
+  console.log(`[smsBy] response ${res.status}: ${responseText}`);
+
+  let data: SmsByResponse;
   try {
-    const res = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-      },
-      body,
-    });
-
-    // Read response as text first
-    const responseText = await res.text();
-
-    // Try to parse as JSON
-    let data: SmsByResponse;
-    try {
-      data = JSON.parse(responseText);
-    } catch {
-      // If not JSON, treat as error
-      throw new Error(
-        res.ok
-          ? "Неверный формат ответа от SMS.BY"
-          : `Ошибка SMS.BY: ${responseText}`
-      );
-    }
-
-    // Check for errors in response
-    if (!res.ok || data.error) {
-      const errorMessage =
-        data.error || data.message || `HTTP ${res.status}: ${responseText}`;
-      throw new Error(errorMessage);
-    }
-
-    // Success
-    return data;
-  } catch (error) {
-    // Re-throw with readable message
-    if (error instanceof Error) {
-      throw error;
-    }
-    throw new Error("Не удалось отправить SMS");
+    data = JSON.parse(responseText);
+  } catch {
+    throw new Error(
+      res.ok
+        ? `SMS.BY: неверный формат ответа: ${responseText}`
+        : `SMS.BY HTTP ${res.status}: ${responseText}`
+    );
   }
+
+  if (!res.ok || data.error) {
+    throw new Error(data.error ?? data.message ?? `SMS.BY HTTP ${res.status}`);
+  }
+
+  return data;
 }

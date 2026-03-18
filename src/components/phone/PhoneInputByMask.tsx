@@ -62,7 +62,11 @@ export function PhoneInputByMask({
 
   // Sync display value when valueE164 changes externally
   useEffect(() => {
-    setDisplayValue(formatForDisplay(valueE164 || "+375"));
+    const updateDisplayValue = () => {
+      setDisplayValue(formatForDisplay(valueE164 || "+375"));
+    };
+    
+    requestAnimationFrame(updateDisplayValue);
   }, [valueE164]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {

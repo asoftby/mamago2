@@ -98,7 +98,7 @@ export async function getMediaUsagesWithDetails(mediaId: string) {
             break;
 
           case "EVENT":
-            const event = await prisma.event.findUnique({
+            const event = await prisma.activity.findUnique({
               where: { id: usage.entityId },
               select: { title: true },
             });

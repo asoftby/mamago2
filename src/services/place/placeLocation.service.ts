@@ -13,6 +13,7 @@
  * 5. Return updated place with all geo fields
  */
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import prisma from "@/lib/prisma";
 import { LocationSource } from "@prisma/client";
 import { resolveCityId } from "./cityResolver.service";

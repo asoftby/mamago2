@@ -1,9 +1,10 @@
 import type { Metadata, Viewport } from "next";
-import { Manrope, Geist_Mono } from "next/font/google";
+import { Manrope, Geist_Mono, Literata } from "next/font/google";
 import "./globals.css";
 import { Sonner } from "@/components/ui/sonner";
 
 const manrope = Manrope({
+  variable: "--font-manrope",
   subsets: ["latin", "cyrillic"],
   display: "swap",
   preload: true,
@@ -12,6 +13,14 @@ const manrope = Manrope({
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
+});
+
+const literata = Literata({
+  variable: "--font-serif",
+  subsets: ["latin", "cyrillic"],
+  display: "swap",
+  style: ["normal", "italic"],
+  weight: ["400", "500", "600", "700"],
 });
 
 export const metadata: Metadata = {
@@ -34,7 +43,7 @@ export default function RootLayout({
   return (
     <html lang="ru">
       <body
-        className={`${manrope.className} ${geistMono.variable} antialiased font-sans min-h-screen bg-background text-foreground`}
+        className={`${manrope.variable} ${geistMono.variable} ${literata.variable} antialiased font-sans min-h-screen bg-background text-foreground`}
       >
         {children}
         <Sonner />

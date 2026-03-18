@@ -13,6 +13,7 @@ import { PlaceCardSection } from "./_sections/PlaceCardSection";
 import { OpeningHoursSection } from "./_sections/OpeningHoursSection";
 import { DateTimePickerSection } from "./_sections/DateTimePickerSection";
 import { ChildrenSystemSection } from "./_sections/ChildrenSystemSection";
+import { ArticlePublicationSection } from "./_sections/ArticlePublicationSection";
 
 export default function UiLabPage() {
   if (process.env.NODE_ENV === "production") {
@@ -52,6 +53,7 @@ export default function UiLabPage() {
           <OpeningHoursSection />
           <DateTimePickerSection />
           <ChildrenSystemSection />
+          <ArticlePublicationSection />
         </main>
       </div>
     </div>

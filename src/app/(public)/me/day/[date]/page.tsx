@@ -1,120 +1,98 @@
 import { redirect } from "next/navigation";
-import { use } from "react";
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/auth/server";
 import { listPlanItemsByDate } from "@/server/services/plan.service";
 import { Container } from "@/components/ui/Container";
-import { Surface } from "@/components/ui/surface";
-import { H1, Body } from "@/components/ui/typography";
-import { PrimaryButton } from "@/components/ui/PrimaryButton";
+import { CalendarDays, ExternalLink } from "lucide-react";
 
 type PageProps = {
   params: Promise<{ date: string }>;
 };
 
-export default async function DayScenarioPage({ params }: PageProps) {
-  const resolvedParams = await params;
-  
-  // Check authentication
+function formatTime(dt: Date | null): string | null {
+  if (!dt) return null;
+  return new Date(dt).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
+}
+
+export default async function DayPage({ params }: PageProps) {
+  const { date } = await params;
+
   const user = await getCurrentUser();
-  if (!user) {
-    redirect("/login");
-  }
+  if (!user) redirect("/login");
 
-  // Validate date format (YYYY-MM-DD)
-  const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-  if (!dateRegex.test(resolvedParams.date)) {
-    redirect("/me/plan");
-  }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) redirect("/me/plan");
 
-  // Load plan items for this date
-  const planItems = await listPlanItemsByDate(user.id, resolvedParams.date);
+  const items = await listPlanItemsByDate(user.id, date);
 
-  // Sort by startsAt if available, otherwise by creation time
-  const sortedItems = [...planItems].sort((a, b) => {
-    if (a.startsAt && b.startsAt) {
-      return a.startsAt.getTime() - b.startsAt.getTime();
-    }
-    if (a.startsAt) return -1;
-    if (b.startsAt) return 1;
-    return a.createdAt.getTime() - b.createdAt.getTime();
-  });
-
-  // Format date for display
-  const date = new Date(resolvedParams.date);
-  const dateLabel = date.toLocaleDateString("ru-RU", {
+  const dateLabel = new Date(date + "T00:00:00").toLocaleDateString("ru-RU", {
+    weekday: "long",
     day: "numeric",
     month: "long",
     year: "numeric",
-    weekday: "long",
   });
-
-  const formatTime = (dateTime: Date) => {
-    return dateTime.toLocaleTimeString("ru-RU", {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  };
 
   return (
     <div className="min-h-screen bg-background py-8">
-      <Container className="max-w-4xl">
-        <div className="space-y-6">
-          {/* Header */}
-          <div>
-            <Link
-              href="/me/plan"
-              className="text-sm text-primary hover:underline mb-2 inline-block"
-            >
-              ← Вернуться к плану
-            </Link>
-            <H1 className="capitalize">Сценарий на {dateLabel}</H1>
-          </div>
-
-          {/* Scenario Items */}
-          {sortedItems.length > 0 ? (
-            <div className="space-y-4">
-              {sortedItems.map((item, index) => (
-                <Surface key={item.id} className="p-6">
-                  <div className="flex items-start gap-4">
-                    {/* Number badge */}
-                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center font-semibold">
-                      {index + 1}
-                    </div>
-
-                    {/* Content */}
-                    <div className="flex-1">
-                      <div className="flex items-start justify-between gap-4">
-                        <div>
-                          <Body className="font-medium text-lg">
-                            Activity ID: {item.activityId}
-                          </Body>
-                          {item.startsAt && (
-                            <Body className="text-muted-foreground text-sm mt-1">
-                              Время: {formatTime(item.startsAt)}
-                            </Body>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </Surface>
-              ))}
-            </div>
-          ) : (
-            /* Empty State */
-            <Surface className="p-12">
-              <div className="text-center space-y-4">
-                <Body className="text-muted-foreground text-lg">
-                  На этот день ничего не запланировано
-                </Body>
-                <Link href="/minsk">
-                  <PrimaryButton>Найти мероприятия</PrimaryButton>
-                </Link>
-              </div>
-            </Surface>
-          )}
+      <Container className="max-w-2xl">
+        <div className="mb-6">
+          <Link href="/me/plan" className="text-sm text-neutral-500 hover:text-neutral-900 transition-colors">
+            ← Мой план
+          </Link>
+          <h1 className="text-2xl font-bold text-neutral-900 mt-1 capitalize">{dateLabel}</h1>
         </div>
+
+        {items.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-20 text-center">
+            <div className="w-14 h-14 rounded-2xl bg-neutral-100 flex items-center justify-center mb-4">
+              <CalendarDays className="w-6 h-6 text-neutral-400" />
+            </div>
+            <p className="text-base font-semibold text-neutral-900">На этот день ничего нет</p>
+            <p className="text-sm text-neutral-500 mt-1 mb-6">Добавьте активности в план</p>
+            <Link href="/minsk" className="px-5 py-2.5 rounded-2xl bg-neutral-900 text-white text-sm font-semibold hover:bg-neutral-700 transition-colors">
+              Найти активности
+            </Link>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {items.map((item, index) => {
+              const time = formatTime(item.startsAt);
+              const title = item.activity?.title ?? item.title ?? "Активность";
+              const image = item.activity?.coverImageUrl ?? item.coverImageUrl ?? null;
+              return (
+                <div key={item.id} className="flex items-center gap-3.5 px-4 py-3.5 rounded-2xl border border-neutral-200 bg-white">
+                  <div className="w-8 h-8 rounded-xl bg-neutral-900 text-white flex items-center justify-center text-sm font-bold shrink-0">
+                    {index + 1}
+                  </div>
+
+                  {item.activity?.coverImageUrl ?? item.coverImageUrl ? (
+                    <img src={image!} alt={title} className="w-12 h-12 rounded-xl object-cover shrink-0" />
+                  ) : (
+                    <div className="w-12 h-12 rounded-xl bg-neutral-100 flex items-center justify-center shrink-0">
+                      <CalendarDays className="w-5 h-5 text-neutral-400" />
+                    </div>
+                  )}
+
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-neutral-900 leading-tight line-clamp-1">{title}</p>
+                    {time && <p className="text-xs text-neutral-500 mt-0.5">{time}</p>}
+                    {item.activity?.ageLabel && (
+                      <p className="text-xs text-neutral-400 mt-0.5">{item.activity.ageLabel}</p>
+                    )}
+                  </div>
+
+                  {item.activityId && (
+                    <Link
+                      href={`/minsk/activity/${item.activityId}`}
+                      className="p-2 rounded-xl text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 transition-colors shrink-0"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                    </Link>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
       </Container>
     </div>
   );

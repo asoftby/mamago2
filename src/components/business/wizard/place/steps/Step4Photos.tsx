@@ -7,7 +7,7 @@ import type { PlaceFormData } from "../types";
 
 interface Step4PhotosProps {
   data: PlaceFormData;
-  wizardSessionId: string;
+  wizardSessionId?: string;
   onChange: (updates: Partial<PlaceFormData>) => void;
   isEditable?: boolean;
 }
@@ -74,7 +74,7 @@ export function Step4Photos({
           Добавьте логотип или главное фото вашего места
         </p>
         <PlaceLogoUploadTemp
-          wizardSessionId={wizardSessionId}
+          wizardSessionId={wizardSessionId || ""}
           currentLogoUrl={logoImage?.url || data.logoUrl || undefined}
           onUploadComplete={handleLogoUploadComplete}
           disabled={!isEditable}
@@ -88,7 +88,7 @@ export function Step4Photos({
           Добавьте дополнительные фотографии (необязательно)
         </p>
         <PlaceGalleryUploadTemp
-          wizardSessionId={wizardSessionId}
+          wizardSessionId={wizardSessionId || ""}
           initialImages={initialGalleryItems}
           onImagesChange={handleGalleryImagesChange}
           disabled={!isEditable}

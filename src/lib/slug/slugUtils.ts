@@ -83,7 +83,7 @@ export function extractStreetName(address: string): string | null {
   if (!address) return null;
   
   // Remove common prefixes
-  let cleaned = address
+  const cleaned = address
     .replace(/^(ул\.|улица|пр\.|проспект|пер\.|переулок|пл\.|площадь|вул\.|вулиця)\s*/i, "")
     .trim();
   

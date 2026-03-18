@@ -3,17 +3,12 @@
 import React, { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { Heart } from "lucide-react";
-import { ScheduleModal } from "./ScheduleModal";
-
-type Session = {
-  date: string; // YYYY-MM-DD
-  startsAt?: string; // ISO string
-};
+import { SaveToPlanModal, SaveScenario, SaveToPlanResult } from "@/components/activity/SaveToPlanModal";
 
 type SaveHeartProps = {
   activityId: string;
   activityTitle: string;
-  sessions?: Session[];
+  coverImageUrl?: string | null;
   className?: string;
   onSaveChange?: (isSaved: boolean) => void;
 };
@@ -21,16 +16,20 @@ type SaveHeartProps = {
 export function SaveHeart({
   activityId,
   activityTitle,
-  sessions = [],
+  coverImageUrl,
   className,
   onSaveChange,
 }: SaveHeartProps) {
-  const [isSaved, setIsSaved] = useState(false);
+  const [isIdea, setIsIdea] = useState(false);
+  const [inPlan, setInPlan] = useState(false);
+  const [planDate, setPlanDate] = useState<string | null>(null);
+  const [planStartsAt, setPlanStartsAt] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isAnimating, setIsAnimating] = useState(false);
 
-  // Check save status on mount
+  const isSaved = isIdea || inPlan;
+
   useEffect(() => {
     checkSaveStatus();
   }, [activityId]);
@@ -40,7 +39,10 @@ export function SaveHeart({
       const res = await fetch(`/api/save/status?activityId=${activityId}`);
       if (res.ok) {
         const data = await res.json();
-        setIsSaved(data.isSaved);
+        setIsIdea(data.isIdea ?? false);
+        setInPlan(data.inPlan ?? false);
+        setPlanDate(data.planDate ?? null);
+        setPlanStartsAt(data.planStartsAt ?? null);
       }
     } catch (error) {
       console.error("Failed to check save status:", error);
@@ -50,65 +52,70 @@ export function SaveHeart({
   const handleClick = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    
-    if (isSaved) {
-      // Already saved - do nothing for now (could show unsave option)
-      return;
-    }
-    
-    // Open modal to choose save method
     setIsModalOpen(true);
   };
 
-  const handleSaveIdea = async () => {
+  const handleConfirm = async (result: SaveToPlanResult) => {
+    if (result.action === "cancel") return;
+
     setIsLoading(true);
     try {
-      const res = await fetch("/api/save/idea", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ activityId }),
-      });
-
-      if (res.ok) {
-        setIsSaved(true);
-        setIsAnimating(true);
-        setTimeout(() => setIsAnimating(false), 300);
-        onSaveChange?.(true);
+      if (result.action === "ideas") {
+        const res = await fetch("/api/save/idea", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ activityId }),
+        });
+        if (res.ok) {
+          setIsIdea(true);
+          triggerAnimation();
+          onSaveChange?.(true);
+        }
+      } else if (result.action === "remove-idea") {
+        const res = await fetch(`/api/save/idea?activityId=${activityId}`, { method: "DELETE" });
+        if (res.ok) {
+          setIsIdea(false);
+          if (!inPlan) onSaveChange?.(false);
+        }
+      } else if (result.action === "plan") {
+        const res = await fetch("/api/save/plan", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            activityId,
+            date: result.dateISO,
+            startsAt: result.timeSlotId ?? null,
+            title: activityTitle,
+            coverImageUrl: coverImageUrl ?? null,
+          }),
+        });
+        if (res.ok) {
+          setInPlan(true);
+          setPlanDate(result.dateISO);
+          triggerAnimation();
+          onSaveChange?.(true);
+        }
       }
     } catch (error) {
-      console.error("Failed to save idea:", error);
+      console.error("Failed to save:", error);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleSchedule = async (date: string, startsAt?: string) => {
-    setIsLoading(true);
-    try {
-      const res = await fetch("/api/save/plan", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ activityId, date, startsAt }),
-      });
-
-      if (res.ok) {
-        setIsSaved(true);
-        setIsAnimating(true);
-        setTimeout(() => setIsAnimating(false), 300);
-        onSaveChange?.(true);
-      }
-    } catch (error) {
-      console.error("Failed to schedule:", error);
-    } finally {
-      setIsLoading(false);
-    }
+  const triggerAnimation = () => {
+    setIsAnimating(true);
+    setTimeout(() => setIsAnimating(false), 300);
   };
+
+  const scenario: SaveScenario = { kind: "quickdate", title: activityTitle };
 
   return (
     <>
       <button
         onClick={handleClick}
         disabled={isLoading}
+        aria-label={isSaved ? "Сохранено" : "Сохранить"}
         className={cn(
           "group flex h-[40px] w-[40px] items-center justify-center rounded-full bg-white shadow-sm transition-all hover:scale-105 active:scale-95",
           isSaved ? "text-primary" : "text-muted-foreground hover:text-primary",
@@ -125,14 +132,15 @@ export function SaveHeart({
         />
       </button>
 
-      <ScheduleModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        activityId={activityId}
-        activityTitle={activityTitle}
-        sessions={sessions}
-        onSaveIdea={handleSaveIdea}
-        onSchedule={handleSchedule}
+      <SaveToPlanModal
+        open={isModalOpen}
+        onOpenChange={setIsModalOpen}
+        scenario={scenario}
+        onConfirm={handleConfirm}
+        isIdea={isIdea}
+        inPlan={inPlan}
+        planDate={planDate}
+        planStartsAt={planStartsAt}
       />
     </>
   );

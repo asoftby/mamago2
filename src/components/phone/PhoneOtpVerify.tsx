@@ -6,12 +6,18 @@ import { PrimaryButton } from "@/components/ui/PrimaryButton";
 /**
  * Helper to safely extract error message from various error formats
  */
-function errorToText(e: any): string {
+function errorToText(e: unknown): string {
   if (!e) return "Неизвестная ошибка";
   if (typeof e === "string") return e;
   if (e instanceof Error) return e.message;
-  if (typeof e?.error === "string") return e.error;
-  if (typeof e?.message === "string") return e.message;
+  if (typeof e === "object" && e !== null) {
+    if ("error" in e && typeof (e as { error?: unknown }).error === "string") {
+      return (e as { error: string }).error;
+    }
+    if ("message" in e && typeof (e as { message?: unknown }).message === "string") {
+      return (e as { message: string }).message;
+    }
+  }
   try {
     return JSON.stringify(e);
   } catch {

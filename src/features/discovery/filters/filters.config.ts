@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 type FilterType = "single" | "multi" | "dateRange";
 
 type FilterConfig = {

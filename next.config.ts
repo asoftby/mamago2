@@ -7,8 +7,20 @@ const nextConfig: NextConfig = {
   // Exclude sharp from client bundle (server-only image processing)
   serverExternalPackages: ['sharp'],
   
+  images: {
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "images.unsplash.com",
+      },
+      {
+        protocol: "https",
+        hostname: "**.unsplash.com",
+      },
+    ],
+  },
+
   experimental: {
-    serverComponentsExternalPackages: ['sharp'],
     // Set body size limit for API routes (10MB for image uploads)
     serverActions: {
       bodySizeLimit: '10mb',

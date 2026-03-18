@@ -50,7 +50,11 @@ export default async function EditOfferPage({ params }: EditOfferPageProps) {
       offer={offer}
       userId={user.id}
       userRole="BUSINESS_OWNER"
-      business={business}
+      business={{
+        id: business.id,
+        name: business.name,
+        phone: business.phone || undefined,
+      }}
     />
   );
 }

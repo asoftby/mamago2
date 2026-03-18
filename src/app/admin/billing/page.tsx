@@ -21,8 +21,8 @@ export default async function AdminBillingPage() {
   try {
     overview = await getBillingOverview();
     attention = await getBusinessesRequiringAttention();
-  } catch (e: any) {
-    error = e.message;
+  } catch (e) {
+    error = e instanceof Error ? e.message : 'Unknown error';
     console.error("Billing overview error:", e);
   }
 

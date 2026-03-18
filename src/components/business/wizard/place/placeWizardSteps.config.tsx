@@ -104,11 +104,11 @@ export const PLACE_WIZARD_STEPS: WizardStepConfig<PlaceFormData>[] = [
       },
       {
         label: "Район",
-        value: data.districtName || "Не определен",
+        value: data.displayDistrictName || "Не определен",
       },
       {
         label: "Метро",
-        value: data.metroName || "Не указано",
+        value: data.displayMetroName || "Не указано",
       },
     ],
     

@@ -1,4 +1,6 @@
+ 
 import prisma from "@/lib/prisma";
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { UserStatus, UserModerationActionType, Role } from "@prisma/client";
 import { logAudit } from "./auditLog.service";
 

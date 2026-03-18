@@ -98,8 +98,8 @@ async function backfillMediaLibrary() {
 
       created++;
       usagesCreated++;
-    } catch (error: any) {
-      console.error(`Error processing PlaceImage ${img.id}:`, error.message);
+    } catch (error) {
+      console.error(`Error processing PlaceImage ${img.id}:`, error instanceof Error ? error.message : 'Unknown error');
     }
   }
 
@@ -186,8 +186,8 @@ async function backfillMediaLibrary() {
 
       activityCreated++;
       usagesCreated++;
-    } catch (error: any) {
-      console.error(`Error processing Activity ${activity.id}:`, error.message);
+    } catch (error) {
+      console.error(`Error processing Activity ${activity.id}:`, error instanceof Error ? error.message : 'Unknown error');
     }
   }
 
@@ -279,8 +279,8 @@ async function backfillMediaLibrary() {
 
       offerCreated++;
       usagesCreated++;
-    } catch (error: any) {
-      console.error(`Error processing Offer ${offer.id}:`, error.message);
+    } catch (error) {
+      console.error(`Error processing Offer ${offer.id}:`, error instanceof Error ? error.message : 'Unknown error');
     }
   }
 

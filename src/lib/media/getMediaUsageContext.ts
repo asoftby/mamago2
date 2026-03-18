@@ -77,7 +77,7 @@ async function fetchEntityData(
       }
 
       case "EVENT": {
-        const event = await prisma.event.findUnique({
+        const event = await prisma.activity.findUnique({
           where: { id: entityId },
           select: { title: true },
         });
@@ -93,7 +93,7 @@ async function fetchEntityData(
       }
 
       case "ROUTE": {
-        const route = await prisma.route.findUnique({
+        const route = await prisma.activity.findUnique({
           where: { id: entityId },
           select: { title: true },
         });
@@ -101,19 +101,16 @@ async function fetchEntityData(
       }
 
       case "ARTICLE": {
-        const article = await prisma.article.findUnique({
-          where: { id: entityId },
-          select: { title: true },
-        });
-        return { title: article?.title || null };
+        // Article model doesn't exist yet
+        return { title: "Article" };
       }
 
       case "USER": {
         const user = await prisma.user.findUnique({
           where: { id: entityId },
-          select: { email: true, name: true },
+          select: { email: true },
         });
-        return { title: user?.name || user?.email || null };
+        return { title: user?.email || null };
       }
 
       default:

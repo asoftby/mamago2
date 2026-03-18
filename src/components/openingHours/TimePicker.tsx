@@ -95,15 +95,19 @@ export function TimePicker({ value, onChange, disabled, placeholder = "Выбе�
 
   // Update input value when external value changes and determine initial mode
   useEffect(() => {
-    if (!isManualMode) {
-      setInputValue(value);
-    }
-    
-    // If the current value is not in standard options, switch to manual mode
-    if (value && !TIME_OPTIONS.includes(value) && !isManualMode) {
-      setIsManualMode(true);
-      setInputValue(value);
-    }
+    const updateValue = () => {
+      if (!isManualMode) {
+        setInputValue(value);
+      }
+      
+      // If the current value is not in standard options, switch to manual mode
+      if (value && !TIME_OPTIONS.includes(value) && !isManualMode) {
+        setIsManualMode(true);
+        setInputValue(value);
+      }
+    };
+
+    requestAnimationFrame(updateValue);
   }, [value, isManualMode]);
 
   const handleSelectChange = (newValue: string) => {

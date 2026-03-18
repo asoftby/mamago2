@@ -29,8 +29,8 @@ export default async function AdminCommercialPage() {
     recentNotifications = await getNotifications({
       scheduledBefore: new Date(),
     });
-  } catch (e: any) {
-    error = e.message;
+  } catch (e) {
+    error = e instanceof Error ? e.message : 'Unknown error';
     console.error("Commercial overview error:", e);
   }
 

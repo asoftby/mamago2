@@ -37,10 +37,10 @@ function getUsageInfo(file: string) {
 }
 
 class ErrorBoundary extends React.Component<
-  { children: React.ReactNode; title: string; filePath: string; usageProps: any },
+  { children: React.ReactNode; title: string; filePath: string; usageProps: ReturnType<typeof getUsageInfo> },
   { hasError: boolean; error: Error | null }
 > {
-  constructor(props: { children: React.ReactNode; title: string; filePath: string; usageProps: any }) {
+  constructor(props: { children: React.ReactNode; title: string; filePath: string; usageProps: ReturnType<typeof getUsageInfo> }) {
     super(props);
     this.state = { hasError: false, error: null };
   }

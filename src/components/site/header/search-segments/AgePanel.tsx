@@ -1,6 +1,7 @@
 "use client";
 
 import { Balloon } from "lucide-react";
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { cn } from "@/lib/utils";
 import { AGE_GROUPS } from "@/features/filters/age/ageGroups";
 

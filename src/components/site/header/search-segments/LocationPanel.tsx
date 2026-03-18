@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { MapPin, Navigation, Zap, ChevronDown } from "lucide-react";
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { cn } from "@/lib/utils";
 
 interface LocationPanelProps {

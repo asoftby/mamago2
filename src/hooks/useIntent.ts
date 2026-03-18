@@ -14,18 +14,22 @@ export function useIntent(defaultIntent: IntentType = 'kuda') {
 
   // Initialize from URL/Storage on mount (client-side only)
   useEffect(() => {
-    // 1. Check URL first
-    const urlIntent = searchParams.get('intent');
-    if (urlIntent && ['kuda', 'classes', 'birthday', 'routes'].includes(urlIntent)) {
-      setIntent(urlIntent as IntentType);
-      return;
-    }
+    const id = requestAnimationFrame(() => {
+      // 1. Check URL first
+      const urlIntent = searchParams.get('intent');
+      if (urlIntent && ['kuda', 'classes', 'birthday', 'routes'].includes(urlIntent)) {
+        setIntent(urlIntent as IntentType);
+        return;
+      }
+      
+      // 2. Check localStorage if no URL param
+      const storedIntent = localStorage.getItem(STORAGE_KEY);
+      if (storedIntent && ['kuda', 'classes', 'birthday', 'routes'].includes(storedIntent)) {
+        setIntent(storedIntent as IntentType);
+      }
+    });
     
-    // 2. Check localStorage if no URL param
-    const storedIntent = localStorage.getItem(STORAGE_KEY);
-    if (storedIntent && ['kuda', 'classes', 'birthday', 'routes'].includes(storedIntent)) {
-      setIntent(storedIntent as IntentType);
-    }
+    return () => cancelAnimationFrame(id);
   }, []); // Run once on mount
 
   // Sync with URL when intent changes
@@ -58,16 +62,20 @@ export function useIntent(defaultIntent: IntentType = 'kuda') {
 
   // Listen to URL changes (e.g. back button)
   useEffect(() => {
-    const urlIntent = searchParams.get('intent');
-    if (urlIntent && ['kuda', 'classes', 'birthday', 'routes'].includes(urlIntent)) {
-      setIntent(urlIntent as IntentType);
-    } else if (!urlIntent && intent !== defaultIntent) {
-      // If URL has no intent but state has non-default, it might mean we navigated back to default
-      // However, we usually want to keep state in sync. 
-      // Let's rely on setIntent being called by UI for direct changes.
-      // This effect handles external navigation changes.
-      setIntent(defaultIntent);
-    }
+    const id = requestAnimationFrame(() => {
+      const urlIntent = searchParams.get('intent');
+      if (urlIntent && ['kuda', 'classes', 'birthday', 'routes'].includes(urlIntent)) {
+        setIntent(urlIntent as IntentType);
+      } else if (!urlIntent && intent !== defaultIntent) {
+        // If URL has no intent but state has non-default, it might mean we navigated back to default
+        // However, we usually want to keep state in sync. 
+        // Let's rely on setIntent being called by UI for direct changes.
+        // This effect handles external navigation changes.
+        setIntent(defaultIntent);
+      }
+    });
+    
+    return () => cancelAnimationFrame(id);
   }, [searchParams, defaultIntent]);
 
   return { intent, setIntent };

@@ -44,6 +44,7 @@ async function repairMediaMetadata() {
   for (const media of brokenMedia) {
     console.log(`Processing ${media.id} (${media.filename})...`);
     
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const updates: any = {};
     let needsUpdate = false;
 

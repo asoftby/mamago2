@@ -81,10 +81,10 @@ export async function POST(req: NextRequest) {
 
     // Register in media library
     try {
-      let sourceType = MediaSourceType.USER_UPLOAD;
+      let sourceType: MediaSourceType = MediaSourceType.USER_UPLOAD;
       if (user.role === "ADMIN") {
         sourceType = MediaSourceType.ADMIN_UPLOAD;
-      } else if (user.business) {
+      } else if (user.role === "BUSINESS_OWNER") {
         sourceType = MediaSourceType.BUSINESS_UPLOAD;
       }
 
@@ -123,11 +123,3 @@ export async function POST(req: NextRequest) {
     );
   }
 }
-
-export const config = {
-  api: {
-    bodyParser: {
-      sizeLimit: "10mb",
-    },
-  },
-};

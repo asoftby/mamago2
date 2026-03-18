@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useEffect, useState } from "react";
+import { useRef, useEffect, useState, Suspense } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useSearchParams } from "next/navigation";
@@ -24,7 +24,7 @@ interface DiscoveryIntentTabsProps {
   className?: string;
 }
 
-export function DiscoveryIntentTabs({ 
+function DiscoveryIntentTabsContent({ 
   city, 
   currentIntent, 
   className 
@@ -174,5 +174,13 @@ export function DiscoveryIntentTabs({
         />
       </div>
     </div>
+  );
+}
+
+export function DiscoveryIntentTabs(props: DiscoveryIntentTabsProps) {
+  return (
+    <Suspense fallback={<div className="h-[60px] w-full" />}>
+      <DiscoveryIntentTabsContent {...props} />
+    </Suspense>
   );
 }

@@ -36,12 +36,10 @@ export function Step3Media({ data, onChange, isEditable, wizardSessionId }: Step
           Главное изображение <span className="text-red-500">*</span>
         </Label>
         <ImageUploader
-          value={data.coverImage}
-          onChange={handleCoverImageChange}
+          onUpload={(image) => handleCoverImageChange(image.id)}
           disabled={!isEditable}
-          wizardSessionId={wizardSessionId}
-          aspectRatio="16:9"
           maxSizeMB={5}
+          className="w-full"
         />
         <p className="text-xs text-muted-foreground">
           Основное изображение, которое будет показано в каталоге
@@ -52,14 +50,13 @@ export function Step3Media({ data, onChange, isEditable, wizardSessionId }: Step
       <div className="space-y-2">
         <Label>Галерея (необязательно)</Label>
         <ImageUploader
-          value={data.gallery}
-          onChange={handleGalleryChange}
+          onUpload={(image) => {
+            const newGallery = [...(data.gallery || []), image.id];
+            handleGalleryChange(newGallery);
+          }}
           disabled={!isEditable}
-          wizardSessionId={wizardSessionId}
-          multiple
-          maxFiles={8}
-          aspectRatio="4:3"
           maxSizeMB={3}
+          className="w-full"
         />
         <p className="text-xs text-muted-foreground">
           Дополнительные фотографии для детального показа предложения

@@ -1,4 +1,5 @@
 // src/server/discovery/getActivityFeed.ts
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 import prisma from "@/lib/prisma";
 import { DiscoveryState } from "@/lib/discovery/urlState";

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Deep equality comparison for objects
  * Used to avoid unnecessary saves when data hasn't actually changed

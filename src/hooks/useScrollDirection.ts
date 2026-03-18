@@ -15,7 +15,9 @@ export function useScrollDirection(threshold: number = 10) {
       const difference = Math.abs(scrollY - lastScrollY);
       
       // Update isScrolled state
-      setIsScrolled(scrollY > threshold);
+      const id = requestAnimationFrame(() => {
+        setIsScrolled(scrollY > threshold);
+      });
 
       // Only update direction if we've scrolled enough to avoid jitter
       if (difference < threshold) {
@@ -23,13 +25,15 @@ export function useScrollDirection(threshold: number = 10) {
         return;
       }
 
-      if (scrollY > lastScrollY && scrollY > threshold) {
-        // Scrolling down
-        setScrollDirection("down");
-      } else if (scrollY < lastScrollY) {
-        // Scrolling up
-        setScrollDirection("up");
-      }
+      const directionId = requestAnimationFrame(() => {
+        if (scrollY > lastScrollY && scrollY > threshold) {
+          // Scrolling down
+          setScrollDirection("down");
+        } else if (scrollY < lastScrollY) {
+          // Scrolling up
+          setScrollDirection("up");
+        }
+      });
 
       lastScrollY = scrollY > 0 ? scrollY : 0;
       ticking = false;
@@ -43,7 +47,9 @@ export function useScrollDirection(threshold: number = 10) {
     };
 
     // Set initial state
-    setIsScrolled(window.scrollY > threshold);
+    const initialId = requestAnimationFrame(() => {
+      setIsScrolled(window.scrollY > threshold);
+    });
 
     window.addEventListener("scroll", onScroll, { passive: true });
 

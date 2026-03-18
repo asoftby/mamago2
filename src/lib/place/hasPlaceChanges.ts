@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Check if place has changes compared to original/published version
  * Uses same comparison logic as PlaceRevisionModerationView

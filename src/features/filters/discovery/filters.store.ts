@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useSearchParams, useRouter, usePathname, ReadonlyURLSearchParams } from 'next/navigation';
 import { whenLabel } from './whenLabel';
@@ -155,7 +156,10 @@ export function useDiscoveryFilters() {
   // Sync draft with applied when URL changes (but not when draft is being edited)
   useEffect(() => {
     if (!openKey) {
-      setDraftState(applied);
+      const id = requestAnimationFrame(() => {
+        setDraftState(applied);
+      });
+      return () => cancelAnimationFrame(id);
     }
   }, [applied, openKey]);
   

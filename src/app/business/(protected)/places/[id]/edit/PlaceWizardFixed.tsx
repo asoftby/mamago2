@@ -237,7 +237,7 @@ export function PlaceWizardFixed({ place: initialPlace, initialStep, moderationM
           const originalValue = (originalPlace as any)[key];
           // Only keep the change if it's different from original
           if (!deepEqual(normalizePlaceData(value), normalizePlaceData(originalValue))) {
-            filteredChanges[key as keyof Place] = value;
+            filteredChanges[key as keyof Place] = value as any;
           }
         }
         

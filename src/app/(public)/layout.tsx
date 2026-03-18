@@ -1,4 +1,4 @@
-import React from "react";
+import React, { Suspense } from "react";
 import { SiteHeader } from "@/components/site/header";
 import { PublicFooter } from "@/components/shell/PublicFooter";
 import { MobileBottomNav } from "@/components/mobile/MobileBottomNav";
@@ -13,23 +13,30 @@ export default function PublicGroupLayout({
   return (
     <RefinementFiltersProvider>
       <div className="min-h-screen flex flex-col">
-        <SiteHeader />
+        <Suspense fallback={<div className="h-16 bg-white" />}>
+          <SiteHeader />
+        </Suspense>
+
         <main className="flex-1 pb-20 lg:pb-0">
           {children}
         </main>
-        
+
         {/* Desktop Footer */}
         <div className="hidden lg:block">
           <PublicFooter />
         </div>
-        
-        {/* Mobile Bottom Navigation (includes tablets) */}
+
+        {/* Mobile Bottom Navigation */}
         <div className="block lg:hidden">
-          <MobileBottomNav />
+          <Suspense fallback={<div className="h-16 bg-white" />}>
+            <MobileBottomNav />
+          </Suspense>
         </div>
-        
-        {/* Global Modal */}
-        <RefinementFiltersModalGlobal />
+
+        {/* Global Refinement Modal */}
+        <Suspense fallback={null}>
+          <RefinementFiltersModalGlobal />
+        </Suspense>
       </div>
     </RefinementFiltersProvider>
   );

@@ -10,7 +10,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { activityId, date, startsAt } = body;
+    const { activityId, date, startsAt, title, coverImageUrl } = body;
 
     if (!activityId || !date) {
       return NextResponse.json(
@@ -23,7 +23,9 @@ export async function POST(request: NextRequest) {
       user.id,
       activityId,
       date,
-      startsAt ? new Date(startsAt) : undefined
+      startsAt ? new Date(startsAt) : undefined,
+      title ?? undefined,
+      coverImageUrl ?? undefined
     );
 
     return NextResponse.json({ success: true, planItem });

@@ -51,7 +51,7 @@ export function mapPlaceToFormData(
     
     // Step 4: Photos
     logoImageId: place.logoImageId,
-    logoUrl: place.logoUrl,
+    logoUrl: place.images?.find(img => img.kind === "LOGO")?.url || null,
     images: place.images ? place.images.map(mapPrismaImageToFormImage) : [],
     
     // Step 5: Opening Hours
@@ -106,7 +106,6 @@ export function buildPlacePayload(data: PlaceFormData): Partial<Place> {
     
     // Step 4: Photos
     logoImageId: data.logoImageId,
-    logoUrl: data.logoUrl,
     
     // Step 5: Opening Hours (handled separately via openingHoursData)
     // openingHoursId is set by backend after creating OpeningHours record

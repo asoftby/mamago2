@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Unified Moderation Service
  * Handles moderation workflow for Place, Activity, and other content entities

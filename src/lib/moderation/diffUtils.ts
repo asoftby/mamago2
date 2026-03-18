@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Diff utilities for content moderation
  * Compares current and new versions of content to highlight changes

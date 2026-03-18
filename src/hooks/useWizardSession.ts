@@ -27,38 +27,42 @@ export function useWizardSession({ userId, wizardType, entityId }: WizardSession
   useEffect(() => {
     const sessionKey = getSessionKey();
     
-    // Try to restore from localStorage
-    const stored = localStorage.getItem(sessionKey);
-    
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored);
-        if (parsed.sessionId && parsed.timestamp) {
-          // Check if session is not too old (24 hours)
-          const age = Date.now() - parsed.timestamp;
-          if (age < 24 * 60 * 60 * 1000) {
-            console.log("[useWizardSession] Restored session:", parsed.sessionId);
-            setWizardSessionId(parsed.sessionId);
-            setIsLoaded(true);
-            return;
+    const id = requestAnimationFrame(() => {
+      // Try to restore from localStorage
+      const stored = localStorage.getItem(sessionKey);
+      
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          if (parsed.sessionId && parsed.timestamp) {
+            // Check if session is not too old (24 hours)
+            const age = Date.now() - parsed.timestamp;
+            if (age < 24 * 60 * 60 * 1000) {
+              console.log("[useWizardSession] Restored session:", parsed.sessionId);
+              setWizardSessionId(parsed.sessionId);
+              setIsLoaded(true);
+              return;
+            }
           }
+        } catch (error) {
+          console.error("[useWizardSession] Failed to parse stored session:", error);
         }
-      } catch (error) {
-        console.error("[useWizardSession] Failed to parse stored session:", error);
       }
-    }
 
-    // Create new session
-    const newSessionId = crypto.randomUUID();
-    const sessionData = {
-      sessionId: newSessionId,
-      timestamp: Date.now(),
-    };
+      // Create new session
+      const newSessionId = crypto.randomUUID();
+      const sessionData = {
+        sessionId: newSessionId,
+        timestamp: Date.now(),
+      };
+      
+      localStorage.setItem(sessionKey, JSON.stringify(sessionData));
+      console.log("[useWizardSession] Created new session:", newSessionId);
+      setWizardSessionId(newSessionId);
+      setIsLoaded(true);
+    });
     
-    localStorage.setItem(sessionKey, JSON.stringify(sessionData));
-    console.log("[useWizardSession] Created new session:", newSessionId);
-    setWizardSessionId(newSessionId);
-    setIsLoaded(true);
+    return () => cancelAnimationFrame(id);
   }, [getSessionKey]);
 
   // Clear session (on discard or successful save)

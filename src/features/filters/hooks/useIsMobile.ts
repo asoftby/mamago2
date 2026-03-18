@@ -9,12 +9,20 @@ export function useIsMobile() {
   const isMobileQuery = useMediaQuery({ maxWidth: 768 });
 
   useEffect(() => {
-    setMounted(true);
+    const id = requestAnimationFrame(() => {
+      setMounted(true);
+    });
+    
+    return () => cancelAnimationFrame(id);
   }, []);
 
   useEffect(() => {
     if (mounted) {
-      setIsMobile(isMobileQuery);
+      const id = requestAnimationFrame(() => {
+        setIsMobile(isMobileQuery);
+      });
+      
+      return () => cancelAnimationFrame(id);
     }
   }, [mounted, isMobileQuery]);
 

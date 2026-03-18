@@ -69,7 +69,10 @@ export function DiscoveryFilters({
   } = useDiscoveryFilters();
 
   useEffect(() => {
-    setMounted(true);
+    const id = requestAnimationFrame(() => {
+      setMounted(true);
+    });
+    return () => cancelAnimationFrame(id);
   }, []);
 
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -329,6 +332,7 @@ export function DiscoveryFilters({
              age: draft.age,
              metro: draft.metro,
              district: draft.district,
+             nearby: false,
              dateFrom: draft.dateFrom,
              dateTo: draft.dateTo,
              whenPreset: draft.whenPreset,

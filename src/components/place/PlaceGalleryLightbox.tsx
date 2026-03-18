@@ -30,6 +30,14 @@ export function PlaceGalleryLightbox({
     }
   }, [isOpen, initialIndex]);
 
+  const goToNext = () => {
+    setCurrentIndex((prev) => (prev + 1) % images.length);
+  };
+
+  const goToPrevious = () => {
+    setCurrentIndex((prev) => (prev - 1 + images.length) % images.length);
+  };
+
   // Keyboard navigation
   useEffect(() => {
     if (!isOpen) return;
@@ -46,7 +54,7 @@ export function PlaceGalleryLightbox({
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, currentIndex, images.length]);
+  }, [isOpen, goToNext, goToPrevious, onClose]);
 
   // Prevent body scroll when open
   useEffect(() => {
@@ -59,14 +67,6 @@ export function PlaceGalleryLightbox({
       document.body.style.overflow = "";
     };
   }, [isOpen]);
-
-  const goToNext = () => {
-    setCurrentIndex((prev) => (prev + 1) % images.length);
-  };
-
-  const goToPrevious = () => {
-    setCurrentIndex((prev) => (prev - 1 + images.length) % images.length);
-  };
 
   if (!isOpen) return null;
 

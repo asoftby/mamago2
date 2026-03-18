@@ -14,8 +14,8 @@ export default async function AdminServicePlacementsPage() {
     redirect("/login");
   }
 
-  let servicePlacements = [];
-  let error = null;
+  let servicePlacements: Awaited<ReturnType<typeof getServicePlacements>> = [];
+  let error: string | null = null;
 
   try {
     servicePlacements = await getServicePlacements();
