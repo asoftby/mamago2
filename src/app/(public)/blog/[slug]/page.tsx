@@ -220,7 +220,7 @@ export default async function ArticlePage({
           title="7 мест для семейных выходных в Минске"
           subtitle="Все места из этой статьи — в одной подборке"
           places={showcasePlaces}
-          viewAllHref="/minsk"
+          viewAllHref="/minsk/kuda"
           viewAllLabel="Смотреть все места"
         />
       </ArticleContent>
