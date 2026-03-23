@@ -60,13 +60,7 @@ export function DiscoveryFilters({
     ? forceUIMode === "mobile" 
     : (mounted && isMobileQuery);
 
-  const { 
-    applied, 
-    draft, 
-    setDraft, 
-    actions, 
-    derived 
-  } = useDiscoveryFilters();
+  const { applied, setDraft, actions, derived } = useDiscoveryFilters();
 
   useEffect(() => {
     const id = requestAnimationFrame(() => {
@@ -76,12 +70,6 @@ export function DiscoveryFilters({
   }, []);
 
   const [sheetOpen, setSheetOpen] = useState(false);
-  // Initialize draft from applied only when opening the sheet
-  useEffect(() => {
-    if (sheetOpen) {
-      setDraft(applied);
-    }
-  }, [sheetOpen, applied, setDraft]);
 
   // Track if component has mounted to avoid calling onChange on initial render
   const didMountRef = useRef(false);
@@ -325,22 +313,21 @@ export function DiscoveryFilters({
           open={sheetOpen}
           onOpenChange={setSheetOpen}
           filters={{
-             when: draft.whenPreset === "TODAY" ? "today"
-               : draft.whenPreset === "TOMORROW" ? "tomorrow"
-               : draft.whenPreset === "WEEKEND" ? "weekend"
-               : (draft.dateFrom ? (draft.dateTo ? { from: new Date(draft.dateFrom), to: new Date(draft.dateTo) } : new Date(draft.dateFrom)) : null),
-             age: draft.age,
-             metro: draft.metro,
-             district: draft.district,
+             when: applied.whenPreset === "TODAY" ? "today"
+               : applied.whenPreset === "TOMORROW" ? "tomorrow"
+               : applied.whenPreset === "WEEKEND" ? "weekend"
+               : (applied.dateFrom ? (applied.dateTo ? { from: new Date(applied.dateFrom), to: new Date(applied.dateTo) } : new Date(applied.dateFrom)) : null),
+             age: applied.age,
+             metro: applied.metro,
+             district: applied.district,
              nearby: false,
-             dateFrom: draft.dateFrom,
-             dateTo: draft.dateTo,
-             whenPreset: draft.whenPreset,
+             dateFrom: applied.dateFrom,
+             dateTo: applied.dateTo,
+             whenPreset: applied.whenPreset,
           }}
-          draft={draft}
+          draft={applied}
           setDraft={setDraft}
           onDone={() => {
-              actions.apply();
               setSheetOpen(false);
           }}
           onReset={actions.resetAll}

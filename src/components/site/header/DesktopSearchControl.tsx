@@ -13,6 +13,8 @@ import { useDropdownPosition } from "@/hooks/useDropdownPosition";
 import { DISCOVERY_INTENT_CONFIG } from "@/lib/discovery/discoveryIntentConfig";
 import { IconCompass, IconPalette, IconParty, IconMap } from "@/components/ui/icons";
 import type { HeaderPanel } from "@/hooks/useStableHeaderBehavior";
+import type { Intent } from "@/lib/intent";
+import { RefinementFiltersButtonCompact } from "@/components/discovery/RefinementFiltersButtonCompact";
 
 type SearchMode = "compact" | "expanded";
 
@@ -29,10 +31,301 @@ interface DesktopSearchControlProps {
   renderPanels?: boolean;
   /** Визуально встроена в хедер — без отдельного блока (мягкая обводка, без тени). */
   embeddedInHeader?: boolean;
+  /** Хаб города: только выбор города, без даты и «с кем». */
+  variant?: "discovery" | "cityHub";
 }
 
-export function DesktopSearchControl({ 
-  citySlug = "minsk", 
+export function DesktopSearchControl({
+  variant = "discovery",
+  ...props
+}: DesktopSearchControlProps) {
+  if (variant === "cityHub") {
+    return <CityHubDesktopSearchControl {...props} />;
+  }
+  return <DiscoveryDesktopSearchControl {...props} />;
+}
+
+type CityHubDesktopSearchControlProps = Omit<DesktopSearchControlProps, "variant">;
+
+/** Хаб города: одна капсула «Куда» как в разделах, без даты и «с кем». */
+function CityHubDesktopSearchControl({
+  citySlug = "minsk",
+  className,
+  mode,
+  activePanel,
+  onPanelChange,
+  onPanelClose,
+  onExpand,
+  renderPanels = true,
+  embeddedInHeader = false,
+}: CityHubDesktopSearchControlProps) {
+  const locationRef = useRef<HTMLButtonElement>(null);
+  const { applied, actions } = useDiscoveryFilters();
+  const { options: apiOptions } = useDiscoveryFilterOptions(citySlug);
+  const safeApiOptions = apiOptions || {
+    districts: [],
+    metros: [],
+    categories: [],
+  };
+  const formDisplayFilters = applied;
+
+  const locationPosition = useDropdownPosition(
+    locationRef as RefObject<HTMLElement | null>,
+    mode === "expanded" && activePanel === "where",
+  );
+
+  const getCityDisplayName = (slug: string) => {
+    const cityNames: Record<string, string> = {
+      minsk: "Минск",
+      brest: "Брест",
+      gomel: "Гомель",
+      grodno: "Гродно",
+      mogilev: "Могилёв",
+      vitebsk: "Витебск",
+    };
+    return cityNames[slug] || slug;
+  };
+
+  const getLocationText = () => {
+    const parts: string[] = [];
+    parts.push(getCityDisplayName(citySlug));
+    if (formDisplayFilters.nearby) parts.push("Поблизости");
+    if (formDisplayFilters.metro) {
+      const metro = safeApiOptions.metros.find(
+        (m) => m.value === formDisplayFilters.metro,
+      );
+      parts.push(metro?.label || formDisplayFilters.metro);
+    } else if (formDisplayFilters.district) {
+      const district = safeApiOptions.districts.find(
+        (d) => d.value === formDisplayFilters.district,
+      );
+      parts.push(district?.label || formDisplayFilters.district);
+    }
+    return parts.join(" • ");
+  };
+
+  const handleSegmentClick = (panel: HeaderPanel) => {
+    if (activePanel === panel) {
+      onPanelClose();
+      actions.close();
+    } else {
+      onPanelChange(panel);
+    }
+  };
+
+  const handleClearLocation = () => {
+    actions.setDraft({ nearby: false, metro: null, district: null });
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Escape") {
+      onPanelClose();
+      actions.close();
+    }
+  };
+
+  useEffect(() => {
+    if (activePanel === "none" || mode !== "expanded") return;
+
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Element;
+      const portalPanels = document.querySelectorAll("[data-portal-panel]");
+      for (const panel of portalPanels) {
+        if (panel.contains(target)) return;
+      }
+      if (locationRef.current?.contains(target)) return;
+      if (target.closest("[data-secondary-filters-slot]")) return;
+      if (target.closest("[data-secondary-filters-trigger]")) return;
+      if (target.closest('[data-slot="dialog-content"]')) return;
+      if (target.closest('[data-slot="dialog-overlay"]')) return;
+      onPanelClose();
+      actions.close();
+    };
+
+    document.addEventListener("mousedown", handleClickOutside, true);
+    return () =>
+      document.removeEventListener("mousedown", handleClickOutside, true);
+  }, [activePanel, mode, onPanelClose, actions]);
+
+  const hasLocationFilter = !!(
+    formDisplayFilters.nearby ||
+    formDisplayFilters.metro ||
+    formDisplayFilters.district
+  );
+
+  return (
+    <div className={cn("relative w-full flex items-center gap-3", className)}>
+      {mode === "compact" ? (
+        <button
+          type="button"
+          data-search-container
+          onClick={(e) => {
+            e.preventDefault();
+            onExpand?.();
+          }}
+          className={cn(
+            "relative w-full bg-white rounded-full border border-gray-200 shadow-sm flex-1 overflow-hidden text-left",
+            "transition-[box-shadow,border-color] duration-200 ease-out",
+            "hover:shadow-md hover:border-gray-300",
+            "focus:shadow-md focus:border-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-200 focus:ring-offset-2",
+            "cursor-pointer",
+          )}
+          aria-label="Куда: город и район — нажмите, чтобы раскрыть"
+        >
+          <div className="flex items-center gap-3 px-6 py-3">
+            <CompactLocationSummary
+              citySlug={citySlug}
+              applied={applied}
+              apiOptions={safeApiOptions}
+            />
+          </div>
+        </button>
+      ) : (
+        <div
+          data-search-container
+          className={cn(
+            "relative flex-1 overflow-hidden rounded-full transition-[box-shadow,border-color] duration-200 ease-out",
+            embeddedInHeader
+              ? "border border-gray-100 bg-gray-50/80 hover:border-gray-200 focus-within:border-gray-200"
+              : "bg-white border border-gray-200 shadow-sm hover:shadow-md hover:border-gray-300 focus-within:shadow-md focus-within:border-gray-300",
+            "focus-within:outline-none",
+          )}
+        >
+          <div className="flex w-full items-center">
+            <button
+              ref={locationRef}
+              type="button"
+              onClick={() => handleSegmentClick("where")}
+              className={cn(
+                "group flex w-full flex-1 items-center gap-3 overflow-hidden rounded-full px-6 py-4 text-left transition-[background-color] duration-200 ease-out",
+                "hover:bg-gray-50",
+                activePanel === "where" && "bg-gray-50",
+              )}
+            >
+              <MapPin className="h-4 w-4 flex-shrink-0 text-gray-400" />
+              <div className="flex min-w-0 flex-1 flex-col items-start">
+                <span className="text-xs font-medium text-gray-900">Куда</span>
+                <span className="w-full truncate text-left text-sm text-gray-600">
+                  {getLocationText()}
+                </span>
+              </div>
+              {hasLocationFilter ? (
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleClearLocation();
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.stopPropagation();
+                      e.preventDefault();
+                      handleClearLocation();
+                    }
+                  }}
+                  className="flex h-5 w-5 flex-shrink-0 cursor-pointer items-center justify-center rounded-full bg-gray-200 opacity-0 transition-[opacity,background-color] duration-200 ease-out hover:bg-gray-300 group-hover:opacity-100"
+                  aria-label="Очистить местоположение"
+                >
+                  <X className="h-3 w-3 text-gray-600" />
+                </div>
+              ) : null}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {mode === "expanded" && renderPanels && activePanel === "where" ? (
+        <Portal>
+          <div
+            data-portal-panel
+            style={{
+              position: "absolute",
+              top: locationPosition.top + 8,
+              left: locationPosition.containerLeft,
+              width: locationPosition.containerWidth,
+              zIndex: 9999,
+            }}
+          >
+            <LocationPanel
+              variant="cityHub"
+              citySlug={citySlug}
+              searchText=""
+              onSearchTextChange={() => {}}
+              onClose={() => {
+                onPanelClose();
+                actions.close();
+              }}
+              applied={applied}
+              actions={actions}
+              apiOptions={safeApiOptions}
+            />
+          </div>
+        </Portal>
+      ) : null}
+
+      {mode === "expanded" && activePanel !== "none" ? (
+        <div
+          className="fixed inset-0 z-[-1]"
+          onKeyDown={handleKeyDown}
+          tabIndex={-1}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+/** Компактный хаб: как в разделах, но иконка поля «Куда» (MapPin), только локация. */
+function CompactLocationSummary({
+  citySlug,
+  applied,
+  apiOptions: safeApiOptions,
+}: {
+  citySlug: string;
+  applied: any;
+  apiOptions: any;
+}) {
+  const getCityDisplayName = (slug: string) => {
+    const cityNames: Record<string, string> = {
+      minsk: "Минск",
+      brest: "Брест",
+      gomel: "Гомель",
+      grodno: "Гродно",
+      mogilev: "Могилёв",
+      vitebsk: "Витебск",
+    };
+    return cityNames[slug] || slug;
+  };
+
+  const parts: string[] = [];
+  parts.push(getCityDisplayName(citySlug));
+  if (applied.nearby) parts.push("Поблизости");
+  if (applied.metro) {
+    const metro = safeApiOptions.metros.find(
+      (m: any) => m.value === applied.metro,
+    );
+    parts.push(metro?.label || applied.metro);
+  } else if (applied.district) {
+    const district = safeApiOptions.districts.find(
+      (d: any) => d.value === applied.district,
+    );
+    parts.push(district?.label || applied.district);
+  }
+
+  const summaryText = parts.length > 0 ? parts.join(" • ") : "Поиск";
+
+  return (
+    <>
+      <MapPin className="h-[21px] w-[21px] flex-shrink-0 text-gray-400" />
+      <span className="flex-1 truncate text-sm text-gray-700">{summaryText}</span>
+    </>
+  );
+}
+
+type DiscoveryDesktopSearchControlProps = Omit<DesktopSearchControlProps, "variant">;
+
+function DiscoveryDesktopSearchControl({
+  citySlug = "minsk",
   className,
   currentIntent,
   mode,
@@ -41,14 +334,14 @@ export function DesktopSearchControl({
   onPanelClose,
   onExpand,
   renderPanels = true,
-  embeddedInHeader = false
-}: DesktopSearchControlProps) {
+  embeddedInHeader = false,
+}: DiscoveryDesktopSearchControlProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const locationRef = useRef<HTMLButtonElement>(null);
   const dateRef = useRef<HTMLButtonElement>(null);
   const ageRef = useRef<HTMLButtonElement>(null);
   
-  const { applied, draft, actions, beginDraft } = useDiscoveryFilters();
+  const { applied, actions } = useDiscoveryFilters();
   const { options: apiOptions } = useDiscoveryFilterOptions(citySlug);
   
   // Fallback options if API fails
@@ -58,9 +351,7 @@ export function DesktopSearchControl({
     categories: []
   };
   
-  // Use draft for visual feedback in form fields (shows immediate changes)
-  // Use applied for URL state (only changes when "Go" is clicked)
-  const formDisplayFilters = draft;
+  const formDisplayFilters = applied;
   
   // Calculate positions for each dropdown (only in expanded mode)
   const locationPosition = useDropdownPosition(
@@ -159,20 +450,10 @@ export function DesktopSearchControl({
     return `${ageLabels[0]} +${ageLabels.length - 1}`;
   };
 
-  const handleSearch = () => {
-    // Apply draft filters to URL
-    actions.apply();
-    // Close any open panels
-    onPanelClose();
-  };
-
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") {
-      handleSearch();
-    }
     if (e.key === "Escape") {
       onPanelClose();
-      actions.close(); // Revert draft on escape
+      actions.close();
     }
   };
 
@@ -182,7 +463,6 @@ export function DesktopSearchControl({
       onPanelClose();
       actions.close(); // Revert draft when closing
     } else {
-      beginDraft(panel as any);
       onPanelChange(panel);
     }
   };
@@ -228,12 +508,11 @@ export function DesktopSearchControl({
         return;
       }
       
-      // Проверяем клик по кнопке Go
-      const goButton = containerRef.current?.querySelector('[aria-label="Применить фильтры"]');
-      if (goButton && goButton.contains(target)) {
-        return; // Игнорируем клики по кнопке Go
-      }
-      
+      if (target.closest("[data-secondary-filters-slot]")) return;
+      if (target.closest("[data-secondary-filters-trigger]")) return;
+      if (target.closest('[data-slot="dialog-content"]')) return;
+      if (target.closest('[data-slot="dialog-overlay"]')) return;
+
       // Любой другой клик - закрываем панель
       onPanelClose();
       actions.close(); // Revert draft when closing
@@ -248,6 +527,11 @@ export function DesktopSearchControl({
   const hasLocationFilter = !!(formDisplayFilters.nearby || formDisplayFilters.metro || formDisplayFilters.district);
   const hasDateFilter = !!(formDisplayFilters.dateFrom || formDisplayFilters.dateTo || formDisplayFilters.whenPreset);
   const hasAgeFilter = !!(formDisplayFilters.age && formDisplayFilters.age.length > 0);
+
+  const showSecondaryFiltersInBar =
+    mode === "expanded" &&
+    !!currentIntent &&
+    DISCOVERY_INTENT_CONFIG[currentIntent as Intent]?.hasFilters === true;
 
   return (
     <div ref={containerRef} className={cn("relative w-full flex items-center gap-3", className)}>
@@ -419,15 +703,11 @@ export function DesktopSearchControl({
         </div>
       )}
 
-      {/* GO BUTTON - Only visible in expanded mode */}
-      {mode === "expanded" && (
-        <button
-          onClick={handleSearch}
-          className="flex items-center justify-center w-[64px] h-[64px] bg-[#EF8759] hover:bg-[#e67c4f] text-white font-semibold rounded-full transition-colors duration-200 shadow-sm flex-shrink-0"
-          aria-label="Применить фильтры"
-        >
-          Go
-        </button>
+      {/* Secondary filters — [ Куда ][ Когда ][ С кем ] [ Фильтры ] */}
+      {showSecondaryFiltersInBar && currentIntent && (
+        <div data-secondary-filters-slot className="flex shrink-0 items-center">
+          <RefinementFiltersButtonCompact intent={currentIntent as Intent} />
+        </div>
       )}
 
       {/* PANELS - только у того экземпляра формы, который по ширине открыт (без дубля) */}
@@ -451,9 +731,9 @@ export function DesktopSearchControl({
                   onSearchTextChange={() => {}}
                   onClose={() => {
                     onPanelClose();
-                    actions.close(); // Revert draft when closing
+                    actions.close();
                   }}
-                  applied={draft}
+                  applied={applied}
                   actions={actions}
                   apiOptions={safeApiOptions}
                 />
@@ -476,9 +756,9 @@ export function DesktopSearchControl({
                 <DatePanel
                   onClose={() => {
                     onPanelClose();
-                    actions.close(); // Revert draft when closing
+                    actions.close();
                   }}
-                  applied={draft}
+                  applied={applied}
                   actions={actions}
                 />
               </div>
@@ -500,9 +780,9 @@ export function DesktopSearchControl({
                 <AgePanel
                   onClose={() => {
                     onPanelClose();
-                    actions.close(); // Revert draft when closing
+                    actions.close();
                   }}
-                  applied={draft}
+                  applied={applied}
                   actions={actions}
                 />
               </div>

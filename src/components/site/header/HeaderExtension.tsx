@@ -5,10 +5,11 @@ import { cn } from "@/lib/utils";
 import { DiscoveryIntentTabs } from "@/components/city/DiscoveryIntentTabs";
 import { DesktopSearchControl } from "./DesktopSearchControl";
 import type { HeaderPanel } from "@/hooks/useHeaderBehavior";
+import type { Intent } from "@/lib/intent";
 
 interface HeaderExtensionProps {
   citySlug: string;
-  currentIntent?: string | null;
+  currentIntent?: Intent | null;
   shouldShowIntentTabs: boolean;
   isVisible: boolean;
   activePanel: HeaderPanel;
@@ -82,7 +83,7 @@ export function HeaderExtension({
             <div className="flex items-center justify-center">
               <DiscoveryIntentTabs
                 city={citySlug}
-                currentIntent={(currentIntent || "kuda") as any}
+                currentIntent={currentIntent ?? null}
               />
             </div>
           )}

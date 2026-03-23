@@ -27,6 +27,8 @@ export interface DateTimePickerProps {
     time?: string;
     placeholder?: string;
   };
+  /** Только календарь без выбора времени (паттерн из ui-lab / date-time-picker) */
+  dateOnly?: boolean;
 }
 
 function generateTimeSlots(step: number = 15, minTime?: string, maxTime?: string): string[] {
@@ -64,11 +66,19 @@ export function DateTimePicker({
   disabled = false,
   disablePast = true,
   labels = {},
+  dateOnly = false,
 }: DateTimePickerProps) {
   const now = React.useMemo(() => new Date(), []);
   const todayStart = React.useMemo(() => getTodayStart(), []);
   const [month, setMonth] = React.useState(value?.getMonth() ?? now.getMonth());
   const [year, setYear] = React.useState(value?.getFullYear() ?? now.getFullYear());
+
+  React.useEffect(() => {
+    if (value) {
+      setMonth(value.getMonth());
+      setYear(value.getFullYear());
+    }
+  }, [value]);
   
   const timeSlots = React.useMemo(
     () => generateTimeSlots(step, minTime, maxTime),
@@ -203,45 +213,46 @@ export function DateTimePicker({
         </div>
       </div>
 
-      {/* Time Section */}
-      <div className="space-y-3 pt-2 border-t border-border/40">
-        <label className="text-sm font-medium text-foreground">
-          {labels.time || "Время"}
-        </label>
-        <Select
-          value={time || undefined}
-          onValueChange={onTimeChange}
-          disabled={disabled || !hasDateSelected}
-        >
-          <SelectTrigger
-            className={cn(
-              "w-full h-14 rounded-2xl border-2 text-base font-medium",
-              "transition-all shadow-sm",
-              !hasDateSelected && "opacity-50 cursor-not-allowed",
-              time && "border-primary/30 bg-primary/5"
-            )}
-            style={{ backgroundColor: time ? undefined : 'white' }}
+      {!dateOnly ? (
+        <div className="space-y-3 border-t border-border/40 pt-2">
+          <label className="text-sm font-medium text-foreground">
+            {labels.time || "Время"}
+          </label>
+          <Select
+            value={time || undefined}
+            onValueChange={onTimeChange}
+            disabled={disabled || !hasDateSelected}
           >
-            <SelectValue placeholder={labels.placeholder || "Выберите время"} />
-          </SelectTrigger>
-          <SelectContent className="bg-white max-h-[300px]">
-            {timeSlots.map((slot) => (
-              <SelectItem
-                key={slot}
-                value={slot}
-                className="text-base py-3 cursor-pointer"
-              >
-                {slot}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        {!hasDateSelected && (
-          <p className="text-xs text-muted-foreground">
-            Сначала выберите дату
-          </p>
-        )}
-      </div>
+            <SelectTrigger
+              className={cn(
+                "h-14 w-full rounded-2xl border-2 text-base font-medium",
+                "shadow-sm transition-all",
+                !hasDateSelected && "cursor-not-allowed opacity-50",
+                time && "border-primary/30 bg-primary/5",
+              )}
+              style={{ backgroundColor: time ? undefined : "white" }}
+            >
+              <SelectValue placeholder={labels.placeholder || "Выберите время"} />
+            </SelectTrigger>
+            <SelectContent className="max-h-[300px] bg-white">
+              {timeSlots.map((slot) => (
+                <SelectItem
+                  key={slot}
+                  value={slot}
+                  className="cursor-pointer py-3 text-base"
+                >
+                  {slot}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {!hasDateSelected && (
+            <p className="text-xs text-muted-foreground">
+              Сначала выберите дату
+            </p>
+          )}
+        </div>
+      ) : null}
     </div>
   );
 }

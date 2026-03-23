@@ -1,11 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { MapPin, Navigation, Zap, ChevronDown } from "lucide-react";
+import { MapPin, Navigation, Zap, ChevronDown, Check } from "lucide-react";
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { cn } from "@/lib/utils";
+import { useCity } from "@/contexts/CityContext";
+import { VALID_CITY_SLUGS } from "@/lib/intent";
 
 interface LocationPanelProps {
+  /** Хаб города (главная): во всплывающем окне только выбор города */
+  variant?: "default" | "cityHub";
   citySlug: string;
   searchText: string;
   onSearchTextChange: (text: string) => void;
@@ -16,14 +20,16 @@ interface LocationPanelProps {
 }
 
 export function LocationPanel({
+  variant = "default",
   citySlug,
   searchText,
   onSearchTextChange,
   onClose,
   applied,
   actions,
-  apiOptions
+  apiOptions,
 }: LocationPanelProps) {
+  const { setCity } = useCity();
   const [showMetroList, setShowMetroList] = useState(false);
   const [showDistrictList, setShowDistrictList] = useState(false);
 
@@ -71,17 +77,57 @@ export function LocationPanel({
       <div className="p-6">
         {/* Quick Actions */}
         <div className="space-y-3">
-          {/* City - First position - Disabled until multiple cities available */}
-          <div className="w-full flex items-center gap-4 p-4 rounded-xl bg-gray-50 opacity-50 cursor-not-allowed">
-            <div className="flex items-center justify-center w-10 h-10 bg-gray-100 rounded-full">
-              <MapPin className="h-5 w-5 text-gray-600" />
+          {variant === "cityHub" ? (
+            <div className="space-y-1">
+              <p className="text-xs font-medium text-gray-500 px-1 pb-1">Город</p>
+              {VALID_CITY_SLUGS.map((slug) => {
+                const name = getCityDisplayName(slug);
+                const selected = slug === citySlug;
+                return (
+                  <button
+                    key={slug}
+                    type="button"
+                    onClick={() => {
+                      setCity(slug);
+                      onClose();
+                    }}
+                    className={cn(
+                      "w-full flex items-center justify-between gap-3 p-4 rounded-xl text-left border transition-colors",
+                      selected
+                        ? "bg-gray-100 border-gray-200"
+                        : "border-transparent hover:bg-gray-50",
+                    )}
+                  >
+                    <span className="flex items-center gap-3 min-w-0">
+                      <div className="flex items-center justify-center w-10 h-10 bg-gray-100 rounded-full shrink-0">
+                        <MapPin className="h-5 w-5 text-gray-600" />
+                      </div>
+                      <span className="min-w-0">
+                        <span className="font-medium text-gray-900 block">{name}</span>
+                        <span className="text-sm text-gray-500">Весь город</span>
+                      </span>
+                    </span>
+                    {selected ? (
+                      <Check className="h-5 w-5 text-primary shrink-0" aria-hidden />
+                    ) : null}
+                  </button>
+                );
+              })}
             </div>
-            <div className="flex-1 min-w-0">
-              <div className="font-medium text-gray-900">{getCityDisplayName(citySlug)}</div>
-              <div className="text-sm text-gray-500">Весь город</div>
+          ) : (
+            <div className="w-full flex items-center gap-4 p-4 rounded-xl bg-gray-50 opacity-50 cursor-not-allowed">
+              <div className="flex items-center justify-center w-10 h-10 bg-gray-100 rounded-full">
+                <MapPin className="h-5 w-5 text-gray-600" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="font-medium text-gray-900">{getCityDisplayName(citySlug)}</div>
+                <div className="text-sm text-gray-500">Весь город</div>
+              </div>
             </div>
-          </div>
+          )}
 
+          {variant !== "cityHub" ? (
+            <>
           {/* Nearby */}
           <button
             onClick={handleNearbyClick}
@@ -199,6 +245,8 @@ export function LocationPanel({
               </div>
             )}
           </div>
+            </>
+          ) : null}
         </div>
       </div>
     </div>

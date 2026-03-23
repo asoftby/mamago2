@@ -1,17 +1,12 @@
-import { CityShell } from "@/components/city/CityShell";
+import type { Metadata } from "next";
+import { MinskCityHomePage } from "@/features/city-home/pages/MinskCityHomePage";
 
-interface PageProps {
-  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
-}
+export const metadata: Metadata = {
+  title: "Минск — семейная афиша и идеи | mamaGo",
+  description:
+    "Афиша событий, занятия, маршруты и журнал mamaGo — городской хаб для семей с детьми в Минске.",
+};
 
-export default async function MinskPage({ searchParams }: PageProps) {
-  const resolvedSearchParams = await searchParams;
-
-  return (
-    <CityShell
-      citySlug="minsk"
-      intent="kuda"
-      searchParams={resolvedSearchParams}
-    />
-  );
+export default function MinskCityHomeRoute() {
+  return <MinskCityHomePage />;
 }

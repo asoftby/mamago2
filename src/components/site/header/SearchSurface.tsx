@@ -6,6 +6,7 @@ import type { HeaderPanel } from "@/hooks/useStableHeaderBehavior";
 
 interface SearchSurfaceProps {
   citySlug: string;
+  isCityHub: boolean;
   currentIntent?: string | null;
   shouldShowIntentTabs: boolean;
   shouldShowFilters: boolean;
@@ -26,6 +27,7 @@ interface SearchSurfaceProps {
  */
 export function SearchSurface({
   citySlug,
+  isCityHub,
   currentIntent,
   shouldShowIntentTabs,
   shouldShowFilters,
@@ -49,7 +51,7 @@ export function SearchSurface({
       <div className="relative mx-auto w-full max-w-[1200px] px-4 py-6">
         <div className="flex flex-col gap-4">
           <div className="flex items-center justify-center">
-            <div className="w-full max-w-[600px]">
+            <div className="w-full max-w-[760px]">
               <DesktopSearchControl
                 citySlug={citySlug}
                 currentIntent={currentIntent}
@@ -58,6 +60,7 @@ export function SearchSurface({
                 onPanelChange={onPanelChange}
                 onPanelClose={onPanelClose}
                 renderPanels={true}
+                variant={isCityHub ? "cityHub" : "discovery"}
               />
             </div>
           </div>

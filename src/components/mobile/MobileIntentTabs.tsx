@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { IconCompass, IconPalette, IconParty, IconMap } from "@/components/ui/icons";
 import { Intent } from "@/lib/intent";
 import { DISCOVERY_INTENT_ITEMS } from "@/lib/discovery/discoveryIntentConfig";
+import { appendCityQuery } from "@/lib/city/appendCityQuery";
 
 // Map intent IDs to icons (fallback if no image)
 const TAB_ICONS = {
@@ -19,7 +20,7 @@ const TAB_ICONS = {
 
 interface MobileIntentTabsProps {
   city: string;
-  currentIntent: Intent;
+  currentIntent: Intent | null;
   className?: string;
 }
 
@@ -48,15 +49,14 @@ function MobileIntentTabsContent({
     
     const baseUrl = intentConfig.href(city);
     const currentFilters = searchParams.toString();
-    
-    // Only access localStorage on client side
+    const withCity = (href: string) => appendCityQuery(href, city);
+
     if (!isClient) {
-      // Server-side: return clean URLs
-      return baseUrl;
+      return withCity(baseUrl);
     }
     
     // Save current filters to localStorage if we're leaving 'kuda' intent
-    if (currentIntent === 'kuda' && intentId !== 'kuda' && currentFilters) {
+    if (currentIntent === "kuda" && intentId !== "kuda" && currentFilters) {
       try {
         localStorage.setItem(`filters_kuda_${city}`, currentFilters);
       } catch (e) {
@@ -65,23 +65,22 @@ function MobileIntentTabsContent({
     }
     
     // If going TO 'kuda', restore saved filters
-    if (intentId === 'kuda') {
+    if (intentId === "kuda") {
       try {
         const savedFilters = localStorage.getItem(`filters_kuda_${city}`);
         if (savedFilters) {
-          return `${baseUrl}?${savedFilters}`;
+          return withCity(`${baseUrl}?${savedFilters}`);
         }
       } catch (e) {
         // Ignore localStorage errors
       }
       // If no saved filters, use current filters if we're already on kuda
-      if (currentIntent === 'kuda' && currentFilters) {
-        return `${baseUrl}?${currentFilters}`;
+      if (currentIntent === "kuda" && currentFilters) {
+        return withCity(`${baseUrl}?${currentFilters}`);
       }
     }
-    
-    // For other intents, return clean URL without filters
-    return baseUrl;
+
+    return withCity(baseUrl);
   };
 
   return (
@@ -97,7 +96,7 @@ function MobileIntentTabsContent({
         }}
       >
         {DISCOVERY_INTENT_ITEMS.map((intentConfig, index) => {
-          const isActive = index === safeActiveIndex;
+          const isActive = activeIndex >= 0 && index === activeIndex;
           const Icon = TAB_ICONS[intentConfig.id];
           
           return (

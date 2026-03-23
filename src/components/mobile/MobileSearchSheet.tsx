@@ -18,11 +18,19 @@ interface MobileSearchSheetProps {
   onClose: () => void;
   citySlug?: string;
   currentIntent?: string; // Add current intent prop
+  /** Городской хаб: поиск + город, как на десктопе */
+  cityHubOnly?: boolean;
 }
 
 type ExpandedSection = 'location' | 'date' | 'age' | null;
 
-export function MobileSearchSheet({ isOpen, onClose, citySlug = "minsk", currentIntent }: MobileSearchSheetProps) {
+export function MobileSearchSheet({
+  isOpen,
+  onClose,
+  citySlug = "minsk",
+  currentIntent,
+  cityHubOnly = false,
+}: MobileSearchSheetProps) {
   const [expandedSection, setExpandedSection] = useState<ExpandedSection>(null);
   const [searchText, setSearchText] = useState("");
   // Default to "kuda" if no currentIntent is provided
@@ -34,20 +42,8 @@ export function MobileSearchSheet({ isOpen, onClose, citySlug = "minsk", current
   const searchParams = useSearchParams();
   
   const { applied, actions, derived } = useDiscoveryFilters();
-  
-  // Use local draft state instead of the one from useDiscoveryFilters
-  // This prevents draft from being reset when switching between intent tabs
-  const [localDraft, setLocalDraft] = useState(applied);
-  
-  // Track if sheet was just opened to initialize draft only once
-  const wasOpenRef = useRef(false);
-  
+
   const { options: apiOptions } = useDiscoveryFilterOptions(citySlug);
-  
-  // Helper function to update local draft with logging
-  const updateLocalDraft = (patch: any) => {
-    setLocalDraft(prev => ({ ...prev, ...patch }));
-  };
   const safeApiOptions = apiOptions || {
     districts: [],
     metros: [],
@@ -93,18 +89,6 @@ export function MobileSearchSheet({ isOpen, onClose, citySlug = "minsk", current
     }
   }, [isOpen, selectedIntent]);
 
-  // Initialize draft when opening the sheet - only once when sheet opens
-  useEffect(() => {
-    if (isOpen && !wasOpenRef.current) {
-      // Sheet just opened - initialize local draft from applied
-      setLocalDraft(applied);
-      wasOpenRef.current = true;
-    } else if (!isOpen && wasOpenRef.current) {
-      // Sheet closed - reset the flag
-      wasOpenRef.current = false;
-    }
-  }, [isOpen]); // Remove applied from dependencies!
-
   // Prevent body scroll when sheet is open
   useEffect(() => {
     if (isOpen) {
@@ -120,64 +104,106 @@ export function MobileSearchSheet({ isOpen, onClose, citySlug = "minsk", current
 
   if (!isOpen) return null;
 
-  const handleSearch = () => {
-    // Apply current draft filters before navigating
-    // Don't call actions.apply() as it uses the global draft, use our local draft
-    
-    // Navigate to the selected intent page WITH current filters
-    const intentConfig = DISCOVERY_INTENT_ITEMS.find(item => item.id === selectedIntent);
-    if (intentConfig) {
-      // Build URL with current search params
-      const currentParams = new URLSearchParams(searchParams.toString());
-      
-      // Apply local draft filters to URL params
-      if (localDraft.dateFrom) currentParams.set("from", localDraft.dateFrom);
-      else currentParams.delete("from");
-      
-      if (localDraft.dateTo) currentParams.set("to", localDraft.dateTo);
-      else currentParams.delete("to");
-      
-      if (localDraft.whenPreset) currentParams.set("preset", localDraft.whenPreset);
-      else currentParams.delete("preset");
-      
-      if (localDraft.age.length > 0) currentParams.set("age", localDraft.age.join(","));
-      else currentParams.delete("age");
-      
-      if (localDraft.metro) currentParams.set("metro", localDraft.metro);
-      else currentParams.delete("metro");
-      
-      if (localDraft.district) currentParams.set("district", localDraft.district);
-      else currentParams.delete("district");
-      
-      if (localDraft.nearby) currentParams.set("nearby", "true");
-      else currentParams.delete("nearby");
-      
-      const queryString = currentParams.toString();
-      const targetUrl = intentConfig.href(citySlug) + (queryString ? `?${queryString}` : '');
-      
-      router.push(targetUrl);
-    }
-    onClose();
-  };
+  if (cityHubOnly) {
+    const handleClearLocationHub = () => {
+      actions.setDraft({ nearby: false, metro: null, district: null });
+    };
+    const hasLocationDirty =
+      !!applied.nearby || !!applied.metro || !!applied.district;
+
+    return (
+      <div className="fixed inset-0 z-[9999] flex flex-col bg-white">
+        <div className="sticky top-0 z-10 border-b border-gray-100 bg-white px-4 py-4">
+          <div className="flex items-center justify-between">
+            <button
+              type="button"
+              onClick={onClose}
+              className="-ml-2 rounded-full p-2 transition-colors hover:bg-gray-100"
+            >
+              <X className="h-6 w-6 text-gray-600" />
+            </button>
+            <h2 className="text-lg font-semibold text-gray-900">Поиск</h2>
+            <div className="w-10" />
+          </div>
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          {/* Как в разделах: глобальный поиск сверху, ниже — город */}
+          <div className="px-4 pt-4 pb-2">
+            <div className="relative">
+              <input
+                type="search"
+                enterKeyHint="search"
+                placeholder="Поиск мест, событий, активностей..."
+                value={searchText}
+                onChange={(e) => setSearchText(e.target.value)}
+                className="w-full rounded-xl border border-gray-200 px-4 py-3 pr-10 text-base focus:border-transparent focus:outline-none focus:ring-2 focus:ring-[#EF8759]"
+              />
+              {searchText ? (
+                <button
+                  type="button"
+                  onClick={() => setSearchText("")}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-1 transition-colors hover:bg-gray-100"
+                  aria-label="Очистить поле"
+                >
+                  <X className="h-4 w-4 text-gray-400" />
+                </button>
+              ) : null}
+            </div>
+          </div>
+          <div className="px-4 pb-4">
+            <MobileLocationPanel
+              variant="cityHub"
+              citySlug={citySlug}
+              searchText={searchText}
+              onSearchTextChange={setSearchText}
+              onClose={onClose}
+              draft={applied}
+              setDraft={actions.setDraft}
+              actions={actions}
+              apiOptions={safeApiOptions}
+            />
+          </div>
+        </div>
+        <div className="sticky bottom-0 border-t border-gray-100 bg-white p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={handleClearLocationHub}
+              disabled={!hasLocationDirty}
+              className={cn(
+                "rounded-xl px-4 py-3 font-medium transition-colors",
+                hasLocationDirty
+                  ? "cursor-pointer text-gray-900 hover:bg-gray-100 active:bg-gray-200"
+                  : "cursor-not-allowed text-gray-400",
+              )}
+            >
+              Сбросить
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 rounded-xl bg-[#EF8759] py-4 font-semibold text-white transition-colors hover:bg-[#e67c4f] active:scale-[0.98]"
+            >
+              Готово
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const handleIntentSelect = (intentId: string) => {
-    // Just update the selected intent, don't navigate
-    // Navigation will happen when user clicks "Показать" button
     setSelectedIntent(intentId);
+    const intentConfig = DISCOVERY_INTENT_ITEMS.find((item) => item.id === intentId);
+    if (!intentConfig) return;
+    const qs = searchParams.toString();
+    const targetUrl =
+      intentConfig.href(citySlug) + (qs ? `?${qs}` : "");
+    router.replace(targetUrl);
   };
 
   const handleClearAll = () => {
-    // Clear local draft
-    const emptyDraft = {
-      dateFrom: null,
-      dateTo: null,
-      whenPreset: null,
-      age: [],
-      metro: null,
-      district: null,
-      nearby: false,
-    };
-    setLocalDraft(emptyDraft);
+    actions.resetAll();
     setSearchText("");
     setExpandedSection(null);
   };
@@ -203,19 +229,19 @@ export function MobileSearchSheet({ isOpen, onClose, citySlug = "minsk", current
     items.push(getCityDisplayName(citySlug));
     
     // Add "Поблизости" if selected
-    if (localDraft.nearby) {
+    if (applied.nearby) {
       items.push("Поблизости");
     }
     
     // Add metro station if selected
-    if (localDraft.metro) {
-      const metro = safeApiOptions.metros.find(m => m.value === localDraft.metro);
+    if (applied.metro) {
+      const metro = safeApiOptions.metros.find(m => m.value === applied.metro);
       if (metro) items.push(metro.label);
     }
     
     // Add district if selected
-    if (localDraft.district) {
-      const district = safeApiOptions.districts.find(d => d.value === localDraft.district);
+    if (applied.district) {
+      const district = safeApiOptions.districts.find(d => d.value === applied.district);
       if (district) items.push(district.label);
     }
     
@@ -225,14 +251,14 @@ export function MobileSearchSheet({ isOpen, onClose, citySlug = "minsk", current
 
   // Build date display text
   const getDateText = () => {
-    if (localDraft.whenPreset === "TODAY") return "Сегодня";
-    if (localDraft.whenPreset === "TOMORROW") return "Завтра";
-    if (localDraft.whenPreset === "WEEKEND") return "Выходные";
+    if (applied.whenPreset === "TODAY") return "Сегодня";
+    if (applied.whenPreset === "TOMORROW") return "Завтра";
+    if (applied.whenPreset === "WEEKEND") return "Выходные";
     
-    if (localDraft.dateFrom) {
-      const fromDate = new Date(localDraft.dateFrom);
-      if (localDraft.dateTo && localDraft.dateFrom !== localDraft.dateTo) {
-        const toDate = new Date(localDraft.dateTo);
+    if (applied.dateFrom) {
+      const fromDate = new Date(applied.dateFrom);
+      if (applied.dateTo && applied.dateFrom !== applied.dateTo) {
+        const toDate = new Date(applied.dateTo);
         const fromDay = fromDate.getDate();
         const toDay = toDate.getDate();
         const fromMonth = fromDate.getMonth();
@@ -257,9 +283,9 @@ export function MobileSearchSheet({ isOpen, onClose, citySlug = "minsk", current
 
   // Build age display text
   const getAgeText = () => {
-    if (localDraft.age.length === 0) return "Добавить гостей";
+    if (applied.age.length === 0) return "Добавить гостей";
     
-    const ageLabels = localDraft.age.map(ageValue => {
+    const ageLabels = applied.age.map(ageValue => {
       const group = AGE_GROUPS.find(g => g.value === ageValue);
       return group ? group.label : ageValue;
     });
@@ -269,16 +295,6 @@ export function MobileSearchSheet({ isOpen, onClose, citySlug = "minsk", current
     return `${ageLabels[0]} +${ageLabels.length - 1}`;
   };
 
-  // Count active filters for "Показать" button
-  const getActiveFiltersCount = () => {
-    let count = 0;
-    if (localDraft.district || localDraft.metro || localDraft.nearby) count++;
-    if (localDraft.dateFrom || localDraft.whenPreset) count++;
-    if (localDraft.age.length > 0) count++;
-    return count;
-  };
-
-  const activeFiltersCount = getActiveFiltersCount();
 
   return (
     <div className="fixed inset-0 z-[9999] bg-white flex flex-col">
@@ -412,8 +428,8 @@ export function MobileSearchSheet({ isOpen, onClose, citySlug = "minsk", current
                   searchText={searchText}
                   onSearchTextChange={setSearchText}
                   onClose={() => setExpandedSection(null)}
-                  draft={localDraft}
-                  setDraft={updateLocalDraft}
+                  draft={applied}
+                  setDraft={actions.setDraft}
                   actions={actions}
                   apiOptions={safeApiOptions}
                 />
@@ -450,8 +466,8 @@ export function MobileSearchSheet({ isOpen, onClose, citySlug = "minsk", current
               <div className="border-t border-gray-100 p-4 bg-gray-50">
                 <DatePanel
                   onClose={() => setExpandedSection(null)}
-                  applied={localDraft}
-                  actions={{ ...actions, setDraft: updateLocalDraft }}
+                  applied={applied}
+                  actions={actions}
                 />
               </div>
             )}
@@ -486,8 +502,8 @@ export function MobileSearchSheet({ isOpen, onClose, citySlug = "minsk", current
               <div className="border-t border-gray-100 p-4 bg-gray-50">
                 <AgePanel
                   onClose={() => setExpandedSection(null)}
-                  applied={localDraft}
-                  actions={{ ...actions, setDraft: updateLocalDraft }}
+                  applied={applied}
+                  actions={actions}
                 />
               </div>
             )}
@@ -498,7 +514,6 @@ export function MobileSearchSheet({ isOpen, onClose, citySlug = "minsk", current
       {/* Sticky Footer */}
       <div className="sticky bottom-0 bg-white border-t border-gray-100 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
         <div className="flex items-center gap-3">
-          {/* Clear Button */}
           <button
             onClick={handleClearAll}
             disabled={!derived.isDirty}
@@ -512,12 +527,12 @@ export function MobileSearchSheet({ isOpen, onClose, citySlug = "minsk", current
             Сбросить
           </button>
           
-          {/* Search Button */}
           <button
-            onClick={handleSearch}
+            type="button"
+            onClick={onClose}
             className="flex-1 bg-[#EF8759] text-white font-semibold py-4 rounded-xl hover:bg-[#e67c4f] transition-colors active:scale-[0.98]"
           >
-            {activeFiltersCount > 0 ? `Показать (${activeFiltersCount})` : 'Показать'}
+            Готово
           </button>
         </div>
       </div>

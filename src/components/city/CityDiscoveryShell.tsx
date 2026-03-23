@@ -1,15 +1,13 @@
 "use client";
 
 import { Container } from "@/components/ui/Container";
-import { ActivityCard } from "@/components/activity/ActivityCard";
 import { RouteCard } from "@/components/routes/RouteCard";
 import { MINSK_ACTIVITIES } from "@/mocks/activities.minsk";
+import { DiscoveryActivitiesGrid } from "@/components/discovery/DiscoveryActivitiesGrid";
 import { Intent } from "@/lib/intent";
 import { H1 } from "@/components/ui/typography";
-import { RefinementFiltersButton } from "@/components/discovery/RefinementFiltersButton";
 import { DISCOVERY_INTENT_CONFIG } from "@/lib/discovery/discoveryIntentConfig";
 import { formatCityTitle } from "@/lib/city/cityDisplayNames";
-import { formatRuShortDayMonth } from "@/lib/formatters/date";
 import type { MockRoute } from "@/mocks/routes.mock";
 import Link from "next/link";
 import { Plus } from "lucide-react";
@@ -27,7 +25,6 @@ export function CityDiscoveryShell({
 }: CityDiscoveryShellProps) {
   const intentConfig = DISCOVERY_INTENT_CONFIG[intent];
   const pageTitle = formatCityTitle(intentConfig.titleTemplate, city);
-  const filteredActivities = MINSK_ACTIVITIES;
 
   // ── Routes intent ──────────────────────────────────────────────────────────
   if (intent === "routes") {
@@ -65,31 +62,45 @@ export function CityDiscoveryShell({
     );
   }
 
+  // ── Birthday: CTA block + activities ───────────────────────────────────────
+  if (intent === "birthday") {
+    return (
+      <main className="min-h-screen bg-background pb-20">
+        <Container className="pt-10 space-y-6">
+          <div className="space-y-4">
+            <H1 className="px-1">{pageTitle}</H1>
+          </div>
+
+          {/* CTA: Собрать праздник */}
+          <div className="rounded-2xl border border-orange-200 bg-gradient-to-br from-orange-50 to-white p-6">
+            <h2 className="text-lg font-semibold text-foreground mb-2">
+              Собрать праздник за 10 минут
+            </h2>
+            <p className="text-sm text-muted-foreground mb-4">
+              Выберите площадку, развлечения, торт и декор — всё в одном конструкторе
+            </p>
+            <Link
+              href={`/${city}/birthday/make`}
+              className="inline-flex items-center justify-center rounded-xl bg-[#EF8759] text-white px-6 py-3 text-sm font-semibold hover:bg-[#e07848] transition-colors"
+            >
+              Собрать праздник
+            </Link>
+          </div>
+
+          <DiscoveryActivitiesGrid activities={MINSK_ACTIVITIES} />
+        </Container>
+      </main>
+    );
+  }
+
   // ── Default: activities ────────────────────────────────────────────────────
   return (
     <main className="min-h-screen bg-background pb-20">
       <Container className="pt-10 space-y-6">
         <div className="space-y-4">
           <H1 className="px-1">{pageTitle}</H1>
-          {intentConfig.hasFilters && (
-            <div className="py-2 hidden md:block">
-              <RefinementFiltersButton intent={intent} />
-            </div>
-          )}
         </div>
-        <div className="grid gap-6 grid-cols-2 md:grid-cols-4">
-          {filteredActivities.map((activity) => (
-            <ActivityCard
-              key={activity.id}
-              activity={activity}
-              saveMeta={{
-                title: activity.title,
-                dateISO: activity.dateStart ?? null,
-                dateLabel: activity.dateStart ? formatRuShortDayMonth(activity.dateStart) : null,
-              }}
-            />
-          ))}
-        </div>
+        <DiscoveryActivitiesGrid activities={MINSK_ACTIVITIES} />
       </Container>
     </main>
   );

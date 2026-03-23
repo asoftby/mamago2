@@ -9,6 +9,7 @@ import { IconCompass, IconPalette, IconParty, IconMap } from "@/components/ui/ic
 import { Intent } from "@/lib/intent";
 import { Label } from "@/components/ui/typography";
 import { DISCOVERY_INTENT_ITEMS } from "@/lib/discovery/discoveryIntentConfig";
+import { appendCityQuery } from "@/lib/city/appendCityQuery";
 
 // Map intent IDs to icons (fallback if no image)
 const TAB_ICONS = {
@@ -20,7 +21,8 @@ const TAB_ICONS = {
 
 interface DiscoveryIntentTabsProps {
   city: string | null;
-  currentIntent: Intent;
+  /** На городском хабе (например `/minsk`) — без активной вкладки */
+  currentIntent: Intent | null;
   className?: string;
 }
 
@@ -39,9 +41,10 @@ function DiscoveryIntentTabsContent({
     setIsClient(true);
   }, []);
 
-  // Find active index based on current intent
-  const activeIndex = DISCOVERY_INTENT_ITEMS.findIndex(item => item.id === currentIntent);
-  const safeActiveIndex = activeIndex === -1 ? 0 : activeIndex;
+  const activeIndex =
+    currentIntent === null
+      ? -1
+      : DISCOVERY_INTENT_ITEMS.findIndex((item) => item.id === currentIntent);
   
   // Build URL with filters preserved (same logic as mobile)
   const buildUrlWithFilters = (intentId: string) => {
@@ -53,15 +56,15 @@ function DiscoveryIntentTabsContent({
     
     const baseUrl = intentConfig.href(city);
     const currentFilters = searchParams.toString();
-    
+    const withCity = (href: string) => appendCityQuery(href, city);
+
     // Only access localStorage on client side
     if (!isClient) {
-      // Server-side: return clean URLs
-      return baseUrl;
+      return withCity(baseUrl);
     }
     
     // Save current filters to localStorage if we're leaving 'kuda' intent
-    if (currentIntent === 'kuda' && intentId !== 'kuda' && currentFilters) {
+    if (currentIntent === "kuda" && intentId !== "kuda" && currentFilters) {
       try {
         localStorage.setItem(`filters_kuda_${city}`, currentFilters);
       } catch (e) {
@@ -70,41 +73,44 @@ function DiscoveryIntentTabsContent({
     }
     
     // If going TO 'kuda', restore saved filters
-    if (intentId === 'kuda') {
+    if (intentId === "kuda") {
       try {
         const savedFilters = localStorage.getItem(`filters_kuda_${city}`);
         if (savedFilters) {
-          return `${baseUrl}?${savedFilters}`;
+          return withCity(`${baseUrl}?${savedFilters}`);
         }
       } catch (e) {
         // Ignore localStorage errors
       }
       // If no saved filters, use current filters if we're already on kuda
-      if (currentIntent === 'kuda' && currentFilters) {
-        return `${baseUrl}?${currentFilters}`;
+      if (currentIntent === "kuda" && currentFilters) {
+        return withCity(`${baseUrl}?${currentFilters}`);
       }
     }
-    
+
     // For other intents, return clean URL without filters
-    return baseUrl;
+    return withCity(baseUrl);
   };
 
   useEffect(() => {
-    const currentTab = tabsRef.current[safeActiveIndex];
+    if (activeIndex < 0) {
+      setIndicatorStyle({ left: 0, width: 0 });
+      return;
+    }
+    const currentTab = tabsRef.current[activeIndex];
     if (currentTab) {
       setIndicatorStyle({
         left: currentTab.offsetLeft,
-        width: currentTab.clientWidth
+        width: currentTab.clientWidth,
       });
-      
-      // Scroll into view on mobile if needed
+
       currentTab.scrollIntoView({
         behavior: "smooth",
         block: "nearest",
-        inline: "center"
+        inline: "center",
       });
     }
-  }, [safeActiveIndex, currentIntent]);
+  }, [activeIndex, currentIntent]);
 
   // If no city, don't render tabs (after all hooks)
   if (!city) {
@@ -115,7 +121,7 @@ function DiscoveryIntentTabsContent({
     <div className={cn("relative w-full bg-transparent z-10", className)}>
       <div className="flex w-full justify-center overflow-x-auto no-scrollbar relative pointer-events-auto">
         {DISCOVERY_INTENT_ITEMS.map((intentConfig, index) => {
-          const isActive = index === safeActiveIndex;
+          const isActive = activeIndex >= 0 && index === activeIndex;
           const Icon = TAB_ICONS[intentConfig.id];
           
           return (
@@ -166,10 +172,11 @@ function DiscoveryIntentTabsContent({
         
         {/* Animated Indicator */}
         <div
-          className="absolute bottom-0 h-[4px] rounded-full bg-[#EF8759] transition-all duration-300 ease-out"
+          className="absolute bottom-0 h-[4px] rounded-full bg-[#EF8759] transition-all duration-300 ease-out pointer-events-none"
           style={{
             left: `${indicatorStyle.left}px`,
-            width: `${indicatorStyle.width}px`
+            width: `${indicatorStyle.width}px`,
+            opacity: activeIndex < 0 ? 0 : 1,
           }}
         />
       </div>

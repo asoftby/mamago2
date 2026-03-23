@@ -38,25 +38,47 @@ export async function fetchDiscoveryFilters(
         method: "GET",
         headers: { "Content-Type": "application/json" },
       }),
-      fetch(`/api/geo/metro-stations?citySlug=${citySlug}`, {
+      fetch(`/api/geo/metro-stations?citySlug=${encodeURIComponent(citySlug)}`, {
         method: "GET",
         headers: { "Content-Type": "application/json" },
       }),
-      fetch(`/api/geo/districts?citySlug=${citySlug}`, {
+      fetch(`/api/geo/districts?citySlug=${encodeURIComponent(citySlug)}`, {
         method: "GET",
         headers: { "Content-Type": "application/json" },
       }),
     ]);
 
-    if (!filtersResponse.ok || !metroResponse.ok || !districtsResponse.ok) {
-      throw new Error("Failed to fetch filter options");
+    const filtersData = filtersResponse.ok
+      ? await filtersResponse.json()
+      : { filters: [] };
+    if (!filtersResponse.ok && process.env.NODE_ENV === "development") {
+      console.warn(
+        "[fetchDiscoveryFilters] /api/discovery/filters:",
+        filtersResponse.status,
+      );
     }
 
-    const [filtersData, metroData, districtsData] = await Promise.all([
-      filtersResponse.json(),
-      metroResponse.json(),
-      districtsResponse.json(),
-    ]);
+    const metroData = metroResponse.ok
+      ? await metroResponse.json()
+      : { metroStations: [] };
+    if (!metroResponse.ok && process.env.NODE_ENV === "development") {
+      console.warn(
+        "[fetchDiscoveryFilters] metro-stations:",
+        metroResponse.status,
+        citySlug,
+      );
+    }
+
+    const districtsData = districtsResponse.ok
+      ? await districtsResponse.json()
+      : { districts: [] };
+    if (!districtsResponse.ok && process.env.NODE_ENV === "development") {
+      console.warn(
+        "[fetchDiscoveryFilters] districts:",
+        districtsResponse.status,
+        citySlug,
+      );
+    }
     
     // Transform API responses to our format
     const filters = filtersData.filters || [];
@@ -165,34 +187,44 @@ export function useDiscoveryFilterOptions(citySlug: string | null = "minsk") {
           return;
         }
         
-        // Simple client-side fetch without server-specific options
+        const slug = encodeURIComponent(citySlug);
         const [metroResponse, districtsResponse] = await Promise.all([
-          fetch(`/api/geo/metro-stations?citySlug=${citySlug}`),
-          fetch(`/api/geo/districts?citySlug=${citySlug}`),
+          fetch(`/api/geo/metro-stations?citySlug=${slug}`),
+          fetch(`/api/geo/districts?citySlug=${slug}`),
         ]);
 
-        if (!metroResponse.ok || !districtsResponse.ok) {
-          throw new Error("Failed to fetch filter options");
+        let metros: FilterOption[] = [];
+        let districts: FilterOption[] = [];
+
+        if (metroResponse.ok) {
+          const metroData = await metroResponse.json();
+          metros = (metroData.metroStations || []).map((station: any) => ({
+            id: station.id,
+            value: station.id,
+            label: station.name,
+          }));
+        } else if (process.env.NODE_ENV === "development") {
+          console.warn(
+            "[useDiscoveryFilterOptions] metro-stations:",
+            metroResponse.status,
+            citySlug,
+          );
         }
 
-        const [metroData, districtsData] = await Promise.all([
-          metroResponse.json(),
-          districtsResponse.json(),
-        ]);
-
-        // Transform metro stations
-        const metros: FilterOption[] = (metroData.metroStations || []).map((station: any) => ({
-          id: station.id,
-          value: station.id,
-          label: station.name,
-        }));
-
-        // Transform districts
-        const districts: FilterOption[] = (districtsData.districts || []).map((district: any) => ({
-          id: district.id,
-          value: district.id,
-          label: district.name,
-        }));
+        if (districtsResponse.ok) {
+          const districtsData = await districtsResponse.json();
+          districts = (districtsData.districts || []).map((district: any) => ({
+            id: district.id,
+            value: district.id,
+            label: district.name,
+          }));
+        } else if (process.env.NODE_ENV === "development") {
+          console.warn(
+            "[useDiscoveryFilterOptions] districts:",
+            districtsResponse.status,
+            citySlug,
+          );
+        }
         
         const data = {
           ages: [], // Skip ages for now to simplify
@@ -204,7 +236,9 @@ export function useDiscoveryFilterOptions(citySlug: string | null = "minsk") {
           setOptions(data);
         }
       } catch (err) {
-        console.error('useDiscoveryFilterOptions - error:', err);
+        if (process.env.NODE_ENV === "development") {
+          console.warn("useDiscoveryFilterOptions:", err);
+        }
         if (mounted) {
           setError(err instanceof Error ? err : new Error("Unknown error"));
         }

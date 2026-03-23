@@ -7,7 +7,8 @@ import { MobileSearchEntry } from "@/components/mobile/MobileSearchEntry";
 import { MobileIntentTabs } from "@/components/mobile/MobileIntentTabs";
 import { MobileSearchSheet } from "@/components/mobile/MobileSearchSheet";
 import { MobileFilterButton } from "@/components/mobile/MobileFilterButton";
-import { getIntentFromPath, getCityFromPath } from "@/lib/intent";
+import { getIntentFromPath, getCityFromPath, isCityHubPath } from "@/lib/intent";
+import { useCity } from "@/contexts/CityContext";
 import { DISCOVERY_INTENT_CONFIG } from "@/lib/discovery/discoveryIntentConfig";
 import { useHeaderScrolled } from "@/hooks/useHeaderScrolled";
 
@@ -16,12 +17,12 @@ export function SiteHeaderMobile() {
   const pathname = usePathname();
   const isScrolled = useHeaderScrolled(50); // Hide tabs after 50px scroll
   
-  // Get current intent and city from path
   const currentIntent = getIntentFromPath(pathname);
   const currentCity = getCityFromPath(pathname);
-  
-  // For pages without city context (like /register, /profile), use default city for navigation
-  const displayCity = currentCity || "minsk";
+  const { citySlug } = useCity();
+  const isCityHub = isCityHubPath(pathname);
+
+  const displayCity = citySlug;
   const displayIntent = currentIntent || "kuda";
   
   // Check if we're on a discovery page (has intent)
@@ -39,7 +40,8 @@ export function SiteHeaderMobile() {
           <div className="px-4 pt-4 pb-4">
             <div className="flex items-center gap-3">
               <div className="flex-1">
-                <MobileSearchEntry 
+                <MobileSearchEntry
+                  cityHubOnly={isCityHub}
                   onSearchClick={() => setIsSearchSheetOpen(true)}
                   citySlug={displayCity}
                   currentIntent={displayIntent}
@@ -63,20 +65,18 @@ export function SiteHeaderMobile() {
                 : "max-h-[100px] opacity-100"
             )}
           >
-            <MobileIntentTabs 
-              city={displayCity} 
-              currentIntent={currentIntent || "kuda"}
-            />
+            <MobileIntentTabs city={displayCity} currentIntent={currentIntent} />
           </div>
         </div>
       </header>
 
       {/* Search Sheet */}
-      <MobileSearchSheet 
+      <MobileSearchSheet
         isOpen={isSearchSheetOpen}
         onClose={() => setIsSearchSheetOpen(false)}
         citySlug={displayCity}
         currentIntent={displayIntent}
+        cityHubOnly={isCityHub}
       />
     </>
   );

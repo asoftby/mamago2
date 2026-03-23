@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Search } from "lucide-react";
+import { MapPin, Search } from "lucide-react";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
 import { useDiscoveryFilters } from "@/features/filters/discovery/filters.store";
@@ -24,13 +24,16 @@ interface MobileSearchEntryProps {
   className?: string;
   citySlug?: string;
   currentIntent?: Intent;
+  /** Хаб города: как в разделах, но только «Куда» и иконка MapPin */
+  cityHubOnly?: boolean;
 }
 
-export function MobileSearchEntry({ 
-  onSearchClick, 
+export function MobileSearchEntry({
+  onSearchClick,
   className,
   citySlug = "minsk",
-  currentIntent = "kuda"
+  currentIntent = "kuda",
+  cityHubOnly = false,
 }: MobileSearchEntryProps) {
   const [isClient, setIsClient] = useState(false);
   const { applied } = useDiscoveryFilters();
@@ -163,21 +166,28 @@ export function MobileSearchEntry({
     return `${ageLabels[0]} +${ageLabels.length - 1}`;
   };
 
-  // Build summary parts
   const locationText = getLocationText();
+
   const dateText = getDateText();
   const ageText = getAgeText();
-  
-  const parts = [
-    locationText,
-    dateText,
-    ageText
-  ].filter(Boolean);
 
-  const summaryText = parts.length > 0 ? parts.join(" • ") : "Начать поиск";
-  
-  // Check if we have any filters beyond just the default city
-  const hasAdditionalFilters = applied.district || applied.metro || applied.nearby || applied.dateFrom || applied.whenPreset || applied.age.length > 0;
+  const parts = cityHubOnly
+    ? [locationText]
+    : [locationText, dateText, ageText].filter(Boolean);
+
+  const summaryText =
+    parts.length > 0 ? parts.join(" • ") : cityHubOnly ? locationText : "Начать поиск";
+
+  const hasAdditionalFilters = cityHubOnly
+    ? !!(applied.district || applied.metro || applied.nearby)
+    : !!(
+        applied.district ||
+        applied.metro ||
+        applied.nearby ||
+        applied.dateFrom ||
+        applied.whenPreset ||
+        applied.age.length > 0
+      );
 
   return (
     <button
@@ -188,14 +198,15 @@ export function MobileSearchEntry({
         className
       )}
     >
-      {/* Intent Icon - Always show current category icon */}
       <div className="flex-shrink-0">
-        {intentConfig.image ? (
-          <Image 
+        {cityHubOnly ? (
+          <MapPin className="h-5 w-5 text-gray-400" aria-hidden />
+        ) : intentConfig.image ? (
+          <Image
             src={intentConfig.image}
             alt={intentConfig.label}
-            width={20} 
-            height={20} 
+            width={20}
+            height={20}
             className="object-contain"
           />
         ) : FallbackIcon ? (

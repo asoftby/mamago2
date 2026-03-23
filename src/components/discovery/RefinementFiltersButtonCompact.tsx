@@ -1,69 +1,80 @@
 "use client";
 
+import { useState } from "react";
 import { SlidersHorizontal } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useRefinementFilters } from "@/contexts/RefinementFiltersContext";
-import { FilterState } from "./RefinementFiltersModal";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { SecondaryFiltersForm } from "@/components/discovery/SecondaryFiltersForm";
+import type { Intent } from "@/lib/intent";
+import { useSecondaryFiltersFromUrl } from "@/features/filters/discovery/useSecondaryFiltersFromUrl";
 
 interface RefinementFiltersButtonCompactProps {
   className?: string;
-  intent?: string; // Add intent prop
+  intent?: Intent | string | null;
 }
 
-// Helper function to count active filters
-const countActiveFilters = (filters: FilterState): number => {
-  let count = 0;
-  count += filters.types.length;
-  count += filters.isFree ? 1 : 0;
-  count += filters.categories.length;
-  return count;
-};
-
-export function RefinementFiltersButtonCompact({ 
+export function RefinementFiltersButtonCompact({
   className,
   intent,
 }: RefinementFiltersButtonCompactProps) {
-  const { getFilters, setIsOpen, setCurrentIntent } = useRefinementFilters();
-  
-  // Get filters for this intent
-  const filters = intent ? getFilters(intent) : {
-    types: [],
-    isFree: false,
-    categories: [],
-  };
-  
-  const activeCount = countActiveFilters(filters);
+  const [open, setOpen] = useState(false);
+  const safeIntent = (intent ?? null) as Intent | null;
+  const { activeCount } = useSecondaryFiltersFromUrl(safeIntent);
 
-  const handleClick = () => {
-    if (intent) {
-      setCurrentIntent(intent);
-    }
-    setIsOpen(true);
-  };
+  if (!safeIntent) return null;
 
   return (
-    <button
-      type="button"
-      onClick={handleClick}
-      aria-label="Фильтры — нажмите, чтобы раскрыть и настроить"
-      className={cn(
-        // Match compact search form height exactly (py-3 + border)
-        "inline-flex items-center gap-2 px-4 py-3 rounded-full border border-gray-200 bg-white hover:bg-gray-50 transition-all duration-200 text-sm font-semibold text-gray-800 hover:text-gray-900 shadow-sm hover:shadow-md hover:border-gray-300 hover:scale-[1.02] active:scale-[0.98]",
-        // Ensure button doesn't shrink
-        "flex-shrink-0",
-        className
-      )}
-    >
-      <SlidersHorizontal className="h-4 w-4 flex-shrink-0" />
-      <span className="whitespace-nowrap">Фильтры</span>
-      {activeCount > 0 && (
-        <>
-          <span className="text-gray-400 mx-1">·</span>
-          <span className="bg-gray-900 text-white text-xs font-bold px-2 py-0.5 rounded-full min-w-[20px] h-5 flex items-center justify-center flex-shrink-0">
-            {activeCount}
-          </span>
-        </>
-      )}
-    </button>
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <button
+          type="button"
+          data-secondary-filters-trigger
+          aria-label="Фильтры — нажмите, чтобы открыть"
+          aria-expanded={open}
+          aria-haspopup="dialog"
+          className={cn(
+            "inline-flex h-[64px] min-h-[64px] items-center justify-center gap-2 rounded-full border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-800 shadow-sm transition-colors duration-200",
+            "hover:border-gray-300 hover:bg-gray-50 hover:shadow-md",
+            "active:scale-[0.98]",
+            "flex-shrink-0",
+            className,
+          )}
+        >
+          <SlidersHorizontal className="h-4 w-4 flex-shrink-0" />
+          <span className="whitespace-nowrap">Фильтры</span>
+          {activeCount > 0 && (
+            <>
+              <span className="text-gray-400 mx-1">·</span>
+              <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-gray-900 px-2 text-xs font-bold text-white">
+                {activeCount}
+              </span>
+            </>
+          )}
+        </button>
+      </DialogTrigger>
+
+      <DialogContent
+        showCloseButton
+        className="max-h-[min(90vh,800px)] max-w-[calc(100%-2rem)] gap-0 overflow-hidden p-0 sm:max-w-lg"
+        onOpenAutoFocus={(e) => e.preventDefault()}
+      >
+        <DialogHeader className="border-b border-border/60 px-6 py-4 text-left">
+          <DialogTitle className="text-lg font-semibold">Фильтры</DialogTitle>
+        </DialogHeader>
+        <div className="max-h-[min(70vh,640px)] overflow-y-auto px-6 py-4">
+          <SecondaryFiltersForm
+            intent={safeIntent}
+            compact
+            onApply={() => setOpen(false)}
+          />
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }

@@ -4,7 +4,8 @@ import { useRef } from "react";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useStableHeaderBehavior } from "@/hooks/useStableHeaderBehavior";
-import { getIntentFromPath, getCityFromPath } from "@/lib/intent";
+import { getIntentFromPath, isCityHubPath } from "@/lib/intent";
+import { useCity } from "@/contexts/CityContext";
 
 import { StableHeaderChrome } from "./StableHeaderChrome";
 import { SearchSurface } from "./SearchSurface";
@@ -32,10 +33,10 @@ export function SiteHeaderShell() {
   const currentHeight = isCompact ? HEADER_HEIGHT_COMPACT : HEADER_HEIGHT_EXPANDED;
 
   const currentIntent = getIntentFromPath(pathname);
-  const currentCity = getCityFromPath(pathname);
-  const displayCity = currentCity || "minsk";
-  const shouldShowFilters = !!(currentIntent && currentCity);
-  // Show intent tabs always — use displayCity as fallback for non-city pages
+  const { citySlug } = useCity();
+  const isCityHub = isCityHubPath(pathname);
+  const shouldShowFilters = !!(currentIntent && citySlug);
+  // Show intent tabs always — city slug comes from CityProvider (path → query → storage → minsk)
   const shouldShowIntentTabs = true;
 
   return (
@@ -57,7 +58,8 @@ export function SiteHeaderShell() {
       >
         <div className="mx-auto w-full max-w-[1200px] px-4 h-full">
           <StableHeaderChrome
-            citySlug={displayCity}
+            citySlug={citySlug}
+            isCityHub={isCityHub}
             currentIntent={currentIntent}
             shouldShowIntentTabs={shouldShowIntentTabs}
             shouldShowFilters={shouldShowFilters}
@@ -70,7 +72,8 @@ export function SiteHeaderShell() {
       {/* Search Surface Overlay - только если действительно нужен overlay */}
       {headerBehavior.showSearchSurface && (
         <SearchSurface
-          citySlug={displayCity}
+          citySlug={citySlug}
+          isCityHub={isCityHub}
           currentIntent={currentIntent}
           shouldShowIntentTabs={shouldShowIntentTabs}
           shouldShowFilters={shouldShowFilters}

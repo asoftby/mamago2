@@ -4,10 +4,11 @@ import { cn } from "@/lib/utils";
 import { DiscoveryIntentTabs } from "@/components/city/DiscoveryIntentTabs";
 import { DesktopSearchControl } from "./DesktopSearchControl";
 import type { HeaderMode, HeaderPanel } from "@/hooks/useHeaderBehavior";
+import type { Intent } from "@/lib/intent";
 
 interface HeaderExpandedPresentationProps {
   citySlug: string;
-  currentIntent?: string | null;
+  currentIntent?: Intent | null;
   shouldShowIntentTabs: boolean;
   shouldShowFilters: boolean;
   headerBehavior: {
@@ -39,7 +40,7 @@ export function HeaderExpandedPresentation({
           <div className="flex items-center justify-center whitespace-nowrap">
             <DiscoveryIntentTabs
               city={citySlug}
-              currentIntent={(currentIntent || "kuda") as any}
+              currentIntent={currentIntent ?? null}
             />
           </div>
         )}

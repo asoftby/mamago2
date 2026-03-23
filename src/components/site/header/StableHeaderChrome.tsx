@@ -8,10 +8,13 @@ import { DiscoveryIntentTabs } from "@/components/city/DiscoveryIntentTabs";
 import { DesktopSearchControl } from "./DesktopSearchControl";
 import { RefinementFiltersButtonCompact } from "@/components/discovery/RefinementFiltersButtonCompact";
 import type { HeaderMode, HeaderPanel } from "@/hooks/useStableHeaderBehavior";
+import type { Intent } from "@/lib/intent";
 
 interface StableHeaderChromeProps {
   citySlug: string;
-  currentIntent?: string | null;
+  /** Городской хаб `/{city}` — только выбор города в шапке */
+  isCityHub: boolean;
+  currentIntent?: Intent | null;
   shouldShowIntentTabs: boolean;
   shouldShowFilters: boolean;
   headerBehavior: {
@@ -40,11 +43,12 @@ interface StableHeaderChromeProps {
  */
 export function StableHeaderChrome({
   citySlug,
+  isCityHub,
   currentIntent,
   shouldShowIntentTabs,
   shouldShowFilters,
   headerBehavior,
-  isCompact = false
+  isCompact = false,
 }: StableHeaderChromeProps) {
   // Показываем встроенную форму поиска всегда когда не в компактном режиме
   const showEmbeddedSearch = !isCompact;
@@ -57,7 +61,7 @@ export function StableHeaderChrome({
           {/* Ряд 1: лого, иконка поиска | категории | избранное, профиль */}
           <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center shrink-0 pt-5 pb-1">
             <div className="flex items-center gap-3">
-              <Link href="/minsk" className="hover:opacity-80 transition-opacity flex items-center">
+              <Link href={`/${citySlug}`} className="hover:opacity-80 transition-opacity flex items-center">
                 <Image
                   src="/favico_mamago.webp"
                   alt="MamaGo"
@@ -68,19 +72,16 @@ export function StableHeaderChrome({
                 />
               </Link>
               <Link
-                href="/minsk"
+                href={`/${citySlug}`}
                 className="flex items-center justify-center w-[39px] h-[39px] bg-white border border-gray-200 rounded-full hover:bg-gray-50 hover:border-gray-300 transition-colors duration-200 shadow-sm"
-                aria-label="Глобальный поиск"
+                aria-label="Город и поиск"
               >
                 <Search className="h-5 w-5 text-gray-600" />
               </Link>
             </div>
             <div className="flex items-center justify-center min-w-0 px-2">
               {shouldShowIntentTabs ? (
-                <DiscoveryIntentTabs
-                  city={citySlug}
-                  currentIntent={(currentIntent || "kuda") as any}
-                />
+                <DiscoveryIntentTabs city={citySlug} currentIntent={currentIntent ?? null} />
               ) : (
                 <span className="text-sm text-gray-400" aria-hidden />
               )}
@@ -105,7 +106,7 @@ export function StableHeaderChrome({
           {/* Ряд 2: форма поиска встроена в хедер */}
           {showEmbeddedSearch && (
             <div className="flex items-center justify-center flex-1 min-h-[52px] min-w-0 pt-0 pb-3">
-              <div className="w-full max-w-[600px] flex items-center justify-center">
+              <div className="w-full max-w-[760px] flex items-center justify-center">
                 <DesktopSearchControl
                   citySlug={citySlug}
                   currentIntent={currentIntent}
@@ -115,6 +116,7 @@ export function StableHeaderChrome({
                   onPanelClose={headerBehavior.actions.closePanel}
                   renderPanels={true}
                   embeddedInHeader
+                  variant={isCityHub ? "cityHub" : "discovery"}
                 />
               </div>
             </div>
@@ -126,7 +128,7 @@ export function StableHeaderChrome({
       {isCompact && (
         <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 h-full min-h-0 py-0">
           <div className="flex items-center gap-3 flex-shrink-0">
-            <Link href="/minsk" className="hover:opacity-80 transition-opacity flex items-center">
+            <Link href={`/${citySlug}`} className="hover:opacity-80 transition-opacity flex items-center">
               <Image
                 src="/favico_mamago.webp"
                 alt="MamaGo"
@@ -137,9 +139,9 @@ export function StableHeaderChrome({
               />
             </Link>
             <Link
-              href="/minsk"
+              href={`/${citySlug}`}
               className="flex items-center justify-center w-[39px] h-[39px] bg-white border border-gray-200 rounded-full hover:bg-gray-50 hover:border-gray-300 transition-colors duration-200 shadow-sm flex-shrink-0"
-              aria-label="Глобальный поиск"
+              aria-label="Город и поиск"
             >
               <Search className="h-5 w-5 text-gray-600" />
             </Link>
@@ -155,6 +157,7 @@ export function StableHeaderChrome({
                 onPanelChange={() => {}}
                 onPanelClose={() => {}}
                 onExpand={headerBehavior.actions.openSearchSurface}
+                variant={isCityHub ? "cityHub" : "discovery"}
               />
             </div>
             {shouldShowFilters && currentIntent && (

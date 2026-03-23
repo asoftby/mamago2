@@ -12,17 +12,29 @@
  */
 
 export interface AgeOption {
+  /** Optional stable id (builder selection, analytics, SignalOption cuid) */
+  id?: string;
   /** Unique key stored in database */
   key: string;
+  /** Same as `key`; aligned with signals / admin `value` */
+  value: string;
   /** Full label for forms and detailed views */
   label: string;
   /** Short label for chips and compact displays */
   shortLabel: string;
   /** Display order (lower = first) */
   order: number;
-  /** Minimum age in years */
+  /** Whether option is selectable in UI (default true) */
+  active: boolean;
+  /** Minimum age in years (ranking / personalization) */
+  minAge: number;
+  /** Maximum age in years inclusive; for open-ended groups use a practical upper bound (e.g. 120) */
+  maxAge: number;
+  /** Weight multiplier for ranking scores (default 1) */
+  weight: number;
+  /** Minimum age in years (legacy alias; keep in sync with minAge) */
   min: number;
-  /** Maximum age in years (null = no upper limit) */
+  /** Maximum age in years (null = no upper limit in legacy model) */
   max: number | null;
   /** Minimum age in months (for filtering) */
   minMonths: number;
@@ -36,107 +48,48 @@ export interface AgeOption {
  * Format: "0-1", "1-3", "3-5", "5-7", "7-9", "9-12", "12-14", "14-16", "16-18", "18+"
  * This matches the canonical AGE_GROUPS used in discovery filters.
  */
+function ageRow(
+  key: string,
+  label: string,
+  shortLabel: string,
+  order: number,
+  minY: number,
+  maxY: number | null,
+  minMonths: number,
+  maxMonths: number | null,
+  openEnded = false,
+  optionId?: string
+): AgeOption {
+  const maxAgeYears = maxY ?? 120;
+  return {
+    ...(optionId ? { id: optionId } : {}),
+    key,
+    value: key,
+    label,
+    shortLabel,
+    order,
+    active: true,
+    minAge: minY,
+    maxAge: maxAgeYears,
+    weight: 1,
+    min: minY,
+    max: openEnded ? null : maxY,
+    minMonths,
+    maxMonths,
+  };
+}
+
 export const AGE_OPTIONS: readonly AgeOption[] = [
-  {
-    key: "0-1",
-    label: "0–1 год",
-    shortLabel: "0–1",
-    order: 1,
-    min: 0,
-    max: 1,
-    minMonths: 0,
-    maxMonths: 12,
-  },
-  {
-    key: "1-3",
-    label: "1–3 года",
-    shortLabel: "1–3",
-    order: 2,
-    min: 1,
-    max: 3,
-    minMonths: 12,
-    maxMonths: 36,
-  },
-  {
-    key: "3-5",
-    label: "3–5 лет",
-    shortLabel: "3–5",
-    order: 3,
-    min: 3,
-    max: 5,
-    minMonths: 36,
-    maxMonths: 60,
-  },
-  {
-    key: "5-7",
-    label: "5–7 лет",
-    shortLabel: "5–7",
-    order: 4,
-    min: 5,
-    max: 7,
-    minMonths: 60,
-    maxMonths: 84,
-  },
-  {
-    key: "7-9",
-    label: "7–9 лет",
-    shortLabel: "7–9",
-    order: 5,
-    min: 7,
-    max: 9,
-    minMonths: 84,
-    maxMonths: 108,
-  },
-  {
-    key: "9-12",
-    label: "9–12 лет",
-    shortLabel: "9–12",
-    order: 6,
-    min: 9,
-    max: 12,
-    minMonths: 108,
-    maxMonths: 144,
-  },
-  {
-    key: "12-14",
-    label: "12–14 лет",
-    shortLabel: "12–14",
-    order: 7,
-    min: 12,
-    max: 14,
-    minMonths: 144,
-    maxMonths: 168,
-  },
-  {
-    key: "14-16",
-    label: "14–16 лет",
-    shortLabel: "14–16",
-    order: 8,
-    min: 14,
-    max: 16,
-    minMonths: 168,
-    maxMonths: 192,
-  },
-  {
-    key: "16-18",
-    label: "16–18 лет",
-    shortLabel: "16–18",
-    order: 9,
-    min: 16,
-    max: 18,
-    minMonths: 192,
-    maxMonths: 216,
-  },
-  {
-    key: "18+",
-    label: "18+",
-    shortLabel: "18+",
-    order: 10,
-    min: 18,
-    max: null,
-    minMonths: 216,
-    maxMonths: null,
-  },
+  ageRow("0-1", "0–1 год", "0–1", 1, 0, 1, 0, 12),
+  ageRow("1-3", "1–3 года", "1–3", 2, 1, 3, 12, 36),
+  ageRow("3-5", "3–5 лет", "3–5", 3, 3, 5, 36, 60),
+  ageRow("5-7", "5–7 лет", "5–7", 4, 5, 7, 60, 84),
+  ageRow("7-9", "7–9 лет", "7–9", 5, 7, 9, 84, 108),
+  ageRow("9-12", "9–12 лет", "9–12", 6, 9, 12, 108, 144),
+  ageRow("12-14", "12–14 лет", "12–14", 7, 12, 14, 144, 168),
+  ageRow("14-16", "14–16 лет", "14–16", 8, 14, 16, 168, 192),
+  ageRow("16-18", "16–18 лет", "16–18", 9, 16, 18, 192, 216),
+  ageRow("18+", "18+", "18+", 10, 18, null, 216, null, true),
 ] as const;
 
 /**
@@ -158,6 +111,16 @@ export type AgeKey = typeof AGE_KEYS[number];
  */
 export function getAgeOption(key: string): AgeOption | undefined {
   return AGE_OPTIONS.find((opt) => opt.key === key);
+}
+
+/**
+ * Resolve canonical age options from DB/content age tag keys (Place.ageTags, Activity.ageTags, …)
+ */
+export function resolveAgeOptionsFromKeys(keys: string[]): AgeOption[] {
+  if (!keys?.length) return [];
+  return keys
+    .map((k) => getAgeOption(k))
+    .filter((o): o is AgeOption => o !== undefined);
 }
 
 /**

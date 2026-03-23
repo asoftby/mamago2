@@ -1,10 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { MapPin, Navigation, Zap, ChevronDown } from "lucide-react";
+import { MapPin, Navigation, Zap, ChevronDown, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useCity } from "@/contexts/CityContext";
+import { VALID_CITY_SLUGS } from "@/lib/intent";
 
 interface MobileLocationPanelProps {
+  variant?: "default" | "cityHub";
   citySlug: string;
   searchText: string;
   onSearchTextChange: (text: string) => void;
@@ -16,6 +19,7 @@ interface MobileLocationPanelProps {
 }
 
 export function MobileLocationPanel({
+  variant = "default",
   citySlug,
   searchText,
   onSearchTextChange,
@@ -23,8 +27,9 @@ export function MobileLocationPanel({
   draft,
   setDraft,
   actions,
-  apiOptions
+  apiOptions,
 }: MobileLocationPanelProps) {
+  const { setCity } = useCity();
   const [showMetroList, setShowMetroList] = useState(false);
   const [showDistrictList, setShowDistrictList] = useState(false);
 
@@ -69,17 +74,55 @@ export function MobileLocationPanel({
       <div className="p-3">
         {/* Quick Actions */}
         <div className="space-y-1.5">
-          {/* City - First position - Disabled until multiple cities available */}
-          <div className="w-full flex items-center gap-2.5 p-2.5 rounded-lg text-left opacity-50 cursor-not-allowed">
-            <div className="flex items-center justify-center w-7 h-7 bg-gray-100 rounded-full">
-              <MapPin className="h-3.5 w-3.5 text-gray-600" />
+          {variant === "cityHub" ? (
+            <div className="space-y-1">
+              <p className="text-[11px] font-medium text-gray-500 px-0.5">Город</p>
+              {VALID_CITY_SLUGS.map((slug) => {
+                const name = getCityDisplayName(slug);
+                const selected = slug === citySlug;
+                return (
+                  <button
+                    key={slug}
+                    type="button"
+                    onClick={() => {
+                      setCity(slug);
+                      onClose();
+                    }}
+                    className={cn(
+                      "w-full flex items-center justify-between gap-2 p-2.5 rounded-lg text-left",
+                      selected ? "bg-white ring-1 ring-gray-200" : "hover:bg-white",
+                    )}
+                  >
+                    <span className="flex items-center gap-2.5 min-w-0">
+                      <div className="flex items-center justify-center w-7 h-7 bg-gray-100 rounded-full shrink-0">
+                        <MapPin className="h-3.5 w-3.5 text-gray-600" />
+                      </div>
+                      <span className="min-w-0">
+                        <span className="font-medium text-gray-900 text-sm block">{name}</span>
+                        <span className="text-xs text-gray-500">Весь город</span>
+                      </span>
+                    </span>
+                    {selected ? (
+                      <Check className="h-4 w-4 text-primary shrink-0" aria-hidden />
+                    ) : null}
+                  </button>
+                );
+              })}
             </div>
-            <div className="flex-1 min-w-0">
-              <div className="font-medium text-gray-900 text-sm">{getCityDisplayName(citySlug)}</div>
-              <div className="text-xs text-gray-500">Весь город</div>
+          ) : (
+            <div className="w-full flex items-center gap-2.5 p-2.5 rounded-lg text-left opacity-50 cursor-not-allowed">
+              <div className="flex items-center justify-center w-7 h-7 bg-gray-100 rounded-full">
+                <MapPin className="h-3.5 w-3.5 text-gray-600" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="font-medium text-gray-900 text-sm">{getCityDisplayName(citySlug)}</div>
+                <div className="text-xs text-gray-500">Весь город</div>
+              </div>
             </div>
-          </div>
+          )}
 
+          {variant !== "cityHub" ? (
+            <>
           {/* Nearby */}
           <button
             onClick={handleNearbyClick}
@@ -197,6 +240,8 @@ export function MobileLocationPanel({
               </div>
             )}
           </div>
+            </>
+          ) : null}
         </div>
       </div>
     </div>

@@ -1,19 +1,25 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useState, useMemo, useCallback, useEffect } from 'react';
-import { useSearchParams, useRouter, usePathname, ReadonlyURLSearchParams } from 'next/navigation';
-import { whenLabel } from './whenLabel';
-import { AGE_GROUPS } from '@/features/filters/age/ageGroups';
+import { useMemo, useCallback } from "react";
+import {
+  useSearchParams,
+  useRouter,
+  usePathname,
+  ReadonlyURLSearchParams,
+} from "next/navigation";
+import { whenLabel } from "./whenLabel";
+import { AGE_GROUPS } from "@/features/filters/age/ageGroups";
 
 export type WhenPreset = "TODAY" | "TOMORROW" | "WEEKEND" | null;
 
+/** Primary discovery filters — источник правды: URL (searchParams) */
 export type DiscoveryFilters = {
   dateFrom: string | null;
   dateTo: string | null;
   whenPreset: WhenPreset;
   age: string[];
-  metro: string | null; // Changed from array to single value
+  metro: string | null;
   district: string | null;
-  nearby: boolean; // Track "Поблизости" selection
+  nearby: boolean;
 };
 
 export const defaultFilters: DiscoveryFilters = {
@@ -21,67 +27,88 @@ export const defaultFilters: DiscoveryFilters = {
   dateTo: null,
   whenPreset: null,
   age: [],
-  metro: null, // Changed from [] to null
+  metro: null,
   district: null,
   nearby: false,
 };
 
 export type OpenKey = "date" | "age" | "metro" | "district" | null;
 
-// --- Utilities ---
+function mergeDiscoveryPatch(
+  base: DiscoveryFilters,
+  patch: Partial<DiscoveryFilters>,
+): DiscoveryFilters {
+  const next: DiscoveryFilters = { ...base, ...patch };
 
-export function parseAppliedFromUrl(searchParams: ReadonlyURLSearchParams): DiscoveryFilters {
-  const dateFrom = searchParams.get("from") || searchParams.get("dateFrom") || searchParams.get("when"); // Fallback for old 'when' if any
-  // Wait, old implementation used 'when' param with comma for ranges.
-  // New spec: "from" param (or "dateFrom"), "to" param (or "dateTo")
-  // Let's support both for transition if needed, but stick to spec.
-  // But wait, the previous code was using 'when' with comma separated range.
-  // Let's stick to the spec: "from", "to". 
-  // But to be safe with existing links, let's also check 'when'.
+  if (Object.prototype.hasOwnProperty.call(patch, "whenPreset")) {
+    if (patch.whenPreset !== null && patch.whenPreset !== undefined) {
+      next.dateFrom = null;
+      next.dateTo = null;
+    }
+  }
+
+  if (
+    Object.prototype.hasOwnProperty.call(patch, "dateFrom") ||
+    Object.prototype.hasOwnProperty.call(patch, "dateTo")
+  ) {
+    if (next.dateFrom || next.dateTo) {
+      next.whenPreset = null;
+    }
+  }
+
+  return next;
+}
+
+export function parseAppliedFromUrl(
+  searchParams: ReadonlyURLSearchParams,
+): DiscoveryFilters {
   let dFrom = searchParams.get("from") || searchParams.get("dateFrom");
   let dTo = searchParams.get("to") || searchParams.get("dateTo");
 
   if (!dFrom && !dTo) {
-      const w = searchParams.get("when");
-      if (w) {
-          if (w.includes(",")) {
-              const parts = w.split(",");
-              dFrom = parts[0];
-              dTo = parts[1];
-          } else {
-              dFrom = w;
-          }
+    const w = searchParams.get("when");
+    if (w) {
+      if (w.includes(",")) {
+        const parts = w.split(",");
+        dFrom = parts[0];
+        dTo = parts[1];
+      } else {
+        dFrom = w;
       }
+    }
   }
 
   const age = searchParams.get("age")?.split(",").filter(Boolean) || [];
-  
-  // Sanitize age values - only keep valid age group IDs
-  const validAgeIds = new Set(AGE_GROUPS.map(g => g.value));
-  const sanitizedAge = age.filter(id => validAgeIds.has(id));
-  
-  // Legacy mapping for backward compatibility (optional)
+
+  const validAgeIds = new Set(AGE_GROUPS.map((g) => g.value));
+  const sanitizedAge = age.filter((id) => validAgeIds.has(id));
+
   const legacyAgeMap: Record<string, string> = {
     "0+": "0-1",
     "6+": "5-7",
     "12+": "12-14",
   };
-  
-  const mappedAge = sanitizedAge.map(id => legacyAgeMap[id] || id);
-  
-  // Metro is now single value - support backward compat with comma-separated (take first)
+
+  const mappedAge = sanitizedAge.map((id) => legacyAgeMap[id] || id);
+
   const metroParam = searchParams.get("metro");
-  const metro = metroParam ? (metroParam.includes(",") ? metroParam.split(",")[0] : metroParam) : null;
-  
+  const metro = metroParam
+    ? metroParam.includes(",")
+      ? metroParam.split(",")[0]
+      : metroParam
+    : null;
+
   const district = searchParams.get("district") || null;
-  
-  // Parse nearby from URL
+
   const nearby = searchParams.get("nearby") === "true";
-  
-  // Parse whenPreset from URL if present
+
   const presetParam = searchParams.get("preset");
   let whenPreset: WhenPreset = null;
-  if (presetParam === "TODAY" || presetParam === "TOMORROW" || presetParam === "WEEKEND") {
+  if (
+    presetParam === "TODAY" ||
+    presetParam === "TOMORROW" ||
+    presetParam === "WEEKEND"
+  ) {
     whenPreset = presetParam;
   }
 
@@ -97,38 +124,34 @@ export function parseAppliedFromUrl(searchParams: ReadonlyURLSearchParams): Disc
 }
 
 function writeAppliedToUrl(
-  router: any,
+  router: ReturnType<typeof useRouter>,
   pathname: string,
   searchParams: ReadonlyURLSearchParams,
   next: DiscoveryFilters,
-  mode: "replace" | "push" = "replace"
+  mode: "replace" | "push" = "replace",
 ) {
   const params = new URLSearchParams(searchParams.toString());
 
-  // Date
-  if (next.dateFrom) params.set("from", next.dateFrom); else params.delete("from");
-  if (next.dateTo) params.set("to", next.dateTo); else params.delete("to");
-  // Clean up old 'when' if it exists
+  if (next.dateFrom) params.set("from", next.dateFrom);
+  else params.delete("from");
+  if (next.dateTo) params.set("to", next.dateTo);
+  else params.delete("to");
   params.delete("when");
-  params.delete("dateFrom"); // ensure we use 'from' consistently or stick to one. Spec said "from" or "dateFrom". Let's use "from".
+  params.delete("dateFrom");
   params.delete("dateTo");
 
-  // When Preset
-  if (next.whenPreset) params.set("preset", next.whenPreset); else params.delete("preset");
+  if (next.whenPreset) params.set("preset", next.whenPreset);
+  else params.delete("preset");
 
-  // Age
   if (next.age.length > 0) params.set("age", next.age.join(","));
   else params.delete("age");
 
-  // Metro (now single value)
   if (next.metro) params.set("metro", next.metro);
   else params.delete("metro");
 
-  // District
   if (next.district) params.set("district", next.district);
   else params.delete("district");
 
-  // Nearby
   if (next.nearby) params.set("nearby", "true");
   else params.delete("nearby");
 
@@ -139,97 +162,58 @@ function writeAppliedToUrl(
   else router.replace(url, { scroll: false });
 }
 
-// --- Hook ---
-
 export function useDiscoveryFilters() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  // 1. Applied state (Derived from URL)
-  const applied = useMemo(() => parseAppliedFromUrl(searchParams), [searchParams]);
+  const applied = useMemo(
+    () => parseAppliedFromUrl(searchParams),
+    [searchParams],
+  );
 
-  // 2. Draft state (Local) - Initialize from applied
-  const [draft, setDraftState] = useState<DiscoveryFilters>(applied);
-  const [openKey, setOpenKey] = useState<OpenKey>(null);
-
-  // Sync draft with applied when URL changes (but not when draft is being edited)
-  useEffect(() => {
-    if (!openKey) {
-      const id = requestAnimationFrame(() => {
-        setDraftState(applied);
-      });
-      return () => cancelAnimationFrame(id);
-    }
-  }, [applied, openKey]);
-  
-  const beginDraft = useCallback((key: OpenKey) => {
-    // Just open the panel - don't reset draft
-    // Draft should already be in sync with applied from the useEffect above
-    setOpenKey(key);
-  }, []);
-
-  const setDraft = useCallback((patch: Partial<DiscoveryFilters>) => {
-    setDraftState(prev => ({ ...prev, ...patch }));
-  }, []);
-
-  const actions = useMemo(() => ({
-    apply: () => {
-      writeAppliedToUrl(router, pathname, searchParams, draft, "replace");
-      setOpenKey(null);
+  const patchFilters = useCallback(
+    (patch: Partial<DiscoveryFilters>) => {
+      const base = parseAppliedFromUrl(searchParams);
+      const next = mergeDiscoveryPatch(base, patch);
+      writeAppliedToUrl(router, pathname, searchParams, next, "replace");
     },
-    setDraft: (patch: Partial<DiscoveryFilters>) => {
-      setDraft(patch);
-    },
-    resetAll: () => {
-      // Clear all
-      writeAppliedToUrl(router, pathname, searchParams, defaultFilters, "replace");
-      setDraftState(defaultFilters);
-      setOpenKey(null);
-    },
-    resetKey: (key: keyof DiscoveryFilters) => {
-        // This resets specific key in URL immediately? 
-        // Or in draft? Spec says: "clears only those params in URL, updates draft accordingly"
-        // So immediate effect.
-        const next = { ...applied, [key]: defaultFilters[key] };
-        // Special case for date (it has two keys in our object but logically one group)
-        if (key === 'dateFrom' || key === 'dateTo') {
-            next.dateFrom = null;
-            next.dateTo = null;
+    [router, pathname, searchParams],
+  );
+
+  const actions = useMemo(
+    () => ({
+      /** @deprecated Кнопки Go больше нет — оставлено для совместимости */
+      apply: () => {},
+      /** Немедленная запись в URL (реактивные фильтры) */
+      setDraft: patchFilters,
+      resetAll: () => {
+        writeAppliedToUrl(
+          router,
+          pathname,
+          searchParams,
+          defaultFilters,
+          "replace",
+        );
+      },
+      resetKey: (key: keyof DiscoveryFilters) => {
+        const base = parseAppliedFromUrl(searchParams);
+        const next = { ...base, [key]: defaultFilters[key] };
+        if (key === "dateFrom" || key === "dateTo") {
+          next.dateFrom = null;
+          next.dateTo = null;
         }
-        
         writeAppliedToUrl(router, pathname, searchParams, next, "replace");
-        // Update draft to match
-        setDraftState(prev => {
-            const newDraft = { ...prev };
-            if (key === 'dateFrom' || key === 'dateTo') {
-                newDraft.dateFrom = null;
-                newDraft.dateTo = null;
-            } else {
-                 // @ts-ignore
-                newDraft[key] = defaultFilters[key];
-            }
-            return newDraft;
-        });
-    },
-    close: () => {
-      setOpenKey(null);
-      setDraftState(applied); // Revert draft
-    }
-  }), [router, pathname, searchParams, draft, applied, setDraft]);
+      },
+      /** Закрыть панель без отката URL */
+      close: () => {},
+    }),
+    [router, pathname, searchParams, applied, patchFilters],
+  );
 
   const derived = useMemo(() => {
-    // We use DRAFT for dirty check if open? Or applied?
-    // Usually dirty check is "is current state different from default".
-    // If we are in draft mode (UI open), we might want to show draft state?
-    // But usually "active filters" badge counts APPLIED filters.
-    // The spec says "applied: derived from URL".
-    // So derived values should be based on APPLIED mostly for the "Filter Bar".
-    // But inside the sheet, we use draft.
-    // Let's compute derived from APPLIED for the main bar usage.
-    
     const filters = applied;
-    
+
     const isDirty =
       !!filters.dateFrom ||
       !!filters.dateTo ||
@@ -246,12 +230,14 @@ export function useDiscoveryFilters() {
       (filters.district ? 1 : 0) +
       (filters.nearby ? 1 : 0);
 
-    // Date label with preset support
     const dateLabel = whenLabel(filters);
 
-    const ageLabel = filters.age.length > 0 
-      ? filters.age.length === 1 ? filters.age[0] : `Возраст: ${filters.age.length}`
-      : "Возраст";
+    const ageLabel =
+      filters.age.length > 0
+        ? filters.age.length === 1
+          ? filters.age[0]
+          : `Возраст: ${filters.age.length}`
+        : "Возраст";
 
     const metroLabel = filters.metro || "Метро";
 
@@ -269,14 +255,18 @@ export function useDiscoveryFilters() {
     };
   }, [applied]);
 
+  const setDraft = patchFilters;
+
   return {
     applied,
-    draft,
-    openKey,
-    setOpenKey, // Low level setter if needed, but beginDraft is better
-    beginDraft,
+    /** Алиас для совместимости; совпадает с applied */
+    draft: applied,
+    openKey: null as OpenKey | null,
+    setOpenKey: (_: OpenKey | null) => {},
+    beginDraft: (_key: unknown) => {},
     setDraft,
+    patchFilters,
     actions,
-    derived
+    derived,
   };
 }

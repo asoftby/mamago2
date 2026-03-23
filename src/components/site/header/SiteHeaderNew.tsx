@@ -43,9 +43,9 @@ export function SiteHeaderNew() {
   const currentCity = getCityFromPath(pathname);
   const displayCity = currentCity || "minsk";
   
-  // Check if we should show filters/tabs
   const shouldShowFilters = !!(currentIntent && currentCity);
-  const shouldShowIntentTabs = !!(currentIntent && currentCity);
+  /** Вкладки discovery на всех страницах города, включая хаб `/minsk` */
+  const shouldShowIntentTabs = !!currentCity;
   
   return (
     <>
