@@ -15,36 +15,40 @@ export const INTENT_ITEMS: IntentItem[] = DISCOVERY_INTENT_ITEMS.map(config => (
   href: config.href,
 }));
 
+/** Список городов с городским хабом `/{city}` */
+export const VALID_CITY_SLUGS = ["minsk"] as const;
+
+export type CitySlug = (typeof VALID_CITY_SLUGS)[number];
+
+export function isCityHubPath(pathname: string | null): boolean {
+  if (!pathname) return false;
+  const segments = pathname.split("/").filter(Boolean);
+  return segments.length === 1 && VALID_CITY_SLUGS.includes(segments[0] as CitySlug);
+}
+
 export function getIntentFromPath(pathname: string | null): Intent | null {
   if (!pathname) return null;
-  
-  // Extract segments: /city/intent
-  const segments = pathname.split('/').filter(Boolean);
-  
-  // Need at least city segment
+
+  const segments = pathname.split("/").filter(Boolean);
   if (segments.length < 1) return null;
-  
-  // If only city (e.g., /minsk), it's "kuda"
-  if (segments.length === 1) return "kuda";
-  
-  // If more than 2 segments (e.g., /minsk/activity/123), it's a detail page, not a discovery page
+
+  /** Односегментные пути: хаб города, блог, landing — не вкладка discovery */
+  if (segments.length === 1) {
+    return null;
+  }
+
+  /** Детальные страницы /city/activity/id и т.д. */
   if (segments.length > 2) return null;
-  
-  // Check second segment for valid intents
+
   const potentialIntent = segments[1];
-  
+
+  if (potentialIntent === "kuda") return "kuda";
   if (potentialIntent === "classes") return "classes";
   if (potentialIntent === "birthday") return "birthday";
   if (potentialIntent === "routes") return "routes";
-  
-  // If second segment exists but is not a valid intent, return null
-  // This handles cases like /minsk/activity, /minsk/places, etc.
+
   return null;
 }
-
-// List of valid city slugs
-// TODO: Consider fetching this dynamically or from a config file
-const VALID_CITY_SLUGS = ["minsk"];
 
 // List of known non-city route prefixes
 const NON_CITY_ROUTES = [
@@ -75,8 +79,7 @@ export function getCityFromPath(pathname: string | null): string | null {
     return null;
   }
   
-  // Check if first segment is a valid city slug
-  if (VALID_CITY_SLUGS.includes(firstSegment)) {
+  if ((VALID_CITY_SLUGS as readonly string[]).includes(firstSegment)) {
     return firstSegment;
   }
   

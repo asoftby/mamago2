@@ -15,7 +15,8 @@ export const DISCOVERY_INTENT_CONFIG: Record<Intent, DiscoveryIntentConfig> = {
     id: "kuda",
     label: "Куда пойти",
     titleTemplate: "Куда пойти с ребёнком в {city}",
-    href: (city) => `/${city}`,
+    /** Минск: отдельный сегмент discovery; остальные города — пока корень /{city} */
+    href: (city) => (city === "minsk" ? "/minsk/kuda" : `/${city}`),
     hasFilters: true,
     image: "/compass.svg",
   },
@@ -40,7 +41,7 @@ export const DISCOVERY_INTENT_CONFIG: Record<Intent, DiscoveryIntentConfig> = {
     label: "Маршруты",
     titleTemplate: "Готовые маршруты для прогулок с детьми в {city}",
     href: (city) => `/${city}/routes`,
-    hasFilters: false,
+    hasFilters: true,
     image: "/mag.svg",
   },
 };
