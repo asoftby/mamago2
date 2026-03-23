@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { appendBirthdayBuilderAuthParam } from "@/lib/auth/appendBirthdayBuilderAuthParam";
 import { getPostAuthRedirect } from "@/lib/auth/postAuthRedirect";
 
 interface Props {
@@ -44,7 +45,8 @@ export function EmailLoginForm({ mode, next }: Props) {
         setError(data.error ?? "Что-то пошло не так");
         return;
       }
-      const target = next ?? getPostAuthRedirect();
+      const raw = next ?? getPostAuthRedirect();
+      const target = appendBirthdayBuilderAuthParam(raw);
       router.replace(target);
     } catch {
       setError("Ошибка сети");

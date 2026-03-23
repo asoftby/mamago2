@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { appendBirthdayBuilderAuthParam } from "@/lib/auth/appendBirthdayBuilderAuthParam";
 import { getPostAuthRedirect } from "@/lib/auth/postAuthRedirect";
 import { PhoneInput } from "./PhoneInput";
 import { isPhoneValid, PHONE_INITIAL } from "./phoneUtils";
@@ -80,7 +81,8 @@ export function PhoneLoginForm({ purpose, initialPhone, next, onSwitchMode, onPh
       if (!res.ok) {
         setError(data.error ?? "Неверный код");
       } else {
-        const target = next ?? getPostAuthRedirect();
+        const raw = next ?? getPostAuthRedirect();
+        const target = appendBirthdayBuilderAuthParam(raw);
         router.replace(target);
       }
     } catch {
