@@ -111,11 +111,22 @@ export function PlanDayList({ date, items, onRemove }: Props) {
           ))}
         </div>
       ) : (
-        <div className="rounded-2xl border border-dashed border-neutral-200 bg-white px-5 py-6 text-center">
-          <p className="text-sm font-semibold text-neutral-700">На этот день пока ничего не запланировано</p>
-          <p className="text-xs text-neutral-400 mt-1">
-            Добавьте событие, место или идею, чтобы собрать план дня
-          </p>
+        <div className="rounded-2xl border border-dashed border-neutral-200 bg-white px-5 py-5">
+          <div className="flex items-start gap-3">
+            <CalendarDays
+              className="mt-0.5 h-5 w-5 shrink-0 text-neutral-400"
+              strokeWidth={1.75}
+              aria-hidden
+            />
+            <div className="min-w-0 text-left">
+              <p className="text-sm font-medium text-neutral-700">
+                Нет событий
+              </p>
+              <p className="mt-1 text-xs text-neutral-400">
+                Добавьте событие, место или идею, чтобы собрать план дня
+              </p>
+            </div>
+          </div>
         </div>
       )}
     </div>

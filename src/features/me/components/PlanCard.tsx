@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { CalendarDays } from "lucide-react";
 import { Surface } from "@/components/ui/surface";
 import { H2, Body, BodyMuted, Caption } from "@/components/ui/typography";
 import { Button } from "@/components/ui/button";
@@ -197,11 +198,22 @@ function DaySection({
           )}
         </>
       ) : (
-        <div className="text-center py-8">
-          <BodyMuted className="mb-4">Пока ничего не запланировано.</BodyMuted>
-          <Link href="/minsk">
-            <PrimaryButton size="sm">Найти событие</PrimaryButton>
-          </Link>
+        <div className="py-6">
+          <div className="flex items-start gap-3 px-1">
+            <CalendarDays
+              className="mt-0.5 h-5 w-5 shrink-0 text-neutral-400"
+              strokeWidth={1.75}
+              aria-hidden
+            />
+            <div className="min-w-0 text-left">
+              <BodyMuted className="mb-1 text-neutral-700">
+                Нет событий
+              </BodyMuted>
+              <Link href="/minsk" className="inline-block pt-1">
+                <PrimaryButton size="sm">Найти событие</PrimaryButton>
+              </Link>
+            </div>
+          </div>
         </div>
       )}
     </div>

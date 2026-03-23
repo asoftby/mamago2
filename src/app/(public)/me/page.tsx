@@ -10,7 +10,9 @@ import { listRoutesByUser } from "@/server/services/route.service";
 import { Container } from "@/components/ui/Container";
 import { MeHeaderCard } from "@/features/me/components/MeHeaderCard";
 import { ChildrenCard } from "@/features/me/components/ChildrenCard";
+import { MyBirthdaysCard } from "@/features/me/components/MyBirthdaysCard";
 import { PlanCard } from "@/features/me/components/PlanCard";
+import { listUserBirthdayParties } from "@/server/services/userBirthdays.service";
 import Link from "next/link";
 import { MapPin, Plus, Clock } from "lucide-react";
 import { BUDGET_LABELS } from "@/mocks/routes.mock";
@@ -90,6 +92,8 @@ export default async function MePage({ searchParams }: PageProps) {
   // Load user's routes
   const userRoutes = await listRoutesByUser(user.id).catch(() => []);
 
+  const birthdayParties = await listUserBirthdayParties(user.id);
+
   // Generate week dates for display
   const weekDates = Array.from({ length: 7 }, (_, i) => {
     const date = new Date(weekStart);
@@ -106,6 +110,9 @@ export default async function MePage({ searchParams }: PageProps) {
 
           {/* Children */}
           <ChildrenCard children={children} />
+
+          {/* Birthday parties */}
+          <MyBirthdaysCard parties={birthdayParties} />
 
           {/* Plan */}
           <PlanCard
