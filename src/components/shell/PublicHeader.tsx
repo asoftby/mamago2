@@ -35,7 +35,7 @@ export function PublicHeader() {
 
           {/* CENTER: Search Trigger */}
           <Link
-            href="/minsk"
+            href="/minsk/kuda"
             className={cn(
               "flex items-center gap-2 w-full",
               "px-4 py-2 rounded-full",

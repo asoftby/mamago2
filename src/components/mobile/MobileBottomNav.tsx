@@ -1,81 +1,110 @@
 "use client";
 
-import Link from "next/link";
+import { User } from "lucide-react";
 import { usePathname } from "next/navigation";
-import { Search, Calendar, User, Lightbulb } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useScrollDirection } from "@/hooks/useScrollDirection";
+import { useCity } from "@/contexts/CityContext";
+import { NavIconButton } from "@/components/mobile/NavIconButton";
+import { PlanPillNavButton } from "@/components/mobile/PlanPillNavButton";
 
-export function MobileBottomNav() {
+export type MobileBottomNavProps = {
+  /** true — в pill «Мой план» скрыть строку про пустой план (подключить из API) */
+  hasPlannedEvents?: boolean;
+  /** Planning / recommendations / confirmations — shown on «Мой план» */
+  planBadgeCount?: number;
+  /** Account / system — shown on profile */
+  profileBadgeCount?: number;
+  /** undefined / null = иконка профиля; string = фото из URL */
+  profileAvatarUrl?: string | null;
+};
+
+/**
+ * Premium floating glass bottom bar: Home (logo) · «Мой план» (core) · Profile.
+ * Routing matches previous 4-tab nav minus Ideas — Ideas stay reachable from header.
+ */
+export function MobileBottomNav({
+  hasPlannedEvents,
+  planBadgeCount = 0,
+  profileBadgeCount = 0,
+  profileAvatarUrl,
+}: MobileBottomNavProps) {
   const pathname = usePathname();
-  const { scrollDirection, isScrolled } = useScrollDirection(100);
+  const { citySlug } = useCity();
 
-  // Hide bottom nav when scrolling down, show when scrolling up or at top
-  const shouldHide = scrollDirection === "down" && isScrolled;
+  const resolvedProfileAvatar = profileAvatarUrl ? profileAvatarUrl : undefined;
 
-  const navItems = [
-    {
-      href: "/minsk",
-      icon: Search,
-      label: "Поиск",
-      isActive: pathname.startsWith("/minsk") || pathname === "/"
-    },
-    {
-      href: "/ideas", // или другой путь для идей
-      icon: Lightbulb,
-      label: "Идеи",
-      isActive: pathname.startsWith("/ideas")
-    },
-    {
-      href: "/me",
-      icon: Calendar,
-      label: "План",
-      isActive: pathname.startsWith("/me") && !pathname.startsWith("/me/profile")
-    },
-    {
-      href: "/profile",
-      icon: User,
-      label: "Профиль",
-      isActive: pathname.startsWith("/me/profile") || pathname.startsWith("/business") || pathname.startsWith("/admin")
-    }
-  ];
+  const homeHref = `/${citySlug}`;
+  const planHref = "/me";
+  const profileHref = "/profile";
+
+  const isHomeActive = pathname === homeHref;
+  const isPlanActive =
+    pathname.startsWith("/me") && !pathname.startsWith("/me/profile");
+  const isProfileActive =
+    pathname === "/profile" ||
+    pathname.startsWith("/profile/") ||
+    pathname.startsWith("/me/profile") ||
+    pathname.startsWith("/business") ||
+    pathname.startsWith("/admin");
 
   return (
-    <nav className={cn(
-      "fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-200 pb-[env(safe-area-inset-bottom)] transition-transform duration-300 ease-in-out",
-      shouldHide ? "translate-y-full" : "translate-y-0"
-    )}>
-      <div className="flex items-center justify-around px-2 py-2">
-        {navItems.map((item) => {
-          const Icon = item.icon;
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
+    <nav
+      className="pointer-events-none fixed bottom-0 left-0 right-0 z-40"
+      aria-label="Основная навигация"
+    >
+      {/* Safe area: bar floats above home indicator */}
+      <div
+        className={cn(
+          "pointer-events-auto mx-3 mb-[max(0.5rem,env(safe-area-inset-bottom))]",
+        )}
+      >
+        <div
+          className={cn(
+            "flex items-center gap-2 rounded-[28px] p-2 pl-2 pr-2",
+            /* Liquid glass: blur + translucency + thin edge + soft lift */
+            "border border-white/80 bg-white/65 shadow-[0_10px_40px_rgba(15,23,42,0.08)] backdrop-blur-2xl backdrop-saturate-150",
+          )}
+        >
+          <NavIconButton
+            href={homeHref}
+            isActive={isHomeActive}
+            ariaLabel="Главная"
+            isHomeLogo
+          />
+
+          <PlanPillNavButton
+            href={planHref}
+            isActive={isPlanActive}
+            badgeCount={planBadgeCount}
+            hasPlannedEvents={hasPlannedEvents ?? false}
+          />
+
+          <NavIconButton
+            href={profileHref}
+            isActive={isProfileActive}
+            ariaLabel="Профиль"
+            avatarUrl={resolvedProfileAvatar}
+            badgeCount={profileBadgeCount}
+          >
+            <span
               className={cn(
-                "flex flex-col items-center justify-center gap-1 px-3 py-2 rounded-lg transition-colors min-w-[60px]",
-                item.isActive
-                  ? "text-[#EF8759]"
-                  : "text-gray-500 hover:text-gray-700 active:bg-gray-100"
+                "flex h-[41px] w-[41px] shrink-0 items-center justify-center rounded-full transition-colors duration-200",
+                isProfileActive
+                  ? "bg-[#EF8759]/12"
+                  : "bg-neutral-100/95",
               )}
             >
-              <Icon 
+              <User
                 className={cn(
-                  "h-5 w-5 transition-all duration-200",
-                  item.isActive && "scale-110"
-                )} 
-              />
-              <span 
-                className={cn(
-                  "text-xs font-medium transition-all duration-200",
-                  item.isActive ? "text-[#EF8759] font-semibold" : "text-gray-500"
+                  "h-[26px] w-[26px] transition-colors duration-200",
+                  isProfileActive ? "text-[#EF8759]" : "text-neutral-500",
                 )}
-              >
-                {item.label}
-              </span>
-            </Link>
-          );
-        })}
+                strokeWidth={isProfileActive ? 1.35 : 1.2}
+                absoluteStrokeWidth
+              />
+            </span>
+          </NavIconButton>
+        </div>
       </div>
     </nav>
   );

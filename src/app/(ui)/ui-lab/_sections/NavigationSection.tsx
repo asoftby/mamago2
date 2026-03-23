@@ -7,7 +7,7 @@ import { RenderSafe } from "../_components/RenderSafe";
 
 export function NavigationSection() {
   return (
-    <DemoSection title="Navigation Components" description="src/components/navigation">
+    <DemoSection id="navigation" title="Navigation Components" description="src/components/navigation">
       <InventoryGrid>
         <RenderSafe title="ContextFilters" file="src/components/navigation/ContextFilters.tsx" listedOnly />
       </InventoryGrid>
