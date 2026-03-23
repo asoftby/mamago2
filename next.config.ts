@@ -3,6 +3,12 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   /* config options here */
   reactCompiler: true,
+
+  async redirects() {
+    return [
+      { source: "/birthday/builder", destination: "/minsk/birthday/make", permanent: true },
+    ];
+  },
   
   // Exclude sharp from client bundle (server-only image processing)
   serverExternalPackages: ['sharp'],

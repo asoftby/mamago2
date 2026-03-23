@@ -61,6 +61,14 @@ async function main() {
     { value: "high", label: "Высокая", order: 3 },
   ])
 
+  /** Birthday Builder + ranking: taxonomy `signals.age` (public API `/api/public/signals/age`) */
+  await upsertSignal("age", "Возраст", [
+    { value: "0-3", label: "0–3 года", order: 1 },
+    { value: "3-5", label: "3–5 лет", order: 2 },
+    { value: "5-8", label: "6–10 лет", order: 3 },
+    { value: "8-12", label: "10+ лет", order: 4 },
+  ])
+
   // Filters
   console.log('Seeding Filters...')
   await upsertFilter("when", "Когда", "single", "tabs", [
