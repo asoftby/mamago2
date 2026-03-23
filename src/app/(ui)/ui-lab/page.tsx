@@ -21,7 +21,7 @@ export default function UiLabPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="text-foreground">
       <div className="container mx-auto px-4 py-12 max-w-7xl">
         <header className="mb-12 space-y-4">
           <div className="inline-block rounded-md bg-destructive/10 px-3 py-1 text-sm font-medium text-destructive">
@@ -38,7 +38,7 @@ export default function UiLabPage() {
           </div>
         </header>
 
-        <main className="space-y-16 pb-32">
+        <div className="space-y-16 pb-8 [&_section]:scroll-mt-36">
           <HeaderSection />
           <UiPrimitivesSection />
           <FiltersSection />
@@ -54,7 +54,7 @@ export default function UiLabPage() {
           <DateTimePickerSection />
           <ChildrenSystemSection />
           <ArticlePublicationSection />
-        </main>
+        </div>
       </div>
     </div>
   );

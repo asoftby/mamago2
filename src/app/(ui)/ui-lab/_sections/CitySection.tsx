@@ -7,7 +7,7 @@ import { RenderSafe } from "../_components/RenderSafe";
 
 export function CitySection() {
   return (
-    <DemoSection title="City Components" description="src/components/city">
+    <DemoSection id="city" title="City Components" description="src/components/city">
       <InventoryGrid>
         <RenderSafe title="DiscoveryIntentTabs" file="src/components/city/DiscoveryIntentTabs.tsx" listedOnly />
         <RenderSafe title="CityDiscoveryShell" file="src/components/city/CityDiscoveryShell.tsx" listedOnly />

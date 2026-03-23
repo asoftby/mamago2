@@ -9,7 +9,7 @@ import { BreakingNewsRow } from "@/components/news/BreakingNewsRow";
 
 export function NewsSection() {
   return (
-    <DemoSection title="News Components" description="src/components/news">
+    <DemoSection id="news" title="News Components" description="src/components/news">
       <InventoryGrid>
         <RenderSafe title="BreakingNewsRow" file="src/components/news/BreakingNewsRow.tsx">
            <BreakingNewsRow items={[{ 

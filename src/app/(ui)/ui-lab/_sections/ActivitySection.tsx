@@ -21,7 +21,7 @@ export function ActivitySection() {
   };
 
   return (
-    <DemoSection title="Activity Components" description="src/components/activity">
+    <DemoSection id="activity" title="Activity Components" description="src/components/activity">
       <InventoryGrid>
         <RenderSafe title="ActivityCard with SaveToPlanModal" file="src/components/activity/ActivityCard.tsx">
           <div className="grid grid-cols-2 gap-4 md:grid-cols-1 md:gap-6">

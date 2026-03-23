@@ -28,7 +28,11 @@ import { MediaCover } from "@/components/ui/media-cover";
 
 export function UiPrimitivesSection() {
   return (
-    <DemoSection title="UI Primitives" description="Core building blocks from src/components/ui">
+    <DemoSection
+      id="ui-primitives"
+      title="UI Primitives"
+      description="Core building blocks from src/components/ui"
+    >
       <InventoryGrid>
         <RenderSafe title="Button" file="src/components/ui/button.tsx">
           <div className="flex gap-2 flex-wrap">

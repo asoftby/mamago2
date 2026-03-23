@@ -9,7 +9,7 @@ import { FilterMasonryMenu } from "@/components/discovery/FilterMasonryMenu";
 
 export function DiscoverySection() {
   return (
-    <DemoSection title="Discovery Components" description="src/components/discovery">
+    <DemoSection id="discovery" title="Discovery Components" description="src/components/discovery">
       <InventoryGrid>
         <RenderSafe title="DropdownChip" file="src/components/discovery/DropdownChip.tsx" listedOnly />
         <RenderSafe title="MobileFilterSheet" file="src/components/discovery/MobileFilterSheet.tsx" listedOnly />

@@ -1,4 +1,18 @@
+import React, { Suspense } from "react";
+import { CityProvider } from "@/contexts/CityContext";
 import { SiteHeaderDesktop, SiteHeaderMobile } from "@/components/site/header";
+
+function HeaderWithCity({ children }: { children: React.ReactNode }) {
+  return (
+    <Suspense
+      fallback={
+        <div className="h-[180px] animate-pulse rounded-lg bg-muted/30 lg:h-[220px]" />
+      }
+    >
+      <CityProvider>{children}</CityProvider>
+    </Suspense>
+  );
+}
 
 export function HeaderSection() {
   return (
@@ -6,14 +20,14 @@ export function HeaderSection() {
       <div>
         <h2 className="text-3xl font-bold tracking-tight mb-2">Site Header</h2>
         <p className="text-muted-foreground">
-          Responsive header with separate Desktop and Mobile implementations.
-          City label visible on both versions.
+          На экранах &lt; lg — мобильный хедер, от lg — десктопный (как в{" "}
+          <code className="text-xs">SiteHeader</code>).
         </p>
       </div>
 
       <div className="space-y-12">
-        {/* Desktop Header */}
-        <div className="space-y-4">
+        {/* Desktop Header — только lg+ (как в SiteHeader: иначе на узких экранах виден fixed desktop shell) */}
+        <div className="hidden lg:block space-y-4">
           <div>
             <h3 className="text-xl font-semibold mb-1">Desktop Header</h3>
             <p className="text-sm text-muted-foreground">
@@ -21,12 +35,14 @@ export function HeaderSection() {
             </p>
           </div>
           <div className="border rounded-lg overflow-hidden">
-            <SiteHeaderDesktop />
+            <HeaderWithCity>
+              <SiteHeaderDesktop />
+            </HeaderWithCity>
           </div>
         </div>
 
-        {/* Mobile Header */}
-        <div className="space-y-4">
+        {/* Mobile Header — только &lt; lg */}
+        <div className="block lg:hidden space-y-4">
           <div>
             <h3 className="text-xl font-semibold mb-1">Mobile Header</h3>
             <p className="text-sm text-muted-foreground">
@@ -34,12 +50,14 @@ export function HeaderSection() {
             </p>
           </div>
           <div className="border rounded-lg overflow-hidden max-w-[390px]">
-            <SiteHeaderMobile />
+            <HeaderWithCity>
+              <SiteHeaderMobile />
+            </HeaderWithCity>
           </div>
         </div>
 
-        {/* Long City Name Test */}
-        <div className="space-y-4">
+        {/* Long City Name Test — только &lt; lg */}
+        <div className="block lg:hidden space-y-4">
           <div>
             <h3 className="text-xl font-semibold mb-1">Long City Name Test</h3>
             <p className="text-sm text-muted-foreground">

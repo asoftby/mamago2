@@ -44,7 +44,7 @@ export function ChildrenSystemSection() {
   const [showMockData, setShowMockData] = useState(false);
 
   return (
-    <div className="space-y-6">
+    <section id="children" className="space-y-6 py-8 border-b border-border/40">
       <div>
         <H2>Children Management System</H2>
         <BodyMuted>
@@ -115,6 +115,6 @@ export function ChildrenSystemSection() {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
       />
-    </div>
+    </section>
   );
 }

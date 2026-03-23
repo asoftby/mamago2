@@ -12,7 +12,7 @@ import { minskActivitiesFilters } from "@/features/filters/presets/minskActiviti
 
 export function FiltersSection() {
   return (
-    <DemoSection title="Filters" description="Filter components and new Feature Filters">
+    <DemoSection id="filters" title="Filters" description="Filter components and new Feature Filters">
       <InventoryGrid>
         <RenderSafe title="FilterPill" file="src/features/filters/ui/FilterPill.tsx">
           <div className="flex gap-2">

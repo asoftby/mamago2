@@ -7,7 +7,7 @@ import { RenderSafe } from "../_components/RenderSafe";
 
 export function ShellSection() {
   return (
-    <DemoSection title="Shell Components" description="src/components/shell">
+    <DemoSection id="shell" title="Shell Components" description="src/components/shell">
       <InventoryGrid>
         <RenderSafe title="PublicHeader" file="src/components/shell/PublicHeader.tsx" listedOnly />
         <RenderSafe title="PublicFooter" file="src/components/shell/PublicFooter.tsx" listedOnly />
