@@ -24,6 +24,7 @@ export function WizardHeader({
     PUBLISHED: "Опубликовано",
     NEEDS_REVISION: "Требует изменений",
     REJECTED: "Отклонено",
+    DELETED: "Удалено",
   };
 
   return (

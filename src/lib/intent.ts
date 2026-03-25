@@ -18,12 +18,56 @@ export const INTENT_ITEMS: IntentItem[] = DISCOVERY_INTENT_ITEMS.map(config => (
 /** Список городов с городским хабом `/{city}` */
 export const VALID_CITY_SLUGS = ["minsk"] as const;
 
+/** Главная страница текущего города-флагмана (первый slug в `VALID_CITY_SLUGS`) */
+export const DEFAULT_CITY_HUB_PATH = `/${VALID_CITY_SLUGS[0]}`;
+
 export type CitySlug = (typeof VALID_CITY_SLUGS)[number];
 
 export function isCityHubPath(pathname: string | null): boolean {
   if (!pathname) return false;
   const segments = pathname.split("/").filter(Boolean);
   return segments.length === 1 && VALID_CITY_SLUGS.includes(segments[0] as CitySlug);
+}
+
+/** Карточка публикации (активность/событие): `/{city}/activity/{id}` */
+export function isPublicationDetailPath(pathname: string | null): boolean {
+  if (!pathname) return false;
+  const segments = pathname.split("/").filter(Boolean);
+  return segments.length >= 3 && segments[1] === "activity";
+}
+
+/**
+ * Страницы контента публикаций — без фиксированного mobile bottom bar
+ * (статья, место, маршрут, событие, короткая ссылка).
+ */
+export function shouldHideMobileBottomNav(pathname: string | null): boolean {
+  if (!pathname) return false;
+  const segments = pathname.split("/").filter(Boolean);
+  if (segments.length < 2) return false;
+
+  if (segments[0] === "blog") return true;
+  if (segments[0] === "places") return true;
+  if (segments[0] === "p") return true;
+  if (segments[0] === "routes" && segments[1] !== "new") return true;
+
+  return isPublicationDetailPath(pathname);
+}
+
+/**
+ * Какой раздел discovery связан со страницей публикации (для подстановки сохранённых фильтров).
+ */
+export function getDiscoveryIntentForPublicationPath(
+  pathname: string | null,
+): Intent | null {
+  if (!pathname) return null;
+  const s = pathname.split("/").filter(Boolean);
+  if (s.length < 2) return null;
+  if (s[0] === "blog") return "kuda";
+  if (s[0] === "places") return "kuda";
+  if (s[0] === "p") return "kuda";
+  if (s[0] === "routes" && s[1] !== "new") return "routes";
+  if (s.length >= 3 && s[1] === "activity") return "kuda";
+  return null;
 }
 
 export function getIntentFromPath(pathname: string | null): Intent | null {

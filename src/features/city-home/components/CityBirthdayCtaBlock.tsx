@@ -27,10 +27,10 @@ export function CityBirthdayCtaBlock({
           </div>
           <div className="min-w-0">
             <h2 className="text-base font-semibold text-neutral-900 leading-tight">
-              Организовать день рождения за 5 минут
+              Организовать день рождения за 10 минут
             </h2>
             <p className="text-sm text-neutral-600 mt-1 leading-snug">
-              Площадка, развлечения и торт — в одном конструкторе
+              Площадка, анимация, торт, декор и другие штуковины — в одном конструкторе легко и просто
             </p>
           </div>
         </div>

@@ -10,6 +10,7 @@ import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
 import { PlaceImageKind } from "@prisma/client";
 import { getOrCreatePlaceRevision } from "@/server/services/placeRevision.service";
+import { canCreateBusinessContent, canManageOwnedContent } from "@/lib/auth/businessContentAccess";
 
 /**
  * POST - Add image to place revision
@@ -21,7 +22,7 @@ export async function POST(
   try {
     const user = await getCurrentUser();
 
-    if (!user || user.role !== "BUSINESS_OWNER") {
+    if (!user || !canCreateBusinessContent(user.role)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -40,7 +41,7 @@ export async function POST(
       return NextResponse.json({ error: "Place not found" }, { status: 404 });
     }
 
-    if (place.ownerUserId !== user.id) {
+    if (!canManageOwnedContent(user, place.ownerUserId)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
@@ -72,7 +73,7 @@ export async function POST(
     }
 
     // Get or create revision
-    const revision = await getOrCreatePlaceRevision(placeId, user.id);
+    const revision = await getOrCreatePlaceRevision(placeId, user);
 
     // If kind is LOGO, remove existing logo from revision
     if (kind === "LOGO") {
@@ -152,7 +153,7 @@ export async function DELETE(
   try {
     const user = await getCurrentUser();
 
-    if (!user || user.role !== "BUSINESS_OWNER") {
+    if (!user || !canCreateBusinessContent(user.role)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -180,7 +181,7 @@ export async function DELETE(
       return NextResponse.json({ error: "Place not found" }, { status: 404 });
     }
 
-    if (place.ownerUserId !== user.id) {
+    if (!canManageOwnedContent(user, place.ownerUserId)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
@@ -193,7 +194,7 @@ export async function DELETE(
     }
 
     // Get revision
-    const revision = await getOrCreatePlaceRevision(placeId, user.id);
+    const revision = await getOrCreatePlaceRevision(placeId, user);
 
     // Check if image belongs to this revision
     const image = await prisma.placeRevisionImage.findUnique({

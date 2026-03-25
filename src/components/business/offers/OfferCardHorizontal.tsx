@@ -144,7 +144,7 @@ export function OfferCardHorizontal({
           {/* Actions */}
           <div className="flex items-center gap-2">
             <Link
-              href={`/business/offers/${offer.id}/edit`}
+              href={`/editor/offer/${offer.id}/edit`}
               className="inline-flex items-center gap-1 px-3 py-1.5 text-sm text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors"
             >
               <Pencil className="w-4 h-4" />

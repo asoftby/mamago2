@@ -1,40 +1,30 @@
-import { getCurrentUser } from "@/lib/auth/server";
-import { redirect } from "next/navigation";
-import prisma from "@/lib/prisma";
-import { OfferWizard } from "@/components/business/wizard/offer/OfferWizard";
+/**
+ * Legacy URL — create flow lives in the isolated content editor.
+ */
 
-export default async function NewOfferPage() {
+import { redirect } from "next/navigation";
+import { getCurrentUser } from "@/lib/auth/server";
+import { canCreateBusinessContent } from "@/lib/auth/businessContentAccess";
+
+export default async function NewOfferPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const user = await getCurrentUser();
-  
-  if (!user || user.role !== "BUSINESS_OWNER") {
+
+  if (!user || !canCreateBusinessContent(user.role)) {
     redirect("/business/login");
   }
 
-  // Verify user has a business
-  const business = await prisma.business.findUnique({
-    where: { ownerUserId: user.id },
-    select: {
-      id: true,
-      name: true,
-      phone: true,
-    },
-  });
-
-  if (!business) {
-    console.warn(`User ${user.email} has BUSINESS_OWNER role but no Business entity`);
-    redirect("/business/onboarding");
+  const sp = await searchParams;
+  const qs = new URLSearchParams();
+  if (sp.returnTo && typeof sp.returnTo === "string") {
+    qs.set("returnTo", sp.returnTo);
   }
-
-  return (
-    <OfferWizard
-      mode="create"
-      userId={user.id}
-      userRole="BUSINESS_OWNER"
-      business={{
-        id: business.id,
-        name: business.name,
-        phone: business.phone || undefined,
-      }}
-    />
-  );
+  if (sp.placeId && typeof sp.placeId === "string") {
+    qs.set("placeId", sp.placeId);
+  }
+  const q = qs.toString();
+  redirect(`/editor/offer/new${q ? `?${q}` : ""}`);
 }

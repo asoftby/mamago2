@@ -72,7 +72,7 @@ export function Step4DateTime({ data, onChange, isEditable }: Step4DateTimeProps
     <div className="space-y-6">
       <div>
         <h2 className="text-xl font-semibold mb-2">Дата и время</h2>
-        <p className="text-sm text-muted-foreground">
+        <p className="text-[12px] text-muted-foreground">
           Укажите даты проведения и расписание события
         </p>
       </div>

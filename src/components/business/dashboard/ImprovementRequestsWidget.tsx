@@ -256,7 +256,7 @@ export function ImprovementRequestsWidget() {
                     variant={urgency?.urgent ? "default" : "outline"}
                     className={urgency?.urgent ? "bg-amber-600 hover:bg-amber-700" : ""}
                   >
-                    <Link href={`/business/places/${request.entityId}/edit`}>
+                    <Link href={`/editor/place/${request.entityId}/edit`}>
                       Исправить
                     </Link>
                   </Button>

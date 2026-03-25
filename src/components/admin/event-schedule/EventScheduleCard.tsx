@@ -291,10 +291,11 @@ export function EventScheduleCard({
                     item.isMultiDay ? "flex" : ""
                   )}>
                     <div className={cn(
-                      "p-6 bg-white",
+                      "bg-white p-3 sm:p-4",
                       item.isMultiDay ? "flex-1 border-r border-gray-200" : "w-full"
                     )}>
                       <Calendar
+                        size="compact"
                         value={selectedDate}
                         onChange={handleDateSelect}
                         disablePast={true}
@@ -304,8 +305,9 @@ export function EventScheduleCard({
                       />
                     </div>
                     {item.isMultiDay && (
-                      <div className="flex-1 p-6 bg-white">
+                      <div className="flex-1 bg-white p-3 sm:p-4">
                         <Calendar
+                          size="compact"
                           value={null}
                           onChange={handleDateSelect}
                           disablePast={true}
@@ -320,8 +322,8 @@ export function EventScheduleCard({
                   
                   {/* Save button for multi-day mode */}
                   {item.isMultiDay && tempStartDate && (
-                    <div className="border-t border-gray-200 p-4 bg-white flex items-center justify-between">
-                      <div className="text-sm text-gray-600">
+                    <div className="border-t border-gray-200 bg-white p-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="text-xs text-gray-600 sm:text-sm">
                         {tempEndDate ? (
                           <span>
                             {tempStartDate.getDate()} {getShortMonth(tempStartDate)}
@@ -363,7 +365,7 @@ export function EventScheduleCard({
           {/* All-day Switch */}
           <div className="flex items-center justify-between">
             <Label htmlFor={`allday-${item.id}`} className="text-sm font-normal text-gray-700">
-              All-day event
+              Весь день
             </Label>
             <Switch
               id={`allday-${item.id}`}
@@ -404,7 +406,7 @@ export function EventScheduleCard({
           {/* Recurring Switch */}
           <div className="flex items-center justify-between pt-2 border-t border-gray-100">
             <Label htmlFor={`recurring-${item.id}`} className="text-sm font-normal text-gray-700">
-              Recurring event?
+              Повторять?
             </Label>
             <Switch
               id={`recurring-${item.id}`}
@@ -435,7 +437,7 @@ export function EventScheduleCard({
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor={`unit-${item.id}`} className="text-sm font-medium text-gray-900">
-                    Period
+                    Период
                   </Label>
                   <Select
                     value={item.recurrenceUnit}
@@ -485,8 +487,9 @@ export function EventScheduleCard({
                     sideOffset={4}
                     style={{ width: 'var(--radix-popover-trigger-width)' }}
                   >
-                    <div className="p-6 bg-white">
+                    <div className="bg-white p-3 sm:p-4">
                       <Calendar
+                        size="compact"
                         value={untilDate}
                         onChange={handleUntilDateSelect}
                         disablePast={true}

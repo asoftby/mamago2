@@ -113,7 +113,7 @@ function GalleryItemContent({
   index: number;
   onRemove: (id: string) => void;
   showDragHandle: boolean;
-  dragHandleProps?: any;
+  dragHandleProps?: Record<string, unknown>;
 }) {
   if (image.status === "uploading") {
     return (
@@ -173,6 +173,27 @@ export function Step3Media({ data, onChange, isEditable, wizardSessionId }: Step
   const [isMounted, setIsMounted] = useState(false);
   
   const hasInitialized = useRef(false);
+
+  const UPLOAD_TIMEOUT_MS = 120_000;
+
+  function withUploadTimeout<T>(p: Promise<T>, label: string): Promise<T> {
+    return new Promise((resolve, reject) => {
+      const t = setTimeout(
+        () => reject(new Error(`${label}: превышено время ожидания`)),
+        UPLOAD_TIMEOUT_MS,
+      );
+      p.then(
+        (v) => {
+          clearTimeout(t);
+          resolve(v);
+        },
+        (e) => {
+          clearTimeout(t);
+          reject(e);
+        },
+      );
+    });
+  }
 
   const { uploadImage } = useImageUpload({
     maxSizeMB: 5,
@@ -242,21 +263,27 @@ export function Step3Media({ data, onChange, isEditable, wizardSessionId }: Step
     setIsUploadingCover(true);
 
     try {
-      const uploadedImage = await uploadImage(file);
+      const uploadedImage = await withUploadTimeout(
+        uploadImage(file),
+        "Обложка",
+      );
       
       if (!uploadedImage) {
         throw new Error("Failed to upload image");
       }
 
-      // TODO: Save to temp media or get media ID
-      const mediaId = `temp-${Date.now()}`;
-      
+      // `/api/media/[filename]` ищет медиа по `filename` в `mediaAsset`.
+      // В url от `/api/upload` формат: `/uploads/<filename>`.
+      const filename = uploadedImage.url.split("/").pop() || uploadedImage.id;
+
       setCoverPreview(uploadedImage.url);
-      onChange({ coverImage: mediaId });
+      onChange({ coverImage: filename });
       toast.success("Обложка загружена");
     } catch (error) {
       console.error("Cover upload error:", error);
-      toast.error("Ошибка загрузки");
+      toast.error(
+        error instanceof Error ? error.message : "Ошибка загрузки обложки",
+      );
     } finally {
       setIsUploadingCover(false);
     }
@@ -320,25 +347,31 @@ export function Step3Media({ data, onChange, isEditable, wizardSessionId }: Step
 
     setGalleryItems((prev) => [...prev, ...placeholders]);
 
+    // Prevent closure issues: accumulate into local variable and write once per upload.
+    let nextGallery = [...data.gallery];
+
     for (let i = 0; i < validFiles.length; i++) {
       const file = validFiles[i];
       const placeholderId = placeholders[i].id;
 
       try {
-        const uploadedImage = await uploadImage(file);
+        const uploadedImage = await withUploadTimeout(
+          uploadImage(file),
+          file.name,
+        );
 
         if (!uploadedImage) {
           throw new Error("Failed to upload image");
         }
 
-        // TODO: Save to temp media or get media ID
-        const mediaId = `media-${Date.now()}-${i}`;
+        // Use real filename (so `/api/media/[filename]` works after reload).
+        const filename = uploadedImage.url.split("/").pop() || uploadedImage.id;
 
         setGalleryItems((prev) =>
           prev.map((img) =>
             img.id === placeholderId
               ? {
-                  id: mediaId,
+                  id: filename,
                   url: uploadedImage.url,
                   status: "done" as const,
                 }
@@ -348,8 +381,9 @@ export function Step3Media({ data, onChange, isEditable, wizardSessionId }: Step
 
         // Update parent state
         onChange({ 
-          gallery: [...data.gallery, mediaId]
+          gallery: [...nextGallery, filename]
         });
+        nextGallery = [...nextGallery, filename];
       } catch (error) {
         console.error("Gallery upload error:", error);
         
@@ -403,7 +437,7 @@ export function Step3Media({ data, onChange, isEditable, wizardSessionId }: Step
     <div className="space-y-6">
       <div>
         <h2 className="text-xl font-semibold mb-2">Медиа</h2>
-        <p className="text-sm text-muted-foreground">
+        <p className="text-[12px] text-muted-foreground">
           Добавьте фотографии и видео события
         </p>
       </div>
@@ -413,7 +447,7 @@ export function Step3Media({ data, onChange, isEditable, wizardSessionId }: Step
         <h3 className="text-sm font-medium mb-2">
           Главное изображение <span className="text-red-500">*</span>
         </h3>
-        <p className="text-sm text-muted-foreground mb-3">
+        <p className="text-[12px] text-muted-foreground mb-3">
           Добавьте обложку или главное фото вашего события
         </p>
         
@@ -462,14 +496,14 @@ export function Step3Media({ data, onChange, isEditable, wizardSessionId }: Step
                   </button>
                 )}
               </div>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-[12px] text-muted-foreground">
                 Перетащите логотип сюда или нажмите для загрузки
               </p>
             </div>
           ) : (
             <div className="space-y-3">
               <Upload className="mx-auto h-12 w-12 text-gray-400" />
-              <p className="text-sm text-gray-600">
+              <p className="text-[12px] text-gray-600">
                 Перетащите логотип сюда или нажмите для загрузки
               </p>
             </div>
@@ -480,7 +514,7 @@ export function Step3Media({ data, onChange, isEditable, wizardSessionId }: Step
       {/* Gallery */}
       <div>
         <h3 className="text-sm font-medium mb-2">Галерея</h3>
-        <p className="text-sm text-muted-foreground mb-3">
+        <p className="text-[12px] text-muted-foreground mb-3">
           Добавьте дополнительные фотографии (необязательно)
         </p>
 
@@ -507,10 +541,10 @@ export function Step3Media({ data, onChange, isEditable, wizardSessionId }: Step
           <div className="space-y-3">
             <Upload className="mx-auto h-10 w-10 text-gray-400" />
             <div>
-              <p className="text-sm text-gray-600">
+              <p className="text-[12px] text-gray-600">
                 Перетащите фотографии сюда или нажмите для загрузки
               </p>
-              <p className="text-xs text-muted-foreground mt-1">
+              <p className="text-[12px] text-muted-foreground mt-1">
                 Можно загрузить несколько фото сразу
               </p>
             </div>
@@ -564,8 +598,9 @@ export function Step3Media({ data, onChange, isEditable, wizardSessionId }: Step
           onChange={(e) => onChange({ reelsUrl: e.target.value })}
           placeholder="https://youtube.com/... или https://instagram.com/..."
           disabled={!isEditable}
+          className="!text-[13px]"
         />
-        <p className="text-xs text-muted-foreground mt-2">
+        <p className="text-[12px] text-muted-foreground mt-2">
           Добавьте ссылку на видео о событии
         </p>
       </div>

@@ -1,7 +1,7 @@
 // Event Wizard Configuration
 
 export const WIZARD_STEPS = [
-  { id: 1, key: "basics", label: "Основное" },
+  { id: 1, key: "basics", label: "Основная информация" },
   { id: 2, key: "description", label: "Описание" },
   { id: 3, key: "media", label: "Медиа" },
   { id: 4, key: "datetime", label: "Дата и время" },

@@ -42,6 +42,62 @@ function haversineMeters(
   return distanceKm * 1000; // Convert to meters
 }
 
+function extractNamedComponentFromAddressJson(
+  addressJson: unknown,
+  acceptedTypes: string[]
+): string | null {
+  if (!Array.isArray(addressJson)) return null;
+
+  for (const component of addressJson) {
+    const comp = component as Record<string, unknown>;
+    const types = comp?.types;
+    if (!Array.isArray(types)) continue;
+
+    const matched = types.some((t: unknown) => typeof t === "string" && acceptedTypes.includes(t));
+    if (!matched) continue;
+
+    const longName = comp?.long_name;
+    if (typeof longName === "string" && longName.trim().length > 0) {
+      return longName.trim();
+    }
+  }
+
+  return null;
+}
+
+function extractDistrictNameFromAddressJson(addressJson: unknown): string | null {
+  // Google often uses sublocality for district-like entities.
+  return extractNamedComponentFromAddressJson(addressJson, [
+    "sublocality",
+    "sublocality_level_1",
+    "administrative_area_level_3",
+  ]);
+}
+
+function extractMetroNameFromAddressJson(addressJson: unknown): string | null {
+  return extractNamedComponentFromAddressJson(addressJson, [
+    "transit_station",
+    "subway_station",
+    "train_station",
+    "station",
+    "bus_station",
+    "bus_stop",
+    "light_rail_station",
+    "railway_station",
+    "stop",
+  ]);
+}
+
+function normalizeNameForMatch(input: string): string {
+  return input
+    .toLowerCase()
+    .replace(/[.,/#!$%^&*;:{}=_`~()]/g, " ")
+    .replace(/\s+/g, " ")
+    .replace(/\bрайон\b/g, " ")
+    .replace(/\bр-?\s*н\b/g, " ")
+    .trim();
+}
+
 /**
  * Find nearest district by centroid
  */
@@ -113,11 +169,9 @@ async function computeNearestMetro(
   lng: number
 ): Promise<{ metroStationId: string; metroName: string; distanceM: number } | null> {
   try {
-    // Check if city has metro
     const city = await prisma.city.findUnique({
       where: { id: cityId },
       select: {
-        hasMetro: true,
         metroMaxDistanceM: true,
         name: true,
       },
@@ -127,13 +181,8 @@ async function computeNearestMetro(
       console.log(`[enrich-location] City ${cityId} not found`);
       return null;
     }
-
-    if (!city.hasMetro) {
-      console.log(`[enrich-location] City ${city.name} has no metro`);
-      return null;
-    }
-
-    const maxDistance = city.metroMaxDistanceM || METRO_SEARCH_RADIUS_METERS;
+    // Some cities might have `metroMaxDistanceM` unset/falsey; use nullish coalescing.
+    const maxDistance = city.metroMaxDistanceM ?? METRO_SEARCH_RADIUS_METERS;
 
     // Get all metro stations for the city
     const stations = await prisma.metroStation.findMany({
@@ -227,14 +276,138 @@ export async function POST(req: NextRequest) {
       computeNearestMetro(cityResult.cityId, lat, lng),
     ]);
 
+    // Fallback: if we couldn't compute by coordinates, try extracting from `address_components`.
+    // This helps when district centroids / metro station coordinates data is incomplete.
+    let districtAutoId = districtResult?.districtId ?? null;
+    let districtName = districtResult?.districtName ?? null;
+
+    let metroAutoId = metroResult?.metroStationId ?? null;
+    let metroName = metroResult?.metroName ?? null;
+    let metroAutoDistanceM = metroResult?.distanceM ?? null;
+
+    if (!districtAutoId) {
+      const districtNameFromAddress = extractDistrictNameFromAddressJson(addressJson);
+      if (districtNameFromAddress) {
+        console.log("[enrich-location] Fallback districtNameFromAddress:", districtNameFromAddress);
+
+        const allDistricts = await prisma.district.findMany({
+          where: { cityId: cityResult.cityId },
+          select: { id: true, name: true },
+        });
+
+        const normalizedTarget = normalizeNameForMatch(districtNameFromAddress);
+        const districtByName =
+          allDistricts.find((d) => normalizeNameForMatch(d.name) === normalizedTarget) ||
+          allDistricts.find((d) => normalizeNameForMatch(d.name).includes(normalizedTarget) || normalizedTarget.includes(normalizeNameForMatch(d.name)));
+
+        if (districtByName) {
+          districtAutoId = districtByName.id;
+          districtName = districtByName.name;
+          console.log("[enrich-location] Fallback matched district:", { districtAutoId, districtName });
+        } else {
+          console.log("[enrich-location] Fallback district not matched in DB");
+        }
+      }
+    }
+
+    if (!metroAutoId) {
+      const metroNameFromAddress = extractMetroNameFromAddressJson(addressJson);
+      const allStations = await prisma.metroStation.findMany({
+        where: { cityId: cityResult.cityId },
+        select: { id: true, name: true, lat: true, lng: true },
+      });
+
+      const matchByTargetNormalized = (normalizedTarget: string) => {
+        if (!normalizedTarget) return null;
+
+        const normalizedStations = allStations.map((s) => ({
+          ...s,
+          normalizedName: normalizeNameForMatch(s.name),
+        }));
+
+        // Score: exact match wins; otherwise, use includes by match length.
+        let best: (typeof normalizedStations)[number] | null = null;
+        let bestScore = -1;
+
+        for (const s of normalizedStations) {
+          if (s.normalizedName === normalizedTarget) {
+            return s;
+          }
+
+          const a = s.normalizedName;
+          const b = normalizedTarget;
+
+          const aIncludesB = a.includes(b);
+          const bIncludesA = b.includes(a);
+
+          if (aIncludesB || bIncludesA) {
+            const len = Math.max(a.length, b.length);
+            const score = len + (aIncludesB ? 10 : 0) + (bIncludesA ? 5 : 0);
+            if (score > bestScore) {
+              bestScore = score;
+              best = s;
+            }
+          }
+        }
+
+        return best;
+      };
+
+      const tryExtracted = metroNameFromAddress ? normalizeNameForMatch(metroNameFromAddress) : null;
+      if (metroNameFromAddress) {
+        console.log("[enrich-location] Fallback metroNameFromAddress:", metroNameFromAddress);
+      }
+
+      let metroByName =
+        tryExtracted && matchByTargetNormalized(tryExtracted) ? matchByTargetNormalized(tryExtracted) : null;
+
+      // If types-based extraction didn't work, fall back to matching ANY `long_name` candidates from address_components.
+      if (!metroByName) {
+        const candidates: string[] = [];
+        if (Array.isArray(addressJson)) {
+          for (const component of addressJson) {
+            const comp = component as Record<string, unknown>;
+            const longName = comp?.long_name;
+            if (typeof longName === "string") {
+              const normalized = normalizeNameForMatch(longName);
+              if (normalized.length >= 3) candidates.push(longName);
+            }
+          }
+        }
+
+        // Try candidates in order; first strong match wins.
+        for (const candidate of candidates.slice(0, 20)) {
+          const normalizedTarget = normalizeNameForMatch(candidate);
+          metroByName = matchByTargetNormalized(normalizedTarget);
+          if (metroByName) {
+            console.log("[enrich-location] Fallback matched metro by long_name candidate:", {
+              candidate,
+              metroAutoId: metroByName.id,
+              metroName: metroByName.name,
+            });
+            break;
+          }
+        }
+      }
+
+      if (metroByName) {
+        metroAutoId = metroByName.id;
+        metroName = metroByName.name;
+        metroAutoDistanceM = Math.round(haversineMeters(lat, lng, metroByName.lat, metroByName.lng));
+        console.log("[enrich-location] Fallback matched metro:", { metroAutoId, metroName, metroAutoDistanceM });
+      } else {
+        console.log("[enrich-location] Fallback metro not matched in DB");
+      }
+    }
+
     const response = {
       cityId: cityResult.cityId,
       cityName: cityResult.cityName,
-      districtAutoId: districtResult?.districtId || null,
-      districtName: districtResult?.districtName || null,
-      metroAutoId: metroResult?.metroStationId || null,
-      metroName: metroResult?.metroName || null,
-      metroAutoDistanceM: metroResult?.distanceM || null,
+      districtAutoId,
+      districtName,
+      metroAutoId,
+      metroName,
+      metroAutoDistanceM,
     };
 
     console.log("[enrich-location] ✅ Enrichment complete:", response);

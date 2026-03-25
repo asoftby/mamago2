@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
 import { getActiveRevision } from "@/server/services/placeRevision.service";
+import { canCreateBusinessContent, canManageOwnedContent } from "@/lib/auth/businessContentAccess";
 
 export async function GET(
   request: NextRequest,
@@ -15,7 +16,7 @@ export async function GET(
 ) {
   try {
     const user = await getCurrentUser();
-    if (!user || user.role !== "BUSINESS_OWNER") {
+    if (!user || !canCreateBusinessContent(user.role)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -87,7 +88,7 @@ export async function GET(
     }
 
     // Check ownership
-    if (place.ownerUserId !== user.id) {
+    if (!canManageOwnedContent(user, place.ownerUserId)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
@@ -120,7 +121,7 @@ export async function PATCH(
 ) {
   try {
     const user = await getCurrentUser();
-    if (!user || user.role !== "BUSINESS_OWNER") {
+    if (!user || !canCreateBusinessContent(user.role)) {
       return NextResponse.json(
         { error: "UNAUTHORIZED", message: "Authentication required" },
         { status: 401 }
@@ -152,7 +153,7 @@ export async function PATCH(
       );
     }
 
-    if (existing.ownerUserId !== user.id) {
+    if (!canManageOwnedContent(user, existing.ownerUserId)) {
       return NextResponse.json(
         { error: "FORBIDDEN", message: "You don't have access to this place" },
         { status: 403 }
@@ -221,7 +222,7 @@ export async function DELETE(
 ) {
   try {
     const user = await getCurrentUser();
-    if (!user || user.role !== "BUSINESS_OWNER") {
+    if (!user || !canCreateBusinessContent(user.role)) {
       return NextResponse.json(
         { error: "UNAUTHORIZED", message: "Authentication required" },
         { status: 401 }
@@ -250,7 +251,7 @@ export async function DELETE(
       );
     }
 
-    if (existing.ownerUserId !== user.id) {
+    if (!canManageOwnedContent(user, existing.ownerUserId)) {
       return NextResponse.json(
         { error: "FORBIDDEN", message: "You don't have access to this place" },
         { status: 403 }

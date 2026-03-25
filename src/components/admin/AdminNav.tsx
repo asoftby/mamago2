@@ -3,12 +3,25 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
+import {
+  MODERATION_NAV_ITEMS,
+  moderationItemHref,
+  type ModerationNavItemId,
+} from "@/lib/admin/moderationSidebarConfig";
+import { SEO_CONTROL_NAV } from "@/lib/admin/seoNavConfig";
 
 // Admin route helper to ensure all admin links are prefixed correctly
 const ADMIN_BASE = "/admin";
 export const adminPath = (path: string) => {
   const cleanPath = path.startsWith("/") ? path : `/${path}`;
   return `${ADMIN_BASE}${cleanPath}`;
+};
+
+const MODERATION_NAV_EN: Record<ModerationNavItemId, string> = {
+  queue: "Queue",
+  places: "Places",
+  events: "Events",
+  offers: "Offers",
 };
 
 interface NavItem {
@@ -24,10 +37,10 @@ interface NavSection {
 const NAV_SECTIONS: NavSection[] = [
   {
     title: "Moderation",
-    items: [
-      { label: "Queue", href: adminPath("/moderation/queue") },
-      { label: "Places", href: adminPath("/moderation/places") },
-    ],
+    items: MODERATION_NAV_ITEMS.map((item) => ({
+      label: MODERATION_NAV_EN[item.id],
+      href: moderationItemHref(item.path),
+    })),
   },
   {
     title: "Users",
@@ -69,8 +82,12 @@ const NAV_SECTIONS: NavSection[] = [
   {
     title: "Discovery",
     items: [
-      { label: "Signals", href: adminPath("/taxonomy/signals") },
-      { label: "Filters", href: adminPath("/taxonomy/filters") },
+      { label: "Сигналы", href: adminPath("/taxonomy/signals") },
+      { label: "Категории", href: adminPath("/taxonomy/filters/event-categories") },
+      { label: "Поводы", href: adminPath("/discovery/occasions") },
+      { label: "Темы", href: adminPath("/discovery/themes") },
+      { label: "Жанры", href: adminPath("/discovery/genres") },
+      { label: "Фильтры", href: adminPath("/discovery/filters") },
     ],
   },
   {
@@ -79,6 +96,13 @@ const NAV_SECTIONS: NavSection[] = [
       { label: "Districts", href: adminPath("/taxonomy/districts") },
       { label: "Metro Stations", href: adminPath("/taxonomy/metro-stations") },
     ],
+  },
+  {
+    title: "SEO",
+    items: SEO_CONTROL_NAV.map((item) => ({
+      label: item.label,
+      href: item.href,
+    })),
   },
 ];
 

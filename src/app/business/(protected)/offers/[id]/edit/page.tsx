@@ -1,60 +1,29 @@
+/**
+ * Legacy URL — edit flow lives in the isolated content editor.
+ */
+
+import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/server";
-import { redirect, notFound } from "next/navigation";
-import prisma from "@/lib/prisma";
-import { OfferWizard } from "@/components/business/wizard/offer/OfferWizard";
+import { canCreateBusinessContent } from "@/lib/auth/businessContentAccess";
 
 interface EditOfferPageProps {
   params: Promise<{ id: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
-export default async function EditOfferPage({ params }: EditOfferPageProps) {
+export default async function EditOfferPage({ params, searchParams }: EditOfferPageProps) {
   const user = await getCurrentUser();
-  
-  if (!user || user.role !== "BUSINESS_OWNER") {
+
+  if (!user || !canCreateBusinessContent(user.role)) {
     redirect("/business/login");
   }
 
   const { id } = await params;
-
-  // Verify user has a business
-  const business = await prisma.business.findUnique({
-    where: { ownerUserId: user.id },
-    select: {
-      id: true,
-      name: true,
-      phone: true,
-    },
-  });
-
-  if (!business) {
-    console.warn(`User ${user.email} has BUSINESS_OWNER role but no Business entity`);
-    redirect("/business/onboarding");
+  const sp = await searchParams;
+  const qs = new URLSearchParams();
+  if (sp.returnTo && typeof sp.returnTo === "string") {
+    qs.set("returnTo", sp.returnTo);
   }
-
-  // Fetch the offer and verify ownership
-  const offer = await prisma.offer.findFirst({
-    where: {
-      id,
-      // TODO: Add proper ownership verification based on offer structure
-    },
-    // TODO: Add proper includes based on offer structure
-  });
-
-  if (!offer) {
-    notFound();
-  }
-
-  return (
-    <OfferWizard
-      mode="edit"
-      offer={offer}
-      userId={user.id}
-      userRole="BUSINESS_OWNER"
-      business={{
-        id: business.id,
-        name: business.name,
-        phone: business.phone || undefined,
-      }}
-    />
-  );
+  const q = qs.toString();
+  redirect(`/editor/offer/${id}/edit${q ? `?${q}` : ""}`);
 }

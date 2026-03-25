@@ -1,50 +1,32 @@
+/**
+ * Legacy URL — create flow lives in the isolated content editor.
+ */
+
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/server";
-import { EventWizard } from "@/components/business/wizard/event/EventWizard";
-import { prisma } from "@/lib/prisma";
+import { canCreateBusinessContent } from "@/lib/auth/businessContentAccess";
 
 export const metadata = {
   title: "Новое событие | MamaGo Business",
   description: "Создание нового события",
 };
 
-export default async function NewEventPage() {
+export default async function NewEventPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const user = await getCurrentUser();
 
-  if (!user || user.role !== "BUSINESS_OWNER") {
+  if (!user || !canCreateBusinessContent(user.role)) {
     redirect("/business/login");
   }
 
-  // Get user's business profile
-  const business = await prisma.business.findUnique({
-    where: { ownerUserId: user.id },
-    select: {
-      id: true,
-      name: true,
-      legalName: true,
-      phone: true,
-    },
-  });
-
-  console.log("NewEventPage - user:", user.id, "role:", user.role, "business:", business);
-
-  return (
-    <EventWizard
-      mode="create"
-      userId={user.id}
-      userRole={user.role}
-      business={business ? {
-        id: business.id,
-        name: business.name,
-        description: business.legalName || undefined,
-        phone: business.phone || undefined,
-      } : {
-        // Fallback mock business for development
-        id: "mock-business-1",
-        name: "Мой бизнес",
-        description: "Описание бизнеса",
-        phone: "+375 29 123 45 67",
-      }}
-    />
-  );
+  const sp = await searchParams;
+  const qs = new URLSearchParams();
+  if (sp.returnTo && typeof sp.returnTo === "string") {
+    qs.set("returnTo", sp.returnTo);
+  }
+  const q = qs.toString();
+  redirect(`/editor/event/new${q ? `?${q}` : ""}`);
 }

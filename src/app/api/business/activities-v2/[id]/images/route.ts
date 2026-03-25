@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
+import { canCreateBusinessContent, canManageOwnedContent } from "@/lib/auth/businessContentAccess";
 
 export async function POST(
   req: NextRequest,
@@ -14,7 +15,7 @@ export async function POST(
   try {
     const user = await getCurrentUser();
 
-    if (!user || user.role !== "BUSINESS_OWNER") {
+    if (!user || !canCreateBusinessContent(user.role)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -30,7 +31,7 @@ export async function POST(
       return NextResponse.json({ error: "Activity not found" }, { status: 404 });
     }
 
-    if (activity.ownerUserId !== user.id) {
+    if (!canManageOwnedContent(user, activity.ownerUserId)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 

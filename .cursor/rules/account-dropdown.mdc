@@ -1,0 +1,11 @@
+---
+description: Единый паттерн меню аккаунта (AccountDropdown)
+globs: "**/site/header/**/*.tsx,**/admin/**/*.tsx,**/business/**/*.tsx,**/mobile/MobileProfileSheet.tsx,**/components/account/**/*.tsx,**/lib/account/**/*.ts"
+alwaysApply: false
+---
+
+# Меню аккаунта (user dropdown)
+
+- Новые выпадающие меню профиля / аккаунта делай только на базе **`AccountDropdown`** (`src/components/account/`) и **`AccountDropdownContent`**. Не копируй разметку списка, сепараторы и стили локально.
+- Конфигурацию пунктов собирай через **`buildPublicSiteAccountModel`** (публичный сайт, `/me`, business через `ProfileDropdown`) или **`buildAdminAccountModel`** (админка), либо расширяй эти билдеры. Контекст приложения: public/me + business vs admin — через роль и режим (`AccountMode`), без дублирования логики переходов.
+- Визуальный эталон и варианты — в **`src/app/(ui)/ui-lab/_sections/AccountDropdownSection.tsx`**. При изменении внешнего вида обновляй компонент и эту секцию ui-lab, не вводи отдельные «одноразовые» стили меню.

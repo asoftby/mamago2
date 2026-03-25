@@ -4,6 +4,8 @@ import { CityDiscoveryShell } from "./CityDiscoveryShell";
 import { Intent } from "@/lib/intent";
 import { listPublicRoutesByCity } from "@/server/services/route.service";
 import { MOCK_ROUTES } from "@/mocks/routes.mock";
+import { getCurrentUser } from "@/lib/auth/server";
+import { getKudaDiscoveryFeedMocks } from "@/server/discovery/kudaDiscoveryFeed";
 
 interface CityShellProps {
   citySlug: string;
@@ -16,7 +18,13 @@ export async function CityShell({ citySlug, intent, searchParams }: CityShellPro
   const city = await prisma.city.findUnique({ where: { slug: citySlug } });
   if (!city) notFound();
 
-  // 2. For routes intent, load routes data server-side
+  let discoveryActivities = undefined;
+  if (intent === "kuda") {
+    const user = await getCurrentUser();
+    discoveryActivities = await getKudaDiscoveryFeedMocks(city.id, user?.id ?? null);
+  }
+
+  // For routes intent, load routes data server-side
   let routesData = undefined;
   if (intent === "routes") {
     const dbRoutes = await listPublicRoutesByCity(city.id).catch(() => []);
@@ -60,6 +68,7 @@ export async function CityShell({ citySlug, intent, searchParams }: CityShellPro
       city={citySlug}
       intent={intent}
       routesData={routesData}
+      discoveryActivities={discoveryActivities}
     />
   );
 }

@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { PrimaryButton } from "@/components/ui/PrimaryButton";
 import { cn } from "@/lib/utils";
 import type { PlanItemWithActivity } from "@/server/services/plan.service";
+import { getPlanActivityPublicAvailability } from "@/lib/plan/publicVisibility";
 
 type PlanCardProps = {
   weekDates: string[];
@@ -113,6 +114,9 @@ function PlanItemMiniCard({ item }: PlanItemMiniCardProps) {
   const activity = item.activity;
   const displayTitle = activity?.title ?? item.title ?? "Активность";
   const displayImage = activity?.coverImageUrl ?? item.coverImageUrl ?? null;
+  const availability = getPlanActivityPublicAvailability(activity);
+  const unavailable =
+    availability === "business_disabled" || availability === "missing_activity";
 
   const formatTime = (dateTime: Date) => {
     return new Date(dateTime).toLocaleTimeString("ru-RU", {
@@ -141,6 +145,9 @@ function PlanItemMiniCard({ item }: PlanItemMiniCardProps) {
       </div>
       <div className="flex-1 min-w-0">
         <Body className="font-medium line-clamp-2 mb-1">{displayTitle}</Body>
+        {unavailable && (
+          <Caption className="text-amber-800 block mb-0.5">Снято с публикации</Caption>
+        )}
         <Caption className="text-muted-foreground">
           {item.startsAt ? formatTime(item.startsAt) : "В любое время"}
         </Caption>

@@ -333,7 +333,7 @@ export function PlaceRevisionModerationView({
           <ArrowLeft className="w-4 h-4" />
           Back to queue
         </Link>
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">
               Place Update Moderation
@@ -342,9 +342,18 @@ export function PlaceRevisionModerationView({
               {revision.title ?? place.title}
             </p>
           </div>
-          <Badge className="bg-amber-100 text-amber-800 border-amber-200">
-            Revision Pending
-          </Badge>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variant="outline" size="sm" asChild>
+              <Link
+                href={`/editor/place/${place.id}/edit?returnTo=${encodeURIComponent(`/admin/moderation/places/${place.id}`)}`}
+              >
+                Редактор
+              </Link>
+            </Button>
+            <Badge className="bg-amber-100 text-amber-800 border-amber-200">
+              Revision Pending
+            </Badge>
+          </div>
         </div>
       </div>
 

@@ -6,6 +6,8 @@ import { AuthTabs } from "./AuthTabs";
 import { PhoneAuthForm } from "./PhoneAuthForm";
 import { EmailAuthForm } from "./EmailAuthForm";
 import { useState, useRef, useCallback } from "react";
+import { cn } from "@/lib/utils";
+import { getPostAuthRedirect } from "@/lib/auth/postAuthRedirect";
 
 export type AuthMode = "login" | "register";
 
@@ -14,10 +16,10 @@ export function AuthPage() {
   const router = useRouter();
 
   const initialMode = (searchParams.get("mode") === "register" ? "register" : "login") as AuthMode;
-  const next = searchParams.get("next") ?? "/";
+  const next = searchParams.get("next") ?? getPostAuthRedirect();
 
   const [mode, setMode] = useState<AuthMode>(initialMode);
-  const [focusKey, setFocusKey] = useState(0);
+  const [registerPhoneVerified, setRegisterPhoneVerified] = useState(false);
   const sharedRawPhone = useRef("");
 
   function handleBack() {
@@ -27,11 +29,10 @@ export function AuthPage() {
 
   const switchMode = useCallback((m: AuthMode) => {
     setMode(m);
-    setFocusKey((k) => k + 1);
   }, []);
 
   return (
-    <div className="relative min-h-screen bg-neutral-50 flex items-center justify-center px-4">
+    <div className="relative min-h-screen bg-neutral-50 flex flex-col items-center justify-center px-4 py-8">
       <button
         onClick={handleBack}
         className="absolute top-4 left-4 flex items-center gap-1 text-sm text-neutral-500 hover:text-neutral-900 transition-colors"
@@ -50,19 +51,43 @@ export function AuthPage() {
 
         <AuthTabs mode={mode} onChange={switchMode} />
 
-        {/*
-          key={mode} — fully remounts PhoneAuthForm on tab switch.
-          No OTP/error/loading state leaks between login and register.
-        */}
-        <PhoneAuthForm
-          key={mode}
-          mode={mode}
-          next={next}
-          autoFocus={focusKey > 0}
-          initialPhone={sharedRawPhone.current}
-          onPhoneChange={(raw) => { sharedRawPhone.current = raw; }}
-          onSwitchMode={() => switchMode(mode === "login" ? "register" : "login")}
-        />
+        <div
+          className={cn(mode !== "login" && "hidden")}
+          aria-hidden={mode !== "login"}
+        >
+          <PhoneAuthForm
+            mode="login"
+            next={next}
+            autoFocus={false}
+            initialPhone={sharedRawPhone.current}
+            onPhoneChange={(raw) => {
+              sharedRawPhone.current = raw;
+            }}
+            onSwitchMode={() => switchMode("register")}
+          />
+        </div>
+        <div
+          className={cn(mode !== "register" && "hidden")}
+          aria-hidden={mode !== "register"}
+        >
+          <PhoneAuthForm
+            mode="register"
+            next={next}
+            autoFocus={false}
+            initialPhone={sharedRawPhone.current}
+            onPhoneChange={(raw) => {
+              sharedRawPhone.current = raw;
+            }}
+            onSwitchMode={() => switchMode("login")}
+            onRegisterPhoneVerified={() => setRegisterPhoneVerified(true)}
+          />
+        </div>
+
+        {mode === "register" && registerPhoneVerified && (
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+            Номер подтверждён. Теперь завершите создание аккаунта.
+          </div>
+        )}
 
         {/* Divider — login only */}
         {mode === "login" && (
@@ -73,10 +98,14 @@ export function AuthPage() {
           </div>
         )}
 
-        <EmailAuthForm mode={mode} next={next} />
+        <EmailAuthForm
+          mode={mode}
+          next={next}
+          registerPhoneVerified={mode === "register" ? registerPhoneVerified : true}
+        />
 
         {/* Legal text — register only */}
-        {mode === "register" && (
+        {mode === "register" && registerPhoneVerified && (
           <p className="text-xs text-neutral-400 text-center leading-relaxed">
             Продолжая, вы соглашаетесь с{" "}
             <a href="/terms" className="underline hover:text-neutral-600">условиями использования</a>

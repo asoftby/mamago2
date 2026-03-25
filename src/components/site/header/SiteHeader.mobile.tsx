@@ -1,82 +1,132 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useLayoutEffect } from "react";
 import { usePathname } from "next/navigation";
+import { useReducedMotion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { MobileSearchEntry } from "@/components/mobile/MobileSearchEntry";
-import { MobileIntentTabs } from "@/components/mobile/MobileIntentTabs";
 import { MobileSearchSheet } from "@/components/mobile/MobileSearchSheet";
 import { MobileFilterButton } from "@/components/mobile/MobileFilterButton";
-import { getIntentFromPath, getCityFromPath, isCityHubPath } from "@/lib/intent";
+import {
+  getIntentFromPath,
+  getCityFromPath,
+  isCityHubPath,
+  isPublicationDetailPath,
+} from "@/lib/intent";
 import { useCity } from "@/contexts/CityContext";
+import { usePublicationIntent } from "@/contexts/PublicationIntentContext";
 import { DISCOVERY_INTENT_CONFIG } from "@/lib/discovery/discoveryIntentConfig";
 import { useHeaderScrolled } from "@/hooks/useHeaderScrolled";
+import { useAirbnbMobileHeaderScroll } from "@/hooks/useAirbnbMobileHeaderScroll";
 
 export function SiteHeaderMobile() {
   const [isSearchSheetOpen, setIsSearchSheetOpen] = useState(false);
   const pathname = usePathname();
-  const isScrolled = useHeaderScrolled(50); // Hide tabs after 50px scroll
-  
-  const currentIntent = getIntentFromPath(pathname);
+  const headerRef = useRef<HTMLElement>(null);
+  const [spacerHeight, setSpacerHeight] = useState(0);
+  const reduceMotion = useReducedMotion();
+  const isScrolled = useHeaderScrolled(50);
+
+  const routeIntent = getIntentFromPath(pathname);
+  const publicationIntent = usePublicationIntent();
+  const isPublicationPage = isPublicationDetailPath(pathname);
+  const searchIntent = routeIntent ?? publicationIntent ?? null;
   const currentCity = getCityFromPath(pathname);
   const { citySlug } = useCity();
-  const isCityHub = isCityHubPath(pathname);
+  const isCityHubRoute = isCityHubPath(pathname);
+
+  const mobileScroll = useAirbnbMobileHeaderScroll({
+    searchSurfaceOpen: isSearchSheetOpen,
+    reduceMotion,
+    scrollDirectionMode: routeIntent !== null,
+  });
 
   const displayCity = citySlug;
-  const displayIntent = currentIntent || "kuda";
-  
-  // Check if we're on a discovery page (has intent)
-  const isDiscoveryPage = currentIntent !== null && currentCity !== null;
-  const intentConfig = currentIntent ? DISCOVERY_INTENT_CONFIG[currentIntent] : null;
+  /** На главной города (`/minsk`) в URL нет раздела — не подсвечиваем «Куда пойти». */
+  const displayIntent = searchIntent ?? (isCityHubRoute ? undefined : "kuda");
+
+  const isDiscoveryPage = searchIntent !== null && currentCity !== null;
+  const intentConfig = searchIntent
+    ? DISCOVERY_INTENT_CONFIG[searchIntent]
+    : null;
+
+  const cityHubOnly = isCityHubRoute || isPublicationPage;
+
+  const useScrollTransform = mobileScroll.enabled;
+
+  useLayoutEffect(() => {
+    if (!useScrollTransform) return;
+    const el = headerRef.current;
+    if (!el) return;
+    const sync = () => setSpacerHeight(Math.round(el.offsetHeight));
+    sync();
+    const ro = new ResizeObserver(sync);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [useScrollTransform, pathname, isSearchSheetOpen]);
 
   return (
     <>
-      <header className={cn(
-        "bg-white transition-shadow duration-200",
-        isScrolled && "shadow-sm"
-      )}>
+      <header
+        ref={headerRef}
+        data-header-shell
+        style={
+          useScrollTransform
+            ? {
+                transform: `translate3d(0, calc(-100% * ${mobileScroll.hideRatio}), 0)`,
+              }
+            : undefined
+        }
+        className={cn(
+          "z-50 w-full border-b border-[#EBEBEB] bg-gradient-to-b from-white to-[#F7F7F7] text-foreground antialiased transition-shadow duration-200",
+          useScrollTransform
+            ? "fixed left-0 right-0 top-0 will-change-transform"
+            : "sticky top-0",
+          useScrollTransform &&
+            mobileScroll.fullyHidden &&
+            "pointer-events-none",
+          isScrolled && "shadow-[0_4px_20px_rgba(0,0,0,0.08)]",
+        )}
+        aria-hidden={
+          useScrollTransform && mobileScroll.fullyHidden ? true : undefined
+        }
+      >
         <div className="mx-auto w-full">
-          {/* Search Entry Bar with Filter Button */}
           <div className="px-4 pt-4 pb-4">
-            <div className="flex items-center gap-3">
-              <div className="flex-1">
+            <div className="flex min-w-0 items-center gap-3">
+              <div className="min-w-0 flex-1">
                 <MobileSearchEntry
-                  cityHubOnly={isCityHub}
+                  cityHubOnly={cityHubOnly}
+                  showSectionIcon={isPublicationPage}
+                  showTapToSelectHint={isCityHubRoute}
                   onSearchClick={() => setIsSearchSheetOpen(true)}
                   citySlug={displayCity}
                   currentIntent={displayIntent}
                 />
               </div>
-              
-              {/* Filter Button - only show on discovery pages with filters */}
-              {isDiscoveryPage && intentConfig?.hasFilters && (
-                <MobileFilterButton intent={currentIntent} />
+
+              {isDiscoveryPage && intentConfig?.hasFilters && searchIntent && (
+                <MobileFilterButton intent={searchIntent} />
               )}
             </div>
-          </div>
-
-          {/* Intent Tabs - show on all pages but hide when scrolled on non-discovery pages */}
-          <div 
-            className={cn(
-              "py-2 transition-all duration-300 ease-in-out overflow-hidden",
-              // Hide tabs when scrolled on non-discovery pages, always show on discovery pages
-              (!isDiscoveryPage && isScrolled) || (isDiscoveryPage && isScrolled)
-                ? "max-h-0 py-0 opacity-0 pointer-events-none" 
-                : "max-h-[100px] opacity-100"
-            )}
-          >
-            <MobileIntentTabs city={displayCity} currentIntent={currentIntent} />
           </div>
         </div>
       </header>
 
-      {/* Search Sheet */}
+      {useScrollTransform ? (
+        <div
+          aria-hidden
+          className="w-full shrink-0"
+          style={{ height: spacerHeight }}
+        />
+      ) : null}
+
       <MobileSearchSheet
         isOpen={isSearchSheetOpen}
         onClose={() => setIsSearchSheetOpen(false)}
         citySlug={displayCity}
         currentIntent={displayIntent}
-        cityHubOnly={isCityHub}
+        cityHubOnly={cityHubOnly}
       />
     </>
   );

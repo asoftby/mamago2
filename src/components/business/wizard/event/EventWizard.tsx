@@ -1,10 +1,18 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, Send, Save } from "lucide-react";
 import { toast } from "sonner";
+import {
+  FormWizardShell,
+  FormWizardHeader,
+  FormStepSegments,
+  FormPrimaryContentCard,
+  FormStickyActionBar,
+  formWizardPhaseFromFlags,
+} from "@/components/form-shell";
+import { getBusinessFormActionLabels, businessFormCopy } from "../businessFormLabels";
+import { canPublishContentDirectly } from "@/lib/auth/businessContentAccess";
 import { useWizardSession } from "@/hooks/useWizardSession";
 
 import type { EventFormData, EventWizardMode } from "./types";
@@ -14,12 +22,22 @@ import { mapEventToFormData, buildEventPayload } from "./mappers";
 import { EVENT_WIZARD_STEPS, getStepLabel, TOTAL_CONTENT_STEPS } from "./eventWizardSteps.config";
 
 import { Step9Review } from "./steps/Step9Review";
+import { EventSubmitModerationSuccessDialog } from "./EventSubmitModerationSuccessDialog";
+import { EventPublishedSuccessDialog } from "./EventPublishedSuccessDialog";
+import { publicActivityPath } from "@/lib/business/eventPublicLink";
+import type { Role } from "@prisma/client";
+import {
+  defaultEditorNav,
+  editorEventEditHref,
+  type ContentEditorNav,
+  type ContentEditorSurface,
+} from "@/lib/content-editor/types";
 
 interface EventWizardProps {
   mode: EventWizardMode;
   event?: any; // Event entity for edit mode
   userId: string;
-  userRole?: "BUSINESS_OWNER" | "ADMIN" | "MODERATOR";
+  userRole?: Role;
   business?: {
     id: string;
     name: string;
@@ -29,13 +47,62 @@ interface EventWizardProps {
     logoUrl?: string;
   };
   onComplete?: (eventId: string) => void;
+  editorSurface?: ContentEditorSurface;
+  contentEditorNav?: Partial<ContentEditorNav>;
+  returnTo?: string;
 }
 
 const LOCAL_STORAGE_KEY = "event-wizard-draft";
+const CURRENT_STEP_STORAGE_KEY = "event-wizard-current-step";
 const TOTAL_STEPS = TOTAL_CONTENT_STEPS + 1; // Content steps + review step
 
-export function EventWizard({ mode, event, userId, userRole, business, onComplete }: EventWizardProps) {
+function apiErrorMessage(body: unknown, fallback: string): string {
+  if (!body || typeof body !== "object") return fallback;
+  const b = body as { error?: unknown; errors?: unknown };
+  if (Array.isArray(b.errors) && b.errors.length > 0) {
+    const lines = b.errors.filter((e): e is string => typeof e === "string");
+    if (lines.length > 0) return lines.join("\n");
+  }
+  if (typeof b.error === "string" && b.error.length > 0) return b.error;
+  return fallback;
+}
+
+/** Submit API returns PENDING for business authors; show success modal instead of toast + redirect. */
+function isModerationPendingSuccess(userRole: Role | undefined, submitBody: unknown): boolean {
+  if (canPublishContentDirectly(userRole)) return false;
+  if (!submitBody || typeof submitBody !== "object") return false;
+  const ev = (submitBody as { event?: { status?: unknown } }).event;
+  return ev?.status === "PENDING";
+}
+
+function isPublishedSuccess(submitBody: unknown): boolean {
+  if (!submitBody || typeof submitBody !== "object") return false;
+  const ev = (submitBody as { event?: { status?: unknown } }).event;
+  return ev?.status === "PUBLISHED";
+}
+
+export function EventWizard({
+  mode,
+  event,
+  userId,
+  userRole,
+  business,
+  onComplete,
+  editorSurface,
+  contentEditorNav,
+  returnTo,
+}: EventWizardProps) {
   const router = useRouter();
+  const surface: ContentEditorSurface = editorSurface ?? "business";
+  const nav: ContentEditorNav = {
+    ...defaultEditorNav(surface, "event"),
+    ...contentEditorNav,
+  };
+  const afterSubmitDestination = returnTo ?? nav.afterSubmitListPath;
+  const [moderationSuccessModalOpen, setModerationSuccessModalOpen] = useState(false);
+  const [moderationSuccessEventId, setModerationSuccessEventId] = useState<string | null>(null);
+  const [publishedSuccessModalOpen, setPublishedSuccessModalOpen] = useState(false);
+  const [publishedActivityHref, setPublishedActivityHref] = useState<string | null>(null);
   const [currentStep, setCurrentStep] = useState(1);
   const [eventId, setEventId] = useState<string | null>(
     mode === "edit" && event ? event.id : null
@@ -44,104 +111,52 @@ export function EventWizard({ mode, event, userId, userRole, business, onComplet
     if (mode === "edit" && event) {
       return mapEventToFormData(event);
     }
-    
-    // Always start with defaults to prevent hydration mismatch
-    // localStorage restoration happens in useEffect
     return getDefaultFormData();
   });
-  
-  // Restore from localStorage after hydration to prevent mismatch
+
+  /** Новое создание: не восстанавливаем незавершённое заполнение из localStorage. */
   useEffect(() => {
-    if (mode === "create") {
-      try {
-        const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          const defaults = getDefaultFormData();
-          
-          // Migrate old structure to new structure
-          const migrated = {
-            ...defaults,
-            ...parsed,
-            // Ensure dates is array of strings, not objects
-            dates: Array.isArray(parsed.dates) 
-              ? parsed.dates.map((d: any) => typeof d === 'string' ? d : d.date || '')
-              : [],
-            // Ensure ageGroups exists (renamed from age)
-            ageGroups: parsed.ageGroups || parsed.age || [],
-            // Ensure fullDescription exists (renamed from description)
-            fullDescription: parsed.fullDescription || parsed.description || "",
-            // Ensure reelsUrl exists (renamed from videoLink)
-            reelsUrl: parsed.reelsUrl || parsed.videoLink || "",
-            // Ensure locationMode is correct (renamed from existing)
-            locationMode: parsed.locationMode === "existing" ? "place" : parsed.locationMode || "place",
-            // Flatten manualLocation if it exists
-            venueName: parsed.venueName || parsed.manualLocation?.venueName || "",
-            address: parsed.address || parsed.manualLocation?.address || "",
-            city: parsed.city || parsed.manualLocation?.city || "",
-            // Ensure socialLinks exists (renamed from socialNetworks)
-            socialLinks: parsed.socialLinks || parsed.socialNetworks || [],
-          };
-          
-          setFormData(migrated);
-        }
-      } catch (e) {
-        console.error("Failed to restore draft:", e);
-      }
+    if (mode !== "create" || typeof window === "undefined") return;
+    try {
+      localStorage.removeItem(LOCAL_STORAGE_KEY);
+      localStorage.removeItem(CURRENT_STEP_STORAGE_KEY);
+    } catch {
+      // ignore
     }
   }, [mode]);
-  
+
   const [isSaving, setIsSaving] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
-  const [saveError, setSaveError] = useState<string | null>(null);
 
-  // Wizard session for temp media
-  const { wizardSessionId } = useWizardSession({
+  // Wizard session for temp media (без записи в БД до явного сохранения)
+  const { wizardSessionId, clearSession } = useWizardSession({
     userId,
     wizardType: "event",
     entityId: mode === "edit" ? event?.id : undefined,
   });
 
-  // Clear old localStorage data on mount (one-time migration)
   useEffect(() => {
-    if (mode === "create" && typeof window !== "undefined") {
-      try {
-        const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          // Check if it's old structure (has EventDate objects in dates array)
-          if (parsed.dates && parsed.dates.length > 0 && typeof parsed.dates[0] === 'object') {
-            console.log("Migrating old event wizard data structure");
-            localStorage.removeItem(LOCAL_STORAGE_KEY);
-          }
-        }
-      } catch (e) {
-        console.error("Migration check failed:", e);
+    if (mode !== "create") return;
+    return () => {
+      if (!eventId) {
+        void clearSession();
       }
-    }
-  }, [mode]);
+    };
+  }, [mode, eventId, clearSession]);
 
-  // Autosave effect with debounce
+  /** Закрытие вкладки / обновление без сохранения черновика в БД */
   useEffect(() => {
-    if (mode === "create" && typeof window !== "undefined") {
-      // Local autosave for create mode with debounce
-      const timer = setTimeout(() => {
-        if (hasMeaningfulContent(formData)) {
-          try {
-            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(formData));
-            setLastSaved(new Date());
-            setSaveError(null);
-          } catch (e) {
-            console.error("Failed to save draft:", e);
-            setSaveError("Ошибка автосохранения");
-          }
-        }
-      }, 2000); // 2 second debounce
-      
-      return () => clearTimeout(timer);
-    }
-  }, [formData, mode]);
+    if (mode !== "create" || typeof window === "undefined") return;
+    const unsaved = !eventId && hasMeaningfulContent(formData);
+    if (!unsaved) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [mode, eventId, formData]);
 
   // Update form data
   const handleChange = useCallback((updates: Partial<EventFormData>) => {
@@ -150,9 +165,16 @@ export function EventWizard({ mode, event, userId, userRole, business, onComplet
 
   // Navigation
   const handleNext = () => {
-    if (currentStep < TOTAL_STEPS) {
-      setCurrentStep(prev => prev + 1);
+    if (currentStep >= TOTAL_STEPS) return;
+
+    // Block forward navigation if current step isn't complete
+    const validation = validateStep(currentStep, formData);
+    if (!validation.isComplete) {
+      toast.error("Заполните обязательные поля перед переходом дальше");
+      return;
     }
+
+    setCurrentStep((prev) => prev + 1);
   };
 
   const handlePrev = () => {
@@ -162,9 +184,24 @@ export function EventWizard({ mode, event, userId, userRole, business, onComplet
   };
 
   const handleGoToStep = (step: number) => {
-    if (step >= 1 && step <= TOTAL_STEPS) {
+    if (step < 1 || step > TOTAL_STEPS) return;
+
+    // Allow going back freely
+    if (step <= currentStep) {
       setCurrentStep(step);
+      return;
     }
+
+    // For any forward jump, ensure all intermediate steps are complete
+    for (let s = currentStep; s < step; s += 1) {
+      const validation = validateStep(s, formData);
+      if (!validation.isComplete) {
+        toast.error("Заполните обязательные поля перед переходом дальше");
+        return;
+      }
+    }
+
+    setCurrentStep(step);
   };
 
   // Save as draft
@@ -195,15 +232,18 @@ export function EventWizard({ mode, event, userId, userRole, business, onComplet
         });
         
         if (!response.ok) {
-          const error = await response.json();
-          throw new Error(error.error || "Failed to create draft");
+          const errorBody = await response.json();
+          throw new Error(apiErrorMessage(errorBody, "Не удалось создать черновик"));
         }
         
         const data = await response.json();
         setEventId(data.event.id);
         
-        // Switch to edit mode
-        router.replace(`/business/events/${data.event.id}/edit`);
+        if (onComplete) {
+          onComplete(data.event.id);
+        } else {
+          router.push(editorEventEditHref(data.event.id));
+        }
       }
       
       toast.success("Черновик сохранен");
@@ -211,6 +251,7 @@ export function EventWizard({ mode, event, userId, userRole, business, onComplet
       
       if (mode === "create" && typeof window !== "undefined") {
         localStorage.removeItem(LOCAL_STORAGE_KEY);
+        localStorage.removeItem(CURRENT_STEP_STORAGE_KEY);
       }
     } catch (error: any) {
       console.error("Save draft error:", error);
@@ -234,9 +275,10 @@ export function EventWizard({ mode, event, userId, userRole, business, onComplet
     setIsSubmitting(true);
     
     try {
-      // First save as draft if not saved yet
-      if (!eventId) {
-        const payload = buildEventPayload(formData);
+      const payload = buildEventPayload(formData);
+      const targetId = eventId ?? (mode === "edit" && event ? event.id : null);
+
+      if (!targetId) {
         const createResponse = await fetch("/api/business/events", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -244,41 +286,123 @@ export function EventWizard({ mode, event, userId, userRole, business, onComplet
         });
         
         if (!createResponse.ok) {
-          const error = await createResponse.json();
-          throw new Error(error.error || "Failed to create event");
+          const errorBody = await createResponse.json();
+          throw new Error(apiErrorMessage(errorBody, "Не удалось создать событие"));
         }
         
         const createData = await createResponse.json();
-        setEventId(createData.event.id);
+        const newId = createData.event.id;
+        setEventId(newId);
         
-        // Submit the newly created event
-        const submitResponse = await fetch(`/api/business/events/${createData.event.id}/submit`, {
+        const submitResponse = await fetch(`/api/business/events/${newId}/submit`, {
           method: "POST",
         });
         
         if (!submitResponse.ok) {
-          const error = await submitResponse.json();
-          throw new Error(error.error || "Failed to submit event");
+          const errorBody = await submitResponse.json();
+          throw new Error(apiErrorMessage(errorBody, "Не удалось отправить на модерацию"));
         }
-      } else {
-        // Submit existing draft
-        const response = await fetch(`/api/business/events/${eventId}/submit`, {
-          method: "POST",
-        });
-        
-        if (!response.ok) {
-          const error = await response.json();
-          throw new Error(error.error || "Failed to submit event");
+
+        const submitBody = await submitResponse.json();
+        if (isModerationPendingSuccess(userRole, submitBody)) {
+          if (mode === "create" && typeof window !== "undefined") {
+            localStorage.removeItem(LOCAL_STORAGE_KEY);
+            localStorage.removeItem(CURRENT_STEP_STORAGE_KEY);
+          }
+          setModerationSuccessEventId(newId);
+          setModerationSuccessModalOpen(true);
+          return;
         }
+        if (isPublishedSuccess(submitBody)) {
+          if (mode === "create" && typeof window !== "undefined") {
+            localStorage.removeItem(LOCAL_STORAGE_KEY);
+            localStorage.removeItem(CURRENT_STEP_STORAGE_KEY);
+          }
+          setPublishedActivityHref(publicActivityPath(newId, formData.city));
+          setPublishedSuccessModalOpen(true);
+          return;
+        }
+
+        toast.success(
+          canPublishContentDirectly(userRole)
+            ? "Событие опубликовано"
+            : "Событие отправлено на модерацию",
+        );
+
+        if (mode === "create" && typeof window !== "undefined") {
+          localStorage.removeItem(LOCAL_STORAGE_KEY);
+        }
+
+        if (onComplete) {
+          onComplete(newId);
+        } else {
+          router.push(afterSubmitDestination);
+        }
+        return;
+      }
+
+      const patchResponse = await fetch(`/api/business/events/${targetId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      
+      if (!patchResponse.ok) {
+        const errorBody = await patchResponse.json();
+        throw new Error(apiErrorMessage(errorBody, "Не удалось сохранить событие"));
       }
       
-      toast.success("Событие отправлено на модерацию");
+      const submitResponse = await fetch(`/api/business/events/${targetId}/submit`, {
+        method: "POST",
+      });
+      
+      if (!submitResponse.ok) {
+        const errorBody = await submitResponse.json();
+        throw new Error(apiErrorMessage(errorBody, "Не удалось отправить на модерацию"));
+      }
+
+      const submitBody = await submitResponse.json();
+      if (isModerationPendingSuccess(userRole, submitBody)) {
+        if (mode === "create" && typeof window !== "undefined") {
+          localStorage.removeItem(LOCAL_STORAGE_KEY);
+          localStorage.removeItem(CURRENT_STEP_STORAGE_KEY);
+        }
+        setModerationSuccessEventId(targetId);
+        setModerationSuccessModalOpen(true);
+        return;
+      }
+      if (isPublishedSuccess(submitBody)) {
+        if (mode === "create" && typeof window !== "undefined") {
+          localStorage.removeItem(LOCAL_STORAGE_KEY);
+          localStorage.removeItem(CURRENT_STEP_STORAGE_KEY);
+        }
+        setPublishedActivityHref(publicActivityPath(targetId, formData.city));
+        setPublishedSuccessModalOpen(true);
+        return;
+      }
+
+      toast.success(
+        canPublishContentDirectly(userRole)
+          ? "Событие опубликовано"
+          : "Событие отправлено на модерацию",
+      );
       
       if (mode === "create" && typeof window !== "undefined") {
         localStorage.removeItem(LOCAL_STORAGE_KEY);
+        localStorage.removeItem(CURRENT_STEP_STORAGE_KEY);
       }
       
-      router.push("/business/events");
+      if (onComplete) {
+        onComplete(targetId);
+      } else if (mode === "create") {
+        router.push(afterSubmitDestination);
+      } else if (returnTo) {
+        router.push(returnTo);
+      } else if (surface === "admin") {
+        router.push(nav.afterSubmitListPath);
+      } else {
+        router.refresh();
+      }
     } catch (error: any) {
       console.error("Submit error:", error);
       toast.error(error.message || "Ошибка отправки");
@@ -289,6 +413,14 @@ export function EventWizard({ mode, event, userId, userRole, business, onComplet
 
   // Determine if editable
   const isEditable = true; // TODO: Add proper logic
+
+  const displayTitleRaw = formData.title?.trim() ?? "";
+  const displayTitle =
+    displayTitleRaw.length === 0
+      ? businessFormCopy.event.createTitle
+      : displayTitleRaw.length <= 60
+        ? displayTitleRaw
+        : `${displayTitleRaw.slice(0, 57)}...`;
 
   // Check if form is valid for submission (only on review step)
   const submitValidation = currentStep === TOTAL_STEPS ? validateForSubmit(formData) : { isValid: true };
@@ -331,120 +463,80 @@ export function EventWizard({ mode, event, userId, userRole, business, onComplet
     return <StepComponent {...commonProps} />;
   };
 
-  const canNext = currentStep < TOTAL_STEPS;
+  const canNext =
+    currentStep < TOTAL_STEPS && validateStep(currentStep, formData).isComplete;
   const canPrev = currentStep > 1;
-  const isReviewStep = currentStep === 9;
+  const isReviewStep = currentStep === TOTAL_STEPS;
+
+  const segments = useMemo(
+    () => [
+      ...EVENT_WIZARD_STEPS.map((s) => ({ id: s.id, title: s.title })),
+      { id: TOTAL_STEPS, title: businessFormCopy.reviewStepShortTitle },
+    ],
+    []
+  );
+
+  const actionLabels = useMemo(
+    () => getBusinessFormActionLabels(userRole),
+    [userRole],
+  );
+
+  const phase = formWizardPhaseFromFlags({ isSaving, isSubmitting });
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white border-b sticky top-0 z-10">
-        <div className="max-w-4xl mx-auto px-6 py-4">
-          <div className="mb-4">
-            <div className="flex items-center justify-between mb-2">
-              <h1 className="text-2xl font-bold">
-                {mode === "create" ? "Новое событие" : "Редактирование события"}
-              </h1>
-              {lastSaved && (
-                <div className="text-xs text-muted-foreground">
-                  Сохранено {lastSaved.toLocaleTimeString()}
-                </div>
-              )}
-            </div>
-            <div className="flex items-center justify-between">
-              <p className="text-sm text-muted-foreground">
-                Шаг {currentStep} из {TOTAL_STEPS}: {getStepLabel(currentStep)}
-              </p>
-            </div>
-          </div>
-          
-          {/* Step Progress with Navigation */}
-          <div className="space-y-3">
-            <div className="flex gap-2">
-              {/* Content steps from config */}
-              {EVENT_WIZARD_STEPS.map((step) => (
-                <button
-                  key={step.id}
-                  onClick={() => handleGoToStep(step.id)}
-                  className={`flex-1 h-2 rounded-full transition-colors ${
-                    step.id === currentStep
-                      ? "bg-primary"
-                      : step.id < currentStep
-                      ? "bg-primary/50"
-                      : "bg-gray-200"
-                  }`}
-                  title={step.title}
-                />
-              ))}
-              {/* Review step */}
-              <button
-                onClick={() => handleGoToStep(TOTAL_STEPS)}
-                className={`flex-1 h-2 rounded-full transition-colors ${
-                  TOTAL_STEPS === currentStep
-                    ? "bg-primary"
-                    : TOTAL_STEPS < currentStep
-                    ? "bg-primary/50"
-                    : "bg-gray-200"
-                }`}
-                title="Проверка"
-              />
-            </div>
-            
-            {/* Navigation Buttons */}
-            <div className="flex items-center justify-between pt-2">
-              <div>
-                {canPrev && (
-                  <Button
-                    variant="outline"
-                    onClick={handlePrev}
-                    disabled={isSaving || isSubmitting}
-                  >
-                    <ChevronLeft className="w-4 h-4 mr-2" />
-                    Назад
-                  </Button>
-                )}
-              </div>
+    <FormWizardShell>
+      <FormWizardHeader
+        title={displayTitle}
+        subtitle={businessFormCopy.stepSubtitle(
+          currentStep,
+          TOTAL_STEPS,
+          currentStep === TOTAL_STEPS
+            ? businessFormCopy.reviewStepShortTitle
+            : getStepLabel(currentStep)
+        )}
+        trailing={lastSaved ? businessFormCopy.savedAt(lastSaved) : undefined}
+      >
+        <FormStepSegments
+          segments={segments}
+          currentStep={currentStep}
+          onStepClick={handleGoToStep}
+        />
+      </FormWizardHeader>
 
-              <div className="flex gap-3">
-                {isReviewStep ? (
-                  <>
-                    <Button
-                      variant="outline"
-                      onClick={handleSaveDraft}
-                      disabled={isSaving || isSubmitting}
-                    >
-                      <Save className="w-4 h-4 mr-2" />
-                      {isSaving ? "Сохранение..." : "Сохранить черновик"}
-                    </Button>
-                    <Button
-                      onClick={handleSubmit}
-                      disabled={isSubmitting || isSaving || !submitValidation.isValid}
-                    >
-                      <Send className="w-4 h-4 mr-2" />
-                      {isSubmitting ? "Отправка..." : "Отправить на модерацию"}
-                    </Button>
-                  </>
-                ) : (
-                  <Button
-                    onClick={handleNext}
-                    disabled={!canNext || isSaving || isSubmitting}
-                  >
-                    Далее
-                    <ChevronRight className="w-4 h-4 ml-2" />
-                  </Button>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+      <FormPrimaryContentCard>{renderStep()}</FormPrimaryContentCard>
 
-      {/* Content */}
-      <div className="max-w-4xl mx-auto px-6 py-8">
-        <div className="bg-white rounded-lg border p-8">
-          {renderStep()}
-        </div>
-      </div>
-    </div>
+      <FormStickyActionBar
+        phase={phase}
+        labels={actionLabels}
+        showBack={canPrev}
+        onBack={handlePrev}
+        showSaveDraft={isReviewStep}
+        onSaveDraft={isReviewStep ? handleSaveDraft : undefined}
+        saveDraftDisabled={isSaving || isSubmitting}
+        isReviewStep={isReviewStep}
+        onContinue={!isReviewStep ? handleNext : undefined}
+        continueDisabled={!canNext || isSaving || isSubmitting}
+        onSubmit={isReviewStep ? handleSubmit : undefined}
+        submitDisabled={
+          isSubmitting || isSaving || !submitValidation.isValid
+        }
+      />
+
+      {moderationSuccessEventId && (
+        <EventSubmitModerationSuccessDialog
+          open={moderationSuccessModalOpen}
+          onOpenChange={setModerationSuccessModalOpen}
+          eventId={moderationSuccessEventId}
+        />
+      )}
+
+      {publishedActivityHref && (
+        <EventPublishedSuccessDialog
+          open={publishedSuccessModalOpen}
+          onOpenChange={setPublishedSuccessModalOpen}
+          activityHref={publishedActivityHref}
+        />
+      )}
+    </FormWizardShell>
   );
 }

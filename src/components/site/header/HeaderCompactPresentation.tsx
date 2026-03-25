@@ -29,12 +29,13 @@ export function HeaderCompactPresentation({
 }: HeaderCompactPresentationProps) {
   
   return (
-    <div className="flex items-center justify-center h-full">
-      <div className="flex items-center gap-3 w-full max-w-[500px]">
+    <div className="flex h-full items-center justify-center">
+      <div className="flex min-h-0 w-full max-w-[500px] items-stretch gap-3">
         
         {/* COMPACT SEARCH */}
-        <div className="flex-1">
+        <div className="flex min-h-11 flex-1 items-stretch">
           <DesktopSearchControl
+            className="h-full min-h-11"
             citySlug={citySlug}
             currentIntent={currentIntent}
             mode="compact"
@@ -47,7 +48,7 @@ export function HeaderCompactPresentation({
         
         {/* COMPACT FILTERS BUTTON */}
         {shouldShowFilters && currentIntent && (
-          <div className="flex-shrink-0">
+          <div className="flex min-h-11 shrink-0 items-stretch">
             <RefinementFiltersButtonCompact intent={currentIntent} />
           </div>
         )}

@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { Container } from "@/components/ui/Container";
 import { IdeasClient } from "./IdeasClient";
 import type { IdeaItem } from "./types";
+import { getPlanActivityPublicAvailability } from "@/lib/plan/publicVisibility";
 
 export const metadata = { title: "Мои идеи — mamaGo" };
 
@@ -28,11 +29,17 @@ async function getUserIdeas(userId: string): Promise<IdeaItem[]> {
       type: true,
       coverImageUrl: true,
       ageLabel: true,
+      status: true,
       nextOccurrenceAt: true,
       sessions: {
         orderBy: { startsAt: "asc" },
         take: 1,
         select: { startsAt: true },
+      },
+      owner: {
+        select: {
+          business: { select: { operationalStatus: true } },
+        },
       },
       place: {
         select: {
@@ -69,11 +76,12 @@ async function getUserIdeas(userId: string): Promise<IdeaItem[]> {
           title: activity.title,
           type: activity.type as IdeaItem["activity"]["type"],
           coverImageUrl: activity.coverImageUrl ?? undefined,
-          city: (activity.place as any)?.city?.name ?? undefined,
+          city: activity.place?.city?.name ?? undefined,
           ageRange: activity.ageLabel ?? undefined,
           dateStart,
           dateEnd,
         },
+        planAvailability: getPlanActivityPublicAvailability(activity),
         isPlanned: !!plannedDate,
         plannedDate: plannedDate ?? undefined,
         createdAt: idea.createdAt.toISOString(),

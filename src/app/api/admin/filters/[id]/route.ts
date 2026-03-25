@@ -3,6 +3,23 @@ import prisma from "@/lib/prisma";
 
 export const runtime = "nodejs";
 
+export async function GET(
+  _request: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const { id } = await params;
+  const filter = await prisma.filterDefinition.findUnique({
+    where: { id },
+    include: {
+      options: { orderBy: [{ orderIndex: "asc" }, { value: "asc" }] },
+    },
+  });
+  if (!filter) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+  return NextResponse.json(filter);
+}
+
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }

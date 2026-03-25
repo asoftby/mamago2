@@ -9,6 +9,7 @@ import { NewsSection } from "./_sections/NewsSection";
 import { ShellSection } from "./_sections/ShellSection";
 import { PlanCardSection } from "./_sections/PlanCardSection";
 import { HeaderSection } from "./_sections/HeaderSection";
+import { AccountDropdownSection } from "./_sections/AccountDropdownSection";
 import { PlaceCardSection } from "./_sections/PlaceCardSection";
 import { OpeningHoursSection } from "./_sections/OpeningHoursSection";
 import { DateTimePickerSection } from "./_sections/DateTimePickerSection";
@@ -40,6 +41,7 @@ export default function UiLabPage() {
 
         <div className="space-y-16 pb-8 [&_section]:scroll-mt-36">
           <HeaderSection />
+          <AccountDropdownSection />
           <UiPrimitivesSection />
           <FiltersSection />
           <DiscoverySection />

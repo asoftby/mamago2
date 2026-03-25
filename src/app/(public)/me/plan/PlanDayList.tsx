@@ -36,6 +36,9 @@ function PlanItemCard({
   const title = item.activity?.title ?? item.title ?? "Активность";
   const image = item.activity?.coverImageUrl ?? item.coverImageUrl ?? null;
   const time = formatTime(item.startsAt);
+  const unavailable =
+    item.planAvailability === "business_disabled" ||
+    item.planAvailability === "missing_activity";
 
   const handleRemove = async () => {
     setRemoving(true);
@@ -63,13 +66,16 @@ function PlanItemCard({
       )}
       <div className="flex-1 min-w-0">
         <p className="text-sm font-semibold text-neutral-900 leading-tight line-clamp-1">{title}</p>
+        {unavailable && (
+          <p className="text-xs text-amber-700 mt-0.5">Снято с публикации</p>
+        )}
         {time && <p className="text-xs text-neutral-500 mt-0.5">{time}</p>}
         {item.activity?.ageLabel && (
           <p className="text-xs text-neutral-400 mt-0.5">{item.activity.ageLabel}</p>
         )}
       </div>
       <div className="flex items-center gap-1 shrink-0">
-        {item.activityId && (
+        {item.activityId && !unavailable && (
           <Link
             href={`/minsk/activity/${item.activityId}`}
             className="p-2 rounded-xl text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 transition-colors"

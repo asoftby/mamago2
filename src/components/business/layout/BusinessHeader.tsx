@@ -1,91 +1,132 @@
 "use client";
 
-import { Search, User, UserCircle, Settings, LogOut } from "lucide-react";
-import { NotificationBell } from "@/components/business/notifications/NotificationBell";
+import { useState } from "react";
+import { Search } from "lucide-react";
+import { useNarrowViewport } from "@/hooks/useNarrowViewport";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { CreatePublicationQuickMenu } from "@/components/shared/CreatePublicationQuickMenu";
+import { NotificationsDropdown } from "@/components/site/header/NotificationsDropdown";
+import { ProfileDropdown } from "@/components/site/header/ProfileDropdown";
+import type { AccountMenuUser } from "@/components/site/header/AccountMenuBody";
+import { HEADER_CHROME_ICON_BUTTON_CLASS } from "@/components/site/header/headerIconButtonClass";
+import { useAccountMode } from "@/contexts/AccountModeContext";
+import { cn } from "@/lib/utils";
 
-interface BusinessHeaderProps {
-  userEmail?: string;
+function userInitials(email: string): string {
+  const local = email.split("@")[0] ?? "?";
+  const cleaned = local.replace(/[._-]+/g, " ").trim();
+  const parts = cleaned.split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) {
+    const a = parts[0]![0];
+    const b = parts[parts.length - 1]![0];
+    return (a + b).toUpperCase();
+  }
+  return cleaned.slice(0, 2).toUpperCase() || "?";
 }
 
-export function BusinessHeader({ userEmail }: BusinessHeaderProps) {
+interface BusinessHeaderProps {
+  user: AccountMenuUser;
+}
+
+export function BusinessHeader({ user }: BusinessHeaderProps) {
+  const router = useRouter();
+  const narrow = useNarrowViewport();
+  const { mode, goToBusinessAccount, goToPersonalAccount, hydrated } =
+    useAccountMode();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
+
+  const handleLogout = async () => {
+    setLoggingOut(true);
+    try {
+      const res = await fetch("/api/auth/logout", {
+        method: "POST",
+        credentials: "same-origin",
+      });
+      if (res.ok || res.redirected) {
+        setMenuOpen(false);
+        router.replace("/");
+        router.refresh();
+      }
+    } finally {
+      setLoggingOut(false);
+    }
+  };
+
+  const initials = userInitials(user.email);
+  const isBusinessPartner = user.role === "BUSINESS_OWNER";
+  const notificationContext =
+    !hydrated
+      ? "business"
+      : mode === "personal"
+        ? "user"
+        : "business";
+
+  const trigger = (
+    <Button
+      type="button"
+      variant="ghost"
+      size="icon"
+      className={cn(HEADER_CHROME_ICON_BUTTON_CLASS, "overflow-hidden p-0")}
+      aria-label="Меню аккаунта"
+      aria-haspopup="dialog"
+      aria-expanded={menuOpen}
+    >
+      <span className="flex h-full w-full items-center justify-center rounded-full bg-neutral-500 text-[11px] font-semibold text-white">
+        {initials}
+      </span>
+    </Button>
+  );
+
   return (
     <header className="sticky top-0 z-50 w-full border-b border-gray-200 bg-white">
       <div className="flex h-16 items-center gap-4 px-6">
-        {/* Brand */}
-        <div className="flex items-center gap-2 min-w-[200px]">
+        <div className="flex min-w-[200px] items-center gap-2">
           <span className="text-lg font-semibold text-gray-900">
             mamaGo Business
           </span>
         </div>
 
-        {/* Search Bar */}
-        <div className="flex-1 max-w-md">
+        <div className="max-w-md flex-1">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
             <Input
               type="search"
               placeholder="Поиск..."
-              className="pl-9 h-9 bg-gray-50 border-gray-200 focus:bg-white"
+              className="h-9 border-gray-200 bg-gray-50 pl-9 focus:bg-white"
             />
           </div>
         </div>
 
-        {/* Right Actions */}
-        <div className="flex items-center gap-3 ml-auto">
-          {/* Notifications */}
-          <NotificationBell />
-
-          {/* Profile Menu */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="flex items-center gap-2"
-              >
-                <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center">
-                  <User className="w-4 h-4 text-gray-600" />
-                </div>
-                {userEmail && (
-                  <span className="text-sm text-gray-700 hidden md:inline">
-                    {userEmail}
-                  </span>
-                )}
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-64 bg-white">
-              <DropdownMenuItem asChild>
-                <a href="/profile" className="flex items-center gap-3 px-4 py-3 cursor-pointer">
-                  <UserCircle className="w-5 h-5 text-gray-600" />
-                  <span>Профиль</span>
-                </a>
-              </DropdownMenuItem>
-              <DropdownMenuItem asChild>
-                <a href="/business/settings" className="flex items-center gap-3 px-4 py-3 cursor-pointer">
-                  <Settings className="w-5 h-5 text-gray-600" />
-                  <span>Настройки</span>
-                </a>
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem asChild>
-                <form action="/api/auth/logout" method="POST" className="w-full">
-                  <button type="submit" className="flex items-center gap-3 px-4 py-3 w-full text-left">
-                    <LogOut className="w-5 h-5 text-gray-600" />
-                    <span>Выйти</span>
-                  </button>
-                </form>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+        <div className="ml-auto flex items-center gap-2">
+          <CreatePublicationQuickMenu />
+          <NotificationsDropdown
+            context={notificationContext}
+            narrow={narrow}
+            viewAllHref={
+              notificationContext === "business"
+                ? "/business/notifications"
+                : "/notifications"
+            }
+            triggerClassName={cn("inline-flex", HEADER_CHROME_ICON_BUTTON_CLASS)}
+          />
+          <ProfileDropdown
+            mode={!hydrated ? "business" : mode}
+            user={user}
+            open={menuOpen}
+            onOpenChange={setMenuOpen}
+            narrow={narrow}
+            trigger={trigger}
+            loggingOut={loggingOut}
+            onLogout={handleLogout}
+            onNavigate={() => setMenuOpen(false)}
+            onGoToBusinessAccount={() =>
+              goToBusinessAccount(isBusinessPartner)
+            }
+            onGoToPersonalAccount={goToPersonalAccount}
+          />
         </div>
       </div>
     </header>

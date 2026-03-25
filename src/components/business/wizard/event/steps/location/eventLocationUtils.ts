@@ -188,7 +188,7 @@ export async function enrichEventLocation(data: {
   lng: number;
   cityId?: string;
   formattedAddr?: string;
-  addressJson?: any[];
+  addressJson?: unknown[];
 }): Promise<{
   cityId?: string;
   districtAutoId?: string | null;

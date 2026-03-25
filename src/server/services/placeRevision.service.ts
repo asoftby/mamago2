@@ -7,7 +7,9 @@
 
 import prisma from "@/lib/prisma";
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import type { Role } from "@prisma/client";
 import { PlaceRevisionStatus, LocationSource, PlaceKind } from "@prisma/client";
+import { canManageOwnedContent } from "@/lib/auth/businessContentAccess";
 import type { PlaceImage, PlaceRevisionImage, TempMedia, OpeningHoursRule, OpeningHoursInterval, Prisma } from "../types";
 import {
   notifyPlaceUpdateApproved,
@@ -96,7 +98,7 @@ export async function hasActiveRevision(placeId: string): Promise<boolean> {
  */
 export async function getOrCreatePlaceRevision(
   placeId: string,
-  businessUserId: string
+  user: { id: string; role: Role }
 ) {
   // Get the Place with ownership check
   const place = await prisma.place.findUnique({
@@ -112,7 +114,7 @@ export async function getOrCreatePlaceRevision(
     throw new Error("Place not found");
   }
 
-  if (place.ownerUserId !== businessUserId) {
+  if (!canManageOwnedContent(user, place.ownerUserId)) {
     throw new Error("Unauthorized: not place owner");
   }
 
@@ -194,7 +196,7 @@ export async function getOrCreatePlaceRevision(
 export async function savePlaceRevisionDraft(
   revisionId: string,
   data: PlaceRevisionData & { wizardSessionId?: string },
-  businessUserId: string
+  user: { id: string; role: Role }
 ) {
   // Get revision with ownership check
   const revision = await prisma.placeRevision.findUnique({
@@ -212,7 +214,7 @@ export async function savePlaceRevisionDraft(
     throw new Error("Revision not found");
   }
 
-  if (revision.place.ownerUserId !== businessUserId) {
+  if (!canManageOwnedContent(user, revision.place.ownerUserId)) {
     throw new Error("Unauthorized: not place owner");
   }
 
@@ -289,7 +291,7 @@ export async function savePlaceRevisionDraft(
       // Get all temp media for this session
       const tempMedia = await prisma.tempMedia.findMany({
         where: {
-          ownerUserId: businessUserId,
+          ownerUserId: user.id,
           wizardSessionId,
           status: "TEMP",
         },
@@ -339,7 +341,7 @@ export async function savePlaceRevisionDraft(
         // Mark temp media as attached
         await prisma.tempMedia.updateMany({
           where: {
-            ownerUserId: businessUserId,
+            ownerUserId: user.id,
             wizardSessionId,
             status: "TEMP",
           },
@@ -377,7 +379,7 @@ export async function savePlaceRevisionDraft(
  */
 export async function submitPlaceRevisionForModeration(
   revisionId: string,
-  businessUserId: string,
+  user: { id: string; role: Role },
   wizardSessionId?: string
 ) {
   // Get revision with ownership check
@@ -397,7 +399,7 @@ export async function submitPlaceRevisionForModeration(
     throw new Error("Revision not found");
   }
 
-  if (revision.place.ownerUserId !== businessUserId) {
+  if (!canManageOwnedContent(user, revision.place.ownerUserId)) {
     throw new Error("Unauthorized: not place owner");
   }
 

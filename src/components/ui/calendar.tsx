@@ -19,6 +19,8 @@ export interface CalendarProps {
   mode?: 'single' | 'multiple'; // Selection mode
   selectedDates?: Date[]; // For multiple selection mode
   onMultipleChange?: (dates: Date[]) => void; // Callback for multiple selection
+  /** Smaller typography and cells — use in tight popovers / wizards */
+  size?: "default" | "compact";
 }
 
 export function Calendar({
@@ -35,7 +37,9 @@ export function Calendar({
   mode = 'single',
   selectedDates = [],
   onMultipleChange,
+  size = "default",
 }: CalendarProps) {
+  const compact = size === "compact";
   const now = React.useMemo(() => new Date(), []);
   const todayStart = React.useMemo(() => getTodayStart(), []);
   
@@ -177,19 +181,33 @@ export function Calendar({
   };
 
   return (
-    <div className={cn("space-y-5 bg-white w-full", className)}>
+    <div
+      className={cn(
+        "bg-white w-full",
+        compact ? "space-y-2" : "space-y-5",
+        className
+      )}
+    >
       {/* Month Navigation */}
-      <div className="flex items-center justify-between px-1">
+      <div className="flex items-center justify-between px-0.5">
         <button
           type="button"
-          className="h-11 w-11 rounded-full hover:bg-muted/40 flex items-center justify-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className={cn(
+            "rounded-full hover:bg-muted/40 flex items-center justify-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed",
+            compact ? "h-8 w-8" : "h-11 w-11"
+          )}
           onClick={handlePrevMonth}
           disabled={disabled}
           aria-label="Предыдущий месяц"
         >
-          <ChevronLeft className="h-6 w-6" />
+          <ChevronLeft className={compact ? "h-4 w-4" : "h-6 w-6"} />
         </button>
-        <div className="text-xl font-semibold">
+        <div
+          className={cn(
+            "font-semibold capitalize",
+            compact ? "text-sm leading-tight" : "text-xl"
+          )}
+        >
           {new Date(year, month, 1).toLocaleDateString("ru-RU", {
             month: "long",
             year: "numeric",
@@ -197,28 +215,36 @@ export function Calendar({
         </div>
         <button
           type="button"
-          className="h-11 w-11 rounded-full hover:bg-muted/40 flex items-center justify-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className={cn(
+            "rounded-full hover:bg-muted/40 flex items-center justify-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed",
+            compact ? "h-8 w-8" : "h-11 w-11"
+          )}
           onClick={handleNextMonth}
           disabled={disabled}
           aria-label="Следующий месяц"
         >
-          <ChevronRight className="h-6 w-6" />
+          <ChevronRight className={compact ? "h-4 w-4" : "h-6 w-6"} />
         </button>
       </div>
 
       {/* Weekday Headers */}
-      <div className="grid grid-cols-7 text-center text-base text-muted-foreground font-medium">
+      <div
+        className={cn(
+          "grid grid-cols-7 text-center text-muted-foreground font-medium",
+          compact ? "text-[11px] leading-none" : "text-base"
+        )}
+      >
         {["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"].map((day, i) => (
-          <div key={i} className="py-2">
+          <div key={i} className={compact ? "py-0.5" : "py-2"}>
             {day}
           </div>
         ))}
       </div>
 
       {/* Calendar Grid */}
-      <div className="grid grid-cols-7 gap-2">
+      <div className={cn("grid grid-cols-7", compact ? "gap-0.5" : "gap-2")}>
         {Array.from({ length: startOffset }).map((_, i) => (
-          <div key={`empty-${i}`} className="h-14" />
+          <div key={`empty-${i}`} className={compact ? "h-8" : "h-14"} />
         ))}
         {Array.from({ length: daysInMonth }).map((_, i) => {
           const day = i + 1;
@@ -234,7 +260,10 @@ export function Calendar({
               key={day}
               type="button"
               className={cn(
-                "h-14 rounded-xl text-lg font-medium transition-all",
+                "font-medium transition-all",
+                compact
+                  ? "h-8 rounded-md text-xs"
+                  : "h-14 rounded-xl text-lg",
                 "hover:bg-muted/50 active:scale-95",
                 "disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent",
                 today && !selected && !rangeStartDay && !rangeEndDay && "ring-1 ring-primary/30 text-primary",

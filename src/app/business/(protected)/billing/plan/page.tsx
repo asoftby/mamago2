@@ -14,7 +14,7 @@ export default async function BillingPlanPage() {
   const user = await getCurrentUser();
   
   if (!user) {
-    redirect("/login?from=business");
+    redirect("/login");
   }
 
   const plan = mockCurrentPlan;

@@ -1,0 +1,47 @@
+@import "react-phone-number-input/style.css";
+
+.international-phone-field {
+  --PhoneInput-color--focus: var(--ring);
+}
+
+.international-phone-field .PhoneInput {
+  width: 100%;
+  min-height: 2.75rem;
+  border: 1px solid var(--input);
+  border-radius: calc(var(--radius) - 2px);
+  background: #fff;
+  padding: 0.125rem 0.5rem;
+  box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  transition: color 0.15s, box-shadow 0.15s, border-color 0.15s;
+}
+
+.international-phone-field .PhoneInput--focus {
+  outline: none;
+  border-color: var(--ring);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--ring) 50%, transparent);
+}
+
+.international-phone-field .PhoneInput:has(.PhoneInputInput:disabled) {
+  opacity: 0.5;
+  pointer-events: none;
+  cursor: not-allowed;
+}
+
+.international-phone-field .PhoneInputInput {
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  min-height: 2.5rem;
+}
+
+.international-phone-field .PhoneInputCountrySelect {
+  font-size: 0.875rem;
+}
+
+.international-phone-field--invalid .PhoneInput {
+  border-color: var(--destructive);
+}
+
+.international-phone-field--invalid .PhoneInput--focus {
+  border-color: var(--destructive);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--destructive) 20%, transparent);
+}

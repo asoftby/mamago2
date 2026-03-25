@@ -159,7 +159,7 @@ export function PlacesList({ places: initialPlaces, currentView }: PlacesListPro
             </p>
             {currentView === "active" && (
               <Button asChild size="lg">
-                <Link href="/business/places/new">
+                <Link href="/editor/place/new">
                   <Plus className="w-5 h-5 mr-2" />
                   Добавить место
                 </Link>
@@ -201,7 +201,7 @@ export function PlacesList({ places: initialPlaces, currentView }: PlacesListPro
       {currentView === "active" && (
         <div className="flex justify-end">
           <Button asChild>
-            <Link href="/business/places/new">
+            <Link href="/editor/place/new">
               <Plus className="w-4 h-4 mr-2" />
               Добавить место
             </Link>

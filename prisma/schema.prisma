@@ -225,15 +225,27 @@ enum UiPlacement {
 }
 
 model SignalDefinition {
-  id       String         @id @default(cuid())
-  slug     String         @unique
-  title    String
-  order    Int            @default(0)
-  isActive Boolean        @default(true)
-  options  SignalOption[]
+  id        String  @id @default(cuid())
+  slug      String  @unique
+  title     String
+  titleEn   String  @default("")
+  icon      String?
+  order     Int     @default(0)
+  isActive  Boolean @default(true)
+  isFeatured Boolean @default(false)
+
+  /// Два уровня: только корень (parentId = null) может иметь детей.
+  parentId String?
+  parent   SignalDefinition?  @relation("SignalDefinitionHierarchy", fields: [parentId], references: [id], onDelete: Restrict)
+  children SignalDefinition[] @relation("SignalDefinitionHierarchy")
+
+  options SignalOption[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([order])
+  @@index([parentId, order])
 }
 
 model SignalOption {
@@ -280,6 +292,70 @@ model FilterOption {
 
   @@unique([filterId, value])
   @@index([filterId, isActive, order])
+}
+
+/// Плоские оси Discovery: поводы / темы / жанры (отдельно от EventCategory и SignalDefinition).
+enum DiscoveryTaxonomyAxis {
+  OCCASION
+  THEME
+  GENRE
+}
+
+model DiscoveryTaxonomyEntry {
+  id        String                @id @default(cuid())
+  axis      DiscoveryTaxonomyAxis
+  slug      String
+  title     String
+  sortOrder Int                   @default(0)
+  isActive  Boolean               @default(true)
+  createdAt DateTime              @default(now())
+  updatedAt DateTime              @updatedAt
+
+  @@unique([axis, slug])
+  @@index([axis, sortOrder])
+}
+
+/// Категории событий — отдельный справочник админки «Фильтры» (не SignalDefinition / не ranking).
+model EventCategory {
+  id         String   @id @default(cuid())
+  nameRu     String
+  nameEn     String
+  slug       String   @unique
+  icon       String?
+  sortOrder  Int      @default(0)
+  isActive   Boolean  @default(true)
+  isFeatured Boolean  @default(false)
+
+  /// Родительская категория: только корень (parentId = null) может иметь детей; максимум 2 уровня.
+  parentId String?
+  parent   EventCategory?  @relation("EventCategoryChildren", fields: [parentId], references: [id], onDelete: Restrict)
+  children EventCategory[] @relation("EventCategoryChildren")
+
+  options EventCategoryOption[]
+
+  activities Activity[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([sortOrder])
+  @@index([isActive, sortOrder])
+  @@index([parentId])
+  @@index([parentId, sortOrder])
+}
+
+model EventCategoryOption {
+  id         String  @id @default(cuid())
+  categoryId String
+  label      String
+  value      String
+  order      Int     @default(0)
+  isActive   Boolean @default(true)
+
+  category EventCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@unique([categoryId, value])
+  @@index([categoryId, isActive, order])
 }
 
 model City {
@@ -400,6 +476,10 @@ model Activity {
   ageMinMonths   Int?
   ageMaxMonths   Int?
 
+  /// Справочник «Фильтры → Категории событий» (опционально)
+  eventCategoryId String?
+  eventCategory   EventCategory? @relation(fields: [eventCategoryId], references: [id], onDelete: SetNull)
+
   // Relations
   place         Place?                 @relation("PlaceActivities", fields: [placeId], references: [id], onDelete: Restrict)
   owner         User                   @relation(fields: [ownerUserId], references: [id], onDelete: Cascade, name: "ActivityOwner")
@@ -422,6 +502,7 @@ model Activity {
   @@index([ageMinMonths, ageMaxMonths])
   @@index([businessId])
   @@index([cityId])
+  @@index([eventCategoryId])
 }
 
 // Activity images
@@ -540,6 +621,13 @@ enum BusinessVerificationStatus {
   REJECTED
 }
 
+/// Видимость бизнеса для пользователей (мягкое отключение без удаления данных)
+enum BusinessOperationalStatus {
+  ACTIVE
+  DISABLED
+  ARCHIVED
+}
+
 // Content status (unified for Place, Activity, etc.)
 enum ContentStatus {
   DRAFT
@@ -547,6 +635,7 @@ enum ContentStatus {
   PUBLISHED
   NEEDS_REVISION // Renamed from NEEDS_CHANGES for consistency
   REJECTED
+  DELETED // Soft-delete: скрыто из списков, запись сохранена
 }
 
 // Activity type (determines section classification)
@@ -678,6 +767,9 @@ model Business {
   rejectedAt         DateTime?
   isVerified         Boolean                    @default(false)
 
+  /// Показ контента бизнеса пользователям (отдельно от верификации)
+  operationalStatus BusinessOperationalStatus @default(ACTIVE)
+
   owner            User                      @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
   verificationLogs BusinessVerificationLog[]
   billingAccount   BillingAccount?
@@ -694,6 +786,7 @@ model Business {
   @@index([ownerUserId])
   @@index([status])
   @@index([verificationStatus])
+  @@index([operationalStatus])
 }
 
 // Business verification audit log

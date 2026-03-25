@@ -67,6 +67,8 @@ async function testPlaceRevisionService() {
 
   console.log(`✅ Created published place: ${place.title} (${place.id})\n`);
 
+  const owner = { id: businessOwner.id, role: businessOwner.role };
+
   // Test 1: Check no active revision initially
   console.log("Test 1: Check no active revision initially");
   const hasRevision1 = await hasActiveRevision(place.id);
@@ -75,7 +77,7 @@ async function testPlaceRevisionService() {
 
   // Test 2: Create revision from published place
   console.log("Test 2: Create revision from published place");
-  const revision1 = await getOrCreatePlaceRevision(place.id, businessOwner.id);
+  const revision1 = await getOrCreatePlaceRevision(place.id, owner);
   console.log(`✅ Created revision: ${revision1.id}`);
   console.log(`   Status: ${revision1.status}`);
   console.log(`   Title: ${revision1.title}`);
@@ -85,7 +87,7 @@ async function testPlaceRevisionService() {
 
   // Test 3: Verify one-active-revision rule (should return existing)
   console.log("Test 3: Verify one-active-revision rule");
-  const revision2 = await getOrCreatePlaceRevision(place.id, businessOwner.id);
+  const revision2 = await getOrCreatePlaceRevision(place.id, owner);
   console.assert(revision2.id === revision1.id, "Should return same revision");
   console.log(`✅ Returned existing revision: ${revision2.id === revision1.id}\n`);
 
@@ -98,7 +100,7 @@ async function testPlaceRevisionService() {
       description: "Updated long description",
       phone: "+375291234567",
     },
-    businessOwner.id
+    owner
   );
   console.log(`✅ Updated revision`);
   console.log(`   New title: ${updatedRevision.title}`);
@@ -110,7 +112,7 @@ async function testPlaceRevisionService() {
   console.log("Test 5: Submit revision for moderation");
   const submittedRevision = await submitPlaceRevisionForModeration(
     revision1.id,
-    businessOwner.id
+    owner
   );
   console.log(`✅ Submitted revision`);
   console.log(`   Status: ${submittedRevision.status}`);
@@ -140,7 +142,7 @@ async function testPlaceRevisionService() {
   console.log("Test 7: Resubmit after changes");
   const resubmittedRevision = await submitPlaceRevisionForModeration(
     revision1.id,
-    businessOwner.id
+    owner
   );
   console.log(`✅ Resubmitted revision`);
   console.log(`   Status: ${resubmittedRevision.status}`);
@@ -173,13 +175,13 @@ async function testPlaceRevisionService() {
 
   // Test 9: Create new revision and reject it
   console.log("Test 9: Create new revision and reject it");
-  const revision3 = await getOrCreatePlaceRevision(place.id, businessOwner.id);
+  const revision3 = await getOrCreatePlaceRevision(place.id, owner);
   await savePlaceRevisionDraft(
     revision3.id,
     { title: "Test Cafe Rejected Version" },
-    businessOwner.id
+    owner
   );
-  await submitPlaceRevisionForModeration(revision3.id, businessOwner.id);
+  await submitPlaceRevisionForModeration(revision3.id, owner);
   await rejectPlaceRevision(
     revision3.id,
     admin.id,
@@ -202,14 +204,14 @@ async function testPlaceRevisionService() {
 
   // Test 10: Error handling - cannot edit PENDING revision
   console.log("Test 10: Error handling - cannot edit PENDING revision");
-  const revision4 = await getOrCreatePlaceRevision(place.id, businessOwner.id);
-  await submitPlaceRevisionForModeration(revision4.id, businessOwner.id);
+  const revision4 = await getOrCreatePlaceRevision(place.id, owner);
+  await submitPlaceRevisionForModeration(revision4.id, owner);
   
   try {
     await savePlaceRevisionDraft(
       revision4.id,
       { title: "Should fail" },
-      businessOwner.id
+      owner
     );
     console.log("❌ Should have thrown error");
   } catch (error) {

@@ -3,6 +3,7 @@ import { getCurrentUser } from "@/lib/auth/server";
 import { listAllPlanItems } from "@/server/services/plan.service";
 import { prisma } from "@/lib/prisma";
 import { PlanPageClient } from "./PlanPageClient";
+import { getPlanActivityPublicAvailability } from "@/lib/plan/publicVisibility";
 
 export default async function PlanPage() {
   const user = await getCurrentUser();
@@ -40,6 +41,7 @@ export default async function PlanPage() {
     activityId: item.activityId,
     title: item.title,
     coverImageUrl: item.coverImageUrl,
+    planAvailability: getPlanActivityPublicAvailability(item.activity),
     activity: item.activity
       ? {
           id: item.activity.id,

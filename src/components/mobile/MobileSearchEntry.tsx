@@ -10,6 +10,7 @@ import { useDiscoveryFilterOptions } from "@/features/filters/discovery/filters.
 import { DISCOVERY_INTENT_CONFIG } from "@/lib/discovery/discoveryIntentConfig";
 import { Intent } from "@/lib/intent";
 import { IconCompass, IconPalette, IconParty, IconMap } from "@/components/ui/icons";
+import { getCityLocativePhrase } from "@/lib/city/cityDisplayNames";
 
 // Map intent IDs to fallback icons
 const INTENT_ICONS = {
@@ -23,50 +24,50 @@ interface MobileSearchEntryProps {
   onSearchClick: () => void;
   className?: string;
   citySlug?: string;
-  currentIntent?: Intent;
+  /** `undefined` на главной хаба — без активного раздела (иконка MapPin). */
+  currentIntent?: Intent | null;
   /** Хаб города: как в разделах, но только «Куда» и иконка MapPin */
   cityHubOnly?: boolean;
+  /** На посадочной публикации — иконка раздела вместо MapPin при cityHubOnly */
+  showSectionIcon?: boolean;
+  /** Подсказка «тапни, чтобы выбрать» — только на главной города (`/{city}`) */
+  showTapToSelectHint?: boolean;
 }
 
 export function MobileSearchEntry({
   onSearchClick,
   className,
   citySlug = "minsk",
-  currentIntent = "kuda",
+  currentIntent,
   cityHubOnly = false,
+  showSectionIcon = false,
+  showTapToSelectHint = false,
 }: MobileSearchEntryProps) {
   const [isClient, setIsClient] = useState(false);
   const { applied } = useDiscoveryFilters();
   const { options: apiOptions } = useDiscoveryFilterOptions(citySlug);
 
-  // Ensure we're on the client
   useEffect(() => {
-    setIsClient(true);
+    const id = window.setTimeout(() => setIsClient(true), 0);
+    return () => window.clearTimeout(id);
   }, []);
 
-  // Get current intent config
-  const intentConfig = DISCOVERY_INTENT_CONFIG[currentIntent];
-  const FallbackIcon = INTENT_ICONS[currentIntent];
+  const resolvedIntent: Intent | null =
+    currentIntent ?? (cityHubOnly ? null : "kuda");
 
-  // Format city display name
-  const getCityDisplayName = (slug: string) => {
-    const cityNames: Record<string, string> = {
-      minsk: "Минск",
-      brest: "Брест",
-      gomel: "Гомель",
-      grodno: "Гродно",
-      mogilev: "Могилёв",
-      vitebsk: "Витебск",
-    };
-    return cityNames[slug] || slug;
-  };
+  const intentConfig = resolvedIntent
+    ? DISCOVERY_INTENT_CONFIG[resolvedIntent]
+    : undefined;
+  const FallbackIcon = resolvedIntent
+    ? INTENT_ICONS[resolvedIntent]
+    : undefined;
 
   // Build location text
   const getLocationText = () => {
     const parts: string[] = [];
     
     // Always show city first
-    parts.push(getCityDisplayName(citySlug));
+    parts.push(getCityLocativePhrase(citySlug));
     
     // Add "Поблизости" if selected
     if (applied.nearby) {
@@ -173,7 +174,9 @@ export function MobileSearchEntry({
 
   const parts = cityHubOnly
     ? [locationText]
-    : [locationText, dateText, ageText].filter(Boolean);
+    : [locationText, dateText, ageText].filter(
+        (p): p is string => p != null && p !== "",
+      );
 
   const summaryText =
     parts.length > 0 ? parts.join(" • ") : cityHubOnly ? locationText : "Начать поиск";
@@ -189,19 +192,38 @@ export function MobileSearchEntry({
         applied.age.length > 0
       );
 
+  /** Только город в фильтрах (локация по умолчанию), без даты/возраста/метро/района/поблизости */
+  const onlyCitySelected = !(
+    applied.district ||
+    applied.metro ||
+    applied.nearby ||
+    applied.whenPreset ||
+    applied.dateFrom ||
+    applied.dateTo ||
+    applied.age.length > 0
+  );
+
+  /** Подсказка «тапни…» только если кроме города ничего не выбрано */
+  const showTapToSelectHintRight =
+    onlyCitySelected && (showTapToSelectHint || !cityHubOnly);
+
+  const TAP_HINT = "[ тапни, чтобы выбрать ]";
+
   return (
     <button
       onClick={onSearchClick}
       className={cn(
-        "flex items-center gap-3 w-full h-[52px] rounded-full bg-white border border-gray-200 shadow-sm hover:shadow-md transition-all duration-200 px-5 relative",
-        "active:scale-[0.98] active:shadow-sm text-left",
+        "flex min-w-0 items-center gap-3 h-[52px] w-full max-w-full overflow-hidden rounded-full px-5 relative text-left",
+        "border border-gray-200 bg-white shadow-sm transition-all duration-200",
+        "hover:border-gray-300 hover:shadow-md",
+        "active:scale-[0.98] active:shadow-sm",
         className
       )}
     >
       <div className="flex-shrink-0">
-        {cityHubOnly ? (
+        {cityHubOnly && !showSectionIcon ? (
           <MapPin className="h-5 w-5 text-gray-400" aria-hidden />
-        ) : intentConfig.image ? (
+        ) : intentConfig?.image ? (
           <Image
             src={intentConfig.image}
             alt={intentConfig.label}
@@ -216,13 +238,27 @@ export function MobileSearchEntry({
         )}
       </div>
       
-      {/* Search Summary Text */}
-      <span className={cn(
-        "text-base font-normal truncate flex-1",
-        hasAdditionalFilters ? "text-gray-700" : "text-gray-500"
-      )}>
-        {summaryText}
-      </span>
+      {/* Сводка + подсказка, если не выбраны опциональные фильтры (дата/возраст; город не считается) */}
+      <div className="flex min-w-0 flex-1 items-center justify-between gap-2 overflow-hidden">
+        {showTapToSelectHintRight ? (
+          <>
+            <span className="block min-w-0 flex-1 truncate text-left text-sm font-normal text-gray-700">
+              {summaryText}
+            </span>
+            <span className="shrink-0 pl-2 text-right text-xs text-neutral-400">
+              {TAP_HINT}
+            </span>
+          </>
+        ) : hasAdditionalFilters ? (
+          <span className="block min-w-0 flex-1 truncate text-left text-sm font-normal text-gray-700">
+            {summaryText}
+          </span>
+        ) : (
+          <span className="block min-w-0 flex-1 truncate text-left text-sm font-normal text-gray-600">
+            {summaryText}
+          </span>
+        )}
+      </div>
     </button>
   );
 }

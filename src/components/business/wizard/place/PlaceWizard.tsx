@@ -1,12 +1,19 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, Send, Save } from "lucide-react";
 import { toast } from "sonner";
+import {
+  FormWizardShell,
+  FormWizardHeader,
+  FormStepSegments,
+  FormPrimaryContentCard,
+  FormStickyActionBar,
+  formWizardPhaseFromFlags,
+} from "@/components/form-shell";
+import { getBusinessFormActionLabels, businessFormCopy } from "../businessFormLabels";
+import { canPublishContentDirectly } from "@/lib/auth/businessContentAccess";
 import { useWizardSession } from "@/hooks/useWizardSession";
-import { ContentStatus } from "@prisma/client";
 
 import type { PlaceFormData, PlaceWizardMode } from "./types";
 import { WIZARD_STEPS, TOTAL_STEPS, getStepLabel } from "./config";
@@ -21,18 +28,69 @@ import { Step4Photos } from "./steps/Step4Photos";
 import { Step5OpeningHours } from "./steps/Step5OpeningHours";
 import { Step6Review } from "./steps/Step6Review";
 import { CompletionProgress } from "./CompletionProgress";
+import {
+  defaultNavForSurface,
+  editorPlaceEditHref,
+  type ContentEditorNav,
+  type ContentEditorSurface,
+} from "@/lib/content-editor/types";
+import type { Role } from "@prisma/client";
 
 interface PlaceWizardProps {
   mode: PlaceWizardMode;
   place?: any; // Place entity for edit mode
   userId: string;
+  userRole?: Role;
   onComplete?: (placeId: string) => void;
+  /** When set (e.g. isolated /editor routes), drives list/edit URLs and post-submit navigation */
+  editorSurface?: ContentEditorSurface;
+  contentEditorNav?: Partial<ContentEditorNav>;
+  /** Overrides default list/queue destination after submit */
+  returnTo?: string;
 }
 
 const LOCAL_STORAGE_KEY = "place-wizard-draft";
 
-export function PlaceWizard({ mode, place, userId, onComplete }: PlaceWizardProps) {
+/** POST /api/business/places expects { createRequestId, status, data } — not a flat payload. */
+function buildCreatePlaceRequestBody(
+  formData: PlaceFormData,
+  createRequestId: string,
+  status: "DRAFT" | "PENDING" | "PUBLISHED",
+  wizardSessionId: string | undefined
+) {
+  const data: Record<string, unknown> = {
+    ...buildPlacePayload(formData),
+  };
+  if (wizardSessionId) {
+    data.wizardSessionId = wizardSessionId;
+  }
+  if (formData.openingHoursData) {
+    data.openingHoursData = formData.openingHoursData;
+  }
+  return {
+    createRequestId,
+    status,
+    data,
+  };
+}
+
+export function PlaceWizard({
+  mode,
+  place,
+  userId,
+  userRole,
+  onComplete,
+  editorSurface,
+  contentEditorNav,
+  returnTo,
+}: PlaceWizardProps) {
   const router = useRouter();
+  const surface: ContentEditorSurface = editorSurface ?? "business";
+  const nav: ContentEditorNav = {
+    ...defaultNavForSurface(surface),
+    ...contentEditorNav,
+  };
+  const afterSubmitDestination = returnTo ?? nav.afterSubmitListPath;
   const [currentStep, setCurrentStep] = useState(1);
   const [formData, setFormData] = useState<PlaceFormData>(() => {
     if (mode === "edit" && place) {
@@ -61,6 +119,9 @@ export function PlaceWizard({ mode, place, userId, onComplete }: PlaceWizardProp
   const [originalData] = useState<PlaceFormData>(() => 
     mode === "edit" && place ? mapPlaceToFormData(place) : getDefaultFormData()
   );
+
+  /** Stable idempotency key for create — must match API contract. */
+  const [createRequestId] = useState(() => crypto.randomUUID());
 
   // Wizard session for temp media
   const { wizardSessionId, clearSession } = useWizardSession({
@@ -147,21 +208,26 @@ export function PlaceWizard({ mode, place, userId, onComplete }: PlaceWizardProp
     
     try {
       if (mode === "create") {
-        // Create new place as draft
-        const payload = {
-          ...buildPlacePayload(formData),
-          status: ContentStatus.DRAFT,
-          ownerUserId: userId,
-        };
-        
+        const body = buildCreatePlaceRequestBody(
+          formData,
+          createRequestId,
+          "DRAFT",
+          wizardSessionId
+        );
+
         const response = await fetch("/api/business/places", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
+          body: JSON.stringify(body),
         });
-        
+
         if (!response.ok) {
-          throw new Error("Failed to save draft");
+          const err = await response.json().catch(() => ({}));
+          throw new Error(
+            (err as { message?: string }).message ||
+              (err as { error?: string }).error ||
+              "Failed to save draft"
+          );
         }
         
         const result = await response.json();
@@ -174,7 +240,7 @@ export function PlaceWizard({ mode, place, userId, onComplete }: PlaceWizardProp
         if (onComplete) {
           onComplete(result.place.id);
         } else {
-          router.push(`/business/places/${result.place.id}/edit`);
+          router.push(editorPlaceEditHref(result.place.id));
         }
       } else {
         // Update existing place
@@ -222,22 +288,18 @@ export function PlaceWizard({ mode, place, userId, onComplete }: PlaceWizardProp
     
     try {
       if (mode === "create") {
-        // Create and submit
-        const payload = {
-          ...buildPlacePayload(formData),
-          status: ContentStatus.PENDING,
-          ownerUserId: userId,
-        };
-        
-        // Include opening hours if configured
-        if (formData.openingHoursData) {
-          (payload as any).openingHoursData = formData.openingHoursData;
-        }
-        
+        const publishDirect = canPublishContentDirectly(userRole);
+        const body = buildCreatePlaceRequestBody(
+          formData,
+          createRequestId,
+          publishDirect ? "PUBLISHED" : "PENDING",
+          wizardSessionId
+        );
+
         const response = await fetch("/api/business/places", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
+          body: JSON.stringify(body),
         });
         
         if (!response.ok) {
@@ -250,12 +312,14 @@ export function PlaceWizard({ mode, place, userId, onComplete }: PlaceWizardProp
         // Clear local draft
         localStorage.removeItem(LOCAL_STORAGE_KEY);
         
-        toast.success("Место отправлено на модерацию");
+        toast.success(
+          publishDirect ? "Место опубликовано" : "Место отправлено на модерацию",
+        );
         
         if (onComplete) {
           onComplete(result.place.id);
         } else {
-          router.push("/business/places");
+          router.push(afterSubmitDestination);
         }
       } else {
         // Submit existing place or create revision
@@ -291,10 +355,22 @@ export function PlaceWizard({ mode, place, userId, onComplete }: PlaceWizardProp
             throw new Error("Failed to submit");
           }
           
-          toast.success("Место отправлено на модерацию");
+          toast.success(
+            canPublishContentDirectly(userRole)
+              ? "Место опубликовано"
+              : "Место отправлено на модерацию",
+          );
         }
-        
-        router.refresh();
+
+        if (onComplete) {
+          onComplete(place.id);
+        } else if (returnTo) {
+          router.push(returnTo);
+        } else if (surface === "admin") {
+          router.push(nav.afterSubmitListPath);
+        } else {
+          router.refresh();
+        }
       }
     } catch (error: any) {
       console.error("Submit error:", error);
@@ -339,104 +415,68 @@ export function PlaceWizard({ mode, place, userId, onComplete }: PlaceWizardProp
   const canPrev = currentStep > 1;
   const isReviewStep = currentStep === 6;
 
+  const segments = useMemo(
+    () => WIZARD_STEPS.map((s) => ({ id: s.id, title: s.label })),
+    []
+  );
+
+  const phase = formWizardPhaseFromFlags({ isSaving, isSubmitting });
+
+  const actionLabels = useMemo(
+    () => getBusinessFormActionLabels(userRole),
+    [userRole],
+  );
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white border-b sticky top-0 z-10">
-        <div className="max-w-4xl mx-auto px-6 py-4">
-          <div className="mb-4">
-            <div className="flex items-center justify-between mb-2">
-              <h1 className="text-2xl font-bold">
-                {mode === "create" ? "Новое место" : "Редактирование места"}
-              </h1>
-              {lastSaved && (
-                <div className="text-xs text-muted-foreground">
-                  Сохранено {lastSaved.toLocaleTimeString()}
-                </div>
-              )}
-            </div>
-            <div className="flex items-center justify-between">
-              <p className="text-sm text-muted-foreground">
-                Шаг {currentStep} из {TOTAL_STEPS}: {getStepLabel(currentStep)}
-              </p>
-              <CompletionProgress data={formData} />
-            </div>
-          </div>
-          
-          {/* Step Progress with Navigation */}
-          <div className="space-y-3">
-            <div className="flex gap-2">
-              {WIZARD_STEPS.map((step) => (
-                <button
-                  key={step.id}
-                  onClick={() => handleGoToStep(step.id)}
-                  className={`flex-1 h-2 rounded-full transition-colors ${
-                    step.id === currentStep
-                      ? "bg-primary"
-                      : step.id < currentStep
-                      ? "bg-primary/50"
-                      : "bg-gray-200"
-                  }`}
-                  title={step.label}
-                />
-              ))}
-            </div>
-            
-            {/* Navigation Buttons */}
-            <div className="flex items-center justify-between pt-2">
-              <div>
-                {canPrev && (
-                  <Button
-                    variant="outline"
-                    onClick={handlePrev}
-                    disabled={isSaving || isSubmitting}
-                  >
-                    <ChevronLeft className="w-4 h-4 mr-2" />
-                    Назад
-                  </Button>
-                )}
-              </div>
-
-              <div className="flex gap-3">
-                {isReviewStep ? (
-                  <>
-                    <Button
-                      variant="outline"
-                      onClick={handleSaveDraft}
-                      disabled={isSaving || isSubmitting}
-                    >
-                      <Save className="w-4 h-4 mr-2" />
-                      {isSaving ? "Сохранение..." : "Сохранить черновик"}
-                    </Button>
-                    <Button
-                      onClick={handleSubmit}
-                      disabled={!stepValidation.isValid || isSubmitting || isSaving}
-                    >
-                      <Send className="w-4 h-4 mr-2" />
-                      {isSubmitting ? "Отправка..." : "Отправить на модерацию"}
-                    </Button>
-                  </>
-                ) : (
-                  <Button
-                    onClick={handleNext}
-                    disabled={!canNext || isSaving || isSubmitting}
-                  >
-                    Далее
-                    <ChevronRight className="w-4 h-4 ml-2" />
-                  </Button>
-                )}
-              </div>
-            </div>
+    <FormWizardShell>
+      <FormWizardHeader
+        title={
+          mode === "create"
+            ? businessFormCopy.place.createTitle
+            : businessFormCopy.place.editTitle
+        }
+        subtitle={businessFormCopy.stepSubtitle(
+          currentStep,
+          TOTAL_STEPS,
+          getStepLabel(currentStep)
+        )}
+        trailing={lastSaved ? businessFormCopy.savedAt(lastSaved) : undefined}
+      >
+        <div className="space-y-3">
+          <FormStepSegments
+            segments={segments}
+            currentStep={currentStep}
+            onStepClick={handleGoToStep}
+          />
+          <div className="flex justify-end">
+            <CompletionProgress data={formData} />
           </div>
         </div>
-      </div>
+      </FormWizardHeader>
 
-      {/* Content */}
-      <div className="max-w-4xl mx-auto px-6 py-8">
-        <div className="bg-white rounded-lg border p-8">
-          {renderStep()}
-        </div>
-      </div>
-    </div>
+      <FormPrimaryContentCard>{renderStep()}</FormPrimaryContentCard>
+
+      <FormStickyActionBar
+        phase={phase}
+        labels={actionLabels}
+        showBack={canPrev}
+        onBack={handlePrev}
+        showSaveDraft={isReviewStep}
+        onSaveDraft={isReviewStep ? handleSaveDraft : undefined}
+        saveDraftDisabled={isSaving || isSubmitting}
+        isReviewStep={isReviewStep}
+        onContinue={!isReviewStep ? handleNext : undefined}
+        continueDisabled={
+          !canNext ||
+          isSaving ||
+          isSubmitting ||
+          !canGoToNextStep(currentStep, formData)
+        }
+        onSubmit={isReviewStep ? handleSubmit : undefined}
+        submitDisabled={
+          !stepValidation.isValid || isSubmitting || isSaving
+        }
+      />
+    </FormWizardShell>
   );
 }

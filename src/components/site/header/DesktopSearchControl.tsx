@@ -15,6 +15,11 @@ import { IconCompass, IconPalette, IconParty, IconMap } from "@/components/ui/ic
 import type { HeaderPanel } from "@/hooks/useStableHeaderBehavior";
 import type { Intent } from "@/lib/intent";
 import { RefinementFiltersButtonCompact } from "@/components/discovery/RefinementFiltersButtonCompact";
+import { getCityLocativePhrase } from "@/lib/city/cityDisplayNames";
+
+/** Как у кнопки «Фильтры» (RefinementFiltersButtonCompact): белый фон, бордер, тень. */
+const SEARCH_BAR_EMBEDDED_IN_HEADER_CLASSES =
+  "border border-gray-200 bg-white shadow-sm transition-[box-shadow,border-color,background-color] duration-200 ease-out hover:border-gray-300 hover:bg-gray-50 hover:shadow-md focus-within:border-gray-300 focus-within:shadow-md";
 
 type SearchMode = "compact" | "expanded";
 
@@ -33,6 +38,8 @@ interface DesktopSearchControlProps {
   embeddedInHeader?: boolean;
   /** Хаб города: только выбор города, без даты и «с кем». */
   variant?: "discovery" | "cityHub";
+  /** Компактный cityHub: иконка раздела вместо MapPin (страница публикации) */
+  compactIconIntent?: Intent | null;
 }
 
 export function DesktopSearchControl({
@@ -51,6 +58,7 @@ type CityHubDesktopSearchControlProps = Omit<DesktopSearchControlProps, "variant
 function CityHubDesktopSearchControl({
   citySlug = "minsk",
   className,
+  compactIconIntent = null,
   mode,
   activePanel,
   onPanelChange,
@@ -74,21 +82,9 @@ function CityHubDesktopSearchControl({
     mode === "expanded" && activePanel === "where",
   );
 
-  const getCityDisplayName = (slug: string) => {
-    const cityNames: Record<string, string> = {
-      minsk: "Минск",
-      brest: "Брест",
-      gomel: "Гомель",
-      grodno: "Гродно",
-      mogilev: "Могилёв",
-      vitebsk: "Витебск",
-    };
-    return cityNames[slug] || slug;
-  };
-
   const getLocationText = () => {
     const parts: string[] = [];
-    parts.push(getCityDisplayName(citySlug));
+    parts.push(getCityLocativePhrase(citySlug));
     if (formDisplayFilters.nearby) parts.push("Поблизости");
     if (formDisplayFilters.metro) {
       const metro = safeApiOptions.metros.find(
@@ -154,7 +150,7 @@ function CityHubDesktopSearchControl({
   );
 
   return (
-    <div className={cn("relative w-full flex items-center gap-3", className)}>
+    <div className={cn("relative flex w-full min-h-0 items-stretch gap-3", className)}>
       {mode === "compact" ? (
         <button
           type="button"
@@ -164,19 +160,20 @@ function CityHubDesktopSearchControl({
             onExpand?.();
           }}
           className={cn(
-            "relative w-full bg-white rounded-full border border-gray-200 shadow-sm flex-1 overflow-hidden text-left",
+            "relative min-h-0 w-full flex-1 overflow-hidden rounded-full border border-gray-200 bg-white text-left shadow-sm",
             "transition-[box-shadow,border-color] duration-200 ease-out",
             "hover:shadow-md hover:border-gray-300",
             "focus:shadow-md focus:border-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-200 focus:ring-offset-2",
             "cursor-pointer",
           )}
-          aria-label="Куда: город и район — нажмите, чтобы раскрыть"
+          aria-label="Где: город и район — нажмите, чтобы раскрыть"
         >
-          <div className="flex items-center gap-3 px-6 py-3">
+          <div className="flex h-full items-center gap-3 px-6 py-3">
             <CompactLocationSummary
               citySlug={citySlug}
               applied={applied}
               apiOptions={safeApiOptions}
+              iconIntent={compactIconIntent}
             />
           </div>
         </button>
@@ -184,9 +181,9 @@ function CityHubDesktopSearchControl({
         <div
           data-search-container
           className={cn(
-            "relative flex-1 overflow-hidden rounded-full transition-[box-shadow,border-color] duration-200 ease-out",
+            "relative flex-1 overflow-hidden rounded-full transition-[box-shadow,border-color,background-color] duration-200 ease-out",
             embeddedInHeader
-              ? "border border-gray-100 bg-gray-50/80 hover:border-gray-200 focus-within:border-gray-200"
+              ? SEARCH_BAR_EMBEDDED_IN_HEADER_CLASSES
               : "bg-white border border-gray-200 shadow-sm hover:shadow-md hover:border-gray-300 focus-within:shadow-md focus-within:border-gray-300",
             "focus-within:outline-none",
           )}
@@ -204,7 +201,7 @@ function CityHubDesktopSearchControl({
             >
               <MapPin className="h-4 w-4 flex-shrink-0 text-gray-400" />
               <div className="flex min-w-0 flex-1 flex-col items-start">
-                <span className="text-xs font-medium text-gray-900">Куда</span>
+                <span className="text-xs font-medium text-gray-900">Где?</span>
                 <span className="w-full truncate text-left text-sm text-gray-600">
                   {getLocationText()}
                 </span>
@@ -275,30 +272,27 @@ function CityHubDesktopSearchControl({
   );
 }
 
-/** Компактный хаб: как в разделах, но иконка поля «Куда» (MapPin), только локация. */
+/** Компактный хаб: как на главной — одна строка локации; при `iconIntent` — иконка раздела вместо MapPin. */
 function CompactLocationSummary({
   citySlug,
   applied,
   apiOptions: safeApiOptions,
+  iconIntent = null,
 }: {
   citySlug: string;
   applied: any;
   apiOptions: any;
+  iconIntent?: Intent | null;
 }) {
-  const getCityDisplayName = (slug: string) => {
-    const cityNames: Record<string, string> = {
-      minsk: "Минск",
-      brest: "Брест",
-      gomel: "Гомель",
-      grodno: "Гродно",
-      mogilev: "Могилёв",
-      vitebsk: "Витебск",
-    };
-    return cityNames[slug] || slug;
+  const INTENT_ICONS = {
+    kuda: IconCompass,
+    classes: IconPalette,
+    birthday: IconParty,
+    routes: IconMap,
   };
 
   const parts: string[] = [];
-  parts.push(getCityDisplayName(citySlug));
+  parts.push(getCityLocativePhrase(citySlug));
   if (applied.nearby) parts.push("Поблизости");
   if (applied.metro) {
     const metro = safeApiOptions.metros.find(
@@ -314,9 +308,35 @@ function CompactLocationSummary({
 
   const summaryText = parts.length > 0 ? parts.join(" • ") : "Поиск";
 
+  const intentKey = iconIntent ?? null;
+  const intentConfig =
+    intentKey != null
+      ? DISCOVERY_INTENT_CONFIG[intentKey as keyof typeof DISCOVERY_INTENT_CONFIG]
+      : null;
+  const FallbackIcon =
+    intentKey != null
+      ? INTENT_ICONS[intentKey as keyof typeof INTENT_ICONS] || IconCompass
+      : null;
+
   return (
     <>
-      <MapPin className="h-[21px] w-[21px] flex-shrink-0 text-gray-400" />
+      {intentKey != null && intentConfig && FallbackIcon ? (
+        <div className="flex-shrink-0">
+          {intentConfig.image ? (
+            <Image
+              src={intentConfig.image}
+              alt={intentConfig.label}
+              width={21}
+              height={21}
+              className="object-contain"
+            />
+          ) : (
+            <FallbackIcon className="h-[21px] w-[21px] text-gray-400" />
+          )}
+        </div>
+      ) : (
+        <MapPin className="h-[21px] w-[21px] flex-shrink-0 text-gray-400" />
+      )}
       <span className="flex-1 truncate text-sm text-gray-700">{summaryText}</span>
     </>
   );
@@ -328,6 +348,7 @@ function DiscoveryDesktopSearchControl({
   citySlug = "minsk",
   className,
   currentIntent,
+  compactIconIntent: _compactIconIntent,
   mode,
   activePanel,
   onPanelChange,
@@ -367,25 +388,12 @@ function DiscoveryDesktopSearchControl({
     mode === "expanded" && activePanel === "who"
   );
   
-  // Format city display name
-  const getCityDisplayName = (slug: string) => {
-    const cityNames: Record<string, string> = {
-      minsk: "Минск",
-      brest: "Брест",
-      gomel: "Гомель",
-      grodno: "Гродно",
-      mogilev: "Могилёв",
-      vitebsk: "Витебск",
-    };
-    return cityNames[slug] || slug;
-  };
-
   // Build location display text
   const getLocationText = () => {
     const parts = [];
     
     // Always show city first
-    parts.push(getCityDisplayName(citySlug));
+    parts.push(getCityLocativePhrase(citySlug));
     
     // Add nearby if selected
     if (formDisplayFilters.nearby) {
@@ -433,12 +441,12 @@ function DiscoveryDesktopSearchControl({
       return `${day} ${month}`;
     }
     
-    return "Когда";
+    return "Выберите дату";
   };
 
   // Build age display text
   const getAgeText = () => {
-    if (formDisplayFilters.age.length === 0) return "С кем";
+    if (formDisplayFilters.age.length === 0) return "Выберите возраст";
     
     const ageLabels = formDisplayFilters.age.map(ageValue => {
       const group = AGE_GROUPS.find(g => g.value === ageValue);
@@ -534,7 +542,16 @@ function DiscoveryDesktopSearchControl({
     DISCOVERY_INTENT_CONFIG[currentIntent as Intent]?.hasFilters === true;
 
   return (
-    <div ref={containerRef} className={cn("relative w-full flex items-center gap-3", className)}>
+    <div
+      ref={containerRef}
+      className={cn(
+        "relative flex w-full min-h-0 items-stretch gap-3",
+        /* Обёртка прозрачная — фон хедера (градиент) виден; белые капсулы внутри. */
+        showSecondaryFiltersInBar &&
+          "rounded-[28px] bg-transparent p-1.5",
+        className,
+      )}
+    >
       
       {/* SEARCH SHELL - В compact: вся капсула (поле «Минск») — одна кнопка, клик открывает раскрытый хедер */}
       {mode === "compact" ? (
@@ -546,7 +563,7 @@ function DiscoveryDesktopSearchControl({
             onExpand?.();
           }}
           className={cn(
-            "relative w-full bg-white rounded-full border border-gray-200 shadow-sm flex-1 overflow-hidden text-left",
+            "relative min-h-0 w-full flex-1 overflow-hidden rounded-full border border-gray-200 bg-white text-left shadow-sm",
             "transition-[box-shadow,border-color] duration-200 ease-out",
             "hover:shadow-md hover:border-gray-300",
             "focus:shadow-md focus:border-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-200 focus:ring-offset-2",
@@ -554,7 +571,7 @@ function DiscoveryDesktopSearchControl({
           )}
           aria-label="Поиск: место, дата, возраст — нажмите, чтобы раскрыть"
         >
-          <div className="flex items-center gap-3 px-6 py-3">
+          <div className="flex h-full items-center gap-3 px-6 py-3">
             <CompactSearchSummary 
               citySlug={citySlug}
               applied={applied}
@@ -567,10 +584,12 @@ function DiscoveryDesktopSearchControl({
         <div 
           data-search-container
           className={cn(
-            "relative flex-1 overflow-hidden rounded-full transition-[box-shadow,border-color] duration-200 ease-out",
+            "relative flex-1 overflow-hidden rounded-full transition-[box-shadow,border-color,background-color] duration-200 ease-out",
             embeddedInHeader
-              ? "border border-gray-100 bg-gray-50/80 hover:border-gray-200 focus-within:border-gray-200"
-              : "bg-white border border-gray-200 shadow-sm hover:shadow-md hover:border-gray-300 focus-within:shadow-md focus-within:border-gray-300",
+              ? SEARCH_BAR_EMBEDDED_IN_HEADER_CLASSES
+              : showSecondaryFiltersInBar
+                ? "border border-gray-200 bg-white shadow-none hover:border-gray-300 focus-within:border-gray-300"
+                : "border border-gray-200 bg-white shadow-sm hover:shadow-md hover:border-gray-300 focus-within:shadow-md focus-within:border-gray-300",
             "focus-within:outline-none"
           )}
         >
@@ -588,7 +607,7 @@ function DiscoveryDesktopSearchControl({
             >
               <MapPin className="h-4 w-4 text-gray-400 flex-shrink-0" />
               <div className="flex flex-col items-start min-w-0 flex-1">
-                <span className="text-xs font-medium text-gray-900">Куда</span>
+                <span className="text-xs font-medium text-gray-900">Где?</span>
                 <span className="text-sm text-gray-600 truncate w-full text-left">
                   {getLocationText()}
                 </span>
@@ -630,7 +649,7 @@ function DiscoveryDesktopSearchControl({
             >
               <Calendar className="h-4 w-4 text-gray-400 flex-shrink-0" />
               <div className="flex flex-col items-start min-w-0 flex-1">
-                <span className="text-xs font-medium text-gray-900">Когда</span>
+                <span className="text-xs font-medium text-gray-900">Когда?</span>
                 <span className="text-sm text-gray-600 truncate w-full text-left">
                   {getDateText()}
                 </span>
@@ -672,7 +691,7 @@ function DiscoveryDesktopSearchControl({
             >
               <Users className="h-4 w-4 text-gray-400 flex-shrink-0" />
               <div className="flex flex-col items-start min-w-0 flex-1">
-                <span className="text-xs font-medium text-gray-900">С кем</span>
+                <span className="text-xs font-medium text-gray-900">С кем?</span>
                 <span className="text-sm text-gray-600 truncate w-full text-left">
                   {getAgeText()}
                 </span>
@@ -705,7 +724,7 @@ function DiscoveryDesktopSearchControl({
 
       {/* Secondary filters — [ Куда ][ Когда ][ С кем ] [ Фильтры ] */}
       {showSecondaryFiltersInBar && currentIntent && (
-        <div data-secondary-filters-slot className="flex shrink-0 items-center">
+        <div data-secondary-filters-slot className="flex shrink-0 items-stretch self-stretch">
           <RefinementFiltersButtonCompact intent={currentIntent as Intent} />
         </div>
       )}
@@ -827,62 +846,56 @@ function CompactSearchSummary({
   const intentConfig = DISCOVERY_INTENT_CONFIG[currentIntent as keyof typeof DISCOVERY_INTENT_CONFIG];
   const FallbackIcon = INTENT_ICONS[currentIntent as keyof typeof INTENT_ICONS] || IconCompass;
 
-  // Format city display name
-  const getCityDisplayName = (slug: string) => {
-    const cityNames: Record<string, string> = {
-      minsk: "Минск",
-      brest: "Брест",
-      gomel: "Гомель",
-      grodno: "Гродно",
-      mogilev: "Могилёв",
-      vitebsk: "Витебск",
-    };
-    return cityNames[slug] || slug;
-  };
-
-  // Build summary text
-  const parts = [];
-  
-  // Location - Always show city first
-  parts.push(getCityDisplayName(citySlug));
-  
-  // Add nearby if selected
-  if (applied.nearby) {
-    parts.push("Поблизости");
-  }
-  
-  // Add metro or district (mutually exclusive with nearby)
+  const locationParts: string[] = [getCityLocativePhrase(citySlug)];
+  if (applied.nearby) locationParts.push("Поблизости");
   if (applied.metro) {
     const metro = safeApiOptions.metros.find((m: any) => m.value === applied.metro);
-    parts.push(metro?.label || applied.metro);
+    locationParts.push(metro?.label || applied.metro);
   } else if (applied.district) {
     const district = safeApiOptions.districts.find((d: any) => d.value === applied.district);
-    parts.push(district?.label || applied.district);
+    locationParts.push(district?.label || applied.district);
   }
+  const locationLine = locationParts.join(" • ");
 
-  // Date
-  if (applied.whenPreset === "TODAY") parts.push("Сегодня");
-  else if (applied.whenPreset === "TOMORROW") parts.push("Завтра");
-  else if (applied.whenPreset === "WEEKEND") parts.push("Выходные");
-  else if (applied.dateFrom) {
-    const fromDate = new Date(applied.dateFrom);
-    const day = fromDate.getDate();
-    const month = ["янв", "фев", "мар", "апр", "май", "июн", "июл", "авг", "сен", "окт", "ноя", "дек"][fromDate.getMonth()];
-    parts.push(`${day} ${month}`);
-  }
+  const dateLine = (() => {
+    if (applied.whenPreset === "TODAY") return "Сегодня";
+    if (applied.whenPreset === "TOMORROW") return "Завтра";
+    if (applied.whenPreset === "WEEKEND") return "Выходные";
+    if (applied.dateFrom) {
+      const fromDate = new Date(applied.dateFrom);
+      if (applied.dateTo && applied.dateFrom !== applied.dateTo) {
+        const toDate = new Date(applied.dateTo);
+        const fromDay = fromDate.getDate();
+        const toDay = toDate.getDate();
+        const fromMonth = fromDate.getMonth();
+        const toMonth = toDate.getMonth();
+        const months = ["янв", "фев", "мар", "апр", "май", "июн", "июл", "авг", "сен", "окт", "ноя", "дек"];
+        if (fromMonth === toMonth) {
+          return `${fromDay}–${toDay} ${months[fromMonth]}`;
+        }
+        return `${fromDay} ${months[fromMonth]}–${toDay} ${months[toMonth]}`;
+      }
+      const day = fromDate.getDate();
+      const month = ["янв", "фев", "мар", "апр", "май", "июн", "июл", "авг", "сен", "окт", "ноя", "дек"][fromDate.getMonth()];
+      return `${day} ${month}`;
+    }
+    return null;
+  })();
 
-  // Age
-  if (applied.age.length > 0) {
+  const ageLine = (() => {
+    if (applied.age.length === 0) return null;
     const ageLabels = applied.age.map((ageValue: string) => {
       const group = AGE_GROUPS.find(g => g.value === ageValue);
       return group ? group.label : ageValue;
     });
-    if (ageLabels.length === 1) parts.push(ageLabels[0]);
-    else if (ageLabels.length === 2) parts.push(`${ageLabels[0]}, ${ageLabels[1]}`);
-    else parts.push(`${ageLabels[0]} +${ageLabels.length - 1}`);
-  }
+    if (ageLabels.length === 1) return ageLabels[0];
+    if (ageLabels.length === 2) return `${ageLabels[0]}, ${ageLabels[1]}`;
+    return `${ageLabels[0]} +${ageLabels.length - 1}`;
+  })();
 
-  const summaryText = parts.length > 0 ? parts.join(" • ") : "Поиск";
+  const summaryText = [locationLine, dateLine, ageLine]
+    .filter((p): p is string => p != null && p !== "")
+    .join(" • ");
 
   return (
     <>

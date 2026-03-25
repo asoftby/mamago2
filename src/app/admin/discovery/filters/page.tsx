@@ -1,30 +1,31 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { H1, H3, Label } from "@/components/ui/typography";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useRouter } from "next/navigation";
+import { Label } from "@/components/ui/typography";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Trash2, Plus, Save, ArrowUp, ArrowDown } from "lucide-react";
+import { Plus } from "lucide-react";
 import { toast } from "sonner";
+import { useAutoSlug } from "@/hooks/useAutoSlug";
+import { messageFromApiError } from "@/lib/admin/messageFromApiError";
+import { cn } from "@/lib/utils";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { FilterOptionRow } from "./FilterOptionRow";
+  DiscoveryTaxonomyPageShell,
+  DiscoveryTaxonomyPageHeader,
+  DiscoveryCreateCard,
+  DiscoveryTitleSlugCreateRow,
+  DiscoveryTaxonomyTable,
+  DiscoveryEmptyState,
+  DiscoveryTableChevronCell,
+  discoveryTh,
+  discoveryTd,
+  discoveryTableRowClass,
+} from "@/components/admin/discovery";
 
-type Option = {
-  id: string;
-  label: string;
-  value: string;
-  order: number;
-  orderIndex: number;
-  isActive: boolean;
-};
+const adminFetch: RequestInit = { credentials: "include" };
+
+const EDIT_FILTER_HREF = (id: string) => `/admin/discovery/filters/${id}`;
 
 type Filter = {
   id: string;
@@ -36,23 +37,22 @@ type Filter = {
   orderIndex: number;
   placement: "PRIMARY" | "SECONDARY" | "HIDDEN";
   isActive: boolean;
-  options: Option[];
+  options: { id: string }[];
 };
 
 export default function FiltersPage() {
+  const router = useRouter();
   const [filters, setFilters] = useState<Filter[]>([]);
   const [loading, setLoading] = useState(true);
-  
-  // New Filter Form
-  const [newSlug, setNewSlug] = useState("");
-  const [newTitle, setNewTitle] = useState("");
+
+  const newFilter = useAutoSlug("", "");
   const [newType, setNewType] = useState("single");
   const [newUi, setNewUi] = useState("tabs");
 
   const fetchFilters = async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/admin/filters");
+      const res = await fetch("/api/admin/filters", adminFetch);
       if (res.ok) {
         const data = await res.json();
         setFilters(data);
@@ -67,365 +67,127 @@ export default function FiltersPage() {
   }, []);
 
   const createFilter = async () => {
-    if (!newSlug || !newTitle) return;
+    if (!newFilter.source.trim()) {
+      toast.error("Укажите название");
+      return;
+    }
     const res = await fetch("/api/admin/filters", {
+      ...adminFetch,
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ slug: newSlug, title: newTitle, type: newType, ui: newUi }),
+      body: JSON.stringify({
+        slug: newFilter.slug,
+        title: newFilter.source,
+        type: newType,
+        ui: newUi,
+      }),
     });
     if (res.ok) {
-      setNewSlug("");
-      setNewTitle("");
+      newFilter.hydrate("", "");
       setNewType("single");
       setNewUi("tabs");
       fetchFilters();
-    }
-  };
-
-  const updateFilter = async (id: string, data: Partial<Filter>) => {
-    const res = await fetch(`/api/admin/filters/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
-    });
-    if (res.ok) {
-      toast.success("Updated");
-      fetchFilters();
+      toast.success("Фильтр создан");
     } else {
-      toast.error("Failed to update");
+      const err = await res.json().catch(() => ({}));
+      toast.error(messageFromApiError(err, res.status));
     }
   };
 
-  const deleteFilter = async (id: string) => {
-    if (!confirm("Delete filter?")) return;
-    const res = await fetch(`/api/admin/filters/${id}`, {
-      method: "DELETE",
-    });
-    if (res.ok) fetchFilters();
-  };
+  const sorted = [...filters].sort((a, b) => a.orderIndex - b.orderIndex);
 
-  const createOption = async (filterId: string, label: string, value: string) => {
-    const res = await fetch(`/api/admin/filters/${filterId}/options`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ label, value }),
-    });
-    if (res.ok) fetchFilters();
-  };
-
-  const updateOption = async (optionId: string, data: Partial<Option>) => {
-    const res = await fetch(`/api/admin/filter-options/${optionId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
-    });
-    if (res.ok) fetchFilters();
-  };
-
-  const reorderOption = async (optionId: string, direction: "UP" | "DOWN") => {
-    const res = await fetch("/api/admin/filters/options/reorder", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ optionId, direction }),
-    });
-    if (res.ok) {
-      fetchFilters();
-    } else {
-      toast.error("Option reorder failed");
-    }
-  };
-
-  const deleteOption = async (optionId: string) => {
-    if (!confirm("Delete option?")) return;
-    const res = await fetch(`/api/admin/filter-options/${optionId}`, {
-      method: "DELETE",
-    });
-    if (res.ok) fetchFilters();
+  const goToEdit = (id: string) => {
+    router.push(EDIT_FILTER_HREF(id));
   };
 
   return (
-    <div className="space-y-8 max-w-5xl mx-auto p-6">
-      <div className="flex items-center justify-between">
-        <H1>Discovery: Filters</H1>
-      </div>
+    <DiscoveryTaxonomyPageShell>
+      <DiscoveryTaxonomyPageHeader
+        title="Taxonomy: Filters"
+        description="UI-слой: конфигурация фильтров каталога (тип, представление, опции). Не источник бизнес-данных — ссылается на категории, сигналы и др. Откройте строку для редактирования."
+      />
 
-      {/* Create New Filter */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Create New Filter</CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-wrap gap-4 items-end">
-          <div className="grid gap-2 min-w-[150px] flex-1">
-            <Label>Slug</Label>
-            <Input 
-              value={newSlug} 
-              onChange={(e) => setNewSlug(e.target.value)} 
-              placeholder="e.g. metro" 
-            />
+      <div className="space-y-6">
+        <DiscoveryCreateCard title="Create New Filter">
+          <div className="grid gap-4 max-w-2xl md:grid-cols-2">
+            <div className="grid gap-2">
+              <Label>Тип (single / multi)</Label>
+              <Input
+                value={newType}
+                onChange={(e) => setNewType(e.target.value)}
+                placeholder="single"
+                className="font-mono text-sm"
+              />
+              <p className="text-xs text-gray-500">Логика выбора значений фильтра.</p>
+            </div>
+            <div className="grid gap-2">
+              <Label>UI (tabs / dropdown / …)</Label>
+              <Input
+                value={newUi}
+                onChange={(e) => setNewUi(e.target.value)}
+                placeholder="tabs"
+                className="font-mono text-sm"
+              />
+              <p className="text-xs text-gray-500">Как отображается блок в интерфейсе.</p>
+            </div>
           </div>
-          <div className="grid gap-2 min-w-[150px] flex-1">
-            <Label>Title</Label>
-            <Input 
-              value={newTitle} 
-              onChange={(e) => setNewTitle(e.target.value)} 
-              placeholder="e.g. Метро" 
-            />
-          </div>
-          <div className="grid gap-2 w-[120px]">
-            <Label>Type</Label>
-            <Input 
-              value={newType} 
-              onChange={(e) => setNewType(e.target.value)} 
-              placeholder="single/multi" 
-            />
-          </div>
-          <div className="grid gap-2 w-[120px]">
-            <Label>UI</Label>
-            <Input 
-              value={newUi} 
-              onChange={(e) => setNewUi(e.target.value)} 
-              placeholder="tabs/dropdown" 
-            />
-          </div>
-          <Button onClick={createFilter}>
-            <Plus className="w-4 h-4 mr-2" />
-            Create
-          </Button>
-        </CardContent>
-      </Card>
+          <DiscoveryTitleSlugCreateRow
+            titleLabel="Название"
+            auto={newFilter}
+            onCreate={createFilter}
+            titlePlaceholder="Например: Метро"
+            slugPlaceholder="metro"
+          />
+        </DiscoveryCreateCard>
 
-      {/* Filters List */}
-      <div className="grid gap-6">
         {loading ? (
-          <div>Loading...</div>
+          <div className="text-sm text-gray-600">Loading...</div>
+        ) : sorted.length === 0 ? (
+          <DiscoveryEmptyState
+            title="Пока нет фильтров"
+            description="Создайте первый фильтр — затем настройте опции на странице редактирования."
+          />
         ) : (
-          filters
-            .sort((a, b) => a.orderIndex - b.orderIndex)
-            .map((filter, index) => (
-            <FilterCard
-              key={filter.id}
-              filter={filter}
-              onUpdate={updateFilter}
-              onDelete={deleteFilter}
-              onCreateOption={createOption}
-              onUpdateOption={updateOption}
-              onReorderOption={reorderOption}
-              onDeleteOption={deleteOption}
-            />
-          ))
+          <DiscoveryTaxonomyTable>
+            <thead className="bg-gray-50 border-b border-gray-200">
+              <tr>
+                <th className={discoveryTh()}>Название</th>
+                <th className={discoveryTh()}>Slug</th>
+                <th className={discoveryTh()}>Тип</th>
+                <th className={discoveryTh()}>UI</th>
+                <th className={discoveryTh("w-20")}>Порядок</th>
+                <th className={discoveryTh("w-24")}>Используется</th>
+                <th className="w-10 px-2 py-3" aria-hidden />
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200">
+              {sorted.map((f) => (
+                <tr
+                  key={f.id}
+                  role="link"
+                  tabIndex={0}
+                  className={discoveryTableRowClass(false)}
+                  onClick={() => goToEdit(f.id)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      goToEdit(f.id);
+                    }
+                  }}
+                >
+                  <td className={cn(discoveryTd(), "font-medium text-gray-900")}>{f.title}</td>
+                  <td className={cn(discoveryTd(), "font-mono text-xs text-gray-700")}>{f.slug}</td>
+                  <td className={cn(discoveryTd(), "text-gray-600 font-mono text-xs")}>{f.type}</td>
+                  <td className={cn(discoveryTd(), "text-gray-600 font-mono text-xs")}>{f.ui}</td>
+                  <td className={discoveryTd("text-gray-600")}>{f.orderIndex}</td>
+                  <td className={discoveryTd("text-gray-600")}>{f.options?.length ?? 0}</td>
+                  <DiscoveryTableChevronCell />
+                </tr>
+              ))}
+            </tbody>
+          </DiscoveryTaxonomyTable>
         )}
       </div>
-    </div>
-  );
-}
-
-function FilterCard({ 
-  filter, 
-  onUpdate, 
-  onDelete, 
-  onCreateOption,
-  onUpdateOption,
-  onReorderOption,
-  onDeleteOption 
-}: { 
-  filter: Filter;
-  onUpdate: (id: string, data: Partial<Filter>) => void;
-  onDelete: (id: string) => void;
-  onCreateOption: (id: string, label: string, value: string) => void;
-  onUpdateOption: (id: string, data: Partial<Option>) => void;
-  onReorderOption: (optionId: string, direction: "UP" | "DOWN") => void;
-  onDeleteOption: (id: string) => void;
-}) {
-  const [title, setTitle] = useState(filter.title);
-  const [type, setType] = useState(filter.type);
-  const [ui, setUi] = useState(filter.ui);
-  const [orderIndex, setOrderIndex] = useState(filter.orderIndex);
-  const [isActive, setIsActive] = useState(filter.isActive);
-  const [placement, setPlacement] = useState<"PRIMARY" | "SECONDARY" | "HIDDEN">(filter.placement || "PRIMARY");
-  
-  // New Option State
-  const [newOptLabel, setNewOptLabel] = useState("");
-  const [newOptValue, setNewOptValue] = useState("");
-
-  const handleSave = () => {
-    onUpdate(filter.id, { title, type, ui, isActive, placement, orderIndex });
-  };
-
-  const handleAddOption = () => {
-    if (!newOptLabel || !newOptValue) return;
-    onCreateOption(filter.id, newOptLabel, newOptValue);
-    setNewOptLabel("");
-    setNewOptValue("");
-  };
-
-  return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <div className="flex items-center gap-3">
-          <CardTitle className="text-xl font-bold font-mono text-muted-foreground">
-            {filter.slug}
-          </CardTitle>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={() => onDelete(filter.id)}>
-            <Trash2 className="w-4 h-4 text-destructive" />
-          </Button>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        {/* Main Fields */}
-        <div className="grid grid-cols-1 md:grid-cols-6 gap-4 items-end">
-          <div className="grid gap-2 md:col-span-2">
-            <Label>Title</Label>
-            <Input value={title} onChange={(e) => setTitle(e.target.value)} />
-          </div>
-          <div className="grid gap-2">
-            <Label>Type</Label>
-            <Input value={type} onChange={(e) => setType(e.target.value)} />
-          </div>
-          <div className="grid gap-2">
-            <Label>UI</Label>
-            <Input value={ui} onChange={(e) => setUi(e.target.value)} />
-          </div>
-          <div className="grid gap-2">
-            <Label>Placement</Label>
-            <Select value={placement} onValueChange={(val: any) => setPlacement(val)}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="PRIMARY">Primary</SelectItem>
-                <SelectItem value="SECONDARY">Secondary</SelectItem>
-                <SelectItem value="HIDDEN">Hidden</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="grid gap-2 w-20">
-            <Label>Order</Label>
-            <Input 
-              type="number"
-              value={orderIndex} 
-              onChange={(e) => setOrderIndex(Number(e.target.value))} 
-            />
-          </div>
-          <div className="flex items-center gap-4 pb-2">
-            <div className="flex items-center gap-2">
-              <Checkbox 
-                checked={isActive} 
-                onCheckedChange={(c) => setIsActive(!!c)} 
-              />
-              <Label>Active</Label>
-            </div>
-            <Button size="sm" onClick={handleSave}>
-              <Save className="w-4 h-4 mr-2" />
-              Save
-            </Button>
-          </div>
-        </div>
-
-        {/* Options List */}
-        <div className="space-y-4 pt-4 border-t">
-          <H3>Options</H3>
-          <div className="space-y-2">
-            {filter.options
-              .sort((a, b) => a.orderIndex - b.orderIndex)
-              .map((opt, index) => (
-                <FilterOptionRow
-                  key={opt.id}
-                  option={opt}
-                  index={index}
-                  totalOptions={filter.options.length}
-                  onUpdate={onUpdateOption}
-                  onReorder={onReorderOption}
-                  onDelete={onDeleteOption}
-                />
-              ))}
-          </div>
-
-          {/* Add Option */}
-          <div className="flex gap-2 items-end pt-2 border-t">
-            <div className="grid gap-1 flex-1">
-              <Label className="text-xs">Label</Label>
-              <Input 
-                value={newOptLabel} 
-                onChange={(e) => setNewOptLabel(e.target.value)} 
-                placeholder="Label" 
-                className="h-8 text-sm"
-              />
-            </div>
-            <div className="grid gap-1 flex-1">
-              <Label className="text-xs">Value</Label>
-              <Input 
-                value={newOptValue} 
-                onChange={(e) => setNewOptValue(e.target.value)} 
-                placeholder="value" 
-                className="h-8 text-sm"
-              />
-            </div>
-            <Button size="sm" variant="secondary" onClick={handleAddOption}>
-              Add
-            </Button>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-function OptionRow({ 
-  option, 
-  onUpdate, 
-  onDelete 
-}: { 
-  option: Option;
-  onUpdate: (id: string, data: Partial<Option>) => void;
-  onDelete: (id: string) => void;
-}) {
-  const [label, setLabel] = useState(option.label);
-  const [value, setValue] = useState(option.value);
-  const [order, setOrder] = useState(option.order);
-  const [isActive, setIsActive] = useState(option.isActive);
-
-  const hasChanges = 
-    label !== option.label || 
-    value !== option.value || 
-    order !== option.order || 
-    isActive !== option.isActive;
-
-  const handleSave = () => {
-    onUpdate(option.id, { label, value, order, isActive });
-  };
-
-  return (
-    <div className="flex items-center gap-2 bg-background p-2 rounded border">
-      <Input 
-        value={label} 
-        onChange={(e) => setLabel(e.target.value)} 
-        className="h-8 text-sm flex-[2]" 
-      />
-      <Input 
-        value={value} 
-        onChange={(e) => setValue(e.target.value)} 
-        className="h-8 text-sm font-mono flex-[2]" 
-      />
-      <Input 
-        type="number" 
-        value={order} 
-        onChange={(e) => setOrder(Number(e.target.value))} 
-        className="h-8 text-sm w-16" 
-      />
-      <Checkbox 
-        checked={isActive} 
-        onCheckedChange={(c) => setIsActive(!!c)} 
-      />
-      {hasChanges && (
-        <Button size="icon-xs" onClick={handleSave}>
-          <Save className="w-3 h-3" />
-        </Button>
-      )}
-      <Button size="icon-xs" variant="ghost" onClick={() => onDelete(option.id)}>
-        <Trash2 className="w-3 h-3 text-muted-foreground hover:text-destructive" />
-      </Button>
-    </div>
+    </DiscoveryTaxonomyPageShell>
   );
 }

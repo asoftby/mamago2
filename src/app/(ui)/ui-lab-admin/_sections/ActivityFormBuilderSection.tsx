@@ -123,7 +123,7 @@ export function ActivityFormBuilderSection() {
         <h3 className="text-base font-semibold text-gray-900 mb-4">Архитектура Activity</h3>
         <div className="space-y-4 text-sm text-gray-700">
           <div>
-            <div className="font-medium text-gray-900 mb-2">Activity Type (Тип активности):</div>
+            <div className="font-medium text-gray-900 mb-2">Класс активности (событие / курс / услуга):</div>
             <ul className="list-disc list-inside space-y-1 ml-2">
               <li>Событие - разовые мероприятия, спектакли, выставки</li>
               <li>Курс - регулярные занятия с расписанием</li>

@@ -4,6 +4,7 @@ import { getCurrentUser } from "@/lib/auth/server";
 import { listPlanItemsByDate } from "@/server/services/plan.service";
 import { Container } from "@/components/ui/Container";
 import { CalendarDays, ExternalLink } from "lucide-react";
+import { getPlanActivityPublicAvailability } from "@/lib/plan/publicVisibility";
 
 type PageProps = {
   params: Promise<{ date: string }>;
@@ -58,6 +59,9 @@ export default async function DayPage({ params }: PageProps) {
               const time = formatTime(item.startsAt);
               const title = item.activity?.title ?? item.title ?? "Активность";
               const image = item.activity?.coverImageUrl ?? item.coverImageUrl ?? null;
+              const availability = getPlanActivityPublicAvailability(item.activity);
+              const unavailable =
+                availability === "business_disabled" || availability === "missing_activity";
               return (
                 <div key={item.id} className="flex items-center gap-3.5 px-4 py-3.5 rounded-2xl border border-neutral-200 bg-white">
                   <div className="w-8 h-8 rounded-xl bg-neutral-900 text-white flex items-center justify-center text-sm font-bold shrink-0">
@@ -74,13 +78,16 @@ export default async function DayPage({ params }: PageProps) {
 
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-neutral-900 leading-tight line-clamp-1">{title}</p>
+                    {unavailable && (
+                      <p className="text-xs text-amber-700 mt-0.5">Снято с публикации</p>
+                    )}
                     {time && <p className="text-xs text-neutral-500 mt-0.5">{time}</p>}
                     {item.activity?.ageLabel && (
                       <p className="text-xs text-neutral-400 mt-0.5">{item.activity.ageLabel}</p>
                     )}
                   </div>
 
-                  {item.activityId && (
+                  {item.activityId && !unavailable && (
                     <Link
                       href={`/minsk/activity/${item.activityId}`}
                       className="p-2 rounded-xl text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 transition-colors shrink-0"

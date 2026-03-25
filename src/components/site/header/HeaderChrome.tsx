@@ -69,15 +69,17 @@ export function HeaderChrome({
         </div>
 
         {/* CENTER - Compact Search Button */}
-        <div className="flex items-center justify-center gap-3 min-w-[400px]">
+        <div className="flex min-h-0 min-w-[400px] items-stretch justify-center gap-3">
           
           {/* Compact Search Button */}
-          <div className="flex-1 max-w-[400px]">
+          <div className="flex min-h-11 flex-1 max-w-[400px] items-stretch">
             <button
+              type="button"
               onClick={onSearchClick}
-              className="w-full"
+              className="flex h-full min-h-11 w-full min-w-0"
             >
               <DesktopSearchControl
+                className="h-full min-h-11"
                 citySlug={citySlug}
                 currentIntent={currentIntent}
                 mode="compact"
@@ -91,7 +93,7 @@ export function HeaderChrome({
           
           {/* Compact Filters Button */}
           {shouldShowFilters && currentIntent && (
-            <div className="flex-shrink-0">
+            <div className="flex min-h-11 shrink-0 items-stretch">
               <RefinementFiltersButtonCompact intent={currentIntent} />
             </div>
           )}
@@ -109,7 +111,7 @@ export function HeaderChrome({
           </Link>
 
           <Link
-            href="/profile"
+            href="/me"
             className="flex items-center justify-center w-[39px] h-[39px] bg-white border border-gray-200 rounded-full hover:bg-gray-50 hover:border-gray-300 transition-colors duration-200 shadow-sm"
             aria-label="Профіль"
           >

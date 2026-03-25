@@ -2,7 +2,7 @@
 
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import { InternationalPhoneInput } from "@/components/phone/InternationalPhoneInput";
 import type { OrganizerData } from "./types";
 
 interface OrganizerCreateFormProps {
@@ -34,28 +34,13 @@ export function OrganizerCreateForm({ data, onChange, isEditable }: OrganizerCre
           />
         </div>
 
-        <div>
-          <Label htmlFor="organizer-description">Описание</Label>
-          <Textarea
-            id="organizer-description"
-            value={data.description}
-            onChange={(e) => onChange({ description: e.target.value })}
-            placeholder="Краткое описание организатора..."
-            rows={2}
-            disabled={!isEditable}
-            className="mt-1"
-          />
-        </div>
-
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <Label htmlFor="organizer-phone">Телефон</Label>
-            <Input
+            <InternationalPhoneInput
               id="organizer-phone"
-              type="tel"
               value={data.phone}
-              onChange={(e) => onChange({ phone: e.target.value })}
-              placeholder="+375 29 123 45 67"
+              onChange={(phone) => onChange({ phone })}
               disabled={!isEditable}
               className="mt-1"
             />

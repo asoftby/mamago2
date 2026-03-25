@@ -11,17 +11,32 @@ import {
   Image,
   Filter,
   MapPin,
+  Globe,
 } from "lucide-react";
 import { SidebarItem } from "@/components/shared/sidebar/SidebarItem";
 import { SidebarGroup } from "@/components/shared/sidebar/SidebarGroup";
 import { SidebarSubItem } from "@/components/shared/sidebar/SidebarSubItem";
+import {
+  MODERATION_NAV_ITEMS,
+  getModerationItemCount,
+  isModerationNavItemActive,
+  moderationItemHref,
+  type ModerationNavCounts,
+} from "@/lib/admin/moderationSidebarConfig";
 import { adminPath } from "./AdminNav";
+import { SEO_CONTROL_NAV, isSeoNavActive } from "@/lib/admin/seoNavConfig";
 
 interface AdminSidebarProps {
   onNavigate?: () => void;
+  moderationCounts: ModerationNavCounts;
+  b2bPendingVerificationCount?: number;
 }
 
-export function AdminSidebar({ onNavigate }: AdminSidebarProps) {
+export function AdminSidebar({
+  onNavigate,
+  moderationCounts,
+  b2bPendingVerificationCount = 0,
+}: AdminSidebarProps) {
   const pathname = usePathname();
 
   const isActive = (href: string) => pathname === href;
@@ -45,21 +60,23 @@ export function AdminSidebar({ onNavigate }: AdminSidebarProps) {
           icon={Shield}
           label="Модерация"
           defaultOpen={isGroupActive([adminPath("/moderation")])}
-          hasAttention={true}
         >
-          <SidebarSubItem
-            href={adminPath("/moderation/queue")}
-            label="Очередь"
-            isActive={isActive(adminPath("/moderation/queue"))}
-            onClick={onNavigate}
-            count={12}
-          />
-          <SidebarSubItem
-            href={adminPath("/moderation/places")}
-            label="Места"
-            isActive={isActive(adminPath("/moderation/places"))}
-            onClick={onNavigate}
-          />
+          {MODERATION_NAV_ITEMS.map((item) => {
+            const href = moderationItemHref(item.path);
+            const rawCount = getModerationItemCount(item.id, moderationCounts);
+            const count =
+              rawCount !== undefined && rawCount > 0 ? rawCount : undefined;
+            return (
+              <SidebarSubItem
+                key={item.id}
+                href={href}
+                label={item.label}
+                isActive={isModerationNavItemActive(pathname, item.path)}
+                onClick={onNavigate}
+                count={count}
+              />
+            );
+          })}
         </SidebarGroup>
 
         {/* Users Group */}
@@ -81,13 +98,18 @@ export function AdminSidebar({ onNavigate }: AdminSidebarProps) {
           icon={Briefcase}
           label="B2B"
           defaultOpen={isGroupActive([adminPath("/b2b")])}
-          hasAttention={true}
+          hasAttention={b2bPendingVerificationCount > 0}
         >
           <SidebarSubItem
             href={adminPath("/b2b/requests")}
             label="Заявки"
             isActive={isActive(adminPath("/b2b/requests"))}
             onClick={onNavigate}
+            count={
+              b2bPendingVerificationCount > 0
+                ? b2bPendingVerificationCount
+                : undefined
+            }
           />
           <SidebarSubItem
             href={adminPath("/b2b/partners")}
@@ -175,11 +197,16 @@ export function AdminSidebar({ onNavigate }: AdminSidebarProps) {
           />
         </SidebarGroup>
 
-        {/* Discovery Group */}
+        {/* Discovery Group — taxonomy axes + UI filters (не география) */}
         <SidebarGroup
           icon={Filter}
-          label="Поиск"
-          defaultOpen={isGroupActive([adminPath("/taxonomy")])}
+          label="Discovery"
+          defaultOpen={isGroupActive([
+            adminPath("/taxonomy/signals"),
+            adminPath("/taxonomy/filters/event-categories"),
+            adminPath("/taxonomy/event-categories"),
+            adminPath("/discovery"),
+          ])}
         >
           <SidebarSubItem
             href={adminPath("/taxonomy/signals")}
@@ -188,9 +215,36 @@ export function AdminSidebar({ onNavigate }: AdminSidebarProps) {
             onClick={onNavigate}
           />
           <SidebarSubItem
-            href={adminPath("/taxonomy/filters")}
+            href={adminPath("/taxonomy/filters/event-categories")}
+            label="Категории"
+            isActive={
+              pathname.startsWith(adminPath("/taxonomy/filters/event-categories")) ||
+              pathname.startsWith(adminPath("/taxonomy/event-categories"))
+            }
+            onClick={onNavigate}
+          />
+          <SidebarSubItem
+            href={adminPath("/discovery/occasions")}
+            label="Поводы"
+            isActive={pathname.startsWith(adminPath("/discovery/occasions"))}
+            onClick={onNavigate}
+          />
+          <SidebarSubItem
+            href={adminPath("/discovery/themes")}
+            label="Темы"
+            isActive={pathname.startsWith(adminPath("/discovery/themes"))}
+            onClick={onNavigate}
+          />
+          <SidebarSubItem
+            href={adminPath("/discovery/genres")}
+            label="Жанры"
+            isActive={pathname.startsWith(adminPath("/discovery/genres"))}
+            onClick={onNavigate}
+          />
+          <SidebarSubItem
+            href={adminPath("/discovery/filters")}
             label="Фильтры"
-            isActive={isActive(adminPath("/taxonomy/filters"))}
+            isActive={pathname.startsWith(adminPath("/discovery/filters"))}
             onClick={onNavigate}
           />
         </SidebarGroup>
@@ -213,6 +267,23 @@ export function AdminSidebar({ onNavigate }: AdminSidebarProps) {
             isActive={isActive(adminPath("/taxonomy/metro-stations"))}
             onClick={onNavigate}
           />
+        </SidebarGroup>
+
+        {/* SEO Control Center */}
+        <SidebarGroup
+          icon={Globe}
+          label="SEO"
+          defaultOpen={isGroupActive([adminPath("/seo")])}
+        >
+          {SEO_CONTROL_NAV.map((item) => (
+            <SidebarSubItem
+              key={item.href}
+              href={item.href}
+              label={item.label}
+              isActive={isSeoNavActive(pathname, item.href)}
+              onClick={onNavigate}
+            />
+          ))}
         </SidebarGroup>
       </nav>
     </aside>

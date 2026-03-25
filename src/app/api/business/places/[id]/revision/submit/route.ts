@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import { submitPlaceRevisionForModeration } from "@/server/services/placeRevision.service";
+import { canCreateBusinessContent } from "@/lib/auth/businessContentAccess";
 
 export async function POST(
   request: NextRequest,
@@ -15,7 +16,7 @@ export async function POST(
     const { id: placeId } = await params;
     const user = await getCurrentUser();
 
-    if (!user || user.role !== "BUSINESS_OWNER") {
+    if (!user || !canCreateBusinessContent(user.role)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -33,7 +34,7 @@ export async function POST(
     try {
       const submittedRevision = await submitPlaceRevisionForModeration(
         revisionId,
-        user.id,
+        user,
         wizardSessionId // Pass wizard session ID for temp media conversion
       );
       return NextResponse.json({

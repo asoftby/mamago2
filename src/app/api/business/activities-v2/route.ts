@@ -10,6 +10,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
 import { ActivityType, ScheduleMode } from "@prisma/client";
+import { canCreateBusinessContent, canManageOwnedContent } from "@/lib/auth/businessContentAccess";
 
 /**
  * POST - Create new Activity in DRAFT status
@@ -18,7 +19,7 @@ export async function POST(req: NextRequest) {
   try {
     const user = await getCurrentUser();
 
-    if (!user || user.role !== "BUSINESS_OWNER") {
+    if (!user || !canCreateBusinessContent(user.role)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -52,7 +53,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "Place not found" }, { status: 404 });
       }
 
-      if (place.ownerUserId !== user.id) {
+      if (!canManageOwnedContent(user, place.ownerUserId)) {
         return NextResponse.json(
           { error: "You don't own this place" },
           { status: 403 }
@@ -102,7 +103,7 @@ export async function GET(req: NextRequest) {
   try {
     const user = await getCurrentUser();
 
-    if (!user || user.role !== "BUSINESS_OWNER") {
+    if (!user || !canCreateBusinessContent(user.role)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 

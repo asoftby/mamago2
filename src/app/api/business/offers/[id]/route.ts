@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
 import { z } from "zod";
+import {
+  canCreateBusinessContent,
+  canManageOwnedContent,
+  canPublishContentDirectly,
+} from "@/lib/auth/businessContentAccess";
 
 const updateOfferSchema = z.object({
   title: z.string().min(1).optional(),
@@ -22,7 +27,7 @@ const updateOfferSchema = z.object({
   phone: z.string().optional(),
   website: z.string().optional(),
   bookingInstructions: z.string().optional(),
-  status: z.enum(["DRAFT", "PENDING"]).optional(),
+  status: z.enum(["DRAFT", "PENDING", "PUBLISHED"]).optional(),
 });
 
 export async function GET(
@@ -32,30 +37,29 @@ export async function GET(
   try {
     const user = await getCurrentUser();
     
-    if (!user || user.role !== "BUSINESS_OWNER") {
+    if (!user || !canCreateBusinessContent(user.role)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const { id } = await params;
 
-    const offer = await prisma.offer.findFirst({
-      where: {
-        id,
-        place: {
-          ownerUserId: user.id,
-        },
-      },
+    const offer = await prisma.offer.findUnique({
+      where: { id },
       include: {
         place: {
           select: {
             id: true,
             title: true,
+            ownerUserId: true,
           },
         },
       },
     });
 
-    if (!offer) {
+    if (
+      !offer ||
+      !canManageOwnedContent(user, offer.place.ownerUserId)
+    ) {
       return NextResponse.json({ error: "Offer not found" }, { status: 404 });
     }
 
@@ -77,7 +81,7 @@ export async function PATCH(
   try {
     const user = await getCurrentUser();
     
-    if (!user || user.role !== "BUSINESS_OWNER") {
+    if (!user || !canCreateBusinessContent(user.role)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -85,17 +89,21 @@ export async function PATCH(
     const body = await request.json();
     const data = updateOfferSchema.parse(body);
 
-    // Verify offer ownership
-    const existingOffer = await prisma.offer.findFirst({
-      where: {
-        id,
-        place: {
-          ownerUserId: user.id,
-        },
+    if (data.status === "PUBLISHED" && !canPublishContentDirectly(user.role)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    const existingOffer = await prisma.offer.findUnique({
+      where: { id },
+      include: {
+        place: { select: { ownerUserId: true } },
       },
     });
 
-    if (!existingOffer) {
+    if (
+      !existingOffer ||
+      !canManageOwnedContent(user, existingOffer.place.ownerUserId)
+    ) {
       return NextResponse.json({ error: "Offer not found" }, { status: 404 });
     }
 
@@ -118,7 +126,12 @@ export async function PATCH(
     if (data.ageMinMonths !== undefined) updateData.ageMinMonths = data.ageMinMonths;
     if (data.ageMaxMonths !== undefined) updateData.ageMaxMonths = data.ageMaxMonths;
     if (data.coverImage !== undefined) updateData.coverImage = data.coverImage;
-    if (data.status !== undefined) updateData.status = data.status;
+    if (data.status !== undefined) {
+      updateData.status = data.status;
+      if (data.status === "PUBLISHED") {
+        updateData.publishedAt = new Date();
+      }
+    }
     
     // Update price fields if they were recalculated
     if (priceFrom !== existingOffer.priceFrom) updateData.priceFrom = priceFrom;
@@ -163,24 +176,26 @@ export async function DELETE(
   try {
     const user = await getCurrentUser();
     
-    if (!user || user.role !== "BUSINESS_OWNER") {
+    if (!user || !canCreateBusinessContent(user.role)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const { id } = await params;
 
-    // Verify offer ownership and that it's a draft
     const offer = await prisma.offer.findFirst({
       where: {
         id,
-        place: {
-          ownerUserId: user.id,
-        },
-        status: "DRAFT", // Only allow deleting drafts
+        status: "DRAFT",
+      },
+      include: {
+        place: { select: { ownerUserId: true } },
       },
     });
 
-    if (!offer) {
+    if (
+      !offer ||
+      !canManageOwnedContent(user, offer.place.ownerUserId)
+    ) {
       return NextResponse.json(
         { error: "Offer not found or cannot be deleted" },
         { status: 404 }

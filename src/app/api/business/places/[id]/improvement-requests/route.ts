@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import { listImprovementRequestsForEntity } from "@/server/services/improvementRequest.service";
 import { prisma } from "@/lib/prisma";
+import { canCreateBusinessContent, canManageOwnedContent } from "@/lib/auth/businessContentAccess";
 
 /**
  * GET /api/business/places/[id]/improvement-requests
@@ -13,7 +14,7 @@ export async function GET(
 ) {
   try {
     const user = await getCurrentUser();
-    if (!user || user.role !== "BUSINESS_OWNER") {
+    if (!user || !canCreateBusinessContent(user.role)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 
@@ -29,7 +30,7 @@ export async function GET(
       return NextResponse.json({ error: "Place not found" }, { status: 404 });
     }
 
-    if (place.ownerUserId !== user.id) {
+    if (!canManageOwnedContent(user, place.ownerUserId)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 

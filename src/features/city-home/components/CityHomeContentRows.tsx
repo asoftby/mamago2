@@ -37,10 +37,11 @@ export function CityHomeKudaSection() {
   if (preview.length === 0) {
     return (
       <CityHomeSection
+        className="pt-[5px]"
         title={kudaTitle(citySlug)}
-        subtitle="События, места и развлечения для семьи"
         actionLabel="Смотреть все"
         actionHref={appendCityQuery(`/${citySlug}/kuda`)}
+        actionIconButton
       >
         <p className="text-sm text-neutral-500 px-1 py-2 leading-relaxed">
           Подборка для {getCityDisplayName(citySlug)} скоро появится — а пока
@@ -52,10 +53,11 @@ export function CityHomeKudaSection() {
 
   return (
     <CityHomeSection
+      className="pt-[5px]"
       title={kudaTitle(citySlug)}
-      subtitle="События, места и развлечения для семьи"
       actionLabel="Смотреть все"
       actionHref={appendCityQuery(`/${citySlug}/kuda`)}
+      actionIconButton
     >
       <HorizontalCardRow>
         {preview.map((activity) => (
@@ -87,9 +89,9 @@ export function CityHomeClassesSection() {
   return (
     <CityHomeSection
       title="Занятия"
-      subtitle="Мастер-классы и творческие программы"
       actionLabel="Все занятия"
       actionHref={appendCityQuery(`/${citySlug}/classes`)}
+      actionIconButton
     >
       <HorizontalCardRow>
         {preview.map((activity) => (
@@ -121,9 +123,9 @@ export function CityHomeRoutesSection() {
   return (
     <CityHomeSection
       title="Маршруты"
-      subtitle="Готовые прогулки по городу"
       actionLabel="Все маршруты"
       actionHref={appendCityQuery(`/${citySlug}/routes`)}
+      actionIconButton
     >
       <HorizontalCardRow>
         {preview.map((route) => (
@@ -143,9 +145,9 @@ export function CityHomeJournalSection() {
   return (
     <CityHomeSection
       title="Статьи и обзоры"
-      subtitle="Журнал mamaGo"
       actionLabel="В журнал"
       actionHref={appendCityQuery("/blog")}
+      actionIconButton
     >
       <HorizontalCardRow>
         {MINSK_JOURNAL_PREVIEW.map((a) => (

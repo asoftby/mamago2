@@ -31,6 +31,9 @@ interface Props {
 export function IdeaCard({ idea, onPlanned, onRemove }: Props) {
   const [modalOpen, setModalOpen] = useState(false);
   const { activity } = idea;
+  const unavailable =
+    idea.planAvailability === "business_disabled" ||
+    idea.planAvailability === "missing_activity";
 
   const dateLabel = activity.dateStart
     ? `${formatDate(activity.dateStart)}${activity.dateEnd && activity.dateEnd !== activity.dateStart ? ` — ${formatDate(activity.dateEnd)}` : ""}`
@@ -109,16 +112,19 @@ export function IdeaCard({ idea, onPlanned, onRemove }: Props) {
           <div className="flex gap-2 mt-auto pt-1">
             <button
               onClick={() => setModalOpen(true)}
-              className="flex-1 h-9 rounded-xl bg-neutral-900 hover:bg-neutral-700 text-white text-xs font-medium transition-colors"
+              disabled={unavailable}
+              className="flex-1 h-9 rounded-xl bg-neutral-900 hover:bg-neutral-700 text-white text-xs font-medium transition-colors disabled:opacity-40"
             >
               {idea.isPlanned ? "Изменить дату" : "Запланировать"}
             </button>
-            <Link
-              href={`/activities/${activity.id}`}
-              className="h-9 px-3 rounded-xl border border-neutral-200 hover:border-neutral-400 text-xs font-medium text-neutral-700 flex items-center transition-colors"
-            >
-              Открыть
-            </Link>
+            {!unavailable && (
+              <Link
+                href={`/activities/${activity.id}`}
+                className="h-9 px-3 rounded-xl border border-neutral-200 hover:border-neutral-400 text-xs font-medium text-neutral-700 flex items-center transition-colors"
+              >
+                Открыть
+              </Link>
+            )}
             <button
               onClick={onRemove}
               className="h-9 px-3 rounded-xl border border-neutral-200 hover:border-red-200 hover:text-red-500 text-xs font-medium text-neutral-500 flex items-center transition-colors"

@@ -42,7 +42,7 @@ async function testImports() {
     console.log("✅ Default form data created:", {
       venueKind: defaultData.venueKind,
       title: defaultData.title,
-      categories: defaultData.categories.length,
+      categoryId: defaultData.categoryId,
     });
 
     console.log("\n9. Testing step validation...");

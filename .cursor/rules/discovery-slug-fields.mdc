@@ -1,0 +1,12 @@
+---
+description: Title/name + slug в админке Discovery и связанной таксономии
+globs: "**/admin/discovery/**/*.tsx,**/admin/taxonomy/**/*.tsx,**/hooks/useAutoSlug.ts,**/lib/taxonomy/transliterateToSlug.ts"
+alwaysApply: false
+---
+
+# Поля slug рядом с названием
+
+- Используй **`useAutoSlug`** из `src/hooks/useAutoSlug.ts` с **`transliterateToSlug`** (единая транслитерация + kebab-case).
+- **Создание записи:** `useAutoSlug("", "", { mode: "create" })` или без второго аргумента (по умолчанию create). Slug генерируется из названия, пока пользователь не изменил slug вручную.
+- **Редактирование существующей записи:** `useAutoSlug(title, slug, { mode: "edit" })` — при смене названия slug **не** пересчитывается автоматически; меняется только при ручном вводе в поле slug.
+- Не дублируй логику slug вручную в формах; не синхронизируй slug с title в edit без этого хука.

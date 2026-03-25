@@ -6,8 +6,8 @@ export const runtime = "nodejs";
 async function upsertSignal(slug: string, title: string, options: Array<{ value: string; label: string; order: number }>) {
   const def = await prisma.signalDefinition.upsert({
     where: { slug },
-    update: { title, isActive: true },
-    create: { slug, title, order: 0, isActive: true },
+    update: { title, titleEn: title, isActive: true },
+    create: { slug, title, titleEn: title, order: 0, isActive: true },
   });
 
   for (const o of options) {
@@ -37,12 +37,6 @@ async function upsertFilter(slug: string, title: string, type: string, ui: strin
 
 export async function POST() {
   // Signals
-  await upsertSignal("vibe", "Vibe", [
-    { value: "calm", label: "Спокойно", order: 1 },
-    { value: "playful", label: "Игриво", order: 2 },
-    { value: "active", label: "Активно", order: 3 },
-  ]);
-
   await upsertSignal("tempo", "Tempo", [
     { value: "slow", label: "Медленно", order: 1 },
     { value: "medium", label: "Умеренно", order: 2 },

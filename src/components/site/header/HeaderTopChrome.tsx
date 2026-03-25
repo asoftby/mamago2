@@ -46,7 +46,7 @@ export function HeaderTopChrome() {
         </Link>
 
         <Link
-          href="/profile"
+          href="/me"
           className="flex items-center justify-center w-[39px] h-[39px] bg-white border border-gray-200 rounded-full hover:bg-gray-50 hover:border-gray-300 transition-colors duration-200 shadow-sm"
           aria-label="Профіль"
         >

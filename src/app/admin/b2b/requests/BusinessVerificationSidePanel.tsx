@@ -2,6 +2,9 @@
 
 import { useState, useEffect } from "react";
 import { X } from "lucide-react";
+import { BusinessVisibilityControl } from "@/components/admin/business/BusinessVisibilityControl";
+import { normalizeBusinessVisibilityStatus } from "@/lib/business/businessStatusModel";
+import { BusinessDangerZonePlaceholder } from "@/components/admin/business/BusinessDangerZonePlaceholder";
 
 type BusinessDetail = {
   id: string;
@@ -9,6 +12,7 @@ type BusinessDetail = {
   legalName: string | null;
   unp: string | null;
   phone: string | null;
+  operationalStatus: "ACTIVE" | "DISABLED" | "ARCHIVED";
   verificationStatus: string;
   submittedAt: string | null;
   reviewedAt: string | null;
@@ -52,6 +56,8 @@ export function BusinessVerificationSidePanel({
   onActionComplete: (newStatus: string) => void;
 }) {
   const [business, setBusiness] = useState<BusinessDetail | null>(null);
+  const [canManageBusinessVisibility, setCanManageBusinessVisibility] =
+    useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [note, setNote] = useState("");
@@ -74,6 +80,7 @@ export function BusinessVerificationSidePanel({
       }
 
       setBusiness(data.business);
+      setCanManageBusinessVisibility(data.canManageBusinessVisibility === true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Ошибка загрузки");
     } finally {
@@ -230,7 +237,8 @@ export function BusinessVerificationSidePanel({
               <div>
                 <h3 className="text-2xl font-bold text-gray-900">{business.name}</h3>
                 <p className="text-gray-600 mt-1">
-                  Статус: {STATUS_LABELS[business.verificationStatus]}
+                  Статус верификации:{" "}
+                  {STATUS_LABELS[business.verificationStatus]}
                 </p>
               </div>
 
@@ -394,6 +402,22 @@ export function BusinessVerificationSidePanel({
                   </div>
                 </div>
               )}
+
+              <div className="space-y-4 border-t border-gray-100 pt-4">
+                <BusinessVisibilityControl
+                  businessId={business.id}
+                  readOnly={!canManageBusinessVisibility}
+                  initialVisibilityStatus={normalizeBusinessVisibilityStatus(
+                    business.operationalStatus,
+                  )}
+                  onStatusChange={(next) => {
+                    setBusiness((prev) =>
+                      prev ? { ...prev, operationalStatus: next } : prev,
+                    );
+                  }}
+                />
+                <BusinessDangerZonePlaceholder />
+              </div>
             </div>
           )}
         </div>

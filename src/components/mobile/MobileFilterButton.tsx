@@ -28,7 +28,7 @@ export function MobileFilterButton({ intent, className }: MobileFilterButtonProp
       type="button"
       onClick={handleClick}
       className={cn(
-        "relative flex items-center justify-center w-[52px] h-[52px] rounded-full bg-white border border-gray-200 shadow-sm hover:shadow-md transition-all duration-200 active:scale-[0.98]",
+        "relative flex h-[52px] w-[52px] items-center justify-center rounded-full border border-gray-200 bg-white shadow-sm transition-all duration-200 hover:border-gray-300 hover:bg-gray-50 hover:shadow-md active:scale-[0.98]",
         className,
       )}
       aria-label="Открыть фильтры"

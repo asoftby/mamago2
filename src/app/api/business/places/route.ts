@@ -16,11 +16,22 @@ import { updatePlaceLocation } from "@/services/place/placeLocation.service";
 import { extractStreetName } from "@/lib/slug/slugUtils";
 import { generatePlaceSlug } from "@/lib/slug/placeSlugService";
 import { attachMediaToEntity } from "@/lib/media/mediaRegistry";
+import {
+  canCreateBusinessContent,
+  canManageOwnedContent,
+  canPublishContentDirectly,
+} from "@/lib/auth/businessContentAccess";
+
+async function finalizePublishedPlaceSlugIfNeeded(placeId: string, isPublished: boolean) {
+  if (!isPublished) return;
+  const { assignSlugOnPublish } = await import("@/lib/slug/placeSlugService");
+  await assignSlugOnPublish(placeId);
+}
 
 export async function POST(request: NextRequest) {
   try {
     const user = await getCurrentUser();
-    if (!user || user.role !== "BUSINESS_OWNER") {
+    if (!user || !canCreateBusinessContent(user.role)) {
       return NextResponse.json({ error: "UNAUTHORIZED", message: "Authentication required" }, { status: 401 });
     }
 
@@ -35,19 +46,59 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!status || !["DRAFT", "PENDING"].includes(status)) {
+    const allowedSubmitStatuses = [
+      "PENDING",
+      ...(canPublishContentDirectly(user.role) ? (["PUBLISHED"] as const) : []),
+    ];
+    if (
+      !status ||
+      !(
+        status === "DRAFT" ||
+        allowedSubmitStatuses.includes(status as "PENDING" | "PUBLISHED")
+      )
+    ) {
       return NextResponse.json(
-        { error: "VALIDATION_ERROR", message: "status must be DRAFT or PENDING" },
+        {
+          error: "VALIDATION_ERROR",
+          message: canPublishContentDirectly(user.role)
+            ? "status must be DRAFT, PENDING, or PUBLISHED"
+            : "status must be DRAFT or PENDING",
+        },
         { status: 400 }
       );
     }
 
-    if (!data || !data.title || !data.category || !data.shortDesc) {
+    if (!data || typeof data !== "object") {
       return NextResponse.json(
-        { error: "VALIDATION_ERROR", message: "data.title, data.category, and data.shortDesc are required" },
+        { error: "VALIDATION_ERROR", message: "data is required" },
         { status: 400 }
       );
     }
+
+    const isDraft = status === "DRAFT";
+    const isPublished = status === "PUBLISHED";
+
+    // PENDING / PUBLISHED: full profile required. DRAFT: allow empty — DB still needs strings (category defaults to "other").
+    if (!isDraft) {
+      const t = String(data.title ?? "").trim();
+      const c = String(data.category ?? "").trim();
+      const s = String(data.shortDesc ?? "").trim();
+      if (!t || !c || !s) {
+        return NextResponse.json(
+          { error: "VALIDATION_ERROR", message: "data.title, data.category, and data.shortDesc are required" },
+          { status: 400 }
+        );
+      }
+    }
+
+    const d = isDraft
+      ? {
+          ...data,
+          title: String(data.title ?? "").trim(),
+          shortDesc: String(data.shortDesc ?? "").trim(),
+          category: String(data.category ?? "").trim() || "other",
+        }
+      : data;
 
     // Idempotency check: if place with this createRequestId already exists, return it
     const existingPlace = await prisma.place.findFirst({
@@ -62,10 +113,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ place: existingPlace });
     }
 
-    console.log("[places/POST] Creating place for user:", user.id, "title:", data.title, "status:", status);
+    console.log("[places/POST] Creating place for user:", user.id, "title:", d.title, "status:", status);
 
     // Extract short address from formatted address
-    const shortAddress = extractStreetName(data.formattedAddr || "");
+    const shortAddress = extractStreetName(d.formattedAddr || "");
     console.log("[places/POST] Extracted shortAddress:", shortAddress);
 
     // Slug will be generated on publish, not on creation
@@ -73,7 +124,7 @@ export async function POST(request: NextRequest) {
     console.log("[places/POST] Slug will be generated on publish");
 
     // Determine location source
-    const locationSource: LocationSource = data.googlePlaceId ? "GOOGLE" : "MANUAL";
+    const locationSource: LocationSource = d.googlePlaceId ? "GOOGLE" : "MANUAL";
 
     // Create Place with all provided data
     const place = await prisma.place.create({
@@ -84,59 +135,59 @@ export async function POST(request: NextRequest) {
         slug, // Add SEO-friendly slug
         
         // Step 1 fields
-        title: data.title,
+        title: d.title,
         shortAddress, // Add short address for disambiguation
-        category: data.category,
-        shortDesc: data.shortDesc,
-        description: data.description || null,
-        ageTags: data.ageTags || [],
-        visitFormats: data.visitFormats || [],
-        activityTypes: data.activityTypes || [],
+        category: d.category,
+        shortDesc: d.shortDesc,
+        description: d.description || null,
+        ageTags: d.ageTags || [],
+        visitFormats: d.visitFormats || [],
+        activityTypes: d.activityTypes || [],
         
         // Step 2 fields
-        lat: data.lat || null,
-        lng: data.lng || null,
-        googlePlaceId: data.googlePlaceId || null,
-        formattedAddr: data.formattedAddr || null,
-        addressJson: data.addressJson || null,
-        customAddress: data.customAddress || null,
+        lat: d.lat || null,
+        lng: d.lng || null,
+        googlePlaceId: d.googlePlaceId || null,
+        formattedAddr: d.formattedAddr || null,
+        addressJson: d.addressJson || null,
+        customAddress: d.customAddress || null,
         locationSource,
-        cityId: data.cityId || null,
-        districtAutoId: data.districtAutoId || null,
-        districtManualId: data.districtManualId || null,
-        metroAutoId: data.metroAutoId || null,
-        metroAutoDistanceM: data.metroAutoDistanceM || null,
-        metroManualId: data.metroManualId || null,
-        metroManualDistanceM: data.metroManualDistanceM || null,
+        cityId: d.cityId || null,
+        districtAutoId: d.districtAutoId || null,
+        districtManualId: d.districtManualId || null,
+        metroAutoId: d.metroAutoId || null,
+        metroAutoDistanceM: d.metroAutoDistanceM || null,
+        metroManualId: d.metroManualId || null,
+        metroManualDistanceM: d.metroManualDistanceM || null,
         
         // Step 3 fields
-        logoImageId: data.logoImageId || null,
+        logoImageId: d.logoImageId || null,
         
         // Step 4 fields
-        phone: data.phone || null,
-        website: data.website || null,
-        instagramHandle: data.instagramHandle || null,
-        instagramUrl: data.instagramUrl || null,
+        phone: d.phone || null,
+        website: d.website || null,
+        instagramHandle: d.instagramHandle || null,
+        instagramUrl: d.instagramUrl || null,
         
         // Hierarchy
-        placeKind: data.placeKind || PlaceKind.STANDALONE,
-        floor: data.floor || null,
-        unit: data.unit || null,
+        placeKind: d.placeKind || PlaceKind.STANDALONE,
+        floor: d.floor || null,
+        unit: d.unit || null,
       },
     });
 
     console.log("[places/POST] ✅ Created place:", place.id, "status:", place.status);
 
     // Attach temp media if wizardSessionId provided
-    if (data.wizardSessionId) {
-      console.log("[places/POST] 📎 Attaching temp media from session:", data.wizardSessionId);
+    if (d.wizardSessionId) {
+      console.log("[places/POST] 📎 Attaching temp media from session:", d.wizardSessionId);
       
       try {
         // Get all temp media for this session
         const tempMedia = await prisma.tempMedia.findMany({
           where: {
             ownerUserId: user.id,
-            wizardSessionId: data.wizardSessionId,
+            wizardSessionId: d.wizardSessionId,
             status: "TEMP",
           },
           orderBy: [
@@ -200,7 +251,7 @@ export async function POST(request: NextRequest) {
         await prisma.tempMedia.updateMany({
           where: {
             ownerUserId: user.id,
-            wizardSessionId: data.wizardSessionId,
+            wizardSessionId: d.wizardSessionId,
             status: "TEMP",
           },
           data: {
@@ -246,6 +297,8 @@ export async function POST(request: NextRequest) {
             metroAutoDistanceM: enrichedPlace.metroAutoDistanceM,
           });
           
+          await finalizePublishedPlaceSlugIfNeeded(place.id, isPublished);
+
           // Return enriched place with full data
           return NextResponse.json({ 
             place: {
@@ -262,6 +315,8 @@ export async function POST(request: NextRequest) {
     } else {
       console.log("[places/POST] ℹ️ Skipping geo enrichment (no location data)");
     }
+
+    await finalizePublishedPlaceSlugIfNeeded(place.id, isPublished);
 
     return NextResponse.json({ place });
   } catch (error) {
@@ -285,7 +340,7 @@ export async function POST(request: NextRequest) {
 export async function GET(request: NextRequest) {
   try {
     const user = await getCurrentUser();
-    if (!user || user.role !== "BUSINESS_OWNER") {
+    if (!user || !canCreateBusinessContent(user.role)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 

@@ -8,6 +8,7 @@ import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
 import { ContentStatus, ActivityType } from "@prisma/client";
 import { isPlaceRequired } from "@/lib/activity/classification";
+import { canCreateBusinessContent, canManageOwnedContent } from "@/lib/auth/businessContentAccess";
 
 interface ValidationError {
   error: "VALIDATION";
@@ -22,7 +23,7 @@ export async function POST(
   try {
     const user = await getCurrentUser();
 
-    if (!user || user.role !== "BUSINESS_OWNER") {
+    if (!user || !canCreateBusinessContent(user.role)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -41,7 +42,7 @@ export async function POST(
     }
 
     // Check ownership
-    if (activity.ownerUserId !== user.id) {
+    if (!canManageOwnedContent(user, activity.ownerUserId)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 

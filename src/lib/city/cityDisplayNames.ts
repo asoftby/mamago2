@@ -22,6 +22,14 @@ export function getCityDisplayName(citySlug: string): string {
 }
 
 /**
+ * Phrase for search bars: «в Минске», «в Бресте», …
+ */
+export function getCityLocativePhrase(citySlug: string): string {
+  const tail = CITY_DISPLAY_NAMES[citySlug.toLowerCase()];
+  return tail ? `в ${tail}` : `в ${citySlug}`;
+}
+
+/**
  * Get formatted title by replacing {city} placeholder with proper city name
  * Example: formatCityTitle("Куда пойти в {city}", "minsk") => "Куда пойти в Минске"
  */

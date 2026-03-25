@@ -8,6 +8,7 @@ import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
 import { updatePlaceLocation } from "@/services/place/placeLocation.service";
 import { Prisma } from "@prisma/client";
+import { canCreateBusinessContent, canManageOwnedContent } from "@/lib/auth/businessContentAccess";
 
 export async function POST(
   request: NextRequest,
@@ -17,7 +18,7 @@ export async function POST(
   
   try {
     const user = await getCurrentUser();
-    if (!user || user.role !== "BUSINESS_OWNER") {
+    if (!user || !canCreateBusinessContent(user.role)) {
       return NextResponse.json(
         { error: "UNAUTHORIZED", message: "Authentication required" },
         { status: 401 }
@@ -40,7 +41,7 @@ export async function POST(
       );
     }
 
-    if (existing.ownerUserId !== user.id) {
+    if (!canManageOwnedContent(user, existing.ownerUserId)) {
       return NextResponse.json(
         { error: "FORBIDDEN", message: "You don't have access to this place" },
         { status: 403 }

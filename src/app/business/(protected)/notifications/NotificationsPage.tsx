@@ -6,6 +6,7 @@ import { formatDistanceToNow } from "date-fns";
 import { ru } from "date-fns/locale";
 import { Bell, CheckCheck, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { getNotificationHref } from "@/lib/notifications/routing";
 import { toast } from "sonner";
 
 interface Notification {
@@ -85,13 +86,6 @@ export function NotificationsPage() {
     }
   };
 
-  const getNotificationLink = (notification: Notification): string | null => {
-    if (notification.entityType === "PLACE" && notification.entityId) {
-      return `/business/places/${notification.entityId}/edit`;
-    }
-    return null;
-  };
-
   const getNotificationIcon = (type: string): string => {
     switch (type) {
       case "PLACE_APPROVED":
@@ -168,7 +162,7 @@ export function NotificationsPage() {
       ) : (
         <div className="space-y-2">
           {notifications.map((notification) => {
-            const link = getNotificationLink(notification);
+            const link = getNotificationHref(notification);
             const icon = getNotificationIcon(notification.type);
 
             return (

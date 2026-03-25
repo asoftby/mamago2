@@ -9,17 +9,24 @@
  */
 export function extractPlainTextFromHtml(html: string): string {
   if (!html) return "";
-  
-  // Remove HTML tags
+
   const text = html.replace(/<[^>]*>/g, "");
-  
-  // Decode HTML entities
-  const textarea = document.createElement("textarea");
-  textarea.innerHTML = text;
-  const decoded = textarea.value;
-  
-  // Trim whitespace
-  return decoded.trim();
+
+  if (typeof document !== "undefined") {
+    const textarea = document.createElement("textarea");
+    textarea.innerHTML = text;
+    return textarea.value.trim();
+  }
+
+  return text
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 /**

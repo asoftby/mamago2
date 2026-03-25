@@ -15,13 +15,6 @@ export function StickyModerationBar({
   hasChanges,
   isVisible,
 }: StickyModerationBarProps) {
-  // Debug logging
-  console.log("[StickyModerationBar] Render:", {
-    isVisible,
-    hasChanges,
-    isSubmitting,
-  });
-  
   if (!isVisible) return null;
 
   return (

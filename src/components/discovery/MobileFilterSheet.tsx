@@ -86,7 +86,7 @@ export function MobileFilterSheet({
     <button
       onClick={onClick}
       className={cn(
-        "flex flex-col gap-0.5 w-full text-left px-5 py-3 rounded-full border bg-background hover:bg-muted/30 transition-all min-h-[56px] justify-center",
+        "flex flex-col gap-0.5 w-full text-left px-5 py-3 rounded-full border border-gray-200 bg-white transition-all min-h-[56px] justify-center hover:bg-gray-50",
         isActive && "border-primary bg-primary/5"
       )}
     >
@@ -134,10 +134,10 @@ export function MobileFilterSheet({
       <SheetContent
         side="bottom"
         showCloseButton={false}
-        className="fixed inset-x-0 bottom-0 w-full max-h-[85vh] rounded-t-3xl bg-background border-t border-border/60 shadow-2xl p-0 flex flex-col overflow-hidden gap-0"
+        className="fixed inset-x-0 bottom-0 w-full max-h-[85vh] rounded-t-3xl border-t border-gray-200/80 bg-white shadow-2xl p-0 flex flex-col overflow-hidden gap-0"
       >
         {/* Header */}
-        <div className="flex items-center justify-center p-4 border-b border-border/40 relative shrink-0">
+        <div className="flex shrink-0 items-center justify-center border-b border-gray-200/80 bg-white p-4 relative">
           <SheetTitle>Фильтры</SheetTitle>
         </div>
 
@@ -206,6 +206,7 @@ export function MobileFilterSheet({
                  isMulti={true}
                  placeholderSearch="Поиск возраста..."
                  showSearch={false}
+                 layoutVariant="age-masonry"
                />
             </div>
 
@@ -262,7 +263,7 @@ export function MobileFilterSheet({
         </div>
 
         {/* Sticky Footer Action Bar */}
-        <div className="sticky bottom-0 bg-background/95 backdrop-blur border-t border-border/60 px-4 py-3 pb-[calc(16px+env(safe-area-inset-bottom))] flex items-center justify-between shrink-0">
+        <div className="sticky bottom-0 border-t border-gray-200/80 bg-white px-4 py-3 pb-[calc(16px+env(safe-area-inset-bottom))] flex items-center justify-between shrink-0">
           <button
             onClick={onReset}
             className="px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"

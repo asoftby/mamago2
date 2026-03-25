@@ -1,5 +1,6 @@
 "use client";
 
+import { toast } from "sonner";
 import { BusinessContentList, ItemHandlers } from "@/components/business/shared/BusinessContentList";
 import { EventCardHorizontal } from "@/components/business/events/EventCardHorizontal";
 import { Calendar } from "lucide-react";
@@ -34,14 +35,18 @@ interface EventsListProps {
 
 export function EventsList({ activities, currentView }: EventsListProps) {
   const handleDelete = async (id: string) => {
-    const response = await fetch(`/api/business/activities/${id}`, {
+    const response = await fetch(`/api/business/events/${id}`, {
       method: "DELETE",
     });
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || "Failed to delete");
+      const error = await response.json().catch(() => ({}));
+      throw new Error(
+        typeof error.error === "string" ? error.error : "Не удалось удалить событие"
+      );
     }
+
+    toast.success("Событие удалено");
   };
 
   // Archive/unarchive will be implemented when we add archived field to Activity
@@ -63,7 +68,7 @@ export function EventsList({ activities, currentView }: EventsListProps) {
       emptyTitle="У вас пока нет событий"
       emptyDescription="Создайте первое событие, чтобы привлечь посетителей"
       addButtonText="Добавить событие"
-      addButtonHref="/business/events/new"
+      addButtonHref="/editor/event/new"
       renderItem={(activity, handlers) => (
         <EventCardHorizontal
           key={activity.id}

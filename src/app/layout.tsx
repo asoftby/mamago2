@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Manrope, Geist_Mono, Literata } from "next/font/google";
 import "./globals.css";
 import { Sonner } from "@/components/ui/sonner";
+import { AccountModeProvider } from "@/contexts/AccountModeContext";
 
 const manrope = Manrope({
   variable: "--font-manrope",
@@ -43,9 +44,9 @@ export default function RootLayout({
   return (
     <html lang="ru">
       <body
-        className={`${manrope.variable} ${geistMono.variable} ${literata.variable} antialiased font-sans min-h-screen bg-background text-foreground`}
+        className={`${manrope.variable} ${geistMono.variable} ${literata.variable} antialiased font-sans min-h-screen text-foreground`}
       >
-        {children}
+        <AccountModeProvider>{children}</AccountModeProvider>
         <Sonner />
       </body>
     </html>

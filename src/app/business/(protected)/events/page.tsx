@@ -1,7 +1,10 @@
 import { getCurrentUser } from "@/lib/auth/server";
 import { redirect } from "next/navigation";
 import prisma from "@/lib/prisma";
+import { ActivityType } from "@prisma/client";
+import { excludeDeletedEvents, excludeGhostEventDrafts } from "@/lib/business/eventListWhere";
 import { EventsList } from "./EventsList";
+import { canCreateBusinessContent } from "@/lib/auth/businessContentAccess";
 
 interface SearchParams {
   view?: "active" | "archived";
@@ -14,7 +17,7 @@ export default async function EventsPage({
 }) {
   const user = await getCurrentUser();
   
-  if (!user || user.role !== "BUSINESS_OWNER") {
+  if (!user || !canCreateBusinessContent(user.role)) {
     redirect("/business/login");
   }
 
@@ -36,8 +39,9 @@ export default async function EventsPage({
   const activities = await prisma.activity.findMany({
     where: {
       ownerUserId: user.id,
-      // Filter by archived status if needed (assuming we'll add this field later)
-      // For now, just fetch all
+      type: ActivityType.EVENT,
+      ...excludeDeletedEvents(),
+      ...excludeGhostEventDrafts(),
     },
     include: {
       place: {

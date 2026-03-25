@@ -55,10 +55,10 @@ export function MobileDateSheet({
       <SheetContent
         side="bottom"
         showCloseButton={false}
-        className="fixed inset-x-0 bottom-0 w-full max-h-[85vh] rounded-t-3xl bg-background border-t border-border/60 shadow-2xl p-0 flex flex-col overflow-hidden gap-0"
+        className="fixed inset-x-0 bottom-0 w-full max-h-[85vh] rounded-t-3xl border-t border-gray-200/80 bg-white shadow-2xl p-0 flex flex-col overflow-hidden gap-0"
       >
         {/* Header */}
-        <div className="flex items-center justify-center p-4 border-b border-border/40 relative shrink-0">
+        <div className="flex shrink-0 items-center justify-center border-b border-gray-200/80 bg-white p-4 relative">
           <SheetTitle>Когда идём</SheetTitle>
         </div>
 
@@ -73,7 +73,7 @@ export function MobileDateSheet({
         </div>
 
         {/* Sticky Footer Action Bar */}
-        <div className="sticky bottom-0 bg-background/95 backdrop-blur border-t border-border/60 px-4 py-3 pb-[calc(16px+env(safe-area-inset-bottom))] flex items-center justify-between shrink-0">
+        <div className="sticky bottom-0 border-t border-gray-200/80 bg-white px-4 py-3 pb-[calc(16px+env(safe-area-inset-bottom))] flex items-center justify-between shrink-0">
           <button
             onClick={handleReset}
             className="px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"

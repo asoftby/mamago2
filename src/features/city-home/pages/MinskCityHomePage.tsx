@@ -12,14 +12,15 @@ import { MINSK_BREAKING_NEWS } from "@/features/city-home/data/minskCityHome";
 
 export function MinskCityHomePage() {
   return (
-    <main className="min-h-screen bg-background pb-20">
-      <Container className="pt-6 md:pt-8 space-y-10">
+    <div className="min-h-screen bg-background pb-20">
+      {/* pt-10 = тот же шаг, что space-y-10 (2.5rem). В layout уже есть <main> — здесь только div. */}
+      <Container className="space-y-10 pt-10">
         <div className="space-y-1 px-1">
           <H1 className="text-2xl md:text-3xl font-semibold tracking-tight text-neutral-900">
             Фамилинг с mamaGo
           </H1>
           <p className="text-sm text-neutral-500 max-w-xl leading-relaxed pt-1">
-            Персональный помощник в организации семейного отдыха
+            Персональный помощник в организации семейного отдыха и развития
           </p>
         </div>
 
@@ -35,6 +36,6 @@ export function MinskCityHomePage() {
 
         <CityHomeJournalSection />
       </Container>
-    </main>
+    </div>
   );
 }

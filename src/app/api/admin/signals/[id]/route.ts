@@ -1,24 +1,201 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
+import { getCurrentUser } from "@/lib/auth/server";
+import { canManageSignalDefinitions } from "@/lib/auth/signalDefinitionsAdmin";
+import { ensureEventCategorySlug } from "@/lib/taxonomy/eventCategorySlug";
+import {
+  assertSignalCanBecomeChild,
+  assertValidSignalParentIdOrNull,
+} from "@/lib/taxonomy/signalHierarchy";
 
 export const runtime = "nodejs";
 
-export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) { 
-  const { id } = await params;
-  const body = await req.json(); 
-  const updated = await prisma.signalDefinition.update({ 
-    where: { id }, 
-    data: { 
-      title: body.title, 
-      order: body.order, 
-      isActive: body.isActive, 
-    }, 
-  }); 
-  return NextResponse.json(updated); 
-} 
+type RouteParams = { params: Promise<{ id: string }> };
 
-export async function DELETE(_: Request, { params }: { params: Promise<{ id: string }> }) { 
+const SCHEMA_OUT_OF_SYNC_MESSAGE =
+  "Схема БД не совпадает с кодом: выполните npx prisma migrate deploy (в dev можно npx prisma db push).";
+
+function jsonFromPrismaError(e: unknown): NextResponse | null {
+  if (!(e instanceof Prisma.PrismaClientKnownRequestError)) return null;
+  if (e.code === "P2021" || e.code === "P2022") {
+    return NextResponse.json({ error: SCHEMA_OUT_OF_SYNC_MESSAGE }, { status: 503 });
+  }
+  return null;
+}
+
+export async function GET(_req: Request, { params }: RouteParams) {
+  const user = await getCurrentUser();
+  if (!user || !canManageSignalDefinitions(user.role)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
   const { id } = await params;
-  await prisma.signalDefinition.delete({ where: { id } }); 
-  return NextResponse.json({ ok: true }); 
-} 
+  const item = await prisma.signalDefinition.findUnique({
+    where: { id },
+    include: {
+      parent: { select: { id: true, title: true, slug: true } },
+      options: { orderBy: [{ order: "asc" }, { value: "asc" }] },
+      _count: { select: { children: true, options: true } },
+    },
+  });
+  if (!item) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+  if (item.slug === "vibe") {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+  return NextResponse.json(item);
+}
+
+export async function PATCH(req: Request, { params }: RouteParams) {
+  const user = await getCurrentUser();
+  if (!user || !canManageSignalDefinitions(user.role)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const { id } = await params;
+  const body = await req.json();
+
+  if (body.mode === "moveUp" || body.mode === "moveDown") {
+    const current = await prisma.signalDefinition.findUnique({ where: { id } });
+    if (!current) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+    const siblings = await prisma.signalDefinition.findMany({
+      where: { parentId: current.parentId },
+      orderBy: [{ order: "asc" }, { id: "asc" }],
+    });
+    const idx = siblings.findIndex((x) => x.id === id);
+    if (idx === -1) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+    const swapIdx = body.mode === "moveUp" ? idx - 1 : idx + 1;
+    if (swapIdx < 0 || swapIdx >= siblings.length) {
+      return NextResponse.json({ ok: true });
+    }
+    const a = siblings[idx];
+    const b = siblings[swapIdx];
+    await prisma.$transaction([
+      prisma.signalDefinition.update({
+        where: { id: a.id },
+        data: { order: b.order },
+      }),
+      prisma.signalDefinition.update({
+        where: { id: b.id },
+        data: { order: a.order },
+      }),
+    ]);
+    return NextResponse.json({ ok: true });
+  }
+
+  const data: Record<string, unknown> = {};
+
+  if (body.parentId !== undefined) {
+    const raw = body.parentId;
+    const nextParentId =
+      raw === null || raw === undefined || raw === "" ? null : String(raw);
+    try {
+      await assertValidSignalParentIdOrNull(nextParentId);
+    } catch (e) {
+      return NextResponse.json(
+        { error: e instanceof Error ? e.message : "Invalid parent" },
+        { status: 400 },
+      );
+    }
+    if (nextParentId === id) {
+      return NextResponse.json({ error: "Cannot set parent to self" }, { status: 400 });
+    }
+    if (nextParentId != null) {
+      try {
+        await assertSignalCanBecomeChild(id);
+      } catch (e) {
+        return NextResponse.json(
+          { error: e instanceof Error ? e.message : "Cannot assign parent" },
+          { status: 400 },
+        );
+      }
+    }
+    data.parentId = nextParentId;
+  }
+
+  if (body.title !== undefined) {
+    const v = String(body.title).trim();
+    if (!v) return NextResponse.json({ error: "title cannot be empty" }, { status: 400 });
+    data.title = v;
+    data.titleEn = v;
+  }
+  if (body.slug !== undefined) {
+    const existing = await prisma.signalDefinition.findUnique({
+      where: { id },
+      select: { title: true },
+    });
+    if (!existing) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+    const s = ensureEventCategorySlug(String(body.slug), existing.title);
+    const other = await prisma.signalDefinition.findFirst({
+      where: { slug: s, NOT: { id } },
+    });
+    if (other) {
+      return NextResponse.json({ error: "Slug already exists" }, { status: 409 });
+    }
+    data.slug = s;
+  }
+  if (body.icon !== undefined) {
+    data.icon = body.icon === null || body.icon === "" ? null : String(body.icon).trim();
+  }
+  if (body.order !== undefined) {
+    const n = Number(body.order);
+    if (!Number.isFinite(n)) {
+      return NextResponse.json({ error: "Invalid order" }, { status: 400 });
+    }
+    data.order = Math.floor(n);
+  }
+  if (body.isActive !== undefined) data.isActive = Boolean(body.isActive);
+  if (body.isFeatured !== undefined) data.isFeatured = Boolean(body.isFeatured);
+
+  if (Object.keys(data).length === 0) {
+    return NextResponse.json({ error: "No fields to update" }, { status: 400 });
+  }
+
+  try {
+    const updated = await prisma.signalDefinition.update({
+      where: { id },
+      data,
+      include: {
+        parent: { select: { id: true, title: true, slug: true } },
+        options: { orderBy: [{ order: "asc" }, { value: "asc" }] },
+        _count: { select: { children: true, options: true } },
+      },
+    });
+    return NextResponse.json(updated);
+  } catch (e) {
+    const schema = jsonFromPrismaError(e);
+    if (schema) return schema;
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+}
+
+export async function DELETE(_req: Request, { params }: RouteParams) {
+  const user = await getCurrentUser();
+  if (!user || !canManageSignalDefinitions(user.role)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const { id } = await params;
+  const n = await prisma.signalDefinition.count({ where: { parentId: id } });
+  if (n > 0) {
+    return NextResponse.json(
+      { error: "Delete child signals first" },
+      { status: 409 },
+    );
+  }
+
+  try {
+    await prisma.signalDefinition.delete({ where: { id } });
+    return NextResponse.json({ ok: true });
+  } catch {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+}

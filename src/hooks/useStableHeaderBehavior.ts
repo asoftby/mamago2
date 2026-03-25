@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef, type RefObject } from "react";
+import { usePathname } from "next/navigation";
 
 export type HeaderMode = "expanded-top" | "compact" | "expanded-overlay";
 export type HeaderPanel = "none" | "where" | "when" | "who" | "filters";
@@ -24,245 +25,319 @@ interface StableHeaderBehaviorActions {
 
 interface UseStableHeaderBehaviorOptions {
   scrollThreshold?: number;
-  /** Ref на корень хедера (форма внутри). Нужен для надёжной проверки «клик вне формы». */
+  /**
+   * Гистерезис (px): компакт включается позже, выключается раньше — меньше рывков на iOS (rubber band, subpixel scroll).
+   */
+  scrollHysteresisPx?: number;
+  /**
+   * Ref на корневой `<header>` (верхняя + нижняя строка).
+   * Клик вне `data-header-chrome` / `data-search-surface` / `[data-portal-panel]` закрывает панели.
+   */
   headerRef?: RefObject<HTMLElement | null>;
+}
+
+/** Блок 2 — компактная строка (лого, капсула, действия), px. */
+export const STABLE_HEADER_BLOCK2_PX = 80;
+/** Блок 1 — оценка высоты второй строки; спейсер на десктопе подгоняется по ResizeObserver в Header. */
+export const STABLE_HEADER_BLOCK1_DEFAULT_PX = 176;
+/**
+ * Раньше было больше при «открытой» surface — из‑за этого спейсер подскакивал и контент съезжал.
+ * Панели Where/When/Who в портале; высота полосы фиксирована — держим одно значение с DEFAULT.
+ */
+export const STABLE_HEADER_BLOCK1_OPEN_PX = STABLE_HEADER_BLOCK1_DEFAULT_PX;
+/** @deprecated используйте STABLE_HEADER_BLOCK2_PX */
+export const STABLE_HEADER_TOP_ROW_PX = STABLE_HEADER_BLOCK2_PX;
+/** @deprecated */
+export const STABLE_HEADER_OPEN_TOTAL_PX =
+  STABLE_HEADER_BLOCK2_PX + STABLE_HEADER_BLOCK1_OPEN_PX;
+
+/** Режим при однократном чтении scrollY (без гистерезиса по prev.mode) — порог «вошли в компакт». */
+function modeFromScrollY(scrollY: number, enterCompactY: number): HeaderMode {
+  return scrollY >= enterCompactY ? "compact" : "expanded-top";
 }
 
 /**
  * Stable Header Behavior Hook
- * 
- * Production-grade behavioral controller for desktop header.
- * Eliminates layout shift and reflow by managing state transitions
- * without changing header height or causing DOM restructuring.
+ *
+ * Airbnb-лайаут:
+ * - **Верхняя строка** (`data-header-chrome`, `data-header-block2`): лого | центр (навигация или компактная капсула) | глобус и меню.
+ * - **Нижняя строка** (`data-header-block1`, `data-search-surface`): большая сегментированная строка поиска — только когда не компактная одна строка.
+ *
+ * Видимость:
+ * - У верха (`expanded-top`, без открытой search surface): две строки — навигация + большой поиск.
+ * - После скролла (`compact`): одна строка — компактная капсула в центре.
+ * - `showSearchSurface === true`: две строки (навигация + расширенная форма), даже при скролле.
  */
 export function useStableHeaderBehavior(options: UseStableHeaderBehaviorOptions = {}) {
-  const { scrollThreshold = 80, headerRef } = options;
+  const { scrollThreshold = 80, scrollHysteresisPx = 14, headerRef } = options;
+  const pathname = usePathname();
+
+  /** Вниз: компакт после threshold + hysteresis; вверх: разворот раньше threshold. */
+  const enterCompactY = scrollThreshold + Math.max(4, Math.round(scrollHysteresisPx * 0.45));
+  const exitCompactY = Math.max(8, scrollThreshold - scrollHysteresisPx);
 
   const [state, setState] = useState<StableHeaderBehaviorState>({
     mode: "expanded-top",
     activePanel: "none",
     showSearchSurface: false,
     isScrolled: false,
-    scrollProgress: 0
+    scrollProgress: 0,
   });
 
   const rafRef = useRef<number | null>(null);
   const lastScrollYRef = useRef(0);
   const actionsRef = useRef<StableHeaderBehaviorActions>(null!);
   const stateRef = useRef(state);
-  const forceExpandedUntilRef = useRef<number>(0); // timestamp до которого игнорируем скролл
+  const forceExpandedUntilRef = useRef<number>(0);
+  /** Ниже lg: компактная строка отключена — скрытие через translate (см. useAirbnbMobileHeaderScroll). */
+  const isMobileLayoutRef = useRef(false);
   stateRef.current = state;
+
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 1023px)");
+    const sync = () => {
+      isMobileLayoutRef.current = mq.matches;
+    };
+    sync();
+    mq.addEventListener("change", sync);
+    return () => mq.removeEventListener("change", sync);
+  }, []);
 
   const updateFromScroll = useCallback(() => {
     rafRef.current = null;
     const currentScrollY = window.scrollY;
     const progress = Math.min(1, currentScrollY / scrollThreshold);
-    const wasAboveThreshold = lastScrollYRef.current >= scrollThreshold;
-    const isAboveThreshold = currentScrollY >= scrollThreshold;
 
-    setState(prev => {
-      // Если SearchSurface открыт, не меняем режим при обычном скролле
+    setState((prev) => {
       if (prev.showSearchSurface) {
         return { ...prev, isScrolled: currentScrollY > 10, scrollProgress: progress };
       }
-      
-      // Если принудительно expanded — игнорируем скролл
+
       if (Date.now() < forceExpandedUntilRef.current) {
         return { ...prev, isScrolled: currentScrollY > 10, scrollProgress: progress };
       }
-      
-      // Если expanded-top открыт принудительно (через клик на компактный) и мы выше threshold — сворачиваем
-      if (prev.mode === "expanded-top" && isAboveThreshold) {
+
+      if (isMobileLayoutRef.current) {
+        if (prev.mode !== "expanded-top") {
+          return {
+            ...prev,
+            mode: "expanded-top",
+            isScrolled: currentScrollY > 10,
+            scrollProgress: progress,
+            activePanel: prev.activePanel,
+            showSearchSurface: false,
+          };
+        }
+        return { ...prev, isScrolled: currentScrollY > 10, scrollProgress: progress };
+      }
+
+      let nextMode = prev.mode;
+      if (prev.mode === "expanded-top" && currentScrollY >= enterCompactY) {
+        nextMode = "compact";
+      } else if (prev.mode === "compact" && currentScrollY < exitCompactY) {
+        nextMode = "expanded-top";
+      }
+
+      if (nextMode !== prev.mode) {
         return {
           ...prev,
-          mode: "compact",
+          mode: nextMode,
           isScrolled: currentScrollY > 10,
           scrollProgress: progress,
-          activePanel: "none"
+          activePanel: nextMode === "compact" ? "none" : prev.activePanel,
+          showSearchSurface: nextMode === "compact" ? false : prev.showSearchSurface,
         };
       }
 
-      // Обычная логика переключения режимов (пересечение threshold)
-      if (wasAboveThreshold !== isAboveThreshold) {
-        const newMode: HeaderMode = isAboveThreshold ? "compact" : "expanded-top";
-        return {
-          ...prev,
-          mode: newMode,
-          isScrolled: currentScrollY > 10,
-          scrollProgress: progress,
-          activePanel: newMode === "compact" ? "none" : prev.activePanel
-        };
-      }
-      
       return { ...prev, isScrolled: currentScrollY > 10, scrollProgress: progress };
     });
 
     lastScrollYRef.current = currentScrollY;
-  }, [scrollThreshold]);
+  }, [scrollThreshold, enterCompactY, exitCompactY]);
 
   const handleScroll = useCallback(() => {
     if (rafRef.current !== null) return;
     rafRef.current = requestAnimationFrame(updateFromScroll);
   }, [updateFromScroll]);
 
-  // Обработчик для закрытия search surface и панелей при скролле
+  /**
+   * Закрытие поиска при осознанном скролле страницы.
+   * Нельзя брать scrollY до отрисовки второй строки хедера: спейсер и reflow меняют scrollY на несколько px,
+   * из‑за чего surface открывалась и тут же закрывалась (~100ms + delta > 10).
+   */
   useEffect(() => {
     if (!state.showSearchSurface && state.activePanel === "none") return;
 
-    let initialScrollY = window.scrollY;
+    let baselineScrollY = window.scrollY;
     let isReady = false;
 
     const readyTimeout = setTimeout(() => {
+      baselineScrollY = window.scrollY;
       isReady = true;
-    }, 100);
+    }, 400);
 
     const handleScrollForClose = () => {
       if (!isReady) return;
-      
+
       const currentScrollY = window.scrollY;
-      const scrollDelta = Math.abs(currentScrollY - initialScrollY);
-      
-      if (scrollDelta > 10) {
-        setState(prev => {
+      const scrollDelta = Math.abs(currentScrollY - baselineScrollY);
+
+      // Порог выше микродрожи от смены высоты layout / subpixel
+      if (scrollDelta > 48) {
+        setState((prev) => {
           if (!prev.showSearchSurface && prev.activePanel === "none") return prev;
-          const targetMode: HeaderMode = currentScrollY < scrollThreshold ? "expanded-top" : "compact";
+          const targetMode = modeFromScrollY(currentScrollY, enterCompactY);
           return {
             ...prev,
             showSearchSurface: false,
             activePanel: "none",
-            mode: targetMode
+            mode: targetMode,
           };
         });
       }
     };
 
-    initialScrollY = window.scrollY;
     window.addEventListener("scroll", handleScrollForClose, { passive: true });
     return () => {
       window.removeEventListener("scroll", handleScrollForClose);
       clearTimeout(readyTimeout);
     };
-  }, [state.showSearchSurface, state.activePanel, scrollThreshold]);
+  }, [state.showSearchSurface, state.activePanel, scrollThreshold, enterCompactY]);
 
   useEffect(() => {
     const y = window.scrollY;
     lastScrollYRef.current = y;
     const progress = Math.min(1, y / scrollThreshold);
-    const atTop = progress < 1;
-    setState(prev => ({
+    const mobile = window.matchMedia("(max-width: 1023px)").matches;
+    const mode: HeaderMode = mobile
+      ? "expanded-top"
+      : y >= enterCompactY
+        ? "compact"
+        : "expanded-top";
+    setState((prev) => ({
       ...prev,
       scrollProgress: progress,
-      mode: atTop ? "expanded-top" : "compact",
-      isScrolled: y > 10
+      mode,
+      isScrolled: y > 10,
     }));
 
     window.addEventListener("scroll", handleScroll, { passive: true });
+    const vv = window.visualViewport;
+    /** Только resize (полоса URL): `scroll` на visualViewport на iOS дублирует window и даёт лишние пересчёты режима. */
+    const onViewportResize = () => {
+      handleScroll();
+    };
+    vv?.addEventListener("resize", onViewportResize);
+
     return () => {
       window.removeEventListener("scroll", handleScroll);
+      vv?.removeEventListener("resize", onViewportResize);
       if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
     };
-  }, [handleScroll, scrollThreshold]);
-  
-  // Actions (stable callbacks)
+  }, [handleScroll, scrollThreshold, pathname, enterCompactY, exitCompactY]);
+
   const actions: StableHeaderBehaviorActions = {
-    openPanel: useCallback((panel: HeaderPanel) => {
-      setState(prev => ({
-        ...prev,
-        activePanel: panel,
-        // If we're in compact mode and opening a panel, show search surface
-        showSearchSurface: prev.mode === "compact" ? true : prev.showSearchSurface,
-        mode: prev.mode === "compact" ? "expanded-overlay" : prev.mode
-      }));
-    }, []),
-    
+    openPanel: useCallback(
+      (panel: HeaderPanel) => {
+        setState((prev) => ({
+          ...prev,
+          activePanel: panel,
+          /** Открытие сегмента Where/When/Who — показываем оба блока (в т.ч. компактную строку). */
+          showSearchSurface: true,
+        }));
+      },
+      [],
+    ),
+
     closePanel: useCallback(() => {
-      setState(prev => ({
+      setState((prev) => ({
         ...prev,
-        activePanel: "none"
+        activePanel: "none",
       }));
     }, []),
-    
+
     openSearchSurface: useCallback(() => {
-      // Отменяем любой pending RAF чтобы не было гонки
       if (rafRef.current !== null) {
         cancelAnimationFrame(rafRef.current);
         rafRef.current = null;
       }
-      // Защита: игнорируем скролл 500ms после открытия
       forceExpandedUntilRef.current = Date.now() + 500;
-      // Устанавливаем lastScrollYRef на текущую позицию чтобы не было ложного срабатывания
       lastScrollYRef.current = window.scrollY;
-      
-      setState(prev => ({
-        ...prev,
-        showSearchSurface: false,
-        mode: "expanded-top" as HeaderMode
-      }));
-    }, []),
-    
+
+      setState((prev) => {
+        const y = window.scrollY;
+        return {
+          ...prev,
+          showSearchSurface: true,
+          mode: modeFromScrollY(y, enterCompactY),
+          activePanel: "none",
+        };
+      });
+    }, [enterCompactY]),
+
     closeSearchSurface: useCallback(() => {
-      console.log('🔍 closeSearchSurface called');
-      setState(prev => {
-        // Determine target mode based on scroll position
+      setState((prev) => {
         const currentScrollY = window.scrollY;
-        const targetMode: HeaderMode = currentScrollY < scrollThreshold ? "expanded-top" : "compact";
-        
-        console.log('🔍 Closing SearchSurface, targetMode:', targetMode, 'scrollY:', currentScrollY);
-        
+        const targetMode = modeFromScrollY(currentScrollY, enterCompactY);
         return {
           ...prev,
           showSearchSurface: false,
           mode: targetMode,
-          activePanel: "none"
+          activePanel: "none",
         };
       });
-    }, [scrollThreshold]),
-    
+    }, [enterCompactY]),
+
     toggleSearchSurface: useCallback(() => {
-      setState(prev => {
+      setState((prev) => {
         if (prev.showSearchSurface) {
-          // Close search surface
           const currentScrollY = window.scrollY;
-          const targetMode: HeaderMode = currentScrollY < scrollThreshold ? "expanded-top" : "compact";
-          
+          const targetMode = modeFromScrollY(currentScrollY, enterCompactY);
           return {
             ...prev,
             showSearchSurface: false,
             mode: targetMode,
-            activePanel: "none"
-          };
-        } else {
-          // Open search surface
-          return {
-            ...prev,
-            showSearchSurface: true,
-            mode: "expanded-overlay"
+            activePanel: "none",
           };
         }
+        if (rafRef.current !== null) {
+          cancelAnimationFrame(rafRef.current);
+          rafRef.current = null;
+        }
+        forceExpandedUntilRef.current = Date.now() + 500;
+        lastScrollYRef.current = window.scrollY;
+        const y = window.scrollY;
+        return {
+          ...prev,
+          showSearchSurface: true,
+          mode: modeFromScrollY(y, enterCompactY),
+        };
       });
-    }, [scrollThreshold])
+    }, [enterCompactY]),
   };
-  
+
   actionsRef.current = actions;
-  
-  // Outside click — закрыть выпадающую панель или (если открыт хедер из компактного) поверхность
+
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const current = stateRef.current;
       if (!current.showSearchSurface && current.activePanel === "none") return;
 
       const target = event.target as Node;
-      const headerEl = headerRef?.current ?? document.querySelector("[data-header-chrome]");
-      const inHeader = headerEl?.contains(target) ?? false;
+      const root = headerRef?.current;
+      const block1 = document.querySelector("[data-header-block1]");
+      const block2 = document.querySelector("[data-header-block2]");
+      const inRoot = root?.contains(target) ?? false;
+      const inB1 = block1?.contains(target) ?? false;
+      const inB2 = block2?.contains(target) ?? false;
       const inPanel = Array.from(document.querySelectorAll("[data-portal-panel]")).some((el) =>
-        el.contains(target)
+        el.contains(target),
       );
-      
-      // Проверяем клик по search surface
+
       const searchSurface = document.querySelector("[data-search-surface]");
       const inSearchSurface = searchSurface?.contains(target) ?? false;
-      
-      if (inHeader || inPanel || inSearchSurface) return;
+
+      if (inRoot || inB1 || inB2 || inPanel || inSearchSurface) return;
 
       if (current.activePanel !== "none") {
         actionsRef.current.closePanel();
@@ -271,19 +346,16 @@ export function useStableHeaderBehavior(options: UseStableHeaderBehaviorOptions 
       }
     };
 
-    // Добавляем задержку перед активацией outside click handler
-    // Это предотвращает немедленное закрытие после открытия
     const timeoutId = setTimeout(() => {
       document.addEventListener("mousedown", handleClickOutside, true);
-    }, 150); // Increased from 100ms to 150ms
+    }, 150);
 
     return () => {
       clearTimeout(timeoutId);
       document.removeEventListener("mousedown", handleClickOutside, true);
     };
   }, [state.showSearchSurface, state.activePanel, headerRef]);
-  
-  // Escape key
+
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
@@ -293,14 +365,17 @@ export function useStableHeaderBehavior(options: UseStableHeaderBehaviorOptions 
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [state.showSearchSurface, state.activePanel]);
-  
+
+  /** Одна компактная строка (лого + капсула + действия), без второй строки поиска. */
+  const showAirbnbCompactBar = state.mode === "compact" && !state.showSearchSurface;
+
   return {
     ...state,
     actions,
-    // Computed properties for easier consumption
     isExpanded: state.mode === "expanded-top",
     isCompact: state.mode === "compact",
     isOverlay: state.mode === "expanded-overlay",
-    hasActivePanel: state.activePanel !== "none"
+    hasActivePanel: state.activePanel !== "none",
+    showAirbnbCompactBar,
   };
 }

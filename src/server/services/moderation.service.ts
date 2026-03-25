@@ -237,7 +237,7 @@ export async function rejectPlace(
  */
 export async function submitPlace(
   placeId: string,
-  ownerUserId: string
+  _actingUserId: string
 ): Promise<void> {
   const place = await prisma.place.findUnique({
     where: { id: placeId },
@@ -248,9 +248,7 @@ export async function submitPlace(
     throw new Error("Place not found");
   }
 
-  if (place.ownerUserId !== ownerUserId) {
-    throw new Error("Unauthorized: not place owner");
-  }
+  // Access control is enforced by API routes (owner or admin/moderator).
 
   if (
     place.status !== "DRAFT" &&
@@ -290,6 +288,52 @@ export async function submitPlace(
       },
     }),
   ]);
+}
+
+/**
+ * Publish a Place from draft/revision/rejected without moderation queue (admin flow).
+ */
+export async function publishPlaceFromDraft(
+  placeId: string,
+  publishedByUserId: string,
+): Promise<void> {
+  const place = await prisma.place.findUnique({
+    where: { id: placeId },
+    select: { status: true, ownerUserId: true },
+  });
+
+  if (!place) {
+    throw new Error("Place not found");
+  }
+
+  if (
+    place.status !== "DRAFT" &&
+    place.status !== "NEEDS_REVISION" &&
+    place.status !== "REJECTED"
+  ) {
+    throw new Error(`Cannot publish from status: ${place.status}`);
+  }
+
+  await prisma.$transaction([
+    prisma.place.update({
+      where: { id: placeId },
+      data: {
+        status: "PUBLISHED",
+      },
+    }),
+    prisma.moderationLog.create({
+      data: {
+        entityType: "PLACE",
+        entityId: placeId,
+        action: "APPROVE",
+        message: "Опубликовано администратором",
+        reviewedByUserId: publishedByUserId,
+      },
+    }),
+  ]);
+
+  const { assignSlugOnPublish } = await import("@/lib/slug/placeSlugService");
+  await assignSlugOnPublish(placeId);
 }
 
 /**

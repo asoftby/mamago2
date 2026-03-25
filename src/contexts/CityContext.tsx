@@ -2,6 +2,7 @@
 
 import {
   createContext,
+  Suspense,
   useCallback,
   useContext,
   useEffect,
@@ -83,7 +84,18 @@ function CityProviderInner({ children }: { children: React.ReactNode }) {
 }
 
 export function CityProvider({ children }: { children: React.ReactNode }) {
-  return <CityProviderInner>{children}</CityProviderInner>;
+  return (
+    <Suspense
+      fallback={<div className="min-h-screen flex flex-col bg-background" />}
+    >
+      <CityProviderInner>{children}</CityProviderInner>
+    </Suspense>
+  );
+}
+
+/** When CityProvider is still behind Suspense or missing, returns null (use pathname fallbacks). */
+export function useOptionalCity(): CityContextValue | null {
+  return useContext(CityContext);
 }
 
 export function useCity(): CityContextValue {

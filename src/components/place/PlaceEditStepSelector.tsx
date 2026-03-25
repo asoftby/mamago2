@@ -71,7 +71,7 @@ export function PlaceEditStepSelector({ placeId, className }: PlaceEditStepSelec
 
   const handleStepSelect = (step: number) => {
     setOpen(false);
-    router.push(`/business/places/${placeId}/edit?step=${step}`);
+    router.push(`/editor/place/${placeId}/edit?step=${step}`);
   };
 
   return (

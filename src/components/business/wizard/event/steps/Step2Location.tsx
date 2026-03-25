@@ -37,6 +37,7 @@ export function Step2Location({ data, onChange, isEditable }: Step2LocationProps
   const [userPlaces, setUserPlaces] = useState<UserPlace[]>([]);
   const [isLoadingPlaces, setIsLoadingPlaces] = useState(true);
   const [placesError, setPlacesError] = useState<string | null>(null);
+  const [mobileConcreteSnapshot, setMobileConcreteSnapshot] = useState<Partial<EventFormData> | null>(null);
 
   // Fetch user places on mount
   useEffect(() => {
@@ -126,15 +127,75 @@ export function Step2Location({ data, onChange, isEditable }: Step2LocationProps
       metroManualId: null,
       district: "",
       metro: "",
-      venueNote: "",
+      // Keep note value so toggling does not erase user input.
+      venueNote: data.venueNote,
     });
+  };
+
+  const toggleMobile = () => {
+    if (!isEditable) return;
+
+    if (data.venueKind === "MOBILE") {
+      // Un-toggle: restore previous concrete location state
+      if (mobileConcreteSnapshot) {
+        onChange({
+          ...mobileConcreteSnapshot,
+          venueKind: mobileConcreteSnapshot.venueKind ?? null,
+        });
+      } else {
+        // Fallback: just clear special case
+        onChange({
+          locationSource: null,
+          venueKind: null,
+          placeId: null,
+          venueName: "",
+          address: "",
+          city: "",
+          lat: null,
+          lng: null,
+          source: null,
+          districtAutoId: null,
+          districtManualId: null,
+          metroAutoId: null,
+          metroManualId: null,
+          district: "",
+          metro: "",
+        });
+      }
+      return;
+    }
+
+    // Toggle ON: save current state and switch to MOBILE
+    setMobileConcreteSnapshot({
+      locationSource: data.locationSource,
+      venueKind: data.venueKind,
+      placeId: data.placeId,
+      venueName: data.venueName,
+      address: data.address,
+      city: data.city,
+      lat: data.lat,
+      lng: data.lng,
+      source: data.source,
+      districtAutoId: data.districtAutoId,
+      districtManualId: data.districtManualId,
+      districtName: data.districtName,
+      district: data.district,
+      metroAutoId: data.metroAutoId,
+      metroManualId: data.metroManualId,
+      metroAutoDistanceM: data.metroAutoDistanceM,
+      metroManualDistanceM: data.metroManualDistanceM,
+      metroName: data.metroName,
+      metro: data.metro,
+    });
+
+    handleSpecialCase("MOBILE");
   };
 
   return (
     <div className="space-y-6">
       <div>
         <h2 className="text-xl font-semibold mb-2">Локация</h2>
-        <p className="text-sm text-muted-foreground">
+        <p className="text-[12px] text-muted-foreground">
           Где проходит событие?
         </p>
       </div>
@@ -144,7 +205,7 @@ export function Step2Location({ data, onChange, isEditable }: Step2LocationProps
         <Label>Мои места</Label>
         
         {isLoadingPlaces && (
-          <div className="flex items-center gap-2 p-4 text-sm text-muted-foreground">
+          <div className="flex items-center gap-2 p-4 text-[12px] text-muted-foreground">
             <Loader2 className="w-4 h-4 animate-spin" />
             Загружаем ваши места...
           </div>
@@ -157,8 +218,8 @@ export function Step2Location({ data, onChange, isEditable }: Step2LocationProps
         )}
         
         {!isLoadingPlaces && !placesError && userPlaces.length === 0 && (
-          <div className="p-4 text-sm text-muted-foreground bg-gray-50 border border-gray-200 rounded-lg">
-            У вас пока нет добавленных мест. Создайте место в разделе "Места", чтобы использовать его для событий.
+          <div className="p-4 text-[12px] text-muted-foreground bg-gray-50 border border-gray-200 rounded-lg">
+            У вас пока нет добавленных мест. Создайте место в разделе «Места», чтобы использовать его для событий.
           </div>
         )}
         
@@ -177,12 +238,12 @@ export function Step2Location({ data, onChange, isEditable }: Step2LocationProps
                 } ${!isEditable ? "opacity-50 cursor-not-allowed" : ""}`}
               >
                 <div className="font-medium">{place.title}</div>
-                <div className="text-sm text-muted-foreground">
+                <div className="text-[12px] text-muted-foreground">
                   {place.cityName} • {place.address}
                 </div>
                 {/* Show district/metro info if available */}
                 {(place.districtName || place.metroName) && (
-                  <div className="text-xs text-muted-foreground mt-1">
+                  <div className="text-[12px] text-muted-foreground mt-1">
                     {place.districtName && `${place.districtName}`}
                     {place.districtName && place.metroName && " • "}
                     {place.metroName && `м. ${place.metroName}`}
@@ -208,7 +269,7 @@ export function Step2Location({ data, onChange, isEditable }: Step2LocationProps
         <div className="space-y-2">
           <button
             type="button"
-            onClick={() => handleSpecialCase("MOBILE")}
+            onClick={toggleMobile}
             disabled={!isEditable}
             className={`w-full p-4 rounded-lg border text-left transition-colors ${
               data.venueKind === "MOBILE"
@@ -220,7 +281,7 @@ export function Step2Location({ data, onChange, isEditable }: Step2LocationProps
               <TruckIcon className="w-5 h-5 text-muted-foreground" />
               <div>
                 <div className="font-medium">Выездное событие</div>
-                <div className="text-sm text-muted-foreground">
+                <div className="text-[12px] text-muted-foreground">
                   Событие проходит на локации клиента или в разных местах
                 </div>
               </div>
@@ -243,7 +304,7 @@ export function Step2Location({ data, onChange, isEditable }: Step2LocationProps
               <ClockIcon className="w-5 h-5 text-muted-foreground" />
               <div>
                 <div className="font-medium">Локация будет объявлена позже</div>
-                <div className="text-sm text-muted-foreground">
+                <div className="text-[12px] text-muted-foreground">
                   {hasConcreteLocation 
                     ? "Недоступно: уже выбрана конкретная локация"
                     : "Место проведения пока не определено"
@@ -274,40 +335,7 @@ export function Step2Location({ data, onChange, isEditable }: Step2LocationProps
         </div>
       )}
 
-      {/* Current Selection Summary */}
-      {data.venueKind && (
-        <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-          <div className="flex items-start gap-3">
-            <MapPinIcon className="w-5 h-5 text-green-600 mt-0.5" />
-            <div>
-              <div className="font-medium text-green-900">Локация выбрана</div>
-              <div className="text-sm text-green-700 mt-1">
-                {data.venueKind === "PLACE" && data.venueName && (
-                  <>{data.venueName} • {data.city}</>
-                )}
-                {data.venueKind === "MANUAL" && (
-                  <>
-                    {formatEventLocationAddress({
-                      venueName: data.venueName,
-                      address: data.address,
-                      city: data.city,
-                    })}
-                  </>
-                )}
-                {data.venueKind === "MOBILE" && "Выездное событие"}
-                {data.venueKind === "TBD" && "Локация будет объявлена"}
-                {data.source && (
-                  <div className="text-xs mt-1 opacity-75">
-                    Источник: {data.source === "PLACE" ? "Место из базы" : 
-                              data.source === "ADDRESS_INPUT" ? "Google Places" :
-                              data.source === "MAP_PICKER" ? "Выбор на карте" : data.source}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* (Summary block removed as requested) */}
     </div>
   );
 }

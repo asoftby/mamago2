@@ -19,7 +19,7 @@ const MOCK_BUSINESS: BusinessProfile = {
   id: "business-1",
   name: "Детский центр Солнышко",
   description: "Развивающие занятия и мероприятия для детей",
-  phone: "+375 29 123 45 67",
+  phone: "+375291234567",
   website: "https://solnyshko.by",
   logoUrl: undefined,
 };
@@ -162,7 +162,7 @@ export function Step8Organizer({ data, onChange, isEditable, userRole }: Step8Or
     <div className="space-y-6">
       <div>
         <h2 className="text-xl font-semibold mb-2">Организатор</h2>
-        <p className="text-sm text-muted-foreground">
+        <p className="text-[12px] text-muted-foreground">
           Выберите, кто организует это событие
         </p>
       </div>
@@ -176,7 +176,7 @@ export function Step8Organizer({ data, onChange, isEditable, userRole }: Step8Or
           return (
             <div
               key={option.id}
-              className={`rounded-xl border-2 transition-all duration-200 ${
+              className={`overflow-hidden rounded-xl border-2 transition-all duration-200 ${
                 isSelected
                   ? option.isRecommended
                     ? "border-primary bg-primary/5 shadow-sm"
@@ -188,9 +188,11 @@ export function Step8Organizer({ data, onChange, isEditable, userRole }: Step8Or
                 type="button"
                 onClick={() => handleModeChange(option.id as "business" | "existing" | "custom")}
                 disabled={!isEditable}
-                className={`w-full p-4 text-left transition-all duration-200 ${
-                  !isEditable ? "opacity-50 cursor-not-allowed" : "cursor-pointer hover:bg-gray-50"
-                } ${isSelected ? "" : "hover:bg-gray-50"}`}
+                className={`w-full p-4 text-left transition-colors duration-200 ${
+                  !isEditable
+                    ? "opacity-50 cursor-not-allowed"
+                    : "cursor-pointer hover:bg-gray-50"
+                }`}
               >
                 <div className="flex items-start gap-4">
                   {/* Icon */}
@@ -221,7 +223,7 @@ export function Step8Organizer({ data, onChange, isEditable, userRole }: Step8Or
                       )}
                     </div>
                     
-                    <p className={`text-sm ${
+                    <p className={`text-[12px] ${
                       isSelected ? "text-gray-600" : "text-gray-500"
                     }`}>
                       {option.subtitle}
@@ -229,7 +231,7 @@ export function Step8Organizer({ data, onChange, isEditable, userRole }: Step8Or
                     
                     {/* Additional info for default organizer */}
                     {option.id === "business" && defaultOrganizer && (
-                      <div className="mt-2 flex flex-wrap gap-3 text-xs text-gray-500">
+                      <div className="mt-2 flex flex-wrap gap-3 text-[12px] text-gray-500">
                         {defaultOrganizer.phone && (
                           <span>{defaultOrganizer.phone}</span>
                         )}

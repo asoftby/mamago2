@@ -4,6 +4,9 @@ import prisma from "@/lib/prisma";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
+import { BusinessVisibilityControl } from "@/components/admin/business/BusinessVisibilityControl";
+import { normalizeBusinessVisibilityStatus } from "@/lib/business/businessStatusModel";
+import { BusinessDangerZonePlaceholder } from "@/components/admin/business/BusinessDangerZonePlaceholder";
 
 const STATUS_COLORS: Record<string, string> = {
   DRAFT: "bg-gray-100 text-gray-800",
@@ -101,6 +104,10 @@ export default async function PartnerDetailPage({
   });
 
   // Get events for this business owner
+  const visibility = normalizeBusinessVisibilityStatus(
+    business.operationalStatus,
+  );
+
   const events = await prisma.activity.findMany({
     where: {
       ownerUserId: business.ownerUserId,
@@ -135,16 +142,33 @@ export default async function PartnerDetailPage({
             Назад к списку
           </Button>
         </Link>
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <h1 className="text-2xl md:text-xl font-bold text-gray-900">{business.name}</h1>
-          <span
-            className={`px-3 py-1 rounded-full text-sm font-medium ${
-              STATUS_COLORS[business.verificationStatus]
-            }`}
-          >
-            {STATUS_LABELS[business.verificationStatus] ||
-              business.verificationStatus}
-          </span>
+          <div className="flex flex-wrap items-center gap-2">
+            <span
+              className={`px-3 py-1 rounded-full text-sm font-medium ${
+                STATUS_COLORS[business.verificationStatus]
+              }`}
+            >
+              {STATUS_LABELS[business.verificationStatus] ||
+                business.verificationStatus}
+            </span>
+            <span
+              className={`px-3 py-1 rounded-full text-sm font-medium ${
+                visibility === "DISABLED"
+                  ? "bg-amber-100 text-amber-900"
+                  : visibility === "ARCHIVED"
+                    ? "bg-neutral-200 text-neutral-800"
+                    : "bg-emerald-50 text-emerald-800"
+              }`}
+            >
+              {visibility === "DISABLED"
+                ? "Отключён для пользователей"
+                : visibility === "ARCHIVED"
+                  ? "В архиве (не в выдаче)"
+                  : "Доступен пользователям"}
+            </span>
+          </div>
         </div>
       </div>
         {/* Основная информация */}
@@ -436,6 +460,15 @@ export default async function PartnerDetailPage({
               </table>
             </div>
           )}
+        </div>
+
+        <div className="space-y-4">
+          <BusinessVisibilityControl
+            businessId={business.id}
+            readOnly={user.role !== "ADMIN"}
+            initialVisibilityStatus={visibility}
+          />
+          <BusinessDangerZonePlaceholder />
         </div>
     </div>
   );

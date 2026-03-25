@@ -10,6 +10,8 @@ import { buildPlaceChips } from "@/lib/placeChips";
 import { getCurrentUser } from "@/lib/auth/server";
 import { canShowEditButton } from "@/lib/permissions/placeEditPermissions";
 import { PlaceEditStepSelector } from "@/components/place/PlaceEditStepSelector";
+import { isPlacePubliclyVisible } from "@/lib/plan/publicVisibility";
+import { placeOwnerBusinessActiveWhere } from "@/server/public/publicContentVisibility";
 
 interface PlacePageProps {
   params: Promise<{ slug: string }>;
@@ -21,7 +23,17 @@ export async function generateMetadata({ params }: PlacePageProps): Promise<Meta
   // Check if it's a legacy ID (cuid format)
   const isLegacyId = slug.length > 20 && !slug.includes("-");
   
-  let place;
+  let place: {
+    id: string;
+    title: string;
+    shortDesc: string;
+    formattedAddr: string | null;
+    customAddress: string | null;
+    cityId: string | null;
+    status: string;
+    archivedAt: Date | null;
+    owner: { business: { operationalStatus: string } | null } | null;
+  } | null;
   
   if (isLegacyId) {
     // Legacy ID - find by id
@@ -34,6 +46,13 @@ export async function generateMetadata({ params }: PlacePageProps): Promise<Meta
         formattedAddr: true,
         customAddress: true,
         cityId: true,
+        status: true,
+        archivedAt: true,
+        owner: {
+          select: {
+            business: { select: { operationalStatus: true } },
+          },
+        },
       },
     });
     
@@ -44,9 +63,14 @@ export async function generateMetadata({ params }: PlacePageProps): Promise<Meta
       };
     }
   } else {
-    // Modern slug - find by slug
+    const slugResult = await findPlaceBySlug(slug);
+    if (!slugResult) {
+      return {
+        title: "Place Not Found",
+      };
+    }
     place = await prisma.place.findUnique({
-      where: { id: slug },
+      where: { id: slugResult.placeId },
       select: { 
         id: true,
         title: true, 
@@ -54,6 +78,13 @@ export async function generateMetadata({ params }: PlacePageProps): Promise<Meta
         formattedAddr: true,
         customAddress: true,
         cityId: true,
+        status: true,
+        archivedAt: true,
+        owner: {
+          select: {
+            business: { select: { operationalStatus: true } },
+          },
+        },
       },
     });
     
@@ -62,6 +93,10 @@ export async function generateMetadata({ params }: PlacePageProps): Promise<Meta
         title: "Place Not Found",
       };
     }
+  }
+
+  if (!isPlacePubliclyVisible(place)) {
+    return { title: "Place Not Found" };
   }
 
   // Get display title with duplicate check
@@ -165,6 +200,7 @@ export default async function PlacePage({ params }: PlacePageProps) {
           business: {
             select: {
               name: true,
+              operationalStatus: true,
             },
           },
         },
@@ -178,6 +214,10 @@ export default async function PlacePage({ params }: PlacePageProps) {
 
   // Only show published places
   if (place.status !== "PUBLISHED") {
+    notFound();
+  }
+
+  if (!isPlacePubliclyVisible(place)) {
     notFound();
   }
 
@@ -202,55 +242,59 @@ export default async function PlacePage({ params }: PlacePageProps) {
   const locationString = getPlaceLocationString(place);
 
   // Fetch related places from the same network/group
-  let relatedPlaces: any[] = [];
-  if (place.placeGroupId) {
-    relatedPlaces = await prisma.place.findMany({
-      where: {
-        placeGroupId: place.placeGroupId,
-        id: { not: place.id }, // Exclude current place
-        status: "PUBLISHED", // Only published places
-        archivedAt: null,
-      },
-      select: {
-        id: true,
-        title: true,
-        formattedAddr: true,
-        customAddress: true,
-        cityId: true,
-        category: true,
-        ageTags: true,
-        visitFormats: true,
-        activityTypes: true,
-        images: {
-          where: { kind: "GALLERY" },
-          orderBy: { sortOrder: "asc" },
-          take: 1,
+  const relatedPlaces = place.placeGroupId
+    ? await prisma.place.findMany({
+        where: {
+          AND: [
+            {
+              placeGroupId: place.placeGroupId,
+              id: { not: place.id }, // Exclude current place
+              status: "PUBLISHED", // Only published places
+              archivedAt: null,
+            },
+            placeOwnerBusinessActiveWhere,
+          ],
         },
-        city: {
-          select: { name: true },
+        select: {
+          id: true,
+          title: true,
+          formattedAddr: true,
+          customAddress: true,
+          cityId: true,
+          category: true,
+          ageTags: true,
+          visitFormats: true,
+          activityTypes: true,
+          images: {
+            where: { kind: "GALLERY" },
+            orderBy: { sortOrder: "asc" },
+            take: 1,
+          },
+          city: {
+            select: { name: true },
+          },
+          districtManual: {
+            select: { name: true },
+          },
+          districtAuto: {
+            select: { name: true },
+          },
+          metroManual: {
+            select: { name: true },
+          },
+          metroAuto: {
+            select: { name: true },
+          },
         },
-        districtManual: {
-          select: { name: true },
-        },
-        districtAuto: {
-          select: { name: true },
-        },
-        metroManual: {
-          select: { name: true },
-        },
-        metroAuto: {
-          select: { name: true },
-        },
-      },
-      orderBy: [
-        // Same city first
-        { cityId: place.cityId ? "asc" : "desc" },
-        // Then by title
-        { title: "asc" },
-      ],
-      take: 6,
-    });
-  }
+        orderBy: [
+          // Same city first
+          { cityId: place.cityId ? "asc" : "desc" },
+          // Then by title
+          { title: "asc" },
+        ],
+        take: 6,
+      })
+    : [];
 
   const logoImage = place.images.find((img) => img.kind === "LOGO");
   const galleryImages = place.images

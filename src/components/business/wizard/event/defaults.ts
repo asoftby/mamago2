@@ -1,15 +1,31 @@
 // Event Wizard Defaults
 
-import type { EventFormData } from "./types";
+import type { EventFormData, SocialLink } from "./types";
 import { isRichTextMeaningful } from "@/lib/richtext/utils";
+
+/** Одна стартовая строка соцсетей (Instagram, URL пустой). */
+export function createDefaultSocialLink(id?: string): SocialLink {
+  return {
+    id: id ?? `social-${Date.now()}`,
+    network: "instagram",
+    url: "",
+  };
+}
 
 export function getDefaultFormData(): EventFormData {
   return {
     // Step 1: Basics
     title: "",
-    activityType: null,
-    categories: [],
-    ageGroups: [],
+    eventFormats: [],
+    categoryIds: [],
+    subcategoryIdsByCategoryId: {},
+    categoryId: null,
+    subcategoryId: null,
+    ageRangeIds: [],
+    ageTags: [],
+    interestIds: [],
+    categorySlug: null,
+    categoryPathLabel: null,
     cinemaGenre: "",
     cinemaDuration: undefined,
     cinemaTrailerUrl: "",
@@ -25,7 +41,7 @@ export function getDefaultFormData(): EventFormData {
     // Step 4: Schedule (MVP: common time for all dates)
     scheduleMode: "single",
     dates: [],
-    allDay: true,
+    allDay: false,
     startTime: "10:00",
     endTime: "18:00",
     repeatEnabled: false,
@@ -37,7 +53,7 @@ export function getDefaultFormData(): EventFormData {
     price: "",
     priceDetails: "",
     ticketLink: "",
-    participationMode: "simple-booking",
+    participationMode: "walk-in",
     simpleBookingDate: null,
     simpleBookingTime: null,
     simpleBookingCapacity: null,
@@ -75,7 +91,7 @@ export function getDefaultFormData(): EventFormData {
     // Step 7: Contacts
     phone: "",
     website: "",
-    socialLinks: [],
+    socialLinks: [createDefaultSocialLink("social-initial")],
     
     // Step 8: Organizer
     organizerMode: "business",
@@ -95,7 +111,9 @@ export function hasMeaningfulContent(data: EventFormData): boolean {
   return !!(
     data.title ||
     isRichTextMeaningful(data.fullDescription) ||
-    data.categories.length > 0 ||
+    (data.categoryIds?.length ?? 0) > 0 ||
+    data.categoryId ||
+    (data.interestIds?.length ?? 0) > 0 ||
     data.dates.length > 0
   );
 }
@@ -106,6 +124,6 @@ export function hasMeaningfulContent(data: EventFormData): boolean {
 export function canSaveAsDraft(data: EventFormData): boolean {
   return !!(
     data.title.trim().length > 0 &&
-    data.categories.length > 0
+    ((data.categoryIds?.length ?? 0) > 0 || !!data.categoryId)
   );
 }

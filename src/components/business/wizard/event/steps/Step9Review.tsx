@@ -21,7 +21,7 @@ export function Step9Review({ data, isSubmitting, onGoToStep }: Step9ReviewProps
     <div className="space-y-6">
       <div>
         <h2 className="text-xl font-semibold mb-2">Проверка и отправка</h2>
-        <p className="text-sm text-muted-foreground">
+        <p className="text-[12px] text-muted-foreground">
           Проверьте все данные перед отправкой на модерацию
         </p>
       </div>
@@ -50,7 +50,7 @@ export function Step9Review({ data, isSubmitting, onGoToStep }: Step9ReviewProps
           <div className="flex items-center gap-3">
             <CheckCircle2 className="w-5 h-5 text-green-600" />
             <p className="text-sm text-green-900 font-medium">
-              Все обязательные поля заполнены. Событие готово к отправке!
+              Всё окей. Публикация готова к отправке!
             </p>
           </div>
         </div>
@@ -79,7 +79,7 @@ export function Step9Review({ data, isSubmitting, onGoToStep }: Step9ReviewProps
                 </div>
                 
                 {/* Step Content Summary from Config */}
-                <div className="text-sm text-muted-foreground space-y-1">
+                <div className="text-[12px] text-muted-foreground space-y-1">
                   {section.summary.map((item, index) => (
                     <p key={index}>
                       {item.label}: {item.value}

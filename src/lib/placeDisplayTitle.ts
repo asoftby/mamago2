@@ -9,6 +9,7 @@
 
 import { PrismaClient } from "@prisma/client";
 import { normalizePlaceName, getStreetLabelPrepositional } from "./slug/slugUtils";
+import { getPublicPublishedPlaceWhere } from "@/server/public/publicContentVisibility";
 
 /**
  * Check if there are duplicate Place titles in the same city
@@ -26,10 +27,13 @@ export async function hasDuplicateTitleInCity(
 
   const duplicates = await prisma.place.findMany({
     where: {
-      cityId,
-      id: excludePlaceId ? { not: excludePlaceId } : undefined,
-      status: "PUBLISHED", // Only check published places
-      archivedAt: null,
+      AND: [
+        {
+          cityId,
+          id: excludePlaceId ? { not: excludePlaceId } : undefined,
+        },
+        getPublicPublishedPlaceWhere(),
+      ],
     },
     select: {
       id: true,

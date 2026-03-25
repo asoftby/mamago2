@@ -1,5 +1,19 @@
 import { prisma } from "@/lib/prisma";
 
+const planActivitySelect = {
+  id: true,
+  title: true,
+  type: true,
+  coverImageUrl: true,
+  ageLabel: true,
+  status: true,
+  owner: {
+    select: {
+      business: { select: { operationalStatus: true } },
+    },
+  },
+};
+
 export type PlanItemWithActivity = {
   id: string;
   userId: string;
@@ -15,6 +29,10 @@ export type PlanItemWithActivity = {
     type: string;
     coverImageUrl: string | null;
     ageLabel: string | null;
+    status: string;
+    owner: {
+      business: { operationalStatus: string } | null;
+    } | null;
   } | null;
 };
 
@@ -78,26 +96,26 @@ export async function listPlanItemsByWeek(
   endDate.setDate(endDate.getDate() + 6);
   const endDateStr = endDate.toISOString().split("T")[0];
 
-  return await prisma.planItem.findMany({
+  return (await prisma.planItem.findMany({
     where: { userId, date: { gte: weekStartDate, lte: endDateStr } },
     include: {
-      activity: { select: { id: true, title: true, type: true, coverImageUrl: true, ageLabel: true } },
+      activity: { select: planActivitySelect },
     },
     orderBy: [{ date: "asc" }, { startsAt: "asc" }],
-  });
+  })) as PlanItemWithActivity[];
 }
 
 /**
  * List ALL plan items for a user, grouped-ready (for /me/plan page)
  */
 export async function listAllPlanItems(userId: string): Promise<PlanItemWithActivity[]> {
-  return await prisma.planItem.findMany({
+  return (await prisma.planItem.findMany({
     where: { userId },
     include: {
-      activity: { select: { id: true, title: true, type: true, coverImageUrl: true, ageLabel: true } },
+      activity: { select: planActivitySelect },
     },
     orderBy: [{ date: "asc" }, { startsAt: "asc" }],
-  });
+  })) as PlanItemWithActivity[];
 }
 
 /**
@@ -107,13 +125,13 @@ export async function listPlanItemsByDate(
   userId: string,
   date: string
 ): Promise<PlanItemWithActivity[]> {
-  return await prisma.planItem.findMany({
+  return (await prisma.planItem.findMany({
     where: { userId, date },
     include: {
-      activity: { select: { id: true, title: true, type: true, coverImageUrl: true, ageLabel: true } },
+      activity: { select: planActivitySelect },
     },
     orderBy: { startsAt: "asc" },
-  });
+  })) as PlanItemWithActivity[];
 }
 
 /**

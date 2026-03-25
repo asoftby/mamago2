@@ -30,18 +30,6 @@ export default async function MePage({ searchParams }: PageProps) {
     redirect("/login");
   }
 
-  // Role-based redirect
-  switch (user.role) {
-    case "BUSINESS_OWNER":
-      redirect("/business/verification");
-    case "ADMIN":
-    case "MODERATOR":
-      redirect("/admin");
-    case "USER":
-      // Continue to render profile page
-      break;
-  }
-
   // Fetch children with interests using separate queries to avoid TypeScript issues
   const childrenRaw = await prisma.child.findMany({
     where: { parentId: user.id },

@@ -17,7 +17,7 @@ export function Step2Description({ data, onChange, isEditable }: Step2Descriptio
     <div className="space-y-6">
       <div>
         <h2 className="text-xl font-semibold mb-2">Описание</h2>
-        <p className="text-sm text-muted-foreground">
+        <p className="text-[12px] text-muted-foreground">
           Расскажите подробнее о событии
         </p>
       </div>
@@ -28,7 +28,7 @@ export function Step2Description({ data, onChange, isEditable }: Step2Descriptio
           <span className="text-sm font-medium">
             Подробное описание <span className="text-red-500">*</span>
           </span>
-          <span className="text-xs text-muted-foreground">
+          <span className="text-[12px] text-muted-foreground">
             {fullDescLength} символов
           </span>
         </div>
@@ -38,8 +38,10 @@ export function Step2Description({ data, onChange, isEditable }: Step2Descriptio
           placeholder="Расскажите о программе события, что ждет участников..."
           disabled={!isEditable}
         />
-        <p className="text-xs text-muted-foreground">
-          Минимум 20 символов. Используйте форматирование для лучшей читаемости
+        <p className="text-[12px] text-muted-foreground">
+          Минимум 20 символов. Используйте форматирование для лучшей читаемости. Краткое описание
+          для карточки события и модерации формируется автоматически из этого текста (и названия),
+          отдельное поле не нужно.
         </p>
       </div>
     </div>

@@ -4,6 +4,7 @@ import prisma from "@/lib/prisma";
 import { Button } from "@/components/ui/button";
 import { CheckCircle2, Clock } from "lucide-react";
 import Link from "next/link";
+import { canCreateBusinessContent, canManageOwnedContent } from "@/lib/auth/businessContentAccess";
 
 export default async function PlaceSubmittedPage({
   params,
@@ -14,7 +15,7 @@ export default async function PlaceSubmittedPage({
 }) {
   const user = await getCurrentUser();
 
-  if (!user || user.role !== "BUSINESS_OWNER") {
+  if (!user || !canCreateBusinessContent(user.role)) {
     redirect("/login");
   }
 
@@ -65,7 +66,7 @@ export default async function PlaceSubmittedPage({
 
         <div className="space-y-3">
           <Button asChild className="w-full" size="lg">
-            <Link href={isRevisionSubmission ? `/business/places/${id}/edit` : "/business/places"}>
+            <Link href={isRevisionSubmission ? `/editor/place/${id}/edit` : "/business/places"}>
               {isRevisionSubmission ? "Вернуться к публикации" : "Перейти к списку мест"}
             </Link>
           </Button>

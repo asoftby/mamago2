@@ -1,3 +1,5 @@
+import type { PlanActivityPublicAvailability } from "@/lib/plan/publicVisibility";
+
 export type IdeaItem = {
   id: string;
   activity: {
@@ -10,6 +12,7 @@ export type IdeaItem = {
     dateStart?: string;
     dateEnd?: string;
   };
+  planAvailability?: PlanActivityPublicAvailability;
   isPlanned: boolean;
   plannedDate?: string;
   createdAt: string;

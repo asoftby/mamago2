@@ -475,9 +475,11 @@
       ]
     },
     "src/components/ui/chips-row.tsx": {
-      "count": 1,
+      "count": 3,
       "examples": [
-        "src/app/(ui)/ui-lab/_sections/UiPrimitivesSection.tsx"
+        "src/app/(ui)/ui-lab/_sections/UiPrimitivesSection.tsx",
+        "src/components/site/header/search-segments/AgePanel.tsx",
+        "src/components/filters/MobileSelectSheet.tsx"
       ]
     },
     "src/components/ui/command.tsx": {

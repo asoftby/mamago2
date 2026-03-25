@@ -1,13 +1,15 @@
 import Link from "next/link";
-import { ChevronRight } from "lucide-react";
+import { ArrowRight, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export type SectionHeaderProps = {
   title: string;
   subtitle?: string | null;
-  /** Текст ссылки справа (например «Смотреть все») */
+  /** Текст ссылки справа (например «Смотреть все»); для `actionIconButton` используется как `aria-label` */
   actionLabel?: string | null;
   actionHref?: string | null;
+  /** Круглая кнопка со стрелкой вместо текстовой ссылки (как в Breaking News) */
+  actionIconButton?: boolean;
   className?: string;
 };
 
@@ -16,12 +18,59 @@ export function SectionHeader({
   subtitle,
   actionLabel,
   actionHref,
+  actionIconButton = false,
   className,
 }: SectionHeaderProps) {
+  const showAction = Boolean(actionHref && actionLabel);
+  const useIconButton = showAction && actionIconButton;
+  const inlineTitleAndIcon = useIconButton && !subtitle;
+
+  const actionLink = showAction ? (
+    <Link
+      href={actionHref!}
+      className={cn(
+        useIconButton &&
+          cn(
+            "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full",
+            "bg-neutral-200 text-neutral-900 transition-colors hover:bg-neutral-300/90",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+          ),
+        !useIconButton &&
+          "inline-flex items-center gap-0.5 text-sm font-medium text-primary shrink-0 hover:opacity-90 transition-opacity",
+      )}
+      aria-label={useIconButton ? actionLabel! : undefined}
+    >
+      {useIconButton ? (
+        <ArrowRight className="h-4 w-4" strokeWidth={1.75} aria-hidden />
+      ) : (
+        <>
+          {actionLabel}
+          <ChevronRight className="h-4 w-4" aria-hidden />
+        </>
+      )}
+    </Link>
+  ) : null;
+
+  if (inlineTitleAndIcon) {
+    return (
+      <div
+        className={cn(
+          "flex flex-wrap items-center gap-x-2 gap-y-2 px-1 mb-4",
+          className,
+        )}
+      >
+        <h2 className="text-lg font-semibold text-neutral-900 leading-tight tracking-tight">
+          {title}
+        </h2>
+        {actionLink}
+      </div>
+    );
+  }
+
   return (
     <div
       className={cn(
-        "flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between sm:gap-4 px-1 mb-3",
+        "flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between sm:gap-4 px-1 mb-4",
         className,
       )}
     >
@@ -35,15 +84,7 @@ export function SectionHeader({
           </p>
         ) : null}
       </div>
-      {actionLabel && actionHref ? (
-        <Link
-          href={actionHref}
-          className="inline-flex items-center gap-0.5 text-sm font-medium text-primary shrink-0 hover:opacity-90 transition-opacity"
-        >
-          {actionLabel}
-          <ChevronRight className="h-4 w-4" aria-hidden />
-        </Link>
-      ) : null}
+      {actionLink}
     </div>
   );
 }

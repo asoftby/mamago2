@@ -12,31 +12,6 @@ interface OrganizerSearchSelectProps {
   isEditable: boolean;
 }
 
-// Mock data - в реальном приложении будет API
-const MOCK_ORGANIZERS: ExistingOrganizer[] = [
-  {
-    id: "org-1",
-    name: "Детский центр Радуга",
-    description: "Развивающие занятия для детей от 2 до 12 лет",
-    phone: "+375 29 123 45 67",
-    website: "https://raduga.by",
-    isVerified: true,
-  },
-  {
-    id: "org-2", 
-    name: "Спортивный клуб Олимп",
-    description: "Спортивные секции и тренировки",
-    phone: "+375 29 987 65 43",
-    isVerified: false,
-  },
-  {
-    id: "org-3",
-    name: "Творческая студия Палитра",
-    description: "Художественные мастер-классы и курсы",
-    isVerified: true,
-  },
-];
-
 export function OrganizerSearchSelect({ 
   selectedOrganizer, 
   onSelect, 
@@ -53,18 +28,38 @@ export function OrganizerSearchSelect({
     }
 
     setIsSearching(true);
-    
-    // Mock search - в реальном приложении будет API запрос
-    const timer = setTimeout(() => {
-      const filtered = MOCK_ORGANIZERS.filter(org =>
-        org.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (org.description && org.description.toLowerCase().includes(searchQuery.toLowerCase()))
-      );
-      setSearchResults(filtered);
-      setIsSearching(false);
+    const controller = new AbortController();
+
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch(
+          `/api/admin/b2b/partners?query=${encodeURIComponent(searchQuery)}&limit=10`,
+          { signal: controller.signal },
+        );
+
+        if (!res.ok) {
+          throw new Error(`Search failed: ${res.status}`);
+        }
+
+        const json = (await res.json()) as { ok: boolean; organizers: ExistingOrganizer[]; error?: string };
+        if (!json.ok) {
+          throw new Error(json.error || "Search failed");
+        }
+
+        setSearchResults(json.organizers || []);
+      } catch (e) {
+        if ((e as Error).name === "AbortError") return;
+        console.error("[OrganizerSearchSelect] Search error:", e);
+        setSearchResults([]);
+      } finally {
+        setIsSearching(false);
+      }
     }, 300);
 
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
   }, [searchQuery]);
 
   if (selectedOrganizer) {

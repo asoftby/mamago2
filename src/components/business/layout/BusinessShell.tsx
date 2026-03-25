@@ -1,16 +1,16 @@
+import type { AccountMenuUser } from "@/components/site/header/AccountMenuBody";
 import { BusinessHeader } from "./BusinessHeader";
 import { BusinessSidebar } from "./BusinessSidebar";
 
 interface BusinessShellProps {
   children: React.ReactNode;
-  userEmail?: string;
+  user: AccountMenuUser;
 }
 
-export function BusinessShell({ children, userEmail }: BusinessShellProps) {
+export function BusinessShell({ children, user }: BusinessShellProps) {
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Global Header */}
-      <BusinessHeader userEmail={userEmail} />
+      <BusinessHeader user={user} />
 
       {/* Two-column layout: Sidebar + Content */}
       <div className="flex">

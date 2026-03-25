@@ -94,7 +94,7 @@ export async function getMediaUsagesWithDetails(mediaId: string) {
               select: { title: true },
             });
             entityName = place?.title || null;
-            entityUrl = `/business/places/${usage.entityId}/edit`;
+            entityUrl = `/editor/place/${usage.entityId}/edit`;
             break;
 
           case "EVENT":

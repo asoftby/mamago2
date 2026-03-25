@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import type { AuthMode } from "./AuthPage";
 
@@ -11,9 +11,11 @@ interface Props {
   initialPhone?: string;
   onPhoneChange?: (raw: string) => void;
   autoFocus?: boolean;
+  onRegisterPhoneVerified?: (phoneE164: string) => void;
 }
 
 const PHONE_INITIAL = "375";
+const RESEND_COOLDOWN_SEC = 60;
 
 function isPhoneValid(raw: string) {
   return raw.length === 12 && raw.startsWith("375");
@@ -31,7 +33,15 @@ function formatLocal(d: string): string {
   return result;
 }
 
-export function PhoneAuthForm({ mode, next, onSwitchMode, initialPhone, onPhoneChange, autoFocus }: Props) {
+export function PhoneAuthForm({
+  mode,
+  next,
+  onSwitchMode,
+  initialPhone,
+  onPhoneChange,
+  autoFocus,
+  onRegisterPhoneVerified,
+}: Props) {
   const router = useRouter();
   const purpose = mode === "login" ? "LOGIN" : "REGISTER";
 
@@ -41,9 +51,23 @@ export function PhoneAuthForm({ mode, next, onSwitchMode, initialPhone, onPhoneC
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [hint, setHint] = useState<"login" | "register" | null>(null);
+  const [resendCooldownUntil, setResendCooldownUntil] = useState<number | null>(null);
+  const [, setTick] = useState(0);
+  const [phoneFlowComplete, setPhoneFlowComplete] = useState(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
+
+  const resendSecondsLeft =
+    resendCooldownUntil != null
+      ? Math.max(0, Math.ceil((resendCooldownUntil - Date.now()) / 1000))
+      : 0;
+
+  useEffect(() => {
+    if (step !== "otp" || resendCooldownUntil == null) return;
+    const id = window.setInterval(() => setTick((t) => t + 1), 1000);
+    return () => window.clearInterval(id);
+  }, [step, resendCooldownUntil]);
 
   useEffect(() => {
     if (step === "otp") otpRefs.current[0]?.focus();
@@ -67,30 +91,62 @@ export function PhoneAuthForm({ mode, next, onSwitchMode, initialPhone, onPhoneC
     onPhoneChange?.(full);
   }
 
-  async function handleSendCode(e: React.FormEvent) {
-    console.log(`[${purpose}] form submit fired`);
-    e.preventDefault();
-    console.log(`[${purpose}] sendCode handler called`, { rawPhone, isValid: isPhoneValid(rawPhone) });
-    if (!isPhoneValid(rawPhone)) {
-      console.log(`[${purpose}] early return: phone invalid`, rawPhone);
-      return;
+  const sendOtpRequest = useCallback(async (): Promise<{
+    ok: boolean;
+    error?: string;
+    hint?: "login" | "register";
+  }> => {
+    const res = await fetch("/api/auth/phone/send-otp", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ phone: "+" + rawPhone, purpose }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      return {
+        ok: false,
+        error: typeof data.error === "string" ? data.error : "Ошибка отправки кода",
+        hint: data.hint === "login" || data.hint === "register" ? data.hint : undefined,
+      };
     }
+    return { ok: true };
+  }, [rawPhone, purpose]);
+
+  async function handleSendCode(e: React.FormEvent) {
+    e.preventDefault();
+    if (!isPhoneValid(rawPhone)) return;
     setError("");
     setHint(null);
     setLoading(true);
     try {
-      console.log(`[${purpose}] about to call API`, { phone: "+" + rawPhone, purpose });
-      const res = await fetch("/api/auth/phone/send-otp", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone: "+" + rawPhone, purpose }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setError(data.error ?? "Ошибка отправки кода");
-        if (data.hint) setHint(data.hint);
+      const result = await sendOtpRequest();
+      if (!result.ok) {
+        setError(result.error ?? "Ошибка");
+        if (result.hint) setHint(result.hint);
       } else {
         setStep("otp");
+        setOtp(["", "", "", ""]);
+        setResendCooldownUntil(Date.now() + RESEND_COOLDOWN_SEC * 1000);
+      }
+    } catch {
+      setError("Ошибка сети");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleResendCode() {
+    if (resendSecondsLeft > 0 || loading) return;
+    setError("");
+    setHint(null);
+    setLoading(true);
+    try {
+      const result = await sendOtpRequest();
+      if (!result.ok) {
+        setError(result.error ?? "Не удалось отправить код");
+      } else {
+        setResendCooldownUntil(Date.now() + RESEND_COOLDOWN_SEC * 1000);
       }
     } catch {
       setError("Ошибка сети");
@@ -107,15 +163,23 @@ export function PhoneAuthForm({ mode, next, onSwitchMode, initialPhone, onPhoneC
       const res = await fetch("/api/auth/phone/verify-otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ phone: "+" + rawPhone, code, purpose }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setError(data.error ?? "Неверный код");
-      } else {
-        router.replace(next);
-        router.refresh();
+        setError(typeof data.error === "string" ? data.error : "Неверный код");
+        return;
       }
+
+      if (purpose === "REGISTER" && onRegisterPhoneVerified) {
+        onRegisterPhoneVerified("+" + rawPhone);
+        setPhoneFlowComplete(true);
+        return;
+      }
+
+      router.replace(next);
+      router.refresh();
     } catch {
       setError("Ошибка сети");
     } finally {
@@ -125,11 +189,11 @@ export function PhoneAuthForm({ mode, next, onSwitchMode, initialPhone, onPhoneC
 
   function handleOtpChange(index: number, value: string) {
     const digit = value.replace(/\D/g, "").slice(-1);
-    const next = [...otp];
-    next[index] = digit;
-    setOtp(next);
+    const nextOtp = [...otp];
+    nextOtp[index] = digit;
+    setOtp(nextOtp);
     if (digit && index < 3) otpRefs.current[index + 1]?.focus();
-    if (next.every((d) => d !== "")) handleVerifyOtp(next.join(""));
+    if (nextOtp.every((d) => d !== "")) handleVerifyOtp(nextOtp.join(""));
   }
 
   function handleOtpKeyDown(index: number, e: React.KeyboardEvent) {
@@ -138,38 +202,70 @@ export function PhoneAuthForm({ mode, next, onSwitchMode, initialPhone, onPhoneC
     }
   }
 
+  const otpConfirmLabel = purpose === "REGISTER" ? "Подтвердить номер" : "Подтвердить";
+
+  if (phoneFlowComplete) {
+    return null;
+  }
+
   if (step === "otp") {
     return (
       <div className="space-y-4">
         <p className="text-sm text-neutral-600">
           Код отправлен на <span className="font-medium">+{rawPhone}</span>
         </p>
-        <div className="flex gap-2">
-          {otp.map((digit, i) => (
-            <input
-              key={i}
-              ref={(el) => { otpRefs.current[i] = el; }}
-              type="text"
-              inputMode="numeric"
-              maxLength={1}
-              value={digit}
-              onChange={(e) => handleOtpChange(i, e.target.value)}
-              onKeyDown={(e) => handleOtpKeyDown(i, e)}
-              className="w-full h-12 text-center text-lg font-semibold bg-white border border-neutral-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#EF8759] transition-shadow"
-            />
-          ))}
+        <div>
+          <label className="block text-xs font-medium text-neutral-500 mb-1.5">Код из SMS</label>
+          <div className="flex gap-2">
+            {otp.map((digit, i) => (
+              <input
+                key={i}
+                ref={(el) => {
+                  otpRefs.current[i] = el;
+                }}
+                type="text"
+                inputMode="numeric"
+                maxLength={1}
+                value={digit}
+                onChange={(e) => handleOtpChange(i, e.target.value)}
+                onKeyDown={(e) => handleOtpKeyDown(i, e)}
+                className="w-full h-12 text-center text-lg font-semibold bg-white border border-neutral-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#EF8759] transition-shadow"
+              />
+            ))}
+          </div>
         </div>
         {error && <p className="text-sm text-red-500">{error}</p>}
         <button
+          type="button"
           onClick={() => handleVerifyOtp(otp.join(""))}
           disabled={loading || otp.some((d) => !d)}
           className="w-full h-12 rounded-xl bg-[#EF8759] hover:bg-[#e07040] disabled:opacity-50 text-white font-medium transition-colors"
         >
-          {loading ? "Проверяем..." : "Подтвердить"}
+          {loading ? "Проверяем..." : otpConfirmLabel}
         </button>
+        <div className="flex flex-col gap-2 items-center text-sm">
+          {resendSecondsLeft > 0 ? (
+            <p className="text-neutral-500">Повторная отправка через {resendSecondsLeft} сек.</p>
+          ) : (
+            <button
+              type="button"
+              onClick={handleResendCode}
+              disabled={loading}
+              className="text-[#EF8759] hover:text-[#e07040] font-medium disabled:opacity-50"
+            >
+              Отправить код ещё раз
+            </button>
+          )}
+        </div>
         <button
           type="button"
-          onClick={() => { setStep("phone"); setOtp(["", "", "", ""]); setError(""); setHint(null); }}
+          onClick={() => {
+            setStep("phone");
+            setOtp(["", "", "", ""]);
+            setError("");
+            setHint(null);
+            setResendCooldownUntil(null);
+          }}
           className="w-full text-sm text-neutral-500 hover:text-neutral-900 transition-colors"
         >
           Изменить номер
@@ -182,14 +278,15 @@ export function PhoneAuthForm({ mode, next, onSwitchMode, initialPhone, onPhoneC
 
   return (
     <form onSubmit={handleSendCode} className="space-y-3">
-      {/* Split-prefix phone input */}
       <div
         className={[
           "flex h-12 bg-white border rounded-xl overflow-hidden transition-shadow",
           "focus-within:ring-2 focus-within:ring-[#EF8759]",
           error && !hint ? "border-red-400" : "border-neutral-200",
           loading ? "opacity-50" : "",
-        ].filter(Boolean).join(" ")}
+        ]
+          .filter(Boolean)
+          .join(" ")}
       >
         <span className="flex items-center pl-4 pr-2 text-sm text-neutral-500 select-none whitespace-nowrap">
           +375
@@ -225,7 +322,6 @@ export function PhoneAuthForm({ mode, next, onSwitchMode, initialPhone, onPhoneC
       <button
         type="submit"
         disabled={loading || !isPhoneValid(rawPhone)}
-        onClick={() => console.log(`[${purpose}] button clicked`, { rawPhone, isValid: isPhoneValid(rawPhone), loading })}
         className="w-full h-12 rounded-xl bg-[#EF8759] hover:bg-[#e07040] disabled:opacity-50 text-white font-medium transition-colors"
       >
         {loading ? "Отправляем..." : "Получить код"}

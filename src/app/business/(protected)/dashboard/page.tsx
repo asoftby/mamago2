@@ -14,7 +14,7 @@ export default async function BusinessDashboardPage() {
   const user = await getCurrentUser();
   
   if (!user) {
-    redirect("/register?from=business");
+    redirect("/login");
   }
 
   // Check business exists

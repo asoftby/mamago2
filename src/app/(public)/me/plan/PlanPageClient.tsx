@@ -8,6 +8,7 @@ import { WeekCalendar } from "./WeekCalendar";
 import { PlanDayList } from "./PlanDayList";
 import { RecommendationsSection } from "./RecommendationsSection";
 import { MINSK_ACTIVITIES } from "@/mocks/activities.minsk";
+import type { PlanActivityPublicAvailability } from "@/lib/plan/publicVisibility";
 
 export type SerializedPlanItem = {
   id: string;
@@ -16,6 +17,7 @@ export type SerializedPlanItem = {
   activityId: string | null;
   title: string | null;
   coverImageUrl: string | null;
+  planAvailability?: PlanActivityPublicAvailability;
   activity: {
     id: string;
     title: string;

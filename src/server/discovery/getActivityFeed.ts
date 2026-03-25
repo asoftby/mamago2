@@ -3,6 +3,7 @@
 
 import prisma from "@/lib/prisma";
 import { DiscoveryState } from "@/lib/discovery/urlState";
+import { getPublicListingActivityWhere } from "@/server/public/publicContentVisibility";
 
 export async function getActivityFeed(citySlug: string, state: DiscoveryState) {
   // 1. Find city
@@ -15,9 +16,7 @@ export async function getActivityFeed(citySlug: string, state: DiscoveryState) {
   }
 
   // 2. Build where clause
-  const where: any = {
-    cityId: city.id,
-  };
+  const andParts: any[] = [{ cityId: city.id }];
 
   // Intent filtering (future implementation, e.g. category based)
   // For now, assume 'go' shows all, or map intent to categories.
@@ -31,17 +30,28 @@ export async function getActivityFeed(citySlug: string, state: DiscoveryState) {
   // filterDefinition.slug = key AND filterOption.value IN values
   
   if (Object.keys(state.filters).length > 0) {
-    where.AND = Object.entries(state.filters).map(([key, values]) => ({
-      filterOptions: {
-        some: {
-          filterOption: {
-            filter: { slug: key },
-            value: { in: values },
+    andParts.push(
+      ...Object.entries(state.filters).map(([key, values]) => ({
+        filterOptions: {
+          some: {
+            filterOption: {
+              filter: { slug: key },
+              value: { in: values },
+            },
           },
         },
-      },
-    }));
+      }))
+    );
   }
+
+  const publicListing = getPublicListingActivityWhere();
+  const publicAnd = publicListing.AND;
+  if (publicAnd) {
+    const pubParts = Array.isArray(publicAnd) ? publicAnd : [publicAnd];
+    andParts.push(...pubParts);
+  }
+
+  const where = { AND: andParts };
 
   // 3. Fetch activities
   const activities = await prisma.activity.findMany({

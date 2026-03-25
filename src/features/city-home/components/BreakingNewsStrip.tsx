@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { ChevronRight } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export type BreakingNewsItem = {
@@ -21,7 +21,7 @@ type BreakingNewsStripProps = {
 };
 
 /**
- * Блок Breaking News: заголовок, подзаголовок «СЕЙЧАС В ГОРОДЕ», горизонтальная лента с фото-карточками.
+ * Блок Breaking News: заголовок и горизонтальная лента с фото-карточками.
  * Без данных — не рендерится.
  */
 export function BreakingNewsStrip({
@@ -33,21 +33,20 @@ export function BreakingNewsStrip({
 
   return (
     <section className={cn("space-y-4", className)}>
-      <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2 px-1">
-        <div className="min-w-0 space-y-1">
-          <h2 className="text-lg font-bold text-neutral-900 tracking-tight leading-tight">
-            Breaking News
-          </h2>
-          <p className="text-[11px] font-semibold text-neutral-500 uppercase tracking-[0.2em]">
-            СЕЙЧАС В ГОРОДЕ
-          </p>
-        </div>
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-2 px-1">
+        <h2 className="text-lg font-semibold text-neutral-900 leading-tight tracking-tight">
+          Breaking News
+        </h2>
         <Link
           href={allNewsHref}
-          className="inline-flex items-center gap-0.5 text-sm font-medium text-primary shrink-0 hover:opacity-90 transition-opacity"
+          className={cn(
+            "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full",
+            "bg-neutral-200 text-neutral-900 transition-colors hover:bg-neutral-300/90",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+          )}
+          aria-label="Все новости"
         >
-          Все новости
-          <ChevronRight className="h-4 w-4" aria-hidden />
+          <ArrowRight className="h-4 w-4" strokeWidth={1.75} aria-hidden />
         </Link>
       </div>
 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth/server";
+import { canManageOwnedContent } from "@/lib/auth/businessContentAccess";
 
 export async function POST(
   request: NextRequest,
@@ -30,8 +31,8 @@ export async function POST(
       return NextResponse.json({ error: "Place not found" }, { status: 404 });
     }
 
-    // Verify ownership
-    if (place.ownerUserId !== user.id && user.role !== "ADMIN") {
+    // Verify ownership (владелец или админ/модератор)
+    if (!canManageOwnedContent(user, place.ownerUserId)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 

@@ -60,7 +60,7 @@ export function OffersList({ offers, currentView }: OffersListProps) {
       emptyTitle="У вас пока нет предложений"
       emptyDescription="Создайте первое предложение, чтобы привлечь больше клиентов"
       addButtonText="Добавить предложение"
-      addButtonHref="/business/offers/new"
+      addButtonHref="/editor/offer/new"
       renderItem={(offer, handlers) => (
         <OfferCardHorizontal
           key={offer.id}

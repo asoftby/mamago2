@@ -1,9 +1,8 @@
 "use client";
 
-import { useRef, useState, useEffect, Suspense } from "react";
+import { useRef, Suspense } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { IconCompass, IconPalette, IconParty, IconMap } from "@/components/ui/icons";
 import { Intent } from "@/lib/intent";
@@ -30,57 +29,14 @@ function MobileIntentTabsContent({
   className 
 }: MobileIntentTabsProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const searchParams = useSearchParams();
-  const [isClient, setIsClient] = useState(false);
-
-  // Detect client-side mount
-  useEffect(() => {
-    setIsClient(true);
-  }, []);
 
   // Find active index based on current intent
   const activeIndex = DISCOVERY_INTENT_ITEMS.findIndex(item => item.id === currentIntent);
-  const safeActiveIndex = activeIndex === -1 ? 0 : activeIndex;
-  
-  // Build URL with current filters preserved (only for 'kuda' intent)
-  const buildUrlWithFilters = (intentId: string) => {
-    const intentConfig = DISCOVERY_INTENT_ITEMS.find(item => item.id === intentId);
-    if (!intentConfig) return '#';
-    
-    const baseUrl = intentConfig.href(city);
-    const currentFilters = searchParams.toString();
-    const withCity = (href: string) => appendCityQuery(href, city);
 
-    if (!isClient) {
-      return withCity(baseUrl);
-    }
-    
-    // Save current filters to localStorage if we're leaving 'kuda' intent
-    if (currentIntent === "kuda" && intentId !== "kuda" && currentFilters) {
-      try {
-        localStorage.setItem(`filters_kuda_${city}`, currentFilters);
-      } catch (e) {
-        // Ignore localStorage errors
-      }
-    }
-    
-    // If going TO 'kuda', restore saved filters
-    if (intentId === "kuda") {
-      try {
-        const savedFilters = localStorage.getItem(`filters_kuda_${city}`);
-        if (savedFilters) {
-          return withCity(`${baseUrl}?${savedFilters}`);
-        }
-      } catch (e) {
-        // Ignore localStorage errors
-      }
-      // If no saved filters, use current filters if we're already on kuda
-      if (currentIntent === "kuda" && currentFilters) {
-        return withCity(`${baseUrl}?${currentFilters}`);
-      }
-    }
-
-    return withCity(baseUrl);
+  const buildIntentHref = (intentId: string) => {
+    const intentConfig = DISCOVERY_INTENT_ITEMS.find((item) => item.id === intentId);
+    if (!intentConfig) return "#";
+    return appendCityQuery(intentConfig.href(city), city);
   };
 
   return (
@@ -102,7 +58,7 @@ function MobileIntentTabsContent({
           return (
             <Link
               key={intentConfig.id}
-              href={buildUrlWithFilters(intentConfig.id)}
+              href={buildIntentHref(intentConfig.id)}
               scroll={false}
               className={cn(
                 "group flex min-w-[80px] flex-col items-center justify-center gap-1 py-2 transition-all duration-200 select-none scroll-snap-align-start",
@@ -125,11 +81,11 @@ function MobileIntentTabsContent({
                   />
                 </div>
               ) : (
-                <Icon 
+                <Icon
                   className={cn(
-                    "transition-all duration-200",
-                    isActive ? "h-[28px] w-[28px] opacity-100" : "h-[26px] w-[26px] opacity-70"
-                  )} 
+                    "h-[28px] w-[28px] shrink-0 transition-opacity duration-200",
+                    isActive ? "opacity-100" : "opacity-70",
+                  )}
                 />
               )}
               <span 

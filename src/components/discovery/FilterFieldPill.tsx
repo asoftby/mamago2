@@ -51,7 +51,7 @@ export function FilterFieldPill({
         "aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive",
         "shadow-xs hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50",
         "has-[>svg]:px-3 h-auto min-h-[56px] w-full justify-between",
-        "rounded-full border bg-background px-5 py-3 hover:bg-muted/30 transition-all",
+        "rounded-full border border-gray-200 bg-white px-5 py-3 transition-all hover:bg-gray-50",
         "flex items-center text-left font-normal",
         // Selected state
         selected && "border-primary bg-primary/5",

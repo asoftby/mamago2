@@ -2,6 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
 import { ActivityType, ContentStatus } from "@prisma/client";
+import { fetchActivityEventRowSummary } from "@/lib/activity/fetchActivityEventRowSummary";
+import {
+  canCreateBusinessContent,
+  canManageOwnedContent,
+  canPublishContentDirectly,
+} from "@/lib/auth/businessContentAccess";
+import { replaceActivitySessionsFromScheduleJson } from "@/lib/business/syncEventActivitySessions";
 
 /**
  * POST /api/business/events/[id]/submit
@@ -9,23 +16,34 @@ import { ActivityType, ContentStatus } from "@prisma/client";
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const user = await getCurrentUser();
 
-    if (!user || user.role !== "BUSINESS_OWNER") {
+    if (!user || !canCreateBusinessContent(user.role)) {
       return NextResponse.json(
         { error: "Unauthorized" },
         { status: 401 }
       );
     }
 
-    // Verify ownership
+    const summary = await fetchActivityEventRowSummary(id);
+    if (
+      !summary ||
+      !canManageOwnedContent(user, summary.ownerUserId) ||
+      summary.status === "DELETED"
+    ) {
+      return NextResponse.json(
+        { error: "Event not found" },
+        { status: 404 }
+      );
+    }
+
     const existing = await prisma.activity.findFirst({
       where: {
-        id: params.id,
-        ownerUserId: user.id,
+        id,
         type: ActivityType.EVENT,
       },
     });
@@ -36,6 +54,8 @@ export async function POST(
         { status: 404 }
       );
     }
+
+    await replaceActivitySessionsFromScheduleJson(existing.id, existing.scheduleJson);
 
     // Validate required fields
     const errors: string[] = [];
@@ -63,7 +83,7 @@ export async function POST(
     // Check sessions
     const sessions = await prisma.activitySession.count({
       where: {
-        activityId: params.id,
+        activityId: id,
       },
     });
 
@@ -78,13 +98,25 @@ export async function POST(
       );
     }
 
-    // Update status to PENDING_REVIEW
+    const sessionRows = await prisma.activitySession.findMany({
+      where: { activityId: id },
+      orderBy: { startsAt: "asc" },
+    });
+    const now = new Date();
+    const nextUp = sessionRows.find((s) => s.startsAt >= now);
+    const nextOccurrenceAt = nextUp?.startsAt ?? null;
+
+    const nextStatus = canPublishContentDirectly(user.role)
+      ? ContentStatus.PUBLISHED
+      : ContentStatus.PENDING;
+
     const event = await prisma.activity.update({
       where: {
-        id: params.id,
+        id,
       },
       data: {
-        status: ContentStatus.PENDING,
+        status: nextStatus,
+        nextOccurrenceAt,
       },
     });
 

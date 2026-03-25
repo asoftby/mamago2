@@ -12,6 +12,7 @@ import {
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useHydrated } from "@/hooks/use-hydrated";
 import { MobileSelectSheet } from "@/components/filters/MobileSelectSheet";
+import { ChipsRow, type ChipItem } from "@/components/ui/chips-row";
 
 export interface CardMultiSelectOption {
   value: string;
@@ -33,6 +34,8 @@ interface CardMultiSelectProps {
   trigger?: React.ReactNode;
   applyMode?: "instant" | "manual"; // New: manual mode requires Apply button
   closeOnApply?: boolean; // New: close dropdown after Apply (default true for manual)
+  /** Список с галочками или masonry-чипы (возраст), как в ChipsRow */
+  optionsLayout?: "list" | "masonry";
 }
 
 export function CardMultiSelect({
@@ -50,6 +53,7 @@ export function CardMultiSelect({
   trigger: customTrigger,
   applyMode = "instant",
   closeOnApply = true,
+  optionsLayout = "list",
 }: CardMultiSelectProps) {
   const [open, setOpen] = React.useState(false);
   const [isClient, setIsClient] = React.useState(false);
@@ -92,6 +96,18 @@ export function CardMultiSelect({
 
   const isSelected = (val: string) => effectiveValues.includes(val);
   const isMaxReached = maxSelected !== undefined && effectiveValues.length >= maxSelected;
+
+  const chipItems: ChipItem[] = options.map((option) => {
+    const selected = isSelected(option.value);
+    const itemDisabled = !selected && isMaxReached;
+    return {
+      id: option.value,
+      label: option.label,
+      active: selected,
+      disabled: itemDisabled,
+      onClick: () => toggle(option.value),
+    };
+  });
 
   const toggle = (val: string) => {
     if (applyMode === "manual") {
@@ -228,6 +244,8 @@ export function CardMultiSelect({
           isMulti={true}
           maxSelected={maxSelected}
           placeholderSearch="Поиск..."
+          showSearch={optionsLayout !== "masonry"}
+          layoutVariant={optionsLayout === "masonry" ? "age-masonry" : "list"}
         />
       </>
     );
@@ -238,8 +256,13 @@ export function CardMultiSelect({
       <PopoverTrigger asChild>
         {customTrigger || trigger}
       </PopoverTrigger>
-      <PopoverPanelContent 
-        className="bg-background p-0 w-[320px]"
+      <PopoverPanelContent
+        className={cn(
+          "bg-background p-0",
+          optionsLayout === "masonry"
+            ? "w-[min(22rem,calc(100vw-2rem))] max-w-[24rem]"
+            : "w-[320px]",
+        )}
         align="start"
       >
         {applyMode === "manual" ? (
@@ -250,6 +273,15 @@ export function CardMultiSelect({
               "overflow-auto",
               draftValues.length > 0 ? "pb-16" : "pb-1"
             )}>
+              {optionsLayout === "masonry" ? (
+                <div className="p-[15px]">
+                  <ChipsRow
+                    layout="masonry"
+                    aria-label={label}
+                    items={chipItems}
+                  />
+                </div>
+              ) : (
               <div className="p-1">
                 {options.map((option) => {
                   const selected = isSelected(option.value);
@@ -276,6 +308,7 @@ export function CardMultiSelect({
                   );
                 })}
               </div>
+              )}
             </div>
             
             {/* Sticky footer - only show when selections exist */}
@@ -293,6 +326,15 @@ export function CardMultiSelect({
           </div>
         ) : (
           // Instant mode: original layout
+          optionsLayout === "masonry" ? (
+            <div className="p-[15px]">
+              <ChipsRow
+                layout="masonry"
+                aria-label={label}
+                items={chipItems}
+              />
+            </div>
+          ) : (
           <div className="flex flex-col gap-1 p-1">
             {options.map((option) => {
               const selected = isSelected(option.value);
@@ -333,7 +375,9 @@ export function CardMultiSelect({
               </div>
             )}
           </div>
-        )}
+          )
+        )
+        }
       </PopoverPanelContent>
     </Popover>
   );

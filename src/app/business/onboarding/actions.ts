@@ -7,6 +7,7 @@ import { getCurrentUser } from "@/lib/auth/server";
 import { getMyBusiness } from "@/server/business/getMyBusiness";
 import prisma from "@/lib/prisma";
 import { resolveCompanyByUnp } from "@/server/company/resolveByUnp";
+import { notifyAdminBusinessVerificationPending } from "@/lib/admin/notifyAdminBusinessVerification";
 
 // Server action for UNP lookup
 export async function lookupLegalNameByUnp(unp: string) {
@@ -35,7 +36,7 @@ export async function createBusinessAction(
   // Check authentication
   const user = await getCurrentUser();
   if (!user) {
-    redirect("/login?from=business");
+    redirect("/login");
   }
 
   // Extract and validate form data
@@ -48,26 +49,6 @@ export async function createBusinessAction(
   try {
     // Validate
     const validated = onboardingSchema.parse(payload);
-
-    // Verify phone is verified
-    const userWithPhone = await prisma.user.findUnique({
-      where: { id: user.id },
-      select: { phoneE164: true, phoneVerifiedAt: true },
-    });
-
-    if (!userWithPhone?.phoneVerifiedAt) {
-      return {
-        ok: false,
-        message: "Необходимо подтвердить номер телефона",
-      };
-    }
-
-    if (userWithPhone.phoneE164 !== validated.phone) {
-      return {
-        ok: false,
-        message: "Номер телефона не совпадает с подтвержденным",
-      };
-    }
 
     // Check if business already exists
     const existing = await getMyBusiness(user.id);
@@ -93,7 +74,7 @@ export async function createBusinessAction(
       }
 
       // DRAFT or REJECTED: Allow update and resubmit
-      await prisma.business.update({
+      const updated = await prisma.business.update({
         where: { id: existing.id },
         data: {
           name: businessName,
@@ -112,9 +93,16 @@ export async function createBusinessAction(
           status: "PENDING_VERIFICATION",
         },
       });
+      notifyAdminBusinessVerificationPending({
+        businessId: updated.id,
+        name: updated.name,
+        legalName: updated.legalName,
+        unp: updated.unp,
+        ownerEmail: user.email ?? null,
+      });
     } else {
       // CREATE: New business submission
-      await prisma.business.create({
+      const created = await prisma.business.create({
         data: {
           ownerUserId: user.id,
           name: businessName,
@@ -127,6 +115,13 @@ export async function createBusinessAction(
           // Legacy: Keep status in sync
           status: "PENDING_VERIFICATION",
         },
+      });
+      notifyAdminBusinessVerificationPending({
+        businessId: created.id,
+        name: created.name,
+        legalName: created.legalName,
+        unp: created.unp,
+        ownerEmail: user.email ?? null,
       });
     }
   } catch (e) {

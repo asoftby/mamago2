@@ -1,6 +1,6 @@
 import { format, addDays } from "date-fns";
 import { ru } from "date-fns/locale";
-import { WhenPreset } from "./filters.store";
+import { type WhenPreset } from "./filters.store";
 
 function fmtDay(d: Date): string {
   return format(d, "d MMM", { locale: ru }); // e.g., "5 мар."
@@ -78,4 +78,12 @@ export function whenLabel(filters: {
   }
   
   return "Выберите…";
+}
+
+/** Окончание заголовка страницы (H1) при выборе пресета «когда» в URL */
+export function whenPresetPageTitleSuffix(whenPreset: WhenPreset): string {
+  if (whenPreset === "TODAY") return " сегодня";
+  if (whenPreset === "TOMORROW") return " завтра";
+  if (whenPreset === "WEEKEND") return " на выходных";
+  return "";
 }

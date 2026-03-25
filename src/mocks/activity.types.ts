@@ -1,3 +1,5 @@
+import type { Intent } from "@/lib/intent";
+
 export type ActivityType = 
   | 'EVENT_FIXED'      // Событие с фиксированной датой/временем (Спектакль)
   | 'PLACE_FLEX'       // Место с часами работы (Зоопарк, Кафе)
@@ -8,6 +10,8 @@ export type ActivityType =
 export interface ActivityMock {
   id: string;
   type: ActivityType;
+  /** Раздел сайта (иконка в хедере на странице публикации); иначе выводится из `type` */
+  discoveryIntent?: Intent;
   title: string;
   description: string;
   image: string; // URL placeholder

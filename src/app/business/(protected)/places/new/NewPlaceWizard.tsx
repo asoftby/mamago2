@@ -313,11 +313,6 @@ export function NewPlaceWizard() {
   };
 
   const saveDraft = useCallback(async (navigateTo?: string) => {
-    if (!localDraft.title || !localDraft.category || !localDraft.shortDesc) {
-      toast.error("Заполните обязательные поля: название, категория, краткое описание");
-      return false;
-    }
-
     setIsSaving(true);
     try {
       console.log("[NewPlaceWizard] Creating place (DRAFT) with sessionId:", wizardSessionId);

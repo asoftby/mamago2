@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
 import { z } from "zod";
+import {
+  canCreateBusinessContent,
+  canManageOwnedContent,
+  canPublishContentDirectly,
+} from "@/lib/auth/businessContentAccess";
 
 const createOfferSchema = z.object({
   source: z.enum(["PLACE", "EVENT"]),
@@ -30,30 +35,32 @@ const createOfferSchema = z.object({
   phone: z.string().optional(),
   website: z.string().optional(),
   bookingInstructions: z.string().optional(),
-  status: z.enum(["DRAFT", "PENDING"]).default("DRAFT"),
+  status: z.enum(["DRAFT", "PENDING", "PUBLISHED"]).default("DRAFT"),
 });
 
 export async function POST(request: NextRequest) {
   try {
     const user = await getCurrentUser();
     
-    if (!user || user.role !== "BUSINESS_OWNER") {
+    if (!user || !canCreateBusinessContent(user.role)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const body = await request.json();
     const data = createOfferSchema.parse(body);
 
-    // Verify place ownership if source is PLACE
+    if (data.status === "PUBLISHED" && !canPublishContentDirectly(user.role)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    // Verify place access (владелец или админ/модератор)
     if (data.source === "PLACE" && data.selectedPlace) {
-      const place = await prisma.place.findFirst({
-        where: {
-          id: data.selectedPlace.id,
-          ownerUserId: user.id,
-        },
+      const place = await prisma.place.findUnique({
+        where: { id: data.selectedPlace.id },
+        select: { id: true, ownerUserId: true },
       });
 
-      if (!place) {
+      if (!place || !canManageOwnedContent(user, place.ownerUserId)) {
         return NextResponse.json({ error: "Place not found" }, { status: 404 });
       }
 
@@ -84,6 +91,7 @@ export async function POST(request: NextRequest) {
           ageMinMonths: data.ageMinMonths,
           ageMaxMonths: data.ageMaxMonths,
           status: data.status,
+          ...(data.status === "PUBLISHED" ? { publishedAt: new Date() } : {}),
         },
       });
 
@@ -114,34 +122,49 @@ export async function GET(request: NextRequest) {
   try {
     const user = await getCurrentUser();
     
-    if (!user || user.role !== "BUSINESS_OWNER") {
+    if (!user || !canCreateBusinessContent(user.role)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Get user's places
+    if (user.role === "ADMIN" || user.role === "MODERATOR") {
+      const offers = await prisma.offer.findMany({
+        include: {
+          place: {
+            select: {
+              id: true,
+              title: true,
+            },
+          },
+        },
+        orderBy: { createdAt: "desc" },
+      });
+      return NextResponse.json(offers);
+    }
+
     const userPlaces = await prisma.place.findMany({
       where: { ownerUserId: user.id },
       select: { id: true },
     });
 
-    const placeIds = userPlaces.map(p => p.id);
+    const placeIds = userPlaces.map((p) => p.id);
 
-    const offers = placeIds.length > 0
-      ? await prisma.offer.findMany({
-          where: {
-            placeId: { in: placeIds },
-          },
-          include: {
-            place: {
-              select: {
-                id: true,
-                title: true,
+    const offers =
+      placeIds.length > 0
+        ? await prisma.offer.findMany({
+            where: {
+              placeId: { in: placeIds },
+            },
+            include: {
+              place: {
+                select: {
+                  id: true,
+                  title: true,
+                },
               },
             },
-          },
-          orderBy: { createdAt: "desc" },
-        })
-      : [];
+            orderBy: { createdAt: "desc" },
+          })
+        : [];
 
     return NextResponse.json(offers);
 

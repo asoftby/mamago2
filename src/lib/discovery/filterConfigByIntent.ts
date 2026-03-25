@@ -60,12 +60,13 @@ export const filterConfigByIntent: Record<Intent, SecondaryFilterGroup[]> = {
     },
     {
       id: "activity_type",
-      label: "Тип активности",
+      label: "Как проходит событие",
       kind: "multi",
       options: [
-        { id: "active", label: "Активно" },
+        { id: "calm_relaxed", label: "Спокойно и расслабленно" },
         { id: "educational", label: "Познавательно" },
-        { id: "calm", label: "Спокойно" },
+        { id: "playful", label: "Игриво" },
+        { id: "active_energetic", label: "Активно и энергично" },
         { id: "shows", label: "Спектакли" },
         { id: "exhibitions", label: "Выставки" },
         { id: "parks", label: "Парки" },

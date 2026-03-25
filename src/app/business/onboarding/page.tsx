@@ -12,7 +12,7 @@ export default async function OnboardingPage() {
   const user = await getCurrentUser();
   
   if (!user) {
-    redirect("/register?from=business");
+    redirect("/login");
   }
 
   // 2. Check existing business profile
@@ -44,7 +44,7 @@ export default async function OnboardingPage() {
     <div className="max-w-2xl mx-auto">
       <div className="bg-white rounded-lg shadow p-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-6">
-          {isEditing ? "Редактировать профиль бизнеса" : "Welcome to Business Cabinet"}
+          {isEditing ? "Редактировать профиль бизнеса" : "mamaGo Business"}
         </h1>
         
         <div className="space-y-6">
@@ -62,18 +62,18 @@ export default async function OnboardingPage() {
           {!isEditing && (
             <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
               <h2 className="text-lg font-semibold text-blue-900 mb-2">
-                Create Your Business
+                Создайте профиль компании
               </h2>
               <p className="text-blue-700 text-sm">
-                Let's start by creating your business profile. You'll be able to add 
-                places and offers after this step.
+                Заполните данные ниже — после проверки вы сможете добавлять свои публикации
+                (места, события, предложения).
               </p>
             </div>
           )}
 
-          <OnboardingForm 
+          <OnboardingForm
             initialData={existingBusiness}
-            isPhoneVerifiedInitial={!!user.phoneVerifiedAt}
+            accountPhoneE164={user.phoneE164 ?? null}
           />
         </div>
       </div>

@@ -1,0 +1,30 @@
+@import "react-phone-number-input/style.css";
+
+/* Align with form inputs + project primary focus */
+.onboarding-phone-wrap {
+  --PhoneInput-color--focus: var(--primary, #ef8759);
+}
+
+.onboarding-phone-wrap .PhoneInput {
+  width: 100%;
+  border: 1px solid rgb(209 213 219);
+  border-radius: 0.375rem;
+  padding: 0.125rem 0.5rem;
+  min-height: 2.625rem;
+  background: #fff;
+}
+
+.onboarding-phone-wrap .PhoneInput--focus {
+  outline: 2px solid var(--primary, #ef8759);
+  outline-offset: 0;
+  border-color: transparent;
+}
+
+.onboarding-phone-wrap .PhoneInputInput {
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+}
+
+.onboarding-phone-wrap .PhoneInputCountrySelect {
+  font-size: 0.875rem;
+}

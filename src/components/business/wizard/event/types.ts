@@ -1,5 +1,7 @@
 // Event Wizard Types
 
+import type { EventFormatPreset } from "@/lib/business/eventFormatSignals";
+
 export type EventWizardMode = "create" | "edit";
 
 /**
@@ -9,11 +11,36 @@ export type EventWizardMode = "create" | "edit";
 export interface EventFormData {
   // Step 1: Basics
   title: string;
-  activityType: "active" | "educational" | "calm" | null;
-  categories: string[];
-  ageGroups: string[]; // ageTags in Activity model
-  
-  // Cinema-specific (conditional on categories including "Кино")
+  /** Пресет «как проходит событие» → при сохранении маппится в сигналы в scheduleJson */
+  eventFormats: EventFormatPreset[];
+  /**
+   * Multi-category (корневые категории):
+   * - UI поддерживает максимум 3 выбранные корневые категории
+   * - Для совместимости с БД/legacy хранится ещё первичная пара: `categoryId`/`subcategoryId`
+   */
+  categoryIds: string[];
+  /**
+   * Multi subcategory selection per root category:
+   * key: root category id -> selected child ids
+   */
+  subcategoryIdsByCategoryId: Record<string, string[]>;
+
+  /** Primary корневая категория события (для legacy: EventCategoryId в БД). */
+  categoryId: string | null;
+  /** Primary подкатегория (для legacy: leaf EventCategoryId). */
+  subcategoryId: string | null;
+  /** id опций сигнала age (Discovery / Signals) */
+  ageRangeIds: string[];
+  /** Значения сигнала age для поля Activity.ageTags (синхронизируется с ageRangeIds) */
+  ageTags: string[];
+  /** id/values опций сигнала interests (Discovery / Signals, axis INTERESTS) */
+  interestIds: string[];
+  /** Slug выбранной категории (подкатегория или корень) — для кино и сохранения в scheduleJson */
+  categorySlug: string | null;
+  /** Подпись для review (корень → подкатегория), из справочника */
+  categoryPathLabel: string | null;
+
+  // Cinema-specific (conditional on category slug, см. isCinemaEventCategorySlug)
   cinemaGenre?: string;
   cinemaDuration?: number;
   cinemaTrailerUrl?: string;
@@ -37,13 +64,13 @@ export interface EventFormData {
   repeatUntil: string | null; // YYYY-MM-DD
   
   // Step 5: Pricing & Participation
-  pricingMode: "free" | "fixed" | "from" | "on-request";
+  pricingMode: "free" | "fixed" | "from";
   price: string;
   priceDetails: string; // Optional details for "from" mode (e.g., different ticket categories)
   ticketLink: string;
-  participationMode: "external-link" | "time-slots" | "simple-booking" | "request" | "info-only";
-  ctaType?: "book" | "buy" | "request" | "details"; // Optional - auto-determined from participationMode
-  
+  /** Как попасть на событие (3 сценария; при загрузке старых данных нормализуется в маппере) */
+  participationMode: "external-link" | "time-slots" | "walk-in";
+
   // Simple booking fields
   simpleBookingDate: string | null; // YYYY-MM-DD
   simpleBookingTime: string | null; // HH:mm–HH:mm
@@ -120,7 +147,7 @@ export interface SocialLink {
  */
 export const DRAFT_REQUIRED = {
   title: true,
-  categories: true, // at least one
+  categoryId: true,
 } as const;
 
 /**
@@ -130,9 +157,9 @@ export const DRAFT_REQUIRED = {
 export const SUBMIT_REQUIRED = {
   // Step 1
   title: true,
-  activityType: true,
-  categories: true, // at least one
-  ageGroups: true, // at least one
+  eventFormats: true,
+  categoryId: true,
+  ageRangeIds: true, // at least one id
   
   // Step 2
   fullDescription: true,

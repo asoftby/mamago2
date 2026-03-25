@@ -3,6 +3,7 @@
 
 import { WizardStepConfig, SummaryItem, buildReviewSections } from "../shared/types";
 import type { EventFormData } from "./types";
+import { labelForEventFormats } from "@/lib/business/eventFormatSignals";
 import { isRichTextMeaningful, getRichTextLength, createExcerpt } from "@/lib/richtext/utils";
 
 // Re-export buildReviewSections for convenience
@@ -27,20 +28,33 @@ export const EVENT_WIZARD_STEPS: WizardStepConfig<EventFormData>[] = [
   {
     id: 1,
     key: "basics",
-    title: "Основное",
-    description: "Название, тип активности, категории и возраст",
+    title: "Основная информация",
+    description: "Название, формат события, категория и возраст",
     component: Step1Basics,
     
     isComplete: (data) => {
+      const selectedCategoryIds =
+        (Array.isArray(data.categoryIds) && data.categoryIds.length > 0
+          ? data.categoryIds
+          : data.categoryId
+            ? [data.categoryId]
+            : []);
       return !!(
         data.title.trim().length >= 3 &&
-        data.activityType &&
-        data.categories.length > 0 &&
-        data.ageGroups.length > 0
+        data.eventFormats.length > 0 &&
+        selectedCategoryIds.length > 0 &&
+        data.ageRangeIds.length > 0
       );
     },
     
     getSummary: (data) => {
+      const selectedCategoryIds =
+        (Array.isArray(data.categoryIds) && data.categoryIds.length > 0
+          ? data.categoryIds
+          : data.categoryId
+            ? [data.categoryId]
+            : []);
+
       const items: SummaryItem[] = [
         {
           label: "Название",
@@ -48,23 +62,29 @@ export const EVENT_WIZARD_STEPS: WizardStepConfig<EventFormData>[] = [
           isMissing: !data.title,
         },
         {
-          label: "Тип активности",
-          value: data.activityType || <span className="text-yellow-600">Не выбран</span>,
-          isMissing: !data.activityType,
+          label: "Как проходит событие",
+          value: data.eventFormats.length > 0 ? (
+            labelForEventFormats(data.eventFormats)
+          ) : (
+            <span className="text-yellow-600">Не выбран</span>
+          ),
+          isMissing: data.eventFormats.length === 0,
         },
         {
-          label: "Категории",
-          value: data.categories.length > 0 
-            ? data.categories.join(", ") 
-            : <span className="text-red-500">Не выбраны</span>,
-          isMissing: data.categories.length === 0,
+          label: "Категория",
+          value: data.categoryPathLabel ? (
+            data.categoryPathLabel
+          ) : (
+            <span className="text-red-500">Не выбрана</span>
+          ),
+          isMissing: selectedCategoryIds.length === 0,
         },
         {
-          label: "Возраст",
-          value: data.ageGroups.length > 0 
-            ? data.ageGroups.join(", ") 
+          label: "Возрастные группы",
+          value: data.ageRangeIds.length > 0
+            ? data.ageRangeIds.join(", ")
             : <span className="text-yellow-600">Не выбран</span>,
-          isMissing: data.ageGroups.length === 0,
+          isMissing: data.ageRangeIds.length === 0,
         },
       ];
       
@@ -73,10 +93,16 @@ export const EVENT_WIZARD_STEPS: WizardStepConfig<EventFormData>[] = [
     
     getMissingFields: (data) => {
       const missing: string[] = [];
+      const selectedCategoryIds =
+        (Array.isArray(data.categoryIds) && data.categoryIds.length > 0
+          ? data.categoryIds
+          : data.categoryId
+            ? [data.categoryId]
+            : []);
       if (!data.title || data.title.trim().length < 3) missing.push("Название");
-      if (!data.activityType) missing.push("Тип активности");
-      if (data.categories.length === 0) missing.push("Категории");
-      if (data.ageGroups.length === 0) missing.push("Возраст");
+      if (data.eventFormats.length === 0) missing.push("Как проходит событие");
+      if (selectedCategoryIds.length === 0) missing.push("Категория");
+      if (data.ageRangeIds.length === 0) missing.push("Возрастные группы");
       return missing;
     },
   },
@@ -290,7 +316,7 @@ export const EVENT_WIZARD_STEPS: WizardStepConfig<EventFormData>[] = [
     id: 6,
     key: "pricing",
     title: "Стоимость и запись",
-    description: "Цена и способ взаимодействия с пользователями",
+    description: "Стоимость и как попасть на событие",
     component: Step5PricingParticipation,
     
     isComplete: (data) => {
@@ -307,11 +333,6 @@ export const EVENT_WIZARD_STEPS: WizardStepConfig<EventFormData>[] = [
       
       // If external link, ticketLink must be filled
       if (data.participationMode === "external-link" && !data.ticketLink?.trim()) {
-        return false;
-      }
-      
-      // If simple booking, date must be filled
-      if (data.participationMode === "simple-booking" && !data.simpleBookingDate) {
         return false;
       }
       
@@ -332,7 +353,6 @@ export const EVENT_WIZARD_STEPS: WizardStepConfig<EventFormData>[] = [
         free: "Бесплатно",
         fixed: `${data.price} BYN`,
         from: `От ${data.price} BYN`,
-        "on-request": "По запросу",
       };
       items.push({
         label: "Стоимость",
@@ -346,14 +366,13 @@ export const EVENT_WIZARD_STEPS: WizardStepConfig<EventFormData>[] = [
       const participationLabels = {
         "external-link": "Покупка по ссылке",
         "time-slots": "Запись по времени",
-        "simple-booking": "Простая запись",
-        "request": "Оставить заявку",
-        "info-only": "Только информация",
+        "walk-in": "Узнать подробнее",
       };
+      const effectiveParticipation = data.participationMode;
       items.push({
-        label: "Формат участия",
-        value: data.participationMode 
-          ? participationLabels[data.participationMode] 
+        label: "Как попасть",
+        value: effectiveParticipation
+          ? participationLabels[effectiveParticipation]
           : <span className="text-red-500">Не выбран</span>,
         isMissing: !data.participationMode,
       });
@@ -375,9 +394,6 @@ export const EVENT_WIZARD_STEPS: WizardStepConfig<EventFormData>[] = [
       } else {
         if (data.participationMode === "external-link" && !data.ticketLink?.trim()) {
           missing.push("Ссылка на покупку билетов");
-        }
-        if (data.participationMode === "simple-booking" && !data.simpleBookingDate) {
-          missing.push("Дата события для записи");
         }
         if (data.participationMode === "time-slots") {
           const hasSlots = data.timeSlots?.dates?.some(d => d.slots.length > 0);
@@ -412,7 +428,10 @@ export const EVENT_WIZARD_STEPS: WizardStepConfig<EventFormData>[] = [
       },
       {
         label: "Соцсети",
-        value: `${data.socialLinks.length} шт.`,
+        value: (() => {
+          const n = data.socialLinks.filter((l) => l.url.trim().length > 0).length;
+          return n === 0 ? "Не указано" : `${n} шт.`;
+        })(),
       },
     ],
     

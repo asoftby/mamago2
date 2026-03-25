@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import prisma from "@/lib/prisma";
 import { PlacesList } from "./PlacesList";
 import { getBusinessPlaces } from "@/server/services/place.service";
+import { canCreateBusinessContent, canManageOwnedContent } from "@/lib/auth/businessContentAccess";
 
 interface SearchParams {
   view?: "active" | "archived";
@@ -15,7 +16,7 @@ export default async function PlacesPage({
 }) {
   const user = await getCurrentUser();
   
-  if (!user || user.role !== "BUSINESS_OWNER") {
+  if (!user || !canCreateBusinessContent(user.role)) {
     redirect("/business/login");
   }
 

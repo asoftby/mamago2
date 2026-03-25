@@ -26,6 +26,10 @@ const STATUS_CONFIG: Record<ContentStatus, { label: string; className: string }>
     label: "Отклонено",
     className: "bg-red-100 text-red-800",
   },
+  DELETED: {
+    label: "Удалено",
+    className: "bg-gray-200 text-gray-600",
+  },
 };
 
 export function ContentStatusBadge({ status, className = "" }: ContentStatusBadgeProps) {

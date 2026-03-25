@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { Input } from "@/components/ui/input";
 import { MapPin } from "lucide-react";
 import { GoogleMapsService } from "@/services/googleMaps";
@@ -11,7 +11,7 @@ interface EventLocationSearchInputProps {
     lat: number;
     lng: number;
     formattedAddr: string;
-    addressJson: any[];
+    addressJson: unknown[];
   }) => void;
   disabled?: boolean;
   initialValue?: string;
@@ -27,23 +27,7 @@ export function EventLocationSearchInput({
   const inputRef = useRef<HTMLInputElement>(null);
   const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
 
-  // Set initial value when component mounts or initialValue changes
-  useEffect(() => {
-    if (inputRef.current && initialValue) {
-      inputRef.current.value = initialValue;
-    }
-  }, [initialValue]);
-
-  useEffect(() => {
-    initAutocomplete();
-    return () => {
-      if (autocompleteRef.current && typeof google !== "undefined") {
-        google.maps.event.clearInstanceListeners(autocompleteRef.current);
-      }
-    };
-  }, []);
-
-  const initAutocomplete = async () => {
+  const initAutocomplete = useCallback(async () => {
     if (!inputRef.current) return;
 
     try {
@@ -59,7 +43,7 @@ export function EventLocationSearchInput({
 
       autocomplete.addListener("place_changed", () => {
         const place = autocomplete.getPlace();
-        
+
         if (!place.place_id || !place.geometry?.location) {
           return;
         }
@@ -75,7 +59,23 @@ export function EventLocationSearchInput({
     } catch (err) {
       console.error("[EventLocationSearchInput] Init error:", err);
     }
-  };
+  }, [onPlaceSelect]);
+
+  // Set initial value when component mounts or initialValue changes
+  useEffect(() => {
+    if (inputRef.current && initialValue) {
+      inputRef.current.value = initialValue;
+    }
+  }, [initialValue]);
+
+  useEffect(() => {
+    initAutocomplete();
+    return () => {
+      if (autocompleteRef.current && typeof google !== "undefined") {
+        google.maps.event.clearInstanceListeners(autocompleteRef.current);
+      }
+    };
+  }, [initAutocomplete]);
 
   return (
     <div className="relative">
@@ -83,7 +83,7 @@ export function EventLocationSearchInput({
       <Input
         ref={inputRef}
         placeholder={placeholder}
-        className="pl-10"
+        className="pl-10 text-[13px]"
         disabled={disabled}
       />
     </div>

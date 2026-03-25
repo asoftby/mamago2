@@ -14,44 +14,9 @@ export function getProfileDestination(params: {
   role: Role;
   businessStatus?: "DRAFT" | "PENDING" | "REJECTED" | "APPROVED" | "NEEDS_INFO" | null;
 }): string {
-  const { host, role, businessStatus } = params;
-
-  // Regular users go to /me
-  if (role !== "BUSINESS_OWNER") {
-    return "/me";
-  }
-
-  // Business owners go to business subdomain
-  const businessPath = businessStatus === "APPROVED" 
-    ? "/dashboard" 
-    : businessStatus === "DRAFT"
-    ? "/onboarding"
-    : "/verification";
-
-  return businessSubdomainUrl(host, businessPath);
-}
-
-/**
- * Build business subdomain URL preserving environment
- * 
- * @param host - Current request host
- * @param path - Path on business subdomain
- * @returns Full URL with business subdomain
- */
-function businessSubdomainUrl(host: string, path: string): string {
-  // Normalize path
-  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
-
-  // Check if localhost
-  if (host.includes("localhost")) {
-    // Extract port if present
-    const portMatch = host.match(/:(\d+)/);
-    const port = portMatch ? `:${portMatch[1]}` : ":3000";
-    return `http://business.localhost${port}${normalizedPath}`;
-  }
-
-  // Production - use business subdomain
-  // Extract base domain (handle both "mamago.by" and "www.mamago.by")
-  const baseDomain = host.replace(/^(www\.|business\.|admin\.)/, "");
-  return `https://business.${baseDomain}${normalizedPath}`;
+  void params.host;
+  void params.role;
+  void params.businessStatus;
+  /** Единая точка входа в личный кабинет — без редиректов по роли. */
+  return "/me";
 }

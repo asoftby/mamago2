@@ -9,8 +9,8 @@ async function upsertSignal(slug: string, title: string, options: Array<{ value:
   
   const def = await prisma.signalDefinition.upsert({
     where: { slug },
-    update: { title, isActive: true },
-    create: { slug, title, order: 0, isActive: true },
+    update: { title, titleEn: title, isActive: true },
+    create: { slug, title, titleEn: title, order: 0, isActive: true },
   })
 
   for (const o of options) {
@@ -43,12 +43,6 @@ async function main() {
 
   // Signals
   console.log('Seeding Signals...')
-  await upsertSignal("vibe", "Vibe", [
-    { value: "calm", label: "Спокойно", order: 1 },
-    { value: "playful", label: "Игриво", order: 2 },
-    { value: "active", label: "Активно", order: 3 },
-  ])
-
   await upsertSignal("tempo", "Tempo", [
     { value: "slow", label: "Медленно", order: 1 },
     { value: "medium", label: "Умеренно", order: 2 },

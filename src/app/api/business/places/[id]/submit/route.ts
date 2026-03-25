@@ -7,7 +7,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
 import { ContentStatus, PlaceKind } from "@prisma/client";
-import { submitPlace } from "@/server/services/moderation.service";
+import { publishPlaceFromDraft, submitPlace } from "@/server/services/moderation.service";
+import {
+  canCreateBusinessContent,
+  canManageOwnedContent,
+  canPublishContentDirectly,
+} from "@/lib/auth/businessContentAccess";
 
 interface ValidationError {
   error: "VALIDATION";
@@ -22,7 +27,7 @@ export async function POST(
   try {
     const { id } = await params;
     const user = await getCurrentUser();
-    if (!user || user.role !== "BUSINESS_OWNER") {
+    if (!user || !canCreateBusinessContent(user.role)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -53,7 +58,7 @@ export async function POST(
     }
 
     // Check ownership
-    if (place.ownerUserId !== user.id) {
+    if (!canManageOwnedContent(user, place.ownerUserId)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
@@ -149,8 +154,12 @@ export async function POST(
       return NextResponse.json(response, { status: 400 });
     }
 
-    // All validations passed - submit for moderation
-    await submitPlace(id, user.id);
+    // All validations passed — moderation queue or direct publish (admin)
+    if (canPublishContentDirectly(user.role)) {
+      await publishPlaceFromDraft(id, user.id);
+    } else {
+      await submitPlace(id, user.id);
+    }
 
     // Fetch updated place with opening hours
     const updatedPlace = await prisma.place.findUnique({

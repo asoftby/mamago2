@@ -109,6 +109,12 @@ const STATUS_CONFIG = {
     className: "",
     action: "Исправить",
   },
+  DELETED: {
+    label: "Удалено",
+    variant: "secondary" as const,
+    className: "text-muted-foreground",
+    action: "—",
+  },
 };
 
 const REVISION_STATUS_CONFIG = {
@@ -262,7 +268,7 @@ export function PlaceCardHorizontal({ place, onDelete, onArchive, onUnarchive }:
     <>
       <div className="group flex items-center gap-4 p-4 border border-gray-200 rounded-lg hover:border-gray-300 hover:shadow-sm transition-all">
         {/* Cover Image */}
-        <Link href={`/business/places/${place.id}/edit`} className="flex-shrink-0">
+        <Link href={`/editor/place/${place.id}/edit`} className="flex-shrink-0">
           <div className="relative w-24 h-24 rounded-lg overflow-hidden bg-gray-100">
             {coverImage ? (
               <Image
@@ -281,7 +287,7 @@ export function PlaceCardHorizontal({ place, onDelete, onArchive, onUnarchive }:
 
         {/* Content */}
         <div className="flex-1 min-w-0">
-          <Link href={`/business/places/${place.id}/edit`}>
+          <Link href={`/editor/place/${place.id}/edit`}>
             <h3 className="text-lg font-semibold text-gray-900 truncate hover:text-blue-600 transition-colors">
               {displayTitle}
             </h3>
@@ -385,7 +391,7 @@ export function PlaceCardHorizontal({ place, onDelete, onArchive, onUnarchive }:
 
           {/* Edit Action (icon button) */}
           {!place.archivedAt && displayStatus !== "PENDING" && (
-            <Link href={`/business/places/${place.id}/edit`}>
+            <Link href={`/editor/place/${place.id}/edit`}>
               <Button
                 variant="ghost"
                 size="sm"

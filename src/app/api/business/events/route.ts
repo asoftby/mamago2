@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
 import { ContentStatus, ActivityType, ScheduleMode } from "@prisma/client";
+import { canCreateBusinessContent, canManageOwnedContent } from "@/lib/auth/businessContentAccess";
+import { replaceActivitySessionsFromScheduleJson } from "@/lib/business/syncEventActivitySessions";
+import { syncEventVenueAndActivityCity } from "@/lib/business/syncEventVenueFromWizard";
+import { computeEventShortDesc } from "@/lib/business/eventShortDesc";
+import { excludeDeletedEvents, excludeGhostEventDrafts } from "@/lib/business/eventListWhere";
 
 /**
  * POST /api/business/events
@@ -11,7 +16,7 @@ export async function POST(request: NextRequest) {
   try {
     const user = await getCurrentUser();
 
-    if (!user || user.role !== "BUSINESS_OWNER") {
+    if (!user || !canCreateBusinessContent(user.role)) {
       return NextResponse.json(
         { error: "Unauthorized" },
         { status: 401 }
@@ -19,6 +24,16 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
+
+    const title = typeof body.title === "string" && body.title.trim() ? body.title : "Новое событие";
+    const description = typeof body.description === "string" ? body.description : "";
+
+    const mergedPlaceId =
+      typeof body.placeId === "string"
+        ? body.placeId
+        : body.venue?.kind === "PLACE" && typeof body.venue?.placeId === "string"
+          ? body.venue.placeId
+          : undefined;
 
     // Create event as draft
     const event = await prisma.activity.create({
@@ -28,9 +43,9 @@ export async function POST(request: NextRequest) {
         ownerUserId: user.id,
         
         // Basic info
-        title: body.title || "Новое событие",
-        shortDesc: body.shortDesc || "",
-        description: body.description || "",
+        title,
+        shortDesc: computeEventShortDesc({ title, fullDescriptionHtml: description }),
+        description,
         
         // Age
         ageTags: body.ageTags || [],
@@ -39,6 +54,10 @@ export async function POST(request: NextRequest) {
         scheduleMode: ScheduleMode.MULTI_DATE,
         scheduleJson: body.scheduleJson || {},
         
+        // Event category (leaf: subcategory if selected, otherwise root)
+        eventCategoryId:
+          typeof body.eventCategoryId === "string" ? body.eventCategoryId : undefined,
+
         // Pricing
         priceFrom: body.priceFrom,
         priceTo: body.priceTo,
@@ -49,12 +68,23 @@ export async function POST(request: NextRequest) {
         coverImageId: body.coverImageId,
         
         // Location
-        placeId: body.placeId,
+        ...(mergedPlaceId !== undefined ? { placeId: mergedPlaceId } : {}),
         
         // Business
         businessId: body.businessId,
       },
     });
+
+    await replaceActivitySessionsFromScheduleJson(event.id, event.scheduleJson);
+    if (body.venue !== undefined) {
+      await syncEventVenueAndActivityCity(
+        event.id,
+        body.venue,
+        mergedPlaceId,
+      );
+    } else if (mergedPlaceId !== undefined) {
+      await syncEventVenueAndActivityCity(event.id, null, mergedPlaceId);
+    }
 
     return NextResponse.json({
       success: true,
@@ -81,7 +111,7 @@ export async function GET(request: NextRequest) {
   try {
     const user = await getCurrentUser();
 
-    if (!user || user.role !== "BUSINESS_OWNER") {
+    if (!user || !canCreateBusinessContent(user.role)) {
       return NextResponse.json(
         { error: "Unauthorized" },
         { status: 401 }
@@ -90,8 +120,12 @@ export async function GET(request: NextRequest) {
 
     const events = await prisma.activity.findMany({
       where: {
-        ownerUserId: user.id,
         type: ActivityType.EVENT,
+        ...(user.role === "ADMIN" || user.role === "MODERATOR"
+          ? {}
+          : { ownerUserId: user.id }),
+        ...excludeDeletedEvents(),
+        ...excludeGhostEventDrafts(),
       },
       orderBy: {
         createdAt: "desc",

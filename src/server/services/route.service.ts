@@ -1,5 +1,10 @@
 import { prisma } from "@/lib/prisma";
 import type { RouteStatus, RouteVisibility, BudgetLevel } from "@prisma/client";
+import { getPublicPublishedPlaceWhere } from "@/server/public/publicContentVisibility";
+
+const publicRouteStopPlaceWhere = {
+  OR: [{ placeId: null }, { place: getPublicPublishedPlaceWhere() }],
+};
 
 export type RouteWithStops = {
   id: string;
@@ -76,6 +81,7 @@ export async function getRouteBySlug(slug: string): Promise<RouteWithStops | nul
       city: { select: { id: true, name: true } },
       author: { select: { id: true, email: true } },
       stops: {
+        where: publicRouteStopPlaceWhere,
         orderBy: { order: "asc" },
         include: { place: { select: { id: true, title: true, formattedAddr: true, shortAddress: true, city: { select: { name: true } } } } },
       },

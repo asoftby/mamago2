@@ -1,9 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { getCurrentUser } from "@/lib/auth/server";
+import { canManageSignalDefinitions } from "@/lib/auth/signalDefinitionsAdmin";
 
 export const runtime = "nodejs";
 
-export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) { 
+export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const user = await getCurrentUser();
+  if (!user || !canManageSignalDefinitions(user.role)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
   const { id } = await params;
   const body = await req.json(); 
   const label = String(body.label || "").trim(); 

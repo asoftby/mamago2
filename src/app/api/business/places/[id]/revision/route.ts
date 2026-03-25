@@ -8,6 +8,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
+import { canCreateBusinessContent } from "@/lib/auth/businessContentAccess";
 import {
   getOrCreatePlaceRevision,
   savePlaceRevisionDraft,
@@ -22,13 +23,13 @@ export async function GET(
     const { id: placeId } = await params;
     const user = await getCurrentUser();
 
-    if (!user || user.role !== "BUSINESS_OWNER") {
+    if (!user || !canCreateBusinessContent(user.role)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     // Get or create revision
     try {
-      const revision = await getOrCreatePlaceRevision(placeId, user.id);
+      const revision = await getOrCreatePlaceRevision(placeId, user);
       return NextResponse.json({ revision });
     } catch (serviceError) {
       const message = serviceError instanceof Error ? serviceError.message : "Failed to get revision";
@@ -63,7 +64,7 @@ export async function PATCH(
     const { id: placeId } = await params;
     const user = await getCurrentUser();
 
-    if (!user || user.role !== "BUSINESS_OWNER") {
+    if (!user || !canCreateBusinessContent(user.role)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -89,7 +90,7 @@ export async function PATCH(
       const updatedRevision = await savePlaceRevisionDraft(
         revisionId,
         data as PlaceRevisionData,
-        user.id
+        user
       );
       return NextResponse.json({ revision: updatedRevision });
     } catch (serviceError) {

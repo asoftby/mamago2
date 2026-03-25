@@ -1,8 +1,10 @@
 // Event Wizard Validation
 
 import type { EventFormData } from "./types";
+import { isValidE164Phone } from "@/lib/phone/e164";
 import { isRichTextMeaningful, getRichTextLength } from "@/lib/richtext/utils";
 import { DRAFT_REQUIRED, SUBMIT_REQUIRED } from "./types";
+import { isCinemaEventCategorySlug } from "@/lib/business/eventCategoryCinema";
 
 export interface ValidationResult {
   isValid: boolean;
@@ -21,8 +23,15 @@ export function validateForDraft(data: EventFormData): ValidationResult {
     errors.push("Укажите название события");
   }
   
-  if (data.categories.length === 0) {
-    errors.push("Выберите хотя бы одну категорию");
+  const selectedCategoryIds =
+    (Array.isArray(data.categoryIds) && data.categoryIds.length > 0
+      ? data.categoryIds
+      : data.categoryId
+        ? [data.categoryId]
+        : []);
+
+  if (selectedCategoryIds.length === 0) {
+    errors.push("Выберите категорию");
   }
   
   return {
@@ -72,20 +81,27 @@ function validateStep1(data: EventFormData): ValidationResult {
     errors.push("Название должно содержать минимум 3 символа");
   }
 
-  if (!data.activityType) {
-    warnings.push("Выберите тип активности");
+  if (data.eventFormats.length === 0) {
+    warnings.push("Выберите формат и атмосферу события");
   }
 
-  if (data.categories.length === 0) {
-    errors.push("Выберите хотя бы одну категорию");
+  const selectedCategoryIds =
+    (Array.isArray(data.categoryIds) && data.categoryIds.length > 0
+      ? data.categoryIds
+      : data.categoryId
+        ? [data.categoryId]
+        : []);
+
+  if (selectedCategoryIds.length === 0) {
+    errors.push("Выберите категорию");
   }
 
-  if (data.ageGroups.length === 0) {
+  if (data.ageRangeIds.length === 0) {
     warnings.push("Выберите возраст");
   }
 
-  // Cinema-specific validation
-  if (data.categories.includes("Кино")) {
+  // Cinema-specific validation (по slug выбранной категории)
+  if (isCinemaEventCategorySlug(data.categorySlug)) {
     if (data.cinemaTrailerUrl && !isValidUrl(data.cinemaTrailerUrl)) {
       errors.push("Некорректная ссылка на трейлер");
     }
@@ -93,9 +109,9 @@ function validateStep1(data: EventFormData): ValidationResult {
 
   const isComplete = 
     data.title.trim().length >= 3 &&
-    !!data.activityType &&
-    data.categories.length > 0 &&
-    data.ageGroups.length > 0;
+    data.eventFormats.length > 0 &&
+    selectedCategoryIds.length > 0 &&
+    data.ageRangeIds.length > 0;
 
   return {
     isValid: errors.length === 0,
@@ -283,15 +299,6 @@ function validateStep6(data: EventFormData): ValidationResult {
       }
     }
 
-    if (data.participationMode === "simple-booking") {
-      if (!data.simpleBookingDate) {
-        errors.push("Укажите дату события для записи");
-      }
-      if (!data.simpleBookingTime) {
-        warnings.push("Рекомендуется указать время события");
-      }
-    }
-
     if (data.participationMode === "time-slots") {
       const hasSlots = data.timeSlots?.dates?.some(d => d.slots.length > 0);
       if (!hasSlots) {
@@ -307,7 +314,6 @@ function validateStep6(data: EventFormData): ValidationResult {
     ((data.pricingMode === "fixed" || data.pricingMode === "from") ? data.price?.trim() : true) &&
     data.participationMode &&
     (data.participationMode === "external-link" ? data.ticketLink?.trim() : true) &&
-    (data.participationMode === "simple-booking" ? data.simpleBookingDate : true) &&
     (data.participationMode === "time-slots" ? data.timeSlots?.dates?.some(d => d.slots.length > 0) : true)
   );
 
@@ -327,18 +333,18 @@ function validateStep7(data: EventFormData): ValidationResult {
   const warnings: string[] = [];
 
   if (data.phone && !isValidPhone(data.phone)) {
-    errors.push("Некорректный номер телефона");
+    errors.push("Введите корректный номер телефона");
   }
 
   if (data.website && !isValidUrl(data.website)) {
     errors.push("Некорректная ссылка на сайт");
   }
 
-  // Validate social links
+  // Пустые строки (только платформа) не ошибка; проверяем только заполненные URL
   data.socialLinks.forEach((link, index) => {
-    if (!link.url || link.url.trim().length === 0) {
-      errors.push(`Соцсеть ${index + 1}: не указана ссылка`);
-    } else if (!isValidUrl(link.url)) {
+    const url = link.url?.trim() ?? "";
+    if (url.length === 0) return;
+    if (!isValidUrl(url)) {
       errors.push(`Соцсеть ${index + 1}: некорректная ссылка`);
     }
   });
@@ -371,7 +377,7 @@ function validateStep8(data: EventFormData): ValidationResult {
   }
 
   if (data.organizerPhone && !isValidPhone(data.organizerPhone)) {
-    warnings.push("Проверьте формат номера телефона");
+    warnings.push("Введите корректный номер телефона");
   }
 
   if (data.organizerWebsite && !isValidUrl(data.organizerWebsite)) {
@@ -429,7 +435,5 @@ function isValidUrl(url: string): boolean {
 }
 
 function isValidPhone(phone: string): boolean {
-  // Basic phone validation
-  const phoneRegex = /^[\d\s\+\-\(\)]+$/;
-  return phoneRegex.test(phone) && phone.replace(/\D/g, "").length >= 9;
+  return isValidE164Phone(phone);
 }

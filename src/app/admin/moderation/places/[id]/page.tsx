@@ -296,6 +296,14 @@ export default async function PlaceModerationPage({
                       Написать владельцу
                     </a>
                   </Button>
+
+                  <Button variant="secondary" asChild>
+                    <Link
+                      href={`/editor/place/${place.id}/edit?returnTo=${encodeURIComponent(`/admin/moderation/places/${place.id}`)}`}
+                    >
+                      Редактор карточки
+                    </Link>
+                  </Button>
                 </div>
               </div>
             </div>

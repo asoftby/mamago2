@@ -6,15 +6,24 @@
  * - unreadOnly: boolean (default: false)
  * - limit: number (default: 50)
  * - offset: number (default: 0)
+ * - stream: "user" | "business" — фильтр по потоку (личные / бизнес)
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
+import type { NotificationStreamFilter } from "@/server/services/notification.service";
 import {
   getUserNotifications,
   getUnreadNotifications,
   getUnreadCount,
 } from "@/server/services/notification.service";
+
+function parseStream(
+  raw: string | null,
+): NotificationStreamFilter | undefined {
+  if (raw === "user" || raw === "business") return raw;
+  return undefined;
+}
 
 export async function GET(req: NextRequest) {
   try {
@@ -27,15 +36,16 @@ export async function GET(req: NextRequest) {
     const unreadOnly = searchParams.get("unreadOnly") === "true";
     const limit = parseInt(searchParams.get("limit") || "50");
     const offset = parseInt(searchParams.get("offset") || "0");
+    const stream = parseStream(searchParams.get("stream"));
 
     let notifications;
     if (unreadOnly) {
-      notifications = await getUnreadNotifications(user.id);
+      notifications = await getUnreadNotifications(user.id, stream);
     } else {
-      notifications = await getUserNotifications(user.id, limit, offset);
+      notifications = await getUserNotifications(user.id, limit, offset, stream);
     }
 
-    const unreadCount = await getUnreadCount(user.id);
+    const unreadCount = await getUnreadCount(user.id, stream);
 
     return NextResponse.json({
       notifications,

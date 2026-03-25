@@ -36,7 +36,7 @@ export function parseDiscoveryState(
   params.forEach((value, key) => {
     if (key === "intent") return;
     
-    // Поддержка CSV (vibe=calm,active)
+    // Поддержка CSV (например: activity_type=calm,active)
     const values = value.split(",").map(v => v.trim()).filter(Boolean);
     if (values.length > 0) {
         if (!filters[key]) {

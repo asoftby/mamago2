@@ -1,45 +1,58 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { H1, H3, Label } from "@/components/ui/typography";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Trash2, Plus, Save } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+import { useAutoSlug } from "@/hooks/useAutoSlug";
+import { orderSignalDefinitionsForDisplay } from "@/lib/taxonomy/signalHierarchy";
+import { messageFromApiError } from "@/lib/admin/messageFromApiError";
+import {
+  DiscoveryTaxonomyPageShell,
+  DiscoveryTaxonomyPageHeader,
+  DiscoveryCreateCard,
+  DiscoveryParentSelector,
+  DiscoveryTitleSlugCreateRow,
+  DiscoveryTaxonomyTable,
+  DiscoveryEmptyState,
+  DiscoveryTableChevronCell,
+  discoveryTh,
+  discoveryTd,
+  discoveryTableRowClass,
+} from "@/components/admin/discovery";
+import { cn } from "@/lib/utils";
 
-type Option = {
-  id: string;
-  label: string;
-  value: string;
-  order: number;
-  isActive: boolean;
-};
+const adminFetch: RequestInit = { credentials: "include" };
 
-type Signal = {
+const EDIT_SIGNAL_HREF = (id: string) => `/admin/taxonomy/signals/${id}`;
+
+type SignalRow = {
   id: string;
   slug: string;
   title: string;
+  parentId: string | null;
+  parent: { id: string; title: string; slug: string } | null;
   order: number;
-  isActive: boolean;
-  options: Option[];
+  _count: { children: number; options: number };
 };
 
 export default function SignalsPage() {
-  const [signals, setSignals] = useState<Signal[]>([]);
+  const router = useRouter();
+  const [signals, setSignals] = useState<SignalRow[]>([]);
   const [loading, setLoading] = useState(true);
-  
-  // New Signal Form
-  const [newSlug, setNewSlug] = useState("");
-  const [newTitle, setNewTitle] = useState("");
+
+  const [createParentId, setCreateParentId] = useState<string | null>(null);
+  const newSignal = useAutoSlug("", "");
 
   const fetchSignals = async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/admin/signals");
+      const res = await fetch("/api/admin/signals", adminFetch);
       if (res.ok) {
         const data = await res.json();
         setSignals(data);
+      } else {
+        const err = await res.json().catch(() => ({}));
+        toast.error(messageFromApiError(err, res.status));
       }
     } finally {
       setLoading(false);
@@ -50,302 +63,142 @@ export default function SignalsPage() {
     fetchSignals();
   }, []);
 
+  const roots = useMemo(
+    () => signals.filter((s) => s.parentId == null),
+    [signals],
+  );
+
+  const ordered = useMemo(
+    () => orderSignalDefinitionsForDisplay(signals),
+    [signals],
+  );
+
+  const parentRootOptions = useMemo(
+    () => roots.map((r) => ({ id: r.id, label: r.title })),
+    [roots],
+  );
+
   const createSignal = async () => {
-    if (!newSlug || !newTitle) return;
+    if (!newSignal.source.trim()) {
+      toast.error("Укажите Title");
+      return;
+    }
     const res = await fetch("/api/admin/signals", {
+      ...adminFetch,
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ slug: newSlug, title: newTitle }),
+      body: JSON.stringify({
+        slug: newSignal.slug,
+        title: newSignal.source,
+        parentId: createParentId,
+      }),
     });
     if (res.ok) {
-      setNewSlug("");
-      setNewTitle("");
+      newSignal.hydrate("", "");
       fetchSignals();
+      toast.success("Сигнал создан");
+    } else {
+      const err = await res.json().catch(() => ({}));
+      toast.error(messageFromApiError(err, res.status));
     }
   };
 
-  const updateSignal = async (id: string, data: Partial<Signal>) => {
-    const res = await fetch(`/api/admin/signals/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
-    });
-    if (res.ok) fetchSignals();
-  };
-
-  const deleteSignal = async (id: string) => {
-    if (!confirm("Delete signal?")) return;
-    const res = await fetch(`/api/admin/signals/${id}`, {
-      method: "DELETE",
-    });
-    if (res.ok) fetchSignals();
-  };
-
-  const createOption = async (signalId: string, label: string, value: string) => {
-    const res = await fetch(`/api/admin/signals/${signalId}/options`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ label, value }),
-    });
-    if (res.ok) fetchSignals();
-  };
-
-  const updateOption = async (optionId: string, data: Partial<Option>) => {
-    const res = await fetch(`/api/admin/signal-options/${optionId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
-    });
-    if (res.ok) fetchSignals();
-  };
-
-  const deleteOption = async (optionId: string) => {
-    if (!confirm("Delete option?")) return;
-    const res = await fetch(`/api/admin/signal-options/${optionId}`, {
-      method: "DELETE",
-    });
-    if (res.ok) fetchSignals();
+  const goToEdit = (id: string) => {
+    router.push(EDIT_SIGNAL_HREF(id));
   };
 
   return (
-    <div className="p-6 md:p-4 space-y-6">
-      {/* AdminPageHeader */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl md:text-xl font-bold text-gray-900">Taxonomy: Signals</h1>
-        </div>
-      </div>
+    <DiscoveryTaxonomyPageShell>
+      <DiscoveryTaxonomyPageHeader
+        title="Taxonomy: Signals"
+        description="Два уровня: группа сигнала (Energy, Format, …) и значения внутри группы на странице редактирования. Под-сигнал можно создать только у корня. Откройте строку для настройки и опций."
+      />
 
-      {/* AdminPageContent */}
       <div className="space-y-6">
+        <DiscoveryCreateCard title="Create New Signal">
+          <DiscoveryParentSelector
+            label="Родительский сигнал"
+            helperText="Не выбрано — корневая группа; выбран корень — создаётся под-сигнал."
+            value={createParentId}
+            onChange={setCreateParentId}
+            roots={parentRootOptions}
+            emptyLabel="— Корневой сигнал —"
+          />
+          <DiscoveryTitleSlugCreateRow
+            titleLabel="Title"
+            auto={newSignal}
+            onCreate={createSignal}
+            titlePlaceholder="Например: Energy"
+            slugPlaceholder="energy"
+          />
+        </DiscoveryCreateCard>
 
-      {/* Create New Signal */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base font-semibold">Create New Signal</CardTitle>
-        </CardHeader>
-        <CardContent className="flex gap-4 items-end">
-          <div className="grid gap-2 flex-1">
-            <Label>Slug</Label>
-            <Input 
-              value={newSlug} 
-              onChange={(e) => setNewSlug(e.target.value)} 
-              placeholder="e.g. atmosphere" 
-            />
-          </div>
-          <div className="grid gap-2 flex-1">
-            <Label>Title</Label>
-            <Input 
-              value={newTitle} 
-              onChange={(e) => setNewTitle(e.target.value)} 
-              placeholder="e.g. Atmosphere" 
-            />
-          </div>
-          <Button onClick={createSignal}>
-            <Plus className="w-4 h-4 mr-2" />
-            Create
-          </Button>
-        </CardContent>
-      </Card>
-
-      {/* Signals List */}
-      <div className="space-y-4">
         {loading ? (
           <div className="text-sm text-gray-600">Loading...</div>
+        ) : ordered.length === 0 ? (
+          <DiscoveryEmptyState
+            title="Пока нет сигналов"
+            description="Создайте корневую группу сигнала или под-сигнал с помощью формы выше."
+          />
         ) : (
-          signals.map((signal) => (
-            <SignalCard
-              key={signal.id}
-              signal={signal}
-              onUpdate={updateSignal}
-              onDelete={deleteSignal}
-              onCreateOption={createOption}
-              onUpdateOption={updateOption}
-              onDeleteOption={deleteOption}
-            />
-          ))
+          <DiscoveryTaxonomyTable>
+            <thead className="bg-gray-50 border-b border-gray-200">
+              <tr>
+                <th className={discoveryTh()}>Название</th>
+                <th className={discoveryTh()}>Slug</th>
+                <th className={discoveryTh()}>Родитель</th>
+                <th className={discoveryTh("w-20")}>Порядок</th>
+                <th className={discoveryTh("w-24")}>Используется</th>
+                <th className="w-10 px-2 py-3" aria-hidden />
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200">
+              {ordered.map((s) => (
+                <tr
+                  key={s.id}
+                  role="link"
+                  tabIndex={0}
+                  className={discoveryTableRowClass(!!s.parentId)}
+                  onClick={() => goToEdit(s.id)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      goToEdit(s.id);
+                    }
+                  }}
+                >
+                  <td className={discoveryTd()}>
+                    <span
+                      className={cn(
+                        "inline-flex items-center gap-2",
+                        s.parentId && "pl-6 border-l-2 border-blue-300 ml-1",
+                      )}
+                    >
+                      {s.parentId ? (
+                        <span className="text-blue-500 text-xs font-mono" aria-hidden>
+                          └
+                        </span>
+                      ) : null}
+                      <span className="font-medium text-gray-900">{s.title}</span>
+                    </span>
+                  </td>
+                  <td className={cn(discoveryTd(), "font-mono text-xs text-gray-700")}>{s.slug}</td>
+                  <td className={discoveryTd("text-gray-600")}>
+                    {s.parent ? (
+                      <span>{s.parent.title}</span>
+                    ) : (
+                      <span className="text-gray-400">—</span>
+                    )}
+                  </td>
+                  <td className={discoveryTd("text-gray-600")}>{s.order}</td>
+                  <td className={discoveryTd("text-gray-600")}>{s._count.options}</td>
+                  <DiscoveryTableChevronCell />
+                </tr>
+              ))}
+            </tbody>
+          </DiscoveryTaxonomyTable>
         )}
       </div>
-      </div>
-    </div>
-  );
-}
-
-function SignalCard({ 
-  signal, 
-  onUpdate, 
-  onDelete, 
-  onCreateOption,
-  onUpdateOption,
-  onDeleteOption 
-}: { 
-  signal: Signal;
-  onUpdate: (id: string, data: Partial<Signal>) => void;
-  onDelete: (id: string) => void;
-  onCreateOption: (id: string, label: string, value: string) => void;
-  onUpdateOption: (id: string, data: Partial<Option>) => void;
-  onDeleteOption: (id: string) => void;
-}) {
-  const [title, setTitle] = useState(signal.title);
-  const [order, setOrder] = useState(signal.order);
-  const [isActive, setIsActive] = useState(signal.isActive);
-  
-  // New Option State
-  const [newOptLabel, setNewOptLabel] = useState("");
-  const [newOptValue, setNewOptValue] = useState("");
-
-  const handleSave = () => {
-    onUpdate(signal.id, { title, order, isActive });
-  };
-
-  const handleAddOption = () => {
-    if (!newOptLabel || !newOptValue) return;
-    onCreateOption(signal.id, newOptLabel, newOptValue);
-    setNewOptLabel("");
-    setNewOptValue("");
-  };
-
-  return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-base font-semibold font-mono text-gray-600">
-          {signal.slug}
-        </CardTitle>
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={() => onDelete(signal.id)}>
-            <Trash2 className="w-4 h-4 text-destructive" />
-          </Button>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        {/* Main Fields */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-          <div className="grid gap-2 md:col-span-2">
-            <Label>Title</Label>
-            <Input value={title} onChange={(e) => setTitle(e.target.value)} />
-          </div>
-          <div className="grid gap-2">
-            <Label>Order</Label>
-            <Input 
-              type="number" 
-              value={order} 
-              onChange={(e) => setOrder(Number(e.target.value))} 
-            />
-          </div>
-          <div className="flex items-center gap-4 pb-2">
-            <div className="flex items-center gap-2">
-              <Checkbox 
-                checked={isActive} 
-                onCheckedChange={(c) => setIsActive(!!c)} 
-              />
-              <Label>Active</Label>
-            </div>
-            <Button size="sm" onClick={handleSave}>
-              <Save className="w-4 h-4 mr-2" />
-              Save
-            </Button>
-          </div>
-        </div>
-
-        {/* Options Section */}
-        <div className="border border-gray-200 rounded-lg p-4 bg-gray-50 space-y-4">
-          <h3 className="text-sm font-semibold text-gray-700">Options</h3>
-          
-          <div className="space-y-2">
-            {signal.options.map((opt) => (
-              <OptionRow 
-                key={opt.id} 
-                option={opt} 
-                onUpdate={onUpdateOption} 
-                onDelete={onDeleteOption} 
-              />
-            ))}
-          </div>
-
-          {/* Add Option */}
-          <div className="flex gap-2 items-end pt-2 border-t">
-            <div className="grid gap-1 flex-1">
-              <Label className="text-xs">Label</Label>
-              <Input 
-                value={newOptLabel} 
-                onChange={(e) => setNewOptLabel(e.target.value)} 
-                placeholder="Label" 
-                className="h-8 text-sm"
-              />
-            </div>
-            <div className="grid gap-1 flex-1">
-              <Label className="text-xs">Value</Label>
-              <Input 
-                value={newOptValue} 
-                onChange={(e) => setNewOptValue(e.target.value)} 
-                placeholder="value" 
-                className="h-8 text-sm"
-              />
-            </div>
-            <Button size="sm" variant="secondary" onClick={handleAddOption}>
-              Add
-            </Button>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-function OptionRow({ 
-  option, 
-  onUpdate, 
-  onDelete 
-}: { 
-  option: Option;
-  onUpdate: (id: string, data: Partial<Option>) => void;
-  onDelete: (id: string) => void;
-}) {
-  const [label, setLabel] = useState(option.label);
-  const [value, setValue] = useState(option.value);
-  const [order, setOrder] = useState(option.order);
-  const [isActive, setIsActive] = useState(option.isActive);
-
-  const hasChanges = 
-    label !== option.label || 
-    value !== option.value || 
-    order !== option.order || 
-    isActive !== option.isActive;
-
-  const handleSave = () => {
-    onUpdate(option.id, { label, value, order, isActive });
-  };
-
-  return (
-    <div className="flex items-center gap-2 bg-background p-2 rounded border">
-      <Input 
-        value={label} 
-        onChange={(e) => setLabel(e.target.value)} 
-        className="h-8 text-sm flex-[2]" 
-      />
-      <Input 
-        value={value} 
-        onChange={(e) => setValue(e.target.value)} 
-        className="h-8 text-sm font-mono flex-[2]" 
-      />
-      <Input 
-        type="number" 
-        value={order} 
-        onChange={(e) => setOrder(Number(e.target.value))} 
-        className="h-8 text-sm w-16" 
-      />
-      <Checkbox 
-        checked={isActive} 
-        onCheckedChange={(c) => setIsActive(!!c)} 
-      />
-      {hasChanges && (
-        <Button size="icon-xs" onClick={handleSave}>
-          <Save className="w-3 h-3" />
-        </Button>
-      )}
-      <Button size="icon-xs" variant="ghost" onClick={() => onDelete(option.id)}>
-        <Trash2 className="w-3 h-3 text-muted-foreground hover:text-destructive" />
-      </Button>
-    </div>
+    </DiscoveryTaxonomyPageShell>
   );
 }

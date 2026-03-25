@@ -13,6 +13,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
 import { ActivityType, ScheduleMode, ContentStatus } from "@prisma/client";
+import { canCreateBusinessContent, canManageOwnedContent } from "@/lib/auth/businessContentAccess";
 
 /**
  * GET - Get activity details
@@ -24,7 +25,7 @@ export async function GET(
   try {
     const user = await getCurrentUser();
 
-    if (!user || user.role !== "BUSINESS_OWNER") {
+    if (!user || !canCreateBusinessContent(user.role)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -52,7 +53,7 @@ export async function GET(
     }
 
     // Check ownership
-    if (activity.ownerUserId !== user.id) {
+    if (!canManageOwnedContent(user, activity.ownerUserId)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
@@ -76,7 +77,7 @@ export async function PATCH(
   try {
     const user = await getCurrentUser();
 
-    if (!user || user.role !== "BUSINESS_OWNER") {
+    if (!user || !canCreateBusinessContent(user.role)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -92,7 +93,7 @@ export async function PATCH(
       return NextResponse.json({ error: "Activity not found" }, { status: 404 });
     }
 
-    if (existing.ownerUserId !== user.id) {
+    if (!canManageOwnedContent(user, existing.ownerUserId)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
@@ -175,7 +176,7 @@ export async function PATCH(
           return NextResponse.json({ error: "Place not found" }, { status: 404 });
         }
 
-        if (place.ownerUserId !== user.id) {
+        if (!canManageOwnedContent(user, place.ownerUserId)) {
           return NextResponse.json(
             { error: "You don't own this place" },
             { status: 403 }
@@ -222,7 +223,7 @@ export async function DELETE(
   try {
     const user = await getCurrentUser();
 
-    if (!user || user.role !== "BUSINESS_OWNER") {
+    if (!user || !canCreateBusinessContent(user.role)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -238,7 +239,7 @@ export async function DELETE(
       return NextResponse.json({ error: "Activity not found" }, { status: 404 });
     }
 
-    if (activity.ownerUserId !== user.id) {
+    if (!canManageOwnedContent(user, activity.ownerUserId)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 

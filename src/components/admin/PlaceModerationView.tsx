@@ -100,13 +100,22 @@ export function PlaceModerationView({ place }: PlaceModerationViewProps) {
     <div className="max-w-7xl mx-auto">
       {/* Header */}
       <div className="mb-6">
-        <Link
-          href="/admin/moderation/queue"
-          className="inline-flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 mb-4"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Back to queue
-        </Link>
+        <div className="mb-4 flex flex-wrap items-center gap-3">
+          <Link
+            href="/admin/moderation/queue"
+            className="inline-flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Back to queue
+          </Link>
+          <Button variant="outline" size="sm" asChild>
+            <Link
+              href={`/editor/place/${place.id}/edit?returnTo=${encodeURIComponent(`/admin/moderation/places/${place.id}`)}`}
+            >
+              Открыть в редакторе
+            </Link>
+          </Button>
+        </div>
         <h1 className="text-2xl font-bold text-gray-900">Place Moderation</h1>
       </div>
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -19,7 +19,7 @@ interface FilterOptionRowProps {
   option: Option;
   index: number;
   totalOptions: number;
-  onUpdate: (id: string, data: Partial<Option>) => void;
+  onUpdate: (id: string, data: Partial<Option>) => Promise<boolean>;
   onReorder: (id: string, direction: "UP" | "DOWN") => void;
   onDelete: (id: string) => void;
 }
@@ -32,6 +32,7 @@ export function FilterOptionRow({
   onReorder,
   onDelete,
 }: FilterOptionRowProps) {
+  const labelInputRef = useRef<HTMLInputElement>(null);
   const [label, setLabel] = useState(option.label);
   const [value, setValue] = useState(option.value);
   const [isActive, setIsActive] = useState(option.isActive);
@@ -45,9 +46,12 @@ export function FilterOptionRow({
     setIsDirty(false);
   }, [option.label, option.value, option.isActive]);
 
-  const handleSave = () => {
-    onUpdate(option.id, { label, value, isActive });
-    setIsDirty(false);
+  const handleSave = async () => {
+    const ok = await onUpdate(option.id, { label, value, isActive });
+    if (ok) {
+      setIsDirty(false);
+      labelInputRef.current?.focus();
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -91,6 +95,7 @@ export function FilterOptionRow({
       </div>
       
       <Input
+        ref={labelInputRef}
         className="w-[120px]"
         value={label}
         onChange={(e) => {
@@ -122,7 +127,7 @@ export function FilterOptionRow({
           onCheckedChange={(c) => {
             const newVal = !!c;
             setIsActive(newVal);
-            onUpdate(option.id, { isActive: newVal }); // Immediate update for checkbox
+            void onUpdate(option.id, { isActive: newVal });
           }}
         />
         

@@ -21,9 +21,9 @@ async function testEventWizardUI() {
   // Step 1: Basics
   console.log("Step 1: Основное");
   formData.title = "Мастер-класс по рисованию";
-  formData.activityType = "educational";
-  formData.categories = ["Мастер-класс"];
-  formData.ageGroups = ["3-7", "7-12"];
+  formData.eventFormats = ["educational"];
+  formData.categoryId = "cat-1";
+  formData.ageRangeIds = ["age-3-7", "age-7-12"];
   
   const step1Validation = validateStep(1, formData);
   console.log(`✅ Step 1 validation: ${step1Validation.isComplete ? "COMPLETE" : "INCOMPLETE"}`);
@@ -67,7 +67,7 @@ async function testEventWizardUI() {
   console.log("\nStep 6: Стоимость и запись");
   formData.pricingMode = "fixed";
   formData.price = "25";
-  formData.participationMode = "simple-booking";
+  formData.participationMode = "walk-in";
   formData.simpleBookingDate = "2026-03-20";
   
   const step6Validation = validateStep(6, formData);

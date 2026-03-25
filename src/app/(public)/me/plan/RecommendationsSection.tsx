@@ -47,6 +47,7 @@ function RecommendationCard({ activity, selectedDate, onAdded }: RecommendationC
           activityId: activity.id,
           title: activity.title,
           coverImageUrl: activity.image,
+          planAvailability: "missing_activity",
           activity: null,
         });
         setModalOpen(false);

@@ -25,6 +25,64 @@ import { FavoriteButton } from "@/components/ui/FavoriteButton";
 import { Chip } from "@/components/ui/Chip";
 import { ChipsRow } from "@/components/ui/chips-row";
 import { MediaCover } from "@/components/ui/media-cover";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { AGE_GROUPS } from "@/features/filters/age/ageGroups";
+
+function ChipsRowLabDemo() {
+  const [masonrySelected, setMasonrySelected] = React.useState<string[]>([]);
+  const masonryAgeItems = AGE_GROUPS.map((g) => ({
+    id: g.value,
+    label: g.label,
+    active: masonrySelected.includes(g.value),
+    onClick: () =>
+      setMasonrySelected((prev) =>
+        prev.includes(g.value) ? prev.filter((x) => x !== g.value) : [...prev, g.value],
+      ),
+  }));
+
+  return (
+    <Tabs defaultValue="masonry" className="w-full max-w-md">
+      <TabsList className="grid w-full grid-cols-3">
+        <TabsTrigger value="scroll">Scroll</TabsTrigger>
+        <TabsTrigger value="wrap">Wrap</TabsTrigger>
+        <TabsTrigger value="masonry">Masonry</TabsTrigger>
+      </TabsList>
+      <TabsContent value="scroll" className="mt-3">
+        <ChipsRow
+          aria-label="Пример scroll"
+          items={[
+            { id: "a", label: "0–1 год" },
+            { id: "b", label: "1–3 года", active: true },
+            { id: "c", label: "3–5 лет" },
+          ]}
+        />
+      </TabsContent>
+      <TabsContent value="wrap" className="mt-3">
+        <ChipsRow
+          layout="wrap"
+          aria-label="Пример wrap"
+          items={[
+            { id: "a", label: "0–1 год" },
+            { id: "b", label: "1–3 года", active: true },
+            { id: "c", label: "3–5 лет" },
+            { id: "d", label: "5–7 лет" },
+          ]}
+        />
+      </TabsContent>
+      <TabsContent value="masonry" className="mt-3">
+        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+          <div className="p-[15px]">
+            <ChipsRow
+              layout="masonry"
+              aria-label="Возраст детей"
+              items={masonryAgeItems}
+            />
+          </div>
+        </div>
+      </TabsContent>
+    </Tabs>
+  );
+}
 
 export function UiPrimitivesSection() {
   return (
@@ -178,12 +236,7 @@ export function UiPrimitivesSection() {
         </RenderSafe>
 
         <RenderSafe title="ChipsRow" file="src/components/ui/chips-row.tsx">
-          <ChipsRow 
-            items={[
-                {id: '1', label: 'Chip 1'}, 
-                {id: '2', label: 'Chip 2', active: true}
-            ]} 
-          />
+          <ChipsRowLabDemo />
         </RenderSafe>
 
         <RenderSafe title="MediaCover" file="src/components/ui/media-cover.tsx">

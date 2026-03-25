@@ -5,26 +5,30 @@ import { Badge } from "@/components/ui/badge";
 import { ContentStatus } from "@prisma/client";
 import { formatDistanceToNow } from "date-fns";
 import { ru } from "date-fns/locale";
+import { MODERATION_CONTENT_STATUS_CONFIG } from "@/lib/admin/moderationContentStatusBadges";
+import { getModerationFilterCities } from "@/lib/admin/moderationAdminQueries";
 import { PlacesFilters } from "./PlacesFilters";
 
-const STATUS_CONFIG = {
-  DRAFT: { label: "Черновик", variant: "secondary" as const, className: "" },
-  PENDING: { label: "На модерации", variant: "outline" as const, className: "bg-gray-100 text-gray-700 border-gray-200" },
-  PUBLISHED: { label: "Опубликовано", variant: "default" as const, className: "" },
-  NEEDS_REVISION: { label: "Требует правок", variant: "destructive" as const, className: "" },
-  REJECTED: { label: "Отклонено", variant: "destructive" as const, className: "" },
-};
+function parseContentStatusFilter(
+  raw: string | undefined,
+): ContentStatus | undefined {
+  if (!raw) return undefined;
+  return Object.values(ContentStatus).includes(raw as ContentStatus)
+    ? (raw as ContentStatus)
+    : undefined;
+}
 
 interface SearchParams {
-  status?: ContentStatus;
+  status?: string;
   cityId?: string;
 }
 
 async function getPlaces(params: SearchParams) {
   const where: any = {};
 
-  if (params.status) {
-    where.status = params.status;
+  const status = parseContentStatusFilter(params.status);
+  if (status) {
+    where.status = status;
   }
 
   if (params.cityId) {
@@ -58,18 +62,6 @@ async function getPlaces(params: SearchParams) {
   });
 
   return places;
-}
-
-async function getCities() {
-  return prisma.city.findMany({
-    select: {
-      id: true,
-      name: true,
-    },
-    orderBy: {
-      name: "asc",
-    },
-  });
 }
 
 function PlacesTable({ places }: { places: Awaited<ReturnType<typeof getPlaces>> }) {
@@ -108,7 +100,9 @@ function PlacesTable({ places }: { places: Awaited<ReturnType<typeof getPlaces>>
         </thead>
         <tbody className="divide-y divide-gray-200">
           {places.map((place) => {
-            const statusConfig = STATUS_CONFIG[place.status] || STATUS_CONFIG.DRAFT;
+            const statusConfig =
+              MODERATION_CONTENT_STATUS_CONFIG[place.status] ||
+              MODERATION_CONTENT_STATUS_CONFIG.DRAFT;
             
             // Extract street and house number from formattedAddr or customAddress
             const fullAddress = place.formattedAddr || place.customAddress || "";
@@ -166,7 +160,7 @@ export default async function PlacesListPage({
   
   const [places, cities] = await Promise.all([
     getPlaces(params),
-    getCities(),
+    getModerationFilterCities(),
   ]);
 
   return (

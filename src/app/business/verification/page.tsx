@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { getMyBusiness } from "@/server/business/getMyBusiness";
 import Link from "next/link";
 import { PrimaryButton } from "@/components/ui/PrimaryButton";
+import { VerificationPendingNextSteps } from "@/components/business/verification/VerificationPendingNextSteps";
 import { getEffectiveVerificationStatus } from "@/server/services/businessStatusMap";
 import prisma from "@/lib/prisma";
 
@@ -16,7 +17,7 @@ export default async function BusinessVerificationPage() {
   const user = await getCurrentUser();
   
   if (!user) {
-    redirect("/login?from=business");
+    redirect("/login");
   }
 
   // Check business exists
@@ -63,8 +64,9 @@ export default async function BusinessVerificationPage() {
   const lastReviewDate = business.reviewedAt || lastLog?.createdAt;
 
   return (
-    <div className="max-w-2xl mx-auto">
-      <div className="bg-white rounded-lg shadow p-8">
+    <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center px-4 py-12 sm:px-6 lg:px-8">
+      <div className="w-full max-w-2xl">
+        <div className="bg-white rounded-lg shadow p-8">
         {/* PENDING Status */}
         {isPending && (
           <>
@@ -257,6 +259,8 @@ export default async function BusinessVerificationPage() {
           </div>
         </div>
 
+        {isPending && <VerificationPendingNextSteps />}
+
         {/* Verification History (optional) */}
         {verificationLogs.length > 0 && (
           <div className="mt-8 border-t pt-6">
@@ -293,12 +297,18 @@ export default async function BusinessVerificationPage() {
           <div className="mt-6 text-center">
             <p className="text-sm text-gray-500">
               Нужна помощь?{" "}
-              <a href="mailto:support@mamago.by" className="text-primary hover:underline font-medium">
+              <a
+                href="https://t.me/shapovalovalexey"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary hover:underline font-medium"
+              >
                 Свяжитесь с поддержкой
               </a>
             </p>
           </div>
         )}
+        </div>
       </div>
     </div>
   );

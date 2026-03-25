@@ -7,12 +7,12 @@ export function SiteHeader() {
   return (
     <>
       {/* Desktop Header (lg and up) - Stable architecture: fixed height + SearchSurface */}
-      <div className="hidden lg:block">
+      <div className="m-0 hidden p-0 lg:block">
         <SiteHeaderShell />
       </div>
 
-      {/* Mobile Header (below lg, includes tablets) */}
-      <div className="block lg:hidden sticky top-0 z-50">
+      {/* Mobile Header (below lg) — glass + inline backdrop (см. SiteHeader.mobile) */}
+      <div className="block lg:hidden">
         <SiteHeaderMobile />
       </div>
     </>

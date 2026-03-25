@@ -6,6 +6,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { getPublicPublishedPlaceWhere } from "@/server/public/publicContentVisibility";
 
 export async function GET(request: NextRequest) {
   const q = request.nextUrl.searchParams.get("q")?.trim();
@@ -17,7 +18,7 @@ export async function GET(request: NextRequest) {
     const places = await prisma.place.findMany({
       where: {
         AND: [
-          { status: "PUBLISHED" },
+          getPublicPublishedPlaceWhere(),
           {
             OR: [
               { title: { contains: q, mode: "insensitive" } },

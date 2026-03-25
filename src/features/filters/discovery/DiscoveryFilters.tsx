@@ -339,13 +339,16 @@ export function DiscoveryFilters({
     );
   }
 
+  const desktopTriggerClass =
+    "flex-1 min-w-0 border-gray-200 bg-white hover:bg-gray-50";
+
   // DESKTOP - All filters use FilterFieldPill style
   return (
-    <div className="w-full flex gap-3 items-center py-1">
+    <div className="flex w-full items-center gap-3 rounded-2xl border border-gray-200 bg-white px-3 py-2 shadow-sm">
       {derived.isDirty && (
           <button
             onClick={actions.resetAll}
-            className="flex h-[40px] w-[40px] min-w-[40px] items-center justify-center rounded-full border bg-background hover:bg-muted/30 transition-all text-muted-foreground hover:text-foreground"
+            className="flex h-[40px] w-[40px] min-w-[40px] items-center justify-center rounded-full border border-gray-200 bg-white text-muted-foreground transition-all hover:bg-gray-50 hover:text-foreground"
             title="Сбросить все фильтры"
           >
             <X className="h-5 w-5" />
@@ -354,7 +357,7 @@ export function DiscoveryFilters({
       
       {/* When Select - using default trigger (already matches FilterFieldPill style) */}
       <WhenSelect 
-        className="flex-1 min-w-0" 
+        className={desktopTriggerClass}
         value={whenValue} 
         onChange={handleWhenChangeDesktop}
         uiMode="desktop"
@@ -368,11 +371,12 @@ export function DiscoveryFilters({
         values={applied.age} 
         onChange={handleAgeChange} 
         allowClear
-        className="flex-1 min-w-0" 
+        className={desktopTriggerClass}
         uiMode="desktop"
         variant="card"
         applyMode="manual"
         closeOnApply={true}
+        optionsLayout="masonry"
       />
 
       {/* Metro Select (SINGLE) - using default trigger (card variant matches FilterFieldPill) */}
@@ -382,7 +386,7 @@ export function DiscoveryFilters({
         value={applied.metro} 
         onChange={handleMetroChange} 
         allowClear
-        className="flex-1 min-w-0" 
+        className={desktopTriggerClass}
         uiMode="desktop"
         variant="card"
       />
@@ -394,7 +398,7 @@ export function DiscoveryFilters({
         value={applied.district} 
         onChange={handleDistrictChange} 
         allowClear
-        className="flex-1 min-w-0" 
+        className={desktopTriggerClass}
         uiMode="desktop"
         variant="card"
       />

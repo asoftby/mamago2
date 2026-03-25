@@ -6,6 +6,7 @@
 
 import prisma from "@/lib/prisma";
 import { BusinessVerificationStatus } from "@prisma/client";
+import { notifyAdminBusinessVerificationPending } from "@/lib/admin/notifyAdminBusinessVerification";
 
 /**
  * Submit business for verification
@@ -68,6 +69,20 @@ export async function submitForVerification(
       },
     }),
   ]);
+
+  const full = await prisma.business.findUnique({
+    where: { id: businessId },
+    include: { owner: { select: { email: true } } },
+  });
+  if (full) {
+    notifyAdminBusinessVerificationPending({
+      businessId: full.id,
+      name: full.name,
+      legalName: full.legalName,
+      unp: full.unp,
+      ownerEmail: full.owner.email,
+    });
+  }
 }
 
 /**
@@ -110,6 +125,10 @@ export async function approve(
         approvedAt: now,
         rejectedAt: null,
         isVerified: true,
+        /** Заявка одобрена — бизнес снова/впервые доступен пользователям сайта */
+        operationalStatus: "ACTIVE",
+        /** Legacy поле onboarding */
+        status: "APPROVED",
       },
     }),
 

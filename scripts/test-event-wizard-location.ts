@@ -31,9 +31,9 @@ console.log("\n2. Testing validation for different venue kinds...");
 const placeVenueData: EventFormData = {
   ...defaultData,
   title: "Test Event",
-  categories: ["Мастер-класс"],
-  ageGroups: ["3-7"],
-  activityType: "educational",
+  categoryId: "cat-1",
+  ageRangeIds: ["age-3-7"],
+  eventFormats: ["educational"],
   venueKind: "PLACE",
   placeId: "place-123",
 };
@@ -45,9 +45,9 @@ console.log("✅ PLACE venue validation:", placeValidation.isComplete ? "PASS" :
 const manualVenueData: EventFormData = {
   ...defaultData,
   title: "Test Event",
-  categories: ["Мастер-класс"],
-  ageGroups: ["3-7"],
-  activityType: "educational",
+  categoryId: "cat-1",
+  ageRangeIds: ["age-3-7"],
+  eventFormats: ["educational"],
   venueKind: "MANUAL",
   venueName: "Детский центр Песочница",
   address: "Притыцкого 12",
@@ -61,9 +61,9 @@ console.log("✅ MANUAL venue validation:", manualValidation.isComplete ? "PASS"
 const mobileVenueData: EventFormData = {
   ...defaultData,
   title: "Test Event",
-  categories: ["Мастер-класс"],
-  ageGroups: ["3-7"],
-  activityType: "educational",
+  categoryId: "cat-1",
+  ageRangeIds: ["age-3-7"],
+  eventFormats: ["educational"],
   venueKind: "MOBILE",
   venueNote: "Выезд в пределах Минска",
 };
@@ -75,9 +75,9 @@ console.log("✅ MOBILE venue validation:", mobileValidation.isComplete ? "PASS"
 const tbdVenueData: EventFormData = {
   ...defaultData,
   title: "Test Event",
-  categories: ["Мастер-класс"],
-  ageGroups: ["3-7"],
-  activityType: "educational",
+  categoryId: "cat-1",
+  ageRangeIds: ["age-3-7"],
+  eventFormats: ["educational"],
   venueKind: "TBD",
 };
 

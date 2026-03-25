@@ -82,7 +82,7 @@ export async function POST(req: NextRequest) {
     // Register in media library
     try {
       let sourceType: MediaSourceType = MediaSourceType.USER_UPLOAD;
-      if (user.role === "ADMIN") {
+      if (user.role === "ADMIN" || user.role === "MODERATOR") {
         sourceType = MediaSourceType.ADMIN_UPLOAD;
       } else if (user.role === "BUSINESS_OWNER") {
         sourceType = MediaSourceType.BUSINESS_UPLOAD;

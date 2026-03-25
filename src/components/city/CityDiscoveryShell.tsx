@@ -8,7 +8,10 @@ import { Intent } from "@/lib/intent";
 import { H1 } from "@/components/ui/typography";
 import { DISCOVERY_INTENT_CONFIG } from "@/lib/discovery/discoveryIntentConfig";
 import { formatCityTitle } from "@/lib/city/cityDisplayNames";
+import { useDiscoveryFilters } from "@/features/filters/discovery/filters.store";
+import { whenPresetPageTitleSuffix } from "@/features/filters/discovery/whenLabel";
 import type { MockRoute } from "@/mocks/routes.mock";
+import type { ActivityMock } from "@/mocks/activity.types";
 import Link from "next/link";
 import { Plus } from "lucide-react";
 
@@ -16,22 +19,28 @@ interface CityDiscoveryShellProps {
   city: string;
   intent: Intent;
   routesData?: MockRoute[];
+  /** Лента «Куда пойти»: реальные события + добор моков (с сервера) */
+  discoveryActivities?: ActivityMock[];
 }
 
 export function CityDiscoveryShell({
   city,
   intent,
   routesData,
+  discoveryActivities,
 }: CityDiscoveryShellProps) {
+  const { applied } = useDiscoveryFilters();
   const intentConfig = DISCOVERY_INTENT_CONFIG[intent];
-  const pageTitle = formatCityTitle(intentConfig.titleTemplate, city);
+  const pageTitle =
+    formatCityTitle(intentConfig.titleTemplate, city) +
+    whenPresetPageTitleSuffix(applied.whenPreset);
 
   // ── Routes intent ──────────────────────────────────────────────────────────
   if (intent === "routes") {
     const routes = routesData ?? [];
 
     return (
-      <main className="min-h-screen bg-background pb-20">
+      <main className="min-h-screen bg-white pb-20">
         <Container className="pt-6 space-y-6">
           <div className="flex items-start justify-between">
             <H1 className="px-1">{pageTitle}</H1>
@@ -65,7 +74,7 @@ export function CityDiscoveryShell({
   // ── Birthday: CTA block + activities ───────────────────────────────────────
   if (intent === "birthday") {
     return (
-      <main className="min-h-screen bg-background pb-20">
+      <main className="min-h-screen bg-white pb-20">
         <Container className="pt-10 space-y-6">
           <div className="space-y-4">
             <H1 className="px-1">{pageTitle}</H1>
@@ -95,12 +104,14 @@ export function CityDiscoveryShell({
 
   // ── Default: activities ────────────────────────────────────────────────────
   return (
-    <main className="min-h-screen bg-background pb-20">
+    <main className="min-h-screen bg-white pb-20">
       <Container className="pt-10 space-y-6">
         <div className="space-y-4">
           <H1 className="px-1">{pageTitle}</H1>
         </div>
-        <DiscoveryActivitiesGrid activities={MINSK_ACTIVITIES} />
+        <DiscoveryActivitiesGrid
+          activities={discoveryActivities ?? MINSK_ACTIVITIES}
+        />
       </Container>
     </main>
   );

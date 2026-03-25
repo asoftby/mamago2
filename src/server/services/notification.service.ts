@@ -5,7 +5,27 @@
  */
 
 import prisma from "@/lib/prisma";
+import type { Prisma } from "@prisma/client";
 import { NotificationType } from "@prisma/client";
+import {
+  NOTIFICATION_TYPES_BUSINESS,
+  NOTIFICATION_TYPES_USER,
+} from "@/lib/notifications/streamFilters";
+
+export type NotificationStreamFilter = "user" | "business";
+
+function mergeStreamFilter(
+  base: Prisma.NotificationWhereInput,
+  stream?: NotificationStreamFilter,
+): Prisma.NotificationWhereInput {
+  if (stream === "user") {
+    return { ...base, type: { in: NOTIFICATION_TYPES_USER } };
+  }
+  if (stream === "business") {
+    return { ...base, type: { in: NOTIFICATION_TYPES_BUSINESS } };
+  }
+  return base;
+}
 
 interface CreateNotificationParams {
   userId: string;
@@ -143,12 +163,18 @@ export async function notifyPlaceUpdateRejected(
 /**
  * Get unread notifications for a user
  */
-export async function getUnreadNotifications(userId: string) {
+export async function getUnreadNotifications(
+  userId: string,
+  stream?: NotificationStreamFilter,
+) {
   return prisma.notification.findMany({
-    where: {
-      userId,
-      isRead: false,
-    },
+    where: mergeStreamFilter(
+      {
+        userId,
+        isRead: false,
+      },
+      stream,
+    ),
     orderBy: {
       createdAt: "desc",
     },
@@ -158,11 +184,14 @@ export async function getUnreadNotifications(userId: string) {
 /**
  * Get all notifications for a user (paginated)
  */
-export async function getUserNotifications(userId: string, limit = 50, offset = 0) {
+export async function getUserNotifications(
+  userId: string,
+  limit = 50,
+  offset = 0,
+  stream?: NotificationStreamFilter,
+) {
   return prisma.notification.findMany({
-    where: {
-      userId,
-    },
+    where: mergeStreamFilter({ userId }, stream),
     orderBy: {
       createdAt: "desc",
     },
@@ -206,12 +235,18 @@ export async function markAllNotificationsAsRead(userId: string) {
 /**
  * Get unread notification count for a user
  */
-export async function getUnreadCount(userId: string): Promise<number> {
+export async function getUnreadCount(
+  userId: string,
+  stream?: NotificationStreamFilter,
+): Promise<number> {
   return prisma.notification.count({
-    where: {
-      userId,
-      isRead: false,
-    },
+    where: mergeStreamFilter(
+      {
+        userId,
+        isRead: false,
+      },
+      stream,
+    ),
   });
 }
 

@@ -2,6 +2,7 @@ import { getCurrentUser } from "@/lib/auth/server";
 import { redirect } from "next/navigation";
 import prisma from "@/lib/prisma";
 import { OffersList } from "./OffersList";
+import { canCreateBusinessContent, canManageOwnedContent } from "@/lib/auth/businessContentAccess";
 
 interface SearchParams {
   view?: "active" | "archived";
@@ -14,7 +15,7 @@ export default async function OffersPage({
 }) {
   const user = await getCurrentUser();
   
-  if (!user || user.role !== "BUSINESS_OWNER") {
+  if (!user || !canCreateBusinessContent(user.role)) {
     redirect("/business/login");
   }
 

@@ -5,6 +5,17 @@ import Link from "next/link";
 import { ContentStatusBadge } from "@/components/business/shared/ContentStatusBadge";
 import { Pencil, Archive, ArchiveRestore, Trash2, Calendar, MapPin } from "lucide-react";
 import { ContentStatus, ActivityType, ScheduleMode } from "@prisma/client";
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 interface Activity {
   id: string;
@@ -33,6 +44,19 @@ interface EventCardHorizontalProps {
   onUnarchive?: (id: string) => Promise<void>;
 }
 
+function deleteDialogCopy(status: ContentStatus): { title: string; description: string } {
+  if (status === ContentStatus.PUBLISHED) {
+    return {
+      title: "Удалить опубликованное событие?",
+      description: "Оно перестанет отображаться пользователям.",
+    };
+  }
+  return {
+    title: "Удалить событие?",
+    description: "Это действие нельзя отменить.",
+  };
+}
+
 export function EventCardHorizontal({
   activity,
   onDelete,
@@ -41,19 +65,20 @@ export function EventCardHorizontal({
 }: EventCardHorizontalProps) {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isArchiving, setIsArchiving] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
-  const coverImage = activity.images.find(img => img.id);
+  const coverImage = activity.images.find((img) => img.id);
 
-  const handleDelete = async () => {
-    if (!confirm("Вы уверены, что хотите удалить это событие?")) {
-      return;
-    }
+  const canDeleteEvent = activity.status !== ContentStatus.DELETED;
 
+  const handleConfirmDelete = async () => {
     setIsDeleting(true);
     try {
       await onDelete(activity.id);
+      setDeleteDialogOpen(false);
     } catch (error: any) {
       alert(error.message);
+    } finally {
       setIsDeleting(false);
     }
   };
@@ -82,10 +107,11 @@ export function EventCardHorizontal({
     }
   };
 
+  const deleteCopy = deleteDialogCopy(activity.status);
+
   return (
     <div className="bg-white rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow">
       <div className="flex gap-4">
-        {/* Cover Image */}
         {coverImage ? (
           <div className="flex-shrink-0 w-24 h-24 rounded-lg overflow-hidden bg-gray-100">
             <img
@@ -100,7 +126,6 @@ export function EventCardHorizontal({
           </div>
         )}
 
-        {/* Content */}
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-4 mb-2">
             <div className="flex-1">
@@ -121,22 +146,59 @@ export function EventCardHorizontal({
                 <span>{activity.place.title}</span>
               </div>
             )}
-            {activity.priceText && (
-              <span>{activity.priceText}</span>
-            )}
+            {activity.priceText && <span>{activity.priceText}</span>}
             {activity.priceFrom !== null && !activity.priceText && (
               <span>от {activity.priceFrom} BYN</span>
             )}
           </div>
 
-          {/* Actions */}
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-3">
             <Link
-              href={`/business/events/${activity.id}/edit`}
-              className="inline-flex items-center gap-1 px-3 py-1.5 text-sm text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors"
+              href={`/editor/event/${activity.id}/edit`}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors"
             >
-              <Pencil className="w-4 h-4" />
+              <Pencil className="w-4 h-4 shrink-0" />
+              Открыть в редакторе
             </Link>
+
+            {canDeleteEvent && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setDeleteDialogOpen(true)}
+                  disabled={isDeleting}
+                  className={cn(
+                    "inline-flex items-center justify-center rounded-md p-1.5 transition-colors",
+                    "text-gray-400 hover:text-red-600 hover:bg-red-50",
+                    "disabled:opacity-50 disabled:pointer-events-none"
+                  )}
+                  title="Удалить событие"
+                  aria-label="Удалить событие"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+
+                <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>{deleteCopy.title}</AlertDialogTitle>
+                      <AlertDialogDescription>{deleteCopy.description}</AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel disabled={isDeleting}>Отмена</AlertDialogCancel>
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        disabled={isDeleting}
+                        onClick={() => void handleConfirmDelete()}
+                      >
+                        {isDeleting ? "Удаление…" : "Удалить"}
+                      </Button>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </>
+            )}
 
             {onArchive && (
               <button
@@ -157,17 +219,6 @@ export function EventCardHorizontal({
                 title="Восстановить"
               >
                 <ArchiveRestore className="w-4 h-4" />
-              </button>
-            )}
-
-            {activity.status === "DRAFT" && (
-              <button
-                onClick={handleDelete}
-                disabled={isDeleting}
-                className="inline-flex items-center gap-1 px-3 py-1.5 text-sm text-red-600 hover:text-red-700 hover:bg-red-50 rounded-md transition-colors disabled:opacity-50"
-                title="Удалить"
-              >
-                <Trash2 className="w-4 h-4" />
               </button>
             )}
           </div>

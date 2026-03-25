@@ -6,8 +6,7 @@ export default async function BusinessEntryPage() {
   const user = await getCurrentUser();
 
   if (!user) {
-    // User is not authenticated - go to login with from=business
-    redirect("/login?from=business");
+    redirect("/login");
   }
 
   // User is authenticated - check if business exists

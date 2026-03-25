@@ -3,19 +3,29 @@
  * Business doesn't choose CTA manually - it's derived from interaction type
  */
 
-type ParticipationMode = "external-link" | "time-slots" | "simple-booking" | "request" | "info-only";
-type CTAType = "details" | "book" | "slot" | "buy" | "request";
+type ParticipationMode =
+  | "external-link"
+  | "time-slots"
+  | "simple-booking"
+  | "request"
+  | "info-only"
+  | "walk-in";
+
+type CTAType = "details" | "book" | "slot" | "buy" | "request" | "route";
 
 export function getCtaFromParticipationMode(participationMode: ParticipationMode): CTAType {
-  const mapping: Record<ParticipationMode, CTAType> = {
-    "external-link": "buy",        // Купить билет
-    "time-slots": "slot",          // Выбрать время
-    "simple-booking": "book",      // Записаться
-    "request": "request",          // Оставить заявку
-    "info-only": "details",        // Подробнее
-  };
-
-  return mapping[participationMode] || "details";
+  if (participationMode === "external-link") return "buy";
+  if (participationMode === "time-slots") return "slot";
+  // «Узнать подробнее» и все legacy-режимы → основная CTA «Подробнее»
+  if (
+    participationMode === "walk-in" ||
+    participationMode === "request" ||
+    participationMode === "info-only" ||
+    participationMode === "simple-booking"
+  ) {
+    return "details";
+  }
+  return "details";
 }
 
 export function getCtaLabel(ctaType: CTAType): string {
@@ -25,6 +35,7 @@ export function getCtaLabel(ctaType: CTAType): string {
     slot: "Выбрать время",
     buy: "Купить билет",
     request: "Оставить заявку",
+    route: "Проложить маршрут",
   };
 
   return labels[ctaType] || "Подробнее";

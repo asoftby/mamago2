@@ -17,7 +17,7 @@ export default async function BillingDepositPage() {
   const user = await getCurrentUser();
   
   if (!user) {
-    redirect("/login?from=business");
+    redirect("/login");
   }
 
   const deposit = mockDeposit;

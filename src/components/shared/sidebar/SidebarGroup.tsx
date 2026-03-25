@@ -36,11 +36,12 @@ export function SidebarGroup({
             : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
         )}
       >
-        <div className="relative flex flex-col items-center">
+        <div className="relative flex flex-col items-center flex-shrink-0">
           {hasAttention && (
-            <span 
+            <span
               className="mb-[3px] w-1 h-1 bg-red-500 rounded-full flex-shrink-0"
-              title="Items require review"
+              title="Требуется внимание"
+              aria-hidden
             />
           )}
           <Icon className="w-5 h-5 flex-shrink-0" />

@@ -4,44 +4,58 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
 import { ru } from "date-fns/locale";
-import { CheckCheck, ExternalLink } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Bell } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
-
-interface Notification {
-  id: string;
-  type: string;
-  title: string;
-  message: string;
-  entityType: string | null;
-  entityId: string | null;
-  isRead: boolean;
-  createdAt: string;
-}
+import {
+  getNotificationHref,
+  getNotificationStreamFromType,
+} from "@/lib/notifications/routing";
+import type { NotificationApiRow } from "@/lib/notifications/types";
+import { cn } from "@/lib/utils";
 
 interface NotificationListProps {
   onNotificationRead?: () => void;
   onClose?: () => void;
   showViewAll?: boolean;
+  viewAllHref?: string;
+  /** Фильтр по потоку (личные / бизнес); без значения — все типы */
+  stream?: "user" | "business";
+  /** Разделы «Для вас» / «Бизнес» (только при stream не задан и grouped) */
+  grouped?: boolean;
+  /** Встроенный заголовок «Уведомления» (для полноэкранной страницы — false) */
+  showHeader?: boolean;
+  /** Ограничение высоты списка (например на странице /notifications) */
+  listClassName?: string;
+}
+
+function isBusinessNotificationRow(row: NotificationApiRow): boolean {
+  return getNotificationStreamFromType(row.type) === "BUSINESS";
 }
 
 export function NotificationList({
   onNotificationRead,
   onClose,
   showViewAll = true,
+  viewAllHref = "/business/notifications",
+  stream,
+  grouped = false,
+  showHeader = true,
+  listClassName,
 }: NotificationListProps) {
-  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [notifications, setNotifications] = useState<NotificationApiRow[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetchNotifications();
-  }, []);
+  }, [stream]);
 
   const fetchNotifications = async () => {
     try {
       setLoading(true);
-      const res = await fetch("/api/notifications?limit=10");
+      const params = new URLSearchParams({ limit: "20" });
+      if (stream) params.set("stream", stream);
+      const res = await fetch(`/api/notifications?${params.toString()}`);
       if (res.ok) {
         const data = await res.json();
         setNotifications(data.notifications || []);
@@ -61,11 +75,10 @@ export function NotificationList({
       });
 
       if (res.ok) {
-        // Update local state
         setNotifications((prev) =>
           prev.map((n) =>
-            n.id === notificationId ? { ...n, isRead: true } : n
-          )
+            n.id === notificationId ? { ...n, isRead: true } : n,
+          ),
         );
         onNotificationRead?.();
       }
@@ -74,18 +87,11 @@ export function NotificationList({
     }
   };
 
-  const handleNotificationClick = (notification: Notification) => {
+  const handleNotificationClick = (notification: NotificationApiRow) => {
     if (!notification.isRead) {
       markAsRead(notification.id);
     }
     onClose?.();
-  };
-
-  const getNotificationLink = (notification: Notification): string | null => {
-    if (notification.entityType === "PLACE" && notification.entityId) {
-      return `/business/places/${notification.entityId}/edit`;
-    }
-    return null;
   };
 
   const getNotificationIcon = (type: string): string => {
@@ -107,11 +113,37 @@ export function NotificationList({
     }
   };
 
+  const renderRow = (notification: NotificationApiRow) => {
+    const link = getNotificationHref(notification);
+    const icon = getNotificationIcon(notification.type);
+
+    return (
+      <div
+        key={notification.id}
+        className={`p-4 hover:bg-gray-50 transition-colors ${
+          !notification.isRead ? "bg-blue-50" : "bg-white"
+        }`}
+      >
+        {link ? (
+          <Link
+            href={link}
+            onClick={() => handleNotificationClick(notification)}
+            className="block"
+          >
+            <NotificationContent notification={notification} icon={icon} />
+          </Link>
+        ) : (
+          <div onClick={() => handleNotificationClick(notification)}>
+            <NotificationContent notification={notification} icon={icon} />
+          </div>
+        )}
+      </div>
+    );
+  };
+
   if (loading) {
     return (
-      <div className="p-4 text-center text-sm text-gray-500">
-        Загрузка...
-      </div>
+      <div className="p-4 text-center text-sm text-gray-500">Загрузка...</div>
     );
   }
 
@@ -119,63 +151,71 @@ export function NotificationList({
     return (
       <div className="p-8 text-center bg-white">
         <Bell className="w-12 h-12 mx-auto text-gray-300 mb-3" />
-        <p className="text-sm text-gray-500">Нет уведомлений</p>
+        <p className="text-sm text-gray-500">Пока нет уведомлений</p>
       </div>
     );
   }
 
+  const userSection =
+    grouped && !stream
+      ? notifications.filter((n) => !isBusinessNotificationRow(n))
+      : notifications;
+  const businessSection =
+    grouped && !stream
+      ? notifications.filter((n) => isBusinessNotificationRow(n))
+      : [];
+
   return (
-    <div className="flex flex-col max-h-[500px] bg-white">
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b bg-white">
-        <h3 className="font-semibold text-gray-900">Уведомления</h3>
-        {showViewAll && (
-          <Link
-            href="/business/notifications"
-            className="text-xs text-blue-600 hover:text-blue-700"
-            onClick={onClose}
-          >
-            Все уведомления
-          </Link>
-        )}
-      </div>
-
-      {/* Notifications List */}
-      <ScrollArea className="flex-1 bg-white">
-        <div className="divide-y bg-white">{notifications.map((notification) => {
-            const link = getNotificationLink(notification);
-            const icon = getNotificationIcon(notification.type);
-
-            return (
-              <div
-                key={notification.id}
-                className={`p-4 hover:bg-gray-50 transition-colors ${
-                  !notification.isRead ? "bg-blue-50" : "bg-white"
-                }`}
-              >
-                {link ? (
-                  <Link
-                    href={link}
-                    onClick={() => handleNotificationClick(notification)}
-                    className="block"
-                  >
-                    <NotificationContent
-                      notification={notification}
-                      icon={icon}
-                    />
-                  </Link>
-                ) : (
-                  <div onClick={() => handleNotificationClick(notification)}>
-                    <NotificationContent
-                      notification={notification}
-                      icon={icon}
-                    />
-                  </div>
-                )}
-              </div>
-            );
-          })}
+    <div
+      className={cn(
+        "flex flex-col max-h-[500px] bg-white",
+        listClassName,
+      )}
+    >
+      {showHeader && (
+        <div className="flex items-center justify-between px-4 py-3 border-b bg-white">
+          <h3 className="font-semibold text-gray-900">Уведомления</h3>
+          {showViewAll && (
+            <Link
+              href={viewAllHref}
+              className="text-xs text-blue-600 hover:text-blue-700"
+              onClick={onClose}
+            >
+              Все уведомления
+            </Link>
+          )}
         </div>
+      )}
+
+      <ScrollArea className="flex-1 bg-white">
+        {grouped && !stream ? (
+          <div className="divide-y divide-gray-100">
+            <div>
+              <p className="px-4 py-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                Для вас
+              </p>
+              {userSection.length === 0 ? (
+                <p className="px-4 pb-3 text-sm text-gray-400">Пока пусто</p>
+              ) : (
+                userSection.map((n) => renderRow(n))
+              )}
+            </div>
+            <div>
+              <p className="px-4 py-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                Бизнес
+              </p>
+              {businessSection.length === 0 ? (
+                <p className="px-4 pb-3 text-sm text-gray-400">Пока пусто</p>
+              ) : (
+                businessSection.map((n) => renderRow(n))
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="divide-y bg-white">
+            {notifications.map((n) => renderRow(n))}
+          </div>
+        )}
       </ScrollArea>
     </div>
   );
@@ -185,7 +225,7 @@ function NotificationContent({
   notification,
   icon,
 }: {
-  notification: Notification;
+  notification: NotificationApiRow;
   icon: string;
 }) {
   return (
@@ -213,6 +253,3 @@ function NotificationContent({
     </div>
   );
 }
-
-// Import Bell icon for empty state
-import { Bell } from "lucide-react";

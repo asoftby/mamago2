@@ -1,24 +1,44 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, Send, Save } from "lucide-react";
 import { toast } from "sonner";
+import {
+  FormWizardShell,
+  FormWizardHeader,
+  FormStepSegments,
+  FormPrimaryContentCard,
+  FormStickyActionBar,
+  formWizardPhaseFromFlags,
+} from "@/components/form-shell";
+import { getBusinessFormActionLabels, businessFormCopy } from "../businessFormLabels";
+import { canPublishContentDirectly } from "@/lib/auth/businessContentAccess";
 import { useWizardSession } from "@/hooks/useWizardSession";
 
 import type { OfferFormData, OfferWizardMode } from "./types";
 import { getDefaultFormData, hasMeaningfulContent, determineIntent, suggestCTAType } from "./defaults";
 import { validateStep, validateForSubmit } from "./validation";
-import { OFFER_WIZARD_STEPS, getStepLabel, TOTAL_CONTENT_STEPS } from "./offerWizardSteps.config";
+import { OFFER_WIZARD_STEPS, getStepLabel, TOTAL_CONTENT_STEPS as OFFER_TOTAL_CONTENT_STEPS } from "./offerWizardSteps.config";
+import {
+  buildOfferCreatePayload,
+  buildOfferUpdatePayload,
+  mapOfferToFormData,
+} from "./mappers";
 
 import { Step8Review } from "./steps/Step8Review";
+import type { Role } from "@prisma/client";
+import {
+  defaultEditorNav,
+  editorOfferEditHref,
+  type ContentEditorNav,
+  type ContentEditorSurface,
+} from "@/lib/content-editor/types";
 
 interface OfferWizardProps {
   mode: OfferWizardMode;
   offer?: any; // Offer entity for edit mode
   userId: string;
-  userRole?: "BUSINESS_OWNER" | "ADMIN" | "MODERATOR";
+  userRole?: Role;
   business?: {
     id: string;
     name: string;
@@ -28,21 +48,42 @@ interface OfferWizardProps {
     logoUrl?: string;
   };
   onComplete?: (offerId: string) => void;
+  /** Required for create — place to attach the offer (query or first owned place). */
+  defaultPlaceId?: string | null;
+  editorSurface?: ContentEditorSurface;
+  contentEditorNav?: Partial<ContentEditorNav>;
+  returnTo?: string;
 }
 
 const LOCAL_STORAGE_KEY = "offer-wizard-draft";
-const TOTAL_STEPS = TOTAL_CONTENT_STEPS + 1; // Content steps + review step
+const TOTAL_STEPS = OFFER_TOTAL_CONTENT_STEPS + 1; // Content steps + review step
 
-export function OfferWizard({ mode, offer, userId, userRole, business, onComplete }: OfferWizardProps) {
+export function OfferWizard({
+  mode,
+  offer,
+  userId,
+  userRole,
+  business,
+  onComplete,
+  defaultPlaceId,
+  editorSurface,
+  contentEditorNav,
+  returnTo,
+}: OfferWizardProps) {
   const router = useRouter();
+  const surface: ContentEditorSurface = editorSurface ?? "business";
+  const nav: ContentEditorNav = {
+    ...defaultEditorNav(surface, "offer"),
+    ...contentEditorNav,
+  };
+  const afterSubmitDestination = returnTo ?? nav.afterSubmitListPath;
   const [currentStep, setCurrentStep] = useState(1);
   const [offerId, setOfferId] = useState<string | null>(
     mode === "edit" && offer ? offer.id : null
   );
   const [formData, setFormData] = useState<OfferFormData>(() => {
     if (mode === "edit" && offer) {
-      // TODO: Add mapOfferToFormData function
-      return getDefaultFormData();
+      return mapOfferToFormData(offer);
     }
     
     // Always start with defaults to prevent hydration mismatch
@@ -149,11 +190,18 @@ export function OfferWizard({ mode, offer, userId, userRole, business, onComplet
     setIsSaving(true);
     
     try {
-      // TODO: Add buildOfferPayload function
-      const payload = formData;
-      
+      const placeId =
+        mode === "edit" && offer?.placeId
+          ? offer.placeId
+          : defaultPlaceId ?? undefined;
+
+      if (mode === "create" && !placeId) {
+        toast.error("Не выбрано место для предложения");
+        return;
+      }
+
       if (offerId) {
-        // Update existing draft
+        const payload = buildOfferUpdatePayload(formData);
         const response = await fetch(`/api/business/offers/${offerId}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
@@ -165,11 +213,16 @@ export function OfferWizard({ mode, offer, userId, userRole, business, onComplet
           throw new Error(error.error || "Failed to update draft");
         }
       } else {
-        // Create new draft
+        if (!placeId) {
+          toast.error("Не выбрано место для предложения");
+          return;
+        }
         const response = await fetch("/api/business/offers", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
+          body: JSON.stringify(
+            buildOfferCreatePayload(formData, placeId, { status: "DRAFT" })
+          ),
         });
         
         if (!response.ok) {
@@ -178,10 +231,13 @@ export function OfferWizard({ mode, offer, userId, userRole, business, onComplet
         }
         
         const data = await response.json();
-        setOfferId(data.offer.id);
+        setOfferId(data.id);
         
-        // Switch to edit mode
-        router.replace(`/business/offers/${data.offer.id}/edit`);
+        if (onComplete) {
+          onComplete(data.id);
+        } else {
+          router.push(editorOfferEditHref(data.id));
+        }
       }
       
       toast.success("Черновик сохранен");
@@ -212,14 +268,28 @@ export function OfferWizard({ mode, offer, userId, userRole, business, onComplet
     setIsSubmitting(true);
     
     try {
-      // First save as draft if not saved yet
+      const placeId =
+        mode === "edit" && offer?.placeId
+          ? offer.placeId
+          : defaultPlaceId ?? undefined;
+
+      if (mode === "create" && !placeId) {
+        toast.error("Не выбрано место для предложения");
+        return;
+      }
+
       if (!offerId) {
-        // TODO: Add buildOfferPayload function
-        const payload = formData;
+        if (!placeId) {
+          toast.error("Не выбрано место для предложения");
+          return;
+        }
+        const finalStatus = canPublishContentDirectly(userRole) ? "PUBLISHED" : "PENDING";
         const createResponse = await fetch("/api/business/offers", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
+          body: JSON.stringify(
+            buildOfferCreatePayload(formData, placeId, { status: finalStatus })
+          ),
         });
         
         if (!createResponse.ok) {
@@ -228,36 +298,54 @@ export function OfferWizard({ mode, offer, userId, userRole, business, onComplet
         }
         
         const createData = await createResponse.json();
-        setOfferId(createData.offer.id);
+        setOfferId(createData.id);
         
-        // Submit the newly created offer
-        const submitResponse = await fetch(`/api/business/offers/${createData.offer.id}/submit`, {
-          method: "POST",
-        });
+        toast.success(
+          finalStatus === "PUBLISHED"
+            ? "Предложение опубликовано"
+            : "Предложение отправлено на модерацию",
+        );
         
-        if (!submitResponse.ok) {
-          const error = await submitResponse.json();
-          throw new Error(error.error || "Failed to submit offer");
+        if (mode === "create" && typeof window !== "undefined") {
+          localStorage.removeItem(LOCAL_STORAGE_KEY);
         }
-      } else {
-        // Submit existing draft
-        const response = await fetch(`/api/business/offers/${offerId}/submit`, {
-          method: "POST",
-        });
         
-        if (!response.ok) {
-          const error = await response.json();
-          throw new Error(error.error || "Failed to submit offer");
+        if (onComplete) {
+          onComplete(createData.id);
+        } else {
+          router.push(afterSubmitDestination);
         }
+        return;
       }
+
+      const response = await fetch(`/api/business/offers/${offerId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(buildOfferUpdatePayload(formData, { status: "PENDING" })),
+      });
       
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to submit offer");
+      }
+
       toast.success("Предложение отправлено на модерацию");
       
       if (mode === "create" && typeof window !== "undefined") {
         localStorage.removeItem(LOCAL_STORAGE_KEY);
       }
       
-      router.push("/business/offers");
+      if (onComplete) {
+        onComplete(offerId);
+      } else if (mode === "create") {
+        router.push(afterSubmitDestination);
+      } else if (returnTo) {
+        router.push(returnTo);
+      } else if (surface === "admin") {
+        router.push(nav.afterSubmitListPath);
+      } else {
+        router.refresh();
+      }
     } catch (error: any) {
       console.error("Submit error:", error);
       toast.error(error.message || "Ошибка отправки");
@@ -298,118 +386,68 @@ export function OfferWizard({ mode, offer, userId, userRole, business, onComplet
 
   const canNext = currentStep < TOTAL_STEPS;
   const canPrev = currentStep > 1;
-  const isReviewStep = currentStep === 8;
+  const isReviewStep = currentStep === TOTAL_STEPS;
+
+  const submitValidation =
+    currentStep === TOTAL_STEPS ? validateForSubmit(formData) : { isValid: true };
+
+  const segments = useMemo(
+    () => [
+      ...OFFER_WIZARD_STEPS.map((s) => ({ id: s.id, title: s.title })),
+      { id: TOTAL_STEPS, title: businessFormCopy.reviewStepShortTitle },
+    ],
+    []
+  );
+
+  const phase = formWizardPhaseFromFlags({ isSaving, isSubmitting });
+
+  const actionLabels = useMemo(
+    () => getBusinessFormActionLabels(userRole),
+    [userRole],
+  );
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white border-b sticky top-0 z-10">
-        <div className="max-w-4xl mx-auto px-6 py-4">
-          <div className="mb-4">
-            <div className="flex items-center justify-between mb-2">
-              <h1 className="text-2xl font-bold">
-                {mode === "create" ? "Новое предложение" : "Редактирование предложения"}
-              </h1>
-              {lastSaved && (
-                <div className="text-xs text-muted-foreground">
-                  Сохранено {lastSaved.toLocaleTimeString()}
-                </div>
-              )}
-            </div>
-            <div className="flex items-center justify-between">
-              <p className="text-sm text-muted-foreground">
-                Шаг {currentStep} из {TOTAL_STEPS}: {getStepLabel(currentStep)}
-              </p>
-            </div>
-          </div>
-          
-          {/* Step Progress with Navigation */}
-          <div className="space-y-3">
-            <div className="flex gap-2">
-              {/* Content steps from config */}
-              {OFFER_WIZARD_STEPS.map((step) => (
-                <button
-                  key={step.id}
-                  onClick={() => handleGoToStep(step.id)}
-                  className={`flex-1 h-2 rounded-full transition-colors ${
-                    step.id === currentStep
-                      ? "bg-primary"
-                      : step.id < currentStep
-                      ? "bg-primary/50"
-                      : "bg-gray-200"
-                  }`}
-                  title={step.title}
-                />
-              ))}
-              {/* Review step */}
-              <button
-                onClick={() => handleGoToStep(TOTAL_STEPS)}
-                className={`flex-1 h-2 rounded-full transition-colors ${
-                  TOTAL_STEPS === currentStep
-                    ? "bg-primary"
-                    : TOTAL_STEPS < currentStep
-                    ? "bg-primary/50"
-                    : "bg-gray-200"
-                }`}
-                title="Проверка"
-              />
-            </div>
-            
-            {/* Navigation Buttons */}
-            <div className="flex items-center justify-between pt-2">
-              <div>
-                {canPrev && (
-                  <Button
-                    variant="outline"
-                    onClick={handlePrev}
-                    disabled={isSaving || isSubmitting}
-                  >
-                    <ChevronLeft className="w-4 h-4 mr-2" />
-                    Назад
-                  </Button>
-                )}
-              </div>
+    <FormWizardShell>
+      <FormWizardHeader
+        title={
+          mode === "create"
+            ? businessFormCopy.offer.createTitle
+            : businessFormCopy.offer.editTitle
+        }
+        subtitle={businessFormCopy.stepSubtitle(
+          currentStep,
+          TOTAL_STEPS,
+          currentStep === TOTAL_STEPS
+            ? businessFormCopy.reviewStepShortTitle
+            : getStepLabel(currentStep)
+        )}
+        trailing={lastSaved ? businessFormCopy.savedAt(lastSaved) : undefined}
+      >
+        <FormStepSegments
+          segments={segments}
+          currentStep={currentStep}
+          onStepClick={handleGoToStep}
+        />
+      </FormWizardHeader>
 
-              <div className="flex gap-3">
-                {isReviewStep ? (
-                  <>
-                    <Button
-                      variant="outline"
-                      onClick={handleSaveDraft}
-                      disabled={isSaving || isSubmitting}
-                    >
-                      <Save className="w-4 h-4 mr-2" />
-                      {isSaving ? "Сохранение..." : "Сохранить черновик"}
-                    </Button>
-                    <Button
-                      onClick={handleSubmit}
-                      disabled={isSubmitting || isSaving}
-                    >
-                      <Send className="w-4 h-4 mr-2" />
-                      {isSubmitting ? "Отправка..." : "Отправить на модерацию"}
-                    </Button>
-                  </>
-                ) : (
-                  <Button
-                    onClick={handleNext}
-                    disabled={!canNext || isSaving || isSubmitting}
-                  >
-                    Далее
-                    <ChevronRight className="w-4 h-4 ml-2" />
-                  </Button>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+      <FormPrimaryContentCard>{renderStep()}</FormPrimaryContentCard>
 
-      {/* Content */}
-      <div className="max-w-4xl mx-auto px-6 py-8">
-        <div className="bg-white rounded-lg border p-8">
-          {renderStep()}
-        </div>
-      </div>
-    </div>
+      <FormStickyActionBar
+        phase={phase}
+        labels={actionLabels}
+        showBack={canPrev}
+        onBack={handlePrev}
+        showSaveDraft={isReviewStep}
+        onSaveDraft={isReviewStep ? handleSaveDraft : undefined}
+        saveDraftDisabled={isSaving || isSubmitting}
+        isReviewStep={isReviewStep}
+        onContinue={!isReviewStep ? handleNext : undefined}
+        continueDisabled={!canNext || isSaving || isSubmitting}
+        onSubmit={isReviewStep ? handleSubmit : undefined}
+        submitDisabled={
+          isSubmitting || isSaving || !submitValidation.isValid
+        }
+      />
+    </FormWizardShell>
   );
 }

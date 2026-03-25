@@ -6,11 +6,12 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Loader2, CheckCircle2, AlertCircle, MapPinIcon } from "lucide-react";
+import { Loader2, CheckCircle2, AlertCircle, MapPinIcon, ChevronDown } from "lucide-react";
 import { EventLocationSearchInput } from "./EventLocationSearchInput";
 import { EventLocationMapPreview } from "./EventLocationMapPreview";
 import { EventLocationMapModal } from "./EventLocationMapModal";
 import { formatDistance } from "@/lib/formatDistance";
+import { nativeSelectFieldClassName } from "@/components/ui/native-select-classes";
 import { loadDistricts, loadMetroStations, enrichEventLocation } from "./eventLocationUtils";
 import type { EventFormData } from "../../types";
 
@@ -135,7 +136,7 @@ export function EventLocationPicker({
     lat: number;
     lng: number;
     formattedAddr: string;
-    addressJson: any[];
+    addressJson: unknown[];
   }) => {
     setIsSaving(true);
     
@@ -154,6 +155,12 @@ export function EventLocationPicker({
 
       // Only enrich with district/metro if locationSource is MANUAL
       // Do NOT overwrite place-derived data
+      console.log("[EventLocationPicker] Calling enrichEventLocation (place)", {
+        lat: placeData.lat,
+        lng: placeData.lng,
+        hasAddressJson: Array.isArray(placeData.addressJson) ? placeData.addressJson.length : null,
+        formattedAddr: placeData.formattedAddr?.slice?.(0, 80) ?? placeData.formattedAddr,
+      });
       const enrichment = await enrichEventLocation({
         lat: placeData.lat,
         lng: placeData.lng,
@@ -163,6 +170,10 @@ export function EventLocationPicker({
       });
 
       // Update enrichment data and city
+      console.log(
+        "[EventLocationPicker] enrichEventLocation result (place)",
+        JSON.stringify(enrichment, null, 2)
+      );
       if (enrichment) {
         onChange({
           city: enrichment.cityId || "minsk", // Store UUID or fallback to slug
@@ -204,6 +215,10 @@ export function EventLocationPicker({
       });
 
       // Only enrich with district/metro if locationSource is MANUAL
+      console.log("[EventLocationPicker] Calling enrichEventLocation (map)", {
+        lat: mapData.lat,
+        lng: mapData.lng,
+      });
       const enrichment = await enrichEventLocation({
         lat: mapData.lat,
         lng: mapData.lng,
@@ -211,6 +226,10 @@ export function EventLocationPicker({
       });
 
       // Update enrichment data and city
+      console.log(
+        "[EventLocationPicker] enrichEventLocation result (map)",
+        JSON.stringify(enrichment, null, 2)
+      );
       if (enrichment) {
         onChange({
           city: enrichment.cityId || "minsk", // Store UUID or fallback to slug
@@ -272,51 +291,23 @@ export function EventLocationPicker({
 
   return (
     <div className="space-y-6">
-      {/* Debug Panel (dev-only) */}
-      {process.env.NODE_ENV === "development" && (
-        <div className="rounded-lg border border-yellow-300 bg-yellow-50 p-4">
-          <h4 className="text-xs font-semibold text-yellow-900 mb-2">🔍 Debug: Event Geo Data</h4>
-          <pre className="text-xs text-yellow-800 overflow-auto">
-            {JSON.stringify(
-              {
-                locationSource: data.locationSource || null,
-                placeId: data.placeId || null,
-                lat: data.lat || null,
-                lng: data.lng || null,
-                cityId: cityId || null,
-                districtAutoId: districtAutoId || null,
-                districtManualId: districtManualId || null,
-                metroAutoId: metroAutoId || null,
-                metroAutoDistanceM: metroAutoDistanceM || null,
-                metroManualId: metroManualId || null,
-                metroManualDistanceM: metroManualDistanceM || null,
-                selectsVisible: !!(hasLocation && cityId),
-                readOnlyVisible: !!(hasLocation && !cityId && (districtAutoId || districtManualId || metroAutoId || metroManualId)),
-              },
-              null,
-              2
-            )}
-          </pre>
-        </div>
-      )}
-
       {/* Status indicators */}
       {(isSaving || isSaved || error) && (
         <div className="flex items-center gap-2">
           {isSaving && (
-            <div className="flex items-center gap-2 text-sm text-gray-600">
+            <div className="flex items-center gap-2 text-[12px] text-gray-600">
               <Loader2 className="h-3 w-3 animate-spin" />
               <span>Сохраняю...</span>
             </div>
           )}
           {isSaved && (
-            <div className="flex items-center gap-2 text-sm text-green-600">
+            <div className="flex items-center gap-2 text-[12px] text-green-600">
               <CheckCircle2 className="h-3 w-3" />
               <span>Сохранено</span>
             </div>
           )}
           {error && (
-            <div className="flex items-center gap-2 text-sm text-red-600">
+            <div className="flex items-center gap-2 text-[12px] text-red-600">
               <AlertCircle className="h-3 w-3" />
               <span>{error}</span>
             </div>
@@ -338,7 +329,7 @@ export function EventLocationPicker({
             type="button"
             onClick={() => setIsMapModalOpen(true)}
             disabled={disabled}
-            className="text-sm text-blue-600 hover:text-blue-700 hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
+            className="text-[12px] text-muted-foreground underline decoration-dashed decoration-primary underline-offset-4 hover:text-muted-foreground hover:decoration-primary/80 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Выбрать точку на карте
           </button>
@@ -365,40 +356,31 @@ export function EventLocationPicker({
       {/* District & Metro (only show if location is set and cityId available) */}
       {hasLocation && cityId && (
         <div className="space-y-4">
-          {/* Location Source Indicator */}
-          {data.locationSource === "PLACE" && data.placeId && (
-            <div className="rounded-lg border border-blue-200 bg-blue-50 p-3">
-              <div className="flex items-center gap-2 text-sm text-blue-800">
-                <MapPinIcon className="w-4 h-4" />
-                <span className="font-medium">Данные из места:</span>
-                <span>{data.venueName}</span>
-              </div>
-              <p className="text-xs text-blue-700 mt-1">
-                Район и метро взяты из настроек места. Вы можете изменить их вручную при необходимости.
-              </p>
-            </div>
-          )}
-
           {/* District Select */}
           <div>
             <Label htmlFor="district">Район</Label>
-            <select
-              id="district"
-              value={districtShown || ""}
-              onChange={(e) => handleDistrictChange(e.target.value)}
-              className="mt-2 w-full rounded-md border border-input bg-background px-3 py-2"
-              disabled={districts.length === 0 || disabled}
-            >
-              <option value="">Не выбрано</option>
-              {districts.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.name}
-                </option>
-              ))}
-            </select>
+            <div className="relative">
+              <select
+                id="district"
+                value={districtShown || ""}
+                onChange={(e) => handleDistrictChange(e.target.value)}
+                className={`${nativeSelectFieldClassName} appearance-none`}
+                disabled={districts.length === 0 || disabled}
+              >
+                <option value="">Не выбрано</option>
+                {districts.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.name}
+                  </option>
+                ))}
+              </select>
+              <div className="pointer-events-none absolute right-3 inset-y-0 flex items-center">
+                <ChevronDown className="h-5 w-5 text-muted-foreground translate-y-[1px]" />
+              </div>
+            </div>
             
             {/* Helper text */}
-            <div className="mt-1 text-xs text-muted-foreground">
+            <div className="mt-1 text-[12px] text-muted-foreground">
               {districtManualId ? (
                 <div className="flex items-center justify-between">
                   <span>Вы выбрали вручную</span>
@@ -422,34 +404,39 @@ export function EventLocationPicker({
           {/* Metro Select */}
           <div>
             <Label htmlFor="metro">Метро</Label>
-            <select
-              id="metro"
-              value={metroShown || ""}
-              onChange={(e) => handleMetroChange(e.target.value)}
-              className="mt-2 w-full rounded-md border border-input bg-background px-3 py-2"
-              disabled={disabled}
-            >
-              <option value="">Не выбрано</option>
-              {/* Show currently selected metro even if stations not loaded yet */}
-              {metroShown && metroStations.length === 0 && data.metroName && (
-                <option value={metroShown}>{data.metroName}</option>
-              )}
-              {metroStations.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.name}
-                </option>
-              ))}
-            </select>
+            <div className="relative">
+              <select
+                id="metro"
+                value={metroShown || ""}
+                onChange={(e) => handleMetroChange(e.target.value)}
+                className={`${nativeSelectFieldClassName} appearance-none`}
+                disabled={disabled}
+              >
+                <option value="">Не выбрано</option>
+                {/* Show currently selected metro even if stations not loaded yet */}
+                {metroShown && metroStations.length === 0 && data.metroName && (
+                  <option value={metroShown}>{data.metroName}</option>
+                )}
+                {metroStations.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.name}
+                  </option>
+                ))}
+              </select>
+              <div className="pointer-events-none absolute right-3 inset-y-0 flex items-center">
+                <ChevronDown className="h-5 w-5 text-muted-foreground translate-y-[1px]" />
+              </div>
+            </div>
             
             {/* Distance display */}
             {metroShown && metroDistanceShown !== null && (
-              <p className="mt-1 text-sm text-gray-700">
+              <p className="mt-1 text-[12px] text-gray-700">
                 Расстояние: {formatDistance(metroDistanceShown)}
               </p>
             )}
             
             {/* Helper text */}
-            <div className="mt-1 text-xs text-muted-foreground">
+            <div className="mt-1 text-[12px] text-muted-foreground">
               {metroManualId ? (
                 <div className="flex items-center justify-between">
                   <span>Вы выбрали вручную</span>
@@ -476,12 +463,12 @@ export function EventLocationPicker({
       {hasLocation && !cityId && (districtAutoId || districtManualId || metroAutoId || metroManualId) && (
         <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-2">
           <h4 className="text-sm font-medium text-gray-900">Район и метро</h4>
-          <p className="text-xs text-gray-600 mb-3">
+          <p className="text-[12px] text-gray-600 mb-3">
             Данные сохранены, но редактирование недоступно (отсутствует cityId)
           </p>
           
           {(districtAutoId || districtManualId) && (
-            <div className="text-sm">
+            <div className="text-[12px]">
               <span className="text-gray-600">Район:</span>{" "}
               <span className="text-gray-900">
                 {districtManualId || districtAutoId}
@@ -492,7 +479,7 @@ export function EventLocationPicker({
           )}
           
           {(metroAutoId || metroManualId) && (
-            <div className="text-sm">
+            <div className="text-[12px]">
               <span className="text-gray-600">Метро:</span>{" "}
               <span className="text-gray-900">
                 {metroStations.find(m => m.id === (metroManualId || metroAutoId))?.name || (metroManualId || metroAutoId)}
@@ -511,7 +498,7 @@ export function EventLocationPicker({
           <h4 className="text-sm font-medium text-blue-900">📍 Определено автоматически</h4>
           
           {districtAutoId && (
-            <div className="text-sm">
+            <div className="text-[12px]">
               <span className="text-blue-700">Район:</span>{" "}
               <span className="text-blue-900 font-medium">
                 {data.districtName || 
@@ -522,7 +509,7 @@ export function EventLocationPicker({
           )}
           
           {metroAutoId && (
-            <div className="text-sm">
+            <div className="text-[12px]">
               <span className="text-blue-700">Метро:</span>{" "}
               <span className="text-blue-900 font-medium">
                 {data.metroName || 
@@ -535,7 +522,7 @@ export function EventLocationPicker({
           )}
           
           {!districtAutoId && !metroAutoId && (
-            <p className="text-xs text-blue-700">
+            <p className="text-[12px] text-blue-700">
               Метро/район определим после выбора точки
             </p>
           )}

@@ -54,9 +54,9 @@ console.log(`   Empty data - Step 1 complete: ${!step1Complete ? "✓" : "✗"} 
 const filledData = {
   ...emptyData,
   title: "Test Event",
-  activityType: "workshop",
-  categories: ["education"],
-  ageGroups: ["6-12"],
+  eventFormats: ["educational"] as const,
+  categoryId: "cat-1",
+  ageRangeIds: ["age-6-12"],
 };
 const step1FilledComplete = EVENT_WIZARD_STEPS[0].isComplete?.(filledData);
 console.log(`   Filled data - Step 1 complete: ${step1FilledComplete ? "✓" : "✗"} (should be true)`);

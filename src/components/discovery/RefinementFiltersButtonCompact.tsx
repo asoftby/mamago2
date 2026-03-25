@@ -38,24 +38,32 @@ export function RefinementFiltersButtonCompact({
           aria-label="Фильтры — нажмите, чтобы открыть"
           aria-expanded={open}
           aria-haspopup="dialog"
+          suppressHydrationWarning
           className={cn(
-            "inline-flex h-[64px] min-h-[64px] items-center justify-center gap-2 rounded-full border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-800 shadow-sm transition-colors duration-200",
+            "flex h-full min-h-[52px] shrink-0 items-center justify-center gap-2 self-stretch rounded-full border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-800 shadow-sm transition-colors duration-200",
             "hover:border-gray-300 hover:bg-gray-50 hover:shadow-md",
             "active:scale-[0.98]",
-            "flex-shrink-0",
             className,
           )}
         >
           <SlidersHorizontal className="h-4 w-4 flex-shrink-0" />
           <span className="whitespace-nowrap">Фильтры</span>
-          {activeCount > 0 && (
-            <>
-              <span className="text-gray-400 mx-1">·</span>
-              <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-gray-900 px-2 text-xs font-bold text-white">
-                {activeCount}
-              </span>
-            </>
-          )}
+          {/*
+            Всегда одинаковая вложенность: иначе при расхождении activeCount (SSR vs URL на клиенте)
+            меняется дерево и съезжают useId у Radix Dialog → aria-controls mismatch.
+          */}
+          <span
+            className={cn(
+              "inline-flex items-center gap-1.5",
+              activeCount === 0 && "invisible w-0 min-w-0 overflow-hidden p-0",
+            )}
+            aria-hidden={activeCount === 0}
+          >
+            <span className="text-gray-400 mx-1">·</span>
+            <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-gray-900 px-2 text-xs font-bold text-white">
+              {activeCount > 0 ? activeCount : "\u00a0"}
+            </span>
+          </span>
         </button>
       </DialogTrigger>
 

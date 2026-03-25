@@ -5,10 +5,15 @@ import { MapPin, Navigation, Zap, ChevronDown, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCity } from "@/contexts/CityContext";
 import { VALID_CITY_SLUGS } from "@/lib/intent";
+import { getCityLocativePhrase } from "@/lib/city/cityDisplayNames";
 
 interface MobileLocationPanelProps {
   variant?: "default" | "cityHub";
   citySlug: string;
+  /** При отложенном применении (моб. шит) — какой город подсвечивать выбранным. */
+  selectedCitySlug?: string;
+  /** Если задан — выбор города не меняет контекст сразу, только колбэк (до «Готово»). */
+  onCityPick?: (slug: string) => void;
   searchText: string;
   onSearchTextChange: (text: string) => void;
   onClose: () => void;
@@ -21,6 +26,8 @@ interface MobileLocationPanelProps {
 export function MobileLocationPanel({
   variant = "default",
   citySlug,
+  selectedCitySlug,
+  onCityPick,
   searchText,
   onSearchTextChange,
   onClose,
@@ -32,6 +39,8 @@ export function MobileLocationPanel({
   const { setCity } = useCity();
   const [showMetroList, setShowMetroList] = useState(false);
   const [showDistrictList, setShowDistrictList] = useState(false);
+  /** cityHub: свёрнутая строка «Где?» — по тапу открывается список городов */
+  const [cityPickerOpen, setCityPickerOpen] = useState(false);
 
   const getCityDisplayName = (slug: string) => {
     const cityNames: Record<string, string> = {
@@ -70,44 +79,101 @@ export function MobileLocationPanel({
   const selectedDistrict = apiOptions.districts.find((d: any) => d.value === draft.district);
 
   return (
-    <div className="bg-gray-50 rounded-xl">
-      <div className="p-3">
-        {/* Quick Actions */}
-        <div className="space-y-1.5">
+    <div className="min-w-0">
+      {/* Quick Actions */}
+      <div className="space-y-0">
           {variant === "cityHub" ? (
-            <div className="space-y-1">
-              <p className="text-[11px] font-medium text-gray-500 px-0.5">Город</p>
-              {VALID_CITY_SLUGS.map((slug) => {
-                const name = getCityDisplayName(slug);
-                const selected = slug === citySlug;
-                return (
-                  <button
-                    key={slug}
-                    type="button"
-                    onClick={() => {
-                      setCity(slug);
-                      onClose();
-                    }}
-                    className={cn(
-                      "w-full flex items-center justify-between gap-2 p-2.5 rounded-lg text-left",
-                      selected ? "bg-white ring-1 ring-gray-200" : "hover:bg-white",
-                    )}
-                  >
-                    <span className="flex items-center gap-2.5 min-w-0">
-                      <div className="flex items-center justify-center w-7 h-7 bg-gray-100 rounded-full shrink-0">
-                        <MapPin className="h-3.5 w-3.5 text-gray-600" />
-                      </div>
-                      <span className="min-w-0">
-                        <span className="font-medium text-gray-900 text-sm block">{name}</span>
-                        <span className="text-xs text-gray-500">Весь город</span>
-                      </span>
-                    </span>
-                    {selected ? (
-                      <Check className="h-4 w-4 text-primary shrink-0" aria-hidden />
-                    ) : null}
-                  </button>
-                );
-              })}
+            <div className="space-y-3">
+              <button
+                type="button"
+                onClick={() => setCityPickerOpen((o) => !o)}
+                className={cn(
+                  "flex w-full items-center gap-3 rounded-2xl border bg-white px-4 py-3 text-left shadow-sm transition-colors",
+                  "border-[#EF8759]/25 hover:border-[#EF8759]/40",
+                  cityPickerOpen && "border-[#EF8759]/35",
+                )}
+                aria-expanded={cityPickerOpen}
+                aria-haspopup="listbox"
+              >
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gray-100">
+                  <MapPin className="h-4 w-4 text-gray-500" aria-hidden />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-[11px] font-medium text-gray-500">Где?</div>
+                  <div className="mt-0.5 text-sm font-normal leading-normal text-gray-700">
+                    {getCityLocativePhrase(selectedCitySlug ?? citySlug)}
+                  </div>
+                </div>
+                <ChevronDown
+                  className={cn(
+                    "h-5 w-5 shrink-0 text-gray-400 transition-transform duration-200",
+                    cityPickerOpen && "rotate-180",
+                  )}
+                  aria-hidden
+                />
+              </button>
+
+              {cityPickerOpen ? (
+                <div
+                  className="rounded-xl border border-gray-100 bg-gray-50/90 p-3"
+                  role="listbox"
+                  aria-label="Выбор города"
+                >
+                  <p className="mb-2 px-0.5 text-[11px] font-medium text-gray-500">
+                    Город
+                  </p>
+                  <div className="space-y-1">
+                    {VALID_CITY_SLUGS.map((slug) => {
+                      const selected =
+                        slug === (selectedCitySlug ?? citySlug);
+                      const name = getCityDisplayName(slug);
+                      return (
+                        <button
+                          key={slug}
+                          type="button"
+                          role="option"
+                          aria-selected={selected}
+                          onClick={() => {
+                            if (onCityPick) {
+                              onCityPick(slug);
+                            } else {
+                              setCity(slug);
+                              onClose();
+                            }
+                            setCityPickerOpen(false);
+                          }}
+                          className={cn(
+                            "flex w-full items-center justify-between gap-2 rounded-lg p-2.5 text-left transition-colors",
+                            selected
+                              ? "bg-white ring-1 ring-gray-200"
+                              : "hover:bg-white",
+                          )}
+                        >
+                          <span className="flex min-w-0 items-center gap-2.5">
+                            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gray-100">
+                              <MapPin className="h-3.5 w-3.5 text-gray-600" />
+                            </div>
+                            <span className="min-w-0">
+                              <span className="block text-sm font-medium text-gray-900">
+                                {name}
+                              </span>
+                              <span className="text-xs text-gray-500">
+                                Весь город
+                              </span>
+                            </span>
+                          </span>
+                          {selected ? (
+                            <Check
+                              className="h-4 w-4 shrink-0 text-primary"
+                              aria-hidden
+                            />
+                          ) : null}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : null}
             </div>
           ) : (
             <div className="w-full flex items-center gap-2.5 p-2.5 rounded-lg text-left opacity-50 cursor-not-allowed">
@@ -242,7 +308,6 @@ export function MobileLocationPanel({
           </div>
             </>
           ) : null}
-        </div>
       </div>
     </div>
   );

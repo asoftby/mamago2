@@ -12,6 +12,7 @@ import { PlaceMapPreview } from "./PlaceMapPreview";
 import { PlaceMapModal } from "./PlaceMapModal";
 import { PlaceDuplicateBlock } from "./PlaceDuplicateBlock";
 import { formatDistance } from "@/lib/formatDistance";
+import { nativeSelectFieldClassName } from "@/components/ui/native-select-classes";
 
 interface PlaceLocationPickerProps {
   placeId: string;
@@ -584,7 +585,7 @@ export function PlaceLocationPicker({
               id="district"
               value={districtShown || ""}
               onChange={(e) => handleDistrictChange(e.target.value)}
-              className="mt-2 w-full rounded-md border border-input bg-background px-3 py-2"
+              className={nativeSelectFieldClassName}
               disabled={districts.length === 0 || disabled}
             >
               <option value="">Не выбрано</option>
@@ -624,7 +625,7 @@ export function PlaceLocationPicker({
               id="metro"
               value={metroShown || ""}
               onChange={(e) => handleMetroChange(e.target.value)}
-              className="mt-2 w-full rounded-md border border-input bg-background px-3 py-2"
+              className={nativeSelectFieldClassName}
               disabled={disabled}
             >
               <option value="">Не выбрано</option>

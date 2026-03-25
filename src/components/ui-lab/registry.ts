@@ -79,6 +79,30 @@ export const UI_LAB_REGISTRY: Record<string, ComponentUsageMeta> = {
     ],
     description: "Clean premium calendar for date selection",
   },
+
+  chip: {
+    title: "Chip",
+    sourcePath: "src/components/ui/Chip.tsx",
+    status: "rendered",
+    usedIn: [
+      "src/app/(ui)/ui-lab/_sections/UiPrimitivesSection.tsx",
+      "src/components/business/wizard/event/steps/Step1Basics.tsx",
+    ],
+    description: "Pill toggle for single-choice filters and form fields",
+  },
+
+  "chips-row": {
+    title: "ChipsRow",
+    sourcePath: "src/components/ui/chips-row.tsx",
+    status: "rendered",
+    usedIn: [
+      "src/app/(ui)/ui-lab/_sections/UiPrimitivesSection.tsx",
+      "src/components/business/wizard/event/steps/Step1Basics.tsx",
+      "src/components/business/wizard/offer/steps/Step2Information.tsx",
+      "src/components/business/wizard/place/steps/Step1Profile.tsx",
+    ],
+    description: "Horizontal or wrapping row of multi-select chip buttons",
+  },
 };
 
 /**

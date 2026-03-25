@@ -39,7 +39,8 @@ export async function compressImage(
     const compressedFile = await imageCompression(file, {
       maxSizeMB,
       maxWidthOrHeight,
-      useWebWorker: true,
+      // true иногда зависает в Safari/Chrome (воркер не отвечает) — UI остаётся на «Загрузка…»
+      useWebWorker: false,
       fileType,
       initialQuality: quality,
     });

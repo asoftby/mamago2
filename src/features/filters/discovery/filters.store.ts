@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useMemo, useCallback } from "react";
+import { useMemo, useCallback, useEffect } from "react";
 import {
   useSearchParams,
   useRouter,
@@ -8,6 +8,14 @@ import {
 } from "next/navigation";
 import { whenLabel } from "./whenLabel";
 import { AGE_GROUPS } from "@/features/filters/age/ageGroups";
+import { useOptionalCity } from "@/contexts/CityContext";
+import {
+  getCityFromPath,
+  getIntentFromPath,
+  getDiscoveryIntentForPublicationPath,
+  shouldHideMobileBottomNav,
+  type Intent,
+} from "@/lib/intent";
 
 export type WhenPreset = "TODAY" | "TOMORROW" | "WEEKEND" | null;
 
@@ -32,9 +40,83 @@ export const defaultFilters: DiscoveryFilters = {
   nearby: false,
 };
 
+export function isDiscoveryFiltersEmpty(f: DiscoveryFilters): boolean {
+  return (
+    !f.dateFrom &&
+    !f.dateTo &&
+    !f.whenPreset &&
+    f.age.length === 0 &&
+    !f.metro &&
+    !f.district &&
+    !f.nearby
+  );
+}
+
+const SESSION_PREFIX = "mmg.discovery.filtersByScope.v1";
+
+function discoverySessionKey(city: string, intent: Intent): string {
+  return `${SESSION_PREFIX}:${city}:${intent}`;
+}
+
+function saveDiscoveryFiltersSession(
+  city: string,
+  intent: Intent,
+  filters: DiscoveryFilters,
+): void {
+  if (typeof window === "undefined") return;
+  try {
+    sessionStorage.setItem(discoverySessionKey(city, intent), JSON.stringify(filters));
+  } catch {
+    /* ignore */
+  }
+}
+
+function loadDiscoveryFiltersSession(
+  city: string,
+  intent: Intent,
+): DiscoveryFilters | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = sessionStorage.getItem(discoverySessionKey(city, intent));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<DiscoveryFilters>;
+    return {
+      ...defaultFilters,
+      ...parsed,
+      age: Array.isArray(parsed.age) ? parsed.age : [],
+    };
+  } catch {
+    return null;
+  }
+}
+
+function clearDiscoveryFiltersSession(city: string, intent: Intent): void {
+  if (typeof window === "undefined") return;
+  try {
+    sessionStorage.removeItem(discoverySessionKey(city, intent));
+  } catch {
+    /* ignore */
+  }
+}
+
+function hasDiscoveryFilterParamsInUrl(
+  searchParams: ReadonlyURLSearchParams,
+): boolean {
+  return !!(
+    searchParams.get("from") ||
+    searchParams.get("to") ||
+    searchParams.get("when") ||
+    searchParams.get("preset") ||
+    searchParams.get("age") ||
+    searchParams.get("metro") ||
+    searchParams.get("district") ||
+    searchParams.get("nearby") === "true"
+  );
+}
+
 export type OpenKey = "date" | "age" | "metro" | "district" | null;
 
-function mergeDiscoveryPatch(
+export function mergeDiscoveryPatch(
   base: DiscoveryFilters,
   patch: Partial<DiscoveryFilters>,
 ): DiscoveryFilters {
@@ -166,19 +248,77 @@ export function useDiscoveryFilters() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const optionalCity = useOptionalCity();
 
-  const applied = useMemo(
+  const cityForSession = useMemo(() => {
+    return getCityFromPath(pathname) ?? optionalCity?.citySlug ?? "minsk";
+  }, [pathname, optionalCity?.citySlug]);
+
+  const appliedFromUrl = useMemo(
     () => parseAppliedFromUrl(searchParams),
     [searchParams],
   );
 
+  const publicationIntent = useMemo(
+    () => getDiscoveryIntentForPublicationPath(pathname),
+    [pathname],
+  );
+
+  /** На страницах публикаций без query — подставляем последние фильтры этого раздела из sessionStorage */
+  const applied = useMemo(() => {
+    if (!isDiscoveryFiltersEmpty(appliedFromUrl)) {
+      return appliedFromUrl;
+    }
+    if (typeof window === "undefined") {
+      return appliedFromUrl;
+    }
+    if (
+      publicationIntent &&
+      cityForSession &&
+      shouldHideMobileBottomNav(pathname)
+    ) {
+      const stored = loadDiscoveryFiltersSession(
+        cityForSession,
+        publicationIntent,
+      );
+      if (stored && !isDiscoveryFiltersEmpty(stored)) {
+        return stored;
+      }
+    }
+    return appliedFromUrl;
+  }, [appliedFromUrl, publicationIntent, cityForSession, pathname]);
+
+  /** Сохраняем фильтры раздела при просмотре списка discovery */
+  useEffect(() => {
+    const intent = getIntentFromPath(pathname);
+    if (!intent || !cityForSession) return;
+    if (isDiscoveryFiltersEmpty(appliedFromUrl)) return;
+    saveDiscoveryFiltersSession(cityForSession, intent, appliedFromUrl);
+  }, [pathname, cityForSession, appliedFromUrl]);
+
+  /** Возврат в список без query — восстанавливаем из sessionStorage */
+  useEffect(() => {
+    const intent = getIntentFromPath(pathname);
+    if (!intent || !cityForSession) return;
+    if (hasDiscoveryFilterParamsInUrl(searchParams)) return;
+    const stored = loadDiscoveryFiltersSession(cityForSession, intent);
+    if (!stored || isDiscoveryFiltersEmpty(stored)) return;
+    writeAppliedToUrl(router, pathname, searchParams, stored, "replace");
+  }, [pathname, cityForSession, searchParams, router]);
+
+  const clearSessionForCurrentRoute = useCallback(() => {
+    const intent =
+      getIntentFromPath(pathname) ?? getDiscoveryIntentForPublicationPath(pathname);
+    if (!intent || !cityForSession) return;
+    clearDiscoveryFiltersSession(cityForSession, intent);
+  }, [pathname, cityForSession]);
+
   const patchFilters = useCallback(
     (patch: Partial<DiscoveryFilters>) => {
-      const base = parseAppliedFromUrl(searchParams);
-      const next = mergeDiscoveryPatch(base, patch);
+      const next = mergeDiscoveryPatch(applied, patch);
       writeAppliedToUrl(router, pathname, searchParams, next, "replace");
     },
-    [router, pathname, searchParams],
+    [router, pathname, searchParams, applied],
   );
 
   const actions = useMemo(
@@ -188,6 +328,7 @@ export function useDiscoveryFilters() {
       /** Немедленная запись в URL (реактивные фильтры) */
       setDraft: patchFilters,
       resetAll: () => {
+        clearSessionForCurrentRoute();
         writeAppliedToUrl(
           router,
           pathname,
@@ -197,7 +338,7 @@ export function useDiscoveryFilters() {
         );
       },
       resetKey: (key: keyof DiscoveryFilters) => {
-        const base = parseAppliedFromUrl(searchParams);
+        const base = applied;
         const next = { ...base, [key]: defaultFilters[key] };
         if (key === "dateFrom" || key === "dateTo") {
           next.dateFrom = null;
@@ -205,10 +346,25 @@ export function useDiscoveryFilters() {
         }
         writeAppliedToUrl(router, pathname, searchParams, next, "replace");
       },
+      /** Одна замена URL: полное состояние фильтров + при необходимости другой pathname (моб. шит «Готово»). */
+      commitFilters: (
+        next: DiscoveryFilters,
+        pathnameOverride?: string,
+      ) => {
+        const path = pathnameOverride ?? pathname;
+        const empty = new URLSearchParams();
+        writeAppliedToUrl(
+          router,
+          path,
+          empty as unknown as ReadonlyURLSearchParams,
+          next,
+          "replace",
+        );
+      },
       /** Закрыть панель без отката URL */
       close: () => {},
     }),
-    [router, pathname, searchParams, applied, patchFilters],
+    [router, pathname, searchParams, applied, patchFilters, clearSessionForCurrentRoute],
   );
 
   const derived = useMemo(() => {

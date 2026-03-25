@@ -69,6 +69,8 @@ export async function GET(
     return NextResponse.json({
       ok: true,
       business,
+      /** Видимость (operationalStatus) меняет только ADMIN — см. PATCH /api/admin/business/[id]/status */
+      canManageBusinessVisibility: user.role === "ADMIN",
     });
   } catch (error) {
     console.error("[admin/business-verification/[id]] Error:", error);

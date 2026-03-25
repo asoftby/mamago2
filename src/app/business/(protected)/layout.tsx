@@ -3,7 +3,6 @@ import { getCurrentUser } from "@/lib/auth/server";
 import { getMyBusiness } from "@/server/business/getMyBusiness";
 import { getEffectiveVerificationStatus } from "@/server/services/businessStatusMap";
 import { BusinessShell } from "@/components/business/layout/BusinessShell";
-
 export default async function ProtectedBusinessLayout({
   children,
 }: {
@@ -12,7 +11,15 @@ export default async function ProtectedBusinessLayout({
   // 1. Check authentication
   const user = await getCurrentUser();
   if (!user) {
-    redirect("/login?from=business");
+    redirect("/login");
+  }
+
+  // Кабинет партнёра — только владельцы бизнеса; остальные роли — в свои разделы
+  if (user.role === "USER") {
+    redirect("/me");
+  }
+  if (user.role === "ADMIN" || user.role === "MODERATOR") {
+    redirect("/admin");
   }
 
   // 2. Check if Business exists (onboarding gate)
@@ -28,8 +35,19 @@ export default async function ProtectedBusinessLayout({
     redirect("/business/verification");
   }
 
+  // 4. Мягкое отключение / архив (публичный контент скрыт; кабинет недоступен до ACTIVE)
+  if (business.operationalStatus !== "ACTIVE") {
+    redirect("/business/suspended");
+  }
+
   return (
-    <BusinessShell userEmail={user.email || undefined}>
+    <BusinessShell
+      user={{
+        id: user.id,
+        email: user.email,
+        role: user.role,
+      }}
+    >
       {children}
     </BusinessShell>
   );
