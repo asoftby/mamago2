@@ -7,13 +7,23 @@
 // SeoPage
 // -----------------------------------------------------------------------------
 
-export type SeoPageType = "preset" | "category" | "generated";
+export type SeoPageType =
+  | "preset"
+  | "category"
+  | "generated"
+  | "landing"
+  | "event"
+  | "place"
+  | "offer"
+  | "route"
+  | "article";
 
 export type SeoPageIndexationStatus = "indexed" | "noindex" | "draft";
 
 export type SeoPageSection =
   | "kuda"
   | "zanyatiya"
+  | "events"
   | "journal"
   | "routes"
   | "birthday"

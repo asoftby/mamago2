@@ -14,6 +14,7 @@ import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
 import { ActivityType, ScheduleMode, ContentStatus } from "@prisma/client";
 import { canCreateBusinessContent, canManageOwnedContent } from "@/lib/auth/businessContentAccess";
+import { assignActivitySlugIfMissing } from "@/lib/slug/activitySlugService";
 
 /**
  * GET - Get activity details
@@ -202,6 +203,11 @@ export async function PATCH(
         },
       },
     });
+
+    // Auto-assign slug only on first meaningful title fill (idempotent).
+    if (body.title !== undefined && typeof body.title === "string" && body.title.trim()) {
+      await assignActivitySlugIfMissing(id, body.title.trim());
+    }
 
     return NextResponse.json({ activity });
   } catch (error) {

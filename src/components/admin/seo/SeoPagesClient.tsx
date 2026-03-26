@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   MoreHorizontal,
   Pencil,
@@ -42,6 +43,12 @@ const TYPE_LABEL: Record<SeoPageType, string> = {
   preset: "Preset",
   category: "Category",
   generated: "Generated",
+  landing: "Landing",
+  event: "Event",
+  place: "Place",
+  offer: "Offer",
+  route: "Route",
+  article: "Article",
 };
 
 const STATUS_LABEL: Record<SeoPageIndexationStatus, string> = {
@@ -59,6 +66,7 @@ const STATUS_BADGE: Record<SeoPageIndexationStatus, string> = {
 const SECTION_LABEL: Record<SeoPageSection, string> = {
   kuda: "Куда",
   zanyatiya: "Занятия",
+  events: "События",
   journal: "Журнал",
   routes: "Маршруты",
   birthday: "Дни рождения",
@@ -69,6 +77,7 @@ const SECTION_OPTIONS: { value: SeoPageSection | "all"; label: string }[] = [
   { value: "all", label: "Все разделы" },
   { value: "kuda", label: "Куда" },
   { value: "zanyatiya", label: "Занятия" },
+  { value: "events", label: "События" },
   { value: "journal", label: "Журнал" },
   { value: "routes", label: "Маршруты" },
   { value: "birthday", label: "Дни рождения" },
@@ -96,7 +105,21 @@ interface SeoPagesClientProps {
   initialRows: SeoAdminPage[];
 }
 
+function getEntityId(row: SeoAdminPage): string | null {
+  const snap = row.filtersSnapshot;
+  if (snap && typeof snap === "object" && "entityId" in snap) {
+    const v = (snap as { entityId?: unknown }).entityId;
+    return typeof v === "string" && v.length > 0 ? v : null;
+  }
+  // Fallback: parse from id `entity:<kind>:<id>`
+  const parts = row.id.split(":");
+  const last = parts[parts.length - 1];
+  return last && last !== row.id ? last : null;
+}
+
 export function SeoPagesClient({ initialRows }: SeoPagesClientProps) {
+  const router = useRouter();
+  const [busyRowId, setBusyRowId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState<SeoPageType | "all">("all");
   const [statusFilter, setStatusFilter] = useState<
@@ -152,6 +175,12 @@ export function SeoPagesClient({ initialRows }: SeoPagesClientProps) {
               <SelectItem value="preset">preset</SelectItem>
               <SelectItem value="category">category</SelectItem>
               <SelectItem value="generated">generated</SelectItem>
+              <SelectItem value="landing">landing</SelectItem>
+              <SelectItem value="event">event</SelectItem>
+              <SelectItem value="place">place</SelectItem>
+              <SelectItem value="offer">offer</SelectItem>
+              <SelectItem value="route">route</SelectItem>
+              <SelectItem value="article">article</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -311,24 +340,92 @@ export function SeoPagesClient({ initialRows }: SeoPagesClientProps) {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-52">
-                          <DropdownMenuItem className="flex items-center gap-2">
+                          <DropdownMenuItem
+                            className="flex items-center gap-2"
+                            onSelect={() => {
+                              const entityId = getEntityId(row);
+                              if (!entityId) return;
+                              if (row.type === "event") router.push(`/admin/seo/pages/event/${entityId}`);
+                              if (row.type === "place") router.push(`/admin/seo/pages/place/${entityId}`);
+                              if (row.type === "offer") router.push(`/admin/seo/pages/offer/${entityId}`);
+                              if (row.type === "route") router.push(`/admin/seo/pages/route/${entityId}`);
+                              if (row.type === "article") router.push(`/admin/seo/pages/article/${entityId}`);
+                            }}
+                          >
                             <Pencil className="h-4 w-4 shrink-0" />
                             Edit
                           </DropdownMenuItem>
-                          <DropdownMenuItem className="flex items-center gap-2">
+                          <DropdownMenuItem
+                            className="flex items-center gap-2"
+                            onSelect={() => {
+                              router.push(row.path);
+                            }}
+                          >
                             <Eye className="h-4 w-4 shrink-0" />
                             Preview
                           </DropdownMenuItem>
-                          <DropdownMenuItem className="flex items-center gap-2">
+                          <DropdownMenuItem
+                            className={[
+                              "flex items-center gap-2",
+                              busyRowId === row.id ? "opacity-50 pointer-events-none" : "",
+                            ].join(" ")}
+                            onSelect={async () => {
+                              if (busyRowId === row.id) return;
+                              const entityId = getEntityId(row);
+                              if (!entityId) return;
+                              const endpoint =
+                                row.type === "event"
+                                  ? `/api/admin/seo/activity/${entityId}/toggle-indexation`
+                                  : row.type === "place"
+                                    ? `/api/admin/seo/place/${entityId}/toggle-indexation`
+                                    : row.type === "offer"
+                                      ? `/api/admin/seo/offer/${entityId}/toggle-indexation`
+                                      : row.type === "route"
+                                        ? `/api/admin/seo/route/${entityId}/toggle-indexation`
+                                        : row.type === "article"
+                                          ? `/api/admin/seo/article/${entityId}/toggle-indexation`
+                                      : null;
+                              if (!endpoint) return;
+                              try {
+                                setBusyRowId(row.id);
+                                await fetch(endpoint, { method: "POST" });
+                                router.refresh();
+                              } finally {
+                                setBusyRowId(null);
+                              }
+                            }}
+                          >
                             <ToggleLeft className="h-4 w-4 shrink-0" />
                             Toggle indexation
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
-                          <DropdownMenuItem className="flex items-center gap-2">
+                          <DropdownMenuItem
+                            className="flex items-center gap-2"
+                            onSelect={() => {
+                              const entityId = getEntityId(row);
+                              if (!entityId) return;
+                              if (row.type === "event") router.push(`/admin/seo/pages/event/${entityId}/schema`);
+                              if (row.type === "place") router.push(`/admin/seo/pages/place/${entityId}/schema`);
+                              if (row.type === "offer") router.push(`/admin/seo/pages/offer/${entityId}/schema`);
+                              if (row.type === "route") router.push(`/admin/seo/pages/route/${entityId}/schema`);
+                              if (row.type === "article") router.push(`/admin/seo/pages/article/${entityId}/schema`);
+                            }}
+                          >
                             <Braces className="h-4 w-4 shrink-0" />
                             View schema
                           </DropdownMenuItem>
-                          <DropdownMenuItem className="flex items-center gap-2">
+                          <DropdownMenuItem
+                            className="flex items-center gap-2"
+                            onSelect={() => {
+                              const entityId = getEntityId(row);
+                              if (!entityId) return;
+                              if (row.type === "event") router.push(`/admin/seo/pages/event/${entityId}/redirects`);
+                              if (row.type === "place") router.push(`/admin/seo/pages/place/${entityId}/redirects`);
+                              if (row.type === "offer") router.push(`/admin/seo/pages/offer/${entityId}/redirects`);
+                              if (row.type === "route") router.push(`/admin/seo/pages/route/${entityId}/redirects`);
+                              if (row.type === "article") router.push(`/admin/seo/pages/article/${entityId}/redirects`);
+                            }}
+                          >
                             <Link2 className="h-4 w-4 shrink-0" />
                             View redirects
                           </DropdownMenuItem>

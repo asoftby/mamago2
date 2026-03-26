@@ -1,14 +1,15 @@
 import { Button } from "@/components/ui/button";
 import { SeoPagesClient } from "@/components/admin/seo/SeoPagesClient";
 import { SeoPageHeader } from "@/components/admin/seo/primitives/SeoPageHeader";
-import { MOCK_SEO_PAGES } from "@/lib/admin/seo/mocks/pages";
+import { getSeoPages } from "@/lib/admin/seo/data/seoAdminData";
 
-export default function AdminSeoPagesPage() {
+export default async function AdminSeoPagesPage() {
+  const rows = await getSeoPages();
   return (
     <div className="space-y-8">
       <SeoPageHeader
         title="SEO Pages"
-        subtitle="Управляемые SEO-посадки и индексируемые страницы (preset, category, generated) — отдельно от сущностей контента"
+        subtitle="Единый SEO control center: управляемые SEO-посадки + публичные страницы сущностей (events/places/…)"
         actions={
           <Button type="button" disabled className="shrink-0">
             Создать SEO Page
@@ -16,10 +17,11 @@ export default function AdminSeoPagesPage() {
         }
       />
       <p className="-mt-4 text-xs text-gray-400">
-        Не редактор событий и мест: это слой SEO landing pages и шаблонов выдачи.
+        Кнопка «Создать SEO Page» — только для manual landing pages. Сущности (event/place/…) редактируются через Edit SEO.
       </p>
 
-      <SeoPagesClient initialRows={MOCK_SEO_PAGES} />
+      {/* Note: server-side fetch; client handles filtering */}
+      <SeoPagesClient initialRows={rows} />
     </div>
   );
 }

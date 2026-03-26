@@ -7,6 +7,7 @@ import {
   canManageOwnedContent,
   canPublishContentDirectly,
 } from "@/lib/auth/businessContentAccess";
+import { assignOfferSlugIfMissing } from "@/lib/slug/offerSlugService";
 
 const createOfferSchema = z.object({
   source: z.enum(["PLACE", "EVENT"]),
@@ -94,6 +95,11 @@ export async function POST(request: NextRequest) {
           ...(data.status === "PUBLISHED" ? { publishedAt: new Date() } : {}),
         },
       });
+
+      // Auto-assign slug only on first meaningful title fill (idempotent).
+      if (offer.title.trim()) {
+        await assignOfferSlugIfMissing(offer.id, offer.title.trim());
+      }
 
       return NextResponse.json(offer);
     }

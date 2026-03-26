@@ -9,6 +9,7 @@ import { syncEventVenueAndActivityCity } from "@/lib/business/syncEventVenueFrom
 import { computeEventShortDesc } from "@/lib/business/eventShortDesc";
 import { softDeleteActivityById } from "@/lib/activity/softDeleteActivity";
 import { fetchActivityEventRowSummary } from "@/lib/activity/fetchActivityEventRowSummary";
+import { assignActivitySlugIfMissing } from "@/lib/slug/activitySlugService";
 
 /**
  * GET /api/business/events/[id]
@@ -175,6 +176,11 @@ export async function PATCH(
         businessId: body.businessId,
       },
     });
+
+    // Auto-assign slug only on first meaningful title fill (idempotent).
+    if (typeof mergedTitle === "string" && mergedTitle.trim()) {
+      await assignActivitySlugIfMissing(event.id, mergedTitle.trim());
+    }
 
     if (body.scheduleJson !== undefined) {
       await replaceActivitySessionsFromScheduleJson(event.id, body.scheduleJson);

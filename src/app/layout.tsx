@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Manrope, Geist_Mono, Literata } from "next/font/google";
+import { Manrope, Geist_Mono, Literata, Noto_Serif, PT_Serif } from "next/font/google";
 import "./globals.css";
 import { Sonner } from "@/components/ui/sonner";
 import { AccountModeProvider } from "@/contexts/AccountModeContext";
@@ -24,6 +24,22 @@ const literata = Literata({
   weight: ["400", "500", "600", "700"],
 });
 
+const notoSerif = Noto_Serif({
+  variable: "--font-noto-serif",
+  subsets: ["latin", "cyrillic"],
+  display: "swap",
+  style: ["normal", "italic"],
+  weight: ["400", "500", "600", "700"],
+});
+
+const ptSerif = PT_Serif({
+  variable: "--font-pt-serif",
+  subsets: ["latin", "cyrillic"],
+  display: "swap",
+  style: ["normal", "italic"],
+  weight: ["400", "700"],
+});
+
 export const metadata: Metadata = {
   title: "mamaGo 2.0",
   description: "Next Generation City Guide",
@@ -44,7 +60,7 @@ export default function RootLayout({
   return (
     <html lang="ru">
       <body
-        className={`${manrope.variable} ${geistMono.variable} ${literata.variable} antialiased font-sans min-h-screen text-foreground`}
+        className={`${manrope.variable} ${geistMono.variable} ${literata.variable} ${notoSerif.variable} ${ptSerif.variable} antialiased font-sans min-h-screen text-foreground`}
       >
         <AccountModeProvider>{children}</AccountModeProvider>
         <Sonner />

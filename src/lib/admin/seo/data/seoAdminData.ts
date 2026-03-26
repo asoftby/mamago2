@@ -24,7 +24,9 @@ export async function getSeoDashboardSummary(): Promise<SeoDashboardSummary> {
 
 export async function getSeoPages(): Promise<SeoPage[]> {
   const { MOCK_SEO_PAGES } = await import("../mocks/pages");
-  return MOCK_SEO_PAGES;
+  const { getAllEntitySeoPages } = await import("./getEntitySeoPages");
+  const entity = await getAllEntitySeoPages();
+  return [...entity, ...MOCK_SEO_PAGES];
 }
 
 export async function getRedirectCenterData(): Promise<{

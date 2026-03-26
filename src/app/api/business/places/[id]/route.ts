@@ -9,6 +9,7 @@ import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
 import { getActiveRevision } from "@/server/services/placeRevision.service";
 import { canCreateBusinessContent, canManageOwnedContent } from "@/lib/auth/businessContentAccess";
+import { assignPlaceSlugIfMissing } from "@/lib/slug/placeSlugService";
 
 export async function GET(
   request: NextRequest,
@@ -201,6 +202,14 @@ export async function PATCH(
       where: { id },
       data: updateData,
     });
+
+    // Auto-assign slug on first meaningful title fill (idempotent).
+    if (body.title !== undefined) {
+      const t = String(body.title).trim();
+      if (t) {
+        await assignPlaceSlugIfMissing(id, t);
+      }
+    }
 
     return NextResponse.json({ place });
   } catch (error) {

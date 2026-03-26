@@ -11,6 +11,7 @@
  */
 
 import { prisma } from "@/lib/prisma";
+import { slugifyRu } from "@/lib/slugify";
 import {
   normalizePlaceName,
   buildBasePlaceSlug,
@@ -247,6 +248,36 @@ export async function assignSlugOnPublish(placeId: string): Promise<string> {
   console.log(`[Slug] Assigned slug to place ${placeId}: ${newSlug}`);
   
   return newSlug;
+}
+
+/**
+ * Assign slug when title is first filled (idempotent).
+ * This is used for drafts so public/admin URLs can exist early.
+ * If slug already exists — does nothing.
+ */
+export async function assignPlaceSlugIfMissing(placeId: string, title: string): Promise<string> {
+  const place = await prisma.place.findUnique({
+    where: { id: placeId },
+    select: { id: true, slug: true },
+  });
+  if (!place) throw new Error(`Place not found: ${placeId}`);
+  if (place.slug) return place.slug;
+
+  const base = slugifyRu(title || "place");
+  let slug = base;
+  let i = 2;
+  while (!(await isSlugAvailable(slug, placeId))) {
+    slug = `${base}-${i}`;
+    i++;
+    if (i > 200) throw new Error(`Could not generate unique place slug for: ${base}`);
+  }
+
+  await prisma.place.update({
+    where: { id: placeId },
+    data: { slug, slugUpdatedAt: new Date() },
+    select: { id: true },
+  });
+  return slug;
 }
 
 /**

@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import type { RouteStatus, RouteVisibility, BudgetLevel } from "@prisma/client";
 import { getPublicPublishedPlaceWhere } from "@/server/public/publicContentVisibility";
+import { generateRouteSlugFromTitle } from "@/lib/slug/routeSlugService";
 
 const publicRouteStopPlaceWhere = {
   OR: [{ placeId: null }, { place: getPublicPublishedPlaceWhere() }],
@@ -17,6 +18,9 @@ export type RouteWithStops = {
   authorId: string | null;
   status: RouteStatus;
   visibility: RouteVisibility;
+  seoTitle: string | null;
+  seoDescription: string | null;
+  seoJsonLdOverride: unknown | null;
   createdAt: Date;
   updatedAt: Date;
   city: { id: string; name: string } | null;
@@ -126,7 +130,7 @@ export async function createRoute(
     }[];
   }
 ): Promise<{ id: string; slug: string }> {
-  const slug = generateSlug(data.title);
+  const slug = await generateRouteSlugFromTitle(data.title);
 
   // Derive coverImageUrl from first stop with a photo
   const coverImageUrl =
@@ -137,6 +141,7 @@ export async function createRoute(
   return prisma.route.create({
     data: {
       slug,
+      slugUpdatedAt: new Date(),
       title: data.title,
       ageTags: data.ageTags,
       budgetLevel: data.budgetLevel,
@@ -160,21 +165,3 @@ export async function createRoute(
     select: { id: true, slug: true },
   });
 }
-
-function generateSlug(title: string): string {
-  const base = title
-    .toLowerCase()
-    .replace(/[а-яё]/g, (c) => RU_MAP[c] ?? c)
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "")
-    .slice(0, 60);
-  return `${base}-${Date.now().toString(36)}`;
-}
-
-const RU_MAP: Record<string, string> = {
-  а: "a", б: "b", в: "v", г: "g", д: "d", е: "e", ё: "yo",
-  ж: "zh", з: "z", и: "i", й: "y", к: "k", л: "l", м: "m",
-  н: "n", о: "o", п: "p", р: "r", с: "s", т: "t", у: "u",
-  ф: "f", х: "h", ц: "ts", ч: "ch", ш: "sh", щ: "sch",
-  ъ: "", ы: "y", ь: "", э: "e", ю: "yu", я: "ya",
-};

@@ -115,6 +115,128 @@ async function main() {
     })
   }
 
+  // Minimal test data for SEO Control Center (Event entity pages)
+  console.log("Seeding demo Event (Activity)...")
+  const admin = await prisma.user.upsert({
+    where: { email: "admin@mamago.local" },
+    update: { role: "ADMIN" },
+    create: {
+      email: "admin@mamago.local",
+      passwordHash: "dev-only",
+      role: "ADMIN",
+    },
+  })
+
+  const demoPlace = await prisma.place.upsert({
+    where: { slug: "demo-place" },
+    update: {},
+    create: {
+      ownerUserId: admin.id,
+      status: "PUBLISHED",
+      slug: "demo-place",
+      slugUpdatedAt: new Date(),
+      title: "Demo Place",
+      category: "park",
+      shortDesc: "Демо-место для тестов SEO.",
+      cityId: minsk.id,
+      ageTags: [],
+      visitFormats: [],
+      activityTypes: [],
+      locationSource: "MANUAL",
+    },
+  })
+
+  console.log("Seeding demo Offer...")
+  const demoOffer = await prisma.offer.upsert({
+    where: { slug: "demo-offer-dlya-dnya-rozhdeniya" },
+    update: {},
+    create: {
+      placeId: demoPlace.id,
+      kind: "SERVICE",
+      status: "PUBLISHED",
+      publishedAt: new Date(),
+      title: "Демо оффер для дня рождения",
+      description: "Пакет для детского праздника: анимация + зал + угощения.",
+      slug: "demo-offer-dlya-dnya-rozhdeniya",
+      slugUpdatedAt: new Date(),
+      seoRobots: "index,follow",
+      priceFrom: 150,
+      priceText: "от 150 BYN",
+    },
+  })
+
+  console.log(`Demo offer id=${demoOffer.id} slug=${demoOffer.slug}`)
+
+  const demoEvent = await prisma.activity.upsert({
+    where: { slug: "detskiy-spektakl-v-minske" },
+    update: {},
+    create: {
+      type: "EVENT",
+      status: "PUBLISHED",
+      ownerUserId: admin.id,
+      title: "Детский спектакль в Минске",
+      shortDesc: "Демо-событие для проверки slug/SEO editor/Schema/Redirects.",
+      description: "<p>Тестовое описание события.</p>",
+      ageTags: ["0-12"],
+      scheduleMode: "MULTI_DATE",
+      scheduleJson: {},
+      placeId: demoPlace.id,
+      cityId: minsk.id,
+      slug: "detskiy-spektakl-v-minske",
+      slugUpdatedAt: new Date(),
+      seoRobots: "index,follow",
+    },
+  })
+
+  await prisma.activitySession.createMany({
+    data: [
+      { activityId: demoEvent.id, startsAt: new Date(Date.now() + 24 * 3600 * 1000) },
+      { activityId: demoEvent.id, startsAt: new Date(Date.now() + 48 * 3600 * 1000) },
+    ],
+    skipDuplicates: true,
+  })
+
+  console.log(`Demo event id=${demoEvent.id} slug=${demoEvent.slug}`)
+
+  console.log("Seeding demo Route...")
+  const demoRoute = await prisma.route.upsert({
+    where: { slug: "demo-route-svisloch" },
+    update: {},
+    create: {
+      slug: "demo-route-svisloch",
+      slugUpdatedAt: new Date(),
+      title: "Демо маршрут вдоль Свислочи",
+      ageTags: ["3-7"],
+      budgetLevel: "FREE",
+      status: "PUBLISHED",
+      visibility: "PUBLIC",
+      stops: {
+        create: [
+          { order: 1, note: "Старт у набережной", address: "Минск, набережная", photoUrl: null },
+          { order: 2, note: "Остановка у кафе", address: "Минск, кафе", photoUrl: null },
+        ],
+      },
+      seoRobots: "index,follow",
+    },
+  })
+  console.log(`Demo route id=${demoRoute.id} slug=${demoRoute.slug}`)
+
+  console.log("Seeding demo Article...")
+  const demoArticle = await prisma.article.upsert({
+    where: { slug: "demo-premium-article" },
+    update: { status: "PUBLISHED", publishedAt: new Date("2026-03-10T00:00:00.000Z") },
+    create: {
+      slug: "demo-premium-article",
+      slugUpdatedAt: new Date(),
+      title: "Как провести выходные с детьми в Минске: 7 идей",
+      subtitle: "От парков до мастер-классов — собрали лучшее для семейного уикенда",
+      excerpt: "7 идей для выходных с детьми в Минске: парки, мастер-классы, музеи и маршруты.",
+      status: "PUBLISHED",
+      publishedAt: new Date("2026-03-10T00:00:00.000Z"),
+      seoRobots: "index,follow",
+    },
+  })
+  console.log(`Demo article id=${demoArticle.id} slug=${demoArticle.slug}`)
   console.log('Seeding finished.')
 }
 

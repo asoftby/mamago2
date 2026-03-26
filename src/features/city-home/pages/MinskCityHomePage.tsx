@@ -12,7 +12,7 @@ import { MINSK_BREAKING_NEWS } from "@/features/city-home/data/minskCityHome";
 
 export function MinskCityHomePage() {
   return (
-    <div className="min-h-screen bg-background pb-20">
+    <div className="min-h-screen bg-white pb-20">
       {/* pt-10 = тот же шаг, что space-y-10 (2.5rem). В layout уже есть <main> — здесь только div. */}
       <Container className="space-y-10 pt-10">
         <div className="space-y-1 px-1">

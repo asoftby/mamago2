@@ -440,6 +440,21 @@ model Activity {
   type   ActivityType
   status ContentStatus @default(DRAFT)
 
+  // SEO-friendly URL slug (public pages)
+  slug          String?   @unique
+  slugUpdatedAt DateTime? // Track when slug was last changed
+
+  // SEO fields (editable via SEO Control Center)
+  seoTitle          String?
+  seoDescription    String?
+  seoH1             String?
+  seoCanonicalUrl   String?
+  seoOgTitle        String?
+  seoOgDescription  String?
+  seoOgImage        String?
+  seoRobots         String? // e.g. "index,follow" | "noindex,nofollow"
+  seoJsonLdOverride Json?
+
   // Basic info
   title       String
   shortDesc   String
@@ -489,6 +504,7 @@ model Activity {
   planItems     PlanItem[]
   images        ActivityImage[]
   venue         EventVenue?
+  slugHistory   ActivitySlugHistory[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -503,6 +519,21 @@ model Activity {
   @@index([businessId])
   @@index([cityId])
   @@index([eventCategoryId])
+  @@index([slug])
+}
+
+// Activity slug history (for SEO-friendly redirects)
+// Stores old slugs when an activity's slug changes
+model ActivitySlugHistory {
+  id         String   @id @default(cuid())
+  activityId String
+  slug       String   @unique // Old slug that should redirect to current activity
+  createdAt  DateTime @default(now())
+
+  activity Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+
+  @@index([activityId])
+  @@index([slug])
 }
 
 // Activity images
@@ -815,6 +846,17 @@ model Place {
   // SEO-friendly URL slug
   slug          String?   @unique
   slugUpdatedAt DateTime? // Track when slug was last changed
+
+  // SEO fields (editable via SEO Control Center)
+  seoTitle          String?
+  seoDescription    String?
+  seoH1             String?
+  seoCanonicalUrl   String?
+  seoOgTitle        String?
+  seoOgDescription  String?
+  seoOgImage        String?
+  seoRobots         String? // e.g. "index,follow" | "noindex,nofollow"
+  seoJsonLdOverride Json?
 
   // Idempotency key for creation (prevents duplicate places)
   createRequestId String?
@@ -1395,6 +1437,22 @@ model Offer {
   id          String    @id @default(cuid())
   placeId     String
   kind        OfferKind
+  
+  // SEO-friendly URL slug (public pages)
+  slug          String?   @unique
+  slugUpdatedAt DateTime? // Track when slug was last changed
+
+  // SEO fields (editable via SEO Control Center)
+  seoTitle          String?
+  seoDescription    String?
+  seoH1             String?
+  seoCanonicalUrl   String?
+  seoOgTitle        String?
+  seoOgDescription  String?
+  seoOgImage        String?
+  seoRobots         String? // e.g. "index,follow" | "noindex,nofollow"
+  seoJsonLdOverride Json?
+
   title       String
   description String?
   coverImage  String?
@@ -1427,6 +1485,7 @@ model Offer {
   place        Place         @relation(fields: [placeId], references: [id], onDelete: Cascade)
   openingHours OpeningHours? @relation(fields: [openingHoursId], references: [id], onDelete: SetNull)
   boosts       Boost[]
+  slugHistory  OfferSlugHistory[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1437,6 +1496,21 @@ model Offer {
   @@index([dateFrom])
   @@index([ageMinMonths, ageMaxMonths])
   @@index([openingHoursId])
+  @@index([slug])
+}
+
+// Offer slug history (for SEO-friendly redirects)
+// Stores old slugs when an offer's slug changes
+model OfferSlugHistory {
+  id        String   @id @default(cuid())
+  offerId   String
+  slug      String   @unique // Old slug that should redirect to current offer
+  createdAt DateTime @default(now())
+
+  offer Offer @relation(fields: [offerId], references: [id], onDelete: Cascade)
+
+  @@index([offerId])
+  @@index([slug])
 }
 
 // Boost entity (ranking modifier only)
@@ -2100,10 +2174,22 @@ enum BudgetLevel {
 model Route {
   id    String @id @default(cuid())
   slug  String @unique
+  slugUpdatedAt DateTime? // Track when slug was last changed
 
   title      String
   ageTags    String[] // e.g., ["0-3", "3-7"] — same pattern as Activity/Place
   budgetLevel BudgetLevel @default(LOW)
+
+  // SEO fields (editable via SEO Control Center)
+  seoTitle          String?
+  seoDescription    String?
+  seoH1             String?
+  seoCanonicalUrl   String?
+  seoOgTitle        String?
+  seoOgDescription  String?
+  seoOgImage        String?
+  seoRobots         String? // e.g. "index,follow" | "noindex,nofollow"
+  seoJsonLdOverride Json?
 
   // Auto-derived from stops
   cityId        String?
@@ -2119,6 +2205,7 @@ model Route {
   author User?       @relation(fields: [authorId], references: [id], onDelete: SetNull, name: "RouteAuthor")
   city   City?       @relation(fields: [cityId], references: [id], onDelete: SetNull)
   stops  RouteStop[]
+  slugHistory RouteSlugHistory[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -2126,6 +2213,66 @@ model Route {
   @@index([status, visibility])
   @@index([authorId])
   @@index([cityId])
+  @@index([slug])
+}
+
+model RouteSlugHistory {
+  id        String   @id @default(cuid())
+  routeId   String
+  slug      String   @unique
+  createdAt DateTime @default(now())
+
+  route Route @relation(fields: [routeId], references: [id], onDelete: Cascade)
+
+  @@index([routeId])
+  @@index([slug])
+}
+
+model Article {
+  id    String @id @default(cuid())
+  slug  String? @unique
+  slugUpdatedAt DateTime?
+
+  title     String
+  subtitle  String?
+  excerpt   String?
+  contentJson Json?
+  heroImage  String?
+
+  // SEO fields
+  seoTitle          String?
+  seoDescription    String?
+  seoH1             String?
+  seoCanonicalUrl   String?
+  seoOgTitle        String?
+  seoOgDescription  String?
+  seoOgImage        String?
+  seoRobots         String?
+  seoJsonLdOverride Json?
+
+  // Publication
+  publishedAt DateTime?
+  status      ContentStatus @default(DRAFT)
+
+  slugHistory ArticleSlugHistory[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([slug])
+  @@index([status])
+  @@index([publishedAt])
+}
+
+model ArticleSlugHistory {
+  id        String   @id @default(cuid())
+  articleId String
+  slug      String   @unique
+  createdAt DateTime @default(now())
+
+  article Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
+
+  @@index([articleId])
   @@index([slug])
 }
 

@@ -1,4 +1,4 @@
-import { notFound, redirect } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import prisma from "@/lib/prisma";
 import { Metadata } from "next";
 import { getPlaceDisplayTitle } from "@/lib/placeDisplayTitle";
@@ -12,6 +12,7 @@ import { canShowEditButton } from "@/lib/permissions/placeEditPermissions";
 import { PlaceEditStepSelector } from "@/components/place/PlaceEditStepSelector";
 import { isPlacePubliclyVisible } from "@/lib/plan/publicVisibility";
 import { placeOwnerBusinessActiveWhere } from "@/server/public/publicContentVisibility";
+import { buildPlaceJsonLd } from "@/lib/seo/schema/buildPlaceJsonLd";
 
 interface PlacePageProps {
   params: Promise<{ slug: string }>;
@@ -27,6 +28,8 @@ export async function generateMetadata({ params }: PlacePageProps): Promise<Meta
     id: string;
     title: string;
     shortDesc: string;
+    seoTitle: string | null;
+    seoDescription: string | null;
     formattedAddr: string | null;
     customAddress: string | null;
     cityId: string | null;
@@ -43,6 +46,8 @@ export async function generateMetadata({ params }: PlacePageProps): Promise<Meta
         id: true,
         title: true, 
         shortDesc: true,
+        seoTitle: true,
+        seoDescription: true,
         formattedAddr: true,
         customAddress: true,
         cityId: true,
@@ -75,6 +80,8 @@ export async function generateMetadata({ params }: PlacePageProps): Promise<Meta
         id: true,
         title: true, 
         shortDesc: true,
+        seoTitle: true,
+        seoDescription: true,
         formattedAddr: true,
         customAddress: true,
         cityId: true,
@@ -110,8 +117,8 @@ export async function generateMetadata({ params }: PlacePageProps): Promise<Meta
   });
 
   return {
-    title: displayTitle,
-    description: place.shortDesc,
+    title: place.seoTitle?.trim() || displayTitle,
+    description: place.seoDescription?.trim() || place.shortDesc,
   };
 }
 
@@ -125,20 +132,24 @@ export default async function PlacePage({ params }: PlacePageProps) {
   const isLegacyId = slug.length > 20 && !slug.includes("-");
   
   let placeId: string;
+  let currentSlug: string | null = null;
   
   if (isLegacyId) {
     // Legacy ID - find by id and redirect to slug URL
     const place = await prisma.place.findUnique({
       where: { id: slug },
-      select: { id: true },
+      select: { id: true, slug: true },
     });
     
     if (!place) {
       notFound();
     }
     
-    // For now, just use the ID as the place identifier
     placeId = place.id;
+    currentSlug = place.slug;
+    if (currentSlug) {
+      permanentRedirect(`/places/${currentSlug}`);
+    }
   } else {
     // Modern slug - find by current slug or historical slug
     const slugResult = await findPlaceBySlug(slug);
@@ -149,17 +160,14 @@ export default async function PlacePage({ params }: PlacePageProps) {
     
     placeId = slugResult.placeId;
     
-    // If found in history, we need to redirect to current slug
     if (slugResult.isRedirect) {
       const currentPlace = await prisma.place.findUnique({
         where: { id: placeId },
-        select: { id: true },
+        select: { slug: true },
       });
       
-      if (!currentPlace) {
-        // Place exists but has no current slug
-        notFound();
-      }
+      if (!currentPlace?.slug) notFound();
+      permanentRedirect(`/places/${currentPlace.slug}`);
     }
   }
   
@@ -241,6 +249,21 @@ export default async function PlacePage({ params }: PlacePageProps) {
   // Get formatted location string
   const locationString = getPlaceLocationString(place);
 
+  const publicBase = process.env.NEXT_PUBLIC_APP_URL || "https://mamago.by";
+  const jsonLd =
+    place.seoJsonLdOverride && typeof place.seoJsonLdOverride === "object"
+      ? (place.seoJsonLdOverride as Record<string, unknown>)
+      : buildPlaceJsonLd({
+          place: {
+            title: place.title,
+            description: place.description,
+            slug: place.slug,
+            formattedAddr: place.formattedAddr,
+            customAddress: place.customAddress,
+          },
+          publicBase,
+        });
+
   // Fetch related places from the same network/group
   const relatedPlaces = place.placeGroupId
     ? await prisma.place.findMany({
@@ -303,6 +326,11 @@ export default async function PlacePage({ params }: PlacePageProps) {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <script
+        type="application/ld+json"
+        // eslint-disable-next-line react/no-danger
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       <div className="max-w-4xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="bg-white rounded-lg shadow-sm p-6 mb-6">

@@ -69,7 +69,7 @@ export function ArticlePlacesShowcaseBlock({
                       {featured.category}
                     </span>
                   )}
-                  <h3 className="font-semibold text-base text-white leading-snug group-hover:opacity-90 transition-opacity">
+                  <h3 className="!font-sans font-semibold text-base text-white leading-snug group-hover:opacity-90 transition-opacity">
                     {featured.title}
                   </h3>
                   {featured.location && (

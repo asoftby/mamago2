@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import { ArticleHeader } from "@/components/article/ArticleHeader";
 import { ArticleContent } from "@/components/article/ArticleContent";
 import { ArticleEventCardBlock } from "@/components/article/blocks/ArticleEventCardBlock";
@@ -6,8 +6,48 @@ import { ArticlePlaceCardBlock } from "@/components/article/blocks/ArticlePlaceC
 import { ArticleOfferCardBlock } from "@/components/article/blocks/ArticleOfferCardBlock";
 import { ArticleRouteCardBlock } from "@/components/article/blocks/ArticleRouteCardBlock";
 import { ArticlePlacesShowcaseBlock } from "@/components/article/blocks/ArticlePlacesShowcaseBlock";
+import prisma from "@/lib/prisma";
+import { findArticleBySlug } from "@/lib/slug/articleSlugService";
+import { buildArticleJsonLd } from "@/lib/seo/schema/buildArticleJsonLd";
+import type { ArticleVm } from "@/lib/blog/articleTypes";
 
-async function getArticle(slug: string) {
+async function getArticle(slug: string): Promise<ArticleVm | null> {
+  const resolved = await findArticleBySlug(slug);
+  if (resolved) {
+    const a = await prisma.article.findUnique({
+      where: { id: resolved.articleId },
+      select: {
+        id: true,
+        slug: true,
+        title: true,
+        subtitle: true,
+        excerpt: true,
+        heroImage: true,
+        publishedAt: true,
+        seoTitle: true,
+        seoDescription: true,
+        seoH1: true,
+        seoCanonicalUrl: true,
+        seoOgTitle: true,
+        seoOgDescription: true,
+        seoOgImage: true,
+        seoRobots: true,
+        seoJsonLdOverride: true,
+      },
+    });
+    if (!a) return null;
+    return {
+      slug: a.slug ?? slug,
+      title: a.seoH1?.trim() || a.title,
+      subtitle: a.subtitle ?? (a.excerpt ?? ""),
+      category: "Журнал",
+      readTime: 5,
+      publishedAt: a.publishedAt ? a.publishedAt.toISOString().slice(0, 10) : "—",
+      heroImage: a.heroImage,
+      _redirectToSlug: resolved.isRedirect ? a.slug : null,
+      _seo: a,
+    };
+  }
   if (slug === "demo-premium-article") {
     return {
       slug,
@@ -31,9 +71,24 @@ export async function generateMetadata({
   const { slug } = await params;
   const article = await getArticle(slug);
   if (!article) return {};
+  if ("_redirectToSlug" in article && article._redirectToSlug) {
+    permanentRedirect(`/blog/${article._redirectToSlug}`);
+  }
+  const seo = "_seo" in article ? article._seo : undefined;
   return {
-    title: `${article.title} — mamaGo`,
-    description: article.subtitle,
+    title: seo?.seoTitle?.trim() || `${article.title} — mamaGo`,
+    description: seo?.seoDescription?.trim() || article.subtitle,
+    alternates: seo?.seoCanonicalUrl?.trim()
+      ? { canonical: seo.seoCanonicalUrl.trim() }
+      : undefined,
+    openGraph: {
+      title: seo?.seoOgTitle?.trim() || seo?.seoTitle?.trim() || `${article.title} — mamaGo`,
+      description: seo?.seoOgDescription?.trim() || seo?.seoDescription?.trim() || article.subtitle,
+      images:
+        seo?.seoOgImage?.trim() || seo?.heroImage
+          ? [{ url: seo.seoOgImage?.trim() || seo.heroImage! }]
+          : undefined,
+    },
   };
 }
 
@@ -98,16 +153,48 @@ export default async function ArticlePage({
   const { slug } = await params;
   const article = await getArticle(slug);
   if (!article) notFound();
+  if ("_redirectToSlug" in article && article._redirectToSlug) {
+    permanentRedirect(`/blog/${article._redirectToSlug}`);
+  }
+
+  const seo = "_seo" in article ? article._seo : undefined;
+  const publicBase = process.env.NEXT_PUBLIC_APP_URL || "https://mamago.by";
+  const jsonLd =
+    seo?.seoJsonLdOverride && typeof seo.seoJsonLdOverride === "object"
+      ? (seo.seoJsonLdOverride as Record<string, unknown>)
+      : seo
+        ? buildArticleJsonLd({
+            article: {
+              slug: seo.slug,
+              title: seo.title,
+              excerpt: seo.excerpt,
+              heroImage: seo.heroImage,
+              publishedAt: seo.publishedAt,
+            },
+            publicBase,
+          })
+        : null;
 
   return (
     <main className="max-w-3xl mx-auto px-4 sm:px-6 py-12 md:py-16">
+      {jsonLd && (
+        <script
+          type="application/ld+json"
+          // eslint-disable-next-line react/no-danger
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
+      )}
       <ArticleHeader
         title={article.title}
         subtitle={article.subtitle}
         category={article.category}
         readTime={article.readTime}
         publishedAt={article.publishedAt}
-        heroImage={article.heroImage ?? undefined}
+        heroImage={
+          article.heroImage
+            ? { src: article.heroImage, alt: article.title }
+            : undefined
+        }
       />
 
       <ArticleContent>

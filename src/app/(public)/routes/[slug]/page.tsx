@@ -1,8 +1,11 @@
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import { MOCK_ROUTES, BUDGET_LABELS } from "@/mocks/routes.mock";
 import { formatAgeKeysShort } from "@/lib/config/ages";
 import { getRouteBySlug, type RouteWithStops } from "@/server/services/route.service";
 import { RouteDetailClient } from "./RouteDetailClient";
+import prisma from "@/lib/prisma";
+import { findRouteBySlug } from "@/lib/slug/routeSlugService";
+import { buildRouteJsonLd } from "@/lib/seo/schema/buildRouteJsonLd";
 
 type Props = {
   params: Promise<{ slug: string }>;
@@ -32,11 +35,15 @@ export async function generateMetadata({ params }: Props) {
       description: `${mock.stopsCount} точки · ${BUDGET_LABELS[mock.budgetLevel]} · ${formatAgeKeysShort(mock.ageTags)}`,
     };
   }
+  const resolved = await findRouteBySlug(slug);
+  if (!resolved) return {};
   const db = await getRouteBySlug(slug).catch(() => null);
   if (!db) return {};
   return {
-    title: `${db.title} — маршрут | mamaGo`,
-    description: `${db.stops.length} точки · ${BUDGET_LABELS[db.budgetLevel as keyof typeof BUDGET_LABELS] ?? ""}`,
+    title: db.seoTitle?.trim() || `${db.title} — маршрут | mamaGo`,
+    description:
+      db.seoDescription?.trim() ||
+      `${db.stops.length} точки · ${BUDGET_LABELS[db.budgetLevel as keyof typeof BUDGET_LABELS] ?? ""}`,
   };
 }
 
@@ -48,8 +55,24 @@ export default async function RouteDetailPage({ params }: Props) {
   if (mock) return <RouteDetailClient route={mock} />;
 
   // Try DB
-  const db = await getRouteBySlug(slug).catch(() => null);
+  const resolved = await findRouteBySlug(slug);
+  if (!resolved) notFound();
+  const db = await prisma.route.findUnique({
+    where: { id: resolved.routeId },
+    include: {
+      city: { select: { id: true, name: true } },
+      author: { select: { id: true, email: true } },
+      stops: {
+        orderBy: { order: "asc" },
+        include: { place: { select: { id: true, title: true, formattedAddr: true, shortAddress: true, city: { select: { name: true } } } } },
+      },
+    },
+  });
   if (!db) notFound();
+
+  if (resolved.isRedirect) {
+    permanentRedirect(`/routes/${db.slug}`);
+  }
 
   const route = {
     id: db.id,
@@ -77,5 +100,20 @@ export default async function RouteDetailPage({ params }: Props) {
     })),
   };
 
-  return <RouteDetailClient route={route} />;
+  const publicBase = process.env.NEXT_PUBLIC_APP_URL || "https://mamago.by";
+  const jsonLd =
+    db.seoJsonLdOverride && typeof db.seoJsonLdOverride === "object"
+      ? (db.seoJsonLdOverride as Record<string, unknown>)
+      : buildRouteJsonLd({ route: db, publicBase });
+
+  return (
+    <>
+      <script
+        type="application/ld+json"
+        // eslint-disable-next-line react/no-danger
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+      <RouteDetailClient route={route} />
+    </>
+  );
 }

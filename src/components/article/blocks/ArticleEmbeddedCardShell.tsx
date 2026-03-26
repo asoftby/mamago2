@@ -6,7 +6,6 @@ import { ReactNode, useState } from "react";
 import { ArrowRight, Heart } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SaveHeart } from "@/features/save/SaveHeart";
-import { manrope } from "@/lib/fonts";
 
 /**
  * ArticleEmbeddedCardShell — unified card template for all article product blocks.
@@ -71,13 +70,13 @@ export function ArticleEmbeddedCardShell({
   }
 
   return (
-    <div className={["article-block not-prose", manrope.className, className].filter(Boolean).join(" ")}>
+    <div className={cn("article-block not-prose", className)}>
       <Link href={href} className="group block">
-        <div className="rounded-2xl overflow-hidden bg-white shadow-sm border border-black/[0.06] hover:shadow-md transition-shadow duration-200">
-          <div className="flex flex-row">
+        <div className="rounded-2xl overflow-hidden bg-white font-sans shadow-sm border border-black/[0.06] hover:shadow-md transition-shadow duration-200">
+          <div className="flex flex-col md:flex-row">
 
             {/* ── Media area ── */}
-            <div className="relative w-32 sm:w-40 shrink-0 bg-muted overflow-hidden">
+            <div className="relative w-full h-40 sm:h-auto sm:aspect-square md:w-1/3 bg-muted overflow-hidden">
               {image ? (
                 <Image
                   src={image}
@@ -95,14 +94,16 @@ export function ArticleEmbeddedCardShell({
               {imagePill && (
                 <div className="absolute top-2.5 left-2.5">{imagePill}</div>
               )}
-            </div>
 
-            {/* ── Content ── */}
-            <div className="relative flex flex-col justify-between gap-2 p-4 flex-1 min-w-0">
-
-              {/* ❤️ Save to plan — top-right of content area */}
+              {/* ❤️ Save to plan — on mobile, top-right of media */}
               {activityId ? (
-                <div className="absolute top-3 right-3" onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
+                <div
+                  className="absolute top-3 right-3 md:hidden"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                  }}
+                >
                   <SaveHeart
                     activityId={activityId}
                     activityTitle={title}
@@ -115,7 +116,46 @@ export function ArticleEmbeddedCardShell({
                   onClick={handleSave}
                   aria-label={saved ? "Сохранено" : "В план"}
                   className={cn(
-                    "absolute top-3 right-3 flex h-[40px] w-[40px] items-center justify-center rounded-full bg-white shadow-sm transition-all hover:scale-105 active:scale-95",
+                    "absolute top-3 right-3 md:hidden flex h-[40px] w-[40px] items-center justify-center rounded-full bg-white shadow-sm transition-all hover:scale-105 active:scale-95",
+                    saved ? "text-primary" : "text-muted-foreground hover:text-primary"
+                  )}
+                >
+                  <Heart
+                    className={cn(
+                      "h-5 w-5 transition-all duration-300",
+                      saved && "fill-current",
+                      animating && "scale-125"
+                    )}
+                  />
+                </button>
+              )}
+            </div>
+
+            {/* ── Content ── */}
+            <div className="relative flex flex-col justify-between gap-2 p-4 flex-1 min-w-0 md:w-2/3">
+
+              {/* ❤️ Save to plan — top-right of content area */}
+              {activityId ? (
+                <div
+                  className="absolute top-3 right-3 hidden md:block"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                  }}
+                >
+                  <SaveHeart
+                    activityId={activityId}
+                    activityTitle={title}
+                    coverImageUrl={image}
+                  />
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleSave}
+                  aria-label={saved ? "Сохранено" : "В план"}
+                  className={cn(
+                    "absolute top-3 right-3 hidden md:flex h-[40px] w-[40px] items-center justify-center rounded-full bg-white shadow-sm transition-all hover:scale-105 active:scale-95",
                     saved ? "text-primary" : "text-muted-foreground hover:text-primary"
                   )}
                 >
@@ -134,7 +174,7 @@ export function ArticleEmbeddedCardShell({
               </span>
 
               <h3
-                className="font-semibold text-[0.9375rem] leading-snug text-foreground group-hover:text-primary transition-colors line-clamp-2 pr-10 -mt-1"
+                className="!font-sans font-bold text-[0.9375rem] leading-snug text-foreground group-hover:text-primary transition-colors line-clamp-2 pr-10 -mt-1"
               >
                 {title}
               </h3>

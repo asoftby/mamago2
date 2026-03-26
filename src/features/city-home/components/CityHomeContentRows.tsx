@@ -20,7 +20,10 @@ const CLASSES_PREVIEW = MINSK_ACTIVITIES.filter((a) => a.type === "CLASS_SCHEDUL
 );
 const ROUTES_PREVIEW = MOCK_ROUTES.filter((r) => r.cityName === "Минск").slice(0, 6);
 
-const cardShell = "shrink-0 snap-start w-[42vw] min-w-[156px] max-w-[220px] sm:max-w-[240px]";
+const cardShell =
+  "shrink-0 snap-start w-[42vw] min-w-[156px] max-w-[220px] sm:max-w-[240px] " +
+  // Desktop: exactly 4 cards per row width (gap-6 => 3 * 1.5rem = 4.5rem)
+  "lg:w-[calc((100%-4.5rem)/4)] lg:max-w-none";
 
 function kudaTitle(citySlug: string): string {
   const name = getCityDisplayName(citySlug);

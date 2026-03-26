@@ -1,6 +1,99 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
+@font-face {
+  font-family: "Craftwork Grotesk";
+  src: url("/fonts/Craftwork%20Grotesk/CraftworkGrotesk-Regular.woff") format("woff");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Craftwork Grotesk";
+  src: url("/fonts/Craftwork%20Grotesk/CraftworkGrotesk-Medium.woff") format("woff");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Craftwork Grotesk";
+  src: url("/fonts/Craftwork%20Grotesk/CraftworkGrotesk-SemiBold.woff") format("woff");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Craftwork Grotesk";
+  src: url("/fonts/Craftwork%20Grotesk/CraftworkGrotesk-Bold.woff") format("woff");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Craftwork Grotesk";
+  src: url("/fonts/Craftwork%20Grotesk/CraftworkGrotesk-Heavy.woff") format("woff");
+  font-weight: 800;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "NTSomic";
+  src: url("/fonts/NTSomic/NTSomic-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "NT Somic";
+  src: url("/fonts/NTSomic/NTSomic-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "NTSomic";
+  src: url("/fonts/NTSomic/NTSomic-Medium.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "NT Somic";
+  src: url("/fonts/NTSomic/NTSomic-Medium.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "NTSomic";
+  src: url("/fonts/NTSomic/NTSomic-Semibold.woff2") format("woff2");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "NT Somic";
+  src: url("/fonts/NTSomic/NTSomic-Semibold.woff2") format("woff2");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "NTSomic";
+  src: url("/fonts/NTSomic/NTSomic-Bold.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "NT Somic";
+  src: url("/fonts/NTSomic/NTSomic-Bold.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
 /* Смена высоты fixed-хедера не должна двигать scroll (иначе рывок, особенно iOS Safari). */
 html {
   overflow-anchor: none;
@@ -21,7 +114,7 @@ html {
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-manrope);
+  --font-sans: var(--font-nt-somic), var(--font-manrope);
   --font-mono: var(--font-geist-mono);
   --font-serif: var(--font-serif);
   
@@ -80,6 +173,8 @@ html {
 :root {
   /* Default Shadcn/Tailwind */
   --radius: 0.625rem;
+  --font-craftwork: "Craftwork Grotesk";
+  --font-nt-somic: "NTSomic", "NT Somic";
   
   /* Design System Colors (mamaGo 2.0) */
   /* Using exact hex values where possible, but mapping to Tailwind variables */
@@ -267,7 +362,7 @@ html {
 
 /* ─── Article / Blog reading typography ─────────────────────────────────── */
 .article-body {
-  font-family: var(--font-serif);
+  font-family: var(--font-pt-serif, var(--font-noto-serif, var(--font-serif)));
   font-size: 1.0625rem; /* 17px */
   line-height: 1.75;
   color: var(--foreground);
@@ -286,10 +381,15 @@ html {
   margin-bottom: 1.5em;
 }
 
+.article-body > p:first-of-type {
+  font-size: calc(1em + 2pt);
+  line-height: 1.4 !important;
+}
+
 .article-body h2 {
-  font-family: var(--font-serif);
+  font-family: var(--font-nt-somic);
   font-size: 1.5rem;
-  font-weight: 600;
+  font-weight: 700;
   line-height: 1.3;
   margin-top: 2.5em;
   margin-bottom: 0.75em;
@@ -303,7 +403,7 @@ html {
 }
 
 .article-body h3 {
-  font-family: var(--font-serif);
+  font-family: var(--font-pt-serif, var(--font-noto-serif, var(--font-serif)));
   font-size: 1.25rem;
   font-weight: 600;
   line-height: 1.4;

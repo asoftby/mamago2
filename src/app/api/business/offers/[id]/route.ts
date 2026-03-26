@@ -7,6 +7,7 @@ import {
   canManageOwnedContent,
   canPublishContentDirectly,
 } from "@/lib/auth/businessContentAccess";
+import { assignOfferSlugIfMissing } from "@/lib/slug/offerSlugService";
 
 const updateOfferSchema = z.object({
   title: z.string().min(1).optional(),
@@ -149,6 +150,10 @@ export async function PATCH(
         },
       },
     });
+
+    if (data.title !== undefined && typeof data.title === "string" && data.title.trim()) {
+      await assignOfferSlugIfMissing(offer.id, data.title.trim());
+    }
 
     return NextResponse.json(offer);
 
