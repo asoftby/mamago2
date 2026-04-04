@@ -16,6 +16,15 @@ enum Role {
   ADMIN
 }
 
+/**
+ * Кто управляет seoCanonicalUrl: автосинхронизация, ручной override или fallback (id URL без slug).
+ */
+enum SeoCanonicalSource {
+  AUTO
+  MANUAL
+  FALLBACK
+}
+
 enum UserStatus {
   ACTIVE
   LIMITED
@@ -32,6 +41,36 @@ enum UserModerationActionType {
   ROLE_CHANGE
 }
 
+enum UserEventType {
+  PAGE_VIEW
+  CARD_VIEW
+  DETAIL_OPEN
+  SAVE
+  UNSAVE
+  PLAN_ADD
+  PLAN_REMOVE
+  CTA_CLICK
+  SEARCH_APPLY
+  FILTER_APPLY
+}
+
+enum AnalyticsEntityType {
+  EVENT
+  PLACE
+  OFFER
+  ROUTE
+  ARTICLE
+}
+
+enum AnalyticsVertical {
+  CITY
+  TRAVEL
+  BIRTHDAY
+  EDUCATION
+  WEEKEND
+  SEASONAL
+}
+
 model Healthcheck {
   id        String   @id @default(cuid())
   createdAt DateTime @default(now())
@@ -43,6 +82,21 @@ model User {
   email        String @unique
   passwordHash String
   role         Role   @default(USER)
+
+  // Profile
+  displayName String?
+  avatarUrl   String?
+
+  /// Роль в семье (блок «Моя семья»): MOM | DAD | GRANDMA | GRANDPA | ADULT
+  familyRole           String?
+  ageBandLabel         String?
+  preferenceSummary    String?
+  leisureFormatSummary String?
+
+  /// Дочерние SignalDefinition (parent.slug = preferences), макс. 3 в UI
+  preferenceSignalIds   String[] @default([])
+  /// Дочерний SignalDefinition (parent.slug = leisure-format), один
+  leisureFormatSignalId String?
 
   resetToken        String?
   resetTokenExpires DateTime?
@@ -65,26 +119,29 @@ model User {
   ideas                         Idea[]
   planItems                     PlanItem[]
   phoneOtps                     PhoneOtp[]
-  reviewedBusinessVerifications BusinessVerificationLog[] @relation("ReviewedBy")
-  places                        Place[]                   @relation("PlaceOwner")
-  moderatedPlaces               Place[]                   @relation("PlaceModerator")
-  archivedPlaces                Place[]                   @relation("PlaceArchiver")
-  placeRevisions                PlaceRevision[]           @relation("PlaceRevisionReviewer")
-  moderationLogs                ModerationLog[]           @relation("ModerationReviewer")
-  activities                    Activity[]                @relation("ActivityOwner")
-  placeClaimRequests            PlaceClaimRequest[]       @relation("ClaimRequester")
-  reviewedPlaceClaimRequests    PlaceClaimRequest[]       @relation("ClaimReviewer")
+  reviewedBusinessVerifications BusinessVerificationLog[]    @relation("ReviewedBy")
+  createdPlaces                 Place[]                      @relation("PlaceCreator")
+  moderatedPlaces               Place[]                      @relation("PlaceModerator")
+  archivedPlaces                Place[]                      @relation("PlaceArchiver")
+  placeRevisions                PlaceRevision[]              @relation("PlaceRevisionReviewer")
+  moderationLogs                ModerationLog[]              @relation("ModerationReviewer")
+  activities                    Activity[]                   @relation("ActivityOwner")
+  placeClaimRequests            PlaceClaimRequest[]          @relation("ClaimRequester")
+  reviewedPlaceClaimRequests    PlaceClaimRequest[]          @relation("ClaimReviewer")
   tempMedia                     TempMedia[]
   notifications                 Notification[]
-  contentEdits                  ContentEditLog[]          @relation("ContentEditor")
-  createdImprovementRequests    ImprovementRequest[]      @relation("ImprovementRequestCreator")
-  assignedImprovementRequests   ImprovementRequest[]      @relation("ImprovementRequestAssignee")
-  moderationActions             UserModerationAction[]    @relation("TargetUser")
-  performedModerationActions    UserModerationAction[]    @relation("ModeratorUser")
-  auditLogs                     AuditLog[]                @relation("AuditTarget")
-  performedAudits               AuditLog[]                @relation("AuditActor")
+  contentEdits                  ContentEditLog[]             @relation("ContentEditor")
+  createdImprovementRequests    ImprovementRequest[]         @relation("ImprovementRequestCreator")
+  assignedImprovementRequests   ImprovementRequest[]         @relation("ImprovementRequestAssignee")
+  moderationActions             UserModerationAction[]       @relation("TargetUser")
+  performedModerationActions    UserModerationAction[]       @relation("ModeratorUser")
+  auditLogs                     AuditLog[]                   @relation("AuditTarget")
+  performedAudits               AuditLog[]                   @relation("AuditActor")
   uploadedMediaAssets           MediaAsset[]
-  routes                        Route[]      @relation("RouteAuthor")
+  routes                        Route[]                      @relation("RouteAuthor")
+  notificationPreferences       UserNotificationPreference[]
+  userEvents                    UserEvent[]
+  behaviorProfile               UserBehaviorProfile?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -94,6 +151,63 @@ model User {
   @@index([phoneE164])
   @@index([status])
   @@index([lastLoginAt])
+}
+
+model UserBehaviorProfile {
+  id     String @id @default(cuid())
+  userId String @unique
+
+  totalViews     Int @default(0)
+  totalOpens     Int @default(0)
+  totalSaves     Int @default(0)
+  totalPlanAdds  Int @default(0)
+  totalCtaClicks Int @default(0)
+
+  firstSeenAt DateTime?
+  lastSeenAt  DateTime?
+
+  weekendShare         Float @default(0)
+  sameDayPlanningShare Float @default(0)
+  advancePlanningShare Float @default(0)
+
+  preferredFormats    Json?
+  preferredCategories Json?
+  preferredSignals    Json?
+  preferredVerticals  Json?
+
+  /// PLAN_ADD buckets: same_day, weekend, advance (внутренние агрегаты).
+  planningBuckets Json?
+  /// Вычисляемые сегменты (SegmentResolverService), например NEW_USER, SAVER.
+  segmentKeys     String[] @default([])
+
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([lastSeenAt])
+}
+
+model UserEvent {
+  id         String               @id @default(cuid())
+  userId     String?
+  sessionId  String?
+  eventType  UserEventType
+  entityType AnalyticsEntityType?
+  entityId   String?
+  vertical   AnalyticsVertical?
+  cityId     String?
+  meta       Json?
+  createdAt  DateTime             @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([sessionId, createdAt])
+  @@index([eventType, createdAt])
+  @@index([entityType, entityId, createdAt])
+  @@index([vertical, createdAt])
+  @@index([cityId, createdAt])
 }
 
 model Session {
@@ -132,9 +246,9 @@ model PhoneOtp {
 }
 
 model Child {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   name      String
-  birthDate DateTime
+  birthDate DateTime?
   interests String? // Legacy field - will be deprecated
   parentId  String
 
@@ -170,7 +284,7 @@ model ChildInterest {
 model ChildCustomInterest {
   id             String  @id @default(cuid())
   childId        String
-  label          String  // User-entered text, e.g., "динозавры"
+  label          String // User-entered text, e.g., "динозавры"
   normalizedSlug String? // Future: normalized version for matching
   status         String  @default("RAW") // RAW, NORMALIZED, etc.
 
@@ -225,14 +339,16 @@ enum UiPlacement {
 }
 
 model SignalDefinition {
-  id        String  @id @default(cuid())
-  slug      String  @unique
-  title     String
-  titleEn   String  @default("")
-  icon      String?
-  order     Int     @default(0)
-  isActive  Boolean @default(true)
+  id         String  @id @default(cuid())
+  slug       String  @unique
+  title      String
+  titleEn    String  @default("")
+  icon       String?
+  order      Int     @default(0)
+  isActive   Boolean @default(true)
   isFeatured Boolean @default(false)
+  /// True = seeded by system, cannot be deleted, key (slug) is immutable
+  isSystem   Boolean @default(false)
 
   /// Два уровня: только корень (parentId = null) может иметь детей.
   parentId String?
@@ -272,6 +388,8 @@ model FilterDefinition {
   orderIndex Int            @default(0)
   placement  UiPlacement    @default(PRIMARY)
   isActive   Boolean        @default(true)
+  /// True = seeded by system, cannot be deleted, slug is immutable
+  isSystem   Boolean        @default(false)
   options    FilterOption[]
 
   createdAt DateTime @default(now())
@@ -294,37 +412,78 @@ model FilterOption {
   @@index([filterId, isActive, order])
 }
 
-/// Плоские оси Discovery: поводы / темы / жанры (отдельно от EventCategory и SignalDefinition).
+/// Плоские оси Discovery: поводы / интересы / жанры (отдельно от EventCategory и SignalDefinition).
 enum DiscoveryTaxonomyAxis {
   OCCASION
-  THEME
+  INTEREST
   GENRE
 }
 
 model DiscoveryTaxonomyEntry {
-  id        String                @id @default(cuid())
-  axis      DiscoveryTaxonomyAxis
-  slug      String
-  title     String
-  sortOrder Int                   @default(0)
-  isActive  Boolean               @default(true)
-  createdAt DateTime              @default(now())
-  updatedAt DateTime              @updatedAt
+  id         String                @id @default(cuid())
+  axis       DiscoveryTaxonomyAxis
+  slug       String
+  title      String
+  sortOrder  Int                   @default(0)
+  isActive   Boolean               @default(true)
+  /// Soft-archive: set instead of hard delete
+  archivedAt DateTime?
+  createdAt  DateTime              @default(now())
+  updatedAt  DateTime              @updatedAt
 
   @@unique([axis, slug])
   @@index([axis, sortOrder])
 }
 
+/// Плоский справочник поводов (календарь, сезоны, семейные даты) — отдельно от DiscoveryTaxonomyEntry.
+enum OccasionType {
+  HOLIDAY
+  SEASON
+  EVENT
+  FAMILY
+}
+
+model Occasion {
+  id        String       @id @default(cuid())
+  name      String
+  slug      String       @unique
+  type      OccasionType
+  isActive  Boolean      @default(true)
+  sortOrder Int          @default(0)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  @@index([sortOrder])
+  @@index([type, sortOrder])
+}
+
+/// Тип публикации для таксономии категорий (события, места, маршруты и т.д.).
+enum EventCategoryPublicationType {
+  EVENT
+  PLACE
+  OFFER
+  ROUTE
+  ARTICLE
+}
+
 /// Категории событий — отдельный справочник админки «Фильтры» (не SignalDefinition / не ranking).
 model EventCategory {
-  id         String   @id @default(cuid())
-  nameRu     String
-  nameEn     String
-  slug       String   @unique
-  icon       String?
-  sortOrder  Int      @default(0)
-  isActive   Boolean  @default(true)
-  isFeatured Boolean  @default(false)
+  id                  String                       @id @default(cuid())
+  nameRu              String
+  nameEn              String
+  slug                String                       @unique
+  /// Сегментация категорий по типу контента (единый справочник, разные табы в админке).
+  publicationType     EventCategoryPublicationType @default(EVENT)
+  icon                String?
+  sortOrder           Int                          @default(0)
+  isActive            Boolean                      @default(true)
+  isFeatured          Boolean                      @default(false)
+  /// Если true → при выборе этой категории как основной у события показываем блок «Что будет в программе».
+  supportsProgram     Boolean                      @default(false)
+  /// Если true → эту категорию можно выбирать внутри «программы» другого события.
+  selectableInProgram Boolean                      @default(false)
+  /// Soft-archive: set instead of hard delete
+  archivedAt          DateTime?
 
   /// Родительская категория: только корень (parentId = null) может иметь детей; максимум 2 уровня.
   parentId String?
@@ -333,7 +492,10 @@ model EventCategory {
 
   options EventCategoryOption[]
 
-  activities Activity[]
+  genres Genre[]
+
+  activities           Activity[]
+  activityProgramLinks ActivityProgramCategory[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -342,6 +504,27 @@ model EventCategory {
   @@index([isActive, sortOrder])
   @@index([parentId])
   @@index([parentId, sortOrder])
+  @@index([publicationType])
+  @@index([publicationType, sortOrder])
+}
+
+/// Жанры контента, привязанные к корневой категории события.
+/// Уникальность slug — в рамках category (одинаковые slug в разных категориях разрешены).
+/// Дубли name/slug внутри одной категории блокируются в API (и name — дубли по названию).
+model Genre {
+  id         String        @id @default(cuid())
+  name       String
+  slug       String
+  categoryId String
+  category   EventCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  sortOrder  Int           @default(0)
+  isActive   Boolean       @default(true)
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  @@unique([categoryId, slug])
+  @@index([categoryId, sortOrder])
+  @@index([categoryId, isActive, sortOrder])
 }
 
 model EventCategoryOption {
@@ -445,15 +628,16 @@ model Activity {
   slugUpdatedAt DateTime? // Track when slug was last changed
 
   // SEO fields (editable via SEO Control Center)
-  seoTitle          String?
-  seoDescription    String?
-  seoH1             String?
-  seoCanonicalUrl   String?
-  seoOgTitle        String?
-  seoOgDescription  String?
-  seoOgImage        String?
-  seoRobots         String? // e.g. "index,follow" | "noindex,nofollow"
-  seoJsonLdOverride Json?
+  seoTitle           String?
+  seoDescription     String?
+  seoH1              String?
+  seoCanonicalUrl    String?
+  seoCanonicalSource SeoCanonicalSource @default(FALLBACK)
+  seoOgTitle         String?
+  seoOgDescription   String?
+  seoOgImage         String?
+  seoRobots          String? // e.g. "index,follow" | "noindex,nofollow"
+  seoJsonLdOverride  Json?
 
   // Basic info
   title       String
@@ -496,15 +680,16 @@ model Activity {
   eventCategory   EventCategory? @relation(fields: [eventCategoryId], references: [id], onDelete: SetNull)
 
   // Relations
-  place         Place?                 @relation("PlaceActivities", fields: [placeId], references: [id], onDelete: Restrict)
-  owner         User                   @relation(fields: [ownerUserId], references: [id], onDelete: Cascade, name: "ActivityOwner")
-  metroStation  MetroStation?          @relation(fields: [metroStationId], references: [id])
-  filterOptions ActivityFilterOption[]
-  sessions      ActivitySession[]
-  planItems     PlanItem[]
-  images        ActivityImage[]
-  venue         EventVenue?
-  slugHistory   ActivitySlugHistory[]
+  place                Place?                    @relation("PlaceActivities", fields: [placeId], references: [id], onDelete: Restrict)
+  owner                User                      @relation(fields: [ownerUserId], references: [id], onDelete: Cascade, name: "ActivityOwner")
+  metroStation         MetroStation?             @relation(fields: [metroStationId], references: [id])
+  filterOptions        ActivityFilterOption[]
+  sessions             ActivitySession[]
+  planItems            PlanItem[]
+  images               ActivityImage[]
+  venue                EventVenue?
+  slugHistory          ActivitySlugHistory[]
+  programCategoryLinks ActivityProgramCategory[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -520,6 +705,19 @@ model Activity {
   @@index([cityId])
   @@index([eventCategoryId])
   @@index([slug])
+}
+
+/// Join table: категории «в программе» события (many-to-many Activity ↔ EventCategory).
+model ActivityProgramCategory {
+  activityId String
+  categoryId String
+  createdAt  DateTime @default(now())
+
+  activity Activity      @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  category EventCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@id([activityId, categoryId])
+  @@index([categoryId])
 }
 
 // Activity slug history (for SEO-friendly redirects)
@@ -556,13 +754,13 @@ model ActivityImage {
 // Event Venue - stores location information for events
 // Separates event location from Place catalog
 model EventVenue {
-  id         String           @id @default(cuid())
-  activityId String           @unique
+  id         String         @id @default(cuid())
+  activityId String         @unique
   kind       EventVenueKind
-  
+
   // Reference to existing Place (if kind = PLACE)
-  placeId    String?
-  
+  placeId String?
+
   // Location details (populated from Place or entered manually)
   title       String?
   addressLine String?
@@ -570,27 +768,27 @@ model EventVenue {
   lat         Float?
   lng         Float?
   note        String? // For MOBILE or TBD - additional info
-  
+
   // Metadata
-  source     String? // "place", "manual", "geocoded"
-  
-  activity   Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
-  place      Place?   @relation(fields: [placeId], references: [id], onDelete: SetNull)
-  
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-  
+  source String? // "place", "manual", "geocoded"
+
+  activity Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  place    Place?   @relation(fields: [placeId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@index([activityId])
   @@index([placeId])
   @@index([kind])
 }
 
 enum EventVenueKind {
-  PLACE    // Linked to existing Place
-  MANUAL   // User entered address manually
-  MOBILE   // Traveling event (client's location)
-  TBD      // Location to be announced
-  ONLINE   // Online event (future)
+  PLACE // Linked to existing Place
+  MANUAL // User entered address manually
+  MOBILE // Traveling event (client's location)
+  TBD // Location to be announced
+  ONLINE // Online event (future)
 }
 
 // Activity sessions (specific dates/times when activity happens)
@@ -663,6 +861,10 @@ enum BusinessOperationalStatus {
 enum ContentStatus {
   DRAFT
   PENDING
+  /**
+   * Опубликовано; правки автора ждут модерации, карточка остаётся в выдаче
+   */
+  PENDING_UPDATE
   PUBLISHED
   NEEDS_REVISION // Renamed from NEEDS_CHANGES for consistency
   REJECTED
@@ -713,6 +915,14 @@ enum PlaceRevisionStatus {
   NEEDS_REVISION
   APPROVED
   REJECTED
+}
+
+// Place claim request status
+enum PlaceClaimRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELED
 }
 
 // Moderation entity type (polymorphic)
@@ -805,10 +1015,14 @@ model Business {
   verificationLogs BusinessVerificationLog[]
   billingAccount   BillingAccount?
 
+  // Business-owned content
+  places        Place[]             @relation("BusinessPlaces")
+  claimRequests PlaceClaimRequest[] @relation("ClaimedPlaces")
+
   // Commercial layer relations
-  contracts              BusinessContract[]
-  placements             BusinessPlacement[]
-  servicePlacements      BusinessServicePlacement[]
+  contracts               BusinessContract[]
+  placements              BusinessPlacement[]
+  servicePlacements       BusinessServicePlacement[]
   commercialNotifications CommercialNotification[]
 
   createdAt DateTime @default(now())
@@ -839,24 +1053,26 @@ model BusinessVerificationLog {
 
 // Place entity (location/venue profile)
 model Place {
-  id          String        @id @default(cuid())
-  ownerUserId String
-  status      ContentStatus @default(DRAFT)
+  id              String        @id @default(cuid())
+  createdByUserId String // Who created this place (audit trail)
+  ownerBusinessId String? // Which business owns this place (nullable)
+  status          ContentStatus @default(DRAFT)
 
   // SEO-friendly URL slug
   slug          String?   @unique
   slugUpdatedAt DateTime? // Track when slug was last changed
 
   // SEO fields (editable via SEO Control Center)
-  seoTitle          String?
-  seoDescription    String?
-  seoH1             String?
-  seoCanonicalUrl   String?
-  seoOgTitle        String?
-  seoOgDescription  String?
-  seoOgImage        String?
-  seoRobots         String? // e.g. "index,follow" | "noindex,nofollow"
-  seoJsonLdOverride Json?
+  seoTitle           String?
+  seoDescription     String?
+  seoH1              String?
+  seoCanonicalUrl    String?
+  seoCanonicalSource SeoCanonicalSource @default(FALLBACK)
+  seoOgTitle         String?
+  seoOgDescription   String?
+  seoOgImage         String?
+  seoRobots          String? // e.g. "index,follow" | "noindex,nofollow"
+  seoJsonLdOverride  Json?
 
   // Idempotency key for creation (prevents duplicate places)
   createRequestId String?
@@ -933,8 +1149,9 @@ model Place {
   openingHoursId String?
 
   // Relations
+  createdBy      User                @relation(fields: [createdByUserId], references: [id], onDelete: Cascade, name: "PlaceCreator")
+  ownerBusiness  Business?           @relation(fields: [ownerBusinessId], references: [id], onDelete: SetNull, name: "BusinessPlaces")
   archivedBy     User?               @relation(fields: [archivedByUserId], references: [id], onDelete: SetNull, name: "PlaceArchiver")
-  owner          User                @relation(fields: [ownerUserId], references: [id], onDelete: Cascade, name: "PlaceOwner")
   moderatedBy    User?               @relation(fields: [moderatedByUserId], references: [id], onDelete: SetNull, name: "PlaceModerator")
   city           City?               @relation(fields: [cityId], references: [id], name: "PlaceCity")
   districtAuto   District?           @relation(fields: [districtAutoId], references: [id], onDelete: SetNull, name: "PlaceDistrictAuto")
@@ -957,8 +1174,9 @@ model Place {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([ownerUserId, createRequestId]) // Prevent duplicate creation with same request ID
-  @@index([ownerUserId])
+  @@unique([createdByUserId, createRequestId]) // Prevent duplicate creation with same request ID
+  @@index([createdByUserId])
+  @@index([ownerBusinessId])
   @@index([status])
   @@index([cityId])
   @@index([googlePlaceId]) // Index for performance (not unique - multiple businesses can add same place)
@@ -979,16 +1197,16 @@ model Place {
 // Place group (for network/chain places)
 // Groups multiple places that belong to the same business network
 model PlaceGroup {
-  id          String  @id @default(cuid())
-  ownerUserId String // Owner who created the group
-  name        String? // Optional group name (e.g., "Пуговка")
+  id              String  @id @default(cuid())
+  createdByUserId String // User who created the group
+  name            String? // Optional group name (e.g., "Пуговка")
 
   places Place[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@index([ownerUserId])
+  @@index([createdByUserId])
 }
 
 // Place revision (post-publication edits)
@@ -1096,25 +1314,27 @@ model PlaceRevisionImage {
   @@index([revisionId, kind, sortOrder])
 }
 
-// Place claim request (user requests ownership of existing place)
+// Place claim request (user requests ownership of existing place for their business)
 model PlaceClaimRequest {
-  id               String    @id @default(cuid())
+  id               String                  @id @default(cuid())
   placeId          String
-  userId           String
-  businessId       String?
-  status           String    @default("PENDING") // PENDING | APPROVED | REJECTED
+  userId           String // User requesting claim
+  businessId       String // Target business (required)
+  status           PlaceClaimRequestStatus @default(PENDING)
   note             String?
   reviewedAt       DateTime?
   reviewedByUserId String?
 
-  place      Place @relation(fields: [placeId], references: [id], onDelete: Cascade)
-  user       User  @relation(fields: [userId], references: [id], onDelete: Cascade, name: "ClaimRequester")
-  reviewedBy User? @relation(fields: [reviewedByUserId], references: [id], onDelete: SetNull, name: "ClaimReviewer")
+  place      Place    @relation(fields: [placeId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade, name: "ClaimRequester")
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade, name: "ClaimedPlaces")
+  reviewedBy User?    @relation(fields: [reviewedByUserId], references: [id], onDelete: SetNull, name: "ClaimReviewer")
 
   createdAt DateTime @default(now())
 
   @@index([placeId, status])
   @@index([userId, createdAt])
+  @@index([businessId, status])
   @@index([status])
 }
 
@@ -1214,6 +1434,8 @@ model Notification {
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  deliveries NotificationDelivery[]
+
   createdAt DateTime @default(now())
 
   @@index([userId, isRead, createdAt])
@@ -1221,15 +1443,26 @@ model Notification {
 }
 
 enum NotificationType {
+  // Place moderation
   PLACE_APPROVED
   PLACE_NEEDS_CHANGES
   PLACE_REJECTED
   PLACE_UPDATE_APPROVED
   PLACE_UPDATE_NEEDS_REVISION
   PLACE_UPDATE_REJECTED
+  // Activity moderation
   ACTIVITY_APPROVED
   ACTIVITY_NEEDS_CHANGES
   ACTIVITY_REJECTED
+  // Offer moderation
+  OFFER_APPROVED
+  OFFER_NEEDS_CHANGES
+  OFFER_REJECTED
+  // Business verification
+  BUSINESS_VERIFIED
+  BUSINESS_REJECTED
+  BUSINESS_NEEDS_INFO
+  // System / user
   SYSTEM
 }
 
@@ -1434,24 +1667,25 @@ model OpeningHoursExceptionInterval {
 
 // Offer entity (EVENT or SERVICE)
 model Offer {
-  id          String    @id @default(cuid())
-  placeId     String
-  kind        OfferKind
-  
+  id      String    @id @default(cuid())
+  placeId String
+  kind    OfferKind
+
   // SEO-friendly URL slug (public pages)
   slug          String?   @unique
   slugUpdatedAt DateTime? // Track when slug was last changed
 
   // SEO fields (editable via SEO Control Center)
-  seoTitle          String?
-  seoDescription    String?
-  seoH1             String?
-  seoCanonicalUrl   String?
-  seoOgTitle        String?
-  seoOgDescription  String?
-  seoOgImage        String?
-  seoRobots         String? // e.g. "index,follow" | "noindex,nofollow"
-  seoJsonLdOverride Json?
+  seoTitle           String?
+  seoDescription     String?
+  seoH1              String?
+  seoCanonicalUrl    String?
+  seoCanonicalSource SeoCanonicalSource @default(FALLBACK)
+  seoOgTitle         String?
+  seoOgDescription   String?
+  seoOgImage         String?
+  seoRobots          String? // e.g. "index,follow" | "noindex,nofollow"
+  seoJsonLdOverride  Json?
 
   title       String
   description String?
@@ -1482,8 +1716,8 @@ model Offer {
   inheritPlaceOpeningHours Boolean @default(true)
   openingHoursId           String?
 
-  place        Place         @relation(fields: [placeId], references: [id], onDelete: Cascade)
-  openingHours OpeningHours? @relation(fields: [openingHoursId], references: [id], onDelete: SetNull)
+  place        Place              @relation(fields: [placeId], references: [id], onDelete: Cascade)
+  openingHours OpeningHours?      @relation(fields: [openingHoursId], references: [id], onDelete: SetNull)
   boosts       Boost[]
   slugHistory  OfferSlugHistory[]
 
@@ -1924,7 +2158,7 @@ model BusinessContract {
   notes String?
 
   // Relations
-  business                Business                   @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  business                Business                 @relation(fields: [businessId], references: [id], onDelete: Cascade)
   commercialNotifications CommercialNotification[]
 
   createdAt DateTime @default(now())
@@ -1955,8 +2189,8 @@ model BusinessPlacement {
   notes String?
 
   // Relations
-  business                Business                   @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  plan                    Plan?                      @relation(fields: [planId], references: [id], onDelete: SetNull)
+  business                Business                 @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  plan                    Plan?                    @relation(fields: [planId], references: [id], onDelete: SetNull)
   commercialNotifications CommercialNotification[]
 
   createdAt DateTime @default(now())
@@ -1985,7 +2219,7 @@ model BusinessServicePlacement {
   notes String?
 
   // Relations
-  business                Business                   @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  business                Business                 @relation(fields: [businessId], references: [id], onDelete: Cascade)
   commercialNotifications CommercialNotification[]
 
   createdAt DateTime @default(now())
@@ -2000,7 +2234,7 @@ model BusinessServicePlacement {
 
 // Commercial Notification (expiration alerts)
 model CommercialNotification {
-  id         String                        @id @default(cuid())
+  id         String                       @id @default(cuid())
   businessId String
   type       CommercialNotificationType
   status     CommercialNotificationStatus @default(PENDING)
@@ -2010,9 +2244,9 @@ model CommercialNotification {
   message String
 
   // Related entities
-  relatedContractId          String?
-  relatedPlacementId         String?
-  relatedServicePlacementId  String?
+  relatedContractId         String?
+  relatedPlacementId        String?
+  relatedServicePlacementId String?
 
   // Scheduling
   scheduledFor DateTime
@@ -2021,10 +2255,10 @@ model CommercialNotification {
   dismissedAt  DateTime?
 
   // Relations
-  business                Business                    @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  relatedContract         BusinessContract?           @relation(fields: [relatedContractId], references: [id], onDelete: SetNull)
-  relatedPlacement        BusinessPlacement?          @relation(fields: [relatedPlacementId], references: [id], onDelete: SetNull)
-  relatedServicePlacement BusinessServicePlacement?   @relation(fields: [relatedServicePlacementId], references: [id], onDelete: SetNull)
+  business                Business                  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  relatedContract         BusinessContract?         @relation(fields: [relatedContractId], references: [id], onDelete: SetNull)
+  relatedPlacement        BusinessPlacement?        @relation(fields: [relatedPlacementId], references: [id], onDelete: SetNull)
+  relatedServicePlacement BusinessServicePlacement? @relation(fields: [relatedServicePlacementId], references: [id], onDelete: SetNull)
 
   createdAt DateTime @default(now())
 
@@ -2089,9 +2323,9 @@ model MediaAsset {
   sizeBytes    Int
 
   // Media dimensions
-  width        Int?
-  height       Int?
-  durationSec  Float?
+  width       Int?
+  height      Int?
+  durationSec Float?
 
   // Storage
   storageKey String  @unique
@@ -2104,9 +2338,9 @@ model MediaAsset {
   caption String?
 
   // Source tracking
-  sourceType    MediaSourceType
-  uploadedById  String?
-  uploadedBy    User?           @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+  sourceType   MediaSourceType
+  uploadedById String?
+  uploadedBy   User?           @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
 
   // Relations
   usages MediaUsage[]
@@ -2172,24 +2406,25 @@ enum BudgetLevel {
 // Editorial: authorId = null, status = PUBLISHED, visibility = PUBLIC
 // UGC: authorId = userId, status = DRAFT/PUBLISHED, visibility = PRIVATE/UNLISTED/PUBLIC
 model Route {
-  id    String @id @default(cuid())
-  slug  String @unique
+  id            String    @id @default(cuid())
+  slug          String    @unique
   slugUpdatedAt DateTime? // Track when slug was last changed
 
-  title      String
-  ageTags    String[] // e.g., ["0-3", "3-7"] — same pattern as Activity/Place
+  title       String
+  ageTags     String[] // e.g., ["0-3", "3-7"] — same pattern as Activity/Place
   budgetLevel BudgetLevel @default(LOW)
 
   // SEO fields (editable via SEO Control Center)
-  seoTitle          String?
-  seoDescription    String?
-  seoH1             String?
-  seoCanonicalUrl   String?
-  seoOgTitle        String?
-  seoOgDescription  String?
-  seoOgImage        String?
-  seoRobots         String? // e.g. "index,follow" | "noindex,nofollow"
-  seoJsonLdOverride Json?
+  seoTitle           String?
+  seoDescription     String?
+  seoH1              String?
+  seoCanonicalUrl    String?
+  seoCanonicalSource SeoCanonicalSource @default(FALLBACK)
+  seoOgTitle         String?
+  seoOgDescription   String?
+  seoOgImage         String?
+  seoRobots          String? // e.g. "index,follow" | "noindex,nofollow"
+  seoJsonLdOverride  Json?
 
   // Auto-derived from stops
   cityId        String?
@@ -2202,9 +2437,9 @@ model Route {
   visibility RouteVisibility @default(PRIVATE)
 
   // Relations
-  author User?       @relation(fields: [authorId], references: [id], onDelete: SetNull, name: "RouteAuthor")
-  city   City?       @relation(fields: [cityId], references: [id], onDelete: SetNull)
-  stops  RouteStop[]
+  author      User?              @relation(fields: [authorId], references: [id], onDelete: SetNull, name: "RouteAuthor")
+  city        City?              @relation(fields: [cityId], references: [id], onDelete: SetNull)
+  stops       RouteStop[]
   slugHistory RouteSlugHistory[]
 
   createdAt DateTime @default(now())
@@ -2229,26 +2464,27 @@ model RouteSlugHistory {
 }
 
 model Article {
-  id    String @id @default(cuid())
-  slug  String? @unique
+  id            String    @id @default(cuid())
+  slug          String?   @unique
   slugUpdatedAt DateTime?
 
-  title     String
-  subtitle  String?
-  excerpt   String?
+  title       String
+  subtitle    String?
+  excerpt     String?
   contentJson Json?
-  heroImage  String?
+  heroImage   String?
 
   // SEO fields
-  seoTitle          String?
-  seoDescription    String?
-  seoH1             String?
-  seoCanonicalUrl   String?
-  seoOgTitle        String?
-  seoOgDescription  String?
-  seoOgImage        String?
-  seoRobots         String?
-  seoJsonLdOverride Json?
+  seoTitle           String?
+  seoDescription     String?
+  seoH1              String?
+  seoCanonicalUrl    String?
+  seoCanonicalSource SeoCanonicalSource @default(FALLBACK)
+  seoOgTitle         String?
+  seoOgDescription   String?
+  seoOgImage         String?
+  seoRobots          String?
+  seoJsonLdOverride  Json?
 
   // Publication
   publishedAt DateTime?
@@ -2285,8 +2521,8 @@ model RouteStop {
   placeId     String?
   lat         Float?
   lng         Float?
-  address     String?     // fallback address string
-  customTitle String?     // human-readable step label for GOOGLE / MANUAL_PIN stops
+  address     String? // fallback address string
+  customTitle String? // human-readable step label for GOOGLE / MANUAL_PIN stops
 
   // Author note — required, short
   note String
@@ -2302,4 +2538,118 @@ model RouteStop {
 
   @@index([routeId, order])
   @@index([placeId])
+}
+
+// ============================================
+// RANKING & STORIES CONFIGURATION
+// ============================================
+
+/// Глобальные веса ранжирования (одна запись — singleton)
+model RankingSettings {
+  id String @id @default("singleton")
+
+  freshnessWeight  Float @default(1.0)
+  boostWeight      Float @default(1.0)
+  ageMatchWeight   Float @default(1.0)
+  proximityWeight  Float @default(1.0)
+  popularityWeight Float @default(1.0)
+
+  updatedAt DateTime @updatedAt
+}
+
+/// Настройки буста (одна запись — singleton)
+model BoostSettings {
+  id String @id @default("singleton")
+
+  allowBoostInToday Boolean @default(true)
+  allowBoostInNew   Boolean @default(true)
+  allowBoostInFree  Boolean @default(false)
+
+  maxBoostedItemsPerStory Int @default(2)
+  maxBoostScore           Int @default(100)
+  repeatCooldown          Int @default(24) // hours
+
+  updatedAt DateTime @updatedAt
+}
+
+/// Конфигурация одного story intent
+model StoryIntentConfig {
+  id     String @id @default(cuid())
+  intent String @unique // today | weekend | free | near | age_3_5 | new
+
+  title   String
+  enabled Boolean @default(true)
+  order   Int     @default(0)
+
+  itemLimit Int @default(5)
+
+  // Allowed content types (stored as string array)
+  allowedTypes String[] // e.g. ["events", "offers", "places"]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([order])
+}
+
+// ============================================
+// NOTIFICATION DELIVERY (Phase B)
+// ============================================
+
+enum NotificationChannel {
+  IN_APP
+  EMAIL
+  TELEGRAM
+}
+
+enum NotificationDeliveryStatus {
+  PENDING
+  SENT
+  FAILED
+  SKIPPED
+}
+
+/// Tracks delivery attempts per channel for each Notification.
+/// IN_APP is always created. EMAIL/TELEGRAM are created when dispatch is attempted.
+model NotificationDelivery {
+  id             String                     @id @default(cuid())
+  notificationId String
+  channel        NotificationChannel
+  status         NotificationDeliveryStatus @default(PENDING)
+  errorMessage   String?
+  sentAt         DateTime?
+
+  notification Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([notificationId, channel])
+  @@index([notificationId])
+  @@index([channel, status])
+  @@index([status, createdAt])
+}
+
+// ============================================
+// NOTIFICATION PREFERENCES
+// ============================================
+
+/// Per-user, per-type channel preferences.
+/// NULL = use role default from notificationDefaultsByRole config.
+model UserNotificationPreference {
+  id               String           @id @default(cuid())
+  userId           String
+  notificationType NotificationType
+
+  inAppEnabled    Boolean?
+  emailEnabled    Boolean?
+  telegramEnabled Boolean?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, notificationType])
+  @@index([userId])
 }
