@@ -1,0 +1,116 @@
+/**
+ * Тема mamaGo для vanilla-cookieconsent (#cc-main).
+ * Базовые стили библиотеки импортируются в CookieConsentProvider.
+ */
+
+#cc-main {
+  /* Бренд primary #EF8759 */
+  --cc-bg: #ffffff;
+  --cc-primary-color: #ef8759;
+  --cc-primary-hover: #e0784a;
+  /* light-scheme задаёт тёмно-серый primary для кнопок — выравниваем с брендом */
+  --cc-btn-primary-bg: var(--cc-primary-color);
+  --cc-btn-primary-border-color: var(--cc-primary-color);
+  --cc-btn-primary-hover-bg: var(--cc-primary-hover);
+  --cc-btn-primary-hover-border-color: var(--cc-primary-hover);
+  --cc-btn-primary-color: #fff;
+  --cc-btn-primary-hover-color: #fff;
+  --cc-toggle-on-bg: var(--cc-primary-color);
+  --cc-secondary-color: #f7f7f5;
+  --cc-secondary-hover: #eceae6;
+  --cc-text: #1f1f1f;
+  --cc-text-muted: #6b6b6b;
+  --cc-border: #eceae6;
+  --cc-btn-height: 2.5rem;
+  --cc-modal-border-radius: 1rem;
+  --cc-btn-border-radius: 0.5rem;
+  --cc-font-family: var(--font-sans, "NTSomic", system-ui, sans-serif);
+  --cc-animation-duration: 0.25s;
+  --cc-overlay-bg: rgba(31, 31, 31, 0.35);
+  z-index: 10050;
+}
+
+/* Компактная «карточка» на десктопе */
+@media (min-width: 640px) {
+  #cc-main .cm,
+  #cc-main .cm--box {
+    max-width: 28rem;
+  }
+
+  #cc-main .cm-wrapper {
+    margin: 1rem;
+    margin-left: auto;
+    margin-right: auto;
+  }
+}
+
+/* Мобильный нижний блок */
+@media (max-width: 639px) {
+  #cc-main .cm-wrapper {
+    width: 100%;
+    max-width: 100%;
+    padding: 0.75rem;
+    padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+  }
+
+  #cc-main .cm {
+    border-radius: 1rem 1rem 0 0;
+  }
+}
+
+#cc-main #cm__desc {
+  color: rgba(0, 0, 0, 1);
+}
+
+/* Preferences modal: category descriptions inherit --cc-secondary-color (light); use body text */
+#cc-main #pm__title {
+  color: rgba(0, 0, 0, 1);
+}
+
+#cc-main .pm__section-desc {
+  color: rgba(0, 0, 0, 1);
+}
+
+#cc-main button.pm__section-title {
+  color: rgba(0, 0, 0, 1);
+  font-weight: 400;
+}
+
+#cc-main .cm__btn {
+  font-weight: 600;
+}
+
+#cc-main .cm__btn--primary {
+  background: var(--cc-primary-color);
+  color: #fff;
+}
+
+#cc-main .cm__btn--primary:hover {
+  background: var(--cc-primary-hover);
+}
+
+#cc-main .pm__badge {
+  opacity: 1;
+}
+
+/* Визуальный фон/рамка у нативного input поверх кастомного toggle (как в превью в DevTools) */
+#cc-main input.section__toggle {
+  background-color: rgb(255, 255, 255);
+  border-style: solid;
+  border-width: 1px;
+  border-color: rgb(0, 0, 0);
+  border-radius: var(--cc-pm-toggle-border-radius, 4em);
+}
+
+/* В футере модалки настроек «Только необходимые» идёт как secondary — делаем как primary */
+#cc-main .pm__footer .pm__btn--secondary {
+  background: var(--cc-btn-primary-bg);
+  border-color: var(--cc-btn-primary-border-color);
+  color: var(--cc-btn-primary-color);
+}
+
+#cc-main .pm__footer .pm__btn--secondary:hover {
+  background: var(--cc-btn-primary-hover-bg);
+  border-color: var(--cc-btn-primary-hover-border-color);
+  color: var(--cc-btn-primary-hover-color);
+}

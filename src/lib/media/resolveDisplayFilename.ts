@@ -1,48 +1,42 @@
 /**
- * Resolve display filename for UI
- * 
- * Fixes .blob extensions by using correct extension from metadata.
- * Does NOT modify storageKey or publicUrl - only for display.
+ * Resolve display filename for UI.
+ *
+ * Rule: the displayed extension must always match the actual mimeType.
+ * If the file was converted (e.g. .jpg → webp), show the real extension.
+ * Does NOT modify storageKey or publicUrl — display only.
  */
 
 const MIME_TO_EXT: Record<string, string> = {
-  "image/jpeg": "jpg",
-  "image/jpg": "jpg",
-  "image/png": "png",
-  "image/webp": "webp",
-  "image/avif": "avif",
-  "image/gif": "gif",
+  "image/jpeg":    "jpg",
+  "image/jpg":     "jpg",
+  "image/png":     "png",
+  "image/webp":    "webp",
+  "image/avif":    "avif",
+  "image/gif":     "gif",
   "image/svg+xml": "svg",
-  "video/mp4": "mp4",
-  "video/webm": "webm",
+  "video/mp4":     "mp4",
+  "video/webm":    "webm",
   "application/pdf": "pdf",
 };
+
+/** Strip any extension from a filename and return the basename. */
+function basename(filename: string): string {
+  return filename.replace(/\.[^.]+$/, "");
+}
 
 export function resolveDisplayFilename(media: {
   filename: string;
   extension?: string | null;
   mimeType?: string | null;
 }): string {
-  // Check if filename has wrong extension (.blob or .tmp)
-  const hasWrongExtension = /\.(blob|tmp)$/.test(media.filename);
-  
-  if (!hasWrongExtension) {
+  // Determine the correct extension from mimeType (source of truth after conversion)
+  const correctExt = media.mimeType ? MIME_TO_EXT[media.mimeType] : null;
+
+  if (!correctExt) {
+    // Unknown mime — fall back to stored filename as-is
     return media.filename;
   }
 
-  // Try to get correct extension from metadata
-  let correctExt = media.extension;
-  
-  // If extension is also wrong, try MIME type
-  if (!correctExt || correctExt === "blob" || correctExt === "tmp") {
-    correctExt = media.mimeType ? MIME_TO_EXT[media.mimeType] : null;
-  }
-  
-  if (correctExt) {
-    // Replace .blob/.tmp with correct extension
-    return media.filename.replace(/\.(blob|tmp)$/, `.${correctExt}`);
-  }
-
-  // Return as-is if can't determine
-  return media.filename;
+  // Always rebuild filename with the correct extension
+  return `${basename(media.filename)}.${correctExt}`;
 }

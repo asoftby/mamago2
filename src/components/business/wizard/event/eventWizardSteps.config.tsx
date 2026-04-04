@@ -33,27 +33,19 @@ export const EVENT_WIZARD_STEPS: WizardStepConfig<EventFormData>[] = [
     component: Step1Basics,
     
     isComplete: (data) => {
-      const selectedCategoryIds =
-        (Array.isArray(data.categoryIds) && data.categoryIds.length > 0
-          ? data.categoryIds
-          : data.categoryId
-            ? [data.categoryId]
-            : []);
+      const categoryOk =
+        !!data.categoryId && (!data.primaryRootHasChildren || !!data.subcategoryId);
       return !!(
         data.title.trim().length >= 3 &&
         data.eventFormats.length > 0 &&
-        selectedCategoryIds.length > 0 &&
+        categoryOk &&
         data.ageRangeIds.length > 0
       );
     },
     
     getSummary: (data) => {
-      const selectedCategoryIds =
-        (Array.isArray(data.categoryIds) && data.categoryIds.length > 0
-          ? data.categoryIds
-          : data.categoryId
-            ? [data.categoryId]
-            : []);
+      const hasPrimary =
+        !!data.categoryId && (!data.primaryRootHasChildren || !!data.subcategoryId);
 
       const items: SummaryItem[] = [
         {
@@ -77,7 +69,7 @@ export const EVENT_WIZARD_STEPS: WizardStepConfig<EventFormData>[] = [
           ) : (
             <span className="text-red-500">Не выбрана</span>
           ),
-          isMissing: selectedCategoryIds.length === 0,
+          isMissing: !hasPrimary,
         },
         {
           label: "Возрастные группы",
@@ -93,15 +85,11 @@ export const EVENT_WIZARD_STEPS: WizardStepConfig<EventFormData>[] = [
     
     getMissingFields: (data) => {
       const missing: string[] = [];
-      const selectedCategoryIds =
-        (Array.isArray(data.categoryIds) && data.categoryIds.length > 0
-          ? data.categoryIds
-          : data.categoryId
-            ? [data.categoryId]
-            : []);
+      const hasPrimary =
+        !!data.categoryId && (!data.primaryRootHasChildren || !!data.subcategoryId);
       if (!data.title || data.title.trim().length < 3) missing.push("Название");
       if (data.eventFormats.length === 0) missing.push("Как проходит событие");
-      if (selectedCategoryIds.length === 0) missing.push("Категория");
+      if (!hasPrimary) missing.push("Категория");
       if (data.ageRangeIds.length === 0) missing.push("Возрастные группы");
       return missing;
     },
@@ -507,6 +495,9 @@ export function getStepConfigByKey(key: string): WizardStepConfig<EventFormData>
  * Get total number of content steps (excluding review)
  */
 export const TOTAL_CONTENT_STEPS = EVENT_WIZARD_STEPS.length;
+
+/** Контентные шаги + шаг «Проверка и отправка» */
+export const TOTAL_EVENT_WIZARD_STEPS = EVENT_WIZARD_STEPS.length + 1;
 
 /**
  * Get step label

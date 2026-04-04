@@ -5,6 +5,7 @@ import { listPlanItemsByDate } from "@/server/services/plan.service";
 import { Container } from "@/components/ui/Container";
 import { CalendarDays, ExternalLink } from "lucide-react";
 import { getPlanActivityPublicAvailability } from "@/lib/plan/publicVisibility";
+import { publicActivityPath } from "@/lib/business/eventPublicLink";
 
 type PageProps = {
   params: Promise<{ date: string }>;
@@ -89,7 +90,7 @@ export default async function DayPage({ params }: PageProps) {
 
                   {item.activityId && !unavailable && (
                     <Link
-                      href={`/minsk/activity/${item.activityId}`}
+                      href={publicActivityPath(item.activityId, "minsk", item.activity?.slug)}
                       className="p-2 rounded-xl text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 transition-colors shrink-0"
                     >
                       <ExternalLink className="w-4 h-4" />

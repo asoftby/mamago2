@@ -2,6 +2,7 @@
 
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { ScheduleEditor } from "@/components/schedule-editor/ScheduleEditor";
 import { Ticket, Clock, Info, type LucideIcon } from "lucide-react";
@@ -112,14 +113,14 @@ export function Step5PricingParticipation({
             {data.pricingMode === "from" && (
               <div className="space-y-2">
                 <Label htmlFor="priceDetails">Детали стоимости (опционально)</Label>
-                <textarea
+                <Textarea
                   id="priceDetails"
                   value={data.priceDetails}
                   onChange={(e) => onChange({ priceDetails: e.target.value })}
                   placeholder="Дети — 30 BYN&#10;Взрослые — 50 BYN&#10;Семейный билет — 80 BYN"
                   rows={4}
                   disabled={!isEditable}
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed resize-none"
+                  className="resize-none"
                 />
                 <p className="text-[12px] text-gray-600">Если есть разные цены — укажите их тут</p>
               </div>

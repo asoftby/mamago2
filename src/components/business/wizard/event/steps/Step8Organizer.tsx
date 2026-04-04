@@ -25,7 +25,18 @@ const MOCK_BUSINESS: BusinessProfile = {
 };
 
 export function Step8Organizer({ data, onChange, isEditable, userRole }: Step8OrganizerProps) {
+  // Сохраняем выбранного организатора из поиска
+  const [savedExistingOrganizer, setSavedExistingOrganizer] = useState<ExistingOrganizer | null>(null);
   const [selectedExistingOrganizer, setSelectedExistingOrganizer] = useState<ExistingOrganizer | null>(null);
+  
+  // Сохраняем данные custom формы, чтобы не терять их при переключении режимов
+  const [savedCustomData, setSavedCustomData] = useState({
+    name: data.organizerName || "",
+    description: data.organizerDescription || "",
+    phone: data.organizerPhone || "",
+    website: data.organizerWebsite || "",
+    logoUrl: data.organizerLogoUrl || null,
+  });
 
   // Determine user role and business context
   const isBusiness = userRole?.role === "BUSINESS_OWNER";
@@ -54,6 +65,20 @@ export function Step8Organizer({ data, onChange, isEditable, userRole }: Step8Or
   }, [defaultOrganizer, data.organizerMode, data.organizerName, onChange]);
 
   const handleModeChange = (mode: "business" | "existing" | "custom") => {
+    // Сохраняем текущие данные перед переключением
+    if (data.organizerMode === "custom") {
+      setSavedCustomData({
+        name: data.organizerName || "",
+        description: data.organizerDescription || "",
+        phone: data.organizerPhone || "",
+        website: data.organizerWebsite || "",
+        logoUrl: data.organizerLogoUrl || null,
+      });
+    } else if (data.organizerMode === "existing" && selectedExistingOrganizer) {
+      // Сохраняем выбранного организатора
+      setSavedExistingOrganizer(selectedExistingOrganizer);
+    }
+
     if (mode === "business" && defaultOrganizer) {
       onChange({
         organizerMode: mode,
@@ -65,25 +90,36 @@ export function Step8Organizer({ data, onChange, isEditable, userRole }: Step8Or
         organizerLogoUrl: defaultOrganizer.logoUrl,
       });
     } else if (mode === "existing") {
-      onChange({ 
-        organizerMode: mode,
-        organizerId: null,
-        organizerName: "",
-        organizerDescription: "",
-        organizerPhone: "",
-        organizerWebsite: "",
-        organizerLogoUrl: null,
-      });
-      setSelectedExistingOrganizer(null);
+      // Восстанавливаем сохраненного организатора, если он был
+      if (savedExistingOrganizer) {
+        setSelectedExistingOrganizer(savedExistingOrganizer);
+        onChange({
+          organizerMode: mode,
+          organizerId: savedExistingOrganizer.id,
+          organizerName: savedExistingOrganizer.name,
+          organizerDescription: savedExistingOrganizer.description || "",
+          organizerPhone: savedExistingOrganizer.phone || "",
+          organizerWebsite: savedExistingOrganizer.website || "",
+          organizerLogoUrl: savedExistingOrganizer.logoUrl || null,
+        });
+      } else {
+        // Если нет сохраненного, просто меняем режим
+        onChange({ 
+          organizerMode: mode,
+          organizerId: null,
+        });
+        setSelectedExistingOrganizer(null);
+      }
     } else if (mode === "custom") {
+      // Восстанавливаем сохраненные данные custom формы
       onChange({
         organizerMode: mode,
         organizerId: null,
-        organizerName: "",
-        organizerDescription: "",
-        organizerPhone: "",
-        organizerWebsite: "",
-        organizerLogoUrl: null,
+        organizerName: savedCustomData.name,
+        organizerDescription: savedCustomData.description,
+        organizerPhone: savedCustomData.phone,
+        organizerWebsite: savedCustomData.website,
+        organizerLogoUrl: savedCustomData.logoUrl,
       });
     }
   };
@@ -91,6 +127,7 @@ export function Step8Organizer({ data, onChange, isEditable, userRole }: Step8Or
   const handleExistingOrganizerSelect = (organizer: ExistingOrganizer | null) => {
     if (organizer) {
       setSelectedExistingOrganizer(organizer);
+      setSavedExistingOrganizer(organizer); // Сохраняем выбор
       onChange({
         organizerId: organizer.id,
         organizerName: organizer.name,
@@ -101,6 +138,7 @@ export function Step8Organizer({ data, onChange, isEditable, userRole }: Step8Or
       });
     } else {
       setSelectedExistingOrganizer(null);
+      setSavedExistingOrganizer(null); // Очищаем сохраненный выбор
       onChange({
         organizerId: null,
         organizerName: "",
@@ -119,12 +157,22 @@ export function Step8Organizer({ data, onChange, isEditable, userRole }: Step8Or
     website: string;
     logoUrl: string | null;
   }>) => {
-    onChange({
+    const newData = {
       organizerName: updates.name ?? data.organizerName,
       organizerDescription: updates.description ?? data.organizerDescription,
       organizerPhone: updates.phone ?? data.organizerPhone,
       organizerWebsite: updates.website ?? data.organizerWebsite,
       organizerLogoUrl: updates.logoUrl ?? data.organizerLogoUrl,
+    };
+    
+    // Обновляем и основные данные, и сохраненные
+    onChange(newData);
+    setSavedCustomData({
+      name: newData.organizerName || "",
+      description: newData.organizerDescription || "",
+      phone: newData.organizerPhone || "",
+      website: newData.organizerWebsite || "",
+      logoUrl: newData.organizerLogoUrl || null,
     });
   };
 

@@ -265,7 +265,7 @@ export function LayoutContractSection() {
               <pre className="bg-gray-50 border border-gray-200 p-3 rounded text-xs font-mono overflow-x-auto">
 {`<div className="flex items-center gap-3">
   <input className="h-10 flex-1" placeholder="Search..." />
-  <select className="h-10">...</select>
+  <FilterSelect className="w-48" ... />
   <button className="h-10 px-4">Filter</button>
 </div>`}
               </pre>
@@ -275,7 +275,7 @@ export function LayoutContractSection() {
               <pre className="bg-gray-50 border border-gray-200 p-3 rounded text-xs font-mono overflow-x-auto">
 {`<div className="flex flex-col md:flex-row gap-3">
   <input className="h-10 w-full" placeholder="Search..." />
-  <select className="h-10 w-full">...</select>
+  <FilterSelect className="w-full" ... />
   <button className="h-10 w-full">Filter</button>
 </div>`}
               </pre>

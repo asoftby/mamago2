@@ -2,6 +2,7 @@
 export type {
   SeoAdminPage,
   SeoPage,
+  SeoPageEntityDiagnostics,
   SeoPageFiltersSnapshot,
   SeoPageIndexationStatus,
   SeoPageSection,

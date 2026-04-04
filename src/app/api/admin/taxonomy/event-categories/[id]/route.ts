@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import type { EventCategoryPublicationType } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth/server";
 import { canManageEventCategories } from "@/lib/auth/eventCategoriesAdmin";
@@ -7,6 +8,10 @@ import {
   assertCanBecomeChild,
   assertValidParentIdOrNull,
 } from "@/lib/taxonomy/eventCategoryHierarchy";
+import {
+  mapCategoryWithParent,
+  parseEventCategoryPublicationType,
+} from "@/lib/taxonomy/eventCategoryPublicationType";
 
 export const runtime = "nodejs";
 
@@ -22,7 +27,7 @@ export async function GET(_req: Request, { params }: RouteParams) {
   const item = await prisma.eventCategory.findUnique({
     where: { id },
     include: {
-      parent: { select: { id: true, nameRu: true, slug: true } },
+      parent: { select: { id: true, nameRu: true, slug: true, publicationType: true } },
       options: { orderBy: [{ order: "asc" }, { value: "asc" }] },
       _count: { select: { activities: true, children: true } },
     },
@@ -30,7 +35,7 @@ export async function GET(_req: Request, { params }: RouteParams) {
   if (!item) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
-  return NextResponse.json(item);
+  return NextResponse.json(mapCategoryWithParent(item));
 }
 
 export async function PATCH(req: Request, { params }: RouteParams) {
@@ -74,14 +79,50 @@ export async function PATCH(req: Request, { params }: RouteParams) {
     return NextResponse.json({ ok: true });
   }
 
-  const data: Record<string, unknown> = {};
+  const current = await prisma.eventCategory.findUnique({
+    where: { id },
+    select: {
+      parentId: true,
+      publicationType: true,
+      _count: { select: { children: true } },
+    },
+  });
+  if (!current) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
 
-  if (body.parentId !== undefined) {
+  const data: {
+    parentId?: string | null;
+    nameRu?: string;
+    nameEn?: string;
+    slug?: string;
+    icon?: string | null;
+    sortOrder?: number;
+    isActive?: boolean;
+    isFeatured?: boolean;
+    supportsProgram?: boolean;
+    selectableInProgram?: boolean;
+    publicationType?: EventCategoryPublicationType;
+  } = {};
+
+  const hasParentPatch = body.parentId !== undefined;
+  const hasTypePatch = body.type !== undefined;
+
+  if (hasParentPatch && hasTypePatch) {
+    return NextResponse.json(
+      { error: "Укажите либо parentId, либо type в одном запросе" },
+      { status: 400 },
+    );
+  }
+
+  if (hasParentPatch) {
     const raw = body.parentId;
     const nextParentId =
       raw === null || raw === undefined || raw === "" ? null : String(raw);
     try {
-      await assertValidParentIdOrNull(nextParentId);
+      await assertValidParentIdOrNull(nextParentId, {
+        childType: current.publicationType,
+      });
     } catch (e) {
       return NextResponse.json(
         { error: e instanceof Error ? e.message : "Invalid parent" },
@@ -100,8 +141,44 @@ export async function PATCH(req: Request, { params }: RouteParams) {
           { status: 400 },
         );
       }
+      const parent = await prisma.eventCategory.findUnique({
+        where: { id: nextParentId },
+        select: { publicationType: true },
+      });
+      if (!parent) {
+        return NextResponse.json({ error: "Parent not found" }, { status: 400 });
+      }
+      if (parent.publicationType !== current.publicationType) {
+        return NextResponse.json(
+          { error: "Parent category type must match child type" },
+          { status: 400 },
+        );
+      }
     }
     data.parentId = nextParentId;
+  }
+
+  if (hasTypePatch) {
+    const t = parseEventCategoryPublicationType(body.type);
+    if (!t) {
+      return NextResponse.json(
+        { error: "Invalid type (EVENT | PLACE | OFFER | ROUTE | ARTICLE)" },
+        { status: 400 },
+      );
+    }
+    if (current.parentId != null) {
+      return NextResponse.json(
+        { error: "Тип задаётся родительской категорией для подкатегорий" },
+        { status: 400 },
+      );
+    }
+    if (current._count.children > 0) {
+      return NextResponse.json(
+        { error: "Смените тип после удаления или переноса подкатегорий" },
+        { status: 400 },
+      );
+    }
+    data.publicationType = t;
   }
 
   if (body.nameRu !== undefined) {
@@ -139,6 +216,10 @@ export async function PATCH(req: Request, { params }: RouteParams) {
   }
   if (body.isActive !== undefined) data.isActive = Boolean(body.isActive);
   if (body.isFeatured !== undefined) data.isFeatured = Boolean(body.isFeatured);
+  if (body.supportsProgram !== undefined) data.supportsProgram = Boolean(body.supportsProgram);
+  if (body.selectableInProgram !== undefined) {
+    data.selectableInProgram = Boolean(body.selectableInProgram);
+  }
 
   if (Object.keys(data).length === 0) {
     return NextResponse.json({ error: "No fields to update" }, { status: 400 });
@@ -149,12 +230,12 @@ export async function PATCH(req: Request, { params }: RouteParams) {
       where: { id },
       data,
       include: {
-        parent: { select: { id: true, nameRu: true, slug: true } },
+        parent: { select: { id: true, nameRu: true, slug: true, publicationType: true } },
         options: { orderBy: [{ order: "asc" }, { value: "asc" }] },
         _count: { select: { activities: true, children: true } },
       },
     });
-    return NextResponse.json(updated);
+    return NextResponse.json(mapCategoryWithParent(updated));
   } catch {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }

@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { notFound, redirect } from "next/navigation";
 import { ActivityType, ContentStatus } from "@prisma/client";
 import { activityStatusesExcludingDeleted } from "@/lib/business/eventListWhere";
@@ -6,6 +7,7 @@ import { canCreateBusinessContent, canManageOwnedContent } from "@/lib/auth/busi
 import prisma from "@/lib/prisma";
 import { EventPageView } from "@/components/event-page/EventPageView";
 import { buildEventPageDataFromPrismaActivity } from "@/lib/event/buildEventPageDataFromPrisma";
+import { editorEventEditHref } from "@/lib/content-editor/types";
 
 type PageProps = { params: Promise<{ id: string }> };
 
@@ -59,13 +61,22 @@ export default async function MeEventPreviewPage({ params }: PageProps) {
   }
 
   const previewBannerLabel =
-    activity.status === ContentStatus.PENDING ? "На модерации" : undefined;
+    activity.status === ContentStatus.PENDING_UPDATE
+      ? "Изменения на проверке"
+      : activity.status === ContentStatus.PENDING
+        ? "На модерации"
+        : undefined;
 
   const data = buildEventPageDataFromPrismaActivity(activity, {
     citySlug,
     previewBannerLabel,
     hidePublicationStats: true,
+    ownerEditHref: editorEventEditHref(activity.id),
   });
 
-  return <EventPageView data={data} />;
+  return (
+    <Suspense fallback={<EventPageView data={data} />}>
+      <EventPageView data={data} />
+    </Suspense>
+  );
 }

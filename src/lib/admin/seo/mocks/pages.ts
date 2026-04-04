@@ -7,7 +7,7 @@ import type { SeoPage } from "../domain/types";
 export const MOCK_SEO_PAGES: SeoPage[] = [
   {
     id: "sp-1",
-    path: "/minsk/kuda",
+    path: "/minsk/events",
     section: "kuda",
     type: "preset",
     filtersSnapshot: { city: "minsk", intent: "kuda" },
@@ -15,13 +15,13 @@ export const MOCK_SEO_PAGES: SeoPage[] = [
     h1: "Куда пойти с ребёнком в Минске",
     description: "Афиша семейных событий и мест для детей в Минске.",
     isIndexable: true,
-    canonical: "https://mamago.by/minsk/kuda",
+    canonical: "https://mamago.by/minsk/events",
     updatedAt: "2025-03-18T10:00:00.000Z",
     indexationStatus: "indexed",
   },
   {
     id: "sp-2",
-    path: "/minsk/kuda?preset=WEEKEND",
+    path: "/minsk/events?preset=WEEKEND",
     section: "kuda",
     type: "generated",
     filtersSnapshot: { city: "minsk", preset: "WEEKEND" },

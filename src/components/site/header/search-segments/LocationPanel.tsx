@@ -1,15 +1,18 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { MapPin, Navigation, Zap, ChevronDown, Check } from "lucide-react";
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { cn } from "@/lib/utils";
-import { useCity } from "@/contexts/CityContext";
+import { useOptionalCity } from "@/contexts/CityContext";
 import { VALID_CITY_SLUGS } from "@/lib/intent";
 
 interface LocationPanelProps {
   /** Хаб города (главная): во всплывающем окне только выбор города */
   variant?: "default" | "cityHub";
+  /** Встраиваемый контрол: позволяет выбрать город и доп. фильтры в одной панели */
+  allowCitySelection?: boolean;
   citySlug: string;
   searchText: string;
   onSearchTextChange: (text: string) => void;
@@ -21,6 +24,7 @@ interface LocationPanelProps {
 
 export function LocationPanel({
   variant = "default",
+  allowCitySelection = false,
   citySlug,
   searchText,
   onSearchTextChange,
@@ -29,7 +33,8 @@ export function LocationPanel({
   actions,
   apiOptions,
 }: LocationPanelProps) {
-  const { setCity } = useCity();
+  const router = useRouter();
+  const cityCtx = useOptionalCity();
   const [showMetroList, setShowMetroList] = useState(false);
   const [showDistrictList, setShowDistrictList] = useState(false);
 
@@ -77,7 +82,7 @@ export function LocationPanel({
       <div className="p-6">
         {/* Quick Actions */}
         <div className="space-y-3">
-          {variant === "cityHub" ? (
+          {variant === "cityHub" || allowCitySelection ? (
             <div className="space-y-1">
               <p className="text-xs font-medium text-gray-500 px-1 pb-1">Город</p>
               {VALID_CITY_SLUGS.map((slug) => {
@@ -88,7 +93,11 @@ export function LocationPanel({
                     key={slug}
                     type="button"
                     onClick={() => {
-                      setCity(slug);
+                      if (cityCtx?.setCity) {
+                        cityCtx.setCity(slug);
+                      } else {
+                        router.push(`/${slug}`);
+                      }
                       onClose();
                     }}
                     className={cn(

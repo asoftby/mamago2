@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
+import { getActivityCityIdForAnalytics } from "@/lib/analytics/activityCity";
+import { getSessionRowIdFromCookies } from "@/lib/analytics/getSessionRowId";
+import { trackUserEvent } from "@/server/services/analytics/AnalyticsEventService";
 import { addIdea, removeIdea } from "@/server/services/idea.service";
 
 export async function POST(request: NextRequest) {
@@ -20,6 +23,19 @@ export async function POST(request: NextRequest) {
     }
 
     const idea = await addIdea(user.id, activityId);
+
+    const cityId = await getActivityCityIdForAnalytics(activityId);
+    const sessionRowId = await getSessionRowIdFromCookies();
+    void trackUserEvent({
+      userId: user.id,
+      sessionId: sessionRowId,
+      eventType: "SAVE",
+      entityType: "EVENT",
+      entityId: activityId,
+      vertical: "CITY",
+      cityId,
+      meta: { source: "detail", section: "afisha", targetAction: "ideas" },
+    });
 
     return NextResponse.json({ success: true, idea });
   } catch (error) {

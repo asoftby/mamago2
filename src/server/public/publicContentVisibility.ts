@@ -1,11 +1,30 @@
 import type { Prisma } from "@prisma/client";
-import { ScheduleMode } from "@prisma/client";
+import { ContentStatus, ScheduleMode } from "@prisma/client";
 import {
   activityOwnerBusinessActiveWhere,
   placeOwnerBusinessActiveWhere,
 } from "@/server/business/businessOperationalPrisma";
 
 export { activityOwnerBusinessActiveWhere, placeOwnerBusinessActiveWhere };
+
+/**
+ * Публичная выдача событий: «живые» карточки = не черновик, не первичная модерация, не правки/отклонено/удалено.
+ * Используем `notIn`, а не `in: [PUBLISHED, PENDING_UPDATE]`: иначе часть рантаймов Prisma/Turbopack
+ * валидирует массив `in` против устаревшего списка enum и падает на PENDING_UPDATE даже при актуальной БД.
+ */
+function publicListingActivityStatusWhere(): Prisma.ActivityWhereInput {
+  return {
+    status: {
+      notIn: [
+        ContentStatus.DRAFT,
+        ContentStatus.PENDING,
+        ContentStatus.NEEDS_REVISION,
+        ContentStatus.REJECTED,
+        ContentStatus.DELETED,
+      ],
+    },
+  };
+}
 
 /**
  * Публичная видимость места: PUBLISHED + не архив + владелец без отключённого бизнеса.
@@ -64,7 +83,7 @@ export function getPublicListingActivityWhere(
 ): Prisma.ActivityWhereInput {
   return {
     AND: [
-      { status: "PUBLISHED" },
+      publicListingActivityStatusWhere(),
       activityOwnerBusinessActiveWhere,
       getActivityNotExpiredForPublicWhere(now),
     ],

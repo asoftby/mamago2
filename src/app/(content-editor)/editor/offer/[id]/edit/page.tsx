@@ -37,7 +37,8 @@ export default async function EditorEditOfferPage({
     notFound();
   }
 
-  if (!canEditOfferForUser(user, offer)) {
+  const canEdit = await canEditOfferForUser(user, offer);
+  if (!canEdit) {
     if (user.role === "BUSINESS_OWNER") {
       redirect("/business/offers");
     }

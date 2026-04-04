@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { AUTH_STATE_CHANGED_EVENT } from "@/lib/auth/client";
 
 type AuthUser = { id: string; role?: string };
 
@@ -27,6 +28,14 @@ export function useAuthMe() {
 
   useEffect(() => {
     void refetch();
+  }, [refetch]);
+
+  useEffect(() => {
+    const onAuthChanged = () => {
+      void refetch();
+    };
+    window.addEventListener(AUTH_STATE_CHANGED_EVENT, onAuthChanged);
+    return () => window.removeEventListener(AUTH_STATE_CHANGED_EVENT, onAuthChanged);
   }, [refetch]);
 
   const isAuthenticated = !loading && user !== null;

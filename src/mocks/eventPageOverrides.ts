@@ -98,7 +98,7 @@ export const EVENT_PAGE_OVERRIDES: Record<string, EventPageOverride> = {
     organizerNote:
       "mamaGo отмечает: у театра удобные семейные места в партере — при бронировании уточняйте ряд у кассы.",
     planDayLinks: {
-      nearbyHref: "/minsk/kuda",
+      nearbyHref: "/minsk/events",
     },
     cta: {
       planLabel: "В план",

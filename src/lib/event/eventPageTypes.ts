@@ -61,6 +61,8 @@ export type EventPageSimilar = {
 
 export type EventPageData = {
   id: string;
+  /** SEO-slug для публичного URL; если нет — в ссылках используется id */
+  slug?: string | null;
   citySlug: string;
   /** Раздел (Куда пойти / Занятия / …) — для хедера на странице публикации */
   discoveryIntent: Intent;
@@ -80,8 +82,13 @@ export type EventPageData = {
   goodFit: string[];
   /** Long-form sections (expandable in UI). */
   about: {
+    /** Short summary for preview (plain text) */
     summary: string;
+    /** Full description (plain text, deprecated - use descriptionHtml) */
     full?: string;
+    /** Full description as HTML from rich text editor */
+    descriptionHtml?: string;
+    /** Bullet points / highlights */
     highlights?: string[];
   };
   planDayLinks?: {
@@ -95,6 +102,8 @@ export type EventPageData = {
   /** Registration / tickets utility copy. */
   bookingNotes?: string;
   cta: EventPageCtaConfig;
+  /** Редактирование в `/editor/event/...` — только для владельца (сервер подставляет href). */
+  ownerEditHref?: string;
   /** Owner preview: label above the page (e.g. moderation status). */
   previewBannerLabel?: string;
   /** Hide publication stats (owner preview). */

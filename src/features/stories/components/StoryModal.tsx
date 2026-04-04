@@ -1,0 +1,176 @@
+"use client";
+
+import { useRef, useCallback, useEffect } from "react";
+import { X } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { StoryModalVisual } from "./StoryModalVisual";
+import { StoryModalActionCard } from "./StoryModalActionCard";
+import type { StoryCollection } from "../types/story";
+
+interface StoryModalProps {
+  activeStory: StoryCollection;
+  activeStoryIndex: number;
+  activeItemIndex: number;
+  totalStories: number;
+  progressKey: number;
+  paused: boolean;
+  onNext: () => void;
+  onPrev: () => void;
+  onClose: () => void;
+  onPause: () => void;
+  onResume: () => void;
+}
+
+export function StoryModal({
+  activeStory,
+  activeStoryIndex,
+  activeItemIndex,
+  totalStories,
+  progressKey,
+  paused,
+  onNext,
+  onPrev,
+  onClose,
+  onPause,
+  onResume,
+}: StoryModalProps) {
+  const backdropRef = useRef<HTMLDivElement>(null);
+  const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const touchStartY = useRef<number | null>(null);
+  const touchStartX = useRef<number | null>(null);
+
+  const currentItem = activeStory.items[activeItemIndex];
+  const prevItem = activeItemIndex > 0 ? activeStory.items[activeItemIndex - 1] : null;
+  const nextItem = activeItemIndex < activeStory.items.length - 1
+    ? activeStory.items[activeItemIndex + 1]
+    : null;
+
+  // ── scroll lock ───────────────────────────────────────────────────────────
+  useEffect(() => {
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = ""; };
+  }, []);
+
+  // ── close on backdrop click ───────────────────────────────────────────────
+  const handleBackdropClick = useCallback(
+    (e: React.MouseEvent) => {
+      if (e.target === backdropRef.current) onClose();
+    },
+    [onClose],
+  );
+
+  // ── mobile: hold → pause, swipe down → close ─────────────────────────────
+  const handleTouchStart = useCallback(
+    (e: React.TouchEvent) => {
+      touchStartX.current = e.touches[0].clientX;
+      touchStartY.current = e.touches[0].clientY;
+      holdTimer.current = setTimeout(onPause, 180);
+    },
+    [onPause],
+  );
+
+  const handleTouchEnd = useCallback(
+    (e: React.TouchEvent) => {
+      if (holdTimer.current) clearTimeout(holdTimer.current);
+      onResume();
+      if (touchStartY.current === null || touchStartX.current === null) return;
+      const dy = e.changedTouches[0].clientY - touchStartY.current;
+      const dx = e.changedTouches[0].clientX - touchStartX.current;
+      if (dy > 72 && Math.abs(dy) > Math.abs(dx)) onClose();
+      touchStartX.current = null;
+      touchStartY.current = null;
+    },
+    [onClose, onResume],
+  );
+
+  if (!currentItem) return null;
+
+  return (
+    /* ── Backdrop ── */
+    <div
+      ref={backdropRef}
+      className="fixed inset-0 z-50 flex items-center justify-center"
+      style={{ background: "rgba(10,10,10,0.72)", backdropFilter: "blur(10px)" }}
+      onClick={handleBackdropClick}
+    >
+      {/* ── Close button — floating outside modal ── */}
+      <button
+        onClick={onClose}
+        className={cn(
+          "absolute z-[60]",
+          // Desktop: top-right outside modal
+          "md:top-6 md:right-6",
+          // Mobile: top-right inside viewport
+          "top-4 right-4",
+          "h-9 w-9 flex items-center justify-center rounded-full",
+          "bg-white/12 backdrop-blur-md text-white border border-white/15",
+          "hover:bg-white/22 transition-colors",
+        )}
+        aria-label="Закрыть"
+      >
+        <X className="h-4 w-4" />
+      </button>
+
+      {/* ── Modal shell ── */}
+      <div
+        className={cn(
+          "relative overflow-hidden bg-white shadow-2xl",
+          // Desktop: 2-column, fixed size
+          "md:flex md:rounded-3xl md:max-w-[780px] md:w-full md:h-[560px] md:mx-8",
+          // Mobile: full screen sheet
+          "max-md:fixed max-md:inset-x-0 max-md:bottom-0 max-md:rounded-t-3xl max-md:flex max-md:flex-col",
+          "max-md:max-h-[92dvh]",
+        )}
+        onClick={(e) => e.stopPropagation()}
+        onMouseEnter={() => {
+          // Pause on hover only on pointer devices (desktop), not on touch
+          if (window.matchMedia("(pointer: fine)").matches) onPause();
+        }}
+        onMouseLeave={() => {
+          if (window.matchMedia("(pointer: fine)").matches) onResume();
+        }}
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+      >
+        {/* ══ LEFT / TOP: Visual panel ══════════════════════════════════════ */}
+        <div
+          className={cn(
+            "relative shrink-0 overflow-hidden bg-neutral-950",
+            // Desktop: left column
+            "md:w-[52%] md:h-full",
+            // Mobile: top area
+            "max-md:h-[52vw] max-md:min-h-[220px] max-md:max-h-[300px]",
+          )}
+        >
+          <StoryModalVisual
+            story={activeStory}
+            currentItem={currentItem}
+            prevItem={prevItem}
+            nextItem={nextItem}
+            activeItemIndex={activeItemIndex}
+            progressKey={progressKey}
+            paused={paused}
+            onNext={onNext}
+            onPrev={onPrev}
+          />
+        </div>
+
+        {/* ══ RIGHT / BOTTOM: Action card ═══════════════════════════════════ */}
+        <div
+          className={cn(
+            "bg-white",
+            "md:flex-1 md:overflow-y-auto",
+            "max-md:flex-1 max-md:overflow-y-auto",
+          )}
+        >
+          <StoryModalActionCard
+            item={currentItem}
+            storyTitle={activeStory.title}
+            onAddToPlan={() => {}}
+            onDetails={() => {}}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}

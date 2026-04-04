@@ -4,6 +4,7 @@ import { useActionState, useRef, useState, useEffect } from "react";
 import { useFormStatus } from "react-dom";
 import { createBusinessAction, lookupLegalNameByUnp } from "./actions";
 import { PrimaryButton } from "@/components/ui/PrimaryButton";
+import { Input } from "@/components/ui/input";
 import {
   loadDraft,
   saveDraft,
@@ -207,7 +208,7 @@ export function OnboardingForm({
           УНП (Учетный номер плательщика)
         </label>
         <div className="relative">
-          <input
+          <Input
             type="text"
             id="unp"
             name="unp"
@@ -217,7 +218,7 @@ export function OnboardingForm({
             onBlur={handleUnpBlur}
             pattern="[0-9]{9}"
             maxLength={9}
-            className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary focus:border-primary"
+            className="pr-10"
             placeholder="123456789"
           />
           {isLookupLoading && (
@@ -261,7 +262,7 @@ export function OnboardingForm({
         >
           Юридическое название
         </label>
-        <input
+        <Input
           type="text"
           id="legalName"
           name="legalName"
@@ -270,7 +271,6 @@ export function OnboardingForm({
           onChange={handleLegalNameChange}
           minLength={2}
           maxLength={200}
-          className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary focus:border-primary"
           placeholder="ООО 'Детский центр Радуга'"
         />
         {state && !state.ok && state.fieldErrors?.legalName && (

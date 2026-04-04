@@ -4,15 +4,24 @@
   --PhoneInput-color--focus: var(--ring);
 }
 
+/* Внешний вид как у `Input`: h-10, rounded-md, border-input, shadow-xs, выравнивание по центру */
 .international-phone-field .PhoneInput {
   width: 100%;
-  min-height: 2.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  min-height: 2.5rem;
+  height: 2.5rem;
   border: 1px solid var(--input);
-  border-radius: calc(var(--radius) - 2px);
+  border-radius: var(--radius);
   background: #fff;
-  padding: 0.125rem 0.5rem;
+  padding: 0 0.75rem;
   box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
   transition: color 0.15s, box-shadow 0.15s, border-color 0.15s;
+}
+
+.dark .international-phone-field .PhoneInput {
+  background: color-mix(in oklab, var(--input) 30%, transparent);
 }
 
 .international-phone-field .PhoneInput--focus {
@@ -27,14 +36,26 @@
   cursor: not-allowed;
 }
 
+/* Убираем «вторую» высоту у внутреннего input — высоту задаёт контейнер */
 .international-phone-field .PhoneInputInput {
+  flex: 1 1 0%;
+  min-width: 0;
+  min-height: 0 !important;
+  height: auto;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
   font-size: 0.875rem;
   line-height: 1.25rem;
-  min-height: 2.5rem;
+  outline: none;
 }
 
-.international-phone-field .PhoneInputCountrySelect {
-  font-size: 0.875rem;
+@media (min-width: 768px) {
+  .international-phone-field .PhoneInputInput {
+    font-size: 0.875rem;
+  }
 }
 
 .international-phone-field--invalid .PhoneInput {

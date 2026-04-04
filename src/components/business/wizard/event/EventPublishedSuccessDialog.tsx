@@ -16,7 +16,7 @@ import { Button } from "@/components/ui/button";
 type EventPublishedSuccessDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** Полный путь `/{city}/activity/{id}` */
+  /** Полный путь `/{city}/events/{slug|id}` */
   activityHref: string;
 };
 

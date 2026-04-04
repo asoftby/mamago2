@@ -29,6 +29,7 @@ import { PlaceGroupDiff } from "./moderation/PlaceGroupDiff";
 import { OpeningHoursDiff } from "./moderation/OpeningHoursDiff";
 import { getPlacePublicUrl } from "@/lib/placePublicUrl";
 import { PlaceDangerZone } from "./moderation/PlaceDangerZone";
+import { Textarea } from "@/components/ui/textarea";
 
 interface PlaceRevisionModerationViewProps {
   place: any; // Published Place
@@ -546,11 +547,11 @@ export function PlaceRevisionModerationView({
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Комментарий модератора
               </label>
-              <textarea
+              <Textarea
                 value={comment}
                 onChange={(e) => setComment(e.target.value)}
                 placeholder="Укажите причину отклонения или необходимые правки..."
-                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm min-h-[100px] focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="min-h-[100px] text-sm"
                 disabled={isSubmitting}
               />
               <p className="text-xs text-gray-500 mt-1">

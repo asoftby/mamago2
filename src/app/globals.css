@@ -199,6 +199,10 @@ html {
   /* card bg usually white on light gray bg */
   --card: #FFFFFF;
   --card-foreground: #1F1F1F;
+
+  /* popover (select dropdowns, tooltips, etc.) */
+  --popover: #FFFFFF;
+  --popover-foreground: #1F1F1F;
   
   /* success #2FBF71 */
   --success: #2FBF71;
@@ -478,3 +482,48 @@ html {
   line-height: 1.5;
   margin: 2.5em 0;
 }
+
+/* TipTap RichTextEditor — типографика редактора
+   Селектор по `.ProseMirror` (всегда на корне), с `!important` поверх preflight `* { margin: 0 }`.
+   Переносы `<br>` внутри одного `<p>` (вставка из Word / старый HTML) — визуальный зазор через block-br. */
+.rich-text-editor-surface .ProseMirror {
+  line-height: 1.7 !important;
+  font-size: 15px;
+}
+
+/* Прямые абзацы у корня документа */
+.rich-text-editor-surface .ProseMirror > p {
+  margin-top: 0 !important;
+  margin-bottom: 12px !important;
+}
+
+.rich-text-editor-surface .ProseMirror > p:last-child {
+  margin-bottom: 0 !important;
+}
+
+/* «Псевдо-абзацы» при одном <p> и нескольких <br> */
+.rich-text-editor-surface .ProseMirror p br {
+  display: block;
+  margin-bottom: 0.65em;
+}
+
+.rich-text-editor-surface .ProseMirror ul,
+.rich-text-editor-surface .ProseMirror ol {
+  margin-top: 8px !important;
+  margin-bottom: 12px !important;
+  padding-left: 20px !important;
+}
+
+.rich-text-editor-surface .ProseMirror li {
+  margin-bottom: 6px !important;
+}
+
+.rich-text-editor-surface .ProseMirror li:last-child {
+  margin-bottom: 0 !important;
+}
+
+.rich-text-editor-surface .ProseMirror li > p {
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+}
+

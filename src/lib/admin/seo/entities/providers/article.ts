@@ -1,10 +1,19 @@
-import type { Prisma } from "@prisma/client";
 import { ContentStatus } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import type { SeoEntityProvider } from "../types";
-import { indexationStatusFromRobots, isIndexableFromRobots } from "../utils";
-import { updateArticleSlug } from "@/lib/slug/articleSlugService";
+import {
+  indexationStatusForPublishedEntity,
+  isIndexableForPublishedEntity,
+} from "../utils";
+import { buildSegmentEntityDiagnostics } from "../buildEntityDiagnostics";
+import { applyArticleSeoUpdate } from "@/lib/admin/seo/entities/applyEntitySeoUpdate";
 import { buildArticleJsonLd } from "@/lib/seo/schema/buildArticleJsonLd";
+import {
+  SEO_ROBOTS_INDEX_FOLLOW,
+  SEO_ROBOTS_NOINDEX_FOLLOW,
+} from "@/lib/admin/seo/entities/robotsConstants";
+
+const ARTICLE_LIST_LIMIT = 400;
 
 export const articleProvider: SeoEntityProvider = {
   entityType: "article",
@@ -13,25 +22,39 @@ export const articleProvider: SeoEntityProvider = {
 
   async listRows() {
     const articles = await prisma.article.findMany({
-      where: { status: ContentStatus.PUBLISHED, slug: { not: null } },
+      where: { status: { not: ContentStatus.DELETED } },
       orderBy: { updatedAt: "desc" },
+      take: ARTICLE_LIST_LIMIT,
       select: {
         id: true,
         slug: true,
         title: true,
         excerpt: true,
+        status: true,
         updatedAt: true,
         seoH1: true,
         seoTitle: true,
         seoDescription: true,
         seoCanonicalUrl: true,
+        seoCanonicalSource: true,
         seoRobots: true,
       },
     });
 
     return articles.map((a) => {
-      const path = `/blog/${a.slug}`;
+      const published = a.status === ContentStatus.PUBLISHED;
+      const seg = a.slug?.trim() || a.id;
+      const path = `/blog/${seg}`;
       const canonical = a.seoCanonicalUrl?.trim() || path;
+      const entityDiagnostics = buildSegmentEntityDiagnostics("article", {
+        entityId: a.id,
+        title: a.title,
+        slug: a.slug,
+        seoCanonicalUrl: a.seoCanonicalUrl,
+        seoCanonicalSource: a.seoCanonicalSource,
+        seoRobots: a.seoRobots,
+        contentStatus: a.status,
+      });
       return {
         id: `entity:article:${a.id}`,
         path,
@@ -43,8 +66,12 @@ export const articleProvider: SeoEntityProvider = {
         description: a.seoDescription?.trim() || a.excerpt || "",
         canonical,
         updatedAt: a.updatedAt.toISOString(),
-        indexationStatus: indexationStatusFromRobots(a.seoRobots),
-        isIndexable: isIndexableFromRobots(a.seoRobots),
+        indexationStatus: indexationStatusForPublishedEntity(
+          published,
+          a.seoRobots,
+        ),
+        isIndexable: isIndexableForPublishedEntity(published, a.seoRobots),
+        entityDiagnostics,
       };
     });
   },
@@ -57,10 +84,12 @@ export const articleProvider: SeoEntityProvider = {
         title: true,
         excerpt: true,
         slug: true,
+        status: true,
         seoTitle: true,
         seoDescription: true,
         seoH1: true,
         seoCanonicalUrl: true,
+        seoCanonicalSource: true,
         seoOgTitle: true,
         seoOgDescription: true,
         seoOgImage: true,
@@ -69,6 +98,15 @@ export const articleProvider: SeoEntityProvider = {
       },
     });
     if (!a) return null;
+    const urlDiagnostics = buildSegmentEntityDiagnostics("article", {
+      entityId: a.id,
+      title: a.title,
+      slug: a.slug,
+      seoCanonicalUrl: a.seoCanonicalUrl,
+      seoCanonicalSource: a.seoCanonicalSource,
+      seoRobots: a.seoRobots,
+      contentStatus: a.status,
+    });
     return {
       id: a.id,
       title: a.title,
@@ -78,41 +116,35 @@ export const articleProvider: SeoEntityProvider = {
       seoDescription: a.seoDescription,
       seoH1: a.seoH1,
       seoCanonicalUrl: a.seoCanonicalUrl,
+      seoCanonicalSource: a.seoCanonicalSource,
       seoOgTitle: a.seoOgTitle,
       seoOgDescription: a.seoOgDescription,
       seoOgImage: a.seoOgImage,
       seoRobots: a.seoRobots,
       seoJsonLdOverride: (a.seoJsonLdOverride as unknown) ?? null,
+      urlDiagnostics,
+      contentStatus: a.status,
+      citySlug: null,
     };
   },
 
   async updateSeo(entityId, input) {
-    if (typeof input.slug === "string") {
-      await updateArticleSlug(entityId, input.slug);
-    }
-    await prisma.article.update({
-      where: { id: entityId },
-      data: {
-        seoTitle: input.seoTitle,
-        seoDescription: input.seoDescription,
-        seoH1: input.seoH1,
-        seoCanonicalUrl: input.seoCanonicalUrl,
-        seoOgTitle: input.seoOgTitle,
-        seoOgDescription: input.seoOgDescription,
-        seoOgImage: input.seoOgImage,
-        seoRobots: input.seoRobots,
-        seoJsonLdOverride: input.seoJsonLdOverride as Prisma.InputJsonValue,
-      },
-      select: { id: true },
-    });
+    await applyArticleSeoUpdate(entityId, input);
   },
 
   async toggleIndexation(entityId) {
     const existing = await prisma.article.findUnique({ where: { id: entityId }, select: { seoRobots: true } });
     if (!existing) return;
     const raw = (existing.seoRobots ?? "").toLowerCase();
-    const next = raw.includes("noindex") ? "index,follow" : "noindex,follow";
+    const next = raw.includes("noindex")
+      ? SEO_ROBOTS_INDEX_FOLLOW
+      : SEO_ROBOTS_NOINDEX_FOLLOW;
     await prisma.article.update({ where: { id: entityId }, data: { seoRobots: next } });
+  },
+
+  async setIndexFollow(entityId, index) {
+    const seoRobots = index ? SEO_ROBOTS_INDEX_FOLLOW : SEO_ROBOTS_NOINDEX_FOLLOW;
+    await prisma.article.update({ where: { id: entityId }, data: { seoRobots } });
   },
 
   async loadRedirects(entityId) {

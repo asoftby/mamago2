@@ -1,28 +1,32 @@
 import { NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
-import { DiscoveryTaxonomyAxis } from "@prisma/client";
+import { getGenresByCategory } from "@/lib/taxonomy/getGenresByCategory";
 
 export const runtime = "nodejs";
 
-/** Публичный read-only список жанров (DiscoveryTaxonomyAxis.GENRE), только активные. */
-export async function GET() {
+/**
+ * Жанры для выбранной категории события (обязательный query `categoryId`).
+ * Возвращает поле `title` для совместимости с существующим UI (alias к `name`).
+ */
+export async function GET(req: Request) {
   try {
-    const rows = await prisma.discoveryTaxonomyEntry.findMany({
-      where: { axis: DiscoveryTaxonomyAxis.GENRE, isActive: true },
-      orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
-      select: {
-        id: true,
-        title: true,
-        slug: true,
-        sortOrder: true,
-        isActive: true,
-      },
-    });
+    const { searchParams } = new URL(req.url);
+    const categoryId = searchParams.get("categoryId")?.trim();
+    if (!categoryId) {
+      return NextResponse.json({ error: "categoryId required" }, { status: 400 });
+    }
 
-    return NextResponse.json({ genres: rows });
+    const rows = await getGenresByCategory(categoryId);
+    const genres = rows.map((r) => ({
+      id: r.id,
+      title: r.name,
+      slug: r.slug,
+      sortOrder: r.sortOrder,
+      isActive: r.isActive,
+    }));
+
+    return NextResponse.json({ genres });
   } catch (e) {
     console.error("[public/genres]", e);
     return NextResponse.json({ genres: [] as unknown[], error: "fetch_failed" }, { status: 200 });
   }
 }
-

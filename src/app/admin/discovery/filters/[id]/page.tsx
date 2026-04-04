@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { H3, Label } from "@/components/ui/typography";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -20,6 +20,11 @@ import {
 import { FilterOptionRow } from "../FilterOptionRow";
 import { useAutoSlug } from "@/hooks/useAutoSlug";
 import { messageFromApiError } from "@/lib/admin/messageFromApiError";
+import {
+  RETURN_TO_PARAM,
+  sanitizeReturnTo,
+  withSavedToastQuery,
+} from "@/lib/backoffice/saveFlow";
 
 const adminFetch: RequestInit = { credentials: "include" };
 
@@ -50,7 +55,13 @@ type Filter = {
 export default function EditFilterPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const id = params.id as string;
+
+  const listHrefAfterSave = useMemo(
+    () => sanitizeReturnTo(searchParams.get(RETURN_TO_PARAM), LIST_HREF),
+    [searchParams],
+  );
 
   const [filter, setFilter] = useState<Filter | null>(null);
   const [loading, setLoading] = useState(true);
@@ -148,6 +159,7 @@ export default function EditFilterPage() {
         filter={filter}
         onRefresh={refreshFilter}
         onDelete={handleDelete}
+        listHrefAfterSave={listHrefAfterSave}
       />
     </div>
   );
@@ -157,12 +169,15 @@ function FilterEditor({
   filter,
   onRefresh,
   onDelete,
+  listHrefAfterSave,
 }: {
   filter: Filter;
   /** Тихое обновление списка опций без полноэкранной загрузки */
   onRefresh: () => Promise<void>;
   onDelete: () => void;
+  listHrefAfterSave: string;
 }) {
+  const router = useRouter();
   const titleSlug = useAutoSlug(filter.title, filter.slug, { mode: "edit" });
   const [type, setType] = useState(filter.type);
   const [ui, setUi] = useState(filter.ui);
@@ -174,18 +189,32 @@ function FilterEditor({
 
   const [newOptLabel, setNewOptLabel] = useState("");
   const [newOptValue, setNewOptValue] = useState("");
+  const [savingMain, setSavingMain] = useState(false);
 
-  const updateFilter = async (id: string, data: Partial<Filter>) => {
-    const res = await fetch(`/api/admin/filters/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
-    });
-    if (res.ok) {
-      toast.success("Сохранено");
-      await onRefresh();
-    } else {
-      toast.error("Не удалось сохранить");
+  const saveMainFields = async () => {
+    if (savingMain) return;
+    setSavingMain(true);
+    try {
+      const res = await fetch(`/api/admin/filters/${filter.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: titleSlug.source,
+          slug: titleSlug.slug,
+          type,
+          ui,
+          isActive,
+          placement,
+          orderIndex,
+        }),
+      });
+      if (res.ok) {
+        router.push(withSavedToastQuery(listHrefAfterSave));
+      } else {
+        toast.error("Не удалось сохранить");
+      }
+    } finally {
+      setSavingMain(false);
     }
   };
 
@@ -231,15 +260,7 @@ function FilterEditor({
   };
 
   const handleSave = () => {
-    updateFilter(filter.id, {
-      title: titleSlug.source,
-      slug: titleSlug.slug,
-      type,
-      ui,
-      isActive,
-      placement,
-      orderIndex,
-    });
+    void saveMainFields();
   };
 
   const handleAddOption = () => {
@@ -315,9 +336,9 @@ function FilterEditor({
               <Checkbox checked={isActive} onCheckedChange={(c) => setIsActive(!!c)} />
               <Label>Active</Label>
             </div>
-            <Button size="sm" onClick={handleSave}>
+            <Button size="sm" onClick={handleSave} disabled={savingMain}>
               <Save className="w-4 h-4 mr-2" />
-              Save
+              {savingMain ? "Сохранение…" : "Save"}
             </Button>
           </div>
         </div>

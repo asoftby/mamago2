@@ -9,18 +9,22 @@ export type ActivityType =
 
 export interface ActivityMock {
   id: string;
+  /** Публичный slug события (SEO), если есть в БД */
+  slug?: string | null;
   type: ActivityType;
   /** Раздел сайта (иконка в хедере на странице публикации); иначе выводится из `type` */
   discoveryIntent?: Intent;
   title: string;
   description: string;
-  image: string; // URL placeholder
+  image: string;
   
   // Мета
   ageFrom: number; // 0
   ageTo: number;   // 16
   priceMin?: number;
   priceMax?: number;
+  /** В подписи карточки: «от X BYN» vs «X BYN» (фикс). */
+  priceListUsesOt?: boolean;
   priceDetails?: string; // Optional price breakdown (e.g., "Дети — 30 BYN\nВзрослые — 50 BYN")
   currency: 'BYN';
   
@@ -38,6 +42,12 @@ export interface ActivityMock {
   
   // UI
   badge?: string;
-  rating: number;
-  reviewsCount: number;
+  /** Гео-маркер для ленты хаба (напр. «За городом» при просмотре /minsk/kuda). */
+  geoBadge?: string;
+  /** Мягкая подсказка по возрасту (второй слой ленты). */
+  ageHintBadge?: string;
+  /** Сырые очки engagement с сервера (ранжирование). */
+  engagementScore?: number;
+  rating?: number;
+  reviewsCount?: number;
 }

@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import { listImprovementRequestsForEntity } from "@/server/services/improvementRequest.service";
 import { prisma } from "@/lib/prisma";
-import { canCreateBusinessContent, canManageOwnedContent } from "@/lib/auth/businessContentAccess";
+import { canCreateBusinessContent } from "@/lib/auth/businessContentAccess";
+import { canManagePlaceAsync } from "@/lib/auth/placeAccess";
 
 /**
  * GET /api/business/places/[id]/improvement-requests
@@ -23,14 +24,18 @@ export async function GET(
     // Verify ownership
     const place = await prisma.place.findUnique({
       where: { id },
-      select: { ownerUserId: true },
+      select: { 
+        createdByUserId: true,
+        ownerBusinessId: true,
+      },
     });
 
     if (!place) {
       return NextResponse.json({ error: "Place not found" }, { status: 404 });
     }
 
-    if (!canManageOwnedContent(user, place.ownerUserId)) {
+    const canManage = await canManagePlaceAsync(user, place);
+    if (!canManage) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 

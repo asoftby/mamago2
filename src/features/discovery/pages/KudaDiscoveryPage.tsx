@@ -7,7 +7,7 @@ export type KudaDiscoveryPageProps = {
 
 /**
  * Публичная страница «Куда пойти» (discovery по городу).
- * Не привязана к конкретному URL — подключается из `/{city}/kuda` или статического `/minsk/kuda`.
+ * Не привязана к конкретному URL — подключается из `/{city}/events` (канон) или алиасов.
  */
 export async function KudaDiscoveryPage({
   citySlug,

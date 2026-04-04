@@ -12,9 +12,6 @@ export const discoveryTh = (extra?: string) =>
 
 export const discoveryTd = (extra?: string) => cn("px-4 py-2.5", extra);
 
-export const DISCOVERY_NATIVE_SELECT =
-  "w-full h-10 border border-gray-300 rounded-md px-3 text-sm bg-white";
-
 /** Строка таблицы: клик + hover + фокус. */
 export function discoveryTableRowClass(isChildRow?: boolean) {
   return cn(

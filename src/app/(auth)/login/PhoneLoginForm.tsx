@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { appendBirthdayBuilderAuthParam } from "@/lib/auth/appendBirthdayBuilderAuthParam";
 import { getPostAuthRedirect } from "@/lib/auth/postAuthRedirect";
+import { notifyAuthStateChanged } from "@/lib/auth/client";
 import { PhoneInput } from "./PhoneInput";
 import { isPhoneValid, PHONE_INITIAL } from "./phoneUtils";
 
@@ -17,6 +18,7 @@ interface Props {
   autoFocus?: boolean;
   /** REGISTER: после успешного verify-otp не редиректить — только колбэк (сессия stub уже в cookie). */
   onRegisterPhoneVerified?: (phoneE164: string) => void;
+  onSuccess?: () => void;
 }
 
 const RESEND_COOLDOWN_SEC = 60;
@@ -29,6 +31,7 @@ export function PhoneLoginForm({
   onPhoneChange,
   autoFocus,
   onRegisterPhoneVerified,
+  onSuccess,
 }: Props) {
   const router = useRouter();
   const [rawPhone, setRawPhone] = useState(initialPhone || PHONE_INITIAL);
@@ -155,7 +158,10 @@ export function PhoneLoginForm({
 
       const raw = next ?? getPostAuthRedirect();
       const target = appendBirthdayBuilderAuthParam(raw);
+      notifyAuthStateChanged();
+      onSuccess?.();
       router.replace(target);
+      router.refresh();
     } catch {
       setError("Ошибка сети");
     } finally {

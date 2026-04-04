@@ -10,9 +10,9 @@ import { ContentStatus, PlaceKind } from "@prisma/client";
 import { publishPlaceFromDraft, submitPlace } from "@/server/services/moderation.service";
 import {
   canCreateBusinessContent,
-  canManageOwnedContent,
   canPublishContentDirectly,
 } from "@/lib/auth/businessContentAccess";
+import { canManagePlaceAsync } from "@/lib/auth/placeAccess";
 
 interface ValidationError {
   error: "VALIDATION";
@@ -57,8 +57,9 @@ export async function POST(
       return NextResponse.json({ error: "Place not found" }, { status: 404 });
     }
 
-    // Check ownership
-    if (!canManageOwnedContent(user, place.ownerUserId)) {
+    // Check access using business-based ownership
+    const canManage = await canManagePlaceAsync(user, place);
+    if (!canManage) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 

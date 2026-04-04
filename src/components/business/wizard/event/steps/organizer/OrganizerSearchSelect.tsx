@@ -58,7 +58,7 @@ export function OrganizerSearchSelect({
 
     return () => {
       clearTimeout(timer);
-      controller.abort();
+      controller.abort("Component unmounted or search query changed");
     };
   }, [searchQuery]);
 

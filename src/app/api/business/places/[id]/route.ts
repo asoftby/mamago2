@@ -8,7 +8,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
 import { getActiveRevision } from "@/server/services/placeRevision.service";
-import { canCreateBusinessContent, canManageOwnedContent } from "@/lib/auth/businessContentAccess";
+import { canCreateBusinessContent } from "@/lib/auth/businessContentAccess";
+import { canManagePlaceAsync } from "@/lib/auth/placeAccess";
 import { assignPlaceSlugIfMissing } from "@/lib/slug/placeSlugService";
 
 export async function GET(
@@ -88,8 +89,9 @@ export async function GET(
       return NextResponse.json({ error: "Place not found" }, { status: 404 });
     }
 
-    // Check ownership
-    if (!canManageOwnedContent(user, place.ownerUserId)) {
+    // Check access using business-based ownership
+    const canManage = await canManagePlaceAsync(user, place);
+    if (!canManage) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
@@ -142,7 +144,8 @@ export async function PATCH(
     const existing = await prisma.place.findUnique({
       where: { id },
       select: { 
-        ownerUserId: true,
+        createdByUserId: true,
+        ownerBusinessId: true,
         status: true,
       },
     });
@@ -154,7 +157,9 @@ export async function PATCH(
       );
     }
 
-    if (!canManageOwnedContent(user, existing.ownerUserId)) {
+    // Check access using business-based ownership
+    const canManage = await canManagePlaceAsync(user, existing);
+    if (!canManage) {
       return NextResponse.json(
         { error: "FORBIDDEN", message: "You don't have access to this place" },
         { status: 403 }
@@ -250,7 +255,11 @@ export async function DELETE(
     // Check ownership
     const existing = await prisma.place.findUnique({
       where: { id },
-      select: { ownerUserId: true, placeKind: true },
+      select: { 
+        createdByUserId: true,
+        ownerBusinessId: true,
+        placeKind: true,
+      },
     });
 
     if (!existing) {
@@ -260,7 +269,9 @@ export async function DELETE(
       );
     }
 
-    if (!canManageOwnedContent(user, existing.ownerUserId)) {
+    // Check access using business-based ownership
+    const canManage = await canManagePlaceAsync(user, existing);
+    if (!canManage) {
       return NextResponse.json(
         { error: "FORBIDDEN", message: "You don't have access to this place" },
         { status: 403 }

@@ -1,11 +1,21 @@
 import { ActivityType, ContentStatus } from "@prisma/client";
-import type { Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import type { SeoEntityProvider } from "../types";
-import { indexationStatusFromRobots, isIndexableFromRobots } from "../utils";
-import { updateActivitySlug } from "@/lib/slug/activitySlugService";
+import {
+  indexationStatusForPublishedEntity,
+  isIndexableForPublishedEntity,
+} from "../utils";
+import { buildEventEntityDiagnostics } from "../buildEntityDiagnostics";
+import { publicActivityPath } from "@/lib/business/eventPublicLink";
+import { applyActivitySeoUpdate } from "@/lib/admin/seo/entities/applyEntitySeoUpdate";
 import { buildEventJsonLd } from "@/lib/seo/schema/buildEventJsonLd";
 import { loadPublicActivityForCityPage } from "@/lib/event/loadPublicActivityForCityPage";
+import {
+  SEO_ROBOTS_INDEX_FOLLOW,
+  SEO_ROBOTS_NOINDEX_FOLLOW,
+} from "@/lib/admin/seo/entities/robotsConstants";
+
+const EVENT_LIST_LIMIT = 500;
 
 export const eventProvider: SeoEntityProvider = {
   entityType: "event",
@@ -16,20 +26,22 @@ export const eventProvider: SeoEntityProvider = {
     const activities = await prisma.activity.findMany({
       where: {
         type: ActivityType.EVENT,
-        status: ContentStatus.PUBLISHED,
-        slug: { not: null },
+        status: { not: ContentStatus.DELETED },
       },
       orderBy: { updatedAt: "desc" },
+      take: EVENT_LIST_LIMIT,
       select: {
         id: true,
         slug: true,
         title: true,
         shortDesc: true,
+        status: true,
         updatedAt: true,
         seoH1: true,
         seoTitle: true,
         seoDescription: true,
         seoCanonicalUrl: true,
+        seoCanonicalSource: true,
         seoRobots: true,
         place: { select: { city: { select: { slug: true } } } },
       },
@@ -37,8 +49,19 @@ export const eventProvider: SeoEntityProvider = {
 
     return activities.map((a) => {
       const citySlug = a.place?.city?.slug ?? "minsk";
-      const path = `/${citySlug}/activity/${a.slug}`;
+      const published = a.status === ContentStatus.PUBLISHED;
+      const path = publicActivityPath(a.id, citySlug, a.slug);
       const canonical = a.seoCanonicalUrl?.trim() || path;
+      const entityDiagnostics = buildEventEntityDiagnostics({
+        activityId: a.id,
+        title: a.title,
+        slug: a.slug,
+        citySlug,
+        seoCanonicalUrl: a.seoCanonicalUrl,
+        seoCanonicalSource: a.seoCanonicalSource,
+        seoRobots: a.seoRobots,
+        contentStatus: a.status,
+      });
       return {
         id: `entity:event:${a.id}`,
         path,
@@ -50,8 +73,12 @@ export const eventProvider: SeoEntityProvider = {
         description: a.seoDescription?.trim() || a.shortDesc || "",
         canonical,
         updatedAt: a.updatedAt.toISOString(),
-        indexationStatus: indexationStatusFromRobots(a.seoRobots),
-        isIndexable: isIndexableFromRobots(a.seoRobots),
+        indexationStatus: indexationStatusForPublishedEntity(
+          published,
+          a.seoRobots,
+        ),
+        isIndexable: isIndexableForPublishedEntity(published, a.seoRobots),
+        entityDiagnostics,
       };
     });
   },
@@ -64,18 +91,32 @@ export const eventProvider: SeoEntityProvider = {
         title: true,
         shortDesc: true,
         slug: true,
+        status: true,
         seoTitle: true,
         seoDescription: true,
         seoH1: true,
         seoCanonicalUrl: true,
+        seoCanonicalSource: true,
         seoOgTitle: true,
         seoOgDescription: true,
         seoOgImage: true,
         seoRobots: true,
         seoJsonLdOverride: true,
+        place: { select: { city: { select: { slug: true } } } },
       },
     });
     if (!a) return null;
+    const citySlug = a.place?.city?.slug ?? "minsk";
+    const urlDiagnostics = buildEventEntityDiagnostics({
+      activityId: a.id,
+      title: a.title,
+      slug: a.slug,
+      citySlug,
+      seoCanonicalUrl: a.seoCanonicalUrl,
+      seoCanonicalSource: a.seoCanonicalSource,
+      seoRobots: a.seoRobots,
+      contentStatus: a.status,
+    });
     return {
       id: a.id,
       title: a.title,
@@ -85,33 +126,20 @@ export const eventProvider: SeoEntityProvider = {
       seoDescription: a.seoDescription,
       seoH1: a.seoH1,
       seoCanonicalUrl: a.seoCanonicalUrl,
+      seoCanonicalSource: a.seoCanonicalSource,
       seoOgTitle: a.seoOgTitle,
       seoOgDescription: a.seoOgDescription,
       seoOgImage: a.seoOgImage,
       seoRobots: a.seoRobots,
       seoJsonLdOverride: (a.seoJsonLdOverride as unknown) ?? null,
+      urlDiagnostics,
+      contentStatus: a.status,
+      citySlug,
     };
   },
 
   async updateSeo(entityId, input) {
-    if (typeof input.slug === "string") {
-      await updateActivitySlug(entityId, input.slug);
-    }
-    await prisma.activity.update({
-      where: { id: entityId },
-      data: {
-        seoTitle: input.seoTitle,
-        seoDescription: input.seoDescription,
-        seoH1: input.seoH1,
-        seoCanonicalUrl: input.seoCanonicalUrl,
-        seoOgTitle: input.seoOgTitle,
-        seoOgDescription: input.seoOgDescription,
-        seoOgImage: input.seoOgImage,
-        seoRobots: input.seoRobots,
-        seoJsonLdOverride: input.seoJsonLdOverride as Prisma.InputJsonValue,
-      },
-      select: { id: true },
-    });
+    await applyActivitySeoUpdate(entityId, input);
   },
 
   async toggleIndexation(entityId) {
@@ -121,8 +149,15 @@ export const eventProvider: SeoEntityProvider = {
     });
     if (!existing) return;
     const raw = (existing.seoRobots ?? "").toLowerCase();
-    const next = raw.includes("noindex") ? "index,follow" : "noindex,follow";
+    const next = raw.includes("noindex")
+      ? SEO_ROBOTS_INDEX_FOLLOW
+      : SEO_ROBOTS_NOINDEX_FOLLOW;
     await prisma.activity.update({ where: { id: entityId }, data: { seoRobots: next } });
+  },
+
+  async setIndexFollow(entityId, index) {
+    const seoRobots = index ? SEO_ROBOTS_INDEX_FOLLOW : SEO_ROBOTS_NOINDEX_FOLLOW;
+    await prisma.activity.update({ where: { id: entityId }, data: { seoRobots } });
   },
 
   async loadRedirects(entityId) {

@@ -1,12 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { User } from "lucide-react";
 import type { AccountMenuUser } from "@/components/site/header/AccountMenuBody";
 import { ProfileDropdown } from "@/components/site/header/ProfileDropdown";
 import { useAccountMode } from "@/contexts/AccountModeContext";
+import { useFamilyPersona } from "@/contexts/FamilyPersonaContext";
+import { notifyAuthStateChanged } from "@/lib/auth/client";
 import { cn } from "@/lib/utils";
 import {
   getNavIconButtonClassName,
@@ -33,29 +35,15 @@ export function MobileProfileSheet({
   const router = useRouter();
   const { mode, goToBusinessAccount, goToPersonalAccount, hydrated } =
     useAccountMode();
+  const family = useFamilyPersona();
+  const user: AccountMenuUser | null | undefined = family
+    ? family.loading
+      ? undefined
+      : family.menuUser
+    : undefined;
+
   const [menuOpen, setMenuOpen] = useState(false);
-  const [user, setUser] = useState<AccountMenuUser | null | undefined>(
-    undefined,
-  );
   const [loggingOut, setLoggingOut] = useState(false);
-
-  const load = useCallback(async () => {
-    try {
-      const res = await fetch("/api/auth/me", { credentials: "include" });
-      if (!res.ok) {
-        setUser(null);
-        return;
-      }
-      const data = (await res.json()) as AccountMenuUser;
-      setUser(data);
-    } catch {
-      setUser(null);
-    }
-  }, []);
-
-  useEffect(() => {
-    load();
-  }, [load]);
 
   const handleLogout = async () => {
     setLoggingOut(true);
@@ -65,8 +53,8 @@ export function MobileProfileSheet({
         credentials: "same-origin",
       });
       if (res.ok || res.redirected) {
-        setUser(null);
         setMenuOpen(false);
+        notifyAuthStateChanged();
         router.replace("/");
         router.refresh();
       }
@@ -75,7 +63,8 @@ export function MobileProfileSheet({
     }
   };
 
-  const resolvedProfileAvatar = profileAvatarUrl ? profileAvatarUrl : undefined;
+  const resolvedProfileAvatar =
+    profileAvatarUrl ?? user?.avatarUrl ?? undefined;
   const showBadge = profileBadgeCount > 0;
   const size = compact ? "compact" : "default";
 

@@ -1,3 +1,5 @@
+"use client";
+
 import type { ReactNode } from "react";
 import { User } from "lucide-react";
 import { DemoSection } from "../_components/DemoSection";

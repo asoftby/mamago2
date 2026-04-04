@@ -83,6 +83,7 @@ export async function getLatestModerationMessage(
 /**
  * Approve a Place
  * Changes status from PENDING to PUBLISHED
+ * Sends notification to owner.
  */
 export async function approvePlace(
   placeId: string,
@@ -91,142 +92,85 @@ export async function approvePlace(
 ): Promise<void> {
   const place = await prisma.place.findUnique({
     where: { id: placeId },
-    select: { status: true },
+    select: { status: true, title: true, createdByUserId: true },
   });
 
-  if (!place) {
-    throw new Error("Place not found");
-  }
-
-  if (place.status !== "PENDING") {
-    throw new Error(`Cannot approve from status: ${place.status}`);
-  }
+  if (!place) throw new Error("Place not found");
+  if (place.status !== "PENDING") throw new Error(`Cannot approve from status: ${place.status}`);
 
   await prisma.$transaction([
-    // Update place status
-    prisma.place.update({
-      where: { id: placeId },
-      data: {
-        status: "PUBLISHED",
-      },
-    }),
-
-    // Log moderation action
+    prisma.place.update({ where: { id: placeId }, data: { status: "PUBLISHED" } }),
     prisma.moderationLog.create({
-      data: {
-        entityType: "PLACE",
-        entityId: placeId,
-        action: "APPROVE",
-        message: message || "Approved",
-        reviewedByUserId,
-      },
+      data: { entityType: "PLACE", entityId: placeId, action: "APPROVE", message: message || "Approved", reviewedByUserId },
     }),
   ]);
-  
-  // Assign slug after publication (outside transaction)
-  // This also recalculates slugs for duplicates if needed
+
   const { assignSlugOnPublish } = await import("@/lib/slug/placeSlugService");
   await assignSlugOnPublish(placeId);
+  const { ensurePublishedPlaceHasSlug } = await import("@/lib/slug/publishSlugGuards");
+  await ensurePublishedPlaceHasSlug(placeId);
+
+  // Notify creator (outside transaction, non-blocking)
+  const { notifyPlaceApproved } = await import("./notification.service");
+  notifyPlaceApproved(placeId, place.title, place.createdByUserId).catch((e) =>
+    console.error("[moderation] notifyPlaceApproved failed:", e),
+  );
 }
 
-/**
- * Request changes for a Place (initial moderation)
- * Changes status from PENDING to NEEDS_REVISION
- * Message is required
- * 
- * Note: For post-publication edits, use PlaceRevision flow instead
- */
 export async function needsRevisionPlace(
   placeId: string,
   reviewedByUserId: string,
   message: string
 ): Promise<void> {
-  if (!message || message.trim().length === 0) {
-    throw new Error("Message is required for NEEDS_REVISION status");
-  }
+  if (!message?.trim()) throw new Error("Message is required for NEEDS_REVISION status");
 
   const place = await prisma.place.findUnique({
     where: { id: placeId },
-    select: { status: true },
+    select: { status: true, title: true, createdByUserId: true },
   });
 
-  if (!place) {
-    throw new Error("Place not found");
-  }
-
-  if (place.status !== "PENDING") {
-    throw new Error(`Cannot request changes from status: ${place.status}`);
-  }
+  if (!place) throw new Error("Place not found");
+  if (place.status !== "PENDING") throw new Error(`Cannot request changes from status: ${place.status}`);
 
   await prisma.$transaction([
-    // Update place status
-    prisma.place.update({
-      where: { id: placeId },
-      data: {
-        status: "NEEDS_REVISION",
-      },
-    }),
-
-    // Log moderation action
+    prisma.place.update({ where: { id: placeId }, data: { status: "NEEDS_REVISION" } }),
     prisma.moderationLog.create({
-      data: {
-        entityType: "PLACE",
-        entityId: placeId,
-        action: "NEEDS_REVISION",
-        message,
-        reviewedByUserId,
-      },
+      data: { entityType: "PLACE", entityId: placeId, action: "NEEDS_REVISION", message, reviewedByUserId },
     }),
   ]);
+
+  const { notifyPlaceNeedsChanges } = await import("./notification.service");
+  notifyPlaceNeedsChanges(placeId, place.title, place.createdByUserId, message).catch((e) =>
+    console.error("[moderation] notifyPlaceNeedsChanges failed:", e),
+  );
 }
 
-/**
- * Reject a Place
- * Changes status from PENDING to REJECTED
- * Message is required
- */
 export async function rejectPlace(
   placeId: string,
   reviewedByUserId: string,
   message: string
 ): Promise<void> {
-  if (!message || message.trim().length === 0) {
-    throw new Error("Message is required for REJECTED status");
-  }
+  if (!message?.trim()) throw new Error("Message is required for REJECTED status");
 
   const place = await prisma.place.findUnique({
     where: { id: placeId },
-    select: { status: true },
+    select: { status: true, title: true, createdByUserId: true },
   });
 
-  if (!place) {
-    throw new Error("Place not found");
-  }
-
-  if (place.status !== "PENDING") {
-    throw new Error(`Cannot reject from status: ${place.status}`);
-  }
+  if (!place) throw new Error("Place not found");
+  if (place.status !== "PENDING") throw new Error(`Cannot reject from status: ${place.status}`);
 
   await prisma.$transaction([
-    // Update place status
-    prisma.place.update({
-      where: { id: placeId },
-      data: {
-        status: "REJECTED",
-      },
-    }),
-
-    // Log moderation action
+    prisma.place.update({ where: { id: placeId }, data: { status: "REJECTED" } }),
     prisma.moderationLog.create({
-      data: {
-        entityType: "PLACE",
-        entityId: placeId,
-        action: "REJECT",
-        message,
-        reviewedByUserId,
-      },
+      data: { entityType: "PLACE", entityId: placeId, action: "REJECT", message, reviewedByUserId },
     }),
   ]);
+
+  const { notifyPlaceRejected } = await import("./notification.service");
+  notifyPlaceRejected(placeId, place.title, place.createdByUserId, message).catch((e) =>
+    console.error("[moderation] notifyPlaceRejected failed:", e),
+  );
 }
 
 /**
@@ -241,7 +185,7 @@ export async function submitPlace(
 ): Promise<void> {
   const place = await prisma.place.findUnique({
     where: { id: placeId },
-    select: { status: true, ownerUserId: true },
+    select: { status: true, createdByUserId: true },
   });
 
   if (!place) {
@@ -299,7 +243,7 @@ export async function publishPlaceFromDraft(
 ): Promise<void> {
   const place = await prisma.place.findUnique({
     where: { id: placeId },
-    select: { status: true, ownerUserId: true },
+    select: { status: true, createdByUserId: true },
   });
 
   if (!place) {
@@ -334,12 +278,10 @@ export async function publishPlaceFromDraft(
 
   const { assignSlugOnPublish } = await import("@/lib/slug/placeSlugService");
   await assignSlugOnPublish(placeId);
+  const { ensurePublishedPlaceHasSlug } = await import("@/lib/slug/publishSlugGuards");
+  await ensurePublishedPlaceHasSlug(placeId);
 }
 
-/**
- * Approve an Activity
- * Changes status from PENDING to PUBLISHED
- */
 export async function approveActivity(
   activityId: string,
   reviewedByUserId: string,
@@ -347,133 +289,169 @@ export async function approveActivity(
 ): Promise<void> {
   const activity = await prisma.activity.findUnique({
     where: { id: activityId },
-    select: { status: true },
+    select: { status: true, title: true, ownerUserId: true },
   });
 
-  if (!activity) {
-    throw new Error("Activity not found");
-  }
-
-  if (activity.status !== "PENDING") {
+  if (!activity) throw new Error("Activity not found");
+  if (activity.status !== "PENDING" && activity.status !== "PENDING_UPDATE") {
     throw new Error(`Cannot approve from status: ${activity.status}`);
   }
 
   await prisma.$transaction([
-    // Update activity status
-    prisma.activity.update({
-      where: { id: activityId },
-      data: {
-        status: "PUBLISHED",
-      },
-    }),
-
-    // Log moderation action
+    prisma.activity.update({ where: { id: activityId }, data: { status: "PUBLISHED" } }),
     prisma.moderationLog.create({
-      data: {
-        entityType: "ACTIVITY",
-        entityId: activityId,
-        action: "APPROVE",
-        message: message || "Approved",
-        reviewedByUserId,
-      },
+      data: { entityType: "ACTIVITY", entityId: activityId, action: "APPROVE", message: message || "Approved", reviewedByUserId },
     }),
   ]);
+
+  const { ensurePublishedActivityHasSlug } = await import("@/lib/slug/publishSlugGuards");
+  await ensurePublishedActivityHasSlug(activityId);
+
+  const { notifyActivityApproved } = await import("./notification.service");
+  notifyActivityApproved(activityId, activity.title, activity.ownerUserId).catch((e) =>
+    console.error("[moderation] notifyActivityApproved failed:", e),
+  );
 }
 
-/**
- * Request changes for an Activity
- * Changes status from PENDING to NEEDS_REVISION
- * Message is required
- */
 export async function needsRevisionActivity(
   activityId: string,
   reviewedByUserId: string,
   message: string
 ): Promise<void> {
-  if (!message || message.trim().length === 0) {
-    throw new Error("Message is required for NEEDS_REVISION status");
-  }
+  if (!message?.trim()) throw new Error("Message is required for NEEDS_REVISION status");
 
   const activity = await prisma.activity.findUnique({
     where: { id: activityId },
-    select: { status: true },
+    select: { status: true, title: true, ownerUserId: true },
   });
 
-  if (!activity) {
-    throw new Error("Activity not found");
-  }
-
-  if (activity.status !== "PENDING") {
+  if (!activity) throw new Error("Activity not found");
+  if (activity.status !== "PENDING" && activity.status !== "PENDING_UPDATE") {
     throw new Error(`Cannot request changes from status: ${activity.status}`);
   }
 
   await prisma.$transaction([
-    // Update activity status
-    prisma.activity.update({
-      where: { id: activityId },
-      data: {
-        status: "NEEDS_REVISION",
-      },
-    }),
-
-    // Log moderation action
+    prisma.activity.update({ where: { id: activityId }, data: { status: "NEEDS_REVISION" } }),
     prisma.moderationLog.create({
-      data: {
-        entityType: "ACTIVITY",
-        entityId: activityId,
-        action: "NEEDS_REVISION",
-        message,
-        reviewedByUserId,
-      },
+      data: { entityType: "ACTIVITY", entityId: activityId, action: "NEEDS_REVISION", message, reviewedByUserId },
     }),
   ]);
+
+  const { notifyActivityNeedsChanges } = await import("./notification.service");
+  notifyActivityNeedsChanges(activityId, activity.title, activity.ownerUserId, message).catch((e) =>
+    console.error("[moderation] notifyActivityNeedsChanges failed:", e),
+  );
 }
 
-/**
- * Reject an Activity
- * Changes status from PENDING to REJECTED
- * Message is required
- */
 export async function rejectActivity(
   activityId: string,
   reviewedByUserId: string,
   message: string
 ): Promise<void> {
-  if (!message || message.trim().length === 0) {
-    throw new Error("Message is required for REJECTED status");
-  }
+  if (!message?.trim()) throw new Error("Message is required for REJECTED status");
 
   const activity = await prisma.activity.findUnique({
     where: { id: activityId },
-    select: { status: true },
+    select: { status: true, title: true, ownerUserId: true },
   });
 
-  if (!activity) {
-    throw new Error("Activity not found");
-  }
-
-  if (activity.status !== "PENDING") {
+  if (!activity) throw new Error("Activity not found");
+  if (activity.status !== "PENDING" && activity.status !== "PENDING_UPDATE") {
     throw new Error(`Cannot reject from status: ${activity.status}`);
   }
 
   await prisma.$transaction([
-    // Update activity status
-    prisma.activity.update({
-      where: { id: activityId },
-      data: {
-        status: "REJECTED",
-      },
-    }),
-
-    // Log moderation action
+    prisma.activity.update({ where: { id: activityId }, data: { status: "REJECTED" } }),
     prisma.moderationLog.create({
-      data: {
-        entityType: "ACTIVITY",
-        entityId: activityId,
-        action: "REJECT",
-        message,
-        reviewedByUserId,
-      },
+      data: { entityType: "ACTIVITY", entityId: activityId, action: "REJECT", message, reviewedByUserId },
     }),
   ]);
+
+  const { notifyActivityRejected } = await import("./notification.service");
+  notifyActivityRejected(activityId, activity.title, activity.ownerUserId, message).catch((e) =>
+    console.error("[moderation] notifyActivityRejected failed:", e),
+  );
+}
+
+// ── OFFER ─────────────────────────────────────────────────────────────────────
+
+/**
+ * Approve an Offer. Resolves owner via place relation.
+ */
+export async function approveOffer(
+  offerId: string,
+  reviewedByUserId: string,
+): Promise<void> {
+  const offer = await prisma.offer.findUnique({
+    where: { id: offerId },
+    select: { status: true, title: true, place: { select: { ownerUserId: true } } },
+  });
+
+  if (!offer) throw new Error("Offer not found");
+  if (offer.status !== "PENDING") throw new Error(`Cannot approve from status: ${offer.status}`);
+
+  await prisma.offer.update({
+    where: { id: offerId },
+    data: { status: "PUBLISHED", publishedAt: new Date() },
+  });
+
+  const { ensurePublishedOfferHasSlug } = await import("@/lib/slug/publishSlugGuards");
+  await ensurePublishedOfferHasSlug(offerId);
+
+  const { notifyOfferApproved } = await import("./notification.service");
+  notifyOfferApproved(offerId, offer.title, offer.place.ownerUserId).catch((e) =>
+    console.error("[moderation] notifyOfferApproved failed:", e),
+  );
+}
+
+export async function needsRevisionOffer(
+  offerId: string,
+  reviewedByUserId: string,
+  message: string,
+): Promise<void> {
+  if (!message?.trim()) throw new Error("Message is required for NEEDS_REVISION status");
+
+  const offer = await prisma.offer.findUnique({
+    where: { id: offerId },
+    select: { status: true, title: true, place: { select: { ownerUserId: true } } },
+  });
+
+  if (!offer) throw new Error("Offer not found");
+  if (offer.status !== "PENDING") throw new Error(`Cannot request changes from status: ${offer.status}`);
+
+  await prisma.offer.update({
+    where: { id: offerId },
+    data: { status: "DRAFT" }, // Offer has no NEEDS_REVISION status — revert to DRAFT
+  });
+
+  const { notifyOfferNeedsChanges } = await import("./notification.service");
+  notifyOfferNeedsChanges(offerId, offer.title, offer.place.ownerUserId, message).catch((e) =>
+    console.error("[moderation] notifyOfferNeedsChanges failed:", e),
+  );
+}
+
+export async function rejectOffer(
+  offerId: string,
+  reviewedByUserId: string,
+  message: string,
+): Promise<void> {
+  if (!message?.trim()) throw new Error("Message is required for REJECTED status");
+
+  const offer = await prisma.offer.findUnique({
+    where: { id: offerId },
+    select: { status: true, title: true, place: { select: { ownerUserId: true } } },
+  });
+
+  if (!offer) throw new Error("Offer not found");
+  if (offer.status !== "PENDING") throw new Error(`Cannot reject from status: ${offer.status}`);
+
+  await prisma.offer.update({
+    where: { id: offerId },
+    data: { status: "REJECTED", rejectionReason: message },
+  });
+
+  const { notifyOfferRejected } = await import("./notification.service");
+  notifyOfferRejected(offerId, offer.title, offer.place.ownerUserId, message).catch((e) =>
+    console.error("[moderation] notifyOfferRejected failed:", e),
+  );
 }

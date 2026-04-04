@@ -69,7 +69,7 @@ async function tryEgrLookup(unp: string): Promise<{ legalName: string | null }> 
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+        const timeoutId = setTimeout(() => controller.abort("Request timeout"), 15000); // 15 second timeout
 
         const res = await fetch(url, {
           method: "GET",
@@ -187,7 +187,7 @@ async function tryGrpLookup(unp: string): Promise<{ legalName: string | null }> 
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+        const timeoutId = setTimeout(() => controller.abort("Request timeout"), 15000); // 15 second timeout
 
         const res = await fetch(url, {
           method: "GET",

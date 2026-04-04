@@ -1,12 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
-import { ContentStatus, ActivityType, ScheduleMode } from "@prisma/client";
+import { ContentStatus, ActivityType, ScheduleMode, Prisma } from "@prisma/client";
 import { canCreateBusinessContent, canManageOwnedContent } from "@/lib/auth/businessContentAccess";
 import { replaceActivitySessionsFromScheduleJson } from "@/lib/business/syncEventActivitySessions";
 import { syncEventVenueAndActivityCity } from "@/lib/business/syncEventVenueFromWizard";
 import { computeEventShortDesc } from "@/lib/business/eventShortDesc";
 import { excludeDeletedEvents, excludeGhostEventDrafts } from "@/lib/business/eventListWhere";
+import { validateEventProgramCategories } from "@/lib/business/validateEventProgramCategories";
+import { assertBusinessEventPrimaryCategory } from "@/lib/business/validatePrimaryEventCategory";
+import { assignActivitySlugIfMissing } from "@/lib/slug/activitySlugService";
 
 /**
  * POST /api/business/events
@@ -35,6 +38,26 @@ export async function POST(request: NextRequest) {
           ? body.venue.placeId
           : undefined;
 
+    const scheduleJsonUnknown =
+      (body.scheduleJson && typeof body.scheduleJson === "object")
+        ? (body.scheduleJson as Record<string, unknown>)
+        : {};
+    const primaryRootCategoryId =
+      typeof scheduleJsonUnknown.categoryId === "string" ? scheduleJsonUnknown.categoryId : null;
+    const primaryLeafCategoryId =
+      typeof body.eventCategoryId === "string" ? body.eventCategoryId : null;
+
+    assertBusinessEventPrimaryCategory({
+      eventCategoryId: primaryLeafCategoryId,
+      scheduleJson: scheduleJsonUnknown,
+    });
+
+    const { programCategoryIds } = await validateEventProgramCategories({
+      primaryRootCategoryId,
+      primaryLeafCategoryId,
+      programCategoryIds: body.programCategoryIds,
+    });
+
     // Create event as draft
     const event = await prisma.activity.create({
       data: {
@@ -52,11 +75,20 @@ export async function POST(request: NextRequest) {
         
         // Schedule
         scheduleMode: ScheduleMode.MULTI_DATE,
-        scheduleJson: body.scheduleJson || {},
+        scheduleJson: (body.scheduleJson ?? {}) as Prisma.InputJsonValue,
         
         // Event category (leaf: subcategory if selected, otherwise root)
         eventCategoryId:
           typeof body.eventCategoryId === "string" ? body.eventCategoryId : undefined,
+        programCategoryLinks:
+          programCategoryIds.length > 0
+            ? {
+                createMany: {
+                  data: programCategoryIds.map((categoryId) => ({ categoryId })),
+                  skipDuplicates: true,
+                },
+              }
+            : undefined,
 
         // Pricing
         priceFrom: body.priceFrom,
@@ -86,16 +118,27 @@ export async function POST(request: NextRequest) {
       await syncEventVenueAndActivityCity(event.id, null, mergedPlaceId);
     }
 
+    await assignActivitySlugIfMissing(event.id, title);
+
+    const slugRow = await prisma.activity.findUnique({
+      where: { id: event.id },
+      select: { slug: true },
+    });
+
     return NextResponse.json({
       success: true,
       event: {
         id: event.id,
         title: event.title,
         status: event.status,
+        slug: slugRow?.slug ?? null,
       },
     });
   } catch (error: any) {
     console.error("Create event error:", error);
+    if (error instanceof Error) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
     return NextResponse.json(
       { error: error.message || "Failed to create event" },
       { status: 500 }

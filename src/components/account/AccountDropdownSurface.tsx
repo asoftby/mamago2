@@ -44,8 +44,7 @@ export function AccountDropdownSurface({
           showCloseButton
           className={cn(
             "z-[60] max-h-[min(90vh,calc(100dvh-1rem))] gap-0 overflow-y-auto rounded-t-2xl border-t border-gray-200 bg-white px-0 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 shadow-lg",
-            ACCOUNT_DROPDOWN_WIDTH_CLASS,
-            "mx-auto max-w-[100vw]",
+            "w-full max-w-none",
           )}
         >
           <SheetHeader className="space-y-0 px-4 pb-3 text-left">

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Upload, X } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import { useImageUpload, type UploadedImage } from "@/hooks/useImageUpload";
 import { useRouter } from "next/navigation";
 
@@ -68,13 +69,13 @@ export function AdminMediaUploader({ onUploadComplete }: AdminMediaUploaderProps
           ${uploading ? "opacity-50 cursor-not-allowed" : ""}
         `}
       >
-        <input
+        <Input
           type="file"
           multiple
           accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif"
           onChange={(e) => handleFileSelect(e.target.files)}
-          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
           disabled={uploading}
+          className="absolute inset-0 h-full min-h-0 w-full cursor-pointer rounded-lg border-0 p-0 opacity-0 shadow-none ring-0 focus-visible:ring-0"
         />
 
         {uploading ? (

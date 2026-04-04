@@ -10,11 +10,11 @@ export function buildEventJsonLd(args: {
   const ends = activity.sessions?.[activity.sessions.length - 1]?.startsAt;
 
   const url =
-    activity.slug ? `${publicBase}/${citySlug}/activity/${activity.slug}` : undefined;
+    activity.slug ? `${publicBase}/${citySlug}/events/${activity.slug}` : undefined;
 
   const image =
+    activity.coverImageUrl?.trim() ||
     activity.images?.[0]?.url ||
-    activity.coverImageUrl ||
     undefined;
 
   const venueTitle =

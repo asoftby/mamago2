@@ -12,11 +12,15 @@ const loginSchema = z.object({
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { email, password } = loginSchema.parse(body);
+    const parsed = loginSchema.parse(body);
+    const email = parsed.email.trim().toLowerCase();
+    const password = parsed.password;
 
     // Find user
-    const user = await prisma.user.findUnique({
-      where: { email },
+    const user = await prisma.user.findFirst({
+      where: {
+        email: { equals: email, mode: "insensitive" },
+      },
     });
 
     if (!user) {
@@ -27,6 +31,12 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify password
+    if (!user.passwordHash) {
+      return NextResponse.json(
+        { error: "Invalid email or password" },
+        { status: 401 }
+      );
+    }
     const isValid = await verifyPassword(password, user.passwordHash);
     if (!isValid) {
       return NextResponse.json(

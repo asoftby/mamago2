@@ -6,6 +6,7 @@
 import prisma from "@/lib/prisma";
 import { PlaceKind, ContentStatus, LocationSource } from "@prisma/client";
 import type { Place } from "@prisma/client";
+import { getUserBusinessId } from "@/lib/auth/placeAccess";
 
 /**
  * Check if a place is a complex (shopping mall, park, etc.)
@@ -111,9 +112,13 @@ export async function createUnitInComplex(
   // Generate unitLabel
   const unitLabel = `${data.floor} этаж, павильон ${data.unit}`;
 
+  // Get user's business ID
+  const businessId = await getUserBusinessId(userId);
+
   return await prisma.place.create({
     data: {
-      ownerUserId: userId,
+      createdByUserId: userId,
+      ownerBusinessId: businessId,
       title: data.title,
       category: data.category,
       shortDesc: data.shortDesc,

@@ -6,6 +6,7 @@ import Link from "next/link";
 import { format } from "date-fns";
 import { ru } from "date-fns/locale";
 import { Star, MapPin, Calendar, Gift, Megaphone, BookOpen } from "lucide-react";
+import { CommercialToolbarFilterSelects } from "@/components/admin/commercial/CommercialToolbarFilterSelects";
 
 export default async function AdminServicePlacementsPage() {
   const user = await getCurrentUser();
@@ -79,21 +80,29 @@ export default async function AdminServicePlacementsPage() {
 
       {/* AdminPageToolbar */}
       <div className="flex flex-col md:flex-row gap-3">
-        <select className="h-10 w-full md:w-auto px-3 border border-gray-300 rounded-lg text-sm">
-          <option value="">Все статусы</option>
-          <option value="ACTIVE">Активные</option>
-          <option value="EXPIRING">Заканчиваются</option>
-          <option value="EXPIRED">Завершенные</option>
-          <option value="CANCELED">Отмененные</option>
-        </select>
-        <select className="h-10 w-full md:w-auto px-3 border border-gray-300 rounded-lg text-sm">
-          <option value="">Все типы</option>
-          <option value="PLACE">Место</option>
-          <option value="EVENT">Мероприятие</option>
-          <option value="OFFER">Предложение</option>
-          <option value="STORY">История</option>
-          <option value="PROMO">Промо</option>
-        </select>
+        <CommercialToolbarFilterSelects
+          filters={[
+            {
+              placeholder: "Все статусы",
+              options: [
+                { value: "ACTIVE", label: "Активные" },
+                { value: "EXPIRING", label: "Заканчиваются" },
+                { value: "EXPIRED", label: "Завершенные" },
+                { value: "CANCELED", label: "Отмененные" },
+              ],
+            },
+            {
+              placeholder: "Все типы",
+              options: [
+                { value: "PLACE", label: "Место" },
+                { value: "EVENT", label: "Мероприятие" },
+                { value: "OFFER", label: "Предложение" },
+                { value: "STORY", label: "История" },
+                { value: "PROMO", label: "Промо" },
+              ],
+            },
+          ]}
+        />
         <button className="h-10 w-full md:w-auto px-4 border border-gray-300 rounded-lg text-sm hover:bg-gray-50">
           Заканчиваются в течение 7 дней
         </button>

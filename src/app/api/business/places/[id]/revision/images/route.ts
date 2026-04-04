@@ -10,7 +10,8 @@ import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
 import { PlaceImageKind } from "@prisma/client";
 import { getOrCreatePlaceRevision } from "@/server/services/placeRevision.service";
-import { canCreateBusinessContent, canManageOwnedContent } from "@/lib/auth/businessContentAccess";
+import { canCreateBusinessContent } from "@/lib/auth/businessContentAccess";
+import { canManagePlaceAsync } from "@/lib/auth/placeAccess";
 
 /**
  * POST - Add image to place revision
@@ -32,7 +33,8 @@ export async function POST(
     const place = await prisma.place.findUnique({
       where: { id: placeId },
       select: { 
-        ownerUserId: true,
+        createdByUserId: true,
+        ownerBusinessId: true,
         status: true,
       },
     });
@@ -41,7 +43,8 @@ export async function POST(
       return NextResponse.json({ error: "Place not found" }, { status: 404 });
     }
 
-    if (!canManageOwnedContent(user, place.ownerUserId)) {
+    const canManage = await canManagePlaceAsync(user, place);
+    if (!canManage) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
@@ -172,7 +175,8 @@ export async function DELETE(
     const place = await prisma.place.findUnique({
       where: { id: placeId },
       select: { 
-        ownerUserId: true,
+        createdByUserId: true,
+        ownerBusinessId: true,
         status: true,
       },
     });
@@ -181,7 +185,8 @@ export async function DELETE(
       return NextResponse.json({ error: "Place not found" }, { status: 404 });
     }
 
-    if (!canManageOwnedContent(user, place.ownerUserId)) {
+    const canManage = await canManagePlaceAsync(user, place);
+    if (!canManage) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 

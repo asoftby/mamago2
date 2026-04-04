@@ -11,7 +11,8 @@ export async function loadOfferForWizard(offerId: string) {
       place: {
         select: {
           id: true,
-          ownerUserId: true,
+          createdByUserId: true,
+          ownerBusinessId: true,
           title: true,
         },
       },

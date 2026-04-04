@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,7 @@ import { PlaceMapPreview } from "./PlaceMapPreview";
 import { PlaceMapModal } from "./PlaceMapModal";
 import { PlaceDuplicateBlock } from "./PlaceDuplicateBlock";
 import { formatDistance } from "@/lib/formatDistance";
-import { nativeSelectFieldClassName } from "@/components/ui/native-select-classes";
+import { FilterSelect } from "@/components/ui/filter-select";
 
 interface PlaceLocationPickerProps {
   placeId: string;
@@ -486,6 +486,21 @@ export function PlaceLocationPicker({
   const metroShown = metroManualId ?? metroAutoId;
   const metroDistanceShown = metroManualId ? metroManualDistanceM : metroAutoDistanceM;
 
+  const metroFilterOptions = useMemo(() => {
+    const out: { value: string; label: string }[] = [];
+    if (
+      metroShown &&
+      metroStations.length === 0 &&
+      initialLocation?.metroName
+    ) {
+      out.push({ value: metroShown, label: initialLocation.metroName });
+    }
+    for (const m of metroStations) {
+      out.push({ value: m.id, label: m.name });
+    }
+    return out;
+  }, [metroShown, metroStations, initialLocation?.metroName]);
+
   return (
     <div className="space-y-6">
       {/* Debug Panel (dev-only) */}
@@ -581,20 +596,14 @@ export function PlaceLocationPicker({
           {/* District Select */}
           <div>
             <Label htmlFor="district">Район</Label>
-            <select
+            <FilterSelect
               id="district"
               value={districtShown || ""}
-              onChange={(e) => handleDistrictChange(e.target.value)}
-              className={nativeSelectFieldClassName}
+              placeholder="Не выбрано"
+              options={districts.map((d) => ({ value: d.id, label: d.name }))}
+              onChange={handleDistrictChange}
               disabled={districts.length === 0 || disabled}
-            >
-              <option value="">Не выбрано</option>
-              {districts.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.name}
-                </option>
-              ))}
-            </select>
+            />
             
             {/* Helper text */}
             <div className="mt-1 text-xs text-muted-foreground">
@@ -621,24 +630,14 @@ export function PlaceLocationPicker({
           {/* Metro Select */}
           <div>
             <Label htmlFor="metro">Метро</Label>
-            <select
+            <FilterSelect
               id="metro"
               value={metroShown || ""}
-              onChange={(e) => handleMetroChange(e.target.value)}
-              className={nativeSelectFieldClassName}
+              placeholder="Не выбрано"
+              options={metroFilterOptions}
+              onChange={handleMetroChange}
               disabled={disabled}
-            >
-              <option value="">Не выбрано</option>
-              {/* Show currently selected metro even if stations not loaded yet */}
-              {metroShown && metroStations.length === 0 && initialLocation?.metroName && (
-                <option value={metroShown}>{initialLocation.metroName}</option>
-              )}
-              {metroStations.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.name}
-                </option>
-              ))}
-            </select>
+            />
             
             {/* Distance display */}
             {metroShown && metroDistanceShown !== null && (

@@ -1,5 +1,5 @@
 /**
- * Добавляет `?city=` только если город не задан первым сегментом пути (`/{city}/kuda` — без дубля в query).
+ * Добавляет `?city=` только если город не задан первым сегментом пути (`/{city}/events` — без дубля в query).
  */
 export function appendCityQuery(pathOrUrl: string, citySlug: string): string {
   if (pathOrUrl.startsWith("http://") || pathOrUrl.startsWith("https://")) {

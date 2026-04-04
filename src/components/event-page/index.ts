@@ -1,4 +1,5 @@
 export { EventAboutSection } from "./EventAboutSection";
+export { EventRichDescription } from "./EventRichDescription";
 export { EventBreadcrumbs } from "./EventBreadcrumbs";
 export { EventDecisionPanel } from "./EventDecisionPanel";
 export { EventFactsChips } from "./EventFactsChips";
@@ -7,6 +8,7 @@ export { EventGoodFit } from "./EventGoodFit";
 export { EventMediaStack } from "./EventMediaStack";
 export { EventOrganizerNotes } from "./EventOrganizerNotes";
 export { EventPageView } from "./EventPageView";
+export { ModernEventPageView } from "./ModernEventPageView";
 export { EventPlanDayCta } from "./EventPlanDayCta";
 export { EventSessionSelector } from "./EventSessionSelector";
 export { EventStickyActionBar } from "./EventStickyActionBar";
@@ -14,3 +16,14 @@ export { EventVenueBlock } from "./EventVenueBlock";
 export { EventVenueLocationRows } from "./EventVenueLocationRows";
 export { EventWhyGo } from "./EventWhyGo";
 export { SimilarEventsSection } from "./SimilarEventsSection";
+
+// Новые конверсионные компоненты
+export { ConversionEventPageView } from "./ConversionEventPageView";
+export { EventHero } from "./EventHero";
+export { EventHighlights } from "./EventHighlights";
+export { EventProgram } from "./EventProgram";
+export { EventAudience } from "./EventAudience";
+export { EventIncludes } from "./EventIncludes";
+export { EventLocation } from "./EventLocation";
+export { EventReviews } from "./EventReviews";
+export { EventFullDescription } from "./EventFullDescription";

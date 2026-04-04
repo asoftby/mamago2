@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth/server";
-import { canManageOwnedContent } from "@/lib/auth/businessContentAccess";
+import { canManagePlaceAsync } from "@/lib/auth/placeAccess";
 
 export async function POST(
   request: NextRequest,
@@ -22,7 +22,8 @@ export async function POST(
       where: { id: placeId },
       select: {
         id: true,
-        ownerUserId: true,
+        createdByUserId: true,
+        ownerBusinessId: true,
         placeGroupId: true,
       },
     });
@@ -31,8 +32,9 @@ export async function POST(
       return NextResponse.json({ error: "Place not found" }, { status: 404 });
     }
 
-    // Verify ownership (владелец или админ/модератор)
-    if (!canManageOwnedContent(user, place.ownerUserId)) {
+    // Verify access using business-based ownership
+    const canManage = await canManagePlaceAsync(user, place);
+    if (!canManage) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
@@ -60,10 +62,11 @@ export async function POST(
     }
 
     // Fetch related places to check their groups
+    // Security: only places with same business owner
     const relatedPlaces = await prisma.place.findMany({
       where: {
         id: { in: relatedPlaceIds },
-        ownerUserId: place.ownerUserId, // Security: only same owner
+        ownerBusinessId: place.ownerBusinessId, // Security: only same business owner
       },
       select: {
         id: true,
@@ -94,7 +97,8 @@ export async function POST(
       // Create new group
       const newGroup = await prisma.placeGroup.create({
         data: {
-          ownerUserId: place.ownerUserId,
+          createdByUserId: place.createdByUserId,
+          ownerBusinessId: place.ownerBusinessId,
         },
       });
       groupId = newGroup.id;

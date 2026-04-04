@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { cn } from "@/lib/utils";
+import { FilterSelect } from "@/components/ui/filter-select";
 import { getTodayStart } from "@/lib/date/getTodayStart";
 
 export interface DatePickerProps {
@@ -77,8 +78,8 @@ export function DatePicker({
     onDateChange?.(newDate);
   };
 
-  const handleYearSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const newYear = parseInt(e.target.value);
+  const handleYearSelect = (v: string) => {
+    const newYear = parseInt(v, 10);
     setYear(newYear);
     
     // If there's a selected date, maintain the day in the new year/month
@@ -91,8 +92,8 @@ export function DatePicker({
     }
   };
 
-  const handleMonthSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const newMonth = parseInt(e.target.value);
+  const handleMonthSelect = (v: string) => {
+    const newMonth = parseInt(v, 10);
     setMonth(newMonth);
     
     // If there's a selected date, maintain the day in the new month/year
@@ -155,49 +156,28 @@ export function DatePicker({
         {/* Month/Year Navigation */}
         <div className="flex items-center justify-center mb-6">
           <div className="flex items-center gap-2">
-            {/* Month dropdown */}
-            <div className="relative">
-              <select
-                value={month}
-                onChange={handleMonthSelect}
-                disabled={disabled}
-                className="px-3 py-1 text-base font-medium bg-white border border-gray-200 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/30 cursor-pointer appearance-none pr-8 min-w-[120px]"
-                style={{
-                  backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`,
-                  backgroundPosition: 'right 8px center',
-                  backgroundRepeat: 'no-repeat',
-                  backgroundSize: '16px'
-                }}
-              >
-                {monthOptions.map((m) => (
-                  <option key={m.value} value={m.value}>
-                    {m.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            
-            {/* Year dropdown */}
-            <div className="relative">
-              <select
-                value={year}
-                onChange={handleYearSelect}
-                disabled={disabled}
-                className="px-3 py-1 text-base font-medium bg-white border border-gray-200 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/30 cursor-pointer appearance-none pr-8 min-w-[80px]"
-                style={{
-                  backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`,
-                  backgroundPosition: 'right 8px center',
-                  backgroundRepeat: 'no-repeat',
-                  backgroundSize: '16px'
-                }}
-              >
-                {yearOptions.map((y) => (
-                  <option key={y} value={y}>
-                    {y}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <FilterSelect
+              value={String(month)}
+              options={monthOptions.map((m) => ({
+                value: String(m.value),
+                label: m.label,
+              }))}
+              onChange={handleMonthSelect}
+              disabled={disabled}
+              className="min-w-[120px]"
+              selectClassName="!h-9 text-base font-medium"
+              aria-label="Месяц"
+            />
+
+            <FilterSelect
+              value={String(year)}
+              options={yearOptions.map((y) => ({ value: String(y), label: String(y) }))}
+              onChange={handleYearSelect}
+              disabled={disabled}
+              className="min-w-[80px]"
+              selectClassName="!h-9 text-base font-medium"
+              aria-label="Год"
+            />
           </div>
         </div>
 
@@ -243,11 +223,6 @@ export function DatePicker({
         </div>
       </div>
 
-      {!value && (
-        <div className="mt-2 text-xs text-gray-500">
-          {placeholder}
-        </div>
-      )}
     </div>
   );
 }

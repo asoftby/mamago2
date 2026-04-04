@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Trash2, Pencil, Plus, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { FilterSelect } from "@/components/ui/filter-select";
 
 type City = {
   id: string;
@@ -174,17 +175,14 @@ export default function DistrictsPage() {
           <h1 className="text-2xl md:text-xl font-bold text-gray-900">Districts</h1>
         </div>
         <div className="flex flex-col md:flex-row gap-3">
-          <select 
-            className="h-10 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
-            value={selectedCityId}
-            onChange={(e) => setSelectedCityId(e.target.value)}
-          >
-            {cities.map((city) => (
-              <option key={city.id} value={city.id}>
-                {city.name}
-              </option>
-            ))}
-          </select>
+          <div className="min-w-[200px]">
+            <FilterSelect
+              value={selectedCityId}
+              options={cities.map((city) => ({ value: city.id, label: city.name }))}
+              onChange={setSelectedCityId}
+              className="md:w-auto"
+            />
+          </div>
           <Button onClick={handleOpenAdd} disabled={!selectedCityId} className="h-10">
             <Plus className="mr-2 h-4 w-4" />
             Add District

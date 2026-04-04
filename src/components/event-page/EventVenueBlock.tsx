@@ -18,7 +18,7 @@ export function EventVenueBlock({
 
   return (
     <Section title="Место проведения" className={cn("py-8 md:py-10", className)}>
-      <div className="grid gap-6 lg:grid-cols-[1fr_minmax(0,220px)] lg:items-start">
+      <div>
         <div className="space-y-4 rounded-2xl border border-border/60 bg-card/50 p-5 shadow-sm">
           <div className="flex gap-3">
             <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-muted">
@@ -60,17 +60,6 @@ export function EventVenueBlock({
               </Button>
             )}
           </div>
-        </div>
-
-        <div
-          className={cn(
-            "flex h-[140px] items-center justify-center rounded-2xl border border-dashed border-border/70 bg-muted/30 text-center text-xs text-muted-foreground lg:h-full lg:min-h-[160px]"
-          )}
-          aria-hidden
-        >
-          Карта
-          <br />
-          (превью)
         </div>
       </div>
     </Section>

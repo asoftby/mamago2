@@ -10,6 +10,8 @@ import {
 } from "@/lib/content-editor/types";
 import { loadEventForWizard } from "@/lib/content-editor/loadEventForWizard";
 import { canEditEventActivity } from "@/lib/permissions/eventEditPermissions";
+import { parseEventEditorStepQuery } from "@/lib/business/eventEditorStepQuery";
+import { TOTAL_EVENT_WIZARD_STEPS } from "@/components/business/wizard/event/eventWizardSteps.config";
 
 function surfaceFromUserRole(role: string): ContentEditorSurface {
   return role === "ADMIN" || role === "MODERATOR" ? "admin" : "business";
@@ -20,7 +22,7 @@ export default async function EditorEditEventPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ returnTo?: string }>;
+  searchParams: Promise<{ returnTo?: string; step?: string | string[] }>;
 }) {
   const user = await getCurrentUser();
 
@@ -29,7 +31,18 @@ export default async function EditorEditEventPage({
   }
 
   const { id } = await params;
-  const { returnTo } = await searchParams;
+  const sp = await searchParams;
+  const { returnTo } = sp;
+  const stepRaw = Array.isArray(sp.step) ? sp.step[0] : sp.step;
+  const parsedStep = parseEventEditorStepQuery(
+    typeof stepRaw === "string" ? stepRaw : null,
+  );
+  const initialEditStep =
+    parsedStep != null &&
+    parsedStep >= 1 &&
+    parsedStep <= TOTAL_EVENT_WIZARD_STEPS
+      ? parsedStep
+      : undefined;
 
   const { event, eventForWizard } = await loadEventForWizard(id);
 
@@ -87,6 +100,7 @@ export default async function EditorEditEventPage({
         editorSurface={surface}
         contentEditorNav={nav}
         returnTo={returnTo}
+        initialEditStep={initialEditStep}
       />
     </ContentEditorChrome>
   );

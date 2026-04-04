@@ -1,6 +1,8 @@
 "use client";
 
+import { Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { FilterSelect, type FilterSelectOption } from "@/components/ui/filter-select";
 
 export type ModerationStatusFilterKind = "content" | "offer";
 
@@ -12,10 +14,26 @@ export interface ModerationListFiltersProps {
   statusFilter: ModerationStatusFilterKind;
 }
 
+const STATUS_CONTENT: FilterSelectOption[] = [
+  { value: "DRAFT", label: "Черновик" },
+  { value: "PENDING", label: "На модерации" },
+  { value: "PENDING_UPDATE", label: "Обновление на проверке" },
+  { value: "PUBLISHED", label: "Опубликовано" },
+  { value: "NEEDS_REVISION", label: "Требует правок" },
+  { value: "REJECTED", label: "Отклонено" },
+];
+
+const STATUS_OFFER: FilterSelectOption[] = [
+  { value: "DRAFT", label: "Черновик" },
+  { value: "PENDING", label: "На модерации" },
+  { value: "PUBLISHED", label: "Опубликовано" },
+  { value: "REJECTED", label: "Отклонено" },
+];
+
 /**
  * Фильтры статуса и города — те же опции и стиль, что на `/admin/moderation/places`.
  */
-export function ModerationListFilters({
+function ModerationListFiltersInner({
   cities,
   basePath,
   statusFilter,
@@ -33,55 +51,48 @@ export function ModerationListFilters({
     router.push(`${basePath}?${params.toString()}`);
   };
 
+  const statusOptions = statusFilter === "content" ? STATUS_CONTENT : STATUS_OFFER;
+
   return (
     <div className="flex flex-col md:flex-row gap-3">
       <div className="flex-1">
         <label className="block text-sm font-medium text-gray-700 mb-1">
           Статус
         </label>
-        <select
-          className="w-full h-10 border border-gray-300 rounded-md px-3 text-sm"
+        <FilterSelect
           value={searchParams.get("status") || ""}
-          onChange={(e) => handleFilterChange("status", e.target.value)}
-        >
-          {statusFilter === "content" ? (
-            <>
-              <option value="">Все статусы</option>
-              <option value="DRAFT">Черновик</option>
-              <option value="PENDING">На модерации</option>
-              <option value="PUBLISHED">Опубликовано</option>
-              <option value="NEEDS_REVISION">Требует правок</option>
-              <option value="REJECTED">Отклонено</option>
-            </>
-          ) : (
-            <>
-              <option value="">Все статусы</option>
-              <option value="DRAFT">Черновик</option>
-              <option value="PENDING">На модерации</option>
-              <option value="PUBLISHED">Опубликовано</option>
-              <option value="REJECTED">Отклонено</option>
-            </>
-          )}
-        </select>
+          placeholder="Все статусы"
+          options={statusOptions}
+          onChange={(v) => handleFilterChange("status", v)}
+        />
       </div>
 
       <div className="flex-1">
         <label className="block text-sm font-medium text-gray-700 mb-1">
           Город
         </label>
-        <select
-          className="w-full h-10 border border-gray-300 rounded-md px-3 text-sm"
+        <FilterSelect
           value={searchParams.get("cityId") || ""}
-          onChange={(e) => handleFilterChange("cityId", e.target.value)}
-        >
-          <option value="">Все города</option>
-          {cities.map((city) => (
-            <option key={city.id} value={city.id}>
-              {city.name}
-            </option>
-          ))}
-        </select>
+          placeholder="Все города"
+          options={cities.map((city) => ({ value: city.id, label: city.name }))}
+          onChange={(v) => handleFilterChange("cityId", v)}
+        />
       </div>
     </div>
+  );
+}
+
+export function ModerationListFilters(props: ModerationListFiltersProps) {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex flex-col md:flex-row gap-3">
+          <div className="h-10 flex-1 rounded-[12px] bg-muted/40 animate-pulse" />
+          <div className="h-10 flex-1 rounded-[12px] bg-muted/40 animate-pulse" />
+        </div>
+      }
+    >
+      <ModerationListFiltersInner {...props} />
+    </Suspense>
   );
 }

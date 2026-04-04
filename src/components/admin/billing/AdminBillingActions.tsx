@@ -2,6 +2,9 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Textarea } from "@/components/ui/textarea";
 
 interface AdminBillingActionsProps {
   businessId: string;
@@ -158,12 +161,11 @@ export function AdminBillingActions({
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Сумма ({currency})
                 </label>
-                <input
+                <Input
                   type="number"
                   step="0.01"
                   value={formData.amount}
                   onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2"
                   placeholder="0.00"
                 />
               </div>
@@ -171,11 +173,10 @@ export function AdminBillingActions({
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Причина *
                 </label>
-                <input
+                <Input
                   type="text"
                   value={formData.reason}
                   onChange={(e) => setFormData({ ...formData, reason: e.target.value })}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2"
                   placeholder="Промо-акция, компенсация и т.д."
                 />
               </div>
@@ -183,10 +184,9 @@ export function AdminBillingActions({
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Примечание
                 </label>
-                <textarea
+                <Textarea
                   value={formData.note}
                   onChange={(e) => setFormData({ ...formData, note: e.target.value })}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2"
                   rows={2}
                   placeholder="Дополнительная информация"
                 />
@@ -229,12 +229,11 @@ export function AdminBillingActions({
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Сумма ({currency})
                 </label>
-                <input
+                <Input
                   type="number"
                   step="0.01"
                   value={formData.amount}
                   onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2"
                   placeholder="0.00"
                 />
               </div>
@@ -242,11 +241,10 @@ export function AdminBillingActions({
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Причина *
                 </label>
-                <input
+                <Input
                   type="text"
                   value={formData.reason}
                   onChange={(e) => setFormData({ ...formData, reason: e.target.value })}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2"
                   placeholder="Корректировка, штраф и т.д."
                 />
               </div>
@@ -254,21 +252,20 @@ export function AdminBillingActions({
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Примечание
                 </label>
-                <textarea
+                <Textarea
                   value={formData.note}
                   onChange={(e) => setFormData({ ...formData, note: e.target.value })}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2"
                   rows={2}
                   placeholder="Дополнительная информация"
                 />
               </div>
               <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
+                <Checkbox
                   id="allowNegative"
                   checked={formData.allowNegative}
-                  onChange={(e) => setFormData({ ...formData, allowNegative: e.target.checked })}
-                  className="rounded border-gray-300"
+                  onCheckedChange={(checked) =>
+                    setFormData({ ...formData, allowNegative: checked === true })
+                  }
                 />
                 <label htmlFor="allowNegative" className="text-sm text-gray-700">
                   Разрешить отрицательный баланс
@@ -312,10 +309,9 @@ export function AdminBillingActions({
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Причина *
                 </label>
-                <textarea
+                <Textarea
                   value={formData.reason}
                   onChange={(e) => setFormData({ ...formData, reason: e.target.value })}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2"
                   rows={3}
                   placeholder="Укажите причину приостановки"
                 />

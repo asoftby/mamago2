@@ -1,7 +1,15 @@
 /**
  * Notification Service
- * Handles creation and management of in-app notifications
- * Server-only - do not import in client components
+ *
+ * Single entry point for all in-app notifications + delivery dispatch.
+ * Server-only — do not import in client components.
+ *
+ * Flow:
+ *   createNotification(params) → saves Notification → dispatchDelivery(notification, user)
+ *
+ * All notify*() helpers are thin wrappers that resolve the owner userId
+ * and call createNotification(). Route handlers should call these helpers,
+ * not createNotification() directly.
  */
 
 import prisma from "@/lib/prisma";
@@ -11,6 +19,7 @@ import {
   NOTIFICATION_TYPES_BUSINESS,
   NOTIFICATION_TYPES_USER,
 } from "@/lib/notifications/streamFilters";
+import { dispatchDelivery } from "./notificationDelivery.service";
 
 export type NotificationStreamFilter = "user" | "business";
 
@@ -18,12 +27,8 @@ function mergeStreamFilter(
   base: Prisma.NotificationWhereInput,
   stream?: NotificationStreamFilter,
 ): Prisma.NotificationWhereInput {
-  if (stream === "user") {
-    return { ...base, type: { in: NOTIFICATION_TYPES_USER } };
-  }
-  if (stream === "business") {
-    return { ...base, type: { in: NOTIFICATION_TYPES_BUSINESS } };
-  }
+  if (stream === "user") return { ...base, type: { in: NOTIFICATION_TYPES_USER } };
+  if (stream === "business") return { ...base, type: { in: NOTIFICATION_TYPES_BUSINESS } };
   return base;
 }
 
@@ -37,24 +42,37 @@ interface CreateNotificationParams {
 }
 
 /**
- * Create a notification for a user
+ * Core: create in-app notification record + dispatch delivery channels.
+ * Never throws on delivery failure — delivery errors are recorded in NotificationDelivery.
  */
 export async function createNotification(params: CreateNotificationParams) {
-  return prisma.notification.create({
+  const notification = await prisma.notification.create({
     data: {
       userId: params.userId,
       type: params.type,
       title: params.title,
       message: params.message,
-      entityType: params.entityType || null,
-      entityId: params.entityId || null,
+      entityType: params.entityType ?? null,
+      entityId: params.entityId ?? null,
     },
   });
+
+  // Dispatch delivery async — fire and forget, never blocks the caller
+  const user = await prisma.user.findUnique({
+    where: { id: params.userId },
+    select: { id: true, email: true, role: true },
+  });
+  if (user) {
+    dispatchDelivery(notification, user).catch((e) =>
+      console.error("[notification] dispatchDelivery failed:", e),
+    );
+  }
+
+  return notification;
 }
 
-/**
- * Create notification when Place is approved
- */
+// ── PLACE ─────────────────────────────────────────────────────────────────────
+
 export async function notifyPlaceApproved(placeId: string, placeName: string, ownerId: string) {
   return createNotification({
     userId: ownerId,
@@ -66,14 +84,11 @@ export async function notifyPlaceApproved(placeId: string, placeName: string, ow
   });
 }
 
-/**
- * Create notification when Place needs changes
- */
 export async function notifyPlaceNeedsChanges(
   placeId: string,
   placeName: string,
   ownerId: string,
-  moderatorComment: string
+  moderatorComment: string,
 ) {
   return createNotification({
     userId: ownerId,
@@ -85,14 +100,11 @@ export async function notifyPlaceNeedsChanges(
   });
 }
 
-/**
- * Create notification when Place is rejected
- */
 export async function notifyPlaceRejected(
   placeId: string,
   placeName: string,
   ownerId: string,
-  moderatorComment: string
+  moderatorComment: string,
 ) {
   return createNotification({
     userId: ownerId,
@@ -104,14 +116,7 @@ export async function notifyPlaceRejected(
   });
 }
 
-/**
- * Create notification when Place update (revision) is approved
- */
-export async function notifyPlaceUpdateApproved(
-  placeId: string,
-  placeName: string,
-  ownerId: string
-) {
+export async function notifyPlaceUpdateApproved(placeId: string, placeName: string, ownerId: string) {
   return createNotification({
     userId: ownerId,
     type: "PLACE_UPDATE_APPROVED",
@@ -122,33 +127,27 @@ export async function notifyPlaceUpdateApproved(
   });
 }
 
-/**
- * Create notification when Place update (revision) needs revision
- */
 export async function notifyPlaceUpdateNeedsRevision(
   placeId: string,
   placeName: string,
   ownerId: string,
-  moderatorComment: string
+  moderatorComment: string,
 ) {
   return createNotification({
     userId: ownerId,
     type: "PLACE_UPDATE_NEEDS_REVISION",
     title: "Требуются правки",
-    message: `Изменения для места «${placeName}» требуют правок. Откройте публикацию и внесите исправления. ${moderatorComment}`,
+    message: `Изменения для места «${placeName}» требуют правок. ${moderatorComment}`,
     entityType: "PLACE",
     entityId: placeId,
   });
 }
 
-/**
- * Create notification when Place update (revision) is rejected
- */
 export async function notifyPlaceUpdateRejected(
   placeId: string,
   placeName: string,
   ownerId: string,
-  moderatorComment: string
+  moderatorComment: string,
 ) {
   return createNotification({
     userId: ownerId,
@@ -160,30 +159,150 @@ export async function notifyPlaceUpdateRejected(
   });
 }
 
-/**
- * Get unread notifications for a user
- */
-export async function getUnreadNotifications(
-  userId: string,
-  stream?: NotificationStreamFilter,
-) {
-  return prisma.notification.findMany({
-    where: mergeStreamFilter(
-      {
-        userId,
-        isRead: false,
-      },
-      stream,
-    ),
-    orderBy: {
-      createdAt: "desc",
-    },
+// ── ACTIVITY ──────────────────────────────────────────────────────────────────
+
+export async function notifyActivityApproved(activityId: string, activityName: string, ownerId: string) {
+  return createNotification({
+    userId: ownerId,
+    type: "ACTIVITY_APPROVED",
+    title: "Событие опубликовано",
+    message: `Ваше событие «${activityName}» успешно прошло модерацию и теперь доступно пользователям mamaGo.`,
+    entityType: "ACTIVITY",
+    entityId: activityId,
   });
 }
 
-/**
- * Get all notifications for a user (paginated)
- */
+export async function notifyActivityNeedsChanges(
+  activityId: string,
+  activityName: string,
+  ownerId: string,
+  moderatorComment: string,
+) {
+  return createNotification({
+    userId: ownerId,
+    type: "ACTIVITY_NEEDS_CHANGES",
+    title: "Требуются правки",
+    message: `Ваше событие «${activityName}» требует доработки. ${moderatorComment}`,
+    entityType: "ACTIVITY",
+    entityId: activityId,
+  });
+}
+
+export async function notifyActivityRejected(
+  activityId: string,
+  activityName: string,
+  ownerId: string,
+  moderatorComment: string,
+) {
+  return createNotification({
+    userId: ownerId,
+    type: "ACTIVITY_REJECTED",
+    title: "Событие отклонено",
+    message: `Ваше событие «${activityName}» было отклонено. ${moderatorComment}`,
+    entityType: "ACTIVITY",
+    entityId: activityId,
+  });
+}
+
+// ── OFFER ─────────────────────────────────────────────────────────────────────
+
+export async function notifyOfferApproved(offerId: string, offerName: string, ownerId: string) {
+  return createNotification({
+    userId: ownerId,
+    type: "OFFER_APPROVED",
+    title: "Предложение опубликовано",
+    message: `Ваше предложение «${offerName}» успешно прошло модерацию и теперь доступно пользователям mamaGo.`,
+    entityType: "OFFER",
+    entityId: offerId,
+  });
+}
+
+export async function notifyOfferNeedsChanges(
+  offerId: string,
+  offerName: string,
+  ownerId: string,
+  moderatorComment: string,
+) {
+  return createNotification({
+    userId: ownerId,
+    type: "OFFER_NEEDS_CHANGES",
+    title: "Требуются правки",
+    message: `Ваше предложение «${offerName}» требует доработки. ${moderatorComment}`,
+    entityType: "OFFER",
+    entityId: offerId,
+  });
+}
+
+export async function notifyOfferRejected(
+  offerId: string,
+  offerName: string,
+  ownerId: string,
+  moderatorComment: string,
+) {
+  return createNotification({
+    userId: ownerId,
+    type: "OFFER_REJECTED",
+    title: "Предложение отклонено",
+    message: `Ваше предложение «${offerName}» было отклонено. ${moderatorComment}`,
+    entityType: "OFFER",
+    entityId: offerId,
+  });
+}
+
+// ── BUSINESS VERIFICATION ─────────────────────────────────────────────────────
+
+export async function notifyBusinessVerified(businessId: string, businessName: string, ownerId: string) {
+  return createNotification({
+    userId: ownerId,
+    type: "BUSINESS_VERIFIED",
+    title: "Верификация пройдена",
+    message: `Ваш бизнес «${businessName}» успешно верифицирован. Теперь вы можете публиковать места и события.`,
+    entityType: "BUSINESS",
+    entityId: businessId,
+  });
+}
+
+export async function notifyBusinessRejected(
+  businessId: string,
+  businessName: string,
+  ownerId: string,
+  note: string,
+) {
+  return createNotification({
+    userId: ownerId,
+    type: "BUSINESS_REJECTED",
+    title: "Верификация отклонена",
+    message: `Верификация бизнеса «${businessName}» отклонена. ${note}`,
+    entityType: "BUSINESS",
+    entityId: businessId,
+  });
+}
+
+export async function notifyBusinessNeedsInfo(
+  businessId: string,
+  businessName: string,
+  ownerId: string,
+  note: string,
+) {
+  return createNotification({
+    userId: ownerId,
+    type: "BUSINESS_NEEDS_INFO",
+    title: "Требуется дополнительная информация",
+    message: `Для верификации бизнеса «${businessName}» требуется дополнительная информация. ${note}`,
+    entityType: "BUSINESS",
+    entityId: businessId,
+  });
+}
+
+// ── READ / QUERY ──────────────────────────────────────────────────────────────
+
+export async function getUnreadNotifications(userId: string, stream?: NotificationStreamFilter) {
+  return prisma.notification.findMany({
+    where: mergeStreamFilter({ userId, isRead: false }, stream),
+    orderBy: { createdAt: "desc" },
+  });
+}
+
 export async function getUserNotifications(
   userId: string,
   limit = 50,
@@ -192,78 +311,36 @@ export async function getUserNotifications(
 ) {
   return prisma.notification.findMany({
     where: mergeStreamFilter({ userId }, stream),
-    orderBy: {
-      createdAt: "desc",
-    },
+    orderBy: { createdAt: "desc" },
     take: limit,
     skip: offset,
   });
 }
 
-/**
- * Mark notification as read
- */
 export async function markNotificationAsRead(notificationId: string, userId: string) {
   return prisma.notification.update({
-    where: {
-      id: notificationId,
-      userId, // Ensure user owns the notification
-    },
-    data: {
-      isRead: true,
-      readAt: new Date(),
-    },
+    where: { id: notificationId, userId },
+    data: { isRead: true, readAt: new Date() },
   });
 }
 
-/**
- * Mark all notifications as read for a user
- */
 export async function markAllNotificationsAsRead(userId: string) {
   return prisma.notification.updateMany({
-    where: {
-      userId,
-      isRead: false,
-    },
-    data: {
-      isRead: true,
-      readAt: new Date(),
-    },
+    where: { userId, isRead: false },
+    data: { isRead: true, readAt: new Date() },
   });
 }
 
-/**
- * Get unread notification count for a user
- */
-export async function getUnreadCount(
-  userId: string,
-  stream?: NotificationStreamFilter,
-): Promise<number> {
+export async function getUnreadCount(userId: string, stream?: NotificationStreamFilter): Promise<number> {
   return prisma.notification.count({
-    where: mergeStreamFilter(
-      {
-        userId,
-        isRead: false,
-      },
-      stream,
-    ),
+    where: mergeStreamFilter({ userId, isRead: false }, stream),
   });
 }
 
-/**
- * Delete old read notifications (cleanup job)
- * Deletes notifications older than specified days
- */
 export async function deleteOldNotifications(daysOld = 90) {
   const cutoffDate = new Date();
   cutoffDate.setDate(cutoffDate.getDate() - daysOld);
-
   return prisma.notification.deleteMany({
-    where: {
-      isRead: true,
-      readAt: {
-        lt: cutoffDate,
-      },
-    },
+    where: { isRead: true, readAt: { lt: cutoffDate } },
   });
 }

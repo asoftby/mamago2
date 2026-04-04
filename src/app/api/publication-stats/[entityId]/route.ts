@@ -29,7 +29,7 @@ export async function GET(
   }
 
   const url = new URL(request.url);
-  const path = url.searchParams.get("path") ?? `/activity/${entityId}`;
+  const path = url.searchParams.get("path") ?? `/minsk/events/${entityId}`;
   const periodRaw = url.searchParams.get("period");
   const period =
     parsePublicationStatsPeriod(periodRaw) ?? DEFAULT_PUBLICATION_STATS_PERIOD;

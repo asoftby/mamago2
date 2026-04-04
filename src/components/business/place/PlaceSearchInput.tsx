@@ -38,12 +38,15 @@ export function PlaceSearchInput({ onPlaceSelect, disabled, initialValue }: Plac
   }, []);
 
   const initAutocomplete = async () => {
-    if (!inputRef.current) return;
+    if (!inputRef.current || !(inputRef.current instanceof HTMLInputElement)) return;
 
     try {
       const placesLib = await GoogleMapsService.getPlacesLibrary();
 
-      const autocomplete = new placesLib.Autocomplete(inputRef.current, {
+      const input = inputRef.current;
+      if (!input || !(input instanceof HTMLInputElement)) return;
+
+      const autocomplete = new placesLib.Autocomplete(input, {
         types: ["geocode", "establishment"],
         fields: ["place_id", "name", "geometry", "formatted_address", "address_components"],
         componentRestrictions: { country: "by" },

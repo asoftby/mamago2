@@ -1,6 +1,6 @@
 import { Container } from "@/components/ui/Container";
 import { H1 } from "@/components/ui/typography";
-import { CityHomeBreakingNews } from "@/features/city-home/components/CityHomeBreakingNews";
+import { StoriesSection } from "@/features/stories/components/StoriesSection";
 import { CityHomeBirthdayCta } from "@/features/city-home/components/CityHomeBirthdayCta";
 import {
   CityHomeClassesSection,
@@ -8,12 +8,17 @@ import {
   CityHomeKudaSection,
   CityHomeRoutesSection,
 } from "@/features/city-home/components/CityHomeContentRows";
-import { MINSK_BREAKING_NEWS } from "@/features/city-home/data/minskCityHome";
+import prisma from "@/lib/prisma";
+import { getKudaDiscoveryFeed } from "@/server/discovery/kudaDiscoveryFeed";
 
-export function MinskCityHomePage() {
+export default async function MinskCityHomePage() {
+  const city = await prisma.city.findUnique({ where: { slug: "minsk" } });
+  const kudaPreview = city
+    ? await getKudaDiscoveryFeed(city.id, city.slug, null, { take: 8 })
+    : [];
+
   return (
     <div className="min-h-screen bg-white pb-20">
-      {/* pt-10 = тот же шаг, что space-y-10 (2.5rem). В layout уже есть <main> — здесь только div. */}
       <Container className="space-y-10 pt-10">
         <div className="space-y-1 px-1">
           <H1 className="text-2xl md:text-3xl font-semibold tracking-tight text-neutral-900">
@@ -24,9 +29,9 @@ export function MinskCityHomePage() {
           </p>
         </div>
 
-        <CityHomeBreakingNews items={MINSK_BREAKING_NEWS} />
+        <StoriesSection />
 
-        <CityHomeKudaSection />
+        <CityHomeKudaSection activities={kudaPreview} />
 
         <CityHomeClassesSection />
 

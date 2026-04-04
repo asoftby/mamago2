@@ -9,21 +9,55 @@ import { Badge } from "@/components/ui/badge";
 import { H3, Caption } from "@/components/ui/typography";
 import { SaveHeart } from "@/features/save/SaveHeart";
 import { SaveToPlanResult } from "./SaveToPlanModal";
-import { formatRuShortDayMonth } from "@/lib/formatters/date";
+import { formatRuShortDayMonthRange } from "@/lib/formatters/date";
+import { publicActivityPath } from "@/lib/business/eventPublicLink";
 
 type DomainActivity = {
   id: string;
+  /** Публичный slug события; если нет — в ссылке используется id */
+  slug?: string | null;
   title: string;
   image: string;
   coverImage?: string | null;
   ageFrom?: number;
   dateStart?: string | null;
+  dateEnd?: string | null;
   workingHours?: string | null;
   priceMin?: number | null;
+  priceMax?: number | null;
+  /** true = «от X BYN»; false = «X BYN»; если не задано — эвристика по priceMin === priceMax */
+  priceListUsesOt?: boolean | null;
   currency?: string | null;
   badge?: string | null;
+  /** Нейтральный гео-бейдж (область / пригород), не путать с категорией */
+  geoBadge?: string | null;
+  /** Подсказка по возрастной аудитории (второй слой ленты) */
+  ageHintBadge?: string | null;
   rating?: number | null;
+  /** Показываем ★ только при reviewsCount > 0 */
+  reviewsCount?: number | null;
 };
+
+function discoveryCardPriceCaption(
+  a: Pick<
+    DomainActivity,
+    "priceMin" | "priceMax" | "currency" | "priceListUsesOt"
+  >,
+): string | null {
+  if (a.priceMin === 0) return "Бесплатно";
+  if (a.priceMin == null) return null;
+  const cur = (a.currency || "BYN").trim();
+  const useOt =
+    a.priceListUsesOt ??
+    !(
+      a.priceMax != null &&
+      a.priceMin != null &&
+      a.priceMin === a.priceMax
+    );
+  return useOt
+    ? `от ${a.priceMin} ${cur}`.trim()
+    : `${a.priceMin} ${cur}`.trim();
+}
 
 export type ActivitySaveMeta = {
   title: string;
@@ -34,7 +68,14 @@ export type ActivitySaveMeta = {
 };
 
 type AdapterProps =
-  | { activity: DomainActivity; className?: string; saveMeta?: ActivitySaveMeta; onSaveResult?: (result: SaveToPlanResult) => void }
+  | {
+      activity: DomainActivity;
+      className?: string;
+      /** Соотношение сторон обложки (`MediaCover`), по умолчанию `4/5` */
+      coverRatio?: string;
+      saveMeta?: ActivitySaveMeta;
+      onSaveResult?: (result: SaveToPlanResult) => void;
+    }
   | {
       id: string;
       title: string;
@@ -44,7 +85,9 @@ type AdapterProps =
       priceLabel?: string;
       badge?: string;
       rating?: number;
+      reviewsCount?: number;
       className?: string;
+      coverRatio?: string;
       saveMeta?: ActivitySaveMeta;
       onSaveResult?: (result: SaveToPlanResult) => void;
     };
@@ -52,28 +95,32 @@ type AdapterProps =
 export function ActivityCard(props: AdapterProps) {
   const params = useParams() as { city?: string };
   const city = params?.city || "minsk";
+  const coverRatio = props.coverRatio ?? "4/5";
 
   const base =
     "activity" in props
       ? {
           id: props.activity.id,
+          slug: props.activity.slug,
           title: props.activity.title,
           image: props.activity.coverImage ?? props.activity.image ?? null,
           meta: [
             typeof props.activity.ageFrom === "number" ? `${props.activity.ageFrom}+` : null,
             props.activity.dateStart
-              ? formatRuShortDayMonth(props.activity.dateStart)
+              ? formatRuShortDayMonthRange(
+                  props.activity.dateStart,
+                  props.activity.dateEnd ?? null,
+                )
               : props.activity.workingHours || null,
-            props.activity.priceMin === 0
-              ? "Бесплатно"
-              : props.activity.priceMin
-              ? `от ${props.activity.priceMin} ${props.activity.currency || ""}`.trim()
-              : null,
+            discoveryCardPriceCaption(props.activity),
           ]
             .filter(Boolean)
             .join(" • ") || undefined,
+          geoBadge: props.activity.geoBadge ?? undefined,
+          ageHintBadge: props.activity.ageHintBadge ?? undefined,
           badges: (props.activity.badge ? [props.activity.badge] : []) as string[],
           rating: props.activity.rating ?? undefined,
+          reviewsCount: props.activity.reviewsCount ?? undefined,
           className: props.className,
           dateStart: props.activity.dateStart,
           saveMeta: props.saveMeta,
@@ -81,6 +128,7 @@ export function ActivityCard(props: AdapterProps) {
         }
       : {
           id: props.id,
+          slug: undefined,
           title: props.title,
           image: props.image,
           meta: [
@@ -90,20 +138,27 @@ export function ActivityCard(props: AdapterProps) {
           ]
             .filter(Boolean)
             .join(" • ") || undefined,
+          geoBadge: undefined,
+          ageHintBadge: undefined,
           badges: props.badge ? [props.badge] : [],
           rating: props.rating,
+          reviewsCount: props.reviewsCount,
           className: props.className,
           dateStart: null,
           saveMeta: props.saveMeta,
           onSaveResult: props.onSaveResult,
         };
 
-  const href = `/${city}/activity/${base.id}`;
+  const href = publicActivityPath(base.id, city, base.slug);
 
-  const ratingStr =
-    typeof base.rating === "number"
-      ? base.rating.toFixed(1).replace(".", ",")
-      : undefined;
+  const showRating =
+    typeof base.rating === "number" &&
+    ("activity" in props
+      ? (base.reviewsCount ?? 0) > 0
+      : base.reviewsCount === undefined || (base.reviewsCount ?? 0) > 0);
+  const ratingStr = showRating
+    ? base.rating!.toFixed(1).replace(".", ",")
+    : undefined;
   const metaText = [base.meta, ratingStr ? `★ ${ratingStr}` : null]
     .filter(Boolean)
     .join(" • ");
@@ -111,10 +166,26 @@ export function ActivityCard(props: AdapterProps) {
   return (
     <div className={cn("group relative select-none", base.className)}>
       <Link href={href} className="block">
-        <MediaCover imageUrl={base.image} ratio="4/5">
-          {base.badges?.length > 0 && (
-            <div className="absolute top-3 left-3 z-10 flex gap-2">
-              {base.badges.slice(0, 2).map((b, i) => (
+        <MediaCover imageUrl={base.image} ratio={coverRatio}>
+          {(base.geoBadge ||
+            base.ageHintBadge ||
+            (base.badges?.length ?? 0) > 0) && (
+            <div className="absolute top-3 left-3 z-10 flex max-w-[min(100%-5rem,15rem)] flex-col gap-1.5 items-start">
+              {base.geoBadge && (
+                <Badge
+                  className="border border-neutral-200/90 bg-neutral-100/95 px-2.5 py-0.5 text-xs font-medium text-neutral-700 shadow-sm backdrop-blur-sm"
+                >
+                  {base.geoBadge}
+                </Badge>
+              )}
+              {base.ageHintBadge && (
+                <Badge
+                  className="border border-slate-200/90 bg-slate-50/95 px-2.5 py-0.5 text-xs font-medium text-slate-800 shadow-sm backdrop-blur-sm"
+                >
+                  {base.ageHintBadge}
+                </Badge>
+              )}
+              {base.badges?.slice(0, base.geoBadge || base.ageHintBadge ? 1 : 2).map((b, i) => (
                 <Badge
                   key={i}
                   className="bg-white/90 text-foreground shadow-sm border-none backdrop-blur-sm px-2.5 py-0.5 text-xs font-medium"

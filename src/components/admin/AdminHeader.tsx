@@ -15,6 +15,7 @@ import { useAccountMode } from "@/contexts/AccountModeContext";
 import { AccountDropdown } from "@/components/account/AccountDropdown";
 import { buildAdminAccountModel } from "@/lib/account/accountMenuBuilders";
 import { userInitialsFromEmail } from "@/lib/account/userInitials";
+import { useHydrated } from "@/hooks/use-hydrated";
 
 interface AdminHeaderProps {
   userEmail?: string;
@@ -31,6 +32,7 @@ export function AdminHeader({
   const [profileOpen, setProfileOpen] = useState(false);
   const isMobile = useMediaQuery("(max-width: 1023px)");
   const { goToPersonalAccount } = useAccountMode();
+  const hydrated = useHydrated();
 
   const profileInitials = userInitialsFromEmail(userEmail);
 
@@ -75,33 +77,52 @@ export function AdminHeader({
           </div>
 
           <div className="flex shrink-0 items-center gap-1.5 md:gap-2">
-            <CreatePublicationQuickMenu />
-            <AdminNotificationsDropdown
-              b2bPendingVerificationCount={b2bPendingVerificationCount}
-            />
+            {hydrated ? (
+              <>
+                <CreatePublicationQuickMenu />
+                <AdminNotificationsDropdown
+                  b2bPendingVerificationCount={b2bPendingVerificationCount}
+                />
 
-            <AccountDropdown
-              open={profileOpen}
-              onOpenChange={setProfileOpen}
-              narrow={!!isMobile}
-              trigger={
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className={cn(
-                    HEADER_CHROME_ICON_BUTTON_CLASS,
-                    "overflow-hidden p-0",
-                  )}
-                  aria-label="Профиль"
-                  aria-expanded={profileOpen}
-                  aria-haspopup="dialog"
-                >
-                  {profileTrigger}
-                </Button>
-              }
-              {...profileModel}
-            />
+                <AccountDropdown
+                  open={profileOpen}
+                  onOpenChange={setProfileOpen}
+                  narrow={!!isMobile}
+                  trigger={
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className={cn(
+                        HEADER_CHROME_ICON_BUTTON_CLASS,
+                        "overflow-hidden p-0",
+                      )}
+                      aria-label="Профиль"
+                      aria-expanded={profileOpen}
+                      aria-haspopup="dialog"
+                    >
+                      {profileTrigger}
+                    </Button>
+                  }
+                  {...profileModel}
+                />
+              </>
+            ) : (
+              <div
+                className="flex shrink-0 items-center gap-1.5 md:gap-2"
+                aria-hidden
+              >
+                <span
+                  className={cn(HEADER_CHROME_ICON_BUTTON_CLASS, "block animate-pulse")}
+                />
+                <span
+                  className={cn(HEADER_CHROME_ICON_BUTTON_CLASS, "block animate-pulse")}
+                />
+                <span
+                  className={cn(HEADER_CHROME_ICON_BUTTON_CLASS, "block animate-pulse")}
+                />
+              </div>
+            )}
           </div>
         </div>
       </header>

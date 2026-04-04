@@ -114,7 +114,6 @@ export async function approve(
   const statusTo: BusinessVerificationStatus = "APPROVED";
 
   await prisma.$transaction([
-    // Update business status
     prisma.business.update({
       where: { id: businessId },
       data: {
@@ -125,24 +124,26 @@ export async function approve(
         approvedAt: now,
         rejectedAt: null,
         isVerified: true,
-        /** Заявка одобрена — бизнес снова/впервые доступен пользователям сайта */
         operationalStatus: "ACTIVE",
-        /** Legacy поле onboarding */
         status: "APPROVED",
       },
     }),
-
-    // Create log entry
     prisma.businessVerificationLog.create({
-      data: {
-        businessId,
-        statusFrom,
-        statusTo,
-        note: note || "Approved",
-        reviewedByUserId: actorUserId,
-      },
+      data: { businessId, statusFrom, statusTo, note: note || "Approved", reviewedByUserId: actorUserId },
     }),
   ]);
+
+  // Notify business owner
+  const full = await prisma.business.findUnique({
+    where: { id: businessId },
+    select: { name: true, ownerUserId: true },
+  });
+  if (full) {
+    const { notifyBusinessVerified } = await import("./notification.service");
+    notifyBusinessVerified(businessId, full.name, full.ownerUserId).catch((e) =>
+      console.error("[businessVerification] notifyBusinessVerified failed:", e),
+    );
+  }
 }
 
 /**
@@ -179,7 +180,6 @@ export async function reject(
   const statusTo: BusinessVerificationStatus = "REJECTED";
 
   await prisma.$transaction([
-    // Update business status
     prisma.business.update({
       where: { id: businessId },
       data: {
@@ -191,18 +191,21 @@ export async function reject(
         rejectedAt: now,
       },
     }),
-
-    // Create log entry
     prisma.businessVerificationLog.create({
-      data: {
-        businessId,
-        statusFrom,
-        statusTo,
-        note,
-        reviewedByUserId: actorUserId,
-      },
+      data: { businessId, statusFrom, statusTo, note, reviewedByUserId: actorUserId },
     }),
   ]);
+
+  const full = await prisma.business.findUnique({
+    where: { id: businessId },
+    select: { name: true, ownerUserId: true },
+  });
+  if (full) {
+    const { notifyBusinessRejected } = await import("./notification.service");
+    notifyBusinessRejected(businessId, full.name, full.ownerUserId, note).catch((e) =>
+      console.error("[businessVerification] notifyBusinessRejected failed:", e),
+    );
+  }
 }
 
 /**
@@ -239,7 +242,6 @@ export async function needsInfo(
   const statusTo: BusinessVerificationStatus = "NEEDS_INFO";
 
   await prisma.$transaction([
-    // Update business status
     prisma.business.update({
       where: { id: businessId },
       data: {
@@ -251,18 +253,21 @@ export async function needsInfo(
         rejectedAt: null,
       },
     }),
-
-    // Create log entry
     prisma.businessVerificationLog.create({
-      data: {
-        businessId,
-        statusFrom,
-        statusTo,
-        note,
-        reviewedByUserId: actorUserId,
-      },
+      data: { businessId, statusFrom, statusTo, note, reviewedByUserId: actorUserId },
     }),
   ]);
+
+  const full = await prisma.business.findUnique({
+    where: { id: businessId },
+    select: { name: true, ownerUserId: true },
+  });
+  if (full) {
+    const { notifyBusinessNeedsInfo } = await import("./notification.service");
+    notifyBusinessNeedsInfo(businessId, full.name, full.ownerUserId, note).catch((e) =>
+      console.error("[businessVerification] notifyBusinessNeedsInfo failed:", e),
+    );
+  }
 }
 
 /**

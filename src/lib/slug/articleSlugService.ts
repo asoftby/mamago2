@@ -10,6 +10,8 @@
 import { prisma } from "@/lib/prisma";
 import { slugifyRu } from "@/lib/slugify";
 import { ensureUniqueSlug } from "@/lib/slug/ensureUniqueSlug";
+import { createArticleSlugHistoryIgnoreDuplicate } from "@/lib/slug/slugHistoryDedupe";
+import { syncArticleCanonical } from "@/lib/seo/syncEntityCanonical";
 
 async function isSlugAvailable(slug: string, excludeArticleId?: string) {
   const existing = await prisma.article.findUnique({ where: { slug }, select: { id: true } });
@@ -25,7 +27,7 @@ async function isSlugAvailable(slug: string, excludeArticleId?: string) {
 }
 
 export async function generateArticleSlugFromTitle(title: string, excludeArticleId?: string) {
-  const base = slugifyRu(title || "article");
+  const base = slugifyRu((title || "article").trim(), "article");
   return ensureUniqueSlug({ base, isAvailable: (s) => isSlugAvailable(s, excludeArticleId) });
 }
 
@@ -38,11 +40,15 @@ export async function assignArticleSlugIfMissing(articleId: string, title: strin
   if (article.slug) return article.slug;
 
   const slug = await generateArticleSlugFromTitle(title, articleId);
-  await prisma.article.update({
-    where: { id: articleId },
-    data: { slug, slugUpdatedAt: new Date() },
-    select: { id: true },
+  await prisma.$transaction(async (tx) => {
+    await createArticleSlugHistoryIgnoreDuplicate(tx, articleId, articleId);
+    await tx.article.update({
+      where: { id: articleId },
+      data: { slug, slugUpdatedAt: new Date() },
+      select: { id: true },
+    });
   });
+  await syncArticleCanonical(articleId);
   return slug;
 }
 
@@ -56,6 +62,10 @@ export async function updateArticleSlug(articleId: string, newSlugRaw: string) {
     if (!article) throw new Error(`Article not found: ${articleId}`);
     if (article.slug === newSlug) return;
 
+    if (!article.slug) {
+      await createArticleSlugHistoryIgnoreDuplicate(tx, articleId, articleId);
+    }
+
     const finalSlug = await ensureUniqueSlug({
       base: newSlug,
       isAvailable: async (s) => {
@@ -66,13 +76,14 @@ export async function updateArticleSlug(articleId: string, newSlugRaw: string) {
     });
 
     if (article.slug) {
-      await tx.articleSlugHistory.create({ data: { articleId, slug: article.slug } });
+      await createArticleSlugHistoryIgnoreDuplicate(tx, articleId, article.slug);
     }
     await tx.article.update({
       where: { id: articleId },
       data: { slug: finalSlug, slugUpdatedAt: new Date() },
     });
   });
+  await syncArticleCanonical(articleId);
 }
 
 export async function findArticleBySlug(slug: string): Promise<{ articleId: string; isRedirect: boolean } | null> {

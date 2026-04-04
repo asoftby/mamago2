@@ -10,6 +10,8 @@ import { computeEventShortDesc } from "@/lib/business/eventShortDesc";
 import { softDeleteActivityById } from "@/lib/activity/softDeleteActivity";
 import { fetchActivityEventRowSummary } from "@/lib/activity/fetchActivityEventRowSummary";
 import { assignActivitySlugIfMissing } from "@/lib/slug/activitySlugService";
+import { validateEventProgramCategories } from "@/lib/business/validateEventProgramCategories";
+import { assertBusinessEventPrimaryCategory } from "@/lib/business/validatePrimaryEventCategory";
 
 /**
  * GET /api/business/events/[id]
@@ -51,6 +53,9 @@ export async function GET(
             formattedAddr: true,
             city: true,
           },
+        },
+        programCategoryLinks: {
+          select: { categoryId: true },
         },
         images: {
           orderBy: {
@@ -152,6 +157,26 @@ export async function PATCH(
           ? body.venue.placeId
           : undefined;
 
+    const nextScheduleJson =
+      body.scheduleJson !== undefined
+        ? ((body.scheduleJson ?? {}) as Record<string, unknown>)
+        : ((existing.scheduleJson ?? {}) as Record<string, unknown>);
+    const nextPrimaryRootCategoryId =
+      typeof nextScheduleJson.categoryId === "string" ? nextScheduleJson.categoryId : null;
+    const nextPrimaryLeafCategoryId =
+      typeof body.eventCategoryId === "string" ? body.eventCategoryId : existing.eventCategoryId;
+
+    assertBusinessEventPrimaryCategory({
+      eventCategoryId: nextPrimaryLeafCategoryId,
+      scheduleJson: nextScheduleJson,
+    });
+
+    const { programCategoryIds } = await validateEventProgramCategories({
+      primaryRootCategoryId: nextPrimaryRootCategoryId,
+      primaryLeafCategoryId: nextPrimaryLeafCategoryId,
+      programCategoryIds: body.programCategoryIds,
+    });
+
     // Update event
     const event = await prisma.activity.update({
       where: {
@@ -167,6 +192,17 @@ export async function PATCH(
         // Event category (leaf: subcategory if selected, otherwise root)
         eventCategoryId:
           typeof body.eventCategoryId === "string" ? body.eventCategoryId : undefined,
+        programCategoryLinks: {
+          deleteMany: {},
+          ...(programCategoryIds.length > 0
+            ? {
+                createMany: {
+                  data: programCategoryIds.map((categoryId) => ({ categoryId })),
+                  skipDuplicates: true,
+                },
+              }
+            : {}),
+        },
         priceFrom: body.priceFrom,
         priceTo: body.priceTo,
         priceText: body.priceText,
@@ -181,6 +217,11 @@ export async function PATCH(
     if (typeof mergedTitle === "string" && mergedTitle.trim()) {
       await assignActivitySlugIfMissing(event.id, mergedTitle.trim());
     }
+
+    const slugRow = await prisma.activity.findUnique({
+      where: { id: event.id },
+      select: { slug: true },
+    });
 
     if (body.scheduleJson !== undefined) {
       await replaceActivitySessionsFromScheduleJson(event.id, body.scheduleJson);
@@ -202,10 +243,14 @@ export async function PATCH(
         id: event.id,
         title: event.title,
         status: event.status,
+        slug: slugRow?.slug ?? null,
       },
     });
   } catch (error: any) {
     console.error("Update event error:", error);
+    if (error instanceof Error) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
     return NextResponse.json(
       { error: error.message || "Failed to update event" },
       { status: 500 }

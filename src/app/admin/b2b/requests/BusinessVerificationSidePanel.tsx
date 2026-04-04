@@ -5,6 +5,7 @@ import { X } from "lucide-react";
 import { BusinessVisibilityControl } from "@/components/admin/business/BusinessVisibilityControl";
 import { normalizeBusinessVisibilityStatus } from "@/lib/business/businessStatusModel";
 import { BusinessDangerZonePlaceholder } from "@/components/admin/business/BusinessDangerZonePlaceholder";
+import { Textarea } from "@/components/ui/textarea";
 
 type BusinessDetail = {
   id: string;
@@ -367,12 +368,11 @@ export function BusinessVerificationSidePanel({
                           (обязателен для уточнения и отклонения)
                         </span>
                       </label>
-                      <textarea
+                      <Textarea
                         id="note"
                         value={note}
                         onChange={(e) => setNote(e.target.value)}
                         rows={4}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary focus:border-primary"
                         placeholder="Укажите причину отклонения или что требуется уточнить..."
                       />
                     </div>

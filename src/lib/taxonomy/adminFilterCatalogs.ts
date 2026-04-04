@@ -13,24 +13,25 @@ export type AdminFilterCatalogEntry = {
 export const ADMIN_FILTER_CATALOGS: AdminFilterCatalogEntry[] = [
   {
     id: "event-categories",
-    title: "Категории событий",
-    description: "Справочник категорий для событий и активностей (отдельно от сигналов и ranking).",
-    href: "/admin/taxonomy/filters/event-categories",
+    title: "Категории (taxonomy)",
+    description:
+      "Единый справочник категорий по типам публикаций: события, места, офферы, маршруты, статьи.",
+    href: "/admin/taxonomy/categories",
     implemented: true,
   },
   {
     id: "place-categories",
     title: "Категории мест",
-    description: "Плейсхолдер — будет добавлено по той же схеме.",
-    href: "/admin/taxonomy/filters/place-categories",
-    implemented: false,
+    description: "Используйте таб Places на странице категорий.",
+    href: "/admin/taxonomy/categories?type=PLACE",
+    implemented: true,
   },
   {
     id: "offer-categories",
     title: "Категории предложений",
-    description: "Плейсхолдер — будет добавлено по той же схеме.",
-    href: "/admin/taxonomy/filters/offer-categories",
-    implemented: false,
+    description: "Используйте таб Offers на странице категорий.",
+    href: "/admin/taxonomy/categories?type=OFFER",
+    implemented: true,
   },
   {
     id: "quick-filters",

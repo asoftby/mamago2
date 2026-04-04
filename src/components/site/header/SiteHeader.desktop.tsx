@@ -1,7 +1,8 @@
 "use client";
 
-import { SiteHeaderShell } from "./SiteHeaderShell";
+/** @deprecated Используйте {@link DesktopHeader} из `./DesktopHeader`. */
+import { DesktopHeader } from "./DesktopHeader";
 
 export function SiteHeaderDesktop() {
-  return <SiteHeaderShell />;
+  return <DesktopHeader />;
 }

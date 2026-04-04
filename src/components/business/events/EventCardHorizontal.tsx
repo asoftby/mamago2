@@ -45,7 +45,7 @@ interface EventCardHorizontalProps {
 }
 
 function deleteDialogCopy(status: ContentStatus): { title: string; description: string } {
-  if (status === ContentStatus.PUBLISHED) {
+  if (status === ContentStatus.PUBLISHED || status === ContentStatus.PENDING_UPDATE) {
     return {
       title: "Удалить опубликованное событие?",
       description: "Оно перестанет отображаться пользователям.",

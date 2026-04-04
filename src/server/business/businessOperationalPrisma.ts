@@ -13,7 +13,7 @@ export const activityOwnerBusinessActiveWhere: Prisma.ActivityWhereInput = {
 
 export const placeOwnerBusinessActiveWhere: Prisma.PlaceWhereInput = {
   OR: [
-    { owner: { business: { is: null } } },
-    { owner: { business: { operationalStatus: "ACTIVE" } } },
+    { ownerBusiness: { is: null } }, // No business owner
+    { ownerBusiness: { operationalStatus: "ACTIVE" } }, // Business owner is active
   ],
 };

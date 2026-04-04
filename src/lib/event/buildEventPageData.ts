@@ -1,4 +1,5 @@
 import type { ActivityMock } from "@/mocks/activity.types";
+import { publicActivityPath } from "@/lib/business/eventPublicLink";
 import { formatRuShortDayMonth } from "@/lib/formatters/date";
 import { EVENT_PAGE_OVERRIDES } from "@/mocks/eventPageOverrides";
 import type { EventPageData } from "./eventPageTypes";
@@ -109,7 +110,7 @@ export function attachSimilarEvents(
       imageUrl: a.image,
       dateLabel: a.dateStart ? formatRuShortDayMonth(a.dateStart) : undefined,
       priceLabel: priceLabelFromMock(a),
-      href: `/${citySlug}/activity/${a.id}`,
+      href: publicActivityPath(a.id, citySlug, null),
     }));
   return { ...data, similar };
 }
@@ -145,6 +146,7 @@ export function buildEventPageData(
 
   const data: EventPageData = {
     id: activity.id,
+    slug: null,
     citySlug,
     discoveryIntent: mapActivityToDiscoveryIntent(activity),
     categoryLabel: activity.badge,
@@ -166,7 +168,7 @@ export function buildEventPageData(
     similar: [],
     breadcrumbs: [
       { label: "Главная", href: `/${citySlug}` },
-      { label: "События", href: `/${citySlug}` },
+      { label: "События", href: `/${citySlug}/kuda` },
       { label: activity.title, href: "#" },
     ],
     priceLabel: priceLabelFromMock(activity),

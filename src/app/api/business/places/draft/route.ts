@@ -28,7 +28,7 @@ export async function GET() {
     // Find existing draft
     const existingDraft = await prisma.place.findFirst({
       where: {
-        ownerUserId: user.id,
+        createdByUserId: user.id,
         status: ContentStatus.DRAFT,
       },
       select: {

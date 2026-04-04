@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { X } from "lucide-react";
 import { formatAgeKeys } from "@/lib/config/ages";
+import { Textarea } from "@/components/ui/textarea";
 
 type PlaceDetail = {
   id: string;
@@ -479,12 +480,11 @@ export function PlaceModerationSidePanel({
                           (обязателен для уточнения и отклонения)
                         </span>
                       </label>
-                      <textarea
+                      <Textarea
                         id="message"
                         value={message}
                         onChange={(e) => setMessage(e.target.value)}
                         rows={4}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary focus:border-primary"
                         placeholder="Укажите причину отклонения или что требуется исправить..."
                       />
                     </div>

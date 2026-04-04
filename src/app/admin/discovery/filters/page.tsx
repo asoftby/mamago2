@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useBackofficeSavedToast } from "@/hooks/useBackofficeSavedToast";
+import { RETURN_TO_PARAM } from "@/lib/backoffice/saveFlow";
 import { Label } from "@/components/ui/typography";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -42,7 +44,11 @@ type Filter = {
 
 export default function FiltersPage() {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [filters, setFilters] = useState<Filter[]>([]);
+
+  useBackofficeSavedToast("Фильтр сохранён");
   const [loading, setLoading] = useState(true);
 
   const newFilter = useAutoSlug("", "");
@@ -97,7 +103,10 @@ export default function FiltersPage() {
   const sorted = [...filters].sort((a, b) => a.orderIndex - b.orderIndex);
 
   const goToEdit = (id: string) => {
-    router.push(EDIT_FILTER_HREF(id));
+    const returnTo = `${pathname}${searchParams.toString() ? `?${searchParams.toString()}` : ""}`;
+    const p = new URLSearchParams();
+    p.set(RETURN_TO_PARAM, returnTo);
+    router.push(`${EDIT_FILTER_HREF(id)}?${p.toString()}`);
   };
 
   return (

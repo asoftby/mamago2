@@ -9,15 +9,13 @@ import { MINSK_JOURNAL_PREVIEW } from "@/features/city-home/data/minskCityHome";
 import { useCity } from "@/contexts/CityContext";
 import { getCityDisplayName } from "@/lib/city/cityLabels";
 import { formatRuShortDayMonth } from "@/lib/formatters/date";
-import { MINSK_ACTIVITIES } from "@/mocks/activities.minsk";
+import type { ActivityMock } from "@/mocks/activity.types";
 import { MOCK_ROUTES } from "@/mocks/routes.mock";
 import { cn } from "@/lib/utils";
 
-const KUDA_PREVIEW = MINSK_ACTIVITIES.slice(0, 8);
-const CLASSES_PREVIEW = MINSK_ACTIVITIES.filter((a) => a.type === "CLASS_SCHEDULE").slice(
-  0,
-  8,
-);
+/** Превью «Занятия» — только из БД (пока пусто, без моков). */
+const CLASSES_PREVIEW = [] as ActivityMock[];
+
 const ROUTES_PREVIEW = MOCK_ROUTES.filter((r) => r.cityName === "Минск").slice(0, 6);
 
 const cardShell =
@@ -32,10 +30,9 @@ function kudaTitle(citySlug: string): string {
     : `Куда пойти сегодня — ${name}`;
 }
 
-export function CityHomeKudaSection() {
+export function CityHomeKudaSection({ activities }: { activities: ActivityMock[] }) {
   const { citySlug, appendCityQuery } = useCity();
-  const preview =
-    citySlug === "minsk" ? KUDA_PREVIEW : ([] as typeof KUDA_PREVIEW);
+  const preview = activities;
 
   if (preview.length === 0) {
     return (
@@ -43,12 +40,11 @@ export function CityHomeKudaSection() {
         className="pt-[5px]"
         title={kudaTitle(citySlug)}
         actionLabel="Смотреть все"
-        actionHref={appendCityQuery(`/${citySlug}/kuda`)}
+        actionHref={appendCityQuery(`/${citySlug}/events`)}
         actionIconButton
       >
         <p className="text-sm text-neutral-500 px-1 py-2 leading-relaxed">
-          Подборка для {getCityDisplayName(citySlug)} скоро появится — а пока
-          загляните в раздел «Куда пойти».
+          Пока нет опубликованных событий — загляните позже в раздел «Куда пойти».
         </p>
       </CityHomeSection>
     );
@@ -59,7 +55,7 @@ export function CityHomeKudaSection() {
       className="pt-[5px]"
       title={kudaTitle(citySlug)}
       actionLabel="Смотреть все"
-      actionHref={appendCityQuery(`/${citySlug}/kuda`)}
+      actionHref={appendCityQuery(`/${citySlug}/events`)}
       actionIconButton
     >
       <HorizontalCardRow>
@@ -100,6 +96,7 @@ export function CityHomeClassesSection() {
         {preview.map((activity) => (
           <div key={activity.id} className={cardShell}>
             <ActivityCard
+              coverRatio="1/1"
               activity={activity}
               saveMeta={{
                 title: activity.title,

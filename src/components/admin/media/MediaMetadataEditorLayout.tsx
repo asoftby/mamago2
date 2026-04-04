@@ -2,6 +2,7 @@
 
 import { FileText, Image as ImageIcon } from "lucide-react";
 import { formatBytes } from "@/lib/media/formatBytes";
+import { resolveDisplayFilename } from "@/lib/media/resolveDisplayFilename";
 import type { MediaAssetKind } from "@prisma/client";
 
 interface MediaMetadataEditorLayoutProps {
@@ -72,7 +73,7 @@ export function MediaMetadataEditorLayout({
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-gray-900 truncate">
-              {media.originalName}
+              {resolveDisplayFilename({ filename: media.originalName, mimeType: media.mimeType, extension: media.extension })}
             </p>
             <div className="mt-2 space-y-1">
               <p className="text-xs text-gray-500">

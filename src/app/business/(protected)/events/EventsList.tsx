@@ -46,7 +46,18 @@ export function EventsList({ activities, currentView }: EventsListProps) {
       );
     }
 
-    toast.success("Событие удалено");
+  };
+
+  const handleRestore = async (id: string) => {
+    const response = await fetch(`/api/business/events/${id}/restore`, {
+      method: "POST",
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(
+        typeof error.error === "string" ? error.error : "Не удалось восстановить событие",
+      );
+    }
   };
 
   // Archive/unarchive will be implemented when we add archived field to Activity
@@ -79,6 +90,9 @@ export function EventsList({ activities, currentView }: EventsListProps) {
         />
       )}
       onDelete={handleDelete}
+      onRestore={handleRestore}
+      deleteEntityLabel="событие"
+      getDeleteEntityName={(a) => a.title}
       onArchive={currentView === "active" ? handleArchive : undefined}
       onUnarchive={currentView === "archived" ? handleUnarchive : undefined}
     />

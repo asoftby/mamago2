@@ -6,6 +6,7 @@ import Link from "next/link";
 import { format } from "date-fns";
 import { ru } from "date-fns/locale";
 import { MapPin, Shield } from "lucide-react";
+import { CommercialToolbarFilterSelects } from "@/components/admin/commercial/CommercialToolbarFilterSelects";
 
 export default async function AdminPlacementsPage() {
   const user = await getCurrentUser();
@@ -62,21 +63,29 @@ export default async function AdminPlacementsPage() {
 
       {/* AdminPageToolbar */}
       <div className="flex flex-col md:flex-row gap-3">
-        <select className="h-10 w-full md:w-auto px-3 border border-gray-300 rounded-lg text-sm">
-          <option value="">Все статусы</option>
-          <option value="ACTIVE">Активные</option>
-          <option value="EXPIRING">Заканчиваются</option>
-          <option value="EXPIRED">Завершенные</option>
-          <option value="PAUSED">Приостановленные</option>
-          <option value="CANCELED">Отмененные</option>
-        </select>
-        <select className="h-10 w-full md:w-auto px-3 border border-gray-300 rounded-lg text-sm">
-          <option value="">Все источники</option>
-          <option value="SUBSCRIPTION">Подписка</option>
-          <option value="MANUAL">Вручную</option>
-          <option value="PROMO_PACKAGE">Промо-пакет</option>
-          <option value="BONUS">Бонус</option>
-        </select>
+        <CommercialToolbarFilterSelects
+          filters={[
+            {
+              placeholder: "Все статусы",
+              options: [
+                { value: "ACTIVE", label: "Активные" },
+                { value: "EXPIRING", label: "Заканчиваются" },
+                { value: "EXPIRED", label: "Завершенные" },
+                { value: "PAUSED", label: "Приостановленные" },
+                { value: "CANCELED", label: "Отмененные" },
+              ],
+            },
+            {
+              placeholder: "Все источники",
+              options: [
+                { value: "SUBSCRIPTION", label: "Подписка" },
+                { value: "MANUAL", label: "Вручную" },
+                { value: "PROMO_PACKAGE", label: "Промо-пакет" },
+                { value: "BONUS", label: "Бонус" },
+              ],
+            },
+          ]}
+        />
         <button className="h-10 w-full md:w-auto px-4 border border-gray-300 rounded-lg text-sm hover:bg-gray-50">
           Заканчиваются на этой неделе
         </button>

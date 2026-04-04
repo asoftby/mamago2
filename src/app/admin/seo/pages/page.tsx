@@ -9,7 +9,7 @@ export default async function AdminSeoPagesPage() {
     <div className="space-y-8">
       <SeoPageHeader
         title="SEO Pages"
-        subtitle="Единый SEO control center: управляемые SEO-посадки + публичные страницы сущностей (events/places/…)"
+        subtitle="Пресеты и сгенерированные страницы — вместе с реальными сущностями из БД (события, места, офферы, маршруты, статьи). Для сущностей показаны slug, public path и диагностика id vs slug."
         actions={
           <Button type="button" disabled className="shrink-0">
             Создать SEO Page

@@ -1,0 +1,17 @@
+import { Prisma } from "@prisma/client";
+import prisma from "@/lib/prisma";
+
+/**
+ * Restore soft-deleted activity.
+ * Assumption: for wizard/business flows we restore to DRAFT.
+ */
+export async function restoreActivityToDraftById(id: string): Promise<void> {
+  const affected = await prisma.$executeRaw(
+    Prisma.sql`UPDATE "Activity" SET status = 'DRAFT'::"ContentStatus" WHERE id = ${id}`,
+  );
+  const n = typeof affected === "bigint" ? Number(affected) : Number(affected);
+  if (n !== 1) {
+    throw new Error(`Activity not found: ${id}`);
+  }
+}
+

@@ -27,12 +27,8 @@ export function PlaceMapModal({
   initialLng,
   onConfirm,
 }: PlaceMapModalProps) {
-  
-  // Temporary pin state (not confirmed yet)
   const [tempPin, setTempPin] = useState<{ lat: number; lng: number } | null>(
-    initialLat !== null && initialLat !== undefined && initialLng !== null && initialLng !== undefined
-      ? { lat: initialLat, lng: initialLng }
-      : null
+    initialLat != null && initialLng != null ? { lat: initialLat, lng: initialLng } : null
   );
 
   const mapRef = useRef<HTMLDivElement>(null);
@@ -40,126 +36,32 @@ export function PlaceMapModal({
   const markerRef = useRef<google.maps.marker.AdvancedMarkerElement | google.maps.Marker | null>(null);
   const clickListenerRef = useRef<google.maps.MapsEventListener | null>(null);
 
-  useEffect(() => {
-    if (isOpen) {
-      initMap();
-      
-      // ESC key handler
-      const handleEsc = (e: KeyboardEvent) => {
-        if (e.key === "Escape") {
-          onClose();
-        }
-      };
-      
-      document.addEventListener("keydown", handleEsc);
-      return () => {
-        document.removeEventListener("keydown", handleEsc);
-        cleanup();
-      };
-    }
-    return () => {
-      cleanup();
-    };
-  }, [isOpen]);
-
-  // Update marker when tempPin changes
-  useEffect(() => {
-    if (tempPin && mapInstanceRef.current) {
-      updateMarkerPosition(tempPin.lat, tempPin.lng);
-      mapInstanceRef.current.panTo({ lat: tempPin.lat, lng: tempPin.lng });
-    }
-  }, [tempPin]);
-
   const cleanup = () => {
     if (clickListenerRef.current) {
       google.maps.event.removeListener(clickListenerRef.current);
       clickListenerRef.current = null;
     }
     if (markerRef.current) {
-      if ('setMap' in markerRef.current) {
+      if ("setMap" in markerRef.current) {
         markerRef.current.setMap(null);
       } else {
         markerRef.current.map = null;
       }
       markerRef.current = null;
     }
+    mapInstanceRef.current = null;
   };
 
-  const initMap = async () => {
-    if (!mapRef.current) return;
-
-    try {
-      const mapsLib = await GoogleMapsService.getMapsLibrary();
-
-      const center = tempPin
-        ? { lat: tempPin.lat, lng: tempPin.lng }
-        : { lat: 53.9045, lng: 27.5615 }; // Minsk default
-
-      const mapId = process.env.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID;
-
-      const map = new mapsLib.Map(mapRef.current, {
-        center,
-        zoom: tempPin ? 16 : 13,
-        mapTypeControl: false,
-        streetViewControl: false,
-        fullscreenControl: false,
-        ...(mapId ? { mapId } : {}),
-      });
-
-      mapInstanceRef.current = map;
-
-      // Wait for map to be ready before adding listeners
-      await new Promise<void>((resolve) => {
-        google.maps.event.addListenerOnce(map, 'idle', () => resolve());
-      });
-
-      // Add initial marker if we have tempPin
-      if (tempPin) {
-        addMarker(tempPin.lat, tempPin.lng);
-      }
-
-      // Setup click listener for manual point selection
-      clickListenerRef.current = map.addListener("click", (e: google.maps.MapMouseEvent) => {
-        if (e.latLng) {
-          const newLat = e.latLng.lat();
-          const newLng = e.latLng.lng();
-          
-          setTempPin({ lat: newLat, lng: newLng });
-        }
-      });
-    } catch (err) {
-      console.error("[PlaceMapModal] Init error:", err);
-    }
-  };
-
-  const updateMarkerPosition = (lat: number, lng: number) => {
+  const placeOrMovePin = async (lat: number, lng: number) => {
     if (!mapInstanceRef.current) return;
 
     if (markerRef.current) {
-      // Update existing marker position
-      if ('position' in markerRef.current && markerRef.current.position) {
-        // AdvancedMarkerElement - update position property
-        (markerRef.current as any).position = { lat, lng };
-      } else if ('setPosition' in markerRef.current) {
-        // Regular Marker
-        markerRef.current.setPosition({ lat, lng });
-      }
-    } else {
-      // Create new marker if doesn't exist
-      addMarker(lat, lng);
-    }
-  };
-
-  const addMarker = async (lat: number, lng: number) => {
-    if (!mapInstanceRef.current) return;
-
-    // Remove old marker
-    if (markerRef.current) {
-      if ('setMap' in markerRef.current) {
+      if ("setMap" in markerRef.current) {
         markerRef.current.setMap(null);
       } else {
         markerRef.current.map = null;
       }
+      markerRef.current = null;
     }
 
     try {
@@ -170,14 +72,14 @@ export function PlaceMapModal({
         const { AdvancedMarkerElement } = markerLib;
 
         const markerContent = document.createElement("div");
-        markerContent.className = "relative";
+        markerContent.className = "relative flex flex-col items-center";
         markerContent.innerHTML = `
-          <div class="relative">
-            <div class="absolute left-1/2 top-full -translate-x-1/2 -translate-y-1/2 w-10 h-10 rounded-full border-3 border-[#EF8759] animate-mg-pulse"></div>
-            <svg width="40" height="52" viewBox="0 0 40 52" fill="none">
-              <path d="M20 0C8.954 0 0 8.954 0 20c0 14 20 32 20 32s20-18 20-32C40 8.954 31.046 0 20 0z" fill="#EF8759"/>
+          <div class="relative drop-shadow-[0_4px_14px_rgba(0,0,0,0.55)]">
+            <div class="absolute left-1/2 top-[calc(100%-4px)] h-10 w-10 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white ring-2 ring-[#c2410c] animate-mg-pulse"></div>
+            <svg width="44" height="56" viewBox="0 0 40 52" fill="none" aria-hidden="true">
+              <path d="M20 0C8.954 0 0 8.954 0 20c0 14 20 32 20 32s20-18 20-32C40 8.954 31.046 0 20 0z" fill="#ea580c"/>
               <path d="M20 2C10.059 2 2 10.059 2 20c0 12.5 18 29 18 29s18-16.5 18-29C38 10.059 29.941 2 20 2z" fill="white"/>
-              <path d="M20 4C11.163 4 4 11.163 4 20c0 11 16 26 16 26s16-15 16-26C36 11.163 28.837 4 20 4z" fill="#EF8759"/>
+              <path d="M20 4C11.163 4 4 11.163 4 20c0 11 16 26 16 26s16-15 16-26C36 11.163 28.837 4 20 4z" fill="#ea580c"/>
               <circle cx="20" cy="20" r="6" fill="white"/>
             </svg>
           </div>
@@ -194,6 +96,7 @@ export function PlaceMapModal({
         const marker = new google.maps.Marker({
           position: { lat, lng },
           map: mapInstanceRef.current,
+          zIndex: 50,
         });
         markerRef.current = marker;
       }
@@ -201,6 +104,85 @@ export function PlaceMapModal({
       console.error("[PlaceMapModal] Marker error:", err);
     }
   };
+
+  const initMap = async (initialPin: { lat: number; lng: number } | null) => {
+    if (!mapRef.current) return;
+
+    try {
+      const mapsLib = await GoogleMapsService.getMapsLibrary();
+
+      const center = initialPin ?? { lat: 53.9045, lng: 27.5615 };
+
+      const mapId = process.env.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID;
+
+      const map = new mapsLib.Map(mapRef.current, {
+        center,
+        zoom: initialPin ? 16 : 13,
+        mapTypeControl: false,
+        streetViewControl: false,
+        fullscreenControl: false,
+        ...(mapId ? { mapId } : {}),
+      });
+
+      mapInstanceRef.current = map;
+
+      await new Promise<void>((resolve) => {
+        google.maps.event.addListenerOnce(map, "idle", () => resolve());
+      });
+
+      clickListenerRef.current = map.addListener("click", (e: google.maps.MapMouseEvent) => {
+        if (e.latLng) {
+          setTempPin({ lat: e.latLng.lat(), lng: e.latLng.lng() });
+        }
+      });
+
+      if (initialPin) {
+        await placeOrMovePin(initialPin.lat, initialPin.lng);
+      }
+    } catch (err) {
+      console.error("[PlaceMapModal] Init error:", err);
+    }
+  };
+
+  useEffect(() => {
+    if (!isOpen) {
+      cleanup();
+      return;
+    }
+
+    const initialPin =
+      initialLat != null && initialLng != null ? { lat: initialLat, lng: initialLng } : null;
+    setTempPin(initialPin);
+
+    void initMap(initialPin);
+
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        onClose();
+      }
+    };
+    document.addEventListener("keydown", handleEsc);
+
+    return () => {
+      document.removeEventListener("keydown", handleEsc);
+      cleanup();
+    };
+  }, [isOpen, initialLat, initialLng]);
+
+  useEffect(() => {
+    if (!tempPin || !mapInstanceRef.current) return;
+
+    let cancelled = false;
+    (async () => {
+      await placeOrMovePin(tempPin.lat, tempPin.lng);
+      if (cancelled || !mapInstanceRef.current) return;
+      mapInstanceRef.current.panTo({ lat: tempPin.lat, lng: tempPin.lng });
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [tempPin]);
 
   const handleConfirm = () => {
     if (!tempPin) return;
@@ -223,36 +205,37 @@ export function PlaceMapModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-white">
-      {/* Close Button */}
-      <button
-        onClick={onClose}
-        className="absolute top-4 right-4 z-10 p-2 rounded-full bg-white shadow-lg hover:bg-gray-100 transition-colors"
-        aria-label="Закрыть"
-      >
-        <X className="h-6 w-6 text-gray-700" />
-      </button>
-
-      {/* Hint Text */}
-      <div className="absolute top-4 left-4 z-10 bg-white shadow-lg rounded-lg px-4 py-2">
-        <p className="text-sm text-gray-700">Кликните на карте, чтобы выбрать точку</p>
+    <div className="fixed inset-0 z-50 flex flex-col bg-background">
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-[100] flex justify-between gap-2 p-3 pt-[max(0.75rem,env(safe-area-inset-top))] pl-[max(0.75rem,env(safe-area-inset-left))] pr-[max(0.75rem,env(safe-area-inset-right))]">
+        <div className="pointer-events-auto max-w-[min(100%,20rem)] rounded-xl border border-border bg-card/95 px-3 py-2 shadow-lg backdrop-blur-sm sm:max-w-md sm:px-4">
+          <p className="text-sm font-medium text-foreground">Кликните по карте, чтобы поставить метку</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">Метка появится сразу; подтвердите, когда готово</p>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="pointer-events-auto flex h-11 min-w-11 shrink-0 items-center justify-center gap-2 rounded-full border border-border bg-card/95 px-3 shadow-lg backdrop-blur-sm transition-colors hover:bg-muted sm:min-w-[7.5rem] sm:px-4"
+          aria-label="Закрыть карту"
+        >
+          <X className="h-5 w-5 text-foreground" strokeWidth={2.25} />
+          <span className="hidden text-sm font-semibold sm:inline">Закрыть</span>
+        </button>
       </div>
 
-      {/* Confirm Button */}
-      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-10">
+      <div className="pointer-events-none absolute bottom-0 left-0 right-0 z-[100] flex justify-center p-4 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
         <Button
+          type="button"
           onClick={handleConfirm}
           disabled={!tempPin}
           size="lg"
-          className="shadow-xl"
+          className="pointer-events-auto shadow-xl"
           style={{ backgroundColor: "#EF8759" }}
         >
           Подтвердить точку
         </Button>
       </div>
 
-      {/* Map */}
-      <div ref={mapRef} className="w-full h-full" />
+      <div ref={mapRef} className="min-h-0 flex-1 w-full" />
     </div>
   );
 }

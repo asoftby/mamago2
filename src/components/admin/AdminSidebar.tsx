@@ -12,6 +12,8 @@ import {
   Filter,
   MapPin,
   Globe,
+  BarChart2,
+  ChartColumn,
 } from "lucide-react";
 import { SidebarItem } from "@/components/shared/sidebar/SidebarItem";
 import { SidebarGroup } from "@/components/shared/sidebar/SidebarGroup";
@@ -203,8 +205,9 @@ export function AdminSidebar({
           label="Discovery"
           defaultOpen={isGroupActive([
             adminPath("/taxonomy/signals"),
-            adminPath("/taxonomy/filters/event-categories"),
+            adminPath("/taxonomy/categories"),
             adminPath("/taxonomy/event-categories"),
+            adminPath("/taxonomy/genres"),
             adminPath("/discovery"),
           ])}
         >
@@ -215,10 +218,10 @@ export function AdminSidebar({
             onClick={onNavigate}
           />
           <SidebarSubItem
-            href={adminPath("/taxonomy/filters/event-categories")}
+            href={adminPath("/taxonomy/categories")}
             label="Категории"
             isActive={
-              pathname.startsWith(adminPath("/taxonomy/filters/event-categories")) ||
+              pathname.startsWith(adminPath("/taxonomy/categories")) ||
               pathname.startsWith(adminPath("/taxonomy/event-categories"))
             }
             onClick={onNavigate}
@@ -230,15 +233,9 @@ export function AdminSidebar({
             onClick={onNavigate}
           />
           <SidebarSubItem
-            href={adminPath("/discovery/themes")}
-            label="Темы"
-            isActive={pathname.startsWith(adminPath("/discovery/themes"))}
-            onClick={onNavigate}
-          />
-          <SidebarSubItem
-            href={adminPath("/discovery/genres")}
+            href={adminPath("/taxonomy/genres")}
             label="Жанры"
-            isActive={pathname.startsWith(adminPath("/discovery/genres"))}
+            isActive={pathname.startsWith(adminPath("/taxonomy/genres"))}
             onClick={onNavigate}
           />
           <SidebarSubItem
@@ -249,8 +246,44 @@ export function AdminSidebar({
           />
         </SidebarGroup>
 
-        {/* Geography Group */}
+        {/* Ranking Group */}
         <SidebarGroup
+          icon={BarChart2}
+          label="Ranking"
+          defaultOpen={isGroupActive([adminPath("/ranking")])}
+        >
+          <SidebarSubItem
+            href={adminPath("/ranking/stories-intents")}
+            label="Stories Intents"
+            isActive={pathname.startsWith(adminPath("/ranking/stories-intents"))}
+            onClick={onNavigate}
+          />
+          <SidebarSubItem
+            href={adminPath("/ranking/weights")}
+            label="Ranking Weights"
+            isActive={pathname.startsWith(adminPath("/ranking/weights"))}
+            onClick={onNavigate}
+          />
+          <SidebarSubItem
+            href={adminPath("/ranking/boost")}
+            label="Boost Rules"
+            isActive={pathname.startsWith(adminPath("/ranking/boost"))}
+            onClick={onNavigate}
+          />
+        </SidebarGroup>
+
+        <SidebarItem
+          href={adminPath("/analytics")}
+          icon={ChartColumn}
+          label="Analytics"
+          isActive={
+            pathname === adminPath("/analytics") ||
+            pathname.startsWith(`${adminPath("/analytics")}/`)
+          }
+          onClick={onNavigate}
+        />
+
+        {/* Geography Group */}        <SidebarGroup
           icon={MapPin}
           label="География"
           defaultOpen={isGroupActive([adminPath("/taxonomy/districts"), adminPath("/taxonomy/metro-stations")])}

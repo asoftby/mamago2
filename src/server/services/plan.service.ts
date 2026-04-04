@@ -2,16 +2,44 @@ import { prisma } from "@/lib/prisma";
 
 const planActivitySelect = {
   id: true,
+  slug: true,
   title: true,
   type: true,
   coverImageUrl: true,
   ageLabel: true,
+  eventCategory: { select: { nameRu: true } },
+  priceFrom: true,
+  priceText: true,
+  currency: true,
   status: true,
   owner: {
     select: {
       business: { select: { operationalStatus: true } },
     },
   },
+  place: {
+    select: {
+      shortAddress: true,
+      formattedAddr: true,
+      customAddress: true,
+      city: { select: { name: true } },
+    },
+  },
+  venue: {
+    select: {
+      addressLine: true,
+      kind: true,
+      place: {
+        select: {
+          shortAddress: true,
+          formattedAddr: true,
+          customAddress: true,
+          city: { select: { name: true } },
+        },
+      },
+    },
+  },
+  scheduleJson: true,
 };
 
 export type PlanItemWithActivity = {
@@ -25,14 +53,37 @@ export type PlanItemWithActivity = {
   createdAt: Date;
   activity: {
     id: string;
+    slug: string | null;
     title: string;
     type: string;
     coverImageUrl: string | null;
     ageLabel: string | null;
+    eventCategory: { nameRu: string } | null;
+    priceFrom: number | null;
+    priceText: string | null;
+    currency: string | null;
     status: string;
     owner: {
       business: { operationalStatus: string } | null;
     } | null;
+    place: {
+      shortAddress: string | null;
+      formattedAddr: string | null;
+      customAddress: string | null;
+      city: { name: string } | null;
+    } | null;
+    venue: {
+      addressLine: string | null;
+      kind: string;
+      place: {
+        shortAddress: string | null;
+        formattedAddr: string | null;
+        customAddress: string | null;
+        city: { name: string } | null;
+      } | null;
+    } | null;
+    /** Режим участия / ссылка на билеты — см. resolveActivityParticipationCta */
+    scheduleJson?: unknown;
   } | null;
 };
 
@@ -43,28 +94,29 @@ export type PlanItemWithActivity = {
  */
 export async function addPlanItem(
   userId: string,
-  activityId: string,
-  date: string, // YYYY-MM-DD format
+  activityId: string | null,
+  date: string,
   startsAt?: Date,
   title?: string,
   coverImageUrl?: string
 ): Promise<{ id: string }> {
-  // Check if this activity is already in the plan
-  const existing = await prisma.planItem.findFirst({
-    where: { userId, activityId },
-    select: { id: true },
-  });
-
-  if (existing) {
-    return await prisma.planItem.update({
-      where: { id: existing.id },
-      data: { date, startsAt: startsAt ?? null, title: title ?? null, coverImageUrl: coverImageUrl ?? null },
+  // Only deduplicate when activityId is present
+  if (activityId) {
+    const existing = await prisma.planItem.findFirst({
+      where: { userId, activityId },
       select: { id: true },
     });
+    if (existing) {
+      return await prisma.planItem.update({
+        where: { id: existing.id },
+        data: { date, startsAt: startsAt ?? null, title: title ?? null, coverImageUrl: coverImageUrl ?? null },
+        select: { id: true },
+      });
+    }
   }
 
   return await prisma.planItem.create({
-    data: { userId, activityId, date, startsAt: startsAt ?? null, title: title ?? null, coverImageUrl: coverImageUrl ?? null },
+    data: { userId, activityId: activityId ?? null, date, startsAt: startsAt ?? null, title: title ?? null, coverImageUrl: coverImageUrl ?? null },
     select: { id: true },
   });
 }

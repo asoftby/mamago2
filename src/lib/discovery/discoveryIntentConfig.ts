@@ -15,8 +15,8 @@ export const DISCOVERY_INTENT_CONFIG: Record<Intent, DiscoveryIntentConfig> = {
     id: "kuda",
     label: "Куда пойти",
     titleTemplate: "Куда пойти с ребёнком в {city}",
-    /** Минск: отдельный сегмент discovery; остальные города — пока корень /{city} */
-    href: (city) => (city === "minsk" ? "/minsk/kuda" : `/${city}`),
+    /** Канонический листинг — `/{city}/events` (редирект с `/{city}/kuda`). */
+    href: (city) => `/${city}/events`,
     hasFilters: true,
     image: "/compass.svg",
   },

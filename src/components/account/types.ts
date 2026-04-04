@@ -23,10 +23,11 @@ export type AccountMenuRow =
 
 export type AccountDropdownHeaderModel = {
   email: string;
+  /** Human-readable name: displayName or email prefix */
+  displayName: string;
   initials: string;
   avatarUrl?: string | null;
-  /** Подпись под email: роль, «Администратор» и т.д. */
   roleLabel?: string | null;
-  /** Над email, напр. «Вы вошли как» — можно не передавать */
-  metaCaption?: string | null;
+  /** Семья: «Папа · 35–44» — тот же источник, что карточка взрослого в «Моя семья» */
+  personaSubtitle?: string | null;
 };

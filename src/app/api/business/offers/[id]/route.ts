@@ -8,6 +8,7 @@ import {
   canPublishContentDirectly,
 } from "@/lib/auth/businessContentAccess";
 import { assignOfferSlugIfMissing } from "@/lib/slug/offerSlugService";
+import { ensurePublishedOfferHasSlug } from "@/lib/slug/publishSlugGuards";
 
 const updateOfferSchema = z.object({
   title: z.string().min(1).optional(),
@@ -151,7 +152,13 @@ export async function PATCH(
       },
     });
 
-    if (data.title !== undefined && typeof data.title === "string" && data.title.trim()) {
+    if (offer.status === "PUBLISHED") {
+      await ensurePublishedOfferHasSlug(offer.id);
+    } else if (
+      data.title !== undefined &&
+      typeof data.title === "string" &&
+      data.title.trim()
+    ) {
       await assignOfferSlugIfMissing(offer.id, data.title.trim());
     }
 

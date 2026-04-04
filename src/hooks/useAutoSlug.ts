@@ -28,11 +28,11 @@ export function useAutoSlug(
   const [slug, setSlugState] = useState(initialSlug);
   /**
    * isValueEditedManually:
-   * - create: false, пока пользователь не начал править VALUE вручную
+   * - create: false, пока пользователь не начал править slug вручную
    * - edit: true, чтобы название не ломало slug/URL
    *
-   * Важное поведение:
-   * - если пользователь очистил VALUE (ввёл пусто), автогенерация разрешается снова
+   * Пустой slug в поле ввода сохраняется (не подставляется slug из названия),
+   * иначе нельзя стереть slug до конца. На сохранении сервер может заполнить slug из title.
    */
   const valueEditedManually = useRef(isEditMode);
 
@@ -47,18 +47,16 @@ export function useAutoSlug(
   );
 
   const setSlug = useCallback((value: string) => {
-    const trimmed = value.trim();
-
-    if (!trimmed) {
-      // Preferred UX: если VALUE пустой — снова включаем автогенерацию из LABEL.
-      valueEditedManually.current = false;
-      setSlugState(transliterateToSlug(source));
+    // Только явная пустая строка или одни пробелы — в пустой slug.
+    // Не используем trim() для «есть ли текст»: иначе ломается ввод (например лидирующий пробел при вставке).
+    if (value === "" || /^\s*$/.test(value)) {
+      valueEditedManually.current = true;
+      setSlugState("");
       return;
     }
-
     valueEditedManually.current = true;
     setSlugState(value);
-  }, [source]);
+  }, []);
 
   const hydrate = useCallback(
     (nextSource: string, nextSlug: string) => {

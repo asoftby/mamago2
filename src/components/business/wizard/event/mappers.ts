@@ -57,10 +57,18 @@ export function mapEventToFormData(event: any): EventFormData {
     (typeof scheduleJson.categoryPathLabel === "string" ? scheduleJson.categoryPathLabel : null) ??
     null;
 
-  // Multi-category (legacy-aware)
+  // Program categories (many-to-many, stored separately from scheduleJson)
+  const rawProgramLinks = Array.isArray(event.programCategoryLinks)
+    ? (event.programCategoryLinks as Array<{ categoryId?: unknown }>)
+    : [];
+  formData.programCategoryIds = rawProgramLinks
+    .map((x) => (typeof x.categoryId === "string" ? x.categoryId : null))
+    .filter((x): x is string => Boolean(x));
+
+  // Одна основная категория: при legacy multi в JSON берём первый корень
   formData.categoryIds =
     multiCategoryIds.length > 0
-      ? multiCategoryIds
+      ? [multiCategoryIds[0]]
       : formData.categoryId
         ? [formData.categoryId]
         : [];
@@ -83,6 +91,18 @@ export function mapEventToFormData(event: any): EventFormData {
     };
   } else {
     formData.subcategoryIdsByCategoryId = {};
+  }
+
+  // Legacy: в подкатегориях оставляем только первую выбранную
+  for (const k of Object.keys(formData.subcategoryIdsByCategoryId)) {
+    const arr = formData.subcategoryIdsByCategoryId[k];
+    if (Array.isArray(arr) && arr.length > 1) {
+      const first = arr[0];
+      formData.subcategoryIdsByCategoryId[k] = first ? [first] : [];
+      if (k === formData.categoryId) {
+        formData.subcategoryId = first ?? null;
+      }
+    }
   }
 
   // If scheduleJson had multi-category but legacy primary is missing, infer primary from first root
@@ -109,6 +129,18 @@ export function mapEventToFormData(event: any): EventFormData {
     if (!formData.categorySlug) {
       formData.categorySlug = ec.slug;
     }
+    formData.primaryRootHasChildren = ec.parentId != null;
+  } else {
+    formData.primaryRootHasChildren = false;
+  }
+
+  const gbcRaw = scheduleJson.genresByCategoryId;
+  if (gbcRaw && typeof gbcRaw === "object" && !Array.isArray(gbcRaw)) {
+    const next: Record<string, string> = {};
+    for (const [k, v] of Object.entries(gbcRaw as Record<string, unknown>)) {
+      if (typeof v === "string" && v.trim()) next[k] = v.trim();
+    }
+    formData.genreSlugByRootCategoryId = next;
   }
 
   if (scheduleJson.cinema && typeof scheduleJson.cinema === "object") {
@@ -117,6 +149,19 @@ export function mapEventToFormData(event: any): EventFormData {
     formData.cinemaDuration = typeof c.duration === "number" ? c.duration : undefined;
     formData.cinemaTrailerUrl = typeof c.trailerUrl === "string" ? c.trailerUrl : undefined;
   }
+
+  if (
+    formData.cinemaGenre &&
+    formData.categoryId &&
+    !formData.genreSlugByRootCategoryId[formData.categoryId]
+  ) {
+    formData.genreSlugByRootCategoryId = {
+      ...formData.genreSlugByRootCategoryId,
+      [formData.categoryId]: formData.cinemaGenre,
+    };
+  }
+
+  formData.categoryIds = formData.categoryId ? [formData.categoryId] : [];
 
   // Step 2: Description
   formData.fullDescription = event.description || "";
@@ -267,32 +312,27 @@ export function mapEventToFormData(event: any): EventFormData {
  * Used when creating or updating event
  */
 export function buildEventPayload(data: EventFormData): any {
-  const categoryIds =
-    Array.isArray(data.categoryIds) && data.categoryIds.length > 0
-      ? data.categoryIds
-      : data.categoryId
-        ? [data.categoryId]
-        : [];
+  const categoryIds = data.categoryId ? [data.categoryId] : [];
 
-  const subcategoryIdsByCategoryId: Record<string, string[]> = {
-    ...(data.subcategoryIdsByCategoryId ?? {}),
-  };
+  const subcategoryIdsByCategoryId: Record<string, string[]> = {};
   if (data.categoryId) {
-    subcategoryIdsByCategoryId[data.categoryId] = data.subcategoryIdsByCategoryId?.[data.categoryId] ?? [];
-    // Ensure legacy primary sub is present as first element (if any)
-    if (data.subcategoryId) {
-      const current = subcategoryIdsByCategoryId[data.categoryId] ?? [];
-      subcategoryIdsByCategoryId[data.categoryId] = Array.isArray(current)
-        ? [data.subcategoryId, ...current.filter((x) => x !== data.subcategoryId)]
-        : [data.subcategoryId];
-    }
+    subcategoryIdsByCategoryId[data.categoryId] = data.subcategoryId
+      ? [data.subcategoryId]
+      : [];
   }
 
   const leafCategoryId = data.subcategoryId || data.categoryId;
 
+  const genreMap = data.genreSlugByRootCategoryId ?? {};
+  const primaryRootId = data.categoryId ?? null;
+  const cinemaGenreResolved =
+    (primaryRootId && genreMap[primaryRootId]) ||
+    (data.categoryId && genreMap[data.categoryId]) ||
+    data.cinemaGenre;
+
   const cinemaBlock = isCinemaEventCategorySlug(data.categorySlug)
     ? {
-        genre: data.cinemaGenre,
+        genre: cinemaGenreResolved,
         duration: data.cinemaDuration,
         trailerUrl: data.cinemaTrailerUrl,
       }
@@ -315,6 +355,7 @@ export function buildEventPayload(data: EventFormData): any {
     scheduleMode: "MULTI_DATE",
 
     eventCategoryId: leafCategoryId || undefined,
+    programCategoryIds: Array.isArray(data.programCategoryIds) ? data.programCategoryIds : [],
 
     scheduleJson: {
       ...(data.eventFormats.length > 0
@@ -335,7 +376,6 @@ export function buildEventPayload(data: EventFormData): any {
               signals: mapEventFormatsToSignals(data.eventFormats),
             }
           : {}),
-      categoryIds: categoryIds.length > 0 ? categoryIds : undefined,
       subcategoryIdsByCategoryId:
         Object.keys(subcategoryIdsByCategoryId).length > 0 ? subcategoryIdsByCategoryId : undefined,
       categoryId: data.categoryId,
@@ -343,6 +383,8 @@ export function buildEventPayload(data: EventFormData): any {
       categorySlug: data.categorySlug || undefined,
       categoryPathLabel: data.categoryPathLabel || undefined,
       ageRangeIds: data.ageRangeIds,
+
+      ...(Object.keys(genreMap).length > 0 ? { genresByCategoryId: genreMap } : {}),
 
       cinema: cinemaBlock,
 

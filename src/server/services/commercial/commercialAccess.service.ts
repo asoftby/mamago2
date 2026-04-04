@@ -269,6 +269,7 @@ export async function getBusinessFeatureCapabilities(businessId: string) {
     canUsePremiumBadge: snapshot.enabledFeatures.includes("PREMIUM_BADGE"),
     canReceivePaidRequests: snapshot.enabledFeatures.includes("PAID_REQUESTS"),
     canAppearAsPremiumBusiness: snapshot.enabledFeatures.includes("PREMIUM_VISIBILITY"),
+    /** Коммерческая фича ANALYTICS для бизнеса; не путать с cookie-согласием на внешнюю аналитику */
     canUseAnalytics: snapshot.enabledFeatures.includes("ANALYTICS"),
     canActivateNewCommercialFeature: snapshot.enabledFeatures.includes("COMMERCIAL_ACTIVATION"),
   };

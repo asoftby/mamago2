@@ -14,31 +14,38 @@ export interface EventFormData {
   /** Пресет «как проходит событие» → при сохранении маппится в сигналы в scheduleJson */
   eventFormats: EventFormatPreset[];
   /**
-   * Multi-category (корневые категории):
-   * - UI поддерживает максимум 3 выбранные корневые категории
-   * - Для совместимости с БД/legacy хранится ещё первичная пара: `categoryId`/`subcategoryId`
+   * Legacy: зеркало одного корня `[categoryId]` при сохранении; multi-select не используется.
    */
   categoryIds: string[];
   /**
-   * Multi subcategory selection per root category:
-   * key: root category id -> selected child ids
+   * Для выбранного корня: не более одной подкатегории в значении.
    */
   subcategoryIdsByCategoryId: Record<string, string[]>;
 
-  /** Primary корневая категория события (для legacy: EventCategoryId в БД). */
+  /** Корневая категория события (родитель листа в справочнике). */
   categoryId: string | null;
-  /** Primary подкатегория (для legacy: leaf EventCategoryId). */
+  /** Подкатегория (лист), если у корня есть дочерние — обязательна. */
   subcategoryId: string | null;
+  /** Синхронизируется из справочника: у корня есть дочерние категории → нужна подкатегория. */
+  primaryRootHasChildren: boolean;
   /** id опций сигнала age (Discovery / Signals) */
   ageRangeIds: string[];
   /** Значения сигнала age для поля Activity.ageTags (синхронизируется с ageRangeIds) */
   ageTags: string[];
   /** id/values опций сигнала interests (Discovery / Signals, axis INTERESTS) */
   interestIds: string[];
+  /**
+   * Slug жанра (справочник Genre) по id корневой категории.
+   * Загружается после выбора категории; ключ — `EventCategory.id` корня.
+   */
+  genreSlugByRootCategoryId: Record<string, string>;
   /** Slug выбранной категории (подкатегория или корень) — для кино и сохранения в scheduleJson */
   categorySlug: string | null;
   /** Подпись для review (корень → подкатегория), из справочника */
   categoryPathLabel: string | null;
+
+  /** Категории «в программе» (many-to-many, только selectableInProgram). */
+  programCategoryIds: string[];
 
   // Cinema-specific (conditional on category slug, см. isCinemaEventCategorySlug)
   cinemaGenre?: string;

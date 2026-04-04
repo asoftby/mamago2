@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { MapPin, Search } from "lucide-react";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
@@ -11,6 +11,13 @@ import { DISCOVERY_INTENT_CONFIG } from "@/lib/discovery/discoveryIntentConfig";
 import { Intent } from "@/lib/intent";
 import { IconCompass, IconPalette, IconParty, IconMap } from "@/components/ui/icons";
 import { getCityLocativePhrase } from "@/lib/city/cityDisplayNames";
+import { useAuthMe } from "@/features/birthday/builder/hooks/useAuthMe";
+import { useFamilyPersona } from "@/contexts/FamilyPersonaContext";
+import { formatWhoHeaderSummary } from "@/lib/family/formatWhoHeaderSummary";
+import {
+  hasSelectedChildren as familyHasSelectedChildren,
+  resolveFamilyAgeMode,
+} from "@/lib/family/familyAgeMode";
 
 // Map intent IDs to fallback icons
 const INTENT_ICONS = {
@@ -45,6 +52,8 @@ export function MobileSearchEntry({
 }: MobileSearchEntryProps) {
   const [isClient, setIsClient] = useState(false);
   const { applied } = useDiscoveryFilters();
+  const { isAuthenticated } = useAuthMe();
+  const family = useFamilyPersona();
   const { options: apiOptions } = useDiscoveryFilterOptions(citySlug);
 
   useEffect(() => {
@@ -153,24 +162,64 @@ export function MobileSearchEntry({
     return null;
   };
 
-  // Build age text
-  const getAgeText = () => {
-    if (applied.age.length === 0) return null;
-    
-    const ageLabels = applied.age.map(ageValue => {
-      const group = AGE_GROUPS.find(g => g.value === ageValue);
-      return group ? group.label : ageValue;
+  const profileChildren = useMemo(
+    () =>
+      isAuthenticated && family && !family.loading
+        ? family.childPersonasForFilter
+        : [],
+    [isAuthenticated, family],
+  );
+  const profileChildIds = useMemo(
+    () => profileChildren.map((c) => c.id),
+    [profileChildren],
+  );
+  const hasSelectedChildren = familyHasSelectedChildren(
+    family?.selectedPersonaIds ?? [],
+    profileChildIds,
+  );
+
+  const showChildrenPreset = profileChildren.length > 0;
+  const ageMode = resolveFamilyAgeMode({
+    hasProfileChildren: showChildrenPreset,
+    selectedPersonaIds: family?.selectedPersonaIds ?? [],
+    profileChildIds,
+  });
+
+  const whoOrAgeText = useMemo(() => {
+    if (!isAuthenticated || !family || family.loading) {
+      if (applied.age.length === 0) return null;
+      const ageLabels = applied.age.map((ageValue) => {
+        const group = AGE_GROUPS.find((g) => g.value === ageValue);
+        return group ? group.label : ageValue;
+      });
+      if (ageLabels.length === 1) return ageLabels[0];
+      if (ageLabels.length === 2) return `${ageLabels[0]}, ${ageLabels[1]}`;
+      return `${ageLabels[0]} +${ageLabels.length - 1}`;
+    }
+    if (ageMode === "free" && showChildrenPreset) {
+      return "Для всех";
+    }
+    const line = formatWhoHeaderSummary({
+      hasSelectedChildren,
+      selectedPersonaIds: family.selectedPersonaIds,
+      personas: family.personas,
+      fallbackAgeValues: applied.age,
     });
-    
-    if (ageLabels.length === 1) return ageLabels[0];
-    if (ageLabels.length === 2) return `${ageLabels[0]}, ${ageLabels[1]}`;
-    return `${ageLabels[0]} +${ageLabels.length - 1}`;
-  };
+    if (line === "Выберите возраст") return null;
+    return line;
+  }, [
+    isAuthenticated,
+    family,
+    ageMode,
+    showChildrenPreset,
+    hasSelectedChildren,
+    applied.age,
+  ]);
 
   const locationText = getLocationText();
 
   const dateText = getDateText();
-  const ageText = getAgeText();
+  const ageText = whoOrAgeText;
 
   const parts = cityHubOnly
     ? [locationText]

@@ -23,7 +23,7 @@ import { cn } from "@/lib/utils";
 
 const adminFetch: RequestInit = { credentials: "include" };
 
-const EDIT_SIGNAL_HREF = (id: string) => `/admin/taxonomy/signals/${id}`;
+const EDIT_SIGNAL_HREF = (slug: string) => `/admin/taxonomy/signals/${slug}`;
 
 type SignalRow = {
   id: string;
@@ -103,8 +103,8 @@ export default function SignalsPage() {
     }
   };
 
-  const goToEdit = (id: string) => {
-    router.push(EDIT_SIGNAL_HREF(id));
+  const goToEdit = (slug: string) => {
+    router.push(EDIT_SIGNAL_HREF(slug));
   };
 
   return (
@@ -159,11 +159,11 @@ export default function SignalsPage() {
                   role="link"
                   tabIndex={0}
                   className={discoveryTableRowClass(!!s.parentId)}
-                  onClick={() => goToEdit(s.id)}
+                  onClick={() => goToEdit(s.slug)}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" || e.key === " ") {
                       e.preventDefault();
-                      goToEdit(s.id);
+                      goToEdit(s.slug);
                     }
                   }}
                 >

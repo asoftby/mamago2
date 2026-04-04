@@ -13,7 +13,8 @@ import {
   validateOpeningHours,
 } from "@/lib/openingHours";
 import type { OpeningHoursData } from "@/components/openingHours";
-import { canCreateBusinessContent, canManageOwnedContent } from "@/lib/auth/businessContentAccess";
+import { canCreateBusinessContent } from "@/lib/auth/businessContentAccess";
+import { canManagePlaceAsync } from "@/lib/auth/placeAccess";
 
 /**
  * GET /api/business/places/[id]/opening-hours
@@ -34,7 +35,9 @@ export async function GET(
     // Get place with opening hours
     const place = await prisma.place.findUnique({
       where: { id: placeId },
-      include: {
+      select: {
+        createdByUserId: true,
+        ownerBusinessId: true,
         openingHours: {
           include: {
             rules: {
@@ -61,7 +64,8 @@ export async function GET(
     }
 
     // Check ownership
-    if (!canManageOwnedContent(user, place.ownerUserId)) {
+    const canManage = await canManagePlaceAsync(user, place);
+    if (!canManage) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 

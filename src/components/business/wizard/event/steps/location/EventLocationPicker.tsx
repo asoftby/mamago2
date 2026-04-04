@@ -1,17 +1,17 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Loader2, CheckCircle2, AlertCircle, MapPinIcon, ChevronDown } from "lucide-react";
+import { Loader2, CheckCircle2, AlertCircle, MapPinIcon } from "lucide-react";
 import { EventLocationSearchInput } from "./EventLocationSearchInput";
 import { EventLocationMapPreview } from "./EventLocationMapPreview";
 import { EventLocationMapModal } from "./EventLocationMapModal";
 import { formatDistance } from "@/lib/formatDistance";
-import { nativeSelectFieldClassName } from "@/components/ui/native-select-classes";
+import { FilterSelect } from "@/components/ui/filter-select";
 import { loadDistricts, loadMetroStations, enrichEventLocation } from "./eventLocationUtils";
 import type { EventFormData } from "../../types";
 
@@ -289,6 +289,17 @@ export function EventLocationPicker({
   const metroShown = metroManualId ?? metroAutoId;
   const metroDistanceShown = metroManualId ? metroManualDistanceM : metroAutoDistanceM;
 
+  const metroFilterOptions = useMemo(() => {
+    const out: { value: string; label: string }[] = [];
+    if (metroShown && metroStations.length === 0 && data.metroName) {
+      out.push({ value: metroShown, label: data.metroName });
+    }
+    for (const m of metroStations) {
+      out.push({ value: m.id, label: m.name });
+    }
+    return out;
+  }, [metroShown, metroStations, data.metroName]);
+
   return (
     <div className="space-y-6">
       {/* Status indicators */}
@@ -359,25 +370,14 @@ export function EventLocationPicker({
           {/* District Select */}
           <div>
             <Label htmlFor="district">Район</Label>
-            <div className="relative">
-              <select
-                id="district"
-                value={districtShown || ""}
-                onChange={(e) => handleDistrictChange(e.target.value)}
-                className={`${nativeSelectFieldClassName} appearance-none`}
-                disabled={districts.length === 0 || disabled}
-              >
-                <option value="">Не выбрано</option>
-                {districts.map((d) => (
-                  <option key={d.id} value={d.id}>
-                    {d.name}
-                  </option>
-                ))}
-              </select>
-              <div className="pointer-events-none absolute right-3 inset-y-0 flex items-center">
-                <ChevronDown className="h-5 w-5 text-muted-foreground translate-y-[1px]" />
-              </div>
-            </div>
+            <FilterSelect
+              id="district"
+              value={districtShown || ""}
+              placeholder="Не выбрано"
+              options={districts.map((d) => ({ value: d.id, label: d.name }))}
+              onChange={handleDistrictChange}
+              disabled={districts.length === 0 || disabled}
+            />
             
             {/* Helper text */}
             <div className="mt-1 text-[12px] text-muted-foreground">
@@ -404,29 +404,14 @@ export function EventLocationPicker({
           {/* Metro Select */}
           <div>
             <Label htmlFor="metro">Метро</Label>
-            <div className="relative">
-              <select
-                id="metro"
-                value={metroShown || ""}
-                onChange={(e) => handleMetroChange(e.target.value)}
-                className={`${nativeSelectFieldClassName} appearance-none`}
-                disabled={disabled}
-              >
-                <option value="">Не выбрано</option>
-                {/* Show currently selected metro even if stations not loaded yet */}
-                {metroShown && metroStations.length === 0 && data.metroName && (
-                  <option value={metroShown}>{data.metroName}</option>
-                )}
-                {metroStations.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.name}
-                  </option>
-                ))}
-              </select>
-              <div className="pointer-events-none absolute right-3 inset-y-0 flex items-center">
-                <ChevronDown className="h-5 w-5 text-muted-foreground translate-y-[1px]" />
-              </div>
-            </div>
+            <FilterSelect
+              id="metro"
+              value={metroShown || ""}
+              placeholder="Не выбрано"
+              options={metroFilterOptions}
+              onChange={handleMetroChange}
+              disabled={disabled}
+            />
             
             {/* Distance display */}
             {metroShown && metroDistanceShown !== null && (

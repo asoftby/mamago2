@@ -99,6 +99,21 @@ function clearDiscoveryFiltersSession(city: string, intent: Intent): void {
   }
 }
 
+/** Чтобы эффект «восстановить из session» не подставлял старый age после «Для всех» / сброса возраста. */
+function stripAgeFromStoredDiscoverySession(
+  cityForSession: string,
+  pathname: string,
+  next: DiscoveryFilters,
+): void {
+  if (next.age.length > 0) return;
+  const intent =
+    getIntentFromPath(pathname) ?? getDiscoveryIntentForPublicationPath(pathname);
+  if (!intent) return;
+  const stored = loadDiscoveryFiltersSession(cityForSession, intent);
+  if (!stored || stored.age.length === 0) return;
+  saveDiscoveryFiltersSession(cityForSession, intent, { ...stored, age: [] });
+}
+
 function hasDiscoveryFilterParamsInUrl(
   searchParams: ReadonlyURLSearchParams,
 ): boolean {
@@ -317,8 +332,9 @@ export function useDiscoveryFilters() {
     (patch: Partial<DiscoveryFilters>) => {
       const next = mergeDiscoveryPatch(applied, patch);
       writeAppliedToUrl(router, pathname, searchParams, next, "replace");
+      stripAgeFromStoredDiscoverySession(cityForSession, pathname, next);
     },
-    [router, pathname, searchParams, applied],
+    [router, pathname, searchParams, applied, cityForSession],
   );
 
   const actions = useMemo(
@@ -345,6 +361,7 @@ export function useDiscoveryFilters() {
           next.dateTo = null;
         }
         writeAppliedToUrl(router, pathname, searchParams, next, "replace");
+        stripAgeFromStoredDiscoverySession(cityForSession, pathname, next);
       },
       /** Одна замена URL: полное состояние фильтров + при необходимости другой pathname (моб. шит «Готово»). */
       commitFilters: (
@@ -360,11 +377,20 @@ export function useDiscoveryFilters() {
           next,
           "replace",
         );
+        stripAgeFromStoredDiscoverySession(cityForSession, path, next);
       },
       /** Закрыть панель без отката URL */
       close: () => {},
     }),
-    [router, pathname, searchParams, applied, patchFilters, clearSessionForCurrentRoute],
+    [
+      router,
+      pathname,
+      searchParams,
+      applied,
+      patchFilters,
+      clearSessionForCurrentRoute,
+      cityForSession,
+    ],
   );
 
   const derived = useMemo(() => {

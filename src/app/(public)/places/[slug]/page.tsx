@@ -13,6 +13,7 @@ import { PlaceEditStepSelector } from "@/components/place/PlaceEditStepSelector"
 import { isPlacePubliclyVisible } from "@/lib/plan/publicVisibility";
 import { placeOwnerBusinessActiveWhere } from "@/server/public/publicContentVisibility";
 import { buildPlaceJsonLd } from "@/lib/seo/schema/buildPlaceJsonLd";
+import { AnalyticsDetailBeacon } from "@/components/analytics/AnalyticsDetailBeacon";
 
 interface PlacePageProps {
   params: Promise<{ slug: string }>;
@@ -35,7 +36,7 @@ export async function generateMetadata({ params }: PlacePageProps): Promise<Meta
     cityId: string | null;
     status: string;
     archivedAt: Date | null;
-    owner: { business: { operationalStatus: string } | null } | null;
+    ownerBusiness: { operationalStatus: string } | null;
   } | null;
   
   if (isLegacyId) {
@@ -53,9 +54,9 @@ export async function generateMetadata({ params }: PlacePageProps): Promise<Meta
         cityId: true,
         status: true,
         archivedAt: true,
-        owner: {
+        ownerBusiness: {
           select: {
-            business: { select: { operationalStatus: true } },
+            operationalStatus: true,
           },
         },
       },
@@ -87,9 +88,9 @@ export async function generateMetadata({ params }: PlacePageProps): Promise<Meta
         cityId: true,
         status: true,
         archivedAt: true,
-        owner: {
+        ownerBusiness: {
           select: {
-            business: { select: { operationalStatus: true } },
+            operationalStatus: true,
           },
         },
       },
@@ -326,6 +327,12 @@ export default async function PlacePage({ params }: PlacePageProps) {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <AnalyticsDetailBeacon
+        entityType="PLACE"
+        entityId={place.id}
+        vertical="CITY"
+        cityId={place.cityId}
+      />
       <script
         type="application/ld+json"
         // eslint-disable-next-line react/no-danger

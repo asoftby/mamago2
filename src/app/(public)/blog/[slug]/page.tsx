@@ -10,6 +10,7 @@ import prisma from "@/lib/prisma";
 import { findArticleBySlug } from "@/lib/slug/articleSlugService";
 import { buildArticleJsonLd } from "@/lib/seo/schema/buildArticleJsonLd";
 import type { ArticleVm } from "@/lib/blog/articleTypes";
+import { AnalyticsDetailBeacon } from "@/components/analytics/AnalyticsDetailBeacon";
 
 async function getArticle(slug: string): Promise<ArticleVm | null> {
   const resolved = await findArticleBySlug(slug);
@@ -177,6 +178,13 @@ export default async function ArticlePage({
 
   return (
     <main className="max-w-3xl mx-auto px-4 sm:px-6 py-12 md:py-16">
+      {"_seo" in article && article._seo?.id ? (
+        <AnalyticsDetailBeacon
+          entityType="ARTICLE"
+          entityId={article._seo.id}
+          vertical="CITY"
+        />
+      ) : null}
       {jsonLd && (
         <script
           type="application/ld+json"
@@ -307,7 +315,7 @@ export default async function ArticlePage({
           title="7 мест для семейных выходных в Минске"
           subtitle="Все места из этой статьи — в одной подборке"
           places={showcasePlaces}
-          viewAllHref="/minsk/kuda"
+          viewAllHref="/minsk/events"
           viewAllLabel="Смотреть все места"
         />
       </ArticleContent>

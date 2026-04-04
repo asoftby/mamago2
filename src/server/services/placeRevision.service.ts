@@ -9,7 +9,7 @@ import prisma from "@/lib/prisma";
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import type { Role } from "@prisma/client";
 import { PlaceRevisionStatus, LocationSource, PlaceKind } from "@prisma/client";
-import { canManageOwnedContent } from "@/lib/auth/businessContentAccess";
+import { canManagePlaceAsync } from "@/lib/auth/placeAccess";
 import type { PlaceImage, PlaceRevisionImage, TempMedia, OpeningHoursRule, OpeningHoursInterval, Prisma } from "../types";
 import {
   notifyPlaceUpdateApproved,
@@ -103,6 +103,11 @@ export async function getOrCreatePlaceRevision(
   // Get the Place with ownership check
   const place = await prisma.place.findUnique({
     where: { id: placeId },
+    select: {
+      createdByUserId: true,
+      ownerBusinessId: true,
+      status: true,
+    },
     include: {
       images: {
         orderBy: { sortOrder: "asc" },
@@ -114,7 +119,8 @@ export async function getOrCreatePlaceRevision(
     throw new Error("Place not found");
   }
 
-  if (!canManageOwnedContent(user, place.ownerUserId)) {
+  const canManage = await canManagePlaceAsync(user, place);
+  if (!canManage) {
     throw new Error("Unauthorized: not place owner");
   }
 
@@ -204,7 +210,8 @@ export async function savePlaceRevisionDraft(
     include: {
       place: {
         select: {
-          ownerUserId: true,
+          createdByUserId: true,
+          ownerBusinessId: true,
         },
       },
     },
@@ -214,7 +221,8 @@ export async function savePlaceRevisionDraft(
     throw new Error("Revision not found");
   }
 
-  if (!canManageOwnedContent(user, revision.place.ownerUserId)) {
+  const canManage = await canManagePlaceAsync(user, revision.place);
+  if (!canManage) {
     throw new Error("Unauthorized: not place owner");
   }
 
@@ -389,7 +397,8 @@ export async function submitPlaceRevisionForModeration(
       place: {
         select: {
           id: true,
-          ownerUserId: true,
+          createdByUserId: true,
+          ownerBusinessId: true,
         },
       },
     },
@@ -399,7 +408,8 @@ export async function submitPlaceRevisionForModeration(
     throw new Error("Revision not found");
   }
 
-  if (!canManageOwnedContent(user, revision.place.ownerUserId)) {
+  const canManage = await canManagePlaceAsync(user, revision.place);
+  if (!canManage) {
     throw new Error("Unauthorized: not place owner");
   }
 

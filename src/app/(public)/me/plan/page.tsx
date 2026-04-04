@@ -28,10 +28,12 @@ export default async function PlanPage() {
 
   // Compute children ages
   const today = new Date();
-  const childrenAges = children.map((c) => {
-    const birth = new Date(c.birthDate);
-    return today.getFullYear() - birth.getFullYear();
-  });
+  const childrenAges = children
+    .filter((c): c is typeof c & { birthDate: Date } => c.birthDate != null)
+    .map((c) => {
+      const birth = new Date(c.birthDate);
+      return today.getFullYear() - birth.getFullYear();
+    });
 
   // Serialize plan items (dates need to be strings for client)
   const serializedItems = planItems.map((item) => ({
@@ -45,6 +47,7 @@ export default async function PlanPage() {
     activity: item.activity
       ? {
           id: item.activity.id,
+          slug: item.activity.slug,
           title: item.activity.title,
           type: item.activity.type,
           coverImageUrl: item.activity.coverImageUrl,

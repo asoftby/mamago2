@@ -20,6 +20,7 @@ export async function getAllEntitySeoPages(): Promise<SeoPage[]> {
     canonical: r.canonical,
     updatedAt: r.updatedAt,
     indexationStatus: r.indexationStatus,
+    entityDiagnostics: r.entityDiagnostics ?? null,
   }));
 }
 

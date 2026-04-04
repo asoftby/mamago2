@@ -35,8 +35,9 @@ export function InternationalPhoneInput({
 
   return (
     <div
+      data-slot="international-phone-input"
       className={cn(
-        "international-phone-field",
+        "international-phone-field w-full",
         ariaInvalid && "international-phone-field--invalid",
         className,
       )}

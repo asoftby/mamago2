@@ -91,6 +91,12 @@ const STATUS_CONFIG = {
     className: "bg-gray-100 text-gray-700 border-gray-200",
     action: "На модерации",
   },
+  PENDING_UPDATE: {
+    label: "На проверке",
+    variant: "outline" as const,
+    className: "bg-amber-50 text-amber-900 border-amber-200",
+    action: "На проверке",
+  },
   PUBLISHED: {
     label: "Опубликовано",
     variant: "default" as const,

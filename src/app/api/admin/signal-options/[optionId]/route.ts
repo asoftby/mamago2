@@ -27,6 +27,6 @@ export async function DELETE(_: Request, { params }: { params: Promise<{ optionI
   }
 
   const { optionId } = await params;
-  await prisma.signalOption.delete({ where: { id: optionId } }); 
-  return NextResponse.json({ ok: true }); 
-} 
+  await prisma.signalOption.delete({ where: { id: optionId } });
+  return NextResponse.json({ ok: true });
+}

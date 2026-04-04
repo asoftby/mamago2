@@ -2,7 +2,6 @@
 
 import { Container } from "@/components/ui/Container";
 import { RouteCard } from "@/components/routes/RouteCard";
-import { MINSK_ACTIVITIES } from "@/mocks/activities.minsk";
 import { DiscoveryActivitiesGrid } from "@/components/discovery/DiscoveryActivitiesGrid";
 import { Intent } from "@/lib/intent";
 import { H1 } from "@/components/ui/typography";
@@ -19,7 +18,7 @@ interface CityDiscoveryShellProps {
   city: string;
   intent: Intent;
   routesData?: MockRoute[];
-  /** Лента «Куда пойти»: реальные события + добор моков (с сервера) */
+  /** Лента «Куда пойти»: только данные с сервера (БД) */
   discoveryActivities?: ActivityMock[];
 }
 
@@ -96,7 +95,7 @@ export function CityDiscoveryShell({
             </Link>
           </div>
 
-          <DiscoveryActivitiesGrid activities={MINSK_ACTIVITIES} />
+          <DiscoveryActivitiesGrid activities={discoveryActivities ?? []} coverRatio="1/1" />
         </Container>
       </main>
     );
@@ -110,7 +109,8 @@ export function CityDiscoveryShell({
           <H1 className="px-1">{pageTitle}</H1>
         </div>
         <DiscoveryActivitiesGrid
-          activities={discoveryActivities ?? MINSK_ACTIVITIES}
+          activities={discoveryActivities ?? []}
+          coverRatio={intent === "classes" ? "1/1" : undefined}
         />
       </Container>
     </main>

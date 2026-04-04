@@ -112,8 +112,9 @@ export default async function AdminMediaDetailPage({
     usageContext || undefined
   );
 
-  // Build page title: always use title from metadata (manual or auto-generated)
-  const pageTitle = effectiveMetadata.title || displayFilename;
+  // Build page title: use metadata title, or filename WITHOUT extension as fallback
+  const filenameWithoutExt = displayFilename.replace(/\.[^.]+$/, "");
+  const pageTitle = effectiveMetadata.title || filenameWithoutExt;
 
   return (
     <div className="p-6 md:p-4 space-y-6">
@@ -121,7 +122,6 @@ export default async function AdminMediaDetailPage({
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl md:text-xl font-bold">{pageTitle}</h1>
-          <p className="text-sm text-gray-600 mt-1">{displayOriginalName}</p>
         </div>
         <div className="flex items-center gap-3">
           <MediaKindBadge 
@@ -243,12 +243,12 @@ export default async function AdminMediaDetailPage({
             <h2 className="text-lg md:text-base font-semibold text-gray-900 mb-4">Информация о файле</h2>
             <dl className="space-y-3">
               <div>
-                <dt className="text-sm font-medium text-gray-500">Оригинальное имя</dt>
-                <dd className="mt-1 text-sm text-gray-900">{displayOriginalName}</dd>
+                <dt className="text-sm font-medium text-gray-500">Имя файла</dt>
+                <dd className="mt-1 text-sm text-gray-900 font-mono break-all">{displayFilename}</dd>
               </div>
               <div>
-                <dt className="text-sm font-medium text-gray-500">Тип файла</dt>
-                <dd className="mt-1 text-sm text-gray-900">{displayFileType}</dd>
+                <dt className="text-sm font-medium text-gray-500">Тип</dt>
+                <dd className="mt-1 text-sm text-gray-900 font-mono">{media.mimeType}</dd>
               </div>
               <div>
                 <dt className="text-sm font-medium text-gray-500">Размер</dt>
@@ -256,7 +256,7 @@ export default async function AdminMediaDetailPage({
               </div>
               {media.width && media.height && (
                 <div>
-                  <dt className="text-sm font-medium text-gray-500">Размеры</dt>
+                  <dt className="text-sm font-medium text-gray-500">Разрешение</dt>
                   <dd className="mt-1 text-sm text-gray-900">
                     {media.width} × {media.height} px
                   </dd>
@@ -268,14 +268,6 @@ export default async function AdminMediaDetailPage({
                   <dd className="mt-1 text-sm text-gray-900">{media.durationSec} сек</dd>
                 </div>
               )}
-              <div>
-                <dt className="text-sm font-medium text-gray-500">MIME тип</dt>
-                <dd className="mt-1 text-xs text-gray-600 font-mono">{media.mimeType}</dd>
-              </div>
-              <div>
-                <dt className="text-sm font-medium text-gray-500">Расширение</dt>
-                <dd className="mt-1 text-xs text-gray-600 font-mono">{media.extension}</dd>
-              </div>
             </dl>
           </div>
 

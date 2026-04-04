@@ -7,12 +7,13 @@
  */
 
 import prisma from "@/lib/prisma";
-import { ContentStatus } from "@prisma/client";
+import { ContentStatus, Role } from "@prisma/client";
+import { canManagePlaceAsync, getUserBusinessId } from "@/lib/auth/placeAccess";
 
 /**
  * Get places for current business user
  * 
- * SECURITY: Only returns places owned by the specified user
+ * SECURITY: Returns places created by user OR owned by their business
  * 
  * @param userId - Current user ID (must be BUSINESS_OWNER)
  * @param options - Filter options
@@ -24,8 +25,15 @@ export async function getBusinessPlaces(
     status?: ContentStatus;
   } = {}
 ) {
+  // Get user's business
+  const businessId = await getUserBusinessId(userId);
+
   const where: any = {
-    ownerUserId: userId, // CRITICAL: Always filter by owner
+    // Show places created by user OR owned by their business
+    OR: [
+      { createdByUserId: userId },
+      ...(businessId ? [{ ownerBusinessId: businessId }] : []),
+    ],
   };
 
   // Archive filter
@@ -99,37 +107,58 @@ export async function getBusinessPlaces(
 }
 
 /**
- * Check if user owns a place
+ * Check if user can manage a place (business-based ownership)
  * 
  * @param placeId - Place ID to check
- * @param userId - User ID to verify ownership
- * @returns true if user owns the place
+ * @param user - User object with id and role
+ * @returns true if user can manage the place
  */
-export async function userOwnsPlace(placeId: string, userId: string): Promise<boolean> {
+export async function userCanManagePlace(
+  placeId: string,
+  user: { id: string; role: Role }
+): Promise<boolean> {
   const place = await prisma.place.findUnique({
     where: { id: placeId },
-    select: { ownerUserId: true },
+    select: { 
+      createdByUserId: true,
+      ownerBusinessId: true,
+    },
   });
 
-  return place?.ownerUserId === userId;
+  if (!place) {
+    return false;
+  }
+
+  return await canManagePlaceAsync(user, place);
 }
 
 /**
- * Get place with ownership verification
+ * Get place with ownership verification (business-based)
  * 
  * @param placeId - Place ID
- * @param userId - User ID (for ownership check)
- * @throws Error if place not found or user doesn't own it
+ * @param user - User object with id and role
+ * @throws Error if place not found or user can't manage it
  */
-export async function getPlaceForOwner(placeId: string, userId: string) {
+export async function getPlaceForOwner(
+  placeId: string,
+  userId: string,
+  userRole: Role = "BUSINESS_OWNER"
+) {
   const place = await prisma.place.findUnique({
     where: { id: placeId },
     include: {
-      owner: {
+      creator: {
         select: {
           id: true,
           email: true,
           role: true,
+        },
+      },
+      ownerBusiness: {
+        select: {
+          id: true,
+          name: true,
+          ownerUserId: true,
         },
       },
     },
@@ -139,8 +168,14 @@ export async function getPlaceForOwner(placeId: string, userId: string) {
     throw new Error("Place not found");
   }
 
-  if (place.ownerUserId !== userId) {
-    throw new Error("Access denied: You don't own this place");
+  // Check access using business-based ownership
+  const canManage = await canManagePlaceAsync(
+    { id: userId, role: userRole },
+    place
+  );
+
+  if (!canManage) {
+    throw new Error("Access denied: You don't have permission to manage this place");
   }
 
   return place;

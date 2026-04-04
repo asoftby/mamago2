@@ -75,7 +75,7 @@ export function FormStickyActionBar({
         </div>
 
         <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3">
-          {isReviewStep && showSaveDraft && onSaveDraft && (
+          {showSaveDraft && onSaveDraft && (
             <Button
               type="button"
               variant="outline"

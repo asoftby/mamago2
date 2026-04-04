@@ -29,11 +29,19 @@ export function isCityHubPath(pathname: string | null): boolean {
   return segments.length === 1 && VALID_CITY_SLUGS.includes(segments[0] as CitySlug);
 }
 
-/** Карточка публикации (активность/событие): `/{city}/activity/{id}` */
+/**
+ * Карточка публикации в городе: `/{city}/activity/...`, `/{city}/events/{slug|id}`.
+ * (Витрина `/city/events` без slug — не деталь.)
+ */
 export function isPublicationDetailPath(pathname: string | null): boolean {
   if (!pathname) return false;
   const segments = pathname.split("/").filter(Boolean);
-  return segments.length >= 3 && segments[1] === "activity";
+  if (segments.length < 3) return false;
+  if (!(VALID_CITY_SLUGS as readonly string[]).includes(segments[0] ?? "")) {
+    return false;
+  }
+  const section = segments[1];
+  return section === "activity" || section === "events";
 }
 
 /**
@@ -47,10 +55,50 @@ export function shouldHideMobileBottomNav(pathname: string | null): boolean {
 
   if (segments[0] === "blog") return true;
   if (segments[0] === "places") return true;
+  if (segments[0] === "offers") return true;
   if (segments[0] === "p") return true;
   if (segments[0] === "routes" && segments[1] !== "new") return true;
 
   return isPublicationDetailPath(pathname);
+}
+
+/** Админ-панель `/admin` — без виджета «Мой план» и без автo-открытия по URL. */
+export function isAdminPanelPath(pathname: string | null): boolean {
+  if (!pathname) return false;
+  return pathname === "/admin" || pathname.startsWith("/admin/");
+}
+
+/** Кабинет бизнеса `/business` — та же backoffice-зона, без продукта «Мой план». */
+export function isBusinessPanelPath(pathname: string | null): boolean {
+  if (!pathname) return false;
+  return pathname === "/business" || pathname.startsWith("/business/");
+}
+
+/** Админка или бизнес-кабинет. */
+export function isBackofficePath(pathname: string | null): boolean {
+  return isAdminPanelPath(pathname) || isBusinessPanelPath(pathname);
+}
+
+/** Изолированный редактор контента: `/editor`, `/editor/event/new`, … */
+export function isContentEditorPath(pathname: string | null): boolean {
+  if (!pathname) return false;
+  return pathname === "/editor" || pathname.startsWith("/editor/");
+}
+
+/**
+ * Где не монтируется оболочка «Мой план» (FAB/модалки): admin, business, редактор.
+ */
+export function isMyPlanShellExcludedPath(pathname: string | null): boolean {
+  return isBackofficePath(pathname) || isContentEditorPath(pathname);
+}
+
+/**
+ * FAB «Мой план»: скрыть вне публичного shell (admin, business, editor) и там же, где скрыт mobile bottom bar
+ * (детали публикаций и т.д.).
+ */
+export function shouldHideMyPlanWidget(pathname: string | null): boolean {
+  if (isMyPlanShellExcludedPath(pathname)) return true;
+  return shouldHideMobileBottomNav(pathname);
 }
 
 /**
@@ -81,12 +129,15 @@ export function getIntentFromPath(pathname: string | null): Intent | null {
     return null;
   }
 
-  /** Детальные страницы /city/activity/id и т.д. */
+  /** Детальные страницы /city/events/… и т.д. */
   if (segments.length > 2) return null;
 
   const potentialIntent = segments[1];
 
+  /** Каноническая витрина «Куда пойти» и алиас (редирект на `/events`). */
+  if (potentialIntent === "events") return "kuda";
   if (potentialIntent === "kuda") return "kuda";
+  if (potentialIntent === "where-to-go") return "kuda";
   if (potentialIntent === "classes") return "classes";
   if (potentialIntent === "birthday") return "birthday";
   if (potentialIntent === "routes") return "routes";

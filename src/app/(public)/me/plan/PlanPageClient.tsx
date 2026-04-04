@@ -20,6 +20,7 @@ export type SerializedPlanItem = {
   planAvailability?: PlanActivityPublicAvailability;
   activity: {
     id: string;
+    slug: string | null;
     title: string;
     type: string;
     coverImageUrl: string | null;

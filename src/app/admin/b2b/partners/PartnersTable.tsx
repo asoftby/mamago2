@@ -46,7 +46,7 @@ export function PartnersTable({ businesses }: PartnersTableProps) {
             placeholder="Поиск по названию, УНП, email..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="h-10 pl-10"
+            className="pl-10"
           />
         </div>
         <div className="text-sm text-gray-600">

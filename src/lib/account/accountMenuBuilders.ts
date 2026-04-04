@@ -3,7 +3,6 @@ import {
   ClipboardList,
   CalendarDays,
   LayoutDashboard,
-  Lightbulb,
   MapPin,
   Settings,
   Shield,
@@ -11,6 +10,7 @@ import {
   UserCircle,
 } from "lucide-react";
 import type { AccountMenuUser } from "@/lib/account/types";
+import { mapFamilyRoleToLabel } from "@/lib/account/mapFamilyRoleToLabel";
 import type { AccountMode } from "@/contexts/AccountModeContext";
 import type { AccountMenuRow } from "@/components/account/types";
 import type { AccountDropdownModel } from "@/components/account/AccountDropdown.types";
@@ -42,12 +42,19 @@ export function buildPublicSiteAccountModel(input: {
     loggingOut,
   } = input;
 
+  const emailPrefix = user.email.split("@")[0] ?? user.email;
+  const displayName = user.displayName?.trim() || emailPrefix;
+
+  const roleRu = mapFamilyRoleToLabel(user.familyRole ?? undefined);
+  const personaSubtitle = roleRu || null;
+
   const header = {
     email: user.email,
+    displayName,
     initials,
-    metaCaption: "Вы вошли как",
     roleLabel: null as string | null,
-    avatarUrl: null as string | null,
+    avatarUrl: user.avatarUrl ?? null,
+    personaSubtitle,
   };
 
   if (mode === "personal") {
@@ -58,13 +65,6 @@ export function buildPublicSiteAccountModel(input: {
         href: "/me",
         label: "Профиль",
         icon: User,
-      },
-      {
-        key: "ideas",
-        type: "link",
-        href: "/me/ideas",
-        label: "Мои идеи",
-        icon: Lightbulb,
       },
       {
         key: "plan",
@@ -171,9 +171,9 @@ export function buildAdminAccountModel(input: {
     sheetTitle: "Профиль",
     header: {
       email: userEmail,
+      displayName: userEmail.split("@")[0] ?? userEmail,
       initials,
       roleLabel: "Администратор",
-      metaCaption: null,
       avatarUrl: null,
     },
     mainItems: [

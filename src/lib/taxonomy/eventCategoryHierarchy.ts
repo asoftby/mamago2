@@ -1,3 +1,4 @@
+import type { EventCategoryPublicationType } from "@prisma/client";
 import prisma from "@/lib/prisma";
 
 /** Плоский список для UI: сначала корни по sortOrder, под каждым — дети по sortOrder. */
@@ -37,17 +38,21 @@ export function orderEventCategoriesForDisplay<
 /** Родитель для новой/переносимой дочерней записи: только существующий корень. */
 export async function assertValidParentIdOrNull(
   parentId: string | null,
+  opts?: { childType?: EventCategoryPublicationType },
 ): Promise<void> {
   if (parentId == null) return;
   const parent = await prisma.eventCategory.findUnique({
     where: { id: parentId },
-    select: { parentId: true },
+    select: { parentId: true, publicationType: true },
   });
   if (!parent) {
     throw new Error("Parent not found");
   }
   if (parent.parentId != null) {
     throw new Error("Only a root category can be a parent");
+  }
+  if (opts?.childType != null && parent.publicationType !== opts.childType) {
+    throw new Error("Parent category type must match child type");
   }
 }
 

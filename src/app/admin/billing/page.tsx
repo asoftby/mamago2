@@ -83,7 +83,7 @@ export default async function AdminBillingPage() {
       />
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
         <BillingKpiCard
           icon={DollarSign}
           label="Revenue Today"

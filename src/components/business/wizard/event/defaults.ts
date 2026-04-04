@@ -21,11 +21,14 @@ export function getDefaultFormData(): EventFormData {
     subcategoryIdsByCategoryId: {},
     categoryId: null,
     subcategoryId: null,
+    primaryRootHasChildren: false,
     ageRangeIds: [],
     ageTags: [],
     interestIds: [],
+    genreSlugByRootCategoryId: {},
     categorySlug: null,
     categoryPathLabel: null,
+    programCategoryIds: [],
     cinemaGenre: "",
     cinemaDuration: undefined,
     cinemaTrailerUrl: "",
@@ -111,7 +114,6 @@ export function hasMeaningfulContent(data: EventFormData): boolean {
   return !!(
     data.title ||
     isRichTextMeaningful(data.fullDescription) ||
-    (data.categoryIds?.length ?? 0) > 0 ||
     data.categoryId ||
     (data.interestIds?.length ?? 0) > 0 ||
     data.dates.length > 0
@@ -122,8 +124,7 @@ export function hasMeaningfulContent(data: EventFormData): boolean {
  * Check if form meets minimum draft requirements
  */
 export function canSaveAsDraft(data: EventFormData): boolean {
-  return !!(
-    data.title.trim().length > 0 &&
-    ((data.categoryIds?.length ?? 0) > 0 || !!data.categoryId)
-  );
+  const categoryOk =
+    !!data.categoryId && (!data.primaryRootHasChildren || !!data.subcategoryId);
+  return !!(data.title.trim().length > 0 && categoryOk);
 }

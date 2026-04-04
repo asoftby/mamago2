@@ -6,6 +6,7 @@ import { RouteDetailClient } from "./RouteDetailClient";
 import prisma from "@/lib/prisma";
 import { findRouteBySlug } from "@/lib/slug/routeSlugService";
 import { buildRouteJsonLd } from "@/lib/seo/schema/buildRouteJsonLd";
+import { AnalyticsDetailBeacon } from "@/components/analytics/AnalyticsDetailBeacon";
 
 type Props = {
   params: Promise<{ slug: string }>;
@@ -52,7 +53,19 @@ export default async function RouteDetailPage({ params }: Props) {
 
   // Try mock first
   const mock = MOCK_ROUTES.find((r) => r.slug === slug);
-  if (mock) return <RouteDetailClient route={mock} />;
+  if (mock) {
+    return (
+      <>
+        <AnalyticsDetailBeacon
+          entityType="ROUTE"
+          entityId={mock.id}
+          vertical="WEEKEND"
+          citySlug="minsk"
+        />
+        <RouteDetailClient route={mock} />
+      </>
+    );
+  }
 
   // Try DB
   const resolved = await findRouteBySlug(slug);
@@ -108,6 +121,12 @@ export default async function RouteDetailPage({ params }: Props) {
 
   return (
     <>
+      <AnalyticsDetailBeacon
+        entityType="ROUTE"
+        entityId={db.id}
+        vertical="CITY"
+        cityId={db.cityId}
+      />
       <script
         type="application/ld+json"
         // eslint-disable-next-line react/no-danger

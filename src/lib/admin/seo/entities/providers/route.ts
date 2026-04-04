@@ -1,10 +1,19 @@
-import type { Prisma } from "@prisma/client";
 import { RouteStatus, RouteVisibility } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import type { SeoEntityProvider } from "../types";
-import { indexationStatusFromRobots, isIndexableFromRobots } from "../utils";
-import { updateRouteSlug } from "@/lib/slug/routeSlugService";
+import {
+  indexationStatusForPublishedEntity,
+  isIndexableForPublishedEntity,
+} from "../utils";
+import { buildSegmentEntityDiagnostics } from "../buildEntityDiagnostics";
+import { applyRouteSeoUpdate } from "@/lib/admin/seo/entities/applyEntitySeoUpdate";
 import { buildRouteJsonLd } from "@/lib/seo/schema/buildRouteJsonLd";
+import {
+  SEO_ROBOTS_INDEX_FOLLOW,
+  SEO_ROBOTS_NOINDEX_FOLLOW,
+} from "@/lib/admin/seo/entities/robotsConstants";
+
+const ROUTE_LIST_LIMIT = 300;
 
 export const routeProvider: SeoEntityProvider = {
   entityType: "route",
@@ -13,24 +22,41 @@ export const routeProvider: SeoEntityProvider = {
 
   async listRows() {
     const routes = await prisma.route.findMany({
-      where: { status: RouteStatus.PUBLISHED, visibility: RouteVisibility.PUBLIC },
+      where: { status: { not: RouteStatus.ARCHIVED } },
       orderBy: { updatedAt: "desc" },
+      take: ROUTE_LIST_LIMIT,
       select: {
         id: true,
         slug: true,
         title: true,
+        status: true,
+        visibility: true,
         updatedAt: true,
         seoH1: true,
         seoTitle: true,
         seoDescription: true,
         seoCanonicalUrl: true,
+        seoCanonicalSource: true,
         seoRobots: true,
       },
     });
 
     return routes.map((r) => {
-      const path = `/routes/${r.slug}`;
+      const published =
+        r.status === RouteStatus.PUBLISHED &&
+        r.visibility === RouteVisibility.PUBLIC;
+      const seg = r.slug?.trim() || r.id;
+      const path = `/routes/${seg}`;
       const canonical = r.seoCanonicalUrl?.trim() || path;
+      const entityDiagnostics = buildSegmentEntityDiagnostics("route", {
+        entityId: r.id,
+        title: r.title,
+        slug: r.slug,
+        seoCanonicalUrl: r.seoCanonicalUrl,
+        seoCanonicalSource: r.seoCanonicalSource,
+        seoRobots: r.seoRobots,
+        contentStatus: `${r.status}/${r.visibility}`,
+      });
       return {
         id: `entity:route:${r.id}`,
         path,
@@ -42,8 +68,12 @@ export const routeProvider: SeoEntityProvider = {
         description: r.seoDescription?.trim() || "",
         canonical,
         updatedAt: r.updatedAt.toISOString(),
-        indexationStatus: indexationStatusFromRobots(r.seoRobots),
-        isIndexable: isIndexableFromRobots(r.seoRobots),
+        indexationStatus: indexationStatusForPublishedEntity(
+          published,
+          r.seoRobots,
+        ),
+        isIndexable: isIndexableForPublishedEntity(published, r.seoRobots),
+        entityDiagnostics,
       };
     });
   },
@@ -55,10 +85,13 @@ export const routeProvider: SeoEntityProvider = {
         id: true,
         title: true,
         slug: true,
+        status: true,
+        visibility: true,
         seoTitle: true,
         seoDescription: true,
         seoH1: true,
         seoCanonicalUrl: true,
+        seoCanonicalSource: true,
         seoOgTitle: true,
         seoOgDescription: true,
         seoOgImage: true,
@@ -67,6 +100,15 @@ export const routeProvider: SeoEntityProvider = {
       },
     });
     if (!r) return null;
+    const urlDiagnostics = buildSegmentEntityDiagnostics("route", {
+      entityId: r.id,
+      title: r.title,
+      slug: r.slug,
+      seoCanonicalUrl: r.seoCanonicalUrl,
+      seoCanonicalSource: r.seoCanonicalSource,
+      seoRobots: r.seoRobots,
+      contentStatus: `${r.status}/${r.visibility}`,
+    });
     return {
       id: r.id,
       title: r.title,
@@ -76,41 +118,35 @@ export const routeProvider: SeoEntityProvider = {
       seoDescription: r.seoDescription,
       seoH1: r.seoH1,
       seoCanonicalUrl: r.seoCanonicalUrl,
+      seoCanonicalSource: r.seoCanonicalSource,
       seoOgTitle: r.seoOgTitle,
       seoOgDescription: r.seoOgDescription,
       seoOgImage: r.seoOgImage,
       seoRobots: r.seoRobots,
       seoJsonLdOverride: (r.seoJsonLdOverride as unknown) ?? null,
+      urlDiagnostics,
+      contentStatus: `${r.status}/${r.visibility}`,
+      citySlug: null,
     };
   },
 
   async updateSeo(entityId, input) {
-    if (typeof input.slug === "string") {
-      await updateRouteSlug(entityId, input.slug);
-    }
-    await prisma.route.update({
-      where: { id: entityId },
-      data: {
-        seoTitle: input.seoTitle,
-        seoDescription: input.seoDescription,
-        seoH1: input.seoH1,
-        seoCanonicalUrl: input.seoCanonicalUrl,
-        seoOgTitle: input.seoOgTitle,
-        seoOgDescription: input.seoOgDescription,
-        seoOgImage: input.seoOgImage,
-        seoRobots: input.seoRobots,
-        seoJsonLdOverride: input.seoJsonLdOverride as Prisma.InputJsonValue,
-      },
-      select: { id: true },
-    });
+    await applyRouteSeoUpdate(entityId, input);
   },
 
   async toggleIndexation(entityId) {
     const existing = await prisma.route.findUnique({ where: { id: entityId }, select: { seoRobots: true } });
     if (!existing) return;
     const raw = (existing.seoRobots ?? "").toLowerCase();
-    const next = raw.includes("noindex") ? "index,follow" : "noindex,follow";
+    const next = raw.includes("noindex")
+      ? SEO_ROBOTS_INDEX_FOLLOW
+      : SEO_ROBOTS_NOINDEX_FOLLOW;
     await prisma.route.update({ where: { id: entityId }, data: { seoRobots: next } });
+  },
+
+  async setIndexFollow(entityId, index) {
+    const seoRobots = index ? SEO_ROBOTS_INDEX_FOLLOW : SEO_ROBOTS_NOINDEX_FOLLOW;
+    await prisma.route.update({ where: { id: entityId }, data: { seoRobots } });
   },
 
   async loadRedirects(entityId) {

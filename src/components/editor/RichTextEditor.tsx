@@ -29,6 +29,8 @@ export function RichTextEditor({
         heading: false, // Disable headings for simplicity
         code: false, // Disable code blocks
         codeBlock: false,
+        /** Явно оставляем блочные абзацы: Enter → новый `<p>`, Shift+Enter → `<br>` (HardBreak). */
+        paragraph: {},
       }),
       Placeholder.configure({
         placeholder,
@@ -151,7 +153,7 @@ export function RichTextEditor({
       <EditorContent
         editor={editor}
         className={cn(
-          "prose prose-sm max-w-none p-4 min-h-[200px] focus:outline-none",
+          "rich-text-editor-surface prose prose-sm max-w-none p-4 min-h-[200px] focus:outline-none",
           "[&_.ProseMirror]:outline-none [&_.ProseMirror]:min-h-[200px]",
           "[&_.ProseMirror_p.is-editor-empty:first-child::before]:content-[attr(data-placeholder)]",
           "[&_.ProseMirror_p.is-editor-empty:first-child::before]:text-muted-foreground",

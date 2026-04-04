@@ -1,12 +1,14 @@
 /**
  * POST /api/business/places/[id]/claim
  * Request ownership/access to an existing place
+ * Requires user to have a business (businessId is required)
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
-import { canCreateBusinessContent, canManageOwnedContent } from "@/lib/auth/businessContentAccess";
+import { canCreateBusinessContent } from "@/lib/auth/businessContentAccess";
+import { getUserBusinessId } from "@/lib/auth/placeAccess";
 
 export async function POST(
   request: NextRequest,
@@ -21,20 +23,35 @@ export async function POST(
 
     const placeId = params.id;
 
+    // Get user's business ID (required for claim)
+    const businessId = await getUserBusinessId(user.id);
+    
+    if (!businessId) {
+      return NextResponse.json(
+        { error: "Business required. You must have a business to claim a place." },
+        { status: 400 }
+      );
+    }
+
     // Check if place exists
     const place = await prisma.place.findUnique({
       where: { id: placeId },
-      select: { id: true, title: true, ownerUserId: true },
+      select: { 
+        id: true, 
+        title: true, 
+        ownerBusinessId: true,
+        createdByUserId: true,
+      },
     });
 
     if (!place) {
       return NextResponse.json({ error: "Place not found" }, { status: 404 });
     }
 
-    // Check if user already owns this place
-    if (place.ownerUserId === user.id) {
+    // Check if business already owns this place
+    if (place.ownerBusinessId === businessId) {
       return NextResponse.json(
-        { error: "You already own this place" },
+        { error: "Your business already owns this place" },
         { status: 400 }
       );
     }
@@ -43,7 +60,7 @@ export async function POST(
     const existingRequest = await prisma.placeClaimRequest.findFirst({
       where: {
         placeId,
-        userId: user.id,
+        businessId,
         status: "PENDING",
       },
     });
@@ -56,18 +73,12 @@ export async function POST(
       });
     }
 
-    // Get user's business ID (if exists)
-    const business = await prisma.business.findUnique({
-      where: { ownerUserId: user.id },
-      select: { id: true },
-    });
-
     // Create claim request
     const claimRequest = await prisma.placeClaimRequest.create({
       data: {
         placeId,
         userId: user.id,
-        businessId: business?.id || null,
+        businessId, // Required
         status: "PENDING",
       },
     });

@@ -7,7 +7,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
 import { ContentStatus } from "@prisma/client";
-import { canCreateBusinessContent, canManageOwnedContent } from "@/lib/auth/businessContentAccess";
+import { canCreateBusinessContent } from "@/lib/auth/businessContentAccess";
+import { canManagePlaceAsync } from "@/lib/auth/placeAccess";
 
 export async function DELETE(
   request: NextRequest,
@@ -28,7 +29,8 @@ export async function DELETE(
     const place = await prisma.place.findUnique({
       where: { id },
       select: {
-        ownerUserId: true,
+        createdByUserId: true,
+        ownerBusinessId: true,
         status: true,
       },
     });
@@ -40,7 +42,8 @@ export async function DELETE(
       );
     }
 
-    if (!canManageOwnedContent(user, place.ownerUserId)) {
+    const canManage = await canManagePlaceAsync(user, place);
+    if (!canManage) {
       return NextResponse.json(
         { error: "FORBIDDEN", message: "You don't have access to this place" },
         { status: 403 }

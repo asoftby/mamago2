@@ -5,13 +5,16 @@ import { prisma } from "@/lib/prisma";
 import { SYSTEM_INTERESTS } from "@/lib/config/interests";
 
 const createChildSchema = z.object({
-  name: z.string().min(2, "Имя должно содержать минимум 2 символа").max(50),
-  birthDate: z.string().refine((date) => {
-    const parsed = new Date(date);
-    const now = new Date();
-    // Allow children up to 25 years old (matching the year dropdown range)
-    return parsed <= now && parsed > new Date(now.getFullYear() - 25, 0, 1);
-  }, "Некорректная дата рождения"),
+  name: z.string().min(1, "Укажите имя").max(50),
+  birthDate: z
+    .union([z.string(), z.null()])
+    .optional()
+    .refine((date) => {
+      if (date == null || date === "") return true;
+      const parsed = new Date(date);
+      const now = new Date();
+      return parsed <= now && parsed > new Date(now.getFullYear() - 25, 0, 1);
+    }, "Некорректная дата рождения"),
   systemInterests: z.array(z.string()).default([]),
   customInterests: z.array(z.string().max(50)).default([]),
 });
@@ -40,7 +43,7 @@ export async function POST(request: NextRequest) {
       const child = await tx.child.create({
         data: {
           name: data.name,
-          birthDate: new Date(data.birthDate),
+          birthDate: data.birthDate ? new Date(data.birthDate) : null,
           parentId: user.id,
         },
       });

@@ -5,9 +5,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { MapPinIcon, TruckIcon, ClockIcon, Loader2 } from "lucide-react";
+import { MapPinIcon, TruckIcon, ClockIcon, Loader2, Search } from "lucide-react";
 import type { EventFormData } from "../types";
-import { EventLocationPicker } from "./location/EventLocationPicker";
+import { PlaceSearchAutocomplete } from "./location/PlaceSearchAutocomplete";
+import { QuickPlaceCreate } from "./location/QuickPlaceCreate";
 import { formatEventLocationAddress } from "./location/eventLocationUtils";
 
 interface Step2LocationProps {
@@ -38,28 +39,118 @@ export function Step2Location({ data, onChange, isEditable }: Step2LocationProps
   const [isLoadingPlaces, setIsLoadingPlaces] = useState(true);
   const [placesError, setPlacesError] = useState<string | null>(null);
   const [mobileConcreteSnapshot, setMobileConcreteSnapshot] = useState<Partial<EventFormData> | null>(null);
+  
+  // New state for quick place creation
+  const [showQuickCreate, setShowQuickCreate] = useState(false);
+  const [quickCreateInitialName, setQuickCreateInitialName] = useState("");
+
+  // Handle place selection from search
+  const handleSearchPlaceSelect = (place: {
+    id: string;
+    title: string;
+    address: string;
+    fullAddress: string;
+    cityId: string | null;
+    citySlug: string | null;
+    lat: number | null;
+    lng: number | null;
+    districtId: string | null;
+    districtName: string | null;
+    metroId: string | null;
+    metroName: string | null;
+    metroDistanceM: number | null;
+  }) => {
+    console.log('[Step2Location] Selecting place from search:', place);
+    
+    onChange({
+      // Set location source to PLACE
+      locationSource: "PLACE",
+      venueKind: "PLACE",
+      placeId: place.id,
+      venueName: place.title,
+      address: place.fullAddress || place.address,
+      city: place.cityId || place.citySlug || "", // Prefer cityId, fallback to slug
+      lat: place.lat,
+      lng: place.lng,
+      source: "PLACE",
+      
+      // Use place's district and metro data directly
+      districtAutoId: place.districtId,
+      districtManualId: null,
+      districtName: place.districtName,
+      
+      metroAutoId: place.metroId,
+      metroAutoDistanceM: place.metroDistanceM,
+      metroManualId: null,
+      metroManualDistanceM: null,
+      metroName: place.metroName,
+      
+      // Clear legacy fields
+      district: place.districtName || "",
+      metro: place.metroName || "",
+    });
+    
+    setShowQuickCreate(false);
+  };
+
+  // Handle quick place creation
+  const handleQuickPlaceCreated = (place: {
+    id: string;
+    title: string;
+    address: string;
+    fullAddress: string;
+    cityId: string | null;
+    citySlug: string | null;
+    lat: number | null;
+    lng: number | null;
+    districtId: string | null;
+    districtName: string | null;
+    metroId: string | null;
+    metroName: string | null;
+    metroDistanceM: number | null;
+  }) => {
+    console.log('[Step2Location] Quick place created:', place);
+    
+    // Select the newly created place
+    handleSearchPlaceSelect(place);
+    
+    // Reload user places to include the new one
+    fetchUserPlaces();
+  };
+
+  // Handle opening quick create with initial name from search
+  const handleOpenQuickCreate = (initialName: string) => {
+    setQuickCreateInitialName(initialName);
+    setShowQuickCreate(true);
+  };
+
+  // Handle closing quick create
+  const handleCloseQuickCreate = () => {
+    setShowQuickCreate(false);
+    setQuickCreateInitialName(""); // Clear initial name
+  };
+
+  const fetchUserPlaces = async () => {
+    try {
+      setIsLoadingPlaces(true);
+      const response = await fetch('/api/business/places/for-events');
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch places');
+      }
+      
+      const result = await response.json();
+      setUserPlaces(result.places || []);
+    } catch (error) {
+      console.error('Error fetching user places:', error);
+      setPlacesError('Не удалось загрузить места');
+    } finally {
+      setIsLoadingPlaces(false);
+    }
+  };
 
   // Fetch user places on mount
   useEffect(() => {
-    const fetchUserPlaces = async () => {
-      try {
-        setIsLoadingPlaces(true);
-        const response = await fetch('/api/business/places/for-events');
-        
-        if (!response.ok) {
-          throw new Error('Failed to fetch places');
-        }
-        
-        const result = await response.json();
-        setUserPlaces(result.places || []);
-      } catch (error) {
-        console.error('Error fetching user places:', error);
-        setPlacesError('Не удалось загрузить места');
-      } finally {
-        setIsLoadingPlaces(false);
-      }
-    };
-
     fetchUserPlaces();
   }, []);
 
@@ -200,6 +291,51 @@ export function Step2Location({ data, onChange, isEditable }: Step2LocationProps
         </p>
       </div>
 
+      {/* Main: Quick Place Search & Create */}
+      <div className="space-y-3">
+        <Label className="flex items-center gap-2">
+          <Search className="h-4 w-4" />
+          Найти или создать место
+        </Label>
+        
+        {!showQuickCreate ? (
+          <>
+            <PlaceSearchAutocomplete
+              onPlaceSelect={handleSearchPlaceSelect}
+              onCreateNew={handleOpenQuickCreate}
+              disabled={!isEditable}
+              selectedPlaceId={data.placeId}
+              placeholder="Начни вводить название места или адрес"
+            />
+            
+            {data.placeId && data.venueKind === "PLACE" && (
+              <div className="rounded-lg border border-green-200 bg-green-50 p-4">
+                <div className="flex items-start gap-3">
+                  <MapPinIcon className="mt-0.5 h-5 w-5 flex-shrink-0 text-green-600" />
+                  <div className="min-w-0 flex-1">
+                    <div className="font-medium text-green-900">{data.venueName}</div>
+                    <div className="mt-1 text-sm text-green-700">{data.address}</div>
+                    {(data.districtName || data.metroName) && (
+                      <div className="mt-1 text-xs text-green-600">
+                        {data.districtName && data.districtName}
+                        {data.districtName && data.metroName && " • "}
+                        {data.metroName && `м. ${data.metroName}`}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+          </>
+        ) : (
+          <QuickPlaceCreate
+            onPlaceCreated={handleQuickPlaceCreated}
+            onCancel={handleCloseQuickCreate}
+            initialName={quickCreateInitialName}
+          />
+        )}
+      </div>
+
       {/* Block 1: My Places */}
       <div className="space-y-3">
         <Label>Мои места</Label>
@@ -255,13 +391,6 @@ export function Step2Location({ data, onChange, isEditable }: Step2LocationProps
           </div>
         )}
       </div>
-
-      {/* Main Location Picker - same as Place */}
-      <EventLocationPicker
-        data={data}
-        onChange={onChange}
-        disabled={!isEditable}
-      />
 
       {/* Block 3: Special cases */}
       <div className="space-y-3">

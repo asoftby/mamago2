@@ -5,13 +5,7 @@ import Link from "next/link";
 import { Role, UserStatus } from "@/types/admin";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { FilterSelect } from "@/components/ui/filter-select";
 import { Badge } from "@/components/ui/badge";
 import { formatDistanceToNow } from "date-fns";
 import { ru } from "date-fns/locale";
@@ -144,39 +138,48 @@ export function UsersListClient() {
       )}
 
       {/* Filters */}
-      <div className="flex gap-4">
-        <Input
-          placeholder="Поиск по email или телефону..."
-          value={query}
-          onChange={(e) => handleSearch(e.target.value)}
-          className="max-w-md"
+      <div className="flex flex-col md:flex-row gap-3 md:items-center">
+        <div className="flex-1 md:max-w-md">
+          <Input
+            placeholder="Поиск по email или телефону..."
+            value={query}
+            onChange={(e) => handleSearch(e.target.value)}
+          />
+        </div>
+
+        <FilterSelect
+          value={roleFilter}
+          placeholder="Все роли"
+          className="w-full md:w-[180px]"
+          options={[
+            { value: "all", label: "Все роли" },
+            { value: "USER", label: "Пользователь" },
+            { value: "BUSINESS_OWNER", label: "Бизнес" },
+            { value: "MODERATOR", label: "Модератор" },
+            { value: "ADMIN", label: "Админ" },
+          ]}
+          onChange={(v) => {
+            setRoleFilter(v);
+            setPage(1);
+          }}
         />
 
-        <Select value={roleFilter} onValueChange={(v) => { setRoleFilter(v); setPage(1); }}>
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Роль" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Все роли</SelectItem>
-            <SelectItem value="USER">Пользователь</SelectItem>
-            <SelectItem value="BUSINESS_OWNER">Бизнес</SelectItem>
-            <SelectItem value="MODERATOR">Модератор</SelectItem>
-            <SelectItem value="ADMIN">Админ</SelectItem>
-          </SelectContent>
-        </Select>
-
-        <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setPage(1); }}>
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Статус" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Все статусы</SelectItem>
-            <SelectItem value="ACTIVE">Активен</SelectItem>
-            <SelectItem value="LIMITED">Ограничен</SelectItem>
-            <SelectItem value="SUSPENDED">Приостановлен</SelectItem>
-            <SelectItem value="BANNED">Заблокирован</SelectItem>
-          </SelectContent>
-        </Select>
+        <FilterSelect
+          value={statusFilter}
+          placeholder="Все статусы"
+          className="w-full md:w-[180px]"
+          options={[
+            { value: "all", label: "Все статусы" },
+            { value: "ACTIVE", label: "Активен" },
+            { value: "LIMITED", label: "Ограничен" },
+            { value: "SUSPENDED", label: "Приостановлен" },
+            { value: "BANNED", label: "Заблокирован" },
+          ]}
+          onChange={(v) => {
+            setStatusFilter(v);
+            setPage(1);
+          }}
+        />
       </div>
 
       {/* Table */}

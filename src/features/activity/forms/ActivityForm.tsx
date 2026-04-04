@@ -3,6 +3,9 @@
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { PrimaryButton } from "@/components/ui/PrimaryButton";
+import { FilterSelect } from "@/components/ui/filter-select";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { getTodayStart } from "@/lib/date/getTodayStart";
 
 export type ActivityFormData = {
@@ -113,12 +116,12 @@ export function ActivityForm({
         <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
           Название *
         </label>
-        <input
+        <Input
           type="text"
           id="name"
           value={formData.name}
           onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-          className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary focus:border-primary text-base"
+          className="text-base"
           placeholder="Название мероприятия"
           required
         />
@@ -129,12 +132,12 @@ export function ActivityForm({
         <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-2">
           Описание
         </label>
-        <textarea
+        <Textarea
           id="description"
           value={formData.description}
           onChange={(e) => setFormData({ ...formData, description: e.target.value })}
           rows={4}
-          className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary focus:border-primary text-base"
+          className="text-base"
           placeholder="Расскажите о мероприятии"
         />
       </div>
@@ -144,19 +147,15 @@ export function ActivityForm({
         <label htmlFor="cityId" className="block text-sm font-medium text-gray-700 mb-2">
           Город *
         </label>
-        <select
+        <FilterSelect
           id="cityId"
           value={formData.cityId}
-          onChange={(e) => setFormData({ ...formData, cityId: e.target.value })}
-          className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary focus:border-primary text-base"
+          options={cities.map((city) => ({ value: city.id, label: city.name }))}
+          onChange={(v) => setFormData({ ...formData, cityId: v })}
+          className="w-full"
           required
-        >
-          {cities.map((city) => (
-            <option key={city.id} value={city.id}>
-              {city.name}
-            </option>
-          ))}
-        </select>
+          aria-label="Город"
+        />
       </div>
 
       {/* Cover Image URL */}
@@ -164,12 +163,12 @@ export function ActivityForm({
         <label htmlFor="coverImageUrl" className="block text-sm font-medium text-gray-700 mb-2">
           URL обложки
         </label>
-        <input
+        <Input
           type="url"
           id="coverImageUrl"
           value={formData.coverImageUrl}
           onChange={(e) => setFormData({ ...formData, coverImageUrl: e.target.value })}
-          className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary focus:border-primary text-base"
+          className="text-base"
           placeholder="https://example.com/image.jpg"
         />
       </div>
@@ -180,10 +179,10 @@ export function ActivityForm({
           <label htmlFor="priceFrom" className="block text-sm font-medium text-gray-700 mb-2">
             Цена от
           </label>
-          <input
+          <Input
             type="number"
             id="priceFrom"
-            value={formData.priceFrom || ""}
+            value={formData.priceFrom ?? ""}
             onChange={(e) =>
               setFormData({
                 ...formData,
@@ -192,7 +191,7 @@ export function ActivityForm({
             }
             min="0"
             step="0.01"
-            className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary focus:border-primary text-base"
+            className="text-base"
             placeholder="0.00"
           />
         </div>
@@ -200,17 +199,19 @@ export function ActivityForm({
           <label htmlFor="currency" className="block text-sm font-medium text-gray-700 mb-2">
             Валюта
           </label>
-          <select
+          <FilterSelect
             id="currency"
-            value={formData.currency}
-            onChange={(e) => setFormData({ ...formData, currency: e.target.value })}
-            className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary focus:border-primary text-base"
-          >
-            <option value="BYN">BYN</option>
-            <option value="USD">USD</option>
-            <option value="EUR">EUR</option>
-            <option value="RUB">RUB</option>
-          </select>
+            value={formData.currency ?? "BYN"}
+            options={[
+              { value: "BYN", label: "BYN" },
+              { value: "USD", label: "USD" },
+              { value: "EUR", label: "EUR" },
+              { value: "RUB", label: "RUB" },
+            ]}
+            onChange={(v) => setFormData({ ...formData, currency: v })}
+            className="w-full"
+            aria-label="Валюта"
+          />
         </div>
       </div>
 
@@ -219,12 +220,12 @@ export function ActivityForm({
         <label htmlFor="ageLabel" className="block text-sm font-medium text-gray-700 mb-2">
           Возраст
         </label>
-        <input
+        <Input
           type="text"
           id="ageLabel"
           value={formData.ageLabel}
           onChange={(e) => setFormData({ ...formData, ageLabel: e.target.value })}
-          className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary focus:border-primary text-base"
+          className="text-base"
           placeholder="Например: 6+, 3-7 лет"
         />
       </div>
@@ -262,25 +263,25 @@ export function ActivityForm({
               <label htmlFor="sessionDate" className="block text-xs text-gray-600 mb-1">
                 Дата
               </label>
-              <input
+              <Input
                 type="date"
                 id="sessionDate"
                 value={newSessionDate}
                 onChange={(e) => setNewSessionDate(e.target.value)}
                 min={minDate}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-base"
+                className="text-base"
               />
             </div>
             <div>
               <label htmlFor="sessionTime" className="block text-xs text-gray-600 mb-1">
                 Время
               </label>
-              <input
+              <Input
                 type="time"
                 id="sessionTime"
                 value={newSessionTime}
                 onChange={(e) => setNewSessionTime(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-base"
+                className="text-base"
               />
             </div>
           </div>

@@ -1,48 +1,39 @@
 import { NextResponse } from "next/server";
-import { Prisma } from "@prisma/client";
+import { Prisma, type EventCategoryPublicationType } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth/server";
 import { canManageEventCategories } from "@/lib/auth/eventCategoriesAdmin";
+import { prismaToHttpResponse } from "@/lib/admin/prismaHttpErrors";
 import { ensureEventCategorySlug } from "@/lib/taxonomy/eventCategorySlug";
-import { assertValidParentIdOrNull } from "@/lib/taxonomy/eventCategoryHierarchy";
+import {
+  mapCategoryWithParent,
+  parseEventCategoryPublicationType,
+} from "@/lib/taxonomy/eventCategoryPublicationType";
 
 export const runtime = "nodejs";
 
-const SCHEMA_OUT_OF_SYNC_MESSAGE =
-  "Схема БД не совпадает с кодом: выполните npx prisma migrate deploy (в dev можно npx prisma db push).";
-
-function jsonFromPrismaError(e: unknown): NextResponse | null {
-  if (!(e instanceof Prisma.PrismaClientKnownRequestError)) return null;
-  if (e.code === "P2021" || e.code === "P2022") {
-    return NextResponse.json({ error: SCHEMA_OUT_OF_SYNC_MESSAGE }, { status: 503 });
-  }
-  if (e.code === "P2003") {
-    return NextResponse.json(
-      { error: "Некорректная родительская категория (связь с БД нарушена)" },
-      { status: 400 },
-    );
-  }
-  return null;
-}
-
-export async function GET() {
+export async function GET(req: Request) {
   const user = await getCurrentUser();
   if (!user || !canManageEventCategories(user.role)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
+  const url = new URL(req.url);
+  const filterType = parseEventCategoryPublicationType(url.searchParams.get("type"));
+
   try {
     const items = await prisma.eventCategory.findMany({
+      where: filterType ? { publicationType: filterType } : undefined,
       orderBy: [{ parentId: "asc" }, { sortOrder: "asc" }, { id: "asc" }],
       include: {
-        parent: { select: { id: true, nameRu: true, slug: true } },
+        parent: { select: { id: true, nameRu: true, slug: true, publicationType: true } },
         options: { orderBy: [{ order: "asc" }, { value: "asc" }] },
         _count: { select: { activities: true, children: true } },
       },
     });
-    return NextResponse.json(items);
+    return NextResponse.json(items.map(mapCategoryWithParent));
   } catch (e) {
-    const schema = jsonFromPrismaError(e);
+    const schema = prismaToHttpResponse(e);
     if (schema) return schema;
     console.error("event-categories GET:", e);
     return NextResponse.json({ error: "Не удалось загрузить категории" }, { status: 500 });
@@ -77,9 +68,38 @@ export async function POST(req: Request) {
       : 0;
   const isActive = Boolean(body.isActive ?? true);
   const isFeatured = Boolean(body.isFeatured ?? false);
+  const supportsProgram = Boolean(body.supportsProgram ?? false);
+  const selectableInProgram = Boolean(body.selectableInProgram ?? false);
 
   if (!nameRu) {
     return NextResponse.json({ error: "nameRu is required" }, { status: 400 });
+  }
+
+  let publicationType: EventCategoryPublicationType;
+  if (parentId) {
+    const parent = await prisma.eventCategory.findUnique({
+      where: { id: parentId },
+      select: { parentId: true, publicationType: true },
+    });
+    if (!parent) {
+      return NextResponse.json({ error: "Parent not found" }, { status: 400 });
+    }
+    if (parent.parentId != null) {
+      return NextResponse.json(
+        { error: "Only a root category can be a parent" },
+        { status: 400 },
+      );
+    }
+    publicationType = parent.publicationType;
+  } else {
+    const t = parseEventCategoryPublicationType(body.type);
+    if (!t) {
+      return NextResponse.json(
+        { error: "type is required (EVENT | PLACE | OFFER | ROUTE | ARTICLE)" },
+        { status: 400 },
+      );
+    }
+    publicationType = t;
   }
 
   const nameEn = nameRu;
@@ -87,47 +107,41 @@ export async function POST(req: Request) {
   const slug = ensureEventCategorySlug(slugRaw, nameRu);
 
   try {
-    await assertValidParentIdOrNull(parentId);
-
-    const exists = await prisma.eventCategory.findUnique({ where: { slug } });
-    if (exists) {
-      return NextResponse.json(
-        { error: "Категория с таким slug уже есть" },
-        { status: 409 },
-      );
-    }
-
     const created = await prisma.eventCategory.create({
       data: {
         nameRu,
         nameEn,
         slug,
+        publicationType,
         icon,
         sortOrder,
         isActive,
         isFeatured,
+        supportsProgram,
+        selectableInProgram,
         parentId,
       },
       include: {
-        parent: { select: { id: true, nameRu: true, slug: true } },
+        parent: { select: { id: true, nameRu: true, slug: true, publicationType: true } },
         options: { orderBy: [{ order: "asc" }, { value: "asc" }] },
         _count: { select: { activities: true, children: true } },
       },
     });
-    return NextResponse.json(created);
+    return NextResponse.json(mapCategoryWithParent(created));
   } catch (e) {
-    const schema = jsonFromPrismaError(e);
+    const schema = prismaToHttpResponse(e);
     if (schema) return schema;
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2003") {
+      return NextResponse.json(
+        { error: "Некорректная родительская категория (связь с БД нарушена)" },
+        { status: 400 },
+      );
+    }
     if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
       return NextResponse.json(
         { error: "Категория с таким slug уже есть" },
         { status: 409 },
       );
-    }
-    if (e instanceof Error) {
-      if (e.message === "Parent not found" || e.message === "Only a root category can be a parent") {
-        return NextResponse.json({ error: e.message }, { status: 400 });
-      }
     }
     console.error("event-categories POST:", e);
     return NextResponse.json(

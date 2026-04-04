@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { CookieSettingsFooterLink } from "@/components/shell/CookieSettingsFooterLink";
 import { Container } from "@/components/ui/Container";
 
 export function PublicFooter() {
@@ -44,7 +45,7 @@ export function PublicFooter() {
             <div className="flex flex-col gap-2 text-sm text-muted-foreground">
               <Link href="#" className="hover:text-primary transition-colors">Политика конфиденциальности</Link>
               <Link href="#" className="hover:text-primary transition-colors">Пользовательское соглашение</Link>
-              <Link href="#" className="hover:text-primary transition-colors">Cookies</Link>
+              <CookieSettingsFooterLink />
             </div>
           </div>
         </div>

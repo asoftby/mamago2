@@ -1,7 +1,16 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
-import { useRouter } from "next/navigation";
+import {
+  Suspense,
+  useState,
+  useEffect,
+  useLayoutEffect,
+  useCallback,
+  useMemo,
+  useRef,
+} from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { ContentStatus } from "@prisma/client";
 import { toast } from "sonner";
 import {
   FormWizardShell,
@@ -17,9 +26,13 @@ import { useWizardSession } from "@/hooks/useWizardSession";
 
 import type { EventFormData, EventWizardMode } from "./types";
 import { getDefaultFormData, hasMeaningfulContent } from "./defaults";
-import { validateStep, validateForSubmit } from "./validation";
+import { validateStep, validateForSubmit, validateForDraft } from "./validation";
 import { mapEventToFormData, buildEventPayload } from "./mappers";
-import { EVENT_WIZARD_STEPS, getStepLabel, TOTAL_CONTENT_STEPS } from "./eventWizardSteps.config";
+import {
+  EVENT_WIZARD_STEPS,
+  getStepLabel,
+  TOTAL_EVENT_WIZARD_STEPS,
+} from "./eventWizardSteps.config";
 
 import { Step9Review } from "./steps/Step9Review";
 import { EventSubmitModerationSuccessDialog } from "./EventSubmitModerationSuccessDialog";
@@ -32,6 +45,12 @@ import {
   type ContentEditorNav,
   type ContentEditorSurface,
 } from "@/lib/content-editor/types";
+import {
+  setEventEditorSession,
+  clearEventEditorReturnStep,
+  readEventEditorReturnStep,
+} from "@/lib/business/eventEditorReturnStep";
+import { parseEventEditorStepQuery } from "@/lib/business/eventEditorStepQuery";
 
 interface EventWizardProps {
   mode: EventWizardMode;
@@ -50,11 +69,20 @@ interface EventWizardProps {
   editorSurface?: ContentEditorSurface;
   contentEditorNav?: Partial<ContentEditorNav>;
   returnTo?: string;
+  /** Серверный `?step=` — чтобы не было гонки с URL-sync (state=1 затирал ?step=N). */
+  initialEditStep?: number;
 }
 
 const LOCAL_STORAGE_KEY = "event-wizard-draft";
 const CURRENT_STEP_STORAGE_KEY = "event-wizard-current-step";
-const TOTAL_STEPS = TOTAL_CONTENT_STEPS + 1; // Content steps + review step
+const TOTAL_STEPS = TOTAL_EVENT_WIZARD_STEPS;
+
+function eventSlugFromSubmitBody(body: unknown): string | null {
+  if (!body || typeof body !== "object") return null;
+  const ev = (body as { event?: { slug?: unknown } }).event;
+  const s = ev?.slug;
+  return typeof s === "string" && s.trim().length > 0 ? s.trim() : null;
+}
 
 function apiErrorMessage(body: unknown, fallback: string): string {
   if (!body || typeof body !== "object") return fallback;
@@ -81,7 +109,7 @@ function isPublishedSuccess(submitBody: unknown): boolean {
   return ev?.status === "PUBLISHED";
 }
 
-export function EventWizard({
+function EventWizardInner({
   mode,
   event,
   userId,
@@ -91,8 +119,11 @@ export function EventWizard({
   editorSurface,
   contentEditorNav,
   returnTo,
+  initialEditStep,
 }: EventWizardProps) {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const surface: ContentEditorSurface = editorSurface ?? "business";
   const nav: ContentEditorNav = {
     ...defaultEditorNav(surface, "event"),
@@ -103,7 +134,17 @@ export function EventWizard({
   const [moderationSuccessEventId, setModerationSuccessEventId] = useState<string | null>(null);
   const [publishedSuccessModalOpen, setPublishedSuccessModalOpen] = useState(false);
   const [publishedActivityHref, setPublishedActivityHref] = useState<string | null>(null);
-  const [currentStep, setCurrentStep] = useState(1);
+  const [currentStep, setCurrentStep] = useState(() => {
+    if (
+      mode === "edit" &&
+      typeof initialEditStep === "number" &&
+      initialEditStep >= 1 &&
+      initialEditStep <= TOTAL_STEPS
+    ) {
+      return initialEditStep;
+    }
+    return 1;
+  });
   const [eventId, setEventId] = useState<string | null>(
     mode === "edit" && event ? event.id : null
   );
@@ -128,6 +169,52 @@ export function EventWizard({
   const [isSaving, setIsSaving] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
+  /** sessionStorage для шага — один раз на смену `eventId`, только если в URL нет `step`. */
+  const sessionHydratedForEventRef = useRef<string | null>(null);
+
+  /**
+   * Строка `step` из query (примитив) — в deps эффектов вместо объекта `searchParams`.
+   */
+  const stepQuery = searchParams.get("step") ?? "";
+
+  /**
+   * state ← URL / session. На клиенте сначала читаем `window.location`: после клика по Link
+   * `useSearchParams` иногда отстаёт от фактического URL.
+   */
+  useLayoutEffect(() => {
+    if (mode !== "edit" || !eventId) return;
+    const raw =
+      typeof window !== "undefined"
+        ? new URLSearchParams(window.location.search).get("step")
+        : null;
+    const q = (raw ?? searchParams.get("step") ?? "") || "";
+    const parsed = parseEventEditorStepQuery(q || null);
+    if (parsed != null) {
+      setCurrentStep(parsed);
+      clearEventEditorReturnStep();
+      return;
+    }
+    if (sessionHydratedForEventRef.current !== eventId) {
+      sessionHydratedForEventRef.current = eventId;
+      const fromStore = readEventEditorReturnStep(eventId);
+      if (fromStore != null && fromStore >= 1 && fromStore <= TOTAL_STEPS) {
+        setCurrentStep(fromStore);
+      }
+    }
+  }, [mode, eventId, stepQuery]);
+
+  /**
+   * state → URL. Зависимости без `searchParams`: берём актуальные query из `window`,
+   * иначе replace порождает новый searchParams → лишние проходы эффекта.
+   */
+  useEffect(() => {
+    if (mode !== "edit" || !eventId) return;
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("step") === String(currentStep)) return;
+    params.set("step", String(currentStep));
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+  }, [currentStep, mode, eventId, pathname, router]);
 
   // Wizard session for temp media (без записи в БД до явного сохранения)
   const { wizardSessionId, clearSession } = useWizardSession({
@@ -206,13 +293,18 @@ export function EventWizard({
 
   // Save as draft
   const handleSaveDraft = async () => {
+    const draftCheck = validateForDraft(formData);
+    if (!draftCheck.isValid) {
+      toast.error(draftCheck.errors[0] ?? "Заполните обязательные поля");
+      return;
+    }
+
     setIsSaving(true);
     
     try {
       const payload = buildEventPayload(formData);
       
       if (eventId) {
-        // Update existing draft
         const response = await fetch(`/api/business/events/${eventId}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
@@ -221,7 +313,23 @@ export function EventWizard({
         
         if (!response.ok) {
           const error = await response.json();
-          throw new Error(error.error || "Failed to update draft");
+          throw new Error(apiErrorMessage(error, "Не удалось сохранить"));
+        }
+
+        toast.success("Изменения сохранены");
+        setLastSaved(new Date());
+
+        // Если есть returnTo, всегда возвращаемся туда после сохранения
+        if (returnTo) {
+          router.push(returnTo);
+          return;
+        }
+
+        // Если нет returnTo, используем старую логику
+        if (mode === "edit") {
+          setEventEditorSession(eventId, { returnStep: currentStep });
+          router.push(`/me/events/${eventId}/preview`);
+          return;
         }
       } else {
         // Create new draft
@@ -258,6 +366,65 @@ export function EventWizard({
       toast.error(error.message || "Ошибка сохранения");
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  /** Опубликованное событие: финальный шаг — сохранить, отправить на проверку, редирект на карточку. */
+  const handlePublishedReviewSave = async () => {
+    const validation = validateForSubmit(formData);
+    if (!validation.isValid) {
+      toast.error("Заполните все обязательные поля");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const payload = buildEventPayload(formData);
+      const tid = eventId ?? (mode === "edit" && event ? event.id : null);
+      if (!tid) {
+        throw new Error("Не найден идентификатор события");
+      }
+
+      const patchResponse = await fetch(`/api/business/events/${tid}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!patchResponse.ok) {
+        const errorBody = await patchResponse.json();
+        throw new Error(apiErrorMessage(errorBody, "Не удалось сохранить событие"));
+      }
+
+      const submitResponse = await fetch(`/api/business/events/${tid}/submit`, {
+        method: "POST",
+      });
+      if (!submitResponse.ok) {
+        const errorBody = await submitResponse.json();
+        throw new Error(apiErrorMessage(errorBody, "Не удалось отправить на проверку"));
+      }
+
+      const submitBody = await submitResponse.json();
+      const href = publicActivityPath(
+        tid,
+        formData.city,
+        eventSlugFromSubmitBody(submitBody),
+      );
+      router.push(href);
+      toast.success(
+        canPublishContentDirectly(userRole)
+          ? "Изменения опубликованы"
+          : "Изменения сохранены и отправлены на проверку",
+      );
+      setLastSaved(new Date());
+      if (mode === "create" && typeof window !== "undefined") {
+        localStorage.removeItem(LOCAL_STORAGE_KEY);
+        localStorage.removeItem(CURRENT_STEP_STORAGE_KEY);
+      }
+    } catch (error: unknown) {
+      console.error("Published review save error:", error);
+      toast.error(error instanceof Error ? error.message : "Ошибка сохранения");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -318,7 +485,9 @@ export function EventWizard({
             localStorage.removeItem(LOCAL_STORAGE_KEY);
             localStorage.removeItem(CURRENT_STEP_STORAGE_KEY);
           }
-          setPublishedActivityHref(publicActivityPath(newId, formData.city));
+          setPublishedActivityHref(
+            publicActivityPath(newId, formData.city, eventSlugFromSubmitBody(submitBody)),
+          );
           setPublishedSuccessModalOpen(true);
           return;
         }
@@ -376,7 +545,9 @@ export function EventWizard({
           localStorage.removeItem(LOCAL_STORAGE_KEY);
           localStorage.removeItem(CURRENT_STEP_STORAGE_KEY);
         }
-        setPublishedActivityHref(publicActivityPath(targetId, formData.city));
+        setPublishedActivityHref(
+          publicActivityPath(targetId, formData.city, eventSlugFromSubmitBody(submitBody)),
+        );
         setPublishedSuccessModalOpen(true);
         return;
       }
@@ -467,6 +638,9 @@ export function EventWizard({
     currentStep < TOTAL_STEPS && validateStep(currentStep, formData).isComplete;
   const canPrev = currentStep > 1;
   const isReviewStep = currentStep === TOTAL_STEPS;
+  const isPublishedEdit =
+    mode === "edit" && event?.status === ContentStatus.PUBLISHED;
+  const isPublishedEditReview = isPublishedEdit && isReviewStep;
 
   const segments = useMemo(
     () => [
@@ -476,10 +650,24 @@ export function EventWizard({
     []
   );
 
-  const actionLabels = useMemo(
-    () => getBusinessFormActionLabels(userRole),
-    [userRole],
-  );
+  const actionLabels = useMemo(() => {
+    const base = getBusinessFormActionLabels(userRole);
+    if (isPublishedEditReview) {
+      return {
+        ...base,
+        submit: "Сохранить изменения",
+        submitting: "Сохранение...",
+      };
+    }
+    if (mode !== "edit" || !event?.status) return base;
+    const published = event.status === ContentStatus.PUBLISHED;
+    return {
+      ...base,
+      saveDraft: published ? "Сохранить изменения" : "Сохранить",
+    };
+  }, [userRole, mode, event, isPublishedEditReview]);
+
+  const showSaveDraftInBar = (mode === "edit" || isReviewStep) && !isPublishedEditReview;
 
   const phase = formWizardPhaseFromFlags({ isSaving, isSubmitting });
 
@@ -510,13 +698,19 @@ export function EventWizard({
         labels={actionLabels}
         showBack={canPrev}
         onBack={handlePrev}
-        showSaveDraft={isReviewStep}
-        onSaveDraft={isReviewStep ? handleSaveDraft : undefined}
+        showSaveDraft={showSaveDraftInBar}
+        onSaveDraft={showSaveDraftInBar ? handleSaveDraft : undefined}
         saveDraftDisabled={isSaving || isSubmitting}
         isReviewStep={isReviewStep}
         onContinue={!isReviewStep ? handleNext : undefined}
         continueDisabled={!canNext || isSaving || isSubmitting}
-        onSubmit={isReviewStep ? handleSubmit : undefined}
+        onSubmit={
+          isReviewStep
+            ? isPublishedEditReview
+              ? handlePublishedReviewSave
+              : handleSubmit
+            : undefined
+        }
         submitDisabled={
           isSubmitting || isSaving || !submitValidation.isValid
         }
@@ -538,5 +732,20 @@ export function EventWizard({
         />
       )}
     </FormWizardShell>
+  );
+}
+
+export function EventWizard(props: EventWizardProps) {
+  return (
+    <Suspense
+      fallback={
+        <div
+          className="min-h-[50vh] rounded-xl bg-muted/25"
+          aria-hidden
+        />
+      }
+    >
+      <EventWizardInner {...props} />
+    </Suspense>
   );
 }

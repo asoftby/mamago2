@@ -11,6 +11,8 @@
 import { prisma } from "@/lib/prisma";
 import { slugifyRu } from "@/lib/slugify";
 import { ensureUniqueSlug } from "@/lib/slug/ensureUniqueSlug";
+import { createActivitySlugHistoryIgnoreDuplicate } from "@/lib/slug/slugHistoryDedupe";
+import { syncActivityCanonical } from "@/lib/seo/syncEntityCanonical";
 
 async function isSlugAvailable(slug: string, excludeActivityId?: string) {
   const existing = await prisma.activity.findUnique({
@@ -32,7 +34,7 @@ export async function generateActivitySlugFromTitle(
   title: string,
   excludeActivityId?: string,
 ) {
-  const base = slugifyRu(title || "event");
+  const base = slugifyRu((title || "event").trim(), "event");
   return ensureUniqueSlug({
     base,
     isAvailable: (slug) => isSlugAvailable(slug, excludeActivityId),
@@ -52,14 +54,18 @@ export async function assignActivitySlugIfMissing(activityId: string, title: str
   if (activity.slug) return activity.slug;
 
   const slug = await generateActivitySlugFromTitle(title, activityId);
-  await prisma.activity.update({
-    where: { id: activityId },
-    data: {
-      slug,
-      slugUpdatedAt: new Date(),
-    },
-    select: { id: true },
+  await prisma.$transaction(async (tx) => {
+    await createActivitySlugHistoryIgnoreDuplicate(tx, activityId, activityId);
+    await tx.activity.update({
+      where: { id: activityId },
+      data: {
+        slug,
+        slugUpdatedAt: new Date(),
+      },
+      select: { id: true },
+    });
   });
+  await syncActivityCanonical(activityId);
   return slug;
 }
 
@@ -68,6 +74,7 @@ export async function assignActivitySlugIfMissing(activityId: string, title: str
  */
 export async function updateActivitySlug(activityId: string, newSlugRaw: string) {
   const newSlug = slugifyRu(newSlugRaw);
+  let finalSlug = newSlug;
   await prisma.$transaction(async (tx) => {
     const activity = await tx.activity.findUnique({
       where: { id: activityId },
@@ -77,33 +84,37 @@ export async function updateActivitySlug(activityId: string, newSlugRaw: string)
 
     if (activity.slug === newSlug) return;
 
+    if (!activity.slug) {
+      await createActivitySlugHistoryIgnoreDuplicate(tx, activityId, activityId);
+    }
+
     // ensure uniqueness across current + history
     const base = newSlug;
-    let finalSlug = base;
+    let candidate = base;
     let i = 2;
     // eslint-disable-next-line no-constant-condition
     while (true) {
       const conflict = await tx.activity.findUnique({
-        where: { slug: finalSlug },
+        where: { slug: candidate },
         select: { id: true },
       });
       const hist = await tx.activitySlugHistory.findUnique({
-        where: { slug: finalSlug },
+        where: { slug: candidate },
         select: { activityId: true },
       });
       const ok =
         (!conflict || conflict.id === activityId) &&
         (!hist || hist.activityId === activityId);
       if (ok) break;
-      finalSlug = `${base}-${i}`;
+      candidate = `${base}-${i}`;
       i++;
       if (i > 200) throw new Error(`Could not set unique activity slug: ${base}`);
     }
 
+    finalSlug = candidate;
+
     if (activity.slug) {
-      await tx.activitySlugHistory.create({
-        data: { activityId, slug: activity.slug },
-      });
+      await createActivitySlugHistoryIgnoreDuplicate(tx, activityId, activity.slug);
     }
 
     await tx.activity.update({
@@ -112,7 +123,8 @@ export async function updateActivitySlug(activityId: string, newSlugRaw: string)
     });
   });
 
-  return newSlug;
+  await syncActivityCanonical(activityId);
+  return finalSlug;
 }
 
 /**

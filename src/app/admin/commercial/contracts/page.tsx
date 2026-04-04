@@ -6,6 +6,7 @@ import Link from "next/link";
 import { format } from "date-fns";
 import { ru } from "date-fns/locale";
 import { FileText, CheckCircle } from "lucide-react";
+import { CommercialToolbarFilterSelects } from "@/components/admin/commercial/CommercialToolbarFilterSelects";
 import type { ContractStatus } from "@prisma/client";
 
 export default async function AdminContractsPage() {
@@ -74,21 +75,29 @@ export default async function AdminContractsPage() {
 
       {/* AdminPageToolbar */}
       <div className="flex flex-col md:flex-row gap-3">
-        <select className="h-10 w-full md:w-auto px-3 border border-gray-300 rounded-lg text-sm">
-          <option value="">Все статусы</option>
-          <option value="ACTIVE">Активные</option>
-          <option value="EXPIRING">Истекающие</option>
-          <option value="EXPIRED">Истекшие</option>
-          <option value="DRAFT">Черновики</option>
-          <option value="TERMINATED">Расторгнутые</option>
-        </select>
-        <select className="h-10 w-full md:w-auto px-3 border border-gray-300 rounded-lg text-sm">
-          <option value="">Все типы</option>
-          <option value="MASTER">Основной</option>
-          <option value="ADDENDUM">Дополнение</option>
-          <option value="OFFER">Оферта</option>
-          <option value="APPENDIX">Приложение</option>
-        </select>
+        <CommercialToolbarFilterSelects
+          filters={[
+            {
+              placeholder: "Все статусы",
+              options: [
+                { value: "ACTIVE", label: "Активные" },
+                { value: "EXPIRING", label: "Истекающие" },
+                { value: "EXPIRED", label: "Истекшие" },
+                { value: "DRAFT", label: "Черновики" },
+                { value: "TERMINATED", label: "Расторгнутые" },
+              ],
+            },
+            {
+              placeholder: "Все типы",
+              options: [
+                { value: "MASTER", label: "Основной" },
+                { value: "ADDENDUM", label: "Дополнение" },
+                { value: "OFFER", label: "Оферта" },
+                { value: "APPENDIX", label: "Приложение" },
+              ],
+            },
+          ]}
+        />
         <button className="h-10 w-full md:w-auto px-4 border border-gray-300 rounded-lg text-sm hover:bg-gray-50">
           Истекают в течение 30 дней
         </button>

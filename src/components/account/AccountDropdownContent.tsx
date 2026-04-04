@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { LogOut } from "lucide-react";
+import { LogOut, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   accountDropdownIconClass,
@@ -79,23 +79,28 @@ export function AccountDropdownContent({
             <img
               src={header.avatarUrl}
               alt=""
-              className="h-12 w-12 shrink-0 rounded-full object-cover ring-1 ring-black/[0.06]"
+              className="h-10 w-10 shrink-0 rounded-full object-cover ring-1 ring-black/[0.06]"
             />
           ) : (
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-neutral-500 text-[13px] font-semibold text-white">
-              {header.initials}
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
+              {header.displayName.charAt(0).toUpperCase()}
             </div>
           )}
           <div className="min-w-0 flex-1">
-            {header.metaCaption ? (
-              <div className="text-xs text-muted-foreground">{header.metaCaption}</div>
+            <div className="truncate text-sm font-semibold text-gray-900">
+              {header.displayName}
+            </div>
+            {header.personaSubtitle ? (
+              <div className="truncate text-xs text-gray-600 mt-0.5">
+                {header.personaSubtitle}
+              </div>
             ) : null}
-            <div className="truncate text-sm font-medium text-gray-900">
+            <div className="truncate text-xs text-gray-400 mt-0.5">
               {header.email}
             </div>
-            {header.roleLabel ? (
-              <div className="text-xs text-gray-500">{header.roleLabel}</div>
-            ) : null}
+            {header.roleLabel && (
+              <div className="text-xs text-gray-500 mt-0.5">{header.roleLabel}</div>
+            )}
           </div>
         </div>
       </div>
@@ -115,6 +120,14 @@ export function AccountDropdownContent({
       ) : null}
 
       <div className="border-t border-gray-200 p-2">
+        <Link
+          href="/me/settings"
+          className={cn(accountDropdownRowDefault, "w-full")}
+          onClick={onNavigate}
+        >
+          <Settings className={accountDropdownIconClass} aria-hidden />
+          Настройки
+        </Link>
         {logoutMode === "form" ? (
           <form action="/api/auth/logout" method="POST" className="w-full">
             <button

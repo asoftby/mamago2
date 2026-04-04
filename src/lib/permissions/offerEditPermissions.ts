@@ -1,9 +1,9 @@
 import type { User } from "@prisma/client";
-import { canManageOwnedContent } from "@/lib/auth/businessContentAccess";
+import { canManagePlaceAsync } from "@/lib/auth/placeAccess";
 
-export function canEditOfferForUser(
+export async function canEditOfferForUser(
   user: User,
-  offer: { place: { ownerUserId: string } }
-): boolean {
-  return canManageOwnedContent(user, offer.place.ownerUserId);
+  offer: { place: { createdByUserId: string; ownerBusinessId: string | null } }
+): Promise<boolean> {
+  return await canManagePlaceAsync(user, offer.place);
 }

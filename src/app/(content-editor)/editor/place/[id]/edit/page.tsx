@@ -35,13 +35,14 @@ export default async function EditorEditPlacePage({
     notFound();
   }
 
-  if (
-    !canEditPlace(user, {
-      placeId: place.id,
-      ownerUserId: place.ownerUserId,
-      status: place.status,
-    })
-  ) {
+  const canEdit = await canEditPlace(user, {
+    placeId: place.id,
+    createdByUserId: place.createdByUserId,
+    ownerBusinessId: place.ownerBusinessId,
+    status: place.status,
+  });
+
+  if (!canEdit) {
     if (user.role === "BUSINESS_OWNER") {
       redirect("/business/places");
     }

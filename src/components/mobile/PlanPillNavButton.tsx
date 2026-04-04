@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 export type PlanPillNavButtonProps = {
   href: string;
   isActive: boolean;
+  onOpenMyPlan?: () => void;
   /** Planning-related badge (recommendations, confirmations) — 0 hides */
   badgeCount?: number;
   /**
@@ -27,6 +28,7 @@ export type PlanPillNavButtonProps = {
 export function PlanPillNavButton({
   href,
   isActive,
+  onOpenMyPlan,
   badgeCount = 0,
   hasPlannedEvents = false,
   className,
@@ -35,10 +37,16 @@ export function PlanPillNavButton({
   const emptyHintId = useId();
   const showBadge = badgeCount > 0;
   const showEmptyHint = !hasPlannedEvents;
+  const handleClick: React.MouseEventHandler<HTMLAnchorElement> = (event) => {
+    if (!onOpenMyPlan) return;
+    event.preventDefault();
+    onOpenMyPlan();
+  };
 
   return (
     <Link
       href={href}
+      onClick={handleClick}
       aria-current={isActive ? "page" : undefined}
       aria-describedby={showEmptyHint ? emptyHintId : undefined}
       className={cn(

@@ -1,5 +1,8 @@
 import { NextRequest } from "next/server";
-import { handleEntityToggleIndexation } from "@/lib/admin/seo/entities/http";
+import {
+  handleEntitySetIndexation,
+  handleEntityToggleIndexation,
+} from "@/lib/admin/seo/entities/http";
 
 export async function POST(
   req: NextRequest,
@@ -7,5 +10,13 @@ export async function POST(
 ) {
   const { id } = await params;
   return handleEntityToggleIndexation(req, "place", id);
+}
+
+export async function PUT(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+  return handleEntitySetIndexation(req, "place", id);
 }
 

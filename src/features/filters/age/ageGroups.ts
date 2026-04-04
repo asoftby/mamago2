@@ -3,6 +3,12 @@
  * Single source of truth for age ranges used across:
  * - Discovery filters
  * - Content creation forms (Events, Places, Offers)
+ *
+ * DATA POLICY NOTE:
+ * This is a presentational fallback constant. The canonical source of truth
+ * is SignalDefinition[slug="age"] in the database.
+ * TODO: Replace with API-loaded data from /api/public/signals/age
+ * See: docs/data-policy.md
  * - Filtering logic
  */
 

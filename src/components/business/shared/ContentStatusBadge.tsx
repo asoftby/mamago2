@@ -14,6 +14,10 @@ const STATUS_CONFIG: Record<ContentStatus, { label: string; className: string }>
     label: "На модерации",
     className: "bg-yellow-100 text-yellow-800",
   },
+  PENDING_UPDATE: {
+    label: "На проверке",
+    className: "bg-amber-100 text-amber-900",
+  },
   PUBLISHED: {
     label: "Опубликовано",
     className: "bg-green-100 text-green-800",

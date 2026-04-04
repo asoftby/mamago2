@@ -1,12 +1,21 @@
 "use client";
 
-import { useRef, RefObject, useEffect } from "react";
+import { useRef, RefObject, useEffect, useMemo, useState } from "react";
 import { MapPin, Calendar, Users, X } from "lucide-react";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
 import { useDiscoveryFilters } from "@/features/filters/discovery/filters.store";
 import { useDiscoveryFilterOptions } from "@/features/filters/discovery/filters.api";
 import { AGE_GROUPS } from "@/features/filters/age/ageGroups";
+import { useChildrenScope } from "@/features/filters/discovery/childrenScope.store";
+import { MAX_ACTIVE_FAMILY_PERSONAS } from "@/lib/family/wholeFamilyPreset";
+import { formatWhoHeaderSummary } from "@/lib/family/formatWhoHeaderSummary";
+import {
+  hasSelectedChildren as familyHasSelectedChildren,
+  resolveFamilyAgeMode,
+} from "@/lib/family/familyAgeMode";
+import { togglePersonaId } from "@/lib/family/togglePersonaSelection";
+import { toast } from "sonner";
 import { LocationPanel, DatePanel, AgePanel } from "./search-segments";
 import { Portal } from "@/components/ui/portal";
 import { useDropdownPosition } from "@/hooks/useDropdownPosition";
@@ -16,12 +25,20 @@ import type { HeaderPanel } from "@/hooks/useStableHeaderBehavior";
 import type { Intent } from "@/lib/intent";
 import { RefinementFiltersButtonCompact } from "@/components/discovery/RefinementFiltersButtonCompact";
 import { getCityLocativePhrase } from "@/lib/city/cityDisplayNames";
+import { useAuthMe } from "@/features/birthday/builder/hooks/useAuthMe";
+import { useFamilyPersona } from "@/contexts/FamilyPersonaContext";
 
 /** Как у кнопки «Фильтры» (RefinementFiltersButtonCompact): белый фон, бордер, тень. */
 const SEARCH_BAR_EMBEDDED_IN_HEADER_CLASSES =
   "border border-gray-200 bg-white shadow-sm transition-[box-shadow,border-color,background-color] duration-200 ease-out hover:border-gray-300 hover:bg-gray-50 hover:shadow-md focus-within:border-gray-300 focus-within:shadow-md";
 
 type SearchMode = "compact" | "expanded";
+
+type ProfileChildFilterOption = {
+  id: string;
+  name: string;
+  birthDate?: string;
+};
 
 interface DesktopSearchControlProps {
   citySlug?: string;
@@ -40,6 +57,8 @@ interface DesktopSearchControlProps {
   variant?: "discovery" | "cityHub";
   /** Компактный cityHub: иконка раздела вместо MapPin (страница публикации) */
   compactIconIntent?: Intent | null;
+  /** Посадочные страницы: без кнопки «Фильтры» рядом с поиском */
+  hideSecondaryFilters?: boolean;
 }
 
 export function DesktopSearchControl({
@@ -356,7 +375,14 @@ function DiscoveryDesktopSearchControl({
   onExpand,
   renderPanels = true,
   embeddedInHeader = false,
+  hideSecondaryFilters = false,
 }: DiscoveryDesktopSearchControlProps) {
+  /** Вторичная панель «Фильтры» зависит от пропсов/контекста; без отложенного рендера возможен hydration mismatch (SSR vs первый клиент). */
+  const [secondaryFiltersMounted, setSecondaryFiltersMounted] = useState(false);
+  useEffect(() => {
+    setSecondaryFiltersMounted(true);
+  }, []);
+
   const containerRef = useRef<HTMLDivElement>(null);
   const locationRef = useRef<HTMLButtonElement>(null);
   const dateRef = useRef<HTMLButtonElement>(null);
@@ -364,6 +390,12 @@ function DiscoveryDesktopSearchControl({
   
   const { applied, actions } = useDiscoveryFilters();
   const { options: apiOptions } = useDiscoveryFilterOptions(citySlug);
+  const { isAuthenticated, isLoading: authLoading } = useAuthMe();
+  const family = useFamilyPersona();
+  const profileChildren: ProfileChildFilterOption[] =
+    isAuthenticated && family && !family.loading
+      ? family.childPersonasForFilter
+      : [];
   
   // Fallback options if API fails
   const safeApiOptions = apiOptions || {
@@ -373,6 +405,136 @@ function DiscoveryDesktopSearchControl({
   };
   
   const formDisplayFilters = applied;
+
+  const setAppliedAgeRanges = (nextAge: string[]) => {
+    actions.setDraft({ age: nextAge });
+  };
+
+  const childrenFamilySync = useMemo(
+    () =>
+      isAuthenticated && family
+        ? {
+            loading: family.loading,
+            selectedPersonaIds: family.selectedPersonaIds,
+            primaryAdultPersonaId: family.primaryAdultPersonaId,
+            setSelectedPersonaIds: family.setSelectedPersonaIds,
+          }
+        : undefined,
+    [
+      isAuthenticated,
+      family,
+      family?.loading,
+      family?.selectedPersonaIds,
+      family?.primaryAdultPersonaId,
+      family?.setSelectedPersonaIds,
+    ],
+  );
+
+  const childrenScope = useChildrenScope({
+    citySlug,
+    availableChildren: isAuthenticated ? profileChildren : [],
+    appliedAgeRanges: applied.age ?? [],
+    setAppliedAgeRanges,
+    familySync: childrenFamilySync,
+  });
+
+  const showChildrenPreset = isAuthenticated && profileChildren.length > 0;
+  const allowMultiChildSelect = profileChildren.length >= 2;
+  const primaryAdultPersonaId = family?.primaryAdultPersonaId ?? null;
+  const adultSelected =
+    !!primaryAdultPersonaId &&
+    !!family?.selectedPersonaIds.includes(primaryAdultPersonaId);
+
+  const profileChildIds = useMemo(
+    () => profileChildren.map((c) => c.id),
+    [profileChildren],
+  );
+  const hasSelectedChildren = familyHasSelectedChildren(
+    family?.selectedPersonaIds ?? [],
+    profileChildIds,
+  );
+  const ageMode = resolveFamilyAgeMode({
+    hasProfileChildren: showChildrenPreset,
+    selectedPersonaIds: family?.selectedPersonaIds ?? [],
+    profileChildIds,
+  });
+
+  const whoPrimaryLine = useMemo(() => {
+    if (ageMode === "free" && showChildrenPreset) {
+      return "Для всех";
+    }
+    return formatWhoHeaderSummary({
+      hasSelectedChildren,
+      selectedPersonaIds: family?.selectedPersonaIds ?? [],
+      personas: family?.personas ?? [],
+      fallbackAgeValues: formDisplayFilters.age ?? [],
+    });
+  }, [
+    ageMode,
+    showChildrenPreset,
+    hasSelectedChildren,
+    family?.selectedPersonaIds,
+    family?.personas,
+    formDisplayFilters.age,
+  ]);
+
+  const toggleChild = (childId: string) => {
+    if (!family?.personas?.length) {
+      const prev = childrenScope.selectedChildrenIds;
+      let next: string[];
+      if (allowMultiChildSelect) {
+        next = prev.includes(childId)
+          ? prev.filter((id) => id !== childId)
+          : [...prev, childId];
+      } else {
+        next = prev.length === 1 && prev[0] === childId ? [] : [childId];
+      }
+      childrenScope.setSelectedChildrenIds(next);
+      return;
+    }
+    const allowed = new Set(family.personas.map((p) => p.id));
+    const { next, limitMessage } = togglePersonaId(
+      family.selectedPersonaIds,
+      childId,
+      allowed,
+    );
+    if (next === null) {
+      if (limitMessage) toast(limitMessage, { duration: 4200 });
+      return;
+    }
+    family.setSelectedPersonaIds(next);
+  };
+
+  const toggleAdult = () => {
+    if (!family?.primaryAdultPersonaId) return;
+    const allowed = new Set(family.personas.map((p) => p.id));
+    const { next, limitMessage } = togglePersonaId(
+      family.selectedPersonaIds,
+      family.primaryAdultPersonaId,
+      allowed,
+    );
+    if (next === null) {
+      if (limitMessage) toast(limitMessage, { duration: 4200 });
+      return;
+    }
+    family.setSelectedPersonaIds(next);
+  };
+
+  const ageLinkedActions = useMemo(
+    () => ({
+      setDraft: (patch: Partial<typeof applied>) => {
+        if (Array.isArray(patch.age)) {
+          if (ageMode === "derived") {
+            return;
+          }
+          actions.setDraft({ age: patch.age });
+          return;
+        }
+        actions.setDraft(patch);
+      },
+    }),
+    [actions, ageMode],
+  );
   
   // Calculate positions for each dropdown (only in expanded mode)
   const locationPosition = useDropdownPosition(
@@ -444,20 +606,6 @@ function DiscoveryDesktopSearchControl({
     return "Выберите дату";
   };
 
-  // Build age display text
-  const getAgeText = () => {
-    if (formDisplayFilters.age.length === 0) return "Выберите возраст";
-    
-    const ageLabels = formDisplayFilters.age.map(ageValue => {
-      const group = AGE_GROUPS.find(g => g.value === ageValue);
-      return group ? group.label : ageValue;
-    });
-    
-    if (ageLabels.length === 1) return ageLabels[0];
-    if (ageLabels.length === 2) return `${ageLabels[0]}, ${ageLabels[1]}`;
-    return `${ageLabels[0]} +${ageLabels.length - 1}`;
-  };
-
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Escape") {
       onPanelClose();
@@ -485,7 +633,17 @@ function DiscoveryDesktopSearchControl({
   };
 
   const handleClearAge = () => {
-    actions.setDraft({ age: [] });
+    if (ageMode === "free" && showChildrenPreset) {
+      actions.setDraft({ age: [] });
+      return;
+    }
+    if (family?.primaryAdultPersonaId && showChildrenPreset) {
+      family.setSelectedPersonaIds([]);
+      actions.setDraft({ age: [] });
+    } else {
+      actions.setDraft({ age: [] });
+      childrenScope.setSelectedChildrenIds([]);
+    }
   };
 
   // Handle outside clicks to close panels
@@ -535,8 +693,14 @@ function DiscoveryDesktopSearchControl({
   const hasLocationFilter = !!(formDisplayFilters.nearby || formDisplayFilters.metro || formDisplayFilters.district);
   const hasDateFilter = !!(formDisplayFilters.dateFrom || formDisplayFilters.dateTo || formDisplayFilters.whenPreset);
   const hasAgeFilter = !!(formDisplayFilters.age && formDisplayFilters.age.length > 0);
+  const hasWhoSelection =
+    hasAgeFilter ||
+    childrenScope.selectedChildrenIds.length > 0 ||
+    (primaryAdultPersonaId ? adultSelected : false);
 
   const showSecondaryFiltersInBar =
+    !hideSecondaryFilters &&
+    secondaryFiltersMounted &&
     mode === "expanded" &&
     !!currentIntent &&
     DISCOVERY_INTENT_CONFIG[currentIntent as Intent]?.hasFilters === true;
@@ -577,6 +741,7 @@ function DiscoveryDesktopSearchControl({
               applied={applied}
               apiOptions={safeApiOptions}
               currentIntent={currentIntent || "kuda"}
+              whoSummaryLine={whoPrimaryLine}
             />
           </div>
         </button>
@@ -691,12 +856,12 @@ function DiscoveryDesktopSearchControl({
             >
               <Users className="h-4 w-4 text-gray-400 flex-shrink-0" />
               <div className="flex flex-col items-start min-w-0 flex-1">
-                <span className="text-xs font-medium text-gray-900">С кем?</span>
+                <span className="text-xs font-medium text-gray-900">Для кого?</span>
                 <span className="text-sm text-gray-600 truncate w-full text-left">
-                  {getAgeText()}
+                  {whoPrimaryLine}
                 </span>
               </div>
-              {hasAgeFilter && (
+              {hasWhoSelection && (
                 <div
                   role="button"
                   tabIndex={0}
@@ -802,7 +967,41 @@ function DiscoveryDesktopSearchControl({
                     actions.close();
                   }}
                   applied={applied}
-                  actions={actions}
+                  actions={ageLinkedActions}
+                  selectedChildIds={childrenScope.selectedChildrenIds}
+                  availableChildren={showChildrenPreset ? profileChildren : []}
+                  onToggleChild={showChildrenPreset ? toggleChild : undefined}
+                  primaryAdult={
+                    showChildrenPreset && family?.primaryAdultPersonaId && family.menuUser
+                      ? {
+                          id: family.primaryAdultPersonaId,
+                          displayName:
+                            family.menuUser.displayName?.trim() ||
+                            family.menuUser.email.split("@")[0] ||
+                            "Я",
+                          birthDate:
+                            family.personas?.find(
+                              (p) => p.id === family.primaryAdultPersonaId,
+                            )?.birthDate ?? undefined,
+                        }
+                      : null
+                  }
+                  adultSelected={adultSelected}
+                  onToggleAdult={showChildrenPreset && family?.primaryAdultPersonaId ? toggleAdult : undefined}
+                  ageMode={ageMode}
+                  autoAgeValues={childrenScope.autoAgeValues}
+                  personaPickAtLimit={
+                    !!family && family.selectedPersonaIds.length >= MAX_ACTIVE_FAMILY_PERSONAS
+                  }
+                  whoFreeMode={ageMode === "free"}
+                  onSelectEveryone={
+                    showChildrenPreset && family
+                      ? () => {
+                          family.setSelectedPersonaIds([]);
+                          actions.setDraft({ age: [] });
+                        }
+                      : undefined
+                  }
                 />
               </div>
             </Portal>
@@ -827,12 +1026,15 @@ function CompactSearchSummary({
   citySlug, 
   applied, 
   apiOptions: safeApiOptions,
-  currentIntent 
+  currentIntent,
+  whoSummaryLine,
 }: {
   citySlug: string;
   applied: any;
   apiOptions: any;
   currentIntent: string;
+  /** Строка «Для кого» — та же, что в раскрытом хедере */
+  whoSummaryLine?: string;
 }) {
   // Map intent IDs to fallback icons
   const INTENT_ICONS = {
@@ -882,16 +1084,18 @@ function CompactSearchSummary({
     return null;
   })();
 
-  const ageLine = (() => {
-    if (applied.age.length === 0) return null;
-    const ageLabels = applied.age.map((ageValue: string) => {
-      const group = AGE_GROUPS.find(g => g.value === ageValue);
-      return group ? group.label : ageValue;
-    });
-    if (ageLabels.length === 1) return ageLabels[0];
-    if (ageLabels.length === 2) return `${ageLabels[0]}, ${ageLabels[1]}`;
-    return `${ageLabels[0]} +${ageLabels.length - 1}`;
-  })();
+  const ageLine =
+    whoSummaryLine ??
+    (() => {
+      if (applied.age.length === 0) return null;
+      const ageLabels = applied.age.map((ageValue: string) => {
+        const group = AGE_GROUPS.find((g) => g.value === ageValue);
+        return group ? group.label : ageValue;
+      });
+      if (ageLabels.length === 1) return ageLabels[0];
+      if (ageLabels.length === 2) return `${ageLabels[0]}, ${ageLabels[1]}`;
+      return `${ageLabels[0]} +${ageLabels.length - 1}`;
+    })();
 
   const summaryText = [locationLine, dateLine, ageLine]
     .filter((p): p is string => p != null && p !== "")

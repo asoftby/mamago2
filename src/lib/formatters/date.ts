@@ -47,6 +47,39 @@ export function formatRuShortDayMonth(date: Date | string): string {
   }
 }
 
+function sameLocalCalendarDay(a: Date, b: Date): boolean {
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
+}
+
+/**
+ * Одна дата или интервал: «4 апр.», «4–5 апр.», «4 апр.–5 мар.» (детерминированно, как formatRuShortDayMonth).
+ */
+export function formatRuShortDayMonthRange(
+  start: Date | string,
+  end?: Date | string | null,
+): string {
+  try {
+    const s = typeof start === "string" ? new Date(start) : start;
+    if (isNaN(s.getTime())) return "";
+    if (end == null || end === "") return formatRuShortDayMonth(s);
+    const e = typeof end === "string" ? new Date(end) : end;
+    if (isNaN(e.getTime())) return formatRuShortDayMonth(s);
+    if (sameLocalCalendarDay(s, e)) return formatRuShortDayMonth(s);
+    if (s.getFullYear() === e.getFullYear() && s.getMonth() === e.getMonth()) {
+      const monthShort = RU_MONTH_SHORT[s.getMonth()];
+      return `${s.getDate()}–${e.getDate()} ${monthShort}`;
+    }
+    return `${formatRuShortDayMonth(s)}–${formatRuShortDayMonth(e)}`;
+  } catch (error) {
+    console.error("formatRuShortDayMonthRange error:", error);
+    return formatRuShortDayMonth(start);
+  }
+}
+
 /**
  * Dev-only validation helper
  * Ensures formatter produces expected output

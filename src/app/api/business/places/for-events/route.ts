@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth/server";
+import { getUserBusinessId } from "@/lib/auth/placeAccess";
 
 /**
  * GET /api/business/places/for-events
@@ -13,9 +14,15 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // Get user's business
+    const businessId = await getUserBusinessId(user.id);
+
     const places = await prisma.place.findMany({
       where: {
-        ownerUserId: user.id,
+        OR: [
+          { createdByUserId: user.id },
+          ...(businessId ? [{ ownerBusinessId: businessId }] : []),
+        ],
         archivedAt: null,
         status: { in: ["PUBLISHED", "NEEDS_REVISION"] }, // Only approved places
       },

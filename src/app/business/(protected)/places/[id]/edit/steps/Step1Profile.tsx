@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { WizardStepHeader } from "../components/WizardStepHeader";
+import { FilterSelect } from "@/components/ui/filter-select";
 import { AGE_OPTIONS } from "@/lib/config/ages";
 
 interface Step1ProfileProps {
@@ -162,19 +163,15 @@ export function Step1Profile({ place, onUpdate, onNext, canNext, isEditable = tr
 
       <div>
         <Label htmlFor="category">Категория *</Label>
-        <select
-          id="category"
-          value={category}
-          onChange={(e) => handleCategoryChange(e.target.value)}
-          className="mt-2 w-full rounded-md border border-input bg-background px-3 py-2"
-          disabled={!isEditable}
-        >
-          {CATEGORIES.map((cat) => (
-            <option key={cat.value} value={cat.value}>
-              {cat.label}
-            </option>
-          ))}
-        </select>
+        <div className="mt-2">
+          <FilterSelect
+            id="category"
+            value={category}
+            options={CATEGORIES.map((cat) => ({ value: cat.value, label: cat.label }))}
+            onChange={handleCategoryChange}
+            disabled={!isEditable}
+          />
+        </div>
       </div>
 
       <div>

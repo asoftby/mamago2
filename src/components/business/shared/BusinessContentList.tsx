@@ -2,6 +2,8 @@
 
 import { useState, useEffect, ReactNode } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+import { ConfirmDestructiveActionDialog } from "@/components/ui/confirm-destructive-action-dialog";
 
 interface BusinessContentListProps<T> {
   items: T[];
@@ -13,8 +15,11 @@ interface BusinessContentListProps<T> {
   addButtonHref: string;
   renderItem: (item: T, handlers: ItemHandlers) => ReactNode;
   onDelete?: (id: string) => Promise<void>;
+  onRestore?: (id: string) => Promise<void>;
   onArchive?: (id: string) => Promise<void>;
   onUnarchive?: (id: string) => Promise<void>;
+  deleteEntityLabel?: string;
+  getDeleteEntityName?: (item: T) => string | undefined;
 }
 
 export interface ItemHandlers {
@@ -33,21 +38,66 @@ export function BusinessContentList<T extends { id: string }>({
   addButtonHref,
   renderItem,
   onDelete: onDeleteProp,
+  onRestore: onRestoreProp,
   onArchive: onArchiveProp,
   onUnarchive: onUnarchiveProp,
+  deleteEntityLabel = "элемент",
+  getDeleteEntityName,
 }: BusinessContentListProps<T>) {
   const router = useRouter();
   const [items, setItems] = useState(initialItems);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
   useEffect(() => {
     setItems(initialItems);
   }, [initialItems]);
 
+  const pendingDeleteItem =
+    pendingDeleteId != null ? items.find((x) => x.id === pendingDeleteId) : null;
+  const pendingDeleteName = pendingDeleteItem
+    ? getDeleteEntityName?.(pendingDeleteItem)
+    : undefined;
+
+  const requestDelete = async (itemId: string) => {
+    setPendingDeleteId(itemId);
+    setDeleteDialogOpen(true);
+  };
+
   const handleDelete = async (itemId: string) => {
     if (onDeleteProp) {
-      await onDeleteProp(itemId);
-      setItems(prev => prev.filter(item => item.id !== itemId));
-      router.refresh();
+      setDeleteLoading(true);
+      try {
+        await onDeleteProp(itemId);
+        setItems((prev) => prev.filter((item) => item.id !== itemId));
+        router.refresh();
+
+        toast.success("Удалено", {
+          description: pendingDeleteName
+            ? `Удалено «${pendingDeleteName}».`
+            : undefined,
+          action: onRestoreProp
+            ? {
+                label: "Отменить",
+                onClick: async () => {
+                  try {
+                    await onRestoreProp(itemId);
+                    router.refresh();
+                    toast.success("Восстановлено");
+                  } catch {
+                    toast.error("Не удалось восстановить");
+                  }
+                },
+              }
+            : undefined,
+          duration: 8000,
+        });
+      } finally {
+        setDeleteLoading(false);
+        setDeleteDialogOpen(false);
+        setPendingDeleteId(null);
+      }
     }
   };
 
@@ -73,7 +123,7 @@ export function BusinessContentList<T extends { id: string }>({
   };
 
   const handlers: ItemHandlers = {
-    onDelete: handleDelete,
+    onDelete: requestDelete,
     onArchive: currentView === "active" ? handleArchive : undefined,
     onUnarchive: currentView === "archived" ? handleUnarchive : undefined,
   };
@@ -135,6 +185,19 @@ export function BusinessContentList<T extends { id: string }>({
 
   return (
     <div className="space-y-4">
+      <ConfirmDestructiveActionDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        title={`Удалить ${deleteEntityLabel}?`}
+        description={
+          pendingDeleteName
+            ? `Вы уверены, что хотите удалить «${pendingDeleteName}»?`
+            : "Вы уверены, что хотите удалить?"
+        }
+        loading={deleteLoading}
+        onConfirm={() => (pendingDeleteId ? handleDelete(pendingDeleteId) : undefined)}
+        onCancel={() => setPendingDeleteId(null)}
+      />
       {/* Filter Tabs */}
       <div className="flex gap-2 border-b">
         <button

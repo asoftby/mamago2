@@ -23,18 +23,25 @@ const TRANSLITERATION_MAP: Record<string, string> = {
  * @param text - Input text (can contain Cyrillic)
  * @returns SEO-friendly slug
  * 
+ * @param emptyFallback — если после очистки строка пустая (по умолчанию `"place"` для обратной совместимости)
+ *
  * @example
  * slugifyRu("Новое место") // "novoe-mesto"
  * slugifyRu("Детский клуб #1") // "detskiy-klub-1"
  * slugifyRu("Кафе \"Солнце\"") // "kafe-solntse"
+ * slugifyRu("Пасхальный мастер-класс по выпечке кулича", "event") // "paskhalnyy-master-klass-po-vypechke-kulicha"
  */
-export function slugifyRu(text: string): string {
-  if (!text || typeof text !== "string") {
-    return "place";
+export function slugifyRu(text: string, emptyFallback: string = "place"): string {
+  let raw = typeof text === "string" ? text : "";
+  if (!raw.trim()) {
+    raw = emptyFallback || "item";
   }
 
+  // Единые дефисы до транслита (длинное тире, минус и т.д.)
+  let slug = raw.replace(/[\u2013\u2014\u2212\u2010\u00AD]/g, "-");
+
   // Transliterate Cyrillic to Latin
-  let slug = text
+  slug = slug
     .split("")
     .map((char) => TRANSLITERATION_MAP[char] || char)
     .join("");
@@ -54,9 +61,10 @@ export function slugifyRu(text: string): string {
   // Remove leading and trailing hyphens
   slug = slug.replace(/^-+|-+$/g, "");
 
-  // If empty after cleanup, return default
+  // If empty after cleanup, return fallback (slugified once to stay [a-z0-9-])
   if (!slug) {
-    return "place";
+    const fb = emptyFallback.replace(/[^a-z0-9-]/gi, "").toLowerCase() || "item";
+    return fb.replace(/-+/g, "-").replace(/^-+|-+$/g, "") || "item";
   }
 
   return slug;

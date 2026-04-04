@@ -8,7 +8,8 @@ import type { OpeningHoursData } from "@/components/openingHours";
 export interface PlaceFormData {
   // Identity
   id?: string;
-  ownerUserId?: string;
+  createdByUserId?: string;
+  ownerBusinessId?: string | null;
   status?: ContentStatus;
   
   // Step 1: Profile

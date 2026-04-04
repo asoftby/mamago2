@@ -9,6 +9,7 @@ import { SlotCard } from "./SlotCard";
 import { SlotFormDialog } from "./SlotFormDialog";
 import { CopySlotsDialog } from "./CopySlotsDialog";
 import { Calendar } from "@/components/ui/calendar";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -703,16 +704,15 @@ export function ScheduleEditor({ value, onChange, className }: ScheduleEditorPro
           <div className="space-y-4">
             {/* Multi-select toggle */}
             <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
+              <Checkbox
                 checked={isMultiSelectMode}
-                onChange={(e) => {
-                  setIsMultiSelectMode(e.target.checked);
-                  if (!e.target.checked) {
+                onCheckedChange={(checked) => {
+                  const next = checked === true;
+                  setIsMultiSelectMode(next);
+                  if (!next) {
                     setSelectedMultipleDates([]);
                   }
                 }}
-                className="w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary"
               />
               <span className="text-sm text-gray-700">
                 Выбрать несколько дат

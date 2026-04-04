@@ -2,6 +2,7 @@ import type { EventVenueKind } from "@prisma/client";
 import type { Intent } from "@/lib/intent";
 import { DEFAULT_CITY_HUB_PATH } from "@/lib/intent";
 import { extractPlainTextFromHtml } from "@/lib/richtext/utils";
+import { resolveActivityCoverUrl } from "@/lib/event/resolveActivityCoverUrl";
 import type { EventPageData } from "./eventPageTypes";
 
 const FALLBACK_POSTER = "/mock/activity/anderson.svg";
@@ -11,7 +12,11 @@ const FALLBACK_POSTER = "/mock/activity/anderson.svg";
  * (matches a typical Prisma `include` for preview / public mapping).
  */
 export type ActivityForEventPageInput = {
+  /** Город листинга (публичная страница города) — для аналитики */
+  cityId?: string | null;
   id: string;
+  /** Публичный slug (может отсутствовать у черновика) */
+  slug?: string | null;
   title: string;
   shortDesc: string;
   description: string | null;
@@ -20,7 +25,10 @@ export type ActivityForEventPageInput = {
   priceFrom: number | null;
   currency: string | null;
   priceDetails: string | null;
+  /** Денормализованный URL обложки; может дублировать запись по coverImageId в images */
   coverImageUrl: string | null;
+  /** Primary: соответствует записи в images (ActivityImage.id) */
+  coverImageId?: string | null;
   images: Array<{ id: string; url: string }>;
   sessions: Array<{ id: string; startsAt: Date }>;
   place: {
@@ -41,9 +49,24 @@ function discoveryIntentForActivity(): Intent {
   return "kuda";
 }
 
+/** Если в `priceText` только число/фраза без валюты — дописываем BYN (как в карточке и визарде). */
+function priceTextWithCurrencyIfNeeded(text: string, currency: string): string {
+  if (/\bbyn\b/i.test(text)) return text;
+  const lower = text.toLowerCase();
+  if (
+    lower.includes("бесплатно") ||
+    lower.includes("уточняйте") ||
+    lower.includes("руб") ||
+    /€|\$|£|₽/.test(text)
+  ) {
+    return text;
+  }
+  return `${text} ${currency}`;
+}
+
 function priceLabel(activity: Pick<ActivityForEventPageInput, "priceText" | "priceFrom" | "currency">): string {
   const t = activity.priceText?.trim();
-  if (t) return t;
+  if (t) return priceTextWithCurrencyIfNeeded(t, activity.currency ?? "BYN");
   if (activity.priceFrom === 0) return "Бесплатно";
   if (activity.priceFrom != null) {
     const cur = activity.currency ?? "BYN";
@@ -119,9 +142,12 @@ function aboutFromActivity(activity: ActivityForEventPageInput): EventPageData["
   const fullPlain = raw ? extractPlainTextFromHtml(raw) : "";
   const summary =
     fullPlain.length > 220 ? `${fullPlain.slice(0, 217)}…` : fullPlain || activity.shortDesc;
+  
   return {
     summary,
     full: fullPlain.length > 220 ? fullPlain : undefined,
+    // Preserve HTML for rich text rendering
+    descriptionHtml: raw || undefined,
   };
 }
 
@@ -141,6 +167,7 @@ export function buildEventPageDataFromPrismaActivity(
     citySlug?: string;
     previewBannerLabel?: string;
     hidePublicationStats?: boolean;
+    ownerEditHref?: string;
   }
 ): EventPageData {
   const citySlug =
@@ -149,7 +176,11 @@ export function buildEventPageDataFromPrismaActivity(
     DEFAULT_CITY_HUB_PATH.replace(/^\//, "");
 
   const poster =
-    activity.images[0]?.url ?? activity.coverImageUrl ?? FALLBACK_POSTER;
+    resolveActivityCoverUrl({
+      coverImageId: activity.coverImageId ?? null,
+      coverImageUrl: activity.coverImageUrl,
+      images: activity.images,
+    }) ?? FALLBACK_POSTER;
 
   const sessions: EventPageData["sessions"] = activity.sessions.map((s) => ({
     id: s.id,
@@ -162,6 +193,7 @@ export function buildEventPageDataFromPrismaActivity(
 
   const data: EventPageData = {
     id: activity.id,
+    slug: activity.slug ?? null,
     citySlug,
     discoveryIntent: discoveryIntentForActivity(),
     categoryLabel: activity.eventCategory?.nameRu,
@@ -186,7 +218,7 @@ export function buildEventPageDataFromPrismaActivity(
     similar: [],
     breadcrumbs: [
       { label: "Главная", href: `/${citySlug}` },
-      { label: "События", href: `/${citySlug}` },
+      { label: "События", href: `/${citySlug}/kuda` },
       { label: activity.title, href: "#" },
     ],
     priceLabel: priceLabel(activity),
@@ -196,6 +228,7 @@ export function buildEventPageDataFromPrismaActivity(
       buyLabel: "Купить билет",
       saveLabel: "В идеи",
     },
+    ownerEditHref: options?.ownerEditHref,
     previewBannerLabel: options?.previewBannerLabel,
     hidePublicationStats: options?.hidePublicationStats ?? true,
   };

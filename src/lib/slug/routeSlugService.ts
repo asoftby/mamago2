@@ -10,6 +10,8 @@
 import { prisma } from "@/lib/prisma";
 import { slugifyRu } from "@/lib/slugify";
 import { ensureUniqueSlug } from "@/lib/slug/ensureUniqueSlug";
+import { createRouteSlugHistoryIgnoreDuplicate } from "@/lib/slug/slugHistoryDedupe";
+import { syncRouteCanonical } from "@/lib/seo/syncEntityCanonical";
 
 async function isSlugAvailable(slug: string, excludeRouteId?: string) {
   const existing = await prisma.route.findUnique({
@@ -28,7 +30,7 @@ async function isSlugAvailable(slug: string, excludeRouteId?: string) {
 }
 
 export async function generateRouteSlugFromTitle(title: string, excludeRouteId?: string) {
-  const base = slugifyRu(title || "route");
+  const base = slugifyRu((title || "route").trim(), "route");
   return ensureUniqueSlug({
     base,
     isAvailable: (s) => isSlugAvailable(s, excludeRouteId),
@@ -54,12 +56,13 @@ export async function updateRouteSlug(routeId: string, newSlugRaw: string) {
       },
     });
 
-    await tx.routeSlugHistory.create({ data: { routeId, slug: route.slug } });
+    await createRouteSlugHistoryIgnoreDuplicate(tx, routeId, route.slug);
     await tx.route.update({
       where: { id: routeId },
       data: { slug: finalSlug, slugUpdatedAt: new Date() },
     });
   });
+  await syncRouteCanonical(routeId);
 }
 
 export async function findRouteBySlug(slug: string): Promise<{ routeId: string; isRedirect: boolean } | null> {

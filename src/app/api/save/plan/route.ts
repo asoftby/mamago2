@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
+import { getActivityCityIdForAnalytics } from "@/lib/analytics/activityCity";
+import { getSessionRowIdFromCookies } from "@/lib/analytics/getSessionRowId";
+import { trackUserEvent } from "@/server/services/analytics/AnalyticsEventService";
 import { addPlanItem, removePlanItem } from "@/server/services/plan.service";
 
 export async function POST(request: NextRequest) {
@@ -12,21 +15,36 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { activityId, date, startsAt, title, coverImageUrl } = body;
 
-    if (!activityId || !date) {
-      return NextResponse.json(
-        { error: "activityId and date are required" },
-        { status: 400 }
-      );
+    if (!date) {
+      return NextResponse.json({ error: "date is required" }, { status: 400 });
+    }
+    if (!activityId && !title) {
+      return NextResponse.json({ error: "activityId or title is required" }, { status: 400 });
     }
 
     const planItem = await addPlanItem(
       user.id,
-      activityId,
+      activityId ?? null,
       date,
       startsAt ? new Date(startsAt) : undefined,
       title ?? undefined,
       coverImageUrl ?? undefined
     );
+
+    if (activityId) {
+      const cityId = await getActivityCityIdForAnalytics(activityId);
+      const sessionRowId = await getSessionRowIdFromCookies();
+      void trackUserEvent({
+        userId: user.id,
+        sessionId: sessionRowId,
+        eventType: "PLAN_ADD",
+        entityType: "EVENT",
+        entityId: activityId,
+        vertical: "CITY",
+        cityId,
+        meta: { source: "detail", section: "afisha", targetAction: "plan" },
+      });
+    }
 
     return NextResponse.json({ success: true, planItem });
   } catch (error) {

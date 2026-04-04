@@ -31,9 +31,11 @@ export function rankFeed(activities: ActivityMock[]): ActivityMock[] {
     if (!a.badge && b.badge) return 1;
     
     // 2. Rating
-    if (b.rating !== a.rating) return b.rating - a.rating;
-    
+    const ra = a.rating ?? 0;
+    const rb = b.rating ?? 0;
+    if (rb !== ra) return rb - ra;
+
     // 3. Reviews
-    return b.reviewsCount - a.reviewsCount;
+    return (b.reviewsCount ?? 0) - (a.reviewsCount ?? 0);
   });
 }

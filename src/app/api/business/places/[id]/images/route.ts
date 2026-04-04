@@ -11,7 +11,8 @@ import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
 import { PlaceImageKind, MediaEntityType } from "@prisma/client";
 import { attachMediaToEntity } from "@/lib/media/mediaRegistry";
-import { canCreateBusinessContent, canManageOwnedContent } from "@/lib/auth/businessContentAccess";
+import { canCreateBusinessContent } from "@/lib/auth/businessContentAccess";
+import { canManagePlaceAsync } from "@/lib/auth/placeAccess";
 
 /**
  * POST - Add image to place
@@ -32,14 +33,18 @@ export async function POST(
     // Check ownership
     const place = await prisma.place.findUnique({
       where: { id: placeId },
-      select: { ownerUserId: true },
+      select: { 
+        createdByUserId: true,
+        ownerBusinessId: true,
+      },
     });
 
     if (!place) {
       return NextResponse.json({ error: "Place not found" }, { status: 404 });
     }
 
-    if (!canManageOwnedContent(user, place.ownerUserId)) {
+    const canManage = await canManagePlaceAsync(user, place);
+    if (!canManage) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 

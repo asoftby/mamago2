@@ -68,7 +68,7 @@ export function ChildrenSystemSection() {
       {!showMockData && (
         <Surface variant="elevated" className="p-6">
           <div className="flex items-center justify-between mb-4">
-            <H2>Мои дети</H2>
+            <H2>Моя семья</H2>
           </div>
           <div className="text-center py-8">
             <BodyMuted className="mb-4 max-w-md mx-auto">
@@ -89,14 +89,14 @@ export function ChildrenSystemSection() {
       {showMockData && (
         <Surface variant="elevated" className="p-6">
           <div className="flex items-center justify-between mb-4">
-            <H2>Мои дети</H2>
+            <H2>Моя семья</H2>
             <Button
               onClick={() => setIsModalOpen(true)}
               size="sm"
               className="h-9"
             >
               <Plus className="h-4 w-4 mr-2" />
-              Добавить ребёнка
+              Добавить ещё
             </Button>
           </div>
           <div className="grid gap-4 sm:grid-cols-2">

@@ -1,9 +1,11 @@
+import { Suspense } from "react";
 import { getCurrentUser } from "@/lib/auth/server";
 import { redirect } from "next/navigation";
 import { getBillingTransactions } from "@/server/services/billing/billingTransaction.service";
 import { TransactionStatusBadge } from "@/components/admin/billing/TransactionStatusBadge";
 import { TransactionTypeBadge } from "@/components/admin/billing/TransactionTypeBadge";
 import { TransactionAmount } from "@/components/admin/billing/TransactionAmount";
+import { BillingTransactionsFilters } from "@/components/admin/billing/BillingTransactionsFilters";
 import { BillingTransactionType, BillingTransactionStatus } from "@prisma/client";
 import Link from "next/link";
 
@@ -45,39 +47,14 @@ export default async function AdminBillingTransactionsPage({ searchParams }: Pag
 
       {/* AdminPageToolbar - Filters */}
       <div className="bg-white border border-gray-200 rounded-lg p-4">
-        <div className="flex flex-col md:flex-row gap-3">
-          <div className="flex-1">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Тип</label>
-            <select 
-              className="w-full h-10 border border-gray-300 rounded-lg px-3 text-sm"
-              defaultValue={params.type || ""}
-            >
-              <option value="">Все типы</option>
-              <option value="SUBSCRIPTION_CHARGE">Подписка</option>
-              <option value="SUBSCRIPTION_RENEWAL">Продление</option>
-              <option value="DEPOSIT_TOPUP">Пополнение</option>
-              <option value="LEAD_CHARGE">Лид</option>
-              <option value="PROMOTION_CHARGE">Продвижение</option>
-              <option value="REFUND">Возврат</option>
-              <option value="MANUAL_ADJUSTMENT">Корректировка</option>
-            </select>
-          </div>
+        <div className="flex flex-col md:flex-row gap-3 md:items-end">
+          <Suspense
+            fallback={<div className="text-sm text-gray-500 py-2">Загрузка фильтров…</div>}
+          >
+            <BillingTransactionsFilters />
+          </Suspense>
 
-          <div className="flex-1">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Статус</label>
-            <select 
-              className="w-full h-10 border border-gray-300 rounded-lg px-3 text-sm"
-              defaultValue={params.status || ""}
-            >
-              <option value="">Все статусы</option>
-              <option value="SUCCEEDED">Успешно</option>
-              <option value="FAILED">Ошибка</option>
-              <option value="PENDING">В обработке</option>
-              <option value="CANCELED">Отменено</option>
-            </select>
-          </div>
-
-          <div className="flex items-end">
+          <div className="flex items-end pb-0.5 md:ml-auto">
             <p className="text-sm text-gray-600">
               Найдено: <span className="font-medium">{total}</span> транзакций
             </p>

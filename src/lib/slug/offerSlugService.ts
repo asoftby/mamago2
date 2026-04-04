@@ -11,6 +11,8 @@
 import { prisma } from "@/lib/prisma";
 import { slugifyRu } from "@/lib/slugify";
 import { ensureUniqueSlug } from "@/lib/slug/ensureUniqueSlug";
+import { createOfferSlugHistoryIgnoreDuplicate } from "@/lib/slug/slugHistoryDedupe";
+import { syncOfferCanonical } from "@/lib/seo/syncEntityCanonical";
 
 async function isSlugAvailable(slug: string, excludeOfferId?: string) {
   const existing = await prisma.offer.findUnique({
@@ -29,7 +31,7 @@ async function isSlugAvailable(slug: string, excludeOfferId?: string) {
 }
 
 export async function generateOfferSlugFromTitle(title: string, excludeOfferId?: string) {
-  const base = slugifyRu(title || "offer");
+  const base = slugifyRu((title || "offer").trim(), "offer");
   return ensureUniqueSlug({
     base,
     isAvailable: (slug) => isSlugAvailable(slug, excludeOfferId),
@@ -45,11 +47,15 @@ export async function assignOfferSlugIfMissing(offerId: string, title: string) {
   if (offer.slug) return offer.slug;
 
   const slug = await generateOfferSlugFromTitle(title, offerId);
-  await prisma.offer.update({
-    where: { id: offerId },
-    data: { slug, slugUpdatedAt: new Date() },
-    select: { id: true },
+  await prisma.$transaction(async (tx) => {
+    await createOfferSlugHistoryIgnoreDuplicate(tx, offerId, offerId);
+    await tx.offer.update({
+      where: { id: offerId },
+      data: { slug, slugUpdatedAt: new Date() },
+      select: { id: true },
+    });
   });
+  await syncOfferCanonical(offerId);
   return slug;
 }
 
@@ -62,6 +68,10 @@ export async function updateOfferSlug(offerId: string, newSlugRaw: string) {
     });
     if (!offer) throw new Error(`Offer not found: ${offerId}`);
     if (offer.slug === newSlug) return;
+
+    if (!offer.slug) {
+      await createOfferSlugHistoryIgnoreDuplicate(tx, offerId, offerId);
+    }
 
     const base = newSlug;
     let finalSlug = base;
@@ -86,9 +96,7 @@ export async function updateOfferSlug(offerId: string, newSlugRaw: string) {
     }
 
     if (offer.slug) {
-      await tx.offerSlugHistory.create({
-        data: { offerId, slug: offer.slug },
-      });
+      await createOfferSlugHistoryIgnoreDuplicate(tx, offerId, offer.slug);
     }
 
     await tx.offer.update({
@@ -97,6 +105,7 @@ export async function updateOfferSlug(offerId: string, newSlugRaw: string) {
     });
   });
 
+  await syncOfferCanonical(offerId);
   return newSlug;
 }
 

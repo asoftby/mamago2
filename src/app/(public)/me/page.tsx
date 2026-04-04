@@ -8,14 +8,15 @@ import {
 } from "@/server/services/plan.service";
 import { listRoutesByUser } from "@/server/services/route.service";
 import { Container } from "@/components/ui/Container";
-import { MeHeaderCard } from "@/features/me/components/MeHeaderCard";
 import { ChildrenCard } from "@/features/me/components/ChildrenCard";
+import { mapFamilyRoleToLabel } from "@/lib/account/mapFamilyRoleToLabel";
 import { MyBirthdaysCard } from "@/features/me/components/MyBirthdaysCard";
-import { PlanCard } from "@/features/me/components/PlanCard";
+import { UserGreeting } from "@/features/me/components/UserGreeting";
 import { listUserBirthdayParties } from "@/server/services/userBirthdays.service";
 import Link from "next/link";
-import { MapPin, Plus, Clock } from "lucide-react";
+import { MapPin, Plus } from "lucide-react";
 import { BUDGET_LABELS } from "@/mocks/routes.mock";
+import { buildAdultPreferenceDisplayLine } from "@/lib/adultPersonaSignals/buildAdultPreferenceLine";
 
 type PageProps = {
   searchParams: Promise<{ date?: string }>;
@@ -70,8 +71,6 @@ export default async function MePage({ searchParams }: PageProps) {
       .map((interest: any) => ({ label: interest.label })),
   }));
 
-  console.log("Loaded children from database:", JSON.stringify(children, null, 2));
-
   // Load plan items for current week
   const weekStart = getCurrentWeekStart();
   const planItems = await listPlanItemsByWeek(user.id, weekStart);
@@ -89,29 +88,51 @@ export default async function MePage({ searchParams }: PageProps) {
     return date.toISOString().split("T")[0];
   });
 
+  // Today hero
+  const todayDate = new Date().toISOString().split("T")[0];
+  const todayItems = planItemsByDate[todayDate] ?? [];
+  const hour = new Date().getHours();
+  const greetingWord =
+    hour < 6 ? "Доброй ночи" : hour < 12 ? "Доброе утро" : hour < 18 ? "Добрый день" : "Добрый вечер";
+  const firstName = user.displayName ?? user.email.split("@")[0];
+  const greeting = `${greetingWord}, ${firstName}`;
+
+  const preferenceDisplayLine = await buildAdultPreferenceDisplayLine({
+    preferenceSignalIds: user.preferenceSignalIds ?? [],
+    leisureFormatSignalId: user.leisureFormatSignalId ?? null,
+    preferenceSummary: user.preferenceSummary,
+    leisureFormatSummary: user.leisureFormatSummary,
+  });
+
   return (
     <div className="min-h-screen bg-background py-8">
       <Container className="max-w-4xl">
         <div className="space-y-6">
-          {/* User Header */}
-          <MeHeaderCard email={user.email} />
+
+          {/* ── Greeting ── */}
+          <UserGreeting greeting={greeting} />
 
           {/* Children */}
-          <ChildrenCard children={children} />
-
-          {/* Birthday parties */}
-          <MyBirthdaysCard parties={birthdayParties} />
-
-          {/* Plan */}
-          <PlanCard
-            weekDates={weekDates}
-            planItemsByDate={planItemsByDate}
+          <ChildrenCard
+            adult={{
+              displayName: user.displayName,
+              avatarUrl: user.avatarUrl,
+              initialChar: firstName.charAt(0),
+              roleLabel: mapFamilyRoleToLabel(user.familyRole),
+              ageBandLabel: user.ageBandLabel,
+              preferenceSummary: user.preferenceSummary,
+              leisureFormatSummary: user.leisureFormatSummary,
+              preferenceDisplayLine,
+            }}
+            children={children}
           />
 
           {/* My Routes */}
           <div className="bg-white rounded-2xl border border-neutral-100 shadow-sm overflow-hidden">
             <div className="flex items-center justify-between px-5 py-4 border-b border-neutral-100">
-              <h2 className="text-base font-semibold text-neutral-900">Мои маршруты</h2>
+              <div className="flex items-center gap-2 min-w-0">
+                <MapPin className="h-5 w-5 text-primary shrink-0" aria-hidden />
+                <h2 className="text-xl md:text-2xl font-semibold tracking-tight leading-tight text-neutral-900 truncate">Мои маршруты</h2>              </div>
               <Link
                 href="/routes/new"
                 className="flex items-center gap-1.5 text-sm font-medium text-neutral-500 hover:text-neutral-900 transition-colors"
@@ -174,6 +195,9 @@ export default async function MePage({ searchParams }: PageProps) {
               </div>
             )}
           </div>
+
+          {/* Birthday parties */}
+          <MyBirthdaysCard parties={birthdayParties} />
         </div>
       </Container>
     </div>

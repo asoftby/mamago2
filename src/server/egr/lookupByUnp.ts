@@ -22,7 +22,7 @@ export async function lookupLegalNameByUnp(
 
   // Fetch from EGR API
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
+  const timeoutId = setTimeout(() => controller.abort("Request timeout"), 8000); // 8 second timeout
 
   try {
     const url = `http://egr.gov.by/api/v2/egr/getBaseInfoByRegNum/${cleaned}`;

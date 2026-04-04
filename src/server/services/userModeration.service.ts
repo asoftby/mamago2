@@ -90,7 +90,14 @@ export async function getUserWithDetails(userId: string) {
   // Get activity stats
   const [businessCount, placesCount, activitiesCount] = await Promise.all([
     prisma.business.count({ where: { ownerUserId: userId } }),
-    prisma.place.count({ where: { ownerUserId: userId } }),
+    prisma.place.count({ 
+      where: { 
+        OR: [
+          { createdByUserId: userId },
+          { ownerBusiness: { ownerUserId: userId } }
+        ]
+      } 
+    }),
     prisma.activity.count({ where: { ownerUserId: userId } }),
   ]);
 

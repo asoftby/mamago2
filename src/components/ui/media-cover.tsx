@@ -11,14 +11,24 @@ type MediaCoverProps = {
 };
 
 export function MediaCover({ imageUrl, alt, ratio = "4/5", className, children }: MediaCoverProps) {
+  // Inline aspect-ratio: Tailwind arbitrary `aspect-[2/3]` часто не попадает в CSS (слеш в значении),
+  // из-за чего контейнер получает высоту 0 и «нет фото».
+  const aspectStyle =
+    ratio && /^\d+\s*\/\s*\d+$/.test(ratio.trim())
+      ? ({ aspectRatio: ratio.replace(/\s/g, "") } as React.CSSProperties)
+      : undefined;
+
   return (
-    <div className={cn("relative w-full overflow-hidden rounded-[var(--radius-card)] shadow-card", `aspect-[${ratio}]`, className)}>
+    <div
+      className={cn("relative w-full overflow-hidden rounded-[var(--radius-card)] shadow-card", className)}
+      style={aspectStyle}
+    >
       {imageUrl ? (
         imageUrl.startsWith('http') ? (
           <img
             src={imageUrl}
             alt={alt || ""}
-            className="absolute inset-0 h-full w-full object-cover"
+            className="absolute right-0 bottom-0 h-full w-full object-cover"
           />
         ) : (
           <Image

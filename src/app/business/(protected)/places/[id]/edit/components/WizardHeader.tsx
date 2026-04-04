@@ -21,6 +21,7 @@ export function WizardHeader({
   const statusLabels: Record<ContentStatus, string> = {
     DRAFT: "Черновик",
     PENDING: "На модерации",
+    PENDING_UPDATE: "На проверке",
     PUBLISHED: "Опубликовано",
     NEEDS_REVISION: "Требует изменений",
     REJECTED: "Отклонено",

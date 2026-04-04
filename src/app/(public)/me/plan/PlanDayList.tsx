@@ -5,19 +5,14 @@ import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { CalendarDays, Trash2, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
+import { publicActivityPath } from "@/lib/business/eventPublicLink";
 import type { SerializedPlanItem } from "./PlanPageClient";
 
-function formatDayTitle(dateStr: string): string {
-  const date = new Date(dateStr + "T00:00:00");
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const tomorrow = new Date(today);
-  tomorrow.setDate(today.getDate() + 1);
-
-  if (date.getTime() === today.getTime()) return "Сегодня";
-  if (date.getTime() === tomorrow.getTime()) return "Завтра";
-
-  return date.toLocaleDateString("ru-RU", { weekday: "long", day: "numeric", month: "long" });
+/** Подпись секции: день недели (как в макете вместо «СЕГОДНЯ»). */
+function formatDayWeekdayLabel(dateStr: string): string {
+  const date = new Date(dateStr + "T12:00:00");
+  const w = date.toLocaleDateString("ru-RU", { weekday: "long" });
+  return w.charAt(0).toUpperCase() + w.slice(1);
 }
 
 function formatTime(iso: string | null): string | null {
@@ -77,7 +72,7 @@ function PlanItemCard({
       <div className="flex items-center gap-1 shrink-0">
         {item.activityId && !unavailable && (
           <Link
-            href={`/minsk/activity/${item.activityId}`}
+            href={publicActivityPath(item.activityId, "minsk", item.activity?.slug)}
             className="p-2 rounded-xl text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 transition-colors"
           >
             <ExternalLink className="w-4 h-4" />
@@ -102,7 +97,7 @@ type Props = {
 };
 
 export function PlanDayList({ date, items, onRemove }: Props) {
-  const title = formatDayTitle(date);
+  const title = formatDayWeekdayLabel(date);
 
   return (
     <div>

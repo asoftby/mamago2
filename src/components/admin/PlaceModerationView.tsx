@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { formatAgeKeys } from "@/lib/config/ages";
 import { getPlacePublicUrl } from "@/lib/placePublicUrl";
 import { PlaceDangerZone } from "@/components/admin/moderation/PlaceDangerZone";
+import { Textarea } from "@/components/ui/textarea";
 
 const STATUS_CONFIG = {
   DRAFT: { label: "Черновик", variant: "secondary" as const, className: "" },
@@ -321,11 +322,11 @@ export function PlaceModerationView({ place }: PlaceModerationViewProps) {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Комментарий модератора
               </label>
-              <textarea
+              <Textarea
                 value={comment}
                 onChange={(e) => setComment(e.target.value)}
                 placeholder="Укажите причину отклонения или необходимые правки..."
-                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm min-h-[100px] focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="min-h-[100px] text-sm"
                 disabled={isSubmitting}
               />
             </div>

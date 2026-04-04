@@ -2,12 +2,12 @@ import { ActivityType } from "@prisma/client";
 import type { Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { getPublicListingActivityWhere } from "@/server/public/publicContentVisibility";
-import { activityInCityWhere } from "@/server/discovery/activityInCityWhere";
+import { activityInAnyOfCitiesWhere } from "@/server/discovery/activityInCityWhere";
+import { resolveKudaDiscoveryCityIds } from "@/server/discovery/discoveryHubExpand";
+import { resolveActivityCoverUrl } from "@/lib/event/resolveActivityCoverUrl";
 import type { ActivityMock } from "@/mocks/activity.types";
-import { MINSK_ACTIVITIES } from "@/mocks/activities.minsk";
-
-const FALLBACK_IMAGE =
-  "https://images.unsplash.com/photo-1503095392213-2d6d34b949c6?q=80&w=800";
+import { getEventEngagementScores } from "@/server/discovery/eventEngagementScores";
+import { normalizePricingMode } from "@/components/business/wizard/event/pricingMode";
 
 function ageBoundsFromActivity(a: {
   ageTags: string[];
@@ -29,6 +29,32 @@ function ageBoundsFromActivity(a: {
   return { ageFrom: 0, ageTo: 12 };
 }
 
+/** Мин/макс по сессиям и nextOccurrence — для подписи «4–5 апр.» / «4 апр.–5 мар.». */
+function discoveryCardDatesFromActivity(a: {
+  nextOccurrenceAt: Date | null;
+  sessions: { startsAt: Date }[];
+}): { dateStart?: string; dateEnd?: string } {
+  const times: number[] = [];
+  for (const s of a.sessions) {
+    times.push(s.startsAt.getTime());
+  }
+  if (a.nextOccurrenceAt) times.push(a.nextOccurrenceAt.getTime());
+  if (times.length === 0) return {};
+  const min = Math.min(...times);
+  const max = Math.max(...times);
+  const start = new Date(min);
+  const end = new Date(max);
+  const ds = start.toISOString();
+  if (
+    start.getFullYear() === end.getFullYear() &&
+    start.getMonth() === end.getMonth() &&
+    start.getDate() === end.getDate()
+  ) {
+    return { dateStart: ds };
+  }
+  return { dateStart: ds, dateEnd: end.toISOString() };
+}
+
 function tagsFromSchedule(next: Date | null): string[] {
   if (!next) return [];
   const d = new Date(next);
@@ -39,9 +65,34 @@ function tagsFromSchedule(next: Date | null): string[] {
   return tags;
 }
 
-function mapRowToMock(
+/** «от» только для режима «цена от»; фикс — без префикса. */
+function discoveryCardPriceUsesOtPrefix(a: {
+  scheduleJson: unknown;
+  priceText: string | null;
+  priceFrom: number | null;
+  priceTo: number | null;
+}): boolean {
+  const sj = a.scheduleJson as Record<string, unknown> | null | undefined;
+  const mode = normalizePricingMode(sj?.pricingMode, {
+    priceText: a.priceText,
+    priceFrom: a.priceFrom,
+    priceTo: a.priceTo,
+  });
+  return mode === "from";
+}
+
+function resolveListingCityIdForKudaBadge(a: {
+  cityId: string | null;
+  place: { cityId: string | null } | null;
+  venue: { cityId: string | null } | null;
+}): string | null {
+  return a.venue?.cityId ?? a.place?.cityId ?? a.cityId ?? null;
+}
+
+function mapActivityRowToCard(
   a: {
     id: string;
+    slug: string | null;
     title: string;
     shortDesc: string;
     ageTags: string[];
@@ -52,32 +103,46 @@ function mapRowToMock(
     priceText: string | null;
     currency: string | null;
     priceDetails: string | null;
+    scheduleJson: unknown;
+    coverImageId: string | null;
     coverImageUrl: string | null;
     nextOccurrenceAt: Date | null;
     ownerUserId: string;
+    cityId: string | null;
+    place: { cityId: string | null } | null;
+    venue: { cityId: string | null } | null;
     eventCategory: { nameRu: string } | null;
-    images: Array<{ url: string }>;
+    images: Array<{ id: string; url: string }>;
     sessions: Array<{ startsAt: Date }>;
   },
   ownerFirst: boolean,
+  hubPrimaryCityId: string,
+  engagementScore: number,
 ): ActivityMock {
   const { ageFrom, ageTo } = ageBoundsFromActivity(a);
   const cover =
-    a.coverImageUrl?.trim() ||
-    a.images[0]?.url ||
-    FALLBACK_IMAGE;
-  const dateStart =
-    a.nextOccurrenceAt?.toISOString() ??
-    a.sessions[0]?.startsAt.toISOString() ??
-    undefined;
+    resolveActivityCoverUrl({
+      coverImageId: a.coverImageId,
+      coverImageUrl: a.coverImageUrl,
+      images: a.images,
+    }) ?? "";
+  const { dateStart, dateEnd } = discoveryCardDatesFromActivity({
+    nextOccurrenceAt: a.nextOccurrenceAt,
+    sessions: a.sessions,
+  });
 
   const priceMin =
     a.priceFrom != null && !Number.isNaN(a.priceFrom)
       ? a.priceFrom
       : undefined;
 
+  const listingCityId = resolveListingCityIdForKudaBadge(a);
+  const geoBadge =
+    listingCityId && listingCityId !== hubPrimaryCityId ? "За городом" : undefined;
+
   return {
     id: a.id,
+    slug: a.slug,
     type: "EVENT_FIXED",
     discoveryIntent: "kuda",
     title: a.title,
@@ -87,13 +152,21 @@ function mapRowToMock(
     ageTo,
     priceMin,
     priceMax: a.priceTo != null ? a.priceTo : undefined,
+    priceListUsesOt: discoveryCardPriceUsesOtPrefix({
+      scheduleJson: a.scheduleJson,
+      priceText: a.priceText,
+      priceFrom: a.priceFrom,
+      priceTo: a.priceTo,
+    }),
     priceDetails: a.priceDetails ?? undefined,
     currency: "BYN",
     dateStart,
+    dateEnd,
     district: undefined,
     tags: tagsFromSchedule(a.nextOccurrenceAt ?? a.sessions[0]?.startsAt ?? null),
     badge: a.eventCategory?.nameRu ?? (ownerFirst ? "Моё событие" : "Событие"),
-    rating: 4.5,
+    geoBadge,
+    engagementScore,
     reviewsCount: 0,
   };
 }
@@ -101,39 +174,53 @@ function mapRowToMock(
 /**
  * Опубликованные события (EVENT) в городе для ленты «Куда пойти».
  * События текущего пользователя — выше остальных.
+ * Только данные из БД (без моков и добора).
  */
-export async function getKudaDiscoveryFeedMocks(
+export async function getKudaDiscoveryFeed(
   cityId: string,
+  citySlug: string,
   currentUserId: string | null,
   options?: { take?: number },
 ): Promise<ActivityMock[]> {
-  const take = options?.take ?? 40;
+  /** Больше кандидатов в ответе — клиент ранжирует по возрасту + показывает второй слой по engagement. */
+  const take = options?.take ?? 80;
+  const { primaryCityId, expandedCityIds } = await resolveKudaDiscoveryCityIds(citySlug, cityId);
   const pub = getPublicListingActivityWhere();
   const pubParts = (pub.AND ?? []) as Prisma.ActivityWhereInput[];
 
   const where: Prisma.ActivityWhereInput = {
     AND: [
       { type: ActivityType.EVENT },
-      activityInCityWhere(cityId),
+      activityInAnyOfCitiesWhere(expandedCityIds),
       ...pubParts,
     ],
   };
 
+  /** Достаточно изображений, чтобы сопоставить coverImageId с ActivityImage (как на detail). */
+  const GALLERY_FOR_COVER = 40;
+
   const rows = await prisma.activity.findMany({
     where,
-    take: Math.min(take * 2, 120),
+    take: Math.min(take * 5, 400),
     orderBy: [{ nextOccurrenceAt: "desc" }, { createdAt: "desc" }],
     include: {
-      images: { orderBy: { sortOrder: "asc" }, take: 2 },
-      sessions: { orderBy: { startsAt: "asc" }, take: 1 },
+      images: { orderBy: { sortOrder: "asc" }, take: GALLERY_FOR_COVER },
+      sessions: { orderBy: { startsAt: "asc" }, take: 100 },
       eventCategory: { select: { nameRu: true } },
+      place: { select: { cityId: true } },
+      venue: { select: { cityId: true } },
     },
   });
+
+  const scoreMap = await getEventEngagementScores(rows.map((r) => r.id));
 
   rows.sort((a, b) => {
     const aMine = currentUserId && a.ownerUserId === currentUserId ? 0 : 1;
     const bMine = currentUserId && b.ownerUserId === currentUserId ? 0 : 1;
     if (aMine !== bMine) return aMine - bMine;
+    const sa = scoreMap.get(a.id) ?? 0;
+    const sb = scoreMap.get(b.id) ?? 0;
+    if (sa !== sb) return sb - sa;
     const ta = a.nextOccurrenceAt?.getTime() ?? a.createdAt.getTime();
     const tb = b.nextOccurrenceAt?.getTime() ?? b.createdAt.getTime();
     return tb - ta;
@@ -141,14 +228,12 @@ export async function getKudaDiscoveryFeedMocks(
 
   const sliced = rows.slice(0, take);
 
-  const mocks = sliced.map((a) =>
-    mapRowToMock(
+  return sliced.map((a) =>
+    mapActivityRowToCard(
       a,
       Boolean(currentUserId && a.ownerUserId === currentUserId),
+      primaryCityId,
+      scoreMap.get(a.id) ?? 0,
     ),
   );
-
-  const seen = new Set(mocks.map((m) => m.id));
-  const filler = MINSK_ACTIVITIES.filter((m) => !seen.has(m.id));
-  return [...mocks, ...filler];
 }

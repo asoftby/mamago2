@@ -1,12 +1,12 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ChevronDown } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { ChipsRow, type ChipItem } from "@/components/ui/chips-row";
 import { AGE_OPTIONS } from "@/lib/config/ages";
+import { FilterSelect } from "@/components/ui/filter-select";
 import { PLACE_CATEGORIES, VISIT_FORMATS, ACTIVITY_TYPES } from "../config";
 import type { PlaceFormData } from "../types";
 
@@ -96,22 +96,18 @@ export function Step1Profile({ data, onChange, isEditable = true }: Step1Profile
 
       <div>
         <Label htmlFor="category">Категория *</Label>
-        <div className="relative mt-2">
-          <select
+        <div className="mt-2">
+          <FilterSelect
             id="category"
             value={category}
-            onChange={(e) => handleCategoryChange(e.target.value)}
-            className="h-[2.75rem] w-full rounded-md border border-input bg-background px-3 py-2 pr-10 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 appearance-none"
+            placeholder="Выберите категорию"
+            options={PLACE_CATEGORIES.map((cat) => ({
+              value: cat.value,
+              label: cat.label,
+            }))}
+            onChange={handleCategoryChange}
             disabled={!isEditable}
-          >
-            <option value="">Выберите категорию</option>
-            {PLACE_CATEGORIES.map((cat) => (
-              <option key={cat.value} value={cat.value}>
-                {cat.label}
-              </option>
-            ))}
-          </select>
-          <ChevronDown className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+          />
         </div>
       </div>
 

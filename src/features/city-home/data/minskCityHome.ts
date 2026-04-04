@@ -13,7 +13,7 @@ export const MINSK_BREAKING_NEWS: BreakingNewsItem[] = [
   {
     id: "n2",
     title: "Выставка птиц в Троицком предместье",
-    href: "/minsk/kuda",
+    href: "/minsk/events",
     imageUrl:
       "https://images.unsplash.com/photo-1444464666168-e49d077b8a7e?q=80&w=800&auto=format&fit=crop",
     relativeTime: "3 дня назад",
@@ -29,7 +29,7 @@ export const MINSK_BREAKING_NEWS: BreakingNewsItem[] = [
   {
     id: "n4",
     title: "Самая изысканная весенняя фотозона в ботаническом саду",
-    href: "/minsk/kuda",
+    href: "/minsk/events",
     imageUrl:
       "https://images.unsplash.com/photo-1490750967868-88aa4486c946?q=80&w=800&auto=format&fit=crop",
     relativeTime: "2 недели назад",

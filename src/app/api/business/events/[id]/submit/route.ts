@@ -9,6 +9,8 @@ import {
   canPublishContentDirectly,
 } from "@/lib/auth/businessContentAccess";
 import { replaceActivitySessionsFromScheduleJson } from "@/lib/business/syncEventActivitySessions";
+import { assignActivitySlugIfMissing } from "@/lib/slug/activitySlugService";
+import { ensurePublishedActivityHasSlug } from "@/lib/slug/publishSlugGuards";
 
 /**
  * POST /api/business/events/[id]/submit
@@ -98,6 +100,10 @@ export async function POST(
       );
     }
 
+    if (existing.title?.trim()) {
+      await assignActivitySlugIfMissing(id, existing.title.trim());
+    }
+
     const sessionRows = await prisma.activitySession.findMany({
       where: { activityId: id },
       orderBy: { startsAt: "asc" },
@@ -108,7 +114,9 @@ export async function POST(
 
     const nextStatus = canPublishContentDirectly(user.role)
       ? ContentStatus.PUBLISHED
-      : ContentStatus.PENDING;
+      : existing.status === ContentStatus.PUBLISHED
+        ? ContentStatus.PENDING_UPDATE
+        : ContentStatus.PENDING;
 
     const event = await prisma.activity.update({
       where: {
@@ -120,12 +128,22 @@ export async function POST(
       },
     });
 
+    if (event.status === ContentStatus.PUBLISHED) {
+      await ensurePublishedActivityHasSlug(event.id);
+    }
+
+    const slugRow = await prisma.activity.findUnique({
+      where: { id: event.id },
+      select: { slug: true },
+    });
+
     return NextResponse.json({
       success: true,
       event: {
         id: event.id,
         title: event.title,
         status: event.status,
+        slug: slugRow?.slug ?? null,
       },
     });
   } catch (error: any) {

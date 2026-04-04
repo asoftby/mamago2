@@ -7,7 +7,7 @@ export const runtime = "nodejs";
 export async function GET() {
   try {
     const rows = await prisma.eventCategory.findMany({
-      where: { isActive: true },
+      where: { isActive: true, publicationType: "EVENT" },
       orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
       select: {
         id: true,
@@ -16,6 +16,8 @@ export async function GET() {
         icon: true,
         parentId: true,
         sortOrder: true,
+        supportsProgram: true,
+        selectableInProgram: true,
       },
     });
 

@@ -8,7 +8,7 @@ type Options = {
   searchSurfaceOpen: boolean;
   reduceMotion: boolean | null;
   /**
-   * true — раздел discovery (`/{city}/kuda` и т.д.): скрытие по направлению скролла
+   * true — раздел discovery (`/{city}/events` и т.д.): скрытие по направлению скролла
    * (вниз — прячем, вверх — показываем). false — прежняя привязка к позиции scrollY.
    */
   scrollDirectionMode?: boolean;

@@ -8,7 +8,8 @@ import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
 import { updatePlaceLocation } from "@/services/place/placeLocation.service";
 import { Prisma } from "@prisma/client";
-import { canCreateBusinessContent, canManageOwnedContent } from "@/lib/auth/businessContentAccess";
+import { canCreateBusinessContent } from "@/lib/auth/businessContentAccess";
+import { canManagePlaceAsync } from "@/lib/auth/placeAccess";
 
 export async function POST(
   request: NextRequest,
@@ -31,7 +32,10 @@ export async function POST(
     // Check ownership
     const existing = await prisma.place.findUnique({
       where: { id },
-      select: { ownerUserId: true },
+      select: { 
+        createdByUserId: true,
+        ownerBusinessId: true,
+      },
     });
 
     if (!existing) {
@@ -41,7 +45,8 @@ export async function POST(
       );
     }
 
-    if (!canManageOwnedContent(user, existing.ownerUserId)) {
+    const canManage = await canManagePlaceAsync(user, existing);
+    if (!canManage) {
       return NextResponse.json(
         { error: "FORBIDDEN", message: "You don't have access to this place" },
         { status: 403 }

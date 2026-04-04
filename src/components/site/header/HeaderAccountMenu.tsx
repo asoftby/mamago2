@@ -1,58 +1,40 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import { CircleUser } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { SiteAuthModal } from "@/components/auth/SiteAuthModal";
 import type { AccountMenuUser } from "@/components/site/header/AccountMenuBody";
 import { HEADER_CHROME_ICON_BUTTON_CLASS } from "@/components/site/header/headerIconButtonClass";
 import { NotificationsDropdown } from "@/components/site/header/NotificationsDropdown";
 import { ProfileDropdown } from "@/components/site/header/ProfileDropdown";
 import { useAccountMode } from "@/contexts/AccountModeContext";
+import { useFamilyPersona } from "@/contexts/FamilyPersonaContext";
 import { cn } from "@/lib/utils";
 import { useNarrowViewport } from "@/hooks/useNarrowViewport";
+import { notifyAuthStateChanged } from "@/lib/auth/client";
 
-function userInitials(email: string): string {
-  const local = email.split("@")[0] ?? "?";
-  const cleaned = local.replace(/[._-]+/g, " ").trim();
-  const parts = cleaned.split(/\s+/).filter(Boolean);
-  if (parts.length >= 2) {
-    const a = parts[0]![0];
-    const b = parts[parts.length - 1]![0];
-    return (a + b).toUpperCase();
-  }
-  return cleaned.slice(0, 2).toUpperCase() || "?";
-}
-
+/**
+ * Меню профиля: только отображение primary adult persona из FamilyPersonaContext
+ * (единый источник с блоком «Моя семья»), без отдельного fetch / редактирования персоны здесь.
+ */
 export function HeaderAccountMenu() {
   const router = useRouter();
+  const pathname = usePathname();
   const narrow = useNarrowViewport();
   const { mode, goToBusinessAccount, goToPersonalAccount, hydrated } =
     useAccountMode();
-  const [user, setUser] = useState<AccountMenuUser | null | undefined>(
-    undefined,
-  );
+  const family = useFamilyPersona();
+  const user: AccountMenuUser | null | undefined = family
+    ? family.loading
+      ? undefined
+      : family.menuUser
+    : undefined;
+
   const [loggingOut, setLoggingOut] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
-
-  const load = useCallback(async () => {
-    try {
-      const res = await fetch("/api/auth/me", { credentials: "include" });
-      if (!res.ok) {
-        setUser(null);
-        return;
-      }
-      const data = (await res.json()) as AccountMenuUser;
-      setUser(data);
-    } catch {
-      setUser(null);
-    }
-  }, []);
-
-  useEffect(() => {
-    load();
-  }, [load]);
+  const [guestAuthOpen, setGuestAuthOpen] = useState(false);
 
   const handleLogout = async () => {
     setLoggingOut(true);
@@ -62,8 +44,8 @@ export function HeaderAccountMenu() {
         credentials: "same-origin",
       });
       if (res.ok || res.redirected) {
-        setUser(null);
         setUserMenuOpen(false);
+        notifyAuthStateChanged();
         router.replace("/");
         router.refresh();
       }
@@ -91,16 +73,37 @@ export function HeaderAccountMenu() {
   if (!user) {
     return (
       <div className="flex items-center gap-1.5 md:gap-2">
-        <Button variant="ghost" size="icon" className={HEADER_CHROME_ICON_BUTTON_CLASS} asChild>
-          <Link href="/login" aria-label="Войти или зарегистрироваться">
-            <CircleUser className="h-4 w-4" aria-hidden />
-          </Link>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className={HEADER_CHROME_ICON_BUTTON_CLASS}
+          aria-label="Войти или зарегистрироваться"
+          aria-haspopup="dialog"
+          aria-expanded={guestAuthOpen}
+          onClick={() => setGuestAuthOpen(true)}
+        >
+          <CircleUser className="h-4 w-4" aria-hidden />
         </Button>
+        <SiteAuthModal
+          open={guestAuthOpen}
+          onOpenChange={setGuestAuthOpen}
+          nextHref={pathname || "/"}
+          dialogTitle="Вход в mamaGo"
+          title="Вход в mamaGo"
+          subtitle="Планируйте лучшее время с детьми"
+          onAuthSuccess={() => {
+            setGuestAuthOpen(false);
+            notifyAuthStateChanged();
+            router.refresh();
+          }}
+        />
       </div>
     );
   }
 
-  const initials = userInitials(user.email);
+  const displayName = user.displayName?.trim() || user.email.split("@")[0] || "?";
+  const avatarLetter = displayName.charAt(0).toUpperCase();
   const isBusinessPartner = user.role === "BUSINESS_OWNER";
   const notificationContext =
     hydrated && mode === "business" ? "business" : "user";
@@ -115,9 +118,18 @@ export function HeaderAccountMenu() {
       aria-haspopup="dialog"
       aria-expanded={userMenuOpen}
     >
-      <span className="flex h-full w-full items-center justify-center rounded-full bg-neutral-500 text-[11px] font-semibold text-white">
-        {initials}
-      </span>
+      {user.avatarUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={user.avatarUrl}
+          alt=""
+          className="h-full w-full rounded-full object-cover"
+        />
+      ) : (
+        <span className="flex h-full w-full items-center justify-center rounded-full bg-primary/10 text-[11px] font-semibold text-primary">
+          {avatarLetter}
+        </span>
+      )}
     </Button>
   );
 

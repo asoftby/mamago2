@@ -8,6 +8,8 @@ import { NavIconButton } from "@/components/mobile/NavIconButton";
 import { MobileProfileSheet } from "@/components/mobile/MobileProfileSheet";
 import { PlanPillNavButton } from "@/components/mobile/PlanPillNavButton";
 import { useCity } from "@/contexts/CityContext";
+import { useFamilyPersona } from "@/contexts/FamilyPersonaContext";
+import { requestOpenMyPlan } from "@/lib/my-plan/myPlanOpenIntent";
 
 export type MobileBottomNavProps = {
   /** true — в pill «Мой план» скрыть строку про пустой план (подключить из API) */
@@ -34,9 +36,11 @@ export function MobileBottomNav({
 }: MobileBottomNavProps) {
   const pathname = usePathname();
   const { citySlug } = useCity();
+  const family = useFamilyPersona();
   const { unreadCount } = useUnreadNotificationCount();
 
-  const resolvedProfileAvatar = profileAvatarUrl ? profileAvatarUrl : undefined;
+  const resolvedProfileAvatar =
+    profileAvatarUrl ?? family?.menuUser?.avatarUrl ?? undefined;
 
   const homeHref = `/${citySlug}`;
   const planHref = "/me/plan";
@@ -94,6 +98,7 @@ export function MobileBottomNav({
           <PlanPillNavButton
             href={planHref}
             isActive={isPlanActive}
+            onOpenMyPlan={requestOpenMyPlan}
             badgeCount={planBadgeCount}
             hasPlannedEvents={hasPlannedEvents ?? false}
             className="min-w-0 flex-1"

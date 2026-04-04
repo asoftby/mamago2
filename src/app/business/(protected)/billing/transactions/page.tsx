@@ -10,6 +10,7 @@ import {
   type TransactionStatus,
 } from "@/lib/mocks/businessBilling";
 import { Filter, ChevronDown, ExternalLink } from "lucide-react";
+import { FilterSelect } from "@/components/ui/filter-select";
 import { TransactionStatusBadge } from "@/components/business/billing/TransactionStatusBadge";
 
 export default function BillingTransactionsPage() {
@@ -60,30 +61,30 @@ export default function BillingTransactionsPage() {
             <span className="text-sm font-medium text-gray-700">Фильтры:</span>
           </div>
 
-          <div className="flex items-center gap-2">
-            <label className="text-sm text-gray-600">Тип:</label>
-            <select
+          <div className="flex items-center gap-2 min-w-[200px]">
+            <label className="text-sm text-gray-600 shrink-0">Тип:</label>
+            <FilterSelect
               value={selectedType}
-              onChange={(e) => setSelectedType(e.target.value as TransactionType | "all")}
-              className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              {transactionTypes.map(type => (
-                <option key={type.value} value={type.value}>{type.label}</option>
-              ))}
-            </select>
+              options={transactionTypes.map((t) => ({
+                value: String(t.value),
+                label: t.label,
+              }))}
+              onChange={(v) => setSelectedType(v as TransactionType | "all")}
+              className="min-w-[180px]"
+            />
           </div>
 
-          <div className="flex items-center gap-2">
-            <label className="text-sm text-gray-600">Статус:</label>
-            <select
+          <div className="flex items-center gap-2 min-w-[200px]">
+            <label className="text-sm text-gray-600 shrink-0">Статус:</label>
+            <FilterSelect
               value={selectedStatus}
-              onChange={(e) => setSelectedStatus(e.target.value as TransactionStatus | "all")}
-              className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              {statuses.map(status => (
-                <option key={status.value} value={status.value}>{status.label}</option>
-              ))}
-            </select>
+              options={statuses.map((s) => ({
+                value: String(s.value),
+                label: s.label,
+              }))}
+              onChange={(v) => setSelectedStatus(v as TransactionStatus | "all")}
+              className="min-w-[180px]"
+            />
           </div>
 
           <div className="ml-auto text-sm text-gray-600">

@@ -5,7 +5,7 @@ import { Intent } from "@/lib/intent";
 import { listPublicRoutesByCity } from "@/server/services/route.service";
 import { MOCK_ROUTES } from "@/mocks/routes.mock";
 import { getCurrentUser } from "@/lib/auth/server";
-import { getKudaDiscoveryFeedMocks } from "@/server/discovery/kudaDiscoveryFeed";
+import { getKudaDiscoveryFeed } from "@/server/discovery/kudaDiscoveryFeed";
 
 interface CityShellProps {
   citySlug: string;
@@ -19,9 +19,9 @@ export async function CityShell({ citySlug, intent, searchParams }: CityShellPro
   if (!city) notFound();
 
   let discoveryActivities = undefined;
-  if (intent === "kuda") {
+  if (intent === "kuda" || intent === "birthday") {
     const user = await getCurrentUser();
-    discoveryActivities = await getKudaDiscoveryFeedMocks(city.id, user?.id ?? null);
+    discoveryActivities = await getKudaDiscoveryFeed(city.id, city.slug, user?.id ?? null);
   }
 
   // For routes intent, load routes data server-side

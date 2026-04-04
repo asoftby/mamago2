@@ -8,10 +8,24 @@ import {
   assertSignalCanBecomeChild,
   assertValidSignalParentIdOrNull,
 } from "@/lib/taxonomy/signalHierarchy";
+import { assertNotSystemDelete, assertNotSystemKeyChange, systemEntityErrorResponse } from "@/lib/data-policy/systemEntityGuard";
 
 export const runtime = "nodejs";
 
 type RouteParams = { params: Promise<{ id: string }> };
+
+async function resolveSignalIdentifier(identifier: string) {
+  const bySlug = await prisma.signalDefinition.findUnique({
+    where: { slug: identifier },
+    select: { id: true, slug: true },
+  });
+  if (bySlug) return bySlug;
+  const byId = await prisma.signalDefinition.findUnique({
+    where: { id: identifier },
+    select: { id: true, slug: true },
+  });
+  return byId;
+}
 
 const SCHEMA_OUT_OF_SYNC_MESSAGE =
   "Схема БД не совпадает с кодом: выполните npx prisma migrate deploy (в dev можно npx prisma db push).";
@@ -31,8 +45,12 @@ export async function GET(_req: Request, { params }: RouteParams) {
   }
 
   const { id } = await params;
+  const resolved = await resolveSignalIdentifier(id);
+  if (!resolved) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
   const item = await prisma.signalDefinition.findUnique({
-    where: { id },
+    where: { id: resolved.id },
     include: {
       parent: { select: { id: true, title: true, slug: true } },
       options: { orderBy: [{ order: "asc" }, { value: "asc" }] },
@@ -55,10 +73,14 @@ export async function PATCH(req: Request, { params }: RouteParams) {
   }
 
   const { id } = await params;
+  const resolved = await resolveSignalIdentifier(id);
+  if (!resolved) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
   const body = await req.json();
 
   if (body.mode === "moveUp" || body.mode === "moveDown") {
-    const current = await prisma.signalDefinition.findUnique({ where: { id } });
+    const current = await prisma.signalDefinition.findUnique({ where: { id: resolved.id } });
     if (!current) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
@@ -66,7 +88,7 @@ export async function PATCH(req: Request, { params }: RouteParams) {
       where: { parentId: current.parentId },
       orderBy: [{ order: "asc" }, { id: "asc" }],
     });
-    const idx = siblings.findIndex((x) => x.id === id);
+    const idx = siblings.findIndex((x) => x.id === resolved.id);
     if (idx === -1) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
@@ -103,12 +125,12 @@ export async function PATCH(req: Request, { params }: RouteParams) {
         { status: 400 },
       );
     }
-    if (nextParentId === id) {
+    if (nextParentId === resolved.id) {
       return NextResponse.json({ error: "Cannot set parent to self" }, { status: 400 });
     }
     if (nextParentId != null) {
       try {
-        await assertSignalCanBecomeChild(id);
+        await assertSignalCanBecomeChild(resolved.id);
       } catch (e) {
         return NextResponse.json(
           { error: e instanceof Error ? e.message : "Cannot assign parent" },
@@ -127,7 +149,7 @@ export async function PATCH(req: Request, { params }: RouteParams) {
   }
   if (body.slug !== undefined) {
     const existing = await prisma.signalDefinition.findUnique({
-      where: { id },
+      where: { id: resolved.id },
       select: { title: true },
     });
     if (!existing) {
@@ -135,7 +157,7 @@ export async function PATCH(req: Request, { params }: RouteParams) {
     }
     const s = ensureEventCategorySlug(String(body.slug), existing.title);
     const other = await prisma.signalDefinition.findFirst({
-      where: { slug: s, NOT: { id } },
+      where: { slug: s, NOT: { id: resolved.id } },
     });
     if (other) {
       return NextResponse.json({ error: "Slug already exists" }, { status: 409 });
@@ -161,7 +183,7 @@ export async function PATCH(req: Request, { params }: RouteParams) {
 
   try {
     const updated = await prisma.signalDefinition.update({
-      where: { id },
+      where: { id: resolved.id },
       data,
       include: {
         parent: { select: { id: true, title: true, slug: true } },
@@ -184,16 +206,26 @@ export async function DELETE(_req: Request, { params }: RouteParams) {
   }
 
   const { id } = await params;
-  const n = await prisma.signalDefinition.count({ where: { parentId: id } });
+  const resolved = await resolveSignalIdentifier(id);
+  if (!resolved) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  const signal = await prisma.signalDefinition.findUnique({ where: { id: resolved.id }, select: { isSystem: true, slug: true } });
+  if (!signal) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  try {
+    assertNotSystemDelete(signal);
+  } catch (e) {
+    const err = systemEntityErrorResponse(e);
+    if (err) return NextResponse.json(err, { status: 403 });
+  }
+
+  const n = await prisma.signalDefinition.count({ where: { parentId: resolved.id } });
   if (n > 0) {
-    return NextResponse.json(
-      { error: "Delete child signals first" },
-      { status: 409 },
-    );
+    return NextResponse.json({ error: "Delete child signals first" }, { status: 409 });
   }
 
   try {
-    await prisma.signalDefinition.delete({ where: { id } });
+    await prisma.signalDefinition.delete({ where: { id: resolved.id } });
     return NextResponse.json({ ok: true });
   } catch {
     return NextResponse.json({ error: "Not found" }, { status: 404 });

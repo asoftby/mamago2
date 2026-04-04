@@ -27,8 +27,8 @@ export function DiscoveryTitleSlugCreateRow({
   slugPlaceholder?: string;
 }) {
   return (
-    <div className="flex flex-col md:flex-row gap-4 items-end">
-      <div className="grid gap-2 flex-1 min-w-0">
+    <div className="flex w-full flex-col gap-4">
+      <div className="grid w-full gap-2">
         <Label>{titleLabel}</Label>
         <Input
           value={auto.source}
@@ -36,7 +36,7 @@ export function DiscoveryTitleSlugCreateRow({
           placeholder={titlePlaceholder}
         />
       </div>
-      <div className="grid gap-2 flex-1 min-w-0">
+      <div className="grid w-full gap-2">
         <Label>{slugLabel}</Label>
         <Input
           className="font-mono text-sm"
@@ -45,7 +45,7 @@ export function DiscoveryTitleSlugCreateRow({
           placeholder={slugPlaceholder}
         />
       </div>
-      <Button type="button" onClick={onCreate}>
+      <Button type="button" onClick={onCreate} className="self-start">
         <Plus className="w-4 h-4 mr-2" />
         Create
       </Button>

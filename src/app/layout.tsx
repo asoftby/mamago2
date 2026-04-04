@@ -3,6 +3,10 @@ import { Manrope, Geist_Mono, Literata, Noto_Serif, PT_Serif } from "next/font/g
 import "./globals.css";
 import { Sonner } from "@/components/ui/sonner";
 import { AccountModeProvider } from "@/contexts/AccountModeContext";
+import { FamilyPersonaProvider } from "@/contexts/FamilyPersonaContext";
+import { FamilyDerivedAgeSync } from "@/components/family/FamilyDerivedAgeSync";
+import { MyPlanProvider } from "@/components/MyPlanProvider";
+import { CookieConsentProvider } from "@/components/providers/cookie-consent-provider";
 
 const manrope = Manrope({
   variable: "--font-manrope",
@@ -62,7 +66,15 @@ export default function RootLayout({
       <body
         className={`${manrope.variable} ${geistMono.variable} ${literata.variable} ${notoSerif.variable} ${ptSerif.variable} antialiased font-sans min-h-screen text-foreground`}
       >
-        <AccountModeProvider>{children}</AccountModeProvider>
+        <AccountModeProvider>
+          <FamilyPersonaProvider>
+            <CookieConsentProvider>
+              <FamilyDerivedAgeSync />
+              {children}
+              <MyPlanProvider />
+            </CookieConsentProvider>
+          </FamilyPersonaProvider>
+        </AccountModeProvider>
         <Sonner />
       </body>
     </html>

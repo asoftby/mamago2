@@ -16,7 +16,8 @@ export function mapPlaceToFormData(
     
     // Identity
     id: place.id,
-    ownerUserId: place.ownerUserId,
+    createdByUserId: place.createdByUserId,
+    ownerBusinessId: place.ownerBusinessId,
     status: place.status,
     
     // Step 1: Profile

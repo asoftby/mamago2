@@ -1,10 +1,19 @@
-import type { Prisma } from "@prisma/client";
 import { OfferStatus } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import type { SeoEntityProvider } from "../types";
-import { indexationStatusFromRobots, isIndexableFromRobots } from "../utils";
-import { updateOfferSlug } from "@/lib/slug/offerSlugService";
+import {
+  indexationStatusForPublishedEntity,
+  isIndexableForPublishedEntity,
+} from "../utils";
+import { buildSegmentEntityDiagnostics } from "../buildEntityDiagnostics";
+import { applyOfferSeoUpdate } from "@/lib/admin/seo/entities/applyEntitySeoUpdate";
 import { buildOfferJsonLd } from "@/lib/seo/schema/buildOfferJsonLd";
+import {
+  SEO_ROBOTS_INDEX_FOLLOW,
+  SEO_ROBOTS_NOINDEX_FOLLOW,
+} from "@/lib/admin/seo/entities/robotsConstants";
+
+const OFFER_LIST_LIMIT = 300;
 
 export const offerProvider: SeoEntityProvider = {
   entityType: "offer",
@@ -13,25 +22,39 @@ export const offerProvider: SeoEntityProvider = {
 
   async listRows() {
     const offers = await prisma.offer.findMany({
-      where: { status: OfferStatus.PUBLISHED, slug: { not: null } },
+      where: { status: { not: OfferStatus.REJECTED } },
       orderBy: { updatedAt: "desc" },
+      take: OFFER_LIST_LIMIT,
       select: {
         id: true,
         slug: true,
         title: true,
         description: true,
+        status: true,
         updatedAt: true,
         seoH1: true,
         seoTitle: true,
         seoDescription: true,
         seoCanonicalUrl: true,
+        seoCanonicalSource: true,
         seoRobots: true,
       },
     });
 
     return offers.map((o) => {
-      const path = `/offers/${o.slug}`;
+      const published = o.status === OfferStatus.PUBLISHED;
+      const seg = o.slug?.trim() || o.id;
+      const path = `/offers/${seg}`;
       const canonical = o.seoCanonicalUrl?.trim() || path;
+      const entityDiagnostics = buildSegmentEntityDiagnostics("offer", {
+        entityId: o.id,
+        title: o.title,
+        slug: o.slug,
+        seoCanonicalUrl: o.seoCanonicalUrl,
+        seoCanonicalSource: o.seoCanonicalSource,
+        seoRobots: o.seoRobots,
+        contentStatus: o.status,
+      });
       return {
         id: `entity:offer:${o.id}`,
         path,
@@ -43,8 +66,12 @@ export const offerProvider: SeoEntityProvider = {
         description: o.seoDescription?.trim() || o.description || "",
         canonical,
         updatedAt: o.updatedAt.toISOString(),
-        indexationStatus: indexationStatusFromRobots(o.seoRobots),
-        isIndexable: isIndexableFromRobots(o.seoRobots),
+        indexationStatus: indexationStatusForPublishedEntity(
+          published,
+          o.seoRobots,
+        ),
+        isIndexable: isIndexableForPublishedEntity(published, o.seoRobots),
+        entityDiagnostics,
       };
     });
   },
@@ -57,18 +84,30 @@ export const offerProvider: SeoEntityProvider = {
         title: true,
         description: true,
         slug: true,
+        status: true,
         seoTitle: true,
         seoDescription: true,
         seoH1: true,
         seoCanonicalUrl: true,
+        seoCanonicalSource: true,
         seoOgTitle: true,
         seoOgDescription: true,
         seoOgImage: true,
         seoRobots: true,
         seoJsonLdOverride: true,
+        place: { select: { city: { select: { slug: true } } } },
       },
     });
     if (!o) return null;
+    const urlDiagnostics = buildSegmentEntityDiagnostics("offer", {
+      entityId: o.id,
+      title: o.title,
+      slug: o.slug,
+      seoCanonicalUrl: o.seoCanonicalUrl,
+      seoCanonicalSource: o.seoCanonicalSource,
+      seoRobots: o.seoRobots,
+      contentStatus: o.status,
+    });
     return {
       id: o.id,
       title: o.title,
@@ -78,33 +117,20 @@ export const offerProvider: SeoEntityProvider = {
       seoDescription: o.seoDescription,
       seoH1: o.seoH1,
       seoCanonicalUrl: o.seoCanonicalUrl,
+      seoCanonicalSource: o.seoCanonicalSource,
       seoOgTitle: o.seoOgTitle,
       seoOgDescription: o.seoOgDescription,
       seoOgImage: o.seoOgImage,
       seoRobots: o.seoRobots,
       seoJsonLdOverride: (o.seoJsonLdOverride as unknown) ?? null,
+      urlDiagnostics,
+      contentStatus: o.status,
+      citySlug: o.place?.city?.slug ?? null,
     };
   },
 
   async updateSeo(entityId, input) {
-    if (typeof input.slug === "string") {
-      await updateOfferSlug(entityId, input.slug);
-    }
-    await prisma.offer.update({
-      where: { id: entityId },
-      data: {
-        seoTitle: input.seoTitle,
-        seoDescription: input.seoDescription,
-        seoH1: input.seoH1,
-        seoCanonicalUrl: input.seoCanonicalUrl,
-        seoOgTitle: input.seoOgTitle,
-        seoOgDescription: input.seoOgDescription,
-        seoOgImage: input.seoOgImage,
-        seoRobots: input.seoRobots,
-        seoJsonLdOverride: input.seoJsonLdOverride as Prisma.InputJsonValue,
-      },
-      select: { id: true },
-    });
+    await applyOfferSeoUpdate(entityId, input);
   },
 
   async toggleIndexation(entityId) {
@@ -114,8 +140,15 @@ export const offerProvider: SeoEntityProvider = {
     });
     if (!existing) return;
     const raw = (existing.seoRobots ?? "").toLowerCase();
-    const next = raw.includes("noindex") ? "index,follow" : "noindex,follow";
+    const next = raw.includes("noindex")
+      ? SEO_ROBOTS_INDEX_FOLLOW
+      : SEO_ROBOTS_NOINDEX_FOLLOW;
     await prisma.offer.update({ where: { id: entityId }, data: { seoRobots: next } });
+  },
+
+  async setIndexFollow(entityId, index) {
+    const seoRobots = index ? SEO_ROBOTS_INDEX_FOLLOW : SEO_ROBOTS_NOINDEX_FOLLOW;
+    await prisma.offer.update({ where: { id: entityId }, data: { seoRobots } });
   },
 
   async loadRedirects(entityId) {

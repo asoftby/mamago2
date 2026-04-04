@@ -1,38 +1,35 @@
 /**
  * Place Edit Permissions
  * Centralized permission checks for place editing
+ * Business-based ownership model
  */
 
 import type { User } from "@prisma/client";
+import { canManagePlaceAsync } from "@/lib/auth/placeAccess";
 
 export interface PlaceEditContext {
   placeId: string;
-  ownerUserId: string;
+  createdByUserId: string;
+  ownerBusinessId: string | null;
   status: string;
 }
 
 /**
- * Check if user can edit a place
- * Rules: owner OR ADMIN OR MODERATOR
+ * Check if user can edit a place (async)
+ * Rules: business owner OR creator (if no business owner) OR ADMIN OR MODERATOR
  */
-export function canEditPlace(user: User | null, place: PlaceEditContext): boolean {
+export async function canEditPlace(user: User | null, place: PlaceEditContext): Promise<boolean> {
   if (!user) return false;
   
-  // Owner can always edit their own places
-  if (user.id === place.ownerUserId) return true;
-  
-  // Admins and moderators can edit any place
-  if (user.role === "ADMIN" || user.role === "MODERATOR") return true;
-  
-  return false;
+  return await canManagePlaceAsync(user, place);
 }
 
 /**
- * Check if user can view edit button on public page
+ * Check if user can view edit button on public page (async)
  * Same rules as canEditPlace but used for UI visibility
  */
-export function canShowEditButton(user: User | null, place: PlaceEditContext): boolean {
-  return canEditPlace(user, place);
+export async function canShowEditButton(user: User | null, place: PlaceEditContext): Promise<boolean> {
+  return await canEditPlace(user, place);
 }
 
 /**
@@ -43,9 +40,5 @@ export function getEditPermissionError(user: User | null, place: PlaceEditContex
     return "Необходимо войти в систему для редактирования места";
   }
   
-  if (!canEditPlace(user, place)) {
-    return "У вас нет прав для редактирования этого места";
-  }
-  
-  return "";
+  return "У вас нет прав для редактирования этого места";
 }

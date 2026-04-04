@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Eye, EyeOff } from "lucide-react";
 import { appendBirthdayBuilderAuthParam } from "@/lib/auth/appendBirthdayBuilderAuthParam";
 import { getPostAuthRedirect } from "@/lib/auth/postAuthRedirect";
+import { notifyAuthStateChanged } from "@/lib/auth/client";
 
 interface Props {
   mode: "login" | "register";
@@ -14,6 +15,7 @@ interface Props {
   registerPhoneVerified?: boolean;
   /** Текст кнопки в режиме регистрации (по умолчанию «Создать аккаунт»). */
   registerSubmitLabel?: string;
+  onSuccess?: () => void;
 }
 
 const inputClass =
@@ -31,6 +33,7 @@ export function EmailLoginForm({
   next,
   registerPhoneVerified = false,
   registerSubmitLabel = "Создать аккаунт",
+  onSuccess,
 }: Props) {
   const router = useRouter();
   const [email, setEmail] = useState("");
@@ -41,8 +44,6 @@ export function EmailLoginForm({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const emailOk = isValidEmail(email);
-  const passwordOk = password.length >= MIN_PASSWORD_LEN;
   const confirmNonEmpty = confirm.length > 0;
   const passwordsMatch = password === confirm && confirmNonEmpty;
 
@@ -54,31 +55,40 @@ export function EmailLoginForm({
     return <p className="text-sm text-emerald-600">Пароли совпадают</p>;
   }, [mode, confirmNonEmpty, passwordsMatch]);
 
-  const canSubmitLogin = mode === "login" && email.trim().length > 0 && password.length > 0 && !loading;
-
-  const canSubmitRegister =
-    mode === "register" &&
-    registerPhoneVerified &&
-    emailOk &&
-    passwordOk &&
-    confirmNonEmpty &&
-    passwordsMatch &&
-    !loading;
-
-  const canSubmit = mode === "login" ? canSubmitLogin : canSubmitRegister;
-
   if (mode === "register" && !registerPhoneVerified) {
     return null;
   }
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError("");
 
-    if (mode === "register") {
-      if (!registerPhoneVerified || !emailOk || !passwordOk || !passwordsMatch) return;
-    } else if (!email.trim() || !password) {
-      return;
+    // Браузерный автозаполнение часто не вызывает onChange — в state пусто, в DOM значения есть.
+    // Берём поля из FormData + name на инпутах, иначе кнопка остаётся disabled или уходит пустой POST.
+    const fd = new FormData(e.currentTarget);
+    const emailVal = String(fd.get("email") ?? "").trim().toLowerCase();
+    const passwordVal = String(fd.get("password") ?? "");
+    const confirmVal = String(fd.get("confirm") ?? "");
+
+    if (mode === "login") {
+      if (!emailVal || !passwordVal) {
+        setError("Введите email и пароль");
+        return;
+      }
+    } else {
+      if (!registerPhoneVerified) return;
+      if (!isValidEmail(emailVal)) {
+        setError("Некорректный email");
+        return;
+      }
+      if (passwordVal.length < MIN_PASSWORD_LEN) {
+        setError(`Пароль не короче ${MIN_PASSWORD_LEN} символов`);
+        return;
+      }
+      if (passwordVal !== confirmVal || !confirmVal) {
+        setError("Пароли не совпадают");
+        return;
+      }
     }
 
     setLoading(true);
@@ -88,15 +98,20 @@ export function EmailLoginForm({
           method: "POST",
           headers: { "Content-Type": "application/json" },
           credentials: "same-origin",
-          body: JSON.stringify({ email: email.trim(), password }),
+          body: JSON.stringify({ email: emailVal, password: passwordVal }),
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) {
-          setError(typeof data.error === "string" ? data.error : "Что-то пошло не так");
+          const raw = typeof data.error === "string" ? data.error : "";
+          setError(
+            raw === "Invalid email or password" ? "Неверный email или пароль" : raw || "Что-то пошло не так",
+          );
           return;
         }
         const raw = next ?? getPostAuthRedirect();
         const target = appendBirthdayBuilderAuthParam(raw);
+        notifyAuthStateChanged();
+        onSuccess?.();
         router.replace(target);
         router.refresh();
         return;
@@ -106,7 +121,7 @@ export function EmailLoginForm({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "same-origin",
-        body: JSON.stringify({ email: email.trim(), password }),
+        body: JSON.stringify({ email: emailVal, password: passwordVal }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -115,6 +130,8 @@ export function EmailLoginForm({
       }
       const raw = next ?? getPostAuthRedirect();
       const target = appendBirthdayBuilderAuthParam(raw);
+      notifyAuthStateChanged();
+      onSuccess?.();
       router.replace(target);
       router.refresh();
     } catch {
@@ -127,6 +144,7 @@ export function EmailLoginForm({
   return (
     <form onSubmit={handleSubmit} className="space-y-3">
       <input
+        name="email"
         type="email"
         value={email}
         onChange={(e) => setEmail(e.target.value)}
@@ -137,6 +155,7 @@ export function EmailLoginForm({
       />
       <div className="relative">
         <input
+          name="password"
           type={showPassword ? "text" : "password"}
           value={password}
           onChange={(e) => setPassword(e.target.value)}
@@ -159,6 +178,7 @@ export function EmailLoginForm({
         <>
           <div className="relative">
             <input
+              name="confirm"
               type={showConfirm ? "text" : "password"}
               value={confirm}
               onChange={(e) => setConfirm(e.target.value)}
@@ -192,7 +212,7 @@ export function EmailLoginForm({
       {error && <p className="text-sm text-red-500">{error}</p>}
       <button
         type="submit"
-        disabled={!canSubmit}
+        disabled={loading}
         className="w-full h-12 rounded-xl bg-[#EF8759] hover:bg-[#e07040] disabled:opacity-50 text-white font-medium transition-colors"
       >
         {loading

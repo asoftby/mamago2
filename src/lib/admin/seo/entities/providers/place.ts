@@ -1,10 +1,19 @@
-import type { Prisma } from "@prisma/client";
 import { ContentStatus } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import type { SeoEntityProvider } from "../types";
-import { indexationStatusFromRobots, isIndexableFromRobots } from "../utils";
-import { updatePlaceSlug } from "@/lib/slug/placeSlugService";
+import {
+  indexationStatusForPublishedEntity,
+  isIndexableForPublishedEntity,
+} from "../utils";
+import { buildSegmentEntityDiagnostics } from "../buildEntityDiagnostics";
+import { applyPlaceSeoUpdate } from "@/lib/admin/seo/entities/applyEntitySeoUpdate";
 import { buildPlaceJsonLd } from "@/lib/seo/schema/buildPlaceJsonLd";
+import {
+  SEO_ROBOTS_INDEX_FOLLOW,
+  SEO_ROBOTS_NOINDEX_FOLLOW,
+} from "@/lib/admin/seo/entities/robotsConstants";
+
+const PLACE_LIST_LIMIT = 400;
 
 export const placeProvider: SeoEntityProvider = {
   entityType: "place",
@@ -14,28 +23,41 @@ export const placeProvider: SeoEntityProvider = {
   async listRows() {
     const places = await prisma.place.findMany({
       where: {
-        status: ContentStatus.PUBLISHED,
         archivedAt: null,
-        slug: { not: null },
+        status: { not: ContentStatus.DELETED },
       },
       orderBy: { updatedAt: "desc" },
+      take: PLACE_LIST_LIMIT,
       select: {
         id: true,
         slug: true,
         title: true,
         shortDesc: true,
+        status: true,
         updatedAt: true,
         seoH1: true,
         seoTitle: true,
         seoDescription: true,
         seoCanonicalUrl: true,
+        seoCanonicalSource: true,
         seoRobots: true,
       },
     });
 
     return places.map((p) => {
-      const path = `/places/${p.slug}`;
+      const published = p.status === ContentStatus.PUBLISHED;
+      const seg = p.slug?.trim() || p.id;
+      const path = `/places/${seg}`;
       const canonical = p.seoCanonicalUrl?.trim() || path;
+      const entityDiagnostics = buildSegmentEntityDiagnostics("place", {
+        entityId: p.id,
+        title: p.title,
+        slug: p.slug,
+        seoCanonicalUrl: p.seoCanonicalUrl,
+        seoCanonicalSource: p.seoCanonicalSource,
+        seoRobots: p.seoRobots,
+        contentStatus: p.status,
+      });
       return {
         id: `entity:place:${p.id}`,
         path,
@@ -47,8 +69,12 @@ export const placeProvider: SeoEntityProvider = {
         description: p.seoDescription?.trim() || p.shortDesc || "",
         canonical,
         updatedAt: p.updatedAt.toISOString(),
-        indexationStatus: indexationStatusFromRobots(p.seoRobots),
-        isIndexable: isIndexableFromRobots(p.seoRobots),
+        indexationStatus: indexationStatusForPublishedEntity(
+          published,
+          p.seoRobots,
+        ),
+        isIndexable: isIndexableForPublishedEntity(published, p.seoRobots),
+        entityDiagnostics,
       };
     });
   },
@@ -61,18 +87,30 @@ export const placeProvider: SeoEntityProvider = {
         title: true,
         shortDesc: true,
         slug: true,
+        status: true,
         seoTitle: true,
         seoDescription: true,
         seoH1: true,
         seoCanonicalUrl: true,
+        seoCanonicalSource: true,
         seoOgTitle: true,
         seoOgDescription: true,
         seoOgImage: true,
         seoRobots: true,
         seoJsonLdOverride: true,
+        city: { select: { slug: true } },
       },
     });
     if (!p) return null;
+    const urlDiagnostics = buildSegmentEntityDiagnostics("place", {
+      entityId: p.id,
+      title: p.title,
+      slug: p.slug,
+      seoCanonicalUrl: p.seoCanonicalUrl,
+      seoCanonicalSource: p.seoCanonicalSource,
+      seoRobots: p.seoRobots,
+      contentStatus: p.status,
+    });
     return {
       id: p.id,
       title: p.title,
@@ -82,33 +120,20 @@ export const placeProvider: SeoEntityProvider = {
       seoDescription: p.seoDescription,
       seoH1: p.seoH1,
       seoCanonicalUrl: p.seoCanonicalUrl,
+      seoCanonicalSource: p.seoCanonicalSource,
       seoOgTitle: p.seoOgTitle,
       seoOgDescription: p.seoOgDescription,
       seoOgImage: p.seoOgImage,
       seoRobots: p.seoRobots,
       seoJsonLdOverride: (p.seoJsonLdOverride as unknown) ?? null,
+      urlDiagnostics,
+      contentStatus: p.status,
+      citySlug: p.city?.slug ?? null,
     };
   },
 
   async updateSeo(entityId, input) {
-    if (typeof input.slug === "string") {
-      await updatePlaceSlug(entityId, input.slug);
-    }
-    await prisma.place.update({
-      where: { id: entityId },
-      data: {
-        seoTitle: input.seoTitle,
-        seoDescription: input.seoDescription,
-        seoH1: input.seoH1,
-        seoCanonicalUrl: input.seoCanonicalUrl,
-        seoOgTitle: input.seoOgTitle,
-        seoOgDescription: input.seoOgDescription,
-        seoOgImage: input.seoOgImage,
-        seoRobots: input.seoRobots,
-        seoJsonLdOverride: input.seoJsonLdOverride as Prisma.InputJsonValue,
-      },
-      select: { id: true },
-    });
+    await applyPlaceSeoUpdate(entityId, input);
   },
 
   async toggleIndexation(entityId) {
@@ -118,8 +143,15 @@ export const placeProvider: SeoEntityProvider = {
     });
     if (!existing) return;
     const raw = (existing.seoRobots ?? "").toLowerCase();
-    const next = raw.includes("noindex") ? "index,follow" : "noindex,follow";
+    const next = raw.includes("noindex")
+      ? SEO_ROBOTS_INDEX_FOLLOW
+      : SEO_ROBOTS_NOINDEX_FOLLOW;
     await prisma.place.update({ where: { id: entityId }, data: { seoRobots: next } });
+  },
+
+  async setIndexFollow(entityId, index) {
+    const seoRobots = index ? SEO_ROBOTS_INDEX_FOLLOW : SEO_ROBOTS_NOINDEX_FOLLOW;
+    await prisma.place.update({ where: { id: entityId }, data: { seoRobots } });
   },
 
   async loadRedirects(entityId) {

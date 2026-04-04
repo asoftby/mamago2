@@ -9,11 +9,28 @@ export function resolveCitySlugForPublicActivity(cityField: string | undefined |
   return VALID_CITY_SLUGS[0];
 }
 
-/** Публичная страница события в формате `/{city}/activity/{id}`. */
-export function publicActivityPath(
-  eventId: string,
-  cityField: string | undefined | null
+/** Сегмент URL: предпочитаем SEO-slug, иначе id (черновики без slug). */
+export function activityPublicPathSegment(
+  slug: string | null | undefined,
+  activityId: string,
 ): string {
-  const slug = resolveCitySlugForPublicActivity(cityField);
-  return `/${slug}/activity/${eventId}`;
+  const s = typeof slug === "string" ? slug.trim() : "";
+  return s.length > 0 ? s : activityId;
+}
+
+/** Сегмент публичного URL для карточки события (не путать с типом `Activity` в БД). */
+export const PUBLIC_EVENT_PATH_SEGMENT = "events";
+
+/**
+ * Публичная страница события: `/{city}/events/{slug|id}`.
+ * Если `activitySlug` задан — в пути только slug (canonical для SEO).
+ */
+export function publicActivityPath(
+  activityId: string,
+  cityField: string | undefined | null,
+  activitySlug?: string | null,
+): string {
+  const citySlug = resolveCitySlugForPublicActivity(cityField);
+  const seg = activityPublicPathSegment(activitySlug ?? null, activityId);
+  return `/${citySlug}/${PUBLIC_EVENT_PATH_SEGMENT}/${seg}`;
 }

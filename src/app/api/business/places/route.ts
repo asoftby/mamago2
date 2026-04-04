@@ -18,9 +18,9 @@ import { generatePlaceSlug } from "@/lib/slug/placeSlugService";
 import { attachMediaToEntity } from "@/lib/media/mediaRegistry";
 import {
   canCreateBusinessContent,
-  canManageOwnedContent,
   canPublishContentDirectly,
 } from "@/lib/auth/businessContentAccess";
+import { getUserBusinessId } from "@/lib/auth/placeAccess";
 
 async function finalizePublishedPlaceSlugIfNeeded(placeId: string, isPublished: boolean) {
   if (!isPublished) return;
@@ -100,10 +100,14 @@ export async function POST(request: NextRequest) {
         }
       : data;
 
+    // Get user's business (if exists)
+    const businessId = await getUserBusinessId(user.id);
+    console.log("[places/POST] User business:", businessId);
+
     // Idempotency check: if place with this createRequestId already exists, return it
     const existingPlace = await prisma.place.findFirst({
       where: {
-        ownerUserId: user.id,
+        createdByUserId: user.id,
         createRequestId,
       },
     });
@@ -129,7 +133,8 @@ export async function POST(request: NextRequest) {
     // Create Place with all provided data
     const place = await prisma.place.create({
       data: {
-        ownerUserId: user.id,
+        createdByUserId: user.id,
+        ownerBusinessId: businessId, // Set business owner if user has business
         createRequestId,
         status: status as ContentStatus,
         slug, // Add SEO-friendly slug
@@ -347,9 +352,16 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const status = searchParams.get("status");
 
+    // Get user's business
+    const businessId = await getUserBusinessId(user.id);
+
     const places = await prisma.place.findMany({
       where: {
-        ownerUserId: user.id,
+        // Show places created by user OR owned by their business
+        OR: [
+          { createdByUserId: user.id },
+          ...(businessId ? [{ ownerBusinessId: businessId }] : []),
+        ],
         ...(status && { status: status as ContentStatus }),
       },
       include: {

@@ -7,7 +7,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
 import { calculateMetroDistance } from "@/services/geo/geoEnrichment.service";
-import { canCreateBusinessContent, canManageOwnedContent } from "@/lib/auth/businessContentAccess";
+import { canCreateBusinessContent } from "@/lib/auth/businessContentAccess";
+import { canManagePlaceAsync } from "@/lib/auth/placeAccess";
 
 export async function PATCH(
   request: NextRequest,
@@ -25,7 +26,8 @@ export async function PATCH(
     const existing = await prisma.place.findUnique({
       where: { id },
       select: {
-        ownerUserId: true,
+        createdByUserId: true,
+        ownerBusinessId: true,
         lat: true,
         lng: true,
       },
@@ -35,7 +37,8 @@ export async function PATCH(
       return NextResponse.json({ error: "Place not found" }, { status: 404 });
     }
 
-    if (!canManageOwnedContent(user, existing.ownerUserId)) {
+    const canManage = await canManagePlaceAsync(user, existing);
+    if (!canManage) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 

@@ -12,6 +12,8 @@
 
 import { prisma } from "@/lib/prisma";
 import { slugifyRu } from "@/lib/slugify";
+import { createPlaceSlugHistoryIgnoreDuplicate } from "@/lib/slug/slugHistoryDedupe";
+import { syncPlaceCanonical } from "@/lib/seo/syncEntityCanonical";
 import {
   normalizePlaceName,
   buildBasePlaceSlug,
@@ -181,13 +183,10 @@ export async function updatePlaceSlug(
     
     // Save old slug to history (if it exists)
     if (place.slug) {
-      await tx.placeSlugHistory.create({
-        data: {
-          placeId,
-          slug: place.slug,
-        },
-      });
+      await createPlaceSlugHistoryIgnoreDuplicate(tx, placeId, place.slug);
       console.log(`[Slug] Saved old slug to history: ${place.slug}`);
+    } else {
+      await createPlaceSlugHistoryIgnoreDuplicate(tx, placeId, placeId);
     }
     
     // Update place with new slug
@@ -201,6 +200,7 @@ export async function updatePlaceSlug(
     
     console.log(`[Slug] Updated place ${placeId} slug: ${place.slug} → ${newSlug}`);
   });
+  await syncPlaceCanonical(placeId);
 }
 
 /**
@@ -236,17 +236,19 @@ export async function assignSlugOnPublish(placeId: string): Promise<string> {
   // Generate new slug
   const newSlug = await generatePlaceSlug(place);
   
-  // Update place slug (no history needed since this is first assignment)
-  await prisma.place.update({
-    where: { id: placeId },
-    data: {
-      slug: newSlug,
-      slugUpdatedAt: new Date(),
-    },
+  await prisma.$transaction(async (tx) => {
+    await createPlaceSlugHistoryIgnoreDuplicate(tx, placeId, placeId);
+    await tx.place.update({
+      where: { id: placeId },
+      data: {
+        slug: newSlug,
+        slugUpdatedAt: new Date(),
+      },
+    });
   });
-  
+
   console.log(`[Slug] Assigned slug to place ${placeId}: ${newSlug}`);
-  
+  await syncPlaceCanonical(placeId);
   return newSlug;
 }
 
@@ -272,11 +274,15 @@ export async function assignPlaceSlugIfMissing(placeId: string, title: string): 
     if (i > 200) throw new Error(`Could not generate unique place slug for: ${base}`);
   }
 
-  await prisma.place.update({
-    where: { id: placeId },
-    data: { slug, slugUpdatedAt: new Date() },
-    select: { id: true },
+  await prisma.$transaction(async (tx) => {
+    await createPlaceSlugHistoryIgnoreDuplicate(tx, placeId, placeId);
+    await tx.place.update({
+      where: { id: placeId },
+      data: { slug, slugUpdatedAt: new Date() },
+      select: { id: true },
+    });
   });
+  await syncPlaceCanonical(placeId);
   return slug;
 }
 

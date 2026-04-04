@@ -4,6 +4,7 @@ import { notFound, permanentRedirect } from "next/navigation";
 import prisma from "@/lib/prisma";
 import { findOfferBySlug } from "@/lib/slug/offerSlugService";
 import { buildOfferJsonLd } from "@/lib/seo/schema/buildOfferJsonLd";
+import { AnalyticsDetailBeacon } from "@/components/analytics/AnalyticsDetailBeacon";
 
 interface OfferPageProps {
   params: Promise<{ slug: string }>;
@@ -116,7 +117,7 @@ export default async function OfferPage({ params }: OfferPageProps) {
       priceFrom: true,
       priceText: true,
       seoJsonLdOverride: true,
-      place: { select: { id: true, title: true } },
+      place: { select: { id: true, title: true, cityId: true } },
     },
   });
   if (!offer) notFound();
@@ -144,6 +145,12 @@ export default async function OfferPage({ params }: OfferPageProps) {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <AnalyticsDetailBeacon
+        entityType="OFFER"
+        entityId={offer.id}
+        vertical="CITY"
+        cityId={offer.place?.cityId ?? null}
+      />
       <script
         type="application/ld+json"
         // eslint-disable-next-line react/no-danger

@@ -6,7 +6,7 @@ import { InternationalPhoneInput } from "@/components/phone/InternationalPhoneIn
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, X } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { formSocialPlatformSelectTriggerClassName } from "@/components/ui/form-control-dimensions";
 import { createDefaultSocialLink } from "../defaults";
 import type { EventFormData, SocialLink } from "../types";
 
@@ -31,10 +31,6 @@ const SOCIAL_URL_PLACEHOLDER: Record<SocialLink["network"], string> = {
   youtube: "https://youtube.com/...",
   other: "https://...",
 };
-
-/** Триггер select в одной системе с `Input` (высота 2.75rem как у `Input`, не h-9 из Select). */
-const socialPlatformSelectTriggerClass =
-  "h-[2.75rem] min-h-[2.75rem] data-[size=default]:h-[2.75rem] data-[size=default]:min-h-[2.75rem] w-[11rem] shrink-0 justify-between gap-2 rounded-md border border-input bg-white px-3 py-1 text-base shadow-xs md:text-sm data-[size=default]:py-1 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50";
 
 export function Step7Contacts({ data, onChange, isEditable }: Step7ContactsProps) {
   const handleAddSocialLink = () => {
@@ -95,7 +91,7 @@ export function Step7Contacts({ data, onChange, isEditable }: Step7ContactsProps
 
         <div className="space-y-3">
           {data.socialLinks.map((link) => (
-            <div key={link.id} className="flex items-stretch gap-2">
+            <div key={link.id} className="flex items-center gap-2">
               <Select
                 value={link.network}
                 onValueChange={(value) =>
@@ -106,7 +102,7 @@ export function Step7Contacts({ data, onChange, isEditable }: Step7ContactsProps
                 disabled={!isEditable}
               >
                 <SelectTrigger
-                  className={cn(socialPlatformSelectTriggerClass, "[&_svg]:opacity-50")}
+                  className={formSocialPlatformSelectTriggerClassName}
                   size="default"
                 >
                   <SelectValue />
@@ -136,11 +132,11 @@ export function Step7Contacts({ data, onChange, isEditable }: Step7ContactsProps
                   type="button"
                   variant="ghost"
                   size="icon"
-                  className="h-[2.75rem] w-10 shrink-0 border-0 bg-transparent shadow-none hover:bg-transparent dark:hover:bg-transparent"
+                  className="h-10 w-10 shrink-0"
                   onClick={() => handleRemoveSocialLink(link.id)}
                   aria-label="Удалить соцсеть"
                 >
-                  <X className="h-4 w-4 text-muted-foreground opacity-80 transition-opacity hover:opacity-100" />
+                  <X className="h-4 w-4 text-muted-foreground" />
                 </Button>
               )}
             </div>

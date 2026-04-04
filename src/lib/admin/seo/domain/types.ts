@@ -35,6 +35,30 @@ export type SeoPageFiltersSnapshot = Record<string, unknown> & {
   ageGroups?: string[];
 };
 
+/** Диагностика публичного URL для строк из entity-провайдеров (SEO center). */
+export type SeoPageEntityDiagnostics = {
+  entityKind: "event" | "place" | "offer" | "route" | "article";
+  entityId: string;
+  entityTitle: string;
+  /** Город (для событий — сегмент перед /events/…) */
+  citySlug: string | null;
+  slug: string | null;
+  /** Последний сегмент пути public URL */
+  urlSegment: string;
+  /** Относительный публичный путь */
+  publicPath: string;
+  /** Собрано из NEXT_PUBLIC_APP_URL + publicPath, если base задан */
+  absolutePublicUrl: string | null;
+  usesIdInUrl: boolean;
+  /** Canonical ведёт на slug в пути (не на сырой id) */
+  canonicalIsSlugBased: boolean;
+  /** Источник seoCanonicalUrl в БД (для SEO center) */
+  seoCanonicalSource?: "AUTO" | "MANUAL" | "FALLBACK";
+  contentStatus: string;
+  seoRobots: string | null;
+  issues: string[];
+};
+
 /** SEO-посадка: отдельный слой от сущностей Event/Place/Article */
 export interface SeoPage {
   id: string;
@@ -49,6 +73,8 @@ export interface SeoPage {
   canonical: string | null;
   updatedAt: string;
   indexationStatus: SeoPageIndexationStatus;
+  /** Заполняется для строк из `listRows()` entity-провайдеров */
+  entityDiagnostics?: SeoPageEntityDiagnostics | null;
 }
 
 /** @deprecated Используйте `SeoPage` */

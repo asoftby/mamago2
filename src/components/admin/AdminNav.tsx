@@ -83,10 +83,9 @@ const NAV_SECTIONS: NavSection[] = [
     title: "Discovery",
     items: [
       { label: "Сигналы", href: adminPath("/taxonomy/signals") },
-      { label: "Категории", href: adminPath("/taxonomy/filters/event-categories") },
+      { label: "Категории", href: adminPath("/taxonomy/categories") },
       { label: "Поводы", href: adminPath("/discovery/occasions") },
-      { label: "Темы", href: adminPath("/discovery/themes") },
-      { label: "Жанры", href: adminPath("/discovery/genres") },
+      { label: "Жанры", href: adminPath("/taxonomy/genres") },
       { label: "Фильтры", href: adminPath("/discovery/filters") },
     ],
   },

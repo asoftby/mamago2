@@ -42,7 +42,12 @@ export default async function EditorNewOfferPage({
   let defaultPlaceId: string | null = placeIdParam ?? null;
   if (!defaultPlaceId && business) {
     const firstPlace = await prisma.place.findFirst({
-      where: { ownerUserId: user.id },
+      where: { 
+        OR: [
+          { createdByUserId: user.id },
+          { ownerBusinessId: business.id },
+        ],
+      },
       select: { id: true },
       orderBy: { updatedAt: "desc" },
     });

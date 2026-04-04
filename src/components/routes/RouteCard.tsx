@@ -10,13 +10,16 @@ import { Heart } from "lucide-react";
 import { formatAgeKeysShort } from "@/lib/config/ages";
 import { BUDGET_LABELS, type MockRoute } from "@/mocks/routes.mock";
 import { AddRouteToPlanSheet } from "./AddRouteToPlanSheet";
+import { AnalyticsCardViewTracker } from "@/components/analytics/AnalyticsCardViewTracker";
 
 type Props = {
   route: MockRoute;
   className?: string;
+  /** Для аналитики CARD_VIEW (город листинга) */
+  analyticsCitySlug?: string;
 };
 
-export function RouteCard({ route, className }: Props) {
+export function RouteCard({ route, className, analyticsCitySlug = "minsk" }: Props) {
   const [planOpen, setPlanOpen] = useState(false);
 
   const ageLabel = route.ageTags.length > 0 ? formatAgeKeysShort(route.ageTags) : null;
@@ -35,9 +38,16 @@ export function RouteCard({ route, className }: Props) {
 
   return (
     <>
+      <AnalyticsCardViewTracker
+        entityType="ROUTE"
+        entityId={route.id}
+        vertical="CITY"
+        citySlug={analyticsCitySlug}
+        meta={{ section: "routes" }}
+      >
       <div className={cn("group relative select-none", className)}>
         <Link href={`/routes/${route.slug}`} className="block">
-          <MediaCover imageUrl={route.coverImageUrl} ratio="4/5">
+          <MediaCover imageUrl={route.coverImageUrl} ratio="1/1">
             {badges.length > 0 && (
               <div className="absolute top-3 left-3 z-10 flex gap-2">
                 {badges.map((b, i) => (
@@ -78,6 +88,7 @@ export function RouteCard({ route, className }: Props) {
           </button>
         </div>
       </div>
+      </AnalyticsCardViewTracker>
 
       <AddRouteToPlanSheet
         open={planOpen}

@@ -1,13 +1,14 @@
-import { ActivityType } from "@prisma/client";
+import { ActivityType, ContentStatus } from "@prisma/client";
 import type { Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { getPublicListingActivityWhere } from "@/server/public/publicContentVisibility";
 import { activityInCityWhere } from "@/server/discovery/activityInCityWhere";
 import type { ActivityForEventPageInput } from "@/lib/event/buildEventPageDataFromPrisma";
 import { findActivityBySlug } from "@/lib/slug/activitySlugService";
+import { resolveActivityCoverUrl } from "@/lib/event/resolveActivityCoverUrl";
 
 /**
- * Публичная карточка события по `/{city}/activity/{slug}` (опубликовано и в городе).
+ * Публичная карточка события по `/{city}/events/{slug|id}` (опубликовано и в городе).
  * Поддерживает:
  * - current slug
  * - old slug history (for redirect)
@@ -18,6 +19,7 @@ export async function loadPublicActivityForCityPage(
   slugOrId: string,
 ): Promise<
   | (ActivityForEventPageInput & {
+      status: ContentStatus;
       slug: string | null;
       seoTitle: string | null;
       seoDescription: string | null;
@@ -28,6 +30,7 @@ export async function loadPublicActivityForCityPage(
       seoOgImage: string | null;
       seoRobots: string | null;
       seoJsonLdOverride: unknown | null;
+      ownerUserId: string;
       _redirectToSlug?: string;
     })
   | null
@@ -81,7 +84,9 @@ export async function loadPublicActivityForCityPage(
     activity.slug && slugOrId !== activity.slug ? activity.slug : undefined;
 
   return {
+    cityId: city.id,
     id: activity.id,
+    status: activity.status,
     slug: activity.slug,
     seoTitle: activity.seoTitle,
     seoDescription: activity.seoDescription,
@@ -100,7 +105,12 @@ export async function loadPublicActivityForCityPage(
     priceFrom: activity.priceFrom,
     currency: activity.currency,
     priceDetails: activity.priceDetails,
-    coverImageUrl: activity.coverImageUrl ?? activity.images[0]?.url ?? null,
+    coverImageId: activity.coverImageId,
+    coverImageUrl: resolveActivityCoverUrl({
+      coverImageId: activity.coverImageId,
+      coverImageUrl: activity.coverImageUrl,
+      images: activity.images.map((img) => ({ id: img.id, url: img.url })),
+    }),
     images: activity.images.map((img) => ({ id: img.id, url: img.url })),
     sessions: activity.sessions.map((s) => ({ id: s.id, startsAt: s.startsAt })),
     place: activity.place
@@ -124,6 +134,7 @@ export async function loadPublicActivityForCityPage(
         }
       : null,
     eventCategory: activity.eventCategory,
+    ownerUserId: activity.ownerUserId,
     ...(redirectToSlug ? { _redirectToSlug: redirectToSlug } : {}),
   };
 }

@@ -22,18 +22,13 @@ export function validateForDraft(data: EventFormData): ValidationResult {
   if (!data.title || data.title.trim().length === 0) {
     errors.push("Укажите название события");
   }
-  
-  const selectedCategoryIds =
-    (Array.isArray(data.categoryIds) && data.categoryIds.length > 0
-      ? data.categoryIds
-      : data.categoryId
-        ? [data.categoryId]
-        : []);
 
-  if (selectedCategoryIds.length === 0) {
-    errors.push("Выберите категорию");
+  if (!data.categoryId) {
+    errors.push("Выберите основную категорию");
+  } else if (data.primaryRootHasChildren && !data.subcategoryId) {
+    errors.push("Выберите подкатегорию");
   }
-  
+
   return {
     isValid: errors.length === 0,
     isComplete: errors.length === 0,
@@ -85,15 +80,10 @@ function validateStep1(data: EventFormData): ValidationResult {
     warnings.push("Выберите формат и атмосферу события");
   }
 
-  const selectedCategoryIds =
-    (Array.isArray(data.categoryIds) && data.categoryIds.length > 0
-      ? data.categoryIds
-      : data.categoryId
-        ? [data.categoryId]
-        : []);
-
-  if (selectedCategoryIds.length === 0) {
-    errors.push("Выберите категорию");
+  if (!data.categoryId) {
+    errors.push("Выберите основную категорию");
+  } else if (data.primaryRootHasChildren && !data.subcategoryId) {
+    errors.push("Выберите подкатегорию");
   }
 
   if (data.ageRangeIds.length === 0) {
@@ -107,10 +97,13 @@ function validateStep1(data: EventFormData): ValidationResult {
     }
   }
 
-  const isComplete = 
+  const categoryOk =
+    !!data.categoryId && (!data.primaryRootHasChildren || !!data.subcategoryId);
+
+  const isComplete =
     data.title.trim().length >= 3 &&
     data.eventFormats.length > 0 &&
-    selectedCategoryIds.length > 0 &&
+    categoryOk &&
     data.ageRangeIds.length > 0;
 
   return {

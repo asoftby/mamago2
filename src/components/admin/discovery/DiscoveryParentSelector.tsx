@@ -1,5 +1,5 @@
 import { Label } from "@/components/ui/typography";
-import { DISCOVERY_NATIVE_SELECT } from "./discoveryTaxonomyClasses";
+import { FilterSelect } from "@/components/ui/filter-select";
 
 export type DiscoveryParentRootOption = { id: string; label: string };
 
@@ -25,18 +25,12 @@ export function DiscoveryParentSelector({
   return (
     <div className="grid gap-2 max-w-md">
       <Label>{label}</Label>
-      <select
-        className={DISCOVERY_NATIVE_SELECT}
+      <FilterSelect
         value={value ?? ""}
-        onChange={(e) => onChange(e.target.value || null)}
-      >
-        <option value="">{emptyLabel}</option>
-        {roots.map((r) => (
-          <option key={r.id} value={r.id}>
-            {r.label}
-          </option>
-        ))}
-      </select>
+        placeholder={emptyLabel}
+        options={roots.map((r) => ({ value: r.id, label: r.label }))}
+        onChange={(v) => onChange(v || null)}
+      />
       <p className="text-xs text-gray-500">{helperText}</p>
     </div>
   );

@@ -29,8 +29,17 @@ import {
   DISCOVERY_INTENT_CONFIG,
   DISCOVERY_INTENT_ITEMS,
 } from "@/lib/discovery/discoveryIntentConfig";
-import { AGE_GROUPS } from "@/features/filters/age/ageGroups";
 import { getCityLocativePhrase } from "@/lib/city/cityDisplayNames";
+import { useAuthMe } from "@/features/birthday/builder/hooks/useAuthMe";
+import { useFamilyPersona } from "@/contexts/FamilyPersonaContext";
+import { useChildrenScope } from "@/features/filters/discovery/childrenScope.store";
+import { formatWhoHeaderSummary } from "@/lib/family/formatWhoHeaderSummary";
+import {
+  hasSelectedChildren as familyHasSelectedChildren,
+  resolveFamilyAgeMode,
+} from "@/lib/family/familyAgeMode";
+import { MAX_ACTIVE_FAMILY_PERSONAS } from "@/lib/family/wholeFamilyPreset";
+import { togglePersonaId } from "@/lib/family/togglePersonaSelection";
 
 /** Единый для всех разделов: пользователь хотя бы раз открыл и закрыл поиск в этой вкладке браузера */
 const SEARCH_FLOW_USED_KEY = "mmg.discovery.searchFlowUsed";
@@ -225,6 +234,164 @@ export function MobileSearchSheet({
         ages: [],
       },
     [apiOptions],
+  );
+
+  const { isAuthenticated } = useAuthMe();
+  const family = useFamilyPersona();
+
+  const profileChildren = useMemo(
+    () =>
+      isAuthenticated && family && !family.loading
+        ? family.childPersonasForFilter
+        : [],
+    [isAuthenticated, family],
+  );
+
+  const setSheetAgeRanges = useCallback((nextAge: string[]) => {
+    patchSheetDraft({ age: nextAge });
+  }, [patchSheetDraft]);
+
+  const childrenFamilySync = useMemo(
+    () =>
+      isAuthenticated && family
+        ? {
+            loading: family.loading,
+            selectedPersonaIds: family.selectedPersonaIds,
+            primaryAdultPersonaId: family.primaryAdultPersonaId,
+            setSelectedPersonaIds: family.setSelectedPersonaIds,
+          }
+        : undefined,
+    [
+      isAuthenticated,
+      family,
+      family?.loading,
+      family?.selectedPersonaIds,
+      family?.primaryAdultPersonaId,
+      family?.setSelectedPersonaIds,
+    ],
+  );
+
+  const childrenScope = useChildrenScope({
+    citySlug: pendingCitySlug,
+    availableChildren: profileChildren,
+    appliedAgeRanges: sheetDraft.age ?? [],
+    setAppliedAgeRanges: setSheetAgeRanges,
+    familySync: childrenFamilySync,
+  });
+
+  const showChildrenPreset = isAuthenticated && profileChildren.length > 0;
+  const allowMultiChildSelect = profileChildren.length >= 2;
+  const primaryAdultPersonaId = family?.primaryAdultPersonaId ?? null;
+  const adultSelected =
+    !!primaryAdultPersonaId &&
+    !!family?.selectedPersonaIds.includes(primaryAdultPersonaId);
+
+  const profileChildIds = useMemo(
+    () => profileChildren.map((c) => c.id),
+    [profileChildren],
+  );
+
+  const ageMode = resolveFamilyAgeMode({
+    hasProfileChildren: showChildrenPreset,
+    selectedPersonaIds: family?.selectedPersonaIds ?? [],
+    profileChildIds,
+  });
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setSheetDraft((prev) => {
+      const pa = [...(prev.age ?? [])].sort().join(",");
+      const aa = [...(applied.age ?? [])].sort().join(",");
+      if (pa === aa) return prev;
+      return mergeDiscoveryPatch(prev, { age: [...(applied.age ?? [])] });
+    });
+  }, [isOpen, applied.age]);
+
+  const toggleChild = useCallback(
+    (childId: string) => {
+      if (!family?.personas?.length) {
+        const prev = childrenScope.selectedChildrenIds;
+        let next: string[];
+        if (allowMultiChildSelect) {
+          next = prev.includes(childId)
+            ? prev.filter((id) => id !== childId)
+            : [...prev, childId];
+        } else {
+          next = prev.length === 1 && prev[0] === childId ? [] : [childId];
+        }
+        childrenScope.setSelectedChildrenIds(next);
+        return;
+      }
+      const allowed = new Set(family.personas.map((p) => p.id));
+      const { next, limitMessage } = togglePersonaId(
+        family.selectedPersonaIds,
+        childId,
+        allowed,
+      );
+      if (next === null) {
+        if (limitMessage) toast(limitMessage, { duration: 4200 });
+        return;
+      }
+      family.setSelectedPersonaIds(next);
+    },
+    [
+      allowMultiChildSelect,
+      childrenScope,
+      family,
+    ],
+  );
+
+  const toggleAdult = useCallback(() => {
+    if (!family?.primaryAdultPersonaId) return;
+    const allowed = new Set(family.personas.map((p) => p.id));
+    const { next, limitMessage } = togglePersonaId(
+      family.selectedPersonaIds,
+      family.primaryAdultPersonaId,
+      allowed,
+    );
+    if (next === null) {
+      if (limitMessage) toast(limitMessage, { duration: 4200 });
+      return;
+    }
+    family.setSelectedPersonaIds(next);
+  }, [family]);
+
+  const hasSelectedChildren = familyHasSelectedChildren(
+    family?.selectedPersonaIds ?? [],
+    profileChildIds,
+  );
+
+  const whoPrimaryLine = useMemo(() => {
+    if (ageMode === "free" && showChildrenPreset) {
+      return "Для всех";
+    }
+    return formatWhoHeaderSummary({
+      hasSelectedChildren,
+      selectedPersonaIds: family?.selectedPersonaIds ?? [],
+      personas: family?.personas ?? [],
+      fallbackAgeValues: sheetDraft.age ?? [],
+    });
+  }, [
+    ageMode,
+    showChildrenPreset,
+    hasSelectedChildren,
+    family?.selectedPersonaIds,
+    family?.personas,
+    sheetDraft.age,
+  ]);
+
+  const ageSheetActions = useMemo(
+    () => ({
+      setDraft: (patch: Partial<DiscoveryFilters>) => {
+        if (Array.isArray(patch.age)) {
+          if (ageMode === "derived") return;
+          patchSheetDraft({ age: patch.age });
+          return;
+        }
+        patchSheetDraft(patch);
+      },
+    }),
+    [ageMode, patchSheetDraft],
   );
 
   const isHubPickMode =
@@ -534,17 +701,6 @@ export function MobileSearchSheet({
       return `${day} ${month}`;
     }
     return "Выберите даты";
-  }, [sheetDraft]);
-
-  const getAgeText = useCallback(() => {
-    if (sheetDraft.age.length === 0) return "Выберите возраст";
-    const ageLabels = sheetDraft.age.map((ageValue) => {
-      const group = AGE_GROUPS.find((g) => g.value === ageValue);
-      return group ? group.label : ageValue;
-    });
-    if (ageLabels.length === 1) return ageLabels[0];
-    if (ageLabels.length === 2) return `${ageLabels[0]}, ${ageLabels[1]}`;
-    return `${ageLabels[0]} +${ageLabels.length - 1}`;
   }, [sheetDraft]);
 
   const showResetAll = hasFilterContent(sheetDraft);
@@ -916,13 +1072,54 @@ export function MobileSearchSheet({
               {renderAccordion(
                 "age",
                 "С кем",
-                getAgeText(),
+                whoPrimaryLine,
                 <div className="p-0">
                   <AgePanel
                     embedded
                     onClose={() => {}}
                     applied={sheetDraft}
-                    actions={sheetActions}
+                    actions={ageSheetActions}
+                    selectedChildIds={childrenScope.selectedChildrenIds}
+                    availableChildren={showChildrenPreset ? profileChildren : []}
+                    onToggleChild={showChildrenPreset ? toggleChild : undefined}
+                    primaryAdult={
+                      showChildrenPreset &&
+                      family?.primaryAdultPersonaId &&
+                      family.menuUser
+                        ? {
+                            id: family.primaryAdultPersonaId,
+                            displayName:
+                              family.menuUser.displayName?.trim() ||
+                              family.menuUser.email.split("@")[0] ||
+                              "Я",
+                            birthDate:
+                              family.personas?.find(
+                                (p) => p.id === family.primaryAdultPersonaId,
+                              )?.birthDate ?? undefined,
+                          }
+                        : null
+                    }
+                    adultSelected={adultSelected}
+                    onToggleAdult={
+                      showChildrenPreset && family?.primaryAdultPersonaId
+                        ? toggleAdult
+                        : undefined
+                    }
+                    ageMode={ageMode}
+                    autoAgeValues={childrenScope.autoAgeValues}
+                    personaPickAtLimit={
+                      !!family &&
+                      family.selectedPersonaIds.length >= MAX_ACTIVE_FAMILY_PERSONAS
+                    }
+                    whoFreeMode={ageMode === "free"}
+                    onSelectEveryone={
+                      showChildrenPreset && family
+                        ? () => {
+                            family.setSelectedPersonaIds([]);
+                            patchSheetDraft({ age: [] });
+                          }
+                        : undefined
+                    }
                   />
                 </div>,
               )}

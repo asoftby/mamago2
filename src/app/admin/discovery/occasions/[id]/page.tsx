@@ -1,9 +1,9 @@
-import { DiscoveryFlatTaxonomyEditPage } from "../../_components/DiscoveryFlatTaxonomyEditPage";
+import { OccasionEditPage } from "../../_components/OccasionEditPage";
 
 export default function DiscoveryOccasionEditPage() {
   return (
-    <DiscoveryFlatTaxonomyEditPage
-      listHref="/admin/discovery/occasions"
+    <OccasionEditPage
+      listHrefBase="/admin/discovery/occasions"
       listLabel="← К списку поводов"
       entityLabel="повод"
     />
