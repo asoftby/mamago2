@@ -4,7 +4,7 @@ import prisma from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth/server";
 import { canManageSignalDefinitions } from "@/lib/auth/signalDefinitionsAdmin";
 import { ensureEventCategorySlug } from "@/lib/taxonomy/eventCategorySlug";
-import { assertValidSignalParentIdOrNull } from "@/lib/taxonomy/signalHierarchy";
+import { assertValidSignalParentIdOrNull } from "@/lib/taxonomy/signalHierarchyServer";
 
 export const runtime = "nodejs";
 

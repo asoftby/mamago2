@@ -1,12 +1,12 @@
 /**
  * Модель «Для кого» / «Возраст детей»:
  * - Personas primary (`selectedPersonaIds` в FamilyPersonaContext).
- * - Возраст в discovery — fallback, пока не выбраны дети-персоны; иначе только derived от детей.
+ * - Возраст в discovery — fallback, пока не выбраны персоны; иначе только derived от персон.
  *
  * `ageMode`:
- * - free — «Для всех»: никого не выбрано при наличии детей в профиле; при переключении на таб сбрасывается возраст, затем можно выбрать вручную.
- * - derived — выбраны дети-персоны: возраст производный от их дат рождения.
- * - manual — выбран только взрослый (или нет детей в профиле): возраст задаётся вручную / 18+ по правилам синка.
+ * - free — «Свободный поиск»: никого не выбрано; возраст можно выбрать вручную.
+ * - derived — выбраны персоны (взрослый и/или дети): возраст производный, чипы неактивны.
+ * - manual — нет детей в профиле: возраст задаётся вручную.
  */
 export type FamilyAgeMode = "derived" | "manual" | "free";
 
@@ -26,15 +26,15 @@ export function resolveFamilyAgeMode(params: {
   profileChildIds: string[];
 }): FamilyAgeMode {
   const { hasProfileChildren, selectedPersonaIds, profileChildIds } = params;
-  if (
-    hasProfileChildren &&
-    profileChildIds.length > 0 &&
-    selectedPersonaIds.length === 0
-  ) {
+  
+  // Если нет детей в профиле — всегда manual (возраст вручную)
+  if (!hasProfileChildren || profileChildIds.length === 0) return "manual";
+  
+  // Если никто не выбран — режим "Свободный поиск" (free)
+  if (selectedPersonaIds.length === 0) {
     return "free";
   }
-  if (!hasProfileChildren || profileChildIds.length === 0) return "manual";
-  return hasSelectedChildren(selectedPersonaIds, profileChildIds)
-    ? "derived"
-    : "manual";
+  
+  // Если выбраны любые персоны (взрослый и/или дети) — derived (возраст неактивен)
+  return "derived";
 }

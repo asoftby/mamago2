@@ -4,6 +4,10 @@ import { getMyBusiness } from "@/server/business/getMyBusiness";
 import { createActivity, listBusinessActivities } from "@/server/services/activity.service";
 import { ActivityType, ScheduleMode } from "@prisma/client";
 import { canCreateBusinessContent, canManageOwnedContent } from "@/lib/auth/businessContentAccess";
+import {
+  nextResponseFromBusinessAccessError,
+  requireBusinessPermission,
+} from "@/server/permissions/business-permissions";
 
 export async function GET(request: NextRequest) {
   try {
@@ -15,6 +19,14 @@ export async function GET(request: NextRequest) {
     const business = await getMyBusiness(user.id);
     if (!business) {
       return NextResponse.json({ error: "Business not found" }, { status: 404 });
+    }
+
+    try {
+      await requireBusinessPermission(user, business.id, "business.view");
+    } catch (e) {
+      const denied = nextResponseFromBusinessAccessError(e);
+      if (denied) return denied;
+      throw e;
     }
 
     const activities = await listBusinessActivities(business.id);
@@ -39,6 +51,14 @@ export async function POST(request: NextRequest) {
     const business = await getMyBusiness(user.id);
     if (!business) {
       return NextResponse.json({ error: "Business not found" }, { status: 404 });
+    }
+
+    try {
+      await requireBusinessPermission(user, business.id, "content.create");
+    } catch (e) {
+      const denied = nextResponseFromBusinessAccessError(e);
+      if (denied) return denied;
+      throw e;
     }
 
     const body = await request.json();

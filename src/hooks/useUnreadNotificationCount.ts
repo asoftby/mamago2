@@ -2,6 +2,10 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
+import {
+  AUTH_STATE_CHANGED_EVENT,
+  NOTIFICATIONS_CHANGED_EVENT,
+} from "@/lib/auth/client";
 
 const DEFAULT_POLL_MS = 60_000;
 
@@ -49,6 +53,16 @@ export function useUnreadNotificationCount(pollMs: number = DEFAULT_POLL_MS) {
       document.removeEventListener("visibilitychange", onVisibility);
     };
   }, [refresh, pollMs]);
+
+  useEffect(() => {
+    const sync = () => void refresh();
+    window.addEventListener(AUTH_STATE_CHANGED_EVENT, sync);
+    window.addEventListener(NOTIFICATIONS_CHANGED_EVENT, sync);
+    return () => {
+      window.removeEventListener(AUTH_STATE_CHANGED_EVENT, sync);
+      window.removeEventListener(NOTIFICATIONS_CHANGED_EVENT, sync);
+    };
+  }, [refresh]);
 
   return { unreadCount, refresh };
 }

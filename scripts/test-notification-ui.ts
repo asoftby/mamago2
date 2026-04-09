@@ -4,6 +4,10 @@
  */
 
 import prisma from "../src/lib/prisma";
+import {
+  WELCOME_NOTIFICATION_BODY,
+  WELCOME_NOTIFICATION_TITLE,
+} from "../src/lib/notifications/welcomeNotification";
 import { createNotification } from "../src/server/services/notification.service";
 
 async function testNotificationUI() {
@@ -36,7 +40,7 @@ async function testNotificationUI() {
     userId: businessUser.id,
     type: "PLACE_APPROVED",
     title: "Место опубликовано",
-    message: "Ваше место «Test Cafe» успешно прошло модерацию и теперь доступно пользователям mamaGo.",
+    body: "Ваше место «Test Cafe» успешно прошло модерацию и теперь доступно пользователям mamaGo.",
     entityType: "PLACE",
     entityId: "test-place-1",
   });
@@ -45,16 +49,17 @@ async function testNotificationUI() {
     userId: businessUser.id,
     type: "PLACE_NEEDS_CHANGES",
     title: "Требуются правки",
-    message: "Ваше место «Test Restaurant» требует доработки. Пожалуйста, добавьте фотографии.",
+    body: "Ваше место «Test Restaurant» требует доработки. Пожалуйста, добавьте фотографии.",
     entityType: "PLACE",
     entityId: "test-place-2",
   });
 
   const notification3 = await createNotification({
     userId: businessUser.id,
-    type: "SYSTEM",
-    title: "Добро пожаловать!",
-    message: "Спасибо за регистрацию в mamaGo Business Cabinet.",
+    type: "WELCOME",
+    title: WELCOME_NOTIFICATION_TITLE,
+    body: WELCOME_NOTIFICATION_BODY,
+    isPinned: true,
   });
 
   console.log(`✅ Created 3 test notifications\n`);
@@ -83,7 +88,7 @@ async function testNotificationUI() {
   console.log(`📋 Recent notifications (${allNotifications.length}):`);
   allNotifications.forEach((n, i) => {
     console.log(`   ${i + 1}. ${n.isRead ? "✓" : "○"} ${n.title}`);
-    console.log(`      ${n.message.substring(0, 60)}...`);
+    console.log(`      ${n.body.substring(0, 60)}...`);
   });
 
   console.log("\n✅ Notification UI test complete!");

@@ -95,7 +95,7 @@ async function handleEmail(
   const template = buildNotificationEmailTemplate(
     notification.type as NotificationType,
     notification.title,
-    notification.message,
+    notification.body,
     notification.entityId,
   );
 

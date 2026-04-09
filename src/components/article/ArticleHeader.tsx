@@ -21,13 +21,16 @@ export function ArticleHeader({
   publishedAt,
   heroImage,
 }: ArticleHeaderProps) {
-  const formattedDate = publishedAt
-    ? new Intl.DateTimeFormat("ru-RU", {
-        day: "numeric",
-        month: "long",
-        year: "numeric",
-      }).format(new Date(publishedAt))
-    : null;
+  const formattedDate = (() => {
+    if (publishedAt == null || publishedAt === "") return null;
+    const d = publishedAt instanceof Date ? publishedAt : new Date(publishedAt);
+    if (Number.isNaN(d.getTime())) return null;
+    return new Intl.DateTimeFormat("ru-RU", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    }).format(d);
+  })();
 
   return (
     <header className="mb-10 md:mb-14">

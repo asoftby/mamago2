@@ -1,15 +1,20 @@
 "use client";
 
+import { useState } from "react";
 import { Bell } from "lucide-react";
 import { usePathname } from "next/navigation";
-import { cn } from "@/lib/utils";
-import { useUnreadNotificationCount } from "@/hooks/useUnreadNotificationCount";
-import { NavIconButton } from "@/components/mobile/NavIconButton";
+import { NotificationsModal } from "@/components/business/notifications/NotificationsModal";
+import {
+  getNavIconButtonClassName,
+  NavIconButton,
+} from "@/components/mobile/NavIconButton";
 import { MobileProfileSheet } from "@/components/mobile/MobileProfileSheet";
 import { PlanPillNavButton } from "@/components/mobile/PlanPillNavButton";
 import { useCity } from "@/contexts/CityContext";
 import { useFamilyPersona } from "@/contexts/FamilyPersonaContext";
+import { useUnreadNotificationCount } from "@/hooks/useUnreadNotificationCount";
 import { requestOpenMyPlan } from "@/lib/my-plan/myPlanOpenIntent";
+import { cn } from "@/lib/utils";
 
 export type MobileBottomNavProps = {
   /** true — в pill «Мой план» скрыть строку про пустой план (подключить из API) */
@@ -26,7 +31,7 @@ const NAV_ICON_SIZE = "compact" as const;
 
 /**
  * Bottom bar: Главная · «Мой план» · Уведомления · Профиль.
- * Один inbox уведомлений; счётчик непрочитанных с API.
+ * Уведомления — только через NotificationsModal (sheet на мобилке).
  */
 export function MobileBottomNav({
   hasPlannedEvents,
@@ -37,20 +42,21 @@ export function MobileBottomNav({
   const pathname = usePathname();
   const { citySlug } = useCity();
   const family = useFamilyPersona();
-  const { unreadCount } = useUnreadNotificationCount();
+  const isAuthenticated = !family?.loading && !!family?.menuUser;
+  const { unreadCount, refresh: refreshUnreadCount } =
+    useUnreadNotificationCount();
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
 
   const resolvedProfileAvatar =
     profileAvatarUrl ?? family?.menuUser?.avatarUrl ?? undefined;
 
   const homeHref = `/${citySlug}`;
   const planHref = "/me/plan";
-  const notificationsHref = "/notifications";
 
   const isHomeActive = pathname === homeHref;
   const isPlanActive =
     pathname.startsWith("/me/plan") || pathname.startsWith("/me/day");
-  const isNotificationsActive =
-    pathname === "/notifications" || pathname.startsWith("/notifications/");
+  const isNotificationsActive = notificationsOpen;
   const isMeHubOrProfileSection =
     pathname === "/me" ||
     (pathname.startsWith("/me/") &&
@@ -62,10 +68,6 @@ export function MobileBottomNav({
     pathname.startsWith("/profile/") ||
     pathname.startsWith("/business") ||
     pathname.startsWith("/admin");
-
-  /** Пульс на колокольчике: есть непрочитанные и пользователь не на экране уведомлений */
-  const showNotificationsUnreadPulse =
-    unreadCount > 0 && !isNotificationsActive;
 
   return (
     <nav
@@ -105,39 +107,64 @@ export function MobileBottomNav({
             chrome="dark"
           />
 
-          <NavIconButton
-            href={notificationsHref}
-            isActive={isNotificationsActive}
-            ariaLabel="Уведомления"
-            badgeCount={unreadCount}
-            size={NAV_ICON_SIZE}
-            chrome="dark"
-          >
-            <span
-              className={cn(
-                "relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-colors duration-200",
-                unreadCount > 0 && "animate-nav-notify-pulse",
-                isNotificationsActive
-                  ? "bg-[#EF8759]/22"
-                  : unreadCount > 0
-                    ? "bg-[#EF8759]/24"
-                    : "bg-neutral-600/45",
-              )}
+          {isAuthenticated && (
+            <button
+              type="button"
+              aria-label="Уведомления"
+              aria-expanded={notificationsOpen}
+              onClick={() => setNotificationsOpen(true)}
+              className={getNavIconButtonClassName({
+                isActive: isNotificationsActive,
+                size: NAV_ICON_SIZE,
+                chrome: "dark",
+              })}
             >
-              <Bell
+              <span
                 className={cn(
-                  "h-[22px] w-[22px] transition-colors duration-200",
-                  isNotificationsActive || unreadCount > 0
-                    ? "text-[#FFB090]"
-                    : "text-neutral-300",
+                  "relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-colors duration-200",
+                  unreadCount > 0 && "animate-nav-notify-pulse",
+                  isNotificationsActive
+                    ? "bg-[#EF8759]/22"
+                    : unreadCount > 0
+                      ? "bg-[#EF8759]/24"
+                      : "bg-neutral-600/45",
                 )}
-                strokeWidth={
-                  isNotificationsActive || unreadCount > 0 ? 1.35 : 1.2
-                }
-                absoluteStrokeWidth
-              />
-            </span>
-          </NavIconButton>
+              >
+                <Bell
+                  className={cn(
+                    "h-[22px] w-[22px] transition-colors duration-200",
+                    isNotificationsActive || unreadCount > 0
+                      ? "text-[#FFB090]"
+                      : "text-neutral-300",
+                  )}
+                  strokeWidth={
+                    isNotificationsActive || unreadCount > 0 ? 1.35 : 1.2
+                  }
+                  absoluteStrokeWidth
+                />
+              </span>
+              {unreadCount > 0 && (
+                <span
+                  className={cn(
+                    "absolute -right-0.5 -top-0.5 flex min-h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[#EF8759] px-1 text-[10px] font-semibold leading-none text-white shadow-sm ring-2 ring-neutral-900/95",
+                  )}
+                  aria-hidden
+                >
+                  {unreadCount > 9 ? "9+" : unreadCount}
+                </span>
+              )}
+            </button>
+          )}
+          {isAuthenticated && (
+            <NotificationsModal
+              open={notificationsOpen}
+              onOpenChange={setNotificationsOpen}
+              stream="user"
+              onNotificationRead={() => {
+                void refreshUnreadCount();
+              }}
+            />
+          )}
 
           <MobileProfileSheet
             isProfileActive={isProfileActive}

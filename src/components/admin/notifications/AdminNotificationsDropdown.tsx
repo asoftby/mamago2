@@ -8,11 +8,7 @@ import {
   DropdownMenuContent,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  Sheet,
-  SheetContent,
-  SheetTitle,
-} from "@/components/ui/sheet";
+import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { AdminNotificationItem } from "./AdminNotificationItem";
 import { mockNotifications } from "@/lib/mocks/adminNotifications";
 import type { AdminNotification } from "@/lib/mocks/adminNotifications";
@@ -135,52 +131,46 @@ export function AdminNotificationsDropdown({
         >
           {notificationIcon}
         </Button>
-        <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-          <SheetContent side="bottom" className="h-[70vh] p-0 rounded-t-2xl">
-            <SheetTitle className="sr-only">Уведомления</SheetTitle>
-
-            <div className="px-4 py-3 border-b border-gray-200">
-              <div className="flex items-center justify-between">
-                <h3 className="text-base font-semibold text-gray-900">
-                  Уведомления
-                </h3>
-              </div>
-            </div>
-
-            <div className="max-h-[calc(70vh-60px)] overflow-y-auto">
-              {displayNotifications.length > 0 ? (
-                displayNotifications.map((notification) => (
-                  <AdminNotificationItem
-                    key={notification.id}
-                    notification={{
-                      ...notification,
-                      read: isRead(notification),
-                    }}
-                    onRead={handleMarkAsRead}
-                  />
-                ))
-              ) : (
-                <div className="px-4 py-12 text-center">
-                  <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-3">
-                    <Bell className="w-6 h-6 text-gray-400" />
-                  </div>
-                  <p className="text-sm text-gray-600">Нет уведомлений</p>
+        <BottomSheet
+          open={sheetOpen}
+          onOpenChange={setSheetOpen}
+          title="Уведомления"
+          showCloseButton={true}
+          height="70vh"
+        >
+          <div className="overflow-y-auto">
+            {displayNotifications.length > 0 ? (
+              displayNotifications.map((notification) => (
+                <AdminNotificationItem
+                  key={notification.id}
+                  notification={{
+                    ...notification,
+                    read: isRead(notification),
+                  }}
+                  onRead={handleMarkAsRead}
+                />
+              ))
+            ) : (
+              <div className="px-4 py-12 text-center">
+                <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-3">
+                  <Bell className="w-6 h-6 text-gray-400" />
                 </div>
-              )}
-            </div>
-
-            {notifications.length > 8 && (
-              <div className="px-4 py-3 border-t border-gray-200">
-                <a
-                  href="/admin/notifications"
-                  className="text-sm text-blue-600 hover:text-blue-700 font-medium block text-center"
-                >
-                  Посмотреть все →
-                </a>
+                <p className="text-sm text-gray-600">Нет уведомлений</p>
               </div>
             )}
-          </SheetContent>
-        </Sheet>
+          </div>
+
+          {notifications.length > 8 && (
+            <div className="px-4 py-3 border-t border-gray-200">
+              <a
+                href="/admin/notifications"
+                className="text-sm text-blue-600 hover:text-blue-700 font-medium block text-center"
+              >
+                Посмотреть все →
+              </a>
+            </div>
+          )}
+        </BottomSheet>
       </>
     );
   }

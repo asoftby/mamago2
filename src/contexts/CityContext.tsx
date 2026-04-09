@@ -93,15 +93,34 @@ export function CityProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
-/** When CityProvider is still behind Suspense or missing, returns null (use pathname fallbacks). */
+/** Контекст города (null, если не внутри CityProvider). */
 export function useOptionalCity(): CityContextValue | null {
   return useContext(CityContext);
 }
 
+/**
+ * Город для ссылок и навигации. Если провайдера нет (редкий SSR / граница RSC),
+ * slug берётся из pathname + дефолт minsk — без падения.
+ */
 export function useCity(): CityContextValue {
-  const ctx = useContext(CityContext);
-  if (!ctx) {
-    throw new Error("useCity must be used within CityProvider");
-  }
-  return ctx;
+  const ctx = useOptionalCity();
+  const pathname = usePathname();
+  const router = useRouter();
+
+  return useMemo(() => {
+    if (ctx) return ctx;
+    const citySlug = resolveCitySlug(pathname, null, null);
+    return {
+      citySlug,
+      setCity: (slug: string) => {
+        try {
+          localStorage.setItem(STORAGE_KEY, slug);
+        } catch {
+          /* ignore */
+        }
+        router.push(`/${slug}`);
+      },
+      appendCityQuery: (href: string) => appendCityQueryToHref(href, citySlug),
+    };
+  }, [ctx, pathname, router]);
 }

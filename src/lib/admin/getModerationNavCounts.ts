@@ -2,8 +2,8 @@ import prisma from "@/lib/prisma";
 import type { ModerationNavCounts } from "@/lib/admin/moderationSidebarConfig";
 
 /**
- * Агрегирует счётчики для бейджей секции «Модерация».
- * Логика очереди совпадает с `getQueueItems` на `/admin/moderation/queue`.
+ * Агрегирует счётчики для бейджа «Очередь» и детальную разбивку.
+ * queueTotal = места (новые) + правки мест + события + предложения в статусе PENDING.
  */
 export async function getModerationNavCounts(): Promise<ModerationNavCounts> {
   const [pendingPlaces, pendingRevisions, eventsPending, offersPending] =
@@ -15,7 +15,7 @@ export async function getModerationNavCounts(): Promise<ModerationNavCounts> {
     ]);
 
   return {
-    queueTotal: pendingPlaces + pendingRevisions,
+    queueTotal: pendingPlaces + pendingRevisions + eventsPending + offersPending,
     places: pendingPlaces,
     events: eventsPending,
     offers: offersPending,

@@ -2,7 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
 import { ContentStatus, ActivityType, ScheduleMode, Prisma } from "@prisma/client";
-import { canCreateBusinessContent, canManageOwnedContent } from "@/lib/auth/businessContentAccess";
+import { canCreateBusinessContent } from "@/lib/auth/businessContentAccess";
+import {
+  buildActivityManageWhereForUser,
+  coalesceActivityBusinessIdFromPlace,
+  getBusinessIdsUserCanAccess,
+} from "@/lib/auth/activityAccess";
+import { getUserBusinessId } from "@/lib/auth/placeAccess";
 import { replaceActivitySessionsFromScheduleJson } from "@/lib/business/syncEventActivitySessions";
 import { syncEventVenueAndActivityCity } from "@/lib/business/syncEventVenueFromWizard";
 import { computeEventShortDesc } from "@/lib/business/eventShortDesc";
@@ -58,6 +64,28 @@ export async function POST(request: NextRequest) {
       programCategoryIds: body.programCategoryIds,
     });
 
+    let resolvedBusinessId: string | null =
+      typeof body.businessId === "string" ? body.businessId : null;
+
+    if (typeof mergedPlaceId === "string" && mergedPlaceId.length > 0) {
+      const placeRow = await prisma.place.findUnique({
+        where: { id: mergedPlaceId },
+        select: { ownerBusinessId: true },
+      });
+      if (!placeRow) {
+        return NextResponse.json(
+          { error: "Place not found" },
+          { status: 404 },
+        );
+      }
+      resolvedBusinessId = coalesceActivityBusinessIdFromPlace(
+        placeRow,
+        resolvedBusinessId,
+      );
+    } else if (!resolvedBusinessId) {
+      resolvedBusinessId = await getUserBusinessId(user.id);
+    }
+
     // Create event as draft
     const event = await prisma.activity.create({
       data: {
@@ -103,7 +131,7 @@ export async function POST(request: NextRequest) {
         ...(mergedPlaceId !== undefined ? { placeId: mergedPlaceId } : {}),
         
         // Business
-        businessId: body.businessId,
+        businessId: resolvedBusinessId,
       },
     });
 
@@ -161,12 +189,18 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    const manageWhere =
+      user.role === "ADMIN" || user.role === "MODERATOR"
+        ? {}
+        : buildActivityManageWhereForUser(
+            user.id,
+            await getBusinessIdsUserCanAccess(user.id),
+          );
+
     const events = await prisma.activity.findMany({
       where: {
         type: ActivityType.EVENT,
-        ...(user.role === "ADMIN" || user.role === "MODERATOR"
-          ? {}
-          : { ownerUserId: user.id }),
+        ...manageWhere,
         ...excludeDeletedEvents(),
         ...excludeGhostEventDrafts(),
       },

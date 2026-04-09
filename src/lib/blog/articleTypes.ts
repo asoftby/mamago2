@@ -18,6 +18,7 @@ export type DbArticleSeo = Pick<
   | "seoOgImage"
   | "seoRobots"
   | "seoJsonLdOverride"
+  | "noindex"
 >;
 
 export type DbBackedArticle = {

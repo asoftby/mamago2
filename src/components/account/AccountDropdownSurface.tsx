@@ -5,13 +5,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from "@/components/ui/sheet";
+import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { ACCOUNT_DROPDOWN_WIDTH_CLASS } from "@/components/account/accountDropdownTokens";
 import { cn } from "@/lib/utils";
 
@@ -20,7 +14,7 @@ export type AccountDropdownSurfaceProps = {
   onOpenChange: (open: boolean) => void;
   narrow: boolean;
   trigger: React.ReactNode;
-  sheetTitle: string;
+  sheetTitle?: string;
   children: React.ReactNode;
 };
 
@@ -37,24 +31,20 @@ export function AccountDropdownSurface({
 }: AccountDropdownSurfaceProps) {
   if (narrow) {
     return (
-      <Sheet open={open} onOpenChange={onOpenChange}>
-        <SheetTrigger asChild>{trigger}</SheetTrigger>
-        <SheetContent
-          side="bottom"
-          showCloseButton
-          className={cn(
-            "z-[60] max-h-[min(90vh,calc(100dvh-1rem))] gap-0 overflow-y-auto rounded-t-2xl border-t border-gray-200 bg-white px-0 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 shadow-lg",
-            "w-full max-w-none",
-          )}
+      <>
+        <div onClick={() => onOpenChange(true)}>{trigger}</div>
+        <BottomSheet
+          open={open}
+          onOpenChange={onOpenChange}
+          title={sheetTitle?.trim() || "Меню аккаунта"}
+          hideTitle={!sheetTitle?.trim()}
+          showCloseButton={true}
+          height="auto"
+          className="max-h-[min(90vh,calc(100dvh-1rem))]"
         >
-          <SheetHeader className="space-y-0 px-4 pb-3 text-left">
-            <SheetTitle className="text-base font-semibold text-gray-900">
-              {sheetTitle}
-            </SheetTitle>
-          </SheetHeader>
-          <div className="min-h-0">{children}</div>
-        </SheetContent>
-      </Sheet>
+          {children}
+        </BottomSheet>
+      </>
     );
   }
 

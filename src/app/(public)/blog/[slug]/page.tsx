@@ -11,6 +11,12 @@ import { findArticleBySlug } from "@/lib/slug/articleSlugService";
 import { buildArticleJsonLd } from "@/lib/seo/schema/buildArticleJsonLd";
 import type { ArticleVm } from "@/lib/blog/articleTypes";
 import { AnalyticsDetailBeacon } from "@/components/analytics/AnalyticsDetailBeacon";
+import { loadArticleMvpBySlugPublic } from "@/lib/article/articleMvpRenderData";
+import { ArticleMvpView } from "@/components/article/mvp/ArticleMvpView";
+import {
+  incrementPublishedArticleViews,
+  shouldCountPublishedArticleViewRequest,
+} from "@/lib/article/articleViews";
 
 async function getArticle(slug: string): Promise<ArticleVm | null> {
   const resolved = await findArticleBySlug(slug);
@@ -34,6 +40,7 @@ async function getArticle(slug: string): Promise<ArticleVm | null> {
         seoOgImage: true,
         seoRobots: true,
         seoJsonLdOverride: true,
+        noindex: true,
       },
     });
     if (!a) return null;
@@ -70,12 +77,56 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
+  const mvp = await loadArticleMvpBySlugPublic(slug);
+  if (mvp) {
+    const article = await prisma.article.findUnique({
+      where: { id: mvp.id },
+      select: {
+        seoTitle: true,
+        seoDescription: true,
+        seoCanonicalUrl: true,
+        seoOgTitle: true,
+        seoOgDescription: true,
+        seoRobots: true,
+        noindex: true,
+      },
+    });
+    const title = article?.seoTitle?.trim() || `${mvp.title} — mamaGo`;
+    const description = article?.seoDescription?.trim() || mvp.excerpt?.trim() || undefined;
+    const ogTitle =
+      article?.seoOgTitle?.trim() || article?.seoTitle?.trim() || `${mvp.title} — mamaGo`;
+    const ogDescription =
+      article?.seoOgDescription?.trim() ||
+      article?.seoDescription?.trim() ||
+      mvp.excerpt?.trim() ||
+      undefined;
+    const canonical = article?.seoCanonicalUrl?.trim();
+    const noindex =
+      article?.noindex === true ||
+      (article?.seoRobots?.toLowerCase().includes("noindex") ?? false);
+    return {
+      title,
+      description,
+      alternates: canonical ? { canonical } : undefined,
+      openGraph: {
+        title: ogTitle,
+        description: ogDescription,
+        images: mvp.heroUrl ? [{ url: mvp.heroUrl }] : undefined,
+      },
+      robots: noindex ? { index: false, follow: false } : undefined,
+    };
+  }
   const article = await getArticle(slug);
   if (!article) return {};
   if ("_redirectToSlug" in article && article._redirectToSlug) {
     permanentRedirect(`/blog/${article._redirectToSlug}`);
   }
   const seo = "_seo" in article ? article._seo : undefined;
+  /** Обложка (heroImage) — основной источник OG; затем seoOgImage (legacy / денорм) */
+  const ogImageUrl =
+    seo?.heroImage?.trim() || seo?.seoOgImage?.trim() || undefined;
+  const noindexFlag =
+    seo?.noindex === true || (seo?.seoRobots?.toLowerCase().includes("noindex") ?? false);
   return {
     title: seo?.seoTitle?.trim() || `${article.title} — mamaGo`,
     description: seo?.seoDescription?.trim() || article.subtitle,
@@ -85,11 +136,9 @@ export async function generateMetadata({
     openGraph: {
       title: seo?.seoOgTitle?.trim() || seo?.seoTitle?.trim() || `${article.title} — mamaGo`,
       description: seo?.seoOgDescription?.trim() || seo?.seoDescription?.trim() || article.subtitle,
-      images:
-        seo?.seoOgImage?.trim() || seo?.heroImage
-          ? [{ url: seo.seoOgImage?.trim() || seo.heroImage! }]
-          : undefined,
+      images: ogImageUrl ? [{ url: ogImageUrl }] : undefined,
     },
+    robots: noindexFlag ? { index: false, follow: false } : undefined,
   };
 }
 
@@ -152,6 +201,25 @@ export default async function ArticlePage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
+  const mvp = await loadArticleMvpBySlugPublic(slug);
+  if (mvp) {
+    if (await shouldCountPublishedArticleViewRequest()) {
+      await incrementPublishedArticleViews(mvp.id);
+    }
+    return (
+      <>
+        <AnalyticsDetailBeacon entityType="ARTICLE" entityId={mvp.id} vertical="CITY" />
+        <ArticleMvpView
+          title={mvp.title}
+          subtitle={mvp.subtitle}
+          excerpt={mvp.excerpt}
+          publishedAt={mvp.publishedAt}
+          blocks={mvp.blocks}
+        />
+      </>
+    );
+  }
+
   const article = await getArticle(slug);
   if (!article) notFound();
   if ("_redirectToSlug" in article && article._redirectToSlug) {

@@ -6,12 +6,8 @@ function toAdminHref(path: string): string {
   return `${ADMIN_BASE}${cleanPath}`;
 }
 
-/** Идентификаторы пунктов секции «Модерация» в сайдбаре */
-export type ModerationNavItemId =
-  | "queue"
-  | "places"
-  | "events"
-  | "offers";
+/** Идентификаторы пунктов секции «Модерация» в сайдбаре — только процесс (inbox). */
+export type ModerationNavItemId = "queue";
 
 export interface ModerationNavItemDefinition {
   id: ModerationNavItemId;
@@ -22,28 +18,22 @@ export interface ModerationNavItemDefinition {
 
 /**
  * Единый источник структуры подменю «Модерация».
- * Счётчики подставляются отдельно через {@link ModerationNavCounts}.
+ * Списочные сущности перенесены в «Контент».
  */
 export const MODERATION_NAV_ITEMS: readonly ModerationNavItemDefinition[] = [
   { id: "queue", label: "Очередь", path: "/moderation/queue" },
-  { id: "places", label: "Места", path: "/moderation/places" },
-  { id: "events", label: "События", path: "/moderation/events" },
-  { id: "offers", label: "Предложения", path: "/moderation/offers" },
 ] as const;
 
 export function moderationItemHref(path: string): string {
   return toAdminHref(path);
 }
 
-/** Счётчики pending для бейджей; поля опциональны — без значения бейдж не показываем */
+/** Счётчики для бейджа очереди; детальные поля — для отчётов/хедера при необходимости */
 export interface ModerationNavCounts {
-  /** Общее число элементов в очереди (как на странице очереди) */
+  /** Единый inbox: все сущности, ожидающие модерации */
   queueTotal: number;
-  /** Места со статусом PENDING */
   places?: number;
-  /** Активности (события и др.) со статусом PENDING */
   events?: number;
-  /** Предложения (Offer) со статусом PENDING */
   offers?: number;
 }
 
@@ -54,12 +44,6 @@ export function getModerationItemCount(
   switch (id) {
     case "queue":
       return counts.queueTotal;
-    case "places":
-      return counts.places;
-    case "events":
-      return counts.events;
-    case "offers":
-      return counts.offers;
     default: {
       const _exhaustive: never = id;
       return _exhaustive;
@@ -67,7 +51,7 @@ export function getModerationItemCount(
   }
 }
 
-/** Активный подпункт: точное совпадение или вложенный маршрут (например `/places/[id]`). */
+/** Активный подпункт: точное совпадение или вложенный маршрут. */
 export function isModerationNavItemActive(pathname: string, itemPath: string): boolean {
   const href = moderationItemHref(itemPath);
   if (pathname === href) return true;

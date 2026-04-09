@@ -5,9 +5,9 @@ import { ActivityType, ContentStatus } from "@prisma/client";
 import { fetchActivityEventRowSummary } from "@/lib/activity/fetchActivityEventRowSummary";
 import {
   canCreateBusinessContent,
-  canManageOwnedContent,
   canPublishContentDirectly,
 } from "@/lib/auth/businessContentAccess";
+import { canManageActivityById } from "@/lib/auth/activityAccess";
 import { replaceActivitySessionsFromScheduleJson } from "@/lib/business/syncEventActivitySessions";
 import { assignActivitySlugIfMissing } from "@/lib/slug/activitySlugService";
 import { ensurePublishedActivityHasSlug } from "@/lib/slug/publishSlugGuards";
@@ -32,11 +32,14 @@ export async function POST(
     }
 
     const summary = await fetchActivityEventRowSummary(id);
-    if (
-      !summary ||
-      !canManageOwnedContent(user, summary.ownerUserId) ||
-      summary.status === "DELETED"
-    ) {
+    if (!summary || summary.status === "DELETED") {
+      return NextResponse.json(
+        { error: "Event not found" },
+        { status: 404 }
+      );
+    }
+
+    if (!(await canManageActivityById(user, id))) {
       return NextResponse.json(
         { error: "Event not found" },
         { status: 404 }

@@ -1,5 +1,5 @@
 import { Prisma } from "@prisma/client";
-import prisma from "@/lib/prisma";
+import prisma, { searchIndexer } from "@/lib/prisma";
 
 /**
  * Restore soft-deleted activity.
@@ -13,5 +13,6 @@ export async function restoreActivityToDraftById(id: string): Promise<void> {
   if (n !== 1) {
     throw new Error(`Activity not found: ${id}`);
   }
+  await searchIndexer.upsertActivity(id);
 }
 

@@ -21,6 +21,10 @@ import {
   canPublishContentDirectly,
 } from "@/lib/auth/businessContentAccess";
 import { getUserBusinessId } from "@/lib/auth/placeAccess";
+import {
+  nextResponseFromBusinessAccessError,
+  requireBusinessPermission,
+} from "@/server/permissions/business-permissions";
 
 async function finalizePublishedPlaceSlugIfNeeded(placeId: string, isPublished: boolean) {
   if (!isPublished) return;
@@ -103,6 +107,16 @@ export async function POST(request: NextRequest) {
     // Get user's business (if exists)
     const businessId = await getUserBusinessId(user.id);
     console.log("[places/POST] User business:", businessId);
+
+    if (businessId) {
+      try {
+        await requireBusinessPermission(user, businessId, "content.create");
+      } catch (e) {
+        const denied = nextResponseFromBusinessAccessError(e);
+        if (denied) return denied;
+        throw e;
+      }
+    }
 
     // Idempotency check: if place with this createRequestId already exists, return it
     const existingPlace = await prisma.place.findFirst({
@@ -354,6 +368,16 @@ export async function GET(request: NextRequest) {
 
     // Get user's business
     const businessId = await getUserBusinessId(user.id);
+
+    if (businessId) {
+      try {
+        await requireBusinessPermission(user, businessId, "business.view");
+      } catch (e) {
+        const denied = nextResponseFromBusinessAccessError(e);
+        if (denied) return denied;
+        throw e;
+      }
+    }
 
     const places = await prisma.place.findMany({
       where: {

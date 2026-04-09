@@ -98,6 +98,14 @@
 html {
   overflow-anchor: none;
 }
+
+/* Фон не скроллится при открытых модалках (дополнение к react-remove-scroll / Radix). */
+body:has([data-slot="dialog-overlay"][data-state="open"]),
+body:has([data-slot="sheet-overlay"][data-state="open"]),
+body:has([data-slot="alert-dialog-overlay"][data-state="open"]) {
+  overflow: hidden;
+  overscroll-behavior: none;
+}
 @utility no-scrollbar {
   /* Chrome, Safari and Opera */
   &::-webkit-scrollbar {
@@ -364,6 +372,49 @@ html {
   }
 }
 
+/* Мой план: градиент непрерывно скользит по рамке (conic + rotate) */
+@keyframes mg-plan-ai-border-spin {
+  from {
+    transform: translate(-50%, -50%) rotate(0deg);
+  }
+  to {
+    transform: translate(-50%, -50%) rotate(360deg);
+  }
+}
+
+.animate-mg-plan-ai-border-spin {
+  animation: mg-plan-ai-border-spin 32s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-mg-plan-ai-border-spin {
+    animation: none;
+    transform: translate(-50%, -50%);
+  }
+}
+
+/* Мой план: появление карточки события в списке дня */
+@keyframes mg-plan-day-item-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-mg-plan-day-item-in {
+  animation: mg-plan-day-item-in 0.38s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-mg-plan-day-item-in {
+    animation: none;
+  }
+}
+
 /* ─── Article / Blog reading typography ─────────────────────────────────── */
 .article-body {
   font-family: var(--font-pt-serif, var(--font-noto-serif, var(--font-serif)));
@@ -511,10 +562,21 @@ html {
 .rich-text-editor-surface .ProseMirror ol {
   margin-top: 8px !important;
   margin-bottom: 12px !important;
-  padding-left: 20px !important;
+  padding-left: 1.5rem !important;
+  list-style-position: outside !important;
+}
+
+/* Preflight / prose задают list-style: none — без этого маркеры не видны */
+.rich-text-editor-surface .ProseMirror ul {
+  list-style-type: disc !important;
+}
+
+.rich-text-editor-surface .ProseMirror ol {
+  list-style-type: decimal !important;
 }
 
 .rich-text-editor-surface .ProseMirror li {
+  display: list-item !important;
   margin-bottom: 6px !important;
 }
 

@@ -12,23 +12,7 @@ import {
 } from "@/components/ui/select";
 import { SYSTEM_INTERESTS } from "@/lib/config/interests";
 import { cn } from "@/lib/utils";
-
-const MONTHS = [
-  { value: 1, label: "Январь" },
-  { value: 2, label: "Февраль" },
-  { value: 3, label: "Март" },
-  { value: 4, label: "Апрель" },
-  { value: 5, label: "Май" },
-  { value: 6, label: "Июнь" },
-  { value: 7, label: "Июль" },
-  { value: 8, label: "Август" },
-  { value: 9, label: "Сентябрь" },
-  { value: 10, label: "Октябрь" },
-  { value: 11, label: "Ноябрь" },
-  { value: 12, label: "Декабрь" },
-];
-
-const YEARS = Array.from({ length: 20 }, (_, i) => new Date().getFullYear() - i);
+import { BIRTH_MONTH_OPTIONS, getBirthYearOptions } from "@/lib/child/birthDateSelectOptions";
 
 interface AddChildStepProps {
   submitting?: boolean;
@@ -42,6 +26,7 @@ interface AddChildStepProps {
 }
 
 export function AddChildStep({ submitting, serverError, onSubmit }: AddChildStepProps) {
+  const birthYears = getBirthYearOptions(20);
   const [name, setName] = useState("");
   const [month, setMonth] = useState<number | "">("");
   const [year, setYear] = useState<number | "">("");
@@ -107,15 +92,15 @@ export function AddChildStep({ submitting, serverError, onSubmit }: AddChildStep
               </span>
               <div className="flex gap-3 flex-wrap">
                 <Select
-                  value={month === "" ? undefined : month.toString()}
+                  value={month === "" ? undefined : String(month)}
                   onValueChange={(value) => setMonth(parseInt(value, 10))}
                 >
                   <SelectTrigger className="min-w-[140px] flex-1">
                     <SelectValue placeholder="Месяц" />
                   </SelectTrigger>
-                  <SelectContent>
-                    {MONTHS.map((m) => (
-                      <SelectItem key={m.value} value={m.value.toString()}>
+                  <SelectContent position="popper" className="z-[110]">
+                    {BIRTH_MONTH_OPTIONS.map((m) => (
+                      <SelectItem key={m.value} value={m.value}>
                         {m.label}
                       </SelectItem>
                     ))}
@@ -123,15 +108,15 @@ export function AddChildStep({ submitting, serverError, onSubmit }: AddChildStep
                 </Select>
 
                 <Select
-                  value={year === "" ? undefined : year.toString()}
+                  value={year === "" ? undefined : String(year)}
                   onValueChange={(value) => setYear(parseInt(value, 10))}
                 >
                   <SelectTrigger className="w-[100px]">
                     <SelectValue placeholder="Год" />
                   </SelectTrigger>
-                  <SelectContent>
-                    {YEARS.map((y) => (
-                      <SelectItem key={y} value={y.toString()}>
+                  <SelectContent position="popper" className="z-[110]">
+                    {birthYears.map((y) => (
+                      <SelectItem key={y} value={String(y)}>
                         {y}
                       </SelectItem>
                     ))}

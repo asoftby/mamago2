@@ -65,7 +65,7 @@ export function RichTextEditor({
   return (
     <div
       className={cn(
-        "border rounded-md overflow-hidden",
+        "border rounded-md",
         error ? "border-red-500" : "border-input",
         disabled && "opacity-50 cursor-not-allowed"
       )}

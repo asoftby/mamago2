@@ -16,7 +16,7 @@ export const mockNotifications: AdminNotification[] = [
     type: "MODERATION",
     title: "Новое место на модерации",
     description: "Детский центр «Пуговка» ожидает проверки",
-    link: "/admin/moderation/places",
+    link: "/admin/content/places",
     createdAt: new Date(Date.now() - 1000 * 60 * 15).toISOString(), // 15 min ago
     read: false,
   },
@@ -52,7 +52,7 @@ export const mockNotifications: AdminNotification[] = [
     type: "MODERATION",
     title: "Обновление места",
     description: "Детский сад «Радуга» обновил информацию",
-    link: "/admin/moderation/places",
+    link: "/admin/content/places",
     createdAt: new Date(Date.now() - 1000 * 60 * 60 * 5).toISOString(), // 5 hours ago
     read: true,
   },

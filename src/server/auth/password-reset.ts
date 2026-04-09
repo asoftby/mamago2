@@ -2,6 +2,7 @@ import { z } from "zod";
 import crypto from "crypto";
 import { prisma } from "@/lib/prisma";
 import { hashPassword } from "@/lib/auth/crypto";
+import { emailService } from "@/features/email/server/email-service";
 import { AuthError } from "./register";
 
 const requestResetSchema = z.object({
@@ -50,10 +51,17 @@ export async function requestPasswordReset(email: string): Promise<void> {
     },
   });
 
-  // TODO: Send email with reset link
-  // For now, log to console (development only)
-  console.log(`[Password Reset] Token for ${normalizedEmail}: ${resetToken}`);
-  console.log(`[Password Reset] Reset link: http://localhost:3000/reset-password/${resetToken}`);
+  try {
+    await emailService.sendPasswordResetEmail({
+      to: normalizedEmail,
+      token: resetToken,
+    });
+  } catch (e) {
+    console.error("[Password Reset] sendPasswordResetEmail failed", {
+      email: normalizedEmail,
+      error: e,
+    });
+  }
 }
 
 /**

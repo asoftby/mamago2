@@ -32,12 +32,12 @@ export function defaultEditorNav(
 ): ContentEditorNav {
   if (surface === "admin") {
     if (entity === "event") {
-      return { afterSubmitListPath: "/admin/moderation/events" };
+      return { afterSubmitListPath: "/admin/content/events" };
     }
     if (entity === "offer") {
-      return { afterSubmitListPath: "/admin/moderation/offers" };
+      return { afterSubmitListPath: "/admin/content/offers" };
     }
-    return { afterSubmitListPath: "/admin/moderation/places" };
+    return { afterSubmitListPath: "/admin/content/places" };
   }
   if (entity === "event") {
     return { afterSubmitListPath: "/business/events" };

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { ComponentType, ReactNode } from "react";
 import { formatDistanceToNow } from "date-fns";
 import { ru } from "date-fns/locale";
 import {
@@ -23,6 +24,36 @@ import {
   getContentQualityData,
   getRecentActivityData,
 } from "@/lib/admin/mockDashboardData";
+import { cn } from "@/lib/utils";
+
+function FinanceStatCard({
+  icon: Icon,
+  iconClassName,
+  label,
+  value,
+  sublabel,
+}: {
+  icon: ComponentType<{ className?: string }>;
+  iconClassName: string;
+  label: string;
+  value: ReactNode;
+  sublabel?: string;
+}) {
+  return (
+    <div className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-lg border border-gray-200 bg-white p-3 sm:p-4">
+      <div className="mb-2 flex min-w-0 items-start gap-2">
+        <Icon className={cn("mt-0.5 h-4 w-4 shrink-0", iconClassName)} />
+        <p className="min-w-0 break-words text-sm leading-snug text-gray-600">{label}</p>
+      </div>
+      <p className="min-w-0 break-words text-base font-bold tabular-nums leading-tight text-gray-900">
+        {value}
+      </p>
+      {sublabel ? (
+        <p className="mt-1 min-w-0 break-words text-xs text-gray-500">{sublabel}</p>
+      ) : null}
+    </div>
+  );
+}
 
 // Severity color mapping
 const severityColors = {
@@ -82,7 +113,7 @@ export default function AdminDashboardPage() {
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <p className="text-sm font-medium mb-1">{item.title}</p>
-                    <p className="text-2xl font-bold">{item.count}</p>
+                    <p className="text-base font-bold">{item.count}</p>
                   </div>
                   <Icon className="w-5 h-5 flex-shrink-0" />
                 </div>
@@ -95,48 +126,40 @@ export default function AdminDashboardPage() {
       {/* 2. Revenue Snapshot */}
       <section>
         <h2 className="text-lg md:text-base font-semibold text-gray-900 mb-4">Финансы</h2>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-          <div className="bg-white rounded-lg border border-gray-200 p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <DollarSign className="w-4 h-4 text-green-600" />
-              <p className="text-sm text-gray-600">Выручка сегодня</p>
-            </div>
-            <p className="text-2xl font-bold text-gray-900">{formatCurrency(revenue.revenueToday)}</p>
-          </div>
-
-          <div className="bg-white rounded-lg border border-gray-200 p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <TrendingUp className="w-4 h-4 text-blue-600" />
-              <p className="text-sm text-gray-600">MRR</p>
-            </div>
-            <p className="text-2xl font-bold text-gray-900">{formatCurrency(revenue.mrr)}</p>
-          </div>
-
-          <div className="bg-white rounded-lg border border-gray-200 p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <TrendingUp className="w-4 h-4 text-purple-600" />
-              <p className="text-sm text-gray-600">Буст (30 дней)</p>
-            </div>
-            <p className="text-2xl font-bold text-gray-900">{formatCurrency(revenue.boostRevenue30d)}</p>
-          </div>
-
-          <div className="bg-white rounded-lg border border-gray-200 p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <CheckCircle className="w-4 h-4 text-green-600" />
-              <p className="text-sm text-gray-600">Новые подписки</p>
-            </div>
-            <p className="text-2xl font-bold text-gray-900">{revenue.newSubscriptions30d}</p>
-            <p className="text-xs text-gray-500 mt-1">За 30 дней</p>
-          </div>
-
-          <div className="bg-white rounded-lg border border-gray-200 p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <Users className="w-4 h-4 text-blue-600" />
-              <p className="text-sm text-gray-600">Лиды</p>
-            </div>
-            <p className="text-2xl font-bold text-gray-900">{revenue.leadsGenerated30d}</p>
-            <p className="text-xs text-gray-500 mt-1">За 30 дней</p>
-          </div>
+        <div className="grid min-w-0 grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-5">
+          <FinanceStatCard
+            icon={DollarSign}
+            iconClassName="text-green-600"
+            label="Выручка сегодня"
+            value={formatCurrency(revenue.revenueToday)}
+          />
+          <FinanceStatCard
+            icon={TrendingUp}
+            iconClassName="text-blue-600"
+            label="MRR"
+            value={formatCurrency(revenue.mrr)}
+          />
+          <FinanceStatCard
+            icon={TrendingUp}
+            iconClassName="text-purple-600"
+            label="Буст"
+            value={formatCurrency(revenue.boostRevenue30d)}
+            sublabel="За 30 дней"
+          />
+          <FinanceStatCard
+            icon={CheckCircle}
+            iconClassName="text-green-600"
+            label="Новые подписки"
+            value={revenue.newSubscriptions30d}
+            sublabel="За 30 дней"
+          />
+          <FinanceStatCard
+            icon={Users}
+            iconClassName="text-blue-600"
+            label="Лиды"
+            value={revenue.leadsGenerated30d}
+            sublabel="За 30 дней"
+          />
         </div>
       </section>
 
@@ -150,14 +173,14 @@ export default function AdminDashboardPage() {
               href={item.link}
               className="bg-white rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow"
             >
-              <div className="flex items-start justify-between mb-2">
+              <div className="flex flex-col gap-1.5 mb-2">
                 <p className="text-sm font-medium text-gray-900">{item.title}</p>
-                <span className="text-xs font-semibold text-green-600 bg-green-50 px-2 py-1 rounded">
+                <span className="w-fit text-xs font-semibold text-green-600 bg-green-50 px-2 py-1 rounded">
                   {formatCurrency(item.potential)}
                 </span>
               </div>
               <p className="text-xs text-gray-600 mb-3">{item.description}</p>
-              <p className="text-2xl font-bold text-gray-900">{item.count}</p>
+              <p className="text-base font-bold text-gray-900">{item.count}</p>
             </Link>
           ))}
         </div>
@@ -204,7 +227,7 @@ export default function AdminDashboardPage() {
                   <FileText className="w-5 h-5 text-gray-400" />
                   <span className="text-sm font-medium text-gray-900">{item.label}</span>
                 </div>
-                <span className="text-lg font-bold text-gray-900">{item.count}</span>
+                <span className="text-base font-bold text-gray-900">{item.count}</span>
               </Link>
             ))}
           </div>
@@ -238,7 +261,7 @@ export default function AdminDashboardPage() {
               >
                 <div className="flex items-start justify-between mb-2">
                   <Icon className="w-5 h-5 text-gray-600" />
-                  <span className="text-2xl font-bold text-gray-900">{item.count}</span>
+                  <span className="text-base font-bold text-gray-900">{item.count}</span>
                 </div>
                 <p className="text-sm font-medium text-gray-900">{item.label}</p>
               </Link>

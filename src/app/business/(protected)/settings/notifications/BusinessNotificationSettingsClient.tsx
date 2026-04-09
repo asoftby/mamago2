@@ -13,6 +13,10 @@ type Group = { title: string; types: NotificationType[] };
 
 const GROUPS: Group[] = [
   {
+    title: "Семья и план",
+    types: ["WELCOME", "REMINDER", "RECOMMENDATION", "SYSTEM"],
+  },
+  {
     title: "Заявки",
     types: [
       "BUSINESS_VERIFIED",
@@ -60,18 +64,54 @@ const TYPE_LABELS: Record<NotificationType, string> = {
   BUSINESS_VERIFIED:           "Верификация пройдена",
   BUSINESS_REJECTED:           "Верификация отклонена",
   BUSINESS_NEEDS_INFO:         "Требуется дополнительная информация",
-  SYSTEM:                      "Напоминания",
+  WELCOME:                     "Приветствие и онбординг",
+  REMINDER:                    "Напоминания",
+  RECOMMENDATION:              "Подборки и рекомендации",
+  SYSTEM:                      "Системные уведомления",
 };
 
 // ── Main component ────────────────────────────────────────────────────────────
 
 interface Props {
   initialPreferences: PreferenceRow[];
+  /** Внутри NotificationsModal */
+  embedded?: boolean;
 }
 
 type PrefsMap = Map<NotificationType, PreferenceRow>;
 
-export function BusinessNotificationSettingsClient({ initialPreferences }: Props) {
+function ChannelColumnHeaders() {
+  return (
+    <div
+      className="flex shrink-0 items-start justify-end gap-3 sm:gap-4"
+      aria-hidden
+    >
+      <div className="flex w-[52px] flex-col items-center gap-1 text-center">
+        <Bell className="h-3.5 w-3.5 shrink-0 text-gray-400" />
+        <span className="text-[10px] font-medium leading-tight text-gray-400">
+          сайт
+        </span>
+      </div>
+      <div className="flex w-[52px] flex-col items-center gap-1 text-center">
+        <Mail className="h-3.5 w-3.5 shrink-0 text-gray-400" />
+        <span className="text-[10px] font-medium leading-tight text-gray-400">
+          почта
+        </span>
+      </div>
+      <div className="flex w-[52px] flex-col items-center gap-1 text-center opacity-40">
+        <Send className="h-3.5 w-3.5 shrink-0 text-gray-400" />
+        <span className="text-[10px] font-medium leading-tight text-gray-400">
+          Telegram
+        </span>
+      </div>
+    </div>
+  );
+}
+
+export function BusinessNotificationSettingsClient({
+  initialPreferences,
+  embedded = false,
+}: Props) {
   const [prefs, setPrefs] = useState<PrefsMap>(
     () => new Map(initialPreferences.map((p) => [p.notificationType, p])),
   );
@@ -116,19 +156,15 @@ export function BusinessNotificationSettingsClient({ initialPreferences }: Props
   const visibleGroups = GROUPS.filter((g) => g.types.some((t) => prefs.has(t)));
 
   return (
-    <div className="max-w-2xl space-y-6 p-6">
-      {/* Page header */}
-      <div>
-        <h1 className="text-xl font-semibold text-gray-900">Уведомления</h1>
-        <p className="text-sm text-gray-500 mt-1">Выберите как получать уведомления</p>
-      </div>
-
-      {/* Channel legend */}
-      <div className="flex items-center gap-5 text-xs text-gray-400">
-        <span className="flex items-center gap-1.5"><Bell className="h-3.5 w-3.5" />В приложении</span>
-        <span className="flex items-center gap-1.5"><Mail className="h-3.5 w-3.5" />Email</span>
-        <span className="flex items-center gap-1.5 opacity-40"><Send className="h-3.5 w-3.5" />Telegram</span>
-      </div>
+    <div className={embedded ? "max-w-2xl space-y-4" : "max-w-2xl space-y-6 p-6"}>
+      {!embedded ? (
+        <div>
+          <h1 className="text-xl font-semibold text-gray-900">Уведомления</h1>
+          <p className="mt-1 text-sm text-gray-500">
+            Выберите как получать уведомления
+          </p>
+        </div>
+      ) : null}
 
       {/* Preference groups */}
       {visibleGroups.map((group) => {
@@ -136,12 +172,15 @@ export function BusinessNotificationSettingsClient({ initialPreferences }: Props
         return (
           <section
             key={group.title}
-            className="bg-white rounded-2xl border border-gray-200 overflow-hidden"
+            className="rounded-2xl border border-gray-200 bg-white shadow-sm"
           >
-            <div className="px-5 py-3.5 border-b border-gray-100">
-              <h2 className="text-sm font-semibold text-gray-700">{group.title}</h2>
+            <div className="sticky top-0 z-10 flex items-start justify-between gap-3 border-b border-gray-100 bg-white px-5 py-3.5 rounded-t-2xl">
+              <h2 className="min-w-0 flex-1 pt-0.5 text-sm font-semibold text-gray-700">
+                {group.title}
+              </h2>
+              <ChannelColumnHeaders />
             </div>
-            <div className="divide-y divide-gray-100">
+            <div className="divide-y divide-gray-100 overflow-hidden rounded-b-2xl">
               {rows.map((type) => {
                 const pref = prefs.get(type)!;
                 return (
@@ -149,25 +188,31 @@ export function BusinessNotificationSettingsClient({ initialPreferences }: Props
                     <span className="text-sm text-gray-800 flex-1 min-w-0">
                       {TYPE_LABELS[type]}
                     </span>
-                    <div className="flex items-center gap-4 shrink-0">
-                      <Toggle
-                        checked={pref.inApp}
-                        onChange={(v) => save(type, { inApp: v })}
-                        disabled={pending}
-                        aria-label={`${TYPE_LABELS[type]}: в приложении`}
-                      />
-                      <Toggle
-                        checked={pref.email}
-                        onChange={(v) => save(type, { email: v })}
-                        disabled={pending}
-                        aria-label={`${TYPE_LABELS[type]}: email`}
-                      />
-                      <Toggle
-                        checked={pref.telegram}
-                        onChange={(v) => save(type, { telegram: v })}
-                        disabled
-                        aria-label={`${TYPE_LABELS[type]}: telegram`}
-                      />
+                    <div className="flex shrink-0 items-center gap-3 sm:gap-4">
+                      <div className="flex w-[52px] justify-center">
+                        <Toggle
+                          checked={pref.inApp}
+                          onChange={(v) => save(type, { inApp: v })}
+                          disabled={pending}
+                          aria-label={`${TYPE_LABELS[type]}: сайт`}
+                        />
+                      </div>
+                      <div className="flex w-[52px] justify-center">
+                        <Toggle
+                          checked={pref.email}
+                          onChange={(v) => save(type, { email: v })}
+                          disabled={pending}
+                          aria-label={`${TYPE_LABELS[type]}: почта`}
+                        />
+                      </div>
+                      <div className="flex w-[52px] justify-center opacity-40">
+                        <Toggle
+                          checked={pref.telegram}
+                          onChange={(v) => save(type, { telegram: v })}
+                          disabled
+                          aria-label={`${TYPE_LABELS[type]}: Telegram`}
+                        />
+                      </div>
                     </div>
                   </div>
                 );
@@ -177,8 +222,7 @@ export function BusinessNotificationSettingsClient({ initialPreferences }: Props
         );
       })}
 
-      {/* Telegram block */}
-      <TelegramBlock />
+      {!embedded ? <TelegramBlock /> : null}
     </div>
   );
 }

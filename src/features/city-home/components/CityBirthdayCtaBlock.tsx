@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Sparkles } from "lucide-react";
+import { Cake } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type CityBirthdayCtaBlockProps = {
@@ -23,7 +23,7 @@ export function CityBirthdayCtaBlock({
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex gap-3 min-w-0">
           <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#EF8759]/15 text-[#EF8759]">
-            <Sparkles className="h-5 w-5" aria-hidden />
+            <Cake className="h-5 w-5" aria-hidden />
           </div>
           <div className="min-w-0">
             <h2 className="text-base font-semibold text-neutral-900 leading-tight">

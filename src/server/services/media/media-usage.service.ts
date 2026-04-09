@@ -8,6 +8,14 @@
 import { prisma } from "@/lib/prisma";
 import { MediaEntityType } from "@prisma/client";
 
+function mediaUsageDedupKey(u: {
+  entityType: MediaEntityType;
+  entityId: string;
+  field: string;
+}) {
+  return `${u.entityType}:${u.entityId}:${u.field}`;
+}
+
 export interface CreateMediaUsageInput {
   mediaId: string;
   entityType: MediaEntityType;
@@ -73,16 +81,92 @@ export async function getMediaUsages(mediaId: string) {
  * Get usages with entity details
  */
 export async function getMediaUsagesWithDetails(mediaId: string) {
-  const usages = await prisma.mediaUsage.findMany({
-    where: { mediaId },
-    orderBy: {
-      createdAt: "desc",
-    },
-  });
+  const [usages, articlesAsCover, articlesAsSeo] = await Promise.all([
+    prisma.mediaUsage.findMany({
+      where: { mediaId },
+      orderBy: {
+        createdAt: "desc",
+      },
+    }),
+    prisma.article.findMany({
+      where: { coverImageId: mediaId },
+      select: { id: true, title: true, updatedAt: true },
+    }),
+    prisma.article.findMany({
+      where: { seoImageId: mediaId },
+      select: { id: true, title: true, updatedAt: true },
+    }),
+  ]);
+
+  const seen = new Set(usages.map((u) => mediaUsageDedupKey(u)));
+  const synthetic: Array<{
+    id: string;
+    mediaId: string;
+    entityType: MediaEntityType;
+    entityId: string;
+    field: string;
+    createdAt: Date;
+  }> = [];
+
+  for (const a of articlesAsCover) {
+    const row = {
+      entityType: MediaEntityType.ARTICLE,
+      entityId: a.id,
+      field: "coverImageId",
+    };
+    if (!seen.has(mediaUsageDedupKey(row))) {
+      synthetic.push({
+        id: `synthetic:article-cover:${a.id}`,
+        mediaId,
+        ...row,
+        createdAt: a.updatedAt,
+      });
+      seen.add(mediaUsageDedupKey(row));
+    }
+  }
+
+  for (const a of articlesAsSeo) {
+    const row = {
+      entityType: MediaEntityType.ARTICLE,
+      entityId: a.id,
+      field: "seoImageId",
+    };
+    if (!seen.has(mediaUsageDedupKey(row))) {
+      synthetic.push({
+        id: `synthetic:article-seo:${a.id}`,
+        mediaId,
+        ...row,
+        createdAt: a.updatedAt,
+      });
+      seen.add(mediaUsageDedupKey(row));
+    }
+  }
+
+  const combined = [...usages, ...synthetic].sort(
+    (a, b) => b.createdAt.getTime() - a.createdAt.getTime()
+  );
+
+  const articleIdsForTitles = [
+    ...new Set(
+      combined
+        .filter((u) => u.entityType === MediaEntityType.ARTICLE)
+        .map((u) => u.entityId)
+    ),
+  ];
+  const articlesForTitles =
+    articleIdsForTitles.length > 0
+      ? await prisma.article.findMany({
+          where: { id: { in: articleIdsForTitles } },
+          select: { id: true, title: true },
+        })
+      : [];
+  const articleTitleById = new Map(
+    articlesForTitles.map((a) => [a.id, a.title] as const)
+  );
 
   // Enrich with entity names
   const enriched = await Promise.all(
-    usages.map(async (usage) => {
+    combined.map(async (usage) => {
       let entityName = null;
       let entityUrl = null;
 
@@ -113,6 +197,11 @@ export async function getMediaUsagesWithDetails(mediaId: string) {
             });
             entityName = offer?.title || null;
             entityUrl = `/admin/offers/${usage.entityId}`;
+            break;
+
+          case "ARTICLE":
+            entityName = articleTitleById.get(usage.entityId) ?? null;
+            entityUrl = `/admin/content/articles/${usage.entityId}/edit`;
             break;
 
           case "USER":

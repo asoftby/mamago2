@@ -103,7 +103,7 @@ export function RecommendationCard({
   return (
     <div
       className={cn(
-        "flex flex-col gap-3 overflow-hidden rounded-2xl border-2 bg-white p-4 shadow-sm transition-colors",
+        "flex flex-col gap-3 overflow-hidden rounded-2xl border bg-white p-4 shadow-sm transition-colors",
         "sm:gap-4 sm:p-5",
         isInPlan
           ? "border-primary"
@@ -181,6 +181,7 @@ export function RecommendationCard({
                 </Button>
               ) : null}
               <Button
+                type="button"
                 onClick={onRemoveFromPlan}
                 variant="ghost"
                 size="sm"

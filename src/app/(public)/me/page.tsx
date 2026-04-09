@@ -94,7 +94,7 @@ export default async function MePage({ searchParams }: PageProps) {
   const hour = new Date().getHours();
   const greetingWord =
     hour < 6 ? "Доброй ночи" : hour < 12 ? "Доброе утро" : hour < 18 ? "Добрый день" : "Добрый вечер";
-  const firstName = user.displayName ?? user.email.split("@")[0];
+  const firstName = user.displayName ?? user.email?.split("@")[0] ?? "Пользователь";
   const greeting = `${greetingWord}, ${firstName}`;
 
   const preferenceDisplayLine = await buildAdultPreferenceDisplayLine({

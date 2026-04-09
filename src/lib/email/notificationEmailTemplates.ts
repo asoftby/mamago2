@@ -17,19 +17,24 @@ const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://mamago.by";
 export function buildNotificationEmailTemplate(
   type: NotificationType,
   title: string,
-  message: string,
+  body: string,
   entityId?: string | null,
 ): EmailTemplate {
   const ctaUrl = buildCtaUrl(type, entityId);
   const ctaLine = ctaUrl ? `\n\nОткрыть: ${ctaUrl}` : "";
 
-  const text = `${title}\n\n${message}${ctaLine}\n\n---\nmamaGo — семейный помощник`;
-  const html = buildHtml(title, message, ctaUrl);
+  const text = `${title}\n\n${body}${ctaLine}\n\n---\nmamaGo — семейный помощник`;
+  const html = buildHtml(title, body, ctaUrl);
 
   return { subject: title, text, html };
 }
 
 function buildCtaUrl(type: NotificationType, entityId?: string | null): string | null {
+  if (type === "WELCOME" || type === "REMINDER" || type === "RECOMMENDATION") {
+    return `${APP_URL}/me/settings/notifications`;
+  }
+  if (type === "SYSTEM") return `${APP_URL}/me/plan`;
+
   if (!entityId) return `${APP_URL}/business/dashboard`;
 
   if (type.startsWith("PLACE_")) return `${APP_URL}/editor/place/${entityId}/edit`;
@@ -37,10 +42,10 @@ function buildCtaUrl(type: NotificationType, entityId?: string | null): string |
   if (type.startsWith("OFFER_")) return `${APP_URL}/editor/offer/${entityId}/edit`;
   if (type.startsWith("BUSINESS_")) return `${APP_URL}/business/verification`;
 
-  return `${APP_URL}/me/plan`;
+  return `${APP_URL}/business/dashboard`;
 }
 
-function buildHtml(title: string, message: string, ctaUrl: string | null): string {
+function buildHtml(title: string, body: string, ctaUrl: string | null): string {
   const btn = ctaUrl
     ? `<p><a href="${ctaUrl}" style="background:#EF8759;color:#fff;padding:10px 20px;border-radius:8px;text-decoration:none;font-weight:600;">Открыть</a></p>`
     : "";
@@ -50,7 +55,7 @@ function buildHtml(title: string, message: string, ctaUrl: string | null): strin
 <html>
 <body style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#1F1F1F;">
   <h2 style="margin-bottom:8px;">${title}</h2>
-  <p style="color:#555;line-height:1.6;">${message}</p>
+  <p style="color:#555;line-height:1.6;">${body}</p>
   ${btn}
   <hr style="margin-top:32px;border:none;border-top:1px solid #eee;"/>
   <p style="font-size:12px;color:#aaa;">mamaGo — семейный помощник</p>

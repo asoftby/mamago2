@@ -19,7 +19,7 @@ export function StoryRingItem({ title, seen, onClick }: StoryRingItemProps) {
       {/* Outer ring */}
       <div
         className={cn(
-          "relative h-[76px] w-[76px] md:h-[90px] md:w-[90px] rounded-full p-[1.5px] transition-transform duration-150",
+          "relative h-[87px] w-[87px] md:h-[104px] md:w-[104px] rounded-full p-[1.5px] transition-transform duration-150",
           "group-active:scale-[0.93] group-focus-visible:ring-2 group-focus-visible:ring-[#EF8759]/50 group-focus-visible:ring-offset-2",
           seen
             ? "bg-neutral-300/60"
@@ -44,7 +44,7 @@ export function StoryRingItem({ title, seen, onClick }: StoryRingItemProps) {
       {/* Label */}
       <span
         className={cn(
-          "text-[12px] leading-tight text-center max-w-[76px] md:max-w-[90px] line-clamp-1 transition-colors",
+          "text-[12px] leading-tight text-center max-w-[87px] md:max-w-[104px] line-clamp-1 transition-colors",
           seen ? "font-normal text-neutral-400" : "font-medium text-neutral-700",
         )}
       >

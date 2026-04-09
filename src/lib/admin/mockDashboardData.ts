@@ -72,7 +72,7 @@ export function getActionCenterData(): ActionCenterItem[] {
       type: "moderation",
       title: "Места на модерации",
       count: 12,
-      link: "/admin/moderation/places?status=PENDING",
+      link: "/admin/content/places?status=PENDING",
       severity: "high",
     },
     {
@@ -80,7 +80,7 @@ export function getActionCenterData(): ActionCenterItem[] {
       type: "improvement",
       title: "Просроченные запросы на улучшение",
       count: 3,
-      link: "/admin/moderation/places", // No dedicated improvement requests page yet
+      link: "/admin/content/places", // No dedicated improvement requests page yet
       severity: "high",
     },
     {
@@ -156,7 +156,7 @@ export function getNeedsAttentionData(): NeedsAttentionItem[] {
       type: "place",
       title: "Детский центр Радуга",
       description: "Отсутствует обложка",
-      link: "/admin/moderation/places",
+      link: "/admin/content/places",
       severity: "medium",
     },
     {
@@ -164,7 +164,7 @@ export function getNeedsAttentionData(): NeedsAttentionItem[] {
       type: "event",
       title: "Мастер-класс по рисованию",
       description: "Ожидает модерации 5 дней",
-      link: "/admin/moderation/places",
+      link: "/admin/content/places",
       severity: "high",
     },
     {
@@ -172,7 +172,7 @@ export function getNeedsAttentionData(): NeedsAttentionItem[] {
       type: "improvement",
       title: "Запрос #IR-2024-045",
       description: "Просрочен на 3 дня",
-      link: "/admin/moderation/places",
+      link: "/admin/content/places",
       severity: "high",
     },
     {
@@ -188,7 +188,7 @@ export function getNeedsAttentionData(): NeedsAttentionItem[] {
       type: "place",
       title: "Парк развлечений Фантазия",
       description: "Отсутствуют SEO метаданные",
-      link: "/admin/moderation/places",
+      link: "/admin/content/places",
       severity: "low",
     },
   ];
@@ -200,25 +200,25 @@ export function getContentQueuesData(): ContentQueueItem[] {
       id: "1",
       label: "Места",
       count: 12,
-      link: "/admin/moderation/places?status=PENDING",
+      link: "/admin/content/places?status=PENDING",
     },
     {
       id: "2",
       label: "События",
       count: 8,
-      link: "/admin/moderation/places", // No separate events moderation yet
+      link: "/admin/content/events?status=PENDING",
     },
     {
       id: "3",
       label: "Предложения",
       count: 5,
-      link: "/admin/moderation/places", // No separate offers moderation yet
+      link: "/admin/content/offers?status=PENDING",
     },
     {
       id: "4",
       label: "Маршруты",
       count: 3,
-      link: "/admin/moderation/places", // No separate routes moderation yet
+      link: "/admin/content/places", // No separate routes moderation yet
     },
   ];
 }
@@ -229,28 +229,28 @@ export function getContentQualityData(): ContentQualityItem[] {
       id: "1",
       label: "Без обложки",
       count: 15,
-      link: "/admin/moderation/places",
+      link: "/admin/content/places",
       severity: "high",
     },
     {
       id: "2",
       label: "Без SEO метаданных",
       count: 34,
-      link: "/admin/moderation/places",
+      link: "/admin/content/places",
       severity: "medium",
     },
     {
       id: "3",
       label: "Без таксономии",
       count: 8,
-      link: "/admin/moderation/places",
+      link: "/admin/content/places",
       severity: "medium",
     },
     {
       id: "4",
       label: "Возможные дубликаты",
       count: 6,
-      link: "/admin/moderation/places",
+      link: "/admin/content/places",
       severity: "low",
     },
   ];
@@ -267,7 +267,7 @@ export function getRecentActivityData(): RecentActivityItem[] {
       action: "одобрил место",
       entity: "Детский центр Радуга",
       timestamp: new Date(now.getTime() - 5 * 60 * 1000), // 5 min ago
-      link: "/admin/moderation/places",
+      link: "/admin/content/places",
     },
     {
       id: "2",
@@ -276,7 +276,7 @@ export function getRecentActivityData(): RecentActivityItem[] {
       action: "создал предложение",
       entity: "Скидка 20% на день рождения",
       timestamp: new Date(now.getTime() - 15 * 60 * 1000), // 15 min ago
-      link: "/admin/moderation/places",
+      link: "/admin/content/places",
     },
     {
       id: "3",
@@ -285,7 +285,7 @@ export function getRecentActivityData(): RecentActivityItem[] {
       action: "отредактировал место",
       entity: "Парк развлечений Фантазия",
       timestamp: new Date(now.getTime() - 30 * 60 * 1000), // 30 min ago
-      link: "/admin/moderation/places",
+      link: "/admin/content/places",
     },
     {
       id: "4",
@@ -294,7 +294,7 @@ export function getRecentActivityData(): RecentActivityItem[] {
       action: "создал запрос на улучшение",
       entity: "Место без контактов",
       timestamp: new Date(now.getTime() - 45 * 60 * 1000), // 45 min ago
-      link: "/admin/moderation/places",
+      link: "/admin/content/places",
     },
     {
       id: "5",
@@ -303,7 +303,7 @@ export function getRecentActivityData(): RecentActivityItem[] {
       action: "одобрил событие",
       entity: "Мастер-класс по рисованию",
       timestamp: new Date(now.getTime() - 60 * 60 * 1000), // 1 hour ago
-      link: "/admin/moderation/places",
+      link: "/admin/content/places",
     },
     {
       id: "6",
@@ -312,7 +312,7 @@ export function getRecentActivityData(): RecentActivityItem[] {
       action: "создал место",
       entity: "Детская студия творчества",
       timestamp: new Date(now.getTime() - 90 * 60 * 1000), // 1.5 hours ago
-      link: "/admin/moderation/places",
+      link: "/admin/content/places",
     },
     {
       id: "7",
@@ -321,7 +321,7 @@ export function getRecentActivityData(): RecentActivityItem[] {
       action: "обновил контакты",
       entity: "Детский центр Солнышко",
       timestamp: new Date(now.getTime() - 120 * 60 * 1000), // 2 hours ago
-      link: "/admin/moderation/places",
+      link: "/admin/content/places",
     },
   ];
 }

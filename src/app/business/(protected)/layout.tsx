@@ -14,18 +14,17 @@ export default async function ProtectedBusinessLayout({
     redirect("/login");
   }
 
-  // Кабинет партнёра — только владельцы бизнеса; остальные роли — в свои разделы
-  if (user.role === "USER") {
-    redirect("/me");
-  }
   if (user.role === "ADMIN" || user.role === "MODERATOR") {
     redirect("/admin");
   }
 
-  // 2. Check if Business exists (onboarding gate)
+  // 2. Partner cabinet: active BusinessMember (OWNER/MANAGER), else owned row; see getPartnerCabinetBusiness.
   const business = await getMyBusiness(user.id);
-  
+
   if (!business) {
+    if (user.role === "USER") {
+      redirect("/me");
+    }
     redirect("/business/onboarding");
   }
 

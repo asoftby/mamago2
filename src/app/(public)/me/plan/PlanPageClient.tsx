@@ -7,6 +7,7 @@ import { Container } from "@/components/ui/Container";
 import { WeekCalendar } from "./WeekCalendar";
 import { PlanDayList } from "./PlanDayList";
 import { RecommendationsSection } from "./RecommendationsSection";
+import { PlanProfileCompletionGate } from "./PlanProfileCompletionGate";
 import { MINSK_ACTIVITIES } from "@/mocks/activities.minsk";
 import type { PlanActivityPublicAvailability } from "@/lib/plan/publicVisibility";
 
@@ -93,6 +94,7 @@ export function PlanPageClient({ initialItems, ideaActivityIds, childrenAges }: 
 
   return (
     <div className="min-h-screen bg-[#F8F8F7]">
+      <PlanProfileCompletionGate />
       <Container className="max-w-2xl py-6 pb-20">
         {/* Header */}
         <div className="mb-6">

@@ -1,17 +1,19 @@
 "use server";
 
-import prisma from "@/lib/prisma";
 import type { Business } from "@prisma/client";
+import {
+  getOwnedBusinessForUser,
+  getPartnerCabinetBusiness,
+} from "@/server/permissions/business-permissions";
 
 /**
- * Get the Business for the current user (one business per owner for MVP)
+ * Business for the partner cabinet: active membership (OWNER/MANAGER), else owned row (no member yet).
  */
 export async function getMyBusiness(userId: string): Promise<Business | null> {
-  const business = await prisma.business.findUnique({
-    where: {
-      ownerUserId: userId,
-    },
-  });
+  return getPartnerCabinetBusiness(userId);
+}
 
-  return business;
+/** Business the user owns (`ownerUserId`). Onboarding / billing — not team membership. */
+export async function getOwnedBusinessProfile(userId: string): Promise<Business | null> {
+  return getOwnedBusinessForUser(userId);
 }

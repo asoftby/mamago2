@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
-import { canCreateBusinessContent, canManageOwnedContent } from "@/lib/auth/businessContentAccess";
+import { canCreateBusinessContent } from "@/lib/auth/businessContentAccess";
+import { canManageActivityById } from "@/lib/auth/activityAccess";
 import { fetchActivityEventRowSummary } from "@/lib/activity/fetchActivityEventRowSummary";
 import { restoreActivityToDraftById } from "@/lib/activity/restoreActivity";
 
@@ -20,7 +21,11 @@ export async function POST(
     }
 
     const summary = await fetchActivityEventRowSummary(id);
-    if (!summary || !canManageOwnedContent(user, summary.ownerUserId)) {
+    if (!summary) {
+      return NextResponse.json({ error: "Event not found" }, { status: 404 });
+    }
+
+    if (!(await canManageActivityById(user, id))) {
       return NextResponse.json({ error: "Event not found" }, { status: 404 });
     }
 

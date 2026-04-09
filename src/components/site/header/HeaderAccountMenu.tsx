@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { CircleUser } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { SiteAuthModal } from "@/components/auth/SiteAuthModal";
+import { DefaultAuthModal } from "@/components/auth/DefaultAuthModal";
 import type { AccountMenuUser } from "@/components/site/header/AccountMenuBody";
 import { HEADER_CHROME_ICON_BUTTON_CLASS } from "@/components/site/header/headerIconButtonClass";
 import { NotificationsDropdown } from "@/components/site/header/NotificationsDropdown";
@@ -21,7 +21,6 @@ import { notifyAuthStateChanged } from "@/lib/auth/client";
  */
 export function HeaderAccountMenu() {
   const router = useRouter();
-  const pathname = usePathname();
   const narrow = useNarrowViewport();
   const { mode, goToBusinessAccount, goToPersonalAccount, hydrated } =
     useAccountMode();
@@ -35,6 +34,11 @@ export function HeaderAccountMenu() {
   const [loggingOut, setLoggingOut] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [guestAuthOpen, setGuestAuthOpen] = useState(false);
+  /** Первый paint на клиенте совпадает с SSR; иначе FamilyPersona успевает дать guest до гидрации → mismatch span/button. */
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const handleLogout = async () => {
     setLoggingOut(true);
@@ -54,18 +58,23 @@ export function HeaderAccountMenu() {
     }
   };
 
-  if (user === undefined) {
+  if (!mounted || user === undefined) {
     return (
       <div className="flex items-center gap-1.5 md:gap-2">
-        <span
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          disabled
           className={cn(
             HEADER_CHROME_ICON_BUTTON_CLASS,
-            "pointer-events-none inline-flex items-center justify-center opacity-60",
+            "pointer-events-none opacity-60",
           )}
-          aria-hidden
+          aria-label="Загрузка профиля"
+          aria-busy="true"
         >
-          <span className="h-4 w-4 rounded-full bg-gray-100" />
-        </span>
+          <span className="h-4 w-4 rounded-full bg-gray-100" aria-hidden />
+        </Button>
       </div>
     );
   }
@@ -85,24 +94,24 @@ export function HeaderAccountMenu() {
         >
           <CircleUser className="h-4 w-4" aria-hidden />
         </Button>
-        <SiteAuthModal
+        <DefaultAuthModal
           open={guestAuthOpen}
           onOpenChange={setGuestAuthOpen}
-          nextHref={pathname || "/"}
+          nextHref="/me"
+          authEntryPoint="profile"
           dialogTitle="Вход в mamaGo"
           title="Вход в mamaGo"
           subtitle="Планируйте лучшее время с детьми"
           onAuthSuccess={() => {
             setGuestAuthOpen(false);
             notifyAuthStateChanged();
-            router.refresh();
           }}
         />
       </div>
     );
   }
 
-  const displayName = user.displayName?.trim() || user.email.split("@")[0] || "?";
+  const displayName = user.displayName?.trim() || user.email?.split("@")[0] || "?";
   const avatarLetter = displayName.charAt(0).toUpperCase();
   const isBusinessPartner = user.role === "BUSINESS_OWNER";
   const notificationContext =
@@ -135,16 +144,12 @@ export function HeaderAccountMenu() {
 
   return (
     <div className="flex min-w-0 items-center justify-end gap-1.5 md:gap-2">
-      <NotificationsDropdown
-        context={notificationContext}
-        narrow={narrow}
-        viewAllHref={
-          notificationContext === "business"
-            ? "/business/notifications"
-            : "/notifications"
-        }
-        triggerClassName={cn("inline-flex", HEADER_CHROME_ICON_BUTTON_CLASS)}
-      />
+      {user && (
+        <NotificationsDropdown
+          context={notificationContext}
+          triggerClassName={cn("inline-flex", HEADER_CHROME_ICON_BUTTON_CLASS)}
+        />
+      )}
 
       <ProfileDropdown
         mode={hydrated ? mode : "personal"}

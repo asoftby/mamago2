@@ -50,19 +50,22 @@ export function isToday(iso: string): boolean {
   return iso === isoFromDate(new Date());
 }
 
-export function buildWeekMonthLabel(weekDays: string[]): string {
+export function buildWeekMonthLabel(weekDays: string[], selectedDate?: string): string {
   if (weekDays.length === 0) return "";
-  const parsed = weekDays.map(dateFromIso);
-  const first = parsed[0]!;
-  const last = parsed[parsed.length - 1]!;
-  const firstMonth = first.toLocaleDateString("ru-RU", { month: "long" }).toUpperCase();
-  const lastMonth = last.toLocaleDateString("ru-RU", { month: "long" }).toUpperCase();
-  const firstYear = first.getFullYear();
-  const lastYear = last.getFullYear();
-
-  if (firstYear === lastYear) {
-    if (firstMonth === lastMonth) return `${firstMonth} ${firstYear}`;
-    return `${firstMonth} - ${lastMonth} ${firstYear}`;
+  
+  // Use selected date if provided, otherwise use middle of week
+  const referenceIso = selectedDate ?? weekDays[Math.floor(weekDays.length / 2)]!;
+  const referenceDate = dateFromIso(referenceIso);
+  
+  // Simple format: "АПРЕЛЬ" or "АПРЕЛЬ 2026" (show year if not current year)
+  const month = referenceDate.toLocaleDateString("ru-RU", { month: "long" }).toUpperCase();
+  const year = referenceDate.getFullYear();
+  const currentYear = new Date().getFullYear();
+  
+  // Show year only if different from current year
+  if (year !== currentYear) {
+    return `${month} ${year}`;
   }
-  return `${firstMonth} ${firstYear} - ${lastMonth} ${lastYear}`;
+  
+  return month;
 }

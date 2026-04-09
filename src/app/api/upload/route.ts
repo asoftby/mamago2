@@ -132,15 +132,16 @@ export async function POST(req: NextRequest) {
     }
 
     // Register in media library
+    let mediaId: string | null = null;
     try {
       let sourceType: MediaSourceType = MediaSourceType.USER_UPLOAD;
-      if (user.role === "ADMIN") {
+      if (user.role === "ADMIN" || user.role === "MODERATOR") {
         sourceType = MediaSourceType.ADMIN_UPLOAD;
       } else if (user.role === "BUSINESS_OWNER") {
         sourceType = MediaSourceType.BUSINESS_UPLOAD;
       }
 
-      await registerUploadedMedia({
+      const asset = await registerUploadedMedia({
         filename: masterFilename,
         originalName: file.name,
         mimeType: "image/webp", // All processed images are WebP
@@ -152,6 +153,7 @@ export async function POST(req: NextRequest) {
         sourceType,
         uploadedById: user.id,
       });
+      mediaId = asset.id;
     } catch (mediaError) {
       console.error("Failed to register media in library:", mediaError);
     }
@@ -166,6 +168,7 @@ export async function POST(req: NextRequest) {
       originalFormat: processedImageSet.originalMimeType,
       responsiveSizes,
       processed: true,
+      mediaId,
     });
   } catch (error: any) {
     console.error("Upload error:", error);

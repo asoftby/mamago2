@@ -7,6 +7,7 @@ import {
   useEffect,
   useCallback,
   useMemo,
+  useRef,
   type ReactNode,
 } from "react";
 import { useParams } from "next/navigation";
@@ -21,6 +22,8 @@ function todayISO(): string {
 }
 import { useAuthMe } from "@/features/birthday/builder/hooks/useAuthMe";
 import type { PlanItemWithActivity } from "../types/event";
+import { normalizePlanItemsFromApi } from "../lib/normalizePlanItemFromApi";
+import { sortPlanItemsForDay } from "../lib/sortPlanItemsForDay";
 import {
   countSelectableCandidatesForSlot,
   getCandidatesForSlot,
@@ -91,8 +94,6 @@ export function useMyPlan() {
   return ctx;
 }
 
-const SLOT_TYPES: PlanSlotType[] = ["morning", "afternoon", "evening"];
-
 function useMyPlanStore() {
   const params = useParams() as { city?: string };
   const cityCtx = useOptionalCity();
@@ -107,24 +108,21 @@ function useMyPlanStore() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedPlanDate, setSelectedPlanDate] = useState<string>(todayISO);
   const [submittingChild, setSubmittingChild] = useState(false);
-  const [slotAlternativeCursor, setSlotAlternativeCursor] = useState<
-    Record<PlanSlotType, number>
-  >({
-    morning: 0,
-    afternoon: 0,
-    evening: 0,
-  });
 
-  /** По дате и слоту: события в плане (до MAX на слот) */
-  const [slotPlanItemsByDate, setSlotPlanItemsByDate] = useState<
-    Record<string, Partial<Record<PlanSlotType, PlanItemWithActivity[]>>>
+  /** Chronological plan items by date - sorted by startsAt */
+  const [planItemsByDateMap, setPlanItemsByDateMap] = useState<
+    Record<string, PlanItemWithActivity[]>
   >({});
-  /** После «Добавить ещё» — показать ещё одну рекомендацию (при непустом слоте) */
-  const [slotPendingSuggestionByDate, setSlotPendingSuggestionByDate] = useState<
-    Record<string, Partial<Record<PlanSlotType, boolean>>>
-  >({});
+  /** Актуальный снимок для проверки дублей в async-колбэках без устаревшего замыкания. */
+  const planItemsByDateMapRef = useRef(planItemsByDateMap);
+  planItemsByDateMapRef.current = planItemsByDateMap;
   const [ideas, setIdeas] = useState<MyPlanIdea[]>([]);
   const [ideasLoading, setIdeasLoading] = useState(false);
+  /** События из каталога для блока «Рекомендации» (не путать с сохранёнными идеями). */
+  const [planSuggestions, setPlanSuggestions] = useState<
+    NonNullable<MyPlanIdea["activity"]>[]
+  >([]);
+  const [suggestionsLoading, setSuggestionsLoading] = useState(false);
 
   const childrenFamilySync = useMemo(
     () =>
@@ -251,13 +249,142 @@ function useMyPlanStore() {
     void refetchIdeas();
   }, [isAuthenticated, authLoading, refetchIdeas]);
 
+  const planSuggestionExcludeSignature = useMemo(() => {
+    const ids = new Set<string>();
+    for (const idea of ideas) ids.add(idea.activityId);
+    for (const item of planItemsByDateMap[selectedPlanDate] ?? []) {
+      if (item.activityId) ids.add(item.activityId);
+    }
+    return [...ids].sort().join(",");
+  }, [ideas, planItemsByDateMap, selectedPlanDate]);
+
+  const selectedAgeRangesKey = useMemo(
+    () =>
+      childrenScope.selectedAgeRanges
+        .map((r) => r.range)
+        .filter(Boolean)
+        .sort()
+        .join(","),
+    [childrenScope.selectedAgeRanges],
+  );
+
+  const refetchPlanSuggestions = useCallback(async () => {
+    if (!isAuthenticated) {
+      setPlanSuggestions([]);
+      return;
+    }
+    setSuggestionsLoading(true);
+    try {
+      const qs = new URLSearchParams();
+      qs.set("city", citySlug);
+      qs.set("date", selectedPlanDate);
+      if (planSuggestionExcludeSignature.length > 0) {
+        qs.set("exclude", planSuggestionExcludeSignature.split(",").filter(Boolean).join(","));
+      }
+      if (selectedAgeRangesKey.length > 0) {
+        qs.set("ageRanges", selectedAgeRangesKey);
+      }
+      const res = await fetch(`/api/plan/suggestions?${qs.toString()}`, {
+        credentials: "include",
+      });
+      if (!res.ok) {
+        setPlanSuggestions([]);
+        return;
+      }
+      const data = (await res.json()) as {
+        suggestions?: NonNullable<MyPlanIdea["activity"]>[];
+      };
+      const list = Array.isArray(data.suggestions) ? data.suggestions : [];
+      setPlanSuggestions(list);
+    } catch {
+      setPlanSuggestions([]);
+    } finally {
+      setSuggestionsLoading(false);
+    }
+  }, [
+    isAuthenticated,
+    citySlug,
+    selectedPlanDate,
+    planSuggestionExcludeSignature,
+    selectedAgeRangesKey,
+  ]);
+
+  useEffect(() => {
+    if (!isAuthenticated || authLoading) {
+      setPlanSuggestions([]);
+      return;
+    }
+    void refetchPlanSuggestions();
+  }, [isAuthenticated, authLoading, refetchPlanSuggestions]);
+
+  const selectedPersonaIdsForPlan = useMemo(
+    () => family?.selectedPersonaIds ?? [],
+    [family?.selectedPersonaIds],
+  );
+
+  const planDayFetchGen = useRef(0);
+
+  const refetchPlanForDate = useCallback(
+    async (date: string) => {
+      if (!isAuthenticated || authLoading) return;
+      const gen = ++planDayFetchGen.current;
+      try {
+        const res = await fetch(
+          `/api/save/plan/day?date=${encodeURIComponent(date)}`,
+          { credentials: "include" },
+        );
+        if (!res.ok) return;
+        if (gen !== planDayFetchGen.current) return;
+        const data = (await res.json()) as { items?: unknown[] };
+        const raw = Array.isArray(data.items) ? data.items : [];
+        const items = sortPlanItemsForDay(normalizePlanItemsFromApi(raw));
+        setPlanItemsByDateMap((prev) => ({
+          ...prev,
+          [date]: items,
+        }));
+      } catch {
+        /* ignore */
+      }
+    },
+    [isAuthenticated, authLoading],
+  );
+
+  const postActivityToPlan = useCallback(
+    async (input: {
+      activityId: string;
+      title: string;
+      coverImageUrl?: string | null;
+      planAddSource: "recommendation" | "idea";
+    }) => {
+      const res = await fetch("/api/save/plan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          activityId: input.activityId,
+          date: selectedPlanDate,
+          title: input.title,
+          coverImageUrl: input.coverImageUrl ?? undefined,
+          selectedPersonaIds: selectedPersonaIdsForPlan,
+          planAddSource: input.planAddSource,
+        }),
+      });
+      if (!res.ok) return { ok: false as const, planItemId: null as string | null };
+      const data = (await res.json()) as { planItem?: { id: string } };
+      const planItemId = data.planItem?.id ?? null;
+      if (!planItemId) return { ok: false as const, planItemId: null };
+      return { ok: true as const, planItemId };
+    },
+    [selectedPlanDate, selectedPersonaIdsForPlan],
+  );
+
   const accessPhase: PlanAccessPhase = useMemo(() => {
     if (authLoading) return "loading";
     if (!isAuthenticated) return "no_children";
     if (profileLoading) return "loading";
-    if (children.length === 0) return "no_children";
+    // Always allow access to My Plan, even without children
     return "ready";
-  }, [isAuthenticated, authLoading, profileLoading, children.length]);
+  }, [isAuthenticated, authLoading, profileLoading]);
 
   const locationFilteredPlanItems = useMemo(() => {
     const normalized = (v?: string | null) => (v ?? "").trim().toLowerCase();
@@ -317,146 +444,71 @@ function useMyPlanStore() {
   }, [accessPhase, locationFilteredPlanItems, selectedPlanDate]);
 
   const planSlots = useMemo((): PlanSlot[] => {
-    if (accessPhase !== "ready") return [];
-    const kidsForRec = children.map((c) => ({
-      id: c.id,
-      birthDate: c.birthDate,
-      systemInterests: c.systemInterests,
-    }));
-    return SLOT_TYPES.map((type) => {
-      const plannedItems = slotPlanItemsByDate[selectedPlanDate]?.[type] ?? [];
-      const pending = slotPendingSuggestionByDate[selectedPlanDate]?.[type] ?? false;
-      const cursor = slotAlternativeCursor[type] ?? 0;
+    // DEPRECATED: Kept for backward compatibility but returns empty array
+    // New UI should use planItemsByDate directly
+    return [];
+  }, []);
 
-      let suggestionItem: PlanItemWithActivity | null = null;
-      if (plannedItems.length === 0) {
-        suggestionItem = pickItemForSlot(
-          type,
-          kidsForRec,
-          scopeForRecommendations,
-          cursor,
-          selectedPlanDate,
-          locationFilteredPlanItems,
+  const addPlanItem = useCallback(
+    (item: PlanItemWithActivity) => {
+      setPlanItemsByDateMap((prev) => {
+        const day = prev[selectedPlanDate] ?? [];
+        if (day.some((i) => i.id === item.id)) {
+          const replaced = day.map((i) => (i.id === item.id ? item : i));
+          return {
+            ...prev,
+            [selectedPlanDate]: sortPlanItemsForDay(replaced),
+          };
+        }
+        const withoutActivityDup = day.filter(
+          (i) => i.activityId == null || i.activityId !== item.activityId,
         );
-      } else if (plannedItems.length < MAX_PLAN_ITEMS_PER_SLOT && pending) {
-        const excludeIds = plannedItems
-          .map((i) => i.activityId)
-          .filter((id): id is string => id != null && id !== "");
-        suggestionItem = pickItemForSlotExcluding(
-          type,
-          kidsForRec,
-          scopeForRecommendations,
-          cursor,
-          selectedPlanDate,
-          excludeIds,
-          locationFilteredPlanItems,
-        );
-      }
-
-      const excludeForCount = plannedItems
-        .map((i) => i.activityId)
-        .filter((id): id is string => id != null && id !== "");
-      let alternativesCountForSuggestion = 0;
-      let suggestionVariantTotal = 0;
-      let suggestionVariantPosition = 1;
-      if (suggestionItem) {
-        const list = getCandidatesForSlot(type, kidsForRec, scopeForRecommendations, locationFilteredPlanItems).filter((c) => {
-          const aid = c.buildForDate(selectedPlanDate).activityId;
-          if (!aid) return true;
-          return !excludeForCount.includes(aid);
-        });
-        const effective =
-          list.length > 0 ? list : getCandidatesForSlot(type, kidsForRec, scopeForRecommendations, locationFilteredPlanItems);
-        alternativesCountForSuggestion = effective.length;
-        suggestionVariantTotal = effective.length;
-        suggestionVariantPosition =
-          effective.length > 0 ? ((cursor % effective.length) + effective.length) % effective.length + 1 : 1;
-      }
-
-      const fullForSlot = getCandidatesForSlot(type, kidsForRec, scopeForRecommendations, locationFilteredPlanItems);
-      const remainingAfterPlanned = fullForSlot.filter((c) => {
-        const aid = c.buildForDate(selectedPlanDate).activityId;
-        if (!aid) return true;
-        return !excludeForCount.includes(aid);
-      });
-      const hasMoreCandidatesForAdd = remainingAfterPlanned.length > 0;
-
-      return {
-        type,
-        plannedItems,
-        suggestionItem,
-        alternativesCountForSuggestion,
-        hasMoreCandidatesForAdd,
-        suggestionVariantPosition,
-        suggestionVariantTotal,
-      };
-    });
-  }, [
-    accessPhase,
-    children,
-    scopeForRecommendations,
-    slotAlternativeCursor,
-    selectedPlanDate,
-    slotPlanItemsByDate,
-    slotPendingSuggestionByDate,
-    locationFilteredPlanItems,
-  ]);
-
-  useEffect(() => {
-    setSlotAlternativeCursor((prev) => {
-      if (
-        prev.morning === 0 &&
-        prev.afternoon === 0 &&
-        prev.evening === 0
-      ) {
-        return prev;
-      }
-      return { morning: 0, afternoon: 0, evening: 0 };
-    });
-  }, [selectedChildrenKey, selectedPlanDate, children.length]);
-
-  const markSlotSaved = useCallback(
-    (slot: PlanSlotType, item: PlanItemWithActivity) => {
-      setSlotPlanItemsByDate((prev) => {
-        const day = prev[selectedPlanDate] ?? {};
-        const cur = day[slot] ?? [];
-        if (cur.length >= MAX_PLAN_ITEMS_PER_SLOT) return prev;
+        const updated = sortPlanItemsForDay([...withoutActivityDup, item]);
         return {
           ...prev,
-          [selectedPlanDate]: {
-            ...day,
-            [slot]: [...cur, item],
-          },
+          [selectedPlanDate]: updated,
         };
       });
-      setSlotPendingSuggestionByDate((prev) => ({
-        ...prev,
-        [selectedPlanDate]: { ...prev[selectedPlanDate], [slot]: false },
-      }));
     },
     [selectedPlanDate],
   );
 
-  const clearSlotSaved = useCallback((slot: PlanSlotType, itemId: string) => {
-    setSlotPlanItemsByDate((prev) => {
-      const day = prev[selectedPlanDate];
-      if (!day?.[slot]) return prev;
-      const nextItems = day[slot].filter((i) => i.id !== itemId);
-      const nextDay = { ...day };
-      if (nextItems.length === 0) {
-        delete nextDay[slot];
-      } else {
-        nextDay[slot] = nextItems;
+  const removePlanItemLocal = useCallback(
+    (itemId: string) => {
+      setPlanItemsByDateMap((prev) => {
+        const day = prev[selectedPlanDate];
+        if (!day) return prev;
+        const updated = day.filter((i) => i.id !== itemId);
+        const out = { ...prev };
+        if (updated.length === 0) {
+          delete out[selectedPlanDate];
+        } else {
+          out[selectedPlanDate] = updated;
+        }
+        return out;
+      });
+    },
+    [selectedPlanDate],
+  );
+
+  /** Удаление пункта плана на сервере и в локальном состоянии. */
+  const removePlanItemFromDay = useCallback(
+    async (planItemId: string): Promise<boolean> => {
+      try {
+        const res = await fetch(
+          `/api/save/plan?planItemId=${encodeURIComponent(planItemId)}`,
+          { method: "DELETE", credentials: "include" },
+        );
+        if (!res.ok) return false;
+        removePlanItemLocal(planItemId);
+        void refetchPlanForDate(selectedPlanDate);
+        return true;
+      } catch {
+        return false;
       }
-      const out = { ...prev };
-      if (Object.keys(nextDay).length === 0) {
-        delete out[selectedPlanDate];
-      } else {
-        out[selectedPlanDate] = nextDay;
-      }
-      return out;
-    });
-  }, [selectedPlanDate]);
+    },
+    [removePlanItemLocal, refetchPlanForDate, selectedPlanDate],
+  );
 
   const removeIdea = useCallback(async (activityId: string): Promise<boolean> => {
     try {
@@ -469,110 +521,18 @@ function useMyPlanStore() {
     }
   }, []);
 
-  const resolveSlotForIdea = useCallback((): PlanSlotType => {
-    const day = slotPlanItemsByDate[selectedPlanDate] ?? {};
-    const order: PlanSlotType[] = ["morning", "afternoon", "evening"];
-    const firstAvailable = order.find((slot) => (day[slot]?.length ?? 0) < MAX_PLAN_ITEMS_PER_SLOT);
-    return firstAvailable ?? "morning";
-  }, [selectedPlanDate, slotPlanItemsByDate]);
-
-  const addIdeaToPlan = useCallback((idea: MyPlanIdea): { ok: boolean; slot?: PlanSlotType } => {
-    const slot = resolveSlotForIdea();
-    const planItem: PlanItemWithActivity = {
-      id: `idea-${idea.id}-${selectedPlanDate}`,
-      userId: "me",
-      activityId: idea.activityId,
-      date: selectedPlanDate,
-      startsAt: null,
-      title: idea.activity.title,
-      coverImageUrl: idea.activity.coverImageUrl ?? null,
-      createdAt: new Date(),
-      activity: idea.activity,
-    };
-    markSlotSaved(slot, planItem);
-    setIdeas((prev) =>
-      prev.map((item) =>
-        item.id === idea.id ? { ...item, inPlanOnDate: true } : item,
-      ),
-    );
-    return { ok: true, slot };
-  }, [markSlotSaved, resolveSlotForIdea, selectedPlanDate]);
-
-  const openSlotSuggestion = useCallback(
-    (slot: PlanSlotType) => {
-      setSlotPendingSuggestionByDate((prev) => ({
-        ...prev,
-        [selectedPlanDate]: { ...prev[selectedPlanDate], [slot]: true },
-      }));
-      setSlotAlternativeCursor((prev) => ({ ...prev, [slot]: 0 }));
-    },
-    [selectedPlanDate],
-  );
-
   const cycleSlotAlternative = useCallback(
-    (slot: PlanSlotType) => {
-      setSlotAlternativeCursor((prev) => {
-        const kidsForRec = children.map((c) => ({
-          id: c.id,
-          birthDate: c.birthDate,
-          systemInterests: c.systemInterests,
-        }));
-        const planned = slotPlanItemsByDate[selectedPlanDate]?.[slot] ?? [];
-        const pending = slotPendingSuggestionByDate[selectedPlanDate]?.[slot] ?? false;
-        const excludeIds =
-          planned.length > 0 && pending
-            ? planned
-                .map((i) => i.activityId)
-                .filter((id): id is string => id != null && id !== "")
-            : [];
-        const len = countSelectableCandidatesForSlot(
-          slot,
-          kidsForRec,
-          scopeForRecommendations,
-          selectedPlanDate,
-          excludeIds,
-          locationFilteredPlanItems,
-        );
-        return {
-          ...prev,
-          [slot]: ((prev[slot] ?? 0) + 1) % len,
-        };
-      });
+    () => {
+      // DEPRECATED: Kept for backward compatibility
     },
-    [children, scopeForRecommendations, selectedPlanDate, slotPlanItemsByDate, slotPendingSuggestionByDate, locationFilteredPlanItems],
+    [],
   );
 
   const cycleSlotAlternativePrev = useCallback(
-    (slot: PlanSlotType) => {
-      setSlotAlternativeCursor((prev) => {
-        const kidsForRec = children.map((c) => ({
-          id: c.id,
-          birthDate: c.birthDate,
-          systemInterests: c.systemInterests,
-        }));
-        const planned = slotPlanItemsByDate[selectedPlanDate]?.[slot] ?? [];
-        const pending = slotPendingSuggestionByDate[selectedPlanDate]?.[slot] ?? false;
-        const excludeIds =
-          planned.length > 0 && pending
-            ? planned
-                .map((i) => i.activityId)
-                .filter((id): id is string => id != null && id !== "")
-            : [];
-        const len = countSelectableCandidatesForSlot(
-          slot,
-          kidsForRec,
-          scopeForRecommendations,
-          selectedPlanDate,
-          excludeIds,
-          locationFilteredPlanItems,
-        );
-        return {
-          ...prev,
-          [slot]: ((prev[slot] ?? 0) - 1 + len) % len,
-        };
-      });
+    () => {
+      // DEPRECATED: Kept for backward compatibility
     },
-    [children, scopeForRecommendations, selectedPlanDate, slotPlanItemsByDate, slotPendingSuggestionByDate, locationFilteredPlanItems],
+    [],
   );
 
   const isLoading = authLoading || (isAuthenticated && profileLoading);
@@ -673,23 +633,99 @@ function useMyPlanStore() {
 
     planItems: filteredItems,
     allPlanItems: planItems,
-    planItemsByDate,
-    todayItems,
+    planItemsByDate: planItemsByDateMap,
+    todayItems: planItemsByDateMap[today] ?? [],
     weekDates,
     searchQuery,
     setSearchQuery,
-    todayCount: isAuthenticated ? todayItems.length : 0,
+    todayCount: isAuthenticated ? (planItemsByDateMap[today] ?? []).length : 0,
     planSlots,
     cycleSlotAlternative,
     cycleSlotAlternativePrev,
-    markSlotSaved,
-    clearSlotSaved,
-    openSlotSuggestion,
+    markSlotSaved: addPlanItem,
+    clearSlotSaved: removePlanItemFromDay,
+    openSlotSuggestion: () => {},
     ideas,
     ideasLoading,
     refetchIdeas,
     removeIdea,
-    addIdeaToPlan,
+    addIdeaToPlan: async (idea: MyPlanIdea): Promise<{ ok: boolean }> => {
+      try {
+        const day = planItemsByDateMapRef.current[selectedPlanDate] ?? [];
+        if (day.some((i) => i.activityId === idea.activityId)) {
+          return { ok: true };
+        }
+
+        const { ok, planItemId } = await postActivityToPlan({
+          activityId: idea.activityId,
+          title: idea.activity.title,
+          coverImageUrl: idea.activity.coverImageUrl,
+          planAddSource: "idea",
+        });
+        if (!ok || !planItemId) return { ok: false };
+
+        const planItem: PlanItemWithActivity = {
+          id: planItemId,
+          userId: "me",
+          activityId: idea.activityId,
+          date: selectedPlanDate,
+          startsAt: null,
+          title: idea.activity.title,
+          coverImageUrl: idea.activity.coverImageUrl ?? null,
+          createdAt: new Date(),
+          activity: idea.activity,
+        };
+        addPlanItem(planItem);
+        setIdeas((prev) =>
+          prev.map((item) =>
+            item.id === idea.id ? { ...item, inPlanOnDate: true } : item,
+          ),
+        );
+        void refetchPlanForDate(selectedPlanDate);
+        return { ok: true };
+      } catch {
+        return { ok: false };
+      }
+    },
+    planSuggestions,
+    suggestionsLoading,
+    refetchPlanSuggestions,
+    addActivityToPlanFromSuggestion: async (
+      activity: NonNullable<MyPlanIdea["activity"]>,
+    ): Promise<{ ok: boolean }> => {
+      try {
+        const dayExisting = planItemsByDateMapRef.current[selectedPlanDate] ?? [];
+        if (dayExisting.some((i) => i.activityId === activity.id)) {
+          return { ok: true };
+        }
+
+        const { ok, planItemId } = await postActivityToPlan({
+          activityId: activity.id,
+          title: activity.title,
+          coverImageUrl: activity.coverImageUrl,
+          planAddSource: "recommendation",
+        });
+        if (!ok || !planItemId) return { ok: false };
+
+        const planItem: PlanItemWithActivity = {
+          id: planItemId,
+          userId: "me",
+          activityId: activity.id,
+          date: selectedPlanDate,
+          startsAt: null,
+          title: activity.title,
+          coverImageUrl: activity.coverImageUrl ?? null,
+          createdAt: new Date(),
+          activity,
+        };
+        addPlanItem(planItem);
+        void refetchPlanForDate(selectedPlanDate);
+        return { ok: true };
+      } catch {
+        return { ok: false };
+      }
+    },
+    refetchPlanForDate,
     todayIso: today,
     selectedPlanDate,
     setSelectedPlanDate,

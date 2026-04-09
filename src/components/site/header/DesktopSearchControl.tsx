@@ -440,7 +440,8 @@ function DiscoveryDesktopSearchControl({
 
   const showChildrenPreset = isAuthenticated && profileChildren.length > 0;
   const allowMultiChildSelect = profileChildren.length >= 2;
-  const primaryAdultPersonaId = family?.primaryAdultPersonaId ?? null;
+  // Always use first persona ID if it's an adult
+  const primaryAdultPersonaId = family?.personas?.[0]?.kind === "adult" ? family.personas[0].id : null;
   const adultSelected =
     !!primaryAdultPersonaId &&
     !!family?.selectedPersonaIds.includes(primaryAdultPersonaId);
@@ -461,7 +462,7 @@ function DiscoveryDesktopSearchControl({
 
   const whoPrimaryLine = useMemo(() => {
     if (ageMode === "free" && showChildrenPreset) {
-      return "Для всех";
+      return "Свободный поиск";
     }
     return formatWhoHeaderSummary({
       hasSelectedChildren,
@@ -478,46 +479,49 @@ function DiscoveryDesktopSearchControl({
     formDisplayFilters.age,
   ]);
 
-  const toggleChild = (childId: string) => {
-    if (!family?.personas?.length) {
-      const prev = childrenScope.selectedChildrenIds;
-      let next: string[];
-      if (allowMultiChildSelect) {
-        next = prev.includes(childId)
-          ? prev.filter((id) => id !== childId)
-          : [...prev, childId];
-      } else {
-        next = prev.length === 1 && prev[0] === childId ? [] : [childId];
+  /**
+   * Toggle persona selection - same logic as in My Plan
+   */
+  const togglePersona = (personaId: string) => {
+    if (!family?.setSelectedPersonaIds) return;
+    
+    const isSelected = family.selectedPersonaIds.includes(personaId);
+    
+    if (isSelected) {
+      // Deselect persona
+      const newIds = family.selectedPersonaIds.filter((id) => id !== personaId);
+      family.setSelectedPersonaIds(newIds);
+      
+      // If no personas left, clear age filters (enters free search mode)
+      if (newIds.length === 0) {
+        actions.setDraft({ age: [] });
       }
-      childrenScope.setSelectedChildrenIds(next);
-      return;
+    } else {
+      // Select persona (exits free search mode automatically)
+      const newIds = [...family.selectedPersonaIds, personaId];
+      family.setSelectedPersonaIds(newIds);
     }
-    const allowed = new Set(family.personas.map((p) => p.id));
-    const { next, limitMessage } = togglePersonaId(
-      family.selectedPersonaIds,
-      childId,
-      allowed,
-    );
-    if (next === null) {
-      if (limitMessage) toast(limitMessage, { duration: 4200 });
-      return;
-    }
-    family.setSelectedPersonaIds(next);
+  };
+
+  /**
+   * Toggle free search mode - clears all persona selections
+   */
+  const handleSelectFreeMode = () => {
+    if (!family?.setSelectedPersonaIds) return;
+    
+    // Switch to free mode: clear all selections via FamilyPersonaContext
+    family.setSelectedPersonaIds([]);
+    // Clear age filters
+    actions.setDraft({ age: [] });
+  };
+
+  const toggleChild = (childId: string) => {
+    togglePersona(childId);
   };
 
   const toggleAdult = () => {
-    if (!family?.primaryAdultPersonaId) return;
-    const allowed = new Set(family.personas.map((p) => p.id));
-    const { next, limitMessage } = togglePersonaId(
-      family.selectedPersonaIds,
-      family.primaryAdultPersonaId,
-      allowed,
-    );
-    if (next === null) {
-      if (limitMessage) toast(limitMessage, { duration: 4200 });
-      return;
-    }
-    family.setSelectedPersonaIds(next);
+    if (!primaryAdultPersonaId) return;
+    togglePersona(primaryAdultPersonaId);
   };
 
   const ageLinkedActions = useMemo(
@@ -969,25 +973,21 @@ function DiscoveryDesktopSearchControl({
                   applied={applied}
                   actions={ageLinkedActions}
                   selectedChildIds={childrenScope.selectedChildrenIds}
+                  selectedPersonaIds={family?.selectedPersonaIds ?? []}
                   availableChildren={showChildrenPreset ? profileChildren : []}
                   onToggleChild={showChildrenPreset ? toggleChild : undefined}
                   primaryAdult={
-                    showChildrenPreset && family?.primaryAdultPersonaId && family.menuUser
+                    family?.personas?.[0]?.kind === "adult" && family.personas[0].isProfileComplete === true
                       ? {
-                          id: family.primaryAdultPersonaId,
-                          displayName:
-                            family.menuUser.displayName?.trim() ||
-                            family.menuUser.email.split("@")[0] ||
-                            "Я",
-                          birthDate:
-                            family.personas?.find(
-                              (p) => p.id === family.primaryAdultPersonaId,
-                            )?.birthDate ?? undefined,
+                          id: family.personas[0].id,
+                          displayName: family.personas[0].displayName,
+                          birthDate: family.personas[0].birthDate ?? undefined,
+                          isProfileComplete: family.personas[0].isProfileComplete,
                         }
                       : null
                   }
                   adultSelected={adultSelected}
-                  onToggleAdult={showChildrenPreset && family?.primaryAdultPersonaId ? toggleAdult : undefined}
+                  onToggleAdult={family ? toggleAdult : undefined}
                   ageMode={ageMode}
                   autoAgeValues={childrenScope.autoAgeValues}
                   personaPickAtLimit={
@@ -995,11 +995,8 @@ function DiscoveryDesktopSearchControl({
                   }
                   whoFreeMode={ageMode === "free"}
                   onSelectEveryone={
-                    showChildrenPreset && family
-                      ? () => {
-                          family.setSelectedPersonaIds([]);
-                          actions.setDraft({ age: [] });
-                        }
+                    family
+                      ? handleSelectFreeMode
                       : undefined
                   }
                 />

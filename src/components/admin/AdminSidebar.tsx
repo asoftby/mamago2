@@ -14,6 +14,7 @@ import {
   Globe,
   BarChart2,
   ChartColumn,
+  Mail,
 } from "lucide-react";
 import { SidebarItem } from "@/components/shared/sidebar/SidebarItem";
 import { SidebarGroup } from "@/components/shared/sidebar/SidebarGroup";
@@ -27,6 +28,11 @@ import {
 } from "@/lib/admin/moderationSidebarConfig";
 import { adminPath } from "./AdminNav";
 import { SEO_CONTROL_NAV, isSeoNavActive } from "@/lib/admin/seoNavConfig";
+import {
+  CONTENT_NAV_ITEMS,
+  contentItemHref,
+  isContentNavItemActive,
+} from "@/lib/admin/contentSidebarConfig";
 
 interface AdminSidebarProps {
   onNavigate?: () => void;
@@ -185,19 +191,30 @@ export function AdminSidebar({
           />
         </SidebarGroup>
 
-        {/* Content Group */}
+        {/* Content Group — сущности и материалы */}
         <SidebarGroup
           icon={Image}
           label="Контент"
-          defaultOpen={isGroupActive([adminPath("/media")])}
+          defaultOpen={isGroupActive([adminPath("/content"), adminPath("/media")])}
         >
-          <SidebarSubItem
-            href={adminPath("/media")}
-            label="Медиатека"
-            isActive={isActive(adminPath("/media"))}
-            onClick={onNavigate}
-          />
+          {CONTENT_NAV_ITEMS.map((item) => (
+            <SidebarSubItem
+              key={item.id}
+              href={contentItemHref(item.path)}
+              label={item.label}
+              isActive={isContentNavItemActive(pathname, item.path)}
+              onClick={onNavigate}
+            />
+          ))}
         </SidebarGroup>
+
+        <SidebarItem
+          href={adminPath("/email-studio")}
+          icon={Mail}
+          label="Email Studio"
+          isActive={pathname.startsWith(adminPath("/email-studio"))}
+          onClick={onNavigate}
+        />
 
         {/* Discovery Group — taxonomy axes + UI filters (не география) */}
         <SidebarGroup

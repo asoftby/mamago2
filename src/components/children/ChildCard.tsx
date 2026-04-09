@@ -1,5 +1,5 @@
 import { Badge } from "@/components/ui/badge";
-import { getSystemInterestLabel } from "@/lib/config/interests";
+import { useChildInterests, getInterestLabel } from "@/hooks/useChildInterests";
 
 interface ChildData {
   id: string;
@@ -15,6 +15,8 @@ interface ChildCardProps {
 }
 
 export function ChildCard({ child, onClick }: ChildCardProps) {
+  const { interests } = useChildInterests();
+  
   console.log("ChildCard render - child:", child, "onClick:", !!onClick);
   
   const handleClick = () => {
@@ -71,7 +73,7 @@ export function ChildCard({ child, onClick }: ChildCardProps) {
                 variant="secondary"
                 className="text-xs h-6 px-2 bg-[#EF8759]/10 text-[#EF8759] border-[#EF8759]/20"
               >
-                {getSystemInterestLabel(interest.interestSlug)}
+                {getInterestLabel(interests, interest.interestSlug)}
               </Badge>
             ))}
             

@@ -12,8 +12,9 @@ import {
   useMemo,
   type ReactNode,
 } from "react";
-import { X, ChevronDown } from "lucide-react";
-import Image from "next/image";
+import { ChevronDown } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ModalCloseButton } from "@/components/ui/modal-close-button";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import {
@@ -27,7 +28,6 @@ import { DatePanel, AgePanel } from "@/components/site/header/search-segments";
 import { MobileLocationPanel } from "@/components/mobile/panels/MobileLocationPanel";
 import {
   DISCOVERY_INTENT_CONFIG,
-  DISCOVERY_INTENT_ITEMS,
 } from "@/lib/discovery/discoveryIntentConfig";
 import { getCityLocativePhrase } from "@/lib/city/cityDisplayNames";
 import { useAuthMe } from "@/features/birthday/builder/hooks/useAuthMe";
@@ -39,7 +39,8 @@ import {
   resolveFamilyAgeMode,
 } from "@/lib/family/familyAgeMode";
 import { MAX_ACTIVE_FAMILY_PERSONAS } from "@/lib/family/wholeFamilyPreset";
-import { togglePersonaId } from "@/lib/family/togglePersonaSelection";
+import { MobileSearch } from "@/components/mobile/MobileSearch";
+import type { SearchResultItem } from "@/lib/search/types";
 
 /** Единый для всех разделов: пользователь хотя бы раз открыл и закрыл поиск в этой вкладке браузера */
 const SEARCH_FLOW_USED_KEY = "mmg.discovery.searchFlowUsed";
@@ -168,6 +169,7 @@ export function MobileSearchSheet({
   currentIntent,
   cityHubOnly = false,
 }: MobileSearchSheetProps) {
+  const router = useRouter();
   const { applied, actions } = useDiscoveryFilters();
 
   const [activeSection, setActiveSection] = useState<AccordionSection | null>(
@@ -179,13 +181,9 @@ export function MobileSearchSheet({
   const [searchText, setSearchText] = useState("");
   /** На главной города без раздела в URL — null, пока пользователь не выбрал раздел в шите */
   const [selectedIntent, setSelectedIntent] = useState<string | null>(null);
-  const [indicatorStyle, setIndicatorStyle] = useState<{
-    left: number;
-    width: number;
-  }>({ left: 0, width: 0 });
-  const tabsRef = useRef<(HTMLButtonElement | null)[]>([]);
-  const containerRef = useRef<HTMLDivElement>(null);
   const prevIsOpenRef = useRef(false);
+  /** Область прокрутки контента шита — сброс вверх при открытии, чтобы строка поиска была видна */
+  const scrollRegionRef = useRef<HTMLDivElement>(null);
   const prevIntentForAccordionRef = useRef<string | null>(null);
   const sectionRefs = useRef<
     Partial<Record<AccordionSection, HTMLDivElement | null>>
@@ -216,6 +214,14 @@ export function MobileSearchSheet({
     markSearchFlowUsed();
     onClose();
   }, [markSearchFlowUsed, onClose]);
+
+  const handleSearchResultNavigate = useCallback(
+    (item: SearchResultItem) => {
+      router.push(item.url);
+      handleSheetClose();
+    },
+    [router, handleSheetClose],
+  );
 
   const sheetActions = useMemo(
     () => ({
@@ -281,7 +287,8 @@ export function MobileSearchSheet({
 
   const showChildrenPreset = isAuthenticated && profileChildren.length > 0;
   const allowMultiChildSelect = profileChildren.length >= 2;
-  const primaryAdultPersonaId = family?.primaryAdultPersonaId ?? null;
+  // Always use first persona ID if it's an adult
+  const primaryAdultPersonaId = family?.personas?.[0]?.kind === "adult" ? family.personas[0].id : null;
   const adultSelected =
     !!primaryAdultPersonaId &&
     !!family?.selectedPersonaIds.includes(primaryAdultPersonaId);
@@ -307,54 +314,56 @@ export function MobileSearchSheet({
     });
   }, [isOpen, applied.age]);
 
+  /**
+   * Toggle persona selection - same logic as in My Plan
+   */
+  const togglePersona = useCallback(
+    (personaId: string) => {
+      if (!family?.setSelectedPersonaIds) return;
+      
+      const isSelected = family.selectedPersonaIds.includes(personaId);
+      
+      if (isSelected) {
+        // Deselect persona
+        const newIds = family.selectedPersonaIds.filter((id) => id !== personaId);
+        family.setSelectedPersonaIds(newIds);
+        
+        // If no personas left, clear age filters (enters free search mode)
+        if (newIds.length === 0) {
+          setSheetDraft((prev) => ({ ...prev, age: [] }));
+        }
+      } else {
+        // Select persona (exits free search mode automatically)
+        const newIds = [...family.selectedPersonaIds, personaId];
+        family.setSelectedPersonaIds(newIds);
+      }
+    },
+    [family],
+  );
+
+  /**
+   * Toggle free search mode - clears all persona selections
+   */
+  const handleSelectFreeMode = useCallback(() => {
+    if (!family?.setSelectedPersonaIds) return;
+    
+    // Switch to free mode: clear all selections via FamilyPersonaContext
+    family.setSelectedPersonaIds([]);
+    // Clear age filters
+    setSheetDraft((prev) => ({ ...prev, age: [] }));
+  }, [family]);
+
   const toggleChild = useCallback(
     (childId: string) => {
-      if (!family?.personas?.length) {
-        const prev = childrenScope.selectedChildrenIds;
-        let next: string[];
-        if (allowMultiChildSelect) {
-          next = prev.includes(childId)
-            ? prev.filter((id) => id !== childId)
-            : [...prev, childId];
-        } else {
-          next = prev.length === 1 && prev[0] === childId ? [] : [childId];
-        }
-        childrenScope.setSelectedChildrenIds(next);
-        return;
-      }
-      const allowed = new Set(family.personas.map((p) => p.id));
-      const { next, limitMessage } = togglePersonaId(
-        family.selectedPersonaIds,
-        childId,
-        allowed,
-      );
-      if (next === null) {
-        if (limitMessage) toast(limitMessage, { duration: 4200 });
-        return;
-      }
-      family.setSelectedPersonaIds(next);
+      togglePersona(childId);
     },
-    [
-      allowMultiChildSelect,
-      childrenScope,
-      family,
-    ],
+    [togglePersona],
   );
 
   const toggleAdult = useCallback(() => {
-    if (!family?.primaryAdultPersonaId) return;
-    const allowed = new Set(family.personas.map((p) => p.id));
-    const { next, limitMessage } = togglePersonaId(
-      family.selectedPersonaIds,
-      family.primaryAdultPersonaId,
-      allowed,
-    );
-    if (next === null) {
-      if (limitMessage) toast(limitMessage, { duration: 4200 });
-      return;
-    }
-    family.setSelectedPersonaIds(next);
-  }, [family]);
+    if (!primaryAdultPersonaId) return;
+    togglePersona(primaryAdultPersonaId);
+  }, [primaryAdultPersonaId, togglePersona]);
 
   const hasSelectedChildren = familyHasSelectedChildren(
     family?.selectedPersonaIds ?? [],
@@ -363,7 +372,7 @@ export function MobileSearchSheet({
 
   const whoPrimaryLine = useMemo(() => {
     if (ageMode === "free" && showChildrenPreset) {
-      return "Для всех";
+      return "Свободный поиск";
     }
     return formatWhoHeaderSummary({
       hasSelectedChildren,
@@ -455,40 +464,6 @@ export function MobileSearchSheet({
       }
     }
   }, [currentIntent, isOpen, cityHubOnly]);
-
-  useEffect(() => {
-    if (selectedIntent == null) {
-      setIndicatorStyle({ left: 0, width: 0 });
-      return;
-    }
-    const activeIndex = DISCOVERY_INTENT_ITEMS.findIndex(
-      (item) => item.id === selectedIntent,
-    );
-    const currentTab = tabsRef.current[activeIndex];
-    if (currentTab && containerRef.current) {
-      setIndicatorStyle({
-        left: currentTab.offsetLeft,
-        width: currentTab.clientWidth,
-      });
-    }
-  }, [selectedIntent]);
-
-  useEffect(() => {
-    if (!isOpen || selectedIntent == null) return;
-    const timer = setTimeout(() => {
-      const activeIndex = DISCOVERY_INTENT_ITEMS.findIndex(
-        (item) => item.id === selectedIntent,
-      );
-      const currentTab = tabsRef.current[activeIndex];
-      if (currentTab && containerRef.current) {
-        setIndicatorStyle({
-          left: currentTab.offsetLeft,
-          width: currentTab.clientWidth,
-        });
-      }
-    }, 50);
-    return () => clearTimeout(timer);
-  }, [isOpen, selectedIntent]);
 
   useEffect(() => {
     if (isOpen) {
@@ -785,10 +760,19 @@ export function MobileSearchSheet({
     handleSheetClose,
   ]);
 
-  /** После «Далее» подводим начало следующей карточки к верху прокручиваемой области */
+  /** При открытии шита — с верху экрана (строка поиска + табы), без смещения вниз */
+  useLayoutEffect(() => {
+    if (!isOpen) return;
+    scrollRegionRef.current?.scrollTo(0, 0);
+  }, [isOpen]);
+
+  /**
+   * После «Далее» подводим следующую карточку (Когда / С кем).
+   * Для шага «Где» не скроллим: иначе scrollIntoView уводит аккордеон к верху области и скрывает строку поиска.
+   */
   useLayoutEffect(() => {
     if (!isOpen || isHubPickMode) return;
-    if (!activeSection) return;
+    if (!activeSection || activeSection === "location") return;
     const el = sectionRefs.current[activeSection];
     if (!el) return;
     el.scrollIntoView({ behavior: "smooth", block: "start", inline: "nearest" });
@@ -849,20 +833,17 @@ export function MobileSearchSheet({
     <div className="fixed inset-0 z-[9999] flex min-h-0 flex-col bg-white">
       <div className="sticky top-0 z-10 shrink-0 border-b border-gray-100 bg-white px-4 py-3">
         <div className="flex items-center justify-between">
-          <button
-            type="button"
+          <ModalCloseButton
             onClick={handleSheetClose}
-            className="-ml-2 rounded-full p-2 transition-colors hover:bg-gray-100"
-            aria-label="Закрыть"
-          >
-            <X className="h-6 w-6 text-gray-600" />
-          </button>
+            className="-ml-2 shrink-0"
+          />
           <h2 className="text-lg font-semibold text-gray-900">Поиск</h2>
           <div className="w-10" />
         </div>
       </div>
 
       <div
+        ref={scrollRegionRef}
         className={cn(
           "min-h-0 flex-1 overflow-y-auto",
           isHubPickMode
@@ -870,173 +851,31 @@ export function MobileSearchSheet({
             : "pb-[calc(5.5rem+env(safe-area-inset-bottom))]",
         )}
       >
-        {isHubPickMode ? (
-          <>
-            <div className="px-4 pb-2 pt-4">
-              <MobileLocationPanel
-                variant="cityHub"
-                citySlug={citySlug}
-                selectedCitySlug={pendingCitySlug}
-                onCityPick={(slug) => setPendingCitySlug(slug)}
-                searchText={searchText}
-                onSearchTextChange={setSearchText}
-                onClose={() => {}}
-                draft={sheetDraft}
-                setDraft={patchSheetDraft}
-                actions={sheetActions}
-                apiOptions={safeApiOptions}
-              />
-            </div>
-            <div className="border-b border-gray-100 py-4">
-              <div
-                ref={containerRef}
-                className="relative flex gap-4 overflow-x-auto px-4 no-scrollbar"
-              >
-                {DISCOVERY_INTENT_ITEMS.map((intentConfig, index) => {
-                  const isActive = intentConfig.id === selectedIntent;
-                  return (
-                    <button
-                      key={intentConfig.id}
-                      type="button"
-                      ref={(el) => {
-                        tabsRef.current[index] = el;
-                      }}
-                      onClick={() => handleIntentSelect(intentConfig.id)}
-                      className={cn(
-                        "flex min-w-[80px] flex-col items-center gap-2 rounded-xl p-3 transition-all duration-200",
-                        isActive
-                          ? "text-gray-900"
-                          : "text-gray-500 hover:bg-gray-50 hover:text-gray-700 active:scale-95",
-                      )}
-                    >
-                      {intentConfig.image ? (
-                        <div className="relative flex h-8 w-8 items-center justify-center">
-                          <Image
-                            src={intentConfig.image}
-                            alt={intentConfig.label}
-                            width={32}
-                            height={32}
-                            className={cn(
-                              "object-contain transition-all duration-200",
-                              isActive ? "scale-100" : "scale-90 opacity-80",
-                            )}
-                          />
-                        </div>
-                      ) : (
-                        <div className="h-8 w-8 rounded-full bg-gray-200" />
-                      )}
-                      <span
-                        className={cn(
-                          "text-center text-xs font-medium leading-tight transition-all duration-200",
-                          isActive
-                            ? "font-semibold text-gray-900"
-                            : "text-gray-500",
-                        )}
-                      >
-                        {intentConfig.label}
-                      </span>
-                    </button>
-                  );
-                })}
-                <div
-                  className="absolute bottom-0 h-[3px] rounded-full bg-[#EF8759] transition-all duration-300 ease-out"
-                  style={{
-                    left: `${indicatorStyle.left}px`,
-                    width: `${indicatorStyle.width}px`,
-                    opacity: selectedIntent == null ? 0 : 1,
-                  }}
-                />
-              </div>
-            </div>
-          </>
-        ) : (
-          <>
-            <div className="px-4 pb-2 pt-4">
-              <div className="relative">
-                <input
-                  type="search"
-                  enterKeyHint="search"
-                  placeholder="Поиск мест, событий, активностей..."
-                  value={searchText}
-                  onChange={(e) => setSearchText(e.target.value)}
-                  className="w-full rounded-xl border border-gray-200 px-4 py-3 pr-10 text-base focus:border-transparent focus:outline-none focus:ring-2 focus:ring-[#EF8759]"
-                />
-                {searchText ? (
-                  <button
-                    type="button"
-                    onClick={() => setSearchText("")}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-1 transition-colors hover:bg-gray-100"
-                    aria-label="Очистить поле"
-                  >
-                    <X className="h-4 w-4 text-gray-400" />
-                  </button>
-                ) : null}
-              </div>
-            </div>
-
-            <div className="border-b border-gray-100 py-4">
-              <div
-                ref={containerRef}
-                className="relative flex gap-4 overflow-x-auto px-4 no-scrollbar"
-              >
-                {DISCOVERY_INTENT_ITEMS.map((intentConfig, index) => {
-                  const isActive = intentConfig.id === selectedIntent;
-                  return (
-                    <button
-                      key={intentConfig.id}
-                      type="button"
-                      ref={(el) => {
-                        tabsRef.current[index] = el;
-                      }}
-                      onClick={() => handleIntentSelect(intentConfig.id)}
-                      className={cn(
-                        "flex min-w-[80px] flex-col items-center gap-2 rounded-xl p-3 transition-all duration-200",
-                        isActive
-                          ? "text-gray-900"
-                          : "text-gray-500 hover:bg-gray-50 hover:text-gray-700 active:scale-95",
-                      )}
-                    >
-                      {intentConfig.image ? (
-                        <div className="relative flex h-8 w-8 items-center justify-center">
-                          <Image
-                            src={intentConfig.image}
-                            alt={intentConfig.label}
-                            width={32}
-                            height={32}
-                            className={cn(
-                              "object-contain transition-all duration-200",
-                              isActive ? "scale-100" : "scale-90 opacity-80",
-                            )}
-                          />
-                        </div>
-                      ) : (
-                        <div className="h-8 w-8 rounded-full bg-gray-200" />
-                      )}
-                      <span
-                        className={cn(
-                          "text-center text-xs font-medium leading-tight transition-all duration-200",
-                          isActive
-                            ? "font-semibold text-gray-900"
-                            : "text-gray-500",
-                        )}
-                      >
-                        {intentConfig.label}
-                      </span>
-                    </button>
-                  );
-                })}
-                <div
-                  className="absolute bottom-0 h-[3px] rounded-full bg-[#EF8759] transition-all duration-300 ease-out"
-                  style={{
-                    left: `${indicatorStyle.left}px`,
-                    width: `${indicatorStyle.width}px`,
-                    opacity: selectedIntent == null ? 0 : 1,
-                  }}
-                />
-              </div>
-            </div>
-
-            <div className="space-y-3 p-4">
+        {cityHubOnly && selectedIntent == null ? (
+          <div className="px-4 pb-2 pt-3">
+            <MobileLocationPanel
+              variant="cityHub"
+              citySlug={citySlug}
+              selectedCitySlug={pendingCitySlug}
+              onCityPick={(slug) => setPendingCitySlug(slug)}
+              searchText={searchText}
+              onSearchTextChange={setSearchText}
+              onClose={() => {}}
+              draft={sheetDraft}
+              setDraft={patchSheetDraft}
+              actions={sheetActions}
+              apiOptions={safeApiOptions}
+            />
+          </div>
+        ) : null}
+        <MobileSearch
+          searchText={searchText}
+          onSearchTextChange={setSearchText}
+          selectedIntent={selectedIntent}
+          onIntentSelect={handleIntentSelect}
+          onResultNavigate={handleSearchResultNavigate}
+          filtersSection={
+            <>
               {renderAccordion(
                 "location",
                 "Где",
@@ -1080,28 +919,22 @@ export function MobileSearchSheet({
                     applied={sheetDraft}
                     actions={ageSheetActions}
                     selectedChildIds={childrenScope.selectedChildrenIds}
+                    selectedPersonaIds={family?.selectedPersonaIds ?? []}
                     availableChildren={showChildrenPreset ? profileChildren : []}
                     onToggleChild={showChildrenPreset ? toggleChild : undefined}
                     primaryAdult={
-                      showChildrenPreset &&
-                      family?.primaryAdultPersonaId &&
-                      family.menuUser
+                      family?.personas?.[0]?.kind === "adult" && family.personas[0].isProfileComplete === true
                         ? {
-                            id: family.primaryAdultPersonaId,
-                            displayName:
-                              family.menuUser.displayName?.trim() ||
-                              family.menuUser.email.split("@")[0] ||
-                              "Я",
-                            birthDate:
-                              family.personas?.find(
-                                (p) => p.id === family.primaryAdultPersonaId,
-                              )?.birthDate ?? undefined,
+                            id: family.personas[0].id,
+                            displayName: family.personas[0].displayName,
+                            birthDate: family.personas[0].birthDate ?? undefined,
+                            isProfileComplete: family.personas[0].isProfileComplete,
                           }
                         : null
                     }
                     adultSelected={adultSelected}
                     onToggleAdult={
-                      showChildrenPreset && family?.primaryAdultPersonaId
+                      family
                         ? toggleAdult
                         : undefined
                     }
@@ -1113,19 +946,16 @@ export function MobileSearchSheet({
                     }
                     whoFreeMode={ageMode === "free"}
                     onSelectEveryone={
-                      showChildrenPreset && family
-                        ? () => {
-                            family.setSelectedPersonaIds([]);
-                            patchSheetDraft({ age: [] });
-                          }
+                      family
+                        ? handleSelectFreeMode
                         : undefined
                     }
                   />
                 </div>,
               )}
-            </div>
-          </>
-        )}
+            </>
+          }
+        />
       </div>
 
       <div

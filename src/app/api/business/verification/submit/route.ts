@@ -1,5 +1,6 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
+import { isEmailVerified, jsonEmailNotVerified } from "@/lib/auth/requireVerifiedEmail";
 import { submitForVerification } from "@/server/services/businessVerification.service";
 import prisma from "@/lib/prisma";
 
@@ -9,7 +10,7 @@ export const runtime = "nodejs";
  * POST /api/business/verification/submit
  * Submit business for verification
  */
-export async function POST(request: NextRequest) {
+export async function POST() {
   try {
     const user = await getCurrentUser();
     if (!user) {
@@ -17,6 +18,10 @@ export async function POST(request: NextRequest) {
         { ok: false, error: "Требуется авторизация" },
         { status: 401 }
       );
+    }
+
+    if (!isEmailVerified(user)) {
+      return jsonEmailNotVerified();
     }
 
     // Find business for current user

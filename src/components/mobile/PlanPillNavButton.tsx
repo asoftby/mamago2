@@ -1,6 +1,5 @@
 "use client";
 
-import { useId } from "react";
 import Link from "next/link";
 import { CalendarDays } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -34,7 +33,7 @@ export function PlanPillNavButton({
   className,
   chrome = "light",
 }: PlanPillNavButtonProps) {
-  const emptyHintId = useId();
+  const emptyHintId = "plan-pill-empty-hint";
   const showBadge = badgeCount > 0;
   const showEmptyHint = !hasPlannedEvents;
   const handleClick: React.MouseEventHandler<HTMLAnchorElement> = (event) => {

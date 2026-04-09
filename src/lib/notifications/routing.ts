@@ -4,7 +4,6 @@ import type {
   NotificationStream,
   NotificationViewModel,
 } from "@/lib/notifications/types";
-
 export function getNotificationStreamFromType(type: string): NotificationStream {
   if (
     type.startsWith("PLACE_") ||
@@ -36,6 +35,9 @@ export function getNotificationCategoryFromType(type: string): NotificationCateg
     case "BUSINESS_REJECTED":
     case "BUSINESS_NEEDS_INFO":
       return "REQUEST";
+    case "WELCOME":
+    case "REMINDER":
+    case "RECOMMENDATION":
     case "SYSTEM":
     default:
       return "REMINDER";
@@ -43,6 +45,9 @@ export function getNotificationCategoryFromType(type: string): NotificationCateg
 }
 
 export function getNotificationHref(n: NotificationApiRow): string | null {
+  if (n.type === "WELCOME" || n.type === "REMINDER" || n.type === "RECOMMENDATION") {
+    return null;
+  }
   if (n.entityType === "PLACE" && n.entityId) return `/editor/place/${n.entityId}/edit`;
   if (n.entityType === "ACTIVITY" && n.entityId) return `/editor/event/${n.entityId}/edit`;
   if (n.entityType === "OFFER" && n.entityId) return `/editor/offer/${n.entityId}/edit`;
@@ -67,7 +72,7 @@ export function mapApiRowToViewModel(
     type: getNotificationStreamFromType(row.type),
     category: getNotificationCategoryFromType(row.type),
     title: row.title,
-    description: row.message,
+    description: row.body,
     isRead: row.isRead,
     createdAt: new Date(row.createdAt),
   };

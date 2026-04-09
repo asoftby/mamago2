@@ -52,8 +52,33 @@ export async function assignArticleSlugIfMissing(articleId: string, title: strin
   return slug;
 }
 
-export async function updateArticleSlug(articleId: string, newSlugRaw: string) {
-  const newSlug = slugifyRu(newSlugRaw);
+export type UpdateArticleSlugOptions = {
+  /**
+   * Если true — slug должен быть свободен ровно в запрошенном виде (после slugify).
+   * Иначе при конфликте к базе добавляется суффикс (-2, -3, …), как раньше.
+   */
+  strict?: boolean;
+};
+
+export async function updateArticleSlug(
+  articleId: string,
+  newSlugRaw: string,
+  options?: UpdateArticleSlugOptions,
+) {
+  const trimmed = newSlugRaw.trim();
+  /** Пустая строка: прежнее поведение slugifyRu (fallback), нужно для SEO-апдейтов без strict. */
+  const newSlug = trimmed ? slugifyRu(trimmed) : slugifyRu(newSlugRaw);
+
+  if (options?.strict) {
+    if (!trimmed) {
+      throw new Error("Укажите корректный slug или оставьте поле пустым для автогенерации");
+    }
+    const ok = await isSlugAvailable(newSlug, articleId);
+    if (!ok) {
+      throw new Error("Этот адрес (slug) уже занят другой статьёй или зарезервирован в истории URL");
+    }
+  }
+
   await prisma.$transaction(async (tx) => {
     const article = await tx.article.findUnique({
       where: { id: articleId },
@@ -66,14 +91,19 @@ export async function updateArticleSlug(articleId: string, newSlugRaw: string) {
       await createArticleSlugHistoryIgnoreDuplicate(tx, articleId, articleId);
     }
 
-    const finalSlug = await ensureUniqueSlug({
-      base: newSlug,
-      isAvailable: async (s) => {
-        const conflict = await tx.article.findUnique({ where: { slug: s }, select: { id: true } });
-        const hist = await tx.articleSlugHistory.findUnique({ where: { slug: s }, select: { articleId: true } });
-        return (!conflict || conflict.id === articleId) && (!hist || hist.articleId === articleId);
-      },
-    });
+    const finalSlug = options?.strict
+      ? newSlug
+      : await ensureUniqueSlug({
+          base: newSlug,
+          isAvailable: async (s) => {
+            const conflict = await tx.article.findUnique({ where: { slug: s }, select: { id: true } });
+            const hist = await tx.articleSlugHistory.findUnique({
+              where: { slug: s },
+              select: { articleId: true },
+            });
+            return (!conflict || conflict.id === articleId) && (!hist || hist.articleId === articleId);
+          },
+        });
 
     if (article.slug) {
       await createArticleSlugHistoryIgnoreDuplicate(tx, articleId, article.slug);
@@ -81,6 +111,7 @@ export async function updateArticleSlug(articleId: string, newSlugRaw: string) {
     await tx.article.update({
       where: { id: articleId },
       data: { slug: finalSlug, slugUpdatedAt: new Date() },
+      select: { id: true },
     });
   });
   await syncArticleCanonical(articleId);

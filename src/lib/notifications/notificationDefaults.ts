@@ -54,7 +54,9 @@ const USER_DEFAULTS: NotificationDefaultsMap = {
   BUSINESS_VERIFIED:           SILENT,
   BUSINESS_REJECTED:           SILENT,
   BUSINESS_NEEDS_INFO:         SILENT,
-  // System
+  WELCOME:                     SYSTEM_REMINDER,
+  REMINDER:                    SYSTEM_REMINDER,
+  RECOMMENDATION:              SYSTEM_REMINDER,
   SYSTEM:                      SYSTEM_REMINDER,
 };
 
@@ -82,7 +84,9 @@ const BUSINESS_OWNER_DEFAULTS: NotificationDefaultsMap = {
   BUSINESS_VERIFIED:           MODERATION_DECISION,
   BUSINESS_REJECTED:           MODERATION_REQUEST,
   BUSINESS_NEEDS_INFO:         MODERATION_REQUEST,
-  // System
+  WELCOME:                     SYSTEM_REMINDER,
+  REMINDER:                    SYSTEM_REMINDER,
+  RECOMMENDATION:              SYSTEM_REMINDER,
   SYSTEM:                      SYSTEM_REMINDER,
 };
 
@@ -106,6 +110,9 @@ const MODERATOR_DEFAULTS: NotificationDefaultsMap = {
   BUSINESS_VERIFIED:           SILENT,
   BUSINESS_REJECTED:           SILENT,
   BUSINESS_NEEDS_INFO:         SILENT,
+  WELCOME:                     SYSTEM_REMINDER,
+  REMINDER:                    SYSTEM_REMINDER,
+  RECOMMENDATION:              SYSTEM_REMINDER,
   SYSTEM:                      SYSTEM_REMINDER,
 };
 

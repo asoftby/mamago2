@@ -8,7 +8,8 @@ import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
 import { ContentStatus, ActivityType } from "@prisma/client";
 import { isPlaceRequired } from "@/lib/activity/classification";
-import { canCreateBusinessContent, canManageOwnedContent } from "@/lib/auth/businessContentAccess";
+import { canCreateBusinessContent } from "@/lib/auth/businessContentAccess";
+import { canManageActivityById } from "@/lib/auth/activityAccess";
 
 interface ValidationError {
   error: "VALIDATION";
@@ -41,8 +42,7 @@ export async function POST(
       return NextResponse.json({ error: "Activity not found" }, { status: 404 });
     }
 
-    // Check ownership
-    if (!canManageOwnedContent(user, activity.ownerUserId)) {
+    if (!(await canManageActivityById(user, id))) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 

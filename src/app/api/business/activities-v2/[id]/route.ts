@@ -13,7 +13,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
 import { ActivityType, ScheduleMode, ContentStatus } from "@prisma/client";
-import { canCreateBusinessContent, canManageOwnedContent } from "@/lib/auth/businessContentAccess";
+import { canCreateBusinessContent } from "@/lib/auth/businessContentAccess";
+import {
+  canManageActivityById,
+  coalesceActivityBusinessIdFromPlace,
+} from "@/lib/auth/activityAccess";
+import { canManagePlaceAsync } from "@/lib/auth/placeAccess";
 import { assignActivitySlugIfMissing } from "@/lib/slug/activitySlugService";
 
 /**
@@ -53,8 +58,7 @@ export async function GET(
       return NextResponse.json({ error: "Activity not found" }, { status: 404 });
     }
 
-    // Check ownership
-    if (!canManageOwnedContent(user, activity.ownerUserId)) {
+    if (!(await canManageActivityById(user, activity.id))) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
@@ -84,17 +88,16 @@ export async function PATCH(
 
     const { id } = await params;
 
-    // Check ownership
     const existing = await prisma.activity.findUnique({
       where: { id },
-      select: { ownerUserId: true, status: true },
+      select: { ownerUserId: true, status: true, businessId: true },
     });
 
     if (!existing) {
       return NextResponse.json({ error: "Activity not found" }, { status: 404 });
     }
 
-    if (!canManageOwnedContent(user, existing.ownerUserId)) {
+    if (!(await canManageActivityById(user, id))) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
@@ -167,24 +170,30 @@ export async function PATCH(
     // Place
     if (body.placeId !== undefined) {
       if (body.placeId) {
-        // Verify place ownership
         const place = await prisma.place.findUnique({
           where: { id: body.placeId },
-          select: { ownerUserId: true },
+          select: { createdByUserId: true, ownerBusinessId: true },
         });
 
         if (!place) {
           return NextResponse.json({ error: "Place not found" }, { status: 404 });
         }
 
-        if (!canManageOwnedContent(user, place.ownerUserId)) {
+        if (!(await canManagePlaceAsync(user, place))) {
           return NextResponse.json(
             { error: "You don't own this place" },
             { status: 403 }
           );
         }
+
+        updateData.placeId = body.placeId;
+        updateData.businessId = coalesceActivityBusinessIdFromPlace(
+          place,
+          existing.businessId,
+        );
+      } else {
+        updateData.placeId = null;
       }
-      updateData.placeId = body.placeId;
     }
 
     // Update activity
@@ -235,7 +244,6 @@ export async function DELETE(
 
     const { id } = await params;
 
-    // Check ownership
     const activity = await prisma.activity.findUnique({
       where: { id },
       select: { ownerUserId: true, status: true },
@@ -245,7 +253,7 @@ export async function DELETE(
       return NextResponse.json({ error: "Activity not found" }, { status: 404 });
     }
 
-    if (!canManageOwnedContent(user, activity.ownerUserId)) {
+    if (!(await canManageActivityById(user, id))) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 

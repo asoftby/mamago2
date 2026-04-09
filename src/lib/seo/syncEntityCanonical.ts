@@ -32,6 +32,7 @@ export async function syncActivityCanonical(activityId: string): Promise<void> {
       seoCanonicalUrl: absolute,
       seoCanonicalSource: hasSlug ? SeoCanonicalSource.AUTO : SeoCanonicalSource.FALLBACK,
     },
+    select: { id: true },
   });
 }
 
@@ -53,6 +54,7 @@ export async function syncPlaceCanonical(placeId: string): Promise<void> {
       seoCanonicalUrl: absolute,
       seoCanonicalSource: hasSlug ? SeoCanonicalSource.AUTO : SeoCanonicalSource.FALLBACK,
     },
+    select: { id: true },
   });
 }
 
@@ -74,6 +76,7 @@ export async function syncOfferCanonical(offerId: string): Promise<void> {
       seoCanonicalUrl: absolute,
       seoCanonicalSource: hasSlug ? SeoCanonicalSource.AUTO : SeoCanonicalSource.FALLBACK,
     },
+    select: { id: true },
   });
 }
 
@@ -93,26 +96,32 @@ export async function syncRouteCanonical(routeId: string): Promise<void> {
       seoCanonicalUrl: absolute,
       seoCanonicalSource: SeoCanonicalSource.AUTO,
     },
+    select: { id: true },
   });
 }
 
 export async function syncArticleCanonical(articleId: string): Promise<void> {
-  const row = await prisma.article.findUnique({
-    where: { id: articleId },
-    select: { id: true, slug: true, seoCanonicalSource: true },
-  });
-  if (!row || row.seoCanonicalSource === SeoCanonicalSource.MANUAL) return;
+  try {
+    const row = await prisma.article.findUnique({
+      where: { id: articleId },
+      select: { id: true, slug: true, seoCanonicalSource: true },
+    });
+    if (!row || row.seoCanonicalSource === SeoCanonicalSource.MANUAL) return;
 
-  const seg = row.slug?.trim() || row.id;
-  const path = `/blog/${seg}`;
-  const absolute = `${absoluteBase()}${path}`;
-  const hasSlug = !!row.slug?.trim();
+    const seg = row.slug?.trim() || row.id;
+    const path = `/blog/${seg}`;
+    const absolute = `${absoluteBase()}${path}`;
+    const hasSlug = !!row.slug?.trim();
 
-  await prisma.article.update({
-    where: { id: articleId },
-    data: {
-      seoCanonicalUrl: absolute,
-      seoCanonicalSource: hasSlug ? SeoCanonicalSource.AUTO : SeoCanonicalSource.FALLBACK,
-    },
-  });
+    await prisma.article.update({
+      where: { id: articleId },
+      data: {
+        seoCanonicalUrl: absolute,
+        seoCanonicalSource: hasSlug ? SeoCanonicalSource.AUTO : SeoCanonicalSource.FALLBACK,
+      },
+      select: { id: true },
+    });
+  } catch (e) {
+    console.error("[syncArticleCanonical]", articleId, e);
+  }
 }

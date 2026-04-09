@@ -1,8 +1,9 @@
 "use client";
 
 import { useRef, useCallback } from "react";
-import { X, ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ModalCloseButton } from "@/components/ui/modal-close-button";
 import { StoryProgress } from "./StoryProgress";
 import { StoryViewerCard } from "./StoryViewerCard";
 import type { StoryCollection } from "../types/story";
@@ -110,13 +111,10 @@ export function StoryViewer({
                 {activeItemIndex + 1} / {activeStory.items.length}
               </span>
             </div>
-            <button
+            <ModalCloseButton
               onClick={onClose}
-              className="pointer-events-auto h-8 w-8 flex items-center justify-center rounded-full bg-black/30 backdrop-blur-sm text-white hover:bg-black/50 transition-colors"
-              aria-label="Закрыть"
-            >
-              <X className="h-4 w-4" />
-            </button>
+              className="pointer-events-auto shrink-0"
+            />
           </div>
         </div>
 

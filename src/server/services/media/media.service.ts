@@ -5,6 +5,9 @@
  * Handles CRUD operations, status transitions, and safe deletion.
  */
 
+import { existsSync } from "fs";
+import { unlink } from "fs/promises";
+import { join } from "path";
 import { prisma } from "@/lib/prisma";
 import { MediaAssetKind, MediaAssetStatus, MediaSourceType } from "@prisma/client";
 
@@ -141,6 +144,77 @@ export async function softDeleteMediaAsset(id: string, force = false) {
       deletedAt: new Date(),
     },
   });
+}
+
+export type HardDeleteMediaResult =
+  | { ok: true }
+  | { ok: false; reason: "not_found" | "in_use" };
+
+/**
+ * Удаляет файл с диска и запись в БД. Только если нет привязок (usages).
+ * Соответствует DELETE /api/admin/media/[id].
+ */
+export async function hardDeleteMediaAssetIfUnused(id: string): Promise<HardDeleteMediaResult> {
+  const media = await prisma.mediaAsset.findUnique({
+    where: { id },
+    include: {
+      usages: { select: { id: true } },
+    },
+  });
+
+  if (!media) {
+    return { ok: false, reason: "not_found" };
+  }
+
+  if (media.usages.length > 0) {
+    return { ok: false, reason: "in_use" };
+  }
+
+  if (media.publicUrl) {
+    const filePath = join(process.cwd(), "public", media.publicUrl);
+    if (existsSync(filePath)) {
+      try {
+        await unlink(filePath);
+      } catch (err) {
+        console.error("Failed to delete file:", err);
+      }
+    }
+  }
+
+  await prisma.mediaAsset.delete({
+    where: { id },
+  });
+
+  return { ok: true };
+}
+
+export interface BulkHardDeleteUnusedResult {
+  deleted: number;
+  skippedInUse: number;
+  skippedNotFound: number;
+}
+
+/** Массовое удаление: по каждому id — только если usages пусты. */
+export async function bulkHardDeleteUnusedMediaAssets(
+  ids: string[],
+  options?: { maxBatch?: number }
+): Promise<BulkHardDeleteUnusedResult> {
+  const maxBatch = options?.maxBatch ?? 200;
+  const unique = [...new Set(ids.map((id) => id.trim()).filter(Boolean))];
+  const slice = unique.slice(0, maxBatch);
+
+  let deleted = 0;
+  let skippedInUse = 0;
+  let skippedNotFound = 0;
+
+  for (const id of slice) {
+    const r = await hardDeleteMediaAssetIfUnused(id);
+    if (r.ok) deleted++;
+    else if (r.reason === "in_use") skippedInUse++;
+    else skippedNotFound++;
+  }
+
+  return { deleted, skippedInUse, skippedNotFound };
 }
 
 /**

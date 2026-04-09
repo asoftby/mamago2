@@ -111,7 +111,7 @@ export function PlaceModerationView({ place }: PlaceModerationViewProps) {
           </Link>
           <Button variant="outline" size="sm" asChild>
             <Link
-              href={`/editor/place/${place.id}/edit?returnTo=${encodeURIComponent(`/admin/moderation/places/${place.id}`)}`}
+              href={`/editor/place/${place.id}/edit?returnTo=${encodeURIComponent(`/admin/content/places/${place.id}`)}`}
             >
               Открыть в редакторе
             </Link>

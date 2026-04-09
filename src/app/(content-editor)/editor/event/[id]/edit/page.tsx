@@ -50,7 +50,7 @@ export default async function EditorEditEventPage({
     notFound();
   }
 
-  if (!canEditEventActivity(user, event)) {
+  if (!(await canEditEventActivity(user, event))) {
     if (user.role === "BUSINESS_OWNER") {
       redirect("/business/events");
     }

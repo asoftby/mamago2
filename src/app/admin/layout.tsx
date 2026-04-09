@@ -56,11 +56,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           />
         </div>
 
-        {/* Right Content Area */}
-        <main className="flex-1 w-full lg:w-auto">
-          <div className="max-w-[1400px] mx-auto">
-            {children}
-          </div>
+        {/* Right Content Area — min-w-0 чтобы flex не раздувал ширину по таблице; скролл остаётся внутри страниц */}
+        <main className="min-w-0 flex-1 w-full lg:w-auto">
+          <div className="mx-auto w-full min-w-0 max-w-[1400px]">{children}</div>
         </main>
       </div>
     </div>

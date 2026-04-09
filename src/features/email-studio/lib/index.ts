@@ -1,0 +1,33 @@
+export {
+  EMAIL_TEMPLATE_DOCUMENT_SCHEMA_VERSION,
+  EmailTemplateTypeSchema,
+  EmailTemplateStatusSchema,
+  EmailBlockTypeSchema,
+  EmailHeaderBlockSchema,
+  EmailHeroAlignSchema,
+  EmailHeroBlockSchema,
+  EmailTextBlockSchema,
+  EmailCtaBlockSchema,
+  EmailSpacerSizeSchema,
+  EmailSpacerBlockSchema,
+  EmailDividerBlockSchema,
+  EmailFooterBlockSchema,
+  EmailBlockSchema,
+  EmailTemplateDocumentSchema,
+  createEmailBlockId,
+  createDefaultEmailBlock,
+  createEmptyTemplateDocument,
+  createStarterTemplateDocument,
+  normalizeTemplateDocument,
+  assertTemplateDocumentValid,
+} from "./domain";
+
+export type {
+  EmailTemplateType,
+  EmailTemplateStatus,
+  EmailBlockType,
+  EmailHeroAlign,
+  EmailSpacerSize,
+  EmailBlock,
+  EmailTemplateDocument,
+} from "./domain";

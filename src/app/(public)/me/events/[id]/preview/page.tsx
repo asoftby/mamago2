@@ -3,7 +3,8 @@ import { notFound, redirect } from "next/navigation";
 import { ActivityType, ContentStatus } from "@prisma/client";
 import { activityStatusesExcludingDeleted } from "@/lib/business/eventListWhere";
 import { getCurrentUser } from "@/lib/auth/server";
-import { canCreateBusinessContent, canManageOwnedContent } from "@/lib/auth/businessContentAccess";
+import { canCreateBusinessContent } from "@/lib/auth/businessContentAccess";
+import { canManageActivityById } from "@/lib/auth/activityAccess";
 import prisma from "@/lib/prisma";
 import { EventPageView } from "@/components/event-page/EventPageView";
 import { buildEventPageDataFromPrismaActivity } from "@/lib/event/buildEventPageDataFromPrisma";
@@ -47,7 +48,7 @@ export default async function MeEventPreviewPage({ params }: PageProps) {
     },
   });
 
-  if (!activity || !canManageOwnedContent(user, activity.ownerUserId)) {
+  if (!activity || !(await canManageActivityById(user, activity.id))) {
     notFound();
   }
 

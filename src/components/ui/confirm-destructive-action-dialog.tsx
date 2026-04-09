@@ -80,7 +80,7 @@ export function ConfirmDestructiveActionDialog({
           <AlertDialogAction
             disabled={!canConfirm}
             onClick={onConfirm}
-            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            className="bg-destructive text-white hover:bg-destructive/90"
           >
             {loading ? "Удаление..." : confirmText}
           </AlertDialogAction>

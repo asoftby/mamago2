@@ -14,4 +14,6 @@ export type FamilyPersona = {
   preferenceSignalIds?: string[];
   leisureFormatSignalId?: string | null;
   birthDate?: string | null;
+  /** Для взрослого: true если профиль заполнен (есть displayName) */
+  isProfileComplete?: boolean;
 };

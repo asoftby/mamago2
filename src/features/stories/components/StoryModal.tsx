@@ -1,8 +1,8 @@
 "use client";
 
 import { useRef, useCallback, useEffect } from "react";
-import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ModalCloseButton } from "@/components/ui/modal-close-button";
 import { StoryModalVisual } from "./StoryModalVisual";
 import { StoryModalActionCard } from "./StoryModalActionCard";
 import type { StoryCollection } from "../types/story";
@@ -94,22 +94,14 @@ export function StoryModal({
       onClick={handleBackdropClick}
     >
       {/* ── Close button — floating outside modal ── */}
-      <button
+      <ModalCloseButton
         onClick={onClose}
         className={cn(
           "absolute z-[60]",
-          // Desktop: top-right outside modal
           "md:top-6 md:right-6",
-          // Mobile: top-right inside viewport
           "top-4 right-4",
-          "h-9 w-9 flex items-center justify-center rounded-full",
-          "bg-white/12 backdrop-blur-md text-white border border-white/15",
-          "hover:bg-white/22 transition-colors",
         )}
-        aria-label="Закрыть"
-      >
-        <X className="h-4 w-4" />
-      </button>
+      />
 
       {/* ── Modal shell ── */}
       <div

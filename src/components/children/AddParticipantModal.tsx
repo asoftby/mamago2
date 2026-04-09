@@ -13,9 +13,13 @@ import {
 import { ChipsRow, type ChipItem } from "@/components/ui/chips-row";
 import { BodyMuted } from "@/components/ui/typography";
 import { ArrowLeft, Baby, UserRound } from "lucide-react";
-import { SYSTEM_INTERESTS } from "@/lib/config/interests";
+import { useChildInterests } from "@/hooks/useChildInterests";
 import { cn } from "@/lib/utils";
 import { notifyFamilyPersonasChanged } from "@/lib/family/familyPersonaEvents";
+import {
+  FAMILY_ROLE_OPTIONS as FAMILY_ROLES,
+  ADULT_AGE_BANDS as AGE_BANDS,
+} from "@/lib/family/adultPersonaOptions";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -49,16 +53,6 @@ export type AddParticipantModalProps = {
 
 const STEP_ANIMATION =
   "animate-in fade-in slide-in-from-right-2 duration-200 fill-mode-both";
-
-const FAMILY_ROLES = [
-  { value: "MOM" as const, label: "Мама" },
-  { value: "DAD" as const, label: "Папа" },
-  { value: "GRANDMA" as const, label: "Бабушка" },
-  { value: "GRANDPA" as const, label: "Дедушка" },
-  { value: "ADULT" as const, label: "Взрослый" },
-];
-
-const AGE_BANDS = ["18–24", "25–34", "35–44", "45–54", "55+"];
 
 const MAX_PREFERENCE_SIGNALS = 3;
 
@@ -203,6 +197,7 @@ function ParticipantFlow({
   onSaved,
 }: AddParticipantModalProps) {
   const router = useRouter();
+  const { interests: systemInterests, isLoading: interestsLoading } = useChildInterests();
   const [step, setStep] = useState<1 | 2>(1);
   const [participantType, setParticipantType] = useState<"child" | "adult">("child");
 
@@ -365,13 +360,13 @@ function ParticipantFlow({
 
   const childInterestChipItems = useMemo<ChipItem[]>(
     () =>
-      SYSTEM_INTERESTS.map((interest) => ({
-        id: interest.slug,
+      systemInterests.map((interest) => ({
+        id: interest.value,
         label: interest.label,
-        active: childInterests.includes(interest.slug),
-        onClick: () => toggleChildInterest(interest.slug),
+        active: childInterests.includes(interest.value),
+        onClick: () => toggleChildInterest(interest.value),
       })),
-    [childInterests, toggleChildInterest],
+    [systemInterests, childInterests, toggleChildInterest],
   );
 
   const preferenceSignalChipItems = useMemo<ChipItem[]>(
@@ -421,7 +416,18 @@ function ParticipantFlow({
   };
 
   const canSaveChild = childName.trim().length >= 1;
-  const canSaveAdult = adultName.trim().length >= 1;
+
+  /** Все обязательные поля взрослого: имя, роль, возраст, предпочтения (если есть варианты), формат досуга (если есть варианты). */
+  const prefsOk =
+    preferenceSignals.length === 0 || selectedPreferenceIds.length >= 1;
+  const formatOk =
+    formatSignals.length === 0 || selectedFormatId !== null;
+  const canSaveAdult =
+    adultName.trim().length >= 1 &&
+    familyRole !== "" &&
+    ageBand !== "" &&
+    prefsOk &&
+    formatOk;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -429,7 +435,7 @@ function ParticipantFlow({
 
     const saveAdult = async () => {
       if (!canSaveAdult) {
-        setError("Укажите имя");
+        setError("Заполните все поля профиля");
         return;
       }
       setIsLoading(true);
@@ -667,6 +673,13 @@ function ParticipantFlow({
                   hint="Рекомендуем заполнить, для более точных рекомендаций"
                   ariaLabel="Интересы ребёнка"
                   items={childInterestChipItems}
+                  emptyState={
+                    interestsLoading ? (
+                      <BodyMuted className="text-sm">Загружаем интересы…</BodyMuted>
+                    ) : systemInterests.length === 0 ? (
+                      <BodyMuted className="text-sm">Интересы не найдены</BodyMuted>
+                    ) : undefined
+                  }
                 />
               </div>
             ) : null}

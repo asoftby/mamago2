@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { verifyPassword } from "@/lib/auth/crypto";
 import { createSession, setSessionCookie } from "@/lib/auth/session";
+import { normalizeEmail } from "@/lib/auth/email";
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -13,7 +14,9 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const parsed = loginSchema.parse(body);
-    const email = parsed.email.trim().toLowerCase();
+    
+    // Normalize email (trim + lowercase)
+    const email = normalizeEmail(parsed.email);
     const password = parsed.password;
 
     // Find user

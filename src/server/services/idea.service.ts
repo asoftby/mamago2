@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import type { Idea } from "@prisma/client";
+import { resolveRouteForUserSave } from "@/server/services/route.service";
 
 /**
  * Add an activity to user's saved ideas
@@ -67,4 +68,23 @@ export async function hasIdea(
     },
   });
   return idea !== null;
+}
+
+/** Сохранить маршрут в «Идеи» (idempotent). */
+export async function addRouteIdea(
+  userId: string,
+  routeId: string,
+  routeSlug?: string | null
+) {
+  const route = await resolveRouteForUserSave(routeId, routeSlug);
+  if (!route) {
+    throw new Error("Route not found");
+  }
+  return prisma.routeIdea.upsert({
+    where: {
+      userId_routeId: { userId, routeId: route.id },
+    },
+    create: { userId, routeId: route.id },
+    update: {},
+  });
 }

@@ -1,7 +1,6 @@
 "use client";
 
-import { cn } from "@/lib/utils";
-import { X } from "lucide-react";
+import { ModalCloseButton } from "@/components/ui/modal-close-button";
 import { DiscoveryIntentTabs } from "@/components/city/DiscoveryIntentTabs";
 import { DesktopSearchControl } from "./DesktopSearchControl";
 import type { HeaderMode, HeaderPanel } from "@/hooks/useHeaderBehavior";
@@ -36,14 +35,10 @@ export function HeaderOverlayPresentation({
   return (
     <div className="relative">
       
-      {/* CLOSE BUTTON */}
-      <button
+      <ModalCloseButton
         onClick={headerBehavior.actions.collapseOverlay}
-        className="absolute top-4 right-4 z-10 flex items-center justify-center w-8 h-8 bg-white border border-gray-200 rounded-full hover:bg-gray-50 transition-colors shadow-sm"
-        aria-label="Закрыть"
-      >
-        <X className="h-4 w-4 text-gray-600" />
-      </button>
+        className="absolute top-4 right-4 z-10"
+      />
       
       <div className="flex flex-col py-6">
         

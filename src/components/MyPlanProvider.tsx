@@ -1,31 +1,23 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuthMe } from "@/features/birthday/builder/hooks/useAuthMe";
-import { MyPlanWidget, MyPlanSheet, MyPlanModal } from "@/features/my-plan";
+import { MyPlanWidget, MyPlanOverlay, type MyPlanUnauthSurface } from "@/features/my-plan";
 import { MyPlanStateProvider } from "@/features/my-plan/hooks/useMyPlan";
-import { MyPlanAuthModal } from "@/components/auth/MyPlanAuthModal";
 import { appendMyPlanOpenToHref, MY_PLAN_OPEN_EVENT } from "@/lib/my-plan/myPlanOpenIntent";
 import { isMyPlanShellExcludedPath, shouldHideMyPlanWidget } from "@/lib/intent";
+import { trackPostAuthEvent } from "@/lib/post-auth/analytics";
 
 function MyPlanProviderInner() {
   const pathname = usePathname();
   const hidePlanEntry = shouldHideMyPlanWidget(pathname);
   const router = useRouter();
   const { isAuthenticated, isLoading: authLoading } = useAuthMe();
+  const [embeddedAuthCompleting, setEmbeddedAuthCompleting] = useState(false);
+  const [postAuthCompletionActive, setPostAuthCompletionActive] = useState(false);
   const [planOpen, setPlanOpen] = useState(false);
-  const [authOpen, setAuthOpen] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
-
-  useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768);
-    };
-    checkMobile();
-    window.addEventListener("resize", checkMobile);
-    return () => window.removeEventListener("resize", checkMobile);
-  }, []);
+  const unauthSurfaceRef = useRef<MyPlanUnauthSurface>("auth");
 
   const nextHref = appendMyPlanOpenToHref(pathname || "/");
 
@@ -40,12 +32,27 @@ function MyPlanProviderInner() {
     router.replace(`${pathname || "/"}${qs ? `?${qs}` : ""}`, { scroll: false });
   }, [authLoading, isAuthenticated, router, pathname]);
 
+  useEffect(() => {
+    if (isAuthenticated) setEmbeddedAuthCompleting(false);
+  }, [isAuthenticated]);
+
+  /** Закрыть overlay при переходе на страницу плана (после post-auth navigate). */
+  useEffect(() => {
+    if (pathname === "/me/plan" || pathname?.startsWith("/me/plan/")) {
+      setPlanOpen(false);
+    }
+  }, [pathname]);
+
   const handleOpenMyPlan = useCallback(() => {
     if (authLoading) return;
+
     if (!isAuthenticated) {
-      setAuthOpen(true);
+      trackPostAuthEvent("my_plan_entry_opened", { source: "my_plan" });
+      unauthSurfaceRef.current = "auth";
+      setPlanOpen(true);
       return;
     }
+
     setPlanOpen(true);
   }, [authLoading, isAuthenticated]);
 
@@ -57,16 +64,42 @@ function MyPlanProviderInner() {
     return () => window.removeEventListener(MY_PLAN_OPEN_EVENT, onOpenRequested);
   }, [handleOpenMyPlan]);
 
+  const handlePlanOpenChange = useCallback(
+    (open: boolean) => {
+      if (!open) {
+        setEmbeddedAuthCompleting(false);
+        setPostAuthCompletionActive(false);
+        if (!isAuthenticated && unauthSurfaceRef.current === "auth") {
+          trackPostAuthEvent("completion_abandoned", { source: "my_plan" });
+        }
+      }
+      setPlanOpen(open);
+    },
+    [isAuthenticated],
+  );
+
+  const handleUnauthBeforeClose = useCallback((ctx: { surface: MyPlanUnauthSurface }) => {
+    unauthSurfaceRef.current = ctx.surface;
+  }, []);
+
   return (
     <MyPlanStateProvider>
       {!hidePlanEntry ? <MyPlanWidget onOpen={handleOpenMyPlan} /> : null}
-      <MyPlanAuthModal open={authOpen} onOpenChange={setAuthOpen} nextHref={nextHref} />
-      {isAuthenticated &&
-        (isMobile ? (
-          <MyPlanSheet open={planOpen} onOpenChange={setPlanOpen} />
-        ) : (
-          <MyPlanModal open={planOpen} onOpenChange={setPlanOpen} />
-        ))}
+
+      <MyPlanOverlay
+        open={planOpen}
+        onOpenChange={handlePlanOpenChange}
+        isAuthenticated={
+          (isAuthenticated || embeddedAuthCompleting) && !postAuthCompletionActive
+        }
+        authNextHref={nextHref}
+        onUnauthBeforeClose={handleUnauthBeforeClose}
+        onPostAuthCompletionPhase={setPostAuthCompletionActive}
+        onGuestAuthSuccess={() => {
+          setEmbeddedAuthCompleting(true);
+          setPlanOpen(true);
+        }}
+      />
     </MyPlanStateProvider>
   );
 }

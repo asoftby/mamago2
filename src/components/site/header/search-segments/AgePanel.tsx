@@ -15,12 +15,13 @@ interface AgePanelProps {
   availableChildren?: Array<{ id: string; name: string; birthDate?: string }>;
   onToggleChild?: (childId: string) => void;
   /** Основной взрослый (личный аккаунт) — чип «Для …»; birthDate для порядка чипов по возрасту */
-  primaryAdult?: { id: string; displayName: string; birthDate?: string } | null;
+  primaryAdult?: { id: string; displayName: string; birthDate?: string; isProfileComplete?: boolean } | null;
   adultSelected?: boolean;
   onToggleAdult?: () => void;
   /**
-   * derived — выбраны дети-персоны: возраст только производный, чипы не кликаются.
+   * derived — выбраны персоны: возраст только производный, чипы не кликаются.
    * manual — возраст независимый fallback.
+   * free — свободный поиск: возраст можно выбрать вручную.
    */
   ageMode?: FamilyAgeMode;
   autoAgeValues?: string[];
@@ -28,10 +29,12 @@ interface AgePanelProps {
   embedded?: boolean;
   /** Лимит 3 персоны: нельзя добавить новую, пока не снять выбор с другой */
   personaPickAtLimit?: boolean;
-  /** Режим «Для всех» (никого не выбрано при наличии семьи в профиле) */
+  /** Режим «Свободный поиск» (никого не выбрано) */
   whoFreeMode?: boolean;
-  /** «Для всех»: сброс персон и возраста; дальше возраст можно выбрать вручную */
+  /** «Свободный поиск»: сброс персон и возраста; дальше возраст можно выбрать вручную */
   onSelectEveryone?: () => void;
+  /** Выбранные ID персон (взрослые + дети) из FamilyPersonaContext */
+  selectedPersonaIds?: string[];
 }
 
 export function AgePanel({
@@ -49,6 +52,7 @@ export function AgePanel({
   personaPickAtLimit = false,
   whoFreeMode = false,
   onSelectEveryone,
+  selectedPersonaIds = [],
 }: AgePanelProps) {
   /** Только при выбранных детях-персонах возраст производный и чипы заблокированы. */
   const ageReadOnly = ageMode === "derived";
@@ -100,9 +104,9 @@ export function AgePanel({
     };
   });
 
-  const showChildrenBlock = availableChildren.length > 0 && !!onToggleChild;
+  const showAdultChip = !!primaryAdult && !!onToggleAdult && primaryAdult.isProfileComplete === true;
 
-  const showAdultChip = !!primaryAdult && !!onToggleAdult;
+  const showChildrenBlock = (availableChildren.length > 0 && !!onToggleChild) || showAdultChip;
 
   type PersonaChipRow =
     | { kind: "adult" }
@@ -142,47 +146,55 @@ export function AgePanel({
         {personaChipsOrder.map((row) => {
           if (row.kind === "adult") {
             if (!primaryAdult) return null;
+            // Use selectedPersonaIds if available, fallback to adultSelected
+            const isSelected = selectedPersonaIds.length > 0 
+              ? selectedPersonaIds.includes(primaryAdult.id)
+              : adultSelected;
+            const isActive = !whoFreeMode && isSelected;
             return (
               <button
-                key={primaryAdult.id}
+                key={`adult-${primaryAdult.id}`}
                 type="button"
                 onClick={onToggleAdult}
-                disabled={personaPickAtLimit && !adultSelected}
-                aria-pressed={adultSelected}
+                disabled={personaPickAtLimit && !isSelected}
+                aria-pressed={isActive}
                 className={[
                   "inline-flex max-w-full shrink-0 items-center justify-center rounded-full border px-5 py-2.5 text-sm font-medium transition-colors",
-                  adultSelected
+                  isActive
                     ? "border-transparent bg-[#F8C4B4] text-gray-900"
                     : "border-gray-200 bg-gray-100 text-gray-900 hover:bg-gray-50",
-                  personaPickAtLimit && !adultSelected
+                  personaPickAtLimit && !isSelected
                     ? "cursor-not-allowed opacity-45 hover:bg-gray-100"
                     : "",
                 ].join(" ")}
               >
-                {toGenitiveName(primaryAdult.displayName)}
+                {primaryAdult.displayName}
               </button>
             );
           }
           const { child } = row;
-          const inSelection = selectedChildIds.includes(child.id);
-          const active = inSelection;
+          // Use selectedPersonaIds if available, fallback to selectedChildIds
+          const inSelection = selectedPersonaIds.length > 0
+            ? selectedPersonaIds.includes(child.id)
+            : selectedChildIds.includes(child.id);
+          const isActive = !whoFreeMode && inSelection;
           const pickBlocked = personaPickAtLimit && !inSelection;
           return (
             <button
-              key={child.id}
+              key={`child-${child.id}`}
               type="button"
               onClick={() => onToggleChild?.(child.id)}
               disabled={pickBlocked}
-              aria-pressed={active}
+              aria-pressed={isActive}
               className={[
                 "inline-flex max-w-full shrink-0 items-center justify-center rounded-full border px-5 py-2.5 text-sm font-medium transition-colors",
-                active
+                isActive
                   ? "border-transparent bg-[#F8C4B4] text-gray-900"
                   : "border-gray-200 bg-gray-100 text-gray-900 hover:bg-gray-50",
                 pickBlocked ? "cursor-not-allowed opacity-45 hover:bg-gray-100" : "",
               ].join(" ")}
             >
-              {toGenitiveName(child.name)}
+              {child.name}
             </button>
           );
         })}
@@ -198,7 +210,7 @@ export function AgePanel({
                 : "border-gray-200 bg-gray-100 text-gray-900 hover:bg-gray-50",
             ].join(" ")}
           >
-            Для всех
+            Свободный поиск
           </button>
         ) : null}
       </div>

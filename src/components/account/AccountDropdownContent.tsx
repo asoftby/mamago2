@@ -59,6 +59,11 @@ export type AccountDropdownContentProps = {
   logoutMode?: "fetch" | "form";
   loggingOut?: boolean;
   onNavigate?: () => void;
+  /**
+   * Нижний sheet на мобильном: отступ справа под absolute «Закрыть», верх совпадает с top-4 кнопки.
+   * Не задаётся в билдерах — прокидывается из AccountDropdown при narrow.
+   */
+  sheetLayout?: boolean;
 };
 
 export function AccountDropdownContent({
@@ -69,11 +74,22 @@ export function AccountDropdownContent({
   logoutMode = "fetch",
   loggingOut,
   onNavigate,
+  sheetLayout = false,
 }: AccountDropdownContentProps) {
   return (
     <div className="flex flex-col bg-white">
-      <div className="border-b border-gray-200 px-4 py-4">
-        <div className="flex items-center gap-3">
+      <div
+        className={cn(
+          "border-b border-gray-200 px-4",
+          sheetLayout ? "pb-4 pt-4 pr-14" : "py-4",
+        )}
+      >
+        <div
+          className={cn(
+            "flex gap-3",
+            sheetLayout ? "items-start" : "items-center",
+          )}
+        >
           {header.avatarUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
@@ -87,7 +103,7 @@ export function AccountDropdownContent({
             </div>
           )}
           <div className="min-w-0 flex-1">
-            <div className="truncate text-sm font-semibold text-gray-900">
+            <div className="truncate text-lg font-semibold text-gray-900">
               {header.displayName}
             </div>
             {header.personaSubtitle ? (

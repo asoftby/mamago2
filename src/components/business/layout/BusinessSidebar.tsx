@@ -1,7 +1,15 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, MapPin, Calendar, Tag, CreditCard, FileText } from "lucide-react";
+import {
+  LayoutDashboard,
+  MapPin,
+  Calendar,
+  Tag,
+  CreditCard,
+  FileText,
+  Users,
+} from "lucide-react";
 import { SidebarItem } from "@/components/shared/sidebar/SidebarItem";
 
 const navigationItems = [
@@ -24,6 +32,11 @@ const navigationItems = [
     name: "Offers",
     href: "/business/offers",
     icon: Tag,
+  },
+  {
+    name: "Команда",
+    href: "/business/team",
+    icon: Users,
   },
   {
     name: "Billing",
@@ -51,6 +64,9 @@ export function BusinessSidebar() {
     // For commercial, check if pathname starts with /business/commercial
     if (href === "/business/commercial") {
       return pathname.startsWith("/business/commercial");
+    }
+    if (href === "/business/team") {
+      return pathname.startsWith("/business/team");
     }
     return pathname.startsWith(href);
   };

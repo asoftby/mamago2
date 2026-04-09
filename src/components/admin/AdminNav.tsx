@@ -8,6 +8,10 @@ import {
   moderationItemHref,
   type ModerationNavItemId,
 } from "@/lib/admin/moderationSidebarConfig";
+import {
+  CONTENT_NAV_ITEMS,
+  contentItemHref,
+} from "@/lib/admin/contentSidebarConfig";
 import { SEO_CONTROL_NAV } from "@/lib/admin/seoNavConfig";
 
 // Admin route helper to ensure all admin links are prefixed correctly
@@ -19,9 +23,6 @@ export const adminPath = (path: string) => {
 
 const MODERATION_NAV_EN: Record<ModerationNavItemId, string> = {
   queue: "Queue",
-  places: "Places",
-  events: "Events",
-  offers: "Offers",
 };
 
 interface NavItem {
@@ -75,9 +76,14 @@ const NAV_SECTIONS: NavSection[] = [
   },
   {
     title: "Content",
-    items: [
-      { label: "Медиатека", href: adminPath("/media") },
-    ],
+    items: CONTENT_NAV_ITEMS.map((item) => ({
+      label: item.label,
+      href: contentItemHref(item.path),
+    })),
+  },
+  {
+    title: "Email Studio",
+    items: [{ label: "Templates", href: adminPath("/email-studio") }],
   },
   {
     title: "Discovery",
@@ -132,20 +138,26 @@ export function AdminNav() {
             {section.title}
           </div>
           <div className="flex flex-col gap-1">
-            {section.items.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={cn(
-                  "block px-3 py-2 text-sm rounded-md transition-colors",
-                  pathname === item.href
-                    ? "bg-primary/10 text-primary font-medium"
-                    : "text-gray-700 hover:bg-gray-100"
-                )}
-              >
-                {item.label}
-              </Link>
-            ))}
+            {section.items.map((item) => {
+              const active =
+                pathname === item.href ||
+                (item.href !== adminPath("") &&
+                  pathname.startsWith(`${item.href}/`));
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={cn(
+                    "block px-3 py-2 text-sm rounded-md transition-colors",
+                    active
+                      ? "bg-primary/10 text-primary font-medium"
+                      : "text-gray-700 hover:bg-gray-100",
+                  )}
+                >
+                  {item.label}
+                </Link>
+              );
+            })}
           </div>
         </div>
       ))}

@@ -1,5 +1,7 @@
+import Image from "next/image";
 import Link from "next/link";
 import { CookieSettingsFooterLink } from "@/components/shell/CookieSettingsFooterLink";
+import { FooterSocialLinks } from "@/components/shell/FooterSocialLinks";
 import { Container } from "@/components/ui/Container";
 
 export function PublicFooter() {
@@ -50,14 +52,23 @@ export function PublicFooter() {
           </div>
         </div>
 
-        {/* Bottom */}
-        <div className="flex flex-col md:flex-row items-center justify-between gap-4 pt-8 border-t">
-          <div className="flex items-center gap-2 font-bold text-lg tracking-tight opacity-50">
-            <span>mama</span>
-            <span>Go</span>
+        {/* Bottom: строка 1 — лого слева, соцсети справа; строка 2 — копирайт по центру */}
+        <div className="flex flex-col gap-4 pt-8 border-t">
+          <div className="flex w-full items-center justify-between gap-4">
+            <Image
+              src="/logomamago.webp"
+              alt="mamaGo"
+              width={176}
+              height={44}
+              className="h-[1.925rem] w-auto shrink-0"
+              priority={false}
+            />
+            <div className="flex shrink-0 justify-end">
+              <FooterSocialLinks />
+            </div>
           </div>
-          <p className="text-sm text-muted-foreground text-center md:text-right">
-            © {currentYear} mamaGo.by. All rights reserved.
+          <p className="w-full text-center text-sm text-muted-foreground">
+            © {currentYear} made in Belarus with 🧡
           </p>
         </div>
       </Container>

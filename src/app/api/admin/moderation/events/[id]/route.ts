@@ -58,6 +58,7 @@ export async function POST(
     }
 
     revalidatePath("/admin/moderation/events");
+    revalidatePath("/admin/content/events");
     return NextResponse.json({ success: true, action });
   } catch (error) {
     console.error("Activity moderation error:", error);
@@ -83,6 +84,7 @@ export async function DELETE(
 
     await softDeleteActivityById(id);
     revalidatePath("/admin/moderation/events");
+    revalidatePath("/admin/content/events");
     revalidatePath("/admin");
 
     return NextResponse.json({ success: true });

@@ -1,13 +1,16 @@
 import type { User } from "@prisma/client";
 import { ActivityType } from "@prisma/client";
-import { canManageOwnedContent } from "@/lib/auth/businessContentAccess";
+import { canManageActivityById } from "@/lib/auth/activityAccess";
 
-export function canEditEventActivity(
+/**
+ * Event editor gate: EVENT type + business-first access (see activityAccess).
+ */
+export async function canEditEventActivity(
   user: User,
-  activity: { ownerUserId: string; type: ActivityType }
-): boolean {
+  activity: { id: string; type: ActivityType },
+): Promise<boolean> {
   if (activity.type !== ActivityType.EVENT) {
     return false;
   }
-  return canManageOwnedContent(user, activity.ownerUserId);
+  return canManageActivityById(user, activity.id);
 }

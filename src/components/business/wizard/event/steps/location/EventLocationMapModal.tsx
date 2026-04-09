@@ -16,6 +16,8 @@ interface EventLocationMapModalProps {
     lng: number;
     formattedAddr?: string;
   }) => void;
+  /** inline — встроенная карта без полноэкранного оверлея (редактор статьи и т.п.) */
+  layout?: "fullscreen" | "inline";
 }
 
 export function EventLocationMapModal({
@@ -24,6 +26,7 @@ export function EventLocationMapModal({
   initialLat,
   initialLng,
   onConfirm,
+  layout = "fullscreen",
 }: EventLocationMapModalProps) {
   const [tempPin, setTempPin] = useState<{ lat: number; lng: number } | null>(
     initialLat != null && initialLng != null ? { lat: initialLat, lng: initialLng } : null
@@ -232,6 +235,40 @@ export function EventLocationMapModal({
   };
 
   if (!isOpen) return null;
+
+  if (layout === "inline") {
+    return (
+      <div className="flex h-[min(320px,50vh)] min-h-[220px] flex-col overflow-hidden rounded-lg border border-border bg-background">
+        <div className="flex shrink-0 items-start justify-between gap-2 border-b border-border px-3 py-2">
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-foreground">Кликните по карте, чтобы поставить метку</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">Подтвердите точку снизу</p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="shrink-0 rounded-md p-1.5 text-muted-foreground hover:bg-muted"
+            aria-label="Свернуть карту"
+          >
+            <X className="h-4 w-4" strokeWidth={2.25} />
+          </button>
+        </div>
+        <div ref={mapRef} className="min-h-0 flex-1 w-full" />
+        <div className="flex shrink-0 justify-center border-t border-border p-3">
+          <Button
+            type="button"
+            onClick={() => void handleConfirm()}
+            disabled={!tempPin}
+            size="default"
+            className="shadow-sm"
+            style={{ backgroundColor: "#EF8759" }}
+          >
+            Подтвердить точку
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-background">

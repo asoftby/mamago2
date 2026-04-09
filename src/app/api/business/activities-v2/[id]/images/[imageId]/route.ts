@@ -6,7 +6,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
-import { canCreateBusinessContent, canManageOwnedContent } from "@/lib/auth/businessContentAccess";
+import { canCreateBusinessContent } from "@/lib/auth/businessContentAccess";
+import { canManageActivityById } from "@/lib/auth/activityAccess";
 
 export async function DELETE(
   req: NextRequest,
@@ -21,17 +22,16 @@ export async function DELETE(
 
     const { id: activityId, imageId } = await params;
 
-    // Check ownership
     const activity = await prisma.activity.findUnique({
       where: { id: activityId },
-      select: { ownerUserId: true, coverImageId: true },
+      select: { coverImageId: true },
     });
 
     if (!activity) {
       return NextResponse.json({ error: "Activity not found" }, { status: 404 });
     }
 
-    if (!canManageOwnedContent(user, activity.ownerUserId)) {
+    if (!(await canManageActivityById(user, activityId))) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 

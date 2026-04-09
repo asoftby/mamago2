@@ -30,7 +30,7 @@ export const DISCOVERY_INTENT_CONFIG: Record<Intent, DiscoveryIntentConfig> = {
   },
   birthday: {
     id: "birthday",
-    label: "ДР",
+    label: "Праздник",
     titleTemplate: "Организация детского праздника в {city}",
     href: (city) => `/${city}/birthday`,
     hasFilters: true,
@@ -42,7 +42,7 @@ export const DISCOVERY_INTENT_CONFIG: Record<Intent, DiscoveryIntentConfig> = {
     titleTemplate: "Готовые маршруты для прогулок с детьми в {city}",
     href: (city) => `/${city}/routes`,
     hasFilters: true,
-    image: "/mag.svg",
+    image: "/routes.svg",
   },
 };
 

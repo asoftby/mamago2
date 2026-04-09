@@ -6,39 +6,43 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
+import { isEmailVerified, jsonEmailNotVerified } from "@/lib/auth/requireVerifiedEmail";
 import prisma from "@/lib/prisma";
 import { canCreateBusinessContent } from "@/lib/auth/businessContentAccess";
 import { getUserBusinessId } from "@/lib/auth/placeAccess";
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
+    const { id: placeId } = await params;
     const user = await getCurrentUser();
 
     if (!user || !canCreateBusinessContent(user.role)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const placeId = params.id;
+    if (!isEmailVerified(user)) {
+      return jsonEmailNotVerified();
+    }
 
     // Get user's business ID (required for claim)
     const businessId = await getUserBusinessId(user.id);
-    
+
     if (!businessId) {
       return NextResponse.json(
         { error: "Business required. You must have a business to claim a place." },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     // Check if place exists
     const place = await prisma.place.findUnique({
       where: { id: placeId },
-      select: { 
-        id: true, 
-        title: true, 
+      select: {
+        id: true,
+        title: true,
         ownerBusinessId: true,
         createdByUserId: true,
       },
@@ -52,7 +56,7 @@ export async function POST(
     if (place.ownerBusinessId === businessId) {
       return NextResponse.json(
         { error: "Your business already owns this place" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -92,7 +96,7 @@ export async function POST(
     console.error("[API] Place claim error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

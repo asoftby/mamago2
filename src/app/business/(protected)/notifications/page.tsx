@@ -1,11 +1,11 @@
 import { Metadata } from "next";
-import { NotificationsPage } from "./NotificationsPage";
+import { redirect } from "next/navigation";
 
 export const metadata: Metadata = {
-  title: "Уведомления | Business Cabinet",
-  description: "Все уведомления",
+  title: "Уведомления | Business",
 };
 
-export default function Page() {
-  return <NotificationsPage />;
+/** Старый URL — уведомления только из шапки (NotificationsModal). */
+export default function BusinessNotificationsLegacyPage() {
+  redirect("/business");
 }

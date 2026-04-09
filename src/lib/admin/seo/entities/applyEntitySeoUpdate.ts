@@ -153,6 +153,7 @@ export async function applyArticleSeoUpdate(entityId: string, input: SeoEntityUp
       seoRobots: input.seoRobots,
       seoJsonLdOverride: input.seoJsonLdOverride as Prisma.InputJsonValue,
     },
+    select: { id: true },
   });
 
   if (!manual) {

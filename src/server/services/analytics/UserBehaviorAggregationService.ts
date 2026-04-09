@@ -10,6 +10,8 @@ import {
   resolveSegments,
 } from "@/server/services/analytics/SegmentResolverService";
 
+const BEHAVIOR_PROFILE_LOG = "[behavior-profile]";
+
 export type BehaviorAggregationInput = {
   userId: string;
   eventType: UserEventType;
@@ -110,7 +112,16 @@ export async function applyUserBehaviorEvent(
   const { userId, eventType, entityType, vertical, meta } = input;
   if (!userId) return;
 
+  const verbose = process.env.NODE_ENV !== "production";
+
   try {
+    if (verbose) {
+      console.log(`${BEHAVIOR_PROFILE_LOG} aggregation:start`, {
+        userId,
+        eventType,
+      });
+    }
+
     const d = counterDelta(eventType);
     const now = new Date();
 
@@ -191,53 +202,59 @@ export async function applyUserBehaviorEvent(
       advance: planningBuckets.advance,
     } as Prisma.InputJsonValue;
 
-    if (existing) {
-      const updateData: Prisma.UserBehaviorProfileUpdateInput = {
-        totalViews: { increment: d.views },
-        totalOpens: { increment: d.opens },
-        totalSaves: { increment: d.saves },
-        totalPlanAdds: { increment: d.planAdds },
-        totalCtaClicks: { increment: d.cta },
+    const updateData: Prisma.UserBehaviorProfileUpdateInput = {
+      totalViews: { increment: d.views },
+      totalOpens: { increment: d.opens },
+      totalSaves: { increment: d.saves },
+      totalPlanAdds: { increment: d.planAdds },
+      totalCtaClicks: { increment: d.cta },
+      lastSeenAt: now,
+      preferredVerticals: preferredVJson,
+      preferredCategories: preferredCJson,
+      planningBuckets: planningPayload,
+      segmentKeys,
+    };
+
+    if (eventType === "PLAN_ADD") {
+      updateData.weekendShare = shares.weekend;
+      updateData.sameDayPlanningShare = shares.sameDay;
+      updateData.advancePlanningShare = shares.advance;
+    }
+
+    /** Атомарный upsert устраняет гонку INSERT при параллельных событиях (unique userId). */
+    await prisma.userBehaviorProfile.upsert({
+      where: { userId },
+      create: {
+        userId,
+        totalViews: d.views,
+        totalOpens: d.opens,
+        totalSaves: d.saves,
+        totalPlanAdds: d.planAdds,
+        totalCtaClicks: d.cta,
+        firstSeenAt: now,
         lastSeenAt: now,
+        weekendShare: eventType === "PLAN_ADD" ? shares.weekend : 0,
+        sameDayPlanningShare: eventType === "PLAN_ADD" ? shares.sameDay : 0,
+        advancePlanningShare: eventType === "PLAN_ADD" ? shares.advance : 0,
         preferredVerticals: preferredVJson,
         preferredCategories: preferredCJson,
         planningBuckets: planningPayload,
         segmentKeys,
-      };
+      },
+      update: updateData,
+    });
 
-      if (eventType === "PLAN_ADD") {
-        updateData.weekendShare = shares.weekend;
-        updateData.sameDayPlanningShare = shares.sameDay;
-        updateData.advancePlanningShare = shares.advance;
-      }
-
-      await prisma.userBehaviorProfile.update({
-        where: { userId },
-        data: updateData,
-      });
-    } else {
-      await prisma.userBehaviorProfile.create({
-        data: {
-          user: { connect: { id: userId } },
-          totalViews: d.views,
-          totalOpens: d.opens,
-          totalSaves: d.saves,
-          totalPlanAdds: d.planAdds,
-          totalCtaClicks: d.cta,
-          firstSeenAt: now,
-          lastSeenAt: now,
-          weekendShare: eventType === "PLAN_ADD" ? shares.weekend : 0,
-          sameDayPlanningShare: eventType === "PLAN_ADD" ? shares.sameDay : 0,
-          advancePlanningShare: eventType === "PLAN_ADD" ? shares.advance : 0,
-          preferredVerticals: preferredVJson,
-          preferredCategories: preferredCJson,
-          planningBuckets: planningPayload,
-          segmentKeys,
-        },
+    if (verbose) {
+      console.log(`${BEHAVIOR_PROFILE_LOG} aggregation:done`, {
+        userId,
+        eventType,
       });
     }
   } catch (e) {
-    console.error("[UserBehaviorAggregationService] applyUserBehaviorEvent:", e);
+    console.error(`${BEHAVIOR_PROFILE_LOG} aggregation:error`, {
+      userId,
+      eventType,
+    }, e);
   }
 }
 

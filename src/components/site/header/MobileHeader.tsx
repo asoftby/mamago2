@@ -5,7 +5,7 @@
  * Поисковая точка входа — как на discovery.
  * Иконка фильтров скрыта на посадочных маршрутах (`getSiteHeaderVariant` === `landing`), на витринах — как раньше.
  */
-import { useState, useRef, useLayoutEffect } from "react";
+import { useState, useRef, useLayoutEffect, useEffect } from "react";
 import { usePathname } from "next/navigation";
 import { useReducedMotion } from "framer-motion";
 import { cn } from "@/lib/utils";
@@ -25,6 +25,7 @@ import { DISCOVERY_INTENT_CONFIG } from "@/lib/discovery/discoveryIntentConfig";
 import { useHeaderScrolled } from "@/hooks/useHeaderScrolled";
 import { useAirbnbMobileHeaderScroll } from "@/hooks/useAirbnbMobileHeaderScroll";
 import { getSiteHeaderVariant } from "@/lib/site/siteHeaderVariant";
+import { OPEN_MOBILE_SEARCH_EVENT } from "@/lib/mobile/openMobileSearchEvent";
 
 export function MobileHeader() {
   const [isSearchSheetOpen, setIsSearchSheetOpen] = useState(false);
@@ -61,7 +62,7 @@ export function MobileHeader() {
     ? DISCOVERY_INTENT_CONFIG[searchIntent]
     : null;
 
-  const cityHubOnly = isCityHubRoute || isPublicationPage;
+  const cityHubOnly = isPublicationPage;
 
   const useScrollTransform = mobileScroll.enabled;
 
@@ -94,6 +95,12 @@ export function MobileHeader() {
     const ro = new ResizeObserver(sync);
     ro.observe(el);
     return () => ro.disconnect();
+  }, []);
+
+  useEffect(() => {
+    const open = () => setIsSearchSheetOpen(true);
+    window.addEventListener(OPEN_MOBILE_SEARCH_EVENT, open);
+    return () => window.removeEventListener(OPEN_MOBILE_SEARCH_EVENT, open);
   }, []);
 
   /** Смена маршрута / режима без срабатывания ResizeObserver. */
@@ -140,7 +147,7 @@ export function MobileHeader() {
                 <MobileSearchEntry
                   cityHubOnly={cityHubOnly}
                   showSectionIcon={isPublicationPage}
-                  showTapToSelectHint={isCityHubRoute}
+                  showTapToSelectHint={false}
                   onSearchClick={() => setIsSearchSheetOpen(true)}
                   citySlug={displayCity}
                   currentIntent={displayIntent}

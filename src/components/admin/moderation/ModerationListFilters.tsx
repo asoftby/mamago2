@@ -8,7 +8,7 @@ export type ModerationStatusFilterKind = "content" | "offer";
 
 export interface ModerationListFiltersProps {
   cities: { id: string; name: string }[];
-  /** Базовый путь без query, напр. `/admin/moderation/places` */
+  /** Базовый путь без query, напр. `/admin/content/places` */
   basePath: string;
   /** `content` — как у мест (ContentStatus); `offer` — OfferStatus */
   statusFilter: ModerationStatusFilterKind;
@@ -31,7 +31,7 @@ const STATUS_OFFER: FilterSelectOption[] = [
 ];
 
 /**
- * Фильтры статуса и города — те же опции и стиль, что на `/admin/moderation/places`.
+ * Фильтры статуса и города — те же опции и стиль, что на списках контента (например `/admin/content/places`).
  */
 function ModerationListFiltersInner({
   cities,

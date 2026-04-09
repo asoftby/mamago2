@@ -12,8 +12,9 @@ import {
 import { Button } from "@/components/ui/button";
 import type { EventPageData } from "@/lib/event/eventPageTypes";
 import { publicActivityPath } from "@/lib/business/eventPublicLink";
-import { SaveToPlanModal } from "@/components/activity/SaveToPlanModal";
+import { SaveActivityFlowAdaptive } from "@/components/activity/SaveActivityFlowAdaptive";
 import type { SaveToPlanResult } from "@/components/activity/SaveToPlanModal";
+import { useAuthMe } from "@/features/birthday/builder/hooks/useAuthMe";
 import { PublicationStatsPanel } from "@/components/publication-stats";
 import { postAnalyticsEvent } from "@/lib/analytics/client";
 
@@ -43,6 +44,7 @@ import { EventSessionSelector } from "./EventSessionSelector";
  * 3) Подходит ли это мне / моему ребёнку?
  */
 export function ConversionEventPageView({ data }: { data: EventPageData }) {
+  const { isAuthenticated } = useAuthMe();
   const setPublicationIntent = useSetPublicationIntent();
   
   useEffect(() => {
@@ -177,10 +179,11 @@ export function ConversionEventPageView({ data }: { data: EventPageData }) {
           toast.success("Убрано из идей");
         }
         await loadSaveStatus();
-      } catch {
+      } catch (e) {
         toast.error("Не удалось сохранить", {
           description: "Попробуйте еще раз",
         });
+        throw e;
       } finally {
         setIsPrimaryLoading(false);
       }
@@ -538,11 +541,12 @@ export function ConversionEventPageView({ data }: { data: EventPageData }) {
       />
 
       {/* Модалы */}
-      <SaveToPlanModal
+      <SaveActivityFlowAdaptive
         open={saveModalOpen}
         onOpenChange={setSaveModalOpen}
+        isAuthenticated={isAuthenticated}
         scenario={{ kind: "quickdate", title: data.title }}
-        onConfirm={handleSaveToPlanConfirm}
+        onPersist={handleSaveToPlanConfirm}
         isIdea={saveStatus.isIdea}
         inPlan={saveStatus.inPlan}
         planDate={saveStatus.planDate}

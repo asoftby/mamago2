@@ -2,7 +2,9 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   /* config options here */
-  reactCompiler: true,
+  // В dev React Compiler сильно раздувает время компиляции страниц (десятки секунд TTFB).
+  // В production оставляем включённым.
+  reactCompiler: process.env.NODE_ENV === "production",
 
   async redirects() {
     return [
@@ -32,6 +34,15 @@ const nextConfig: NextConfig = {
       bodySizeLimit: '10mb',
     },
   },
+
+  /** Доступ к dev с другого устройства в LAN (через IP), иначе /_next/* может не грузиться */
+  ...(process.env.NEXT_DEV_ALLOWED_ORIGINS?.trim()
+    ? {
+        allowedDevOrigins: process.env.NEXT_DEV_ALLOWED_ORIGINS.split(",")
+          .map((s) => s.trim())
+          .filter(Boolean),
+      }
+    : {}),
 };
 
 export default nextConfig;

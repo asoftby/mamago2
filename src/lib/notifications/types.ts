@@ -17,10 +17,15 @@ export type NotificationApiRow = {
   id: string;
   type: string;
   title: string;
-  message: string;
+  body: string;
+  ctaLabel: string | null;
+  ctaAction: string | null;
+  isPinned: boolean;
   entityType: string | null;
   entityId: string | null;
   isRead: boolean;
+  /** null = новое (badge); после открытия центра выставляется на сервере */
+  seenAt: string | null;
   createdAt: string;
   userId?: string;
 };

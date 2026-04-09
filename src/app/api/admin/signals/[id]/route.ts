@@ -7,7 +7,7 @@ import { ensureEventCategorySlug } from "@/lib/taxonomy/eventCategorySlug";
 import {
   assertSignalCanBecomeChild,
   assertValidSignalParentIdOrNull,
-} from "@/lib/taxonomy/signalHierarchy";
+} from "@/lib/taxonomy/signalHierarchyServer";
 import { assertNotSystemDelete, assertNotSystemKeyChange, systemEntityErrorResponse } from "@/lib/data-policy/systemEntityGuard";
 
 export const runtime = "nodejs";

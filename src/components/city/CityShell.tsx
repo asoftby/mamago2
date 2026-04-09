@@ -14,13 +14,14 @@ interface CityShellProps {
 }
 
 export async function CityShell({ citySlug, intent, searchParams }: CityShellProps) {
-  // 1. Check city
-  const city = await prisma.city.findUnique({ where: { slug: citySlug } });
+  const [city, user] = await Promise.all([
+    prisma.city.findUnique({ where: { slug: citySlug } }),
+    getCurrentUser(),
+  ]);
   if (!city) notFound();
 
   let discoveryActivities = undefined;
   if (intent === "kuda" || intent === "birthday") {
-    const user = await getCurrentUser();
     discoveryActivities = await getKudaDiscoveryFeed(city.id, city.slug, user?.id ?? null);
   }
 

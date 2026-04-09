@@ -134,7 +134,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Send SMS
-    const message = `mamaGo.by: код ${code}`;
+    const message = `Ваш код: ${code}`;
 
     try {
       await sendQuickSms({ phoneDigits, message });

@@ -5,6 +5,10 @@
 
 import type { Role } from "@prisma/client";
 import prisma from "@/lib/prisma";
+import {
+  canAccessBusiness as canAccessBusinessMemberOrOwner,
+  getPartnerCabinetBusiness,
+} from "@/server/permissions/business-permissions";
 
 /**
  * Check if user can manage a place
@@ -36,31 +40,18 @@ export function canManagePlace(
 }
 
 /**
- * Check if user can access/manage a business (async)
- * 
- * MVP: Business has one owner (ownerUserId)
- * Future: Can be extended to support team members/roles
+ * Business-scoped access: membership + transitional owner (see business-permissions).
+ * Re-exported for existing call sites (activity, places).
  */
 export async function canAccessBusiness(
   userId: string,
-  businessId: string
+  businessId: string,
 ): Promise<boolean> {
-  const business = await prisma.business.findUnique({
-    where: { id: businessId },
-    select: { ownerUserId: true },
-  });
-
-  if (!business) {
-    return false;
-  }
-
-  // MVP: Check if user is business owner
-  return business.ownerUserId === userId;
+  return canAccessBusinessMemberOrOwner(userId, businessId);
 }
 
 /**
- * Check if user can access/manage a business (sync with business data)
- * Use when you already have business data
+ * Transitional sync check: canonical owner only (no BusinessMember lookup).
  */
 export function canAccessBusinessSync(
   userId: string,
@@ -69,17 +60,10 @@ export function canAccessBusinessSync(
   return business.ownerUserId === userId;
 }
 
-/**
- * Get user's business ID (if exists)
- * Returns null if user has no business
- */
+/** Cabinet business id (owner or team member). */
 export async function getUserBusinessId(userId: string): Promise<string | null> {
-  const business = await prisma.business.findUnique({
-    where: { ownerUserId: userId },
-    select: { id: true },
-  });
-
-  return business?.id || null;
+  const b = await getPartnerCabinetBusiness(userId);
+  return b?.id ?? null;
 }
 
 /**

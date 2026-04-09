@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { User } from "lucide-react";
 import type { AccountMenuUser } from "@/components/site/header/AccountMenuBody";
+import { DefaultAuthModal } from "@/components/auth/DefaultAuthModal";
 import { ProfileDropdown } from "@/components/site/header/ProfileDropdown";
 import { useAccountMode } from "@/contexts/AccountModeContext";
 import { useFamilyPersona } from "@/contexts/FamilyPersonaContext";
@@ -43,6 +43,7 @@ export function MobileProfileSheet({
     : undefined;
 
   const [menuOpen, setMenuOpen] = useState(false);
+  const [guestAuthOpen, setGuestAuthOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
 
   const handleLogout = async () => {
@@ -141,24 +142,42 @@ export function MobileProfileSheet({
 
   if (!user) {
     return (
-      <Link
-        href="/login?next=/me"
-        aria-label="Профиль"
-        className={triggerClass}
-      >
-        {inner}
-        {showBadge && (
-          <span
-            className={cn(
-              "absolute -right-0.5 -top-0.5 flex min-h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[#EF8759] px-1 text-[10px] font-semibold leading-none text-white shadow-sm ring-2",
-              chrome === "dark" ? "ring-neutral-900/95" : "ring-white/90",
-            )}
-            aria-hidden
-          >
-            {profileBadgeCount > 9 ? "9+" : profileBadgeCount}
-          </span>
-        )}
-      </Link>
+      <div className="relative flex shrink-0 items-center justify-center">
+        <button
+          type="button"
+          aria-label="Войти или зарегистрироваться"
+          aria-haspopup="dialog"
+          aria-expanded={guestAuthOpen}
+          className={triggerClass}
+          onClick={() => setGuestAuthOpen(true)}
+        >
+          {inner}
+          {showBadge && (
+            <span
+              className={cn(
+                "absolute -right-0.5 -top-0.5 flex min-h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[#EF8759] px-1 text-[10px] font-semibold leading-none text-white shadow-sm ring-2",
+                chrome === "dark" ? "ring-neutral-900/95" : "ring-white/90",
+              )}
+              aria-hidden
+            >
+              {profileBadgeCount > 9 ? "9+" : profileBadgeCount}
+            </span>
+          )}
+        </button>
+        <DefaultAuthModal
+          open={guestAuthOpen}
+          onOpenChange={setGuestAuthOpen}
+          nextHref="/me"
+          authEntryPoint="profile"
+          dialogTitle="Вход в mamaGo"
+          title="Вход в mamaGo"
+          subtitle="Планируйте лучшее время с детьми"
+          onAuthSuccess={() => {
+            setGuestAuthOpen(false);
+            notifyAuthStateChanged();
+          }}
+        />
+      </div>
     );
   }
 

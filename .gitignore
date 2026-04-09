@@ -1,87 +1,66 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+# Dependencies
+node_modules/
 
-# dependencies
-/node_modules
-/.pnp
-.pnp.*
-.yarn/*
-!.yarn/patches
-!.yarn/plugins
-!.yarn/releases
-!.yarn/versions
+# Next.js
+.next/
+out/
+dist/
+build/
 
-# testing
-/coverage
+# Environment variables
+.env
+.env.*
+!.env.example
 
-# next.js
-/.next/
-/out/
-
-# production
-/build
-
-# misc
-.DS_Store
-*.pem
-
-# debug
+# Logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-.pnpm-debug.log*
+pnpm-debug.log*
+*.log
 
-# env files (can opt-in for committing if needed)
-.env*
+# OS files
+.DS_Store
+Thumbs.db
 
-# vercel
-.vercel
-
-# typescript
-*.tsbuildinfo
-next-env.d.ts
-
-/src/generated/prisma
-prisma.config.ts.bak
-
-# sqlite
-*.db
-*.db-journal
-
-mamago2/
-mamago2/
-
-# local ai / drafts
-.kiro/
-
-# local scripts
-*.sh
-
-# local notes
-BUSINESS_*.md
-SMS_*.md
-PHONE_*.md
-AUTH_*.md
-START_HERE_*.md
-UNP_*.md
-VERIFICATION_*.md
-GRP_*.md
-PRISMA_*.md
-USER_PROFILE_*.md
-
-# prisma local scripts
-prisma/scripts/
+# Editor directories
+.idea/
 .vscode/
+!.vscode/settings.json
 
-# Local AI / temp notes
-.ai/
-.tmp/
-notes/
+# Prisma
+prisma/dev.db
+prisma/dev.db-journal
+dev.db
+dev.db-journal
 
-# Database backups (local only)
-backups/
-
-public/uploads/
-*.blob
-
-.cursor/
+# Build artifacts & caches
 .turbo/
+.cache/
+coverage/
+
+# Temporary files
+*.tmp
+*.swp
+scripts/debug-*.ts
+scripts/tmp/
+scripts/temp/
+
+# Root-level experimental docs (keep docs/ folder)
+/CONVERSION_EVENT_PAGE_REDESIGN.md
+/MODERN_EVENT_PAGE_UPDATE.md
+/STICKY_ACTION_BAR_IMPLEMENTATION.md
+/ADMIN_MEDIA_IMAGE_PIPELINE.md
+/GLOBAL_OUTSIDE_CLICK_FIX.md
+/HEADER_REFACTOR_SUMMARY.md
+/OUTSIDE_CLICK_FEATURE.md
+/SCROLL_BEHAVIOR_FIX.md
+/SEARCH_PANELS_OUTSIDE_CLICK.md
+public/uploads/
+*.tsbuildinfo
+.ai/
+.kiro/
+.react-email/
+backups/
+notes/
+*.backup

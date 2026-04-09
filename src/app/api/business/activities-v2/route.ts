@@ -9,8 +9,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
-import { ActivityType, ScheduleMode } from "@prisma/client";
-import { canCreateBusinessContent, canManageOwnedContent } from "@/lib/auth/businessContentAccess";
+import { ActivityType, ContentStatus, Prisma } from "@prisma/client";
+import { canCreateBusinessContent } from "@/lib/auth/businessContentAccess";
+import {
+  buildActivityManageWhereForUser,
+  coalesceActivityBusinessIdFromPlace,
+  getBusinessIdsUserCanAccess,
+} from "@/lib/auth/activityAccess";
+import { canManagePlaceAsync, getUserBusinessId } from "@/lib/auth/placeAccess";
 
 /**
  * POST - Create new Activity in DRAFT status
@@ -42,23 +48,29 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // If placeId provided, verify ownership
+    let resolvedBusinessId: string | null = null;
+
+    // If placeId provided, verify ownership and inherit business from place
     if (placeId) {
       const place = await prisma.place.findUnique({
         where: { id: placeId },
-        select: { ownerUserId: true },
+        select: { createdByUserId: true, ownerBusinessId: true },
       });
 
       if (!place) {
         return NextResponse.json({ error: "Place not found" }, { status: 404 });
       }
 
-      if (!canManageOwnedContent(user, place.ownerUserId)) {
+      if (!(await canManagePlaceAsync(user, place))) {
         return NextResponse.json(
           { error: "You don't own this place" },
           { status: 403 }
         );
       }
+
+      resolvedBusinessId = coalesceActivityBusinessIdFromPlace(place, null);
+    } else if (type === "ROUTE") {
+      resolvedBusinessId = await getUserBusinessId(user.id);
     }
 
     // Create activity with minimal required fields
@@ -67,6 +79,7 @@ export async function POST(req: NextRequest) {
         ownerUserId: user.id,
         type,
         placeId: placeId || null,
+        businessId: resolvedBusinessId,
         status: "DRAFT",
         title: "Новая активность",
         shortDesc: "",
@@ -111,16 +124,24 @@ export async function GET(req: NextRequest) {
     const status = searchParams.get("status");
     const type = searchParams.get("type");
 
-    const where: any = {
-      ownerUserId: user.id,
+    const manageWhere =
+      user.role === "ADMIN" || user.role === "MODERATOR"
+        ? {}
+        : buildActivityManageWhereForUser(
+            user.id,
+            await getBusinessIdsUserCanAccess(user.id),
+          );
+
+    const where: Prisma.ActivityWhereInput = {
+      ...manageWhere,
     };
 
-    if (status) {
-      where.status = status;
+    if (status && Object.values(ContentStatus).includes(status as ContentStatus)) {
+      where.status = status as ContentStatus;
     }
 
-    if (type) {
-      where.type = type;
+    if (type && Object.values(ActivityType).includes(type as ActivityType)) {
+      where.type = type as ActivityType;
     }
 
     const activities = await prisma.activity.findMany({

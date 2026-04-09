@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { resolveRouteForUserSave } from "@/server/services/route.service";
 
 const planActivitySelect = {
   id: true,
@@ -46,6 +47,9 @@ export type PlanItemWithActivity = {
   id: string;
   userId: string;
   activityId: string | null;
+  /** Present on persisted rows; synthetic UI items may omit */
+  routeId?: string | null;
+  planRouteSlug?: string | null;
   date: string;
   startsAt: Date | null;
   title: string | null;
@@ -117,6 +121,90 @@ export async function addPlanItem(
 
   return await prisma.planItem.create({
     data: { userId, activityId: activityId ?? null, date, startsAt: startsAt ?? null, title: title ?? null, coverImageUrl: coverImageUrl ?? null },
+    select: { id: true },
+  });
+}
+
+/**
+ * Добавить маршрут в план на дату (дедупликация по userId + routeId или по slug для демо без Route).
+ */
+export async function addRoutePlanItem(
+  userId: string,
+  routeId: string,
+  date: string,
+  routeSlug?: string | null,
+  options?: { title?: string | null; coverImageUrl?: string | null }
+): Promise<{ id: string }> {
+  const resolved = await resolveRouteForUserSave(routeId, routeSlug);
+  if (resolved) {
+    const existing = await prisma.planItem.findFirst({
+      where: { userId, routeId: resolved.id },
+      select: { id: true },
+    });
+    if (existing) {
+      return prisma.planItem.update({
+        where: { id: existing.id },
+        data: {
+          date,
+          title: resolved.title,
+          coverImageUrl: resolved.coverImageUrl,
+          activityId: null,
+          planRouteSlug: null,
+        },
+        select: { id: true },
+      });
+    }
+
+    return prisma.planItem.create({
+      data: {
+        userId,
+        routeId: resolved.id,
+        planRouteSlug: null,
+        activityId: null,
+        date,
+        title: resolved.title,
+        coverImageUrl: resolved.coverImageUrl,
+      },
+      select: { id: true },
+    });
+  }
+
+  const slug = routeSlug?.trim();
+  const title = options?.title?.trim();
+  if (!slug || !title) {
+    throw new Error("Route not found");
+  }
+
+  const coverRaw = options?.coverImageUrl?.trim();
+  const cover = coverRaw && coverRaw.length > 0 ? coverRaw : null;
+
+  const existingStandalone = await prisma.planItem.findFirst({
+    where: { userId, routeId: null, planRouteSlug: slug },
+    select: { id: true },
+  });
+  if (existingStandalone) {
+    return prisma.planItem.update({
+      where: { id: existingStandalone.id },
+      data: {
+        date,
+        title,
+        coverImageUrl: cover,
+        activityId: null,
+      },
+      select: { id: true },
+    });
+  }
+
+  return prisma.planItem.create({
+    data: {
+      userId,
+      routeId: null,
+      planRouteSlug: slug,
+      activityId: null,
+      date,
+      title,
+      coverImageUrl: cover,
+    },
     select: { id: true },
   });
 }

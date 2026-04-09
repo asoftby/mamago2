@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { notifyFamilyPersonasChanged } from "@/lib/family/familyPersonaEvents";
 
 export interface ProfileSaveInput {
   displayName?: string;
@@ -53,6 +54,7 @@ export function useProfileSave() {
 
       const updated: ProfileSaveResult = await res.json();
       toast.success("Профиль обновлён");
+      notifyFamilyPersonasChanged();
       router.refresh();
       return updated;
     } catch (e) {

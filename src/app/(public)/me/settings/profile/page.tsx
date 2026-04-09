@@ -11,7 +11,7 @@ export default async function ProfileSettingsPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
 
-  const initial = (user.displayName ?? user.email.split("@")[0]).charAt(0);
+  const initial = (user.displayName ?? user.email?.split("@")[0] ?? "?").charAt(0);
 
   return (
     <div className="min-h-screen bg-background py-8">

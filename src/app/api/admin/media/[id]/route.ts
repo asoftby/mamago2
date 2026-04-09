@@ -6,9 +6,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
-import { unlink } from "fs/promises";
-import { join } from "path";
-import { existsSync } from "fs";
+import { hardDeleteMediaAssetIfUnused } from "@/server/services/media/media.service";
 
 export async function PATCH(
   req: NextRequest,
@@ -58,42 +56,17 @@ export async function DELETE(
 
     const { id } = await params;
 
-    // Check if media exists
-    const media = await prisma.mediaAsset.findUnique({
-      where: { id },
-      include: {
-        usages: true,
-      },
-    });
+    const result = await hardDeleteMediaAssetIfUnused(id);
 
-    if (!media) {
-      return NextResponse.json({ error: "Media not found" }, { status: 404 });
-    }
-
-    // Check if media is in use
-    if (media.usages.length > 0) {
+    if (!result.ok) {
+      if (result.reason === "not_found") {
+        return NextResponse.json({ error: "Media not found" }, { status: 404 });
+      }
       return NextResponse.json(
         { error: "Cannot delete media that is in use" },
         { status: 400 }
       );
     }
-
-    // Delete file from filesystem
-    if (media.publicUrl) {
-      const filePath = join(process.cwd(), "public", media.publicUrl);
-      if (existsSync(filePath)) {
-        try {
-          await unlink(filePath);
-        } catch (err) {
-          console.error("Failed to delete file:", err);
-        }
-      }
-    }
-
-    // Delete from database
-    await prisma.mediaAsset.delete({
-      where: { id },
-    });
 
     return NextResponse.json({ success: true });
   } catch (error: any) {

@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
-import type { Activity, ActivitySession, ActivityType, ScheduleMode } from "@prisma/client";
+import type { Activity, ActivitySession, ActivityType, ScheduleMode, User } from "@prisma/client";
+import { canManageActivityById } from "@/lib/auth/activityAccess";
 
 export type CreateActivityInput = {
   title: string;
@@ -44,7 +45,7 @@ export async function createActivity(
   const activity = await prisma.activity.create({
     data: {
       ...activityData,
-      owner: { connect: { id: createdBy } },
+      ownerUserId: createdBy,
       sessions: sessions
         ? {
             create: sessions.map((startsAt) => ({ startsAt })),
@@ -142,33 +143,11 @@ export async function deleteActivity(activityId: string): Promise<void> {
 }
 
 /**
- * Check if user can manage activity
- * Business owners can only manage their own activities
+ * Check if user can manage activity (business-first; legacy ownerUserId fallback).
  */
 export async function canManageActivity(
-  userId: string,
+  user: Pick<User, "id" | "role">,
   activityId: string
 ): Promise<boolean> {
-  const activity = await prisma.activity.findUnique({
-    where: { id: activityId },
-    select: { createdBy: true, businessId: true },
-  });
-
-  if (!activity) return false;
-
-  // Check if user created this activity
-  if (activity.createdBy === userId) return true;
-
-  // Check if user owns the business
-  if (activity.businessId) {
-    const business = await prisma.business.findFirst({
-      where: {
-        id: activity.businessId,
-        ownerUserId: userId,
-      },
-    });
-    return business !== null;
-  }
-
-  return false;
+  return canManageActivityById(user, activityId);
 }

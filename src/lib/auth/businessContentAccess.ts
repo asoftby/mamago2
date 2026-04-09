@@ -1,5 +1,11 @@
 import type { Role } from "@prisma/client";
 
+/**
+ * Глобальные проверки роли платформы (legacy / transitional).
+ * Доступ к конкретному бизнесу — через `@/server/permissions/business-permissions`
+ * (BusinessMember + transitional owner).
+ */
+
 /** Кто может создавать/редактировать места, события и предложения в кабинете */
 export function canCreateBusinessContent(role: Role): boolean {
   return (

@@ -1,5 +1,6 @@
 import prisma from "@/lib/prisma";
 import type { Business } from "@prisma/client";
+import { getOwnedBusinessForUser } from "@/server/permissions/business-permissions";
 import {
   BusinessCreateSchema,
   BusinessUpdateSchema,
@@ -20,25 +21,11 @@ export class BusinessError extends Error {
 }
 
 /**
- * Get the Business for the current user (one business per owner for MVP)
- * Returns null if no business exists
- */
-export async function getMyBusiness(userId: string): Promise<Business | null> {
-  const business = await prisma.business.findUnique({
-    where: {
-      ownerUserId: userId,
-    },
-  });
-
-  return business;
-}
-
-/**
- * Get the Business for the current user or throw error
+ * Get owned business or throw (owner-only; not team membership).
  * @throws BusinessError with code "BUSINESS_NOT_FOUND" if business doesn't exist
  */
 export async function assertMyBusiness(userId: string): Promise<Business> {
-  const business = await getMyBusiness(userId);
+  const business = await getOwnedBusinessForUser(userId);
 
   if (!business) {
     throw new BusinessError("Business not found for user", "BUSINESS_NOT_FOUND");
@@ -60,7 +47,7 @@ export async function createMyBusiness(
   const validated = BusinessCreateSchema.parse(raw);
 
   // Check if business already exists
-  const existing = await getMyBusiness(userId);
+  const existing = await getOwnedBusinessForUser(userId);
   if (existing) {
     throw new BusinessError(
       "User already has a business",

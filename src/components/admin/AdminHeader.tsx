@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
+import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { CreatePublicationQuickMenu } from "@/components/shared/CreatePublicationQuickMenu";
 import { HEADER_CHROME_ICON_BUTTON_CLASS } from "@/components/site/header/headerIconButtonClass";
 import { cn } from "@/lib/utils";
@@ -127,23 +127,18 @@ export function AdminHeader({
         </div>
       </header>
 
-      <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
-        <SheetContent side="bottom" className="h-[85vh] p-0 rounded-t-2xl">
-          <SheetTitle className="sr-only">Навигация</SheetTitle>
-          <div className="flex h-full flex-col">
-            <div className="flex-shrink-0 border-b border-gray-200 px-4 py-3">
-              <h3 className="text-base font-semibold text-gray-900">Навигация</h3>
-            </div>
-            <div className="flex-1 overflow-y-auto">
-              <AdminSidebar
-                moderationCounts={moderationCounts}
-                b2bPendingVerificationCount={b2bPendingVerificationCount}
-                onNavigate={() => setMobileMenuOpen(false)}
-              />
-            </div>
-          </div>
-        </SheetContent>
-      </Sheet>
+      <BottomSheet
+        open={mobileMenuOpen}
+        onOpenChange={setMobileMenuOpen}
+        title="Навигация"
+        showCloseButton={true}
+      >
+        <AdminSidebar
+          moderationCounts={moderationCounts}
+          b2bPendingVerificationCount={b2bPendingVerificationCount}
+          onNavigate={() => setMobileMenuOpen(false)}
+        />
+      </BottomSheet>
     </>
   );
 }

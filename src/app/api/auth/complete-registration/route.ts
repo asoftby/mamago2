@@ -1,8 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { hashPassword } from "@/lib/auth/crypto";
+import { createSession, setSessionCookie } from "@/lib/auth/session";
 import { getCurrentUser } from "@/lib/auth/server";
+import { normalizeEmail } from "@/lib/auth/email";
+import { sendRegistrationVerificationEmail } from "@/server/auth/email-verification";
+import { sendWelcomeEmail } from "@/server/email/send-welcome-email";
 
 const bodySchema = z.object({
   email: z.string().email("Некорректный email"),
@@ -11,60 +16,133 @@ const bodySchema = z.object({
 
 const STUB_EMAIL_SUFFIX = "@pending.mamago.by";
 
+async function sendPostRegistrationEmails(params: {
+  userId: string;
+  email: string;
+  userName?: string | null;
+}): Promise<{ verificationEmailSendFailed?: true }> {
+  const emailResult = await sendRegistrationVerificationEmail(params.userId, params.email);
+
+  await sendWelcomeEmail({
+    userId: params.userId,
+    email: params.email,
+    userName: params.userName,
+  });
+
+  return {
+    ...(emailResult.verificationEmailSendFailed ? { verificationEmailSendFailed: true } : {}),
+  };
+}
+
 /**
- * Завершение регистрации после подтверждения телефона (stub-сессия из verify-otp REGISTER).
+ * 1) Сессия есть, email — stub после SMS: подставляем реальный email + пароль.
+ * 2) Сессии нет: обычная регистрация email + пароль (как /api/auth/register), чтобы модалки без телефона работали.
  */
 export async function POST(request: NextRequest) {
   try {
-    const user = await getCurrentUser();
-    if (!user) {
-      return NextResponse.json({ error: "Требуется вход" }, { status: 401 });
-    }
-
-    if (!user.phoneVerifiedAt) {
-      return NextResponse.json(
-        { error: "Сначала подтвердите номер телефона" },
-        { status: 400 },
-      );
-    }
-
-    if (!user.email.endsWith(STUB_EMAIL_SUFFIX)) {
-      return NextResponse.json(
-        { error: "Регистрация уже завершена" },
-        { status: 400 },
-      );
-    }
-
     const json = await request.json();
     const { email, password } = bodySchema.parse(json);
-    const normalizedEmail = email.toLowerCase().trim();
+    const normalizedEmail = normalizeEmail(email);
 
-    const other = await prisma.user.findUnique({
-      where: { email: normalizedEmail },
+    const user = await getCurrentUser();
+
+    if (user) {
+      if (!user.phoneVerifiedAt) {
+        return NextResponse.json(
+          { error: "Сначала подтвердите номер телефона" },
+          { status: 400 },
+        );
+      }
+
+      if (!user.email.endsWith(STUB_EMAIL_SUFFIX)) {
+        return NextResponse.json(
+          { error: "Регистрация уже завершена" },
+          { status: 400 },
+        );
+      }
+
+      const other = await prisma.user.findFirst({
+        where: {
+          email: { equals: normalizedEmail, mode: "insensitive" },
+          id: { not: user.id },
+        },
+      });
+
+      if (other) {
+        return NextResponse.json(
+          { error: "Аккаунт с таким email уже существует" },
+          { status: 409 },
+        );
+      }
+
+      const passwordHash = await hashPassword(password);
+
+      await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          email: normalizedEmail,
+          passwordHash,
+          status: "ACTIVE",
+        },
+      });
+
+      const emailResult = await sendPostRegistrationEmails({
+        userId: user.id,
+        email: normalizedEmail,
+        userName: user.displayName,
+      });
+
+      return NextResponse.json({
+        success: true,
+        user: {
+          id: user.id,
+          email: normalizedEmail,
+          role: user.role,
+        },
+        ...(emailResult.verificationEmailSendFailed ? { verificationEmailSendFailed: true } : {}),
+      });
+    }
+
+    const existingUser = await prisma.user.findFirst({
+      where: {
+        email: { equals: normalizedEmail, mode: "insensitive" },
+      },
     });
-    if (other && other.id !== user.id) {
-      return NextResponse.json({ error: "Этот email уже занят" }, { status: 409 });
+
+    if (existingUser) {
+      return NextResponse.json(
+        { error: "Аккаунт с таким email уже существует" },
+        { status: 409 },
+      );
     }
 
     const passwordHash = await hashPassword(password);
-
-    await prisma.user.update({
-      where: { id: user.id },
+    const newUser = await prisma.user.create({
       data: {
         email: normalizedEmail,
         passwordHash,
-        status: "ACTIVE",
       },
     });
 
-    return NextResponse.json({
+    const emailResult = await sendPostRegistrationEmails({
+      userId: newUser.id,
+      email: newUser.email,
+      userName: newUser.displayName,
+    });
+
+    const token = await createSession(newUser.id);
+    const response = NextResponse.json({
       success: true,
       user: {
-        id: user.id,
-        email: normalizedEmail,
-        role: user.role,
+        id: newUser.id,
+        email: newUser.email,
+        role: newUser.role,
       },
+      ...(emailResult.verificationEmailSendFailed ? { verificationEmailSendFailed: true } : {}),
     });
+    setSessionCookie(response, token);
+
+    return response;
   } catch (error) {
     if (error instanceof z.ZodError) {
       const first = error.issues[0];
@@ -73,6 +151,17 @@ export async function POST(request: NextRequest) {
         { status: 400 },
       );
     }
+    
+    // Handle unique constraint violation (race condition safety net)
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      if (error.code === "P2002") {
+        return NextResponse.json(
+          { error: "Аккаунт с таким email уже существует" },
+          { status: 409 }
+        );
+      }
+    }
+    
     console.error("[auth/complete-registration]", error);
     return NextResponse.json({ error: "Внутренняя ошибка" }, { status: 500 });
   }

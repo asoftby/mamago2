@@ -13,7 +13,16 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { activityId, date, startsAt, title, coverImageUrl } = body;
+    const { activityId, date, startsAt, title, coverImageUrl, selectedPersonaIds, planAddSource } =
+      body as {
+        activityId?: string;
+        date?: string;
+        startsAt?: string;
+        title?: string;
+        coverImageUrl?: string;
+        selectedPersonaIds?: unknown;
+        planAddSource?: unknown;
+      };
 
     if (!date) {
       return NextResponse.json({ error: "date is required" }, { status: 400 });
@@ -34,6 +43,14 @@ export async function POST(request: NextRequest) {
     if (activityId) {
       const cityId = await getActivityCityIdForAnalytics(activityId);
       const sessionRowId = await getSessionRowIdFromCookies();
+      const personaIds =
+        Array.isArray(selectedPersonaIds) ?
+          selectedPersonaIds.filter((x): x is string => typeof x === "string")
+        : [];
+      const sourceTag =
+        planAddSource === "recommendation" || planAddSource === "idea" ?
+          (`my_plan_${planAddSource}` as const)
+        : ("detail" as const);
       void trackUserEvent({
         userId: user.id,
         sessionId: sessionRowId,
@@ -42,7 +59,12 @@ export async function POST(request: NextRequest) {
         entityId: activityId,
         vertical: "CITY",
         cityId,
-        meta: { source: "detail", section: "afisha", targetAction: "plan" },
+        meta: {
+          source: sourceTag,
+          section: planAddSource === "recommendation" || planAddSource === "idea" ? "my_plan" : "afisha",
+          targetAction: "plan",
+          ...(personaIds.length > 0 ? { selectedPersonaIds: personaIds } : {}),
+        },
       });
     }
 

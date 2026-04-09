@@ -1,7 +1,10 @@
 import { prisma } from "@/lib/prisma";
 import type { RouteStatus, RouteVisibility, BudgetLevel } from "@prisma/client";
 import { getPublicPublishedPlaceWhere } from "@/server/public/publicContentVisibility";
-import { generateRouteSlugFromTitle } from "@/lib/slug/routeSlugService";
+import {
+  generateRouteSlugFromTitle,
+  findRouteBySlug,
+} from "@/lib/slug/routeSlugService";
 
 const publicRouteStopPlaceWhere = {
   OR: [{ placeId: null }, { place: getPublicPublishedPlaceWhere() }],
@@ -90,6 +93,32 @@ export async function getRouteBySlug(slug: string): Promise<RouteWithStops | nul
         include: { place: { select: { id: true, title: true, formattedAddr: true, shortAddress: true, city: { select: { name: true } } } } },
       },
     },
+  });
+}
+
+/**
+ * Resolve a Route for save-to-plan / ideas: by id first, then by slug (including slug history).
+ * Covers mock page ids like "route-1" when the same slug exists in the database.
+ */
+export async function resolveRouteForUserSave(
+  routeId: string,
+  routeSlug?: string | null
+): Promise<{ id: string; title: string; coverImageUrl: string | null } | null> {
+  const byId = await prisma.route.findUnique({
+    where: { id: routeId },
+    select: { id: true, title: true, coverImageUrl: true },
+  });
+  if (byId) return byId;
+
+  const raw = routeSlug?.trim();
+  if (!raw) return null;
+
+  const resolved = await findRouteBySlug(raw);
+  if (!resolved) return null;
+
+  return prisma.route.findUnique({
+    where: { id: resolved.routeId },
+    select: { id: true, title: true, coverImageUrl: true },
   });
 }
 

@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
+import { useRequireVerifiedEmail } from "@/features/email-verification/hooks/useRequireVerifiedEmail";
 import type { BirthdayOffer } from "../../../types/birthday";
 import type { BirthdayBuilderWithGate } from "../../hooks/useBirthdayBuilderWithGate";
 import { BuilderProgress } from "../BuilderProgress";
@@ -223,12 +224,7 @@ export function StepConfirmation({ builder }: { builder: BuilderHook }) {
     })
     .filter((x): x is NonNullable<typeof x> => x != null);
 
-  const handleSubmit = () => {
-    if (builder.isAuthLoading) return;
-    if (!builder.isAuthenticated) {
-      builder.requestLoginToSubmit();
-      return;
-    }
+  const submitParty = useCallback(() => {
     const ts = timeStartEffective;
     const timeline =
       validOffers.length > 0
@@ -267,6 +263,32 @@ export function StepConfirmation({ builder }: { builder: BuilderHook }) {
     };
     console.log("Birthday builder submit:", payload);
     setSubmitted(true);
+  }, [
+    timeStartEffective,
+    validOffers,
+    setPartyPlanning,
+    partyPlanning.dateIso,
+    placeLine,
+    themeL,
+    durationSummary,
+    targets,
+    selectedTargetKeys,
+    partyForChild,
+    theme,
+    placeType,
+  ]);
+
+  const { run: runVerifiedSubmit, VerificationGate } = useRequireVerifiedEmail({
+    onVerifiedAction: submitParty,
+  });
+
+  const handleSubmit = () => {
+    if (builder.isAuthLoading) return;
+    if (!builder.isAuthenticated) {
+      builder.requestLoginToSubmit();
+      return;
+    }
+    runVerifiedSubmit();
   };
 
   if (submitted) {
@@ -537,6 +559,8 @@ export function StepConfirmation({ builder }: { builder: BuilderHook }) {
           </p>
         ) : null}
       </div>
+
+      <VerificationGate />
     </div>
   );
 }

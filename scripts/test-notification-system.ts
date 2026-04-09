@@ -79,7 +79,7 @@ async function testNotificationSystem() {
       const notification = unreadNotifications[0];
       console.log(`   Type: ${notification.type}`);
       console.log(`   Title: ${notification.title}`);
-      console.log(`   Message: ${notification.message}`);
+      console.log(`   Body: ${notification.body}`);
       console.log(`   Entity: ${notification.entityType}/${notification.entityId}`);
     }
     console.log();

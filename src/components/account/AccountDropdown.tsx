@@ -26,7 +26,7 @@ export function AccountDropdown({
       trigger={trigger}
       sheetTitle={sheetTitle}
     >
-      <AccountDropdownContent {...content} />
+      <AccountDropdownContent {...content} sheetLayout={narrow} />
     </AccountDropdownSurface>
   );
 }

@@ -5,6 +5,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Loader2, X, CheckCircle2 } from "lucide-react";
+import { createQuickPlaceDraft } from "@/lib/places/quickPlaceCreateClient";
+import type { QuickPlaceCreateSource } from "@/lib/places/quickPlaceCreateClient";
+import { cn } from "@/lib/utils";
 import { EventLocationSearchInput } from "./EventLocationSearchInput";
 import { EventLocationMapModal } from "./EventLocationMapModal";
 
@@ -27,12 +30,21 @@ interface QuickPlaceCreateProps {
   }) => void;
   onCancel: () => void;
   initialName?: string;
+  /** Встроенный вид (редактор статьи): без «карточки события», без полноэкранной карты по умолчанию */
+  embedded?: boolean;
+  /** Карта: полноэкранный оверлей или встроенный блок */
+  mapLayout?: "modal" | "inline";
+  /** Тот же POST /api/business/places, различается только shortDesc по умолчанию */
+  placeCreateSource?: QuickPlaceCreateSource;
 }
 
 export function QuickPlaceCreate({
   onPlaceCreated,
   onCancel,
   initialName = "",
+  embedded = false,
+  mapLayout = "modal",
+  placeCreateSource = "event_wizard",
 }: QuickPlaceCreateProps) {
   const [name, setName] = useState(initialName);
   const [address, setAddress] = useState("");
@@ -74,10 +86,19 @@ export function QuickPlaceCreate({
     setError(null);
   };
 
-  const handleMapConfirm = (mapData: { lat: number; lng: number }) => {
+  const handleMapConfirm = (mapData: {
+    lat: number;
+    lng: number;
+    formattedAddr?: string;
+  }) => {
     setLat(mapData.lat);
     setLng(mapData.lng);
-    setAddress(`Координаты: ${mapData.lat.toFixed(6)}, ${mapData.lng.toFixed(6)}`);
+    setAddress(
+      mapData.formattedAddr?.trim() ||
+        `Координаты: ${mapData.lat.toFixed(6)}, ${mapData.lng.toFixed(6)}`,
+    );
+    setGooglePlaceId(null);
+    setAddressJson([]);
     setError(null);
   };
 
@@ -97,47 +118,23 @@ export function QuickPlaceCreate({
     setError(null);
 
     try {
-      // Generate unique request ID for idempotency
-      const createRequestId = `quick-place-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-
-      // Create place via API with DRAFT status for quick creation
-      const response = await fetch("/api/business/places", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          createRequestId,
-          status: "DRAFT", // Quick creation as draft
-          data: {
-            title: name.trim(),
-            formattedAddr: address,
-            lat,
-            lng,
-            googlePlaceId,
-            addressJson,
-            // Minimal data for quick creation
-            shortDesc: "Создано при добавлении события",
-            description: "",
-            category: "other",
-          },
-        }),
+      const createdPlace = await createQuickPlaceDraft({
+        title: name.trim(),
+        formattedAddr: address,
+        lat,
+        lng,
+        googlePlaceId,
+        addressJson,
+        source: placeCreateSource,
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || errorData.error || "Не удалось создать место");
-      }
-
-      const data = await response.json();
-      const createdPlace = data.place;
-
-      // Call onPlaceCreated with the new place
       onPlaceCreated({
         id: createdPlace.id,
         title: createdPlace.title,
         address: createdPlace.formattedAddr || createdPlace.customAddress || "",
         fullAddress: createdPlace.formattedAddr || createdPlace.customAddress || "",
         cityId: createdPlace.cityId,
-        cityName: null, // Will be enriched by parent
+        cityName: null,
         citySlug: null,
         lat: createdPlace.lat,
         lng: createdPlace.lng,
@@ -158,9 +155,16 @@ export function QuickPlaceCreate({
   const canCreate = name.trim().length > 0 && lat !== null && lng !== null;
 
   return (
-    <div className="rounded-lg border-2 border-primary/20 bg-primary/5 p-6">
+    <div
+      className={cn(
+        "rounded-lg p-6",
+        embedded
+          ? "border border-border bg-muted/30"
+          : "border-2 border-primary/20 bg-primary/5",
+      )}
+    >
       <div className="mb-4 flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-gray-900">
+        <h3 className={cn("font-semibold text-gray-900", embedded ? "text-base" : "text-lg")}>
           Создать новое место
         </h3>
         <button
@@ -209,7 +213,7 @@ export function QuickPlaceCreate({
               disabled={isCreating}
               className="text-sm text-muted-foreground underline decoration-dashed decoration-primary underline-offset-4 hover:text-muted-foreground hover:decoration-primary/80 disabled:opacity-50"
             >
-              Выбрать точку на карте
+              {mapLayout === "inline" ? "Открыть карту и выбрать точку" : "Выбрать точку на карте"}
             </button>
           </div>
         </div>
@@ -260,19 +264,22 @@ export function QuickPlaceCreate({
         </div>
 
         <p className="text-xs text-muted-foreground">
-          После создания место будет доступно для использования в событиях.
-          Вы сможете дополнить информацию о месте позже в разделе «Места».
+          {embedded
+            ? "Место сохраняется как черновик в общей базе; карточку можно дополнить в разделе «Места»."
+            : "После создания место будет доступно для использования в событиях. Вы сможете дополнить информацию о месте позже в разделе «Места»."}
         </p>
       </div>
 
-      {/* Map Modal */}
-      <EventLocationMapModal
-        isOpen={isMapModalOpen}
-        onClose={() => setIsMapModalOpen(false)}
-        initialLat={lat}
-        initialLng={lng}
-        onConfirm={handleMapConfirm}
-      />
+      <div className={cn(mapLayout === "inline" && isMapModalOpen ? "mt-4" : undefined)}>
+        <EventLocationMapModal
+          isOpen={isMapModalOpen}
+          onClose={() => setIsMapModalOpen(false)}
+          initialLat={lat}
+          initialLng={lng}
+          onConfirm={handleMapConfirm}
+          layout={mapLayout === "inline" ? "inline" : "fullscreen"}
+        />
+      </div>
     </div>
   );
 }

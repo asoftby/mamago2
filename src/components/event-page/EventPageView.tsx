@@ -14,8 +14,9 @@ import type { EventPageData } from "@/lib/event/eventPageTypes";
 import { formatRuSessionHero } from "@/lib/event/eventPageFormat";
 import { isFavorite, toggleFavorite } from "@/lib/favorites";
 import { publicActivityPath } from "@/lib/business/eventPublicLink";
-import { SaveToPlanModal } from "@/components/activity/SaveToPlanModal";
+import { SaveActivityFlowAdaptive } from "@/components/activity/SaveActivityFlowAdaptive";
 import type { SaveToPlanResult } from "@/components/activity/SaveToPlanModal";
+import { useAuthMe } from "@/features/birthday/builder/hooks/useAuthMe";
 import { EventRichDescription } from "./EventRichDescription";
 import { EventDecisionPanel } from "./EventDecisionPanel";
 import { EventFactsGrid } from "./EventFactsGrid";
@@ -37,6 +38,7 @@ function venueOneLine(data: EventPageData): string | undefined {
 }
 
 export function EventPageView({ data }: { data: EventPageData }) {
+  const { isAuthenticated } = useAuthMe();
   const setPublicationIntent = useSetPublicationIntent();
   useEffect(() => {
     setPublicationIntent(data.discoveryIntent);
@@ -178,10 +180,11 @@ export function EventPageView({ data }: { data: EventPageData }) {
           toast.success("Убрано из идей");
         }
         await loadSaveStatus();
-      } catch {
+      } catch (e) {
         toast.error("Не удалось сохранить", {
           description: "Попробуйте еще раз",
         });
+        throw e;
       } finally {
         setIsPrimaryLoading(false);
       }
@@ -359,11 +362,12 @@ export function EventPageView({ data }: { data: EventPageData }) {
         onPrimary={handlePlan}
         onSecondary={handleBuy}
       />
-      <SaveToPlanModal
+      <SaveActivityFlowAdaptive
         open={saveModalOpen}
         onOpenChange={setSaveModalOpen}
+        isAuthenticated={isAuthenticated}
         scenario={{ kind: "quickdate", title: data.title }}
-        onConfirm={handleSaveToPlanConfirm}
+        onPersist={handleSaveToPlanConfirm}
         isIdea={saveStatus.isIdea}
         inPlan={saveStatus.inPlan}
         planDate={saveStatus.planDate}

@@ -11,10 +11,13 @@ import {
 import { formatAgeKeysShort } from "@/lib/config/ages";
 import { BUDGET_LABELS, type MockRoute } from "@/mocks/routes.mock";
 import { ShareSheet } from "@/components/routes/ShareSheet";
-import { AddRouteToPlanSheet } from "@/components/routes/AddRouteToPlanSheet";
+import { SaveActivityFlowAdaptive } from "@/components/activity/SaveActivityFlowAdaptive";
+import type { SaveToPlanResult } from "@/components/activity/SaveToPlanModal";
+import { toast } from "sonner";
 import { RouteMapHero } from "@/components/routes/RouteMapHero";
+import { useAuthMe } from "@/features/birthday/builder/hooks/useAuthMe";
 
-type Props = { route: MockRoute };
+type Props = { route: MockRoute & { isMockRoute?: boolean } };
 
 function buildGoogleMapsUrl(stops: MockRoute["stops"]): string {
   const withCoords = stops.filter((s) => s.lat != null && s.lng != null);
@@ -86,6 +89,30 @@ function StopCard({ stop, index, isLast }: {
 export function RouteDetailClient({ route }: Props) {
   const [shareOpen, setShareOpen] = useState(false);
   const [planOpen, setPlanOpen] = useState(false);
+  const { isAuthenticated } = useAuthMe();
+  const isDemoRouteId = /^route-\d+$/.test(route.id);
+
+  const handlePersist = async (result: SaveToPlanResult) => {
+    if (result.action === "cancel") return;
+    if (result.action === "plan") {
+      const res = await fetch("/api/save/plan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ activityId: route.id, date: result.dateISO, title: route.title, coverImageUrl: route.coverImageUrl }),
+      });
+      if (!res.ok) throw new Error("plan_save_failed");
+      toast.success("Маршрут добавлен в план");
+    } else if (result.action === "ideas") {
+      if (isDemoRouteId) return;
+      const res = await fetch("/api/save/idea", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ activityId: route.id }),
+      });
+      if (!res.ok) throw new Error("idea_save_failed");
+      toast.success("Маршрут сохранён в идеи");
+    }
+  };
 
   const ageLabel = route.ageTags.length > 0 ? formatAgeKeysShort(route.ageTags) : null;
   const mapsUrl = buildGoogleMapsUrl(route.stops);
@@ -213,11 +240,12 @@ export function RouteDetailClient({ route }: Props) {
       </div>
 
       <ShareSheet open={shareOpen} onOpenChange={setShareOpen} route={route} />
-      <AddRouteToPlanSheet
+      <SaveActivityFlowAdaptive
         open={planOpen}
         onOpenChange={setPlanOpen}
-        routeTitle={route.title}
-        routeSlug={route.slug}
+        isAuthenticated={isAuthenticated}
+        scenario={{ kind: "quickdate", title: route.title }}
+        onPersist={handlePersist}
       />
     </>
   );

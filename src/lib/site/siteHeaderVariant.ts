@@ -23,6 +23,7 @@ export function getSiteHeaderVariant(pathname: string | null): SiteHeaderVariant
   const segments = pathname.split("/").filter(Boolean);
   const first = segments[0];
 
+  if (first === "preview") return "landing";
   if (first === "blog") return "landing";
   if (first === "places") return "landing";
   if (first === "offers") return "landing";

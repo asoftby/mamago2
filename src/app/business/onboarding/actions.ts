@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { z, ZodError } from "zod";
 import { getCurrentUser } from "@/lib/auth/server";
-import { getMyBusiness } from "@/server/business/getMyBusiness";
+import { getOwnedBusinessProfile } from "@/server/business/getMyBusiness";
 import prisma from "@/lib/prisma";
 import { resolveCompanyByUnp } from "@/server/company/resolveByUnp";
 import { notifyAdminBusinessVerificationPending } from "@/lib/admin/notifyAdminBusinessVerification";
@@ -51,7 +51,7 @@ export async function createBusinessAction(
     const validated = onboardingSchema.parse(payload);
 
     // Check if business already exists
-    const existing = await getMyBusiness(user.id);
+    const existing = await getOwnedBusinessProfile(user.id);
     
     // Generate name automatically from legalName or user ID
     const businessName = validated.legalName || `Business ${user.id}`;

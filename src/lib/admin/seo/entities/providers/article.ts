@@ -139,12 +139,20 @@ export const articleProvider: SeoEntityProvider = {
     const next = raw.includes("noindex")
       ? SEO_ROBOTS_INDEX_FOLLOW
       : SEO_ROBOTS_NOINDEX_FOLLOW;
-    await prisma.article.update({ where: { id: entityId }, data: { seoRobots: next } });
+    await prisma.article.update({
+      where: { id: entityId },
+      data: { seoRobots: next },
+      select: { id: true },
+    });
   },
 
   async setIndexFollow(entityId, index) {
     const seoRobots = index ? SEO_ROBOTS_INDEX_FOLLOW : SEO_ROBOTS_NOINDEX_FOLLOW;
-    await prisma.article.update({ where: { id: entityId }, data: { seoRobots } });
+    await prisma.article.update({
+      where: { id: entityId },
+      data: { seoRobots },
+      select: { id: true },
+    });
   },
 
   async loadRedirects(entityId) {

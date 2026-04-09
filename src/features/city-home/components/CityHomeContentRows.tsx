@@ -23,6 +23,16 @@ const cardShell =
   // Desktop: exactly 4 cards per row width (gap-6 => 3 * 1.5rem = 4.5rem)
   "lg:w-[calc((100%-4.5rem)/4)] lg:max-w-none";
 
+import { useFamilyPersona } from "@/contexts/FamilyPersonaContext";
+import { useDiscoveryFilters } from "@/features/filters/discovery/filters.store";
+
+function whenLabel(preset: string | null): string | null {
+  if (preset === "TODAY") return "сегодня";
+  if (preset === "TOMORROW") return "завтра";
+  if (preset === "WEEKEND") return "на выходные";
+  return null;
+}
+
 function kudaTitle(citySlug: string): string {
   const name = getCityDisplayName(citySlug);
   return citySlug === "minsk"
@@ -30,15 +40,43 @@ function kudaTitle(citySlug: string): string {
     : `Куда пойти сегодня — ${name}`;
 }
 
+function useReactiveKudaTitle(citySlug: string): string {
+  const family = useFamilyPersona();
+  const { applied } = useDiscoveryFilters();
+
+  const personas = family?.personas ?? [];
+  const selectedIds = family?.selectedPersonaIds ?? [];
+  const loading = family?.loading ?? true;
+
+  if (loading) return kudaTitle(citySlug);
+
+  const selected = personas.filter((p) => selectedIds.includes(p.id));
+  const children = selected.filter((p) => p.kind === "child");
+  const when = whenLabel(applied.whenPreset);
+
+  if (children.length === 1) {
+    const name = children[0]!.displayName;
+    return when ? `Для ${name} ${when}` : `Для ${name}`;
+  }
+  if (children.length > 1) {
+    return when ? `Для детей ${when}` : "Для детей";
+  }
+  if (when) {
+    return `Куда пойти ${when}`;
+  }
+  return kudaTitle(citySlug);
+}
+
 export function CityHomeKudaSection({ activities }: { activities: ActivityMock[] }) {
   const { citySlug, appendCityQuery } = useCity();
+  const title = useReactiveKudaTitle(citySlug);
   const preview = activities;
 
   if (preview.length === 0) {
     return (
       <CityHomeSection
         className="pt-[5px]"
-        title={kudaTitle(citySlug)}
+        title={title}
         actionLabel="Смотреть все"
         actionHref={appendCityQuery(`/${citySlug}/events`)}
         actionIconButton
@@ -53,7 +91,7 @@ export function CityHomeKudaSection({ activities }: { activities: ActivityMock[]
   return (
     <CityHomeSection
       className="pt-[5px]"
-      title={kudaTitle(citySlug)}
+      title={title}
       actionLabel="Смотреть все"
       actionHref={appendCityQuery(`/${citySlug}/events`)}
       actionIconButton

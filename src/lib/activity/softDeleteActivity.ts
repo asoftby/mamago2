@@ -1,5 +1,5 @@
 import { Prisma } from "@prisma/client";
-import prisma from "@/lib/prisma";
+import prisma, { searchIndexer } from "@/lib/prisma";
 
 /**
  * Убеждаемся, что в PostgreSQL у enum "ContentStatus" есть значение DELETED.
@@ -51,4 +51,5 @@ export async function softDeleteActivityById(id: string): Promise<void> {
   if (n !== 1) {
     throw new Error(`Activity not found: ${id}`);
   }
+  await searchIndexer.upsertActivity(id);
 }

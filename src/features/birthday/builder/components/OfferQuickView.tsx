@@ -11,7 +11,8 @@ import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { checkAddonCompatibility } from "../lib/compatibility";
 import { AddRemoveButton } from "./AddRemoveButton";
-import { Star, AlertCircle, X } from "lucide-react";
+import { Star, AlertCircle } from "lucide-react";
+import { ModalCloseButton } from "@/components/ui/modal-close-button";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import type { BirthdayOffer } from "../../types/birthday";
@@ -105,17 +106,14 @@ function OfferQuickViewContent({
       <div className="flex-1 overflow-y-auto overscroll-contain min-h-0">
         {/* Hero image — full width, 220–280px on desktop */}
         <div className="relative h-48 sm:h-[260px] bg-muted shrink-0 overflow-hidden">
-          <button
+          <ModalCloseButton
             type="button"
             onClick={(e) => {
               e.stopPropagation();
               onClose();
             }}
-            className="absolute top-4 left-4 z-10 p-2 rounded-full bg-white/90 backdrop-blur-sm border border-border/60 hover:bg-white transition-colors"
-            aria-label="Закрыть"
-          >
-            <X className="h-5 w-5 text-muted-foreground" strokeWidth={2} />
-          </button>
+            className="absolute top-4 left-4 z-10"
+          />
           <Image
             src={offer.image}
             alt={offer.title}

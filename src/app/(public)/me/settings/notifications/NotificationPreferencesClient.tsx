@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { Toggle } from "@/components/ui/Toggle";
 import { Mail, Bell, Send } from "lucide-react";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 import type { PreferenceRow } from "@/server/services/notificationPreference.service";
 import type { NotificationType } from "@prisma/client";
 
@@ -42,7 +43,7 @@ const GROUPS: Group[] = [
   },
   {
     title: "План и напоминания",
-    types: ["SYSTEM"],
+    types: ["WELCOME", "REMINDER", "RECOMMENDATION", "SYSTEM"],
   },
 ];
 
@@ -62,18 +63,54 @@ const TYPE_LABELS: Record<NotificationType, string> = {
   BUSINESS_VERIFIED:           "Верификация пройдена",
   BUSINESS_REJECTED:           "Верификация отклонена",
   BUSINESS_NEEDS_INFO:         "Требуется дополнительная информация",
-  SYSTEM:                      "Напоминания и подборки",
+  WELCOME:                     "Приветствие и онбординг",
+  REMINDER:                    "Напоминания",
+  RECOMMENDATION:              "Подборки и рекомендации",
+  SYSTEM:                      "Системные уведомления",
 };
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
 interface Props {
   initialPreferences: PreferenceRow[];
+  /** Внутри NotificationsModal — без лишних отступов и нижней ремарки */
+  embedded?: boolean;
 }
 
 type PrefsMap = Map<NotificationType, PreferenceRow>;
 
-export function NotificationPreferencesClient({ initialPreferences }: Props) {
+function ChannelColumnHeaders() {
+  return (
+    <div
+      className="flex shrink-0 items-start justify-end gap-3 sm:gap-4"
+      aria-hidden
+    >
+      <div className="flex w-[52px] flex-col items-center gap-1 text-center">
+        <Bell className="h-3.5 w-3.5 shrink-0 text-neutral-400" />
+        <span className="text-[10px] font-medium leading-tight text-neutral-400">
+          сайт
+        </span>
+      </div>
+      <div className="flex w-[52px] flex-col items-center gap-1 text-center">
+        <Mail className="h-3.5 w-3.5 shrink-0 text-neutral-400" />
+        <span className="text-[10px] font-medium leading-tight text-neutral-400">
+          почта
+        </span>
+      </div>
+      <div className="flex w-[52px] flex-col items-center gap-1 text-center opacity-40">
+        <Send className="h-3.5 w-3.5 shrink-0 text-neutral-400" />
+        <span className="text-[10px] font-medium leading-tight text-neutral-400">
+          Telegram
+        </span>
+      </div>
+    </div>
+  );
+}
+
+export function NotificationPreferencesClient({
+  initialPreferences,
+  embedded = false,
+}: Props) {
   const [prefs, setPrefs] = useState<PrefsMap>(
     () => new Map(initialPreferences.map((p) => [p.notificationType, p])),
   );
@@ -120,14 +157,7 @@ export function NotificationPreferencesClient({ initialPreferences }: Props) {
   );
 
   return (
-    <div className="space-y-4">
-      {/* Channel legend */}
-      <div className="flex items-center gap-5 px-1 text-xs text-neutral-400">
-        <span className="flex items-center gap-1.5"><Bell className="h-3.5 w-3.5" />В приложении</span>
-        <span className="flex items-center gap-1.5"><Mail className="h-3.5 w-3.5" />Email</span>
-        <span className="flex items-center gap-1.5 opacity-40"><Send className="h-3.5 w-3.5" />Telegram</span>
-      </div>
-
+    <div className={embedded ? "space-y-3" : "space-y-4"}>
       {visibleGroups.map((group) => {
         const rows = group.types.filter((t) => prefs.has(t));
         if (!rows.length) return null;
@@ -135,13 +165,21 @@ export function NotificationPreferencesClient({ initialPreferences }: Props) {
         return (
           <section
             key={group.title}
-            className="bg-white rounded-2xl border border-neutral-100 shadow-sm overflow-hidden"
+            className="rounded-2xl border border-neutral-100 bg-white shadow-sm"
           >
-            <div className="px-5 py-3.5 border-b border-neutral-100">
-              <h2 className="text-sm font-semibold text-neutral-700">{group.title}</h2>
+            <div
+              className={cn(
+                "sticky top-0 z-10 flex items-start justify-between gap-3 border-b border-neutral-100 bg-white px-5 py-3.5",
+                "rounded-t-2xl",
+              )}
+            >
+              <h2 className="min-w-0 flex-1 pt-0.5 text-sm font-semibold text-neutral-700">
+                {group.title}
+              </h2>
+              <ChannelColumnHeaders />
             </div>
 
-            <div className="divide-y divide-neutral-100">
+            <div className="divide-y divide-neutral-100 overflow-hidden rounded-b-2xl">
               {rows.map((type) => {
                 const pref = prefs.get(type)!;
                 return (
@@ -150,28 +188,31 @@ export function NotificationPreferencesClient({ initialPreferences }: Props) {
                       {TYPE_LABELS[type]}
                     </span>
 
-                    <div className="flex items-center gap-4 shrink-0">
-                      {/* In-app */}
-                      <Toggle
-                        checked={pref.inApp}
-                        onChange={(v) => save(type, { inApp: v })}
-                        disabled={pending}
-                        aria-label={`${TYPE_LABELS[type]}: в приложении`}
-                      />
-                      {/* Email */}
-                      <Toggle
-                        checked={pref.email}
-                        onChange={(v) => save(type, { email: v })}
-                        disabled={pending}
-                        aria-label={`${TYPE_LABELS[type]}: email`}
-                      />
-                      {/* Telegram — disabled until implemented */}
-                      <Toggle
-                        checked={pref.telegram}
-                        onChange={(v) => save(type, { telegram: v })}
-                        disabled
-                        aria-label={`${TYPE_LABELS[type]}: telegram`}
-                      />
+                    <div className="flex shrink-0 items-center gap-3 sm:gap-4">
+                      <div className="flex w-[52px] justify-center">
+                        <Toggle
+                          checked={pref.inApp}
+                          onChange={(v) => save(type, { inApp: v })}
+                          disabled={pending}
+                          aria-label={`${TYPE_LABELS[type]}: сайт`}
+                        />
+                      </div>
+                      <div className="flex w-[52px] justify-center">
+                        <Toggle
+                          checked={pref.email}
+                          onChange={(v) => save(type, { email: v })}
+                          disabled={pending}
+                          aria-label={`${TYPE_LABELS[type]}: почта`}
+                        />
+                      </div>
+                      <div className="flex w-[52px] justify-center opacity-40">
+                        <Toggle
+                          checked={pref.telegram}
+                          onChange={(v) => save(type, { telegram: v })}
+                          disabled
+                          aria-label={`${TYPE_LABELS[type]}: Telegram`}
+                        />
+                      </div>
                     </div>
                   </div>
                 );
@@ -181,9 +222,12 @@ export function NotificationPreferencesClient({ initialPreferences }: Props) {
         );
       })}
 
-      <p className="text-xs text-neutral-400 px-1">
-        Telegram пока недоступен — появится в следующем обновлении.
-      </p>
+      {!embedded ? (
+        <p className="text-xs text-neutral-400 px-1">
+          Каналы Email и Telegram применяются, когда доставка для них включена на
+          стороне сервиса.
+        </p>
+      ) : null}
     </div>
   );
 }

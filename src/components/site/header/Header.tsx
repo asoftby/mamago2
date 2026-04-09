@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
@@ -28,6 +28,7 @@ import { Button } from "@/components/ui/button";
 import { SITE_CONTENT_CONTAINER_CLASS } from "@/components/ui/Container";
 import { HeaderAccountMenu } from "@/components/site/header/HeaderAccountMenu";
 import { HEADER_CHROME_ICON_BUTTON_CLASS } from "@/components/site/header/headerIconButtonClass";
+import { SearchOverlay } from "@/components/search/SearchOverlay";
 
 /** Плавный кроссфейд табов ↔ компактной капсулы (без «мигания» пустым центром). */
 const CENTER_EASE = [0.32, 0.72, 0, 1] as const;
@@ -97,11 +98,12 @@ export function SiteHeaderShell() {
     null;
   const tabsIntent = isPublicationPage ? null : routeIntent ?? null;
   const { citySlug } = useCity();
+  const [searchOverlayOpen, setSearchOverlayOpen] = useState(false);
   const isCityHubRoute = isCityHubPath(pathname);
   const expandedSearchVariant =
-    isCityHubRoute || isPublicationPage ? "cityHub" : "discovery";
+    isPublicationPage ? "cityHub" : "discovery";
   const compactSearchVariant =
-    isCityHubRoute || isPublicationPage ? "cityHub" : "discovery";
+    isPublicationPage ? "cityHub" : "discovery";
   const shouldShowIntentTabs = true;
 
   /** Вторая строка (сегментированный поиск): на посадочных не показываем. */
@@ -309,7 +311,16 @@ export function SiteHeaderShell() {
                     size="icon"
                     className={HEADER_CHROME_ICON_BUTTON_CLASS}
                     aria-label="Поиск"
-                    onClick={() => hb.actions.openSearchSurface()}
+                    onClick={() => {
+                      if (
+                        typeof window !== "undefined" &&
+                        window.matchMedia("(min-width: 1024px)").matches
+                      ) {
+                        setSearchOverlayOpen(true);
+                      } else {
+                        hb.actions.openSearchSurface();
+                      }
+                    }}
                   >
                     <Search className="h-4 w-4" />
                   </Button>
@@ -357,6 +368,9 @@ export function SiteHeaderShell() {
             ))}
         </div>
       </header>
+      {!isLandingHeader ? (
+        <SearchOverlay open={searchOverlayOpen} onOpenChange={setSearchOverlayOpen} />
+      ) : null}
     </>
   );
 }

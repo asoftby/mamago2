@@ -1,7 +1,12 @@
 import type { NotificationType } from "@prisma/client";
 
-/** Личные уведомления (напоминания плана и т.п.) */
-export const NOTIFICATION_TYPES_USER: NotificationType[] = ["SYSTEM"];
+/** Личные уведомления (семья, план, welcome, подборки) */
+export const NOTIFICATION_TYPES_USER: NotificationType[] = [
+  "WELCOME",
+  "REMINDER",
+  "RECOMMENDATION",
+  "SYSTEM",
+];
 
 /** Бизнес: модерация мест/активностей/предложений + верификация */
 export const NOTIFICATION_TYPES_BUSINESS: NotificationType[] = [

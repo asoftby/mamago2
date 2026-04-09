@@ -39,7 +39,7 @@ export function SidebarItem({
           "flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-150",
           "ml-3",
           isActive
-            ? "bg-blue-50 text-blue-700"
+            ? "bg-primary/10 text-primary"
             : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
         )}
       >

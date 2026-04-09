@@ -2,7 +2,8 @@ import type { ReactNode } from "react";
 import type { AccountDropdownContentProps } from "@/components/account/AccountDropdownContent";
 
 export type AccountDropdownModel = AccountDropdownContentProps & {
-  sheetTitle: string;
+  /** Заголовок нижнего sheet на мобильном; без него — только скрытый title для a11y */
+  sheetTitle?: string;
 };
 
 export type AccountDropdownProps = AccountDropdownModel & {

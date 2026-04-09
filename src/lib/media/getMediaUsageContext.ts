@@ -27,19 +27,46 @@ export async function getMediaUsageContext(
     orderBy: { createdAt: "asc" },
   });
 
-  if (!usage) {
-    return null;
+  if (usage) {
+    const entityData = await fetchEntityData(usage.entityType, usage.entityId);
+    return {
+      entityType: usage.entityType,
+      entityTitle: entityData.title,
+      field: usage.field,
+      placeAddress: entityData.placeAddress,
+    };
   }
 
-  // Fetch entity title based on type
-  const entityData = await fetchEntityData(usage.entityType, usage.entityId);
+  // Article cover / SEO image may reference media without a MediaUsage row
+  const articleCover = await prisma.article.findFirst({
+    where: { coverImageId: mediaId },
+    orderBy: { updatedAt: "desc" },
+    select: { id: true, title: true },
+  });
+  if (articleCover) {
+    return {
+      entityType: "ARTICLE",
+      entityTitle: articleCover.title,
+      field: "coverImageId",
+      placeAddress: undefined,
+    };
+  }
 
-  return {
-    entityType: usage.entityType,
-    entityTitle: entityData.title,
-    field: usage.field,
-    placeAddress: entityData.placeAddress,
-  };
+  const articleSeo = await prisma.article.findFirst({
+    where: { seoImageId: mediaId },
+    orderBy: { updatedAt: "desc" },
+    select: { id: true, title: true },
+  });
+  if (articleSeo) {
+    return {
+      entityType: "ARTICLE",
+      entityTitle: articleSeo.title,
+      field: "seoImageId",
+      placeAddress: undefined,
+    };
+  }
+
+  return null;
 }
 
 /**
@@ -101,8 +128,11 @@ async function fetchEntityData(
       }
 
       case "ARTICLE": {
-        // Article model doesn't exist yet
-        return { title: "Article" };
+        const article = await prisma.article.findUnique({
+          where: { id: entityId },
+          select: { title: true },
+        });
+        return { title: article?.title ?? null };
       }
 
       case "USER": {

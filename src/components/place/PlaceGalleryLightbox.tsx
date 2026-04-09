@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { X, ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ModalCloseButton } from "@/components/ui/modal-close-button";
 
 interface PlaceGalleryLightboxProps {
   images: Array<{
@@ -75,14 +76,10 @@ export function PlaceGalleryLightbox({
 
   return (
     <div className="fixed inset-0 z-50 bg-black">
-      {/* Close button */}
-      <button
+      <ModalCloseButton
         onClick={onClose}
-        className="absolute top-4 right-4 z-10 p-2 rounded-full bg-black/50 text-white hover:bg-black/70 transition-colors"
-        aria-label="Закрыть"
-      >
-        <X className="h-6 w-6" />
-      </button>
+        className="absolute top-4 right-4 z-10"
+      />
 
       {/* Counter */}
       {hasMultiple && (

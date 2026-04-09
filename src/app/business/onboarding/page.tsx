@@ -1,6 +1,6 @@
 import { getCurrentUser } from "@/lib/auth/server";
 import { redirect } from "next/navigation";
-import { getMyBusiness } from "@/server/business/getMyBusiness";
+import { getOwnedBusinessProfile } from "@/server/business/getMyBusiness";
 import { OnboardingForm } from "./OnboardingForm";
 import { getEffectiveVerificationStatus } from "@/server/services/businessStatusMap";
 
@@ -16,7 +16,7 @@ export default async function OnboardingPage() {
   }
 
   // 2. Check existing business profile
-  const existingBusiness = await getMyBusiness(user.id);
+  const existingBusiness = await getOwnedBusinessProfile(user.id);
   
   if (existingBusiness) {
     const verificationStatus = getEffectiveVerificationStatus(existingBusiness);

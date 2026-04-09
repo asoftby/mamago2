@@ -9,8 +9,12 @@ import { H3, Caption } from "@/components/ui/typography";
 import { Heart } from "lucide-react";
 import { formatAgeKeysShort } from "@/lib/config/ages";
 import { BUDGET_LABELS, type MockRoute } from "@/mocks/routes.mock";
-import { AddRouteToPlanSheet } from "./AddRouteToPlanSheet";
 import { AnalyticsCardViewTracker } from "@/components/analytics/AnalyticsCardViewTracker";
+import { useAuthMe } from "@/features/birthday/builder/hooks/useAuthMe";
+import { SaveActivityFlowAdaptive } from "@/components/activity/SaveActivityFlowAdaptive";
+import type { SaveToPlanResult } from "@/components/activity/SaveToPlanModal";
+import { toast } from "sonner";
+import { useRouter } from "next/navigation";
 
 type Props = {
   route: MockRoute;
@@ -21,6 +25,33 @@ type Props = {
 
 export function RouteCard({ route, className, analyticsCitySlug = "minsk" }: Props) {
   const [planOpen, setPlanOpen] = useState(false);
+  const { isAuthenticated } = useAuthMe();
+  const isDemoRouteId = /^route-\d+$/.test(route.id);
+  const router = useRouter();
+
+  const handlePersist = async (result: SaveToPlanResult) => {
+    if (result.action === "cancel") return;
+    if (result.action === "plan") {
+      const res = await fetch("/api/save/plan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ activityId: route.id, date: result.dateISO, title: route.title, coverImageUrl: route.coverImageUrl }),
+      });
+      if (!res.ok) throw new Error("plan_save_failed");
+      toast.success("Маршрут добавлен в план", {
+        action: { label: "Открыть план", onClick: () => router.push("/?myPlan=open") },
+      });
+    } else if (result.action === "ideas") {
+      if (isDemoRouteId) return;
+      const res = await fetch("/api/save/idea", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ activityId: route.id }),
+      });
+      if (!res.ok) throw new Error("idea_save_failed");
+      toast.success("Маршрут сохранён в идеи");
+    }
+  };
 
   const ageLabel = route.ageTags.length > 0 ? formatAgeKeysShort(route.ageTags) : null;
 
@@ -90,11 +121,12 @@ export function RouteCard({ route, className, analyticsCitySlug = "minsk" }: Pro
       </div>
       </AnalyticsCardViewTracker>
 
-      <AddRouteToPlanSheet
+      <SaveActivityFlowAdaptive
         open={planOpen}
         onOpenChange={setPlanOpen}
-        routeTitle={route.title}
-        routeSlug={route.slug}
+        isAuthenticated={isAuthenticated}
+        scenario={{ kind: "quickdate", title: route.title }}
+        onPersist={handlePersist}
       />
     </>
   );

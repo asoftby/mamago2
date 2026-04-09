@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { useMyPlan } from "../hooks/useMyPlan";
-import { AddChildStep } from "./AddChildStep";
 import { PlanMainContent } from "./PlanMainContent";
 
 interface MyPlanPanelContentProps {
@@ -42,6 +41,10 @@ export function MyPlanPanelContent({
     ideasLoading,
     addIdeaToPlan,
     removeIdea,
+    planSuggestions,
+    suggestionsLoading,
+    addActivityToPlanFromSuggestion,
+    refetchPlanForDate,
   } = useMyPlan();
 
   const [addErr, setAddErr] = useState<string | null>(null);
@@ -49,6 +52,12 @@ export function MyPlanPanelContent({
   useEffect(() => {
     if (open) setAddErr(null);
   }, [open]);
+
+  /** Подтягиваем план с сервера при открытии и при смене даты — единый источник с БД + live после add. */
+  useEffect(() => {
+    if (!open) return;
+    void refetchPlanForDate(selectedPlanDate);
+  }, [open, selectedPlanDate, refetchPlanForDate]);
 
   if (isLoading || accessPhase === "loading") {
     return (
@@ -58,20 +67,6 @@ export function MyPlanPanelContent({
           <p className="text-gray-600">Загружаем ваш план...</p>
         </div>
       </div>
-    );
-  }
-
-  if (accessPhase === "no_children") {
-    return (
-      <AddChildStep
-        submitting={submittingChild}
-        serverError={addErr}
-        onSubmit={async (data) => {
-          setAddErr(null);
-          const r = await createChild(data);
-          if (!r.ok) setAddErr(r.error ?? "Не удалось сохранить");
-        }}
-      />
     );
   }
 
@@ -94,11 +89,15 @@ export function MyPlanPanelContent({
       onCycleSlotAlternativePrev={cycleSlotAlternativePrev}
       onMarkSlotSaved={markSlotSaved}
       onClearSlotSaved={clearSlotSaved}
+      onRemoveItemFromPlan={clearSlotSaved}
       onOpenSlotSuggestion={openSlotSuggestion}
       ideas={ideas}
       ideasLoading={ideasLoading}
       onAddIdeaToPlan={addIdeaToPlan}
       onRemoveIdea={removeIdea}
+      planSuggestions={planSuggestions}
+      suggestionsLoading={suggestionsLoading}
+      onAddSuggestionToPlan={addActivityToPlanFromSuggestion}
       onRequestClose={onRequestClose}
     />
   );

@@ -135,7 +135,7 @@ export const ADMIN_LAB_REGISTRY: Record<string, ComponentUsageMeta> = {
     sourcePath: "src/components/admin/PlaceModerationView.tsx",
     status: "rendered",
     usedIn: [
-      "src/app/admin/moderation/places/page.tsx",
+      "src/app/admin/content/places/[id]/page.tsx",
     ],
     description: "Admin interface for moderating place submissions",
   },
@@ -145,7 +145,7 @@ export const ADMIN_LAB_REGISTRY: Record<string, ComponentUsageMeta> = {
     sourcePath: "src/components/admin/PlaceRevisionModerationView.tsx",
     status: "rendered",
     usedIn: [
-      "src/app/admin/moderation/places/page.tsx",
+      "src/app/admin/content/places/[id]/page.tsx",
     ],
     description: "Admin interface for moderating place revision requests",
   },

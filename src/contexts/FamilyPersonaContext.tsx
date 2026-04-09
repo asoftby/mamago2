@@ -18,6 +18,7 @@ import {
   MAX_ACTIVE_FAMILY_PERSONAS,
   FAMILY_SELECTION_LIMIT_MESSAGE,
 } from "@/lib/family/wholeFamilyPreset";
+import { MY_PLAN_REG_FOCUS_CHILD_SESSION_KEY } from "@/lib/family/postMyPlanRegistrationFocus";
 import { AUTH_STATE_CHANGED_EVENT } from "@/lib/auth/client";
 import { toast } from "sonner";
 
@@ -26,10 +27,11 @@ const STORAGE_SELECTED = "mamago:selectedPersonaIds";
 type MeApiUser = AccountMenuUser & Record<string, unknown>;
 
 function buildPersonas(me: MeApiUser, children: Array<{ id: string; name: string; birthDate?: string | null }>): FamilyPersona[] {
+  const hasDisplayName = !!me.displayName?.trim();
   const adult: FamilyPersona = {
     id: me.id,
     kind: "adult",
-    displayName: me.displayName?.trim() || me.email.split("@")[0] || "Я",
+    displayName: me.displayName?.trim() || me.email?.split("@")[0] || "Я",
     avatarUrl: me.avatarUrl ?? null,
     familyRole: me.familyRole ?? null,
     ageBandLabel: me.ageBandLabel ?? null,
@@ -38,6 +40,7 @@ function buildPersonas(me: MeApiUser, children: Array<{ id: string; name: string
     preferenceSignalIds: Array.isArray(me.preferenceSignalIds) ? me.preferenceSignalIds : [],
     leisureFormatSignalId:
       typeof me.leisureFormatSignalId === "string" ? me.leisureFormatSignalId : null,
+    isProfileComplete: hasDisplayName,
   };
   const childPersonas: FamilyPersona[] = children.map((c) => ({
     id: c.id,
@@ -117,7 +120,10 @@ export function FamilyPersonaProvider({ children }: { children: React.ReactNode 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const meRes = await fetch("/api/auth/me", { credentials: "include", cache: "no-store" });
+      const [meRes, chRes] = await Promise.all([
+        fetch("/api/auth/me", { credentials: "include", cache: "no-store" }),
+        fetch("/api/children", { credentials: "include", cache: "no-store" }),
+      ]);
       if (!meRes.ok) {
         setMe(null);
         setChildRows([]);
@@ -127,7 +133,6 @@ export function FamilyPersonaProvider({ children }: { children: React.ReactNode 
       const meJson = (await meRes.json()) as MeApiUser;
       setMe(meJson);
 
-      const chRes = await fetch("/api/children", { credentials: "include", cache: "no-store" });
       let children: Array<{ id: string; name: string; birthDate?: string | null }> = [];
       if (chRes.ok) {
         const data = (await chRes.json()) as {
@@ -217,6 +222,34 @@ export function FamilyPersonaProvider({ children }: { children: React.ReactNode 
     },
     [allowedIds],
   );
+
+  /** После регистрации из «Мой план» — выбрать взрослого + только что созданного ребёнка для подборки. */
+  useEffect(() => {
+    if (loading || !me) return;
+    let raw: string | null = null;
+    try {
+      raw = sessionStorage.getItem(MY_PLAN_REG_FOCUS_CHILD_SESSION_KEY);
+    } catch {
+      return;
+    }
+    if (!raw?.trim()) return;
+    const childId = raw.trim();
+    if (childRows.length === 0 || !childRows.some((c) => c.id === childId)) return;
+
+    try {
+      sessionStorage.removeItem(MY_PLAN_REG_FOCUS_CHILD_SESSION_KEY);
+    } catch {
+      /* ignore */
+    }
+
+    const built = buildPersonas(me, childRows);
+    const allowed = new Set(built.map((p) => p.id));
+    const adultId = me.id;
+    const next = [adultId, childId].filter((id) => allowed.has(id));
+    if (next.length === 0) return;
+
+    setSelectedPersonaIds(next);
+  }, [loading, me, childRows, setSelectedPersonaIds]);
 
   const menuUser: AccountMenuUser | null = me
     ? {

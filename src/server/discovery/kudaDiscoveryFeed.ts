@@ -199,9 +199,10 @@ export async function getKudaDiscoveryFeed(
   /** Достаточно изображений, чтобы сопоставить coverImageId с ActivityImage (как на detail). */
   const GALLERY_FOR_COVER = 40;
 
+  /** Пул кандидатов для сортировки; без избыточного findMany (было ×5 до 400 — долго на TTFB). */
   const rows = await prisma.activity.findMany({
     where,
-    take: Math.min(take * 5, 400),
+    take: Math.min(take * 3, 200),
     orderBy: [{ nextOccurrenceAt: "desc" }, { createdAt: "desc" }],
     include: {
       images: { orderBy: { sortOrder: "asc" }, take: GALLERY_FOR_COVER },

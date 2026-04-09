@@ -42,7 +42,7 @@ export function buildPublicSiteAccountModel(input: {
     loggingOut,
   } = input;
 
-  const emailPrefix = user.email.split("@")[0] ?? user.email;
+  const emailPrefix = user.email?.split("@")[0] ?? user.email ?? "";
   const displayName = user.displayName?.trim() || emailPrefix;
 
   const roleRu = mapFamilyRoleToLabel(user.familyRole ?? undefined);
@@ -100,7 +100,6 @@ export function buildPublicSiteAccountModel(input: {
         ];
 
     return {
-      sheetTitle: "Аккаунт",
       header,
       mainItems,
       contextItems,

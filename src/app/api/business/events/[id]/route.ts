@@ -3,7 +3,11 @@ import { revalidatePath } from "next/cache";
 import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
 import { ActivityType } from "@prisma/client";
-import { canCreateBusinessContent, canManageOwnedContent } from "@/lib/auth/businessContentAccess";
+import { canCreateBusinessContent } from "@/lib/auth/businessContentAccess";
+import {
+  canManageActivityById,
+  coalesceActivityBusinessIdFromPlace,
+} from "@/lib/auth/activityAccess";
 import { replaceActivitySessionsFromScheduleJson } from "@/lib/business/syncEventActivitySessions";
 import { syncEventVenueAndActivityCity } from "@/lib/business/syncEventVenueFromWizard";
 import { computeEventShortDesc } from "@/lib/business/eventShortDesc";
@@ -34,6 +38,13 @@ export async function GET(
 
     const summary = await fetchActivityEventRowSummary(id);
     if (!summary || summary.status === "DELETED") {
+      return NextResponse.json(
+        { error: "Event not found" },
+        { status: 404 }
+      );
+    }
+
+    if (!(await canManageActivityById(user, id))) {
       return NextResponse.json(
         { error: "Event not found" },
         { status: 404 }
@@ -114,11 +125,14 @@ export async function PATCH(
     const body = await request.json();
 
     const summary = await fetchActivityEventRowSummary(id);
-    if (
-      !summary ||
-      !canManageOwnedContent(user, summary.ownerUserId) ||
-      summary.status === "DELETED"
-    ) {
+    if (!summary || summary.status === "DELETED") {
+      return NextResponse.json(
+        { error: "Event not found" },
+        { status: 404 }
+      );
+    }
+
+    if (!(await canManageActivityById(user, id))) {
       return NextResponse.json(
         { error: "Event not found" },
         { status: 404 }
@@ -156,6 +170,38 @@ export async function PATCH(
         : body.venue?.kind === "PLACE" && typeof body.venue?.placeId === "string"
           ? body.venue.placeId
           : undefined;
+
+    let nextBusinessId: string | null | undefined = undefined;
+    if (body.businessId !== undefined) {
+      nextBusinessId = body.businessId;
+    }
+    if (typeof mergedPlaceId === "string" && mergedPlaceId.length > 0) {
+      const placeRow = await prisma.place.findUnique({
+        where: { id: mergedPlaceId },
+        select: { ownerBusinessId: true },
+      });
+      if (!placeRow) {
+        return NextResponse.json({ error: "Place not found" }, { status: 404 });
+      }
+      if (
+        body.businessId !== undefined &&
+        body.businessId !== null &&
+        placeRow.ownerBusinessId != null &&
+        body.businessId !== placeRow.ownerBusinessId
+      ) {
+        return NextResponse.json(
+          {
+            error:
+              "businessId must match the business that owns this place (Place.ownerBusinessId)",
+          },
+          { status: 400 },
+        );
+      }
+      nextBusinessId = coalesceActivityBusinessIdFromPlace(
+        placeRow,
+        existing.businessId,
+      );
+    }
 
     const nextScheduleJson =
       body.scheduleJson !== undefined
@@ -209,7 +255,7 @@ export async function PATCH(
         currency: body.currency,
         coverImageId: body.coverImageId,
         ...(mergedPlaceId !== undefined ? { placeId: mergedPlaceId } : {}),
-        businessId: body.businessId,
+        ...(nextBusinessId !== undefined ? { businessId: nextBusinessId } : {}),
       },
     });
 
@@ -275,17 +321,18 @@ export async function DELETE(
     }
 
     const summary = await fetchActivityEventRowSummary(id);
-    if (
-      !summary ||
-      !canManageOwnedContent(user, summary.ownerUserId) ||
-      summary.status === "DELETED"
-    ) {
+    if (!summary || summary.status === "DELETED") {
+      return NextResponse.json({ error: "Event not found" }, { status: 404 });
+    }
+
+    if (!(await canManageActivityById(user, id))) {
       return NextResponse.json({ error: "Event not found" }, { status: 404 });
     }
 
     await softDeleteActivityById(id);
 
     revalidatePath("/admin/moderation/events");
+    revalidatePath("/admin/content/events");
     revalidatePath("/admin");
 
     return NextResponse.json({ success: true });

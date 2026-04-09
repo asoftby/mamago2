@@ -42,7 +42,7 @@ export function WeekCalendarStrip({
   }, [selectedDate, visibleWeekStart]);
 
   const weekDays = useMemo(() => getWeekDays(visibleWeekStart), [visibleWeekStart]);
-  const monthLabel = useMemo(() => buildWeekMonthLabel(weekDays), [weekDays]);
+  const monthLabel = useMemo(() => buildWeekMonthLabel(weekDays, selectedDate), [weekDays, selectedDate]);
 
   const shiftWeek = (dir: 1 | -1) => {
     const nextStart = dir === 1 ? getNextWeekStart(visibleWeekStart) : getPrevWeekStart(visibleWeekStart);
@@ -88,7 +88,7 @@ export function WeekCalendarStrip({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -4 }}
             transition={{ duration: 0.18 }}
-            className="inline-block text-xs font-semibold tracking-[0.12em] text-neutral-400"
+            className="inline-block text-[11px] font-medium uppercase leading-none text-neutral-400"
           >
             {monthLabel}
           </motion.p>

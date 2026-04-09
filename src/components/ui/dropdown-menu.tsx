@@ -25,16 +25,18 @@ DropdownMenuContent.displayName = "DropdownMenuContent";
 
 const DropdownMenuItem = React.forwardRef<
   HTMLDivElement,
-  React.HTMLAttributes<HTMLDivElement> & { asChild?: boolean }
->(({ className, asChild, children, ...props }, ref) => {
+  React.HTMLAttributes<HTMLDivElement> & { asChild?: boolean; disabled?: boolean }
+>(({ className, asChild, children, disabled, ...props }, ref) => {
   const Comp = asChild ? "div" : "div";
-  
+
   return (
     <Comp
       ref={ref}
+      aria-disabled={disabled ? true : undefined}
       className={cn(
         "relative flex cursor-pointer select-none items-center rounded-md px-3 py-2.5 text-sm outline-none transition-colors hover:bg-gray-50 focus:bg-gray-50",
-        className
+        disabled && "pointer-events-none cursor-not-allowed opacity-50",
+        className,
       )}
       {...props}
     >

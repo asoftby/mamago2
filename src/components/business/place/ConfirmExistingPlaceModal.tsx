@@ -1,6 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { toast } from "sonner";
+import { useRequireVerifiedEmail } from "@/features/email-verification/hooks/useRequireVerifiedEmail";
 import {
   Dialog,
   DialogContent,
@@ -67,7 +69,7 @@ export function ConfirmExistingPlaceModal({
     }
   };
 
-  const handleClaimRequest = async () => {
+  const performClaim = useCallback(async () => {
     setIsClaiming(true);
     setError(null);
 
@@ -76,6 +78,20 @@ export function ConfirmExistingPlaceModal({
         method: "POST",
       });
 
+      if (response.status === 403) {
+        const data = (await response.json().catch(() => ({}))) as {
+          code?: string;
+          error?: string;
+        };
+        if (data.code === "EMAIL_NOT_VERIFIED") {
+          toast.message("Подтвердите email, чтобы продолжить", {
+            description:
+              "Отправьте письмо для подтверждения в настройках или из баннера на сайте.",
+          });
+          return;
+        }
+      }
+
       if (!response.ok) {
         const data = await response.json();
         throw new Error(data.error || "Failed to submit claim request");
@@ -83,7 +99,6 @@ export function ConfirmExistingPlaceModal({
 
       setClaimSuccess(true);
 
-      // Auto-close after 2 seconds
       setTimeout(() => {
         onClose();
         setClaimSuccess(false);
@@ -96,7 +111,11 @@ export function ConfirmExistingPlaceModal({
     } finally {
       setIsClaiming(false);
     }
-  };
+  }, [onClose, placeId]);
+
+  const { run: runClaimWithEmailGate, VerificationGate } = useRequireVerifiedEmail({
+    onVerifiedAction: performClaim,
+  });
 
   const handleAddNewPlace = () => {
     onClose();
@@ -104,6 +123,7 @@ export function ConfirmExistingPlaceModal({
   };
 
   return (
+    <>
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
@@ -154,7 +174,7 @@ export function ConfirmExistingPlaceModal({
 
         <DialogFooter className="flex-col sm:flex-col gap-2">
           <Button
-            onClick={handleClaimRequest}
+            onClick={() => runClaimWithEmailGate()}
             disabled={isLoading || isClaiming || claimSuccess}
             className="w-full"
           >
@@ -192,5 +212,7 @@ export function ConfirmExistingPlaceModal({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+    <VerificationGate />
+    </>
   );
 }

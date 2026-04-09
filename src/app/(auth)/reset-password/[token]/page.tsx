@@ -7,28 +7,22 @@ export default function ResetPasswordPage({
   params: { token: string };
 }) {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4">
-      <div className="max-w-md w-full space-y-8">
-        <div className="bg-white rounded-lg shadow-md p-8">
-          <div className="mb-8">
-            <h2 className="text-center text-3xl font-bold text-gray-900">
-              Новый пароль
-            </h2>
-            <p className="mt-2 text-center text-sm text-gray-600">
-              Введите новый пароль для вашего аккаунта
-            </p>
-          </div>
-
+    <div className="relative min-h-screen bg-neutral-50 flex items-center justify-center px-4">
+      <div className="w-full max-w-[420px] bg-white rounded-2xl shadow-md p-6 sm:p-8 space-y-5">
+        <div className="space-y-1">
+          <h1 className="text-xl font-semibold text-neutral-900">Новый пароль</h1>
+          <p className="text-sm text-neutral-500">Введите новый пароль для вашего аккаунта.</p>
+        </div>
+        
           <ResetPasswordForm token={params.token} />
-
-          <div className="mt-6 text-center text-sm">
-            <Link
-              href="/login"
-              className="font-medium text-blue-600 hover:text-blue-500"
-            >
-              ← Вернуться к входу
-            </Link>
-          </div>
+        
+        <div className="text-center">
+          <Link
+            href="/login"
+            className="text-sm text-neutral-500 hover:text-neutral-900 transition-colors"
+          >
+            Вернуться к входу
+          </Link>
         </div>
       </div>
     </div>

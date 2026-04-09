@@ -152,7 +152,7 @@ export function DatePicker({
       )}
 
       {/* Calendar */}
-      <div className="w-full bg-white rounded-lg">
+      <div className="w-full rounded-lg pt-5 pb-2.5">
         {/* Month/Year Navigation */}
         <div className="flex items-center justify-center mb-6">
           <div className="flex items-center gap-2">

@@ -160,9 +160,11 @@ function PlanItemCard({ item, onRemove }: { item: PlanItemWithActivity; onRemove
   const displayImage = activity?.coverImageUrl ?? item.coverImageUrl ?? null;
   const availability = getPlanActivityPublicAvailability(activity);
   const unavailable = availability === "business_disabled" || availability === "missing_activity";
+  const routeHref =
+    !activity?.id && item.planRouteSlug ? `/routes/${item.planRouteSlug}` : null;
   const detailHref = activity?.id
     ? publicActivityPath(activity.id, "minsk", activity.slug)
-    : null;
+    : routeHref;
 
   const formatTime = (dt: Date) =>
     new Date(dt).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });

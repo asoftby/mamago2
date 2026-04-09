@@ -33,6 +33,6 @@ export async function forgotPasswordAction(
   // Always return success message (don't reveal if email exists)
   return {
     ok: true,
-    message: "Если аккаунт с таким email существует, мы отправили инструкции.",
+    message: "Если вы зарегистрированы — письмо с инструкциями уже ждет вас 😊",
   };
 }

@@ -1,4 +1,4 @@
-import { DISCOVERY_INTENT_CONFIG, DISCOVERY_INTENT_ITEMS } from "@/lib/discovery/discoveryIntentConfig";
+import { DISCOVERY_INTENT_ITEMS } from "@/lib/discovery/discoveryIntentConfig";
 
 export type Intent = "kuda" | "classes" | "birthday" | "routes";
 
@@ -53,6 +53,7 @@ export function shouldHideMobileBottomNav(pathname: string | null): boolean {
   const segments = pathname.split("/").filter(Boolean);
   if (segments.length < 2) return false;
 
+  if (segments[0] === "preview" && segments[1] === "articles") return true;
   if (segments[0] === "blog") return true;
   if (segments[0] === "places") return true;
   if (segments[0] === "offers") return true;
@@ -85,11 +86,30 @@ export function isContentEditorPath(pathname: string | null): boolean {
   return pathname === "/editor" || pathname.startsWith("/editor/");
 }
 
+/** Восстановление / сброс пароля — отдельные auth-страницы без виджета «Мой план». */
+export function isPasswordRecoveryPath(pathname: string | null): boolean {
+  if (!pathname) return false;
+  return (
+    pathname === "/forgot-password" ||
+    pathname.startsWith("/reset-password/")
+  );
+}
+
+/** Full-page auth-страницы без shell/виджета «Мой план». */
+export function isStandaloneAuthPath(pathname: string | null): boolean {
+  if (!pathname) return false;
+  return pathname === "/login" || isPasswordRecoveryPath(pathname);
+}
+
 /**
  * Где не монтируется оболочка «Мой план» (FAB/модалки): admin, business, редактор.
  */
 export function isMyPlanShellExcludedPath(pathname: string | null): boolean {
-  return isBackofficePath(pathname) || isContentEditorPath(pathname);
+  return (
+    isBackofficePath(pathname) ||
+    isContentEditorPath(pathname) ||
+    isStandaloneAuthPath(pathname)
+  );
 }
 
 /**
@@ -97,6 +117,7 @@ export function isMyPlanShellExcludedPath(pathname: string | null): boolean {
  * (детали публикаций и т.д.).
  */
 export function shouldHideMyPlanWidget(pathname: string | null): boolean {
+  if (isStandaloneAuthPath(pathname)) return true;
   if (isMyPlanShellExcludedPath(pathname)) return true;
   return shouldHideMobileBottomNav(pathname);
 }

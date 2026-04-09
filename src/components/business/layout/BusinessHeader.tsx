@@ -101,15 +101,9 @@ export function BusinessHeader({ user }: BusinessHeaderProps) {
         </div>
 
         <div className="ml-auto flex items-center gap-2">
-          <CreatePublicationQuickMenu />
+          <CreatePublicationQuickMenu publicationMode="business" />
           <NotificationsDropdown
             context={notificationContext}
-            narrow={narrow}
-            viewAllHref={
-              notificationContext === "business"
-                ? "/business/notifications"
-                : "/notifications"
-            }
             triggerClassName={cn("inline-flex", HEADER_CHROME_ICON_BUTTON_CLASS)}
           />
           <ProfileDropdown

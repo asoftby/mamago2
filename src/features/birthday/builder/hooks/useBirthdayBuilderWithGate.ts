@@ -33,7 +33,7 @@ export function useBirthdayBuilderWithGate() {
   const prefilledAge = parseAgeFromSearchParams(searchParams);
   const builder = useBirthdayBuilder(prefilledAge ? { ageGroup: prefilledAge } : undefined);
 
-  const { isAuthenticated, isLoading, refetch } = useAuthMe();
+  const { isAuthenticated, isLoading, refetch, isEmailVerified } = useAuthMe();
   const { openAuthModal } = useBirthdayBuilderAuth();
 
   const guestHydratedRef = useRef(false);
@@ -244,6 +244,7 @@ export function useBirthdayBuilderWithGate() {
     nextStep,
     resetBuilder,
     isAuthenticated,
+    isEmailVerified,
     isAuthLoading: isLoading,
     requestLoginToSubmit: openAuthModal,
     postLoginChildModalOpen,

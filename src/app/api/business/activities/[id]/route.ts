@@ -26,7 +26,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
     }
 
     // Check if user can manage this activity
-    const canManage = await canManageActivity(user.id, id);
+    const canManage = await canManageActivity(user, id);
     if (!canManage) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
@@ -51,7 +51,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     const { id } = await context.params;
 
     // Check if user can manage this activity
-    const canManage = await canManageActivity(user.id, id);
+    const canManage = await canManageActivity(user, id);
     if (!canManage) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
@@ -92,7 +92,7 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
     const { id } = await context.params;
 
     // Check if user can manage this activity
-    const canManage = await canManageActivity(user.id, id);
+    const canManage = await canManageActivity(user, id);
     if (!canManage) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }

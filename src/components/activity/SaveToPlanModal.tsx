@@ -12,6 +12,7 @@ import {
   Bookmark, BookmarkCheck, ChevronRight, ChevronLeft,
   ExternalLink, Pencil, Trash2,
 } from "lucide-react";
+import { DatePicker } from "@/components/ui/date-picker";
 
 export type SaveScenario =
   | { kind: "confirm"; title: string; dateLabel: string; timeLabel: string; dateISO: string; slotId?: string | null }
@@ -103,22 +104,22 @@ function StatusCard({ icon, title, subtitle, actions }: StatusCardProps) {
 }
 
 function CalendarView({ onBack, onSelect }: { onBack: () => void; onSelect: (iso: string) => void }) {
-  const [value, setValue] = React.useState("");
+  const [value, setValue] = React.useState<Date | null>(null);
+  const handleConfirm = () => {
+    if (!value) return;
+    const iso = value.toISOString().split("T")[0]!;
+    onSelect(iso);
+  };
   return (
-    <div className="space-y-5 px-4 py-4">
-      <button onClick={onBack} className="flex items-center gap-1.5 text-sm font-medium text-neutral-500 hover:text-neutral-900 transition-colors">
-        <ChevronLeft className="w-4 h-4" />Назад
-      </button>
-      <div>
-        <p className="text-sm font-semibold text-neutral-900">Выберите дату</p>
-        <p className="text-xs text-neutral-500 mt-0.5">Активность будет добавлена в ваш план</p>
-      </div>
-      <input type="date" min={getTodayISO()} value={value} onChange={(e) => setValue(e.target.value)}
-        className="w-full h-12 px-4 rounded-2xl border border-neutral-200 bg-white text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-neutral-900/20 focus:border-neutral-400 transition-all cursor-pointer" />
-      <div className="flex gap-2.5">
-        <Button variant="outline" size="lg" className="flex-1 rounded-2xl border-neutral-200" onClick={onBack}>Назад</Button>
-        <Button size="lg" className="flex-1 rounded-2xl font-semibold" disabled={!value} onClick={() => value && onSelect(value)}>Сохранить в план</Button>
-      </div>
+    <div className="space-y-4 px-4 py-4">
+      <DatePicker
+        value={value}
+        onDateChange={setValue}
+        disablePast
+      />
+      <Button size="lg" className="w-full rounded-2xl font-semibold" disabled={!value} onClick={handleConfirm}>
+        Сохранить в план
+      </Button>
     </div>
   );
 }
@@ -175,20 +176,52 @@ function QuickView({ isIdea, inPlan, planDate, onPlan, onIdea, onRemoveIdea, onS
   );
 }
 
-interface ModalContentProps extends SaveToPlanModalProps { onClose: () => void; }
-function ModalContent({ scenario, onConfirm, onClose, isIdea = false, inPlan = false, planDate = null, planStartsAt = null }: ModalContentProps) {
+/** Только выбор (план / идеи / слоты) — без тостов и без закрытия. Для SaveActivityFlow и кастомных сценариев. */
+export interface SaveToPlanPickerBodyProps {
+  scenario: SaveScenario;
+  onCommit: (result: SaveToPlanResult) => void;
+  isIdea?: boolean;
+  inPlan?: boolean;
+  planDate?: string | null;
+  planStartsAt?: string | null;
+}
+
+export function SaveToPlanPickerBody({
+  scenario,
+  onCommit,
+  isIdea = false,
+  inPlan = false,
+  planDate = null,
+  planStartsAt = null,
+}: SaveToPlanPickerBodyProps) {
   const [view, setView] = React.useState<ModalView>("quick");
   const [selectedSlotId, setSelectedSlotId] = React.useState<string | null>(
     scenario.kind === "timeslots" && scenario.slots.length > 0 ? scenario.slots[0].id : null
   );
 
-  const handlePlan = (iso: string) => { onConfirm({ action: "plan", dateISO: iso, timeSlotId: null }); toastPlan(iso); onClose(); };
-  const handleIdea = () => { onConfirm({ action: "ideas" }); toastIdea(); onClose(); };
-  const handleRemoveIdea = () => { onConfirm({ action: "remove-idea" }); toastRemovedIdea(); onClose(); };
+  const handlePlan = (iso: string) => {
+    onCommit({ action: "plan", dateISO: iso, timeSlotId: null });
+  };
+  const handleIdea = () => {
+    onCommit({ action: "ideas" });
+  };
+  const handleRemoveIdea = () => {
+    onCommit({ action: "remove-idea" });
+  };
   const handleConfirmPlan = () => {
-    if (scenario.kind === "confirm") { onConfirm({ action: "plan", dateISO: scenario.dateISO, timeSlotId: scenario.slotId ?? null }); toastPlan(scenario.dateISO); }
-    else if (scenario.kind === "timeslots") { onConfirm({ action: "plan", dateISO: scenario.dateISO, timeSlotId: selectedSlotId }); toastPlan(scenario.dateISO); }
-    onClose();
+    if (scenario.kind === "confirm") {
+      onCommit({
+        action: "plan",
+        dateISO: scenario.dateISO,
+        timeSlotId: scenario.slotId ?? null,
+      });
+    } else if (scenario.kind === "timeslots") {
+      onCommit({
+        action: "plan",
+        dateISO: scenario.dateISO,
+        timeSlotId: selectedSlotId,
+      });
+    }
   };
 
   const isQuickdate = scenario.kind === "quickdate";
@@ -198,7 +231,7 @@ function ModalContent({ scenario, onConfirm, onClose, isIdea = false, inPlan = f
   return (
     <div className="flex flex-col">
       <div className="px-5 pt-5 pb-4 border-b border-neutral-100">
-        <p className="text-[15px] font-semibold text-neutral-900 text-center leading-snug">{headerTitle}</p>
+        <p className="text-[18px] font-semibold text-neutral-900 text-center leading-snug">{headerTitle}</p>
         {headerSubtitle && <p className="text-xs text-neutral-500 text-center mt-1 leading-snug">{headerSubtitle}</p>}
       </div>
       {isQuickdate ? (
@@ -250,9 +283,44 @@ function ModalContent({ scenario, onConfirm, onClose, isIdea = false, inPlan = f
   );
 }
 
+interface ModalContentProps extends SaveToPlanModalProps {
+  onClose: () => void;
+}
+function ModalContent(props: ModalContentProps) {
+  const { onConfirm, onClose, scenario, isIdea, inPlan, planDate, planStartsAt } =
+    props;
+  return (
+    <SaveToPlanPickerBody
+      scenario={scenario}
+      isIdea={isIdea}
+      inPlan={inPlan}
+      planDate={planDate}
+      planStartsAt={planStartsAt}
+      onCommit={(result) => {
+        if (result.action === "plan") {
+          toastPlan(result.dateISO);
+        } else if (result.action === "ideas") {
+          toastIdea();
+        } else if (result.action === "remove-idea") {
+          toastRemovedIdea();
+        }
+        onConfirm(result);
+        onClose();
+      }}
+    />
+  );
+}
+
 export function SaveToPlanModal(props: SaveToPlanModalProps) {
   const { open, onOpenChange } = props;
   const isDesktop = useMediaQuery("(min-width: 640px)");
+  // `mounted` prevents rendering either container during SSR / hydration,
+  // so we never mount Sheet and Dialog simultaneously.
+  const [mounted, setMounted] = React.useState(false);
+  React.useEffect(() => { setMounted(true); }, []);
+
+  if (!mounted) return null;
+
   if (isDesktop) {
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
