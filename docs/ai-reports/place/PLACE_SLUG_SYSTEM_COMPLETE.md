@@ -231,11 +231,11 @@ When published place name changes:
 
 ## Scripts
 
-### 1. Backfill Script (`scripts/backfill-place-slugs-v2.ts`)
+### 1. Backfill Script (`scripts/data-migrations/backfill-place-slugs-v2.ts`)
 
 Generates slugs for all existing published places:
 ```bash
-npx tsx scripts/backfill-place-slugs-v2.ts
+npx tsx scripts/data-migrations/backfill-place-slugs-v2.ts
 ```
 
 **Features:**
@@ -376,7 +376,7 @@ User visits: /places/pugovka
 - ✅ `src/app/(public)/places/[slug]/page.tsx` - Redirect support
 
 **Scripts:**
-- ✅ `scripts/backfill-place-slugs-v2.ts` - Backfill existing places (NEW)
+- ✅ `scripts/data-migrations/backfill-place-slugs-v2.ts` - Backfill existing places (NEW)
 - ✅ `scripts/test-place-slug-logic.ts` - Test suite (NEW)
 
 **Documentation:**

@@ -123,7 +123,7 @@ Should show:
 
 If not, run:
 ```bash
-npx tsx scripts/seed-city-coordinates.ts
+npx tsx scripts/data-migrations/seed-city-coordinates.ts
 ```
 
 **Check 3: Server logs**

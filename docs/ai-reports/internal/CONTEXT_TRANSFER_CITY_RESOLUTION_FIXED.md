@@ -43,7 +43,7 @@ npx prisma generate
 ### Automated Tests
 Created comprehensive test suite:
 - `scripts/diagnostics/check-city-coordinates.ts` - Verify city data
-- `scripts/seed-city-coordinates.ts` - Populate city data
+- `scripts/data-migrations/seed-city-coordinates.ts` - Populate city data
 - `scripts/manual-tests/test-city-resolution.ts` - Unit tests (4/4 pass)
 - `scripts/manual-tests/test-place-geo-enrichment.ts` - E2E tests (2/2 pass)
 
@@ -97,7 +97,7 @@ Return enriched place to client
 
 ### Test Scripts (New)
 - `scripts/diagnostics/check-city-coordinates.ts`
-- `scripts/seed-city-coordinates.ts`
+- `scripts/data-migrations/seed-city-coordinates.ts`
 - `scripts/manual-tests/test-city-resolution.ts`
 - `scripts/manual-tests/test-place-geo-enrichment.ts`
 
@@ -136,7 +136,7 @@ When creating a place with Minsk address:
 
 ## How to Add More Cities
 ```typescript
-// In scripts/seed-city-coordinates.ts
+// In scripts/data-migrations/seed-city-coordinates.ts
 await prisma.city.update({
   where: { slug: "gomel" },
   data: {

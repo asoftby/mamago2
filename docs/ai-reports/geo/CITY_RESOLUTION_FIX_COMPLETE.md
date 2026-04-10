@@ -27,7 +27,7 @@ npx prisma generate
 Created and ran a seed script to populate `radiusKm` for Minsk:
 
 ```typescript
-// scripts/seed-city-coordinates.ts
+// scripts/data-migrations/seed-city-coordinates.ts
 await prisma.city.update({
   where: { slug: "minsk" },
   data: {
@@ -137,7 +137,7 @@ Step 5: Return enriched place
 
 ### Test Scripts
 - `scripts/diagnostics/check-city-coordinates.ts` - Verify city coordinates
-- `scripts/seed-city-coordinates.ts` - Populate city coordinates
+- `scripts/data-migrations/seed-city-coordinates.ts` - Populate city coordinates
 - `scripts/manual-tests/test-city-resolution.ts` - Unit tests for resolver
 - `scripts/manual-tests/test-place-geo-enrichment.ts` - E2E tests for full pipeline
 

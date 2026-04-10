@@ -12,7 +12,7 @@ City table missing `radiusKm` value (was NULL).
 npx prisma generate
 
 # 2. Populate city coordinates
-npx tsx scripts/seed-city-coordinates.ts
+npx tsx scripts/data-migrations/seed-city-coordinates.ts
 
 # 3. Verify fix
 npx tsx scripts/manual-tests/test-place-geo-enrichment.ts

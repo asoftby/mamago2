@@ -200,7 +200,7 @@ POST /api/admin/media/recalculate-orphans
 ### Run Backfill
 After adding new media sources:
 ```bash
-npx tsx scripts/backfill-media-library.ts
+npx tsx scripts/data-migrations/backfill-media-library.ts
 ```
 
 ### Test Media Library

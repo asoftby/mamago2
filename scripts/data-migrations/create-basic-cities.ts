@@ -4,7 +4,7 @@
  * Create basic cities for the application
  */
 
-import { prisma } from "../src/lib/prisma";
+import { prisma } from "../../src/lib/prisma";
 
 async function createBasicCities() {
   console.log("🏙️ Creating basic cities");

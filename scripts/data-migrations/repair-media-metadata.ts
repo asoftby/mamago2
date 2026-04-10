@@ -6,11 +6,11 @@
  * - Attempts to recover real file sizes
  * - Fixes generic MIME types
  * 
- * Run: npx tsx scripts/repair-media-metadata.ts
+ * Run: npx tsx scripts/data-migrations/repair-media-metadata.ts
  */
 
-import { prisma } from "../src/lib/prisma";
-import { extractExtension } from "../src/lib/media/extractExtension";
+import { prisma } from "../../src/lib/prisma";
+import { extractExtension } from "../../src/lib/media/extractExtension";
 import { stat } from "fs/promises";
 import { join } from "path";
 import { existsSync } from "fs";

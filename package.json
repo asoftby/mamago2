@@ -27,7 +27,7 @@
     "cleanup:otp": "tsx src/scripts/cleanupPhoneOtps.ts",
     "backfill:verification": "tsx prisma/scripts/backfillVerificationStatus.ts",
     "db:backfill:business-members": "tsx prisma/scripts/backfill-business-members.ts",
-    "backfill:place-slugs": "tsx scripts/backfill-place-slugs.ts",
+    "backfill:place-slugs": "tsx scripts/data-migrations/backfill-place-slugs.ts",
     "db:backup": "bash scripts/db/backup.sh",
     "db:backup:sql": "bash scripts/db/backup-sql.sh",
     "db:backups": "bash scripts/db/list-backups.sh",

@@ -4,10 +4,10 @@
  * Migrates existing media files into the MediaAsset registry.
  * Creates MediaAsset records and MediaUsage mappings.
  * 
- * Run: npx tsx scripts/backfill-media-library.ts
+ * Run: npx tsx scripts/data-migrations/backfill-media-library.ts
  */
 
-import { prisma } from "../src/lib/prisma";
+import { prisma } from "../../src/lib/prisma";
 import { MediaAssetKind, MediaSourceType, MediaEntityType } from "@prisma/client";
 
 async function backfillMediaLibrary() {

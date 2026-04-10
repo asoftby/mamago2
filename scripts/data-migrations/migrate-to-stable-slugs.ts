@@ -10,7 +10,7 @@
  */
 
 import { PrismaClient } from "@prisma/client";
-import { assignSlugOnPublish } from "../src/lib/slug/placeSlugService";
+import { assignSlugOnPublish } from "../../src/lib/slug/placeSlugService";
 
 const prisma = new PrismaClient();
 

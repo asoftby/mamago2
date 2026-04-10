@@ -145,7 +145,7 @@ Helper functions для интеграции:
 
 ## 7. Backfill Script
 
-### `scripts/backfill-media-library.ts`
+### `scripts/data-migrations/backfill-media-library.ts`
 Миграция существующих файлов:
 - PlaceImage (logo + gallery) → MediaAsset + MediaUsage
 - Activity coverImageUrl → MediaAsset + MediaUsage
@@ -159,7 +159,7 @@ Features:
 
 Run:
 ```bash
-npx tsx scripts/backfill-media-library.ts
+npx tsx scripts/data-migrations/backfill-media-library.ts
 ```
 
 Results:
@@ -285,7 +285,7 @@ npx tsx scripts/manual-tests/test-media-library.ts
 - `src/lib/media/mediaRegistry.ts`
 
 ### Scripts:
-- `scripts/backfill-media-library.ts`
+- `scripts/data-migrations/backfill-media-library.ts`
 - `scripts/manual-tests/test-media-library.ts`
 
 ### Modified Files:

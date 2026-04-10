@@ -1,11 +1,11 @@
 /**
  * Assign slug to a specific place
  * 
- * Usage: npx tsx scripts/assign-slug-to-place.ts <place-id>
+ * Usage: npx tsx scripts/data-migrations/assign-slug-to-place.ts <place-id>
  */
 
 import { PrismaClient } from "@prisma/client";
-import { assignSlugOnPublish } from "../src/lib/slug/placeSlugService";
+import { assignSlugOnPublish } from "../../src/lib/slug/placeSlugService";
 
 const prisma = new PrismaClient();
 
@@ -14,7 +14,7 @@ async function main() {
 
   if (!placeId) {
     console.log("❌ Please provide a place ID");
-    console.log("Usage: npx tsx scripts/assign-slug-to-place.ts <place-id>");
+    console.log("Usage: npx tsx scripts/data-migrations/assign-slug-to-place.ts <place-id>");
     process.exit(1);
   }
 

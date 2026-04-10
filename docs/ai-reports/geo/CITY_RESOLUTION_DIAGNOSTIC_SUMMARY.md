@@ -154,7 +154,7 @@ NewPlaceWizard updates state
 
 ### Test Scripts Created
 - ✅ `scripts/diagnostics/check-city-coordinates.ts` - Verify city data
-- ✅ `scripts/seed-city-coordinates.ts` - Populate city data
+- ✅ `scripts/data-migrations/seed-city-coordinates.ts` - Populate city data
 - ✅ `scripts/manual-tests/test-city-resolution.ts` - Unit tests
 - ✅ `scripts/manual-tests/test-place-geo-enrichment.ts` - E2E tests
 
@@ -209,9 +209,9 @@ To clear IDE cache:
 
 3. Add more cities:
    ```bash
-   # Edit scripts/seed-city-coordinates.ts
+   # Edit scripts/data-migrations/seed-city-coordinates.ts
    # Add Gomel, Vitebsk, etc.
-   npx tsx scripts/seed-city-coordinates.ts
+   npx tsx scripts/data-migrations/seed-city-coordinates.ts
    ```
 
 ## Resolution Time

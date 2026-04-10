@@ -4,7 +4,7 @@
  */
 
 import { PrismaClient } from "@prisma/client";
-import { generateUniquePlaceSlug } from "../src/lib/slugify";
+import { generateUniquePlaceSlug } from "../../src/lib/slugify";
 
 const prisma = new PrismaClient();
 

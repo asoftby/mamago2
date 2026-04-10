@@ -42,7 +42,7 @@ npx tsx scripts/list-place-urls.ts
 ### 3. Назначить slug конкретному месту
 
 ```bash
-npx tsx scripts/assign-slug-to-place.ts <place-id>
+npx tsx scripts/data-migrations/assign-slug-to-place.ts <place-id>
 ```
 
 **Что делает:**
@@ -53,7 +53,7 @@ npx tsx scripts/assign-slug-to-place.ts <place-id>
 ### 4. Назначить slug всем местам (backfill)
 
 ```bash
-npx tsx scripts/backfill-place-slugs-v2.ts
+npx tsx scripts/data-migrations/backfill-place-slugs-v2.ts
 ```
 
 **Что делает:**
@@ -142,7 +142,7 @@ http://localhost:3000/places/pugovka-ratomskaya-7
 npx tsx scripts/check-place-url.ts <place-id>
 
 # 3. Если slug не назначен, назначить
-npx tsx scripts/assign-slug-to-place.ts <place-id>
+npx tsx scripts/data-migrations/assign-slug-to-place.ts <place-id>
 
 # 4. Открыть в браузере
 # http://localhost:3000/places/<slug>
@@ -155,7 +155,7 @@ npx tsx scripts/assign-slug-to-place.ts <place-id>
 npx tsx scripts/list-place-urls.ts
 
 # Если есть места без slug, назначить всем
-npx tsx scripts/backfill-place-slugs-v2.ts
+npx tsx scripts/data-migrations/backfill-place-slugs-v2.ts
 ```
 
 ### Сценарий 3: Проверить дубликаты
@@ -196,7 +196,7 @@ npx tsx scripts/check-place-url.ts <place-id>
 
 3. Если slug не назначен:
 ```bash
-npx tsx scripts/assign-slug-to-place.ts <place-id>
+npx tsx scripts/data-migrations/assign-slug-to-place.ts <place-id>
 ```
 
 ### Slug не генерируется
@@ -211,7 +211,7 @@ npx tsx scripts/assign-slug-to-place.ts <place-id>
 
 1. Запустите пересчет:
 ```bash
-npx tsx scripts/backfill-place-slugs-v2.ts
+npx tsx scripts/data-migrations/backfill-place-slugs-v2.ts
 ```
 
 2. Проверьте результат:
@@ -229,10 +229,10 @@ npx tsx scripts/check-place-url.ts
 npx tsx scripts/list-place-urls.ts
 
 # Назначить slug одному месту
-npx tsx scripts/assign-slug-to-place.ts <place-id>
+npx tsx scripts/data-migrations/assign-slug-to-place.ts <place-id>
 
 # Назначить slug всем местам
-npx tsx scripts/backfill-place-slugs-v2.ts
+npx tsx scripts/data-migrations/backfill-place-slugs-v2.ts
 
 # Тест slug-логики
 npx tsx scripts/test-place-slug-logic.ts

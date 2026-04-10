@@ -4,11 +4,11 @@
  * Generates human-readable slugs for all published places
  * Handles duplicates by adding address information
  * 
- * Usage: npx tsx scripts/backfill-place-slugs-v2.ts
+ * Usage: npx tsx scripts/data-migrations/backfill-place-slugs-v2.ts
  */
 
 import { PrismaClient } from "@prisma/client";
-import { generatePlaceSlug } from "../src/lib/slug/placeSlugService";
+import { generatePlaceSlug } from "../../src/lib/slug/placeSlugService";
 
 const prisma = new PrismaClient();
 

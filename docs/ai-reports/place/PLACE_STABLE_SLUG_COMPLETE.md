@@ -163,7 +163,7 @@ Tests:
 ### Migration Script
 
 ```bash
-npx tsx scripts/migrate-to-stable-slugs.ts
+npx tsx scripts/data-migrations/migrate-to-stable-slugs.ts
 ```
 
 Migrates existing places to new slug logic (preserves old slugs in history).
