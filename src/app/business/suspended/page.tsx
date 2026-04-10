@@ -1,11 +1,14 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/server";
 import { getMyBusiness } from "@/server/business/getMyBusiness";
+import { buildSurfaceRedirectDestination } from "@/lib/routing/surface";
+import { getCurrentRequestRoutingContext } from "@/lib/routing/requestContext";
 
 /**
  * Показ владельцу при operationalStatus ≠ ACTIVE (DISABLED / ARCHIVED; без удаления данных).
  */
 export default async function BusinessSuspendedPage() {
+  const routing = await getCurrentRequestRoutingContext();
   const user = await getCurrentUser();
   if (!user) {
     redirect("/login");
@@ -15,16 +18,34 @@ export default async function BusinessSuspendedPage() {
     redirect("/me");
   }
   if (user.role === "ADMIN" || user.role === "MODERATOR") {
-    redirect("/admin");
+    redirect(
+      buildSurfaceRedirectDestination({
+        targetSurface: "admin",
+        targetPath: "/",
+        ...routing,
+      }),
+    );
   }
 
   const business = await getMyBusiness(user.id);
   if (!business) {
-    redirect("/business/onboarding");
+    redirect(
+      buildSurfaceRedirectDestination({
+        targetSurface: "business",
+        targetPath: "/onboarding",
+        ...routing,
+      }),
+    );
   }
 
   if (business.operationalStatus === "ACTIVE") {
-    redirect("/business/dashboard");
+    redirect(
+      buildSurfaceRedirectDestination({
+        targetSurface: "business",
+        targetPath: "/dashboard",
+        ...routing,
+      }),
+    );
   }
 
   const isArchived = business.operationalStatus === "ARCHIVED";

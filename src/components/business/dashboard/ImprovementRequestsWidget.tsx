@@ -29,7 +29,11 @@ interface ImprovementRequestWithPlace extends ImprovementRequest {
   };
 }
 
-export function ImprovementRequestsWidget() {
+export function ImprovementRequestsWidget({
+  allRequestsHref,
+}: {
+  allRequestsHref: string;
+}) {
   const [requests, setRequests] = useState<ImprovementRequestWithPlace[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -270,7 +274,7 @@ export function ImprovementRequestsWidget() {
         {requests.length > 3 && (
           <div className="pt-2 border-t border-amber-200">
             <Link
-              href="/business/places?filter=needs-attention"
+              href={allRequestsHref}
               className="text-sm text-amber-700 hover:text-amber-800 font-medium flex items-center gap-1"
             >
               Показать все ({requests.length})

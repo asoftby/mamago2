@@ -2,7 +2,7 @@ import Link from "next/link";
 import { CreditCard, CheckCircle, Clock, XCircle } from "lucide-react";
 import { mockCurrentPlan, formatCurrency, formatDate } from "@/lib/mocks/businessBilling";
 
-export function BillingPlanWidget() {
+export function BillingPlanWidget({ href }: { href: string }) {
   const plan = mockCurrentPlan;
   
   const statusConfig = {
@@ -69,7 +69,7 @@ export function BillingPlanWidget() {
       </div>
 
       <Link
-        href="/business/billing/plan"
+        href={href}
         className="block w-full text-center px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors text-sm font-medium"
       >
         Управлять тарифом

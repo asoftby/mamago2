@@ -5,9 +5,9 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 
 const billingTabs = [
-  { name: "Тариф", href: "/business/billing/plan" },
-  { name: "Депозит", href: "/business/billing/deposit" },
-  { name: "История операций", href: "/business/billing/transactions" },
+  { name: "Тариф", path: "/billing/plan" },
+  { name: "Депозит", path: "/billing/deposit" },
+  { name: "История операций", path: "/billing/transactions" },
 ];
 
 export default function BillingLayout({
@@ -16,6 +16,13 @@ export default function BillingLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const usePrefixedPaths = pathname.startsWith("/business");
+
+  const buildTabHref = (path: string) =>
+    usePrefixedPaths ? `/business${path}` : path;
+
+  const isCurrentTab = (path: string) =>
+    pathname === path || pathname === `/business${path}`;
 
   return (
     <div className="space-y-6">
@@ -23,11 +30,12 @@ export default function BillingLayout({
       <div className="border-b border-gray-200">
         <nav className="flex gap-6">
           {billingTabs.map((tab) => {
-            const isActive = pathname === tab.href;
+            const href = buildTabHref(tab.path);
+            const isActive = isCurrentTab(tab.path);
             return (
               <Link
-                key={tab.href}
-                href={tab.href}
+                key={tab.path}
+                href={href}
                 className={cn(
                   "pb-3 px-1 border-b-2 text-sm font-medium transition-colors",
                   isActive

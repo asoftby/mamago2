@@ -3,11 +3,14 @@ import { redirect } from "next/navigation";
 import { getOwnedBusinessProfile } from "@/server/business/getMyBusiness";
 import { OnboardingForm } from "./OnboardingForm";
 import { getEffectiveVerificationStatus } from "@/server/services/businessStatusMap";
+import { buildSurfaceRedirectDestination } from "@/lib/routing/surface";
+import { getCurrentRequestRoutingContext } from "@/lib/routing/requestContext";
 
 // Ensure Node.js runtime for fetch compatibility
 export const runtime = "nodejs";
 
 export default async function OnboardingPage() {
+  const routing = await getCurrentRequestRoutingContext();
   // 1. Auth guard
   const user = await getCurrentUser();
   
@@ -23,12 +26,24 @@ export default async function OnboardingPage() {
     
     // APPROVED → dashboard
     if (verificationStatus === "APPROVED") {
-      redirect("/business/dashboard");
+      redirect(
+        buildSurfaceRedirectDestination({
+          targetSurface: "business",
+          targetPath: "/dashboard",
+          ...routing,
+        }),
+      );
     }
     
     // PENDING → verification page
     if (verificationStatus === "PENDING") {
-      redirect("/business/verification");
+      redirect(
+        buildSurfaceRedirectDestination({
+          targetSurface: "business",
+          targetPath: "/verification",
+          ...routing,
+        }),
+      );
     }
     
     // DRAFT or REJECTED → stay here to edit

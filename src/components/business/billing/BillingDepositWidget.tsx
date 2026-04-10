@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Wallet, TrendingDown, AlertCircle } from "lucide-react";
 import { mockDeposit, formatCurrency } from "@/lib/mocks/businessBilling";
 
-export function BillingDepositWidget() {
+export function BillingDepositWidget({ href }: { href: string }) {
   const deposit = mockDeposit;
   const isLowBalance = deposit.balance < deposit.lowBalanceThreshold;
 
@@ -54,7 +54,7 @@ export function BillingDepositWidget() {
       </div>
 
       <Link
-        href="/business/billing/deposit"
+        href={href}
         className={`block w-full text-center px-4 py-2 rounded-lg transition-colors text-sm font-medium ${
           isLowBalance
             ? "bg-orange-600 text-white hover:bg-orange-700"

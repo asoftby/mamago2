@@ -8,8 +8,11 @@ import { ImprovementRequestsWidget } from "@/components/business/dashboard/Impro
 import { BillingPlanWidget } from "@/components/business/billing/BillingPlanWidget";
 import { BillingDepositWidget } from "@/components/business/billing/BillingDepositWidget";
 import prisma from "@/lib/prisma";
+import { buildSurfaceRedirectDestination } from "@/lib/routing/surface";
+import { getCurrentRequestRoutingContext } from "@/lib/routing/requestContext";
 
 export default async function BusinessDashboardPage() {
+  const routing = await getCurrentRequestRoutingContext();
   // Auth guard
   const user = await getCurrentUser();
   
@@ -21,8 +24,45 @@ export default async function BusinessDashboardPage() {
   const business = await getMyBusiness(user.id);
   
   if (!business) {
-    redirect("/business/onboarding");
+    redirect(
+      buildSurfaceRedirectDestination({
+        targetSurface: "business",
+        targetPath: "/onboarding",
+        ...routing,
+      }),
+    );
   }
+
+  const billingPlanHref = buildSurfaceRedirectDestination({
+    targetSurface: "business",
+    targetPath: "/billing/plan",
+    ...routing,
+  });
+  const billingDepositHref = buildSurfaceRedirectDestination({
+    targetSurface: "business",
+    targetPath: "/billing/deposit",
+    ...routing,
+  });
+  const placesHref = buildSurfaceRedirectDestination({
+    targetSurface: "business",
+    targetPath: "/places",
+    ...routing,
+  });
+  const eventsHref = buildSurfaceRedirectDestination({
+    targetSurface: "business",
+    targetPath: "/events",
+    ...routing,
+  });
+  const offersHref = buildSurfaceRedirectDestination({
+    targetSurface: "business",
+    targetPath: "/offers",
+    ...routing,
+  });
+  const attentionPlacesHref = buildSurfaceRedirectDestination({
+    targetSurface: "business",
+    targetPath: "/places?filter=needs-attention",
+    ...routing,
+  });
 
   // Fetch counts for dashboard cards
   const userPlaces = await prisma.place.findMany({
@@ -71,13 +111,13 @@ export default async function BusinessDashboardPage() {
 
       {/* Billing Widgets */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <BillingPlanWidget />
-        <BillingDepositWidget />
+        <BillingPlanWidget href={billingPlanHref} />
+        <BillingDepositWidget href={billingDepositHref} />
       </div>
 
       {/* Improvement Requests Widget */}
       <RequireVerifiedBusiness status={business.verificationStatus as any}>
-        <ImprovementRequestsWidget />
+        <ImprovementRequestsWidget allRequestsHref={attentionPlacesHref} />
       </RequireVerifiedBusiness>
 
       {/* Business Info */}
@@ -115,7 +155,7 @@ export default async function BusinessDashboardPage() {
       <RequireVerifiedBusiness status={business.verificationStatus as any}>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Link
-            href="/business/places"
+            href={placesHref}
             className="bg-white rounded-lg shadow p-6 hover:shadow-md transition-shadow"
           >
             <h3 className="text-lg font-semibold text-gray-900 mb-2">
@@ -130,7 +170,7 @@ export default async function BusinessDashboardPage() {
           </Link>
 
           <Link
-            href="/business/events"
+            href={eventsHref}
             className="bg-white rounded-lg shadow p-6 hover:shadow-md transition-shadow"
           >
             <h3 className="text-lg font-semibold text-gray-900 mb-2">
@@ -145,7 +185,7 @@ export default async function BusinessDashboardPage() {
           </Link>
 
           <Link
-            href="/business/offers"
+            href={offersHref}
             className="bg-white rounded-lg shadow p-6 hover:shadow-md transition-shadow"
           >
             <h3 className="text-lg font-semibold text-gray-900 mb-2">

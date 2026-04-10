@@ -6,6 +6,8 @@ import { PrimaryButton } from "@/components/ui/PrimaryButton";
 import { VerificationPendingNextSteps } from "@/components/business/verification/VerificationPendingNextSteps";
 import { getEffectiveVerificationStatus } from "@/server/services/businessStatusMap";
 import prisma from "@/lib/prisma";
+import { buildSurfaceRedirectDestination } from "@/lib/routing/surface";
+import { getCurrentRequestRoutingContext } from "@/lib/routing/requestContext";
 
 /**
  * Business Verification Status Page - CANONICAL
@@ -13,6 +15,7 @@ import prisma from "@/lib/prisma";
  * APPROVED businesses are redirected to dashboard
  */
 export default async function BusinessVerificationPage() {
+  const routing = await getCurrentRequestRoutingContext();
   // Auth guard
   const user = await getCurrentUser();
   
@@ -24,7 +27,13 @@ export default async function BusinessVerificationPage() {
   const business = await getMyBusiness(user.id);
   
   if (!business) {
-    redirect("/business/onboarding");
+    redirect(
+      buildSurfaceRedirectDestination({
+        targetSurface: "business",
+        targetPath: "/onboarding",
+        ...routing,
+      }),
+    );
   }
 
   // Get effective verification status
@@ -32,12 +41,24 @@ export default async function BusinessVerificationPage() {
 
   // DRAFT → redirect to onboarding
   if (verificationStatus === "DRAFT") {
-    redirect("/business/onboarding");
+    redirect(
+      buildSurfaceRedirectDestination({
+        targetSurface: "business",
+        targetPath: "/onboarding",
+        ...routing,
+      }),
+    );
   }
 
   // If approved, redirect to dashboard
   if (verificationStatus === "APPROVED") {
-    redirect("/business/dashboard");
+    redirect(
+      buildSurfaceRedirectDestination({
+        targetSurface: "business",
+        targetPath: "/dashboard",
+        ...routing,
+      }),
+    );
   }
 
   // Fetch verification logs for history
@@ -156,7 +177,13 @@ export default async function BusinessVerificationPage() {
               </p>
             </div>
 
-            <Link href="/business/onboarding">
+            <Link
+              href={buildSurfaceRedirectDestination({
+                targetSurface: "business",
+                targetPath: "/onboarding",
+                ...routing,
+              })}
+            >
               <PrimaryButton className="w-full">
                 Исправить данные и отправить снова
               </PrimaryButton>
@@ -208,7 +235,13 @@ export default async function BusinessVerificationPage() {
               </p>
             </div>
 
-            <Link href="/business/onboarding">
+            <Link
+              href={buildSurfaceRedirectDestination({
+                targetSurface: "business",
+                targetPath: "/onboarding",
+                ...routing,
+              })}
+            >
               <PrimaryButton className="w-full">
                 Исправить данные
               </PrimaryButton>
