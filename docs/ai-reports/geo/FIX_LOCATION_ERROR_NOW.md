@@ -19,7 +19,7 @@ Output shows:
 ```bash
 # Stop current dev server (Ctrl+C in terminal)
 # Then run:
-./scripts/restart-dev.sh
+./scripts/dev/restart-dev.sh
 pnpm dev
 ```
 

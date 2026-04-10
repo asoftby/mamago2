@@ -77,7 +77,7 @@ model User {
 - **File:** `ADMIN_BOOTSTRAP_QUICK_START.md`
   - Updated available roles list
 
-- **File:** `scripts/test-promote-api.sh`
+- **File:** `scripts/manual-tests/test-promote-api.sh`
   - Updated test examples to use MODERATOR instead of EDITOR
   - Updated valid roles list
 
@@ -281,7 +281,7 @@ const invalid: Role = "EDITOR"; // ❌ Compile error
 ### Documentation
 - `docs/ADMIN_BOOTSTRAP.md`
 - `ADMIN_BOOTSTRAP_QUICK_START.md`
-- `scripts/test-promote-api.sh`
+- `scripts/manual-tests/test-promote-api.sh`
 - `USER_ROLE_ENUM_REFACTOR.md` (this file)
 
 ---

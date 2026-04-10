@@ -78,7 +78,7 @@ Completely rewrote `cityResolver.service.ts`:
 3. **prisma/migrations/20260305215029_add_city_radius_km/**
    - Migration to add radiusKm field
 
-4. **scripts/setup-city-coordinates.sql**
+4. **scripts/db/setup-city-coordinates.sql**
    - SQL script to populate city coordinates
    - Includes Minsk, Gomel, Mogilev, Vitebsk, Grodno, Brest
 
@@ -86,7 +86,7 @@ Completely rewrote `cityResolver.service.ts`:
 
 Run the setup script:
 ```bash
-psql -d mamago2 -f scripts/setup-city-coordinates.sql
+psql -d mamago2 -f scripts/db/setup-city-coordinates.sql
 ```
 
 This populates for each city:
@@ -186,4 +186,4 @@ WHERE slug = 'city-slug';
 - `CITY_COORDINATE_RESOLUTION_COMPLETE.md` - Complete implementation details
 - `CITY_RESOLUTION_TESTING_GUIDE.md` - Testing instructions
 - `PLACE_GEO_ENRICHMENT_FIX_COMPLETE.md` - Geo enrichment pipeline
-- `scripts/setup-city-coordinates.sql` - Database setup script
+- `scripts/db/setup-city-coordinates.sql` - Database setup script

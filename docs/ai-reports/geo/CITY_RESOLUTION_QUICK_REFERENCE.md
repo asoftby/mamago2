@@ -39,7 +39,7 @@ WHERE slug = 'minsk';
 
 ```bash
 # 1. Setup database
-psql -d mamago2 -f scripts/setup-city-coordinates.sql
+psql -d mamago2 -f scripts/db/setup-city-coordinates.sql
 
 # 2. Test in UI
 # - Select Minsk address → cityId = Minsk ✅
@@ -98,6 +98,6 @@ WHERE p.id = '<place_id>';
 
 - **Service**: `src/services/place/cityResolver.service.ts`
 - **Schema**: `prisma/schema.prisma` (City model)
-- **Setup**: `scripts/setup-city-coordinates.sql`
+- **Setup**: `scripts/db/setup-city-coordinates.sql`
 - **Docs**: `CITY_COORDINATE_RESOLUTION_COMPLETE.md`
 - **Testing**: `CITY_RESOLUTION_TESTING_GUIDE.md`
