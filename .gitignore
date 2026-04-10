@@ -27,6 +27,7 @@ Thumbs.db
 .idea/
 .vscode/
 !.vscode/settings.json
+.cursor/
 
 # Prisma
 prisma/dev.db
@@ -46,16 +47,6 @@ scripts/debug-*.ts
 scripts/tmp/
 scripts/temp/
 
-# Root-level experimental docs (keep docs/ folder)
-/CONVERSION_EVENT_PAGE_REDESIGN.md
-/MODERN_EVENT_PAGE_UPDATE.md
-/STICKY_ACTION_BAR_IMPLEMENTATION.md
-/ADMIN_MEDIA_IMAGE_PIPELINE.md
-/GLOBAL_OUTSIDE_CLICK_FIX.md
-/HEADER_REFACTOR_SUMMARY.md
-/OUTSIDE_CLICK_FEATURE.md
-/SCROLL_BEHAVIOR_FIX.md
-/SEARCH_PANELS_OUTSIDE_CLICK.md
 public/uploads/
 *.tsbuildinfo
 .ai/
