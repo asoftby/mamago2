@@ -171,7 +171,7 @@ displayCaption = media.caption ?? autoCaption ?? null
 
 ```bash
 # Тест автогенерации
-npx tsx scripts/test-media-autogen.ts
+npx tsx scripts/manual-tests/test-media-autogen.ts
 
 # Результат:
 # Entity Type: PLACE

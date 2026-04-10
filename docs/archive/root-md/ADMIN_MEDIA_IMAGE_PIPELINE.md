@@ -366,7 +366,7 @@ Potential improvements (not currently implemented):
 Run the test suite:
 
 ```bash
-npx tsx scripts/test-image-pipeline.ts
+npx tsx scripts/manual-tests/test-image-pipeline.ts
 ```
 
 **Test Coverage:**

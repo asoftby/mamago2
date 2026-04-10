@@ -105,7 +105,7 @@ caption: "Фотография места Пуговка1"
 
 ### Тестовый скрипт
 ```bash
-npx tsx scripts/test-place-address-metadata.ts
+npx tsx scripts/manual-tests/test-place-address-metadata.ts
 ```
 
 Проверяет:
@@ -158,7 +158,7 @@ Caption: Фотогалерея места Пуговка1, Ратомская 7
 - `src/lib/media/formatShortAddress.ts` — логика форматирования адреса
 
 ### Добавлены
-- `scripts/test-place-address-metadata.ts` — тестовый скрипт
+- `scripts/manual-tests/test-place-address-metadata.ts` — тестовый скрипт
 
 ## Что дальше
 

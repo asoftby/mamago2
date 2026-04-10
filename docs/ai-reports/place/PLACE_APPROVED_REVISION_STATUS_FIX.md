@@ -93,10 +93,10 @@
 
 ### Автоматический тест
 
-Создан тестовый скрипт `scripts/test-approved-revision-status.ts`:
+Создан тестовый скрипт `scripts/manual-tests/test-approved-revision-status.ts`:
 
 ```bash
-npx tsx scripts/test-approved-revision-status.ts
+npx tsx scripts/manual-tests/test-approved-revision-status.ts
 ```
 
 **Результаты:**

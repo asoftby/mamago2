@@ -48,7 +48,7 @@ npx tsx scripts/diagnose-city-resolution.ts
 
 ### E2E Test
 ```bash
-npx tsx scripts/test-place-creation-with-city.ts
+npx tsx scripts/manual-tests/test-place-creation-with-city.ts
 ```
 
 **Expected Output:**
@@ -101,7 +101,7 @@ All major Belarusian cities with language variants:
 
 1. **src/services/place/cityResolver.service.ts** - Added alias matching
 2. **scripts/diagnose-city-resolution.ts** - Diagnostic tool (NEW)
-3. **scripts/test-place-creation-with-city.ts** - E2E test (NEW)
+3. **scripts/manual-tests/test-place-creation-with-city.ts** - E2E test (NEW)
 
 ## Documentation
 

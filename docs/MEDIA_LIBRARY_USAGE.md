@@ -205,7 +205,7 @@ npx tsx scripts/backfill-media-library.ts
 
 ### Test Media Library
 ```bash
-npx tsx scripts/test-media-library.ts
+npx tsx scripts/manual-tests/test-media-library.ts
 ```
 
 ### Recalculate Orphaned Status

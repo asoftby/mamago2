@@ -243,7 +243,7 @@ export const OFFER_WIZARD_STEPS: WizardStepConfig<OfferFormData>[] = [
 - [ ] Validation errors display correctly (manual test needed)
 - [ ] Missing fields highlighted correctly (manual test needed)
 
-**Automated Test Results**: ✅ All automated tests passed (see `scripts/test-event-wizard-config.ts`)
+**Automated Test Results**: ✅ All automated tests passed (see `scripts/manual-tests/test-event-wizard-config.ts`)
 
 ---
 

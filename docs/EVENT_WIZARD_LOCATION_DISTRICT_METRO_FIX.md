@@ -127,7 +127,7 @@ POST /api/geo/enrich-location
 
 ### Unit Tests
 ```bash
-npx tsx scripts/test-event-location-metro-district.ts
+npx tsx scripts/manual-tests/test-event-location-metro-district.ts
 ```
 
 ### API Integration Tests
@@ -136,7 +136,7 @@ npx tsx scripts/test-event-location-metro-district.ts
 npm run dev
 
 # Then test APIs
-npx tsx scripts/test-event-location-api.ts
+npx tsx scripts/manual-tests/test-event-location-api.ts
 ```
 
 ## Result
@@ -153,8 +153,8 @@ Event Location теперь работает точно так же, как Plac
 
 - `src/components/business/wizard/event/steps/location/EventLocationPicker.tsx`
 - `src/components/business/wizard/event/steps/location/eventLocationUtils.ts`
-- `scripts/test-event-location-metro-district.ts`
-- `scripts/test-event-location-api.ts` (новый)
+- `scripts/manual-tests/test-event-location-metro-district.ts`
+- `scripts/manual-tests/test-event-location-api.ts` (новый)
 
 ## Debug Information
 

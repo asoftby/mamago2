@@ -9,10 +9,10 @@ Run these commands to verify the fix:
 npx tsx scripts/check-city-coordinates.ts
 
 # 2. Test city resolution logic
-npx tsx scripts/test-city-resolution.ts
+npx tsx scripts/manual-tests/test-city-resolution.ts
 
 # 3. Test full E2E pipeline
-npx tsx scripts/test-place-geo-enrichment.ts
+npx tsx scripts/manual-tests/test-place-geo-enrichment.ts
 ```
 
 All tests should pass with ✅.

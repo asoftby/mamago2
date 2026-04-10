@@ -87,7 +87,7 @@ npx tsx scripts/diagnose-city-resolution.ts
 ### E2E Test Results
 
 ```bash
-npx tsx scripts/test-place-creation-with-city.ts
+npx tsx scripts/manual-tests/test-place-creation-with-city.ts
 ```
 
 **Output:**
@@ -174,7 +174,7 @@ npx tsx scripts/test-place-creation-with-city.ts
 - Coordinate-based resolution
 - Full resolution with both methods
 
-### 3. scripts/test-place-creation-with-city.ts (NEW)
+### 3. scripts/manual-tests/test-place-creation-with-city.ts (NEW)
 **Purpose:** E2E test simulating full wizard flow
 **Tests:**
 - Place creation with Google address

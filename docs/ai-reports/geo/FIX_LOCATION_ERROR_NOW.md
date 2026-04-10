@@ -5,7 +5,7 @@ The location service works correctly (verified by test script), but Next.js dev 
 
 ## Verified Working ✅
 ```bash
-npx tsx scripts/test-location-service.ts
+npx tsx scripts/manual-tests/test-location-service.ts
 ```
 Output shows:
 - ✅ Service test passed!
@@ -106,7 +106,7 @@ Should show:
 
 ### Test Service Directly
 ```bash
-npx tsx scripts/test-location-service.ts
+npx tsx scripts/manual-tests/test-location-service.ts
 ```
 
 Should show "✅ Service test passed!"

@@ -169,7 +169,7 @@ Results:
 
 ## 8. Test Script
 
-### `scripts/test-media-library.ts`
+### `scripts/manual-tests/test-media-library.ts`
 Тестирование функциональности:
 - getMediaStats()
 - getAdminMediaList()
@@ -180,7 +180,7 @@ Results:
 
 Run:
 ```bash
-npx tsx scripts/test-media-library.ts
+npx tsx scripts/manual-tests/test-media-library.ts
 ```
 
 ## 9. Current Stats
@@ -286,7 +286,7 @@ npx tsx scripts/test-media-library.ts
 
 ### Scripts:
 - `scripts/backfill-media-library.ts`
-- `scripts/test-media-library.ts`
+- `scripts/manual-tests/test-media-library.ts`
 
 ### Modified Files:
 - `src/components/admin/AdminNav.tsx` (added "Медиатека" menu item)

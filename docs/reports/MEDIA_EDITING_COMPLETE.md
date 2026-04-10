@@ -98,10 +98,10 @@
 
 ## Тестирование
 
-Создан скрипт: `scripts/test-media-editing.ts`
+Создан скрипт: `scripts/manual-tests/test-media-editing.ts`
 
 ```bash
-npx tsx scripts/test-media-editing.ts
+npx tsx scripts/manual-tests/test-media-editing.ts
 ```
 
 **Результат теста:**

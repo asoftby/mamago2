@@ -149,7 +149,7 @@ const alt = getEffectiveAlt(media.alt, undefined, place.title);
 
 ```bash
 # Тест автогенерации
-npx tsx scripts/test-media-autogen.ts
+npx tsx scripts/manual-tests/test-media-autogen.ts
 
 # Проверка в UI
 1. Открыть /admin/media/[id]

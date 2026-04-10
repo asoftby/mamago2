@@ -69,7 +69,7 @@ for (const [slug, cityAliases] of Object.entries(aliases)) {
 ✅ cityId resolved with HIGH confidence
 ```
 
-**E2E Test:** `scripts/test-place-creation-with-city.ts`
+**E2E Test:** `scripts/manual-tests/test-place-creation-with-city.ts`
 ```
 ✅ cityId resolved
 ✅ districtAutoId resolved
@@ -194,7 +194,7 @@ const addressResult = await resolveCityByAddressComponents(addressJson);
    - Tests each component of the pipeline
    - Identifies exact failure points
 
-2. **scripts/test-place-creation-with-city.ts**
+2. **scripts/manual-tests/test-place-creation-with-city.ts**
    - E2E test simulating full wizard flow
    - Verifies cityId, district, and metro resolution
    - Cleans up test data automatically

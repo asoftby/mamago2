@@ -224,24 +224,24 @@ The following files still reference `NEEDS_CHANGES` and must be updated to `NEED
     - Status check (already updated in previous fix)
 
 ### Test Scripts
-13. `scripts/test-place-moderation.ts`
+13. `scripts/manual-tests/test-place-moderation.ts`
     - Status references
     - Action references
 
-14. `scripts/test-notification-ui.ts`
+14. `scripts/manual-tests/test-notification-ui.ts`
     - Notification type
 
-15. `scripts/test-place-types.ts`
+15. `scripts/manual-tests/test-place-types.ts`
     - Enum value
 
-16. `scripts/test-notification-system.ts`
+16. `scripts/manual-tests/test-notification-system.ts`
     - Notification type
     - Comments
 
-17. `scripts/test-place-api.ts`
+17. `scripts/manual-tests/test-place-api.ts`
     - Status check
 
-18. `scripts/test-moderation-system.ts`
+18. `scripts/manual-tests/test-moderation-system.ts`
     - Multiple references
     - Function calls
     - Assertions

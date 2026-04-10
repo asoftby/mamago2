@@ -84,7 +84,7 @@ pnpm tsc --noEmit
 2. `src/app/api/admin/users/promote/route.ts` - Promote API endpoint
 3. `docs/ADMIN_BOOTSTRAP.md` - Comprehensive documentation
 4. `ADMIN_BOOTSTRAP_QUICK_START.md` - Quick reference guide
-5. `scripts/verify-bootstrap.ts` - Verification checklist
+5. `scripts/manual-tests/verify-bootstrap.ts` - Verification checklist
 6. `ADMIN_BOOTSTRAP_IMPLEMENTATION.md` - This file
 
 ### Modified Files
@@ -262,7 +262,7 @@ All role changes are logged to console:
 - **Full Guide:** `docs/ADMIN_BOOTSTRAP.md`
 - **Quick Start:** `ADMIN_BOOTSTRAP_QUICK_START.md`
 - **Project Status:** `PROJECT_STATUS.md`
-- **Verification:** `scripts/verify-bootstrap.ts`
+- **Verification:** `scripts/manual-tests/verify-bootstrap.ts`
 
 ---
 

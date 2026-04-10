@@ -82,7 +82,7 @@
 - Логирование предупреждений
 
 ### 4. Создан тест безопасности
-**Файл**: `scripts/test-place-security.ts`
+**Файл**: `scripts/manual-tests/test-place-security.ts`
 
 Проверяет:
 - Изоляцию пользователей
@@ -153,7 +153,7 @@ Business → Place
 1. ✅ `src/server/services/place.service.ts` - СОЗДАН
 2. ✅ `src/server/services/placeArchive.service.ts` - УЛУЧШЕН
 3. ✅ `src/app/business/(protected)/places/page.tsx` - УЛУЧШЕН
-4. ✅ `scripts/test-place-security.ts` - СОЗДАН
+4. ✅ `scripts/manual-tests/test-place-security.ts` - СОЗДАН
 5. ✅ `docs/ai-reports/place/PLACE_SECURITY_AUDIT.md` - СОЗДАН
 
 ## Результат

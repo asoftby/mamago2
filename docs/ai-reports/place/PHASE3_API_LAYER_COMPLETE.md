@@ -415,7 +415,7 @@ if (activeRevision?.status === "NEEDS_REVISION" && activeRevision.revisionReques
 1. `src/app/api/business/places/[id]/revision/route.ts` - GET/PATCH revision
 2. `src/app/api/business/places/[id]/revision/submit/route.ts` - POST submit
 3. `src/app/api/admin/moderation/revisions/[id]/route.ts` - POST moderate
-4. `scripts/test-place-revision-api.ts` - API documentation script
+4. `scripts/manual-tests/test-place-revision-api.ts` - API documentation script
 5. `docs/ai-reports/place/PHASE3_API_LAYER_COMPLETE.md` - This document
 
 ## Files Modified
@@ -438,7 +438,7 @@ if (activeRevision?.status === "NEEDS_REVISION" && activeRevision.revisionReques
 
 ### Test Script
 
-**File:** `scripts/test-place-revision-api.ts`
+**File:** `scripts/manual-tests/test-place-revision-api.ts`
 
 Documents all API endpoints with:
 - Endpoint URLs
@@ -448,7 +448,7 @@ Documents all API endpoints with:
 
 **Run:**
 ```bash
-npx tsx scripts/test-place-revision-api.ts
+npx tsx scripts/manual-tests/test-place-revision-api.ts
 ```
 
 ### Manual Testing Checklist

@@ -264,7 +264,7 @@ Examples:
 
 ### Test Script
 
-**File:** `scripts/test-notification-ui.ts`
+**File:** `scripts/manual-tests/test-notification-ui.ts`
 
 Creates test notifications for a business user:
 1. PLACE_APPROVED notification
@@ -273,7 +273,7 @@ Creates test notifications for a business user:
 
 **Run test:**
 ```bash
-npx tsx scripts/test-notification-ui.ts
+npx tsx scripts/manual-tests/test-notification-ui.ts
 ```
 
 **Output:**
@@ -483,7 +483,7 @@ navigator.vibrate(200);
 5. `src/app/api/notifications/mark-all-read/route.ts` - Mark all as read endpoint
 
 ### Tests
-6. `scripts/test-notification-ui.ts` - UI test script
+6. `scripts/manual-tests/test-notification-ui.ts` - UI test script
 
 ### Modified
 7. `src/app/business/(protected)/layout.tsx` - Added NotificationBell to header

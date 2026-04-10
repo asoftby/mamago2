@@ -184,7 +184,7 @@ const resolveCityIdClient = async (lat, lng, addressJson) => {
 ### Тест API
 
 ```bash
-npx tsx scripts/test-enrich-location-api.ts
+npx tsx scripts/manual-tests/test-enrich-location-api.ts
 ```
 
 **Результат:**
@@ -239,7 +239,7 @@ Test 2: Minsk center (53.9045, 27.5615)
    - Проверяет наличие districts и metro stations
    - Вычисляет расстояния
 
-3. **scripts/test-enrich-location-api.ts** (НОВЫЙ)
+3. **scripts/manual-tests/test-enrich-location-api.ts** (НОВЫЙ)
    - Тестовый скрипт для нового API
    - Проверяет разрешение city, district, metro
 

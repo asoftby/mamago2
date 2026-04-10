@@ -129,7 +129,7 @@ npx tsx scripts/check-city-data.ts
 
 ### Direct API Testing
 ```bash
-npx tsx scripts/test-geo-api-direct.ts
+npx tsx scripts/manual-tests/test-geo-api-direct.ts
 ```
 ✅ Districts API works: 9 districts
 ✅ Metro stations API works: 36 stations
@@ -162,7 +162,7 @@ npx tsx scripts/test-geo-api-direct.ts
 npx tsx scripts/check-city-data.ts
 
 # Test API endpoints directly
-npx tsx scripts/test-geo-api-direct.ts
+npx tsx scripts/manual-tests/test-geo-api-direct.ts
 
 # Test with dev server
 npm run dev
@@ -174,6 +174,6 @@ npm run dev
 - `src/components/business/wizard/event/steps/location/EventLocationPicker.tsx`
 - `src/components/business/wizard/event/steps/location/eventLocationUtils.ts`
 - `scripts/check-city-data.ts` (новый)
-- `scripts/test-geo-api-direct.ts` (новый)
+- `scripts/manual-tests/test-geo-api-direct.ts` (новый)
 
 Event Location теперь работает стабильно в любых условиях! 🎉

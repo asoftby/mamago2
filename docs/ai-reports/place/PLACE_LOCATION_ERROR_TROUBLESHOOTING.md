@@ -91,7 +91,7 @@ npx tsx prisma/seed/city-configuration.ts
 
 ### Check Database
 ```bash
-npx tsx scripts/test-city-fields.ts
+npx tsx scripts/manual-tests/test-city-fields.ts
 ```
 
 Should show:

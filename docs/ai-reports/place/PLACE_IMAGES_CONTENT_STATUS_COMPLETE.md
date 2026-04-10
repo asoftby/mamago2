@@ -164,7 +164,7 @@ CREATE INDEX "PlaceImage_placeId_kind_sortOrder_idx" ON "PlaceImage"("placeId", 
 
 ### Функциональные тесты
 ```bash
-pnpm tsx scripts/test-place-model.ts
+pnpm tsx scripts/manual-tests/test-place-model.ts
 ```
 
 **Результат**: ✅ Все тесты пройдены
@@ -177,7 +177,7 @@ pnpm tsx scripts/test-place-model.ts
 
 ### TypeScript типы
 ```bash
-pnpm tsx scripts/test-place-types.ts
+pnpm tsx scripts/manual-tests/test-place-types.ts
 ```
 
 **Результат**: ✅ Все типы валидны
@@ -216,8 +216,8 @@ pnpm prisma migrate dev
 import { ContentStatus, LocationSource, PlaceImageKind } from '@prisma/client'
 
 # Тесты
-pnpm tsx scripts/test-place-model.ts
-pnpm tsx scripts/test-place-types.ts
+pnpm tsx scripts/manual-tests/test-place-model.ts
+pnpm tsx scripts/manual-tests/test-place-types.ts
 ```
 
 ---

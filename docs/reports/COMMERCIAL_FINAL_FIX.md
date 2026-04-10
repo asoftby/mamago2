@@ -115,7 +115,7 @@ If you want to verify data before restarting:
 npx tsx scripts/check-commercial-data.ts
 
 # Test services
-npx tsx scripts/test-commercial-services.ts
+npx tsx scripts/manual-tests/test-commercial-services.ts
 ```
 
 Both should run without errors.

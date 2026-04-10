@@ -77,7 +77,7 @@ if (!title && input.originalName) {
 Запустите тест:
 
 ```bash
-npx tsx scripts/test-filename-preservation.ts
+npx tsx scripts/manual-tests/test-filename-preservation.ts
 ```
 
 Тест проверяет:

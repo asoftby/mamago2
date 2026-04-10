@@ -44,8 +44,8 @@ npx prisma generate
 Created comprehensive test suite:
 - `scripts/check-city-coordinates.ts` - Verify city data
 - `scripts/seed-city-coordinates.ts` - Populate city data
-- `scripts/test-city-resolution.ts` - Unit tests (4/4 pass)
-- `scripts/test-place-geo-enrichment.ts` - E2E tests (2/2 pass)
+- `scripts/manual-tests/test-city-resolution.ts` - Unit tests (4/4 pass)
+- `scripts/manual-tests/test-place-geo-enrichment.ts` - E2E tests (2/2 pass)
 
 ### Test Results
 ```
@@ -98,8 +98,8 @@ Return enriched place to client
 ### Test Scripts (New)
 - `scripts/check-city-coordinates.ts`
 - `scripts/seed-city-coordinates.ts`
-- `scripts/test-city-resolution.ts`
-- `scripts/test-place-geo-enrichment.ts`
+- `scripts/manual-tests/test-city-resolution.ts`
+- `scripts/manual-tests/test-place-geo-enrichment.ts`
 
 ### Documentation (New)
 - `CITY_RESOLUTION_FIX_COMPLETE.md` - Detailed fix documentation

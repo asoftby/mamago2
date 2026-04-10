@@ -67,9 +67,9 @@
 - `src/app/api/media/[filename]/route.ts` - media proxy
 
 ### Scripts:
-- `scripts/test-media-proxy.ts` - тест proxy route
-- `scripts/test-media-editing.ts` - тест редактирования
-- `scripts/test-media-autogen.ts` - тест автогенерации
+- `scripts/manual-tests/test-media-proxy.ts` - тест proxy route
+- `scripts/manual-tests/test-media-editing.ts` - тест редактирования
+- `scripts/manual-tests/test-media-autogen.ts` - тест автогенерации
 
 ### Documentation:
 - `MEDIA_PROXY_FIX_COMPLETE.md`

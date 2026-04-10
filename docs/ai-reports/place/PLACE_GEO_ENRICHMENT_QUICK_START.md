@@ -21,7 +21,7 @@ Expected output:
 
 ### Test Enrichment Service
 ```bash
-npx tsx scripts/test-place-geo-enrichment.ts
+npx tsx scripts/manual-tests/test-place-geo-enrichment.ts
 ```
 
 Expected output:
@@ -76,7 +76,7 @@ Enrichment runs automatically when:
 
 ### Scripts
 - `prisma/seed/district-centroids.ts` - Seed script
-- `scripts/test-place-geo-enrichment.ts` - Test script
+- `scripts/manual-tests/test-place-geo-enrichment.ts` - Test script
 
 ## Configuration
 

@@ -51,7 +51,7 @@ console.log('[loadDistricts] Using param:', param, 'for input:', cityIdOrSlug);
 
 ### CUID Detection Logic
 ```bash
-npx tsx scripts/test-cuid-detection.ts
+npx tsx scripts/manual-tests/test-cuid-detection.ts
 ```
 
 ✅ CUID from database: `cmmj3p3uh0011ws3mmxhskmsf` → `cityId`  
@@ -62,7 +62,7 @@ npx tsx scripts/test-cuid-detection.ts
 
 ### API Testing with CUID
 ```bash
-npx tsx scripts/test-api-with-cuid.ts
+npx tsx scripts/manual-tests/test-api-with-cuid.ts
 ```
 
 ✅ Districts API with CUID: 9 districts  
@@ -131,8 +131,8 @@ API call: /api/geo/districts?cityId=cmmj3p3uh0011ws3mmxhskmsf
 ## Files Modified
 
 - `src/components/business/wizard/event/steps/location/eventLocationUtils.ts`
-- `scripts/test-cuid-detection.ts` (новый)
-- `scripts/test-api-with-cuid.ts` (новый)
+- `scripts/manual-tests/test-cuid-detection.ts` (новый)
+- `scripts/manual-tests/test-api-with-cuid.ts` (новый)
 
 Event Location теперь правильно работает с CUID идентификаторами! 🎉
 

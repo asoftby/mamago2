@@ -15,7 +15,7 @@ npx prisma generate
 npx tsx scripts/seed-city-coordinates.ts
 
 # 3. Verify fix
-npx tsx scripts/test-place-geo-enrichment.ts
+npx tsx scripts/manual-tests/test-place-geo-enrichment.ts
 ```
 
 ## Expected Output

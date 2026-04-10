@@ -172,7 +172,7 @@ Admin reviews:
 
 ### Test Script
 
-**File:** `scripts/test-place-revision-service.ts`
+**File:** `scripts/manual-tests/test-place-revision-service.ts`
 
 Comprehensive test coverage for all flows:
 
@@ -256,7 +256,7 @@ The following API routes need to be created or updated to use the new service la
 
 ### Created
 1. `src/server/services/placeRevision.service.ts` - New service (300+ lines)
-2. `scripts/test-place-revision-service.ts` - Comprehensive tests (200+ lines)
+2. `scripts/manual-tests/test-place-revision-service.ts` - Comprehensive tests (200+ lines)
 3. `docs/ai-reports/place/PHASE2_SERVICE_LAYER_COMPLETE.md` - This document
 
 ### Modified

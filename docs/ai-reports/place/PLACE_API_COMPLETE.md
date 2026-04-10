@@ -449,7 +449,7 @@ if (duplicate && duplicate.placeKind === "COMPLEX") {
 
 ```bash
 # Test API logic
-pnpm tsx scripts/test-place-api.ts
+pnpm tsx scripts/manual-tests/test-place-api.ts
 ```
 
 **Result:** ✅ All tests passed

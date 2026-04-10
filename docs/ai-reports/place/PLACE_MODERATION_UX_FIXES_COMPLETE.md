@@ -199,10 +199,10 @@ console.log("[PlaceWizard] Moderation data:", {
 ## Тестирование
 
 ### Автоматические тесты
-Создан тестовый скрипт `scripts/test-moderation-ux-fixes.ts`:
+Создан тестовый скрипт `scripts/manual-tests/test-moderation-ux-fixes.ts`:
 
 ```bash
-npx tsx scripts/test-moderation-ux-fixes.ts
+npx tsx scripts/manual-tests/test-moderation-ux-fixes.ts
 ```
 
 **Результаты:**

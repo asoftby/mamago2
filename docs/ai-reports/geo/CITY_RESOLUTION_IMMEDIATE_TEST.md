@@ -39,7 +39,7 @@
 ## Тест API
 
 ```bash
-npx tsx scripts/test-resolve-city-api.ts
+npx tsx scripts/manual-tests/test-resolve-city-api.ts
 ```
 
 **Ожидаемый результат:**
@@ -114,7 +114,7 @@ Response: { cityId, cityName, confidence }
 2. **src/app/api/geo/resolve-city/route.ts** (НОВЫЙ)
    - Легковесный endpoint для разрешения cityId
 
-3. **scripts/test-resolve-city-api.ts** (НОВЫЙ)
+3. **scripts/manual-tests/test-resolve-city-api.ts** (НОВЫЙ)
    - Тестовый скрипт для проверки API
 
 ## Проверка в localStorage
@@ -164,7 +164,7 @@ Response: { cityId: "...", cityName: "Минск" }
 
 ### 4. Запустите тест API
 ```bash
-npx tsx scripts/test-resolve-city-api.ts
+npx tsx scripts/manual-tests/test-resolve-city-api.ts
 ```
 
 Если тест проходит - проблема на клиенте

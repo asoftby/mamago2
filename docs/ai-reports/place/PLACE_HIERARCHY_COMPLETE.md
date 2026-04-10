@@ -373,7 +373,7 @@ function isStandalone(place: Place): boolean {
 ## Тестирование
 
 ```bash
-pnpm tsx scripts/test-place-hierarchy.ts
+pnpm tsx scripts/manual-tests/test-place-hierarchy.ts
 ```
 
 **Результат**: ✅ Все тесты пройдены

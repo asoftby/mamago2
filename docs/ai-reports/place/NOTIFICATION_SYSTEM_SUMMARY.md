@@ -83,9 +83,9 @@ Actions: Mark as read, Mark all as read, Open entity
 10. `src/app/business/(protected)/notifications/page.tsx` - Page route
 
 ### Tests
-11. `scripts/test-notification-system.ts` - Backend tests
-12. `scripts/test-notification-ui.ts` - UI tests
-13. `scripts/test-notification-e2e.ts` - E2E tests
+11. `scripts/manual-tests/test-notification-system.ts` - Backend tests
+12. `scripts/manual-tests/test-notification-ui.ts` - UI tests
+13. `scripts/manual-tests/test-notification-e2e.ts` - E2E tests
 
 ### Documentation
 14. `docs/ai-reports/place/PLACE_APPROVAL_NOTIFICATIONS.md` - Backend docs
@@ -101,13 +101,13 @@ Actions: Mark as read, Mark all as read, Open entity
 ### Run All Tests
 ```bash
 # Backend tests
-npx tsx scripts/test-notification-system.ts
+npx tsx scripts/manual-tests/test-notification-system.ts
 
 # UI tests (creates sample notifications)
-npx tsx scripts/test-notification-ui.ts
+npx tsx scripts/manual-tests/test-notification-ui.ts
 
 # E2E test (full flow)
-npx tsx scripts/test-notification-e2e.ts
+npx tsx scripts/manual-tests/test-notification-e2e.ts
 ```
 
 ### Manual Testing
@@ -328,7 +328,7 @@ curl http://localhost:3002/api/notifications
 tail -f logs/server.log
 
 # Run tests
-npx tsx scripts/test-notification-e2e.ts
+npx tsx scripts/manual-tests/test-notification-e2e.ts
 ```
 
 ## Conclusion

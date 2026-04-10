@@ -8,7 +8,7 @@ HEIC файлы не загружались, хотя sharp имеет подд�
 
 ### Шаг 1: Проверка Sharp
 ```bash
-npx tsx scripts/test-heic-support.ts
+npx tsx scripts/manual-tests/test-heic-support.ts
 ```
 
 Результат:
@@ -67,7 +67,7 @@ allowedTypes = ["image/jpeg", "image/png", "image/webp", "image/heic", "image/he
 
 ### Тест 1: Проверка Sharp поддержки
 ```bash
-npx tsx scripts/test-heic-support.ts
+npx tsx scripts/manual-tests/test-heic-support.ts
 ```
 
 Результат: ✅ HEIC/HEIF поддерживается
@@ -129,7 +129,7 @@ Please convert to JPEG, PNG, or WebP before uploading, or install libheif suppor
 1. `src/lib/image/compression.ts` - добавлены HEIC/HEIF в allowedTypes
 2. `src/app/api/upload/route.ts` - добавлено логирование
 3. `src/lib/media/imageProcessor.ts` - добавлено детальное логирование
-4. `scripts/test-heic-support.ts` - тест поддержки HEIC
+4. `scripts/manual-tests/test-heic-support.ts` - тест поддержки HEIC
 
 ## Проверка
 

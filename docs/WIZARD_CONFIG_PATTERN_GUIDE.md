@@ -458,7 +458,7 @@ export function Step9Review({ data, onGoToStep }: Step9ReviewProps) {
 
 ## Testing Your Wizard
 
-Create a test script similar to `scripts/test-event-wizard-config.ts`:
+Create a test script similar to `scripts/manual-tests/test-event-wizard-config.ts`:
 
 ```typescript
 import { OFFER_WIZARD_STEPS, getStepConfig, TOTAL_CONTENT_STEPS } from "../src/components/business/wizard/offer/offerWizardSteps.config";

@@ -180,11 +180,11 @@ getLatestModerationMessage(entityType, entityId)
 ## Testing
 
 All test scripts passing:
-- ✅ scripts/test-place-model.ts
-- ✅ scripts/test-place-hierarchy.ts
-- ✅ scripts/test-place-api.ts
-- ✅ scripts/test-moderation-system.ts
-- ✅ scripts/test-activity-v2-api.ts
+- ✅ scripts/manual-tests/test-place-model.ts
+- ✅ scripts/manual-tests/test-place-hierarchy.ts
+- ✅ scripts/manual-tests/test-place-api.ts
+- ✅ scripts/manual-tests/test-moderation-system.ts
+- ✅ scripts/manual-tests/test-activity-v2-api.ts
 
 ## Documentation
 

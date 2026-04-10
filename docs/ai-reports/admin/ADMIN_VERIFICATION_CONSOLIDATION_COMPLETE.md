@@ -350,7 +350,7 @@ https://admin.mamago.by/admin/b2b/requests?status=PENDING&open=clx123abc
 
 ### Update These Docs
 1. `docs/ADMIN_BOOTSTRAP.md` - Change verification URL examples
-2. `scripts/verify-bootstrap.ts` - Update test URLs
+2. `scripts/manual-tests/verify-bootstrap.ts` - Update test URLs
 3. `ADMIN_BOOTSTRAP_QUICK_START.md` - Update navigation examples
 4. Any team documentation referencing old URLs
 

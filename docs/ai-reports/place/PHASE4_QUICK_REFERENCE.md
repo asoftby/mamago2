@@ -87,7 +87,7 @@ Admin reviews:
 
 ## Testing
 
-Run manual tests: `npx tsx scripts/test-phase4-ui.ts`
+Run manual tests: `npx tsx scripts/manual-tests/test-phase4-ui.ts`
 
 ## Next Phase
 

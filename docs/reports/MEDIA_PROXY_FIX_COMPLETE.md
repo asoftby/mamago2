@@ -34,7 +34,7 @@ Implemented media proxy route at `/api/media/[filename]` that:
 ## Testing
 
 ### Test Script
-Created `scripts/test-media-proxy.ts` to demonstrate the fix.
+Created `scripts/manual-tests/test-media-proxy.ts` to demonstrate the fix.
 
 ### Verification
 ```bash

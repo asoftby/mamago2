@@ -222,7 +222,7 @@ try {
 
 ### Test Script
 
-**File:** `scripts/test-notification-system.ts`
+**File:** `scripts/manual-tests/test-notification-system.ts`
 
 Tests all notification types and operations:
 1. Create PLACE_APPROVED notification ✅
@@ -235,7 +235,7 @@ Tests all notification types and operations:
 
 **Run tests:**
 ```bash
-npx tsx scripts/test-notification-system.ts
+npx tsx scripts/manual-tests/test-notification-system.ts
 ```
 
 ### Manual Testing
@@ -339,7 +339,7 @@ Keeps database size manageable while preserving recent history.
 5. `src/app/api/notifications/[id]/read/route.ts` - Mark as read
 
 ### Tests
-6. `scripts/test-notification-system.ts` - Test script
+6. `scripts/manual-tests/test-notification-system.ts` - Test script
 
 ### Modified
 7. `src/app/api/admin/moderation/places/[id]/route.ts` - Create notifications on moderation

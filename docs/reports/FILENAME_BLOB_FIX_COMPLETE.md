@@ -63,7 +63,7 @@ if (!title && input.originalName) {
 
 Создан тест для проверки исправлений:
 ```bash
-npx tsx scripts/test-filename-preservation.ts
+npx tsx scripts/manual-tests/test-filename-preservation.ts
 ```
 
 Результаты:
@@ -86,7 +86,7 @@ npx tsx scripts/test-filename-preservation.ts
 
 1. `src/lib/image/compression.ts` - сохранение оригинального имени
 2. `src/lib/media/mediaRegistry.ts` - автогенерация заголовка
-3. `scripts/test-filename-preservation.ts` - тесты
+3. `scripts/manual-tests/test-filename-preservation.ts` - тесты
 4. `docs/FILENAME_PRESERVATION_FIX.md` - документация
 
 ## Дополнительная информация

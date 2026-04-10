@@ -220,5 +220,5 @@ Potential improvements (not implemented):
 ## Related Documentation
 
 - Moderation service: `src/server/services/moderation.service.ts`
-- Test script: `scripts/test-moderation-system.ts`
+- Test script: `scripts/manual-tests/test-moderation-system.ts`
 - Place API: `docs/PLACE_API_USAGE.md`

@@ -53,14 +53,14 @@ nearestCity = { cityId: city.id, cityName: city.name, distance };
 ## Verification
 
 ### Unit Tests
-Created `scripts/test-city-resolution.ts` to test the resolver in isolation:
+Created `scripts/manual-tests/test-city-resolution.ts` to test the resolver in isolation:
 - ✅ Minsk city center coordinates → cityId resolved
 - ✅ Minsk address with coordinates → cityId resolved
 - ✅ Coordinates outside Minsk → null (correct)
 - ✅ Edge of Minsk radius → cityId resolved
 
 ### E2E Tests
-Created `scripts/test-place-geo-enrichment.ts` to test the full pipeline:
+Created `scripts/manual-tests/test-place-geo-enrichment.ts` to test the full pipeline:
 - ✅ Create Place + Google address → cityId, districtAutoId, metroAutoId all resolved
 - ✅ Create Place + manual pin → cityId resolved from coordinates only
 
@@ -138,8 +138,8 @@ Step 5: Return enriched place
 ### Test Scripts
 - `scripts/check-city-coordinates.ts` - Verify city coordinates
 - `scripts/seed-city-coordinates.ts` - Populate city coordinates
-- `scripts/test-city-resolution.ts` - Unit tests for resolver
-- `scripts/test-place-geo-enrichment.ts` - E2E tests for full pipeline
+- `scripts/manual-tests/test-city-resolution.ts` - Unit tests for resolver
+- `scripts/manual-tests/test-place-geo-enrichment.ts` - E2E tests for full pipeline
 
 ## How to Add More Cities
 
@@ -190,4 +190,4 @@ The user should now:
 If issues persist, check:
 - Browser console for client-side errors
 - Server logs for API errors
-- Run `npx tsx scripts/test-place-geo-enrichment.ts` to verify pipeline
+- Run `npx tsx scripts/manual-tests/test-place-geo-enrichment.ts` to verify pipeline

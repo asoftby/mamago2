@@ -108,7 +108,7 @@ useEffect(() => {
 ## Тесты
 
 ### Серверная логика
-✅ `scripts/test-archive-ui-flow.ts` - все 9 шагов прошли успешно
+✅ `scripts/manual-tests/test-archive-ui-flow.ts` - все 9 шагов прошли успешно
 
 ### Проверенные сценарии
 1. ✅ Архивация активного места
@@ -128,7 +128,7 @@ useEffect(() => {
    - Добавлен `useEffect` для синхронизации с серверными данными
    - Добавлен импорт `useEffect`
 
-2. ✅ `scripts/test-archive-ui-flow.ts` - СОЗДАН
+2. ✅ `scripts/manual-tests/test-archive-ui-flow.ts` - СОЗДАН
    - Тест полного UI flow архивации/разархивации
 
 3. ✅ `docs/ai-reports/place/ARCHIVE_UI_BUG_FIX.md` - СОЗДАН

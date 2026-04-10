@@ -18,14 +18,14 @@ All tests pass successfully:
 
 ```bash
 # Unit tests
-npx tsx scripts/test-city-resolution.ts
+npx tsx scripts/manual-tests/test-city-resolution.ts
 ✅ Test 1: Minsk city center coordinates - PASS
 ✅ Test 2: Minsk address (Мястровская 5) - PASS
 ✅ Test 3: Coordinates outside Minsk - PASS (correctly returns null)
 ✅ Test 4: Edge of Minsk radius - PASS
 
 # E2E tests
-npx tsx scripts/test-place-geo-enrichment.ts
+npx tsx scripts/manual-tests/test-place-geo-enrichment.ts
 ✅ Test 1: Google address → cityId, district, metro resolved
 ✅ Test 2: Manual pin → cityId, district, metro resolved
 ```
@@ -155,8 +155,8 @@ NewPlaceWizard updates state
 ### Test Scripts Created
 - ✅ `scripts/check-city-coordinates.ts` - Verify city data
 - ✅ `scripts/seed-city-coordinates.ts` - Populate city data
-- ✅ `scripts/test-city-resolution.ts` - Unit tests
-- ✅ `scripts/test-place-geo-enrichment.ts` - E2E tests
+- ✅ `scripts/manual-tests/test-city-resolution.ts` - Unit tests
+- ✅ `scripts/manual-tests/test-place-geo-enrichment.ts` - E2E tests
 
 ## TypeScript Errors (IDE Cache Issue)
 
@@ -201,7 +201,7 @@ To clear IDE cache:
    npx tsx scripts/check-city-coordinates.ts
    
    # Run E2E test
-   npx tsx scripts/test-place-geo-enrichment.ts
+   npx tsx scripts/manual-tests/test-place-geo-enrichment.ts
    
    # Check server logs
    # Check browser console

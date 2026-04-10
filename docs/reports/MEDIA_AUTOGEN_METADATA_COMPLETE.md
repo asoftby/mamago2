@@ -115,10 +115,10 @@ const alt = getEffectiveAlt(
 
 ## Тестирование
 
-Создан скрипт: `scripts/test-media-autogen.ts`
+Создан скрипт: `scripts/manual-tests/test-media-autogen.ts`
 
 ```bash
-npx tsx scripts/test-media-autogen.ts
+npx tsx scripts/manual-tests/test-media-autogen.ts
 ```
 
 **Результат теста:**

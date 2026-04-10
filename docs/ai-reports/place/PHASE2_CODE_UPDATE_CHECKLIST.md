@@ -22,12 +22,12 @@
 - [ ] `src/components/business/notifications/NotificationList.tsx`
 
 ### Priority 5: Test Scripts (Medium)
-- [ ] `scripts/test-place-moderation.ts`
-- [ ] `scripts/test-notification-ui.ts`
-- [ ] `scripts/test-place-types.ts`
-- [ ] `scripts/test-notification-system.ts`
-- [ ] `scripts/test-place-api.ts`
-- [ ] `scripts/test-moderation-system.ts`
+- [ ] `scripts/manual-tests/test-place-moderation.ts`
+- [ ] `scripts/manual-tests/test-notification-ui.ts`
+- [ ] `scripts/manual-tests/test-place-types.ts`
+- [ ] `scripts/manual-tests/test-notification-system.ts`
+- [ ] `scripts/manual-tests/test-place-api.ts`
+- [ ] `scripts/manual-tests/test-moderation-system.ts`
 
 ## Global Find/Replace Commands
 

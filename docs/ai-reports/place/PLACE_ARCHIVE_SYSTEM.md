@@ -206,7 +206,7 @@ where: {
 
 ### Test Script
 
-**File**: `scripts/test-place-archive.ts`
+**File**: `scripts/manual-tests/test-place-archive.ts`
 
 #### Test Cases
 
@@ -220,7 +220,7 @@ where: {
 #### Run Tests
 
 ```bash
-npx tsx scripts/test-place-archive.ts
+npx tsx scripts/manual-tests/test-place-archive.ts
 ```
 
 ---
@@ -241,7 +241,7 @@ npx tsx scripts/test-place-archive.ts
 - `src/components/business/places/PlaceCardHorizontal.tsx` - Added archive UI
 
 ### Testing & Docs
-- `scripts/test-place-archive.ts` - Test script (NEW)
+- `scripts/manual-tests/test-place-archive.ts` - Test script (NEW)
 - `docs/ai-reports/place/PLACE_ARCHIVE_SYSTEM.md` - This document (NEW)
 
 ---

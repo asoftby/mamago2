@@ -8,7 +8,7 @@
 - **FILES**: 
   - `prisma/schema.prisma`
   - `prisma/migrations/20260304203731_place_images_content_status/`
-  - `scripts/test-place-model.ts`
+  - `scripts/manual-tests/test-place-model.ts`
   - `PLACE_IMAGES_CONTENT_STATUS_COMPLETE.md`
   - `docs/PLACE_MODEL_USAGE.md`
 
@@ -19,7 +19,7 @@
   - `prisma/schema.prisma`
   - `prisma/migrations/20260304204921_place_hierarchy_complex_units/`
   - `src/lib/place/hierarchy.ts`
-  - `scripts/test-place-hierarchy.ts`
+  - `scripts/manual-tests/test-place-hierarchy.ts`
   - `PLACE_HIERARCHY_COMPLETE.md`
 
 ### ✅ TASK 3: Place API Endpoints
@@ -31,7 +31,7 @@
   - `src/app/api/business/places/[id]/location/google/route.ts`
   - `src/app/api/business/places/[id]/location/manual/route.ts`
   - `src/app/api/business/places/[id]/submit/route.ts`
-  - `scripts/test-place-api.ts`
+  - `scripts/manual-tests/test-place-api.ts`
   - `PLACE_API_COMPLETE.md`
   - `docs/PLACE_API_USAGE.md`
 
@@ -72,7 +72,7 @@
   - `src/components/admin/PlaceModerationSidePanel.tsx`
   - `src/app/business/(protected)/places/[id]/edit/PlaceWizard.tsx` (updated)
   - `src/app/business/(protected)/places/[id]/edit/page.tsx` (updated)
-  - `scripts/test-moderation-system.ts`
+  - `scripts/manual-tests/test-moderation-system.ts`
   - `UNIFIED_MODERATION_COMPLETE.md`
   - `docs/MODERATION_SYSTEM_USAGE.md`
   - `PLACE_MODERATION_SUMMARY.md`
@@ -119,10 +119,10 @@ PUBLISHED        NEEDS_CHANGES           REJECTED
 ## Testing
 
 All test scripts passing:
-- ✅ `scripts/test-place-model.ts`
-- ✅ `scripts/test-place-hierarchy.ts`
-- ✅ `scripts/test-place-api.ts`
-- ✅ `scripts/test-moderation-system.ts`
+- ✅ `scripts/manual-tests/test-place-model.ts`
+- ✅ `scripts/manual-tests/test-place-hierarchy.ts`
+- ✅ `scripts/manual-tests/test-place-api.ts`
+- ✅ `scripts/manual-tests/test-moderation-system.ts`
 
 ## TODOs (Future Work)
 

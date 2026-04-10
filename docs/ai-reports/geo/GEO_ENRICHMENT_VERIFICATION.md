@@ -10,7 +10,7 @@ District and metro auto-resolution now happens **immediately** after address sel
 
 ### API Tests (2/2 passed)
 ```bash
-npx tsx scripts/test-enrich-location-api.ts
+npx tsx scripts/manual-tests/test-enrich-location-api.ts
 ```
 
 **Test 1: Minsk address (Мястровская 5)**
@@ -109,7 +109,7 @@ The implementation is complete and verified. You can now:
 ### Created (3 files)
 1. `src/app/api/geo/enrich-location/route.ts` - Full enrichment API
 2. `scripts/diagnose-district-metro.ts` - Diagnostic tool
-3. `scripts/test-enrich-location-api.ts` - API tests
+3. `scripts/manual-tests/test-enrich-location-api.ts` - API tests
 
 ### Modified (1 file)
 1. `src/app/business/(protected)/places/new/NewPlaceWizard.tsx` - Client enrichment

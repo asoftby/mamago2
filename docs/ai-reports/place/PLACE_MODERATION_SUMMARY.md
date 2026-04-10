@@ -70,10 +70,10 @@ A complete Place management system with unified moderation workflow, from creati
 - ✅ docs/MODERATION_SYSTEM_USAGE.md
 
 ### 7. Testing
-- ✅ scripts/test-place-model.ts
-- ✅ scripts/test-place-hierarchy.ts
-- ✅ scripts/test-place-api.ts
-- ✅ scripts/test-moderation-system.ts
+- ✅ scripts/manual-tests/test-place-model.ts
+- ✅ scripts/manual-tests/test-place-hierarchy.ts
+- ✅ scripts/manual-tests/test-place-api.ts
+- ✅ scripts/manual-tests/test-moderation-system.ts
 - ✅ All tests passing
 
 ## Status Flow

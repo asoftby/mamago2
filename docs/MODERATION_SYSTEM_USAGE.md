@@ -252,7 +252,7 @@ try {
 
 Run the test suite:
 ```bash
-pnpm tsx scripts/test-moderation-system.ts
+pnpm tsx scripts/manual-tests/test-moderation-system.ts
 ```
 
 Tests cover:

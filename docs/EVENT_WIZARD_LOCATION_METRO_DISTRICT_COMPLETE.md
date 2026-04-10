@@ -118,7 +118,7 @@ The implementation uses the same geo API endpoints as Place:
 
 ### ✅ Testing
 
-Created comprehensive test script `scripts/test-event-location-metro-district.ts` that verifies:
+Created comprehensive test script `scripts/manual-tests/test-event-location-metro-district.ts` that verifies:
 
 - Default form data includes new fields
 - API integration functions (mock tested)

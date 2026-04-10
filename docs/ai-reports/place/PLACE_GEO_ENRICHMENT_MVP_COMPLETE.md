@@ -123,7 +123,7 @@ Place model already had required fields:
 - >= 1000m: "1.4 км" (1 decimal)
 
 ### 6. Test Script
-**File**: `scripts/test-place-geo-enrichment.ts`
+**File**: `scripts/manual-tests/test-place-geo-enrichment.ts`
 
 **Features**:
 - Finds place with coordinates
@@ -133,7 +133,7 @@ Place model already had required fields:
 - Displays district details
 - Shows total metro stations count
 
-**Usage**: `npx tsx scripts/test-place-geo-enrichment.ts`
+**Usage**: `npx tsx scripts/manual-tests/test-place-geo-enrichment.ts`
 
 ## How It Works
 
@@ -199,7 +199,7 @@ Should show: "✅ Districts with centroids: 9/9"
 
 ### 3. Test Enrichment
 ```bash
-npx tsx scripts/test-place-geo-enrichment.ts
+npx tsx scripts/manual-tests/test-place-geo-enrichment.ts
 ```
 Should show:
 - District (after): [district-id]
@@ -278,7 +278,7 @@ Should see:
 
 ### New Files
 1. `prisma/seed/district-centroids.ts` - District centroids seed script
-2. `scripts/test-place-geo-enrichment.ts` - Test script
+2. `scripts/manual-tests/test-place-geo-enrichment.ts` - Test script
 
 ### Modified Files
 1. `prisma/schema.prisma` - Added centerLat/centerLng to District

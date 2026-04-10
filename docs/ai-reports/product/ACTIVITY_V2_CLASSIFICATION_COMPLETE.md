@@ -283,7 +283,7 @@ All moderation actions are logged in ModerationLog with entityType="ACTIVITY".
 
 ## Testing
 
-**Test script:** `scripts/test-activity-v2-api.ts`
+**Test script:** `scripts/manual-tests/test-activity-v2-api.ts`
 
 Tests cover:
 - ✅ Classification for all activity types
@@ -340,7 +340,7 @@ All tests passing.
 - `src/app/api/business/activities-v2/route.ts`
 - `src/app/api/business/activities-v2/[id]/route.ts`
 - `src/app/api/business/activities-v2/[id]/submit/route.ts`
-- `scripts/test-activity-v2-api.ts`
+- `scripts/manual-tests/test-activity-v2-api.ts`
 - `prisma/migrations/20260304212419_activity_type_schedule_classification/`
 
 ### Modified
