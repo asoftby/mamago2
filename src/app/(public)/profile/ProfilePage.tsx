@@ -2,10 +2,12 @@
 
 import { User, Role } from "@prisma/client";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Building2, Settings, Users, BarChart3 } from "lucide-react";
+import { navigateToSurface } from "@/lib/routing/clientNavigation";
 
 interface ProfilePageProps {
   user: User;
@@ -13,6 +15,8 @@ interface ProfilePageProps {
 }
 
 export function ProfilePage({ user, businessStatus }: ProfilePageProps) {
+  const router = useRouter();
+
   const getRoleLabel = (role: Role) => {
     switch (role) {
       case "USER":
@@ -131,8 +135,16 @@ export function ProfilePage({ user, businessStatus }: ProfilePageProps) {
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
-                  <Button asChild className="w-full">
-                    <Link href="/me">Перейти в семейный кабинет</Link>
+                  <Button
+                    className="w-full"
+                    onClick={() =>
+                      navigateToSurface(router, {
+                        targetSurface: "public",
+                        targetPath: "/me",
+                      })
+                    }
+                  >
+                    Перейти в семейный кабинет
                   </Button>
                 </div>
               </CardContent>
@@ -165,8 +177,16 @@ export function ProfilePage({ user, businessStatus }: ProfilePageProps) {
                       </div>
                     </div>
                   )}
-                  <Button asChild className="w-full">
-                    <Link href="/business-entry">Перейти в бизнес-кабинет</Link>
+                  <Button
+                    className="w-full"
+                    onClick={() =>
+                      navigateToSurface(router, {
+                        targetSurface: "business",
+                        targetPath: "/",
+                      })
+                    }
+                  >
+                    Перейти в бизнес-кабинет
                   </Button>
                 </div>
               </CardContent>
@@ -187,8 +207,16 @@ export function ProfilePage({ user, businessStatus }: ProfilePageProps) {
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
-                  <Button asChild className="w-full">
-                    <Link href="/admin">Перейти в админ-панель</Link>
+                  <Button
+                    className="w-full"
+                    onClick={() =>
+                      navigateToSurface(router, {
+                        targetSurface: "admin",
+                        targetPath: "/",
+                      })
+                    }
+                  >
+                    Перейти в админ-панель
                   </Button>
                 </div>
               </CardContent>

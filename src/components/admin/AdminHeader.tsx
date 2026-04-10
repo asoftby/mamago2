@@ -16,6 +16,8 @@ import { AccountDropdown } from "@/components/account/AccountDropdown";
 import { buildAdminAccountModel } from "@/lib/account/accountMenuBuilders";
 import { userInitialsFromEmail } from "@/lib/account/userInitials";
 import { useHydrated } from "@/hooks/use-hydrated";
+import { navigateToSurface } from "@/lib/routing/clientNavigation";
+import { useRouter } from "next/navigation";
 
 interface AdminHeaderProps {
   userEmail?: string;
@@ -30,6 +32,7 @@ export function AdminHeader({
 }: AdminHeaderProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const router = useRouter();
   const isMobile = useMediaQuery("(max-width: 1023px)");
   const { goToPersonalAccount } = useAccountMode();
   const hydrated = useHydrated();
@@ -41,10 +44,20 @@ export function AdminHeader({
       buildAdminAccountModel({
         userEmail: userEmail ?? "",
         initials: profileInitials,
+        goToAdminSettings: () =>
+          navigateToSurface(router, {
+            targetSurface: "admin",
+            targetPath: "/settings",
+          }),
+        goToProfile: () =>
+          navigateToSurface(router, {
+            targetSurface: "public",
+            targetPath: "/profile",
+          }),
         goToPersonalAccount,
         onNavigate: () => setProfileOpen(false),
       }),
-    [userEmail, profileInitials, goToPersonalAccount],
+    [userEmail, profileInitials, router, goToPersonalAccount],
   );
 
   const profileTrigger = (

@@ -77,13 +77,7 @@ function stripSurfacePrefix(pathname: string, surface: AppSurface): string {
 
 function buildExternalPathForSurface(surface: AppSurface, path: string): string {
   const { pathname, search, hash } = splitPathQueryAndHash(path);
-  const normalizedPathname =
-    surface === "admin"
-      ? buildAdminPath(pathname)
-      : surface === "business"
-        ? buildBusinessPath(pathname)
-        : buildPublicPath(pathname);
-  const visiblePathname = stripSurfacePrefix(normalizedPathname, surface);
+  const visiblePathname = stripSurfacePrefix(pathname, surface);
   return `${visiblePathname}${search}${hash}`;
 }
 

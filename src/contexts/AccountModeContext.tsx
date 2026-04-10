@@ -11,10 +11,10 @@ import {
 import { usePathname, useRouter } from "next/navigation";
 import { shouldRedirectPersonalModeAwayFromBusiness } from "@/lib/accountModePaths";
 import {
-  buildBusinessPath,
-  buildPublicPath,
   BUSINESS_PATH_PREFIX,
+  buildPublicPath,
 } from "@/lib/routing/surface";
+import { navigateToSurface } from "@/lib/routing/clientNavigation";
 
 export type AccountMode = "personal" | "business";
 
@@ -68,18 +68,20 @@ export function AccountModeProvider({ children }: { children: React.ReactNode })
   const goToBusinessAccount = useCallback(
     (isBusinessPartner: boolean) => {
       setMode("business");
-      router.push(
-        isBusinessPartner
-          ? buildBusinessPath("/dashboard")
-          : buildBusinessPath("/onboarding"),
-      );
+      navigateToSurface(router, {
+        targetSurface: "business",
+        targetPath: isBusinessPartner ? "/dashboard" : "/onboarding",
+      });
     },
     [router, setMode],
   );
 
   const goToPersonalAccount = useCallback(() => {
     setMode("personal");
-    router.push(buildPublicPath("/me"));
+    navigateToSurface(router, {
+      targetSurface: "public",
+      targetPath: "/me",
+    });
   }, [router, setMode]);
 
   useEffect(() => {

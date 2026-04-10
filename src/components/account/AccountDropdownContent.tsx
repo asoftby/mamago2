@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { LogOut, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -9,6 +10,7 @@ import {
   accountDropdownRowDefault,
 } from "@/components/account/accountDropdownTokens";
 import type { AccountDropdownHeaderModel, AccountMenuRow } from "@/components/account/types";
+import { navigateToSurface } from "@/lib/routing/clientNavigation";
 
 function RowIcon({ Icon }: { Icon: AccountMenuRow["icon"] }) {
   const Cmp = Icon;
@@ -76,6 +78,8 @@ export function AccountDropdownContent({
   onNavigate,
   sheetLayout = false,
 }: AccountDropdownContentProps) {
+  const router = useRouter();
+
   return (
     <div className="flex flex-col bg-white">
       <div
@@ -136,14 +140,20 @@ export function AccountDropdownContent({
       ) : null}
 
       <div className="border-t border-gray-200 p-2">
-        <Link
-          href="/me/settings"
+        <button
+          type="button"
           className={cn(accountDropdownRowDefault, "w-full")}
-          onClick={onNavigate}
+          onClick={() => {
+            navigateToSurface(router, {
+              targetSurface: "public",
+              targetPath: "/me/settings",
+            });
+            onNavigate?.();
+          }}
         >
           <Settings className={accountDropdownIconClass} aria-hidden />
           Настройки
-        </Link>
+        </button>
         {logoutMode === "form" ? (
           <form action="/api/auth/logout" method="POST" className="w-full">
             <button

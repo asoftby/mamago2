@@ -14,6 +14,7 @@ import { useFamilyPersona } from "@/contexts/FamilyPersonaContext";
 import { cn } from "@/lib/utils";
 import { useNarrowViewport } from "@/hooks/useNarrowViewport";
 import { notifyAuthStateChanged } from "@/lib/auth/client";
+import { navigateToSurface } from "@/lib/routing/clientNavigation";
 
 /**
  * Меню профиля: только отображение primary adult persona из FamilyPersonaContext
@@ -50,7 +51,11 @@ export function HeaderAccountMenu() {
       if (res.ok || res.redirected) {
         setUserMenuOpen(false);
         notifyAuthStateChanged();
-        router.replace("/");
+        navigateToSurface(router, {
+          targetSurface: "public",
+          targetPath: "/",
+          replace: true,
+        });
         router.refresh();
       }
     } finally {
@@ -161,10 +166,46 @@ export function HeaderAccountMenu() {
         loggingOut={loggingOut}
         onLogout={handleLogout}
         onNavigate={() => setUserMenuOpen(false)}
+        onGoToAdminAccount={() =>
+          navigateToSurface(router, {
+            targetSurface: "admin",
+            targetPath: "/",
+          })
+        }
         onGoToBusinessAccount={() =>
           goToBusinessAccount(isBusinessPartner)
         }
+        onGoToPersonalProfile={() =>
+          navigateToSurface(router, {
+            targetSurface: "public",
+            targetPath: "/me",
+          })
+        }
         onGoToPersonalAccount={goToPersonalAccount}
+        onGoToPersonalPlan={() =>
+          navigateToSurface(router, {
+            targetSurface: "public",
+            targetPath: "/me/plan",
+          })
+        }
+        onGoToBusinessDashboard={() =>
+          navigateToSurface(router, {
+            targetSurface: "business",
+            targetPath: "/dashboard",
+          })
+        }
+        onGoToBusinessPlaces={() =>
+          navigateToSurface(router, {
+            targetSurface: "business",
+            targetPath: "/places",
+          })
+        }
+        onGoToBusinessCommercial={() =>
+          navigateToSurface(router, {
+            targetSurface: "business",
+            targetPath: "/commercial",
+          })
+        }
       />
     </div>
   );

@@ -10,6 +10,7 @@ import { useAccountMode } from "@/contexts/AccountModeContext";
 import { useFamilyPersona } from "@/contexts/FamilyPersonaContext";
 import { notifyAuthStateChanged } from "@/lib/auth/client";
 import { cn } from "@/lib/utils";
+import { navigateToSurface } from "@/lib/routing/clientNavigation";
 import {
   getNavIconButtonClassName,
   type NavIconChrome,
@@ -56,7 +57,11 @@ export function MobileProfileSheet({
       if (res.ok || res.redirected) {
         setMenuOpen(false);
         notifyAuthStateChanged();
-        router.replace("/");
+        navigateToSurface(router, {
+          targetSurface: "public",
+          targetPath: "/",
+          replace: true,
+        });
         router.refresh();
       }
     } finally {
@@ -215,8 +220,44 @@ export function MobileProfileSheet({
       loggingOut={loggingOut}
       onLogout={handleLogout}
       onNavigate={() => setMenuOpen(false)}
+      onGoToAdminAccount={() =>
+        navigateToSurface(router, {
+          targetSurface: "admin",
+          targetPath: "/",
+        })
+      }
       onGoToBusinessAccount={() => goToBusinessAccount(isBusinessPartner)}
+      onGoToPersonalProfile={() =>
+        navigateToSurface(router, {
+          targetSurface: "public",
+          targetPath: "/me",
+        })
+      }
       onGoToPersonalAccount={goToPersonalAccount}
+      onGoToPersonalPlan={() =>
+        navigateToSurface(router, {
+          targetSurface: "public",
+          targetPath: "/me/plan",
+        })
+      }
+      onGoToBusinessDashboard={() =>
+        navigateToSurface(router, {
+          targetSurface: "business",
+          targetPath: "/dashboard",
+        })
+      }
+      onGoToBusinessPlaces={() =>
+        navigateToSurface(router, {
+          targetSurface: "business",
+          targetPath: "/places",
+        })
+      }
+      onGoToBusinessCommercial={() =>
+        navigateToSurface(router, {
+          targetSurface: "business",
+          targetPath: "/commercial",
+        })
+      }
     />
   );
 }

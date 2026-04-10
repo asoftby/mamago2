@@ -14,12 +14,6 @@ import { mapFamilyRoleToLabel } from "@/lib/account/mapFamilyRoleToLabel";
 import type { AccountMode } from "@/contexts/AccountModeContext";
 import type { AccountMenuRow } from "@/components/account/types";
 import type { AccountDropdownModel } from "@/components/account/AccountDropdown.types";
-import {
-  ADMIN_PATH_PREFIX,
-  buildAdminPath,
-  buildBusinessPath,
-  buildPublicPath,
-} from "@/lib/routing/surface";
 
 const isAdminRole = (role: string) =>
   role === "ADMIN" || role === "MODERATOR";
@@ -32,8 +26,14 @@ export function buildPublicSiteAccountModel(input: {
   mode: AccountMode;
   initials: string;
   onNavigate: () => void;
+  onGoToAdminAccount: () => void;
   onGoToBusinessAccount: () => void;
   onGoToPersonalAccount: () => void;
+  onGoToPersonalProfile: () => void;
+  onGoToPersonalPlan: () => void;
+  onGoToBusinessDashboard: () => void;
+  onGoToBusinessPlaces: () => void;
+  onGoToBusinessCommercial: () => void;
   onLogout: () => void | Promise<void>;
   loggingOut: boolean;
 }): AccountDropdownModel {
@@ -42,8 +42,14 @@ export function buildPublicSiteAccountModel(input: {
     mode,
     initials,
     onNavigate,
+    onGoToAdminAccount,
     onGoToBusinessAccount,
     onGoToPersonalAccount,
+    onGoToPersonalProfile,
+    onGoToPersonalPlan,
+    onGoToBusinessDashboard,
+    onGoToBusinessPlaces,
+    onGoToBusinessCommercial,
     onLogout,
     loggingOut,
   } = input;
@@ -67,17 +73,21 @@ export function buildPublicSiteAccountModel(input: {
     const mainItems: AccountMenuRow[] = [
       {
         key: "profile",
-        type: "link",
-        href: buildPublicPath("/me"),
+        type: "button",
         label: "Профиль",
         icon: User,
+        onClick: () => {
+          onGoToPersonalProfile();
+        },
       },
       {
         key: "plan",
-        type: "link",
-        href: buildPublicPath("/me/plan"),
+        type: "button",
         label: "Мой план",
         icon: CalendarDays,
+        onClick: () => {
+          onGoToPersonalPlan();
+        },
       },
     ];
 
@@ -85,11 +95,13 @@ export function buildPublicSiteAccountModel(input: {
       ? [
           {
             key: "admin",
-            type: "link",
-            href: ADMIN_PATH_PREFIX,
+            type: "button",
             label: "Админ панель",
             icon: Shield,
             variant: "accent",
+            onClick: () => {
+              onGoToAdminAccount();
+            },
           },
         ]
       : [
@@ -122,24 +134,30 @@ export function buildPublicSiteAccountModel(input: {
     mainItems: [
       {
         key: "dash",
-        type: "link",
-        href: buildBusinessPath("/dashboard"),
+        type: "button",
         label: "Дашборд",
         icon: LayoutDashboard,
+        onClick: () => {
+          onGoToBusinessDashboard();
+        },
       },
       {
         key: "places",
-        type: "link",
-        href: buildBusinessPath("/places"),
+        type: "button",
         label: "Мои места",
         icon: MapPin,
+        onClick: () => {
+          onGoToBusinessPlaces();
+        },
       },
       {
         key: "commercial",
-        type: "link",
-        href: buildBusinessPath("/commercial"),
+        type: "button",
         label: "Заявки и коммерция",
         icon: ClipboardList,
+        onClick: () => {
+          onGoToBusinessCommercial();
+        },
       },
     ],
     contextItems: [
@@ -167,10 +185,19 @@ export function buildPublicSiteAccountModel(input: {
 export function buildAdminAccountModel(input: {
   userEmail: string;
   initials: string;
+  goToAdminSettings: () => void;
+  goToProfile: () => void;
   goToPersonalAccount: () => void;
   onNavigate: () => void;
 }): AccountDropdownModel {
-  const { userEmail, initials, goToPersonalAccount, onNavigate } = input;
+  const {
+    userEmail,
+    initials,
+    goToAdminSettings,
+    goToProfile,
+    goToPersonalAccount,
+    onNavigate,
+  } = input;
 
   return {
     sheetTitle: "Профиль",
@@ -184,17 +211,21 @@ export function buildAdminAccountModel(input: {
     mainItems: [
       {
         key: "profile",
-        type: "link",
-        href: buildPublicPath("/profile"),
+        type: "button",
         label: "Профиль",
         icon: UserCircle,
+        onClick: () => {
+          goToProfile();
+        },
       },
       {
         key: "settings",
-        type: "link",
-        href: buildAdminPath("/settings"),
+        type: "button",
         label: "Настройки",
         icon: Settings,
+        onClick: () => {
+          goToAdminSettings();
+        },
       },
     ],
     contextItems: [

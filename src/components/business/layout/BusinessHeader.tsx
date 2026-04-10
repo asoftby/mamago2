@@ -13,6 +13,7 @@ import type { AccountMenuUser } from "@/components/site/header/AccountMenuBody";
 import { HEADER_CHROME_ICON_BUTTON_CLASS } from "@/components/site/header/headerIconButtonClass";
 import { useAccountMode } from "@/contexts/AccountModeContext";
 import { cn } from "@/lib/utils";
+import { navigateToSurface } from "@/lib/routing/clientNavigation";
 
 function userInitials(email: string): string {
   const local = email.split("@")[0] ?? "?";
@@ -47,7 +48,11 @@ export function BusinessHeader({ user }: BusinessHeaderProps) {
       });
       if (res.ok || res.redirected) {
         setMenuOpen(false);
-        router.replace("/");
+        navigateToSurface(router, {
+          targetSurface: "public",
+          targetPath: "/",
+          replace: true,
+        });
         router.refresh();
       }
     } finally {
@@ -116,10 +121,46 @@ export function BusinessHeader({ user }: BusinessHeaderProps) {
             loggingOut={loggingOut}
             onLogout={handleLogout}
             onNavigate={() => setMenuOpen(false)}
+            onGoToAdminAccount={() =>
+              navigateToSurface(router, {
+                targetSurface: "admin",
+                targetPath: "/",
+              })
+            }
             onGoToBusinessAccount={() =>
               goToBusinessAccount(isBusinessPartner)
             }
+            onGoToPersonalProfile={() =>
+              navigateToSurface(router, {
+                targetSurface: "public",
+                targetPath: "/me",
+              })
+            }
             onGoToPersonalAccount={goToPersonalAccount}
+            onGoToPersonalPlan={() =>
+              navigateToSurface(router, {
+                targetSurface: "public",
+                targetPath: "/me/plan",
+              })
+            }
+            onGoToBusinessDashboard={() =>
+              navigateToSurface(router, {
+                targetSurface: "business",
+                targetPath: "/dashboard",
+              })
+            }
+            onGoToBusinessPlaces={() =>
+              navigateToSurface(router, {
+                targetSurface: "business",
+                targetPath: "/places",
+              })
+            }
+            onGoToBusinessCommercial={() =>
+              navigateToSurface(router, {
+                targetSurface: "business",
+                targetPath: "/commercial",
+              })
+            }
           />
         </div>
       </div>

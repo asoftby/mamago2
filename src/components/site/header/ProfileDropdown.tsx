@@ -17,8 +17,14 @@ export type ProfileDropdownProps = {
   loggingOut: boolean;
   onLogout: () => void;
   onNavigate: () => void;
+  onGoToAdminAccount: () => void;
   onGoToBusinessAccount: () => void;
+  onGoToPersonalProfile: () => void;
   onGoToPersonalAccount: () => void;
+  onGoToPersonalPlan: () => void;
+  onGoToBusinessDashboard: () => void;
+  onGoToBusinessPlaces: () => void;
+  onGoToBusinessCommercial: () => void;
 };
 
 export function ProfileDropdown({
@@ -31,8 +37,14 @@ export function ProfileDropdown({
   loggingOut,
   onLogout,
   onNavigate,
+  onGoToAdminAccount,
   onGoToBusinessAccount,
+  onGoToPersonalProfile,
   onGoToPersonalAccount,
+  onGoToPersonalPlan,
+  onGoToBusinessDashboard,
+  onGoToBusinessPlaces,
+  onGoToBusinessCommercial,
 }: ProfileDropdownProps) {
   const initials = userInitialsFromEmail(user.email);
   const model = buildPublicSiteAccountModel({
@@ -40,8 +52,14 @@ export function ProfileDropdown({
     mode,
     initials,
     onNavigate,
+    onGoToAdminAccount,
     onGoToBusinessAccount,
     onGoToPersonalAccount,
+    onGoToPersonalProfile,
+    onGoToPersonalPlan,
+    onGoToBusinessDashboard,
+    onGoToBusinessPlaces,
+    onGoToBusinessCommercial,
     onLogout,
     loggingOut,
   });
