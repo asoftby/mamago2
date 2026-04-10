@@ -1,10 +1,12 @@
+import { buildAdminPath } from "@/lib/routing/surface";
+
 export type SeoNavItem = {
   href: string;
   label: string;
   description: string;
 };
 
-const SEO_ROOT = "/admin/seo";
+const SEO_ROOT = buildAdminPath("/seo");
 
 /** Внутренняя навигация SEO Control Center (порядок = порядок вкладок) */
 export const SEO_CONTROL_NAV: SeoNavItem[] = [

@@ -1,10 +1,6 @@
-/** Совпадает с {@link adminPath} в `AdminNav` — общий префикс `/admin`. */
-const ADMIN_BASE = "/admin";
+import { buildAdminPath } from "@/lib/routing/surface";
 
-function toAdminHref(path: string): string {
-  const cleanPath = path.startsWith("/") ? path : `/${path}`;
-  return `${ADMIN_BASE}${cleanPath}`;
-}
+/** Совпадает с {@link buildAdminPath} / `adminPath` — общий префикс `/admin`. */
 
 export type ContentNavItemId =
   | "events"
@@ -32,7 +28,7 @@ export const CONTENT_NAV_ITEMS: readonly ContentNavItemDefinition[] = [
 ] as const;
 
 export function contentItemHref(path: string): string {
-  return toAdminHref(path);
+  return buildAdminPath(path);
 }
 
 /** Активный подпункт: точное совпадение или вложенный маршрут. */

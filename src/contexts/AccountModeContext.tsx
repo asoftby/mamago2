@@ -10,6 +10,11 @@ import {
 } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { shouldRedirectPersonalModeAwayFromBusiness } from "@/lib/accountModePaths";
+import {
+  buildBusinessPath,
+  buildPublicPath,
+  BUSINESS_PATH_PREFIX,
+} from "@/lib/routing/surface";
 
 export type AccountMode = "personal" | "business";
 
@@ -44,7 +49,7 @@ export function AccountModeProvider({ children }: { children: React.ReactNode })
       const path =
         typeof window !== "undefined" ? window.location.pathname : "";
       if (
-        path.startsWith("/business") &&
+        path.startsWith(BUSINESS_PATH_PREFIX) &&
         shouldRedirectPersonalModeAwayFromBusiness(path)
       ) {
         next = "business";
@@ -64,7 +69,9 @@ export function AccountModeProvider({ children }: { children: React.ReactNode })
     (isBusinessPartner: boolean) => {
       setMode("business");
       router.push(
-        isBusinessPartner ? "/business/dashboard" : "/business/onboarding",
+        isBusinessPartner
+          ? buildBusinessPath("/dashboard")
+          : buildBusinessPath("/onboarding"),
       );
     },
     [router, setMode],
@@ -72,14 +79,14 @@ export function AccountModeProvider({ children }: { children: React.ReactNode })
 
   const goToPersonalAccount = useCallback(() => {
     setMode("personal");
-    router.push("/me");
+    router.push(buildPublicPath("/me"));
   }, [router, setMode]);
 
   useEffect(() => {
     if (!hydrated) return;
     if (mode !== "personal") return;
     if (!shouldRedirectPersonalModeAwayFromBusiness(pathname)) return;
-    router.replace("/me");
+    router.replace(buildPublicPath("/me"));
   }, [hydrated, mode, pathname, router]);
 
   const value = useMemo(

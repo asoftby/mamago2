@@ -1,10 +1,6 @@
-/** Совпадает с {@link adminPath} в `AdminNav` — общий префикс `/admin`. */
-const ADMIN_BASE = "/admin";
+import { buildAdminPath } from "@/lib/routing/surface";
 
-function toAdminHref(path: string): string {
-  const cleanPath = path.startsWith("/") ? path : `/${path}`;
-  return `${ADMIN_BASE}${cleanPath}`;
-}
+/** Совпадает с {@link buildAdminPath} / `adminPath` — общий префикс `/admin`. */
 
 /** Идентификаторы пунктов секции «Модерация» в сайдбаре — только процесс (inbox). */
 export type ModerationNavItemId = "queue";
@@ -25,7 +21,7 @@ export const MODERATION_NAV_ITEMS: readonly ModerationNavItemDefinition[] = [
 ] as const;
 
 export function moderationItemHref(path: string): string {
-  return toAdminHref(path);
+  return buildAdminPath(path);
 }
 
 /** Счётчики для бейджа очереди; детальные поля — для отчётов/хедера при необходимости */

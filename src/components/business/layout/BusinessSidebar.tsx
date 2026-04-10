@@ -11,41 +11,47 @@ import {
   Users,
 } from "lucide-react";
 import { SidebarItem } from "@/components/shared/sidebar/SidebarItem";
+import { buildBusinessPath } from "@/lib/routing/surface";
+
+const BUSINESS_DASHBOARD = buildBusinessPath("/dashboard");
+const BUSINESS_BILLING_PLAN = buildBusinessPath("/billing/plan");
+const BUSINESS_COMMERCIAL = buildBusinessPath("/commercial");
+const BUSINESS_TEAM = buildBusinessPath("/team");
 
 const navigationItems = [
   {
     name: "Dashboard",
-    href: "/business/dashboard",
+    href: BUSINESS_DASHBOARD,
     icon: LayoutDashboard,
   },
   {
     name: "Places",
-    href: "/business/places",
+    href: buildBusinessPath("/places"),
     icon: MapPin,
   },
   {
     name: "Events",
-    href: "/business/events",
+    href: buildBusinessPath("/events"),
     icon: Calendar,
   },
   {
     name: "Offers",
-    href: "/business/offers",
+    href: buildBusinessPath("/offers"),
     icon: Tag,
   },
   {
     name: "Команда",
-    href: "/business/team",
+    href: BUSINESS_TEAM,
     icon: Users,
   },
   {
     name: "Billing",
-    href: "/business/billing/plan",
+    href: BUSINESS_BILLING_PLAN,
     icon: CreditCard,
   },
   {
     name: "Commercial",
-    href: "/business/commercial",
+    href: BUSINESS_COMMERCIAL,
     icon: FileText,
   },
 ];
@@ -54,19 +60,17 @@ export function BusinessSidebar() {
   const pathname = usePathname();
 
   const isActive = (href: string) => {
-    if (href === "/business/dashboard") {
+    if (href === BUSINESS_DASHBOARD) {
       return pathname === href;
     }
-    // For billing, check if pathname starts with /business/billing
-    if (href === "/business/billing/plan") {
-      return pathname.startsWith("/business/billing");
+    if (href === BUSINESS_BILLING_PLAN) {
+      return pathname.startsWith(buildBusinessPath("/billing"));
     }
-    // For commercial, check if pathname starts with /business/commercial
-    if (href === "/business/commercial") {
-      return pathname.startsWith("/business/commercial");
+    if (href === BUSINESS_COMMERCIAL) {
+      return pathname.startsWith(BUSINESS_COMMERCIAL);
     }
-    if (href === "/business/team") {
-      return pathname.startsWith("/business/team");
+    if (href === BUSINESS_TEAM) {
+      return pathname.startsWith(BUSINESS_TEAM);
     }
     return pathname.startsWith(href);
   };

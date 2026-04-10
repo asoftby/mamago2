@@ -14,6 +14,12 @@ import { mapFamilyRoleToLabel } from "@/lib/account/mapFamilyRoleToLabel";
 import type { AccountMode } from "@/contexts/AccountModeContext";
 import type { AccountMenuRow } from "@/components/account/types";
 import type { AccountDropdownModel } from "@/components/account/AccountDropdown.types";
+import {
+  ADMIN_PATH_PREFIX,
+  buildAdminPath,
+  buildBusinessPath,
+  buildPublicPath,
+} from "@/lib/routing/surface";
 
 const isAdminRole = (role: string) =>
   role === "ADMIN" || role === "MODERATOR";
@@ -62,14 +68,14 @@ export function buildPublicSiteAccountModel(input: {
       {
         key: "profile",
         type: "link",
-        href: "/me",
+        href: buildPublicPath("/me"),
         label: "Профиль",
         icon: User,
       },
       {
         key: "plan",
         type: "link",
-        href: "/me/plan",
+        href: buildPublicPath("/me/plan"),
         label: "Мой план",
         icon: CalendarDays,
       },
@@ -80,7 +86,7 @@ export function buildPublicSiteAccountModel(input: {
           {
             key: "admin",
             type: "link",
-            href: "/admin",
+            href: ADMIN_PATH_PREFIX,
             label: "Админ панель",
             icon: Shield,
             variant: "accent",
@@ -117,21 +123,21 @@ export function buildPublicSiteAccountModel(input: {
       {
         key: "dash",
         type: "link",
-        href: "/business/dashboard",
+        href: buildBusinessPath("/dashboard"),
         label: "Дашборд",
         icon: LayoutDashboard,
       },
       {
         key: "places",
         type: "link",
-        href: "/business/places",
+        href: buildBusinessPath("/places"),
         label: "Мои места",
         icon: MapPin,
       },
       {
         key: "commercial",
         type: "link",
-        href: "/business/commercial",
+        href: buildBusinessPath("/commercial"),
         label: "Заявки и коммерция",
         icon: ClipboardList,
       },
@@ -179,14 +185,14 @@ export function buildAdminAccountModel(input: {
       {
         key: "profile",
         type: "link",
-        href: "/profile",
+        href: buildPublicPath("/profile"),
         label: "Профиль",
         icon: UserCircle,
       },
       {
         key: "settings",
         type: "link",
-        href: "/admin/settings",
+        href: buildAdminPath("/settings"),
         label: "Настройки",
         icon: Settings,
       },

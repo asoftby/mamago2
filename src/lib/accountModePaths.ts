@@ -1,13 +1,15 @@
+import { BUSINESS_PATH_PREFIX } from "@/lib/routing/surface";
+
 /**
  * Маршруты под /business, где режим «личный» допустим (онбординг, статусы и т.д.).
  * Остальные /business/* при активном личном режиме → редирект на /me.
  */
 const BUSINESS_PATHS_ALLOWED_IN_PERSONAL_MODE = [
-  "/business/onboarding",
-  "/business/verification",
-  "/business/suspended",
-  "/business/pricing",
-  "/business/pending",
+  `${BUSINESS_PATH_PREFIX}/onboarding`,
+  `${BUSINESS_PATH_PREFIX}/verification`,
+  `${BUSINESS_PATH_PREFIX}/suspended`,
+  `${BUSINESS_PATH_PREFIX}/pricing`,
+  `${BUSINESS_PATH_PREFIX}/pending`,
 ] as const;
 
 export function isBusinessPathAllowedInPersonalMode(pathname: string): boolean {
@@ -19,6 +21,6 @@ export function isBusinessPathAllowedInPersonalMode(pathname: string): boolean {
 export function shouldRedirectPersonalModeAwayFromBusiness(
   pathname: string,
 ): boolean {
-  if (!pathname.startsWith("/business")) return false;
+  if (!pathname.startsWith(BUSINESS_PATH_PREFIX)) return false;
   return !isBusinessPathAllowedInPersonalMode(pathname);
 }

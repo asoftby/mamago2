@@ -13,13 +13,9 @@ import {
   contentItemHref,
 } from "@/lib/admin/contentSidebarConfig";
 import { SEO_CONTROL_NAV } from "@/lib/admin/seoNavConfig";
+import { adminPath } from "@/lib/routing/surface";
 
-// Admin route helper to ensure all admin links are prefixed correctly
-const ADMIN_BASE = "/admin";
-export const adminPath = (path: string) => {
-  const cleanPath = path.startsWith("/") ? path : `/${path}`;
-  return `${ADMIN_BASE}${cleanPath}`;
-};
+export { adminPath };
 
 const MODERATION_NAV_EN: Record<ModerationNavItemId, string> = {
   queue: "Queue",

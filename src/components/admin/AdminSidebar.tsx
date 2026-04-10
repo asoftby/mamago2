@@ -26,7 +26,7 @@ import {
   moderationItemHref,
   type ModerationNavCounts,
 } from "@/lib/admin/moderationSidebarConfig";
-import { adminPath } from "./AdminNav";
+import { adminPath } from "@/lib/routing/surface";
 import { SEO_CONTROL_NAV, isSeoNavActive } from "@/lib/admin/seoNavConfig";
 import {
   CONTENT_NAV_ITEMS,
