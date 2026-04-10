@@ -5,6 +5,8 @@ import { ActivityType } from "@prisma/client";
 import { excludeDeletedEvents, excludeGhostEventDrafts } from "@/lib/business/eventListWhere";
 import { EventsList } from "./EventsList";
 import { canCreateBusinessContent } from "@/lib/auth/businessContentAccess";
+import { buildSurfaceRedirectDestination } from "@/lib/routing/surface";
+import { getCurrentRequestRoutingContext } from "@/lib/routing/requestContext";
 
 interface SearchParams {
   view?: "active" | "archived";
@@ -15,10 +17,17 @@ export default async function EventsPage({
 }: {
   searchParams: Promise<SearchParams>;
 }) {
+  const routing = await getCurrentRequestRoutingContext();
   const user = await getCurrentUser();
   
   if (!user || !canCreateBusinessContent(user.role)) {
-    redirect("/business/login");
+    redirect(
+      buildSurfaceRedirectDestination({
+        targetSurface: "public",
+        targetPath: "/login",
+        ...routing,
+      }),
+    );
   }
 
   // Verify user has a business
@@ -28,7 +37,13 @@ export default async function EventsPage({
 
   if (!business) {
     console.warn(`User ${user.email} has BUSINESS_OWNER role but no Business entity`);
-    redirect("/business/onboarding");
+    redirect(
+      buildSurfaceRedirectDestination({
+        targetSurface: "business",
+        targetPath: "/onboarding",
+        ...routing,
+      }),
+    );
   }
 
   const params = await searchParams;

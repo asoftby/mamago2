@@ -1,5 +1,9 @@
 import type { AuthEntryPoint } from "./types";
 import { trackPostAuthEvent } from "./analytics";
+import {
+  navigateToCompatibleHref,
+  navigateToSurface,
+} from "@/lib/routing/clientNavigation";
 
 type RouterLike = { push: (href: string) => void; replace: (href: string) => void };
 
@@ -23,7 +27,10 @@ export function applyPostAuthCompletionOutcome(
     case "profile":
       if (!skipNavigation) {
         toast.success("Профиль заполнен");
-        router.push("/me");
+        navigateToSurface(router, {
+          targetSurface: "public",
+          targetPath: "/me",
+        });
       }
       return;
     case "save_idea":
@@ -31,25 +38,37 @@ export function applyPostAuthCompletionOutcome(
       return;
     case "save_plan":
       if (isMobile) {
-        if (!skipNavigation) router.push("/me/plan");
+        if (!skipNavigation) {
+          navigateToSurface(router, {
+            targetSurface: "public",
+            targetPath: "/me/plan",
+          });
+        }
       } else {
         toast.success("Добавлено в план", {
           action: {
             label: "Открыть мой план",
-            onClick: () => router.push("/me/plan"),
+            onClick: () =>
+              navigateToSurface(router, {
+                targetSurface: "public",
+                targetPath: "/me/plan",
+              }),
           },
         });
       }
       return;
     case "my_plan":
       if (!skipNavigation) {
-        router.push("/me/plan");
+        navigateToSurface(router, {
+          targetSurface: "public",
+          targetPath: "/me/plan",
+        });
       }
       return;
     case "birthday_constructor": {
       if (!skipNavigation) {
         const target = returnTo?.trim() || "/";
-        router.replace(target);
+        navigateToCompatibleHref(router, target, { replace: true });
       }
       return;
     }

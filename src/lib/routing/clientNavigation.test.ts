@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 
-import { buildClientSurfaceDestination } from "./clientNavigation.ts";
+import {
+  buildClientCompatibleDestination,
+  buildClientSurfaceDestination,
+} from "./clientNavigation.ts";
 
 assert.equal(
   buildClientSurfaceDestination({
@@ -38,6 +41,35 @@ assert.equal(
     targetPath: "/dashboard",
   }),
   "/business/dashboard",
+);
+
+assert.equal(
+  buildClientCompatibleDestination("/business/events", {
+    currentHost: "mamago.by",
+    currentProtocol: "https",
+  }),
+  "https://business.mamago.by/events",
+);
+
+assert.equal(
+  buildClientCompatibleDestination("/me", {
+    currentHost: "admin.mamago.by",
+    currentProtocol: "https",
+  }),
+  "https://mamago.by/me",
+);
+
+assert.equal(
+  buildClientCompatibleDestination("/editor/place/new", {
+    currentHost: "business.mamago.local:3002",
+    currentProtocol: "http",
+  }),
+  "http://mamago.local:3002/editor/place/new",
+);
+
+assert.equal(
+  buildClientCompatibleDestination("https://example.com/welcome"),
+  "https://example.com/welcome",
 );
 
 console.log("client surface navigation tests: OK");

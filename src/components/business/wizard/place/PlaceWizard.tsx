@@ -35,6 +35,7 @@ import {
   type ContentEditorSurface,
 } from "@/lib/content-editor/types";
 import type { Role } from "@prisma/client";
+import { navigateToCompatibleHref } from "@/lib/routing/clientNavigation";
 
 interface PlaceWizardProps {
   mode: PlaceWizardMode;
@@ -365,9 +366,9 @@ export function PlaceWizard({
         if (onComplete) {
           onComplete(place.id);
         } else if (returnTo) {
-          router.push(returnTo);
+          navigateToCompatibleHref(router, returnTo);
         } else if (surface === "admin") {
-          router.push(nav.afterSubmitListPath);
+          navigateToCompatibleHref(router, nav.afterSubmitListPath);
         } else {
           router.refresh();
         }

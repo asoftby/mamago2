@@ -6,10 +6,13 @@ import { OfferWizard } from "@/components/business/wizard/offer/OfferWizard";
 import { ContentEditorChrome } from "@/components/content-editor/ContentEditorChrome";
 import {
   defaultEditorNav,
+  resolveEditorReturnDestination,
   type ContentEditorSurface,
 } from "@/lib/content-editor/types";
 import { loadOfferForWizard } from "@/lib/content-editor/loadOfferForWizard";
 import { canEditOfferForUser } from "@/lib/permissions/offerEditPermissions";
+import { buildSurfaceRedirectDestination } from "@/lib/routing/surface";
+import { getCurrentRequestRoutingContext } from "@/lib/routing/requestContext";
 
 function surfaceFromUserRole(role: string): ContentEditorSurface {
   return role === "ADMIN" || role === "MODERATOR" ? "admin" : "business";
@@ -22,10 +25,17 @@ export default async function EditorEditOfferPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ returnTo?: string }>;
 }) {
+  const routing = await getCurrentRequestRoutingContext();
   const user = await getCurrentUser();
 
   if (!user || !canCreateBusinessContent(user.role)) {
-    redirect("/business/login");
+    redirect(
+      buildSurfaceRedirectDestination({
+        targetSurface: "public",
+        targetPath: "/login",
+        ...routing,
+      }),
+    );
   }
 
   const { id } = await params;
@@ -40,9 +50,21 @@ export default async function EditorEditOfferPage({
   const canEdit = await canEditOfferForUser(user, offer);
   if (!canEdit) {
     if (user.role === "BUSINESS_OWNER") {
-      redirect("/business/offers");
+      redirect(
+        buildSurfaceRedirectDestination({
+          targetSurface: "business",
+          targetPath: "/offers",
+          ...routing,
+        }),
+      );
     }
-    redirect("/login");
+    redirect(
+      buildSurfaceRedirectDestination({
+        targetSurface: "public",
+        targetPath: "/login",
+        ...routing,
+      }),
+    );
   }
 
   const business = await prisma.business.findUnique({
@@ -55,12 +77,23 @@ export default async function EditorEditOfferPage({
   });
 
   if (!business && user.role === "BUSINESS_OWNER") {
-    redirect("/business/onboarding");
+    redirect(
+      buildSurfaceRedirectDestination({
+        targetSurface: "business",
+        targetPath: "/onboarding",
+        ...routing,
+      }),
+    );
   }
 
   const surface = surfaceFromUserRole(user.role);
   const nav = defaultEditorNav(surface, "offer");
-  const backHref = returnTo ?? nav.afterSubmitListPath;
+  const backHref = resolveEditorReturnDestination({
+    surface,
+    entity: "offer",
+    returnTo,
+    ...routing,
+  });
 
   return (
     <ContentEditorChrome

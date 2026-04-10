@@ -7,6 +7,7 @@ import { Eye, EyeOff, ChevronLeft } from "lucide-react";
 import { appendBirthdayBuilderAuthParam } from "@/lib/auth/appendBirthdayBuilderAuthParam";
 import { getPostAuthRedirect } from "@/lib/auth/postAuthRedirect";
 import { notifyPostAuthSync } from "@/lib/auth/client";
+import { navigateToCompatibleHref } from "@/lib/routing/clientNavigation";
 import { toast } from "sonner";
 import { VERIFICATION_EMAIL_SEND_FAILED_AFTER_REGISTRATION_TOAST } from "@/lib/auth/registrationVerificationToast";
 import { ModalCloseButton } from "@/components/ui/modal-close-button";
@@ -121,7 +122,7 @@ export function CompactSaveAuthPanel({
         if (!skipRedirect) {
           const raw = nextHref || getPostAuthRedirect();
           const target = appendBirthdayBuilderAuthParam(raw);
-          router.replace(target);
+          navigateToCompatibleHref(router, target, { replace: true });
         }
         router.refresh();
         return;
@@ -150,7 +151,7 @@ export function CompactSaveAuthPanel({
       if (!skipRedirect) {
         const raw = nextHref || getPostAuthRedirect();
         const target = appendBirthdayBuilderAuthParam(raw);
-        router.replace(target);
+        navigateToCompatibleHref(router, target, { replace: true });
       }
       router.refresh();
     } catch {

@@ -5,6 +5,8 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/server";
 import { canCreateBusinessContent } from "@/lib/auth/businessContentAccess";
+import { buildSurfaceRedirectDestination } from "@/lib/routing/surface";
+import { getCurrentRequestRoutingContext } from "@/lib/routing/requestContext";
 
 export const metadata = {
   title: "Редактирование события | MamaGo Business",
@@ -18,10 +20,17 @@ export default async function EditEventPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  const routing = await getCurrentRequestRoutingContext();
   const user = await getCurrentUser();
 
   if (!user || !canCreateBusinessContent(user.role)) {
-    redirect("/business/login");
+    redirect(
+      buildSurfaceRedirectDestination({
+        targetSurface: "public",
+        targetPath: "/login",
+        ...routing,
+      }),
+    );
   }
 
   const { id } = await params;
@@ -31,5 +40,11 @@ export default async function EditEventPage({
     qs.set("returnTo", sp.returnTo);
   }
   const q = qs.toString();
-  redirect(`/editor/event/${id}/edit${q ? `?${q}` : ""}`);
+  redirect(
+    buildSurfaceRedirectDestination({
+      targetSurface: "public",
+      targetPath: `/editor/event/${id}/edit${q ? `?${q}` : ""}`,
+      ...routing,
+    }),
+  );
 }

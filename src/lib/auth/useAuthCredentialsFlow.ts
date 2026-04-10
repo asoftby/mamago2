@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { appendBirthdayBuilderAuthParam } from "@/lib/auth/appendBirthdayBuilderAuthParam";
 import { getPostAuthRedirect } from "@/lib/auth/postAuthRedirect";
 import { notifyAuthStateChanged, notifyNotificationsChanged } from "@/lib/auth/client";
+import { navigateToCompatibleHref } from "@/lib/routing/clientNavigation";
 import { toast } from "sonner";
 import { VERIFICATION_EMAIL_SEND_FAILED_AFTER_REGISTRATION_TOAST } from "@/lib/auth/registrationVerificationToast";
 
@@ -96,7 +97,7 @@ export function useAuthCredentialsFlow({
       if (embedded) {
         return;
       }
-      router.replace(target);
+      navigateToCompatibleHref(router, target, { replace: true });
     },
     [embedded, beforeFinishAuthSession, onAuthSuccess, router, skipRedirectAfterAuth],
   );

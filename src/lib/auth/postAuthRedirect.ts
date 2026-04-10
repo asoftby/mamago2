@@ -1,3 +1,5 @@
+import { buildClientSurfaceDestination } from "@/lib/routing/clientNavigation";
+
 /**
  * Unified post-authentication redirect helper
  *
@@ -9,5 +11,17 @@
  * Get the post-authentication redirect URL
  */
 export function getPostAuthRedirect(): string {
-  return "/me";
+  if (typeof window === "undefined") {
+    return "/me";
+  }
+
+  const protocol = window.location.protocol.replace(/:$/u, "");
+  const host = window.location.host;
+
+  return buildClientSurfaceDestination({
+    targetSurface: "public",
+    targetPath: "/me",
+    currentHost: host,
+    currentProtocol: protocol,
+  });
 }

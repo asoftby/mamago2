@@ -33,6 +33,7 @@ import {
   type ContentEditorNav,
   type ContentEditorSurface,
 } from "@/lib/content-editor/types";
+import { navigateToCompatibleHref } from "@/lib/routing/clientNavigation";
 
 interface OfferWizardProps {
   mode: OfferWizardMode;
@@ -338,11 +339,11 @@ export function OfferWizard({
       if (onComplete) {
         onComplete(offerId);
       } else if (mode === "create") {
-        router.push(afterSubmitDestination);
+        navigateToCompatibleHref(router, afterSubmitDestination);
       } else if (returnTo) {
-        router.push(returnTo);
+        navigateToCompatibleHref(router, returnTo);
       } else if (surface === "admin") {
-        router.push(nav.afterSubmitListPath);
+        navigateToCompatibleHref(router, nav.afterSubmitListPath);
       } else {
         router.refresh();
       }

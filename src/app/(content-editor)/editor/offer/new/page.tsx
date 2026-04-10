@@ -6,8 +6,11 @@ import { OfferWizard } from "@/components/business/wizard/offer/OfferWizard";
 import { ContentEditorChrome } from "@/components/content-editor/ContentEditorChrome";
 import {
   defaultEditorNav,
+  resolveEditorReturnDestination,
   type ContentEditorSurface,
 } from "@/lib/content-editor/types";
+import { buildSurfaceRedirectDestination } from "@/lib/routing/surface";
+import { getCurrentRequestRoutingContext } from "@/lib/routing/requestContext";
 
 function surfaceFromUserRole(role: string): ContentEditorSurface {
   return role === "ADMIN" || role === "MODERATOR" ? "admin" : "business";
@@ -18,10 +21,17 @@ export default async function EditorNewOfferPage({
 }: {
   searchParams: Promise<{ returnTo?: string; placeId?: string }>;
 }) {
+  const routing = await getCurrentRequestRoutingContext();
   const user = await getCurrentUser();
 
   if (!user || !canCreateBusinessContent(user.role)) {
-    redirect("/business/login");
+    redirect(
+      buildSurfaceRedirectDestination({
+        targetSurface: "public",
+        targetPath: "/login",
+        ...routing,
+      }),
+    );
   }
 
   const business = await prisma.business.findUnique({
@@ -34,7 +44,13 @@ export default async function EditorNewOfferPage({
   });
 
   if (!business && user.role === "BUSINESS_OWNER") {
-    redirect("/business/onboarding");
+    redirect(
+      buildSurfaceRedirectDestination({
+        targetSurface: "business",
+        targetPath: "/onboarding",
+        ...routing,
+      }),
+    );
   }
 
   const { returnTo, placeId: placeIdParam } = await searchParams;
@@ -55,7 +71,12 @@ export default async function EditorNewOfferPage({
   }
   const surface = surfaceFromUserRole(user.role);
   const nav = defaultEditorNav(surface, "offer");
-  const backHref = returnTo ?? nav.afterSubmitListPath;
+  const backHref = resolveEditorReturnDestination({
+    surface,
+    entity: "offer",
+    returnTo,
+    ...routing,
+  });
 
   return (
     <ContentEditorChrome

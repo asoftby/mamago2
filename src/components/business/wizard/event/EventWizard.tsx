@@ -51,6 +51,7 @@ import {
   readEventEditorReturnStep,
 } from "@/lib/business/eventEditorReturnStep";
 import { parseEventEditorStepQuery } from "@/lib/business/eventEditorStepQuery";
+import { navigateToCompatibleHref } from "@/lib/routing/clientNavigation";
 
 interface EventWizardProps {
   mode: EventWizardMode;
@@ -566,11 +567,11 @@ function EventWizardInner({
       if (onComplete) {
         onComplete(targetId);
       } else if (mode === "create") {
-        router.push(afterSubmitDestination);
+        navigateToCompatibleHref(router, afterSubmitDestination);
       } else if (returnTo) {
-        router.push(returnTo);
+        navigateToCompatibleHref(router, returnTo);
       } else if (surface === "admin") {
-        router.push(nav.afterSubmitListPath);
+        navigateToCompatibleHref(router, nav.afterSubmitListPath);
       } else {
         router.refresh();
       }

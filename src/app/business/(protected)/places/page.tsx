@@ -4,6 +4,8 @@ import prisma from "@/lib/prisma";
 import { PlacesList } from "./PlacesList";
 import { getBusinessPlaces } from "@/server/services/place.service";
 import { canCreateBusinessContent, canManageOwnedContent } from "@/lib/auth/businessContentAccess";
+import { buildSurfaceRedirectDestination } from "@/lib/routing/surface";
+import { getCurrentRequestRoutingContext } from "@/lib/routing/requestContext";
 
 interface SearchParams {
   view?: "active" | "archived";
@@ -14,10 +16,17 @@ export default async function PlacesPage({
 }: {
   searchParams: Promise<SearchParams>;
 }) {
+  const routing = await getCurrentRequestRoutingContext();
   const user = await getCurrentUser();
   
   if (!user || !canCreateBusinessContent(user.role)) {
-    redirect("/business/login");
+    redirect(
+      buildSurfaceRedirectDestination({
+        targetSurface: "public",
+        targetPath: "/login",
+        ...routing,
+      }),
+    );
   }
 
   // Verify user has a business
@@ -29,7 +38,13 @@ export default async function PlacesPage({
     // User is BUSINESS_OWNER but has no Business entity
     // This shouldn't happen in production, but handle gracefully
     console.warn(`User ${user.email} has BUSINESS_OWNER role but no Business entity`);
-    redirect("/business/onboarding");
+    redirect(
+      buildSurfaceRedirectDestination({
+        targetSurface: "business",
+        targetPath: "/onboarding",
+        ...routing,
+      }),
+    );
   }
 
   const params = await searchParams;
@@ -102,4 +117,3 @@ export default async function PlacesPage({
     </div>
   );
 }
-

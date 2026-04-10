@@ -5,6 +5,8 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/server";
 import { canCreateBusinessContent } from "@/lib/auth/businessContentAccess";
+import { buildSurfaceRedirectDestination } from "@/lib/routing/surface";
+import { getCurrentRequestRoutingContext } from "@/lib/routing/requestContext";
 
 interface EditOfferPageProps {
   params: Promise<{ id: string }>;
@@ -12,10 +14,17 @@ interface EditOfferPageProps {
 }
 
 export default async function EditOfferPage({ params, searchParams }: EditOfferPageProps) {
+  const routing = await getCurrentRequestRoutingContext();
   const user = await getCurrentUser();
 
   if (!user || !canCreateBusinessContent(user.role)) {
-    redirect("/business/login");
+    redirect(
+      buildSurfaceRedirectDestination({
+        targetSurface: "public",
+        targetPath: "/login",
+        ...routing,
+      }),
+    );
   }
 
   const { id } = await params;
@@ -25,5 +34,11 @@ export default async function EditOfferPage({ params, searchParams }: EditOfferP
     qs.set("returnTo", sp.returnTo);
   }
   const q = qs.toString();
-  redirect(`/editor/offer/${id}/edit${q ? `?${q}` : ""}`);
+  redirect(
+    buildSurfaceRedirectDestination({
+      targetSurface: "public",
+      targetPath: `/editor/offer/${id}/edit${q ? `?${q}` : ""}`,
+      ...routing,
+    }),
+  );
 }

@@ -6,8 +6,11 @@ import { EventWizard } from "@/components/business/wizard/event/EventWizard";
 import { ContentEditorChrome } from "@/components/content-editor/ContentEditorChrome";
 import {
   defaultEditorNav,
+  resolveEditorReturnDestination,
   type ContentEditorSurface,
 } from "@/lib/content-editor/types";
+import { buildSurfaceRedirectDestination } from "@/lib/routing/surface";
+import { getCurrentRequestRoutingContext } from "@/lib/routing/requestContext";
 
 function surfaceFromUserRole(role: string): ContentEditorSurface {
   return role === "ADMIN" || role === "MODERATOR" ? "admin" : "business";
@@ -18,10 +21,17 @@ export default async function EditorNewEventPage({
 }: {
   searchParams: Promise<{ returnTo?: string }>;
 }) {
+  const routing = await getCurrentRequestRoutingContext();
   const user = await getCurrentUser();
 
   if (!user || !canCreateBusinessContent(user.role)) {
-    redirect("/business/login");
+    redirect(
+      buildSurfaceRedirectDestination({
+        targetSurface: "public",
+        targetPath: "/login",
+        ...routing,
+      }),
+    );
   }
 
   const business = await prisma.business.findUnique({
@@ -37,7 +47,12 @@ export default async function EditorNewEventPage({
   const { returnTo } = await searchParams;
   const surface = surfaceFromUserRole(user.role);
   const nav = defaultEditorNav(surface, "event");
-  const backHref = returnTo ?? nav.afterSubmitListPath;
+  const backHref = resolveEditorReturnDestination({
+    surface,
+    entity: "event",
+    returnTo,
+    ...routing,
+  });
 
   const businessProps = business
     ? {

@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getSessionToken, validateSession } from "./session";
 import type { User, Role } from "@prisma/client";
+import { buildSurfaceRedirectDestination } from "@/lib/routing/surface";
 
 /**
  * Get the current authenticated user (returns null if not authenticated)
@@ -21,7 +22,12 @@ export async function getCurrentUser(): Promise<User | null> {
 export async function requireUser(): Promise<User> {
   const user = await getCurrentUser();
   if (!user) {
-    redirect("/login");
+    redirect(
+      buildSurfaceRedirectDestination({
+        targetSurface: "public",
+        targetPath: "/login",
+      }),
+    );
   }
   return user;
 }

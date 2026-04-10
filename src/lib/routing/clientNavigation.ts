@@ -1,6 +1,8 @@
 import {
   type AppSurface,
   buildSurfaceRedirectDestination,
+  normalizeTargetPathForSurface,
+  surfaceFromPathname,
 } from "./surface.ts";
 
 type RouterLike = {
@@ -44,6 +46,55 @@ export function buildCurrentBrowserSurfaceDestination(
 
 function isAbsoluteDestination(href: string): boolean {
   return href.startsWith("http://") || href.startsWith("https://");
+}
+
+export function buildClientCompatibleDestination(
+  href: string,
+  context?: {
+    currentHost?: string | null;
+    currentProtocol?: string | null;
+  },
+): string {
+  if (!href) return "/";
+  if (isAbsoluteDestination(href)) return href;
+  if (!href.startsWith("/")) return href;
+  const targetSurface = surfaceFromPathname(href);
+
+  return buildClientSurfaceDestination({
+    targetSurface,
+    targetPath: normalizeTargetPathForSurface(targetSurface, href),
+    currentHost: context?.currentHost,
+    currentProtocol: context?.currentProtocol,
+  });
+}
+
+export function buildCurrentBrowserCompatibleDestination(href: string): string {
+  return buildClientCompatibleDestination(href, getCurrentBrowserRoutingContext());
+}
+
+export function navigateToCompatibleHref(
+  router: RouterLike,
+  href: string,
+  options?: { replace?: boolean },
+): string {
+  const destination = buildCurrentBrowserCompatibleDestination(href);
+
+  if (typeof window !== "undefined" && isAbsoluteDestination(destination)) {
+    if (options?.replace) {
+      window.location.replace(destination);
+    } else {
+      window.location.assign(destination);
+    }
+    return destination;
+  }
+
+  if (options?.replace) {
+    router.replace(destination);
+  } else {
+    router.push(destination);
+  }
+
+  return destination;
 }
 
 export function navigateToSurface(

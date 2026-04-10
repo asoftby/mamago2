@@ -16,6 +16,8 @@ import {
 import { runPostAuthPipeline } from "@/lib/post-auth/pipeline";
 import { trackAuthCompleted, applyPostAuthCompletionOutcome } from "@/lib/post-auth/resolver";
 import { trackPostAuthEvent } from "@/lib/post-auth/analytics";
+import { getPostAuthRedirect } from "@/lib/auth/postAuthRedirect";
+import { navigateToSurface } from "@/lib/routing/clientNavigation";
 
 export type AuthModalPhase = "auth" | "completion";
 
@@ -59,7 +61,7 @@ export function DefaultAuthModal({
       savePostAuthContext({
         source: authEntryPoint,
         pendingAction: null,
-        returnTo: nextHref || "/me",
+        returnTo: nextHref || getPostAuthRedirect(),
       });
     }
   }, [open, authEntryPoint, nextHref]);
@@ -93,7 +95,10 @@ export function DefaultAuthModal({
         });
       } else if (authEntryPoint === "profile") {
         // Профиль уже был готов при открытии completion — иначе редирект не вызывался
-        router.push("/me");
+        navigateToSurface(router, {
+          targetSurface: "public",
+          targetPath: "/me",
+        });
       }
       onAuthSuccess?.();
       onOpenChange(false);

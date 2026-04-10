@@ -2,6 +2,14 @@
  * Shared content editor surface — same UI for business dashboard authors and admin/moderation.
  */
 
+import {
+  buildAdminPath,
+  buildBusinessPath,
+  buildSurfaceRedirectDestination,
+  normalizeTargetPathForSurface,
+  surfaceFromPathname,
+} from "../routing/surface.ts";
+
 export type ContentEditorSurface = "business" | "admin";
 
 export type ContentEditorEntity = "place" | "event" | "offer";
@@ -32,23 +40,51 @@ export function defaultEditorNav(
 ): ContentEditorNav {
   if (surface === "admin") {
     if (entity === "event") {
-      return { afterSubmitListPath: "/admin/content/events" };
+      return { afterSubmitListPath: buildAdminPath("/content/events") };
     }
     if (entity === "offer") {
-      return { afterSubmitListPath: "/admin/content/offers" };
+      return { afterSubmitListPath: buildAdminPath("/content/offers") };
     }
-    return { afterSubmitListPath: "/admin/content/places" };
+    return { afterSubmitListPath: buildAdminPath("/content/places") };
   }
   if (entity === "event") {
-    return { afterSubmitListPath: "/business/events" };
+    return { afterSubmitListPath: buildBusinessPath("/events") };
   }
   if (entity === "offer") {
-    return { afterSubmitListPath: "/business/offers" };
+    return { afterSubmitListPath: buildBusinessPath("/offers") };
   }
-  return { afterSubmitListPath: "/business/places" };
+  return { afterSubmitListPath: buildBusinessPath("/places") };
 }
 
 /** @deprecated Use defaultEditorNav(surface, "place") */
 export function defaultNavForSurface(surface: ContentEditorSurface): ContentEditorNav {
   return defaultEditorNav(surface, "place");
+}
+
+export function resolveEditorReturnDestination(params: {
+  surface: ContentEditorSurface;
+  entity: ContentEditorEntity;
+  returnTo?: string | null;
+  currentHost?: string | null;
+  currentProtocol?: string | null;
+}): string {
+  const fallback = defaultEditorNav(params.surface, params.entity).afterSubmitListPath;
+  const rawTarget = params.returnTo?.trim() || fallback;
+
+  if (
+    rawTarget.startsWith("http://") ||
+    rawTarget.startsWith("https://") ||
+    !rawTarget.startsWith("/")
+  ) {
+    return rawTarget;
+  }
+
+  const targetSurface = surfaceFromPathname(rawTarget);
+
+  return buildSurfaceRedirectDestination({
+    targetSurface,
+    targetPath: normalizeTargetPathForSurface(targetSurface, rawTarget),
+    currentHost: params.currentHost,
+    currentProtocol: params.currentProtocol,
+  });
 }

@@ -5,9 +5,12 @@ import { PlaceWizard } from "@/components/business/wizard/place/PlaceWizard";
 import { ContentEditorChrome } from "@/components/content-editor/ContentEditorChrome";
 import {
   defaultNavForSurface,
+  resolveEditorReturnDestination,
   type ContentEditorSurface,
 } from "@/lib/content-editor/types";
 import { loadPlaceForWizard } from "@/lib/content-editor/loadPlaceForWizard";
+import { buildSurfaceRedirectDestination } from "@/lib/routing/surface";
+import { getCurrentRequestRoutingContext } from "@/lib/routing/requestContext";
 
 function surfaceFromUserRole(role: string): ContentEditorSurface {
   return role === "ADMIN" || role === "MODERATOR" ? "admin" : "business";
@@ -20,10 +23,17 @@ export default async function EditorEditPlacePage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ returnTo?: string }>;
 }) {
+  const routing = await getCurrentRequestRoutingContext();
   const user = await getCurrentUser();
 
   if (!user) {
-    redirect("/login");
+    redirect(
+      buildSurfaceRedirectDestination({
+        targetSurface: "public",
+        targetPath: "/login",
+        ...routing,
+      }),
+    );
   }
 
   const { id } = await params;
@@ -44,14 +54,31 @@ export default async function EditorEditPlacePage({
 
   if (!canEdit) {
     if (user.role === "BUSINESS_OWNER") {
-      redirect("/business/places");
+      redirect(
+        buildSurfaceRedirectDestination({
+          targetSurface: "business",
+          targetPath: "/places",
+          ...routing,
+        }),
+      );
     }
-    redirect("/login");
+    redirect(
+      buildSurfaceRedirectDestination({
+        targetSurface: "public",
+        targetPath: "/login",
+        ...routing,
+      }),
+    );
   }
 
   const surface = surfaceFromUserRole(user.role);
   const nav = defaultNavForSurface(surface);
-  const backHref = returnTo ?? nav.afterSubmitListPath;
+  const backHref = resolveEditorReturnDestination({
+    surface,
+    entity: "place",
+    returnTo,
+    ...routing,
+  });
 
   const title =
     place.status === "PUBLISHED" ? "Редактирование места" : "Место — черновик";

@@ -6,12 +6,15 @@ import { EventWizard } from "@/components/business/wizard/event/EventWizard";
 import { ContentEditorChrome } from "@/components/content-editor/ContentEditorChrome";
 import {
   defaultEditorNav,
+  resolveEditorReturnDestination,
   type ContentEditorSurface,
 } from "@/lib/content-editor/types";
 import { loadEventForWizard } from "@/lib/content-editor/loadEventForWizard";
 import { canEditEventActivity } from "@/lib/permissions/eventEditPermissions";
 import { parseEventEditorStepQuery } from "@/lib/business/eventEditorStepQuery";
 import { TOTAL_EVENT_WIZARD_STEPS } from "@/components/business/wizard/event/eventWizardSteps.config";
+import { buildSurfaceRedirectDestination } from "@/lib/routing/surface";
+import { getCurrentRequestRoutingContext } from "@/lib/routing/requestContext";
 
 function surfaceFromUserRole(role: string): ContentEditorSurface {
   return role === "ADMIN" || role === "MODERATOR" ? "admin" : "business";
@@ -24,10 +27,17 @@ export default async function EditorEditEventPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ returnTo?: string; step?: string | string[] }>;
 }) {
+  const routing = await getCurrentRequestRoutingContext();
   const user = await getCurrentUser();
 
   if (!user || !canCreateBusinessContent(user.role)) {
-    redirect("/business/login");
+    redirect(
+      buildSurfaceRedirectDestination({
+        targetSurface: "public",
+        targetPath: "/login",
+        ...routing,
+      }),
+    );
   }
 
   const { id } = await params;
@@ -52,9 +62,21 @@ export default async function EditorEditEventPage({
 
   if (!(await canEditEventActivity(user, event))) {
     if (user.role === "BUSINESS_OWNER") {
-      redirect("/business/events");
+      redirect(
+        buildSurfaceRedirectDestination({
+          targetSurface: "business",
+          targetPath: "/events",
+          ...routing,
+        }),
+      );
     }
-    redirect("/login");
+    redirect(
+      buildSurfaceRedirectDestination({
+        targetSurface: "public",
+        targetPath: "/login",
+        ...routing,
+      }),
+    );
   }
 
   const business = await prisma.business.findUnique({
@@ -69,7 +91,12 @@ export default async function EditorEditEventPage({
 
   const surface = surfaceFromUserRole(user.role);
   const nav = defaultEditorNav(surface, "event");
-  const backHref = returnTo ?? nav.afterSubmitListPath;
+  const backHref = resolveEditorReturnDestination({
+    surface,
+    entity: "event",
+    returnTo,
+    ...routing,
+  });
 
   const businessProps = business
     ? {

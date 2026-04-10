@@ -81,6 +81,16 @@ function buildExternalPathForSurface(surface: AppSurface, path: string): string 
   return `${visiblePathname}${search}${hash}`;
 }
 
+export function normalizeTargetPathForSurface(surface: AppSurface, path: string): string {
+  if (!path.startsWith("/")) {
+    return path;
+  }
+
+  const { pathname, search, hash } = splitPathQueryAndHash(path);
+  const normalizedPathname = stripSurfacePrefix(pathname, surface);
+  return `${normalizedPathname}${search}${hash}`;
+}
+
 function parseHost(host: string): { hostname: string; port: string } {
   const normalized = host.trim().replace(/^\[|\]$/g, "");
   const lastColon = normalized.lastIndexOf(":");

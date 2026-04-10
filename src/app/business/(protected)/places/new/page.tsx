@@ -3,7 +3,17 @@
  */
 
 import { redirect } from "next/navigation";
+import { buildSurfaceRedirectDestination } from "@/lib/routing/surface";
+import { getCurrentRequestRoutingContext } from "@/lib/routing/requestContext";
 
 export default async function NewPlacePage() {
-  redirect("/editor/place/new");
+  const routing = await getCurrentRequestRoutingContext();
+
+  redirect(
+    buildSurfaceRedirectDestination({
+      targetSurface: "public",
+      targetPath: "/editor/place/new",
+      ...routing,
+    }),
+  );
 }

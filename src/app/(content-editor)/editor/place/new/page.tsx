@@ -5,8 +5,11 @@ import { PlaceWizard } from "@/components/business/wizard/place/PlaceWizard";
 import { ContentEditorChrome } from "@/components/content-editor/ContentEditorChrome";
 import {
   defaultNavForSurface,
+  resolveEditorReturnDestination,
   type ContentEditorSurface,
 } from "@/lib/content-editor/types";
+import { buildSurfaceRedirectDestination } from "@/lib/routing/surface";
+import { getCurrentRequestRoutingContext } from "@/lib/routing/requestContext";
 
 function surfaceFromUserRole(role: string): ContentEditorSurface {
   return role === "ADMIN" || role === "MODERATOR" ? "admin" : "business";
@@ -17,16 +20,28 @@ export default async function EditorNewPlacePage({
 }: {
   searchParams: Promise<{ returnTo?: string }>;
 }) {
+  const routing = await getCurrentRequestRoutingContext();
   const user = await getCurrentUser();
 
   if (!user || !canCreateBusinessContent(user.role)) {
-    redirect("/business/login");
+    redirect(
+      buildSurfaceRedirectDestination({
+        targetSurface: "public",
+        targetPath: "/login",
+        ...routing,
+      }),
+    );
   }
 
   const { returnTo } = await searchParams;
   const surface = surfaceFromUserRole(user.role);
   const nav = defaultNavForSurface(surface);
-  const backHref = returnTo ?? nav.afterSubmitListPath;
+  const backHref = resolveEditorReturnDestination({
+    surface,
+    entity: "place",
+    returnTo,
+    ...routing,
+  });
 
   return (
     <ContentEditorChrome
