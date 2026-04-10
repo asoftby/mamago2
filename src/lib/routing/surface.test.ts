@@ -6,6 +6,7 @@ import {
   buildAdminPath,
   buildBusinessPath,
   buildPublicPath,
+  buildSurfaceRedirectDestination,
   resolveSurfaceFromHostAndPathname,
   surfaceFromPathname,
 } from "./surface";
@@ -37,5 +38,55 @@ assert.equal(buildPublicPath(""), "/");
 assert.equal(buildPublicPath("/"), "/");
 assert.equal(buildPublicPath("/me/plan"), "/me/plan");
 assert.equal(buildPublicPath("me"), "/me");
+
+assert.equal(
+  buildSurfaceRedirectDestination({
+    targetSurface: "public",
+    targetPath: "/login?from=admin",
+    currentHost: "admin.mamago.by",
+    currentProtocol: "https",
+  }),
+  "https://mamago.by/login?from=admin",
+);
+
+assert.equal(
+  buildSurfaceRedirectDestination({
+    targetSurface: "admin",
+    targetPath: "/",
+    currentHost: "business.mamago.by",
+    currentProtocol: "https",
+  }),
+  "https://admin.mamago.by/",
+);
+
+assert.equal(
+  buildSurfaceRedirectDestination({
+    targetSurface: "business",
+    targetPath: "/dashboard",
+    currentHost: "mamago.local:3002",
+    currentProtocol: "http",
+  }),
+  "http://business.mamago.local:3002/dashboard",
+);
+
+assert.equal(
+  buildSurfaceRedirectDestination({
+    targetSurface: "business",
+    targetPath: "/dashboard",
+    currentHost: "localhost:3000",
+    currentProtocol: "http",
+  }),
+  "/business/dashboard",
+);
+
+assert.equal(
+  buildSurfaceRedirectDestination({
+    targetSurface: "public",
+    targetPath: "/profile",
+    currentHost: "preview.example.com",
+    currentProtocol: "https",
+  }),
+  "/profile",
+);
 
 console.log("surface routing tests: OK");

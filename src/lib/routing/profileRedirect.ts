@@ -1,4 +1,5 @@
 import type { Role } from "@prisma/client";
+import { buildSurfaceRedirectDestination } from "@/lib/routing/surface";
 
 /**
  * Get the appropriate profile destination URL based on user role and business status
@@ -10,13 +11,18 @@ import type { Role } from "@prisma/client";
  * @returns Absolute or relative URL for profile destination
  */
 export function getProfileDestination(params: {
-  host: string;
+  host?: string;
+  protocol?: string;
   role: Role;
   businessStatus?: "DRAFT" | "PENDING" | "REJECTED" | "APPROVED" | "NEEDS_INFO" | null;
 }): string {
-  void params.host;
   void params.role;
   void params.businessStatus;
   /** Единая точка входа в личный кабинет — без редиректов по роли. */
-  return "/me";
+  return buildSurfaceRedirectDestination({
+    targetSurface: "public",
+    targetPath: "/profile",
+    currentHost: params.host,
+    currentProtocol: params.protocol,
+  });
 }

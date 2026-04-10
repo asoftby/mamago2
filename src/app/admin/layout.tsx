@@ -6,6 +6,8 @@ import { getModerationNavCounts } from "@/lib/admin/getModerationNavCounts";
 import { getB2bPendingVerificationCount } from "@/lib/admin/getB2bPendingVerificationCount";
 import type { ModerationNavCounts } from "@/lib/admin/moderationSidebarConfig";
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
+import { buildSurfaceRedirectDestination } from "@/lib/routing/surface";
 
 const EMPTY_MODERATION_COUNTS: ModerationNavCounts = {
   queueTotal: 0,
@@ -15,15 +17,32 @@ const EMPTY_MODERATION_COUNTS: ModerationNavCounts = {
 };
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
+  const headerStore = await headers();
+  const host = headerStore.get("x-forwarded-host") ?? headerStore.get("host");
+  const protocol = headerStore.get("x-forwarded-proto");
   const user = await getCurrentUser();
 
   // Require authentication for admin
   if (!user) {
-    redirect("/login?from=admin");
+    redirect(
+      buildSurfaceRedirectDestination({
+        targetSurface: "public",
+        targetPath: "/login?from=admin",
+        currentHost: host,
+        currentProtocol: protocol,
+      }),
+    );
   }
 
   if (user.role !== "ADMIN" && user.role !== "MODERATOR") {
-    redirect("/me");
+    redirect(
+      buildSurfaceRedirectDestination({
+        targetSurface: "public",
+        targetPath: "/me",
+        currentHost: host,
+        currentProtocol: protocol,
+      }),
+    );
   }
 
   let moderationCounts: ModerationNavCounts = EMPTY_MODERATION_COUNTS;
