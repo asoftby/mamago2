@@ -69,7 +69,7 @@ for (const [slug, cityAliases] of Object.entries(aliases)) {
 ### Diagnostic Test Results
 
 ```bash
-npx tsx scripts/diagnose-city-resolution.ts
+npx tsx scripts/diagnostics/diagnose-city-resolution.ts
 ```
 
 **Output:**
@@ -165,7 +165,7 @@ npx tsx scripts/manual-tests/test-place-creation-with-city.ts
 
 **Lines changed:** ~50 lines in `resolveCityByAddressComponents` function
 
-### 2. scripts/diagnose-city-resolution.ts (NEW)
+### 2. scripts/diagnostics/diagnose-city-resolution.ts (NEW)
 **Purpose:** Diagnostic script to test city resolution pipeline
 **Tests:**
 - City table data completeness

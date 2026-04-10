@@ -5,8 +5,8 @@
  * Identifies exactly where data is lost or processing fails
  */
 
-import prisma from "../src/lib/prisma";
-import { resolveCityId } from "../src/services/place/cityResolver.service";
+import prisma from "../../src/lib/prisma";
+import { resolveCityId } from "../../src/services/place/cityResolver.service";
 
 // Sample Google address_components for "ул. Мястровская 5, Минск"
 const sampleAddressComponents = [

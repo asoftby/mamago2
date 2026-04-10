@@ -2,7 +2,7 @@
  * Debug script to test city resolution from different paths
  */
 
-import { getCityFromPath, getIntentFromPath } from "../src/lib/intent";
+import { getCityFromPath, getIntentFromPath } from "../../src/lib/intent";
 
 const testPaths = [
   "/",

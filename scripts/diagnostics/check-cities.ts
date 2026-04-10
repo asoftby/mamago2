@@ -4,7 +4,7 @@
  * Check cities in database
  */
 
-import { prisma } from "../src/lib/prisma";
+import { prisma } from "../../src/lib/prisma";
 
 async function checkCities() {
   console.log("🏙️ Checking cities in database");

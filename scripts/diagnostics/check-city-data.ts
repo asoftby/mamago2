@@ -5,7 +5,7 @@
  * Verifies what cities, districts, and metro stations exist
  */
 
-import prisma from "../src/lib/prisma.js";
+import prisma from "../../src/lib/prisma.js";
 
 async function checkCityData() {
   console.log("🔍 Checking City Data in Database\n");

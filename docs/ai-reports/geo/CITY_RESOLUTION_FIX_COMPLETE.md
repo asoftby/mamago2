@@ -136,7 +136,7 @@ Step 5: Return enriched place
 - Populated `City.radiusKm` for Minsk
 
 ### Test Scripts
-- `scripts/check-city-coordinates.ts` - Verify city coordinates
+- `scripts/diagnostics/check-city-coordinates.ts` - Verify city coordinates
 - `scripts/seed-city-coordinates.ts` - Populate city coordinates
 - `scripts/manual-tests/test-city-resolution.ts` - Unit tests for resolver
 - `scripts/manual-tests/test-place-geo-enrichment.ts` - E2E tests for full pipeline

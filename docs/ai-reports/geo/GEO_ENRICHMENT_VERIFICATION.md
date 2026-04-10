@@ -26,7 +26,7 @@ npx tsx scripts/manual-tests/test-enrich-location-api.ts
 
 ### Diagnostic Tests
 ```bash
-npx tsx scripts/diagnose-district-metro.ts
+npx tsx scripts/diagnostics/diagnose-district-metro.ts
 ```
 
 **Database verification:**
@@ -108,7 +108,7 @@ The implementation is complete and verified. You can now:
 
 ### Created (3 files)
 1. `src/app/api/geo/enrich-location/route.ts` - Full enrichment API
-2. `scripts/diagnose-district-metro.ts` - Diagnostic tool
+2. `scripts/diagnostics/diagnose-district-metro.ts` - Diagnostic tool
 3. `scripts/manual-tests/test-enrich-location-api.ts` - API tests
 
 ### Modified (1 file)

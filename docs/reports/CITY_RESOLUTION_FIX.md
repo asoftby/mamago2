@@ -160,14 +160,14 @@ export function Component({ city }) {
 - `src/lib/intent.ts` - Core fix
 - `src/components/city/DiscoveryIntentTabs.tsx` - Handle null city + fix hooks
 - `src/features/filters/discovery/filters.api.ts` - Handle null citySlug
-- `scripts/debug-city-resolution.ts` - Debug script (new)
-- `scripts/list-cities.ts` - Helper script (new)
+- `scripts/diagnostics/debug-city-resolution.ts` - Debug script (new)
+- `scripts/diagnostics/list-cities.ts` - Helper script (new)
 
 ## Testing
 
 Run debug script to verify:
 ```bash
-npx tsx scripts/debug-city-resolution.ts
+npx tsx scripts/diagnostics/debug-city-resolution.ts
 ```
 
 Visit these URLs to test:

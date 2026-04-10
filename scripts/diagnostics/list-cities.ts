@@ -1,4 +1,4 @@
-import prisma from "../src/lib/prisma";
+import prisma from "../../src/lib/prisma";
 
 async function listCities() {
   const cities = await prisma.city.findMany({

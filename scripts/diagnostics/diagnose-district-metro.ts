@@ -4,7 +4,7 @@
  * Checks why district and metro are not being resolved
  */
 
-import prisma from "../src/lib/prisma";
+import prisma from "../../src/lib/prisma";
 
 const testCoordinates = {
   lat: 53.9320215,

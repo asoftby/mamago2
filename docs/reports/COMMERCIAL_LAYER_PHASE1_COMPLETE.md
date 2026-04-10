@@ -263,7 +263,7 @@ npx tsx prisma/seed-commercial.ts
 - `src/server/services/commercial/commercialOverview.service.ts`
 
 ### Scripts
-- `scripts/check-business-status.ts` (helper for debugging)
+- `scripts/diagnostics/check-business-status.ts` (helper for debugging)
 
 ---
 
@@ -322,7 +322,7 @@ npx tsx prisma/seed-commercial.ts
 
 ### Verify Seed Data
 ```bash
-npx tsx scripts/check-business-status.ts
+npx tsx scripts/diagnostics/check-business-status.ts
 npx tsx prisma/seed-commercial.ts
 ```
 

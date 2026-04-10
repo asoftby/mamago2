@@ -2,7 +2,7 @@
  * Check if City table has coordinates populated
  */
 
-import prisma from "../src/lib/prisma";
+import prisma from "../../src/lib/prisma";
 
 async function main() {
   console.log("Checking City coordinates...\n");

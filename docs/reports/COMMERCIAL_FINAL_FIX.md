@@ -112,7 +112,7 @@ If you want to verify data before restarting:
 
 ```bash
 # Check data counts
-npx tsx scripts/check-commercial-data.ts
+npx tsx scripts/diagnostics/check-commercial-data.ts
 
 # Test services
 npx tsx scripts/manual-tests/test-commercial-services.ts

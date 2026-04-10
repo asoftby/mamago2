@@ -2,11 +2,11 @@
  * Скрипт для проверки и изменения роли пользователя
  * 
  * Использование:
- * pnpm tsx scripts/check-user-role.ts <email>
- * pnpm tsx scripts/check-user-role.ts <email> --set-admin
+ * pnpm tsx scripts/diagnostics/check-user-role.ts <email>
+ * pnpm tsx scripts/diagnostics/check-user-role.ts <email> --set-admin
  */
 
-import prisma from "../src/lib/prisma";
+import prisma from "../../src/lib/prisma";
 import { Role } from "@prisma/client";
 
 async function main() {
@@ -16,8 +16,8 @@ async function main() {
   if (!email) {
     console.error("❌ Укажите email пользователя");
     console.log("\nИспользование:");
-    console.log("  pnpm tsx scripts/check-user-role.ts <email>");
-    console.log("  pnpm tsx scripts/check-user-role.ts <email> --set-admin");
+    console.log("  pnpm tsx scripts/diagnostics/check-user-role.ts <email>");
+    console.log("  pnpm tsx scripts/diagnostics/check-user-role.ts <email> --set-admin");
     process.exit(1);
   }
 

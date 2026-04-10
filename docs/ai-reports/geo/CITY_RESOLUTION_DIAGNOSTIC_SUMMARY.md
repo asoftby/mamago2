@@ -153,7 +153,7 @@ NewPlaceWizard updates state
 - ✅ City table - Populated radiusKm for Minsk
 
 ### Test Scripts Created
-- ✅ `scripts/check-city-coordinates.ts` - Verify city data
+- ✅ `scripts/diagnostics/check-city-coordinates.ts` - Verify city data
 - ✅ `scripts/seed-city-coordinates.ts` - Populate city data
 - ✅ `scripts/manual-tests/test-city-resolution.ts` - Unit tests
 - ✅ `scripts/manual-tests/test-place-geo-enrichment.ts` - E2E tests
@@ -198,7 +198,7 @@ To clear IDE cache:
 2. If issues persist:
    ```bash
    # Verify database
-   npx tsx scripts/check-city-coordinates.ts
+   npx tsx scripts/diagnostics/check-city-coordinates.ts
    
    # Run E2E test
    npx tsx scripts/manual-tests/test-place-geo-enrichment.ts

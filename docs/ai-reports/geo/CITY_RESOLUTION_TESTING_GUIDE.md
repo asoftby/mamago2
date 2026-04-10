@@ -6,7 +6,7 @@ Run these commands to verify the fix:
 
 ```bash
 # 1. Check city coordinates are populated
-npx tsx scripts/check-city-coordinates.ts
+npx tsx scripts/diagnostics/check-city-coordinates.ts
 
 # 2. Test city resolution logic
 npx tsx scripts/manual-tests/test-city-resolution.ts
@@ -111,7 +111,7 @@ npx prisma generate
 
 **Check 2: City coordinates populated?**
 ```bash
-npx tsx scripts/check-city-coordinates.ts
+npx tsx scripts/diagnostics/check-city-coordinates.ts
 ```
 Should show:
 ```

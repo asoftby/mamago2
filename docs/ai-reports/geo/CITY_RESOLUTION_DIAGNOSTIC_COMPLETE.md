@@ -14,7 +14,7 @@
 
 ### Phase 1: Pipeline Trace
 
-Created diagnostic script (`scripts/diagnose-city-resolution.ts`) to test each component:
+Created diagnostic script (`scripts/diagnostics/diagnose-city-resolution.ts`) to test each component:
 
 1. ✅ City table has valid coordinates and radius
 2. ✅ address_components extracted correctly from Google
@@ -62,7 +62,7 @@ for (const [slug, cityAliases] of Object.entries(aliases)) {
 
 ### Phase 4: Verification
 
-**Unit Test:** `scripts/diagnose-city-resolution.ts`
+**Unit Test:** `scripts/diagnostics/diagnose-city-resolution.ts`
 ```
 ✅ Coordinate resolution: 4.06km from Minsk center
 ✅ Alias match: "Мінск" → slug "minsk"
@@ -189,7 +189,7 @@ const addressResult = await resolveCityByAddressComponents(addressJson);
    - ~50 lines changed in one function
 
 ### Created (2 files)
-1. **scripts/diagnose-city-resolution.ts**
+1. **scripts/diagnostics/diagnose-city-resolution.ts**
    - Diagnostic script for testing city resolution
    - Tests each component of the pipeline
    - Identifies exact failure points
@@ -294,7 +294,7 @@ const aliases: Record<string, string[]> = {
 
 3. Test with diagnostic script:
 ```bash
-npx tsx scripts/diagnose-city-resolution.ts
+npx tsx scripts/diagnostics/diagnose-city-resolution.ts
 ```
 
 ## Monitoring

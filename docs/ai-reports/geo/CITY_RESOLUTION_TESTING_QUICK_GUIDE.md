@@ -35,7 +35,7 @@
 
 ### Diagnostic Test
 ```bash
-npx tsx scripts/diagnose-city-resolution.ts
+npx tsx scripts/diagnostics/diagnose-city-resolution.ts
 ```
 
 **Expected Output:**
@@ -87,7 +87,7 @@ All major Belarusian cities with language variants:
 2. **Check server logs** (terminal 24) for detailed pipeline logs
 3. **Run diagnostic script** to isolate the issue:
    ```bash
-   npx tsx scripts/diagnose-city-resolution.ts
+   npx tsx scripts/diagnostics/diagnose-city-resolution.ts
    ```
 
 ### If district/metro not resolved:
@@ -100,7 +100,7 @@ All major Belarusian cities with language variants:
 ## Files Changed
 
 1. **src/services/place/cityResolver.service.ts** - Added alias matching
-2. **scripts/diagnose-city-resolution.ts** - Diagnostic tool (NEW)
+2. **scripts/diagnostics/diagnose-city-resolution.ts** - Diagnostic tool (NEW)
 3. **scripts/manual-tests/test-place-creation-with-city.ts** - E2E test (NEW)
 
 ## Documentation

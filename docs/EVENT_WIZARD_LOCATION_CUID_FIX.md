@@ -71,7 +71,7 @@ npx tsx scripts/manual-tests/test-api-with-cuid.ts
 
 ### Database Verification
 ```bash
-npx tsx scripts/check-city-data.ts
+npx tsx scripts/diagnostics/check-city-data.ts
 ```
 
 ✅ Минск (minsk) - ID: `cmmj3p3uh0011ws3mmxhskmsf`  

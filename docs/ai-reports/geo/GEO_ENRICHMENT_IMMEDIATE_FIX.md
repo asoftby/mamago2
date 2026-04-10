@@ -21,7 +21,7 @@
 
 ### Шаг 1: Проверка данных в БД
 
-Запустил `scripts/diagnose-district-metro.ts`:
+Запустил `scripts/diagnostics/diagnose-district-metro.ts`:
 
 ```
 ✅ City found: Минск
@@ -234,7 +234,7 @@ Test 2: Minsk center (53.9045, 27.5615)
    - Полное геообогащение без создания Place
    - Возвращает cityId, district, metro
 
-2. **scripts/diagnose-district-metro.ts** (НОВЫЙ)
+2. **scripts/diagnostics/diagnose-district-metro.ts** (НОВЫЙ)
    - Диагностический скрипт для проверки данных
    - Проверяет наличие districts и metro stations
    - Вычисляет расстояния

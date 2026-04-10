@@ -122,7 +122,7 @@ export async function enrichEventLocation(data) {
 
 ### Database Verification
 ```bash
-npx tsx scripts/check-city-data.ts
+npx tsx scripts/diagnostics/check-city-data.ts
 ```
 ✅ Минск (minsk) - ID: cmmj3p3uh0011ws3mmxhskmsf
 ✅ Districts: 9, Metro: 36, HasMetro: true
@@ -159,7 +159,7 @@ npx tsx scripts/manual-tests/test-geo-api-direct.ts
 ### For Testing
 ```bash
 # Check database data
-npx tsx scripts/check-city-data.ts
+npx tsx scripts/diagnostics/check-city-data.ts
 
 # Test API endpoints directly
 npx tsx scripts/manual-tests/test-geo-api-direct.ts
@@ -173,7 +173,7 @@ npm run dev
 
 - `src/components/business/wizard/event/steps/location/EventLocationPicker.tsx`
 - `src/components/business/wizard/event/steps/location/eventLocationUtils.ts`
-- `scripts/check-city-data.ts` (новый)
+- `scripts/diagnostics/check-city-data.ts` (новый)
 - `scripts/manual-tests/test-geo-api-direct.ts` (новый)
 
 Event Location теперь работает стабильно в любых условиях! 🎉
