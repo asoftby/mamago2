@@ -1,9 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { NotificationPreferencesClient } from "@/app/(public)/me/settings/notifications/NotificationPreferencesClient";
 import { BusinessNotificationSettingsClient } from "@/app/business/(protected)/settings/notifications/BusinessNotificationSettingsClient";
-import type { PreferenceRow } from "@/server/services/notificationPreference.service";
+import {
+  buildEmptyNotificationSettingsSurfaceData,
+  type NotificationSettingsSurface,
+  type NotificationSettingsSurfaceData,
+} from "@/lib/notifications/settingsDomain";
 import { TelegramStatusRow } from "./TelegramStatusRow";
 
 type Mode = "user" | "business";
@@ -12,39 +16,54 @@ type Props = {
   mode: Mode;
 };
 
+function toSurface(mode: Mode): NotificationSettingsSurface {
+  return mode === "business" ? "BUSINESS" : "USER";
+}
+
 /**
  * Настройки каналов (in-app / email / telegram) внутри NotificationsModal без отдельного route.
+ * После подключения Telegram перезагружает данные с сервера — toggles становятся активны сразу.
  */
 export function NotificationSettingsInModal({ mode }: Props) {
-  const [prefs, setPrefs] = useState<PreferenceRow[] | null>(null);
-  const [telegramConnected, setTelegramConnected] = useState(false);
+  const surface = toSurface(mode);
+  const [data, setData] = useState<NotificationSettingsSurfaceData | null>(null);
+
+  const loadData = useCallback(async () => {
+    try {
+      const response = await fetch(
+        `/api/notifications/settings?surface=${surface.toLowerCase()}`,
+        { credentials: "include" },
+      );
+      const json = (await response.json()) as NotificationSettingsSurfaceData;
+      setData(response.ok ? json : buildEmptyNotificationSettingsSurfaceData(surface));
+    } catch {
+      setData(buildEmptyNotificationSettingsSurfaceData(surface));
+    }
+  }, [surface]);
 
   useEffect(() => {
     let alive = true;
-    (async () => {
+    void (async () => {
       try {
-        const [pRes, nRes] = await Promise.all([
-          fetch("/api/notifications/preferences", { credentials: "include" }),
-          fetch("/api/notifications?limit=1", { credentials: "include" }),
-        ]);
+        const response = await fetch(
+          `/api/notifications/settings?surface=${surface.toLowerCase()}`,
+          { credentials: "include" },
+        );
+        const json = (await response.json()) as NotificationSettingsSurfaceData;
         if (!alive) return;
-        const pJson = (await pRes.json()) as { preferences?: PreferenceRow[] };
-        const nJson = (await nRes.json()) as { telegramConnected?: boolean };
-        setPrefs(pJson.preferences ?? []);
-        setTelegramConnected(nJson.telegramConnected === true);
+        setData(response.ok ? json : buildEmptyNotificationSettingsSurfaceData(surface));
       } catch {
         if (alive) {
-          setPrefs([]);
-          setTelegramConnected(false);
+          setData(buildEmptyNotificationSettingsSurfaceData(surface));
         }
       }
     })();
     return () => {
       alive = false;
     };
-  }, []);
+  }, [surface]);
 
-  if (prefs === null) {
+  if (data === null) {
     return (
       <div className="py-10 text-center text-sm text-neutral-500">Загрузка…</div>
     );
@@ -52,15 +71,18 @@ export function NotificationSettingsInModal({ mode }: Props) {
 
   return (
     <div className="space-y-4 pt-4">
-      <TelegramStatusRow connected={telegramConnected} />
+      <TelegramStatusRow
+        connected={data.telegramConnected}
+        onConnected={loadData}
+      />
       {mode === "user" ? (
         <NotificationPreferencesClient
-          initialPreferences={prefs}
+          initialData={data}
           embedded
         />
       ) : (
         <BusinessNotificationSettingsClient
-          initialPreferences={prefs}
+          initialData={data}
           embedded
         />
       )}

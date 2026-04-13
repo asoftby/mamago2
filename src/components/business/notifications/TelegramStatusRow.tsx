@@ -1,19 +1,74 @@
 "use client";
 
-import Link from "next/link";
+import { useCallback, useRef } from "react";
+import { toast } from "sonner";
 import { CheckCircle2, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { getTelegramBotConnectUrl } from "@/lib/telegram/telegramConnectUrl";
 
 type Props = {
   connected: boolean;
+  /** Called when Telegram connection is confirmed by the server */
+  onConnected?: () => void;
 };
 
+const POLL_INTERVAL_MS = 2000;
+const POLL_TIMEOUT_MS = 120_000;
+
 /**
- * Статус / CTA Telegram внутри модалки настроек (без отдельных overlay).
+ * Статус / CTA Telegram внутри модалки настроек.
+ * После открытия бота запускает polling статуса и вызывает onConnected при успехе.
  */
-export function TelegramStatusRow({ connected }: Props) {
-  const connectUrl = getTelegramBotConnectUrl();
+export function TelegramStatusRow({ connected, onConnected }: Props) {
+  const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollStartRef = useRef<number>(0);
+
+  const stopPolling = useCallback(() => {
+    if (pollTimerRef.current) {
+      clearInterval(pollTimerRef.current);
+      pollTimerRef.current = null;
+    }
+  }, []);
+
+  const startPolling = useCallback(() => {
+    stopPolling();
+    pollStartRef.current = Date.now();
+
+    pollTimerRef.current = setInterval(async () => {
+      if (Date.now() - pollStartRef.current > POLL_TIMEOUT_MS) {
+        stopPolling();
+        return;
+      }
+
+      try {
+        const res = await fetch("/api/settings/telegram/status", { credentials: "include" });
+        if (!res.ok) return;
+        const json = (await res.json()) as { linked?: boolean };
+        if (json.linked) {
+          stopPolling();
+          onConnected?.();
+        }
+      } catch {
+        // ignore transient errors, keep polling
+      }
+    }, POLL_INTERVAL_MS);
+  }, [stopPolling, onConnected]);
+
+  const handleConnect = async () => {
+    try {
+      const res = await fetch("/api/settings/telegram/link", {
+        method: "POST",
+        credentials: "include",
+      });
+      const json = (await res.json()) as { url?: string; error?: string };
+      if (!res.ok || !json.url) {
+        throw new Error(json.error || "Не удалось подготовить Telegram");
+      }
+      window.open(json.url, "_blank", "noopener,noreferrer");
+      startPolling();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Не удалось открыть Telegram");
+    }
+  };
 
   return (
     <div className="flex items-center gap-3 rounded-xl border border-neutral-200 bg-neutral-50/90 px-4 py-3">
@@ -33,11 +88,9 @@ export function TelegramStatusRow({ connected }: Props) {
           </p>
         )}
       </div>
-      {!connected && connectUrl.startsWith("http") ? (
-        <Button size="sm" variant="secondary" className="shrink-0" asChild>
-          <Link href={connectUrl} target="_blank" rel="noopener noreferrer">
-            Подключить
-          </Link>
+      {!connected ? (
+        <Button size="sm" variant="secondary" className="shrink-0" onClick={() => void handleConnect()}>
+          Подключить
         </Button>
       ) : null}
     </div>

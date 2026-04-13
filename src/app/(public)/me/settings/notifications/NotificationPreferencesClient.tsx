@@ -2,232 +2,317 @@
 
 import { useState, useTransition } from "react";
 import { Toggle } from "@/components/ui/Toggle";
-import { Mail, Bell, Send } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Bell, Mail, Send, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import type { PreferenceRow } from "@/server/services/notificationPreference.service";
+import type {
+  NotificationSettingsGroupId,
+  NotificationSettingsRow,
+  NotificationSettingsSurfaceData,
+} from "@/lib/notifications/settingsDomain";
 import type { NotificationType } from "@prisma/client";
 
-// ── Groups ────────────────────────────────────────────────────────────────────
-
-type Group = {
-  title: string;
-  types: NotificationType[];
-};
-
-const GROUPS: Group[] = [
-  {
-    title: "Мои публикации",
-    types: [
-      "PLACE_APPROVED",
-      "PLACE_NEEDS_CHANGES",
-      "PLACE_REJECTED",
-      "PLACE_UPDATE_APPROVED",
-      "PLACE_UPDATE_NEEDS_REVISION",
-      "PLACE_UPDATE_REJECTED",
-      "ACTIVITY_APPROVED",
-      "ACTIVITY_NEEDS_CHANGES",
-      "ACTIVITY_REJECTED",
-      "OFFER_APPROVED",
-      "OFFER_NEEDS_CHANGES",
-      "OFFER_REJECTED",
-    ],
-  },
-  {
-    title: "Заявки и ответы",
-    types: [
-      "BUSINESS_VERIFIED",
-      "BUSINESS_REJECTED",
-      "BUSINESS_NEEDS_INFO",
-    ],
-  },
-  {
-    title: "План и напоминания",
-    types: ["WELCOME", "REMINDER", "RECOMMENDATION", "SYSTEM"],
-  },
-];
-
-const TYPE_LABELS: Record<NotificationType, string> = {
-  PLACE_APPROVED:              "Место опубликовано",
-  PLACE_NEEDS_CHANGES:         "Место требует правок",
-  PLACE_REJECTED:              "Место отклонено",
-  PLACE_UPDATE_APPROVED:       "Изменения места опубликованы",
-  PLACE_UPDATE_NEEDS_REVISION: "Изменения места требуют правок",
-  PLACE_UPDATE_REJECTED:       "Изменения места отклонены",
-  ACTIVITY_APPROVED:           "Событие опубликовано",
-  ACTIVITY_NEEDS_CHANGES:      "Событие требует правок",
-  ACTIVITY_REJECTED:           "Событие отклонено",
-  OFFER_APPROVED:              "Предложение опубликовано",
-  OFFER_NEEDS_CHANGES:         "Предложение требует правок",
-  OFFER_REJECTED:              "Предложение отклонено",
-  BUSINESS_VERIFIED:           "Верификация пройдена",
-  BUSINESS_REJECTED:           "Верификация отклонена",
-  BUSINESS_NEEDS_INFO:         "Требуется дополнительная информация",
-  WELCOME:                     "Приветствие и онбординг",
-  REMINDER:                    "Напоминания",
-  RECOMMENDATION:              "Подборки и рекомендации",
-  SYSTEM:                      "Системные уведомления",
-};
-
-// ── Component ─────────────────────────────────────────────────────────────────
-
 interface Props {
-  initialPreferences: PreferenceRow[];
-  /** Внутри NotificationsModal — без лишних отступов и нижней ремарки */
+  initialData: NotificationSettingsSurfaceData;
+  /** Внутри NotificationsModal — без верхнего Telegram-баннера */
   embedded?: boolean;
 }
 
-type PrefsMap = Map<NotificationType, PreferenceRow>;
+type RowsMap = Map<NotificationType, NotificationSettingsRow>;
 
-function ChannelColumnHeaders() {
+function buildRowsMap(data: NotificationSettingsSurfaceData): RowsMap {
+  return new Map(data.rows.map((row) => [row.notificationType, row]));
+}
+
+// "Важное" — чуть более выразительный заголовок
+const PRIORITY_GROUP_IDS: Set<NotificationSettingsGroupId> = new Set(["user-important"]);
+
+// ── Channel header ────────────────────────────────────────────────────────────
+
+function ChannelHeaders({ telegramConnected }: { telegramConnected: boolean }) {
   return (
-    <div
-      className="flex shrink-0 items-start justify-end gap-3 sm:gap-4"
-      aria-hidden
-    >
-      <div className="flex w-[52px] flex-col items-center gap-1 text-center">
-        <Bell className="h-3.5 w-3.5 shrink-0 text-neutral-400" />
-        <span className="text-[10px] font-medium leading-tight text-neutral-400">
-          сайт
-        </span>
+    <div className="flex shrink-0 items-center gap-1" aria-hidden>
+      <div className="flex w-12 flex-col items-center gap-0.5">
+        <Bell className="h-3.5 w-3.5 text-neutral-400" />
+        <span className="text-[10px] font-medium text-neutral-400">сайт</span>
       </div>
-      <div className="flex w-[52px] flex-col items-center gap-1 text-center">
-        <Mail className="h-3.5 w-3.5 shrink-0 text-neutral-400" />
-        <span className="text-[10px] font-medium leading-tight text-neutral-400">
-          почта
-        </span>
+      <div className="flex w-12 flex-col items-center gap-0.5">
+        <Mail className="h-3.5 w-3.5 text-neutral-400" />
+        <span className="text-[10px] font-medium text-neutral-400">почта</span>
       </div>
-      <div className="flex w-[52px] flex-col items-center gap-1 text-center opacity-40">
-        <Send className="h-3.5 w-3.5 shrink-0 text-neutral-400" />
-        <span className="text-[10px] font-medium leading-tight text-neutral-400">
-          Telegram
-        </span>
+      <div
+        className={cn(
+          "flex w-12 flex-col items-center gap-0.5",
+          !telegramConnected && "opacity-35",
+        )}
+      >
+        <Send className="h-3.5 w-3.5 text-neutral-400" />
+        <span className="text-[10px] font-medium text-neutral-400">TG</span>
       </div>
     </div>
   );
 }
 
+// ── Single notification row ───────────────────────────────────────────────────
+
+interface RowProps {
+  row: NotificationSettingsRow;
+  telegramConnected: boolean;
+  pending: boolean;
+  onSave: (
+    type: NotificationType,
+    patch: Partial<NotificationSettingsRow["channels"]>,
+  ) => void;
+}
+
+function NotificationRow({ row, telegramConnected, pending, onSave }: RowProps) {
+  return (
+    <div className="flex items-start gap-3 px-4 py-3.5 sm:px-5">
+      {/* Label + description */}
+      <div className="min-w-0 flex-1 pt-0.5">
+        <p className="text-sm font-medium leading-snug text-neutral-900">
+          {row.label}
+        </p>
+        {row.description ? (
+          <p className="mt-0.5 text-xs leading-snug text-neutral-500">
+            {row.description}
+          </p>
+        ) : null}
+      </div>
+
+      {/* Toggles */}
+      <div className="flex shrink-0 items-center gap-1">
+        <div className="flex w-12 justify-center">
+          <Toggle
+            checked={row.channels.IN_APP}
+            onChange={(v) => onSave(row.notificationType, { IN_APP: v })}
+            disabled={pending}
+            aria-label={`${row.label}: сайт`}
+          />
+        </div>
+        <div className="flex w-12 justify-center">
+          <Toggle
+            checked={row.channels.EMAIL}
+            onChange={(v) => onSave(row.notificationType, { EMAIL: v })}
+            disabled={pending}
+            aria-label={`${row.label}: почта`}
+          />
+        </div>
+        <div
+          className={cn(
+            "flex w-12 justify-center",
+            !telegramConnected && "opacity-35",
+          )}
+        >
+          <Toggle
+            checked={row.channels.TELEGRAM}
+            onChange={(v) => onSave(row.notificationType, { TELEGRAM: v })}
+            disabled={pending || !telegramConnected}
+            aria-label={`${row.label}: Telegram`}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Main component ────────────────────────────────────────────────────────────
+
 export function NotificationPreferencesClient({
-  initialPreferences,
+  initialData,
   embedded = false,
 }: Props) {
-  const [prefs, setPrefs] = useState<PrefsMap>(
-    () => new Map(initialPreferences.map((p) => [p.notificationType, p])),
-  );
+  const [prefs, setPrefs] = useState<RowsMap>(() => buildRowsMap(initialData));
   const [pending, startTransition] = useTransition();
+  const [telegramConnected, setTelegramConnected] = useState(
+    initialData.telegramConnected,
+  );
+  const [telegramUsername, setTelegramUsername] = useState(
+    initialData.telegramUsername,
+  );
+  const [isLinkingTelegram, setIsLinkingTelegram] = useState(false);
 
-  const save = (type: NotificationType, patch: Partial<Pick<PreferenceRow, "inApp" | "email" | "telegram">>) => {
-    // Optimistic update
+  const save = (
+    type: NotificationType,
+    patch: Partial<NotificationSettingsRow["channels"]>,
+  ) => {
     setPrefs((prev) => {
       const next = new Map(prev);
-      const current = next.get(type)!;
-      next.set(type, { ...current, ...patch, isOverridden: true });
+      const cur = next.get(type);
+      if (!cur) return prev;
+      next.set(type, { ...cur, channels: { ...cur.channels, ...patch }, isOverridden: true });
       return next;
     });
 
     startTransition(async () => {
       try {
-        const res = await fetch("/api/notifications/preferences", {
-          method: "POST",
+        const [[channel, enabled]] = Object.entries(patch) as Array<
+          [keyof NotificationSettingsRow["channels"], boolean]
+        >;
+        const res = await fetch("/api/notifications/settings?surface=user", {
+          method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            notificationType: type,
-            inAppEnabled:    patch.inApp    ?? null,
-            emailEnabled:    patch.email    ?? null,
-            telegramEnabled: patch.telegram ?? null,
-          }),
+          body: JSON.stringify({ notificationType: type, channel, enabled }),
         });
         if (!res.ok) throw new Error();
       } catch {
         toast.error("Не удалось сохранить");
-        // Revert on error
-        setPrefs((prev) => {
-          const next = new Map(prev);
-          const original = initialPreferences.find((p) => p.notificationType === type);
-          if (original) next.set(type, original);
-          return next;
-        });
+        setPrefs(buildRowsMap(initialData));
       }
     });
   };
 
-  // Only render groups that have at least one pref available for this user's role
-  const visibleGroups = GROUPS.filter((g) =>
-    g.types.some((t) => prefs.has(t)),
-  );
+  const handleTelegramConnect = async () => {
+    setIsLinkingTelegram(true);
+    try {
+      const res = await fetch("/api/settings/telegram/link", {
+        method: "POST",
+        credentials: "include",
+      });
+      const json = (await res.json()) as { url?: string; error?: string };
+      if (!res.ok || !json.url) {
+        throw new Error(json.error ?? "Не удалось создать ссылку для Telegram");
+      }
+      window.open(json.url, "_blank", "noopener,noreferrer");
+      toast.success("Откройте бота и нажмите Start");
+      window.setTimeout(async () => {
+        try {
+          const r = await fetch("/api/settings/telegram/status", {
+            credentials: "include",
+            cache: "no-store",
+          });
+          const s = (await r.json()) as { linked?: boolean; username?: string };
+          if (r.ok && s.linked) {
+            setTelegramConnected(true);
+            setTelegramUsername(s.username);
+          }
+        } catch { /* passive refresh */ }
+      }, 3000);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Не удалось открыть Telegram");
+    } finally {
+      setIsLinkingTelegram(false);
+    }
+  };
 
   return (
-    <div className={embedded ? "space-y-3" : "space-y-4"}>
-      {visibleGroups.map((group) => {
-        const rows = group.types.filter((t) => prefs.has(t));
+    <div className={cn("flex flex-col", embedded ? "gap-3" : "gap-4")}>
+
+      {/* ── Telegram banner (full-page only) ─────────────────────────────── */}
+      {!embedded && (
+        <section
+          className={cn(
+            "overflow-hidden rounded-2xl border shadow-sm",
+            telegramConnected
+              ? "border-emerald-200 bg-emerald-50/70"
+              : "border-sky-200 bg-gradient-to-br from-sky-50 via-cyan-50 to-white",
+          )}
+        >
+          <div className="flex flex-col gap-4 px-5 py-5 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-3">
+              <div
+                className={cn(
+                  "flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white",
+                  telegramConnected ? "text-emerald-600" : "text-sky-600",
+                )}
+              >
+                {telegramConnected ? (
+                  <CheckCircle2 className="h-5 w-5" />
+                ) : (
+                  <Send className="h-5 w-5" />
+                )}
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-neutral-900">
+                  {telegramConnected
+                    ? "Telegram подключён"
+                    : "Подключите Telegram для уведомлений"}
+                </p>
+                <p className="mt-1 text-sm text-neutral-600">
+                  {telegramConnected
+                    ? telegramUsername
+                      ? `Уведомления приходят в @${telegramUsername}.`
+                      : "Уведомления приходят прямо в Telegram."
+                    : "Так вы быстрее увидите напоминания и важные обновления."}
+                </p>
+              </div>
+            </div>
+            {!telegramConnected && (
+              <Button
+                type="button"
+                onClick={() => void handleTelegramConnect()}
+                disabled={isLinkingTelegram}
+                className="h-11 rounded-xl px-5 sm:shrink-0"
+              >
+                {isLinkingTelegram ? "Готовим ссылку…" : "Подключить Telegram"}
+              </Button>
+            )}
+          </div>
+        </section>
+      )}
+
+      {/* ── Notification groups ───────────────────────────────────────────── */}
+      {initialData.groups.map((group) => {
+        const rows = group.rows
+          .map((r) => prefs.get(r.notificationType))
+          .filter((r): r is NotificationSettingsRow => Boolean(r));
         if (!rows.length) return null;
+
+        const isPriority = PRIORITY_GROUP_IDS.has(group.id);
 
         return (
           <section
-            key={group.title}
-            className="rounded-2xl border border-neutral-100 bg-white shadow-sm"
+            key={group.id}
+            className={cn(
+              "overflow-hidden rounded-2xl border bg-white shadow-sm",
+              isPriority ? "border-neutral-200" : "border-neutral-100",
+            )}
           >
+            {/* Group header */}
             <div
               className={cn(
-                "sticky top-0 z-10 flex items-start justify-between gap-3 border-b border-neutral-100 bg-white px-5 py-3.5",
-                "rounded-t-2xl",
+                "flex items-center justify-between gap-3 border-b px-4 py-3 sm:px-5",
+                isPriority
+                  ? "border-neutral-200 bg-neutral-50"
+                  : "border-neutral-100 bg-white",
               )}
             >
-              <h2 className="min-w-0 flex-1 pt-0.5 text-sm font-semibold text-neutral-700">
-                {group.title}
-              </h2>
-              <ChannelColumnHeaders />
+              <div className="min-w-0 flex-1">
+                <h2
+                  className={cn(
+                    "text-sm font-semibold",
+                    isPriority ? "text-neutral-900" : "text-neutral-600",
+                  )}
+                >
+                  {group.title}
+                </h2>
+              </div>
+              <ChannelHeaders telegramConnected={telegramConnected} />
             </div>
 
-            <div className="divide-y divide-neutral-100 overflow-hidden rounded-b-2xl">
-              {rows.map((type) => {
-                const pref = prefs.get(type)!;
-                return (
-                  <div key={type} className="flex items-center justify-between px-5 py-3.5 gap-4">
-                    <span className="text-sm text-neutral-800 flex-1 min-w-0">
-                      {TYPE_LABELS[type]}
-                    </span>
-
-                    <div className="flex shrink-0 items-center gap-3 sm:gap-4">
-                      <div className="flex w-[52px] justify-center">
-                        <Toggle
-                          checked={pref.inApp}
-                          onChange={(v) => save(type, { inApp: v })}
-                          disabled={pending}
-                          aria-label={`${TYPE_LABELS[type]}: сайт`}
-                        />
-                      </div>
-                      <div className="flex w-[52px] justify-center">
-                        <Toggle
-                          checked={pref.email}
-                          onChange={(v) => save(type, { email: v })}
-                          disabled={pending}
-                          aria-label={`${TYPE_LABELS[type]}: почта`}
-                        />
-                      </div>
-                      <div className="flex w-[52px] justify-center opacity-40">
-                        <Toggle
-                          checked={pref.telegram}
-                          onChange={(v) => save(type, { telegram: v })}
-                          disabled
-                          aria-label={`${TYPE_LABELS[type]}: Telegram`}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
+            {/* Rows */}
+            <div className="divide-y divide-neutral-100">
+              {rows.map((row) => (
+                <NotificationRow
+                  key={row.notificationType}
+                  row={row}
+                  telegramConnected={telegramConnected}
+                  pending={pending}
+                  onSave={save}
+                />
+              ))}
             </div>
           </section>
         );
       })}
 
-      {!embedded ? (
-        <p className="text-xs text-neutral-400 px-1">
-          Каналы Email и Telegram применяются, когда доставка для них включена на
-          стороне сервиса.
+      {/* ── Footer hint ───────────────────────────────────────────────────── */}
+      {!embedded && (
+        <p className="px-1 text-xs text-neutral-400">
+          Изменения сохраняются автоматически.
         </p>
-      ) : null}
+      )}
     </div>
   );
 }
