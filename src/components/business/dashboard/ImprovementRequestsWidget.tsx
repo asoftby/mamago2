@@ -7,8 +7,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { calculateUrgency, SEVERITY_CONFIG, type SeverityLevel } from "@/lib/improvementRequest/urgency";
-import { formatDistanceToNow } from "date-fns";
-import { ru } from "date-fns/locale";
 
 interface ImprovementRequest {
   id: string;
@@ -166,7 +164,7 @@ export function ImprovementRequestsWidget({
   };
 
   return (
-    <Card className="border-amber-200 bg-gradient-to-br from-amber-50 to-orange-50">
+    <Card className="overflow-hidden rounded-[28px] border-amber-200/80 bg-[linear-gradient(180deg,#fff8ef_0%,#ffffff_100%)] shadow-[0_1px_2px_rgba(15,23,42,0.04),0_14px_36px_rgba(15,23,42,0.04)]">
       <CardHeader>
         <CardTitle className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -175,12 +173,12 @@ export function ImprovementRequestsWidget({
           </div>
           <div className="flex items-center gap-2">
             {overdueCount > 0 && (
-              <Badge variant="destructive" className="bg-red-600">
+              <Badge variant="destructive" className="rounded-full bg-red-600 px-3 py-1">
                 {overdueCount} просрочено
               </Badge>
             )}
             {dueSoonCount > 0 && (
-              <Badge variant="outline" className="border-orange-500 text-orange-700">
+              <Badge variant="outline" className="rounded-full border-orange-500 px-3 py-1 text-orange-700">
                 {dueSoonCount} срочно
               </Badge>
             )}
@@ -195,7 +193,7 @@ export function ImprovementRequestsWidget({
           </p>
           
           {/* System Consequence */}
-          <div className="flex items-start gap-2 p-3 bg-white/60 rounded-lg border border-amber-200">
+          <div className="flex items-start gap-2 rounded-[20px] border border-amber-200 bg-white/70 p-3">
             <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
             <p className="text-xs text-amber-800 leading-relaxed">
               Если информация о местах остается неактуальной, система может понизить видимость связанных предложений в рейтинге до момента внесения исправлений.
@@ -216,7 +214,7 @@ export function ImprovementRequestsWidget({
             return (
               <div
                 key={request.id}
-                className="bg-white rounded-lg p-4 border border-amber-200 hover:border-amber-300 transition-colors"
+                className="rounded-[22px] border border-amber-200 bg-white p-4 transition-colors hover:border-amber-300"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">
@@ -232,14 +230,14 @@ export function ImprovementRequestsWidget({
                     </p>
                     
                     <div className="flex items-center gap-2 flex-wrap">
-                      <Badge className={severityConfig.color}>
+                      <Badge className={`${severityConfig.color} rounded-full px-3 py-1`}>
                         {severityConfig.label}
                       </Badge>
                       
                       {urgency && (
                         <Badge 
                           variant="outline" 
-                          className={`${urgency.color} ${urgency.urgent ? "font-semibold" : ""}`}
+                          className={`${urgency.color} rounded-full px-3 py-1 ${urgency.urgent ? "font-semibold" : ""}`}
                         >
                           {urgency.label}
                         </Badge>
@@ -258,9 +256,9 @@ export function ImprovementRequestsWidget({
                     asChild
                     size="sm"
                     variant={urgency?.urgent ? "default" : "outline"}
-                    className={urgency?.urgent ? "bg-amber-600 hover:bg-amber-700" : ""}
+                    className={urgency?.urgent ? "rounded-2xl bg-amber-600 hover:bg-amber-700" : "rounded-2xl border-stone-200 bg-white hover:bg-stone-50"}
                   >
-                    <Link href={`/editor/place/${request.entityId}/edit`}>
+                    <Link href={`/business/places/${request.entityId}/edit`}>
                       Исправить
                     </Link>
                   </Button>

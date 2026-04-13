@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { BusinessSurfaceCard } from "@/components/business/ui/BusinessSurfaceCard";
+import { BusinessChip } from "@/components/business/ui/BusinessChip";
 
 type VerificationStatus = "DRAFT" | "PENDING" | "APPROVED" | "REJECTED";
 
@@ -46,7 +48,7 @@ export function VerificationBanner({
   if (compact) {
     if (status === "APPROVED") {
       return (
-        <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-green-50 border border-green-200 rounded-full">
+        <BusinessChip tone="success" className="gap-2 px-3 py-2">
           <svg
             className="w-4 h-4 text-green-600"
             fill="currentColor"
@@ -61,13 +63,13 @@ export function VerificationBanner({
           <span className="text-sm font-medium text-green-800">
             Подтвержден
           </span>
-        </div>
+        </BusinessChip>
       );
     }
 
     if (status === "PENDING") {
       return (
-        <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-yellow-50 border border-yellow-200 rounded-full">
+        <BusinessChip tone="warning" className="gap-2 px-3 py-2">
           <svg
             className="w-4 h-4 text-yellow-600 animate-spin"
             fill="none"
@@ -90,13 +92,13 @@ export function VerificationBanner({
           <span className="text-sm font-medium text-yellow-800">
             На проверке
           </span>
-        </div>
+        </BusinessChip>
       );
     }
 
     if (status === "REJECTED") {
       return (
-        <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-red-50 border border-red-200 rounded-full">
+        <BusinessChip tone="danger" className="gap-2 px-3 py-2">
           <svg
             className="w-4 h-4 text-red-600"
             fill="currentColor"
@@ -111,13 +113,13 @@ export function VerificationBanner({
           <span className="text-sm font-medium text-red-800">
             Отклонен
           </span>
-        </div>
+        </BusinessChip>
       );
     }
 
     // DRAFT status
     return (
-      <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-full">
+      <BusinessChip tone="accent" className="gap-2 px-3 py-2">
         <svg
           className="w-4 h-4 text-blue-600"
           fill="currentColor"
@@ -132,14 +134,14 @@ export function VerificationBanner({
         <span className="text-sm font-medium text-blue-800">
           Черновик
         </span>
-      </div>
+      </BusinessChip>
     );
   }
 
   // Full mode - original banners
   if (status === "APPROVED") {
     return (
-      <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
+      <BusinessSurfaceCard tone="success" className="mb-6 p-4">
         <div className="flex items-center gap-2">
           <svg
             className="w-5 h-5 text-green-600"
@@ -156,13 +158,13 @@ export function VerificationBanner({
             Ваш бизнес подтвержден
           </span>
         </div>
-      </div>
+      </BusinessSurfaceCard>
     );
   }
 
   if (status === "PENDING") {
     return (
-      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+      <BusinessSurfaceCard tone="warm" className="mb-6 p-4">
         <div className="flex items-center gap-2">
           <svg
             className="w-5 h-5 text-yellow-600 animate-spin"
@@ -190,13 +192,13 @@ export function VerificationBanner({
         <p className="text-sm text-yellow-700 mt-2">
           Мы проверяем вашу заявку. Обычно это занимает 1-2 рабочих дня.
         </p>
-      </div>
+      </BusinessSurfaceCard>
     );
   }
 
   if (status === "REJECTED") {
     return (
-      <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+      <BusinessSurfaceCard className="mb-6 border-red-200 bg-[linear-gradient(180deg,#fff5f5_0%,#ffffff_100%)] p-4">
         <div className="flex items-center gap-2 mb-2">
           <svg
             className="w-5 h-5 text-red-600"
@@ -231,13 +233,13 @@ export function VerificationBanner({
             {loading ? "Отправка..." : "Отправить повторно"}
           </button>
         </div>
-      </div>
+      </BusinessSurfaceCard>
     );
   }
 
   // DRAFT status
   return (
-    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+    <BusinessSurfaceCard tone="accent" className="mb-6 p-4">
       <div className="flex items-center gap-2 mb-2">
         <svg
           className="w-5 h-5 text-blue-600"
@@ -265,6 +267,6 @@ export function VerificationBanner({
       >
         {loading ? "Отправка..." : "Отправить на проверку"}
       </button>
-    </div>
+    </BusinessSurfaceCard>
   );
 }
