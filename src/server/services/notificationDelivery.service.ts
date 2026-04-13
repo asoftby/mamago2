@@ -21,6 +21,9 @@ import { sendEmail } from "@/lib/email/emailAdapter";
 import { buildNotificationEmailTemplate } from "@/lib/email/notificationEmailTemplates";
 import { resolveNotificationChannels } from "@/lib/notifications/resolveNotificationChannels";
 import type { UserForChannelResolution } from "@/lib/notifications/resolveNotificationChannels";
+import { getActiveTelegramConnectionForCurrentEnvironment } from "@/server/services/telegram/telegramConnection.service";
+import { TelegramChannel } from "@/server/services/telegram/TelegramChannel";
+import { renderNotificationTelegramMessage } from "@/server/services/telegram/TelegramTemplateRenderer";
 
 // ── Public entry point ────────────────────────────────────────────────────────
 
@@ -129,19 +132,66 @@ async function handleEmail(
 // ── TELEGRAM ──────────────────────────────────────────────────────────────────
 
 async function handleTelegram(notificationId: string, enabled: boolean): Promise<void> {
-  // Stub — always SKIPPED until adapter is implemented
+  const notification = await prisma.notification.findUnique({
+    where: { id: notificationId },
+  });
+
+  if (!notification) return;
+
+  let deliveryId: string;
   try {
-    await prisma.notificationDelivery.upsert({
+    const delivery = await prisma.notificationDelivery.upsert({
       where: { notificationId_channel: { notificationId, channel: "TELEGRAM" } },
       create: {
         notificationId,
         channel: "TELEGRAM",
-        status: "SKIPPED",
-        errorMessage: enabled ? "TELEGRAM_NOT_IMPLEMENTED" : "CHANNEL_DISABLED",
+        status: enabled ? "PENDING" : "SKIPPED",
+        errorMessage: enabled ? null : "CHANNEL_DISABLED",
       },
       update: {},
     });
+    deliveryId = delivery.id;
   } catch (e) {
     console.error("[delivery:telegram] Failed to record:", e);
+    return;
   }
+
+  if (!enabled) return;
+
+  try {
+    const connection = await getActiveTelegramConnectionForCurrentEnvironment(notification.userId);
+    if (!connection?.isActive) {
+      await prisma.notificationDelivery.update({
+        where: { id: deliveryId },
+        data: { status: "SKIPPED", errorMessage: "TELEGRAM_NOT_CONNECTED" },
+      });
+      return;
+    }
+
+    const rendered = renderNotificationTelegramMessage(notification);
+    const channel = new TelegramChannel();
+    await channel.sendMessage({
+      chatId: connection.telegramChatId,
+      text: rendered.text,
+      replyMarkup: rendered.replyMarkup,
+    });
+
+    await prisma.notificationDelivery.update({
+      where: { id: deliveryId },
+      data: { status: "SENT", sentAt: new Date(), errorMessage: null },
+    });
+  } catch (e) {
+    await prisma.notificationDelivery.update({
+      where: { id: deliveryId },
+      data: {
+        status: "FAILED",
+        errorMessage: e instanceof Error ? e.message : "TELEGRAM_SEND_FAILED",
+      },
+    });
+    console.error("[delivery:telegram] Failed to send:", e);
+  }
+}
+
+export async function forceTelegramDeliveryForNotification(notificationId: string): Promise<void> {
+  await handleTelegram(notificationId, true);
 }

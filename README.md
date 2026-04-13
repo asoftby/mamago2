@@ -1,36 +1,27 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+## Local Development
 
-## Getting Started
-
-First, run the development server:
+Run the development server:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
 pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Local development is host-based and mirrors the production multi-subdomain setup.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Add these entries to `/etc/hosts`:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```text
+127.0.0.1 mamago.local
+127.0.0.1 business.mamago.local
+127.0.0.1 admin.mamago.local
+```
 
-## Learn More
+Use these URLs in development:
 
-To learn more about Next.js, take a look at the following resources:
+- Public app: [http://mamago.local:3000](http://mamago.local:3000)
+- Business cabinet: [http://business.mamago.local:3000](http://business.mamago.local:3000)
+- Admin panel: [http://admin.mamago.local:3000](http://admin.mamago.local:3000)
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+`localhost:3000` is kept only as a legacy fallback for a few development flows such as local tunneling and compatibility checks. It is not the canonical app origin.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+For Telegram or other incoming webhooks, point the tunnel to `http://localhost:3000`, then configure the webhook with the public tunnel URL.

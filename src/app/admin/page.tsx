@@ -70,13 +70,11 @@ const severityIcons = {
   critical: AlertTriangle,
 };
 
-// Format currency
-function formatCurrency(amount: number, currency: string = "BYN"): string {
-  return new Intl.NumberFormat("ru-RU", {
-    style: "currency",
-    currency,
-    minimumFractionDigits: 2,
-  }).format(amount);
+import { formatPrice } from "@/lib/formatters/format-price";
+
+// Format currency — kept for local use, delegates to shared formatter
+function formatCurrency(amount: number): string {
+  return formatPrice(amount);
 }
 
 export default function AdminDashboardPage() {

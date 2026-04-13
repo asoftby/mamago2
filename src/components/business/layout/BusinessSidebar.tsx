@@ -1,92 +1,75 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import {
-  LayoutDashboard,
-  MapPin,
-  Calendar,
-  Tag,
-  CreditCard,
-  FileText,
-  Users,
-} from "lucide-react";
 import { SidebarItem } from "@/components/shared/sidebar/SidebarItem";
-import { buildBusinessPath } from "@/lib/routing/surface";
+import { SidebarGroup } from "@/components/shared/sidebar/SidebarGroup";
+import { SidebarSubItem } from "@/components/shared/sidebar/SidebarSubItem";
+import {
+  BUSINESS_DASHBOARD_HREF,
+  businessNavigation,
+} from "@/lib/business/navigation";
 
-const BUSINESS_DASHBOARD = buildBusinessPath("/dashboard");
-const BUSINESS_BILLING_PLAN = buildBusinessPath("/billing/plan");
-const BUSINESS_COMMERCIAL = buildBusinessPath("/commercial");
-const BUSINESS_TEAM = buildBusinessPath("/team");
+interface BusinessSidebarProps {
+  onNavigate?: () => void;
+  /** В bottomsheet убираем sticky top-16 */
+  variant?: "sidebar" | "sheet";
+}
 
-const navigationItems = [
-  {
-    name: "Dashboard",
-    href: BUSINESS_DASHBOARD,
-    icon: LayoutDashboard,
-  },
-  {
-    name: "Places",
-    href: buildBusinessPath("/places"),
-    icon: MapPin,
-  },
-  {
-    name: "Events",
-    href: buildBusinessPath("/events"),
-    icon: Calendar,
-  },
-  {
-    name: "Offers",
-    href: buildBusinessPath("/offers"),
-    icon: Tag,
-  },
-  {
-    name: "Команда",
-    href: BUSINESS_TEAM,
-    icon: Users,
-  },
-  {
-    name: "Billing",
-    href: BUSINESS_BILLING_PLAN,
-    icon: CreditCard,
-  },
-  {
-    name: "Commercial",
-    href: BUSINESS_COMMERCIAL,
-    icon: FileText,
-  },
-];
-
-export function BusinessSidebar() {
+export function BusinessSidebar({ onNavigate, variant = "sidebar" }: BusinessSidebarProps) {
   const pathname = usePathname();
 
-  const isActive = (href: string) => {
-    if (href === BUSINESS_DASHBOARD) {
-      return pathname === href;
-    }
-    if (href === BUSINESS_BILLING_PLAN) {
-      return pathname.startsWith(buildBusinessPath("/billing"));
-    }
-    if (href === BUSINESS_COMMERCIAL) {
-      return pathname.startsWith(BUSINESS_COMMERCIAL);
-    }
-    if (href === BUSINESS_TEAM) {
-      return pathname.startsWith(BUSINESS_TEAM);
-    }
-    return pathname.startsWith(href);
-  };
+  const matchesPath = (patterns: string[]) =>
+    patterns.some((pattern) =>
+      pathname === pattern || pathname.startsWith(`${pattern}/`)
+    );
 
   return (
-    <aside className="w-[240px] border-r border-gray-200 bg-white min-h-[calc(100vh-4rem)]">
-      <nav className="flex flex-col gap-1.5 p-4">
-        {navigationItems.map((item) => (
-          <SidebarItem
-            key={item.href}
-            href={item.href}
-            icon={item.icon}
-            label={item.name}
-            isActive={isActive(item.href)}
-          />
-        ))}
+    <aside className="w-full lg:w-[248px] h-full border-r border-stone-200/80 bg-white/75 backdrop-blur">
+      <nav className={variant === "sheet" ? "flex flex-col gap-1.5 p-4" : "sticky top-16 flex flex-col gap-1.5 p-4"}>
+        {businessNavigation.map((item) => {
+          if (item.type === "item") {
+            const patterns = item.match ?? [item.href];
+            return (
+              <SidebarItem
+                key={item.href}
+                href={item.href}
+                icon={item.icon}
+                label={item.label}
+                isActive={
+                  item.href === BUSINESS_DASHBOARD_HREF
+                    ? pathname === item.href
+                    : matchesPath(patterns)
+                }
+                onClick={onNavigate}
+              />
+            );
+          }
+
+          const groupPatterns = item.match ?? item.children.map((child) => child.href);
+          const defaultOpen = matchesPath(groupPatterns);
+
+          return (
+            <SidebarGroup
+              key={item.label}
+              icon={item.icon}
+              label={item.label}
+              defaultOpen={defaultOpen}
+            >
+              {item.children.map((child) => (
+                <SidebarSubItem
+                  key={child.href}
+                  href={child.href}
+                  label={child.label}
+                  isActive={
+                    pathname === child.href ||
+                    pathname.startsWith(`${child.href}/`)
+                  }
+                  onClick={onNavigate}
+                />
+              ))}
+            </SidebarGroup>
+          );
+        })}
       </nav>
     </aside>
   );

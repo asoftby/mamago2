@@ -166,6 +166,12 @@ export function HeaderAccountMenu() {
         loggingOut={loggingOut}
         onLogout={handleLogout}
         onNavigate={() => setUserMenuOpen(false)}
+        onGoToSettings={() =>
+          navigateToSurface(router, {
+            targetSurface: "public",
+            targetPath: "/me/settings",
+          })
+        }
         onGoToAdminAccount={() =>
           navigateToSurface(router, {
             targetSurface: "admin",
@@ -203,7 +209,7 @@ export function HeaderAccountMenu() {
         onGoToBusinessCommercial={() =>
           navigateToSurface(router, {
             targetSurface: "business",
-            targetPath: "/commercial",
+            targetPath: "/promotion",
           })
         }
       />

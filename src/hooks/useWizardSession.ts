@@ -4,6 +4,7 @@
  */
 
 import { useState, useEffect, useCallback } from "react";
+import { randomId } from "@/lib/utils/randomId";
 
 interface WizardSessionOptions {
   userId?: string;
@@ -50,7 +51,7 @@ export function useWizardSession({ userId, wizardType, entityId }: WizardSession
       }
 
       // Create new session
-      const newSessionId = crypto.randomUUID();
+      const newSessionId = randomId();
       const sessionData = {
         sessionId: newSessionId,
         timestamp: Date.now(),

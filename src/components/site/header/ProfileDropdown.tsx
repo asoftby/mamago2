@@ -17,6 +17,7 @@ export type ProfileDropdownProps = {
   loggingOut: boolean;
   onLogout: () => void;
   onNavigate: () => void;
+  onGoToSettings: () => void;
   onGoToAdminAccount: () => void;
   onGoToBusinessAccount: () => void;
   onGoToPersonalProfile: () => void;
@@ -37,6 +38,7 @@ export function ProfileDropdown({
   loggingOut,
   onLogout,
   onNavigate,
+  onGoToSettings,
   onGoToAdminAccount,
   onGoToBusinessAccount,
   onGoToPersonalProfile,
@@ -52,6 +54,7 @@ export function ProfileDropdown({
     mode,
     initials,
     onNavigate,
+    onGoToSettings,
     onGoToAdminAccount,
     onGoToBusinessAccount,
     onGoToPersonalAccount,

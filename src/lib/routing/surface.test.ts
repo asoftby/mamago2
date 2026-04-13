@@ -23,6 +23,18 @@ assert.equal(
   "public",
 );
 assert.equal(resolveSurfaceFromHostAndPathname(undefined, "/admin"), "admin");
+assert.equal(
+  resolveSurfaceFromHostAndPathname("admin.mamago.local:3000", "/"),
+  "admin",
+);
+assert.equal(
+  resolveSurfaceFromHostAndPathname("business.mamago.by", "/dashboard"),
+  "business",
+);
+assert.equal(
+  resolveSurfaceFromHostAndPathname("mamago.local:3000", "/"),
+  "public",
+);
 
 assert.equal(buildAdminPath(""), `${ADMIN_PATH_PREFIX}/`);
 assert.equal(buildAdminPath("/users"), `${ADMIN_PATH_PREFIX}/users`);

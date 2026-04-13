@@ -1,16 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { BusinessMemberRole, BusinessInviteStatus } from "@prisma/client";
+import { BusinessInviteStatus, BusinessMemberRole } from "@prisma/client";
+import { Mail, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { BusinessSectionHeader } from "@/components/business/sections/BusinessSectionHeader";
+import { BusinessSurfaceCard } from "@/components/business/ui/BusinessSurfaceCard";
+import { BusinessChip } from "@/components/business/ui/BusinessChip";
+import { BusinessEmptyState } from "@/components/business/ui/BusinessEmptyState";
 
 type MemberRow = {
   id: string;
@@ -57,15 +55,29 @@ function formatRuDate(iso: string) {
   }
 }
 
+function LoadingRows({ count = 3 }: { count?: number }) {
+  return (
+    <div className="space-y-3">
+      {Array.from({ length: count }).map((_, index) => (
+        <div
+          key={index}
+          className="animate-pulse rounded-[22px] border border-stone-200 bg-stone-50/80 px-4 py-4"
+        >
+          <div className="h-4 w-40 rounded bg-stone-200" />
+          <div className="mt-3 h-3 w-56 rounded bg-stone-200" />
+          <div className="mt-3 h-3 w-32 rounded bg-stone-200" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 interface Props {
   businessId: string;
   isOwner: boolean;
 }
 
-export function BusinessTeamPageClient({
-  businessId,
-  isOwner,
-}: Props) {
+export function BusinessTeamPageClient({ businessId, isOwner }: Props) {
   const [members, setMembers] = useState<MemberRow[] | null>(null);
   const [invites, setInvites] = useState<InviteRow[] | null>(null);
   const [loadingMembers, setLoadingMembers] = useState(true);
@@ -107,8 +119,11 @@ export function BusinessTeamPageClient({
   }, [businessId]);
 
   useEffect(() => {
-    void loadMembers();
-    void loadInvites();
+    async function loadInitialData() {
+      await Promise.all([loadMembers(), loadInvites()]);
+    }
+
+    void loadInitialData();
   }, [loadMembers, loadInvites]);
 
   async function handleDeactivate(memberId: string) {
@@ -213,159 +228,191 @@ export function BusinessTeamPageClient({
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">Команда</h1>
-        <p className="text-gray-600 mt-1">
-          Участники и приглашения вашего бизнеса
-        </p>
-      </div>
+      <BusinessSectionHeader
+        eyebrow="Team"
+        title="Команда"
+        description="Управляйте доступом к кабинету, приглашайте менеджеров и держите роли команды в одном рабочем пространстве."
+        actions={
+          <BusinessChip tone="muted" className="px-3 py-2">
+            {isOwner ? "Вы управляете доступами" : "Доступ только для просмотра"}
+          </BusinessChip>
+        }
+      />
 
-      {error && (
+      {error ? (
         <div
-          className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
+          className="rounded-[22px] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
           role="alert"
         >
           {error}
         </div>
-      )}
+      ) : null}
 
-      {/* Блок 1: участники */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Участники</CardTitle>
-          <CardDescription>
-            Люди с доступом к кабинету этого бизнеса
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {loadingMembers ? (
-            <p className="text-sm text-gray-500">Загрузка…</p>
-          ) : !members?.length ? (
-            <p className="text-sm text-gray-500">Нет данных</p>
-          ) : (
-            <ul className="divide-y divide-gray-100 rounded-lg border border-gray-100">
-              {members.map((m) => (
-                <li
-                  key={m.id}
-                  className="flex flex-col gap-2 py-4 px-4 sm:flex-row sm:items-center sm:justify-between"
-                >
-                  <div>
-                    <div className="font-medium text-gray-900">
-                      {m.user.displayName?.trim() || "Без имени"}
-                    </div>
-                    <div className="text-sm text-gray-600">{m.user.email}</div>
-                    <div className="mt-1 flex flex-wrap gap-2 text-xs">
-                      <span className="rounded-full bg-gray-100 px-2 py-0.5 text-gray-800">
-                        {ROLE_LABEL[m.role]}
-                      </span>
-                      {m.title ? (
-                        <span className="text-gray-600">{m.title}</span>
-                      ) : null}
-                      <span className="text-gray-500">
-                        с {formatRuDate(m.createdAt)}
-                      </span>
-                      {!m.isActive && (
-                        <span className="rounded-full bg-amber-100 px-2 py-0.5 text-amber-900">
-                          Доступ отключён
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  {isOwner &&
-                    m.role === BusinessMemberRole.MANAGER &&
-                    m.isActive && (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="shrink-0 text-red-700 border-red-200 hover:bg-red-50"
-                        disabled={busyId === m.id}
-                        onClick={() => void handleDeactivate(m.id)}
-                      >
-                        Отключить доступ
-                      </Button>
-                    )}
-                </li>
-              ))}
-            </ul>
-          )}
-        </CardContent>
-      </Card>
+      <BusinessSurfaceCard className="p-6">
+        <div className="mb-5">
+          <h2 className="text-xl font-semibold tracking-tight text-stone-950">Участники</h2>
+          <p className="mt-2 text-sm leading-7 text-stone-600">
+            Люди с доступом к кабинету этого бизнеса.
+          </p>
+        </div>
 
-      {/* Блок 2: приглашения */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Приглашения</CardTitle>
-          <CardDescription>
-            {isOwner
-              ? "Отправленные приглашения менеджерам"
-              : "Список приглашений (только просмотр)"}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {loadingInvites ? (
-            <p className="text-sm text-gray-500">Загрузка…</p>
-          ) : !invites?.length ? (
-            <p className="text-sm text-gray-500">
-              Пока нет приглашений.{" "}
-              {isOwner && "Пригласите менеджера ниже — на email придёт ссылка."}
-            </p>
-          ) : (
-            <ul className="divide-y divide-gray-100 rounded-lg border border-gray-100">
-              {invites.map((inv) => (
-                <li
-                  key={inv.id}
-                  className="flex flex-col gap-2 py-4 px-4 sm:flex-row sm:items-center sm:justify-between"
-                >
-                  <div>
-                    <div className="font-medium text-gray-900">{inv.email}</div>
-                    <div className="mt-1 flex flex-wrap gap-2 text-xs text-gray-600">
-                      <span>{ROLE_LABEL[inv.role]}</span>
-                      {inv.title ? <span>· {inv.title}</span> : null}
-                      <span>
-                        · {INVITE_STATUS_LABEL[inv.status]}
-                      </span>
-                    </div>
-                    <div className="text-xs text-gray-500 mt-1">
-                      Создано {formatRuDate(inv.createdAt)}
-                      {inv.status === BusinessInviteStatus.PENDING && (
-                        <> · до {formatRuDate(inv.expiresAt)}</>
-                      )}
-                    </div>
+        {loadingMembers ? (
+          <LoadingRows count={3} />
+        ) : !members?.length ? (
+          <BusinessEmptyState
+            icon={<Users className="h-7 w-7" />}
+            title="Пока только вы в команде"
+            description={
+              isOwner
+                ? "Когда появятся менеджеры, здесь будет видно, кто помогает вести бизнес, какие роли у них есть и когда был выдан доступ."
+                : "Когда владелец бизнеса добавит участников, здесь появится состав команды."
+            }
+            secondaryText={
+              isOwner
+                ? "Приглашения отправляются ниже на этой странице и сразу попадают в рабочий поток кабинета."
+                : undefined
+            }
+          />
+        ) : (
+          <ul className="space-y-3">
+            {members.map((member) => (
+              <li
+                key={member.id}
+                className="flex flex-col gap-3 rounded-[22px] border border-stone-200/90 bg-stone-50/70 px-4 py-4 sm:flex-row sm:items-center sm:justify-between"
+              >
+                <div>
+                  <div className="font-medium text-stone-950">
+                    {member.user.displayName?.trim() || "Без имени"}
                   </div>
-                  {isOwner && inv.status === BusinessInviteStatus.PENDING && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="shrink-0"
-                      disabled={busyId === inv.id}
-                      onClick={() => void handleRevoke(inv.id)}
+                  <div className="mt-1 text-sm text-stone-600">{member.user.email}</div>
+                  <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                    <BusinessChip
+                      tone={member.role === BusinessMemberRole.OWNER ? "accent" : "muted"}
                     >
-                      Отозвать
-                    </Button>
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
-        </CardContent>
-      </Card>
+                      {ROLE_LABEL[member.role]}
+                    </BusinessChip>
+                    {member.title ? <BusinessChip>{member.title}</BusinessChip> : null}
+                    <span className="self-center text-stone-500">
+                      с {formatRuDate(member.createdAt)}
+                    </span>
+                    {!member.isActive ? (
+                      <BusinessChip tone="warning">Доступ отключён</BusinessChip>
+                    ) : null}
+                  </div>
+                </div>
 
-      {/* Блок 3: форма — только OWNER */}
-      {isOwner && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Пригласить менеджера</CardTitle>
-            <CardDescription>
-              Сотрудник будет добавлен с ролью «Менеджер» и сможет работать в
-              кабинете после принятия приглашения по ссылке из письма.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={(e) => void handleInviteSubmit(e)} className="space-y-4 max-w-md">
+                {isOwner &&
+                member.role === BusinessMemberRole.MANAGER &&
+                member.isActive ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="shrink-0 rounded-2xl border-red-200 text-red-700 hover:bg-red-50"
+                    disabled={busyId === member.id}
+                    onClick={() => void handleDeactivate(member.id)}
+                  >
+                    Отключить доступ
+                  </Button>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        )}
+      </BusinessSurfaceCard>
+
+      <BusinessSurfaceCard className="p-6">
+        <div className="mb-5">
+          <h2 className="text-xl font-semibold tracking-tight text-stone-950">Приглашения</h2>
+          <p className="mt-2 text-sm leading-7 text-stone-600">
+            {isOwner
+              ? "Отправленные приглашения менеджерам и их текущий статус."
+              : "Список приглашений команды в режиме просмотра."}
+          </p>
+        </div>
+
+        {loadingInvites ? (
+          <LoadingRows count={2} />
+        ) : !invites?.length ? (
+          <BusinessEmptyState
+            icon={<Mail className="h-7 w-7" />}
+            title="Пока нет приглашений"
+            description={
+              isOwner
+                ? "Приглашайте менеджеров по email, чтобы делегировать работу внутри кабинета без потери контроля."
+                : "Если владелец бизнеса отправит приглашения, их статус появится здесь."
+            }
+          />
+        ) : (
+          <ul className="space-y-3">
+            {invites.map((invite) => (
+              <li
+                key={invite.id}
+                className="flex flex-col gap-3 rounded-[22px] border border-stone-200/90 bg-stone-50/70 px-4 py-4 sm:flex-row sm:items-center sm:justify-between"
+              >
+                <div>
+                  <div className="font-medium text-stone-950">{invite.email}</div>
+                  <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                    <BusinessChip tone="muted">{ROLE_LABEL[invite.role]}</BusinessChip>
+                    <BusinessChip
+                      tone={
+                        invite.status === BusinessInviteStatus.ACCEPTED
+                          ? "success"
+                          : invite.status === BusinessInviteStatus.PENDING
+                          ? "accent"
+                          : "warning"
+                      }
+                    >
+                      {INVITE_STATUS_LABEL[invite.status]}
+                    </BusinessChip>
+                    {invite.title ? <BusinessChip>{invite.title}</BusinessChip> : null}
+                    <span className="self-center text-stone-500">
+                      создано {formatRuDate(invite.createdAt)}
+                    </span>
+                    {invite.status === BusinessInviteStatus.PENDING ? (
+                      <span className="self-center text-stone-500">
+                        до {formatRuDate(invite.expiresAt)}
+                      </span>
+                    ) : null}
+                  </div>
+                </div>
+
+                {isOwner && invite.status === BusinessInviteStatus.PENDING ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="shrink-0 rounded-2xl border-stone-200 bg-white hover:bg-stone-50"
+                    disabled={busyId === invite.id}
+                    onClick={() => void handleRevoke(invite.id)}
+                  >
+                    Отозвать
+                  </Button>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        )}
+      </BusinessSurfaceCard>
+
+      {isOwner ? (
+        <BusinessSurfaceCard className="p-6">
+          <div className="mb-5">
+            <h2 className="text-xl font-semibold tracking-tight text-stone-950">
+              Пригласить менеджера
+            </h2>
+            <p className="mt-2 text-sm leading-7 text-stone-600">
+              Сотрудник будет добавлен с ролью «Менеджер» и сможет работать в кабинете после принятия приглашения по ссылке из письма.
+            </p>
+          </div>
+
+          <form
+            onSubmit={(e) => void handleInviteSubmit(e)}
+            className="max-w-xl space-y-4"
+          >
+            <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
-                <label htmlFor="team-email" className="text-sm font-medium text-gray-700">
+                <label htmlFor="team-email" className="text-sm font-medium text-stone-700">
                   Email
                 </label>
                 <Input
@@ -376,31 +423,39 @@ export function BusinessTeamPageClient({
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="colleague@company.com"
+                  className="rounded-2xl border-stone-200 bg-stone-50/70 focus:bg-white"
                 />
               </div>
               <div className="space-y-2">
-                <label htmlFor="team-title" className="text-sm font-medium text-gray-700">
-                  Должность (необязательно)
+                <label htmlFor="team-title" className="text-sm font-medium text-stone-700">
+                  Должность
                 </label>
                 <Input
                   id="team-title"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   placeholder="Например, администратор зала"
+                  className="rounded-2xl border-stone-200 bg-stone-50/70 focus:bg-white"
                 />
               </div>
-              <Button type="submit" disabled={submitting}>
-                {submitting ? "Отправка…" : "Отправить приглашение"}
-              </Button>
-            </form>
-            {process.env.NODE_ENV === "development" && devInviteHint && (
-              <p className="mt-4 text-xs font-mono text-gray-500 break-all border-t pt-4">
-                {devInviteHint}
-              </p>
-            )}
-          </CardContent>
-        </Card>
-      )}
+            </div>
+
+            <Button
+              type="submit"
+              disabled={submitting}
+              className="rounded-2xl bg-stone-900 hover:bg-stone-800"
+            >
+              {submitting ? "Отправка…" : "Отправить приглашение"}
+            </Button>
+          </form>
+
+          {process.env.NODE_ENV === "development" && devInviteHint ? (
+            <div className="mt-5 rounded-[22px] border border-dashed border-stone-300 bg-stone-50 p-4 text-xs leading-6 text-stone-700">
+              {devInviteHint}
+            </div>
+          ) : null}
+        </BusinessSurfaceCard>
+      ) : null}
     </div>
   );
 }

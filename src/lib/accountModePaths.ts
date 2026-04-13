@@ -2,7 +2,7 @@ import { BUSINESS_PATH_PREFIX } from "@/lib/routing/surface";
 
 /**
  * Маршруты под /business, где режим «личный» допустим (онбординг, статусы и т.д.).
- * Остальные /business/* при активном личном режиме → редирект на /me.
+ * Остальные /business/* при активном личном режиме → синхронизация в бизнес-режим (см. AccountModeProvider).
  */
 const BUSINESS_PATHS_ALLOWED_IN_PERSONAL_MODE = [
   `${BUSINESS_PATH_PREFIX}/onboarding`,

@@ -1,65 +1,30 @@
 /**
- * Notification Preference Service
- * Server-only — do not import in client components.
+ * Notification preference persistence primitives.
+ *
+ * Canonical notification settings reads now live in
+ * `notificationSettings.service.ts`. This file remains as the low-level
+ * persistence layer for override writes and compatibility adapters.
  */
 
 import prisma from "@/lib/prisma";
 import { NotificationType } from "@prisma/client";
-import {
-  getNotificationDefaults,
-  notificationDefaultsByRole,
-  type ChannelDefaults,
-} from "@/lib/notifications/notificationDefaults";
+import { resolveNotificationAudience } from "@/lib/notifications/audience";
 
 export type PreferenceRow = {
   notificationType: NotificationType;
-  /** Effective resolved value (default merged with override) */
   inApp: boolean;
   email: boolean;
   telegram: boolean;
-  /** Whether the user has an explicit override stored */
   isOverridden: boolean;
 };
-
-/**
- * Return all preferences for a user, merging role defaults with stored overrides.
- * Every NotificationType relevant to the user's role is included.
- */
-export async function getPreferences(userId: string, role: string): Promise<PreferenceRow[]> {
-  const roleDefaults = notificationDefaultsByRole[role] ?? notificationDefaultsByRole["USER"];
-
-  // Load all stored overrides for this user in one query
-  const stored = await prisma.userNotificationPreference.findMany({
-    where: { userId },
-    select: {
-      notificationType: true,
-      inAppEnabled: true,
-      emailEnabled: true,
-      telegramEnabled: true,
-    },
-  });
-
-  const overrideMap = new Map(stored.map((r) => [r.notificationType, r]));
-
-  return (Object.keys(roleDefaults) as NotificationType[]).map((type) => {
-    const defaults: ChannelDefaults = getNotificationDefaults(role, type);
-    const override = overrideMap.get(type);
-
-    return {
-      notificationType: type,
-      inApp:    override?.inAppEnabled    ?? defaults.inApp,
-      email:    override?.emailEnabled    ?? defaults.email,
-      telegram: override?.telegramEnabled ?? defaults.telegram,
-      isOverridden: !!override,
-    };
-  });
-}
 
 export type UpdatePreferenceInput = {
   inAppEnabled?:    boolean | null;
   emailEnabled?:    boolean | null;
   telegramEnabled?: boolean | null;
 };
+
+export type NotificationPreferenceChannel = "IN_APP" | "EMAIL" | "TELEGRAM";
 
 /**
  * Upsert a single preference override for the current user.
@@ -88,7 +53,74 @@ export async function updatePreference(
 
   await prisma.userNotificationPreference.upsert({
     where: { userId_notificationType: { userId, notificationType } },
-    create: { userId, notificationType, ...data },
-    update: data,
+    create: {
+      userId,
+      audience: resolveNotificationAudience(notificationType),
+      notificationType,
+      ...data,
+    },
+    update: {
+      ...data,
+      audience: resolveNotificationAudience(notificationType),
+    },
+  });
+}
+
+/**
+ * Patch a single channel override without disturbing the other stored values.
+ * Used by the new immediate-save settings UI (`PATCH /api/notifications/settings`).
+ */
+export async function updatePreferenceChannel(
+  userId: string,
+  notificationType: NotificationType,
+  channel: NotificationPreferenceChannel,
+  enabled: boolean,
+): Promise<void> {
+  const existing = await prisma.userNotificationPreference.findUnique({
+    where: {
+      userId_notificationType: {
+        userId,
+        notificationType,
+      },
+    },
+    select: {
+      id: true,
+      inAppEnabled: true,
+      emailEnabled: true,
+      telegramEnabled: true,
+    },
+  });
+
+  const nextData = {
+    inAppEnabled: existing?.inAppEnabled ?? null,
+    emailEnabled: existing?.emailEnabled ?? null,
+    telegramEnabled: existing?.telegramEnabled ?? null,
+  };
+
+  if (channel === "IN_APP") {
+    nextData.inAppEnabled = enabled;
+  } else if (channel === "EMAIL") {
+    nextData.emailEnabled = enabled;
+  } else {
+    nextData.telegramEnabled = enabled;
+  }
+
+  await prisma.userNotificationPreference.upsert({
+    where: {
+      userId_notificationType: {
+        userId,
+        notificationType,
+      },
+    },
+    create: {
+      userId,
+      audience: resolveNotificationAudience(notificationType),
+      notificationType,
+      ...nextData,
+    },
+    update: {
+      ...nextData,
+      audience: resolveNotificationAudience(notificationType),
+    },
   });
 }

@@ -6,7 +6,7 @@ import { Role, UserStatus } from "@prisma/client";
 export async function GET(req: NextRequest) {
   try {
     // Require ADMIN or MODERATOR role
-    const user = await requireRole([Role.ADMIN, Role.MODERATOR]);
+    await requireRole([Role.ADMIN, Role.MODERATOR]);
 
     const { searchParams } = new URL(req.url);
     const query = searchParams.get("q") || "";
@@ -23,11 +23,11 @@ export async function GET(req: NextRequest) {
     });
 
     return NextResponse.json(result);
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error fetching users:", error);
     
     // Handle redirect errors from requireRole
-    if (error.message?.includes("NEXT_REDIRECT")) {
+    if (error instanceof Error && error.message?.includes("NEXT_REDIRECT")) {
       return NextResponse.json(
         { error: "Unauthorized" },
         { status: 401 }
@@ -35,8 +35,15 @@ export async function GET(req: NextRequest) {
     }
     
     return NextResponse.json(
-      { error: error.message || "Failed to fetch users" },
-      { status: error.message === "Insufficient permissions" ? 403 : 500 }
+      {
+        error: error instanceof Error ? error.message : "Failed to fetch users",
+      },
+      {
+        status:
+          error instanceof Error && error.message === "Insufficient permissions"
+            ? 403
+            : 500,
+      }
     );
   }
 }

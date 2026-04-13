@@ -7,6 +7,7 @@ import { SaveToPlanModal } from "@/components/activity/SaveToPlanModal";
 import type { SaveToPlanResult } from "@/components/activity/SaveToPlanModal";
 import type { SerializedPlanItem } from "./PlanPageClient";
 import type { ActivityMock } from "@/mocks/activity.types";
+import { formatPrice as formatPriceAmount, formatPriceFrom } from "@/lib/formatters/format-price";
 
 type RecommendationCardProps = {
   activity: ActivityMock;
@@ -16,7 +17,7 @@ type RecommendationCardProps = {
 
 function formatPrice(activity: ActivityMock): string {
   if (activity.priceMin === 0) return "Бесплатно";
-  if (activity.priceMin) return `от ${activity.priceMin} ${activity.currency}`;
+  if (activity.priceMin) return formatPriceFrom(activity.priceMin);
   return "";
 }
 

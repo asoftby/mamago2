@@ -15,6 +15,7 @@ import {
   BarChart2,
   ChartColumn,
   Mail,
+  Megaphone,
 } from "lucide-react";
 import { SidebarItem } from "@/components/shared/sidebar/SidebarItem";
 import { SidebarGroup } from "@/components/shared/sidebar/SidebarGroup";
@@ -213,6 +214,14 @@ export function AdminSidebar({
           icon={Mail}
           label="Email Studio"
           isActive={pathname.startsWith(adminPath("/email-studio"))}
+          onClick={onNavigate}
+        />
+
+        <SidebarItem
+          href={adminPath("/broadcasts")}
+          icon={Megaphone}
+          label="Коммуникации"
+          isActive={pathname.startsWith(adminPath("/broadcasts"))}
           onClick={onNavigate}
         />
 

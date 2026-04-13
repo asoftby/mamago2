@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Manrope, Geist_Mono, Literata, Noto_Serif, PT_Serif } from "next/font/google";
+import { headers } from "next/headers";
 import "./globals.css";
 import { Sonner } from "@/components/ui/sonner";
 import { AccountModeProvider } from "@/contexts/AccountModeContext";
@@ -8,6 +9,7 @@ import { FamilyDerivedAgeSync } from "@/components/family/FamilyDerivedAgeSync";
 import { MyPlanProvider } from "@/components/MyPlanProvider";
 import { CookieConsentProvider } from "@/components/providers/cookie-consent-provider";
 import { SaveIntentProvider } from "@/lib/save/SaveIntentContext";
+import { resolveSurfaceFromHostAndPathname } from "@/lib/routing/surface";
 
 const manrope = Manrope({
   variable: "--font-manrope",
@@ -57,11 +59,16 @@ export const viewport: Viewport = {
   userScalable: false,
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const headerStore = await headers();
+  const host = headerStore.get("x-forwarded-host") ?? headerStore.get("host") ?? undefined;
+  const currentSurface = resolveSurfaceFromHostAndPathname(host, "/");
+  const shouldMountMyPlanProvider = currentSurface === "public";
+
   return (
     <html lang="ru">
       <body
@@ -73,7 +80,7 @@ export default function RootLayout({
               <CookieConsentProvider>
                 <FamilyDerivedAgeSync />
                 {children}
-                <MyPlanProvider />
+                {shouldMountMyPlanProvider ? <MyPlanProvider /> : null}
               </CookieConsentProvider>
             </FamilyPersonaProvider>
           </AccountModeProvider>

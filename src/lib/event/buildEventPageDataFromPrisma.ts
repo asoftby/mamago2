@@ -3,6 +3,7 @@ import type { Intent } from "@/lib/intent";
 import { DEFAULT_CITY_HUB_PATH } from "@/lib/intent";
 import { extractPlainTextFromHtml } from "@/lib/richtext/utils";
 import { resolveActivityCoverUrl } from "@/lib/event/resolveActivityCoverUrl";
+import { formatPrice, formatPriceFrom } from "@/lib/formatters/format-price";
 import type { EventPageData } from "./eventPageTypes";
 
 const FALLBACK_POSTER = "/mock/activity/anderson.svg";
@@ -50,7 +51,7 @@ function discoveryIntentForActivity(): Intent {
 }
 
 /** Если в `priceText` только число/фраза без валюты — дописываем BYN (как в карточке и визарде). */
-function priceTextWithCurrencyIfNeeded(text: string, currency: string): string {
+function priceTextWithCurrencyIfNeeded(text: string): string {
   if (/\bbyn\b/i.test(text)) return text;
   const lower = text.toLowerCase();
   if (
@@ -61,16 +62,15 @@ function priceTextWithCurrencyIfNeeded(text: string, currency: string): string {
   ) {
     return text;
   }
-  return `${text} ${currency}`;
+  return `${text} BYN`;
 }
 
 function priceLabel(activity: Pick<ActivityForEventPageInput, "priceText" | "priceFrom" | "currency">): string {
   const t = activity.priceText?.trim();
-  if (t) return priceTextWithCurrencyIfNeeded(t, activity.currency ?? "BYN");
+  if (t) return priceTextWithCurrencyIfNeeded(t);
   if (activity.priceFrom === 0) return "Бесплатно";
   if (activity.priceFrom != null) {
-    const cur = activity.currency ?? "BYN";
-    return `от ${activity.priceFrom} ${cur}`;
+    return formatPriceFrom(activity.priceFrom);
   }
   return "Уточняйте цену";
 }

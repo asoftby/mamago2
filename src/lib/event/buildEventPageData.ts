@@ -1,6 +1,7 @@
 import type { ActivityMock } from "@/mocks/activity.types";
 import { publicActivityPath } from "@/lib/business/eventPublicLink";
 import { formatRuShortDayMonth } from "@/lib/formatters/date";
+import { formatPrice, formatPriceFrom } from "@/lib/formatters/format-price";
 import { EVENT_PAGE_OVERRIDES } from "@/mocks/eventPageOverrides";
 import type { EventPageData } from "./eventPageTypes";
 import { mapActivityToDiscoveryIntent } from "./mapActivityToDiscoveryIntent";
@@ -8,7 +9,7 @@ import { mapActivityToDiscoveryIntent } from "./mapActivityToDiscoveryIntent";
 function priceLabelFromMock(a: ActivityMock): string {
   if (a.priceMin === 0) return "Бесплатно";
   if (a.priceMin != null)
-    return `от ${a.priceMin} ${a.currency}`;
+    return formatPriceFrom(a.priceMin);
   return "Уточняйте цену";
 }
 

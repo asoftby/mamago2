@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import { Send } from "lucide-react";
 import { Role, UserStatus } from "@/types/admin";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -14,6 +15,8 @@ interface User {
   id: string;
   email: string;
   phoneE164: string | null;
+  telegramId: string | null;
+  telegramUsername: string | null;
   role: Role;
   status: UserStatus;
   lastLoginAt: Date | null;
@@ -58,6 +61,35 @@ const ROLE_LABELS: Record<Role, string> = {
   ADMIN: "Админ",
 };
 
+function TelegramStatusCell({ user }: { user: User }) {
+  const isConnected = Boolean(user.telegramId);
+
+  if (user.telegramUsername) {
+    return (
+      <Badge variant="outline" className="inline-flex items-center gap-1.5 border-sky-200 bg-sky-50 text-sky-700">
+        <Send className="h-3 w-3" />
+        <span>@{user.telegramUsername}</span>
+      </Badge>
+    );
+  }
+
+  if (isConnected) {
+    return (
+      <Badge variant="outline" className="inline-flex items-center gap-1.5 border-sky-200 bg-sky-50 text-sky-700">
+        <Send className="h-3 w-3" />
+        <span>Подключен</span>
+      </Badge>
+    );
+  }
+
+  return (
+    <span className="inline-flex items-center gap-1.5 text-sm text-gray-400">
+      <Send className="h-3.5 w-3.5" />
+      <span>Не подключен</span>
+    </span>
+  );
+}
+
 export function UsersListClient() {
   const [query, setQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState<string>("all");
@@ -67,11 +99,7 @@ export function UsersListClient() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchUsers();
-  }, [query, roleFilter, statusFilter, page]);
-
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -115,13 +143,19 @@ export function UsersListClient() {
         total: result.total,
       });
       setData(result);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error fetching users:", error);
-      setError(error.message);
+      setError(
+        error instanceof Error ? error.message : "Не удалось загрузить пользователей",
+      );
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, query, roleFilter, statusFilter]);
+
+  useEffect(() => {
+    void fetchUsers();
+  }, [fetchUsers]);
 
   const handleSearch = (value: string) => {
     setQuery(value);
@@ -195,6 +229,7 @@ export function UsersListClient() {
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Телефон</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Telegram</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Роль</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Статус</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Последний вход</th>
@@ -224,6 +259,9 @@ export function UsersListClient() {
                       ) : (
                         <span className="text-gray-400">—</span>
                       )}
+                    </td>
+                    <td className="px-4 py-3 text-sm">
+                      <TelegramStatusCell user={user} />
                     </td>
                     <td className="px-4 py-3 text-sm">
                       <Badge className={ROLE_COLORS[user.role]}>

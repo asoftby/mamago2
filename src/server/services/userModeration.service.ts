@@ -141,6 +141,8 @@ export async function searchUsers(query: string, filters: UserFilters = {}) {
         id: true,
         email: true,
         phoneE164: true,
+        telegramId: true,
+        telegramUsername: true,
         role: true,
         status: true,
         lastLoginAt: true,

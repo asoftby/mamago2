@@ -9,6 +9,7 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import type { TrackUserEventInput, TrackUserEventResult } from "@/lib/analytics/types";
 import { applyUserBehaviorEvent } from "@/server/services/analytics/UserBehaviorAggregationService";
+import { registerPromotionActionFromUserEvent } from "@/server/services/promotion/promotion.service";
 
 async function resolveCityId(
   cityId?: string | null,
@@ -37,7 +38,7 @@ export async function trackUserEvent(
         ? (input.meta as Prisma.InputJsonValue)
         : undefined;
 
-    await prisma.userEvent.create({
+    const userEvent = await prisma.userEvent.create({
       data: {
         userId: input.userId ?? undefined,
         sessionId: input.sessionId ?? undefined,
@@ -59,6 +60,17 @@ export async function trackUserEvent(
         meta: meta === undefined ? null : (meta as Prisma.JsonValue),
       });
     }
+
+    void registerPromotionActionFromUserEvent({
+      userEventId: userEvent.id,
+      eventType: input.eventType,
+      entityType: input.entityType ?? null,
+      entityId: input.entityId ?? null,
+      meta:
+        meta && typeof meta === "object" && !Array.isArray(meta)
+          ? (meta as Record<string, unknown>)
+          : null,
+    });
 
     return { ok: true };
   } catch (e) {

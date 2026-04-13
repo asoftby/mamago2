@@ -1,11 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { Search } from "lucide-react";
+import { Menu, X } from "lucide-react";
 import { useNarrowViewport } from "@/hooks/useNarrowViewport";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { CreatePublicationQuickMenu } from "@/components/shared/CreatePublicationQuickMenu";
 import { NotificationsDropdown } from "@/components/site/header/NotificationsDropdown";
 import { ProfileDropdown } from "@/components/site/header/ProfileDropdown";
@@ -14,6 +14,7 @@ import { HEADER_CHROME_ICON_BUTTON_CLASS } from "@/components/site/header/header
 import { useAccountMode } from "@/contexts/AccountModeContext";
 import { cn } from "@/lib/utils";
 import { navigateToSurface } from "@/lib/routing/clientNavigation";
+import { BusinessSidebar } from "./BusinessSidebar";
 
 function userInitials(email: string): string {
   const local = email.split("@")[0] ?? "?";
@@ -37,6 +38,7 @@ export function BusinessHeader({ user }: BusinessHeaderProps) {
   const { mode, goToBusinessAccount, goToPersonalAccount, hydrated } =
     useAccountMode();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
 
   const handleLogout = async () => {
@@ -86,84 +88,103 @@ export function BusinessHeader({ user }: BusinessHeaderProps) {
   );
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-gray-200 bg-white">
-      <div className="flex h-16 items-center gap-4 px-6">
-        <div className="flex min-w-[200px] items-center gap-2">
-          <span className="text-lg font-semibold text-gray-900">
-            mamaGo Business
-          </span>
-        </div>
+    <>
+      <header className="sticky top-0 z-50 w-full border-b border-stone-200/80 bg-white/90 backdrop-blur">
+        <div className="flex h-16 items-center gap-3 px-4 lg:px-6">
+          <button
+            type="button"
+            onClick={() => setMobileNavOpen(!mobileNavOpen)}
+            className="lg:hidden shrink-0 p-2 -ml-2 hover:bg-stone-100 rounded-lg"
+          >
+            {mobileNavOpen ? (
+              <X className="h-5 w-5 text-stone-600" />
+            ) : (
+              <Menu className="h-5 w-5 text-stone-600" />
+            )}
+          </button>
 
-        <div className="max-w-md flex-1">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-            <Input
-              type="search"
-              placeholder="Поиск..."
-              className="h-9 border-gray-200 bg-gray-50 pl-9 focus:bg-white"
+          <div className="flex min-w-0 flex-1 items-center gap-2">
+            <span className="truncate text-base lg:text-lg font-semibold tracking-tight text-stone-950">
+              <span className="hidden sm:inline">mamaGo Business</span>
+              <span className="sm:hidden">Business</span>
+            </span>
+          </div>
+
+          <div className="ml-auto flex shrink-0 items-center gap-2">
+            <CreatePublicationQuickMenu publicationMode="business" />
+            <NotificationsDropdown
+              context={notificationContext}
+              triggerClassName={cn("inline-flex", HEADER_CHROME_ICON_BUTTON_CLASS)}
+            />
+            <ProfileDropdown
+              mode={!hydrated ? "business" : mode}
+              user={user}
+              open={menuOpen}
+              onOpenChange={setMenuOpen}
+              narrow={narrow}
+              trigger={trigger}
+              loggingOut={loggingOut}
+              onLogout={handleLogout}
+              onNavigate={() => setMenuOpen(false)}
+              onGoToSettings={() =>
+                navigateToSurface(router, {
+                  targetSurface: "business",
+                  targetPath: "/settings",
+                })
+              }
+              onGoToAdminAccount={() =>
+                navigateToSurface(router, {
+                  targetSurface: "admin",
+                  targetPath: "/",
+                })
+              }
+              onGoToBusinessAccount={() =>
+                goToBusinessAccount(isBusinessPartner)
+              }
+              onGoToPersonalProfile={() =>
+                navigateToSurface(router, {
+                  targetSurface: "public",
+                  targetPath: "/me",
+                })
+              }
+              onGoToPersonalAccount={goToPersonalAccount}
+              onGoToPersonalPlan={() =>
+                navigateToSurface(router, {
+                  targetSurface: "public",
+                  targetPath: "/me/plan",
+                })
+              }
+              onGoToBusinessDashboard={() =>
+                navigateToSurface(router, {
+                  targetSurface: "business",
+                  targetPath: "/dashboard",
+                })
+              }
+              onGoToBusinessPlaces={() =>
+                navigateToSurface(router, {
+                  targetSurface: "business",
+                  targetPath: "/places",
+                })
+              }
+              onGoToBusinessCommercial={() =>
+                navigateToSurface(router, {
+                  targetSurface: "business",
+                  targetPath: "/promotion",
+                })
+              }
             />
           </div>
         </div>
+      </header>
 
-        <div className="ml-auto flex items-center gap-2">
-          <CreatePublicationQuickMenu publicationMode="business" />
-          <NotificationsDropdown
-            context={notificationContext}
-            triggerClassName={cn("inline-flex", HEADER_CHROME_ICON_BUTTON_CLASS)}
-          />
-          <ProfileDropdown
-            mode={!hydrated ? "business" : mode}
-            user={user}
-            open={menuOpen}
-            onOpenChange={setMenuOpen}
-            narrow={narrow}
-            trigger={trigger}
-            loggingOut={loggingOut}
-            onLogout={handleLogout}
-            onNavigate={() => setMenuOpen(false)}
-            onGoToAdminAccount={() =>
-              navigateToSurface(router, {
-                targetSurface: "admin",
-                targetPath: "/",
-              })
-            }
-            onGoToBusinessAccount={() =>
-              goToBusinessAccount(isBusinessPartner)
-            }
-            onGoToPersonalProfile={() =>
-              navigateToSurface(router, {
-                targetSurface: "public",
-                targetPath: "/me",
-              })
-            }
-            onGoToPersonalAccount={goToPersonalAccount}
-            onGoToPersonalPlan={() =>
-              navigateToSurface(router, {
-                targetSurface: "public",
-                targetPath: "/me/plan",
-              })
-            }
-            onGoToBusinessDashboard={() =>
-              navigateToSurface(router, {
-                targetSurface: "business",
-                targetPath: "/dashboard",
-              })
-            }
-            onGoToBusinessPlaces={() =>
-              navigateToSurface(router, {
-                targetSurface: "business",
-                targetPath: "/places",
-              })
-            }
-            onGoToBusinessCommercial={() =>
-              navigateToSurface(router, {
-                targetSurface: "business",
-                targetPath: "/commercial",
-              })
-            }
-          />
-        </div>
-      </div>
-    </header>
+      <BottomSheet
+        open={mobileNavOpen}
+        onOpenChange={setMobileNavOpen}
+        title="Навигация"
+        showCloseButton={true}
+      >
+        <BusinessSidebar variant="sheet" onNavigate={() => setMobileNavOpen(false)} />
+      </BottomSheet>
+    </>
   );
 }

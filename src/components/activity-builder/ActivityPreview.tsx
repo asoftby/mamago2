@@ -6,6 +6,7 @@ import type { ActivityFormData } from "./types";
 import { BookingDateSelector } from "@/components/booking/BookingDateSelector";
 import { BookingSlotSelector } from "@/components/booking/BookingSlotSelector";
 import type { BookingDateOption } from "@/components/booking/types";
+import { formatPrice, formatPriceFrom } from "@/lib/formatters/format-price";
 
 interface ActivityPreviewProps {
   data: ActivityFormData;
@@ -46,8 +47,8 @@ export function ActivityPreview({ data }: ActivityPreviewProps) {
   // Format price
   const priceLabel = useMemo(() => {
     if (data.pricingMode === "free") return "Бесплатно";
-    if (data.pricingMode === "fixed") return `${data.price} BYN`;
-    if (data.pricingMode === "from") return `от ${data.priceFrom} BYN`;
+    if (data.pricingMode === "fixed" && data.price != null) return formatPrice(data.price);
+    if (data.pricingMode === "from" && data.priceFrom != null) return formatPriceFrom(data.priceFrom);
     if (data.pricingMode === "on-request") return "По запросу";
     return "";
   }, [data.pricingMode, data.price, data.priceFrom]);

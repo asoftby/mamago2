@@ -1,8 +1,9 @@
 /**
- * App surface routing — compatibility-first.
+ * App surface routing.
  *
- * Today, surfaces are determined by pathname prefixes (`/admin`, `/business`).
- * Host is accepted for future subdomain / tenant routing but does not change behavior yet.
+ * Host-based routing is the canonical architecture for production and local
+ * development (`mamago.local`, `business.mamago.local`, `admin.mamago.local`).
+ * Path prefixes remain in place as compatibility fallbacks and internal routes.
  */
 
 export type AppSurface = "public" | "admin" | "business";
@@ -207,11 +208,30 @@ export function surfaceFromPathname(pathname: string): AppSurface {
 }
 
 /**
- * Resolves surface from host + pathname. Host is reserved for future use; pathname wins today.
+ * Resolves surface from host + pathname.
+ * Pathname prefixes still override host to preserve compatibility during the migration.
  */
 export function resolveSurfaceFromHostAndPathname(
-  _host: string | undefined,
+  host: string | undefined,
   pathname: string,
 ): AppSurface {
-  return surfaceFromPathname(pathname);
+  const pathSurface = surfaceFromPathname(pathname);
+  if (pathSurface !== "public") {
+    return pathSurface;
+  }
+
+  const resolvedHost = resolveSupportedBaseHost(host);
+  if (!resolvedHost) {
+    return "public";
+  }
+
+  const { hostname } = parseHost(host ?? "");
+  if (hostname === `admin.${resolvedHost.baseHost}`) {
+    return "admin";
+  }
+  if (hostname === `business.${resolvedHost.baseHost}`) {
+    return "business";
+  }
+
+  return "public";
 }

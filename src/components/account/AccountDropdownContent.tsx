@@ -55,6 +55,7 @@ export type AccountDropdownContentProps = {
   header: AccountDropdownHeaderModel;
   mainItems: AccountMenuRow[];
   contextItems?: AccountMenuRow[];
+  onGoToSettings?: () => void;
   /** Для logoutMode `fetch` (по умолчанию) */
   onLogout?: () => void | Promise<void>;
   /** form POST на /api/auth/logout (админка) — onLogout не используется */
@@ -72,6 +73,7 @@ export function AccountDropdownContent({
   header,
   mainItems,
   contextItems,
+  onGoToSettings,
   onLogout,
   logoutMode = "fetch",
   loggingOut,
@@ -129,6 +131,25 @@ export function AccountDropdownContent({
         {mainItems.map((row) => (
           <MenuRow key={row.key} row={row} onNavigate={onNavigate} />
         ))}
+        {/* Settings — before role-switch block */}
+        <button
+          type="button"
+          className={cn(accountDropdownRowDefault, "w-full")}
+          onClick={() => {
+            if (onGoToSettings) {
+              onGoToSettings();
+            } else {
+              navigateToSurface(router, {
+                targetSurface: "public",
+                targetPath: "/me/settings",
+              });
+            }
+            onNavigate?.();
+          }}
+        >
+          <Settings className={accountDropdownIconClass} aria-hidden />
+          Настройки
+        </button>
       </nav>
 
       {contextItems && contextItems.length > 0 ? (
@@ -140,20 +161,6 @@ export function AccountDropdownContent({
       ) : null}
 
       <div className="border-t border-gray-200 p-2">
-        <button
-          type="button"
-          className={cn(accountDropdownRowDefault, "w-full")}
-          onClick={() => {
-            navigateToSurface(router, {
-              targetSurface: "public",
-              targetPath: "/me/settings",
-            });
-            onNavigate?.();
-          }}
-        >
-          <Settings className={accountDropdownIconClass} aria-hidden />
-          Настройки
-        </button>
         {logoutMode === "form" ? (
           <form action="/api/auth/logout" method="POST" className="w-full">
             <button

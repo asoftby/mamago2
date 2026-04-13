@@ -66,6 +66,7 @@ export function resolveSubdomainMiddlewareDecision(params: {
   const isLocalhost = host.startsWith("localhost") || host.startsWith("127.0.0.1");
 
   if (isLocalhost) {
+    // Legacy development fallback. Canonical local dev uses mamago.local subdomains.
     if (pathname === "/") {
       return {
         kind: "redirect",

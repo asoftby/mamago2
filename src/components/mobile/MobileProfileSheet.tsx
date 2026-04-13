@@ -220,6 +220,12 @@ export function MobileProfileSheet({
       loggingOut={loggingOut}
       onLogout={handleLogout}
       onNavigate={() => setMenuOpen(false)}
+      onGoToSettings={() =>
+        navigateToSurface(router, {
+          targetSurface: "public",
+          targetPath: "/me/settings",
+        })
+      }
       onGoToAdminAccount={() =>
         navigateToSurface(router, {
           targetSurface: "admin",
@@ -255,7 +261,7 @@ export function MobileProfileSheet({
       onGoToBusinessCommercial={() =>
         navigateToSurface(router, {
           targetSurface: "business",
-          targetPath: "/commercial",
+          targetPath: "/promotion",
         })
       }
     />

@@ -10,6 +10,7 @@ import { H3, Caption } from "@/components/ui/typography";
 import { SaveHeart } from "@/features/save/SaveHeart";
 import { SaveToPlanResult } from "./SaveToPlanModal";
 import { formatRuShortDayMonthRange } from "@/lib/formatters/date";
+import { formatPrice, formatPriceFrom } from "@/lib/formatters/format-price";
 import { publicActivityPath } from "@/lib/business/eventPublicLink";
 
 type DomainActivity = {
@@ -46,7 +47,6 @@ function discoveryCardPriceCaption(
 ): string | null {
   if (a.priceMin === 0) return "Бесплатно";
   if (a.priceMin == null) return null;
-  const cur = (a.currency || "BYN").trim();
   const useOt =
     a.priceListUsesOt ??
     !(
@@ -54,9 +54,7 @@ function discoveryCardPriceCaption(
       a.priceMin != null &&
       a.priceMin === a.priceMax
     );
-  return useOt
-    ? `от ${a.priceMin} ${cur}`.trim()
-    : `${a.priceMin} ${cur}`.trim();
+  return useOt ? formatPriceFrom(a.priceMin) : formatPrice(a.priceMin);
 }
 
 export type ActivitySaveMeta = {

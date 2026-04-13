@@ -18,7 +18,12 @@ export async function submitForVerification(
 ): Promise<void> {
   const business = await prisma.business.findUnique({
     where: { id: businessId },
-    select: { verificationStatus: true, ownerUserId: true },
+    select: {
+      verificationStatus: true,
+      ownerUserId: true,
+      phone: true,
+      contactPhoneVerifiedAt: true,
+    },
   });
 
   if (!business) {
@@ -37,6 +42,10 @@ export async function submitForVerification(
     throw new Error(
       `Cannot submit from status: ${business.verificationStatus}`
     );
+  }
+
+  if (!business.phone || !business.contactPhoneVerifiedAt) {
+    throw new Error("Подтвердите номер телефона, чтобы отправить профиль на проверку");
   }
 
   const now = new Date();

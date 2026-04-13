@@ -10,6 +10,7 @@ import {
 import prisma from "@/lib/prisma";
 import { generateToken } from "@/lib/auth/crypto";
 import { sendEmail } from "@/lib/email/emailAdapter";
+import { getCanonicalPublicAppUrl } from "@/lib/config/publicAppUrl";
 
 export const BUSINESS_INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -187,11 +188,11 @@ export async function createBusinessInvite(
 }
 
 function getPublicBaseUrl(): string {
-  const env = process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL;
+  const env = process.env.APP_PUBLIC_URL || process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL;
   if (env) {
     return env.startsWith("http") ? env.replace(/\/$/, "") : `https://${env.replace(/\/$/, "")}`;
   }
-  return "http://localhost:3000";
+  return getCanonicalPublicAppUrl();
 }
 
 export type AcceptInviteResult =

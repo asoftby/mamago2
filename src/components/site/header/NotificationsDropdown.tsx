@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/popover";
 import { NotificationsModal } from "@/components/business/notifications/NotificationsModal";
 import { NotificationsPanel } from "@/components/business/notifications/NotificationsPanel";
+import { NotificationsBellPopover } from "@/components/business/notifications/NotificationsBellPopover";
 import type { HeaderChromeContext } from "@/lib/header/chromeContext";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { cn } from "@/lib/utils";
@@ -28,6 +29,22 @@ export type NotificationsDropdownProps = {
  * Колокол в шапке: desktop — dropdown (Popover), mobile — тот же контент в bottom sheet через NotificationsModal.
  */
 export function NotificationsDropdown({
+  context,
+  triggerClassName,
+}: NotificationsDropdownProps) {
+  if (context === "business") {
+    return <NotificationsBellPopover triggerClassName={triggerClassName} />;
+  }
+
+  return (
+    <PersonalNotificationsDropdown
+      context={context}
+      triggerClassName={triggerClassName}
+    />
+  );
+}
+
+function PersonalNotificationsDropdown({
   context,
   triggerClassName,
 }: NotificationsDropdownProps) {

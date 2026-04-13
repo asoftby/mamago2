@@ -26,6 +26,7 @@ export function buildPublicSiteAccountModel(input: {
   mode: AccountMode;
   initials: string;
   onNavigate: () => void;
+  onGoToSettings: () => void;
   onGoToAdminAccount: () => void;
   onGoToBusinessAccount: () => void;
   onGoToPersonalAccount: () => void;
@@ -42,6 +43,7 @@ export function buildPublicSiteAccountModel(input: {
     mode,
     initials,
     onNavigate,
+    onGoToSettings,
     onGoToAdminAccount,
     onGoToBusinessAccount,
     onGoToPersonalAccount,
@@ -96,7 +98,7 @@ export function buildPublicSiteAccountModel(input: {
           {
             key: "admin",
             type: "button",
-            label: "Админ панель",
+            label: "Перейти в админ-панель",
             icon: Shield,
             variant: "accent",
             onClick: () => {
@@ -121,6 +123,7 @@ export function buildPublicSiteAccountModel(input: {
       header,
       mainItems,
       contextItems,
+      onGoToSettings,
       onLogout,
       logoutMode: "fetch",
       loggingOut,
@@ -153,7 +156,7 @@ export function buildPublicSiteAccountModel(input: {
       {
         key: "commercial",
         type: "button",
-        label: "Заявки и коммерция",
+        label: "Продвижение",
         icon: ClipboardList,
         onClick: () => {
           onGoToBusinessCommercial();
@@ -172,6 +175,7 @@ export function buildPublicSiteAccountModel(input: {
         },
       },
     ],
+    onGoToSettings,
     onLogout,
     logoutMode: "fetch",
     loggingOut,

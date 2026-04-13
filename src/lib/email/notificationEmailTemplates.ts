@@ -30,10 +30,13 @@ export function buildNotificationEmailTemplate(
 }
 
 function buildCtaUrl(type: NotificationType, entityId?: string | null): string | null {
-  if (type === "WELCOME" || type === "REMINDER" || type === "RECOMMENDATION") {
+  // USER types — link to notification settings or plan
+  if (type === "WELCOME" || type === "RECOMMENDATION") {
     return `${APP_URL}/me/settings/notifications`;
   }
-  if (type === "SYSTEM") return `${APP_URL}/me/plan`;
+  if (type === "REMINDER") return `${APP_URL}/me/plan`;
+  if (type === "SYSTEM") return `${APP_URL}/me/settings/notifications`;
+  if (type === "NEWS" || type === "ANNOUNCEMENT") return null;
 
   if (!entityId) return `${APP_URL}/business/dashboard`;
 

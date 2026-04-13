@@ -23,6 +23,7 @@ import {
   WELCOME_NOTIFICATION_BODY,
   WELCOME_NOTIFICATION_TITLE,
 } from "@/lib/notifications/welcomeNotification";
+import { resolveNotificationAudience } from "@/lib/notifications/audience";
 import { dispatchDelivery } from "./notificationDelivery.service";
 
 export type NotificationStreamFilter = "user" | "business";
@@ -36,7 +37,11 @@ function mergeStreamFilter(
   return base;
 }
 
-/** Скрыть welcome в выдаче API, когда Telegram уже подключён (запись в БД остаётся). */
+/**
+ * Hide WELCOME notification from the feed when Telegram is already connected.
+ * The DB record is preserved — only the feed query excludes it.
+ * WELCOME is a legacy onboarding type; it is not part of the active USER settings model.
+ */
 function mergeHideWelcomeWhenTelegramConnected(
   base: Prisma.NotificationWhereInput,
   telegramConnected?: boolean,
@@ -50,6 +55,7 @@ function mergeHideWelcomeWhenTelegramConnected(
 interface CreateNotificationParams {
   userId: string;
   type: NotificationType;
+  audience?: "USER" | "BUSINESS" | "ADMIN";
   title: string;
   body: string;
   ctaLabel?: string | null;
@@ -67,6 +73,7 @@ export async function createNotification(params: CreateNotificationParams) {
   const notification = await prisma.notification.create({
     data: {
       userId: params.userId,
+      audience: params.audience ?? resolveNotificationAudience(params.type),
       type: params.type,
       title: params.title,
       body: params.body,
@@ -92,7 +99,11 @@ export async function createNotification(params: CreateNotificationParams) {
   return notification;
 }
 
-/** Одноразовое приветствие после регистрации (дубликаты по type WELCOME отсекаются). */
+/**
+ * Send a one-time welcome notification after registration.
+ * Uses the legacy WELCOME type — this is an onboarding record, not a settings category.
+ * Deduplication: only one WELCOME per user is ever created.
+ */
 export async function notifyWelcomeNewUser(userId: string) {
   const existing = await prisma.notification.findFirst({
     where: { userId, type: "WELCOME" },
@@ -475,7 +486,7 @@ export async function getUnreadCount(
   return prisma.notification.count({ where });
 }
 
-/** После подключения Telegram — скрыть welcome из UI и снять непрочитанность. */
+/** После подключения Telegram — скрыть WELCOME из UI и снять непрочитанность. */
 export async function markWelcomeNotificationsRead(userId: string) {
   const now = new Date();
   return prisma.notification.updateMany({
@@ -503,5 +514,38 @@ export async function deleteOldNotifications(daysOld = 90) {
   cutoffDate.setDate(cutoffDate.getDate() - daysOld);
   return prisma.notification.deleteMany({
     where: { seenAt: { not: null, lt: cutoffDate } },
+  });
+}
+
+export async function notifyAdminModerationItemCreated(params: {
+  userId: string;
+  itemTitle: string;
+  itemId?: string;
+}) {
+  return createNotification({
+    userId: params.userId,
+    audience: "ADMIN",
+    type: "ADMIN_MODERATION_ITEM_CREATED",
+    title: "Новый объект на модерации",
+    body: params.itemTitle,
+    entityType: "MODERATION_ITEM",
+    entityId: params.itemId ?? undefined,
+  });
+}
+
+export async function notifyUserPlanReminder(params: {
+  userId: string;
+  title: string;
+  body: string;
+  entityId?: string | null;
+}) {
+  return createNotification({
+    userId: params.userId,
+    audience: "USER",
+    type: "REMINDER",
+    title: params.title,
+    body: params.body,
+    entityType: "PLAN_ITEM",
+    entityId: params.entityId ?? undefined,
   });
 }

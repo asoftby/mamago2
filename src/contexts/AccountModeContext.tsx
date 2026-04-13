@@ -10,10 +10,7 @@ import {
 } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { shouldRedirectPersonalModeAwayFromBusiness } from "@/lib/accountModePaths";
-import {
-  BUSINESS_PATH_PREFIX,
-  buildPublicPath,
-} from "@/lib/routing/surface";
+import { BUSINESS_PATH_PREFIX } from "@/lib/routing/surface";
 import { navigateToSurface } from "@/lib/routing/clientNavigation";
 
 export type AccountMode = "personal" | "business";
@@ -84,12 +81,14 @@ export function AccountModeProvider({ children }: { children: React.ReactNode })
     });
   }, [router, setMode]);
 
+  // Личный режим + URL кабинета `/business/*` (кроме онбординга и т.д.) — синхронизируем режим,
+  // иначе навигация по сайдбару (например /business/events) уводила на /me.
   useEffect(() => {
     if (!hydrated) return;
     if (mode !== "personal") return;
     if (!shouldRedirectPersonalModeAwayFromBusiness(pathname)) return;
-    router.replace(buildPublicPath("/me"));
-  }, [hydrated, mode, pathname, router]);
+    setMode("business");
+  }, [hydrated, mode, pathname, setMode]);
 
   const value = useMemo(
     () => ({
