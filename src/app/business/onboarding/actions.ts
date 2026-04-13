@@ -8,6 +8,10 @@ import { getOwnedBusinessProfile } from "@/server/business/getMyBusiness";
 import prisma from "@/lib/prisma";
 import { resolveCompanyByUnp } from "@/server/company/resolveByUnp";
 import { notifyAdminBusinessVerificationPending } from "@/lib/admin/notifyAdminBusinessVerification";
+import {
+  isBusinessContactPhoneVerifiedForUser,
+  normalizeBusinessContactPhone,
+} from "@/lib/phone-verification/businessContactVerification";
 
 // Server action for UNP lookup
 export async function lookupLegalNameByUnp(unp: string) {
@@ -26,8 +30,31 @@ type ActionState =
 const onboardingSchema = z.object({
   unp: z.string().regex(/^[0-9]{9}$/, "УНП должен содержать 9 цифр"),
   legalName: z.string().min(2, "Минимум 2 символа").max(200, "Максимум 200 символов"),
-  phone: z.string().regex(/^\+\d{7,15}$/, "Неверный формат телефона (E.164)"),
+  phone: z.string().min(1, "Укажите номер телефона"),
 });
+
+function buildPhoneVerificationFieldError(): ActionState {
+  return {
+    ok: false,
+    message: "Подтвердите номер телефона, чтобы отправить профиль на проверку",
+    fieldErrors: {
+      phone: ["Подтвердите номер телефона, чтобы отправить профиль на проверку"],
+    },
+  };
+}
+
+function isExistingBusinessPhoneVerified(params: {
+  business:
+    | { phone: string | null; contactPhoneVerifiedAt: Date | null }
+    | null
+    | undefined;
+  phoneE164: string;
+}) {
+  return (
+    params.business?.phone === params.phoneE164 &&
+    params.business.contactPhoneVerifiedAt instanceof Date
+  );
+}
 
 export async function createBusinessAction(
   prevState: ActionState | null,
@@ -45,17 +72,40 @@ export async function createBusinessAction(
     legalName: String(formData.get("legalName") ?? ""),
     phone: String(formData.get("phone") ?? ""),
   };
+  const clientVerifiedPhone = String(formData.get("phoneVerificationPhone") ?? "");
 
   try {
     // Validate
     const validated = onboardingSchema.parse(payload);
+    const phoneE164 = normalizeBusinessContactPhone(validated.phone);
 
     // Check if business already exists
     const existing = await getOwnedBusinessProfile(user.id);
+    const existingPhoneStillVerified = isExistingBusinessPhoneVerified({
+      business: existing,
+      phoneE164,
+    });
+    const userVerifiedThisPhone = isBusinessContactPhoneVerifiedForUser({
+      phoneE164,
+      userPhoneE164: user.phoneE164,
+      userPhoneVerifiedAt: user.phoneVerifiedAt,
+    });
+    const clientConfirmedCurrentPhone = clientVerifiedPhone === phoneE164;
+
+    if (
+      !existingPhoneStillVerified &&
+      !(clientConfirmedCurrentPhone && userVerifiedThisPhone)
+    ) {
+      return buildPhoneVerificationFieldError();
+    }
     
     // Generate name automatically from legalName or user ID
     const businessName = validated.legalName || `Business ${user.id}`;
     const now = new Date();
+    const contactPhoneVerifiedAt =
+      existingPhoneStillVerified && existing?.contactPhoneVerifiedAt
+        ? existing.contactPhoneVerifiedAt
+        : user.phoneVerifiedAt;
 
     if (existing) {
       // UPSERT: Update existing business and resubmit
@@ -80,7 +130,8 @@ export async function createBusinessAction(
           name: businessName,
           unp: validated.unp,
           legalName: validated.legalName,
-          phone: validated.phone,
+          phone: phoneE164,
+          contactPhoneVerifiedAt,
           // CANONICAL: Set verificationStatus to PENDING
           verificationStatus: "PENDING",
           submittedAt: now,
@@ -108,7 +159,8 @@ export async function createBusinessAction(
           name: businessName,
           unp: validated.unp,
           legalName: validated.legalName,
-          phone: validated.phone,
+          phone: phoneE164,
+          contactPhoneVerifiedAt,
           // CANONICAL: Set verificationStatus to PENDING
           verificationStatus: "PENDING",
           submittedAt: now,
@@ -131,6 +183,16 @@ export async function createBusinessAction(
         ok: false,
         message: "Проверьте поля формы",
         fieldErrors: e.flatten().fieldErrors,
+      };
+    }
+
+    if (e instanceof Error && e.message === "Неверный формат телефона") {
+      return {
+        ok: false,
+        message: "Проверьте номер телефона",
+        fieldErrors: {
+          phone: ["Введите корректный номер телефона"],
+        },
       };
     }
 

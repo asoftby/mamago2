@@ -5,6 +5,7 @@ import { OnboardingForm } from "./OnboardingForm";
 import { getEffectiveVerificationStatus } from "@/server/services/businessStatusMap";
 import { buildSurfaceRedirectDestination } from "@/lib/routing/surface";
 import { getCurrentRequestRoutingContext } from "@/lib/routing/requestContext";
+import { loadBusinessContactOtpClientState } from "@/lib/phone-verification/businessContactVerification";
 
 // Ensure Node.js runtime for fetch compatibility
 export const runtime = "nodejs";
@@ -55,6 +56,9 @@ export default async function OnboardingPage() {
     ? getEffectiveVerificationStatus(existingBusiness)
     : null;
 
+  const initialBusinessContactOtpState =
+    await loadBusinessContactOtpClientState(user.id);
+
   return (
     <div className="max-w-2xl mx-auto">
       <div className="bg-white rounded-lg shadow p-8">
@@ -89,6 +93,7 @@ export default async function OnboardingPage() {
           <OnboardingForm
             initialData={existingBusiness}
             accountPhoneE164={user.phoneE164 ?? null}
+            initialBusinessContactOtpState={initialBusinessContactOtpState}
           />
         </div>
       </div>

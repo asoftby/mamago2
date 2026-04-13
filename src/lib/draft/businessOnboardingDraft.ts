@@ -12,6 +12,7 @@ export interface BusinessOnboardingDraft {
     source?: string | null;
   };
   phoneE164?: string;
+  verifiedPhoneE164?: string;
   updatedAt?: number;
 }
 
@@ -59,6 +60,10 @@ export function loadDraft(): BusinessOnboardingDraft | null {
 
     if (typeof draft.phoneE164 === "string") {
       validated.phoneE164 = draft.phoneE164;
+    }
+
+    if (typeof draft.verifiedPhoneE164 === "string") {
+      validated.verifiedPhoneE164 = draft.verifiedPhoneE164;
     }
 
     if (typeof draft.updatedAt === "number") {

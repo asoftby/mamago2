@@ -3,8 +3,8 @@
  * Usage: pnpm cleanup:otp
  */
 
-import prisma from "@/lib/prisma";
-import { cleanupExpiredPhoneOtps } from "@/lib/otp/cleanup";
+import prisma from "../../src/lib/prisma";
+import { cleanupExpiredPhoneOtps } from "../../src/lib/otp/cleanup";
 
 async function main() {
   console.log("[cleanupPhoneOtps] Starting cleanup...");

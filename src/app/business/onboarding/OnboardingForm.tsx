@@ -5,12 +5,16 @@ import { useFormStatus } from "react-dom";
 import { createBusinessAction, lookupLegalNameByUnp } from "./actions";
 import { PrimaryButton } from "@/components/ui/PrimaryButton";
 import { Input } from "@/components/ui/input";
+import { PhoneVerificationField } from "@/components/phone/PhoneVerificationField";
 import {
   loadDraft,
   saveDraft,
   clearDraft,
 } from "@/lib/draft/businessOnboardingDraft";
-import PhoneInput from "react-phone-number-input";
+import {
+  type BusinessContactOtpClientState,
+  isVerifiedPhoneMatch,
+} from "@/lib/phone-verification/businessContactVerification.shared";
 import "./onboarding-phone-input.css";
 
 function SubmitButton({ disabled }: { disabled?: boolean }) {
@@ -36,13 +40,29 @@ function defaultPhoneFromProps(
   return "";
 }
 
+function defaultVerifiedPhoneFromProps(
+  initialData:
+    | { phone?: string | null; contactPhoneVerifiedAt?: string | Date | null }
+    | undefined
+    | null
+) {
+  if (initialData?.phone && initialData?.contactPhoneVerifiedAt) {
+    return initialData.phone;
+  }
+
+  return "";
+}
+
 export function OnboardingForm({
   initialData,
   accountPhoneE164 = null,
+  initialBusinessContactOtpState,
 }: {
   initialData?: any;
   /** Номер из аккаунта (как правило, подтверждённый при регистрации) — если в заявке ещё нет телефона */
   accountPhoneE164?: string | null;
+  /** Серверное состояние escalation OTP (business contact) */
+  initialBusinessContactOtpState?: BusinessContactOtpClientState;
 }) {
   const [state, formAction] = useActionState(createBusinessAction, null);
   
@@ -55,6 +75,9 @@ export function OnboardingForm({
   
   const [phoneE164, setPhoneE164] = useState(() =>
     defaultPhoneFromProps(initialData, accountPhoneE164)
+  );
+  const [verifiedPhoneE164, setVerifiedPhoneE164] = useState(() =>
+    defaultVerifiedPhoneFromProps(initialData)
   );
   
   const lookupTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -101,6 +124,14 @@ export function OnboardingForm({
         setPhoneE164(draft.phoneE164);
       } else if (accountPhoneE164) {
         setPhoneE164(accountPhoneE164);
+      }
+
+      if (
+        draft.verifiedPhoneE164 &&
+        draft.phoneE164 &&
+        draft.verifiedPhoneE164 === draft.phoneE164
+      ) {
+        setVerifiedPhoneE164(draft.verifiedPhoneE164);
       }
     }
   }, [initialData, accountPhoneE164]);
@@ -186,7 +217,27 @@ export function OnboardingForm({
   const handlePhoneChange = (value: string | undefined) => {
     const e164 = value ?? "";
     setPhoneE164(e164);
-    debouncedSave({ phoneE164: e164 });
+
+    setVerifiedPhoneE164((currentVerifiedPhone) => {
+      const nextVerifiedPhone =
+        currentVerifiedPhone && currentVerifiedPhone === e164
+          ? currentVerifiedPhone
+          : "";
+      debouncedSave({
+        phoneE164: e164,
+        verifiedPhoneE164: nextVerifiedPhone || undefined,
+      });
+      return nextVerifiedPhone;
+    });
+  };
+
+  const handleVerifiedPhoneChange = (verifiedPhone: string | null) => {
+    const nextVerifiedPhone = verifiedPhone ?? "";
+    setVerifiedPhoneE164(nextVerifiedPhone);
+    debouncedSave({
+      phoneE164,
+      verifiedPhoneE164: nextVerifiedPhone || undefined,
+    });
   };
 
   // Clear draft on successful submission
@@ -197,6 +248,11 @@ export function OnboardingForm({
       console.log("Draft cleared after successful submission");
     }
   }, [state]);
+
+  const isPhoneVerified = isVerifiedPhoneMatch({
+    currentPhoneE164: phoneE164,
+    verifiedPhoneE164,
+  });
 
   return (
     <form action={formAction} className="space-y-6">
@@ -287,27 +343,15 @@ export function OnboardingForm({
         >
           Телефон (для связи)
         </label>
-        
-        <div className="onboarding-phone-wrap">
-          <PhoneInput
-            id="phone"
-            international
-            defaultCountry="BY"
-            countryCallingCodeEditable
-            autoComplete="tel"
-            placeholder="Номер телефона"
-            value={phoneE164 || undefined}
-            onChange={handlePhoneChange}
-          />
-        </div>
 
-        <input type="hidden" name="phone" value={phoneE164} />
-        
-        {state && !state.ok && state.fieldErrors?.phone && (
-          <p className="mt-1 text-sm text-red-600">
-            {state.fieldErrors.phone[0]}
-          </p>
-        )}
+        <PhoneVerificationField
+          phoneE164={phoneE164}
+          verifiedPhoneE164={verifiedPhoneE164}
+          fieldError={state && !state.ok ? state.fieldErrors?.phone?.[0] : undefined}
+          onPhoneChange={handlePhoneChange}
+          onVerifiedPhoneChange={handleVerifiedPhoneChange}
+          initialOtpState={initialBusinessContactOtpState}
+        />
       </div>
 
       {state && !state.ok && state.message && !state.fieldErrors && (
@@ -323,7 +367,7 @@ export function OnboardingForm({
         </p>
       </div>
 
-      <SubmitButton />
+      <SubmitButton disabled={!isPhoneVerified} />
     </form>
   );
 }
