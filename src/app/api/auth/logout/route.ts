@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
       await deleteSession(token);
     }
 
-    // Always redirect to / on same domain (no subdomain logic for localhost)
+    // Redirect through the canonical surface helper; localhost remains only a legacy fallback.
     const redirectUrl = new URL(redirectDestination, request.url);
     
     // Create redirect response

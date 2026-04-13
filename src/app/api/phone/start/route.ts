@@ -1,15 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
-import { normalizePhoneToE164 } from "@/lib/phone/phoneNormalize";
-import { genCode4, hashCode } from "@/lib/otp/otp";
-import { sendQuickSms } from "@/lib/sms/smsBy";
-import prisma from "@/lib/prisma";
+import {
+  normalizeBusinessContactVerificationPurpose,
+} from "@/lib/phone-verification/businessContactVerification.shared";
+import {
+  loadBusinessContactOtpClientState,
+  sendBusinessContactVerificationCode,
+} from "@/lib/phone-verification/businessContactVerification";
+import { isBusinessContactOtpEscalationError } from "@/lib/phone-verification/businessContactOtpErrors";
 
-// Force Node.js runtime
 export const runtime = "nodejs";
-
-const OTP_EXPIRY_MS = 10 * 60 * 1000; // 10 minutes
-const RESEND_COOLDOWN_SEC = 60; // 60 seconds
 
 /**
  * POST /api/phone/start
@@ -18,7 +18,6 @@ const RESEND_COOLDOWN_SEC = 60; // 60 seconds
  */
 export async function POST(request: NextRequest) {
   try {
-    // Auth required
     const user = await getCurrentUser();
     if (!user) {
       return NextResponse.json(
@@ -30,126 +29,51 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { phone, purpose } = body;
 
-    // Validate purpose
-    if (purpose !== "BUSINESS_PHONE_VERIFY") {
+    if (!normalizeBusinessContactVerificationPurpose(purpose)) {
       return NextResponse.json(
         { ok: false, error: "Неверный purpose" },
         { status: 400 }
       );
     }
 
-    // Normalize phone
-    const phoneE164 = normalizePhoneToE164(phone);
-    if (!/^\+\d{7,15}$/.test(phoneE164)) {
-      return NextResponse.json(
-        { ok: false, error: "Неверный формат телефона" },
-        { status: 400 }
-      );
-    }
-
-    const phoneDigits = phoneE164.replace(/\D/g, "");
-    const now = new Date();
-
-    // Look up existing OTP
-    const existing = await prisma.phoneOtp.findUnique({
-      where: {
-        userId_phoneE164_purpose: {
-          userId: user.id,
-          phoneE164,
-          purpose,
-        },
-      },
-    });
-
-    let code: string;
-    let codeHash: string;
-    let expiresAt: Date;
-
-    if (existing) {
-      // Check if expired
-      if (existing.expiresAt < now) {
-        // Expired - generate new code
-        code = genCode4();
-        codeHash = hashCode(code);
-        expiresAt = new Date(now.getTime() + OTP_EXPIRY_MS);
-
-        await prisma.phoneOtp.update({
-          where: { id: existing.id },
-          data: {
-            codeHash,
-            expiresAt,
-            lastSentAt: now,
-            attempts: 0,
-          },
-        });
-      } else {
-        // Not expired - check cooldown
-        const timeSinceLastSent =
-          (now.getTime() - existing.lastSentAt.getTime()) / 1000;
-        const remaining = RESEND_COOLDOWN_SEC - timeSinceLastSent;
-
-        if (remaining > 0) {
-          // Still in cooldown
-          return NextResponse.json(
-            {
-              ok: false,
-              error: `Повторная отправка через ${Math.ceil(remaining)} сек.`,
-            },
-            { status: 429 }
-          );
-        }
-
-        // Cooldown passed - generate NEW code (we can't resend same code since we only store hash)
-        code = genCode4();
-        codeHash = hashCode(code);
-        expiresAt = new Date(now.getTime() + OTP_EXPIRY_MS);
-
-        await prisma.phoneOtp.update({
-          where: { id: existing.id },
-          data: {
-            codeHash,
-            expiresAt,
-            lastSentAt: now,
-            attempts: 0,
-          },
-        });
-      }
-    } else {
-      // Create new OTP
-      code = genCode4();
-      codeHash = hashCode(code);
-      expiresAt = new Date(now.getTime() + OTP_EXPIRY_MS);
-
-      await prisma.phoneOtp.create({
-        data: {
-          userId: user.id,
-          phoneE164,
-          purpose,
-          codeHash,
-          expiresAt,
-          lastSentAt: now,
-          attempts: 0,
-        },
-      });
-    }
-
-    // Send SMS
-    const message = `Ваш код: ${code}`;
-
     try {
-      await sendQuickSms({ phoneDigits, message });
+      const result = await sendBusinessContactVerificationCode({
+        userId: user.id,
+        phone,
+      });
 
       return NextResponse.json({
         ok: true,
-        expiresAt: expiresAt.toISOString(),
-        resendAfterSec: RESEND_COOLDOWN_SEC,
+        expiresAt: result.expiresAt,
+        resendAfterSec: result.resendAfterSec,
+        otpState: result.otpState,
       });
     } catch (error) {
+      const otpState = await loadBusinessContactOtpClientState(user.id);
+
+      if (isBusinessContactOtpEscalationError(error)) {
+        const status = error.code === "OTP_SUPPORT" ? 403 : 429;
+        return NextResponse.json(
+          {
+            ok: false,
+            error: error.message,
+            code: error.code,
+            remainingMs: error.remainingMs,
+            lockedUntil: error.lockedUntil?.toISOString(),
+            otpState,
+          },
+          { status }
+        );
+      }
+
       const errorMessage =
         error instanceof Error ? error.message : "Не удалось отправить SMS";
+      const status = errorMessage.includes("Повторная отправка через")
+        ? 429
+        : 400;
       return NextResponse.json(
-        { ok: false, error: errorMessage },
-        { status: 400 }
+        { ok: false, error: errorMessage, otpState },
+        { status }
       );
     }
   } catch (error) {

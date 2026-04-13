@@ -1,25 +1,16 @@
 import crypto from "crypto";
+import bcrypt from "bcryptjs";
+
+const BCRYPT_ROUNDS = 12;
 
 /**
- * Hash a password using scrypt
+ * Hash a password using bcrypt for new credentials.
  */
 export async function hashPassword(password: string): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const salt = crypto.randomBytes(16).toString("hex");
-    crypto.scrypt(password, salt, 64, (err, derivedKey) => {
-      if (err) reject(err);
-      resolve(`${salt}:${derivedKey.toString("hex")}`);
-    });
-  });
+  return bcrypt.hash(password, BCRYPT_ROUNDS);
 }
 
-/**
- * Verify a password against a hash
- */
-export async function verifyPassword(
-  password: string,
-  hash: string
-): Promise<boolean> {
+async function verifyScryptPassword(password: string, hash: string): Promise<boolean> {
   return new Promise((resolve, reject) => {
     const [salt, key] = hash.split(":");
     crypto.scrypt(password, salt, 64, (err, derivedKey) => {
@@ -27,6 +18,21 @@ export async function verifyPassword(
       resolve(key === derivedKey.toString("hex"));
     });
   });
+}
+
+/**
+ * Verify a password against a hash.
+ * Supports new bcrypt hashes and legacy `salt:key` scrypt hashes.
+ */
+export async function verifyPassword(
+  password: string,
+  hash: string
+): Promise<boolean> {
+  if (hash.startsWith("$2a$") || hash.startsWith("$2b$") || hash.startsWith("$2y$")) {
+    return bcrypt.compare(password, hash);
+  }
+
+  return verifyScryptPassword(password, hash);
 }
 
 /**

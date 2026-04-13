@@ -96,7 +96,7 @@ export async function POST(request: NextRequest) {
     if (process.env.NODE_ENV === "development" && process.env.FORCE_SMS !== "true") {
       console.log(`[OTP dev] ${phoneE164} [${purpose}] → ${code}`);
     } else {
-      const smsResult = await sendQuickSms({ phoneDigits, message: `mamaGo: код ${code}` });
+      const smsResult = await sendQuickSms({ phoneDigits, message: `Ваш код: ${code}` });
       console.log(`[OTP sms] sent to ${phoneE164} [${purpose}] → sms_id=${smsResult.sms_id} status=${smsResult.status}`);
     }
 

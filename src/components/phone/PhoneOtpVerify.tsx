@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { PrimaryButton } from "@/components/ui/PrimaryButton";
+import { sameOriginUrl } from "@/lib/client/sameOriginUrl";
 
 /**
  * Helper to safely extract error message from various error formats
@@ -68,7 +69,7 @@ export function PhoneOtpVerify({ phoneE164, onVerified }: PhoneOtpVerifyProps) {
     setError("");
 
     try {
-      const response = await fetch("/api/phone/start", {
+      const response = await fetch(sameOriginUrl("/api/phone/start"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -128,7 +129,7 @@ export function PhoneOtpVerify({ phoneE164, onVerified }: PhoneOtpVerifyProps) {
     setError("");
 
     try {
-      const response = await fetch("/api/phone/verify", {
+      const response = await fetch(sameOriginUrl("/api/phone/verify"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
