@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
-import { prisma } from "@/lib/prisma";
+import { getTelegramLinkStatus } from "@/server/services/telegramLink.service";
 import { markWelcomeNotificationsRead } from "@/server/services/notification.service";
 
 /**
- * POST — Telegram подключён (webhook бота или ручное подтверждение после deep link).
- * Скрывает welcome в UI через user.telegramConnected + помечает WELCOME прочитанными.
+ * POST — legacy helper after deep link.
+ * В новой схеме connection хранится в TelegramConnection; тут только синхронизируем welcome UI.
  */
 export async function POST() {
   try {
@@ -14,13 +14,10 @@ export async function POST() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    await prisma.user.update({
-      where: { id: user.id },
-      data: {
-        telegramConnected: true,
-        telegramPromptDismissedAt: null,
-      },
-    });
+    const status = await getTelegramLinkStatus({ userId: user.id });
+    if (!status.linked) {
+      return NextResponse.json({ error: "Telegram is not connected" }, { status: 400 });
+    }
 
     await markWelcomeNotificationsRead(user.id);
 

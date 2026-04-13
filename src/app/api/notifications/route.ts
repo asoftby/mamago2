@@ -15,6 +15,7 @@ import { Prisma } from "@prisma/client";
 import { getCurrentUser } from "@/lib/auth/server";
 import { shouldShowTelegramPrompt } from "@/lib/user/shouldShowTelegramPrompt";
 import type { NotificationStreamFilter } from "@/server/services/notification.service";
+import { getTelegramLinkStatus } from "@/server/services/telegramLink.service";
 import {
   countUnifiedNotifications,
   getReadNotifications,
@@ -38,6 +39,8 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const telegramStatus = await getTelegramLinkStatus({ userId: user.id });
+
     const { searchParams } = new URL(req.url);
     const unreadOnly = searchParams.get("unreadOnly") === "true";
     const readOnly = searchParams.get("readOnly") === "true";
@@ -47,7 +50,7 @@ export async function GET(req: NextRequest) {
 
     const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(limitRaw, 100) : 15;
 
-    const queryOpts = { telegramConnected: user.telegramConnected };
+    const queryOpts = { telegramConnected: telegramStatus.linked };
 
     if (readOnly && unreadOnly) {
       return NextResponse.json(
@@ -88,10 +91,10 @@ export async function GET(req: NextRequest) {
       unreadCount,
       total,
       hasMore,
-      telegramConnected: user.telegramConnected,
+      telegramConnected: telegramStatus.linked,
       welcomeIsRead,
       showTelegramPrompt: shouldShowTelegramPrompt({
-        telegramConnected: user.telegramConnected,
+        telegramConnected: telegramStatus.linked,
         welcomeIsRead,
       }),
     });

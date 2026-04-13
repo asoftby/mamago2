@@ -221,6 +221,12 @@ export function NotificationFeed({
         return "⚠️";
       case "PLACE_UPDATE_REJECTED":
         return "❌";
+      case "NEWS":
+        return "📰";
+      case "ANNOUNCEMENT":
+        return "📣";
+      case "SYSTEM":
+        return "⚙️";
       default:
         return "📢";
     }

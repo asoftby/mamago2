@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import { shouldShowTelegramPrompt } from "@/lib/user/shouldShowTelegramPrompt";
 import type { NotificationStreamFilter } from "@/server/services/notification.service";
+import { getTelegramLinkStatus } from "@/server/services/telegramLink.service";
 import {
   getUnreadCount,
   getWelcomeIsRead,
@@ -27,9 +28,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const telegramStatus = await getTelegramLinkStatus({ userId: user.id });
+
     const { searchParams } = new URL(req.url);
     const stream = parseStream(searchParams.get("stream"));
-    const queryOpts = { telegramConnected: user.telegramConnected };
+    const queryOpts = { telegramConnected: telegramStatus.linked };
 
     const result = await markUnseenNotificationsAsSeen(user.id, stream, queryOpts);
 
@@ -43,7 +46,7 @@ export async function POST(req: NextRequest) {
       unreadCount,
       welcomeIsRead,
       showTelegramPrompt: shouldShowTelegramPrompt({
-        telegramConnected: user.telegramConnected,
+        telegramConnected: telegramStatus.linked,
         welcomeIsRead,
       }),
     });
