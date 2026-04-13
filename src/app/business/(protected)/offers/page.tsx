@@ -2,9 +2,11 @@ import { getCurrentUser } from "@/lib/auth/server";
 import { redirect } from "next/navigation";
 import prisma from "@/lib/prisma";
 import { OffersList } from "./OffersList";
-import { canCreateBusinessContent, canManageOwnedContent } from "@/lib/auth/businessContentAccess";
 import { buildSurfaceRedirectDestination } from "@/lib/routing/surface";
 import { getCurrentRequestRoutingContext } from "@/lib/routing/requestContext";
+import { BusinessSectionHeader } from "@/components/business/sections/BusinessSectionHeader";
+import { getPerformanceMetricsByEntity } from "@/server/services/business/businessWorkspace.service";
+import { getMyBusiness } from "@/server/business/getMyBusiness";
 
 interface SearchParams {
   view?: "active" | "archived";
@@ -17,8 +19,8 @@ export default async function OffersPage({
 }) {
   const routing = await getCurrentRequestRoutingContext();
   const user = await getCurrentUser();
-  
-  if (!user || !canCreateBusinessContent(user.role)) {
+
+  if (!user) {
     redirect(
       buildSurfaceRedirectDestination({
         targetSurface: "public",
@@ -28,13 +30,9 @@ export default async function OffersPage({
     );
   }
 
-  // Verify user has a business
-  const business = await prisma.business.findUnique({
-    where: { ownerUserId: user.id },
-  });
+  const business = await getMyBusiness(user.id);
 
   if (!business) {
-    console.warn(`User ${user.email} has BUSINESS_OWNER role but no Business entity`);
     redirect(
       buildSurfaceRedirectDestination({
         targetSurface: "business",
@@ -47,9 +45,14 @@ export default async function OffersPage({
   const params = await searchParams;
   const view = params.view || "active";
 
-  // Fetch offers for user's places
+  // Fetch offers for user's places (same ownership scope as getBusinessPlaces)
   const userPlaces = await prisma.place.findMany({
-    where: { ownerUserId: user.id },
+    where: {
+      OR: [
+        { createdByUserId: user.id },
+        { ownerBusinessId: business.id },
+      ],
+    },
     select: { id: true },
   });
 
@@ -71,17 +74,35 @@ export default async function OffersPage({
         orderBy: { createdAt: "desc" },
       })
     : [];
+  const metricsByEntity = await getPerformanceMetricsByEntity({
+    events: [],
+    offers: offers.map((offer) => ({
+      id: offer.id,
+      title: offer.title,
+      updatedAt: offer.createdAt,
+      status: offer.status,
+    })),
+  });
+
+  const offersWithMetrics = offers.map((offer) => ({
+    ...offer,
+    metrics: metricsByEntity.get(`OFFER:${offer.id}`) ?? {
+      views: 0,
+      saves: 0,
+      planAdds: 0,
+      ctaClicks: 0,
+    },
+  }));
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">Мои предложения</h1>
-        <p className="text-gray-600 mt-2">
-          Управляйте вашими предложениями и специальными акциями
-        </p>
-      </div>
+      <BusinessSectionHeader
+        eyebrow="Publications"
+        title="Offers"
+        description="Offers помогают быстро превращать интерес в обращение. Здесь важно видеть, какие предложения реально сохраняют и открывают."
+      />
 
-      <OffersList offers={offers} currentView={view} />
+      <OffersList offers={offersWithMetrics} currentView={view} />
     </div>
   );
 }

@@ -20,6 +20,7 @@ import { formatDistance } from "@/lib/formatDistance";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { calculateUrgency } from "@/lib/improvementRequest/urgency";
+import { BusinessChip } from "@/components/business/ui/BusinessChip";
 
 interface PlaceCardData {
   id: string;
@@ -69,6 +70,9 @@ interface PlaceCardData {
     title: string;
     dueAt: Date | null;
   }>;
+  updatedAt: Date;
+  linkedEventsCount?: number;
+  linkedOffersCount?: number;
 }
 
 interface PlaceCardHorizontalProps {
@@ -222,6 +226,10 @@ export function PlaceCardHorizontal({ place, onDelete, onArchive, onUnarchive }:
   
   // Cover image (logo or first gallery image)
   const coverImage = place.images.find(img => img.kind === "LOGO") || place.images[0];
+  const updatedLabel = new Intl.DateTimeFormat("ru-RU", {
+    day: "numeric",
+    month: "short",
+  }).format(new Date(place.updatedAt));
   
   const handleDelete = async () => {
     if (!onDelete) return;
@@ -272,10 +280,10 @@ export function PlaceCardHorizontal({ place, onDelete, onArchive, onUnarchive }:
 
   return (
     <>
-      <div className="group flex items-center gap-4 p-4 border border-gray-200 rounded-lg hover:border-gray-300 hover:shadow-sm transition-all">
+      <div className="group flex items-center gap-4 rounded-[26px] border border-stone-200/90 bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-all hover:border-stone-300 hover:shadow-[0_14px_32px_rgba(15,23,42,0.05)] md:p-5">
         {/* Cover Image */}
-        <Link href={`/editor/place/${place.id}/edit`} className="flex-shrink-0">
-          <div className="relative w-24 h-24 rounded-lg overflow-hidden bg-gray-100">
+        <Link href={`/business/places/${place.id}/edit`} className="flex-shrink-0">
+          <div className="relative h-24 w-24 overflow-hidden rounded-[22px] bg-stone-100 ring-1 ring-stone-200/70">
             {coverImage ? (
               <Image
                 src={coverImage.url}
@@ -284,7 +292,7 @@ export function PlaceCardHorizontal({ place, onDelete, onArchive, onUnarchive }:
                 className="object-cover"
               />
             ) : (
-              <div className="w-full h-full flex items-center justify-center text-gray-400">
+              <div className="flex h-full w-full items-center justify-center text-stone-400">
                 <MapPin className="w-8 h-8" />
               </div>
             )}
@@ -293,29 +301,29 @@ export function PlaceCardHorizontal({ place, onDelete, onArchive, onUnarchive }:
 
         {/* Content */}
         <div className="flex-1 min-w-0">
-          <Link href={`/editor/place/${place.id}/edit`}>
-            <h3 className="text-lg font-semibold text-gray-900 truncate hover:text-blue-600 transition-colors">
+          <Link href={`/business/places/${place.id}/edit`}>
+            <h3 className="truncate text-lg font-semibold text-stone-950 transition-colors hover:text-stone-700">
               {displayTitle}
             </h3>
           </Link>
           
-          <p className="text-sm text-gray-600 truncate mt-1">
+          <p className="mt-1 truncate text-sm text-stone-600">
             {displayAddress}
           </p>
           
           {/* Status badge - always show for non-archived places */}
           {!place.archivedAt && (
             <div className="mt-2 flex items-center gap-2 flex-wrap">
-              <span className={`inline-flex items-center px-2 py-1 text-xs font-medium rounded ${
+              <span className={`inline-flex items-center rounded-full border px-3 py-1.5 text-xs font-medium ${
                 place.status === "DRAFT"
-                  ? "bg-gray-100 text-gray-700"
+                  ? "border-stone-200 bg-stone-50 text-stone-600"
                   : place.status === "PENDING"
-                  ? "bg-gray-100 text-gray-700 border border-gray-200"
+                  ? "border-amber-200 bg-amber-50 text-amber-800"
                   : place.status === "PUBLISHED"
-                  ? "bg-green-50 text-green-700 border border-green-200"
+                  ? "border-emerald-200 bg-emerald-50 text-emerald-700"
                   : place.status === "NEEDS_REVISION"
-                  ? "bg-orange-50 text-orange-700 border border-orange-200"
-                  : "bg-red-50 text-red-700 border border-red-200"
+                  ? "border-amber-200 bg-amber-50 text-amber-800"
+                  : "border-red-200 bg-red-50 text-red-700"
               }`}>
                 {statusConfig.label}
               </span>
@@ -324,7 +332,7 @@ export function PlaceCardHorizontal({ place, onDelete, onArchive, onUnarchive }:
               {hasActiveImprovementRequest && mostUrgentUrgency && (
                 <Badge 
                   variant="outline" 
-                  className={`${
+                  className={`rounded-full px-3 py-1.5 text-xs ${
                     mostUrgentUrgency.level === "overdue" 
                       ? "bg-red-50 text-red-700 border-red-300" 
                       : mostUrgentUrgency.urgent
@@ -347,12 +355,12 @@ export function PlaceCardHorizontal({ place, onDelete, onArchive, onUnarchive }:
           {/* Revision status badge for published places with active revisions */}
           {hasActiveRevision && place.status === "PUBLISHED" && place.activeRevision && (
             <div className="mt-2">
-              <span className={`inline-flex items-center px-2 py-1 text-xs font-medium rounded ${
+              <span className={`inline-flex items-center rounded-full border px-3 py-1.5 text-xs font-medium ${
                 place.activeRevision.status === "DRAFT" 
-                  ? "bg-blue-50 text-blue-700"
+                  ? "border-blue-200 bg-blue-50 text-blue-700"
                   : place.activeRevision.status === "PENDING"
-                  ? "bg-amber-50 text-amber-700"
-                  : "bg-yellow-50 text-yellow-700"
+                  ? "border-amber-200 bg-amber-50 text-amber-700"
+                  : "border-yellow-200 bg-yellow-50 text-yellow-700"
               }`}>
                 {REVISION_STATUS_CONFIG[place.activeRevision.status as keyof typeof REVISION_STATUS_CONFIG]?.label || place.activeRevision.status}
               </span>
@@ -361,7 +369,7 @@ export function PlaceCardHorizontal({ place, onDelete, onArchive, onUnarchive }:
           
           {/* Inactivity warning for NEEDS_REVISION */}
           {daysSinceRevision !== null && (
-            <p className="text-xs text-amber-600 mt-1">
+            <p className="mt-1 text-xs text-amber-700">
               Отправлено на доработку {daysSinceRevision} {daysSinceRevision === 1 ? "день" : daysSinceRevision < 5 ? "дня" : "дней"} назад
             </p>
           )}
@@ -370,38 +378,50 @@ export function PlaceCardHorizontal({ place, onDelete, onArchive, onUnarchive }:
           {(districtName || shouldShowMetro) && (
             <div className="flex items-center gap-2 mt-2 flex-wrap">
               {districtName && (
-                <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-gray-700 bg-gray-100 rounded">
+                <BusinessChip>
                   <MapPin className="w-3 h-3" />
                   {districtName}
-                </span>
+                </BusinessChip>
               )}
               
               {shouldShowMetro && (
-                <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-blue-700 bg-blue-50 rounded">
+                <BusinessChip tone="accent">
                   <Navigation className="w-3 h-3" />
                   {metroName} • {formatDistance(metroDistance)}
-                </span>
+                </BusinessChip>
               )}
             </div>
           )}
+
+          <div className="mt-4 flex flex-wrap gap-2">
+            <BusinessChip>
+              Events: {place.linkedEventsCount ?? 0}
+            </BusinessChip>
+            <BusinessChip>
+              Offers: {place.linkedOffersCount ?? 0}
+            </BusinessChip>
+            <BusinessChip>
+              Обновлено {updatedLabel}
+            </BusinessChip>
+          </div>
         </div>
 
         {/* Actions */}
         <div className="flex items-center gap-3 flex-shrink-0">
           {/* Archived Badge */}
           {place.archivedAt && (
-            <span className="text-xs font-medium text-gray-500 bg-gray-100 px-2 py-1 rounded">
+            <span className="rounded-full bg-stone-100 px-3 py-1.5 text-xs font-medium text-stone-500">
               Архив
             </span>
           )}
 
           {/* Edit Action (icon button) */}
           {!place.archivedAt && displayStatus !== "PENDING" && (
-            <Link href={`/editor/place/${place.id}/edit`}>
+            <Link href={`/business/places/${place.id}/edit`}>
               <Button
                 variant="ghost"
                 size="sm"
-                className="text-gray-400 hover:text-gray-600"
+                className="rounded-2xl text-stone-400 hover:bg-stone-100 hover:text-stone-700"
               >
                 <Pencil className="w-4 h-4" />
               </Button>
@@ -415,6 +435,7 @@ export function PlaceCardHorizontal({ place, onDelete, onArchive, onUnarchive }:
               size="sm"
               onClick={handleUnarchive}
               disabled={isArchiving}
+              className="rounded-2xl border-stone-200 bg-white hover:bg-stone-50"
             >
               <ArchiveRestore className="w-4 h-4 mr-2" />
               {isArchiving ? "Восстановление..." : "Восстановить"}
@@ -424,11 +445,11 @@ export function PlaceCardHorizontal({ place, onDelete, onArchive, onUnarchive }:
           {/* Archive Action (for active places) */}
           {!place.archivedAt && onArchive && place.status !== "DRAFT" && (
             <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowArchiveDialog(true)}
-              className="text-gray-400 hover:text-gray-600"
-            >
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowArchiveDialog(true)}
+                className="rounded-2xl text-stone-400 hover:bg-stone-100 hover:text-stone-700"
+              >
               <Archive className="w-4 h-4" />
             </Button>
           )}
@@ -436,11 +457,11 @@ export function PlaceCardHorizontal({ place, onDelete, onArchive, onUnarchive }:
           {/* Delete Action (only for DRAFT) */}
           {place.status === "DRAFT" && onDelete && !place.archivedAt && (
             <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowDeleteDialog(true)}
-              className="text-gray-400 hover:text-red-600"
-            >
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowDeleteDialog(true)}
+                className="rounded-2xl text-stone-400 hover:bg-red-50 hover:text-red-600"
+              >
               <Trash2 className="w-4 h-4" />
             </Button>
           )}
@@ -453,7 +474,7 @@ export function PlaceCardHorizontal({ place, onDelete, onArchive, onUnarchive }:
           <AlertDialogHeader>
             <AlertDialogTitle>Удалить место?</AlertDialogTitle>
             <AlertDialogDescription>
-              Вы уверены, что хотите удалить "{displayTitle}"? Это действие нельзя отменить.
+              Вы уверены, что хотите удалить &quot;{displayTitle}&quot;? Это действие нельзя отменить.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -475,7 +496,7 @@ export function PlaceCardHorizontal({ place, onDelete, onArchive, onUnarchive }:
           <AlertDialogHeader>
             <AlertDialogTitle>Переместить в архив?</AlertDialogTitle>
             <AlertDialogDescription>
-              Место "{displayTitle}" будет скрыто от публичного доступа. Вы сможете восстановить его в любое время.
+              Место &quot;{displayTitle}&quot; будет скрыто от публичного доступа. Вы сможете восстановить его в любое время.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

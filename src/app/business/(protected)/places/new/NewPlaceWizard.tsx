@@ -22,6 +22,7 @@ import {
 } from "../[id]/edit/utils/stepValidation";
 import { useWizardSession } from "@/hooks/useWizardSession";
 import { useLocalAutosave } from "@/hooks/useLocalAutosave";
+import { randomId } from "@/lib/utils/randomId";
 
 // Client-side getCurrentUser
 async function getCurrentUser() {
@@ -91,7 +92,7 @@ export function NewPlaceWizard() {
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState(1);
   const [isSaving, setIsSaving] = useState(false);
-  const [createRequestId] = useState(() => crypto.randomUUID());
+  const [createRequestId] = useState(() => randomId());
   const [user, setUser] = useState<any>(null);
   
   // Wizard session for temp media uploads

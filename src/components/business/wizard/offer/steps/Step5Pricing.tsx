@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Plus, Trash2 } from "lucide-react";
 import { StableCardSelector } from "@/components/ui/stable-card-selector";
 import type { OfferFormData, PricingOption } from "../types";
+import { formatPrice } from "@/lib/formatters/format-price";
 
 interface Step5PricingProps {
   data: OfferFormData;
@@ -259,10 +260,10 @@ export function Step5Pricing({ data, onChange, isEditable }: Step5PricingProps) 
                 <div className="text-right">
                   {option.oldPrice && (
                     <span className="text-xs text-muted-foreground line-through mr-2">
-                      {option.oldPrice} BYN
+                      {formatPrice(option.oldPrice)}
                     </span>
                   )}
-                  <span className="font-medium">{option.price} BYN</span>
+                  <span className="font-medium">{formatPrice(option.price)}</span>
                 </div>
               </div>
             ))}

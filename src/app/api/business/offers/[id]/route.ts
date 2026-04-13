@@ -8,6 +8,7 @@ import {
   canPublishContentDirectly,
 } from "@/lib/auth/businessContentAccess";
 import { assignOfferSlugIfMissing } from "@/lib/slug/offerSlugService";
+import { formatPriceFrom } from "@/lib/formatters/format-price";
 import { ensurePublishedOfferHasSlug } from "@/lib/slug/publishSlugGuards";
 
 const updateOfferSchema = z.object({
@@ -118,7 +119,7 @@ export async function PATCH(
       priceText = data.singlePriceLabel || null;
     } else if (data.pricingMode === "MULTIPLE" && data.pricingOptions && data.pricingOptions.length > 0) {
       priceFrom = Math.min(...data.pricingOptions.map(p => p.price));
-      priceText = `от ${priceFrom} BYN`;
+      priceText = formatPriceFrom(priceFrom);
     }
 
     const updateData: any = {};

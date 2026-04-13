@@ -159,6 +159,7 @@ export function Step1Profile({ data, onChange, isEditable = true }: Step1Profile
         <Label>Возраст *</Label>
         <div className="mt-2">
           <ChipsRow
+            layout="masonry"
             items={AGE_OPTIONS.map((ageOption): ChipItem => ({
               id: ageOption.key,
               label: ageOption.shortLabel,
@@ -177,6 +178,7 @@ export function Step1Profile({ data, onChange, isEditable = true }: Step1Profile
         <Label>Формат посещения *</Label>
         <div className="mt-2">
           <ChipsRow
+            layout="masonry"
             items={VISIT_FORMATS.map((format): ChipItem => ({
               id: format,
               label: format,
@@ -195,6 +197,7 @@ export function Step1Profile({ data, onChange, isEditable = true }: Step1Profile
         <Label>Типы активностей *</Label>
         <div className="mt-2">
           <ChipsRow
+            layout="masonry"
             items={ACTIVITY_TYPES.map((type): ChipItem => ({
               id: type,
               label: type,

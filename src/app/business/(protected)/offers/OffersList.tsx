@@ -1,6 +1,6 @@
 "use client";
 
-import { BusinessContentList, ItemHandlers } from "@/components/business/shared/BusinessContentList";
+import { BusinessContentList } from "@/components/business/shared/BusinessContentList";
 import { OfferCardHorizontal } from "@/components/business/offers/OfferCardHorizontal";
 import { Tag } from "lucide-react";
 import { OfferStatus, OfferKind } from "@prisma/client";
@@ -21,7 +21,13 @@ interface Offer {
     id: string;
     title: string;
   };
-  createdAt: Date;
+  updatedAt: Date;
+  metrics: {
+    views: number;
+    saves: number;
+    planAdds: number;
+    ctaClicks: number;
+  };
 }
 
 interface OffersListProps {
@@ -42,12 +48,12 @@ export function OffersList({ offers, currentView }: OffersListProps) {
   };
 
   // Archive/unarchive will be implemented when we add archived field to Offer
-  const handleArchive = async (id: string) => {
+  const handleArchive = async () => {
     // TODO: Implement when Offer model has archived field
     console.log("Archive not yet implemented for offers");
   };
 
-  const handleUnarchive = async (id: string) => {
+  const handleUnarchive = async () => {
     // TODO: Implement when Offer model has archived field
     console.log("Unarchive not yet implemented for offers");
   };
@@ -57,10 +63,10 @@ export function OffersList({ offers, currentView }: OffersListProps) {
       items={offers}
       currentView={currentView}
       emptyIcon={<Tag className="w-8 h-8 text-gray-400" />}
-      emptyTitle="У вас пока нет предложений"
-      emptyDescription="Создайте первое предложение, чтобы привлечь больше клиентов"
+      emptyTitle="Предложений пока нет"
+      emptyDescription="Добавьте первое предложение, чтобы быстро протестировать спрос и увидеть, какие офферы действительно приводят интерес и обращения."
       addButtonText="Добавить предложение"
-      addButtonHref="/editor/offer/new"
+      addButtonHref="/business/offers/new"
       renderItem={(offer, handlers) => (
         <OfferCardHorizontal
           key={offer.id}

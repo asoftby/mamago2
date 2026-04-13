@@ -1,7 +1,6 @@
 "use client";
 
-import { toast } from "sonner";
-import { BusinessContentList, ItemHandlers } from "@/components/business/shared/BusinessContentList";
+import { BusinessContentList } from "@/components/business/shared/BusinessContentList";
 import { EventCardHorizontal } from "@/components/business/events/EventCardHorizontal";
 import { Calendar } from "lucide-react";
 import { ContentStatus, ActivityType, ScheduleMode } from "@prisma/client";
@@ -25,7 +24,13 @@ interface Activity {
     id: string;
     url: string;
   }>;
-  createdAt: Date;
+  updatedAt: Date;
+  metrics: {
+    views: number;
+    saves: number;
+    planAdds: number;
+    ctaClicks: number;
+  };
 }
 
 interface EventsListProps {
@@ -61,12 +66,12 @@ export function EventsList({ activities, currentView }: EventsListProps) {
   };
 
   // Archive/unarchive will be implemented when we add archived field to Activity
-  const handleArchive = async (id: string) => {
+  const handleArchive = async () => {
     // TODO: Implement when Activity model has archived field
     console.log("Archive not yet implemented for activities");
   };
 
-  const handleUnarchive = async (id: string) => {
+  const handleUnarchive = async () => {
     // TODO: Implement when Activity model has archived field
     console.log("Unarchive not yet implemented for activities");
   };
@@ -76,10 +81,10 @@ export function EventsList({ activities, currentView }: EventsListProps) {
       items={activities}
       currentView={currentView}
       emptyIcon={<Calendar className="w-8 h-8 text-gray-400" />}
-      emptyTitle="У вас пока нет событий"
-      emptyDescription="Создайте первое событие, чтобы привлечь посетителей"
+      emptyTitle="Событий пока нет"
+      emptyDescription="Добавьте первое событие, чтобы запустить спрос и увидеть, что именно сохраняют семьи и куда они переходят дальше."
       addButtonText="Добавить событие"
-      addButtonHref="/editor/event/new"
+      addButtonHref="/business/events/new"
       renderItem={(activity, handlers) => (
         <EventCardHorizontal
           key={activity.id}

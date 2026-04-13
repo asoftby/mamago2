@@ -8,6 +8,7 @@ import {
   canPublishContentDirectly,
 } from "@/lib/auth/businessContentAccess";
 import { assignOfferSlugIfMissing } from "@/lib/slug/offerSlugService";
+import { formatPriceFrom } from "@/lib/formatters/format-price";
 
 const createOfferSchema = z.object({
   source: z.enum(["PLACE", "EVENT"]),
@@ -77,7 +78,7 @@ export async function POST(request: NextRequest) {
         priceText = data.singlePriceLabel || null;
       } else if (data.pricingMode === "MULTIPLE" && data.pricingOptions.length > 0) {
         priceFrom = Math.min(...data.pricingOptions.map(p => p.price));
-        priceText = `от ${priceFrom} BYN`;
+        priceText = formatPriceFrom(priceFrom);
       }
 
       const offer = await prisma.offer.create({

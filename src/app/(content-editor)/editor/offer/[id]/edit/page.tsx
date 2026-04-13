@@ -28,7 +28,7 @@ export default async function EditorEditOfferPage({
   const routing = await getCurrentRequestRoutingContext();
   const user = await getCurrentUser();
 
-  if (!user || !canCreateBusinessContent(user.role)) {
+  if (!user) {
     redirect(
       buildSurfaceRedirectDestination({
         targetSurface: "public",

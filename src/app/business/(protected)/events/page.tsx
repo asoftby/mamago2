@@ -4,9 +4,11 @@ import prisma from "@/lib/prisma";
 import { ActivityType } from "@prisma/client";
 import { excludeDeletedEvents, excludeGhostEventDrafts } from "@/lib/business/eventListWhere";
 import { EventsList } from "./EventsList";
-import { canCreateBusinessContent } from "@/lib/auth/businessContentAccess";
 import { buildSurfaceRedirectDestination } from "@/lib/routing/surface";
 import { getCurrentRequestRoutingContext } from "@/lib/routing/requestContext";
+import { BusinessSectionHeader } from "@/components/business/sections/BusinessSectionHeader";
+import { getPerformanceMetricsByEntity } from "@/server/services/business/businessWorkspace.service";
+import { getMyBusiness } from "@/server/business/getMyBusiness";
 
 interface SearchParams {
   view?: "active" | "archived";
@@ -19,8 +21,8 @@ export default async function EventsPage({
 }) {
   const routing = await getCurrentRequestRoutingContext();
   const user = await getCurrentUser();
-  
-  if (!user || !canCreateBusinessContent(user.role)) {
+
+  if (!user) {
     redirect(
       buildSurfaceRedirectDestination({
         targetSurface: "public",
@@ -30,13 +32,9 @@ export default async function EventsPage({
     );
   }
 
-  // Verify user has a business
-  const business = await prisma.business.findUnique({
-    where: { ownerUserId: user.id },
-  });
+  const business = await getMyBusiness(user.id);
 
   if (!business) {
-    console.warn(`User ${user.email} has BUSINESS_OWNER role but no Business entity`);
     redirect(
       buildSurfaceRedirectDestination({
         targetSurface: "business",
@@ -53,7 +51,10 @@ export default async function EventsPage({
   // Note: Using Activity model as data source, but presenting as "Events" in UI
   const activities = await prisma.activity.findMany({
     where: {
-      ownerUserId: user.id,
+      OR: [
+        { ownerUserId: user.id },
+        { businessId: business.id },
+      ],
       type: ActivityType.EVENT,
       ...excludeDeletedEvents(),
       ...excludeGhostEventDrafts(),
@@ -71,17 +72,35 @@ export default async function EventsPage({
     },
     orderBy: { createdAt: "desc" },
   });
+  const metricsByEntity = await getPerformanceMetricsByEntity({
+    events: activities.map((activity) => ({
+      id: activity.id,
+      title: activity.title,
+      updatedAt: activity.createdAt,
+      status: activity.status,
+    })),
+    offers: [],
+  });
+
+  const activitiesWithMetrics = activities.map((activity) => ({
+    ...activity,
+    metrics: metricsByEntity.get(`EVENT:${activity.id}`) ?? {
+      views: 0,
+      saves: 0,
+      planAdds: 0,
+      ctaClicks: 0,
+    },
+  }));
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">Мои события</h1>
-        <p className="text-gray-600 mt-2">
-          Управляйте вашими событиями и отслеживайте их статус
-        </p>
-      </div>
+      <BusinessSectionHeader
+        eyebrow="Publications"
+        title="Events"
+        description="События — это регулярный входящий спрос. Здесь важно сразу видеть статус, интерес и что стоит усилить следующим."
+      />
 
-      <EventsList activities={activities} currentView={view} />
+      <EventsList activities={activitiesWithMetrics} currentView={view} />
     </div>
   );
 }

@@ -5,6 +5,7 @@ import { WizardStepConfig, SummaryItem, buildReviewSections } from "../shared/ty
 import type { EventFormData } from "./types";
 import { labelForEventFormats } from "@/lib/business/eventFormatSignals";
 import { isRichTextMeaningful, getRichTextLength, createExcerpt } from "@/lib/richtext/utils";
+import { formatPrice, formatPriceFrom } from "@/lib/formatters/format-price";
 
 // Re-export buildReviewSections for convenience
 export { buildReviewSections };
@@ -339,8 +340,8 @@ export const EVENT_WIZARD_STEPS: WizardStepConfig<EventFormData>[] = [
       // Pricing
       const pricingLabels = {
         free: "Бесплатно",
-        fixed: `${data.price} BYN`,
-        from: `От ${data.price} BYN`,
+        fixed: data.price != null ? formatPrice(data.price) : "—",
+        from: data.price != null ? formatPriceFrom(data.price) : "—",
       };
       items.push({
         label: "Стоимость",

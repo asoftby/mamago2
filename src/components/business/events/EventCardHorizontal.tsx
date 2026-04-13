@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { ContentStatusBadge } from "@/components/business/shared/ContentStatusBadge";
 import { Pencil, Archive, ArchiveRestore, Trash2, Calendar, MapPin } from "lucide-react";
 import { ContentStatus, ActivityType, ScheduleMode } from "@prisma/client";
@@ -16,6 +17,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { BusinessChip } from "@/components/business/ui/BusinessChip";
+import { buildPromotionLaunchHref } from "@/lib/promotion/shared";
 
 interface Activity {
   id: string;
@@ -35,6 +38,13 @@ interface Activity {
     id: string;
     url: string;
   }>;
+  updatedAt: Date;
+  metrics: {
+    views: number;
+    saves: number;
+    planAdds: number;
+    ctaClicks: number;
+  };
 }
 
 interface EventCardHorizontalProps {
@@ -57,6 +67,13 @@ function deleteDialogCopy(status: ContentStatus): { title: string; description: 
   };
 }
 
+function formatUpdatedAt(date: Date) {
+  return new Intl.DateTimeFormat("ru-RU", {
+    day: "numeric",
+    month: "short",
+  }).format(new Date(date));
+}
+
 export function EventCardHorizontal({
   activity,
   onDelete,
@@ -70,14 +87,16 @@ export function EventCardHorizontal({
   const coverImage = activity.images.find((img) => img.id);
 
   const canDeleteEvent = activity.status !== ContentStatus.DELETED;
+  const getErrorMessage = (error: unknown, fallback: string) =>
+    error instanceof Error ? error.message : fallback;
 
   const handleConfirmDelete = async () => {
     setIsDeleting(true);
     try {
       await onDelete(activity.id);
       setDeleteDialogOpen(false);
-    } catch (error: any) {
-      alert(error.message);
+    } catch (error: unknown) {
+      alert(getErrorMessage(error, "Не удалось удалить событие"));
     } finally {
       setIsDeleting(false);
     }
@@ -89,8 +108,8 @@ export function EventCardHorizontal({
     setIsArchiving(true);
     try {
       await onArchive(activity.id);
-    } catch (error: any) {
-      alert(error.message);
+    } catch (error: unknown) {
+      alert(getErrorMessage(error, "Не удалось архивировать событие"));
       setIsArchiving(false);
     }
   };
@@ -101,8 +120,8 @@ export function EventCardHorizontal({
     setIsArchiving(true);
     try {
       await onUnarchive(activity.id);
-    } catch (error: any) {
-      alert(error.message);
+    } catch (error: unknown) {
+      alert(getErrorMessage(error, "Не удалось восстановить событие"));
       setIsArchiving(false);
     }
   };
@@ -110,36 +129,43 @@ export function EventCardHorizontal({
   const deleteCopy = deleteDialogCopy(activity.status);
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow">
+    <div className="rounded-[26px] border border-stone-200/90 bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-all hover:border-stone-300 hover:shadow-[0_14px_32px_rgba(15,23,42,0.05)] md:p-5">
       <div className="flex gap-4">
         {coverImage ? (
-          <div className="flex-shrink-0 w-24 h-24 rounded-lg overflow-hidden bg-gray-100">
-            <img
+          <div className="flex h-24 w-24 flex-shrink-0 overflow-hidden rounded-[22px] bg-stone-100 ring-1 ring-stone-200/70">
+            <Image
               src={coverImage.url}
               alt={activity.title}
-              className="w-full h-full object-cover"
+              width={96}
+              height={96}
+              className="h-full w-full object-cover"
             />
           </div>
         ) : (
-          <div className="flex-shrink-0 w-24 h-24 rounded-lg bg-gray-100 flex items-center justify-center">
-            <Calendar className="w-8 h-8 text-gray-400" />
+          <div className="flex h-24 w-24 flex-shrink-0 items-center justify-center rounded-[22px] bg-stone-100 text-stone-400 ring-1 ring-stone-200/70">
+            <Calendar className="w-8 h-8" />
           </div>
         )}
 
         <div className="flex-1 min-w-0">
-          <div className="flex items-start justify-between gap-4 mb-2">
+          <div className="mb-3 flex items-start justify-between gap-4">
             <div className="flex-1">
-              <h3 className="text-lg font-semibold text-gray-900 mb-1">
-                {activity.title}
-              </h3>
-              <p className="text-sm text-gray-600 line-clamp-2">
+              <div className="mb-1 flex flex-wrap items-center gap-2">
+                <h3 className="text-lg font-semibold text-stone-950">
+                  {activity.title}
+                </h3>
+                <BusinessChip tone="muted" size="compact">
+                  Event
+                </BusinessChip>
+              </div>
+              <p className="line-clamp-2 text-sm leading-7 text-stone-600">
                 {activity.shortDesc}
               </p>
             </div>
             <ContentStatusBadge status={activity.status} />
           </div>
 
-          <div className="flex items-center gap-4 text-sm text-gray-500 mb-3">
+          <div className="mb-4 flex flex-wrap items-center gap-3 text-sm text-stone-500">
             {activity.place && (
               <div className="flex items-center gap-1">
                 <MapPin className="w-4 h-4" />
@@ -150,15 +176,33 @@ export function EventCardHorizontal({
             {activity.priceFrom !== null && !activity.priceText && (
               <span>от {activity.priceFrom} BYN</span>
             )}
+            <span>Обновлено {formatUpdatedAt(activity.updatedAt)}</span>
+          </div>
+
+          <div className="mb-5 flex flex-wrap gap-2">
+            <BusinessChip>Просмотры: {activity.metrics.views}</BusinessChip>
+            <BusinessChip>Сохранения: {activity.metrics.saves}</BusinessChip>
+            <BusinessChip>В план: {activity.metrics.planAdds}</BusinessChip>
+            <BusinessChip>Переходы: {activity.metrics.ctaClicks}</BusinessChip>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
             <Link
-              href={`/editor/event/${activity.id}/edit`}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors"
+              href={`/business/events/${activity.id}/edit`}
+              className="inline-flex items-center gap-1.5 rounded-2xl border border-stone-200 bg-white px-4 py-2.5 text-sm font-medium text-stone-700 transition-colors hover:border-stone-300 hover:bg-stone-50 hover:text-stone-950"
             >
               <Pencil className="w-4 h-4 shrink-0" />
-              Открыть в редакторе
+              Редактировать
+            </Link>
+
+            <Link
+              href={buildPromotionLaunchHref({
+                publicationType: "EVENT",
+                publicationId: activity.id,
+              })}
+              className="inline-flex items-center gap-1.5 rounded-2xl bg-stone-900 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-stone-800"
+            >
+              Продвигать
             </Link>
 
             {canDeleteEvent && (
@@ -168,8 +212,8 @@ export function EventCardHorizontal({
                   onClick={() => setDeleteDialogOpen(true)}
                   disabled={isDeleting}
                   className={cn(
-                    "inline-flex items-center justify-center rounded-md p-1.5 transition-colors",
-                    "text-gray-400 hover:text-red-600 hover:bg-red-50",
+                    "inline-flex items-center justify-center rounded-xl p-2 transition-colors",
+                    "text-stone-400 hover:bg-red-50 hover:text-red-600",
                     "disabled:opacity-50 disabled:pointer-events-none"
                   )}
                   title="Удалить событие"
@@ -204,7 +248,7 @@ export function EventCardHorizontal({
               <button
                 onClick={handleArchive}
                 disabled={isArchiving}
-                className="inline-flex items-center gap-1 px-3 py-1.5 text-sm text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors disabled:opacity-50"
+                className="inline-flex items-center gap-1 rounded-xl px-3 py-2 text-sm text-stone-600 transition-colors hover:bg-stone-100 hover:text-stone-900 disabled:opacity-50"
                 title="В архив"
               >
                 <Archive className="w-4 h-4" />
@@ -215,7 +259,7 @@ export function EventCardHorizontal({
               <button
                 onClick={handleUnarchive}
                 disabled={isArchiving}
-                className="inline-flex items-center gap-1 px-3 py-1.5 text-sm text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors disabled:opacity-50"
+                className="inline-flex items-center gap-1 rounded-xl px-3 py-2 text-sm text-stone-600 transition-colors hover:bg-stone-100 hover:text-stone-900 disabled:opacity-50"
                 title="Восстановить"
               >
                 <ArchiveRestore className="w-4 h-4" />

@@ -30,7 +30,7 @@ export default async function EditorEditEventPage({
   const routing = await getCurrentRequestRoutingContext();
   const user = await getCurrentUser();
 
-  if (!user || !canCreateBusinessContent(user.role)) {
+  if (!user) {
     redirect(
       buildSurfaceRedirectDestination({
         targetSurface: "public",

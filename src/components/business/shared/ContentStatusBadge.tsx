@@ -1,38 +1,39 @@
 import { ContentStatus } from "@prisma/client";
+import { BusinessChip } from "@/components/business/ui/BusinessChip";
 
 interface ContentStatusBadgeProps {
   status: ContentStatus;
   className?: string;
 }
 
-const STATUS_CONFIG: Record<ContentStatus, { label: string; className: string }> = {
+const STATUS_CONFIG: Record<ContentStatus, { label: string; tone: "muted" | "warning" | "success" | "danger" }> = {
   DRAFT: {
     label: "Черновик",
-    className: "bg-gray-100 text-gray-700",
+    tone: "muted",
   },
   PENDING: {
     label: "На модерации",
-    className: "bg-yellow-100 text-yellow-800",
+    tone: "warning",
   },
   PENDING_UPDATE: {
     label: "На проверке",
-    className: "bg-amber-100 text-amber-900",
+    tone: "warning",
   },
   PUBLISHED: {
     label: "Опубликовано",
-    className: "bg-green-100 text-green-800",
+    tone: "success",
   },
   NEEDS_REVISION: {
     label: "Требует правок",
-    className: "bg-orange-100 text-orange-800",
+    tone: "warning",
   },
   REJECTED: {
     label: "Отклонено",
-    className: "bg-red-100 text-red-800",
+    tone: "danger",
   },
   DELETED: {
     label: "Удалено",
-    className: "bg-gray-200 text-gray-600",
+    tone: "muted",
   },
 };
 
@@ -40,10 +41,8 @@ export function ContentStatusBadge({ status, className = "" }: ContentStatusBadg
   const config = STATUS_CONFIG[status];
 
   return (
-    <span
-      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${config.className} ${className}`}
-    >
+    <BusinessChip tone={config.tone} className={className}>
       {config.label}
-    </span>
+    </BusinessChip>
   );
 }

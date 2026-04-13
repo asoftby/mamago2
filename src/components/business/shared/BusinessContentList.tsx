@@ -1,9 +1,12 @@
 "use client";
 
 import { useState, useEffect, ReactNode } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { ConfirmDestructiveActionDialog } from "@/components/ui/confirm-destructive-action-dialog";
+import { Button } from "@/components/ui/button";
+import { BusinessEmptyState } from "@/components/business/ui/BusinessEmptyState";
 
 interface BusinessContentListProps<T> {
   items: T[];
@@ -130,15 +133,15 @@ export function BusinessContentList<T extends { id: string }>({
 
   if (items.length === 0) {
     return (
-      <div>
+      <div className="space-y-5">
         {/* Filter Tabs */}
-        <div className="flex gap-2 mb-6 border-b">
+        <div className="flex gap-2 border-b border-stone-200">
           <button
             onClick={() => handleViewChange("active")}
             className={`px-4 py-2 font-medium transition-colors ${
               currentView === "active"
-                ? "text-primary border-b-2 border-primary"
-                : "text-gray-600 hover:text-gray-900"
+                ? "border-b-2 border-stone-900 text-stone-950"
+                : "text-stone-500 hover:text-stone-900"
             }`}
           >
             Активные
@@ -147,38 +150,25 @@ export function BusinessContentList<T extends { id: string }>({
             onClick={() => handleViewChange("archived")}
             className={`px-4 py-2 font-medium transition-colors ${
               currentView === "archived"
-                ? "text-primary border-b-2 border-primary"
-                : "text-gray-600 hover:text-gray-900"
+                ? "border-b-2 border-stone-900 text-stone-950"
+                : "text-stone-500 hover:text-stone-900"
             }`}
           >
             Архив
           </button>
         </div>
 
-        <div className="bg-white rounded-lg border-2 border-dashed border-gray-300 p-12">
-          <div className="text-center">
-            <div className="mx-auto w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-              {emptyIcon}
-            </div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">
-              {currentView === "active" ? emptyTitle : "Нет архивных элементов"}
-            </h3>
-            <p className="text-gray-600 mb-6 max-w-md mx-auto">
-              {currentView === "active" ? emptyDescription : "Архивные элементы будут отображаться здесь"}
-            </p>
-            {currentView === "active" && (
-              <a
-                href={addButtonHref}
-                className="inline-flex items-center px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 transition-colors"
-              >
-                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                </svg>
-                {addButtonText}
-              </a>
-            )}
-          </div>
-        </div>
+        <BusinessEmptyState
+          icon={emptyIcon}
+          title={currentView === "active" ? emptyTitle : "Пока нет архивных элементов"}
+          description={
+            currentView === "active"
+              ? emptyDescription
+              : "Архивные элементы будут появляться здесь, когда вы решите временно убрать их из активной работы."
+          }
+          ctaLabel={currentView === "active" ? addButtonText : undefined}
+          ctaHref={currentView === "active" ? addButtonHref : undefined}
+        />
       </div>
     );
   }
@@ -199,13 +189,13 @@ export function BusinessContentList<T extends { id: string }>({
         onCancel={() => setPendingDeleteId(null)}
       />
       {/* Filter Tabs */}
-      <div className="flex gap-2 border-b">
+      <div className="flex gap-2 border-b border-stone-200">
         <button
           onClick={() => handleViewChange("active")}
           className={`px-4 py-2 font-medium transition-colors ${
             currentView === "active"
-              ? "text-primary border-b-2 border-primary"
-              : "text-gray-600 hover:text-gray-900"
+              ? "border-b-2 border-stone-900 text-stone-950"
+              : "text-stone-500 hover:text-stone-900"
           }`}
         >
           Активные
@@ -214,8 +204,8 @@ export function BusinessContentList<T extends { id: string }>({
           onClick={() => handleViewChange("archived")}
           className={`px-4 py-2 font-medium transition-colors ${
             currentView === "archived"
-              ? "text-primary border-b-2 border-primary"
-              : "text-gray-600 hover:text-gray-900"
+              ? "border-b-2 border-stone-900 text-stone-950"
+              : "text-stone-500 hover:text-stone-900"
           }`}
         >
           Архив
@@ -225,15 +215,14 @@ export function BusinessContentList<T extends { id: string }>({
       {/* Add Button */}
       {currentView === "active" && (
         <div className="flex justify-end">
-          <a
-            href={addButtonHref}
-            className="inline-flex items-center px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 transition-colors"
-          >
-            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-            {addButtonText}
-          </a>
+          <Button asChild className="rounded-2xl bg-stone-900 px-4 py-2.5 text-sm font-semibold hover:bg-stone-800">
+            <Link href={addButtonHref}>
+              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              {addButtonText}
+            </Link>
+          </Button>
         </div>
       )}
 

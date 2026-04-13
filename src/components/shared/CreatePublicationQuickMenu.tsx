@@ -100,11 +100,14 @@ const ITEMS: Item[] = [
 /**
  * Кнопка «+» и модалка выбора.
  * `full` — все пункты; `business` — только событие, предложение и место.
+ * `trigger` — кастомный триггер вместо стандартной кнопки «+».
  */
 export function CreatePublicationQuickMenu({
   publicationMode = "full",
+  trigger: customTrigger,
 }: {
   publicationMode?: PublicationMode;
+  trigger?: (onClick: () => void) => React.ReactNode;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -184,16 +187,20 @@ export function CreatePublicationQuickMenu({
 
   return (
     <>
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon"
-        className={cn(HEADER_CHROME_ICON_BUTTON_CLASS)}
-        onClick={() => setOpen(true)}
-        aria-label="Создать публикацию"
-      >
-        <Plus className="h-4 w-4" />
-      </Button>
+      {customTrigger ? (
+        customTrigger(() => setOpen(true))
+      ) : (
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className={cn(HEADER_CHROME_ICON_BUTTON_CLASS)}
+          onClick={() => setOpen(true)}
+          aria-label="Создать публикацию"
+        >
+          <Plus className="h-4 w-4" />
+        </Button>
+      )}
 
       {isMobile ? (
         <BottomSheet

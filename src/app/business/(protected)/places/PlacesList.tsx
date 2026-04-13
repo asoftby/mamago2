@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { PlaceCardHorizontal } from "@/components/business/places/PlaceCardHorizontal";
 import { Button } from "@/components/ui/button";
 import { Plus, MapPin } from "lucide-react";
@@ -46,6 +46,9 @@ interface Place {
     moderatorComment: string | null;
     revisionRequestedAt: Date | null;
   } | null;
+  updatedAt: Date;
+  linkedEventsCount?: number;
+  linkedOffersCount?: number;
 }
 
 interface PlacesListProps {
@@ -114,7 +117,7 @@ export function PlacesList({ places: initialPlaces, currentView }: PlacesListPro
   };
 
   const handleViewChange = (view: "active" | "archived") => {
-    router.push(`/business/places?view=${view}`);
+    router.push(`${window.location.pathname}?view=${view}`);
   };
 
   if (places.length === 0) {
@@ -150,16 +153,16 @@ export function PlacesList({ places: initialPlaces, currentView }: PlacesListPro
               <MapPin className="w-8 h-8 text-gray-400" />
             </div>
             <h3 className="text-lg font-semibold text-gray-900 mb-2">
-              {currentView === "active" ? "У вас пока нет мест" : "Нет архивных мест"}
+              {currentView === "active" ? "Мест пока нет" : "Архивных мест пока нет"}
             </h3>
             <p className="text-gray-600 mb-6 max-w-md mx-auto">
               {currentView === "active"
-                ? "Создайте первое место, чтобы начать публиковать мероприятия и предложения"
+                ? "Добавьте первое место, чтобы привязать к нему события, предложения и видеть, какая инфраструктура уже готова к спросу."
                 : "Архивные места будут отображаться здесь"}
             </p>
             {currentView === "active" && (
               <Button asChild size="lg">
-                <Link href="/editor/place/new">
+                <Link href="/business/places/new">
                   <Plus className="w-5 h-5 mr-2" />
                   Добавить место
                 </Link>
@@ -201,7 +204,7 @@ export function PlacesList({ places: initialPlaces, currentView }: PlacesListPro
       {currentView === "active" && (
         <div className="flex justify-end">
           <Button asChild>
-            <Link href="/editor/place/new">
+            <Link href="/business/places/new">
               <Plus className="w-4 h-4 mr-2" />
               Добавить место
             </Link>

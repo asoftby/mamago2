@@ -122,7 +122,13 @@ export function PlaceWizard({
   );
 
   /** Stable idempotency key for create — must match API contract. */
-  const [createRequestId] = useState(() => crypto.randomUUID());
+  const [createRequestId] = useState(() => {
+    if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+      return crypto.randomUUID();
+    }
+    // Fallback for non-secure contexts
+    return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+  });
 
   // Wizard session for temp media
   const { wizardSessionId, clearSession } = useWizardSession({

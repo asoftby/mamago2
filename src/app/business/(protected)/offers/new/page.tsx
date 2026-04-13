@@ -4,7 +4,6 @@
 
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/server";
-import { canCreateBusinessContent } from "@/lib/auth/businessContentAccess";
 import { buildSurfaceRedirectDestination } from "@/lib/routing/surface";
 import { getCurrentRequestRoutingContext } from "@/lib/routing/requestContext";
 
@@ -16,7 +15,7 @@ export default async function NewOfferPage({
   const routing = await getCurrentRequestRoutingContext();
   const user = await getCurrentUser();
 
-  if (!user || !canCreateBusinessContent(user.role)) {
+  if (!user) {
     redirect(
       buildSurfaceRedirectDestination({
         targetSurface: "public",

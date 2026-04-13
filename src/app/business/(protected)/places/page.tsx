@@ -3,9 +3,10 @@ import { redirect } from "next/navigation";
 import prisma from "@/lib/prisma";
 import { PlacesList } from "./PlacesList";
 import { getBusinessPlaces } from "@/server/services/place.service";
-import { canCreateBusinessContent, canManageOwnedContent } from "@/lib/auth/businessContentAccess";
+import { getMyBusiness } from "@/server/business/getMyBusiness";
 import { buildSurfaceRedirectDestination } from "@/lib/routing/surface";
 import { getCurrentRequestRoutingContext } from "@/lib/routing/requestContext";
+import { BusinessSectionHeader } from "@/components/business/sections/BusinessSectionHeader";
 
 interface SearchParams {
   view?: "active" | "archived";
@@ -18,8 +19,8 @@ export default async function PlacesPage({
 }) {
   const routing = await getCurrentRequestRoutingContext();
   const user = await getCurrentUser();
-  
-  if (!user || !canCreateBusinessContent(user.role)) {
+
+  if (!user) {
     redirect(
       buildSurfaceRedirectDestination({
         targetSurface: "public",
@@ -29,15 +30,9 @@ export default async function PlacesPage({
     );
   }
 
-  // Verify user has a business
-  const business = await prisma.business.findUnique({
-    where: { ownerUserId: user.id },
-  });
+  const business = await getMyBusiness(user.id);
 
   if (!business) {
-    // User is BUSINESS_OWNER but has no Business entity
-    // This shouldn't happen in production, but handle gracefully
-    console.warn(`User ${user.email} has BUSINESS_OWNER role but no Business entity`);
     redirect(
       buildSurfaceRedirectDestination({
         targetSurface: "business",
@@ -97,21 +92,51 @@ export default async function PlacesPage({
       })
     : [];
 
+  const [eventCounts, offerCounts] = allPlaceIds.length > 0
+    ? await Promise.all([
+        prisma.activity.groupBy({
+          by: ["placeId"],
+          where: {
+            placeId: { in: allPlaceIds },
+            type: "EVENT",
+          },
+          _count: { _all: true },
+        }),
+        prisma.offer.groupBy({
+          by: ["placeId"],
+          where: {
+            placeId: { in: allPlaceIds },
+          },
+          _count: { _all: true },
+        }),
+      ])
+    : [[], []];
+
+  const eventCountByPlace = new Map(
+    eventCounts
+      .filter((row) => Boolean(row.placeId))
+      .map((row) => [row.placeId as string, row._count._all])
+  );
+  const offerCountByPlace = new Map(
+    offerCounts.map((row) => [row.placeId, row._count._all])
+  );
+
   // Map revisions and improvement requests to places
   const placesWithRevisions = places.map(place => ({
     ...place,
     activeRevision: activeRevisions.find(r => r.placeId === place.id) || null,
     improvementRequests: improvementRequests.filter(ir => ir.entityId === place.id),
+    linkedEventsCount: eventCountByPlace.get(place.id) ?? 0,
+    linkedOffersCount: offerCountByPlace.get(place.id) ?? 0,
   }));
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">Мои места</h1>
-        <p className="text-gray-600 mt-2">
-          Управляйте вашими местами и отслеживайте их статус
-        </p>
-      </div>
+      <BusinessSectionHeader
+        eyebrow="Infrastructure"
+        title="Places"
+        description="Places — это инфраструктура бизнеса. Здесь видно, какие площадки готовы к работе и сколько публикаций уже опираются на каждое место."
+      />
 
       <PlacesList places={placesWithRevisions} currentView={view} />
     </div>
