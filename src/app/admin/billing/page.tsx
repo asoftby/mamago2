@@ -4,7 +4,8 @@ import { getBillingOverview, getBusinessesRequiringAttention } from "@/server/se
 import { DollarSign, TrendingUp, CheckCircle, XCircle, Users, AlertTriangle } from "lucide-react";
 import { BillingKpiCard } from "@/components/admin/billing/BillingKpiCard";
 import Link from "next/link";
-import { formatCurrency, formatDateTime } from "@/lib/mocks/businessBilling";
+import { formatDateTime } from "@/lib/mocks/businessBilling";
+import { formatPrice, formatTransactionAmount } from "@/lib/formatters/format-price";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 
 export default async function AdminBillingPage() {
@@ -87,12 +88,12 @@ export default async function AdminBillingPage() {
         <BillingKpiCard
           icon={DollarSign}
           label="Revenue Today"
-          value={formatCurrency(overview?.revenueToday || 0, "BYN")}
+          value={formatPrice(overview?.revenueToday || 0)}
         />
         <BillingKpiCard
           icon={TrendingUp}
           label="Revenue This Month"
-          value={formatCurrency(overview?.revenueThisMonth || 0, "BYN")}
+          value={formatPrice(overview?.revenueThisMonth || 0)}
         />
         <BillingKpiCard
           icon={CheckCircle}
@@ -149,7 +150,7 @@ export default async function AdminBillingPage() {
                   <td className={`py-3 px-4 text-right font-medium ${
                     tx.amount.toNumber() > 0 ? "text-green-600" : "text-gray-900"
                   }`}>
-                    {tx.amount.toNumber() > 0 ? "+" : ""}{formatCurrency(Math.abs(tx.amount.toNumber()), tx.currency)}
+                    {tx.amount.toNumber() > 0 ? "+" : ""}{formatPrice(Math.abs(tx.amount.toNumber()))}
                   </td>
                   <td className="py-3 px-4 text-center">
                     <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
@@ -182,7 +183,7 @@ export default async function AdminBillingPage() {
               >
                 <span className="text-sm font-medium text-gray-900">{account.business.name}</span>
                 <span className="text-sm text-orange-600 font-medium">
-                  {formatCurrency(account.depositBalance.toNumber(), account.currency)}
+                  {formatPrice(account.depositBalance.toNumber())}
                 </span>
               </Link>
             ))}

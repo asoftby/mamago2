@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { CreditCard, CheckCircle, Clock, XCircle } from "lucide-react";
-import { mockCurrentPlan, formatCurrency, formatDate } from "@/lib/mocks/businessBilling";
+import { mockCurrentPlan, formatDate } from "@/lib/mocks/businessBilling";
+import { formatPrice } from "@/lib/formatters/format-price";
 
 export function BillingPlanWidget({ href }: { href: string }) {
   const plan = mockCurrentPlan;
@@ -53,10 +54,10 @@ export function BillingPlanWidget({ href }: { href: string }) {
       <div className="space-y-3 mb-4">
         <div className="flex items-baseline gap-2">
           <span className="text-3xl font-bold text-gray-900">
-            {formatCurrency(plan.price, plan.currency).split(" ")[0]}
+            {formatPrice(plan.price)}
           </span>
           <span className="text-sm text-gray-500">
-            {plan.currency} / {plan.period === "month" ? "мес" : "год"}
+            / {plan.period === "month" ? "мес" : "год"}
           </span>
         </div>
 

@@ -1,4 +1,6 @@
 import { LucideIcon } from "lucide-react";
+import { BusinessSurfaceCard } from "@/components/business/ui/BusinessSurfaceCard";
+import { BusinessChip } from "@/components/business/ui/BusinessChip";
 
 interface BillingStatCardProps {
   icon: LucideIcon;
@@ -13,25 +15,25 @@ interface BillingStatCardProps {
 
 export function BillingStatCard({ icon: Icon, label, value, subtitle, trend }: BillingStatCardProps) {
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-4">
-      <div className="flex items-start justify-between mb-3">
-        <div className="w-10 h-10 rounded-lg bg-gray-50 flex items-center justify-center">
-          <Icon className="w-5 h-5 text-gray-600" />
+    <BusinessSurfaceCard className="h-full p-4 md:p-5">
+      <div className="mb-4 flex items-start justify-between gap-3">
+        <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-stone-200 bg-stone-50">
+          <Icon className="h-5 w-5 text-stone-600" />
         </div>
         {trend && (
-          <span className={`text-xs font-medium ${trend.positive ? "text-green-600" : "text-red-600"}`}>
+          <BusinessChip tone={trend.positive ? "success" : "danger"}>
             {trend.value}
-          </span>
+          </BusinessChip>
         )}
       </div>
       
       <div>
-        <p className="text-sm text-gray-600 mb-1">{label}</p>
-        <p className="text-2xl font-bold text-gray-900">{value}</p>
+        <p className="mb-1 text-sm font-medium text-stone-500">{label}</p>
+        <p className="text-2xl font-semibold tracking-tight text-stone-950">{value}</p>
         {subtitle && (
-          <p className="text-xs text-gray-500 mt-1">{subtitle}</p>
+          <p className="mt-2 text-xs leading-6 text-stone-500">{subtitle}</p>
         )}
       </div>
-    </div>
+    </BusinessSurfaceCard>
   );
 }

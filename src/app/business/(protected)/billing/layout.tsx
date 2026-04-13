@@ -3,11 +3,15 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
+import {
+  BUSINESS_BILLING_PLAN_HREF,
+  businessRoute,
+} from "@/lib/business/navigation";
 
 const billingTabs = [
-  { name: "Тариф", path: "/billing/plan" },
-  { name: "Депозит", path: "/billing/deposit" },
-  { name: "История операций", path: "/billing/transactions" },
+  { name: "Тариф", path: "/billing/plan", href: BUSINESS_BILLING_PLAN_HREF },
+  { name: "Депозит", path: "/billing/deposit", href: businessRoute("/billing/deposit") },
+  { name: "История операций", path: "/billing/transactions", href: businessRoute("/billing/transactions") },
 ];
 
 export default function BillingLayout({
@@ -34,7 +38,7 @@ export default function BillingLayout({
             const isActive = isCurrentTab(tab.path);
             return (
               <Link
-                key={tab.path}
+                key={tab.href}
                 href={href}
                 className={cn(
                   "pb-3 px-1 border-b-2 text-sm font-medium transition-colors",

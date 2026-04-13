@@ -1,27 +1,30 @@
 "use client";
 
 import { useState } from "react";
-import { 
-  mockTransactions,
-  formatCurrency,
+import {
   formatDateTime,
   getTransactionTypeLabel,
-  type TransactionType,
+  mockTransactions,
   type TransactionStatus,
+  type TransactionType,
 } from "@/lib/mocks/businessBilling";
-import { Filter, ChevronDown, ExternalLink } from "lucide-react";
+import { formatPrice } from "@/lib/formatters/format-price";
+import { ChevronDown, ExternalLink, Filter } from "lucide-react";
 import { FilterSelect } from "@/components/ui/filter-select";
 import { TransactionStatusBadge } from "@/components/business/billing/TransactionStatusBadge";
+import { BusinessSectionHeader } from "@/components/business/sections/BusinessSectionHeader";
+import { BusinessSurfaceCard } from "@/components/business/ui/BusinessSurfaceCard";
+import { BusinessEmptyState } from "@/components/business/ui/BusinessEmptyState";
+import { BusinessChip } from "@/components/business/ui/BusinessChip";
 
 export default function BillingTransactionsPage() {
   const [selectedType, setSelectedType] = useState<TransactionType | "all">("all");
   const [selectedStatus, setSelectedStatus] = useState<TransactionStatus | "all">("all");
   const [selectedTransaction, setSelectedTransaction] = useState<string | null>(null);
 
-  // Filter transactions
-  const filteredTransactions = mockTransactions.filter(t => {
-    if (selectedType !== "all" && t.type !== selectedType) return false;
-    if (selectedStatus !== "all" && t.status !== selectedStatus) return false;
+  const filteredTransactions = mockTransactions.filter((transaction) => {
+    if (selectedType !== "all" && transaction.type !== selectedType) return false;
+    if (selectedStatus !== "all" && transaction.status !== selectedStatus) return false;
     return true;
   });
 
@@ -45,160 +48,189 @@ export default function BillingTransactionsPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">История операций</h1>
-        <p className="text-gray-600 mt-2">
-          Все списания, пополнения и продления
-        </p>
-      </div>
+      <BusinessSectionHeader
+        eyebrow="Billing"
+        title="История операций"
+        description="Все пополнения, списания и продления в одном месте. Это финансовая лента бизнеса, а не технический журнал."
+      />
 
-      {/* Filters */}
-      <div className="bg-white rounded-lg shadow p-4">
-        <div className="flex items-center gap-4 flex-wrap">
+      <BusinessSurfaceCard className="p-4 md:p-5">
+        <div className="flex flex-wrap items-center gap-4">
           <div className="flex items-center gap-2">
-            <Filter className="w-4 h-4 text-gray-500" />
-            <span className="text-sm font-medium text-gray-700">Фильтры:</span>
+            <Filter className="h-4 w-4 text-stone-500" />
+            <span className="text-sm font-medium text-stone-700">Фильтры</span>
           </div>
 
-          <div className="flex items-center gap-2 min-w-[200px]">
-            <label className="text-sm text-gray-600 shrink-0">Тип:</label>
+          <div className="flex min-w-[220px] items-center gap-2">
+            <label className="shrink-0 text-sm text-stone-600">Тип:</label>
             <FilterSelect
               value={selectedType}
-              options={transactionTypes.map((t) => ({
-                value: String(t.value),
-                label: t.label,
+              options={transactionTypes.map((type) => ({
+                value: String(type.value),
+                label: type.label,
               }))}
-              onChange={(v) => setSelectedType(v as TransactionType | "all")}
+              onChange={(value) => setSelectedType(value as TransactionType | "all")}
               className="min-w-[180px]"
             />
           </div>
 
-          <div className="flex items-center gap-2 min-w-[200px]">
-            <label className="text-sm text-gray-600 shrink-0">Статус:</label>
+          <div className="flex min-w-[220px] items-center gap-2">
+            <label className="shrink-0 text-sm text-stone-600">Статус:</label>
             <FilterSelect
               value={selectedStatus}
-              options={statuses.map((s) => ({
-                value: String(s.value),
-                label: s.label,
+              options={statuses.map((status) => ({
+                value: String(status.value),
+                label: status.label,
               }))}
-              onChange={(v) => setSelectedStatus(v as TransactionStatus | "all")}
+              onChange={(value) =>
+                setSelectedStatus(value as TransactionStatus | "all")
+              }
               className="min-w-[180px]"
             />
           </div>
 
-          <div className="ml-auto text-sm text-gray-600">
-            Найдено: <span className="font-medium text-gray-900">{filteredTransactions.length}</span>
+          <div className="ml-auto">
+            <BusinessChip tone="muted">
+              Найдено: {filteredTransactions.length}
+            </BusinessChip>
           </div>
         </div>
-      </div>
+      </BusinessSurfaceCard>
 
-      {/* Transactions Table */}
-      <div className="bg-white rounded-lg shadow overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
-                <th className="text-left py-3 px-4 text-sm font-medium text-gray-600">Дата</th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-gray-600">Тип операции</th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-gray-600">Описание</th>
-                <th className="text-right py-3 px-4 text-sm font-medium text-gray-600">Сумма</th>
-                <th className="text-center py-3 px-4 text-sm font-medium text-gray-600">Статус</th>
-                <th className="text-center py-3 px-4 text-sm font-medium text-gray-600">Действие</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredTransactions.map((transaction) => (
-                <>
-                  <tr 
-                    key={transaction.id} 
-                    className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer"
-                    onClick={() => setSelectedTransaction(
-                      selectedTransaction === transaction.id ? null : transaction.id
-                    )}
-                  >
-                    <td className="py-3 px-4 text-sm text-gray-900 whitespace-nowrap">
-                      {formatDateTime(transaction.date)}
-                    </td>
-                    <td className="py-3 px-4 text-sm text-gray-700">
-                      {getTransactionTypeLabel(transaction.type)}
-                    </td>
-                    <td className="py-3 px-4 text-sm text-gray-700">
-                      {transaction.description}
-                    </td>
-                    <td className={`py-3 px-4 text-sm text-right font-medium whitespace-nowrap ${
-                      transaction.amount > 0 ? "text-green-600" : "text-gray-900"
-                    }`}>
-                      {transaction.amount > 0 ? "+" : ""}
-                      {formatCurrency(Math.abs(transaction.amount), transaction.currency)}
-                    </td>
-                    <td className="py-3 px-4 text-center">
-                      <TransactionStatusBadge status={transaction.status} />
-                    </td>
-                    <td className="py-3 px-4 text-center">
-                      <button className="text-gray-400 hover:text-gray-600">
-                        <ChevronDown className={`w-4 h-4 transition-transform ${
-                          selectedTransaction === transaction.id ? "rotate-180" : ""
-                        }`} />
-                      </button>
-                    </td>
-                  </tr>
-                  
-                  {/* Expandable Details */}
-                  {selectedTransaction === transaction.id && (
-                    <tr className="bg-gray-50">
-                      <td colSpan={6} className="py-4 px-4">
-                        <div className="bg-white rounded-lg border border-gray-200 p-4">
-                          <h4 className="text-sm font-semibold text-gray-900 mb-3">Детали транзакции</h4>
-                          <div className="grid md:grid-cols-2 gap-4 text-sm">
-                            <div>
-                              <p className="text-gray-600 mb-1">ID транзакции</p>
-                              <p className="font-mono text-gray-900">{transaction.id}</p>
-                            </div>
-                            <div>
-                              <p className="text-gray-600 mb-1">Дата и время</p>
-                              <p className="text-gray-900">{formatDateTime(transaction.date)}</p>
-                            </div>
-                            <div>
-                              <p className="text-gray-600 mb-1">Сумма</p>
-                              <p className="text-gray-900 font-medium">
-                                {formatCurrency(Math.abs(transaction.amount), transaction.currency)}
-                              </p>
-                            </div>
-                            {transaction.paymentMethod && (
-                              <div>
-                                <p className="text-gray-600 mb-1">Метод оплаты</p>
-                                <p className="text-gray-900">{transaction.paymentMethod}</p>
-                              </div>
-                            )}
-                            {transaction.relatedEntity && (
-                              <div className="md:col-span-2">
-                                <p className="text-gray-600 mb-1">Связанная сущность</p>
-                                <div className="flex items-center gap-2">
-                                  <p className="text-gray-900">{transaction.relatedEntity.name}</p>
-                                  <button className="text-blue-600 hover:text-blue-700">
-                                    <ExternalLink className="w-4 h-4" />
-                                  </button>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        </div>
+      {filteredTransactions.length === 0 ? (
+        <BusinessEmptyState
+          icon={<Filter className="h-7 w-7" />}
+          title="Операции не найдены"
+          description="Попробуйте изменить фильтры или вернуться позже. Когда появятся новые списания, пополнения или продления, они отобразятся здесь."
+        />
+      ) : (
+        <BusinessSurfaceCard className="overflow-hidden p-0">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-stone-50/90">
+                <tr className="border-b border-stone-200">
+                  <th className="px-5 py-3 text-left text-sm font-medium text-stone-500">
+                    Дата
+                  </th>
+                  <th className="px-5 py-3 text-left text-sm font-medium text-stone-500">
+                    Тип операции
+                  </th>
+                  <th className="px-5 py-3 text-left text-sm font-medium text-stone-500">
+                    Описание
+                  </th>
+                  <th className="px-5 py-3 text-right text-sm font-medium text-stone-500">
+                    Сумма
+                  </th>
+                  <th className="px-5 py-3 text-center text-sm font-medium text-stone-500">
+                    Статус
+                  </th>
+                  <th className="px-5 py-3 text-center text-sm font-medium text-stone-500">
+                    Действие
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredTransactions.map((transaction) => (
+                  <>
+                    <tr
+                      key={transaction.id}
+                      className="cursor-pointer border-b border-stone-100 transition-colors hover:bg-stone-50/70"
+                      onClick={() =>
+                        setSelectedTransaction(
+                          selectedTransaction === transaction.id ? null : transaction.id,
+                        )
+                      }
+                    >
+                      <td className="whitespace-nowrap px-5 py-4 text-sm text-stone-950">
+                        {formatDateTime(transaction.date)}
+                      </td>
+                      <td className="px-5 py-4 text-sm text-stone-700">
+                        {getTransactionTypeLabel(transaction.type)}
+                      </td>
+                      <td className="px-5 py-4 text-sm text-stone-700">
+                        {transaction.description}
+                      </td>
+                      <td
+                        className={`whitespace-nowrap px-5 py-4 text-right text-sm font-medium ${
+                          transaction.amount > 0 ? "text-green-600" : "text-stone-950"
+                        }`}
+                      >
+                        {transaction.amount > 0 ? "+" : ""}
+                        {formatPrice(Math.abs(transaction.amount))}
+                      </td>
+                      <td className="px-5 py-4 text-center">
+                        <TransactionStatusBadge status={transaction.status} />
+                      </td>
+                      <td className="px-5 py-4 text-center">
+                        <button className="rounded-xl p-2 text-stone-400 transition hover:bg-stone-100 hover:text-stone-700">
+                          <ChevronDown
+                            className={`h-4 w-4 transition-transform ${
+                              selectedTransaction === transaction.id ? "rotate-180" : ""
+                            }`}
+                          />
+                        </button>
                       </td>
                     </tr>
-                  )}
-                </>
-              ))}
-            </tbody>
-          </table>
-        </div>
 
-        {filteredTransactions.length === 0 && (
-          <div className="py-12 text-center">
-            <p className="text-gray-500">Транзакции не найдены</p>
+                    {selectedTransaction === transaction.id ? (
+                      <tr className="bg-stone-50/70">
+                        <td colSpan={6} className="px-5 py-4">
+                          <div className="rounded-[22px] border border-stone-200 bg-white p-4">
+                            <h4 className="mb-3 text-sm font-semibold text-stone-950">
+                              Детали транзакции
+                            </h4>
+                            <div className="grid gap-4 text-sm md:grid-cols-2">
+                              <div>
+                                <p className="mb-1 text-stone-500">ID транзакции</p>
+                                <p className="font-mono text-stone-950">{transaction.id}</p>
+                              </div>
+                              <div>
+                                <p className="mb-1 text-stone-500">Дата и время</p>
+                                <p className="text-stone-950">
+                                  {formatDateTime(transaction.date)}
+                                </p>
+                              </div>
+                              <div>
+                                <p className="mb-1 text-stone-500">Сумма</p>
+                                <p className="font-medium text-stone-950">
+                                  {formatPrice(Math.abs(transaction.amount))}
+                                </p>
+                              </div>
+                              {transaction.paymentMethod ? (
+                                <div>
+                                  <p className="mb-1 text-stone-500">Метод оплаты</p>
+                                  <p className="text-stone-950">
+                                    {transaction.paymentMethod}
+                                  </p>
+                                </div>
+                              ) : null}
+                              {transaction.relatedEntity ? (
+                                <div className="md:col-span-2">
+                                  <p className="mb-1 text-stone-500">
+                                    Связанная сущность
+                                  </p>
+                                  <div className="flex items-center gap-2">
+                                    <p className="text-stone-950">
+                                      {transaction.relatedEntity.name}
+                                    </p>
+                                    <button className="rounded-xl p-1 text-blue-600 transition hover:bg-blue-50 hover:text-blue-700">
+                                      <ExternalLink className="h-4 w-4" />
+                                    </button>
+                                  </div>
+                                </div>
+                              ) : null}
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : null}
+                  </>
+                ))}
+              </tbody>
+            </table>
           </div>
-        )}
-      </div>
+        </BusinessSurfaceCard>
+      )}
     </div>
   );
 }

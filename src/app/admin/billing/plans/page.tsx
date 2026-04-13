@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { getPlans } from "@/server/services/billing/billingPlans.service";
 import { Check, X } from "lucide-react";
 import Link from "next/link";
+import { formatPrice } from "@/lib/formatters/format-price";
 
 export default async function AdminBillingPlansPage() {
   const user = await getCurrentUser();
@@ -89,9 +90,8 @@ export default async function AdminBillingPlansPage() {
             <div className="mb-4">
               <div className="flex items-baseline gap-2">
                 <span className="text-3xl font-bold text-gray-900">
-                  {plan.price.toNumber()}
+                  {formatPrice(plan.price.toNumber())}
                 </span>
-                <span className="text-gray-600">{plan.currency}</span>
                 <span className="text-sm text-gray-500">
                   / {plan.interval === "MONTH" ? "мес" : "год"}
                 </span>

@@ -4,6 +4,7 @@ import { getBillingAccounts } from "@/server/services/billing/billingAccount.ser
 import { BillingAccountStatusBadge } from "@/components/admin/billing/BillingAccountStatusBadge";
 import { AlertTriangle, TrendingDown } from "lucide-react";
 import Link from "next/link";
+import { formatPrice } from "@/lib/formatters/format-price";
 
 export default async function AdminBillingBusinessesPage() {
   const user = await getCurrentUser();
@@ -122,7 +123,7 @@ export default async function AdminBillingBusinessesPage() {
                         <div>
                           <p className="font-medium">{subscription.plan.name}</p>
                           <p className="text-xs text-gray-500">
-                            {subscription.plan.price.toNumber()} {subscription.plan.currency}/мес
+                            {formatPrice(subscription.plan.price.toNumber())}/мес
                           </p>
                         </div>
                       ) : (
@@ -132,7 +133,7 @@ export default async function AdminBillingBusinessesPage() {
                     <td className={`py-3 px-4 text-right font-medium ${
                       isLowBalance ? "text-orange-600" : "text-gray-900"
                     }`}>
-                      {balance.toFixed(2)} {account.currency}
+                      {formatPrice(balance)}
                     </td>
                     <td className="py-3 px-4 text-right text-gray-700">
                       {account._count.transactions}

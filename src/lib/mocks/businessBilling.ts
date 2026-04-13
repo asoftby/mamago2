@@ -368,9 +368,11 @@ export function getTransactionStatusLabel(status: TransactionStatus): string {
   return labels[status];
 }
 
-// Helper to format currency
+// Helper to format currency — delegates to shared formatter
 export function formatCurrency(amount: number, currency: string = "BYN"): string {
-  return `${amount.toFixed(2)} ${currency}`;
+  void currency; // always BYN
+  const isInteger = Number.isInteger(amount);
+  return `${isInteger ? String(amount) : amount.toFixed(2)} BYN`;
 }
 
 // Helper to format date

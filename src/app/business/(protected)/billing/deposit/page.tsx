@@ -1,95 +1,147 @@
 import { getCurrentUser } from "@/lib/auth/server";
 import { redirect } from "next/navigation";
-import { 
-  mockDeposit, 
-  mockUsageStats,
-  mockTransactions,
-  formatCurrency,
+import {
   formatDate,
   formatDateTime,
   getTransactionTypeLabel,
+  mockDeposit,
+  mockTransactions,
+  mockUsageStats,
 } from "@/lib/mocks/businessBilling";
-import { Wallet, TrendingDown, Receipt, DollarSign, AlertCircle, Info } from "lucide-react";
+import { formatPrice } from "@/lib/formatters/format-price";
+import {
+  AlertCircle,
+  DollarSign,
+  Info,
+  Receipt,
+  TrendingDown,
+  Wallet,
+} from "lucide-react";
 import { BillingStatCard } from "@/components/business/billing/BillingStatCard";
 import { TransactionStatusBadge } from "@/components/business/billing/TransactionStatusBadge";
+import { BusinessSectionHeader } from "@/components/business/sections/BusinessSectionHeader";
+import { buildSurfaceRedirectDestination } from "@/lib/routing/surface";
+import { getCurrentRequestRoutingContext } from "@/lib/routing/requestContext";
+import { BusinessSurfaceCard } from "@/components/business/ui/BusinessSurfaceCard";
+import { BusinessChip } from "@/components/business/ui/BusinessChip";
+import { DepositTopUpTrigger } from "@/components/business/billing/DepositTopUpTrigger";
 
 export default async function BillingDepositPage() {
+  const routing = await getCurrentRequestRoutingContext();
   const user = await getCurrentUser();
-  
+
   if (!user) {
-    redirect("/login");
+    redirect(
+      buildSurfaceRedirectDestination({
+        targetSurface: "public",
+        targetPath: "/login",
+        ...routing,
+      }),
+    );
   }
 
   const deposit = mockDeposit;
   const stats = mockUsageStats;
   const isLowBalance = deposit.balance < deposit.lowBalanceThreshold;
-
-  // Get recent deposit-related transactions
   const recentTransactions = mockTransactions
-    .filter(t => ["deposit_topup", "lead_charge", "promotion_charge", "refund"].includes(t.type))
+    .filter((transaction) =>
+      ["deposit_topup", "lead_charge", "promotion_charge", "refund"].includes(
+        transaction.type,
+      ),
+    )
     .slice(0, 10);
+
+  const transactionsHref = buildSurfaceRedirectDestination({
+    targetSurface: "business",
+    targetPath: "/billing/transactions",
+    ...routing,
+  });
+
+  const promotionHref = buildSurfaceRedirectDestination({
+    targetSurface: "business",
+    targetPath: "/promotion",
+    ...routing,
+  });
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">Депозит</h1>
-        <p className="text-gray-600 mt-2">
-          Баланс для списаний за лиды и продвижение
-        </p>
-      </div>
+      <BusinessSectionHeader
+        eyebrow="Billing"
+        title="Депозит"
+        description="Депозит покрывает лиды и продвижение. Здесь видно текущий баланс, скорость списаний и когда пора пополнить счёт."
+      />
 
-      {/* Balance Hero Card */}
-      <div className={`rounded-lg shadow p-6 ${isLowBalance ? "bg-gradient-to-br from-orange-50 to-orange-100 border border-orange-200" : "bg-gradient-to-br from-green-50 to-green-100 border border-green-200"}`}>
-        <div className="flex items-start justify-between mb-6">
+      <BusinessSurfaceCard tone={isLowBalance ? "warm" : "success"} className="p-6 md:p-7">
+        <div className="mb-6 flex items-start justify-between">
           <div className="flex items-center gap-3">
-            <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${isLowBalance ? "bg-orange-200" : "bg-green-200"}`}>
-              <Wallet className={`w-6 h-6 ${isLowBalance ? "text-orange-700" : "text-green-700"}`} />
+            <div
+              className={`flex h-12 w-12 items-center justify-center rounded-2xl ${
+                isLowBalance ? "bg-orange-200" : "bg-green-200"
+              }`}
+            >
+              <Wallet
+                className={`w-6 h-6 ${
+                  isLowBalance ? "text-orange-700" : "text-green-700"
+                }`}
+              />
             </div>
             <div>
-              <p className="text-sm font-medium text-gray-700">Текущий баланс</p>
-              <p className={`text-4xl font-bold ${isLowBalance ? "text-orange-900" : "text-green-900"}`}>
-                {formatCurrency(deposit.balance, deposit.currency)}
+              <p className="text-sm font-medium text-stone-600">Текущий баланс</p>
+              <p
+                className={`text-4xl font-bold ${
+                  isLowBalance ? "text-orange-900" : "text-green-900"
+                }`}
+              >
+                {formatPrice(deposit.balance)}
               </p>
             </div>
           </div>
 
-          {isLowBalance && (
-            <div className="flex items-center gap-2 px-3 py-1.5 bg-orange-200 rounded-full">
+          {isLowBalance ? (
+            <BusinessChip tone="warning" className="gap-2 bg-orange-200/90">
               <AlertCircle className="w-4 h-4 text-orange-700" />
-              <span className="text-sm font-medium text-orange-900">Низкий баланс</span>
-            </div>
-          )}
+              <span className="text-sm font-medium text-orange-900">
+                Низкий баланс
+              </span>
+            </BusinessChip>
+          ) : null}
         </div>
 
-        {isLowBalance && (
-          <div className="bg-white/80 rounded-lg p-4 mb-4">
-            <p className="text-sm text-gray-700 mb-2">
-              Рекомендуем пополнить депозит на <span className="font-semibold">{formatCurrency(deposit.recommendedTopup, deposit.currency)}</span>
+        {isLowBalance ? (
+          <div className="mb-4 rounded-[24px] border border-orange-200 bg-white/80 p-4">
+            <p className="mb-2 text-sm text-stone-700">
+              Рекомендуем пополнить депозит на{" "}
+              <span className="font-semibold">
+                {formatPrice(deposit.recommendedTopup)}
+              </span>
             </p>
-            <p className="text-xs text-gray-600">
-              При балансе ниже {formatCurrency(deposit.lowBalanceThreshold, deposit.currency)} списания могут быть приостановлены
+            <p className="text-xs text-stone-600">
+              При балансе ниже{" "}
+              {formatPrice(deposit.lowBalanceThreshold)}
+              {" "}списания могут быть приостановлены.
             </p>
           </div>
-        )}
+        ) : null}
 
-        <button className={`w-full md:w-auto px-6 py-3 rounded-lg font-medium transition-colors ${
-          isLowBalance 
-            ? "bg-orange-600 text-white hover:bg-orange-700" 
-            : "bg-green-700 text-white hover:bg-green-800"
-        }`}>
-          Пополнить депозит
-        </button>
-      </div>
+        <DepositTopUpTrigger
+          balance={deposit.balance}
+          lowBalanceThreshold={deposit.lowBalanceThreshold}
+          promotionHref={promotionHref}
+          variant={isLowBalance ? "warning" : "primary"}
+          label="Пополнить депозит"
+          className="w-full md:w-auto"
+        />
+      </BusinessSurfaceCard>
 
-      {/* Month Usage Summary */}
       <div>
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">Статистика за месяц</h2>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <h2 className="mb-4 text-xl font-semibold tracking-tight text-stone-950">
+          Статистика за месяц
+        </h2>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
           <BillingStatCard
             icon={TrendingDown}
             label="Потрачено"
-            value={formatCurrency(stats.monthSpent, deposit.currency)}
+            value={formatPrice(stats.monthSpent)}
             subtitle="В текущем месяце"
           />
           <BillingStatCard
@@ -101,57 +153,62 @@ export default async function BillingDepositPage() {
           <BillingStatCard
             icon={DollarSign}
             label="Средний чек"
-            value={formatCurrency(stats.averageCharge, deposit.currency)}
+            value={formatPrice(stats.averageCharge)}
             subtitle="За списание"
           />
           <BillingStatCard
             icon={Wallet}
             label="Последнее списание"
-            value={formatCurrency(stats.lastCharge.amount, deposit.currency)}
+            value={formatPrice(stats.lastCharge.amount)}
             subtitle={formatDate(stats.lastCharge.date)}
           />
         </div>
       </div>
 
-      {/* Recent Usage */}
-      <div className="bg-white rounded-lg shadow p-6">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">Последние операции</h2>
+      <BusinessSurfaceCard className="p-6 md:p-7">
+        <h2 className="mb-4 text-xl font-semibold tracking-tight text-stone-950">
+          Последние операции
+        </h2>
         <div className="space-y-3">
           {recentTransactions.map((transaction) => (
-            <div 
-              key={transaction.id} 
-              className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+            <div
+              key={transaction.id}
+              className="flex items-center justify-between rounded-[22px] border border-stone-200 bg-stone-50/70 p-4 transition-colors hover:border-stone-300 hover:bg-white"
             >
               <div className="flex-1">
-                <div className="flex items-center gap-3 mb-1">
-                  <span className="text-sm font-medium text-gray-900">
+                <div className="mb-1 flex items-center gap-3">
+                  <span className="text-sm font-medium text-stone-950">
                     {getTransactionTypeLabel(transaction.type)}
                   </span>
                   <TransactionStatusBadge status={transaction.status} size="sm" />
                 </div>
-                <p className="text-sm text-gray-600">{transaction.description}</p>
-                <p className="text-xs text-gray-500 mt-1">{formatDateTime(transaction.date)}</p>
+                <p className="text-sm text-stone-600">{transaction.description}</p>
+                <p className="mt-1 text-xs text-stone-500">
+                  {formatDateTime(transaction.date)}
+                </p>
               </div>
-              <div className="text-right ml-4">
-                <p className={`text-lg font-semibold ${
-                  transaction.amount > 0 ? "text-green-600" : "text-gray-900"
-                }`}>
-                  {transaction.amount > 0 ? "+" : ""}{formatCurrency(Math.abs(transaction.amount), transaction.currency)}
+              <div className="ml-4 text-right">
+                <p
+                  className={`text-lg font-semibold ${
+                    transaction.amount > 0 ? "text-green-600" : "text-stone-950"
+                  }`}
+                >
+                  {transaction.amount > 0 ? "+" : ""}
+                  {formatPrice(Math.abs(transaction.amount))}
                 </p>
               </div>
             </div>
           ))}
         </div>
-      </div>
+      </BusinessSurfaceCard>
 
-      {/* Rules/Info Card */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+      <BusinessSurfaceCard tone="accent" className="p-6">
         <div className="flex gap-3">
-          <Info className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
-          <div className="text-sm text-blue-900 space-y-2">
+          <Info className="mt-0.5 h-5 w-5 flex-shrink-0 text-blue-600" />
+          <div className="space-y-2 text-sm text-blue-900">
             <div>
-              <p className="font-medium mb-1">За что списывается депозит?</p>
-              <ul className="list-disc list-inside text-blue-700 space-y-1">
+              <p className="mb-1 font-medium">За что списывается депозит?</p>
+              <ul className="list-disc list-inside space-y-1 text-blue-700">
                 <li>Заявки и лиды от пользователей на ваши места</li>
                 <li>Продвижение предложений и событий</li>
                 <li>Размещение в приоритетных позициях</li>
@@ -159,24 +216,26 @@ export default async function BillingDepositPage() {
               </ul>
             </div>
             <div>
-              <p className="font-medium mb-1">Что произойдет при низком балансе?</p>
+              <p className="mb-1 font-medium">Что произойдет при низком балансе?</p>
               <p className="text-blue-700">
-                При балансе ниже {formatCurrency(deposit.lowBalanceThreshold, deposit.currency)} новые списания будут приостановлены. 
-                Ваши места останутся видимыми, но продвижение и получение лидов будет ограничено.
+                При балансе ниже{" "}
+                {formatPrice(deposit.lowBalanceThreshold)}
+                {" "}новые списания будут приостановлены. Ваши места останутся
+                видимыми, но продвижение и получение лидов будет ограничено.
               </p>
             </div>
             <div>
-              <p className="font-medium mb-1">История всех операций</p>
+              <p className="mb-1 font-medium">История всех операций</p>
               <p className="text-blue-700">
                 Полную историю транзакций можно посмотреть на странице{" "}
-                <a href="/business/billing/transactions" className="underline hover:text-blue-800">
+                <a href={transactionsHref} className="underline hover:text-blue-800">
                   История операций
                 </a>
               </p>
             </div>
           </div>
         </div>
-      </div>
+      </BusinessSurfaceCard>
     </div>
   );
 }

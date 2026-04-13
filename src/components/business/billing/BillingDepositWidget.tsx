@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Wallet, TrendingDown, AlertCircle } from "lucide-react";
 import { mockDeposit, formatCurrency } from "@/lib/mocks/businessBilling";
+import { formatPrice } from "@/lib/formatters/format-price";
 
 export function BillingDepositWidget({ href }: { href: string }) {
   const deposit = mockDeposit;
@@ -34,9 +35,8 @@ export function BillingDepositWidget({ href }: { href: string }) {
       <div className="space-y-3 mb-4">
         <div className="flex items-baseline gap-2">
           <span className={`text-3xl font-bold ${isLowBalance ? "text-orange-600" : "text-gray-900"}`}>
-            {formatCurrency(deposit.balance, deposit.currency).split(" ")[0]}
+            {formatPrice(deposit.balance)}
           </span>
-          <span className="text-sm text-gray-500">{deposit.currency}</span>
         </div>
 
         <div className="flex items-center gap-2 text-sm text-gray-600">

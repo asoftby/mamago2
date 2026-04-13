@@ -9,6 +9,7 @@ import { TransactionAmount } from "@/components/admin/billing/TransactionAmount"
 import { AdminBillingActions } from "@/components/admin/billing/AdminBillingActions";
 import { AlertTriangle, CreditCard, Wallet, TrendingDown } from "lucide-react";
 import Link from "next/link";
+import { formatPrice } from "@/lib/formatters/format-price";
 
 export default async function AdminBusinessBillingPage({
   params,
@@ -90,7 +91,7 @@ export default async function AdminBusinessBillingPage({
           </p>
           {currentSubscription && (
             <p className="text-sm text-gray-500 mt-1">
-              {currentSubscription.plan.price.toNumber()} {currentSubscription.plan.currency} / мес
+              {currentSubscription.plan.price.toNumber()} BYN / мес
             </p>
           )}
         </div>
@@ -103,10 +104,10 @@ export default async function AdminBusinessBillingPage({
             <p className={`text-sm ${isLowBalance ? "text-orange-700" : "text-gray-600"}`}>Депозит</p>
           </div>
           <p className={`text-xl font-bold ${isLowBalance ? "text-orange-900" : "text-gray-900"}`}>
-            {balance.toFixed(2)} {account.currency}
+            {formatPrice(balance)}
           </p>
           {isLowBalance && (
-            <p className="text-xs text-orange-600 mt-1">Ниже порога {account.lowBalanceThreshold.toNumber()} {account.currency}</p>
+            <p className="text-xs text-orange-600 mt-1">Ниже порога {formatPrice(account.lowBalanceThreshold.toNumber())}</p>
           )}
         </div>
 
@@ -116,7 +117,7 @@ export default async function AdminBusinessBillingPage({
             <p className="text-sm text-gray-600">За месяц</p>
           </div>
           <p className="text-xl font-bold text-gray-900">
-            {monthSpent.toFixed(2)} {account.currency}
+            {formatPrice(monthSpent)}
           </p>
           <p className="text-sm text-gray-500 mt-1">Потрачено</p>
         </div>
