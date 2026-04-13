@@ -44,8 +44,18 @@ model User {
   leisureFormatSummary          String?
   /// Пользователь подключил Telegram (бот / канал уведомлений)
   telegramConnected             Boolean                      @default(false)
+  telegramId                    String?                      @unique
+  telegramUsername              String?
   /// Когда закрыл soft-prompt подключения Telegram (повтор через 7 дней)
   telegramPromptDismissedAt     DateTime?
+  /// mamaGo Business: неверные попытки ввода SMS-кода в текущем «окне» (сбрасывается при новой отправке кода / успехе)
+  businessContactOtpFailedAttempts Int       @default(0)
+  /// Ступень escalation после серий по 3 неверных кода (0 = ещё не было блокировки; 1–3 = длительности; 4+ = support)
+  businessContactOtpLockTier       Int       @default(0)
+  /// До какого момента действует блокировка проверки/повторной отправки (если не support)
+  businessContactOtpLockedUntil    DateTime?
+  /// Финальное ограничение: только поддержка support@mamago.by
+  businessContactOtpSupportRequired Boolean  @default(false)
   /// Подписка на маркетинговые письма (newsletters, promo campaigns, digests).
   /// System/transactional emails (verify, reset, critical notifications) не зависят от этого флага.
   marketingEmailsEnabled        Boolean                      @default(true)
@@ -78,12 +88,16 @@ model User {
   routeIdeas                    RouteIdea[]
   sessions                      Session[]
   tempMedia                     TempMedia[]
+  telegramConnections           TelegramConnection[]
+  telegramLinkTokens            TelegramLinkToken[]
   behaviorProfile               UserBehaviorProfile?
   userEvents                    UserEvent[]
   performedModerationActions    UserModerationAction[]       @relation("ModeratorUser")
   moderationActions             UserModerationAction[]       @relation("TargetUser")
   notificationPreferences       UserNotificationPreference[]
   unsubscribeTokens             UnsubscribeToken[]           @relation("UnsubscribeTokens")
+  createdBroadcasts             AdminBroadcast[]             @relation("AdminBroadcastCreator")
+  devTelegramBusinessApplications DevTelegramBusinessApplication[]
 
   @@index([email])
   @@index([resetToken])
@@ -132,6 +146,7 @@ model UserEvent {
   cityId     String?
   meta       Json?
   createdAt  DateTime             @default(now())
+  promotionActions PromotionAction[]
   user       User?                @relation(fields: [userId], references: [id])
 
   @@index([userId, createdAt])
@@ -171,6 +186,44 @@ model PhoneOtp {
   @@unique([userId, phoneE164, purpose])
   @@index([userId, purpose])
   @@index([phoneE164, purpose])
+}
+
+model TelegramLinkToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  environment TelegramEnvironment
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, environment, expiresAt])
+  @@index([expiresAt])
+}
+
+model TelegramConnection {
+  id                  String               @id @default(cuid())
+  userId              String
+  environment         TelegramEnvironment
+  botUsername         String
+  telegramUserId      String
+  telegramChatId      String
+  telegramUsername    String?
+  telegramFirstName   String?
+  isActive            Boolean              @default(true)
+  linkedAt            DateTime             @default(now())
+  lastInteractionAt   DateTime?
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  user                User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, environment])
+  @@unique([environment, telegramChatId])
+  @@index([userId, isActive])
+  @@index([environment, telegramUserId])
+  @@index([environment, isActive])
 }
 
 model Child {
@@ -649,6 +702,7 @@ model Business {
   updatedAt               DateTime                   @updatedAt
   legalName               String?
   phone                   String?
+  contactPhoneVerifiedAt  DateTime?
   status                  BusinessStatus             @default(DRAFT)
   unp                     String?
   approvedAt              DateTime?
@@ -672,6 +726,7 @@ model Business {
   verificationLogs        BusinessVerificationLog[]
   commercialNotifications CommercialNotification[]
   places                  Place[]                    @relation("BusinessPlaces")
+  promotions              Promotion[]
   claimRequests           PlaceClaimRequest[]        @relation("ClaimedPlaces")
 
   @@index([ownerUserId])
@@ -999,6 +1054,7 @@ model TempMedia {
 model Notification {
   id         String                 @id @default(cuid())
   userId     String
+  audience   NotificationAudience?
   type       NotificationType
   title      String
   body       String
@@ -1016,10 +1072,66 @@ model Notification {
   user       User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
   deliveries NotificationDelivery[]
 
+  @@index([userId, audience, createdAt])
   @@index([userId, isPinned, createdAt])
   @@index([userId, isRead, createdAt])
   @@index([userId, seenAt])
   @@index([entityType, entityId])
+}
+
+/// Broadcast-сообщения от администратора (новости, объявления, системные).
+/// При публикации fan-out'ятся в Notification для целевой аудитории.
+model AdminBroadcast {
+  id             String            @id @default(cuid())
+  title          String            @db.VarChar(200)
+  summary        String?           @db.VarChar(500)
+  body           String
+  type           BroadcastType
+  priority       BroadcastPriority @default(NORMAL)
+  audienceType   AudienceType      @default(BUSINESS)
+  status         BroadcastStatus   @default(DRAFT)
+  coverImageUrl  String?
+  ctaLabel       String?           @db.VarChar(100)
+  ctaUrl         String?           @db.VarChar(2000)
+  showInInbox    Boolean           @default(true)
+  sendEmail      Boolean           @default(false)
+  pinToDashboard Boolean           @default(false)
+  publishedAt    DateTime?
+  scheduledAt    DateTime?
+  createdById    String
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  createdBy      User              @relation("AdminBroadcastCreator", fields: [createdById], references: [id])
+
+  @@index([status, publishedAt])
+  @@index([audienceType, status])
+  @@index([createdById])
+}
+
+enum BroadcastType {
+  NEWS
+  ANNOUNCEMENT
+  SYSTEM
+}
+
+enum BroadcastPriority {
+  LOW
+  NORMAL
+  HIGH
+  CRITICAL
+}
+
+enum AudienceType {
+  BUSINESS
+  USER
+  ALL
+}
+
+enum BroadcastStatus {
+  DRAFT
+  SCHEDULED
+  PUBLISHED
+  ARCHIVED
 }
 
 model ModerationLog {
@@ -1462,6 +1574,41 @@ model BillingDispute {
   @@index([status])
 }
 
+model Promotion {
+  id               String                   @id @default(cuid())
+  businessId       String
+  publicationType  PromotionPublicationType
+  publicationId    String
+  publicationTitle String
+  budget           Decimal                  @db.Decimal(10, 2)
+  spent            Decimal                  @default(0) @db.Decimal(10, 2)
+  status           PromotionStatus          @default(DRAFT)
+  startedAt        DateTime?
+  pausedAt         DateTime?
+  endedAt          DateTime?
+  createdAt        DateTime                 @default(now())
+  updatedAt        DateTime                 @updatedAt
+  actions          PromotionAction[]
+  business         Business                 @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([businessId, status])
+  @@index([publicationType, publicationId, status])
+  @@index([createdAt])
+}
+
+model PromotionAction {
+  id         String              @id @default(cuid())
+  promotionId String
+  userEventId String             @unique
+  actionType PromotionActionType
+  amount     Decimal             @db.Decimal(10, 2)
+  createdAt  DateTime            @default(now())
+  promotion  Promotion           @relation(fields: [promotionId], references: [id], onDelete: Cascade)
+  userEvent   UserEvent          @relation(fields: [userEventId], references: [id], onDelete: Cascade)
+
+  @@index([promotionId, actionType, createdAt])
+}
+
 model BusinessContract {
   id                      String                   @id @default(cuid())
   businessId              String
@@ -1820,6 +1967,7 @@ model NotificationDelivery {
 model UserNotificationPreference {
   id               String           @id @default(cuid())
   userId           String
+  audience         NotificationAudience?
   notificationType NotificationType
   inAppEnabled     Boolean?
   emailEnabled     Boolean?
@@ -1829,7 +1977,26 @@ model UserNotificationPreference {
   user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, notificationType])
+  @@index([userId, audience])
   @@index([userId])
+}
+
+model DevTelegramBusinessApplication {
+  id                String                             @id @default(cuid())
+  userId            String
+  applicationNumber String
+  serviceName       String
+  clientName        String
+  scheduledFor      DateTime
+  status            DevTelegramBusinessApplicationStatus @default(PENDING)
+  confirmedAt       DateTime?
+  rejectedAt        DateTime?
+  createdAt         DateTime                           @default(now())
+  updatedAt         DateTime                           @updatedAt
+  user              User                               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
 }
 
 enum Role {
@@ -2130,6 +2297,21 @@ enum NotificationType {
   WELCOME
   REMINDER
   RECOMMENDATION
+  BUSINESS_APPLICATION_CREATED
+  ADMIN_MODERATION_ITEM_CREATED
+  NEWS
+  ANNOUNCEMENT
+}
+
+enum NotificationAudience {
+  USER
+  BUSINESS
+  ADMIN
+}
+
+enum TelegramEnvironment {
+  DEV
+  PROD
 }
 
 enum EmailTemplateType {
@@ -2199,6 +2381,23 @@ enum BillingReferenceType {
   PLACE
   REQUEST
   MANUAL
+}
+
+enum PromotionPublicationType {
+  EVENT
+  OFFER
+}
+
+enum PromotionStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  COMPLETED
+}
+
+enum PromotionActionType {
+  SAVE_TO_PLAN
+  SEND_LEAD
 }
 
 enum PaymentMethodType {
@@ -2326,4 +2525,10 @@ enum NotificationDeliveryStatus {
   SENT
   FAILED
   SKIPPED
+}
+
+enum DevTelegramBusinessApplicationStatus {
+  PENDING
+  CONFIRMED
+  REJECTED
 }

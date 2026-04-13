@@ -35,9 +35,8 @@ export function getNotificationCategoryFromType(type: string): NotificationCateg
     case "BUSINESS_REJECTED":
     case "BUSINESS_NEEDS_INFO":
       return "REQUEST";
-    case "WELCOME":
-    case "REMINDER":
-    case "RECOMMENDATION":
+    case "NEWS":
+    case "ANNOUNCEMENT":
     case "SYSTEM":
     default:
       return "REMINDER";
@@ -45,7 +44,16 @@ export function getNotificationCategoryFromType(type: string): NotificationCateg
 }
 
 export function getNotificationHref(n: NotificationApiRow): string | null {
+  // USER types — no deep link, stay in app
   if (n.type === "WELCOME" || n.type === "REMINDER" || n.type === "RECOMMENDATION") {
+    return null;
+  }
+  if (n.type === "SYSTEM") return null;
+  // Broadcast-уведомления: если есть ctaAction — используем его
+  if ((n.type === "NEWS" || n.type === "ANNOUNCEMENT") && n.ctaAction) {
+    return n.ctaAction;
+  }
+  if (n.type === "NEWS" || n.type === "ANNOUNCEMENT") {
     return null;
   }
   if (n.entityType === "PLACE" && n.entityId) return `/editor/place/${n.entityId}/edit`;
@@ -58,7 +66,6 @@ export function getNotificationHref(n: NotificationApiRow): string | null {
     return "/business/dashboard";
   }
   if (t.startsWith("BUSINESS_")) return "/business/verification";
-  if (t === "SYSTEM") return "/me/plan";
 
   return null;
 }

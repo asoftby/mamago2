@@ -5,13 +5,17 @@
  *
  * Resolution order (highest priority wins):
  *   1. User override  — UserNotificationPreference row (if exists, non-null field)
- *   2. Role default   — notificationDefaultsByRole[role][type]
- *   3. Hard guards    — email requires user.email, telegram requires telegramChatId
+ *   2. Surface default — shared notification settings domain for that type
+ *   3. Hard guards    — email requires user.email, telegram requires active TelegramConnection
  */
 
 import prisma from "@/lib/prisma";
 import type { NotificationType } from "@prisma/client";
-import { getNotificationDefaults } from "./notificationDefaults";
+import {
+  getNotificationSurfaceDefaults,
+  resolveNotificationSettingsSurfaceForType,
+} from "./settingsDomain";
+import { getActiveTelegramConnectionForCurrentEnvironment } from "@/server/services/telegram/telegramConnection.service";
 
 export type ResolvedChannels = {
   inApp: boolean;
@@ -23,8 +27,7 @@ export interface UserForChannelResolution {
   id: string;
   role: string;
   email: string | null;
-  /** Future field — null until Telegram adapter is wired */
-  telegramChatId?: string | null;
+  telegramLinked?: boolean;
 }
 
 /**
@@ -35,8 +38,11 @@ export async function resolveNotificationChannels(
   user: UserForChannelResolution,
   notificationType: NotificationType,
 ): Promise<ResolvedChannels> {
-  // Step 1: role defaults
-  const defaults = getNotificationDefaults(user.role, notificationType);
+  // Step 1: notification surface defaults
+  const defaults = getNotificationSurfaceDefaults(
+    resolveNotificationSettingsSurfaceForType(notificationType),
+    notificationType,
+  );
 
   let inApp    = defaults.inApp;
   let email    = defaults.email;
@@ -69,7 +75,14 @@ export async function resolveNotificationChannels(
 
   // Step 3: hard guards — channel requires infrastructure
   if (!user.email) email = false;
-  if (!user.telegramChatId) telegram = false;
+
+  if (telegram) {
+    const telegramLinked =
+      user.telegramLinked ??
+      Boolean(await getActiveTelegramConnectionForCurrentEnvironment(user.id));
+
+    if (!telegramLinked) telegram = false;
+  }
 
   return { inApp, email, telegram };
 }
