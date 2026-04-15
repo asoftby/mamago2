@@ -11,20 +11,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: "pnpm"
-
-      - name: Enable corepack
-        run: corepack enable
-
+      - name: Install pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: latest
       - name: Install dependencies
         run: pnpm install
-
-      - name: Run lint
+      - name: Lint
         run: pnpm lint
 
   build:
@@ -32,23 +28,14 @@ jobs:
     needs: lint
     steps:
       - uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: "pnpm"
-
-      - name: Enable corepack
-        run: corepack enable
-
+      - name: Install pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: latest
       - name: Install dependencies
         run: pnpm install
-
       - name: Build
         run: pnpm build
-        env:
-          DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/mamago2"
-          NEXT_PUBLIC_API_URL: "http://localhost:3000"
-          NEXTAUTH_SECRET: "test-secret"
-          NEXTAUTH_URL: "http://localhost:3000"
