@@ -103,11 +103,6 @@ export async function getOrCreatePlaceRevision(
   // Get the Place with ownership check
   const place = await prisma.place.findUnique({
     where: { id: placeId },
-    select: {
-      createdByUserId: true,
-      ownerBusinessId: true,
-      status: true,
-    },
     include: {
       images: {
         orderBy: { sortOrder: "asc" },
@@ -245,7 +240,7 @@ export async function savePlaceRevisionDraft(
     galleryMediaIds,
     galleryUrls,
     // Remove any other fields that might come from Place but don't exist in PlaceRevision
-    ownerUserId,
+    ownerBusinessId,
     status,
     createRequestId,
     moderatorComment,
@@ -268,7 +263,7 @@ export async function savePlaceRevisionDraft(
     logoUrl,
     galleryMediaIds,
     galleryUrls,
-    ownerUserId,
+    ownerBusinessId,
     status,
     createRequestId,
     images: images ? `${images.length} images` : undefined,
@@ -709,11 +704,13 @@ export async function approvePlaceRevision(
 
   // Create notification (outside transaction for resilience)
   try {
-    await notifyPlaceUpdateApproved(
-      revision.placeId,
-      revision.title ?? revision.place.title,
-      revision.place.ownerUserId
-    );
+    if (revision.place.ownerBusinessId) {
+      await notifyPlaceUpdateApproved(
+        revision.placeId,
+        revision.title ?? revision.place.title,
+        revision.place.ownerBusinessId
+      );
+    }
   } catch (notificationError) {
     console.error("Failed to create notification:", notificationError);
     // Don't fail the approval if notification fails
@@ -790,19 +787,21 @@ export async function requestPlaceRevisionChanges(
     where: { id: revision.placeId },
     select: {
       title: true,
-      ownerUserId: true,
+      ownerBusinessId: true,
     },
   });
 
   // Create notification (outside transaction for resilience)
   if (place) {
     try {
-      await notifyPlaceUpdateNeedsRevision(
-        revision.placeId,
-        revision.title ?? place.title,
-        place.ownerUserId,
-        comment
-      );
+      if (place.ownerBusinessId) {
+        await notifyPlaceUpdateNeedsRevision(
+          revision.placeId,
+          revision.title ?? place.title,
+          place.ownerBusinessId,
+          comment
+        );
+      }
     } catch (notificationError) {
       console.error("Failed to create notification:", notificationError);
       // Don't fail the moderation if notification fails
@@ -865,19 +864,21 @@ export async function rejectPlaceRevision(
     where: { id: revision.placeId },
     select: {
       title: true,
-      ownerUserId: true,
+      ownerBusinessId: true,
     },
   });
 
   // Create notification (outside transaction for resilience)
   if (place) {
     try {
-      await notifyPlaceUpdateRejected(
-        revision.placeId,
-        revision.title ?? place.title,
-        place.ownerUserId,
-        comment
-      );
+      if (place.ownerBusinessId) {
+        await notifyPlaceUpdateRejected(
+          revision.placeId,
+          revision.title ?? place.title,
+          place.ownerBusinessId,
+          comment
+        );
+      }
     } catch (notificationError) {
       console.error("Failed to create notification:", notificationError);
       // Don't fail the moderation if notification fails
@@ -910,7 +911,7 @@ export async function getExpiredRevisions(daysOld = 30) {
               name: true,
             },
           },
-          owner: {
+          createdBy: {
             select: {
               id: true,
               email: true,

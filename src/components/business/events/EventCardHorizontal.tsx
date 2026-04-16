@@ -39,7 +39,7 @@ interface Activity {
     url: string;
   }>;
   updatedAt: Date;
-  metrics: {
+  metrics?: {
     views: number;
     saves: number;
     planAdds: number;
@@ -180,10 +180,14 @@ export function EventCardHorizontal({
           </div>
 
           <div className="mb-5 flex flex-wrap gap-2">
-            <BusinessChip>Просмотры: {activity.metrics.views}</BusinessChip>
-            <BusinessChip>Сохранения: {activity.metrics.saves}</BusinessChip>
-            <BusinessChip>В план: {activity.metrics.planAdds}</BusinessChip>
-            <BusinessChip>Переходы: {activity.metrics.ctaClicks}</BusinessChip>
+            {activity.metrics && (
+              <>
+                <BusinessChip>Просмотры: {activity.metrics.views}</BusinessChip>
+                <BusinessChip>Сохранения: {activity.metrics.saves}</BusinessChip>
+                <BusinessChip>В план: {activity.metrics.planAdds}</BusinessChip>
+                <BusinessChip>Переходы: {activity.metrics.ctaClicks}</BusinessChip>
+              </>
+            )}
           </div>
 
           <div className="flex flex-wrap items-center gap-3">

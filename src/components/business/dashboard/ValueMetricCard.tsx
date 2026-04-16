@@ -5,9 +5,9 @@ export function ValueMetricCard(props: {
   label: string;
   value: string;
   hint: string;
-  tone?: "neutral" | "accent" | "success";
+  tone?: "default" | "accent" | "success";
 }) {
-  const tone = props.tone ?? "neutral";
+  const tone = props.tone ?? "default";
 
   return (
     <BusinessSurfaceCard

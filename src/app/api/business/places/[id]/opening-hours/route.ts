@@ -14,6 +14,7 @@ import {
 } from "@/lib/openingHours";
 import type { OpeningHoursData } from "@/components/openingHours";
 import { canCreateBusinessContent } from "@/lib/auth/businessContentAccess";
+import { canManageOwnedContent } from "@/lib/auth/businessContentAccess";
 import { canManagePlaceAsync } from "@/lib/auth/placeAccess";
 
 /**
@@ -104,7 +105,7 @@ export async function PUT(
       where: { id: placeId },
       select: {
         id: true,
-        ownerUserId: true,
+        ownerBusinessId: true,
         openingHoursId: true,
         status: true, // Add status to check if place is published
       },
@@ -115,7 +116,7 @@ export async function PUT(
     }
 
     // Check ownership
-    if (!canManageOwnedContent(user, place.ownerUserId)) {
+    if (!place.ownerBusinessId || !canManageOwnedContent(user, place.ownerBusinessId)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 

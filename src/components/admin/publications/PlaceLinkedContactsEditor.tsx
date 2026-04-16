@@ -101,7 +101,10 @@ export function PlaceLinkedContactsEditor({ placeId }: { placeId: string }) {
       setPlaceStatus(place.status);
 
       const merged = mergeContactsFromRevision(place, activeRevision ?? null);
-      const base = mapPlaceToFormData(place);
+      const base = mapPlaceToFormData({
+        ...place,
+        images: place.images as any,
+      });
       const next: PlaceFormData = {
         ...base,
         ...merged,

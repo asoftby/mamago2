@@ -62,14 +62,14 @@ export async function getSessionToken(): Promise<string | null> {
 }
 
 /**
- * Delete session cookie on NextResponse (for Route Handlers)
- * CRITICAL: Must use same domain as setSessionCookie for proper deletion
+ * Delete session cookie in Server Actions
  */
-export function deleteSessionCookie(res: NextResponse): void {
+export async function deleteSessionCookieAction(): Promise<void> {
+  const cookieStore = await cookies();
   const cookieOptions = getAuthCookieOptions();
   
   // Set cookie with maxAge: 0 to delete it
-  res.cookies.set(SESSION_COOKIE_NAME, "", {
+  cookieStore.set(SESSION_COOKIE_NAME, "", {
     ...cookieOptions,
     maxAge: 0,
   });

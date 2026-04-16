@@ -180,8 +180,6 @@ export function SaveEventButton({
           onOpenChange={closeOnboarding}
           activityId={pendingParams.activityId}
           activityTitle={pendingParams.activityTitle}
-          selectedDate={pendingParams.selectedDate}
-          timeSlot={pendingParams.timeSlot}
           sourceContext={sourceContext}
           onSaveComplete={handleSaveComplete}
         />

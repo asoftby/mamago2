@@ -63,7 +63,7 @@ export function Step2Location({ place, onUpdate, onPrev, onNext, canNext, isEdit
       {hasLocation && (
         <PlaceGroupSelector
           currentPlaceId={place.id}
-          ownerUserId={place.ownerUserId}
+          ownerUserId={place.createdByUserId}
           currentGroupId={place.placeGroupId}
           onGroupIdChange={handleGroupIdChange}
           disabled={!isEditable}

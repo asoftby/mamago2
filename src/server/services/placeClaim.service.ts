@@ -31,7 +31,7 @@ export async function getPendingClaimRequests() {
         select: {
           id: true,
           email: true,
-          name: true,
+          displayName: true,
         },
       },
       business: {
@@ -68,7 +68,7 @@ export async function getClaimRequest(claimId: string) {
         select: {
           id: true,
           email: true,
-          name: true,
+          displayName: true,
         },
       },
       business: {

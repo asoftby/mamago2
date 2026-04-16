@@ -59,10 +59,10 @@ export async function POST(request: NextRequest) {
     if (data.source === "PLACE" && data.selectedPlace) {
       const place = await prisma.place.findUnique({
         where: { id: data.selectedPlace.id },
-        select: { id: true, ownerUserId: true },
+        select: { id: true, ownerBusinessId: true },
       });
 
-      if (!place || !canManageOwnedContent(user, place.ownerUserId)) {
+      if (!place || !place.ownerBusinessId || !canManageOwnedContent(user, place.ownerBusinessId)) {
         return NextResponse.json({ error: "Place not found" }, { status: 404 });
       }
 
@@ -149,7 +149,7 @@ export async function GET(request: NextRequest) {
     }
 
     const userPlaces = await prisma.place.findMany({
-      where: { ownerUserId: user.id },
+      where: { ownerBusinessId: user.id },
       select: { id: true },
     });
 

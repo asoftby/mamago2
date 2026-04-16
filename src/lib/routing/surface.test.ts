@@ -9,7 +9,7 @@ import {
   buildSurfaceRedirectDestination,
   resolveSurfaceFromHostAndPathname,
   surfaceFromPathname,
-} from "./surface.ts";
+} from "./surface";
 
 assert.equal(surfaceFromPathname("/admin"), "admin");
 assert.equal(surfaceFromPathname("/admin/users"), "admin");

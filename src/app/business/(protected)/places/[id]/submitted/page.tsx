@@ -29,7 +29,7 @@ export default async function PlaceSubmittedPage({
       id: true,
       title: true,
       status: true,
-      ownerUserId: true,
+      createdByUserId: true,
     },
   });
 
@@ -37,7 +37,7 @@ export default async function PlaceSubmittedPage({
     notFound();
   }
 
-  if (place.ownerUserId !== user.id) {
+  if (place.createdByUserId !== user.id) {
     redirect("/business/places");
   }
 

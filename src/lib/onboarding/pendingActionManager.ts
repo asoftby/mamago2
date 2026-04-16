@@ -5,18 +5,18 @@
  * Заменяет разрозненные реализации (birthday builder и т.д.)
  */
 
-import type { PendingAction } from "./types";
+import type { PendingActionBase } from "./types";
 
 const STORAGE_KEY = "mamaGo_pending_action_v1";
-const DEFAULT_TTL = 30 * 60 * 1000; // 30 minutes
+const DEFAULT_TTL = 30 * 60 * 60 * 1000; // 30 minutes
 
 /**
  * Set pending action
  */
-export function setPendingAction(action: Omit<PendingAction, "createdAt">): void {
+export function setPendingAction(action: Omit<PendingActionBase, "createdAt">): void {
   if (typeof window === "undefined") return;
   
-  const fullAction: PendingAction = {
+  const fullAction: PendingActionBase = {
     ...action,
     createdAt: Date.now(),
     ttl: action.ttl || DEFAULT_TTL,
@@ -32,14 +32,14 @@ export function setPendingAction(action: Omit<PendingAction, "createdAt">): void
 /**
  * Get pending action (without consuming)
  */
-export function getPendingAction(): PendingAction | null {
+export function getPendingAction(): PendingActionBase | null {
   if (typeof window === "undefined") return null;
   
   try {
     const raw = window.sessionStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
     
-    const action = JSON.parse(raw) as PendingAction;
+    const action = JSON.parse(raw) as PendingActionBase;
     
     // Check TTL
     if (action.ttl && Date.now() - action.createdAt > action.ttl) {
@@ -57,7 +57,7 @@ export function getPendingAction(): PendingAction | null {
 /**
  * Consume pending action (get and clear)
  */
-export function consumePendingAction(): PendingAction | null {
+export function consumePendingAction(): PendingActionBase | null {
   const action = getPendingAction();
   if (action) {
     clearPendingAction();
@@ -89,7 +89,7 @@ export function hasPendingAction(): boolean {
  * Update pending action payload
  */
 export function updatePendingAction(
-  updates: Partial<Omit<PendingAction, "createdAt">>
+  updates: Partial<Omit<PendingActionBase, "createdAt">>
 ): void {
   const current = getPendingAction();
   if (!current) return;
@@ -105,9 +105,17 @@ export function updatePendingAction(
 // ============================================================================
 
 /**
+ * Base interface for all pending actions
+ */
+interface BasePendingAction {
+  type: string;
+  payload: Record<string, unknown>;
+}
+
+/**
  * Save event action
  */
-export interface SaveEventAction {
+export interface SaveEventAction extends BasePendingAction {
   type: "saveEvent";
   payload: {
     activityId: string;
@@ -125,7 +133,7 @@ export function setPendingSaveEvent(activityId: string, activityTitle?: string):
 /**
  * Save event with date action
  */
-export interface SaveEventWithDateAction {
+export interface SaveEventWithDateAction extends BasePendingAction {
   type: "saveEventWithDate";
   payload: {
     activityId: string;
@@ -154,7 +162,7 @@ export function setPendingSaveEventWithDate(
 /**
  * Open plan action
  */
-export interface OpenPlanAction {
+export interface OpenPlanAction extends BasePendingAction {
   type: "openPlan";
   payload: {
     date?: string;
@@ -175,7 +183,7 @@ export function setPendingOpenPlan(options?: { date?: string; firstRun?: boolean
 /**
  * Birthday constructor action
  */
-export interface BirthdayConstructorAction {
+export interface BirthdayConstructorAction extends BasePendingAction {
   type: "birthdayConstructor";
   payload: {
     action: "selectBase" | "toggleAddon";
@@ -196,7 +204,7 @@ export function setPendingBirthdayAction(
 /**
  * Review creation action
  */
-export interface CreateReviewAction {
+export interface CreateReviewAction extends BasePendingAction {
   type: "createReview";
   payload: {
     activityId: string;
@@ -222,7 +230,7 @@ export function setPendingCreateReview(
 /**
  * Save route to plan action
  */
-export interface SaveRouteToPlanAction {
+export interface SaveRouteToPlanAction extends BasePendingAction {
   type: "saveRouteToPlan";
   payload: {
     routeId: string;
@@ -254,7 +262,7 @@ export function setPendingSaveRouteToPlan(
 /**
  * Save route to ideas action
  */
-export interface SaveRouteToIdeasAction {
+export interface SaveRouteToIdeasAction extends BasePendingAction {
   type: "saveRouteToIdeas";
   payload: {
     routeId: string;
@@ -279,6 +287,11 @@ export function setPendingSaveRouteToIdeas(
     },
   });
 }
+
+/**
+ * Full pending action type with metadata (for storage)
+ */
+export type PendingAction = SaveEventAction | SaveEventWithDateAction | OpenPlanAction | BirthdayConstructorAction | CreateReviewAction | SaveRouteToPlanAction | SaveRouteToIdeasAction;
 
 /**
  * Type guard for pending actions

@@ -43,6 +43,15 @@ export {
   setPendingCreateReview,
   setPendingSaveRouteToPlan,
   setPendingSaveRouteToIdeas,
+  // Types
+  type PendingAction,
+  type SaveEventAction,
+  type SaveEventWithDateAction,
+  type OpenPlanAction,
+  type BirthdayConstructorAction,
+  type CreateReviewAction,
+  type SaveRouteToPlanAction,
+  type SaveRouteToIdeasAction,
   // Type guards
   isSaveEventAction,
   isSaveEventWithDateAction,

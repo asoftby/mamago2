@@ -53,7 +53,7 @@ export async function GET(
           select: {
             id: true,
             title: true,
-            ownerUserId: true,
+            ownerBusinessId: true,
           },
         },
       },
@@ -61,7 +61,8 @@ export async function GET(
 
     if (
       !offer ||
-      !canManageOwnedContent(user, offer.place.ownerUserId)
+      !offer.place.ownerBusinessId ||
+      !canManageOwnedContent(user, offer.place.ownerBusinessId)
     ) {
       return NextResponse.json({ error: "Offer not found" }, { status: 404 });
     }
@@ -99,13 +100,14 @@ export async function PATCH(
     const existingOffer = await prisma.offer.findUnique({
       where: { id },
       include: {
-        place: { select: { ownerUserId: true } },
+        place: { select: { ownerBusinessId: true } },
       },
     });
 
     if (
       !existingOffer ||
-      !canManageOwnedContent(user, existingOffer.place.ownerUserId)
+      !existingOffer.place.ownerBusinessId ||
+      !canManageOwnedContent(user, existingOffer.place.ownerBusinessId)
     ) {
       return NextResponse.json({ error: "Offer not found" }, { status: 404 });
     }
@@ -201,13 +203,14 @@ export async function DELETE(
         status: "DRAFT",
       },
       include: {
-        place: { select: { ownerUserId: true } },
+        place: { select: { ownerBusinessId: true } },
       },
     });
 
     if (
       !offer ||
-      !canManageOwnedContent(user, offer.place.ownerUserId)
+      !offer.place.ownerBusinessId ||
+      !canManageOwnedContent(user, offer.place.ownerBusinessId)
     ) {
       return NextResponse.json(
         { error: "Offer not found or cannot be deleted" },

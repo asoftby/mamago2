@@ -4,7 +4,7 @@ import {
   PromotionPublicationType,
   type UserEventType,
 } from "@prisma/client";
-import { buildBusinessPath } from "../routing/surface.ts";
+import { buildBusinessPath } from "../routing/surface";
 
 export const PROMOTION_MIN_BUDGET = 20;
 export const PROMOTION_MAX_BUDGET = 1000;

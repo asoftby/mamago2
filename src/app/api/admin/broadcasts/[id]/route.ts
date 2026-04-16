@@ -51,9 +51,12 @@ export async function PATCH(
   }
 
   try {
+    const scheduledAt = parsed.data.scheduledAt
+      ? new Date(parsed.data.scheduledAt)
+      : (parsed.data.scheduledAt as Date | null | undefined);
     const broadcast = await updateAdminBroadcast(id, {
       ...parsed.data,
-      scheduledAt: parsed.data.scheduledAt ? new Date(parsed.data.scheduledAt) : parsed.data.scheduledAt,
+      scheduledAt,
     });
     return NextResponse.json({ broadcast });
   } catch (e: unknown) {

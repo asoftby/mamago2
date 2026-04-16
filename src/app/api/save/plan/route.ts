@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
         : [];
       const sourceTag =
         planAddSource === "recommendation" || planAddSource === "idea" ?
-          (`my_plan_${planAddSource}` as const)
+          ("plan" as const)
         : ("detail" as const);
       void trackUserEvent({
         userId: user.id,
@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
         cityId,
         meta: {
           source: sourceTag,
-          section: planAddSource === "recommendation" || planAddSource === "idea" ? "my_plan" : "afisha",
+          section: "afisha",
           targetAction: "plan",
           ...(personaIds.length > 0 ? { selectedPersonaIds: personaIds } : {}),
         },

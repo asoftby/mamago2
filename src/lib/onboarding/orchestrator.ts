@@ -9,6 +9,7 @@ import type {
   OnboardingEntryPoint,
   PostAuthResult,
   DeferredPromptType,
+  PendingActionBase,
 } from "./types";
 import { getScenario, getDeferredPrompts } from "./scenarioRegistry";
 import {
@@ -82,7 +83,7 @@ export async function completeOnboarding(
   // Execute pending action if exists
   if (pendingAction) {
     try {
-      await executePendingAction(pendingAction, userId);
+      await executePendingAction(pendingAction as PendingActionBase, userId);
       result.completedPendingAction = true;
       
       trackOnboardingEvent("pending_action_completed", {
@@ -199,7 +200,7 @@ function determineNextAction(
  * Execute pending action
  */
 async function executePendingAction(
-  action: PendingAction,
+  action: PendingActionBase,
   userId: string
 ): Promise<void> {
   // This is a placeholder - actual implementation will depend on action type
@@ -502,3 +503,6 @@ export function markDeferredPromptShown(type: DeferredPromptType): void {
     console.error("Failed to mark deferred prompt as shown:", error);
   }
 }
+
+// Re-export getOnboardingContext from contextManager
+export { getOnboardingContext } from "./contextManager";

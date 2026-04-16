@@ -1,0 +1,59 @@
+.calendar-widget {
+  font-family: 'Segoe UI', sans-serif;
+  background-color: #f9f9f9;
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.calendar-header h2 {
+  margin: 0 0 8px 0;
+  font-size: 20px;
+  color: #1a1a1a;
+}
+
+.calendar-header p {
+  margin: 0;
+  font-size: 14px;
+  color: #666;
+}
+
+.calendar-days {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 0;
+  background-color: white;
+  border-radius: 12px;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.05);
+  overflow: hidden;
+}
+
+.calendar-day {
+  width: 60px;
+  text-align: center;
+  transition: all 0.2s ease;
+}
+
+.calendar-day:hover {
+  background-color: #f0f0f0;
+}
+
+.calendar-day.selected {
+  background-color: #f49b6c;
+  color: white;
+  border-radius: 12px;
+  height: 70px; /* 增加高度以容纳小圆点 */
+}
+
+.calendar-day .day-name {
+  font-size: 12px;
+  color: #666;
+  margin-bottom: 4px;
+}
+
+.calendar-day .day-number {
+  font-size: 16px;
+  font-weight: 500;
+  color: #1a1a1a;
+}

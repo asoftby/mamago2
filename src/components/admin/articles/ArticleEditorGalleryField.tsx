@@ -363,7 +363,9 @@ export function ArticleEditorGalleryField({
       file,
       previewUrl: URL.createObjectURL(file),
     }));
-    const clientIds = added.map((a) => a.clientId);
+    const clientIds = added
+      .filter((r): r is Extract<GalleryRow, { type: "local" }> => r.type === "local")
+      .map((a) => a.clientId);
     flushSync(() => {
       setRows((prev) => [...prev, ...added]);
     });

@@ -21,6 +21,7 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { calculateUrgency } from "@/lib/improvementRequest/urgency";
 import { BusinessChip } from "@/components/business/ui/BusinessChip";
+import { CONTENT_STATUS_META } from "@/lib/content-status-meta";
 
 interface PlaceCardData {
   id: string;
@@ -82,51 +83,6 @@ interface PlaceCardHorizontalProps {
   onUnarchive?: (placeId: string) => void;
 }
 
-const STATUS_CONFIG = {
-  DRAFT: {
-    label: "Черновик",
-    variant: "secondary" as const,
-    className: "",
-    action: "Продолжить",
-  },
-  PENDING: {
-    label: "На модерации",
-    variant: "outline" as const,
-    className: "bg-gray-100 text-gray-700 border-gray-200",
-    action: "На модерации",
-  },
-  PENDING_UPDATE: {
-    label: "На проверке",
-    variant: "outline" as const,
-    className: "bg-amber-50 text-amber-900 border-amber-200",
-    action: "На проверке",
-  },
-  PUBLISHED: {
-    label: "Опубликовано",
-    variant: "default" as const,
-    className: "",
-    action: "Редактировать",
-  },
-  NEEDS_REVISION: {
-    label: "Требует правок",
-    variant: "destructive" as const,
-    className: "",
-    action: "Исправить",
-  },
-  REJECTED: {
-    label: "Отклонено",
-    variant: "destructive" as const,
-    className: "",
-    action: "Исправить",
-  },
-  DELETED: {
-    label: "Удалено",
-    variant: "secondary" as const,
-    className: "text-muted-foreground",
-    action: "—",
-  },
-};
-
 const REVISION_STATUS_CONFIG = {
   DRAFT: {
     label: "Редактирование изменений",
@@ -148,7 +104,7 @@ export function PlaceCardHorizontal({ place, onDelete, onArchive, onUnarchive }:
   const [isDeleting, setIsDeleting] = useState(false);
   const [isArchiving, setIsArchiving] = useState(false);
 
-  const statusConfig = STATUS_CONFIG[place.status] || STATUS_CONFIG.DRAFT;
+  const statusConfig = CONTENT_STATUS_META[place.status];
   
   // Determine effective status (revision takes precedence for display)
   const hasActiveRevision = place.activeRevision && 
@@ -319,10 +275,16 @@ export function PlaceCardHorizontal({ place, onDelete, onArchive, onUnarchive }:
                   ? "border-stone-200 bg-stone-50 text-stone-600"
                   : place.status === "PENDING"
                   ? "border-amber-200 bg-amber-50 text-amber-800"
+                  : place.status === "PENDING_UPDATE"
+                  ? "border-amber-200 bg-amber-50 text-amber-800"
                   : place.status === "PUBLISHED"
                   ? "border-emerald-200 bg-emerald-50 text-emerald-700"
                   : place.status === "NEEDS_REVISION"
                   ? "border-amber-200 bg-amber-50 text-amber-800"
+                  : place.status === "SCHEDULED"
+                  ? "border-blue-200 bg-blue-50 text-blue-900"
+                  : place.status === "ARCHIVED"
+                  ? "border-stone-200 bg-stone-50 text-stone-600"
                   : "border-red-200 bg-red-50 text-red-700"
               }`}>
                 {statusConfig.label}

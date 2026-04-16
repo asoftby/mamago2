@@ -20,4 +20,6 @@ export const MODERATION_CONTENT_STATUS_CONFIG: Record<
   NEEDS_REVISION: { label: "Требует правок", variant: "destructive", className: "" },
   REJECTED: { label: "Отклонено", variant: "destructive", className: "" },
   DELETED: { label: "Удалено", variant: "secondary", className: "text-muted-foreground" },
+  SCHEDULED: { label: "Запланировано", variant: "outline", className: "bg-blue-50 text-blue-900 border-blue-200" },
+  ARCHIVED: { label: "В архиве", variant: "secondary", className: "text-muted-foreground" },
 };

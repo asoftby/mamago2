@@ -26,6 +26,8 @@ export function WizardHeader({
     NEEDS_REVISION: "Требует изменений",
     REJECTED: "Отклонено",
     DELETED: "Удалено",
+    ARCHIVED: "В архиве",
+    SCHEDULED: "Запланировано",
   };
 
   return (

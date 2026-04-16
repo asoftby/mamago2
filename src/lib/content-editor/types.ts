@@ -8,7 +8,7 @@ import {
   buildSurfaceRedirectDestination,
   normalizeTargetPathForSurface,
   surfaceFromPathname,
-} from "../routing/surface.ts";
+} from "../routing/surface";
 
 export type ContentEditorSurface = "business" | "admin";
 

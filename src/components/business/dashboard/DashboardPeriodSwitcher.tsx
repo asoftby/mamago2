@@ -36,7 +36,8 @@ function CustomRangePicker({
     return () => document.removeEventListener("mousedown", handler);
   }, [onClose]);
 
-  function handleDayClick(date: Date) {
+  function handleDayClick(date: Date | null) {
+    if (!date) return;
     if (!from || (from && to)) { setFrom(date); setTo(null); }
     else { if (date < from) { setTo(from); setFrom(date); } else { setTo(date); } }
   }

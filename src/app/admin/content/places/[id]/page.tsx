@@ -86,7 +86,7 @@ export default async function PlaceModerationPage({
           name: true,
         },
       },
-      owner: {
+      createdBy: {
         select: {
           id: true,
           email: true,
@@ -171,7 +171,7 @@ export default async function PlaceModerationPage({
       // Map place to form data for completion calculation
       const placeFormData: PlaceFormData = {
         id: place.id,
-        ownerUserId: place.ownerUserId,
+        ownerBusinessId: place.ownerBusinessId,
         status: place.status as ContentStatus,
         title: place.title,
         category: place.category,
@@ -290,7 +290,7 @@ export default async function PlaceModerationPage({
 
                   <Button variant="outline" asChild>
                     <a
-                      href={`mailto:${place.owner.email}?subject=Regarding ${place.title}`}
+                      href={`mailto:${place.createdBy.email}?subject=Regarding ${place.title}`}
                     >
                       <Mail className="w-4 h-4 mr-2" />
                       Написать владельцу
@@ -326,7 +326,7 @@ export default async function PlaceModerationPage({
                     status: place.status,
                     slug: place.slug,
                     formattedAddr: place.formattedAddr,
-                    owner: place.owner,
+                    owner: place.createdBy,
                     city: place.city ? {
                       id: parseInt(place.city.id),
                       name: place.city.name,

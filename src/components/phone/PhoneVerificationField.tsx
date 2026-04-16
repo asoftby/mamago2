@@ -484,15 +484,11 @@ export function PhoneVerificationField({
               onClick={handleSendCode}
               disabled={
                 cooldown > 0 ||
-                status === "sending" ||
-                status === "verifying" ||
                 otpState.supportRequired ||
                 otpEscalationBlocksInput
               }
               className={
                 cooldown > 0 ||
-                status === "sending" ||
-                status === "verifying" ||
                 otpState.supportRequired ||
                 otpEscalationBlocksInput
                   ? "text-sm font-medium text-gray-400 cursor-not-allowed"

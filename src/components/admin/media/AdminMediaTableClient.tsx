@@ -215,7 +215,7 @@ export function AdminMediaTableClient({ items }: { items: AdminMediaTableRow[] }
                 });
 
                 const displayOriginalName = resolveDisplayFilename({
-                  filename: media.originalName,
+                  filename: media.originalName ?? "",
                   extension: media.extension,
                   mimeType: media.mimeType,
                 });

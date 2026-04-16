@@ -74,7 +74,7 @@ export function PlaceWizardFixed({ place: initialPlace, initialStep, moderationM
 
   // Wizard session for temp media uploads
   const { wizardSessionId, clearSession } = useWizardSession({
-    userId: initialPlace.ownerUserId,
+    userId: initialPlace.createdByUserId,
     wizardType: "place",
     entityId: initialPlace.id, // Include placeId for session isolation
   });

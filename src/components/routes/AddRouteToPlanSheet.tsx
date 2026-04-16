@@ -262,7 +262,6 @@ function PlanContent({
           routeId={pendingParams.routeId}
           routeSlug={pendingParams.routeSlug}
           routeTitle={pendingParams.routeTitle}
-          selectedDate={pendingParams.selectedDate}
           sourceContext="route_add_to_plan_sheet"
           onSaveComplete={handleSaveComplete}
         />

@@ -11,6 +11,7 @@ import {
   DeferredPromptType,
   type OnboardingScenario,
   type OnboardingContext,
+  type PostAuthResult,
 } from "./types";
 
 /**

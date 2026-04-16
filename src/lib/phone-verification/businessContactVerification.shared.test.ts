@@ -5,7 +5,7 @@ import {
   isE164Phone,
   isVerifiedPhoneMatch,
   normalizeBusinessContactVerificationPurpose,
-} from "./businessContactVerification.shared.ts";
+} from "./businessContactVerification.shared";
 
 assert.equal(
   normalizeBusinessContactVerificationPurpose(

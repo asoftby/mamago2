@@ -87,7 +87,7 @@ export function MyPlanPanelContent({
       autoAgeValues={autoAgeValues}
       onCycleSlotAlternative={cycleSlotAlternative}
       onCycleSlotAlternativePrev={cycleSlotAlternativePrev}
-      onMarkSlotSaved={markSlotSaved}
+      onMarkSlotSaved={(_, item) => markSlotSaved(item)}
       onClearSlotSaved={clearSlotSaved}
       onRemoveItemFromPlan={clearSlotSaved}
       onOpenSlotSuggestion={openSlotSuggestion}

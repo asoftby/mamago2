@@ -10,24 +10,24 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url);
-    const ownerUserId = searchParams.get("ownerUserId");
+    const ownerBusinessId = searchParams.get("ownerBusinessId");
     const excludeId = searchParams.get("excludeId");
 
-    if (!ownerUserId) {
+    if (!ownerBusinessId) {
       return NextResponse.json(
-        { error: "ownerUserId is required" },
+        { error: "ownerBusinessId is required" },
         { status: 400 }
       );
     }
 
     // Verify user owns these places or is admin
-    if (user.id !== ownerUserId && user.role !== "ADMIN" && user.role !== "MODERATOR") {
+    if (user.id !== ownerBusinessId && user.role !== "ADMIN" && user.role !== "MODERATOR") {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     const places = await prisma.place.findMany({
       where: {
-        ownerUserId,
+        ownerBusinessId,
         id: excludeId ? { not: excludeId } : undefined,
         archivedAt: null, // Don't include archived places
       },

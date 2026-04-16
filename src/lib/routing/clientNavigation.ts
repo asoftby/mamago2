@@ -3,7 +3,7 @@ import {
   buildSurfaceRedirectDestination,
   normalizeTargetPathForSurface,
   surfaceFromPathname,
-} from "./surface.ts";
+} from "./surface";
 
 type RouterLike = {
   push: (href: string) => void;

@@ -12,7 +12,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import { prisma } from "@/lib/prisma";
-import { deleteSessionCookie } from "@/lib/auth/session";
+import { deleteSessionCookieAction } from "@/lib/auth/session";
 
 export async function POST() {
   try {
@@ -112,7 +112,7 @@ export async function POST() {
 
     // Clear session cookie
     const response = NextResponse.json({ success: true });
-    deleteSessionCookie(response);
+    await deleteSessionCookieAction();
     return response;
   } catch (error) {
     console.error("[user/delete]", error);

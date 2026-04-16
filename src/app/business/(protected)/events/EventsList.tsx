@@ -25,7 +25,7 @@ interface Activity {
     url: string;
   }>;
   updatedAt: Date;
-  metrics: {
+  metrics?: {
     views: number;
     saves: number;
     planAdds: number;

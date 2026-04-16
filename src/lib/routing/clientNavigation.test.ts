@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {
   buildClientCompatibleDestination,
   buildClientSurfaceDestination,
-} from "./clientNavigation.ts";
+} from "./clientNavigation";
 
 assert.equal(
   buildClientSurfaceDestination({

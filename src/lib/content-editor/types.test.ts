@@ -4,7 +4,7 @@ import {
   defaultEditorNav,
   defaultNavForSurface,
   resolveEditorReturnDestination,
-} from "./types.ts";
+} from "./types";
 
 assert.deepEqual(defaultEditorNav("admin", "event"), {
   afterSubmitListPath: "/admin/content/events",

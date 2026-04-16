@@ -49,12 +49,12 @@ function splitPathQueryAndHash(path: string): {
   search: string;
   hash: string;
 } {
-  const match = /^(?<pathname>[^?#]*)(?<search>\?[^#]*)?(?<hash>#.*)?$/u.exec(path);
+  const match = /^([^?#]*)(\?[^#]*)?(#.*)?$/u.exec(path);
 
   return {
-    pathname: match?.groups?.pathname || "/",
-    search: match?.groups?.search || "",
-    hash: match?.groups?.hash || "",
+    pathname: match?.[1] || "/",
+    search: match?.[2] || "",
+    hash: match?.[3] || "",
   };
 }
 

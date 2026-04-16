@@ -17,7 +17,7 @@ export function buildDefaultUserBehaviorProfileCreateData(
   now: Date,
 ): Prisma.UserBehaviorProfileCreateInput {
   return {
-    userId,
+    user: { connect: { id: userId } },
     totalViews: 0,
     totalOpens: 0,
     totalSaves: 0,
@@ -57,7 +57,7 @@ export async function ensureUserBehaviorProfile(
 
     if (verbose) {
       console.log(`${LOG_PREFIX} ensure:done`, {
-        userId,
+        user: { connect: { id: userId } },
         source,
         mode: "upsert",
       });

@@ -98,7 +98,6 @@ export async function POST(
       const newGroup = await prisma.placeGroup.create({
         data: {
           createdByUserId: place.createdByUserId,
-          ownerBusinessId: place.ownerBusinessId,
         },
       });
       groupId = newGroup.id;

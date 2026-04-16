@@ -147,7 +147,7 @@ export async function getPlaceForOwner(
   const place = await prisma.place.findUnique({
     where: { id: placeId },
     include: {
-      creator: {
+      createdBy: {
         select: {
           id: true,
           email: true,

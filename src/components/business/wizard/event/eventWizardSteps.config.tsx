@@ -338,10 +338,13 @@ export const EVENT_WIZARD_STEPS: WizardStepConfig<EventFormData>[] = [
       const items: SummaryItem[] = [];
       
       // Pricing
+      const priceValue = data.price?.trim() ? Number(data.price) : null;
+      const isValidPrice = priceValue !== null && !isNaN(priceValue);
+      
       const pricingLabels = {
         free: "Бесплатно",
-        fixed: data.price != null ? formatPrice(data.price) : "—",
-        from: data.price != null ? formatPriceFrom(data.price) : "—",
+        fixed: isValidPrice ? formatPrice(priceValue) : "—",
+        from: isValidPrice ? formatPriceFrom(priceValue) : "—",
       };
       items.push({
         label: "Стоимость",

@@ -289,7 +289,7 @@ export async function approveActivity(
 ): Promise<void> {
   const activity = await prisma.activity.findUnique({
     where: { id: activityId },
-    select: { status: true, title: true, ownerUserId: true },
+    select: { status: true, title: true, businessId: true },
   });
 
   if (!activity) throw new Error("Activity not found");
@@ -308,9 +308,11 @@ export async function approveActivity(
   await ensurePublishedActivityHasSlug(activityId);
 
   const { notifyActivityApproved } = await import("./notification.service");
-  notifyActivityApproved(activityId, activity.title, activity.ownerUserId).catch((e) =>
-    console.error("[moderation] notifyActivityApproved failed:", e),
-  );
+  if (activity.businessId) {
+    notifyActivityApproved(activityId, activity.title, activity.businessId).catch((e) =>
+      console.error("[moderation] notifyActivityApproved failed:", e),
+    );
+  }
 }
 
 export async function needsRevisionActivity(
@@ -322,7 +324,7 @@ export async function needsRevisionActivity(
 
   const activity = await prisma.activity.findUnique({
     where: { id: activityId },
-    select: { status: true, title: true, ownerUserId: true },
+    select: { status: true, title: true, businessId: true },
   });
 
   if (!activity) throw new Error("Activity not found");
@@ -338,9 +340,11 @@ export async function needsRevisionActivity(
   ]);
 
   const { notifyActivityNeedsChanges } = await import("./notification.service");
-  notifyActivityNeedsChanges(activityId, activity.title, activity.ownerUserId, message).catch((e) =>
-    console.error("[moderation] notifyActivityNeedsChanges failed:", e),
-  );
+  if (activity.businessId) {
+    notifyActivityNeedsChanges(activityId, activity.title, activity.businessId, message).catch((e) =>
+      console.error("[moderation] notifyActivityNeedsChanges failed:", e),
+    );
+  }
 }
 
 export async function rejectActivity(
@@ -352,7 +356,7 @@ export async function rejectActivity(
 
   const activity = await prisma.activity.findUnique({
     where: { id: activityId },
-    select: { status: true, title: true, ownerUserId: true },
+    select: { status: true, title: true, businessId: true },
   });
 
   if (!activity) throw new Error("Activity not found");
@@ -368,9 +372,11 @@ export async function rejectActivity(
   ]);
 
   const { notifyActivityRejected } = await import("./notification.service");
-  notifyActivityRejected(activityId, activity.title, activity.ownerUserId, message).catch((e) =>
-    console.error("[moderation] notifyActivityRejected failed:", e),
-  );
+  if (activity.businessId) {
+    notifyActivityRejected(activityId, activity.title, activity.businessId, message).catch((e) =>
+      console.error("[moderation] notifyActivityRejected failed:", e),
+    );
+  }
 }
 
 // ── OFFER ─────────────────────────────────────────────────────────────────────
@@ -384,7 +390,7 @@ export async function approveOffer(
 ): Promise<void> {
   const offer = await prisma.offer.findUnique({
     where: { id: offerId },
-    select: { status: true, title: true, place: { select: { ownerUserId: true } } },
+    select: { status: true, title: true, place: { select: { ownerBusinessId: true } } },
   });
 
   if (!offer) throw new Error("Offer not found");
@@ -399,9 +405,12 @@ export async function approveOffer(
   await ensurePublishedOfferHasSlug(offerId);
 
   const { notifyOfferApproved } = await import("./notification.service");
-  notifyOfferApproved(offerId, offer.title, offer.place.ownerUserId).catch((e) =>
-    console.error("[moderation] notifyOfferApproved failed:", e),
-  );
+  const ownerId = offer.place?.ownerBusinessId;
+  if (ownerId) {
+    notifyOfferApproved(offerId, offer.title, ownerId).catch((e) =>
+      console.error("[moderation] notifyOfferApproved failed:", e),
+    );
+  }
 }
 
 export async function needsRevisionOffer(
@@ -413,7 +422,7 @@ export async function needsRevisionOffer(
 
   const offer = await prisma.offer.findUnique({
     where: { id: offerId },
-    select: { status: true, title: true, place: { select: { ownerUserId: true } } },
+    select: { status: true, title: true, place: { select: { ownerBusinessId: true } } },
   });
 
   if (!offer) throw new Error("Offer not found");
@@ -425,9 +434,12 @@ export async function needsRevisionOffer(
   });
 
   const { notifyOfferNeedsChanges } = await import("./notification.service");
-  notifyOfferNeedsChanges(offerId, offer.title, offer.place.ownerUserId, message).catch((e) =>
-    console.error("[moderation] notifyOfferNeedsChanges failed:", e),
-  );
+  const ownerId = offer.place?.ownerBusinessId;
+  if (ownerId) {
+    notifyOfferNeedsChanges(offerId, offer.title, ownerId, message).catch((e) =>
+      console.error("[moderation] notifyOfferNeedsChanges failed:", e),
+    );
+  }
 }
 
 export async function rejectOffer(
@@ -439,7 +451,7 @@ export async function rejectOffer(
 
   const offer = await prisma.offer.findUnique({
     where: { id: offerId },
-    select: { status: true, title: true, place: { select: { ownerUserId: true } } },
+    select: { status: true, title: true, place: { select: { ownerBusinessId: true } } },
   });
 
   if (!offer) throw new Error("Offer not found");
@@ -451,7 +463,10 @@ export async function rejectOffer(
   });
 
   const { notifyOfferRejected } = await import("./notification.service");
-  notifyOfferRejected(offerId, offer.title, offer.place.ownerUserId, message).catch((e) =>
-    console.error("[moderation] notifyOfferRejected failed:", e),
-  );
+  const ownerId = offer.place?.ownerBusinessId;
+  if (ownerId) {
+    notifyOfferRejected(offerId, offer.title, ownerId, message).catch((e) =>
+      console.error("[moderation] notifyOfferRejected failed:", e),
+    );
+  }
 }

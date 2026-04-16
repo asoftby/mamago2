@@ -103,7 +103,11 @@ export async function generateMetadata({ params }: PlacePageProps): Promise<Meta
     }
   }
 
-  if (!isPlacePubliclyVisible(place)) {
+  if (!isPlacePubliclyVisible({ 
+    status: place.status, 
+    archivedAt: place.archivedAt, 
+    owner: place.ownerBusiness ? { business: place.ownerBusiness } : null 
+  })) {
     return { title: "Place Not Found" };
   }
 
@@ -204,14 +208,9 @@ export default async function PlacePage({ params }: PlacePageProps) {
           name: true,
         },
       },
-      owner: {
+      ownerBusiness: {
         select: {
-          business: {
-            select: {
-              name: true,
-              operationalStatus: true,
-            },
-          },
+          operationalStatus: true,
         },
       },
     },
@@ -226,14 +225,19 @@ export default async function PlacePage({ params }: PlacePageProps) {
     notFound();
   }
 
-  if (!isPlacePubliclyVisible(place)) {
+  if (!isPlacePubliclyVisible({ 
+    status: place.status, 
+    archivedAt: place.archivedAt, 
+    owner: place.ownerBusiness ? { business: place.ownerBusiness } : null 
+  })) {
     notFound();
   }
 
   // Check edit permissions
-  const canEdit = canShowEditButton(currentUser, {
+  const canEdit = await canShowEditButton(currentUser, {
     placeId: place.id,
-    ownerUserId: place.ownerUserId,
+    createdByUserId: place.createdByUserId,
+    ownerBusinessId: place.ownerBusinessId,
     status: place.status,
   });
 

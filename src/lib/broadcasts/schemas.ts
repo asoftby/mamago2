@@ -1,6 +1,7 @@
 import { z } from "zod";
 
-export const createBroadcastSchema = z.object({
+// Base schema without refinements
+const broadcastSchemaBase = z.object({
   title: z.string().min(1, "Заголовок обязателен").max(200, "Максимум 200 символов"),
   summary: z.string().max(500, "Максимум 500 символов").optional().nullable(),
   body: z.string().min(1, "Текст сообщения обязателен"),
@@ -13,7 +14,10 @@ export const createBroadcastSchema = z.object({
   sendEmail: z.boolean().default(false),
   pinToDashboard: z.boolean().default(false),
   scheduledAt: z.string().datetime().optional().nullable(),
-}).refine(
+});
+
+// Create schema with refinements
+export const createBroadcastSchema = broadcastSchemaBase.refine(
   (data) => {
     // Если задан ctaLabel — ctaUrl тоже должен быть
     if (data.ctaLabel && !data.ctaUrl) return false;
@@ -22,7 +26,15 @@ export const createBroadcastSchema = z.object({
   { message: "Если задан текст кнопки, укажите и ссылку", path: ["ctaUrl"] },
 );
 
-export const updateBroadcastSchema = createBroadcastSchema.partial();
+// Update schema: partial base schema with the same refinement
+export const updateBroadcastSchema = broadcastSchemaBase.partial().refine(
+  (data) => {
+    // Если задан ctaLabel — ctaUrl тоже должен быть
+    if (data.ctaLabel && !data.ctaUrl) return false;
+    return true;
+  },
+  { message: "Если задан текст кнопки, укажите и ссылку", path: ["ctaUrl"] },
+);
 
 export const listBroadcastsSchema = z.object({
   status: z.enum(["DRAFT", "SCHEDULED", "PUBLISHED", "ARCHIVED"]).optional(),

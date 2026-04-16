@@ -32,7 +32,7 @@ export async function POST() {
       );
     }
 
-    if (result.alreadyVerified) {
+    if ("sent" in result && !result.sent) {
       return NextResponse.json({
         ok: true,
         alreadyVerified: true,

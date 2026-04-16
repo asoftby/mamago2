@@ -95,7 +95,7 @@ export async function POST(
     // Get place to find owner
     const place = await prisma.place.findUnique({
       where: { id },
-      select: { ownerUserId: true, status: true },
+      select: { ownerBusinessId: true, status: true },
     });
 
     if (!place) {
@@ -113,7 +113,7 @@ export async function POST(
       entityType: "PLACE",
       entityId: id,
       createdByModeratorId: user.id,
-      assignedToUserId: place.ownerUserId,
+      assignedToUserId: place.ownerBusinessId || user.id,
       severity,
       title,
       description,

@@ -249,24 +249,31 @@ export function Step5Pricing({ data, onChange, isEditable }: Step5PricingProps) 
               </div>
             )}
             
-            {data.pricingMode === "multiple" && data.pricingOptions.map((option) => (
-              <div key={option.id} className="flex items-center justify-between">
-                <div>
-                  <span className="font-medium">{option.title}</span>
-                  {option.description && (
-                    <p className="text-xs text-muted-foreground">{option.description}</p>
-                  )}
+            {data.pricingMode === "multiple" && data.pricingOptions.map((option) => {
+              const oldPriceNumber = option.oldPrice !== "" && option.oldPrice != null ? Number(option.oldPrice) : null;
+              const priceNumber = option.price !== "" && option.price != null ? Number(option.price) : null;
+              const isValidOldPrice = oldPriceNumber !== null && !isNaN(oldPriceNumber) && oldPriceNumber > 0;
+              const isValidPrice = priceNumber !== null && !isNaN(priceNumber);
+              
+              return (
+                <div key={option.id} className="flex items-center justify-between">
+                  <div>
+                    <span className="font-medium">{option.title}</span>
+                    {option.description && (
+                      <p className="text-xs text-muted-foreground">{option.description}</p>
+                    )}
+                  </div>
+                  <div className="text-right">
+                    {isValidOldPrice && (
+                      <span className="text-xs text-muted-foreground line-through mr-2">
+                        {formatPrice(oldPriceNumber)}
+                      </span>
+                    )}
+                    {isValidPrice && <span className="font-medium">{formatPrice(priceNumber)}</span>}
+                  </div>
                 </div>
-                <div className="text-right">
-                  {option.oldPrice && (
-                    <span className="text-xs text-muted-foreground line-through mr-2">
-                      {formatPrice(option.oldPrice)}
-                    </span>
-                  )}
-                  <span className="font-medium">{formatPrice(option.price)}</span>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}

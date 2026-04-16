@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
     const userPlaces = user
       ? await prisma.place.findMany({
           where: {
-            ownerUserId: user.id,
+            ownerBusinessId: user.id,
             OR: [
               { title: { contains: q, mode: "insensitive" } },
               { formattedAddr: { contains: q, mode: "insensitive" } },
@@ -64,7 +64,7 @@ export async function GET(request: NextRequest) {
             ],
           },
           // Exclude user's own places from public results
-          ...(user ? [{ ownerUserId: { not: user.id } }] : []),
+          ...(user ? [{ ownerBusinessId: { not: user.id } }] : []),
         ],
       },
       select: {

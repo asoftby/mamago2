@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {
   getPublicBaseFromHost,
   resolveSubdomainMiddlewareDecision,
-} from "./subdomainMiddleware.ts";
+} from "./subdomainMiddleware";
 
 assert.equal(
   getPublicBaseFromHost("business.mamago.local:3002", "http:"),

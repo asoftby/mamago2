@@ -25,14 +25,14 @@ export async function DELETE(
     // Check ownership
     const place = await prisma.place.findUnique({
       where: { id: placeId },
-      select: { ownerUserId: true, logoImageId: true },
+      select: { ownerBusinessId: true, logoImageId: true, createdByUserId: true },
     });
 
     if (!place) {
       return NextResponse.json({ error: "Place not found" }, { status: 404 });
     }
 
-    if (!canManageOwnedContent(user, place.ownerUserId)) {
+    if (!place.ownerBusinessId || !canManagePlaceAsync(user, place)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 

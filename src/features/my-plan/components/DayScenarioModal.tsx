@@ -41,9 +41,9 @@ function formatDate(dateStr: string): string {
   return `${weekdayCapitalized}, ${day} ${month}`;
 }
 
-function formatTime(dateStr: string | null | undefined): string {
-  if (!dateStr) return "";
-  const d = new Date(dateStr);
+function formatTime(date: Date | string | null | undefined): string {
+  if (!date) return "";
+  const d = date instanceof Date ? date : new Date(date);
   return d.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
 }
 
@@ -229,10 +229,9 @@ export function DayScenarioModal({
               {sortedItems.map((item, index) => {
                 const time = formatTime(item.startsAt);
                 const title = item.title || item.activity?.title || "Активность";
-                const place = item.activity?.place?.name;
                 const category = item.activity?.eventCategory?.nameRu;
                 const address = item.activity ? formatActivityAddressLine(item.activity) : null;
-                const subtitle = address || place || category;
+                const subtitle = address || category;
                 const imageUrl = item.coverImageUrl || item.activity?.coverImageUrl;
                 
                 // Price and action

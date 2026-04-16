@@ -78,7 +78,7 @@ export default async function PartnerDetailPage({
   // Get places for this business owner
   const places = await prisma.place.findMany({
     where: {
-      ownerUserId: business.ownerUserId,
+      ownerBusinessId: business.id,
     },
     include: {
       city: {

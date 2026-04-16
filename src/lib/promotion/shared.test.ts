@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import {
   mapUserEventToPromotionAction,
   buildPromotionLaunchHref,
-} from "./shared.ts";
+} from "./shared";
 
 assert.equal(
   buildPromotionLaunchHref({

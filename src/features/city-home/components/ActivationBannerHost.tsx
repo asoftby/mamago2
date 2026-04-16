@@ -27,15 +27,18 @@ function getAdultDismissCount() {
 
 // ── animation variants ────────────────────────────────────────────────────────
 
+const smoothEase: [number, number, number, number] = [0.22, 1, 0.36, 1];
+const exitEase: [number, number, number, number] = [0.4, 0, 1, 1];
+
 const bannerVariants = {
   hidden: { opacity: 0, y: 10, scale: 0.99 },
   visible: {
     opacity: 1, y: 0, scale: 1,
-    transition: { duration: 0.26, ease: [0.22, 1, 0.36, 1] },
+    transition: { duration: 0.26, ease: smoothEase },
   },
   exit: {
     opacity: 0, y: -6, scale: 0.98,
-    transition: { duration: 0.2, ease: [0.4, 0, 1, 1] },
+    transition: { duration: 0.2, ease: exitEase },
   },
 };
 

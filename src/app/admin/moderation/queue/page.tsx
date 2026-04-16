@@ -29,7 +29,7 @@ async function getQueueItems(): Promise<QueueItem[]> {
           title: true,
           createdAt: true,
           city: { select: { name: true } },
-          owner: {
+          createdBy: {
             select: {
               business: { select: { name: true } },
               email: true,
@@ -48,7 +48,7 @@ async function getQueueItems(): Promise<QueueItem[]> {
             select: {
               id: true,
               city: { select: { name: true } },
-              owner: {
+              createdBy: {
                 select: {
                   business: { select: { name: true } },
                   email: true,
@@ -89,7 +89,7 @@ async function getQueueItems(): Promise<QueueItem[]> {
           place: {
             select: {
               city: { select: { name: true } },
-              owner: {
+              createdBy: {
                 select: {
                   business: { select: { name: true } },
                   email: true,
@@ -134,7 +134,7 @@ async function getQueueItems(): Promise<QueueItem[]> {
     title: offer.title,
     cityName: offer.place.city?.name ?? null,
     businessName:
-      offer.place.owner.business?.name || offer.place.owner.email,
+      offer.place.createdBy.business?.name || offer.place.createdBy.email,
     submittedAt: offer.createdAt,
     reviewHref: `/editor/offer/${offer.id}/edit?returnTo=${encodeURIComponent(QUEUE_RETURN)}`,
   }));
@@ -144,7 +144,7 @@ async function getQueueItems(): Promise<QueueItem[]> {
     kind: "PLACE",
     title: place.title,
     cityName: place.city?.name || null,
-    businessName: place.owner.business?.name || place.owner.email,
+    businessName: place.createdBy.business?.name || place.createdBy.email,
     submittedAt: place.createdAt,
     reviewHref: `/admin/content/places/${place.id}`,
   }));
@@ -155,7 +155,7 @@ async function getQueueItems(): Promise<QueueItem[]> {
     title: revision.title || "Без названия",
     cityName: revision.place.city?.name || null,
     businessName:
-      revision.place.owner.business?.name || revision.place.owner.email,
+      revision.place.createdBy.business?.name || revision.place.createdBy.email,
     submittedAt: revision.submittedAt || new Date(),
     reviewHref: `/admin/content/places/${revision.place.id}?mode=revision`,
   }));

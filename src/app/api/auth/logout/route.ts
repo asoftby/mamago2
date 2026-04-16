@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   getSessionToken,
   deleteSession,
-  deleteSessionCookie,
+  deleteSessionCookieAction,
 } from "@/lib/auth/session";
 import { buildSurfaceRedirectDestination } from "@/lib/routing/surface";
 
@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
     const response = NextResponse.redirect(redirectUrl, 303);
     
     // Delete session cookie on response
-    deleteSessionCookie(response);
+    await deleteSessionCookieAction();
     
     return response;
   } catch (error) {
@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
     // Even on error, redirect to homepage
     const redirectUrl = new URL(redirectDestination, request.url);
     const response = NextResponse.redirect(redirectUrl, 303);
-    deleteSessionCookie(response);
+    await deleteSessionCookieAction();
     return response;
   }
 }

@@ -1,8 +1,7 @@
-"use client";
-
 import { ContentStatus } from "@prisma/client";
 import { Badge } from "@/components/ui/badge";
 import { Clock, CheckCircle, AlertTriangle, FileText } from "lucide-react";
+import { CONTENT_STATUS_META } from "@/lib/content-status-meta";
 
 interface PlaceStatusBadgeProps {
   status: ContentStatus;
@@ -11,56 +10,26 @@ interface PlaceStatusBadgeProps {
   className?: string;
 }
 
-const STATUS_CONFIG = {
-  DRAFT: {
-    label: "Черновик",
-    icon: FileText,
-    variant: "secondary" as const,
-    className: "",
-    tooltip: "Место сохранено как черновик. Завершите заполнение и отправьте на модерацию.",
-  },
-  PENDING: {
-    label: "На модерации",
-    icon: Clock,
-    variant: "secondary" as const,
-    className: "",
-    tooltip: "Публикация проверяется модератором. После проверки она появится на сайте.",
-  },
-  PUBLISHED: {
-    label: "Опубликовано",
-    icon: CheckCircle,
-    variant: "default" as const,
-    className: "bg-green-100 text-green-800 border-green-200",
-    tooltip: "Публикация доступна пользователям mamaGo.",
-  },
-  NEEDS_REVISION: {
-    label: "Требуются правки",
-    icon: AlertTriangle,
-    variant: "destructive" as const,
-    className: "bg-orange-100 text-orange-800 border-orange-200",
-    tooltip: "Модератор запросил уточнение данных. Исправьте публикацию и отправьте её повторно.",
-  },
-  REJECTED: {
-    label: "Отклонено",
-    icon: AlertTriangle,
-    variant: "destructive" as const,
-    className: "",
-    tooltip: "Публикация отклонена модератором. Проверьте комментарии и создайте новую публикацию.",
-  },
-};
+interface PlaceStatusBadgeConfig {
+  label: string;
+  icon?: typeof FileText;
+  variant: "default" | "secondary" | "outline" | "destructive";
+  className?: string;
+  tooltip?: string;
+}
 
-const REVISION_STATUS_CONFIG = {
+const REVISION_STATUS_CONFIG: Record<string, PlaceStatusBadgeConfig> = {
   PENDING: {
     label: "На модерации",
     icon: Clock,
-    variant: "secondary" as const,
+    variant: "secondary",
     className: "",
     tooltip: "Изменения отправлены на проверку модератора. После одобрения они появятся на сайте.",
   },
   NEEDS_REVISION: {
     label: "Правки к изменениям",
     icon: AlertTriangle,
-    variant: "destructive" as const,
+    variant: "destructive",
     className: "bg-orange-100 text-orange-800 border-orange-200",
     tooltip: "Модератор запросил правки к вашим изменениям. Исправьте и отправьте повторно.",
   },
@@ -82,24 +51,30 @@ export function PlaceStatusBadge({
 
   const effectiveStatus = shouldShowRevisionStatus ? revisionStatus : status;
 
-  const config = shouldShowRevisionStatus
-    ? REVISION_STATUS_CONFIG[revisionStatus as keyof typeof REVISION_STATUS_CONFIG]
-    : STATUS_CONFIG[effectiveStatus as keyof typeof STATUS_CONFIG];
+  const badgeConfig: PlaceStatusBadgeConfig = shouldShowRevisionStatus
+    ? REVISION_STATUS_CONFIG[revisionStatus]
+    : {
+        label: CONTENT_STATUS_META[effectiveStatus].label,
+        icon: FileText,
+        variant: CONTENT_STATUS_META[effectiveStatus].badgeVariant || "secondary",
+        className: CONTENT_STATUS_META[effectiveStatus].badgeClassName,
+        tooltip: undefined,
+      };
 
-  if (!config) {
+  if (!badgeConfig) {
     return null;
   }
 
-  const Icon = config.icon;
+  const Icon = badgeConfig.icon || FileText;
 
   return (
     <Badge
-      variant={config.variant}
-      className={`${config.className || ""} ${className || ""}`}
-      title={config.tooltip}
+      variant={badgeConfig.variant}
+      className={`${badgeConfig.className || ""} ${className || ""}`}
+      title={badgeConfig.tooltip}
     >
       <Icon className="w-3 h-3 mr-1" />
-      {config.label}
+      {badgeConfig.label}
     </Badge>
   );
 }

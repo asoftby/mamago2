@@ -18,7 +18,7 @@ type UnsubscribeResult =
 async function processUnsubscribe(token: string): Promise<UnsubscribeResult> {
   try {
     // Verify token
-    const verified = verifyUnsubscribeToken(token);
+    const verified = await verifyUnsubscribeToken(token);
     
     if (!verified) {
       return { success: false, reason: "invalid_token" };

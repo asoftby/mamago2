@@ -1,0 +1,32 @@
+src/lib/onboarding/orchestrator.ts(486,1): error TS1233: An export declaration can only be used at the top level of a namespace or module.
+src/lib/onboarding/useOnboarding.ts(20,3): error TS2459: Module '"./orchestrator"' declares 'getOnboardingContext' locally, but it is not exported.
+src/lib/routing/surface.ts(52,21): error TS1503: Named capturing groups are only available when targeting 'ES2018' or later.
+src/lib/routing/surface.ts(52,40): error TS1503: Named capturing groups are only available when targeting 'ES2018' or later.
+src/lib/routing/surface.ts(52,59): error TS1503: Named capturing groups are only available when targeting 'ES2018' or later.
+src/server/modules/import/services/import-matching.service.ts(102,9): error TS2322: Type '"FAILED" | "SKIPPED" | "MATCHED" | "NO_MATCH" | "AMBIGUOUS"' is not assignable to type 'ImportMatchStatus | EnumImportMatchStatusFieldUpdateOperationsInput | undefined'.
+  Type '"FAILED"' is not assignable to type 'ImportMatchStatus | EnumImportMatchStatusFieldUpdateOperationsInput | undefined'.
+src/server/modules/import/services/import-matching.service.ts(167,9): error TS2322: Type '"FAILED" | "SKIPPED" | "MATCHED" | "NO_MATCH" | "AMBIGUOUS"' is not assignable to type 'ImportMatchStatus | EnumImportMatchStatusFieldUpdateOperationsInput | undefined'.
+  Type '"FAILED"' is not assignable to type 'ImportMatchStatus | EnumImportMatchStatusFieldUpdateOperationsInput | undefined'.
+src/server/services/moderation.service.ts(292,42): error TS2561: Object literal may only specify known properties, but 'ownerBusinessId' does not exist in type 'ActivitySelect<DefaultArgs>'. Did you mean to write 'businessId'?
+src/server/services/moderation.service.ts(311,63): error TS2551: Property 'ownerBusinessId' does not exist on type '{ status: ContentStatus; type: ActivityType; coverImageUrl: string | null; createdAt: Date; id: string; updatedAt: Date; description: string | null; ... 33 more ...; seoCanonicalSource: SeoCanonicalSource; }'. Did you mean 'businessId'?
+src/server/services/moderation.service.ts(325,42): error TS2561: Object literal may only specify known properties, but 'ownerBusinessId' does not exist in type 'ActivitySelect<DefaultArgs>'. Did you mean to write 'businessId'?
+src/server/services/moderation.service.ts(341,67): error TS2551: Property 'ownerBusinessId' does not exist on type '{ status: ContentStatus; type: ActivityType; coverImageUrl: string | null; createdAt: Date; id: string; updatedAt: Date; description: string | null; ... 33 more ...; seoCanonicalSource: SeoCanonicalSource; }'. Did you mean 'businessId'?
+src/server/services/moderation.service.ts(355,42): error TS2561: Object literal may only specify known properties, but 'ownerBusinessId' does not exist in type 'ActivitySelect<DefaultArgs>'. Did you mean to write 'businessId'?
+src/server/services/moderation.service.ts(371,63): error TS2551: Property 'ownerBusinessId' does not exist on type '{ status: ContentStatus; type: ActivityType; coverImageUrl: string | null; createdAt: Date; id: string; updatedAt: Date; description: string | null; ... 33 more ...; seoCanonicalSource: SeoCanonicalSource; }'. Did you mean 'businessId'?
+src/server/services/moderation.service.ts(402,51): error TS2551: Property 'placeId' does not exist on type '{ status: OfferStatus; place: { ownerBusinessId: string | null; }; title: string; }'. Did you mean 'place'?
+src/server/services/moderation.service.ts(428,55): error TS2551: Property 'placeId' does not exist on type '{ status: OfferStatus; place: { ownerBusinessId: string | null; }; title: string; }'. Did you mean 'place'?
+src/server/services/moderation.service.ts(454,51): error TS2551: Property 'placeId' does not exist on type '{ status: OfferStatus; place: { ownerBusinessId: string | null; }; title: string; }'. Did you mean 'place'?
+src/server/services/place.service.ts(150,7): error TS2353: Object literal may only specify known properties, and 'creator' does not exist in type 'PlaceInclude<DefaultArgs>'.
+src/server/services/placeClaim.service.ts(40,11): error TS2353: Object literal may only specify known properties, and 'displayName' does not exist in type 'BusinessSelect<DefaultArgs>'.
+src/server/services/placeClaim.service.ts(77,11): error TS2353: Object literal may only specify known properties, and 'displayName' does not exist in type 'BusinessSelect<DefaultArgs>'.
+src/server/services/placeRevision.service.ts(104,47): error TS2345: Argument of type '{ where: { id: string; }; select: { createdByUserId: true; ownerBusinessId: true; status: true; }; include: { images: { orderBy: { sortOrder: "asc"; }; }; }; }' is not assignable to parameter of type 'SelectSubset<{ where: { id: string; }; select: { createdByUserId: true; ownerBusinessId: true; status: true; }; include: { images: { orderBy: { sortOrder: "asc"; }; }; }; }, PlaceFindUniqueArgs<DefaultArgs>>'.
+  Type '{ where: { id: string; }; select: { createdByUserId: true; ownerBusinessId: true; status: true; }; include: { images: { orderBy: { sortOrder: "asc"; }; }; }; }' is not assignable to type '"Please either choose `select` or `include`."'.
+src/server/services/placeRevision.service.ts(302,11): error TS2561: Object literal may only specify known properties, but 'ownerBusinessId' does not exist in type 'TempMediaWhereInput'. Did you mean to write 'ownerUserId'?
+src/server/services/placeRevision.service.ts(352,13): error TS2561: Object literal may only specify known properties, but 'ownerBusinessId' does not exist in type 'TempMediaWhereInput'. Did you mean to write 'ownerUserId'?
+src/server/services/placeRevision.service.ts(715,7): error TS2345: Argument of type 'string | null' is not assignable to parameter of type 'string'.
+  Type 'null' is not assignable to type 'string'.
+src/server/services/placeRevision.service.ts(803,9): error TS2345: Argument of type 'string | null' is not assignable to parameter of type 'string'.
+  Type 'null' is not assignable to type 'string'.
+src/server/services/placeRevision.service.ts(878,9): error TS2345: Argument of type 'string | null' is not assignable to parameter of type 'string'.
+  Type 'null' is not assignable to type 'string'.
+src/server/services/placeRevision.service.ts(913,11): error TS2353: Object literal may only specify known properties, and 'owner' does not exist in type 'PlaceSelect<DefaultArgs>'.

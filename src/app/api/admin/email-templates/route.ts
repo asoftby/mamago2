@@ -47,8 +47,22 @@ export async function POST(req: NextRequest) {
     return jsonValidationError(parsed.error);
   }
 
+  if (!parsed.data.name) {
+    return NextResponse.json(
+      { error: "Validation error", details: { fieldErrors: { name: ["Name is required"] } } },
+      { status: 422 },
+    );
+  }
+
   try {
-    const template = await createTemplate(parsed.data);
+    const template = await createTemplate({
+      name: parsed.data.name,
+      type: parsed.data.type,
+      subject: parsed.data.subject,
+      preheader: parsed.data.preheader,
+      fromName: parsed.data.fromName,
+      document: parsed.data.document,
+    });
     return NextResponse.json({ template }, { status: 201 });
   } catch (error) {
     console.error("[admin/email-templates POST]", error);

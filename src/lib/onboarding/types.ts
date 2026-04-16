@@ -119,7 +119,7 @@ export type RequiredField =
 /**
  * Pending action - действие, которое нужно завершить после auth
  */
-export interface PendingAction {
+export interface PendingActionBase {
   /** Тип действия */
   type: string;
   
@@ -156,7 +156,7 @@ export interface OnboardingContext {
   returnUrl?: string;
   
   /** Pending action для выполнения после auth */
-  pendingAction?: PendingAction;
+  pendingAction?: PendingActionBase;
   
   /** Metadata для аналитики */
   analyticsMetadata?: Record<string, unknown>;

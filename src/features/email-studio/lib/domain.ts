@@ -131,10 +131,10 @@ export function createEmailBlockId(idFactory: BlockIdFactory = defaultBlockIdFac
   return idFactory();
 }
 
-export function createDefaultEmailBlock(
-  type: EmailBlockType,
+export function createDefaultEmailBlock<T extends EmailBlockType>(
+  type: T,
   idFactory: BlockIdFactory = defaultBlockIdFactory,
-): EmailBlock {
+): Extract<EmailBlock, { type: T }> {
   const id = createEmailBlockId(idFactory);
 
   switch (type) {
@@ -145,7 +145,7 @@ export function createDefaultEmailBlock(
         brandText: "mamaGo",
         brandHref: "{{links.homeUrl}}",
         logoUrl: "",
-      };
+      } as Extract<EmailBlock, { type: T }>;
     case "hero":
       return {
         id,
@@ -156,13 +156,13 @@ export function createDefaultEmailBlock(
         buttonUrl: "{{links.homeUrl}}",
         imageUrl: "",
         align: "left",
-      };
+      } as Extract<EmailBlock, { type: T }>;
     case "text":
       return {
         id,
         type,
         content: "",
-      };
+      } as Extract<EmailBlock, { type: T }>;
     case "cta":
       return {
         id,
@@ -171,24 +171,24 @@ export function createDefaultEmailBlock(
         text: "",
         buttonLabel: "Open",
         buttonUrl: "{{links.homeUrl}}",
-      };
+      } as Extract<EmailBlock, { type: T }>;
     case "spacer":
       return {
         id,
         type,
         size: "md",
-      };
+      } as Extract<EmailBlock, { type: T }>;
     case "divider":
       return {
         id,
         type,
-      };
+      } as Extract<EmailBlock, { type: T }>;
     case "footer":
       return {
         id,
         type,
         showUnsubscribe: false,
-      };
+      } as Extract<EmailBlock, { type: T }>;
     default: {
       const neverType: never = type;
       return neverType;
