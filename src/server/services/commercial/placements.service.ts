@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Business Placements Service
  * 
@@ -7,7 +6,7 @@
  */
 
 import { prisma } from "@/lib/prisma";
-import type { PlacementStatus, PlacementSourceType } from "@prisma/client";
+import type { PlacementStatus, PlacementSourceType, Prisma } from "@prisma/client";
 
 export interface PlacementFilters {
   businessId?: string;
@@ -40,7 +39,7 @@ export interface UpdatePlacementInput {
  * Get placements with filters
  */
 export async function getPlacements(filters: PlacementFilters = {}) {
-  const where: any = {};
+  const where: Prisma.BusinessPlacementWhereInput = {};
 
   if (filters.businessId) {
     where.businessId = filters.businessId;

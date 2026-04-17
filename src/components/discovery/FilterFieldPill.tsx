@@ -85,7 +85,7 @@ export function FilterFieldPill({
             onKeyDown={(e) => {
               if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault();
-                handleClear(e as any);
+                handleClear(e as unknown as React.MouseEvent);
               }
             }}
             className="rounded-full p-0.5 hover:bg-black/10 dark:hover:bg-white/10 transition-colors"

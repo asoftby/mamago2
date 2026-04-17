@@ -47,11 +47,7 @@ export function MyPlanPanelContent({
     refetchPlanForDate,
   } = useMyPlan();
 
-  const [addErr, setAddErr] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (open) setAddErr(null);
-  }, [open]);
+  const [addErr, setAddErr] = useState<string | null>(() => null);
 
   /** Подтягиваем план с сервера при открытии и при смене даты — единый источник с БД + live после add. */
   useEffect(() => {

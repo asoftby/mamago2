@@ -2,7 +2,7 @@
  * ImportRunService — Phase 2A
  */
 
-import type { ImportRun, ImportRunStatus } from "@prisma/client";
+import type { ImportRun, ImportRunStatus, Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import * as repo from "../repositories/import-run.repository";
 
@@ -34,7 +34,12 @@ export async function deleteRun(runId: string): Promise<void> {
   if (!run) throw new Error("Run not found");
 
   const appliedCount = await prisma.importedRecord.count({
-    where: { runId, applyResult: { not: null as any } },
+    where: { 
+      runId, 
+      applyResult: { 
+        not: null as unknown as Prisma.JsonNullValueFilter 
+      } 
+    },
   });
   if (appliedCount > 0) {
     throw new Error(

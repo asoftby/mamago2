@@ -20,7 +20,7 @@ type Option = { value: string; label: string };
 type MobileFilterSheetProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  filters: DiscoveryFiltersType & { when: any }; // 'when' is derived in parent for convenience but we can use dateFrom/dateTo
+  filters: DiscoveryFiltersType & { when?: string | null }; // 'when' is derived in parent for convenience but we can use dateFrom/dateTo
   // Actually, let's use the 'filters' object passed from parent which mimics the store shape but might have 'when' for UI
   // The parent passes: { when, age, metro, district }
   
@@ -35,11 +35,55 @@ type MobileFilterSheetProps = {
   districtOptions: Option[];
   
   // Legacy props kept optional to avoid breaking if not removed elsewhere yet
-  onApply?: (filters: any) => void;
+  onApply?: (filters: DiscoveryFiltersType) => void;
 };
 
 import { formatRuShortDayMonth } from "@/lib/formatters/date";
 import { whenLabel } from "@/features/filters/discovery/whenLabel";
+
+// ─── TriggerButton Component ──────────────────────────────────────────────────
+interface TriggerButtonProps {
+  label: string;
+  valueLabel: string;
+  onClick: () => void;
+  onClear?: () => void;
+  isActive: boolean;
+}
+
+function TriggerButton({ label, valueLabel, onClick, onClear, isActive }: TriggerButtonProps) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        "flex flex-col gap-0.5 w-full text-left px-5 py-3 rounded-full border border-gray-200 bg-white transition-all min-h-[56px] justify-center hover:bg-gray-50",
+        isActive && "border-primary bg-primary/5"
+      )}
+    >
+      <div className="flex items-center justify-between w-full">
+        <div className="flex flex-col overflow-hidden">
+            <span className="text-xs text-muted-foreground font-medium truncate">{label}</span>
+            <span className={cn("text-sm truncate", !isActive && "text-muted-foreground")}>{valueLabel}</span>
+        </div>
+        <div className="flex items-center gap-2 shrink-0 ml-2">
+            {isActive && onClear && (
+                <div
+                    role="button"
+                    tabIndex={0}
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        onClear();
+                    }}
+                    className="rounded-full p-0.5 hover:bg-black/10 transition-colors"
+                >
+                    <X className="h-4 w-4" />
+                </div>
+            )}
+            <ChevronDown className="h-4 w-4 opacity-50" />
+        </div>
+      </div>
+    </button>
+  );
+}
 
 export function MobileFilterSheet({
   open,
@@ -81,39 +125,6 @@ export function MobileFilterSheet({
       const opt = options.find(o => o.value === value);
       return opt ? opt.label : value;
   };
-
-  const TriggerButton = ({ label, valueLabel, onClick, onClear, isActive }: { label: string, valueLabel: string, onClick: () => void, onClear?: () => void, isActive: boolean }) => (
-    <button
-      onClick={onClick}
-      className={cn(
-        "flex flex-col gap-0.5 w-full text-left px-5 py-3 rounded-full border border-gray-200 bg-white transition-all min-h-[56px] justify-center hover:bg-gray-50",
-        isActive && "border-primary bg-primary/5"
-      )}
-    >
-      <div className="flex items-center justify-between w-full">
-        <div className="flex flex-col overflow-hidden">
-            <span className="text-xs text-muted-foreground font-medium truncate">{label}</span>
-            <span className={cn("text-sm truncate", !isActive && "text-muted-foreground")}>{valueLabel}</span>
-        </div>
-        <div className="flex items-center gap-2 shrink-0 ml-2">
-            {isActive && onClear && (
-                <div
-                    role="button"
-                    tabIndex={0}
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        onClear();
-                    }}
-                    className="rounded-full p-0.5 hover:bg-black/10 transition-colors"
-                >
-                    <X className="h-4 w-4" />
-                </div>
-            )}
-            <ChevronDown className="h-4 w-4 opacity-50" />
-        </div>
-      </div>
-    </button>
-  );
 
   // Prepare "when" value for MobileDateSheet which expects complex object or string
   // We convert store strings to Date objects if needed, or pass strings if MobileDateSheet handles them.
@@ -157,7 +168,7 @@ export function MobileFilterSheet({
                  open={dateSheetOpen}
                  onOpenChange={setDateSheetOpen}
                  value={whenValue}
-                 onChange={(val: any) => {
+                 onChange={(val: string | null | { from?: Date; to?: Date }) => {
                      // Convert back to store format
                      if (!val) {
                          setDraft({ dateFrom: null, dateTo: null, whenPreset: null });

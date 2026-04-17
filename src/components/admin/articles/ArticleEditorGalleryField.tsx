@@ -262,12 +262,10 @@ export function ArticleEditorGalleryField({
     }
     setRows((prev) => {
       const toAdd = ids.map((id) => ({ type: "remote" as const, mediaId: id }));
-      const merged = [...prev];
-      for (const row of toAdd) {
-        if (!merged.some((r) => r.type === "remote" && r.mediaId === row.mediaId)) {
-          merged.push(row);
-        }
-      }
+      const merged = [
+        ...prev,
+        ...toAdd.filter((row) => !prev.some((r) => r.type === "remote" && r.mediaId === row.mediaId)),
+      ];
       emit(merged);
       return merged;
     });

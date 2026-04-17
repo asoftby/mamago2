@@ -6,7 +6,7 @@ import { PlaceGroupSelector } from "@/components/business/place/PlaceGroupSelect
 import { WizardStepHeader } from "../components/WizardStepHeader";
 
 interface Step2LocationProps {
-  place: Place;
+  place: Place & { _districtName?: string | null; _metroName?: string | null };
   onUpdate: (updates: Partial<Place>) => void;
   onPrev: () => void;
   onNext: () => void;
@@ -30,8 +30,8 @@ export function Step2Location({ place, onUpdate, onPrev, onNext, canNext, isEdit
         metroManualId: place.metroManualId || undefined,
         metroManualDistanceM: place.metroManualDistanceM || undefined,
         // Pass enrichment names if available (from NewPlaceWizard)
-        districtName: (place as any)._districtName || undefined,
-        metroName: (place as any)._metroName || undefined,
+        districtName: place._districtName || undefined,
+        metroName: place._metroName || undefined,
       }
     : null;
 

@@ -53,9 +53,9 @@ export function PlaceDangerZone({ placeId, placeTitle }: PlaceDangerZoneProps) {
       // Redirect to moderation queue
       router.push("/admin/moderation/queue");
       router.refresh();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Delete place error:", error);
-      toast.error(error.message || "Не удалось удалить место");
+      toast.error(error instanceof Error ? error.message : "Не удалось удалить место");
       setIsDeleting(false);
     }
   };

@@ -15,7 +15,7 @@ export default function EditActivityPage({ params }: PageProps) {
   const resolvedParams = use(params);
   const router = useRouter();
   const [cities, setCities] = useState<Array<{ id: string; name: string }>>([]);
-  const [activity, setActivity] = useState<any>(null);
+  const [activity, setActivity] = useState<Record<string, unknown> | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -88,7 +88,7 @@ export default function EditActivityPage({ params }: PageProps) {
     priceFrom: activity.priceFrom,
     currency: activity.currency || "BYN",
     ageLabel: activity.ageLabel || "",
-    sessions: activity.sessions.map((s: any) => new Date(s.startsAt)),
+    sessions: activity.sessions.map((s: { startsAt: string | Date }) => new Date(s.startsAt)),
   };
 
   return (

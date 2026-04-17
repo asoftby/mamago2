@@ -28,7 +28,7 @@ export function EventLocationMapModal({
   onConfirm,
   layout = "fullscreen",
 }: EventLocationMapModalProps) {
-  const [tempPin, setTempPin] = useState<{ lat: number; lng: number } | null>(
+  const [tempPin, setTempPin] = useState<{ lat: number; lng: number } | null>(() =>
     initialLat != null && initialLng != null ? { lat: initialLat, lng: initialLng } : null
   );
 
@@ -156,7 +156,6 @@ export function EventLocationMapModal({
 
     const initialPin =
       initialLat != null && initialLng != null ? { lat: initialLat, lng: initialLng } : null;
-    setTempPin(initialPin);
 
     void initMap(initialPin);
 
@@ -171,7 +170,7 @@ export function EventLocationMapModal({
       document.removeEventListener("keydown", handleEsc);
       cleanup();
     };
-  }, [isOpen, initialLat, initialLng]);
+  }, [isOpen, initialLat, initialLng, onClose]);
 
   /** Клики по карте: сразу переносим pin (карта уже инициализирована). */
   useEffect(() => {

@@ -113,13 +113,10 @@ export function AgePanel({
     | { kind: "child"; child: (typeof availableChildren)[number] };
 
   const personaChipsOrder = useMemo((): PersonaChipRow[] => {
-    const rows: PersonaChipRow[] = [];
-    if (showAdultChip && primaryAdult) {
-      rows.push({ kind: "adult" });
-    }
-    for (const child of availableChildren) {
-      rows.push({ kind: "child", child });
-    }
+    const adultRow = showAdultChip && primaryAdult ? [{ kind: "adult" as const }] : [];
+    const childRows = availableChildren.map((child) => ({ kind: "child" as const, child }));
+    const rows = [...adultRow, ...childRows];
+    
     rows.sort((a, b) => {
       const birthA =
         a.kind === "adult" ? primaryAdult?.birthDate : a.child.birthDate;

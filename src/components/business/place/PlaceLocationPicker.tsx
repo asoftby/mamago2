@@ -31,7 +31,7 @@ interface PlaceLocationPickerProps {
     districtName?: string | null;
     metroName?: string | null;
   } | null;
-  onUpdate?: (updates: any) => void;
+  onUpdate?: (updates: Record<string, unknown>) => void;
   disabled?: boolean;
 }
 
@@ -191,7 +191,7 @@ export function PlaceLocationPicker({
     lat: number;
     lng: number;
     formattedAddr: string;
-    addressJson: any[];
+    addressJson: Record<string, unknown>[];
   }) => {
     // Update location state
     setLocation({

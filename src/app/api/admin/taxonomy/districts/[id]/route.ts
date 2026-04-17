@@ -23,10 +23,10 @@ export async function PATCH(
     });
 
     return NextResponse.json(district);
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error updating district:", error);
     
-    if (error.code === "P2002") {
+    if (error && typeof error === 'object' && 'code' in error && error.code === "P2002") {
       return NextResponse.json({ error: "Такой район уже есть в этом городе" }, { status: 409 });
     }
 

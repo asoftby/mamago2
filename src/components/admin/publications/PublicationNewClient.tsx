@@ -43,10 +43,6 @@ export function PublicationNewClient({
     }
   }, [type, router]);
 
-  useEffect(() => {
-    setNewsTitle("");
-  }, [type]);
-
   if (!valid) {
     return (
       <div className="p-6 md:p-4 space-y-6 max-w-lg">

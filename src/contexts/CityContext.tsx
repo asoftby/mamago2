@@ -28,26 +28,26 @@ function CityProviderInner({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const router = useRouter();
-  const [storedCity, setStoredCity] = useState<string | null>(null);
-
-  useEffect(() => {
+  const [storedCity, setStoredCity] = useState<string | null>(() => {
     try {
-      setStoredCity(localStorage.getItem(STORAGE_KEY));
+      return localStorage.getItem(STORAGE_KEY);
+    } catch {
+      return null;
+    }
+  });
+
+  // Sync storedCity when pathname changes (extract city from path)
+  const cityFromPath = useMemo(() => getCityFromPath(pathname), [pathname]);
+  
+  useEffect(() => {
+    if (!cityFromPath) return;
+    try {
+      localStorage.setItem(STORAGE_KEY, cityFromPath);
     } catch {
       /* ignore */
     }
-  }, []);
-
-  useEffect(() => {
-    const fromPath = getCityFromPath(pathname);
-    if (!fromPath) return;
-    try {
-      localStorage.setItem(STORAGE_KEY, fromPath);
-    } catch {
-      /* ignore */
-    }
-    setStoredCity(fromPath);
-  }, [pathname]);
+    queueMicrotask(() => setStoredCity(cityFromPath));
+  }, [cityFromPath]);
 
   const cityFromQuery = searchParams.get("city");
   const citySlug = useMemo(

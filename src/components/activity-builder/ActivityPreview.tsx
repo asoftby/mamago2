@@ -13,9 +13,6 @@ interface ActivityPreviewProps {
 }
 
 export function ActivityPreview({ data }: ActivityPreviewProps) {
-  const [selectedDateId, setSelectedDateId] = useState<string | null>(null);
-  const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null);
-
   // Convert schedule to booking format
   const bookingDates: BookingDateOption[] = useMemo(() => {
     return data.schedule.dates.map((date) => ({
@@ -35,12 +32,11 @@ export function ActivityPreview({ data }: ActivityPreviewProps) {
     }));
   }, [data.schedule]);
 
-  // Auto-select first date
-  useMemo(() => {
-    if (bookingDates.length > 0 && !selectedDateId) {
-      setSelectedDateId(bookingDates[0].id);
-    }
-  }, [bookingDates, selectedDateId]);
+  // Auto-select first date using lazy initialization
+  const [selectedDateId, setSelectedDateId] = useState<string | null>(() =>
+    bookingDates.length > 0 ? bookingDates[0].id : null
+  );
+  const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null);
 
   const selectedDate = bookingDates.find((d) => d.id === selectedDateId);
 

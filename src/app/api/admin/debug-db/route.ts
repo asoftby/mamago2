@@ -9,7 +9,7 @@ export async function GET() {
   let counts = { signals: -1, filters: -1 };
   
   try {
-    const result = await prisma.$queryRawUnsafe<any>(`select now() as now`);
+    const result = await prisma.$queryRawUnsafe<{ now: Date }[]>(`select now() as now`);
     if (Array.isArray(result) && result.length > 0) {
         now = result[0].now;
     }

@@ -1,13 +1,5 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-/**
- * Unified Moderation Service
- * Handles moderation workflow for Place, Activity, and other content entities
- * Reuses Business Verification pattern with ContentStatus enum
- * Server-only - do not import in client components
- */
-
 import prisma from "@/lib/prisma";
-import { ContentStatus, ModerationEntityType, ModerationAction } from "@prisma/client";
+import { ContentStatus, ModerationEntityType, ModerationAction, Prisma } from "@prisma/client";
 
 /**
  * Log a moderation action
@@ -203,8 +195,8 @@ export async function submitPlace(
   }
 
   // Prepare update data
-  const updateData: any = {
-    status: "PENDING",
+  const updateData: Prisma.PlaceUpdateInput = {
+    status: "PENDING" as ContentStatus,
   };
 
   // If resubmitting after NEEDS_REVISION, set revisionResubmittedAt

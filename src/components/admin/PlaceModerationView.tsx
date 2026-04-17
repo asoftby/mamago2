@@ -25,7 +25,20 @@ const STATUS_CONFIG = {
 };
 
 interface PlaceModerationViewProps {
-  place: any; // Type from the page query
+  place: {
+    id: string;
+    status: string;
+    formattedAddr?: string | null;
+    customAddress?: string | null;
+    districtManual?: { name: string } | null;
+    districtAuto?: { name: string } | null;
+    metroManual?: { name: string } | null;
+    metroAuto?: { name: string } | null;
+    metroManualDistanceM?: number | null;
+    metroAutoDistanceM?: number | null;
+    city?: { hasMetro?: boolean; metroMaxDistanceM?: number } | null;
+    images: Array<{ kind: string; [key: string]: unknown }>;
+  };
 }
 
 export function PlaceModerationView({ place }: PlaceModerationViewProps) {
@@ -50,8 +63,8 @@ export function PlaceModerationView({ place }: PlaceModerationViewProps) {
     metroDistance <= metroMaxDistance;
 
   // Images
-  const logoImage = place.images.find((img: any) => img.kind === "LOGO");
-  const galleryImages = place.images.filter((img: any) => img.kind === "GALLERY");
+  const logoImage = place.images.find((img) => img.kind === "LOGO");
+  const galleryImages = place.images.filter((img) => img.kind === "GALLERY");
 
   const handleModerate = async (action: "APPROVE" | "NEEDS_REVISION" | "REJECT") => {
     if ((action === "NEEDS_REVISION" || action === "REJECT") && !comment.trim()) {
@@ -231,7 +244,7 @@ export function PlaceModerationView({ place }: PlaceModerationViewProps) {
             <div>
               <h3 className="text-lg font-semibold text-gray-900 mb-3">Галерея</h3>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                {galleryImages.map((image: any) => (
+                {galleryImages.map((image) => (
                   <div
                     key={image.id}
                     className="relative aspect-square rounded-lg overflow-hidden bg-gray-100"

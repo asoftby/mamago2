@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * OpeningHours Mapper
  * Maps between UI state, domain models, and Prisma payloads
@@ -20,12 +19,12 @@ export function mapToUIState(
 
   // Create a map of existing rules for quick lookup
   const existingRules = new Map(
-    dbData.rules.map((rule: any) => [rule.dayOfWeek, rule])
+    dbData.rules.map((rule) => [rule.dayOfWeek, rule])
   );
 
   // Always create rules for all 7 days, using existing data where available
   const allDayRules: DayRule[] = ALL_DAYS.map((dayOfWeek) => {
-    const existingRule: any = existingRules.get(dayOfWeek);
+    const existingRule = existingRules.get(dayOfWeek);
     
     if (existingRule) {
       // Use existing rule data
@@ -34,8 +33,8 @@ export function mapToUIState(
         isOpen: existingRule.isOpen,
         allDay: existingRule.allDay,
         intervals: existingRule.intervals
-          .sort((a: any, b: any) => a.sortOrder - b.sortOrder)
-          .map((interval: any) => ({
+          .sort((a, b) => a.sortOrder - b.sortOrder)
+          .map((interval) => ({
             startTime: interval.startTime,
             endTime: interval.endTime,
           })),

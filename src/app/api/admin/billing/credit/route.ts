@@ -61,10 +61,10 @@ export async function POST(request: NextRequest) {
         newBalance: account.depositBalance.toNumber() + amount,
       },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Credit deposit error:", error);
     return NextResponse.json(
-      { error: error.message || "Failed to credit deposit" },
+      { error: error instanceof Error ? error.message : "Failed to credit deposit" },
       { status: 500 }
     );
   }

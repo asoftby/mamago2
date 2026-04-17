@@ -20,8 +20,8 @@ export default async function AdminServicePlacementsPage() {
 
   try {
     servicePlacements = await getServicePlacements();
-  } catch (e: any) {
-    error = e.message;
+  } catch (e: unknown) {
+    error = e instanceof Error ? e.message : "Unknown error";
     console.error("Service placements fetch error:", e);
   }
 

@@ -12,7 +12,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
-import { ActivityType, ScheduleMode, ContentStatus } from "@prisma/client";
+import { ActivityType, ScheduleMode, ContentStatus, Prisma } from "@prisma/client";
 import { canCreateBusinessContent } from "@/lib/auth/businessContentAccess";
 import {
   canManageActivityById,
@@ -112,7 +112,7 @@ export async function PATCH(
     const body = await req.json();
 
     // Build update data (only allow specific fields)
-    const updateData: any = {};
+    const updateData: Prisma.ActivityUpdateInput = {};
 
     // Basic fields
     if (body.title !== undefined) updateData.title = body.title;
@@ -186,13 +186,16 @@ export async function PATCH(
           );
         }
 
-        updateData.placeId = body.placeId;
-        updateData.businessId = coalesceActivityBusinessIdFromPlace(
+        updateData.place = { connect: { id: body.placeId } };
+        const resolvedBusinessId = coalesceActivityBusinessIdFromPlace(
           place,
           existing.businessId,
         );
+        if (resolvedBusinessId) {
+          updateData.business = { connect: { id: resolvedBusinessId } };
+        }
       } else {
-        updateData.placeId = null;
+        updateData.place = { disconnect: true };
       }
     }
 

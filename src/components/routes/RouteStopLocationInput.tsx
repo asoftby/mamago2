@@ -16,7 +16,6 @@
  */
 
 import { useEffect, useRef, useState, useCallback } from "react";
-import { cn } from "@/lib/utils";
 import { PlaceMapModal } from "@/components/business/place/PlaceMapModal";
 import { GoogleMapsService } from "@/services/googleMaps";
 import {
@@ -101,41 +100,32 @@ export function RouteStopLocationInput({
   const [query, setQuery] = useState("");
   const [searchState, setSearchState] = useState<SearchState>({ kind: "idle" });
   const [mapOpen, setMapOpen] = useState(false);
-  const [isEditing, setIsEditing] = useState(!value);
-
-  // Sync isEditing when value is set externally (e.g. parent state restore)
-  const prevValueRef = useRef(value);
-  useEffect(() => {
-    const prev = prevValueRef.current;
-    prevValueRef.current = value;
-    // If value was null and is now set externally, exit editing mode
-    if (!prev && value) setIsEditing(false);
-    // If value was set and is now cleared externally, enter editing mode
-    if (prev && !value) setIsEditing(true);
-  }, [value]);
+  const [isEditing, setIsEditing] = useState(() => !value);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const prevValueRef = useRef(value);
+
+  // Sync isEditing when value is set externally (e.g. parent state restore)
+  useEffect(() => {
+    const prev = prevValueRef.current;
+    prevValueRef.current = value;
+    if (!prev && value) {
+      queueMicrotask(() => setIsEditing(false));
+    }
+    if (prev && !value) {
+      queueMicrotask(() => setIsEditing(true));
+    }
+  }, [value]);
 
   // Always-current ref for onChange — prevents stale closure in autocomplete listener
   const onChangeRef = useRef(onChange);
   useEffect(() => { onChangeRef.current = onChange; }, [onChange]);
 
   // ── Google Autocomplete init ──────────────────────────────────────────────
-  useEffect(() => {
-    if (!isEditing) return;
-    initGoogleAutocomplete();
-    return () => {
-      if (autocompleteRef.current && typeof google !== "undefined") {
-        google.maps.event.clearInstanceListeners(autocompleteRef.current);
-        autocompleteRef.current = null;
-      }
-    };
-  }, [isEditing]);
-
-  const initGoogleAutocomplete = async () => {
+  const initGoogleAutocomplete = useCallback(async () => {
     if (!inputRef.current || !(inputRef.current instanceof HTMLInputElement)) return;
     try {
       const placesLib = await GoogleMapsService.getPlacesLibrary();
@@ -169,7 +159,18 @@ export function RouteStopLocationInput({
     } catch (err) {
       console.error("[RouteStopLocationInput] Google autocomplete init error:", err);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    if (!isEditing) return;
+    initGoogleAutocomplete();
+    return () => {
+      if (autocompleteRef.current && typeof google !== "undefined") {
+        google.maps.event.clearInstanceListeners(autocompleteRef.current);
+        autocompleteRef.current = null;
+      }
+    };
+  }, [isEditing, initGoogleAutocomplete]);
 
   // ── Debounced mamaGo place search ─────────────────────────────────────────
   const searchPlaces = useCallback(async (q: string) => {

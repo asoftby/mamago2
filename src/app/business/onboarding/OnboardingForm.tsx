@@ -58,7 +58,7 @@ export function OnboardingForm({
   accountPhoneE164 = null,
   initialBusinessContactOtpState,
 }: {
-  initialData?: any;
+  initialData?: { unp?: string; legalName?: string; phone?: string | null; contactPhoneVerifiedAt?: string | null } | null;
   /** Номер из аккаунта (как правило, подтверждённый при регистрации) — если в заявке ещё нет телефона */
   accountPhoneE164?: string | null;
   /** Серверное состояние escalation OTP (business contact) */

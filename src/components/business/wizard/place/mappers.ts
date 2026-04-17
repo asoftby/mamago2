@@ -1,13 +1,16 @@
-import type { Place, PlaceImage as PrismaPlaceImage } from "@prisma/client";
+import type { Place, PlaceImage as PrismaPlaceImage, Prisma } from "@prisma/client";
 import type { PlaceFormData, PlaceImage } from "./types";
 import { getDefaultFormData } from "./defaults";
 import { mapToUIState } from "@/lib/openingHours";
+import type { OpeningHoursWithRelations } from "@/server/services/openingHours/openingHours.types";
+
+type PlaceWithRelations = Place & { images?: PrismaPlaceImage[]; openingHours?: OpeningHoursWithRelations | null };
 
 /**
  * Map Place entity from database to form data
  */
 export function mapPlaceToFormData(
-  place: Place & { images?: PrismaPlaceImage[]; openingHours?: any }
+  place: PlaceWithRelations
 ): PlaceFormData {
   const defaults = getDefaultFormData();
   
@@ -89,7 +92,7 @@ export function buildPlacePayload(data: PlaceFormData): Partial<Place> {
     lng: data.lng,
     googlePlaceId: data.googlePlaceId,
     formattedAddr: data.formattedAddr,
-    addressJson: data.addressJson,
+    addressJson: data.addressJson as Prisma.JsonValue,
     customAddress: data.customAddress,
     cityId: data.cityId,
     districtAutoId: data.districtAutoId,
@@ -151,7 +154,7 @@ export function extractChanges(
     
     // Deep comparison for arrays and objects
     if (JSON.stringify(currentValue) !== JSON.stringify(originalValue)) {
-      (changes as any)[key] = currentValue;
+      (changes as Record<string, unknown>)[key] = currentValue;
     }
   }
   

@@ -8,7 +8,7 @@ import { toast } from "sonner";
 interface PlaceLogoUploadProps {
   placeId: string;
   currentLogoUrl?: string | null;
-  onUploadComplete?: (imageId: string, images: any[]) => void;
+  onUploadComplete?: (imageId: string, images: UploadedImage[]) => void;
   onSaveDraft?: () => Promise<boolean>; // Optional - for creating place before upload
 }
 

@@ -42,16 +42,6 @@ export function Step1Profile({ place, onUpdate, onNext, canNext, isEditable = tr
   const [visitFormats, setVisitFormats] = useState<string[]>(place.visitFormats || []);
   const [activityTypes, setActivityTypes] = useState<string[]>(place.activityTypes || []);
 
-  useEffect(() => {
-    setTitle(place.title);
-    setCategory(place.category);
-    setShortDesc(place.shortDesc);
-    setDescription(place.description || "");
-    setAgeTags(place.ageTags || []);
-    setVisitFormats(place.visitFormats || []);
-    setActivityTypes(place.activityTypes || []);
-  }, [place.title, place.category, place.shortDesc, place.description, place.ageTags, place.visitFormats, place.activityTypes]);
-
   const handleTitleChange = (value: string) => {
     setTitle(value);
     onUpdate({ title: value });

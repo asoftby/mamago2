@@ -28,7 +28,7 @@ export function MediaIdField({
 
   useEffect(() => {
     if (!value.trim()) {
-      setPreview(null);
+      // Don't set state synchronously - just skip the fetch
       return;
     }
     let cancelled = false;

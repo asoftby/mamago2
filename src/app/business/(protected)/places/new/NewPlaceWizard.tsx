@@ -56,7 +56,7 @@ interface LocalDraft {
   lng: number | null;
   googlePlaceId: string | null;
   formattedAddr: string | null;
-  addressJson: any | null;
+  addressJson: Record<string, unknown>[] | null;
   customAddress: string | null;
   cityId: string | null;
   districtAutoId: string | null;
@@ -93,7 +93,7 @@ export function NewPlaceWizard() {
   const [currentStep, setCurrentStep] = useState(1);
   const [isSaving, setIsSaving] = useState(false);
   const [createRequestId] = useState(() => randomId());
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<{ id: string; email?: string } | null>(null);
   
   // Wizard session for temp media uploads
   const { wizardSessionId, isLoaded: sessionLoaded, clearSession } = useWizardSession({
@@ -102,7 +102,7 @@ export function NewPlaceWizard() {
   });
   
   // Client-side city resolution
-  const resolveCityIdClient = useCallback(async (lat: number, lng: number, addressJson: any) => {
+  const resolveCityIdClient = useCallback(async (lat: number, lng: number, addressJson: Record<string, unknown>[] | null) => {
     try {
       console.log("[NewPlaceWizard] Enriching location on client...", { lat, lng, hasAddressJson: !!addressJson });
       

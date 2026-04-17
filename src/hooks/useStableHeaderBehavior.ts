@@ -76,12 +76,31 @@ export function useStableHeaderBehavior(options: UseStableHeaderBehaviorOptions 
   const enterCompactY = scrollThreshold + Math.max(4, Math.round(scrollHysteresisPx * 0.45));
   const exitCompactY = Math.max(8, scrollThreshold - scrollHysteresisPx);
 
-  const [state, setState] = useState<StableHeaderBehaviorState>({
-    mode: "expanded-top",
-    activePanel: "none",
-    showSearchSurface: false,
-    isScrolled: false,
-    scrollProgress: 0,
+  const [state, setState] = useState<StableHeaderBehaviorState>(() => {
+    if (typeof window === "undefined") {
+      return {
+        mode: "expanded-top",
+        activePanel: "none",
+        showSearchSurface: false,
+        isScrolled: false,
+        scrollProgress: 0,
+      };
+    }
+    const y = window.scrollY;
+    const progress = Math.min(1, y / scrollThreshold);
+    const mobile = window.matchMedia("(max-width: 1023px)").matches;
+    const mode: HeaderMode = mobile
+      ? "expanded-top"
+      : y >= enterCompactY
+        ? "compact"
+        : "expanded-top";
+    return {
+      mode,
+      activePanel: "none",
+      showSearchSurface: false,
+      isScrolled: y > 10,
+      scrollProgress: progress,
+    };
   });
 
   const rafRef = useRef<number | null>(null);
@@ -91,7 +110,10 @@ export function useStableHeaderBehavior(options: UseStableHeaderBehaviorOptions 
   const forceExpandedUntilRef = useRef<number>(0);
   /** Ниже lg: компактная строка отключена — скрытие через translate (см. useAirbnbMobileHeaderScroll). */
   const isMobileLayoutRef = useRef(false);
-  stateRef.current = state;
+
+  useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
 
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 1023px)");
@@ -207,19 +229,6 @@ export function useStableHeaderBehavior(options: UseStableHeaderBehaviorOptions 
   useEffect(() => {
     const y = window.scrollY;
     lastScrollYRef.current = y;
-    const progress = Math.min(1, y / scrollThreshold);
-    const mobile = window.matchMedia("(max-width: 1023px)").matches;
-    const mode: HeaderMode = mobile
-      ? "expanded-top"
-      : y >= enterCompactY
-        ? "compact"
-        : "expanded-top";
-    setState((prev) => ({
-      ...prev,
-      scrollProgress: progress,
-      mode,
-      isScrolled: y > 10,
-    }));
 
     window.addEventListener("scroll", handleScroll, { passive: true });
     const vv = window.visualViewport;
@@ -316,7 +325,9 @@ export function useStableHeaderBehavior(options: UseStableHeaderBehaviorOptions 
     }, [enterCompactY]),
   };
 
-  actionsRef.current = actions;
+  useEffect(() => {
+    actionsRef.current = actions;
+  }, [actions]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {

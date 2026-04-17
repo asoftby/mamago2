@@ -26,17 +26,10 @@ export function Step5OpeningHours({
   canNext = true,
   isEditable = true,
 }: Step5OpeningHoursProps) {
-  // Local state for editor
-  const [localData, setLocalData] = useState<OpeningHoursData | null>(
+  // Local state for editor - initialize from prop
+  const [localData, setLocalData] = useState<OpeningHoursData | null>(() =>
     openingHoursData || createDefaultUIState()
   );
-
-  // Sync with prop changes
-  useEffect(() => {
-    if (openingHoursData) {
-      setLocalData(openingHoursData);
-    }
-  }, [openingHoursData]);
 
   const handleChange = (data: OpeningHoursData) => {
     setLocalData(data);

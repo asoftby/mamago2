@@ -64,7 +64,7 @@ export function UserModerationForm({ userId, currentStatus, onSuccess }: UserMod
 
     setLoading(true);
     try {
-      const body: any = {
+      const body: Record<string, unknown> = {
         action,
         reason,
         note: note || undefined,
@@ -93,9 +93,9 @@ export function UserModerationForm({ userId, currentStatus, onSuccess }: UserMod
 
       setDialogOpen(false);
       onSuccess();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error performing moderation action:", error);
-      alert(`Ошибка: ${error.message}`);
+      alert(`Ошибка: ${error instanceof Error ? error.message : "Unknown error"}`);
     } finally {
       setLoading(false);
     }

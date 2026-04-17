@@ -6,8 +6,8 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 interface SubmitSectionProps {
-  place: any;
-  openingHoursData: any;
+  place: Record<string, unknown>;
+  openingHoursData: Record<string, unknown>;
   onSubmit: () => void;
   isSaving: boolean;
   isEditable: boolean;

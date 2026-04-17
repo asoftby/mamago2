@@ -34,7 +34,7 @@ export function OverlaysSection() {
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-gray-900">Place approved</p>
                       <p className="text-xs text-gray-600 mt-0.5">
-                        "Central Park Playground" has been approved
+                        &quot;Central Park Playground&quot; has been approved
                       </p>
                       <p className="text-xs text-gray-500 mt-1">2 hours ago</p>
                     </div>
@@ -52,7 +52,7 @@ export function OverlaysSection() {
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-gray-900">Improvement request created</p>
                       <p className="text-xs text-gray-600 mt-0.5">
-                        New request for "Downtown Museum"
+                        New request for &quot;Downtown Museum&quot;
                       </p>
                       <p className="text-xs text-gray-500 mt-1">5 hours ago</p>
                     </div>
@@ -70,7 +70,7 @@ export function OverlaysSection() {
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-gray-900">Business registered</p>
                       <p className="text-xs text-gray-600 mt-0.5">
-                        "Happy Kids Entertainment" joined
+                        &quot;Happy Kids Entertainment&quot; joined
                       </p>
                       <p className="text-xs text-gray-500 mt-1">1 day ago</p>
                     </div>
@@ -88,7 +88,7 @@ export function OverlaysSection() {
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-gray-900">Content updated</p>
                       <p className="text-xs text-gray-600 mt-0.5">
-                        "Summer Festival" details changed
+                        &quot;Summer Festival&quot; details changed
                       </p>
                       <p className="text-xs text-gray-500 mt-1">2 days ago</p>
                     </div>
@@ -137,7 +137,7 @@ export function OverlaysSection() {
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-gray-900">Place approved</p>
                       <p className="text-xs text-gray-600 mt-0.5">
-                        "Central Park Playground" has been approved
+                        &quot;Central Park Playground&quot; has been approved
                       </p>
                       <p className="text-xs text-gray-500 mt-1">2 hours ago</p>
                     </div>
@@ -155,7 +155,7 @@ export function OverlaysSection() {
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-gray-900">Improvement request created</p>
                       <p className="text-xs text-gray-600 mt-0.5">
-                        New request for "Downtown Museum"
+                        New request for &quot;Downtown Museum&quot;
                       </p>
                       <p className="text-xs text-gray-500 mt-1">5 hours ago</p>
                     </div>
@@ -173,7 +173,7 @@ export function OverlaysSection() {
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-gray-900">Business registered</p>
                       <p className="text-xs text-gray-600 mt-0.5">
-                        "Happy Kids Entertainment" joined
+                        &quot;Happy Kids Entertainment&quot; joined
                       </p>
                       <p className="text-xs text-gray-500 mt-1">1 day ago</p>
                     </div>

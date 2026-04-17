@@ -117,7 +117,7 @@ export function PlanAudienceSheet({
               Для кого планируем?
             </h2>
             <p className="mt-1 text-sm text-neutral-500">
-              Выберите участников или режим "Для всех"
+              Выберите участников или режим &quot;Для всех&quot;
             </p>
           </div>
           <ModalCloseButton

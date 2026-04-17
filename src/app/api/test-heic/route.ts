@@ -20,9 +20,8 @@ export async function GET() {
       heifSupported,
       supportedFormats: Object.keys(formats).filter(f => formats[f as keyof typeof formats]?.input?.file),
     });
-  } catch (error: any) {
-    return NextResponse.json({
-      error: error.message,
-    }, { status: 500 });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Failed to test HEIC support";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

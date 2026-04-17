@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ImprovementRequestForm } from "@/components/admin/moderation/ImprovementRequestForm";
-import { ImprovementRequestList } from "@/components/admin/moderation/ImprovementRequestList";
+import { ImprovementRequestList, type ImprovementRequest } from "@/components/admin/moderation/ImprovementRequestList";
 import { loadImprovementRequestsForPlace } from "./placeModerationQueries";
 
 export async function ImprovementRequestsBlock({ placeId }: { placeId: string }) {
@@ -30,7 +30,7 @@ export async function ImprovementRequestsBlock({ placeId }: { placeId: string })
                 <p>Запросов на доработку пока нет</p>
               </div>
             ) : (
-              <ImprovementRequestList requests={improvementRequests as any} />
+              <ImprovementRequestList requests={improvementRequests as ImprovementRequest[]} />
             )}
           </CardContent>
         </Card>

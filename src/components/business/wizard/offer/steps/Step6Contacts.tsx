@@ -128,7 +128,7 @@ export function Step6Contacts({ data, onChange, isEditable }: Step6ContactsProps
                   <div className="flex-1 grid grid-cols-3 gap-3">
                     <Select
                       value={link.network}
-                      onValueChange={(value) => handleUpdateSocialLink(link.id, { network: value as any })}
+                      onValueChange={(value) => handleUpdateSocialLink(link.id, { network: value as SocialLink["network"] })}
                       disabled={!isEditable}
                     >
                       <SelectTrigger>

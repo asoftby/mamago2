@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
 import { calculateMetroDistance } from "@/services/geo/geoEnrichment.service";
 import { canCreateBusinessContent } from "@/lib/auth/businessContentAccess";
 import { canManagePlaceAsync } from "@/lib/auth/placeAccess";
@@ -43,16 +44,20 @@ export async function PATCH(
     }
 
     const body = await request.json();
-    const updateData: any = {};
+    const updateData: Prisma.PlaceUpdateInput = {};
 
     // Handle district manual override
     if (body.districtManualId !== undefined) {
-      updateData.districtManualId = body.districtManualId;
+      updateData.districtManual = body.districtManualId
+        ? { connect: { id: body.districtManualId } }
+        : { disconnect: true };
     }
 
     // Handle metro manual override
     if (body.metroManualId !== undefined) {
-      updateData.metroManualId = body.metroManualId;
+      updateData.metroManual = body.metroManualId
+        ? { connect: { id: body.metroManualId } }
+        : { disconnect: true };
 
       // Calculate distance to manually selected metro
       if (body.metroManualId && existing.lat && existing.lng) {

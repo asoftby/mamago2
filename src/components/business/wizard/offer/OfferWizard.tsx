@@ -26,7 +26,7 @@ import {
 } from "./mappers";
 
 import { Step8Review } from "./steps/Step8Review";
-import type { Role } from "@prisma/client";
+import type { Role, Offer } from "@prisma/client";
 import {
   defaultEditorNav,
   editorOfferEditHref,
@@ -37,7 +37,7 @@ import { navigateToCompatibleHref } from "@/lib/routing/clientNavigation";
 
 interface OfferWizardProps {
   mode: OfferWizardMode;
-  offer?: any; // Offer entity for edit mode
+  offer?: Offer; // Offer entity for edit mode
   userId: string;
   userRole?: Role;
   business?: {
@@ -247,9 +247,9 @@ export function OfferWizard({
       if (mode === "create" && typeof window !== "undefined") {
         localStorage.removeItem(LOCAL_STORAGE_KEY);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Save draft error:", error);
-      toast.error(error.message || "Ошибка сохранения");
+      toast.error(error instanceof Error ? error.message : "Ошибка сохранения");
     } finally {
       setIsSaving(false);
     }
@@ -347,9 +347,9 @@ export function OfferWizard({
       } else {
         router.refresh();
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Submit error:", error);
-      toast.error(error.message || "Ошибка отправки");
+      toast.error(error instanceof Error ? error.message : "Ошибка отправки");
     } finally {
       setIsSubmitting(false);
     }

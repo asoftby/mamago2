@@ -198,10 +198,12 @@ export function DayScenarioBlock({ children, selectedDate }: Props) {
 
   // Reset scenario when date changes
   useEffect(() => {
-    setGlobalSeed(0);
-    setSlotState({});
-    setDirty(false);
-    setSaved(false);
+    queueMicrotask(() => {
+      setGlobalSeed(0);
+      setSlotState({});
+      setDirty(false);
+      setSaved(false);
+    });
   }, [selectedDate]);
 
   const { addScenario, confirmConflict, dismissConflict, saveState, conflict } = useAddScenarioPlan();
@@ -242,7 +244,7 @@ export function DayScenarioBlock({ children, selectedDate }: Props) {
   if (!hasInterests) {
     return (
       <div className="space-y-3">
-        <ChildSwitcher children={children} selection={selection} onChange={handleSelectionChange} />
+        <ChildSwitcher selection={selection} onChange={handleSelectionChange}>{children}</ChildSwitcher>
         <div className="rounded-xl border border-dashed border-neutral-200 bg-neutral-50/50 px-4 py-6 text-center">
           <p className="text-sm font-medium text-neutral-700 mb-1">
             Добавьте интересы {activeChildren.map((c) => c.name).join(" и ")}
@@ -273,7 +275,7 @@ export function DayScenarioBlock({ children, selectedDate }: Props) {
   if (!scenario) {
     return (
       <div className="space-y-3">
-        <ChildSwitcher children={children} selection={selection} onChange={handleSelectionChange} />
+        <ChildSwitcher selection={selection} onChange={handleSelectionChange}>{children}</ChildSwitcher>
         <div className="rounded-xl border border-dashed border-neutral-200 bg-neutral-50/50 px-4 py-6 text-center">
           <BodyMuted className="text-sm">Нет подходящих событий на этот день</BodyMuted>
         </div>
@@ -350,7 +352,7 @@ export function DayScenarioBlock({ children, selectedDate }: Props) {
 
   return (
     <div className="space-y-4">
-      <ChildSwitcher children={children} selection={selection} onChange={handleSelectionChange} />
+      <ChildSwitcher selection={selection} onChange={handleSelectionChange}>{children}</ChildSwitcher>
 
       {/* Header */}
       <div className="flex items-center gap-1.5">

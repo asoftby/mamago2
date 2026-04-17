@@ -70,7 +70,10 @@ export function MobileHeader() {
   const spacerMeasureRef = useRef({
     useScrollTransform,
   });
-  spacerMeasureRef.current = { useScrollTransform };
+  
+  useLayoutEffect(() => {
+    spacerMeasureRef.current = { useScrollTransform };
+  }, [useScrollTransform]);
 
   /** Стабильная подпись смены вёрстки хедера (одна зависимость у второго эффекта). */
   const mobileHeaderSpacerSyncKey = [
@@ -108,10 +111,11 @@ export function MobileHeader() {
     const el = headerRef.current;
     if (!el) return;
     if (!spacerMeasureRef.current.useScrollTransform) {
-      setSpacerHeight(0);
+      requestAnimationFrame(() => setSpacerHeight(0));
       return;
     }
-    setSpacerHeight(Math.round(el.offsetHeight));
+    const newHeight = Math.round(el.offsetHeight);
+    requestAnimationFrame(() => setSpacerHeight(newHeight));
   }, [mobileHeaderSpacerSyncKey]);
 
   return (

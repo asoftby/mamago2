@@ -21,7 +21,7 @@ interface DraftData {
   formattedAddr?: string | null;
   customAddress?: string | null;
   
-  images?: any[];
+  images?: Array<{ url?: string; imageId?: string }>;
   
   ageTags?: string[];
   visitFormats?: string[];

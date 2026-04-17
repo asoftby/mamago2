@@ -73,35 +73,28 @@ export function MobileSearchEntry({
 
   // Build location text
   const getLocationText = () => {
-    const parts: string[] = [];
+    const cityPhrase = getCityLocativePhrase(citySlug);
+    const nearbyPart = applied.nearby ? "Поблизости" : null;
     
-    // Always show city first
-    parts.push(getCityLocativePhrase(citySlug));
-    
-    // Add "Поблизости" if selected
-    if (applied.nearby) {
-      parts.push("Поблизости");
-    }
-    
-    // Add metro or district (mutually exclusive with nearby)
-    // Only try to match API options when we're on client and have loaded options
+    let metroOrDistrictPart: string | null = null;
     if (isClient && apiOptions) {
       if (applied.metro) {
         const metro = apiOptions.metros.find(m => m.value === applied.metro);
-        if (metro) parts.push(metro.label);
+        if (metro) metroOrDistrictPart = metro.label;
       } else if (applied.district) {
         const district = apiOptions.districts.find(d => d.value === applied.district);
-        if (district) parts.push(district.label);
+        if (district) metroOrDistrictPart = district.label;
       }
     } else {
       // Fallback: show filter ID if we have filters but no API options yet
       if (applied.metro) {
-        parts.push(`Метро: ${applied.metro}`);
+        metroOrDistrictPart = `Метро: ${applied.metro}`;
       } else if (applied.district) {
-        parts.push(`Район: ${applied.district}`);
+        metroOrDistrictPart = `Район: ${applied.district}`;
       }
     }
     
+    const parts = [cityPhrase, nearbyPart, metroOrDistrictPart].filter((p): p is string => p != null);
     return parts.join(" • ");
   };
 

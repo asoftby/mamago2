@@ -15,8 +15,8 @@ import { WhenSelect } from "@/components/ui/when-select";
 type MobileDateSheetProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  value: any;
-  onChange: (val: any) => void;
+  value: string | null | { from?: Date; to?: Date };
+  onChange: (val: string | null | { from?: Date; to?: Date }) => void;
 };
 
 // Reuse helpers from WhenSelect or duplicate them to avoid export issues if they aren't exported.

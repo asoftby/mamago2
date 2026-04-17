@@ -3,6 +3,8 @@
  * API client for fetching discovery filter options from the database
  */
 
+import type { AgeDef } from "@/server/discovery/ageMapping";
+
 export type FilterOption = {
   id: string;
   value: string;
@@ -21,6 +23,9 @@ export type DiscoveryFilterOptions = {
   metros: FilterOption[];
   districts: FilterOption[];
 };
+
+type MetroStation = { id: string; name: string };
+type District = { id: string; name: string };
 
 /**
  * Fetch discovery filter options from the API
@@ -99,7 +104,7 @@ export async function fetchDiscoveryFilters(
 
     // Enrich ages with canonical mapping (group/order/min/max)
     const { AGE_DEFS } = await import("@/server/discovery/ageMapping");
-    const ageMap = new Map(AGE_DEFS.map((d: any) => [d.value, d]));
+    const ageMap = new Map<string, AgeDef>(AGE_DEFS.map((d) => [d.value, d]));
     const ages: AgeOption[] = agesRaw
       .map((o) => {
         const def = ageMap.get(o.value);
@@ -123,14 +128,14 @@ export async function fetchDiscoveryFilters(
       });
 
     // Transform metro stations
-    const metros: FilterOption[] = (metroData.metroStations || []).map((station: any) => ({
+    const metros: FilterOption[] = (metroData.metroStations || []).map((station: MetroStation) => ({
       id: station.id,
       value: station.id,
       label: station.name,
     }));
 
     // Transform districts
-    const districts: FilterOption[] = (districtsData.districts || []).map((district: any) => ({
+    const districts: FilterOption[] = (districtsData.districts || []).map((district: District) => ({
       id: district.id,
       value: district.id,
       label: district.name,
@@ -198,7 +203,7 @@ export function useDiscoveryFilterOptions(citySlug: string | null = "minsk") {
 
         if (metroResponse.ok) {
           const metroData = await metroResponse.json();
-          metros = (metroData.metroStations || []).map((station: any) => ({
+          metros = (metroData.metroStations || []).map((station: MetroStation) => ({
             id: station.id,
             value: station.id,
             label: station.name,
@@ -213,7 +218,7 @@ export function useDiscoveryFilterOptions(citySlug: string | null = "minsk") {
 
         if (districtsResponse.ok) {
           const districtsData = await districtsResponse.json();
-          districts = (districtsData.districts || []).map((district: any) => ({
+          districts = (districtsData.districts || []).map((district: District) => ({
             id: district.id,
             value: district.id,
             label: district.name,

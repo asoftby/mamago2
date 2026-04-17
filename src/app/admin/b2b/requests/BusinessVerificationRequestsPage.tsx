@@ -151,7 +151,7 @@ export function BusinessVerificationRequestsPage({
         {/* Empty state */}
         {!loading && !error && businesses.length === 0 && (
           <div className="text-center py-8 text-gray-500">
-            Нет бизнесов со статусом "{STATUS_LABELS[activeStatus]}"
+            Нет бизнесов со статусом &quot;{STATUS_LABELS[activeStatus]}&quot;
           </div>
         )}
 

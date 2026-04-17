@@ -162,15 +162,10 @@ export async function POST(request: NextRequest) {
         slug: slugRow?.slug ?? null,
       },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Create event error:", error);
-    if (error instanceof Error) {
-      return NextResponse.json({ error: error.message }, { status: 400 });
-    }
-    return NextResponse.json(
-      { error: error.message || "Failed to create event" },
-      { status: 500 }
-    );
+    const message = error instanceof Error ? error.message : "Failed to create event";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
 
@@ -228,11 +223,9 @@ export async function GET(request: NextRequest) {
       success: true,
       events,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("List events error:", error);
-    return NextResponse.json(
-      { error: error.message || "Failed to list events" },
-      { status: 500 }
-    );
+    const message = error instanceof Error ? error.message : "Failed to list events";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

@@ -1,9 +1,7 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Check if place has changes compared to original/published version
  * Uses same comparison logic as PlaceRevisionModerationView
  */
-
 import { Place } from "@prisma/client";
 import type { OpeningHoursData } from "@/components/openingHours";
 
@@ -14,7 +12,7 @@ type PlaceImage = {
   width: number | null;
   height: number | null;
   blurhash: string | null;
-  kind: any;
+  kind: string;
   sortOrder: number;
   placeId?: string;
   revisionId?: string;
@@ -46,7 +44,7 @@ function normalizeOpeningHours(data: OpeningHoursData | null): OpeningHoursData 
 /**
  * Check if a value is empty (null, undefined, empty string, empty array)
  */
-function isEmpty(value: any): boolean {
+function isEmpty(value: unknown): boolean {
   if (value === null || value === undefined) return true;
   if (typeof value === "string") return value.trim() === "";
   if (Array.isArray(value)) return value.length === 0;
@@ -56,7 +54,7 @@ function isEmpty(value: any): boolean {
 /**
  * Compare two values and determine if they're different
  */
-function hasChanged(oldValue: any, newValue: any): boolean {
+function hasChanged(oldValue: unknown, newValue: unknown): boolean {
   const oldEmpty = isEmpty(oldValue);
   const newEmpty = isEmpty(newValue);
 

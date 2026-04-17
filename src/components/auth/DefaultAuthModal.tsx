@@ -50,11 +50,12 @@ export function DefaultAuthModal({
   const isMobile = !useMediaQuery("(min-width: 640px)");
   const [phase, setPhase] = useState<AuthModalPhase>("auth");
 
-  useEffect(() => {
-    if (!open) {
+  const handleOpenChange = useCallback((newOpen: boolean) => {
+    if (!newOpen) {
       setPhase("auth");
     }
-  }, [open]);
+    onOpenChange(newOpen);
+  }, [onOpenChange]);
 
   useEffect(() => {
     if (open) {
@@ -107,7 +108,7 @@ export function DefaultAuthModal({
   );
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent
         dismissible={false}
         showCloseButton={false}

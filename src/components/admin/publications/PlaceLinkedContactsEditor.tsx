@@ -103,7 +103,7 @@ export function PlaceLinkedContactsEditor({ placeId }: { placeId: string }) {
       const merged = mergeContactsFromRevision(place, activeRevision ?? null);
       const base = mapPlaceToFormData({
         ...place,
-        images: place.images as any,
+        images: place.images as import("@prisma/client").PlaceImage[],
       });
       const next: PlaceFormData = {
         ...base,

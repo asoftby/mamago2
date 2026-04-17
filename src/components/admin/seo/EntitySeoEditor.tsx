@@ -107,13 +107,13 @@ export function EntitySeoEditor({
   const h1IsCustom = seoH1.trim().length > 0;
 
   const metaLine = useMemo(() => {
+    const city = entity.citySlug?.trim();
     const parts: string[] = [
       ENTITY_TYPE_LABEL[kind],
       SECTION_LABEL[kind],
       humanizeContentStatus(entity.contentStatus),
+      ...(city ? [city] : []),
     ];
-    const city = entity.citySlug?.trim();
-    if (city) parts.push(city);
     return parts.join(" · ");
   }, [kind, entity.contentStatus, entity.citySlug]);
 

@@ -64,15 +64,23 @@ async function testCompleteFlow() {
     
     const childIds = childrenRaw.map(c => c.id);
     
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const systemInterestsData: any[] = await prisma.$queryRaw`
+    interface SystemInterestRow {
+      childId: string;
+      interestSlug: string;
+    }
+    
+    interface CustomInterestRow {
+      childId: string;
+      label: string;
+    }
+    
+    const systemInterestsData: SystemInterestRow[] = await prisma.$queryRaw`
       SELECT "childId", "interestSlug" 
       FROM "ChildInterest" 
       WHERE "childId" = ANY(${childIds})
     `;
     
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const customInterestsData: any[] = await prisma.$queryRaw`
+    const customInterestsData: CustomInterestRow[] = await prisma.$queryRaw`
       SELECT "childId", "label" 
       FROM "ChildCustomInterest" 
       WHERE "childId" = ANY(${childIds})
@@ -83,15 +91,11 @@ async function testCompleteFlow() {
       name: child.name,
       birthDate: child.birthDate,
       systemInterests: systemInterestsData
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .filter((interest: any) => interest.childId === child.id)
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .map((interest: any) => ({ interestSlug: interest.interestSlug })),
+        .filter((interest) => interest.childId === child.id)
+        .map((interest) => ({ interestSlug: interest.interestSlug })),
       customInterests: customInterestsData
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .filter((interest: any) => interest.childId === child.id)
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .map((interest: any) => ({ label: interest.label })),
+        .filter((interest) => interest.childId === child.id)
+        .map((interest) => ({ label: interest.label })),
     }));
     
     console.log(`✅ Loaded ${children.length} children with interests`);
@@ -129,14 +133,15 @@ async function testCompleteFlow() {
     console.log("\n🗑️ Testing child deletion...");
     
     // Check interests before deletion
+    interface CountRow { count: string }
      
-    const interestsBefore = await prisma.$queryRaw`
+    const interestsBefore = await prisma.$queryRaw<CountRow[]>`
       SELECT COUNT(*) as count FROM "ChildInterest" WHERE "childId" = ${child.id}
-    ` as any[];
+    `;
      
-    const customInterestsBefore = await prisma.$queryRaw`
+    const customInterestsBefore = await prisma.$queryRaw<CountRow[]>`
       SELECT COUNT(*) as count FROM "ChildCustomInterest" WHERE "childId" = ${child.id}
-    ` as any[];
+    `;
     
     console.log(`   Interests before deletion: ${interestsBefore[0].count} system, ${customInterestsBefore[0].count} custom`);
     
@@ -147,14 +152,13 @@ async function testCompleteFlow() {
     
     // Check interests after deletion
      
-    const interestsAfter = await prisma.$queryRaw`
+    const interestsAfter = await prisma.$queryRaw<CountRow[]>`
       SELECT COUNT(*) as count FROM "ChildInterest" WHERE "childId" = ${child.id}
-    ` as any[];
+    `;
      
-     
-    const customInterestsAfter = await prisma.$queryRaw`
+    const customInterestsAfter = await prisma.$queryRaw<CountRow[]>`
       SELECT COUNT(*) as count FROM "ChildCustomInterest" WHERE "childId" = ${child.id}
-    ` as any[];
+    `;
     
     console.log(`   Interests after deletion: ${interestsAfter[0].count} system, ${customInterestsAfter[0].count} custom`);
     

@@ -5,7 +5,6 @@ import { ActivityGrid } from "@/components/activity/ActivityGrid";
 import { Chip } from "@/components/ui/Chip";
 import { ActivityMock } from "@/mocks/activity.types";
 import { getFavorites, toggleFavorite } from "@/lib/localFavorites";
-import { useEffect } from "react";
 
 interface CityFeedClientProps {
   city: string;
@@ -22,13 +21,8 @@ const FILTERS = [
 
 export function CityFeedClient({ city, activities }: CityFeedClientProps) {
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [favorites, setFavorites] = useState<string[]>([]);
-  const [isMounted, setIsMounted] = useState(false);
-
-  useEffect(() => {
-    setIsMounted(true);
-    setFavorites(getFavorites());
-  }, []);
+  const [favorites, setFavorites] = useState<string[]>(() => getFavorites());
+  const [isMounted, setIsMounted] = useState(true);
 
   const handleToggleTag = (tagId: string) => {
     setSelectedTags((prev) =>

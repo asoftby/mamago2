@@ -57,8 +57,8 @@ async function testHEICSupport() {
     const metadata = await instance.metadata();
     
     console.log("✅ Metadata read:", metadata);
-  } catch (error: any) {
-    console.log("❌ Test failed (expected for fake buffer):", error.message);
+  } catch (error: unknown) {
+    console.log("❌ Test failed (expected for fake buffer):", error instanceof Error ? error.message : String(error));
   }
 
   console.log("\n" + "=".repeat(60));

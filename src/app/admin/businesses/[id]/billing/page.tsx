@@ -49,8 +49,8 @@ export default async function AdminBusinessBillingPage({
   monthStart.setHours(0, 0, 0, 0);
   
   const monthSpent = transactions
-    .filter((tx: any) => tx.occurredAt >= monthStart && tx.amount.toNumber() < 0 && tx.status === "SUCCEEDED")
-    .reduce((sum: number, tx: any) => sum + Math.abs(tx.amount.toNumber()), 0);
+    .filter((tx) => tx.occurredAt >= monthStart && tx.amount.toNumber() < 0 && tx.status === "SUCCEEDED")
+    .reduce((sum: number, tx) => sum + Math.abs(tx.amount.toNumber()), 0);
 
   return (
     <div className="space-y-6">
@@ -187,7 +187,7 @@ export default async function AdminBusinessBillingPage({
               </tr>
             </thead>
             <tbody>
-              {transactions.slice(0, 10).map((tx: any) => (
+              {transactions.slice(0, 10).map((tx) => (
                 <tr key={tx.id} className="border-b border-gray-100 hover:bg-gray-50">
                   <td className="py-2 px-3 text-sm text-gray-900">
                     {new Date(tx.occurredAt).toLocaleDateString("ru-RU")}

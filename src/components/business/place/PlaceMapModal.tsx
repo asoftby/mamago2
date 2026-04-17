@@ -16,7 +16,7 @@ interface PlaceMapModalProps {
     lng: number;
     googlePlaceId?: string;
     formattedAddr?: string;
-    addressJson?: any[];
+    addressJson?: google.maps.GeocoderAddressComponent[];
   }) => void;
 }
 
@@ -27,7 +27,7 @@ export function PlaceMapModal({
   initialLng,
   onConfirm,
 }: PlaceMapModalProps) {
-  const [tempPin, setTempPin] = useState<{ lat: number; lng: number } | null>(
+  const [tempPin, setTempPin] = useState<{ lat: number; lng: number } | null>(() =>
     initialLat != null && initialLng != null ? { lat: initialLat, lng: initialLng } : null
   );
 
@@ -152,7 +152,6 @@ export function PlaceMapModal({
 
     const initialPin =
       initialLat != null && initialLng != null ? { lat: initialLat, lng: initialLng } : null;
-    setTempPin(initialPin);
 
     void initMap(initialPin);
 
@@ -167,7 +166,7 @@ export function PlaceMapModal({
       document.removeEventListener("keydown", handleEsc);
       cleanup();
     };
-  }, [isOpen, initialLat, initialLng]);
+  }, [isOpen, initialLat, initialLng, onClose]);
 
   useEffect(() => {
     if (!tempPin || !mapInstanceRef.current) return;

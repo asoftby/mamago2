@@ -48,10 +48,10 @@ export async function POST(request: NextRequest) {
         status: updatedAccount.status,
       },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Reactivate account error:", error);
     return NextResponse.json(
-      { error: error.message || "Failed to reactivate account" },
+      { error: error instanceof Error ? error.message : "Failed to reactivate account" },
       { status: 500 }
     );
   }

@@ -1,11 +1,11 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useDiscoveryFilters } from "@/features/filters/discovery/filters.store";
+
+type FilterPatch = Record<string, string | number | boolean | null | undefined>;
 
 export function useFilterUpdater() {
   const { setDraft } = useDiscoveryFilters();
 
-  // Update draft state instead of URL directly
-  const updateFilters = (patch: any) => {
+  const updateFilters = (patch: FilterPatch) => {
     console.log('updateFilters called with patch:', patch);
     setDraft(patch);
   };

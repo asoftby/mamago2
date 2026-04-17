@@ -8,15 +8,13 @@ const AUTOPLAY_DURATION = 5000;
 export function useStoryViewer(stories: StoryCollection[]) {
   const [activeStoryIndex, setActiveStoryIndex] = useState<number | null>(null);
   const [activeItemIndex, setActiveItemIndex] = useState(0);
-  const [seenIds, setSeenIds] = useState<Set<string>>(new Set());
-
-  // Restore seen state from localStorage after mount (avoids SSR hydration mismatch)
-  useEffect(() => {
+  const [seenIds, setSeenIds] = useState<Set<string>>(() => {
     try {
       const raw = localStorage.getItem("mamago.stories.seen");
-      if (raw) setSeenIds(new Set<string>(JSON.parse(raw)));
+      if (raw) return new Set<string>(JSON.parse(raw));
     } catch {}
-  }, []);
+    return new Set();
+  });
   const [paused, setPaused] = useState(false);
   // Incremented on every manual nav to reset the CSS animation
   const [progressKey, setProgressKey] = useState(0);
@@ -89,7 +87,10 @@ export function useStoryViewer(stories: StoryCollection[]) {
   // ── autoplay ─────────────────────────────────────────────────────────────
 
   const nextRef = useRef(next);
-  nextRef.current = next;
+
+  useEffect(() => {
+    nextRef.current = next;
+  }, [next]);
 
   useEffect(() => {
     if (!isOpen || paused) return;

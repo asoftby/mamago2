@@ -3,7 +3,7 @@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ScheduleEditor } from "@/components/schedule-editor/ScheduleEditor";
-import type { ActivityFormData } from "./types";
+import type { ActivityFormData, ActivityType, PricingMode, BookingMode, ActivityCTAType } from "./types";
 
 interface ActivityFormProps {
   data: ActivityFormData;
@@ -77,7 +77,7 @@ export function ActivityForm({ data, onChange }: ActivityFormProps) {
             <button
               key={type.value}
               type="button"
-              onClick={() => handleChange({ activityType: type.value as any })}
+              onClick={() => handleChange({ activityType: type.value as ActivityType })}
               className={`px-4 py-2 rounded-lg border text-sm font-medium transition-colors ${
                 data.activityType === type.value
                   ? "bg-primary text-primary-foreground border-primary"
@@ -103,7 +103,7 @@ export function ActivityForm({ data, onChange }: ActivityFormProps) {
             <button
               key={mode.value}
               type="button"
-              onClick={() => handleChange({ pricingMode: mode.value as any })}
+              onClick={() => handleChange({ pricingMode: mode.value as PricingMode })}
               className={`px-4 py-2 rounded-lg border text-sm font-medium transition-colors ${
                 data.pricingMode === mode.value
                   ? "bg-primary text-primary-foreground border-primary"
@@ -154,7 +154,7 @@ export function ActivityForm({ data, onChange }: ActivityFormProps) {
             <button
               key={mode.value}
               type="button"
-              onClick={() => handleChange({ bookingMode: mode.value as any })}
+              onClick={() => handleChange({ bookingMode: mode.value as BookingMode })}
               className={`px-4 py-2 rounded-lg border text-sm font-medium transition-colors ${
                 data.bookingMode === mode.value
                   ? "bg-primary text-primary-foreground border-primary"
@@ -217,7 +217,7 @@ export function ActivityForm({ data, onChange }: ActivityFormProps) {
             <button
               key={cta.value}
               type="button"
-              onClick={() => handleChange({ ctaType: cta.value as any })}
+              onClick={() => handleChange({ ctaType: cta.value as ActivityCTAType })}
               className={`px-4 py-2 rounded-lg border text-sm font-medium transition-colors ${
                 data.ctaType === cta.value
                   ? "bg-primary text-primary-foreground border-primary"

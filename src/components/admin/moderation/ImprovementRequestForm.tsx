@@ -86,9 +86,9 @@ export function ImprovementRequestForm({
       if (onSuccess) {
         onSuccess();
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Create improvement request error:", error);
-      toast.error(error.message || "Не удалось создать запрос");
+      toast.error(error instanceof Error ? error.message : "Не удалось создать запрос");
     } finally {
       setIsSubmitting(false);
     }

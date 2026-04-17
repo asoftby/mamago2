@@ -50,10 +50,10 @@ export async function POST(request: NextRequest) {
         suspendedReason: updatedAccount.suspendedReason,
       },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Suspend account error:", error);
     return NextResponse.json(
-      { error: error.message || "Failed to suspend account" },
+      { error: error instanceof Error ? error.message : "Failed to suspend account" },
       { status: 500 }
     );
   }

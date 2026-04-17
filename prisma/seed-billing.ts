@@ -208,7 +208,22 @@ async function seedBilling() {
     });
 
     // Create Transactions
-    const transactions: any[] = [];
+    interface TransactionData {
+      billingAccountId: string;
+      type: BillingTransactionType;
+      status: BillingTransactionStatus;
+      amount: number;
+      currency: string;
+      description: string;
+      occurredAt: Date;
+      referenceType: BillingReferenceType;
+      referenceId?: string;
+      subscriptionId?: string;
+      paymentMethodId?: string;
+      failureReason?: string | undefined;
+    }
+    
+    const transactions: TransactionData[] = [];
 
     // Initial subscription charge (2 months ago)
     const initialDate = new Date();
@@ -242,7 +257,7 @@ async function seedBilling() {
       referenceId: subscription.id,
       subscriptionId: subscription.id,
       paymentMethodId: paymentMethod.id,
-      failureReason: subscriptionStatus === SubscriptionStatus.PAST_DUE ? "Insufficient funds" : null,
+      failureReason: subscriptionStatus === SubscriptionStatus.PAST_DUE ? "Insufficient funds" : undefined,
     });
 
     // Deposit topups

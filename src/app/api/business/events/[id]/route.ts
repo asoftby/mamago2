@@ -94,12 +94,10 @@ export async function GET(
       success: true,
       event,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Get event error:", error);
-    return NextResponse.json(
-      { error: error.message || "Failed to get event" },
-      { status: 500 }
-    );
+    const message = error instanceof Error ? error.message : "Failed to get event";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
 
@@ -292,15 +290,10 @@ export async function PATCH(
         slug: slugRow?.slug ?? null,
       },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Update event error:", error);
-    if (error instanceof Error) {
-      return NextResponse.json({ error: error.message }, { status: 400 });
-    }
-    return NextResponse.json(
-      { error: error.message || "Failed to update event" },
-      { status: 500 }
-    );
+    const message = error instanceof Error ? error.message : "Failed to update event";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
 
@@ -336,11 +329,9 @@ export async function DELETE(
     revalidatePath("/admin");
 
     return NextResponse.json({ success: true });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Delete event error:", error);
-    return NextResponse.json(
-      { error: error.message || "Failed to delete event" },
-      { status: 500 }
-    );
+    const message = error instanceof Error ? error.message : "Failed to delete event";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

@@ -24,10 +24,10 @@ export async function GET(
     const usages = await getMediaUsagesWithDetails(id);
 
     return NextResponse.json({ usages });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error fetching media usages:", error);
     return NextResponse.json(
-      { error: error.message || "Failed to fetch usages" },
+      { error: error instanceof Error ? error.message : "Failed to fetch usages" },
       { status: 500 }
     );
   }

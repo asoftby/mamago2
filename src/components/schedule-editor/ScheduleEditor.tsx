@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { Plus, Copy, Calendar as CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ScheduleEditorValue, ScheduleDate, ScheduleSlot, SlotFormData } from "./types";
@@ -28,6 +28,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 
+const EMPTY_SLOTS: ScheduleSlot[] = [];
+
 interface ScheduleEditorProps {
   value: ScheduleEditorValue;
   onChange: (value: ScheduleEditorValue) => void;
@@ -35,6 +37,21 @@ interface ScheduleEditorProps {
 }
 
 export function ScheduleEditor({ value, onChange, className }: ScheduleEditorProps) {
+  // Format date label
+  const formatDateLabel = (date: Date): string => {
+    const days = ["вс", "пн", "вт", "ср", "чт", "пт", "сб"];
+    const months = [
+      "января", "февраля", "марта", "апреля", "мая", "июня",
+      "июля", "августа", "сентября", "октября", "ноября", "декабря"
+    ];
+    
+    const day = date.getDate();
+    const month = months[date.getMonth()];
+    const weekday = days[date.getDay()];
+    
+    return `${day} ${month}, ${weekday}`;
+  };
+
   const [selectedDateId, setSelectedDateId] = useState<string | null>(
     value.dates[0]?.id || null
   );
@@ -105,10 +122,10 @@ export function ScheduleEditor({ value, onChange, className }: ScheduleEditorPro
   };
 
   // Get existing dates as ISO strings for calendar
-  const existingDates = value.dates.map((d) => d.isoDate);
+  const existingDates = useMemo(() => value.dates.map((d) => d.isoDate), [value.dates]);
 
   // Add single date
-  const handleAddDate = (date: Date) => {
+  const handleAddDate = useCallback((date: Date) => {
     const isoDate = date.toISOString().split("T")[0];
     
     // Check if date already exists
@@ -121,7 +138,7 @@ export function ScheduleEditor({ value, onChange, className }: ScheduleEditorPro
       id: `date-${Math.random().toString(36).substr(2, 9)}`,
       isoDate,
       label: formatDateLabel(date),
-      slots: [],
+      slots: EMPTY_SLOTS,
     };
 
     const updatedDates = [...value.dates, newDate].sort((a, b) => 
@@ -142,7 +159,7 @@ export function ScheduleEditor({ value, onChange, className }: ScheduleEditorPro
         setShowCopySlotsPrompt(true);
       }
     }
-  };
+  }, [value.dates, onChange]);
 
   // Add multiple dates
   const handleAddMultipleDates = () => {
@@ -163,7 +180,7 @@ export function ScheduleEditor({ value, onChange, className }: ScheduleEditorPro
         id: `date-${Date.now()}-${Math.random()}`,
         isoDate,
         label: formatDateLabel(date),
-        slots: [],
+        slots: EMPTY_SLOTS,
       };
 
       if (!firstNewDateId) {
@@ -318,21 +335,6 @@ export function ScheduleEditor({ value, onChange, className }: ScheduleEditorPro
     });
 
     onChange({ dates: updatedDates });
-  };
-
-  // Format date label
-  const formatDateLabel = (date: Date): string => {
-    const days = ["вс", "пн", "вт", "ср", "чт", "пт", "сб"];
-    const months = [
-      "января", "февраля", "марта", "апреля", "мая", "июня",
-      "июля", "августа", "сентября", "октября", "ноября", "декабря"
-    ];
-    
-    const day = date.getDate();
-    const month = months[date.getMonth()];
-    const weekday = days[date.getDay()];
-    
-    return `${day} ${month}, ${weekday}`;
   };
 
   return (

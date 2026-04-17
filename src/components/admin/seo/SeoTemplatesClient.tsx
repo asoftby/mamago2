@@ -85,7 +85,9 @@ export function SeoTemplatesClient({ initialTemplates }: SeoTemplatesClientProps
     }
     for (const t of templates) {
       const list = map.get(t.scope);
-      if (list) list.push(t);
+      if (list) {
+        map.set(t.scope, [...list, t]);
+      }
     }
     return map;
   }, [templates]);

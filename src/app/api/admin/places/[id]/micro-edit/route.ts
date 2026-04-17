@@ -20,10 +20,10 @@ export async function GET(
     const edits = await listMicroEditsForEntity("PLACE", params.id);
 
     return NextResponse.json({ edits });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("[API] List micro-edits error:", error);
     return NextResponse.json(
-      { error: error.message || "Failed to list micro-edits" },
+      { error: error instanceof Error ? error.message : "Failed to list micro-edits" },
       { status: 500 }
     );
   }
@@ -72,10 +72,10 @@ export async function POST(
     });
 
     return NextResponse.json({ log });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("[API] Apply micro-edit error:", error);
     return NextResponse.json(
-      { error: error.message || "Failed to apply micro-edit" },
+      { error: error instanceof Error ? error.message : "Failed to apply micro-edit" },
       { status: 500 }
     );
   }

@@ -114,12 +114,13 @@ async function testImagePipeline() {
   try {
     await processImage(fakeHeicBuffer, "image/heic");
     console.log("⚠️  HEIC processing succeeded (libheif is installed)");
-  } catch (error: any) {
-    if (error.message.includes("HEIC/HEIF format is not supported")) {
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    if (errorMessage.includes("HEIC/HEIF format is not supported")) {
       console.log("✅ HEIC/HEIF graceful error handling works");
-      console.log("   Error message:", error.message);
+      console.log("   Error message:", errorMessage);
     } else {
-      console.log("⚠️  HEIC processing failed with different error:", error.message);
+      console.log("⚠️  HEIC processing failed with different error:", errorMessage);
     }
   }
 

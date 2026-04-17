@@ -388,14 +388,14 @@ export function LayoutContractSection() {
                 <span className="text-green-600 font-bold">✓</span>
                 <div>
                   <p className="font-medium text-gray-900">Good: Clickable KPI card</p>
-                  <p className="text-gray-600">Links to filtered list of items (e.g., "12 Pending" → /admin/moderation/places?status=pending)</p>
+                  <p className="text-gray-600">Links to filtered list of items (e.g., &quot;12 Pending&quot; → /admin/moderation/places?status=pending)</p>
                 </div>
               </div>
               <div className="flex items-start gap-2">
                 <span className="text-green-600 font-bold">✓</span>
                 <div>
                   <p className="font-medium text-gray-900">Good: Alert with action</p>
-                  <p className="text-gray-600">"3 Failed Payments" with "View Transactions" button</p>
+                  <p className="text-gray-600">&quot;3 Failed Payments&quot; with &quot;View Transactions&quot; button</p>
                 </div>
               </div>
               <div className="flex items-start gap-2">
@@ -416,7 +416,7 @@ export function LayoutContractSection() {
             <div className="bg-yellow-50 border border-yellow-200 rounded p-3 mt-3">
               <p className="text-xs text-yellow-900">
                 <span className="font-semibold">Enforcement:</span> Every KPI card must link to a real, existing admin route. 
-                If the destination doesn't exist yet, don't show the KPI card.
+                If the destination doesn&#39;t exist yet, don&#39;t show the KPI card.
               </p>
             </div>
           </div>
@@ -443,7 +443,7 @@ export function LayoutContractSection() {
               </ol>
             </div>
             <p className="font-semibold mt-3">
-              When in doubt: Copy from ui-lab-admin. Don't improvise.
+              When in doubt: Copy from ui-lab-admin. Don&#39;t improvise.
             </p>
           </div>
         </div>
@@ -460,7 +460,7 @@ export function LayoutContractSection() {
             <p>✓ Transform tables to cards on mobile</p>
             <p>✓ Handle all four states (loading, empty, error, no results)</p>
             <p>✓ Make KPI cards and alerts actionable</p>
-            <p>✓ Copy patterns from ui-lab-admin, don't improvise</p>
+            <p>✓ Copy patterns from ui-lab-admin, don&#39;t improvise</p>
           </div>
         </div>
       </div>

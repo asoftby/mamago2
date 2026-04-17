@@ -42,10 +42,10 @@ export async function POST(request: NextRequest) {
       newBalance,
       difference: newBalance - oldBalance,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Recalculate balance error:", error);
     return NextResponse.json(
-      { error: error.message || "Failed to recalculate balance" },
+      { error: error instanceof Error ? error.message : "Failed to recalculate balance" },
       { status: 500 }
     );
   }

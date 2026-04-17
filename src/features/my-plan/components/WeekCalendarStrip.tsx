@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -36,10 +36,11 @@ export function WeekCalendarStrip({
   const [direction, setDirection] = useState<1 | -1>(1);
   const activePillLayoutId = useId();
 
-  useEffect(() => {
-    const nextStart = getWeekStart(selectedDate);
-    if (nextStart !== visibleWeekStart) setVisibleWeekStart(nextStart);
-  }, [selectedDate, visibleWeekStart]);
+  // Sync visibleWeekStart when selectedDate changes externally
+  const nextStart = getWeekStart(selectedDate);
+  if (nextStart !== visibleWeekStart) {
+    setVisibleWeekStart(nextStart);
+  }
 
   const weekDays = useMemo(() => getWeekDays(visibleWeekStart), [visibleWeekStart]);
   const monthLabel = useMemo(() => buildWeekMonthLabel(weekDays, selectedDate), [weekDays, selectedDate]);

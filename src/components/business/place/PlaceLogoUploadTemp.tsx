@@ -50,7 +50,7 @@ export function PlaceLogoUploadTemp({
         const response = await fetch(`/api/business/temp-media?wizardSessionId=${wizardSessionId}`);
         if (response.ok) {
           const { media } = await response.json();
-          const logoMedia = media.find((m: any) => m.kind === "PLACE_LOGO");
+          const logoMedia = media.find((m: { kind: string; url: string; id: string }) => m.kind === "PLACE_LOGO");
           
           if (logoMedia) {
             console.log("[PlaceLogoUploadTemp] Restored logo from session:", logoMedia.url);

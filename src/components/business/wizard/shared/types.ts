@@ -26,7 +26,7 @@ export interface StepValidationResult {
 /**
  * Wizard step configuration
  */
-export interface WizardStepConfig<TFormData = any> {
+export interface WizardStepConfig<TFormData = Record<string, unknown>> {
   id: number;
   key: string; // e.g., "basics", "description"
   title: string;
@@ -37,7 +37,7 @@ export interface WizardStepConfig<TFormData = any> {
     data: TFormData;
     onChange: (updates: Partial<TFormData>) => void;
     isEditable: boolean;
-    [key: string]: any; // Allow additional props
+    [key: string]: unknown; // Allow additional props
   }>;
   
   // Completion check

@@ -181,7 +181,14 @@ export default async function AdminMediaDetailPage({
             </h2>
             {usages.length > 0 ? (
               <div className="space-y-3">
-                {usages.map((usage: any) => (
+                {usages.map((usage: {
+                  id: string;
+                  entityType: string;
+                  field: string;
+                  entityName?: string | null;
+                  entityId: string;
+                  entityUrl?: string | null;
+                }) => (
                   <div
                     key={usage.id}
                     className="flex items-center justify-between p-3 border border-gray-200 rounded-lg"

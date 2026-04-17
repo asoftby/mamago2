@@ -233,7 +233,7 @@ function MyForm() {
             <div className="font-mono font-semibold">time</div>
             <div>
               <div className="font-medium">string | null</div>
-              <div className="text-muted-foreground">Выбранное время в формате "HH:mm"</div>
+              <div className="text-muted-foreground">Выбранное время в формате &quot;HH:mm&quot;</div>
             </div>
           </div>
           <div className="grid grid-cols-[120px_1fr] gap-4 pb-3 border-b">
@@ -261,14 +261,14 @@ function MyForm() {
             <div className="font-mono font-semibold">minTime</div>
             <div>
               <div className="font-medium">string</div>
-              <div className="text-muted-foreground">Минимальное время в формате "HH:mm"</div>
+              <div className="text-muted-foreground">Минимальное время в формате &quot;HH:mm&quot;</div>
             </div>
           </div>
           <div className="grid grid-cols-[120px_1fr] gap-4 pb-3 border-b">
             <div className="font-mono font-semibold">maxTime</div>
             <div>
               <div className="font-medium">string</div>
-              <div className="text-muted-foreground">Максимальное время в формате "HH:mm"</div>
+              <div className="text-muted-foreground">Максимальное время в формате &quot;HH:mm&quot;</div>
             </div>
           </div>
           <div className="grid grid-cols-[120px_1fr] gap-4 pb-3 border-b">

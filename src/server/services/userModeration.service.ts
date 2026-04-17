@@ -1,7 +1,5 @@
- 
 import prisma from "@/lib/prisma";
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import { UserStatus, UserModerationActionType, Role } from "@prisma/client";
+import { UserStatus, UserModerationActionType, Role, Prisma } from "@prisma/client";
 import { logAudit } from "./auditLog.service";
 
 // Types
@@ -116,7 +114,7 @@ export async function searchUsers(query: string, filters: UserFilters = {}) {
   const { role, status, page = 1, limit = 20 } = filters;
   const skip = (page - 1) * limit;
 
-  const where: any = {};
+  const where: Prisma.UserWhereInput = {};
 
   // Search query
   if (query) {

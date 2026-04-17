@@ -46,7 +46,7 @@ export default async function PartnerDetailPage({
 
   const { id } = await params;
 
-  const business: any = await prisma.business.findUnique({
+  const business = await prisma.business.findUnique({
     where: { id },
     include: {
       owner: {
@@ -68,7 +68,7 @@ export default async function PartnerDetailPage({
         },
         take: 5,
       },
-    } as any,
+    } ,
   });
 
   if (!business) {
@@ -311,7 +311,7 @@ export default async function PartnerDetailPage({
             <div className="mt-6">
               <h3 className="text-sm font-semibold mb-3">История изменений</h3>
               <div className="space-y-2">
-                {business.verificationLogs.map((log: any) => (
+                {business.verificationLogs.map((log) => (
                   <div
                     key={log.id}
                     className="text-sm bg-gray-50 p-3 rounded flex justify-between items-start"
@@ -363,7 +363,7 @@ export default async function PartnerDetailPage({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
-                  {places.map((place: any) => (
+                  {places.map((place) => (
                     <tr key={place.id} className="hover:bg-gray-50">
                       <td className="px-4 py-3 font-medium text-gray-900">{place.title}</td>
                       <td className="px-4 py-3 text-gray-600">{place.city?.name || "—"}</td>
@@ -381,9 +381,9 @@ export default async function PartnerDetailPage({
         {/* Offers */}
         <div className="bg-white border border-gray-200 rounded-lg p-6">
           <h2 className="text-lg font-semibold mb-4">
-            Предложения ({places.reduce((sum: number, place: any) => sum + place.activities.length, 0)})
+            Предложения ({places.reduce((sum: number, place) => sum + place.activities.length, 0)})
           </h2>
-          {places.every((place: any) => place.activities.length === 0) ? (
+          {places.every((place) => place.activities.length === 0) ? (
             <div className="text-center py-8 text-gray-500">Нет предложений</div>
           ) : (
             <div className="overflow-x-auto">
@@ -396,8 +396,8 @@ export default async function PartnerDetailPage({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
-                  {places.map((place: any) =>
-                    place.activities.map((activity: any) => (
+                  {places.map((place) =>
+                    place.activities.map((activity) => (
                       <tr key={activity.id} className="hover:bg-gray-50">
                         <td className="px-4 py-3 font-medium text-gray-900">{activity.title}</td>
                         <td className="px-4 py-3">
@@ -436,7 +436,7 @@ export default async function PartnerDetailPage({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
-                  {events.map((event: any) => (
+                  {events.map((event) => (
                     <tr key={event.id} className="hover:bg-gray-50">
                       <td className="px-4 py-3 font-medium text-gray-900">{event.title}</td>
                       <td className="px-4 py-3 text-gray-600">{event.place?.title || "—"}</td>

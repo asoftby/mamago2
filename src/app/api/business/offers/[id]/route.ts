@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
 import { z } from "zod";
+import { Prisma } from "@prisma/client";
 import {
   canCreateBusinessContent,
   canManageOwnedContent,
@@ -124,7 +125,7 @@ export async function PATCH(
       priceText = formatPriceFrom(priceFrom);
     }
 
-    const updateData: any = {};
+    const updateData: Prisma.OfferUpdateInput = {};
     
     if (data.title !== undefined) updateData.title = data.title;
     if (data.shortDescription !== undefined) updateData.description = data.shortDescription;

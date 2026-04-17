@@ -224,46 +224,45 @@ export async function processImage(
         originalWidth,
         originalHeight,
       };
-    } catch (sharpError: any) {
+    } catch (sharpError: unknown) {
+      const sharpMsg = sharpError instanceof Error ? sharpError.message : String(sharpError);
+      const sharpStack = sharpError instanceof Error ? sharpError.stack : undefined;
       console.error("❌ [PROCESSOR] Sharp error:", {
-        message: sharpError.message,
-        stack: sharpError.stack,
+        message: sharpMsg,
+        stack: sharpStack,
         mimeType: originalMimeType,
       });
       
       // Handle HEIC/HEIF specific errors
       if (originalMimeType === "image/heic" || originalMimeType === "image/heif") {
-        // Check if it's a format support issue
-        if (sharpError.message?.includes("unsupported") || 
-            sharpError.message?.includes("HEIC") ||
-            sharpError.message?.includes("HEIF")) {
+        if (sharpMsg.includes("unsupported") || 
+            sharpMsg.includes("HEIC") ||
+            sharpMsg.includes("HEIF")) {
           throw new Error(
             "HEIC/HEIF format is not supported in the current environment. " +
             "Please convert to JPEG, PNG, or WebP before uploading, or install libheif support on the server."
           );
         }
         
-        // Check if it's a compression format issue (bad seek)
-        if (sharpError.message?.includes("bad seek") || 
-            sharpError.message?.includes("compression format")) {
+        if (sharpMsg.includes("bad seek") || 
+            sharpMsg.includes("compression format")) {
           throw new Error(
             "Этот HEIC/HEIF файл использует неподдерживаемый формат сжатия. " +
             "Попробуйте конвертировать его в JPEG или PNG, или используйте другой HEIC файл."
           );
         }
         
-        // Generic HEIC error
         throw new Error(
-          `Failed to process HEIC/HEIF file: ${sharpError.message}. ` +
+          `Failed to process HEIC/HEIF file: ${sharpMsg}. ` +
           "Try converting to JPEG, PNG, or WebP before uploading."
         );
       }
       
       throw sharpError;
     }
-  } catch (error: any) {
-    console.error("❌ [PROCESSOR] Processing failed:", error.message);
-    throw new Error(`Image processing failed: ${error.message}`);
+  } catch (error: unknown) {
+    console.error("❌ [PROCESSOR] Processing failed:", error instanceof Error ? error.message : String(error));
+    throw new Error(`Image processing failed: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
 

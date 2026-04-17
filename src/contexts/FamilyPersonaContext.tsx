@@ -179,7 +179,7 @@ export function FamilyPersonaProvider({ children }: { children: React.ReactNode 
       if (missing.length === 0) {
         return prevFiltered.length === prev.length ? prev : prevFiltered;
       }
-      let merged = [...prevFiltered];
+      const merged = [...prevFiltered];
       for (const m of missing) {
         if (merged.length >= MAX_ACTIVE_FAMILY_PERSONAS) break;
         merged.push(m);

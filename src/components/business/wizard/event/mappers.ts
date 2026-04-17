@@ -13,11 +13,45 @@ import { normalizePhoneToE164 } from "@/lib/phone/e164";
 import { createDefaultSocialLink } from "./defaults";
 import { computeEventShortDesc } from "@/lib/business/eventShortDesc";
 
+type ActivityWithRelations = {
+  id: string;
+  title: string | null;
+  description: string | null;
+  ageTags: string[];
+  scheduleJson: Record<string, unknown>;
+  coverImageId: string | null;
+  placeId: string | null;
+  eventCategoryId: string | null;
+  priceFrom: number | null;
+  priceTo: number | null;
+  priceText: string | null;
+  eventCategory?: { id: string; parentId: string | null; slug: string; nameRu: string } | null;
+  images?: Array<{ url?: string; imageId?: string }>;
+  venue?: {
+    kind: "MANUAL" | "PLACE" | "MOBILE" | "TBD" | null;
+    placeId?: string | null;
+    title?: string | null;
+    addressLine?: string | null;
+    cityId?: string | null;
+    note?: string | null;
+    districtAutoId?: string | null;
+    districtManualId?: string | null;
+    metroAutoId?: string | null;
+    metroAutoDistanceM?: number | null;
+    metroManualId?: string | null;
+    metroManualDistanceM?: number | null;
+    district?: string | null;
+    metro?: string | null;
+  } | null;
+  owner?: { name?: string | null } | null;
+  programCategoryLinks?: Array<{ categoryId: string }>;
+};
+
 /**
  * Map Activity entity to EventFormData
  * Used when loading event for editing
  */
-export function mapEventToFormData(event: any): EventFormData {
+export function mapEventToFormData(event: ActivityWithRelations): EventFormData {
   const formData = getDefaultFormData();
 
   // Step 1: Basics
@@ -168,7 +202,7 @@ export function mapEventToFormData(event: any): EventFormData {
 
   // Step 3: Media
   formData.coverImage = event.coverImageId || null;
-  formData.gallery = event.images?.map((img: any) => img.url || img.imageId) || [];
+  formData.gallery = event.images?.map((img) => img.url || img.imageId || "") || [];
   formData.reelsUrl =
     (typeof scheduleJson.reelsUrl === "string" ? scheduleJson.reelsUrl : "") || "";
 
@@ -247,18 +281,18 @@ export function mapEventToFormData(event: any): EventFormData {
   formData.timeSlots =
     timeSlotsRaw &&
     typeof timeSlotsRaw === "object" &&
-    Array.isArray((timeSlotsRaw as any).dates)
+    Array.isArray((timeSlotsRaw as Record<string, unknown>).dates)
       ? (timeSlotsRaw as EventFormData["timeSlots"])
       : { dates: [] };
 
   // Step 6: Location (EventVenue)
   if (event.venue) {
     formData.venueKind = event.venue.kind;
-    formData.placeId = event.venue.placeId;
-    formData.venueName = event.venue.title || "";
-    formData.address = event.venue.addressLine || "";
-    formData.city = event.venue.cityId || "";
-    formData.venueNote = event.venue.note || "";
+    formData.placeId = event.venue.placeId ?? null;
+    formData.venueName = event.venue.title ?? "";
+    formData.address = event.venue.addressLine ?? "";
+    formData.city = event.venue.cityId ?? "";
+    formData.venueNote = event.venue.note ?? "";
     
     // Map district and metro fields if available
     formData.districtAutoId = event.venue.districtAutoId || null;
@@ -307,11 +341,45 @@ export function mapEventToFormData(event: any): EventFormData {
   return formData;
 }
 
+type EventPayload = {
+  title: string;
+  shortDesc: string;
+  description: string;
+  type: "EVENT";
+  ageTags: string[];
+  scheduleMode: "MULTI_DATE";
+  eventCategoryId?: string;
+  programCategoryIds: string[];
+  scheduleJson: Record<string, unknown>;
+  priceFrom: number | null;
+  priceTo: number | null;
+  priceText: string;
+  priceDetails?: string;
+  currency: string;
+  coverImageId: string | null;
+  venue: {
+    kind: string | null;
+    placeId: string | null;
+    title?: string;
+    addressLine?: string;
+    cityId?: string;
+    note?: string;
+    districtAutoId?: string | null;
+    districtManualId?: string | null;
+    metroAutoId?: string | null;
+    metroAutoDistanceM?: number | null;
+    metroManualId?: string | null;
+    metroManualDistanceM?: number | null;
+    district?: string;
+    metro?: string;
+  };
+};
+
 /**
  * Build Activity payload from EventFormData
  * Used when creating or updating event
  */
-export function buildEventPayload(data: EventFormData): any {
+export function buildEventPayload(data: EventFormData): EventPayload {
   const categoryIds = data.categoryId ? [data.categoryId] : [];
 
   const subcategoryIdsByCategoryId: Record<string, string[]> = {};
@@ -343,7 +411,7 @@ export function buildEventPayload(data: EventFormData): any {
     fullDescriptionHtml: data.fullDescription ?? "",
   });
 
-  const payload: any = {
+  const payload: EventPayload = {
     title: data.title,
     shortDesc,
     description: data.fullDescription,
@@ -463,12 +531,24 @@ export function buildEventPayload(data: EventFormData): any {
   return payload;
 }
 
+type EventChanges = {
+  title?: string;
+  description?: string;
+  ageTags?: string[];
+  coverImageId?: string | null;
+  scheduleJson?: Record<string, unknown>;
+  priceFrom?: number | null;
+  priceTo?: number | null;
+  priceText?: string;
+  venue?: EventPayload["venue"];
+};
+
 /**
  * Extract changes between current and original data
  * Used for PATCH updates in edit mode
  */
-export function extractChanges(current: EventFormData, original: EventFormData): Partial<any> {
-  const changes: any = {};
+export function extractChanges(current: EventFormData, original: EventFormData): EventChanges {
+  const changes: EventChanges = {};
 
   // Compare each field and add to changes if different
   if (current.title !== original.title) {

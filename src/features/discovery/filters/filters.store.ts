@@ -1,11 +1,12 @@
 "use client";
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { create } from "zustand";
 import type { DiscoveryFiltersState, DiscoveryFilterKey } from "./filters.types";
 
+type FilterValue = string | string[] | null;
+
 type Actions = {
-  setFilter: (key: DiscoveryFilterKey, value: any) => void;
+  setFilter: (key: DiscoveryFilterKey, value: FilterValue) => void;
   toggleMulti: (key: "age", value: string) => void;
   resetAll: () => void;
   hydrateFromSearchParams: (sp: URLSearchParams) => void;
@@ -53,7 +54,7 @@ function toURLParams(state: DiscoveryFiltersState): URLSearchParams {
 export const useDiscoveryFiltersStore = create<Store>((set, get) => ({
   ...DEFAULTS,
   setFilter: (key, value) => {
-    set({ [key]: value } as any);
+    set({ [key]: value } as Partial<DiscoveryFiltersState>);
     if (safeWindow) {
       const sp = toURLParams(get());
       const nextUrl = `${safeWindow.location.pathname}?${sp.toString()}`;
@@ -66,7 +67,7 @@ export const useDiscoveryFiltersStore = create<Store>((set, get) => ({
     if (current.has(value)) current.delete(value);
     else current.add(value);
     const next = Array.from(current);
-    set({ [key]: next } as any);
+    set({ [key]: next } as Partial<DiscoveryFiltersState>);
     if (safeWindow) {
       const sp = toURLParams(get());
       const nextUrl = `${safeWindow.location.pathname}?${sp.toString()}`;

@@ -55,3 +55,7 @@ public/uploads/
 backups/
 notes/
 *.backup
+
+# local lint reports
+lint-errors*.txt
+lint-errors*.json

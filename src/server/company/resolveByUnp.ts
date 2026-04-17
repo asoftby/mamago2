@@ -310,7 +310,7 @@ async function tryGrpLookup(unp: string): Promise<{ legalName: string | null }> 
 }
 
 // Helper: pick first non-empty string from array
-function pickFirstNonEmpty(values: any[]): string | null {
+function pickFirstNonEmpty(values: unknown[]): string | null {
   for (const val of values) {
     if (typeof val === "string" && val.trim()) {
       return val.trim();

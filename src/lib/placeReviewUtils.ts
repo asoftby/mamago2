@@ -1,10 +1,8 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import type { Place, PlaceImage } from "@prisma/client";
 import type { OpeningHoursData } from "@/components/openingHours";
-
 interface PlaceWithImages extends Omit<Place, 'images'> {
   images: Array<Omit<PlaceImage, 'placeId'> & { placeId?: string; revisionId?: string }>;
-  openingHours?: any;
+  openingHours?: OpeningHoursData | null;
 }
 
 export type SectionStatus = "complete" | "partial" | "empty";

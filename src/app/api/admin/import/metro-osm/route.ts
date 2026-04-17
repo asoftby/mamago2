@@ -52,7 +52,6 @@ async function fetchOverpass(query: string) {
           "user-agent": "mamago-admin-import/1.0 (contact: admin@mamago.by)",
         },
         body,
-        // @ts-ignore - node fetch supports it; if your env doesn't, remove.
         cache: "no-store",
       });
 
@@ -85,16 +84,27 @@ export async function POST(req: Request) {
       return NextResponse.json({ message: "City not found" }, { status: 404 });
     }
 
-    let data: any = null;
+    type OverpassResponse = {
+      elements?: Array<{
+        type: string;
+        id: number;
+        lat?: number;
+        lon?: number;
+        center?: { lat: number; lon: number };
+        tags?: Record<string, string>;
+      }>;
+    };
+
+    let data: OverpassResponse | null = null;
     let usedMethod: string | null = null;
 
     // 1. Try "around" query if city has coordinates
     if (city.lat && city.lng) {
       const radius = Math.min(Math.max(radiusMeters ?? 25000, 5000), 80000);
       const query = buildQueryFromCenter(city.lat, city.lng, radius);
-      const json = await fetchOverpass(query);
+      const json = await fetchOverpass(query) as OverpassResponse;
       
-      const elements: any[] = Array.isArray(json?.elements) ? json.elements : [];
+      const elements = Array.isArray(json?.elements) ? json.elements : [];
       if (elements.length > 0) {
         data = json;
         usedMethod = `around:${radius}m`;
@@ -119,9 +129,9 @@ export async function POST(req: Request) {
 
       for (const name of tryNames) {
         const query = buildQuery(name);
-        const json = await fetchOverpass(query);
+        const json = await fetchOverpass(query) as OverpassResponse;
 
-        const elements: any[] = Array.isArray(json?.elements) ? json.elements : [];
+        const elements = Array.isArray(json?.elements) ? json.elements : [];
         if (elements.length > 0) {
           data = json;
           usedMethod = `area:${name}`;
@@ -140,7 +150,7 @@ export async function POST(req: Request) {
       );
     }
 
-    const elements: any[] = data.elements ?? [];
+    const elements = data.elements ?? [];
 
     const MINSK_BE_TO_RU: Record<string, string> = {
       "Каменнагорская": "Каменная Горка",
@@ -229,9 +239,9 @@ export async function POST(req: Request) {
             data: { name, lat, lng, source: "OSM" },
           });
           updated++;
-        } catch (error: any) {
+        } catch (error: unknown) {
           // Если ошибка уникальности имени (P2002), обновляем только координаты
-          if (error.code === "P2002") {
+          if (error && typeof error === 'object' && 'code' in error && error.code === "P2002") {
             await prisma.metroStation.update({
               where: { id: existing.id },
               data: { lat, lng, source: "OSM" },
@@ -256,9 +266,9 @@ export async function POST(req: Request) {
             },
           });
           imported++;
-        } catch (error: any) {
+        } catch (error: unknown) {
           // Если ошибка уникальности имени (P2002), пробуем добавить суффикс
-          if (error.code === "P2002") {
+          if (error && typeof error === 'object' && 'code' in error && error.code === "P2002") {
              try {
                 await prisma.metroStation.create({
                   data: {
@@ -293,8 +303,8 @@ export async function POST(req: Request) {
       skipped,
       total: elements.length,
     });
-  } catch (e: any) {
-    const msg = e?.message ? String(e.message) : "Import failed";
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : "Import failed";
     // Часто тут будет Overpass 429/504 или network error
     return NextResponse.json({ ok: false, message: msg }, { status: 503 });
   }

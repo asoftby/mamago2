@@ -46,7 +46,7 @@ async function main() {
   }
 
   // Get the schedule JSON
-  const scheduleJson = event.scheduleJson as any;
+  const scheduleJson = event.scheduleJson as Record<string, unknown>;
   
   if (!scheduleJson || typeof scheduleJson !== "object") {
     console.error("❌ scheduleJson не найден или имеет неверный формат");
@@ -70,13 +70,15 @@ async function main() {
   scheduleJson.dates = sessionDates;
 
   // Update timeSlots if they exist
-  if (scheduleJson.timeSlots?.dates) {
+  const timeSlots = scheduleJson.timeSlots as Record<string, unknown> | undefined;
+  const timeSlotsDateArr = timeSlots?.dates as Record<string, unknown>[] | undefined;
+  if (timeSlotsDateArr) {
     console.log(`\n🔄 Обновляю timeSlots...`);
     
     // Keep the first timeSlot structure but update dates
-    const firstSlot = scheduleJson.timeSlots.dates[0];
+    const firstSlot = timeSlotsDateArr[0];
     
-    scheduleJson.timeSlots.dates = sessionDates.map((dateStr, index) => {
+    (scheduleJson.timeSlots as Record<string, unknown>).dates = sessionDates.map((dateStr, index) => {
       const date = new Date(dateStr);
       const dayNames = ["вс", "пн", "вт", "ср", "чт", "пт", "сб"];
       const monthNames = ["января", "февраля", "марта", "апреля", "мая", "июня", "июля", "августа", "сентября", "октября", "ноября", "декабря"];
@@ -89,7 +91,7 @@ async function main() {
         id: `date-${Date.now()}-${index}`,
         label: `${day} ${month}, ${dayOfWeek}`,
         isoDate: dateStr,
-        slots: firstSlot?.slots || [],
+        slots: (firstSlot?.slots as unknown[]) || [],
       };
     });
   }

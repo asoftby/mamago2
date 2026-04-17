@@ -40,8 +40,11 @@ export default async function MePage({ searchParams }: PageProps) {
   // Fetch interests separately if there are children
   const childIds = childrenRaw.map(child => child.id);
   
-  let systemInterestsData: any[] = [];
-  let customInterestsData: any[] = [];
+  type SystemInterest = { childId: string; interestSlug: string };
+  type CustomInterest = { childId: string; label: string };
+  
+  let systemInterestsData: SystemInterest[] = [];
+  let customInterestsData: CustomInterest[] = [];
   
   if (childIds.length > 0) {
     // Use raw queries to avoid TypeScript issues
@@ -49,13 +52,13 @@ export default async function MePage({ searchParams }: PageProps) {
       SELECT "childId", "interestSlug" 
       FROM "ChildInterest" 
       WHERE "childId" = ANY(${childIds})
-    `;
+    ` as SystemInterest[];
     
     customInterestsData = await prisma.$queryRaw`
       SELECT "childId", "label" 
       FROM "ChildCustomInterest" 
       WHERE "childId" = ANY(${childIds})
-    `;
+    ` as CustomInterest[];
   }
 
   // Transform the data to match expected interface
@@ -64,11 +67,11 @@ export default async function MePage({ searchParams }: PageProps) {
     name: child.name,
     birthDate: child.birthDate,
     systemInterests: systemInterestsData
-      .filter((interest: any) => interest.childId === child.id)
-      .map((interest: any) => ({ interestSlug: interest.interestSlug })),
+      .filter((interest) => interest.childId === child.id)
+      .map((interest) => ({ interestSlug: interest.interestSlug })),
     customInterests: customInterestsData
-      .filter((interest: any) => interest.childId === child.id)
-      .map((interest: any) => ({ label: interest.label })),
+      .filter((interest) => interest.childId === child.id)
+      .map((interest) => ({ label: interest.label })),
   }));
 
   // Load plan items for current week
@@ -124,8 +127,9 @@ export default async function MePage({ searchParams }: PageProps) {
               leisureFormatSummary: user.leisureFormatSummary,
               preferenceDisplayLine,
             }}
-            children={children}
-          />
+          >
+            {children}
+          </ChildrenCard>
 
           {/* My Routes */}
           <div className="bg-white rounded-2xl border border-neutral-100 shadow-sm overflow-hidden">

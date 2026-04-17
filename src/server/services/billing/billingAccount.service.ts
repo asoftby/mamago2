@@ -149,7 +149,7 @@ export async function creditBusinessDeposit(params: {
   description: string;
   referenceType?: string;
   referenceId?: string;
-  metadata?: any;
+  metadata?: Prisma.InputJsonValue;
 }) {
   const { accountId, amount, description, referenceType, referenceId, metadata } = params;
 
@@ -191,7 +191,7 @@ export async function debitBusinessDeposit(params: {
   description: string;
   referenceType?: string;
   referenceId?: string;
-  metadata?: any;
+  metadata?: Prisma.InputJsonValue;
 }) {
   const { accountId, amount, type, description, referenceType, referenceId, metadata } = params;
 

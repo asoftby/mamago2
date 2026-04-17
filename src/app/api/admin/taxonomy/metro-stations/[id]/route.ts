@@ -13,7 +13,11 @@ export async function PATCH(
     const body = await request.json();
     const { name, lat, lng } = body;
 
-    const updateData: any = {};
+    const updateData: {
+      name?: string;
+      lat?: number;
+      lng?: number;
+    } = {};
     if (name) updateData.name = name.trim();
     if (lat !== undefined) updateData.lat = Number(lat);
     if (lng !== undefined) updateData.lng = Number(lng);
@@ -24,10 +28,10 @@ export async function PATCH(
     });
 
     return NextResponse.json(station);
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error updating metro station:", error);
     
-    if (error.code === "P2002") {
+    if (error && typeof error === 'object' && 'code' in error && error.code === "P2002") {
       return NextResponse.json({ error: "Такая станция уже существует" }, { status: 409 });
     }
 

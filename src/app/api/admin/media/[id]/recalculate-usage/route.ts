@@ -24,10 +24,10 @@ export async function POST(
     const media = await recalculateMediaUsageStatus(id);
 
     return NextResponse.json(media);
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error recalculating media usage:", error);
     return NextResponse.json(
-      { error: error.message || "Failed to recalculate usage" },
+      { error: error instanceof Error ? error.message : "Failed to recalculate usage" },
       { status: 500 }
     );
   }

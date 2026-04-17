@@ -149,11 +149,9 @@ export async function POST(
         slug: slugRow?.slug ?? null,
       },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Submit event error:", error);
-    return NextResponse.json(
-      { error: error.message || "Failed to submit event" },
-      { status: 500 }
-    );
+    const message = error instanceof Error ? error.message : "Failed to submit event";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

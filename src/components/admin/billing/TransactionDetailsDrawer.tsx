@@ -19,7 +19,7 @@ interface TransactionDetailsDrawerProps {
     parentTransactionId: string | null;
     failureReason: string | null;
     failureCode: string | null;
-    metadata: any;
+    metadata: Record<string, unknown>;
     createdAt: string;
     updatedAt: string;
     billingAccount: {
@@ -67,9 +67,9 @@ export function TransactionDetailsDrawer({ transaction, onClose }: TransactionDe
           <div className="bg-gray-50 rounded-lg p-4">
             <div className="flex items-start justify-between mb-3">
               <div>
-                <TransactionTypeBadge type={transaction.type as any} />
+                <TransactionTypeBadge type={transaction.type as BillingTransactionType} />
               </div>
-              <TransactionStatusBadge status={transaction.status as any} />
+              <TransactionStatusBadge status={transaction.status as BillingTransactionStatus} />
             </div>
             <p className="text-3xl font-bold text-gray-900 mb-2">
               <TransactionAmount amount={transaction.amount} currency={transaction.currency} />

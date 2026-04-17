@@ -56,20 +56,11 @@ function AdultActivationForm({
 }) {
   const router = useRouter();
   const { preferenceSignals, formatSignals, loading: signalsLoading } = useAdultSignals();
-  const [familyRole, setFamilyRole] = useState("");
-  const [ageBand, setAgeBand] = useState("");
-  const [selectedPrefs, setSelectedPrefs] = useState<string[]>([]);
-  const [selectedFormat, setSelectedFormat] = useState<string | null>(null);
+  const [familyRole, setFamilyRole] = useState(() => "");
+  const [ageBand, setAgeBand] = useState(() => "");
+  const [selectedPrefs, setSelectedPrefs] = useState<string[]>(() => []);
+  const [selectedFormat, setSelectedFormat] = useState<string | null>(() => null);
   const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    if (!open) {
-      setFamilyRole("");
-      setAgeBand("");
-      setSelectedPrefs([]);
-      setSelectedFormat(null);
-    }
-  }, [open]);
 
   const togglePref = useCallback((id: string) => {
     setSelectedPrefs((prev) =>
@@ -220,8 +211,10 @@ function AdultActivationForm({
 }
 
 function useClientMounted() {
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => { setMounted(true); }, []);
+  const [mounted, setMounted] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return true;
+  });
   return mounted;
 }
 

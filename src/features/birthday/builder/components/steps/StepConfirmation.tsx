@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useRequireVerifiedEmail } from "@/features/email-verification/hooks/useRequireVerifiedEmail";
 import type { BirthdayOffer } from "../../../types/birthday";
 import type { BirthdayBuilderWithGate } from "../../hooks/useBirthdayBuilderWithGate";
@@ -127,12 +127,8 @@ export function StepConfirmation({ builder }: { builder: BuilderHook }) {
   );
 
   const [selectedTargetKeys, setSelectedTargetKeys] = useState<Set<string>>(
-    () => new Set(),
+    () => new Set(targets.map((t) => t.key)),
   );
-
-  useEffect(() => {
-    setSelectedTargetKeys(new Set(targets.map((t) => t.key)));
-  }, [targetKeySig, targets]);
 
   const placeLine = useMemo(
     () => getFormatPlaceLine(placeType, selectedBase),

@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { Bell } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -43,7 +44,7 @@ export function AdminNotificationsDropdown({
         "заявки",
         "заявок"
       );
-      base.unshift({
+      base = [{
         id: B2B_SYS_ID,
         type: "B2B",
         title: "Заявки на верификацию",
@@ -51,7 +52,7 @@ export function AdminNotificationsDropdown({
         link: `${adminPath("/b2b/requests")}?status=PENDING`,
         createdAt: new Date().toISOString(),
         read: false,
-      });
+      }, ...base];
     }
     return base;
   }, [b2bPendingVerificationCount]);
@@ -108,12 +109,12 @@ export function AdminNotificationsDropdown({
 
       {notifications.length > 8 && (
         <div className="px-3 py-2 border-t border-gray-200">
-          <a
+          <Link
             href="/admin/notifications"
             className="text-xs text-blue-600 hover:text-blue-700 font-medium"
           >
             Посмотреть все →
-          </a>
+          </Link>
         </div>
       )}
     </>
@@ -162,12 +163,12 @@ export function AdminNotificationsDropdown({
 
           {notifications.length > 8 && (
             <div className="px-4 py-3 border-t border-gray-200">
-              <a
+              <Link
                 href="/admin/notifications"
                 className="text-sm text-blue-600 hover:text-blue-700 font-medium block text-center"
               >
                 Посмотреть все →
-              </a>
+              </Link>
             </div>
           )}
         </BottomSheet>

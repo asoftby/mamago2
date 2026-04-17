@@ -24,13 +24,6 @@ export function PlaceGalleryLightbox({
 }: PlaceGalleryLightboxProps) {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
 
-  // Reset index when opening
-  useEffect(() => {
-    if (isOpen) {
-      setCurrentIndex(initialIndex);
-    }
-  }, [isOpen, initialIndex]);
-
   const goToNext = () => {
     setCurrentIndex((prev) => (prev + 1) % images.length);
   };

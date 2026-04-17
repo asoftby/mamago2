@@ -33,7 +33,7 @@ export function AdminBillingActions({
     setIsLoading(true);
     try {
       let endpoint = "";
-      let body: any = { businessId };
+      let body: Record<string, unknown> = { businessId };
 
       switch (action) {
         case "credit":

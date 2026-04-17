@@ -20,8 +20,8 @@ export default async function AdminPlacementsPage() {
 
   try {
     placements = await getPlacements();
-  } catch (e: any) {
-    error = e.message;
+  } catch (e: unknown) {
+    error = e instanceof Error ? e.message : "Unknown error";
     console.error("Placements fetch error:", e);
   }
 
@@ -108,7 +108,7 @@ export default async function AdminPlacementsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {(placements as any[]).map((placement) => {
+              {(placements as { endsAt: Date; graceUntil: Date | null; [key: string]: unknown }[]).map((placement) => {
                 const daysUntilEnd = Math.ceil(
                   (placement.endsAt.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)
                 );

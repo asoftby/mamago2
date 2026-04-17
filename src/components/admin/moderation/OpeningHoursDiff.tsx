@@ -76,7 +76,7 @@ export function OpeningHoursDiff({
     return (
       <div className="space-y-1">
         {ALL_DAYS.map((dayOfWeek) => {
-          const rule = openingHours.rules.find((r: any) => r.dayOfWeek === dayOfWeek);
+          const rule = openingHours.rules.find((r) => r.dayOfWeek === dayOfWeek);
           
           return (
             <div
@@ -94,7 +94,7 @@ export function OpeningHoursDiff({
                   "Круглосуточно"
                 ) : (
                   <span className="space-x-1">
-                    {rule.intervals.map((interval: any, idx: number) => (
+                    {rule.intervals.map((interval, idx: number) => (
                       <span key={idx}>
                         {interval.startTime}—{interval.endTime}
                         {idx < rule.intervals.length - 1 && ", "}

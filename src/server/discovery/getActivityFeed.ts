@@ -1,9 +1,7 @@
-// src/server/discovery/getActivityFeed.ts
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
 import prisma from "@/lib/prisma";
 import { DiscoveryState } from "@/lib/discovery/urlState";
 import { getPublicListingActivityWhere } from "@/server/public/publicContentVisibility";
+import type { Prisma } from "@prisma/client";
 
 export async function getActivityFeed(citySlug: string, state: DiscoveryState) {
   // 1. Find city
@@ -16,7 +14,7 @@ export async function getActivityFeed(citySlug: string, state: DiscoveryState) {
   }
 
   // 2. Build where clause
-  const andParts: any[] = [{ cityId: city.id }];
+  const andParts: Prisma.ActivityWhereInput[] = [{ cityId: city.id }];
 
   // Intent filtering (future implementation, e.g. category based)
   // For now, assume 'go' shows all, or map intent to categories.

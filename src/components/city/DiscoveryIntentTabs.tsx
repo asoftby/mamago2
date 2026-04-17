@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useEffect, useState, Suspense } from "react";
+import { useRef, useEffect, useLayoutEffect, useState, Suspense } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
@@ -48,18 +48,19 @@ function DiscoveryIntentTabsContent({
     return appendCityQuery(intentConfig.href(city), city);
   };
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (variant === "airbnb") return;
     if (activeIndex < 0) {
-      setIndicatorStyle({ left: 0, width: 0 });
+      requestAnimationFrame(() => setIndicatorStyle({ left: 0, width: 0 }));
       return;
     }
     const currentTab = tabsRef.current[activeIndex];
     if (currentTab) {
-      setIndicatorStyle({
+      const newStyle = {
         left: currentTab.offsetLeft,
         width: currentTab.clientWidth,
-      });
+      };
+      requestAnimationFrame(() => setIndicatorStyle(newStyle));
 
       currentTab.scrollIntoView({
         behavior: "smooth",

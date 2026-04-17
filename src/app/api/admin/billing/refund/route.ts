@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
 
     // Check if already refunded
     const existingRefund = parentTx.childTransactions?.find(
-      (tx: any) => tx.type === "REFUND"
+      (tx) => tx.type === "REFUND"
     );
 
     if (existingRefund) {
@@ -93,7 +93,7 @@ export async function POST(request: NextRequest) {
       where: { id: refund.id },
       data: {
         metadata: {
-          ...(refund.metadata as any),
+          ...(refund.metadata as Record<string, unknown>),
           adminId: user.id,
           adminEmail: user.email,
           timestamp: new Date().toISOString(),
@@ -109,10 +109,10 @@ export async function POST(request: NextRequest) {
         parentTransactionId: transactionId,
       },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Refund error:", error);
     return NextResponse.json(
-      { error: error.message || "Failed to create refund" },
+      { error: error instanceof Error ? error.message : "Failed to create refund" },
       { status: 500 }
     );
   }

@@ -12,17 +12,17 @@ interface PlaceImage {
   width: number | null;
   height: number | null;
   blurhash: string | null;
-  kind: any;
+  kind: string;
   sortOrder: number;
   placeId?: string;
   revisionId?: string;
 }
 
 interface Step3PhotosProps {
-  place: any; // Use generic type instead of Prisma Place
+  place: { id: string; logoImageId?: string | null };
   images: PlaceImage[];
   wizardSessionId: string;
-  onUpdate: (updates: any) => void;
+  onUpdate: (updates: Record<string, unknown>) => void;
   onPrev: () => void;
   onNext: () => void;
   canNext: boolean;

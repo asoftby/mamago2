@@ -1,6 +1,5 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { prisma } from "@/lib/prisma";
-import { ImprovementRequestStatus, ImprovementSeverity } from "@prisma/client";
+import { ImprovementRequestStatus, ImprovementSeverity, Prisma } from "@prisma/client";
 
 interface CreateImprovementRequestParams {
   entityType: string;
@@ -10,7 +9,7 @@ interface CreateImprovementRequestParams {
   severity: ImprovementSeverity;
   title: string;
   description: string;
-  requestedChanges?: any;
+  requestedChanges?: Prisma.InputJsonValue;
   dueAt?: Date;
 }
 
@@ -95,7 +94,7 @@ export async function createImprovementRequest(params: CreateImprovementRequestP
       severity,
       title,
       description,
-      requestedChanges: requestedChanges || null,
+      requestedChanges: requestedChanges ?? Prisma.JsonNull,
       dueAt: dueAt || null,
       status: ImprovementRequestStatus.OPEN,
     },
@@ -136,7 +135,7 @@ export async function listImprovementRequestsForEntity(
   entityId: string,
   includeResolved = false
 ) {
-  const where: any = {
+  const where: Prisma.ImprovementRequestWhereInput = {
     entityType,
     entityId,
   };

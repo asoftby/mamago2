@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -17,24 +17,14 @@ interface Step1ProfileProps {
 }
 
 export function Step1Profile({ data, onChange, isEditable = true }: Step1ProfileProps) {
-  const [title, setTitle] = useState(data.title);
-  const [category, setCategory] = useState(data.category);
-  const [shortDesc, setShortDesc] = useState(data.shortDesc);
-  const [description, setDescription] = useState(data.description || "");
+  const [title, setTitle] = useState(() => data.title);
+  const [category, setCategory] = useState(() => data.category);
+  const [shortDesc, setShortDesc] = useState(() => data.shortDesc);
+  const [description, setDescription] = useState(() => data.description || "");
   const [showFullDescription, setShowFullDescription] = useState(false);
-  const [ageTags, setAgeTags] = useState<string[]>(data.ageTags || []);
-  const [visitFormats, setVisitFormats] = useState<string[]>(data.visitFormats || []);
-  const [activityTypes, setActivityTypes] = useState<string[]>(data.activityTypes || []);
-
-  useEffect(() => {
-    setTitle(data.title);
-    setCategory(data.category);
-    setShortDesc(data.shortDesc);
-    setDescription(data.description || "");
-    setAgeTags(data.ageTags || []);
-    setVisitFormats(data.visitFormats || []);
-    setActivityTypes(data.activityTypes || []);
-  }, [data]);
+  const [ageTags, setAgeTags] = useState<string[]>(() => data.ageTags || []);
+  const [visitFormats, setVisitFormats] = useState<string[]>(() => data.visitFormats || []);
+  const [activityTypes, setActivityTypes] = useState<string[]>(() => data.activityTypes || []);
 
   const handleTitleChange = (value: string) => {
     setTitle(value);

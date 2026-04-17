@@ -16,6 +16,7 @@ import { canPublishContentDirectly } from "@/lib/auth/businessContentAccess";
 import { useWizardSession } from "@/hooks/useWizardSession";
 
 import type { PlaceFormData, PlaceWizardMode } from "./types";
+import type { Place } from "@prisma/client";
 import { WIZARD_STEPS, TOTAL_STEPS, getStepLabel } from "./config";
 import { getDefaultFormData, hasMeaningfulContent } from "./defaults";
 import { mapPlaceToFormData, buildPlacePayload, extractChanges } from "./mappers";
@@ -39,7 +40,7 @@ import { navigateToCompatibleHref } from "@/lib/routing/clientNavigation";
 
 interface PlaceWizardProps {
   mode: PlaceWizardMode;
-  place?: any; // Place entity for edit mode
+  place?: Place; // Place entity for edit mode
   userId: string;
   userRole?: Role;
   onComplete?: (placeId: string) => void;
@@ -167,7 +168,7 @@ export function PlaceWizard({
   }, [formData, mode]);
 
   // Auto-save for edit mode
-  const handleAutoSave = async (changes: Partial<any>) => {
+  const handleAutoSave = async (changes: Partial<PlaceFormData>) => {
     if (!place?.id) return;
     
     try {
@@ -266,9 +267,9 @@ export function PlaceWizard({
         toast.success("Изменения сохранены");
         router.refresh();
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Save draft error:", error);
-      toast.error(error.message || "Ошибка сохранения");
+      toast.error(error instanceof Error ? error.message : "Ошибка сохранения");
     } finally {
       setIsSaving(false);
     }
@@ -379,9 +380,9 @@ export function PlaceWizard({
           router.refresh();
         }
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Submit error:", error);
-      toast.error(error.message || "Ошибка отправки");
+      toast.error(error instanceof Error ? error.message : "Ошибка отправки");
     } finally {
       setIsSubmitting(false);
     }

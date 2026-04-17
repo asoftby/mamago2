@@ -1,6 +1,5 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import { prisma } from "@/lib/prisma";
-import { ContentEditType } from "@prisma/client";
+import prisma from "@/lib/prisma";
+import { ContentEditType, Prisma } from "@prisma/client";
 
 // Fields that cannot be micro-edited (protected fields)
 const PROTECTED_FIELDS = new Set([
@@ -46,18 +45,18 @@ export async function applyMicroEdit(params: ApplyMicroEditParams) {
   }
 
   // Get current entity value
-  let entity: any;
   let oldValue: string | null = null;
 
   if (entityType === "PLACE") {
-    entity = await prisma.place.findUnique({
+    const entity = await prisma.place.findUnique({
       where: { id: entityId },
       select: { [fieldName]: true },
     });
     if (!entity) {
       throw new Error("Place not found");
     }
-    oldValue = entity[fieldName] || null;
+    const fieldValue = entity[fieldName as keyof typeof entity];
+    oldValue = typeof fieldValue === "string" ? fieldValue : null;
 
     // Apply the edit
     await prisma.place.update({

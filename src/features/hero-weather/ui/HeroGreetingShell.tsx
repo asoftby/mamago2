@@ -18,7 +18,10 @@ export type HeroGreetingShellProps = {
 export function HeroGreetingShell({ initialModel }: HeroGreetingShellProps) {
   const persistedRef = useRef(false);
   const modelRef = useRef(initialModel);
-  modelRef.current = initialModel;
+
+  useEffect(() => {
+    modelRef.current = initialModel;
+  }, [initialModel]);
 
   useEffect(() => {
     if (persistedRef.current) return;

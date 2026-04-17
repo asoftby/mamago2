@@ -3,23 +3,24 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { MapPin, Navigation, Zap, ChevronDown, Check } from "lucide-react";
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { cn } from "@/lib/utils";
 import { useOptionalCity } from "@/contexts/CityContext";
 import { VALID_CITY_SLUGS } from "@/lib/intent";
+import type { DiscoveryFilters } from "@/features/filters/discovery/filters.store";
+
+type FilterOption = { value: string; label: string };
+type FilterPatch = Partial<DiscoveryFilters>;
 
 interface LocationPanelProps {
-  /** Хаб города (главная): во всплывающем окне только выбор города */
   variant?: "default" | "cityHub";
-  /** Встраиваемый контрол: позволяет выбрать город и доп. фильтры в одной панели */
   allowCitySelection?: boolean;
   citySlug: string;
   searchText: string;
   onSearchTextChange: (text: string) => void;
   onClose: () => void;
-  applied: any;
-  actions: any;
-  apiOptions: any;
+  applied: DiscoveryFilters;
+  actions: { setDraft: (patch: FilterPatch) => void };
+  apiOptions: { metros: FilterOption[]; districts: FilterOption[] };
 }
 
 export function LocationPanel({
@@ -74,8 +75,8 @@ export function LocationPanel({
     // Don't close panel - let user continue selecting
   };
 
-  const selectedMetro = apiOptions.metros.find((m: any) => m.value === applied.metro);
-  const selectedDistrict = apiOptions.districts.find((d: any) => d.value === applied.district);
+  const selectedMetro = apiOptions.metros.find((m) => m.value === applied.metro);
+  const selectedDistrict = apiOptions.districts.find((d) => d.value === applied.district);
 
   return (
     <div className="bg-white rounded-2xl border border-gray-200 shadow-lg overflow-hidden">
@@ -192,7 +193,7 @@ export function LocationPanel({
 
             {showMetroList && (
               <div className="ml-14 space-y-1 max-h-40 overflow-y-auto bg-white rounded-lg p-2">
-                {apiOptions.metros.map((metro: any) => (
+                {apiOptions.metros.map((metro) => (
                   <button
                     key={metro.value}
                     onClick={() => handleMetroSelect(metro.value)}
@@ -237,7 +238,7 @@ export function LocationPanel({
 
             {showDistrictList && (
               <div className="ml-14 space-y-1 max-h-40 overflow-y-auto bg-white rounded-lg p-2">
-                {apiOptions.districts.map((district: any) => (
+                {apiOptions.districts.map((district) => (
                   <button
                     key={district.value}
                     onClick={() => handleDistrictSelect(district.value)}

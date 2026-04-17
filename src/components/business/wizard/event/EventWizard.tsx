@@ -10,7 +10,7 @@ import {
   useRef,
 } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { ContentStatus } from "@prisma/client";
+import { ContentStatus, Activity } from "@prisma/client";
 import { toast } from "sonner";
 import {
   FormWizardShell,
@@ -55,7 +55,7 @@ import { navigateToCompatibleHref } from "@/lib/routing/clientNavigation";
 
 interface EventWizardProps {
   mode: EventWizardMode;
-  event?: any; // Event entity for edit mode
+  event?: Activity; // Event entity for edit mode
   userId: string;
   userRole?: Role;
   business?: {
@@ -362,9 +362,9 @@ function EventWizardInner({
         localStorage.removeItem(LOCAL_STORAGE_KEY);
         localStorage.removeItem(CURRENT_STEP_STORAGE_KEY);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Save draft error:", error);
-      toast.error(error.message || "Ошибка сохранения");
+      toast.error(error instanceof Error ? error.message : "Ошибка сохранения");
     } finally {
       setIsSaving(false);
     }
@@ -575,9 +575,9 @@ function EventWizardInner({
       } else {
         router.refresh();
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Submit error:", error);
-      toast.error(error.message || "Ошибка отправки");
+      toast.error(error instanceof Error ? error.message : "Ошибка отправки");
     } finally {
       setIsSubmitting(false);
     }

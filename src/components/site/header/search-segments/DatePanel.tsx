@@ -2,6 +2,7 @@
 
 import { cn } from "@/lib/utils";
 import { WhenSelect } from "@/components/ui/when-select";
+import type { DiscoveryFilters } from "@/features/filters/discovery/filters.store";
 
 // Helper function to convert Date to YYYY-MM-DD in local timezone
 function formatDateToLocal(date: Date): string {
@@ -11,15 +12,19 @@ function formatDateToLocal(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
+type RangeValue = { from: Date; to: Date };
+type WhenValue = string | Date | RangeValue | null;
+type FilterPatch = Partial<DiscoveryFilters>;
+
 interface DatePanelProps {
   onClose: () => void;
-  applied: any;
-  actions: any;
+  applied: DiscoveryFilters;
+  actions: { setDraft: (patch: FilterPatch) => void };
 }
 
 export function DatePanel({ onClose, applied, actions }: DatePanelProps) {
-  const handleWhenChange = (val: any) => {
-    let patch: any = {};
+  const handleWhenChange = (val: WhenValue) => {
+    let patch: FilterPatch = {};
     if (!val) {
       patch = { dateFrom: null, dateTo: null, whenPreset: null };
     } else if (typeof val === 'string') {
@@ -60,20 +65,21 @@ export function DatePanel({ onClose, applied, actions }: DatePanelProps) {
       } else {
         patch = { whenPreset: null, dateFrom: formatDateToLocal(val), dateTo: null };
       }
-    } else if ('from' in val) {
+    } else if (val !== null && typeof val === 'object' && 'from' in val) {
+      const rangeVal = val as RangeValue;
       // Проверяем, соответствует ли выбранный интервал выходным
       const now = new Date();
       const day = now.getDay() === 0 ? 7 : now.getDay();
       const saturday = new Date(now.getFullYear(), now.getMonth(), now.getDate() + (6 - day));
       const sunday = new Date(now.getFullYear(), now.getMonth(), now.getDate() + (7 - day));
       
-      if (val.from.getTime() === saturday.getTime() && val.to.getTime() === sunday.getTime()) {
+      if (rangeVal.from.getTime() === saturday.getTime() && rangeVal.to.getTime() === sunday.getTime()) {
         patch = { whenPreset: "WEEKEND", dateFrom: null, dateTo: null };
       } else {
         patch = { 
           whenPreset: null,
-          dateFrom: formatDateToLocal(val.from), 
-          dateTo: formatDateToLocal(val.to) 
+          dateFrom: formatDateToLocal(rangeVal.from), 
+          dateTo: formatDateToLocal(rangeVal.to) 
         };
       }
     }

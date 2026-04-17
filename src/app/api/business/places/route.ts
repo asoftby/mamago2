@@ -303,7 +303,7 @@ export async function POST(request: NextRequest) {
           lng: place.lng,
           googlePlaceId: place.googlePlaceId,
           formattedAddr: place.formattedAddr,
-          addressJson: place.addressJson,
+          addressJson: place.addressJson as Record<string, unknown> | null,
           countryCode: place.countryCode,
         });
         

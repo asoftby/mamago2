@@ -1,12 +1,12 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import prisma from "@/lib/prisma";
+import type { Prisma } from "@prisma/client";
 
 export interface AuditLogParams {
   actorId: string;
   targetType: string;
   targetId: string;
   action: string;
-  metadata?: any;
+  metadata?: Prisma.InputJsonValue;
   ipAddress?: string;
   userAgent?: string;
 }

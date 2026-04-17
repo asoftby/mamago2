@@ -4,7 +4,7 @@ import prisma from "@/lib/prisma";
 import { PlaceModerationView } from "@/components/admin/PlaceModerationView";
 import { PlaceRevisionModerationView } from "@/components/admin/PlaceRevisionModerationView";
 import { ImprovementRequestForm } from "@/components/admin/moderation/ImprovementRequestForm";
-import { ImprovementRequestList } from "@/components/admin/moderation/ImprovementRequestList";
+import { ImprovementRequestList, type ImprovementRequest } from "@/components/admin/moderation/ImprovementRequestList";
 import { PlaceDangerZone } from "@/components/admin/moderation/PlaceDangerZone";
 import { PlacePreviewCard } from "@/components/admin/moderation/PlacePreviewCard";
 import { PlaceModerationSidebar } from "@/components/admin/moderation/PlaceModerationSidebar";
@@ -211,7 +211,7 @@ export default async function PlaceModerationPage({
         })),
         openingHoursId: place.openingHoursId,
         openingHoursData: place.openingHours ? {
-          mode: place.openingHours.mode as any,
+          mode: place.openingHours.mode as import("@prisma/client").OpeningHoursMode,
           timezone: place.openingHours.timezone || "Europe/Minsk",
           rules: place.openingHours.rules?.map(rule => ({
             dayOfWeek: rule.dayOfWeek,
@@ -366,7 +366,7 @@ export default async function PlaceModerationPage({
                         <p>Запросов на доработку пока нет</p>
                       </div>
                     ) : (
-                      <ImprovementRequestList requests={improvementRequests as any} />
+                      <ImprovementRequestList requests={improvementRequests as ImprovementRequest[]} />
                     )}
                   </CardContent>
                 </Card>

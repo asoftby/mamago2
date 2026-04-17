@@ -236,9 +236,9 @@ export default function MetroStationsPage() {
       const data = await res.json();
       toast.success(`Импортировано станций: ${data.imported || 0}`);
       fetchStations(); // Refresh list
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error(error);
-      toast.error(error.message || "Ошибка импорта из OSM");
+      toast.error(error instanceof Error ? error.message : "Ошибка импорта из OSM");
     } finally {
       setIsImporting(false);
     }

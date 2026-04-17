@@ -4,7 +4,9 @@ import { useRef, RefObject, useEffect, useMemo, useState } from "react";
 import { MapPin, Calendar, Users, X } from "lucide-react";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
+import type { DiscoveryFilters } from "@/features/filters/discovery/filters.store";
 import { useDiscoveryFilters } from "@/features/filters/discovery/filters.store";
+import type { FilterOption } from "@/features/filters/discovery/filters.api";
 import { useDiscoveryFilterOptions } from "@/features/filters/discovery/filters.api";
 import { AGE_GROUPS } from "@/features/filters/age/ageGroups";
 import { useChildrenScope } from "@/features/filters/discovery/childrenScope.store";
@@ -102,20 +104,23 @@ function CityHubDesktopSearchControl({
   );
 
   const getLocationText = () => {
-    const parts: string[] = [];
-    parts.push(getCityLocativePhrase(citySlug));
-    if (formDisplayFilters.nearby) parts.push("Поблизости");
+    const cityPhrase = getCityLocativePhrase(citySlug);
+    const nearbyPart = formDisplayFilters.nearby ? "Поблизости" : null;
+    
+    let metroOrDistrictPart: string | null = null;
     if (formDisplayFilters.metro) {
       const metro = safeApiOptions.metros.find(
         (m) => m.value === formDisplayFilters.metro,
       );
-      parts.push(metro?.label || formDisplayFilters.metro);
+      metroOrDistrictPart = metro?.label || formDisplayFilters.metro;
     } else if (formDisplayFilters.district) {
       const district = safeApiOptions.districts.find(
         (d) => d.value === formDisplayFilters.district,
       );
-      parts.push(district?.label || formDisplayFilters.district);
+      metroOrDistrictPart = district?.label || formDisplayFilters.district;
     }
+    
+    const parts = [cityPhrase, nearbyPart, metroOrDistrictPart].filter((p): p is string => p != null);
     return parts.join(" • ");
   };
 
@@ -299,8 +304,8 @@ function CompactLocationSummary({
   iconIntent = null,
 }: {
   citySlug: string;
-  applied: any;
-  apiOptions: any;
+  applied: DiscoveryFilters;
+  apiOptions: { metros: FilterOption[]; districts: FilterOption[] };
   iconIntent?: Intent | null;
 }) {
   const INTENT_ICONS = {
@@ -310,21 +315,23 @@ function CompactLocationSummary({
     routes: IconMap,
   };
 
-  const parts: string[] = [];
-  parts.push(getCityLocativePhrase(citySlug));
-  if (applied.nearby) parts.push("Поблизости");
+  const cityPhrase = getCityLocativePhrase(citySlug);
+  const nearbyPart = applied.nearby ? "Поблизости" : null;
+  
+  let metroOrDistrictPart: string | null = null;
   if (applied.metro) {
     const metro = safeApiOptions.metros.find(
-      (m: any) => m.value === applied.metro,
+      (m) => m.value === applied.metro,
     );
-    parts.push(metro?.label || applied.metro);
+    metroOrDistrictPart = metro?.label || applied.metro;
   } else if (applied.district) {
     const district = safeApiOptions.districts.find(
-      (d: any) => d.value === applied.district,
+      (d) => d.value === applied.district,
     );
-    parts.push(district?.label || applied.district);
+    metroOrDistrictPart = district?.label || applied.district;
   }
 
+  const parts = [cityPhrase, nearbyPart, metroOrDistrictPart].filter((p): p is string => p != null);
   const summaryText = parts.length > 0 ? parts.join(" • ") : "Поиск";
 
   const intentKey = iconIntent ?? null;
@@ -378,10 +385,10 @@ function DiscoveryDesktopSearchControl({
   hideSecondaryFilters = false,
 }: DiscoveryDesktopSearchControlProps) {
   /** Вторичная панель «Фильтры» зависит от пропсов/контекста; без отложенного рендера возможен hydration mismatch (SSR vs первый клиент). */
-  const [secondaryFiltersMounted, setSecondaryFiltersMounted] = useState(false);
-  useEffect(() => {
-    setSecondaryFiltersMounted(true);
-  }, []);
+  const [secondaryFiltersMounted, setSecondaryFiltersMounted] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return true;
+  });
 
   const containerRef = useRef<HTMLDivElement>(null);
   const locationRef = useRef<HTMLButtonElement>(null);
@@ -556,25 +563,19 @@ function DiscoveryDesktopSearchControl({
   
   // Build location display text
   const getLocationText = () => {
-    const parts = [];
+    const cityPhrase = getCityLocativePhrase(citySlug);
+    const nearbyPart = formDisplayFilters.nearby ? "Поблизости" : null;
     
-    // Always show city first
-    parts.push(getCityLocativePhrase(citySlug));
-    
-    // Add nearby if selected
-    if (formDisplayFilters.nearby) {
-      parts.push("Поблизости");
-    }
-    
-    // Add metro or district (mutually exclusive with nearby)
+    let metroOrDistrictPart: string | null = null;
     if (formDisplayFilters.metro) {
       const metro = safeApiOptions.metros.find(m => m.value === formDisplayFilters.metro);
-      parts.push(metro?.label || formDisplayFilters.metro);
+      metroOrDistrictPart = metro?.label || formDisplayFilters.metro;
     } else if (formDisplayFilters.district) {
       const district = safeApiOptions.districts.find(d => d.value === formDisplayFilters.district);
-      parts.push(district?.label || formDisplayFilters.district);
+      metroOrDistrictPart = district?.label || formDisplayFilters.district;
     }
     
+    const parts = [cityPhrase, nearbyPart, metroOrDistrictPart].filter((p): p is string => p != null);
     return parts.join(" • ");
   };
 
@@ -1027,8 +1028,8 @@ function CompactSearchSummary({
   whoSummaryLine,
 }: {
   citySlug: string;
-  applied: any;
-  apiOptions: any;
+  applied: DiscoveryFilters;
+  apiOptions: { metros: FilterOption[]; districts: FilterOption[] };
   currentIntent: string;
   /** Строка «Для кого» — та же, что в раскрытом хедере */
   whoSummaryLine?: string;
@@ -1045,15 +1046,20 @@ function CompactSearchSummary({
   const intentConfig = DISCOVERY_INTENT_CONFIG[currentIntent as keyof typeof DISCOVERY_INTENT_CONFIG];
   const FallbackIcon = INTENT_ICONS[currentIntent as keyof typeof INTENT_ICONS] || IconCompass;
 
-  const locationParts: string[] = [getCityLocativePhrase(citySlug)];
-  if (applied.nearby) locationParts.push("Поблизости");
-  if (applied.metro) {
-    const metro = safeApiOptions.metros.find((m: any) => m.value === applied.metro);
-    locationParts.push(metro?.label || applied.metro);
-  } else if (applied.district) {
-    const district = safeApiOptions.districts.find((d: any) => d.value === applied.district);
-    locationParts.push(district?.label || applied.district);
-  }
+  const locationParts = [
+    getCityLocativePhrase(citySlug),
+    applied.nearby ? "Поблизости" : null,
+    (() => {
+      if (applied.metro) {
+        const metro = safeApiOptions.metros.find((m) => m.value === applied.metro);
+        return metro?.label || applied.metro;
+      } else if (applied.district) {
+        const district = safeApiOptions.districts.find((d) => d.value === applied.district);
+        return district?.label || applied.district;
+      }
+      return null;
+    })(),
+  ].filter((p): p is string => p != null);
   const locationLine = locationParts.join(" • ");
 
   const dateLine = (() => {

@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Commercial Notifications Service
  * 
@@ -7,7 +6,7 @@
  */
 
 import { prisma } from "@/lib/prisma";
-import type { CommercialNotificationType, CommercialNotificationStatus } from "@prisma/client";
+import type { CommercialNotificationType, CommercialNotificationStatus, Prisma } from "@prisma/client";
 
 export interface NotificationFilters {
   businessId?: string;
@@ -31,7 +30,7 @@ export interface CreateNotificationInput {
  * Get notifications with filters
  */
 export async function getNotifications(filters: NotificationFilters = {}) {
-  const where: any = {};
+  const where: Prisma.CommercialNotificationWhereInput = {};
 
   if (filters.businessId) {
     where.businessId = filters.businessId;

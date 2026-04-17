@@ -2,6 +2,7 @@
 
 import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { useDiscoveryFilters } from "@/features/filters/discovery/filters.store";
 import { useDiscoveryFilterOptions } from "@/features/filters/discovery/filters.api";
 import { AGE_GROUPS } from "@/features/filters/age/ageGroups";
@@ -91,28 +92,28 @@ function DebugContent() {
           <p><strong>Локация:</strong> {locationText}</p>
           <p><strong>Дата:</strong> {dateText || "(не выбрана)"}</p>
           <p><strong>Возраст:</strong> {ageText || "(не выбран)"}</p>
-          <p><strong>Итоговый текст:</strong> "{summaryText}"</p>
+          <p><strong>Итоговый текст:</strong> &quot;{summaryText}&quot;</p>
           <p><strong>Есть дополнительные фильтры:</strong> {hasAdditionalFilters ? "ДА" : "НЕТ"}</p>
         </div>
 
         <div className="bg-purple-100 p-4 rounded-lg">
           <h2 className="font-semibold mb-2">Тестовые ссылки:</h2>
           <div className="space-y-2">
-            <a href="/debug-mobile-search" className="block text-blue-600 hover:underline">
+            <Link href="/debug-mobile-search" className="block text-blue-600 hover:underline">
               Без фильтров
-            </a>
-            <a href="/debug-mobile-search?age=0-1" className="block text-blue-600 hover:underline">
+            </Link>
+            <Link href="/debug-mobile-search?age=0-1" className="block text-blue-600 hover:underline">
               С возрастом 0-1 год
-            </a>
-            <a href="/debug-mobile-search?preset=TODAY" className="block text-blue-600 hover:underline">
+            </Link>
+            <Link href="/debug-mobile-search?preset=TODAY" className="block text-blue-600 hover:underline">
               Сегодня
-            </a>
-            <a href="/debug-mobile-search?metro=cmmj6x1s5000hws428w3qtxqy" className="block text-blue-600 hover:underline">
+            </Link>
+            <Link href="/debug-mobile-search?metro=cmmj6x1s5000hws428w3qtxqy" className="block text-blue-600 hover:underline">
               С метро
-            </a>
-            <a href="/debug-mobile-search?age=0-1,1-3&preset=TOMORROW" className="block text-blue-600 hover:underline">
+            </Link>
+            <Link href="/debug-mobile-search?age=0-1,1-3&preset=TOMORROW" className="block text-blue-600 hover:underline">
               Несколько фильтров
-            </a>
+            </Link>
           </div>
         </div>
 

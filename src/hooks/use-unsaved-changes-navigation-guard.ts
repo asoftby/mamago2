@@ -56,7 +56,7 @@ export function useUnsavedChangesNavigationGuard(dirty: boolean) {
     if (!dirty) {
       pendingPathRef.current = null;
       confirmingLeaveRef.current = false;
-      setLeaveDialogOpen(false);
+      queueMicrotask(() => setLeaveDialogOpen(false));
     }
   }, [dirty]);
 

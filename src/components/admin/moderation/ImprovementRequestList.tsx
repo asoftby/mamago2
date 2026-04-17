@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { useState } from "react";
 
-interface ImprovementRequest {
+export interface ImprovementRequest {
   id: string;
   status: string;
   severity: string;
@@ -66,9 +66,9 @@ export function ImprovementRequestList({
       if (onUpdate) {
         onUpdate();
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Update improvement request error:", error);
-      toast.error(error.message || "Не удалось обновить запрос");
+      toast.error(error instanceof Error ? error.message : "Не удалось обновить запрос");
     } finally {
       setActioningId(null);
     }

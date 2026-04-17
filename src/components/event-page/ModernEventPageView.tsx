@@ -86,7 +86,7 @@ export function ModernEventPageView({ data }: { data: EventPageData }) {
 
           {/* Description */}
           <section className="py-10 border-t border-zinc-100">
-            <h3 className="text-2xl font-bold mb-6">What you'll do</h3>
+            <h3 className="text-2xl font-bold mb-6">What you&#39;ll do</h3>
             <div className="text-gray-900 text-md leading-relaxed space-y-4 max-w-2xl">
               <p>{data.about.summary}</p>
               {data.about.full && <p>{data.about.full}</p>}
@@ -161,7 +161,7 @@ export function ModernEventPageView({ data }: { data: EventPageData }) {
           {/* Location & Contact */}
           {data.venue && (
             <section className="py-10 border-t border-zinc-100">
-              <h3 className="text-2xl font-bold mb-8">Where you'll be</h3>
+              <h3 className="text-2xl font-bold mb-8">Where you&#39;ll be</h3>
               <div className="space-y-8">
                 <div className="flex flex-col md:flex-row gap-8">
                   <div className="flex-1 space-y-6">
@@ -250,7 +250,7 @@ export function ModernEventPageView({ data }: { data: EventPageData }) {
                   </div>
                 </div>
                 <p className="text-gray-800 text-sm leading-relaxed">
-                  The best rooftop experience I've ever had in New York. The music was world-class
+                  The best rooftop experience I&#39;ve ever had in New York. The music was world-class
                   and the host is a fantastic organizer.
                 </p>
               </div>

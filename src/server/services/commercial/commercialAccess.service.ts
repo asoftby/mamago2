@@ -1,14 +1,4 @@
  
-/**
- * Commercial Access Service - Enforcement Layer
- * 
- * Central service for evaluating and enforcing commercial access rules.
- * This is the single source of truth for what a business can do commercially.
- * 
- * IMPORTANT: This is NOT billing. This is commercial relationship enforcement.
- */
-
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { prisma } from "@/lib/prisma";
 
 /**
@@ -35,6 +25,26 @@ export type CommercialFeature =
   | "PREMIUM_VISIBILITY"   // Enhanced catalog visibility
   | "ANALYTICS"            // Access to analytics
   | "COMMERCIAL_ACTIVATION"; // Can activate new commercial features
+
+type PlacementData = {
+  status?: string;
+  plan?: {
+    hasPriorityBoost?: boolean;
+    hasLeadAccess?: boolean;
+    hasAnalytics?: boolean;
+    storiesPerMonth?: number;
+  };
+  graceUntil?: Date | null;
+  endsAt?: Date;
+};
+
+type ServicePlacementData = {
+  id: string;
+  entityType: string;
+  notes: string | null;
+  endsAt: Date;
+  status?: string;
+};
 
 /**
  * Business Commercial Access Snapshot
@@ -325,8 +335,8 @@ function determineEffectiveStatus(state: {
  */
 function determineEnabledFeatures(context: {
   effectiveStatus: EffectiveCommercialStatus;
-  placement: any;
-  servicePlacements: any[];
+  placement: PlacementData | null;
+  servicePlacements: ServicePlacementData[];
 }): CommercialFeature[] {
   const features: CommercialFeature[] = [];
   
@@ -379,9 +389,9 @@ function determineEnabledFeatures(context: {
  * Generate warnings for business
  */
 function generateWarnings(context: {
-  contract: any;
-  placement: any;
-  servicePlacements: any[];
+  contract: { status?: string; endsAt?: Date } | null;
+  placement: PlacementData | null;
+  servicePlacements: ServicePlacementData[];
   isInGracePeriod: boolean;
   now: Date;
 }): string[] {

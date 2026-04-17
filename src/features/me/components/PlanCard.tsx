@@ -257,7 +257,7 @@ function DaySection({ dateStr, items, children, todayStr }: {
 
   if (isPast) return null;
 
-  return <DayScenarioBlock children={children} selectedDate={dateStr} />;
+  return <DayScenarioBlock selectedDate={dateStr}>{children}</DayScenarioBlock>;
 }
 
 // ── PlanCard ──────────────────────────────────────────────────────────────────
@@ -309,9 +309,10 @@ export function PlanCard({ weekDates, planItemsByDate, selectedDate: initialSele
       <DaySection
         dateStr={selectedDate}
         items={currentItems}
-        children={children}
         todayStr={todayStr}
-      />
+      >
+        {children}
+      </DaySection>
     </Surface>
   );
 }

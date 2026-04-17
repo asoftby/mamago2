@@ -47,13 +47,7 @@ export function MyPlanUnauthFlow({
 }: MyPlanUnauthFlowProps) {
   const router = useRouter();
   const isMobile = !useMediaQuery("(min-width: 640px)");
-  const [phase, setPhase] = useState<MyPlanUnauthPhase>("auth");
-
-  useEffect(() => {
-    if (!open) {
-      setPhase("auth");
-    }
-  }, [open]);
+  const [phase, setPhase] = useState<MyPlanUnauthPhase>(() => "auth");
 
   useEffect(() => {
     onPostAuthCompletionPhase?.(phase === "completion");

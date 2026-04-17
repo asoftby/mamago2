@@ -1,16 +1,8 @@
- 
-/**
- * Place Revision Service
- * Handles post-publication Place edits via PlaceRevision
- * Server-only - do not import in client components
- */
-
 import prisma from "@/lib/prisma";
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import type { Role } from "@prisma/client";
-import { PlaceRevisionStatus, LocationSource, PlaceKind } from "@prisma/client";
+import { PlaceRevisionStatus, LocationSource, PlaceKind, Prisma } from "@prisma/client";
 import { canManagePlaceAsync } from "@/lib/auth/placeAccess";
-import type { PlaceImage, PlaceRevisionImage, TempMedia, OpeningHoursRule, OpeningHoursInterval, Prisma } from "../types";
+import type { PlaceImage, PlaceRevisionImage, TempMedia, OpeningHoursRule, OpeningHoursInterval } from "../types";
 import {
   notifyPlaceUpdateApproved,
   notifyPlaceUpdateNeedsRevision,
@@ -30,7 +22,7 @@ export interface PlaceRevisionData {
   lat?: number | null;
   lng?: number | null;
   formattedAddr?: string | null;
-  addressJson?: any;
+  addressJson?: Prisma.InputJsonValue;
   countryCode?: string | null;
   cityId?: string | null;
   locationSource?: LocationSource;
@@ -144,7 +136,7 @@ export async function getOrCreatePlaceRevision(
       lat: place.lat,
       lng: place.lng,
       formattedAddr: place.formattedAddr,
-      addressJson: place.addressJson as any,
+      addressJson: place.addressJson as Prisma.InputJsonValue,
       countryCode: place.countryCode,
       cityId: place.cityId,
       locationSource: place.locationSource,
@@ -233,6 +225,25 @@ export async function savePlaceRevisionDraft(
   // Filter out fields that don't exist in PlaceRevision model
   // PlaceRevision uses logoImageId, not logoMediaId
   // PlaceRevision doesn't have galleryMediaIds, galleryUrls, or other temp media fields
+  type RevisionDataExtended = PlaceRevisionData & {
+    logoMediaId?: unknown;
+    logoUrl?: unknown;
+    galleryMediaIds?: unknown;
+    galleryUrls?: unknown;
+    ownerBusinessId?: unknown;
+    status?: unknown;
+    createRequestId?: unknown;
+    moderatorComment?: unknown;
+    moderationReviewedAt?: unknown;
+    moderatedByUserId?: unknown;
+    revisionRequestedAt?: unknown;
+    revisionResubmittedAt?: unknown;
+    archivedAt?: unknown;
+    archivedByUserId?: unknown;
+    createdAt?: unknown;
+    updatedAt?: unknown;
+    images?: unknown[];
+  };
   const {
     // Remove temp media fields (used in wizard but not in revision model)
     logoMediaId,
@@ -255,7 +266,7 @@ export async function savePlaceRevisionDraft(
     // Remove relation fields that shouldn't be in data
     images,
     ...validData
-  } = revisionData as any;
+  } = revisionData as RevisionDataExtended;
 
   // Log what we're filtering out for debugging
   const filteredFields = {
@@ -495,8 +506,8 @@ export async function submitPlaceRevisionForModeration(
   }
 
   // Prepare update data
-  const updateData: any = {
-    status: "PENDING",
+  const updateData: Prisma.PlaceRevisionUpdateInput = {
+    status: "PENDING" as PlaceRevisionStatus,
     submittedAt: new Date(),
   };
 
@@ -635,7 +646,7 @@ export async function approvePlaceRevision(
         lat: revision.lat ?? revision.place.lat,
         lng: revision.lng ?? revision.place.lng,
         formattedAddr: revision.formattedAddr ?? revision.place.formattedAddr,
-        addressJson: (revision.addressJson ?? revision.place.addressJson) as any,
+        addressJson: (revision.addressJson ?? revision.place.addressJson) as Prisma.InputJsonValue,
         countryCode: revision.countryCode ?? revision.place.countryCode,
         cityId: revision.cityId ?? revision.place.cityId,
         locationSource: revision.locationSource ?? revision.place.locationSource,

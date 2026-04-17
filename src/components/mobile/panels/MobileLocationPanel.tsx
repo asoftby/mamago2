@@ -6,21 +6,23 @@ import { cn } from "@/lib/utils";
 import { useCity } from "@/contexts/CityContext";
 import { VALID_CITY_SLUGS } from "@/lib/intent";
 import { getCityLocativePhrase } from "@/lib/city/cityDisplayNames";
+import type { DiscoveryFilters } from "@/features/filters/discovery/filters.store";
+
+type FilterOption = { value: string; label: string };
+type FilterPatch = Partial<DiscoveryFilters>;
 
 interface MobileLocationPanelProps {
   variant?: "default" | "cityHub";
   citySlug: string;
-  /** При отложенном применении (моб. шит) — какой город подсвечивать выбранным. */
   selectedCitySlug?: string;
-  /** Если задан — выбор города не меняет контекст сразу, только колбэк (до «Готово»). */
   onCityPick?: (slug: string) => void;
   searchText: string;
   onSearchTextChange: (text: string) => void;
   onClose: () => void;
-  draft: any;
-  setDraft: (patch: any) => void;
-  actions: any;
-  apiOptions: any;
+  draft: DiscoveryFilters;
+  setDraft: (patch: FilterPatch) => void;
+  actions: { setDraft: (patch: FilterPatch) => void };
+  apiOptions: { metros: FilterOption[]; districts: FilterOption[] };
 }
 
 export function MobileLocationPanel({
@@ -75,8 +77,8 @@ export function MobileLocationPanel({
     // Don't close the panel - let user continue selecting
   };
 
-  const selectedMetro = apiOptions.metros.find((m: any) => m.value === draft.metro);
-  const selectedDistrict = apiOptions.districts.find((d: any) => d.value === draft.district);
+  const selectedMetro = apiOptions.metros.find((m) => m.value === draft.metro);
+  const selectedDistrict = apiOptions.districts.find((d) => d.value === draft.district);
 
   return (
     <div className="min-w-0">
@@ -244,7 +246,7 @@ export function MobileLocationPanel({
 
             {showMetroList && (
               <div className="ml-10 space-y-1 max-h-32 overflow-y-auto bg-white rounded-lg p-2">
-                {apiOptions.metros.map((metro: any) => (
+                {apiOptions.metros.map((metro) => (
                   <button
                     key={metro.value}
                     onClick={() => handleMetroSelect(metro.value)}
@@ -289,7 +291,7 @@ export function MobileLocationPanel({
 
             {showDistrictList && (
               <div className="ml-10 space-y-1 max-h-32 overflow-y-auto bg-white rounded-lg p-2">
-                {apiOptions.districts.map((district: any) => (
+                {apiOptions.districts.map((district) => (
                   <button
                     key={district.value}
                     onClick={() => handleDistrictSelect(district.value)}

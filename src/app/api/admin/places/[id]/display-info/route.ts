@@ -47,10 +47,10 @@ export async function GET(
       title: place.title,
       shortAddress: place.shortAddress,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("[API] Get display info error:", error);
     return NextResponse.json(
-      { error: error.message || "Failed to get display info" },
+      { error: error instanceof Error ? error.message : "Failed to get display info" },
       { status: 500 }
     );
   }

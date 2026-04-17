@@ -35,6 +35,7 @@ export function useAutoSlug(
    * иначе нельзя стереть slug до конца. На сохранении сервер может заполнить slug из title.
    */
   const valueEditedManually = useRef(isEditMode);
+  const [isValueEditedManually, setIsValueEditedManually] = useState(isEditMode);
 
   const setSource = useCallback(
     (value: string) => {
@@ -51,21 +52,24 @@ export function useAutoSlug(
     // Не используем trim() для «есть ли текст»: иначе ломается ввод (например лидирующий пробел при вставке).
     if (value === "" || /^\s*$/.test(value)) {
       valueEditedManually.current = true;
+      setIsValueEditedManually(true);
       setSlugState("");
       return;
     }
     valueEditedManually.current = true;
+    setIsValueEditedManually(true);
     setSlugState(value);
   }, []);
 
   const hydrate = useCallback(
     (nextSource: string, nextSlug: string) => {
       valueEditedManually.current = isEditMode;
+      setIsValueEditedManually(isEditMode);
       setSourceState(nextSource);
       setSlugState(nextSlug);
     },
     [isEditMode],
   );
 
-  return { source, slug, setSource, setSlug, hydrate, isValueEditedManually: valueEditedManually.current };
+  return { source, slug, setSource, setSlug, hydrate, isValueEditedManually };
 }

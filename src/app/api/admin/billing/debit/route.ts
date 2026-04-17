@@ -79,10 +79,10 @@ export async function POST(request: NextRequest) {
         newBalance: currentBalance - amount,
       },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Debit deposit error:", error);
     return NextResponse.json(
-      { error: error.message || "Failed to debit deposit" },
+      { error: error instanceof Error ? error.message : "Failed to debit deposit" },
       { status: 500 }
     );
   }

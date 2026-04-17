@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Maximize2 } from "lucide-react";
 import { GoogleMapsService } from "@/services/googleMaps";
@@ -16,59 +16,7 @@ export function PlaceMapPreview({ lat, lng, onOpenMap }: PlaceMapPreviewProps) {
   const mapInstanceRef = useRef<google.maps.Map | null>(null);
   const markerRef = useRef<google.maps.marker.AdvancedMarkerElement | google.maps.Marker | null>(null);
 
-  useEffect(() => {
-    initMap();
-    return () => {
-      if (markerRef.current) {
-        if ('setMap' in markerRef.current) {
-          markerRef.current.setMap(null);
-        } else {
-          markerRef.current.map = null;
-        }
-      }
-    };
-  }, []);
-
-  useEffect(() => {
-    if (mapInstanceRef.current && lat !== null && lng !== null) {
-      mapInstanceRef.current.setCenter({ lat, lng });
-      updateMarker(lat, lng);
-    }
-  }, [lat, lng]);
-
-  const initMap = async () => {
-    if (!mapRef.current || mapInstanceRef.current) return;
-
-    try {
-      const mapsLib = await GoogleMapsService.getMapsLibrary();
-      const center = lat !== null && lng !== null 
-        ? { lat, lng } 
-        : { lat: 53.9045, lng: 27.5615 };
-
-      const map = new mapsLib.Map(mapRef.current, {
-        center,
-        zoom: lat !== null ? 16 : 12,
-        disableDefaultUI: true,
-        gestureHandling: "none",
-        zoomControl: false,
-        mapTypeControl: false,
-        scaleControl: false,
-        streetViewControl: false,
-        rotateControl: false,
-        fullscreenControl: false,
-      });
-
-      mapInstanceRef.current = map;
-
-      if (lat !== null && lng !== null) {
-        updateMarker(lat, lng);
-      }
-    } catch (err) {
-      console.error("[PlaceMapPreview] Init error:", err);
-    }
-  };
-
-  const updateMarker = async (lat: number, lng: number) => {
+  const updateMarker = useCallback(async (lat: number, lng: number) => {
     if (!mapInstanceRef.current) return;
 
     // Remove old marker
@@ -118,7 +66,59 @@ export function PlaceMapPreview({ lat, lng, onOpenMap }: PlaceMapPreviewProps) {
     } catch (err) {
       console.error("[PlaceMapPreview] Marker error:", err);
     }
-  };
+  }, []);
+
+  const initMap = useCallback(async () => {
+    if (!mapRef.current || mapInstanceRef.current) return;
+
+    try {
+      const mapsLib = await GoogleMapsService.getMapsLibrary();
+      const center = lat !== null && lng !== null 
+        ? { lat, lng } 
+        : { lat: 53.9045, lng: 27.5615 };
+
+      const map = new mapsLib.Map(mapRef.current, {
+        center,
+        zoom: lat !== null ? 16 : 12,
+        disableDefaultUI: true,
+        gestureHandling: "none",
+        zoomControl: false,
+        mapTypeControl: false,
+        scaleControl: false,
+        streetViewControl: false,
+        rotateControl: false,
+        fullscreenControl: false,
+      });
+
+      mapInstanceRef.current = map;
+
+      if (lat !== null && lng !== null) {
+        updateMarker(lat, lng);
+      }
+    } catch (err) {
+      console.error("[PlaceMapPreview] Init error:", err);
+    }
+  }, [lat, lng, updateMarker]);
+
+  useEffect(() => {
+    initMap();
+    return () => {
+      if (markerRef.current) {
+        if ('setMap' in markerRef.current) {
+          markerRef.current.setMap(null);
+        } else {
+          markerRef.current.map = null;
+        }
+      }
+    };
+  }, [initMap]);
+
+  useEffect(() => {
+    if (mapInstanceRef.current && lat !== null && lng !== null) {
+      mapInstanceRef.current.setCenter({ lat, lng });
+      updateMarker(lat, lng);
+    }
+  }, [lat, lng, updateMarker]);
 
   return (
     <div className="relative h-[280px] w-full rounded-xl border border-gray-300 overflow-hidden">

@@ -28,16 +28,10 @@ export function RouteMapHero({ stops, fallbackImageUrl, className }: RouteMapHer
   const [failed, setFailed] = useState(false);
   const initialized = useRef(false);
 
-  useEffect(() => {
-    if (initialized.current) return;
-    initialized.current = true;
-    initMap();
-  }, []);
-
-  async function resolveCoords(
+  const resolveCoords = async (
     stop: Stop,
     geocoder: google.maps.Geocoder
-  ): Promise<{ lat: number; lng: number } | null> {
+  ): Promise<{ lat: number; lng: number } | null> => {
     if (stop.lat != null && stop.lng != null) return { lat: stop.lat, lng: stop.lng };
     const query = stop.address || stop.title;
     if (!query) return null;
@@ -49,9 +43,9 @@ export function RouteMapHero({ stops, fallbackImageUrl, className }: RouteMapHer
     } catch {
       return null;
     }
-  }
+  };
 
-  async function initMap() {
+  const initMap = async () => {
     if (!containerRef.current) return;
     try {
       const [mapsLib, markerLib, geocodingLib] = await Promise.all([
@@ -72,8 +66,7 @@ export function RouteMapHero({ stops, fallbackImageUrl, className }: RouteMapHer
         .filter((x) => x.coords !== null) as { stop: Stop; coords: { lat: number; lng: number } }[];
 
       if (resolved.length === 0) {
-        setFailed(true);
-        return;
+        return false; // Return false to indicate failure
       }
 
       const map = new mapsLib.Map(containerRef.current, {
@@ -118,10 +111,22 @@ export function RouteMapHero({ stops, fallbackImageUrl, className }: RouteMapHer
           title: stop.title ?? stop.address,
         });
       });
+      
+      return true; // Success
     } catch {
-      setFailed(true);
+      return false; // Failure
     }
-  }
+  };
+
+  useEffect(() => {
+    if (initialized.current) return;
+    initialized.current = true;
+    void initMap().then((success) => {
+      if (!success) {
+        setFailed(true);
+      }
+    });
+  }, []);
 
   if (failed) {
     if (!fallbackImageUrl) return null;

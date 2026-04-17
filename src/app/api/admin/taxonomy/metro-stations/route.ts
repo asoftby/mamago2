@@ -44,10 +44,10 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json(station, { status: 201 });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error creating metro station:", error);
     
-    if (error.code === "P2002") {
+    if (error && typeof error === 'object' && 'code' in error && error.code === "P2002") {
       return NextResponse.json({ error: "Такая станция уже существует (дубликат имени или OSM ID)" }, { status: 409 });
     }
 

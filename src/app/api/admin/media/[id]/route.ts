@@ -34,10 +34,10 @@ export async function PATCH(
     });
 
     return NextResponse.json(updated);
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Update media error:", error);
     return NextResponse.json(
-      { error: error.message || "Failed to update media" },
+      { error: error instanceof Error ? error.message : "Failed to update media" },
       { status: 500 }
     );
   }
@@ -69,10 +69,10 @@ export async function DELETE(
     }
 
     return NextResponse.json({ success: true });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Delete media error:", error);
     return NextResponse.json(
-      { error: error.message || "Failed to delete media" },
+      { error: error instanceof Error ? error.message : "Failed to delete media" },
       { status: 500 }
     );
   }

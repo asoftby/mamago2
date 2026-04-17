@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -33,18 +33,22 @@ export function FilterOptionRow({
   onDelete,
 }: FilterOptionRowProps) {
   const labelInputRef = useRef<HTMLInputElement>(null);
+  
+  // Use a key to track when option changes to reset local state
+  const [optionKey, setOptionKey] = useState(option.id);
   const [label, setLabel] = useState(option.label);
   const [value, setValue] = useState(option.value);
   const [isActive, setIsActive] = useState(option.isActive);
   const [isDirty, setIsDirty] = useState(false);
 
-  // Sync with props if they change externally (e.g. reorder)
-  useEffect(() => {
+  // Reset local state when option changes (e.g. after reorder)
+  if (optionKey !== option.id) {
+    setOptionKey(option.id);
     setLabel(option.label);
     setValue(option.value);
     setIsActive(option.isActive);
     setIsDirty(false);
-  }, [option.label, option.value, option.isActive]);
+  }
 
   const handleSave = async () => {
     const ok = await onUpdate(option.id, { label, value, isActive });

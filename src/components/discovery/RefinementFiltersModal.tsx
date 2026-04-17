@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Portal } from "@/components/ui/portal";
@@ -18,11 +18,17 @@ export type FilterState = SecondaryValues;
  */
 export function RefinementFiltersModal() {
   const { isOpen, setIsOpen, currentIntent } = useRefinementFilters();
-  const [isVisible, setIsVisible] = useState(false);
+  const [isVisible, setIsVisible] = useState(() => isOpen);
+  const prevIsOpenRef = useRef(isOpen);
 
+  // Sync visibility with animation delay
   useEffect(() => {
+    if (prevIsOpenRef.current === isOpen) return;
+    prevIsOpenRef.current = isOpen;
+    
     if (isOpen) {
-      setIsVisible(true);
+      const timer = setTimeout(() => setIsVisible(true), 0);
+      return () => clearTimeout(timer);
     } else {
       const timer = setTimeout(() => setIsVisible(false), 300);
       return () => clearTimeout(timer);

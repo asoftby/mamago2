@@ -32,8 +32,27 @@ import { PlaceDangerZone } from "./moderation/PlaceDangerZone";
 import { Textarea } from "@/components/ui/textarea";
 
 interface PlaceRevisionModerationViewProps {
-  place: any; // Published Place
-  revision: any; // Pending PlaceRevision
+  place: {
+    id: string;
+    title: string;
+    updatedAt: Date;
+    images?: Array<{ [key: string]: unknown }>;
+    openingHours?: Record<string, unknown> | null;
+    [key: string]: unknown;
+  };
+  revision: {
+    id: string;
+    title: string | null;
+    status: string;
+    createdAt: Date;
+    submittedAt?: Date | null;
+    images?: Array<{ [key: string]: unknown }>;
+    openingHours?: Record<string, unknown> | null;
+    ageTags: string[];
+    visitFormats: string[];
+    activityTypes: string[];
+    [key: string]: unknown;
+  };
 }
 
 export function PlaceRevisionModerationView({
@@ -43,7 +62,7 @@ export function PlaceRevisionModerationView({
   const router = useRouter();
   const [comment, setComment] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [microEdits, setMicroEdits] = useState<any[]>([]);
+  const [microEdits, setMicroEdits] = useState<Array<Record<string, unknown>>>([]);
   const [displayTitle, setDisplayTitle] = useState<string>(place.title);
   const [hasDuplicates, setHasDuplicates] = useState<boolean>(false);
 
@@ -171,8 +190,8 @@ export function PlaceRevisionModerationView({
     
     let openingHoursChange: { 
       changeType: "added" | "removed" | "modified" | null;
-      oldOpeningHours: any;
-      newOpeningHours: any;
+      oldOpeningHours: Record<string, unknown> | null;
+      newOpeningHours: Record<string, unknown> | null;
     } = {
       changeType: null,
       oldOpeningHours: null,
@@ -555,7 +574,7 @@ export function PlaceRevisionModerationView({
                 disabled={isSubmitting}
               />
               <p className="text-xs text-gray-500 mt-1">
-                Для ссылки на фото используйте: "Фото №1", "Фото №2" и т.д.
+                Для ссылки на фото используйте: &quot;Фото №1&quot;, &quot;Фото №2&quot; и т.д.
               </p>
             </div>
 

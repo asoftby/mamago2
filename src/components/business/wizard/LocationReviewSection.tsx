@@ -13,12 +13,12 @@ export function LocationReviewSection({ place, onEdit }: LocationReviewSectionPr
   const status = getLocationStatus(place);
 
   // Get district name (could be from auto or manual)
-  const districtName = (place as any)._districtName || 
+  const districtName = (place as Record<string, unknown>)._districtName as string | undefined || 
     (place.districtAutoId ? "Автоопределенный район" : null) ||
     (place.districtManualId ? "Выбранный район" : null);
 
   // Get metro name (could be from auto or manual)  
-  const metroName = (place as any)._metroName ||
+  const metroName = (place as Record<string, unknown>)._metroName as string | undefined ||
     (place.metroAutoId ? "Автоопределенное метро" : null) ||
     (place.metroManualId ? "Выбранное метро" : null);
 
@@ -36,7 +36,7 @@ export function LocationReviewSection({ place, onEdit }: LocationReviewSectionPr
         
         <ReviewField 
           label="Город" 
-          value={(place as any)._cityName || (place.cityId ? "Указан" : null)} 
+          value={(place as Record<string, unknown>)._cityName as string | undefined || (place.cityId ? "Указан" : null)} 
         />
         
         <ReviewField 

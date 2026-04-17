@@ -61,7 +61,7 @@ export function HeaderSection() {
           <div>
             <h3 className="text-xl font-semibold mb-1">Long City Name Test</h3>
             <p className="text-sm text-muted-foreground">
-              Testing with "Санкт-Петербург" to ensure no wrapping issues
+              Testing with &quot;Санкт-Петербург&quot; to ensure no wrapping issues
             </p>
           </div>
           <div className="border rounded-lg overflow-hidden max-w-[390px]">

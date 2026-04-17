@@ -95,17 +95,14 @@ export async function POST(req: NextRequest) {
         masterDimensions: `${processedImageSet.master.width}x${processedImageSet.master.height}`,
         responsiveSizes: Object.keys(processedImageSet.sizes),
       });
-    } catch (processingError: any) {
+    } catch (processingError: unknown) {
+      const message = processingError instanceof Error ? processingError.message : "Image processing failed";
       console.error("❌ [UPLOAD] Processing failed:", {
-        error: processingError.message,
-        stack: processingError.stack,
+        error: message,
         fileType: file.type,
         fileName: file.name,
       });
-      return NextResponse.json(
-        { error: processingError.message },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: message }, { status: 400 });
     }
 
     // Create upload directory
@@ -170,11 +167,9 @@ export async function POST(req: NextRequest) {
       processed: true,
       mediaId,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Upload error:", error);
-    return NextResponse.json(
-      { error: error.message || "Failed to upload file" },
-      { status: 500 }
-    );
+    const message = error instanceof Error ? error.message : "Failed to upload file";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

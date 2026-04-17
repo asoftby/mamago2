@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -37,7 +37,20 @@ export function RecommendationCard({
   variantPosition,
   variantTotal,
 }: RecommendationCardProps) {
-  const [isAnimating, setIsAnimating] = useState(false);
+  const [isAnimating, setIsAnimating] = useState(() => false);
+  const prevItemIdRef = useRef(item.id);
+
+  useEffect(() => {
+    if (prevItemIdRef.current !== item.id) {
+      prevItemIdRef.current = item.id;
+      const t = window.setTimeout(() => {
+        setIsAnimating(true);
+        window.setTimeout(() => setIsAnimating(false), 150);
+      }, 0);
+      return () => window.clearTimeout(t);
+    }
+  }, [item.id]);
+
   const noMoreAlternatives =
     alternativesCount !== undefined && alternativesCount <= 1;
   const params = useParams() as { city?: string };
@@ -80,12 +93,6 @@ export function RecommendationCard({
   const showVariantControls = !isInPlan && totalVariants > 1;
 
   const title = item.title || item.activity?.title || "Активность";
-
-  useEffect(() => {
-    setIsAnimating(true);
-    const t = window.setTimeout(() => setIsAnimating(false), 150);
-    return () => window.clearTimeout(t);
-  }, [item.id]);
 
   const titleEl = activityDetailHref ? (
     <Link

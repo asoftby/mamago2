@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import Link from "next/link";
 import prisma from "@/lib/prisma";
 import { Badge } from "@/components/ui/badge";
-import { ContentStatus } from "@prisma/client";
+import { ContentStatus, Prisma } from "@prisma/client";
 import { formatDistanceToNow } from "date-fns";
 import { ru } from "date-fns/locale";
 import { MODERATION_CONTENT_STATUS_CONFIG } from "@/lib/admin/moderationContentStatusBadges";
@@ -27,7 +27,7 @@ interface SearchParams {
 }
 
 async function getPlaces(params: SearchParams) {
-  const where: any = {};
+  const where: Prisma.PlaceWhereInput = {};
 
   const status = parseContentStatusFilter(params.status);
   if (status) {

@@ -17,7 +17,7 @@ interface PlaceImage {
   width: number | null;
   height: number | null;
   blurhash: string | null;
-  kind: any;
+  kind: string;
   sortOrder: number;
   placeId?: string;
   revisionId?: string;

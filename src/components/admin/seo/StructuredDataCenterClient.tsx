@@ -126,8 +126,7 @@ export function StructuredDataCenterClient({
     }
     for (const issue of validationIssues) {
       const list = map.get(issue.category) ?? [];
-      list.push(issue);
-      map.set(issue.category, list);
+      map.set(issue.category, [...list, issue]);
     }
     return map;
   }, [validationIssues]);

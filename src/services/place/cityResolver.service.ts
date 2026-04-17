@@ -46,7 +46,7 @@ function haversineKm(
  * Priority: locality > administrative_area_level_2 > administrative_area_level_1
  */
 function extractCityFromAddressComponents(
-  addressComponents: any[]
+  addressComponents: Array<{ long_name: string; short_name: string; types: string[] }>
 ): { cityName: string | null; countryCode: string | null } {
   let cityName: string | null = null;
   let countryCode: string | null = null;
@@ -155,7 +155,7 @@ async function resolveCityByCoordinates(
  * - English: Minsk
  */
 async function resolveCityByAddressComponents(
-  addressJson: any
+  addressJson: Record<string, unknown>
 ): Promise<{ cityId: string; cityName: string } | null> {
   try {
     if (!addressJson || !Array.isArray(addressJson)) {
@@ -238,7 +238,7 @@ async function resolveCityByAddressComponents(
 export async function resolveCityId(input: {
   lat: number;
   lng: number;
-  addressJson?: any | null;
+  addressJson?: Record<string, unknown> | null;
   existingCityId?: string | null;
 }): Promise<{
   cityId: string | null;

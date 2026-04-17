@@ -36,26 +36,26 @@ export default async function AdminBillingPlansPage() {
         <div className="bg-green-50 border border-green-200 rounded-lg p-4">
           <p className="text-sm text-green-700 mb-1">Активных</p>
           <p className="text-2xl font-bold text-green-900">
-            {plans.filter((p: any) => p.isActive).length}
+            {plans.filter((p) => p.isActive).length}
           </p>
         </div>
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
           <p className="text-sm text-blue-700 mb-1">Видимых</p>
           <p className="text-2xl font-bold text-blue-900">
-            {plans.filter((p: any) => p.isVisible).length}
+            {plans.filter((p) => p.isVisible).length}
           </p>
         </div>
         <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
           <p className="text-sm text-purple-700 mb-1">Подписок</p>
           <p className="text-2xl font-bold text-purple-900">
-            {plans.reduce((sum: number, p: any) => sum + p._count.subscriptions, 0)}
+            {plans.reduce((sum: number, p) => sum + p._count.subscriptions, 0)}
           </p>
         </div>
       </div>
 
       {/* Plans Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {plans.map((plan: any) => (
+        {plans.map((plan) => (
           <div
             key={plan.id}
             className={`bg-white rounded-lg border-2 p-6 ${

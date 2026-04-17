@@ -22,7 +22,17 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
 
     // Parse filters
-    const filters: any = {};
+    const filters: {
+      kind?: MediaAssetKind;
+      status?: MediaAssetStatus;
+      sourceType?: MediaSourceType;
+      isOrphan?: boolean;
+      isOrphaned?: boolean;
+      uploadedById?: string;
+      search?: string;
+      dateFrom?: Date;
+      dateTo?: Date;
+    } = {};
 
     const kind = searchParams.get("kind");
     if (kind) filters.kind = kind as MediaAssetKind;
@@ -53,8 +63,8 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get("limit") || "50");
 
     // Parse sort
-    const sortField = searchParams.get("sortField") as any;
-    const sortOrder = searchParams.get("sortOrder") as any;
+    const sortField = searchParams.get("sortField") as "createdAt" | "updatedAt" | "filename" | "sizeBytes" | null;
+    const sortOrder = searchParams.get("sortOrder") as "asc" | "desc" | null;
 
     const result = await getAdminMediaList(
       filters,
@@ -70,10 +80,10 @@ export async function GET(request: NextRequest) {
       ...result,
       stats,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error fetching media list:", error);
     return NextResponse.json(
-      { error: error.message || "Failed to fetch media" },
+      { error: error instanceof Error ? error.message : "Failed to fetch media" },
       { status: 500 }
     );
   }

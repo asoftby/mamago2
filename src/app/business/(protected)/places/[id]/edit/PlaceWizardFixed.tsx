@@ -31,7 +31,7 @@ interface PlaceWizardProps {
   place: PlaceWithImages;
   initialStep: number;
   moderationMessage?: string | null;
-  activeRevision?: any | null;
+  activeRevision?: { status: string; moderatorComment?: string | null } | null;
 }
 
 export function PlaceWizardFixed({ place: initialPlace, initialStep, moderationMessage, activeRevision }: PlaceWizardProps) {
@@ -49,7 +49,7 @@ export function PlaceWizardFixed({ place: initialPlace, initialStep, moderationM
     return JSON.parse(JSON.stringify(initialPlace));
   });
   const [originalOpeningHours] = useState<OpeningHoursData | null>(() => {
-    return mapToUIState((initialPlace as any).openingHours || null);
+    return mapToUIState((initialPlace.openingHours as Parameters<typeof mapToUIState>[0]) || null);
   });
   
   // Track pending changes for submission
@@ -57,11 +57,11 @@ export function PlaceWizardFixed({ place: initialPlace, initialStep, moderationM
   // Opening hours state (stored separately, not in Place model yet)
   const [openingHoursData, setOpeningHoursData] = useState<OpeningHoursData | null>(() => {
     // Initialize from place.openingHours if it exists
-    return mapToUIState((initialPlace as any).openingHours || null);
+    return mapToUIState((initialPlace.openingHours as Parameters<typeof mapToUIState>[0]) || null);
   });
 
   // Improvement requests
-  const [improvementRequests, setImprovementRequests] = useState<any[]>([]);
+  const [improvementRequests, setImprovementRequests] = useState<{ status: string; severity: string; title: string; description: string; dueAt: string | null; createdAt: string; id: string; createdByModerator: { id: string; email: string; role: string } }[]>([]);
 
   // Debug: log moderation data
   console.log("[PlaceWizard] Moderation data:", {
@@ -234,10 +234,10 @@ export function PlaceWizardFixed({ place: initialPlace, initialStep, moderationM
         // Remove fields that have been reverted to original values
         const filteredChanges: Partial<Place> = {};
         for (const [key, value] of Object.entries(newPendingChanges)) {
-          const originalValue = (originalPlace as any)[key];
+          const originalValue = (originalPlace as Record<string, unknown>)[key];
           // Only keep the change if it's different from original
           if (!deepEqual(normalizePlaceData(value), normalizePlaceData(originalValue))) {
-            filteredChanges[key as keyof Place] = value as any;
+            filteredChanges[key as keyof Place] = value as Place[keyof Place];
           }
         }
         
@@ -271,15 +271,13 @@ export function PlaceWizardFixed({ place: initialPlace, initialStep, moderationM
       // For published places, we need to work with revisions
       if (place.status === "PUBLISHED") {
         // Get or create revision first
-        let revisionId: string | undefined;
-        
         const revisionResponse = await fetch(`/api/business/places/${place.id}/revision`);
         if (!revisionResponse.ok) {
           throw new Error("Failed to get or create revision");
         }
         
         const revisionData = await revisionResponse.json();
-        revisionId = revisionData.revision?.id;
+        const revisionId = revisionData.revision?.id;
         
         if (!revisionId) {
           throw new Error("Failed to get or create revision");

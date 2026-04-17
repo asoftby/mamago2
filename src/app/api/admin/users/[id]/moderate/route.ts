@@ -117,11 +117,13 @@ export async function POST(
     }
 
     return NextResponse.json(result);
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error performing moderation action:", error);
     
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    
     // Handle redirect errors from requireRole
-    if (error.message?.includes("NEXT_REDIRECT")) {
+    if (errorMessage.includes("NEXT_REDIRECT")) {
       return NextResponse.json(
         { error: "Unauthorized" },
         { status: 401 }
@@ -129,8 +131,8 @@ export async function POST(
     }
     
     return NextResponse.json(
-      { error: error.message || "Failed to perform moderation action" },
-      { status: error.message === "User not found" ? 404 : error.message === "Insufficient permissions" ? 403 : 500 }
+      { error: errorMessage || "Failed to perform moderation action" },
+      { status: errorMessage === "User not found" ? 404 : errorMessage === "Insufficient permissions" ? 403 : 500 }
     );
   }
 }

@@ -30,7 +30,10 @@ export function AnalyticsCardViewTracker({
   const ref = useRef<HTMLDivElement>(null);
   const fired = useRef(false);
   const metaRef = useRef(meta);
-  metaRef.current = meta;
+
+  useEffect(() => {
+    metaRef.current = meta;
+  }, [meta]);
 
   useEffect(() => {
     const el = ref.current;

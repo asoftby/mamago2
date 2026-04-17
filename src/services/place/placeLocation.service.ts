@@ -13,9 +13,8 @@
  * 5. Return updated place with all geo fields
  */
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import prisma from "@/lib/prisma";
-import { LocationSource } from "@prisma/client";
+import { LocationSource, Prisma } from "@prisma/client";
 import { resolveCityId } from "./cityResolver.service";
 import { enrichPlaceGeo } from "./placeGeoEnrichment.service";
 
@@ -24,7 +23,7 @@ export interface UpdatePlaceLocationInput {
   lng: number;
   googlePlaceId?: string | null;
   formattedAddr?: string | null;
-  addressJson?: any | null;
+  addressJson?: Record<string, unknown> | null;
   countryCode?: string | null;
 }
 
@@ -71,7 +70,9 @@ export async function updatePlaceLocation(
         locationSource,
         googlePlaceId: input.googlePlaceId || null,
         formattedAddr: input.formattedAddr || null,
-        addressJson: input.addressJson || null,
+        addressJson: input.addressJson !== undefined && input.addressJson !== null
+          ? (input.addressJson as Prisma.InputJsonValue)
+          : Prisma.DbNull,
         countryCode: input.countryCode || null,
         customAddress: locationSource === LocationSource.MANUAL ? input.formattedAddr : null,
       },

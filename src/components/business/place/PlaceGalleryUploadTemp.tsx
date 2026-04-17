@@ -121,7 +121,7 @@ function ImageItemContent({
   index: number;
   onRemove: (id: string) => void;
   showDragHandle: boolean;
-  dragHandleProps?: any;
+  dragHandleProps?: Record<string, unknown>;
 }) {
   if (image.status === "uploading") {
     return (
@@ -215,10 +215,11 @@ export function PlaceGalleryUploadTemp({
         const response = await fetch(`/api/business/temp-media?wizardSessionId=${wizardSessionId}`);
         if (response.ok) {
           const { media } = await response.json();
-          const galleryMedia = media
-            .filter((m: any) => m.kind === "PLACE_GALLERY")
-            .sort((a: any, b: any) => a.sortOrder - b.sortOrder)
-            .map((m: any) => ({
+          type TempMediaItem = { id: string; kind: string; url: string; width: number | null; height: number | null; blurhash: string | null; sortOrder: number };
+          const galleryMedia = (media as TempMediaItem[])
+            .filter((m) => m.kind === "PLACE_GALLERY")
+            .sort((a, b) => a.sortOrder - b.sortOrder)
+            .map((m) => ({
               id: m.id,
               url: m.url,
               width: m.width ?? undefined,

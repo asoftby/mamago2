@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Place Service
  * 
@@ -7,7 +6,7 @@
  */
 
 import prisma from "@/lib/prisma";
-import { ContentStatus, Role } from "@prisma/client";
+import { ContentStatus, Role, Prisma } from "@prisma/client";
 import { canManagePlaceAsync, getUserBusinessId } from "@/lib/auth/placeAccess";
 
 /**
@@ -28,7 +27,7 @@ export async function getBusinessPlaces(
   // Get user's business
   const businessId = await getUserBusinessId(userId);
 
-  const where: any = {
+  const where: Prisma.PlaceWhereInput = {
     // Show places created by user OR owned by their business
     OR: [
       { createdByUserId: userId },

@@ -49,7 +49,7 @@ interface ModerationAction {
 interface AuditLog {
   id: string;
   action: string;
-  metadata: any;
+  metadata: Record<string, unknown>;
   createdAt: Date;
   actor: {
     id: string;
@@ -132,9 +132,9 @@ export function UserDetailsClient({ userId }: { userId: string }) {
 
       const result = await res.json();
       setData(result);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Error fetching user details:", err);
-      setError(err.message);
+      setError(err instanceof Error ? err.message : "Unknown error");
     } finally {
       setLoading(false);
     }

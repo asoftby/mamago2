@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 type FilterType = "single" | "multi" | "dateRange";
 
 type FilterConfig = {
@@ -11,7 +10,7 @@ type FilterConfig = {
     mobile: "sheet";
   };
   options?: Array<{ value: string; label: string }>;
-  defaults?: any;
+  defaults?: string | string[] | null;
 };
 
 export const DISCOVERY_FILTERS_CONFIG: FilterConfig[] = [

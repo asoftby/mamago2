@@ -58,10 +58,9 @@ export function FamilyDerivedAgeSync() {
       const fromKids = deriveAgeRangesFromChildren(profileChildren, childIds).map((r) => r.range);
       const adultInSelection =
         !!adultId && family.selectedPersonaIds.includes(adultId);
-      const merged = [...fromKids];
-      if (adultInSelection && !merged.includes("18+")) {
-        merged.push("18+");
-      }
+      const merged = adultInSelection && !fromKids.includes("18+") 
+        ? [...fromKids, "18+"]
+        : fromKids;
       const sortedTarget = merged.slice().sort();
       const cur = applied.age ?? [];
       if (cur.slice().sort().join(",") === sortedTarget.join(",")) {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { useAuthMe } from "@/lib/auth/useAuthMe";
 
 const SESSION_DISMISS_PREFIX = "mamago_email_verify_prompt_dismissed";
@@ -15,20 +15,15 @@ function dismissKey(userId: string | undefined) {
  */
 export function useEmailVerificationPromptVisibility() {
   const { user, isAuthenticated, isLoading, isEmailVerified } = useAuthMe();
-  const [dismissedThisSession, setDismissedThisSession] = useState(false);
-
-  useEffect(() => {
+  const [dismissedThisSession, setDismissedThisSession] = useState(() => {
     const uid = user?.id;
-    if (!uid) {
-      setDismissedThisSession(false);
-      return;
-    }
+    if (!uid) return false;
     try {
-      setDismissedThisSession(sessionStorage.getItem(dismissKey(uid)) === "1");
+      return sessionStorage.getItem(dismissKey(uid)) === "1";
     } catch {
-      setDismissedThisSession(false);
+      return false;
     }
-  }, [user?.id]);
+  });
 
   const dismiss = useCallback(() => {
     const uid = user?.id;

@@ -165,7 +165,7 @@ export function PlaceCardSection() {
           <div>
             <h3 className="text-xl font-semibold mb-1">Network Variant</h3>
             <p className="text-sm text-muted-foreground">
-              Compact vertical card for "Places in this network" sections. Optimized for horizontal scroll on mobile.
+              Compact vertical card for &quot;Places in this network&quot; sections. Optimized for horizontal scroll on mobile.
             </p>
           </div>
           <div className="flex gap-3 overflow-x-auto pb-4">
@@ -246,7 +246,7 @@ export function PlaceCardSection() {
           <div>
             <h3 className="text-xl font-semibold mb-1">Network Section Example</h3>
             <p className="text-sm text-muted-foreground">
-              "Other places in this network" section with horizontal scroll. Note 2-line address format.
+              &quot;Other places in this network&quot; section with horizontal scroll. Note 2-line address format.
             </p>
           </div>
           <div className="rounded-lg border bg-card p-6">

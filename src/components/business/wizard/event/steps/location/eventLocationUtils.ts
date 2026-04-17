@@ -3,10 +3,16 @@
  * Helper functions for processing location data in Event context
  */
 
+type AddressComponent = {
+  types: string[];
+  long_name: string;
+  short_name: string;
+};
+
 /**
  * Extract city information from Google Places address components
  */
-export function extractCityFromAddressComponents(addressComponents: any[]): {
+export function extractCityFromAddressComponents(addressComponents: AddressComponent[]): {
   cityId: string | null;
   district: string | null;
 } {

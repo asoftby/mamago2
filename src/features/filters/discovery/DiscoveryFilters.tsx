@@ -257,7 +257,7 @@ export function DiscoveryFilters({
   };
   
   // Handlers for Desktop (Immediate Apply)
-  const handleWhenChangeDesktop = (val: any) => {
+  const handleWhenChangeDesktop = (val: string | Date | { from: Date; to: Date } | null) => {
       let patch: Partial<DiscoveryFiltersType> = {};
       if (!val) {
           patch = { dateFrom: null, dateTo: null, whenPreset: null };

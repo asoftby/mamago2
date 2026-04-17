@@ -34,28 +34,23 @@ const AccountModeContext = createContext<AccountModeContextValue | null>(null);
 export function AccountModeProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const [mode, setModeState] = useState<AccountMode>("personal");
-  const [hydrated, setHydrated] = useState(false);
-
-  useEffect(() => {
+  const [mode, setModeState] = useState<AccountMode>(() => {
     const raw = localStorage.getItem(STORAGE_KEY);
-    let next: AccountMode = "personal";
     if (raw === "business" || raw === "personal") {
-      next = raw;
-    } else {
-      const path =
-        typeof window !== "undefined" ? window.location.pathname : "";
-      if (
-        path.startsWith(BUSINESS_PATH_PREFIX) &&
-        shouldRedirectPersonalModeAwayFromBusiness(path)
-      ) {
-        next = "business";
-      }
-      localStorage.setItem(STORAGE_KEY, next);
+      return raw;
     }
-    setModeState(next);
-    setHydrated(true);
-  }, []);
+    const path =
+      typeof window !== "undefined" ? window.location.pathname : "";
+    if (
+      path.startsWith(BUSINESS_PATH_PREFIX) &&
+      shouldRedirectPersonalModeAwayFromBusiness(path)
+    ) {
+      return "business";
+    }
+    localStorage.setItem(STORAGE_KEY, "personal");
+    return "personal";
+  });
+  const [hydrated, setHydrated] = useState(true);
 
   const setMode = useCallback((next: AccountMode) => {
     setModeState(next);
@@ -87,7 +82,7 @@ export function AccountModeProvider({ children }: { children: React.ReactNode })
     if (!hydrated) return;
     if (mode !== "personal") return;
     if (!shouldRedirectPersonalModeAwayFromBusiness(pathname)) return;
-    setMode("business");
+    queueMicrotask(() => setMode("business"));
   }, [hydrated, mode, pathname, setMode]);
 
   const value = useMemo(

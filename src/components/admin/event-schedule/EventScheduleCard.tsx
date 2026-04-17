@@ -442,7 +442,7 @@ export function EventScheduleCard({
                   <Select
                     value={item.recurrenceUnit}
                     onValueChange={(value) =>
-                      handleUpdate({ recurrenceUnit: value as any })
+                      handleUpdate({ recurrenceUnit: value as import("./types").RecurrenceUnit })
                     }
                   >
                     <SelectTrigger id={`unit-${item.id}`}>

@@ -21,7 +21,7 @@ global.document = {
       _innerHTML: "",
     };
   },
-} as any;
+} as unknown as typeof document;
 
 import { 
   extractPlainTextFromHtml, 

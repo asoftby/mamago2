@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -31,18 +31,14 @@ export function PostLoginChildChoiceModal({
   onChooseChild,
   onKeepManual,
 }: Props) {
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(() => {
+    if (childrenList.length === 1) {
+      return childrenList[0].id;
+    }
+    return childrenList[0]?.id ?? null;
+  });
   const single = childrenList.length === 1;
   const first = childrenList[0];
-
-  useEffect(() => {
-    if (!open) return;
-    if (childrenList.length === 1) {
-      setSelectedId(childrenList[0].id);
-    } else {
-      setSelectedId(childrenList[0]?.id ?? null);
-    }
-  }, [open, childrenList]);
 
   const handleUseChild = () => {
     if (single && first) {

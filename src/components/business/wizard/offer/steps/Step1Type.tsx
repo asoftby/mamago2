@@ -85,7 +85,7 @@ function ServiceChildSettings({
   onLocationTypeChange,
   isEditable
 }: ServiceChildSettingsProps) {
-  const serviceOptions = [
+  const serviceOptions: { value: "торт" | "декор" | "фотограф" | "аниматор" | "шоу" | "аквагрим" | "ведущий" | "мастер_класс_на_выезд" | "другое"; label: string }[] = [
     { value: "торт", label: "Торт" },
     { value: "декор", label: "Декор" },
     { value: "фотограф", label: "Фотограф" },
@@ -129,7 +129,7 @@ function ServiceChildSettings({
                   ? "ring-2 ring-[#EF8759] border-[#EF8759] bg-orange-50"
                   : "hover:border-gray-300"
               }`}
-              onClick={() => onServiceTypeChange(service.value as any)}
+              onClick={() => onServiceTypeChange(service.value)}
             >
               <CardContent className="p-3 text-center">
                 <span className="text-sm font-medium">{service.label}</span>

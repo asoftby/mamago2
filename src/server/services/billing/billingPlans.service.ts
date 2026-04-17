@@ -1,7 +1,5 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import prisma from "@/lib/prisma";
-import { PlanInterval } from "@prisma/client";
-
+import { PlanInterval, Prisma } from "@prisma/client";
 /**
  * Get all plans
  */
@@ -9,7 +7,7 @@ export async function getPlans(filters?: {
   isActive?: boolean;
   isVisible?: boolean;
 }) {
-  const where: any = {};
+  const where: Prisma.PlanWhereInput = {};
 
   if (filters?.isActive !== undefined) {
     where.isActive = filters.isActive;

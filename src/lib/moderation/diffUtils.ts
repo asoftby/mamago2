@@ -1,14 +1,12 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Diff utilities for content moderation
  * Compares current and new versions of content to highlight changes
  */
-
 import { formatAgeKeys } from "@/lib/config/ages";
 
 export type ChangeType = "added" | "removed" | "changed" | "unchanged";
 
-export interface FieldChange<T = any> {
+export interface FieldChange<T = unknown> {
   field: string;
   label: string;
   oldValue: T;
@@ -36,7 +34,7 @@ export interface DiffSummary {
 /**
  * Check if a value is empty (null, undefined, empty string, empty array)
  */
-function isEmpty(value: any): boolean {
+function isEmpty(value: unknown): boolean {
   if (value === null || value === undefined) return true;
   if (typeof value === "string") return value.trim() === "";
   if (Array.isArray(value)) return value.length === 0;
@@ -46,7 +44,7 @@ function isEmpty(value: any): boolean {
 /**
  * Compare two values and determine change type
  */
-function getChangeType(oldValue: any, newValue: any): ChangeType {
+function getChangeType(oldValue: unknown, newValue: unknown): ChangeType {
   const oldEmpty = isEmpty(oldValue);
   const newEmpty = isEmpty(newValue);
 
@@ -70,7 +68,7 @@ function getChangeType(oldValue: any, newValue: any): ChangeType {
 /**
  * Compare two objects and return field changes
  */
-export function compareFields<T extends Record<string, any>>(
+export function compareFields<T extends Record<string, unknown>>(
   oldData: T,
   newData: T,
   fieldConfig: Array<{ field: keyof T; label: string }>
@@ -199,7 +197,7 @@ export function generateDiffSummary(
  * @param value - The value to format
  * @param field - Optional field name for special formatting (e.g., "ageTags", "placeGroupId")
  */
-export function formatValue(value: any, field?: string): string {
+export function formatValue(value: unknown, field?: string): string {
   if (value === null || value === undefined) {
     // Special case for placeGroupId: null means "not in a group"
     if (field === "placeGroupId") {
@@ -208,7 +206,6 @@ export function formatValue(value: any, field?: string): string {
     return "—";
   }
   if (typeof value === "string") {
-    // Special case for placeGroupId: show ID (will be enhanced with names in component)
     if (field === "placeGroupId") {
       return `В сети (ID: ${value})`;
     }

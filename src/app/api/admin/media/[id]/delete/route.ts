@@ -27,10 +27,10 @@ export async function POST(
     const media = await softDeleteMediaAsset(id, force);
 
     return NextResponse.json(media);
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error deleting media:", error);
     return NextResponse.json(
-      { error: error.message || "Failed to delete media" },
+      { error: error instanceof Error ? error.message : "Failed to delete media" },
       { status: 500 }
     );
   }

@@ -18,30 +18,35 @@ function MyPlanProviderInner() {
   const [postAuthCompletionActive, setPostAuthCompletionActive] = useState(false);
   const [planOpen, setPlanOpen] = useState(false);
   const unauthSurfaceRef = useRef<MyPlanUnauthSurface>("auth");
+  const prevIsAuthenticatedRef = useRef(isAuthenticated);
+
+  // Derive: close plan when on the plan page
+  const isOnPlanPage = pathname === "/me/plan" || (pathname?.startsWith("/me/plan/") ?? false);
+  const effectivePlanOpen = planOpen && !isOnPlanPage;
 
   const nextHref = appendMyPlanOpenToHref(pathname || "/");
 
+  // Handle URL param to open plan — setState deferred to avoid cascading render
   useEffect(() => {
     if (authLoading) return;
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
     if (params.get("myPlan") !== "open" || !isAuthenticated) return;
-    setPlanOpen(true);
     params.delete("myPlan");
     const qs = params.toString();
-    router.replace(`${pathname || "/"}${qs ? `?${qs}` : ""}`, { scroll: false });
+    const newUrl = `${pathname || "/"}${qs ? `?${qs}` : ""}`;
+    router.replace(newUrl, { scroll: false });
+    queueMicrotask(() => setPlanOpen(true));
   }, [authLoading, isAuthenticated, router, pathname]);
 
+  // Reset embeddedAuthCompleting when auth transitions false → true
   useEffect(() => {
-    if (isAuthenticated) setEmbeddedAuthCompleting(false);
-  }, [isAuthenticated]);
-
-  /** Закрыть overlay при переходе на страницу плана (после post-auth navigate). */
-  useEffect(() => {
-    if (pathname === "/me/plan" || pathname?.startsWith("/me/plan/")) {
-      setPlanOpen(false);
+    const wasAuthenticated = prevIsAuthenticatedRef.current;
+    prevIsAuthenticatedRef.current = isAuthenticated;
+    if (!wasAuthenticated && isAuthenticated) {
+      queueMicrotask(() => setEmbeddedAuthCompleting(false));
     }
-  }, [pathname]);
+  }, [isAuthenticated]);
 
   const handleOpenMyPlan = useCallback(() => {
     if (authLoading) return;
@@ -87,7 +92,7 @@ function MyPlanProviderInner() {
       {!hidePlanEntry ? <MyPlanWidget onOpen={handleOpenMyPlan} /> : null}
 
       <MyPlanOverlay
-        open={planOpen}
+        open={effectivePlanOpen}
         onOpenChange={handlePlanOpenChange}
         isAuthenticated={
           (isAuthenticated || embeddedAuthCompleting) && !postAuthCompletionActive

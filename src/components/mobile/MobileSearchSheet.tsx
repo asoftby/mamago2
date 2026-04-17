@@ -609,21 +609,24 @@ export function MobileSearchSheet({
   );
 
   const getLocationText = useCallback(() => {
-    const items: string[] = [];
-    items.push(getCityLocativePhrase(pendingCitySlug));
-    if (sheetDraft.nearby) items.push("Поблизости");
+    const cityPhrase = getCityLocativePhrase(pendingCitySlug);
+    const nearbyPart = sheetDraft.nearby ? "Поблизости" : null;
+    
+    let metroOrDistrictPart: string | null = null;
     if (sheetDraft.metro) {
       const metro = safeApiOptions.metros.find(
         (m) => m.value === sheetDraft.metro,
       );
-      if (metro) items.push(metro.label);
+      if (metro) metroOrDistrictPart = metro.label;
     }
     if (sheetDraft.district) {
       const district = safeApiOptions.districts.find(
         (d) => d.value === sheetDraft.district,
       );
-      if (district) items.push(district.label);
+      if (district) metroOrDistrictPart = district.label;
     }
+    
+    const items = [cityPhrase, nearbyPart, metroOrDistrictPart].filter((p): p is string => p != null);
     return items.join(" • ");
   }, [pendingCitySlug, sheetDraft, safeApiOptions]);
 

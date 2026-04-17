@@ -28,10 +28,10 @@ export async function POST(
     });
 
     return NextResponse.json({ success: true, media: updated });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Archive media error:", error);
     return NextResponse.json(
-      { error: error.message || "Failed to archive media" },
+      { error: error instanceof Error ? error.message : "Failed to archive media" },
       { status: 500 }
     );
   }

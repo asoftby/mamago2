@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Business Contracts Service
  * 
@@ -7,7 +6,7 @@
  */
 
 import { prisma } from "@/lib/prisma";
-import type { ContractStatus, ContractType } from "@prisma/client";
+import type { ContractStatus, ContractType, Prisma } from "@prisma/client";
 
 export interface ContractFilters {
   businessId?: string;
@@ -48,7 +47,7 @@ export interface UpdateContractInput {
  * Get contracts with filters
  */
 export async function getContracts(filters: ContractFilters = {}) {
-  const where: any = {};
+  const where: Prisma.BusinessContractWhereInput = {};
 
   if (filters.businessId) {
     where.businessId = filters.businessId;

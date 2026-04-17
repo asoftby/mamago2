@@ -1,4 +1,4 @@
-import type { ContentStatus, PlaceKind } from "@prisma/client";
+import type { ContentStatus, PlaceKind, Prisma } from "@prisma/client";
 import type { OpeningHoursData } from "@/components/openingHours";
 
 /**
@@ -26,7 +26,7 @@ export interface PlaceFormData {
   lng: number | null;
   googlePlaceId: string | null;
   formattedAddr: string | null;
-  addressJson: any | null;
+  addressJson: Prisma.InputJsonValue | null;
   customAddress: string | null;
   cityId: string | null;
   districtAutoId: string | null;

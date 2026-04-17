@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useCallback } from "react";
 import { Input } from "@/components/ui/input";
 import { MapPin } from "lucide-react";
 import { GoogleMapsService } from "@/services/googleMaps";
@@ -11,7 +11,7 @@ interface PlaceSearchInputProps {
     lat: number;
     lng: number;
     formattedAddr: string;
-    addressJson: any[];
+    addressJson: google.maps.GeocoderAddressComponent[];
   }) => void;
   disabled?: boolean;
   initialValue?: string; // Initial address to display
@@ -28,16 +28,7 @@ export function PlaceSearchInput({ onPlaceSelect, disabled, initialValue }: Plac
     }
   }, [initialValue]);
 
-  useEffect(() => {
-    initAutocomplete();
-    return () => {
-      if (autocompleteRef.current && typeof google !== "undefined") {
-        google.maps.event.clearInstanceListeners(autocompleteRef.current);
-      }
-    };
-  }, []);
-
-  const initAutocomplete = async () => {
+  const initAutocomplete = useCallback(async () => {
     if (!inputRef.current || !(inputRef.current instanceof HTMLInputElement)) return;
 
     try {
@@ -72,7 +63,16 @@ export function PlaceSearchInput({ onPlaceSelect, disabled, initialValue }: Plac
     } catch (err) {
       console.error("[PlaceSearchInput] Init error:", err);
     }
-  };
+  }, [onPlaceSelect]);
+
+  useEffect(() => {
+    initAutocomplete();
+    return () => {
+      if (autocompleteRef.current && typeof google !== "undefined") {
+        google.maps.event.clearInstanceListeners(autocompleteRef.current);
+      }
+    };
+  }, [initAutocomplete]);
 
   return (
     <div className="relative">

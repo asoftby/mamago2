@@ -262,7 +262,7 @@ export function AdminUIRulesSection() {
               <li>Do NOT use custom font sizes (use the typography scale)</li>
               <li>Do NOT create responsive patterns that differ from the documented mobile transformations</li>
             </ul>
-            <p className="font-medium mt-3">When in doubt: Copy from ui-lab-admin, don't improvise.</p>
+            <p className="font-medium mt-3">When in doubt: Copy from ui-lab-admin, don&#39;t improvise.</p>
           </div>
         </div>
       </div>

@@ -49,10 +49,10 @@ export async function GET(
     );
 
     return NextResponse.json({ requests });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("[API] List improvement requests error:", error);
     return NextResponse.json(
-      { error: error.message || "Failed to list improvement requests" },
+      { error: error instanceof Error ? error.message : "Failed to list improvement requests" },
       { status: 500 }
     );
   }
@@ -122,22 +122,24 @@ export async function POST(
     });
 
     return NextResponse.json({ request });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("[API] Create improvement request error:", error);
     
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    
     // Handle the specific case where an active request already exists
-    if (error.message?.startsWith("ACTIVE_REQUEST_EXISTS:")) {
+    if (errorMessage.startsWith("ACTIVE_REQUEST_EXISTS:")) {
       return NextResponse.json(
         { 
           error: "ACTIVE_REQUEST_EXISTS",
-          message: error.message.replace("ACTIVE_REQUEST_EXISTS: ", ""),
+          message: errorMessage.replace("ACTIVE_REQUEST_EXISTS: ", ""),
         },
         { status: 409 } // 409 Conflict
       );
     }
     
     return NextResponse.json(
-      { error: error.message || "Failed to create improvement request" },
+      { error: errorMessage || "Failed to create improvement request" },
       { status: 500 }
     );
   }
@@ -181,10 +183,10 @@ export async function PATCH(
     }
 
     return NextResponse.json({ request });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("[API] Update improvement request error:", error);
     return NextResponse.json(
-      { error: error.message || "Failed to update improvement request" },
+      { error: error instanceof Error ? error.message : "Failed to update improvement request" },
       { status: 500 }
     );
   }
