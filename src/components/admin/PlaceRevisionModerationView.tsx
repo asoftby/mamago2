@@ -30,14 +30,27 @@ import { OpeningHoursDiff } from "./moderation/OpeningHoursDiff";
 import { getPlacePublicUrl } from "@/lib/placePublicUrl";
 import { PlaceDangerZone } from "./moderation/PlaceDangerZone";
 import { Textarea } from "@/components/ui/textarea";
+import type { OpeningHoursWithRelations } from "@/server/services/openingHours/openingHours.types";
 
 interface PlaceRevisionModerationViewProps {
   place: {
     id: string;
     title: string;
     updatedAt: Date;
-    images?: Array<{ [key: string]: unknown }>;
+    images?: Array<{ id: string; url: string; kind: string; sortOrder?: number }>;
     openingHours?: Record<string, unknown> | null;
+    city?: { id: string; name: string; hasMetro?: boolean | null; metroMaxDistanceM?: number | null } | null;
+    owner?: { business: { name: string } | null } | null;
+    status: string;
+    slug?: string | null;
+    districtManual?: { name: string } | null;
+    districtAuto?: { name: string } | null;
+    metroManual?: { name: string } | null;
+    metroAuto?: { name: string } | null;
+    metroManualDistanceM?: number | null;
+    metroAutoDistanceM?: number | null;
+    formattedAddr?: string | null;
+    customAddress?: string | null;
     [key: string]: unknown;
   };
   revision: {
@@ -46,11 +59,23 @@ interface PlaceRevisionModerationViewProps {
     status: string;
     createdAt: Date;
     submittedAt?: Date | null;
-    images?: Array<{ [key: string]: unknown }>;
+    images?: Array<{ id: string; url: string; kind: string; sortOrder?: number }>;
     openingHours?: Record<string, unknown> | null;
     ageTags: string[];
     visitFormats: string[];
     activityTypes: string[];
+    districtManual?: { name: string } | null;
+    districtAuto?: { name: string } | null;
+    districtManualId?: string | null;
+    districtAutoId?: string | null;
+    metroManual?: { name: string } | null;
+    metroAuto?: { name: string } | null;
+    metroManualId?: string | null;
+    metroAutoId?: string | null;
+    metroManualDistanceM?: number | null;
+    metroAutoDistanceM?: number | null;
+    formattedAddr?: string | null;
+    customAddress?: string | null;
     [key: string]: unknown;
   };
 }
@@ -62,7 +87,7 @@ export function PlaceRevisionModerationView({
   const router = useRouter();
   const [comment, setComment] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [microEdits, setMicroEdits] = useState<Array<Record<string, unknown>>>([]);
+  const [microEdits, setMicroEdits] = useState<Array<{ id: string; fieldName: string; oldValue: string | null; newValue: string | null; editType: string; comment: string | null; createdAt: string; moderator: { email: string } }>>([]);
   const [displayTitle, setDisplayTitle] = useState<string>(place.title);
   const [hasDuplicates, setHasDuplicates] = useState<boolean>(false);
 
@@ -185,13 +210,13 @@ export function PlaceRevisionModerationView({
     const imageChanges = compareImages(place.images || [], revision.images || []);
 
     // Compare opening hours
-    const oldOpeningHours = place.openingHours;
-    const newOpeningHours = revision.openingHours;
+    const oldOpeningHours = place.openingHours as OpeningHoursWithRelations | null;
+    const newOpeningHours = revision.openingHours as OpeningHoursWithRelations | null;
     
     let openingHoursChange: { 
       changeType: "added" | "removed" | "modified" | null;
-      oldOpeningHours: Record<string, unknown> | null;
-      newOpeningHours: Record<string, unknown> | null;
+      oldOpeningHours: OpeningHoursWithRelations | null;
+      newOpeningHours: OpeningHoursWithRelations | null;
     } = {
       changeType: null,
       oldOpeningHours: null,
@@ -266,30 +291,30 @@ export function PlaceRevisionModerationView({
     revision.formattedAddr ?? place.formattedAddr ?? revision.customAddress ?? place.customAddress ?? "Адрес не указан";
   
   const districtName =
-    revision.districtManual?.name ??
-    place.districtManual?.name ??
-    revision.districtAuto?.name ??
-    place.districtAuto?.name;
+    (revision.districtManual as { name: string } | null)?.name ??
+    (place.districtManual as { name: string } | null)?.name ??
+    (revision.districtAuto as { name: string } | null)?.name ??
+    (place.districtAuto as { name: string } | null)?.name;
   
   const metroName =
-    revision.metroManual?.name ??
-    place.metroManual?.name ??
-    revision.metroAuto?.name ??
-    place.metroAuto?.name;
+    (revision.metroManual as { name: string } | null)?.name ??
+    (place.metroManual as { name: string } | null)?.name ??
+    (revision.metroAuto as { name: string } | null)?.name ??
+    (place.metroAuto as { name: string } | null)?.name;
   
-  const metroDistance =
-    revision.metroManualDistanceM ??
-    place.metroManualDistanceM ??
-    revision.metroAutoDistanceM ??
-    place.metroAutoDistanceM;
+  const metroDistance: number =
+    (revision.metroManualDistanceM ?? 0) ||
+    (place.metroManualDistanceM ?? 0) ||
+    (revision.metroAutoDistanceM ?? 0) ||
+    (place.metroAutoDistanceM ?? 0);
 
-  const cityHasMetro = place.city?.hasMetro ?? false;
-  const metroMaxDistance = place.city?.metroMaxDistanceM ?? 2500;
+  const cityHasMetro = (place.city as { hasMetro?: boolean } | null)?.hasMetro ?? false;
+  const metroMaxDistance = (place.city as { metroMaxDistanceM?: number } | null)?.metroMaxDistanceM ?? 2500;
 
   const shouldShowMetro =
     metroName &&
-    metroDistance !== null &&
     cityHasMetro &&
+    metroDistance !== 0 &&
     metroDistance <= metroMaxDistance;
 
   const handleModerate = async (
@@ -421,8 +446,8 @@ export function PlaceRevisionModerationView({
                     return (
                       <PlaceGroupDiff
                         key={change.field}
-                        oldGroupId={change.oldValue}
-                        newGroupId={change.newValue}
+                        oldGroupId={change.oldValue as string | null}
+                        newGroupId={change.newValue as string | null}
                         placeId={place.id}
                         changeType={change.changeType}
                       />
@@ -501,7 +526,7 @@ export function PlaceRevisionModerationView({
                 </div>
               )}
 
-              {place.owner.business && (
+              {place.owner?.business && (
                 <div>
                   <span className="text-sm font-medium text-gray-600">
                     Business:
@@ -610,9 +635,9 @@ export function PlaceRevisionModerationView({
             {/* View Published Place Actions */}
             <div className="mt-6 pt-4 border-t space-y-2">
               {/* Primary CTA: Public place page */}
-              {getPlacePublicUrl(place) ? (
+              {getPlacePublicUrl({ status: place.status, slug: place.slug ?? null }) ? (
                 <a
-                  href={getPlacePublicUrl(place)!}
+                  href={getPlacePublicUrl({ status: place.status, slug: place.slug ?? null })!}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700"

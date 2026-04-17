@@ -12,7 +12,7 @@ import { isMeaningfulDraft } from "./utils/isMeaningfulDraft";
 import { AlertCircle, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import type { Place, PlaceImage } from "@prisma/client";
+import type { Place, PlaceImage, Prisma } from "@prisma/client";
 import { ContentStatus, PlaceKind } from "@prisma/client";
 import {
   getStepStatus,
@@ -56,7 +56,7 @@ interface LocalDraft {
   lng: number | null;
   googlePlaceId: string | null;
   formattedAddr: string | null;
-  addressJson: Record<string, unknown>[] | null;
+  addressJson: Prisma.InputJsonValue | null;
   customAddress: string | null;
   cityId: string | null;
   districtAutoId: string | null;
@@ -260,7 +260,9 @@ export function NewPlaceWizard() {
         });
         // Trigger enrichment asynchronously (don't wait)
         // Use addressJson from updates or existing draft
-        resolveCityIdClient(newDraft.lat, newDraft.lng, newDraft.addressJson);
+        // Narrow InputJsonValue to Record<string, unknown>[] | null for the enrichment API
+        const addressJsonForEnrichment = Array.isArray(newDraft.addressJson) ? newDraft.addressJson : null;
+        resolveCityIdClient(newDraft.lat, newDraft.lng, addressJsonForEnrichment);
       }
       
       return newDraft;

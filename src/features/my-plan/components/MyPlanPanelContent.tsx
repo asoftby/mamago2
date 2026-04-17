@@ -69,10 +69,8 @@ export function MyPlanPanelContent({
   return (
     <PlanMainContent
       layout={layout}
-      planSlots={planSlots}
       selectedDate={selectedPlanDate}
       onChangeDate={setSelectedPlanDate}
-      weekDates={weekDates}
       planItemsByDate={planItemsByDate}
       todayIso={todayIso}
       childrenList={children.map((c) => ({ id: c.id, name: c.name, birthDate: c.birthDate }))}
@@ -80,13 +78,6 @@ export function MyPlanPanelContent({
       onChangeSelectedChildIds={setSelectedChildIds}
       selectedAgeRanges={selectedAgeRanges}
       onChangeSelectedAgeRanges={setSelectedAgeRanges}
-      autoAgeValues={autoAgeValues}
-      onCycleSlotAlternative={cycleSlotAlternative}
-      onCycleSlotAlternativePrev={cycleSlotAlternativePrev}
-      onMarkSlotSaved={(_, item) => markSlotSaved(item)}
-      onClearSlotSaved={clearSlotSaved}
-      onRemoveItemFromPlan={clearSlotSaved}
-      onOpenSlotSuggestion={openSlotSuggestion}
       ideas={ideas}
       ideasLoading={ideasLoading}
       onAddIdeaToPlan={addIdeaToPlan}

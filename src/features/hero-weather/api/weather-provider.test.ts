@@ -89,7 +89,7 @@ void (async () => {
   });
   assert.equal(m2.debug?.weatherSource, "mock");
 
-  // eslint-disable-next-line no-console
+   
   console.log("weather-provider tests: OK");
 })().catch((e) => {
   console.error(e);

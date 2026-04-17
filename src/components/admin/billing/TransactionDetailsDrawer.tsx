@@ -1,6 +1,7 @@
 "use client";
 
 import { X } from "lucide-react";
+import { BillingTransactionType, BillingTransactionStatus } from "@prisma/client";
 import { TransactionStatusBadge } from "./TransactionStatusBadge";
 import { TransactionTypeBadge } from "./TransactionTypeBadge";
 import { TransactionAmount } from "./TransactionAmount";

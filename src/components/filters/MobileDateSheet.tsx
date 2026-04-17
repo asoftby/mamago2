@@ -11,12 +11,13 @@ import {
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { WhenSelect } from "@/components/ui/when-select";
+import type { WhenValue } from "@/components/ui/when-select";
 
 type MobileDateSheetProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  value: string | null | { from?: Date; to?: Date };
-  onChange: (val: string | null | { from?: Date; to?: Date }) => void;
+  value: WhenValue;
+  onChange: (val: WhenValue) => void;
 };
 
 // Reuse helpers from WhenSelect or duplicate them to avoid export issues if they aren't exported.

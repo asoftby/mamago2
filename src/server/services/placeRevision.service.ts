@@ -1,5 +1,5 @@
 import prisma from "@/lib/prisma";
-import type { Role } from "@prisma/client";
+import type { Role, PlaceRevision } from "@prisma/client";
 import { PlaceRevisionStatus, LocationSource, PlaceKind, Prisma } from "@prisma/client";
 import { canManagePlaceAsync } from "@/lib/auth/placeAccess";
 import type { PlaceImage, PlaceRevisionImage, TempMedia, OpeningHoursRule, OpeningHoursInterval } from "../types";
@@ -254,15 +254,6 @@ export async function savePlaceRevisionDraft(
     ownerBusinessId,
     status,
     createRequestId,
-    moderatorComment,
-    moderationReviewedAt,
-    moderatedByUserId,
-    revisionRequestedAt,
-    revisionResubmittedAt,
-    archivedAt,
-    archivedByUserId,
-    createdAt,
-    updatedAt,
     // Remove relation fields that shouldn't be in data
     images,
     ...validData
@@ -282,14 +273,19 @@ export async function savePlaceRevisionDraft(
   const hasFilteredFields = Object.values(filteredFields).some(v => v !== undefined);
   if (hasFilteredFields) {
     console.log("[PlaceRevision] Filtered out invalid fields:", 
-      Object.fromEntries(Object.entries(filteredFields).filter(([_, v]) => v !== undefined))
+      Object.fromEntries(Object.entries(filteredFields).filter(([, v]) => v !== undefined))
     );
   }
+
+  // Filter out null values from validData (Prisma expects undefined for optional fields)
+  const validDataFiltered = Object.fromEntries(
+    Object.entries(validData).filter(([, v]) => v !== null)
+  ) as Record<string, unknown>;
 
   // Update revision with only valid PlaceRevision fields
   const updatedRevision = await prisma.placeRevision.update({
     where: { id: revisionId },
-    data: validData,
+    data: validDataFiltered as any,
     include: {
       images: {
         orderBy: { sortOrder: "asc" },

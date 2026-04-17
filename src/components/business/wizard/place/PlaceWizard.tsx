@@ -252,6 +252,11 @@ export function PlaceWizard({
         }
       } else {
         // Update existing place
+        if (!place) {
+          toast.error("Ошибка: данные места отсутствуют");
+          setIsSaving(false);
+          return;
+        }
         const changes = extractChanges(formData, originalData);
         
         const response = await fetch(`/api/business/places/${place.id}`, {
@@ -331,7 +336,12 @@ export function PlaceWizard({
         }
       } else {
         // Submit existing place or create revision
-        if (place.status === "PUBLISHED") {
+        if (!place) {
+            toast.error("Ошибка: данные места отсутствуют");
+            setIsSubmitting(false);
+            return;
+          }
+          if (place.status === "PUBLISHED") {
           // Create revision for published place
           const changes = extractChanges(formData, originalData);
           

@@ -168,7 +168,7 @@ export function MobileFilterSheet({
                  open={dateSheetOpen}
                  onOpenChange={setDateSheetOpen}
                  value={whenValue}
-                 onChange={(val: string | null | { from?: Date; to?: Date }) => {
+                 onChange={(val) => {
                      // Convert back to store format
                      if (!val) {
                          setDraft({ dateFrom: null, dateTo: null, whenPreset: null });
@@ -187,6 +187,7 @@ export function MobileFilterSheet({
                      } else if (val instanceof Date) {
                          setDraft({ whenPreset: null, dateFrom: val.toISOString().split('T')[0], dateTo: null });
                      } else if ('from' in val) {
+                         if (!val.from || !val.to) return;
                          setDraft({ whenPreset: null, dateFrom: val.from.toISOString().split('T')[0], dateTo: val.to.toISOString().split('T')[0] });
                      }
                  }}

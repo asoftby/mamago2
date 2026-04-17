@@ -30,7 +30,7 @@ export async function ImprovementRequestsBlock({ placeId }: { placeId: string })
                 <p>Запросов на доработку пока нет</p>
               </div>
             ) : (
-              <ImprovementRequestList requests={improvementRequests as ImprovementRequest[]} />
+              <ImprovementRequestList requests={improvementRequests} />
             )}
           </CardContent>
         </Card>

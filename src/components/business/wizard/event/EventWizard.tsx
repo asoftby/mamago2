@@ -27,7 +27,7 @@ import { useWizardSession } from "@/hooks/useWizardSession";
 import type { EventFormData, EventWizardMode } from "./types";
 import { getDefaultFormData, hasMeaningfulContent } from "./defaults";
 import { validateStep, validateForSubmit, validateForDraft } from "./validation";
-import { mapEventToFormData, buildEventPayload } from "./mappers";
+import { mapEventToFormData, buildEventPayload, type ActivityWithRelations } from "./mappers";
 import {
   EVENT_WIZARD_STEPS,
   getStepLabel,
@@ -151,7 +151,7 @@ function EventWizardInner({
   );
   const [formData, setFormData] = useState<EventFormData>(() => {
     if (mode === "edit" && event) {
-      return mapEventToFormData(event);
+      return mapEventToFormData(event as unknown as ActivityWithRelations);
     }
     return getDefaultFormData();
   });

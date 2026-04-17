@@ -63,8 +63,8 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get("limit") || "50");
 
     // Parse sort
-    const sortField = searchParams.get("sortField") as "createdAt" | "updatedAt" | "filename" | "sizeBytes" | null;
-    const sortOrder = searchParams.get("sortOrder") as "asc" | "desc" | null;
+    const sortField = (searchParams.get("sortField") ?? undefined) as "createdAt" | "updatedAt" | "filename" | "sizeBytes" | undefined;
+    const sortOrder = (searchParams.get("sortOrder") ?? undefined) as "asc" | "desc" | undefined;
 
     const result = await getAdminMediaList(
       filters,

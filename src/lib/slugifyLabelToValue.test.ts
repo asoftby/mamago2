@@ -29,6 +29,6 @@ expect("", "");
 expect("   ", "");
 expect("   +--/   ", "");
 
-// eslint-disable-next-line no-console
+ 
 console.log("slugifyLabelToValue tests: OK");
 

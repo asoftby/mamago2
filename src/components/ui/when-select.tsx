@@ -16,8 +16,8 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { useHydrated } from "@/hooks/use-hydrated";
 import { Button } from "@/components/ui/button";
 
-type RangeValue = { from: Date; to: Date };
-type WhenValue = string | Date | RangeValue | null;
+export type RangeValue = { from: Date; to: Date };
+export type WhenValue = string | Date | RangeValue | null;
 type WhenSelectProps = {
   label?: string;
   value?: WhenValue;

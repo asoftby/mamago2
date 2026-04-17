@@ -1,6 +1,8 @@
 // Event Wizard Data Mappers
 
 import type { EventFormData } from "./types";
+import type { Activity } from "@prisma/client";
+import type { Prisma } from "@prisma/client";
 import { getDefaultFormData } from "./defaults";
 import {
   mapEventFormatsToSignals,
@@ -13,12 +15,12 @@ import { normalizePhoneToE164 } from "@/lib/phone/e164";
 import { createDefaultSocialLink } from "./defaults";
 import { computeEventShortDesc } from "@/lib/business/eventShortDesc";
 
-type ActivityWithRelations = {
+export type ActivityWithRelations = Activity & {
   id: string;
   title: string | null;
   description: string | null;
   ageTags: string[];
-  scheduleJson: Record<string, unknown>;
+  scheduleJson: Record<string, unknown> | null;
   coverImageId: string | null;
   placeId: string | null;
   eventCategoryId: string | null;
@@ -350,7 +352,7 @@ type EventPayload = {
   scheduleMode: "MULTI_DATE";
   eventCategoryId?: string;
   programCategoryIds: string[];
-  scheduleJson: Record<string, unknown>;
+  scheduleJson: Record<string, unknown> | null;
   priceFrom: number | null;
   priceTo: number | null;
   priceText: string;
@@ -575,7 +577,7 @@ export function extractChanges(current: EventFormData, original: EventFormData):
     current.endTime !== original.endTime ||
     current.repeatEnabled !== original.repeatEnabled
   ) {
-    changes.scheduleJson = buildEventPayload(current).scheduleJson;
+    changes.scheduleJson = buildEventPayload(current).scheduleJson as Record<string, unknown> | undefined;
   }
 
   // Pricing changes

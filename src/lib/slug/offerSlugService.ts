@@ -76,7 +76,7 @@ export async function updateOfferSlug(offerId: string, newSlugRaw: string) {
     const base = newSlug;
     let finalSlug = base;
     let i = 2;
-    // eslint-disable-next-line no-constant-condition
+     
     while (true) {
       const conflict = await tx.offer.findUnique({
         where: { slug: finalSlug },

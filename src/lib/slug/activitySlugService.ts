@@ -92,7 +92,7 @@ export async function updateActivitySlug(activityId: string, newSlugRaw: string)
     const base = newSlug;
     let candidate = base;
     let i = 2;
-    // eslint-disable-next-line no-constant-condition
+     
     while (true) {
       const conflict = await tx.activity.findUnique({
         where: { slug: candidate },

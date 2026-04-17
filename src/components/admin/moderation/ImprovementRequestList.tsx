@@ -13,9 +13,9 @@ export interface ImprovementRequest {
   severity: string;
   title: string;
   description: string;
-  dueAt: string | null;
-  resolvedAt: string | null;
-  createdAt: string;
+  dueAt: Date | string | null;
+  resolvedAt: Date | string | null;
+  createdAt: Date | string;
   createdByModerator: {
     email: string;
   };

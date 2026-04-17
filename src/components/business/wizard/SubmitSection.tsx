@@ -6,7 +6,22 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 interface SubmitSectionProps {
-  place: Record<string, unknown>;
+  place: {
+    title?: string | null;
+    category?: string | null;
+    shortDesc?: string | null;
+    description?: string | null;
+    ageTags?: string[] | null;
+    visitFormats?: string[] | null;
+    activityTypes?: string[] | null;
+    lat?: number | null;
+    lng?: number | null;
+    logoImageId?: string | null;
+    images?: Array<{ id?: string }> | null;
+    phone?: string | null;
+    website?: string | null;
+    instagramHandle?: string | null;
+  };
   openingHoursData: Record<string, unknown>;
   onSubmit: () => void;
   isSaving: boolean;
@@ -48,9 +63,9 @@ export function SubmitSection({
           place.category &&
           place.shortDesc &&
           place.description &&
-          place.ageTags?.length > 0 &&
-          place.visitFormats?.length > 0 &&
-          place.activityTypes?.length > 0
+          (place.ageTags?.length ?? 0) > 0 &&
+          (place.visitFormats?.length ?? 0) > 0 &&
+          (place.activityTypes?.length ?? 0) > 0
         ),
         isRequired: true,
       },
@@ -63,7 +78,7 @@ export function SubmitSection({
       {
         step: "photos",
         label: "Фото",
-        isCompleted: !!(place.logoImageId || place.images?.length > 0),
+        isCompleted: !!(place.logoImageId || (place.images?.length ?? 0) > 0),
         isRequired: true,
       },
       {

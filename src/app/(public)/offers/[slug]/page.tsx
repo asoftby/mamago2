@@ -153,7 +153,7 @@ export default async function OfferPage({ params }: OfferPageProps) {
       />
       <script
         type="application/ld+json"
-        // eslint-disable-next-line react/no-danger
+         
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
       <div className="max-w-3xl mx-auto px-4 py-10 space-y-6">

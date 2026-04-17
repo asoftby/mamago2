@@ -1,12 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Loader2, CheckCircle2, AlertCircle, MapPinIcon } from "lucide-react";
+import { Loader2, CheckCircle2, AlertCircle } from "lucide-react";
 import { EventLocationSearchInput } from "./EventLocationSearchInput";
 import { EventLocationMapPreview } from "./EventLocationMapPreview";
 import { EventLocationMapModal } from "./EventLocationMapModal";
@@ -48,11 +44,7 @@ export function EventLocationPicker({
   const [districts, setDistricts] = useState<Array<{ id: string; name: string }>>([]);
   const [metroStations, setMetroStations] = useState<Array<{ id: string; name: string }>>([]);
 
-  // Details state
-  const [isInsideComplex, setIsInsideComplex] = useState(false);
-  const [floor, setFloor] = useState("");
-  const [unit, setUnit] = useState("");
-  const [howToFind, setHowToFind] = useState("");
+
 
   // Modal state
   const [isMapModalOpen, setIsMapModalOpen] = useState(false);

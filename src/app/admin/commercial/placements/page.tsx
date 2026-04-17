@@ -15,7 +15,7 @@ export default async function AdminPlacementsPage() {
     redirect("/login");
   }
 
-  let placements: unknown[] = [];
+  let placements: Awaited<ReturnType<typeof getPlacements>> = [];
   let error: string | null = null;
 
   try {
@@ -108,7 +108,7 @@ export default async function AdminPlacementsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {(placements as { endsAt: Date; graceUntil: Date | null; [key: string]: unknown }[]).map((placement) => {
+              {placements.map((placement) => {
                 const daysUntilEnd = Math.ceil(
                   (placement.endsAt.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)
                 );

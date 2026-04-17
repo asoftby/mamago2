@@ -11,11 +11,22 @@ type PageProps = {
   params: Promise<{ id: string }>;
 };
 
+type ActivityApiResponse = {
+  name: string;
+  description?: string | null;
+  cityId?: string | null;
+  coverImageUrl?: string | null;
+  priceFrom?: number | null;
+  currency?: string | null;
+  ageLabel?: string | null;
+  sessions: Array<{ startsAt: string | Date }>;
+};
+
 export default function EditActivityPage({ params }: PageProps) {
   const resolvedParams = use(params);
   const router = useRouter();
   const [cities, setCities] = useState<Array<{ id: string; name: string }>>([]);
-  const [activity, setActivity] = useState<Record<string, unknown> | null>(null);
+  const [activity, setActivity] = useState<ActivityApiResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -82,13 +93,13 @@ export default function EditActivityPage({ params }: PageProps) {
 
   const initialData: Partial<ActivityFormData> = {
     name: activity.name,
-    description: activity.description || "",
-    cityId: activity.cityId || cities[0]?.id,
-    coverImageUrl: activity.coverImageUrl || "",
-    priceFrom: activity.priceFrom,
-    currency: activity.currency || "BYN",
-    ageLabel: activity.ageLabel || "",
-    sessions: activity.sessions.map((s: { startsAt: string | Date }) => new Date(s.startsAt)),
+    description: activity.description ?? "",
+    cityId: activity.cityId ?? cities[0]?.id,
+    coverImageUrl: activity.coverImageUrl ?? "",
+    priceFrom: activity.priceFrom ?? undefined,
+    currency: activity.currency ?? "BYN",
+    ageLabel: activity.ageLabel ?? "",
+    sessions: activity.sessions.map((s) => new Date(s.startsAt)),
   };
 
   return (

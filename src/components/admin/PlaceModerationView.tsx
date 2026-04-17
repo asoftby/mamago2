@@ -27,6 +27,7 @@ const STATUS_CONFIG = {
 interface PlaceModerationViewProps {
   place: {
     id: string;
+    title: string;
     status: string;
     formattedAddr?: string | null;
     customAddress?: string | null;
@@ -36,8 +37,23 @@ interface PlaceModerationViewProps {
     metroAuto?: { name: string } | null;
     metroManualDistanceM?: number | null;
     metroAutoDistanceM?: number | null;
-    city?: { hasMetro?: boolean; metroMaxDistanceM?: number } | null;
-    images: Array<{ kind: string; [key: string]: unknown }>;
+    city?: { id: string; name: string; hasMetro?: boolean | null; metroMaxDistanceM?: number | null } | null;
+    images: Array<{ id: string; url: string; kind: string; sortOrder: number; width?: number | null; height?: number | null; blurhash?: string | null }>;
+    shortDesc?: string | null;
+    description?: string | null;
+    lat?: number | null;
+    lng?: number | null;
+    phone?: string | null;
+    website?: string | null;
+    instagramHandle?: string | null;
+    instagramUrl?: string | null;
+    ageTags: string[];
+    visitFormats: string[];
+    activityTypes: string[];
+    slug?: string | null;
+    shortAddress?: string | null;
+    owner?: { business: { name: string } | null } | null;
+    createdAt: Date;
   };
 }
 
@@ -59,6 +75,7 @@ export function PlaceModerationView({ place }: PlaceModerationViewProps) {
   const shouldShowMetro =
     metroName &&
     metroDistance !== null &&
+    metroDistance !== undefined &&
     cityHasMetro &&
     metroDistance <= metroMaxDistance;
 
@@ -315,7 +332,7 @@ export function PlaceModerationView({ place }: PlaceModerationViewProps) {
                 </div>
               )}
 
-              {place.owner.business && (
+              {place.owner?.business && (
                 <div>
                   <span className="text-sm font-medium text-gray-600">Business:</span>
                   <p className="text-sm text-gray-900 mt-1">{place.owner.business.name}</p>
@@ -376,9 +393,9 @@ export function PlaceModerationView({ place }: PlaceModerationViewProps) {
             {/* View Place Actions */}
             <div className="mt-6 pt-4 border-t space-y-2">
               {/* Primary CTA: Public place page */}
-              {getPlacePublicUrl(place) ? (
+              {getPlacePublicUrl({ status: place.status, slug: place.slug ?? null }) ? (
                 <a
-                  href={getPlacePublicUrl(place)!}
+                  href={getPlacePublicUrl({ status: place.status, slug: place.slug ?? null })!}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700"

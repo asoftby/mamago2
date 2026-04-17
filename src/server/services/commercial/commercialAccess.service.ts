@@ -28,14 +28,15 @@ export type CommercialFeature =
 
 type PlacementData = {
   status?: string;
-  plan?: {
+  plan: {
+    name: string;
     hasPriorityBoost?: boolean;
     hasLeadAccess?: boolean;
     hasAnalytics?: boolean;
     storiesPerMonth?: number;
-  };
+  } | null;
   graceUntil?: Date | null;
-  endsAt?: Date;
+  endsAt?: Date | null;
 };
 
 type ServicePlacementData = {
@@ -346,7 +347,7 @@ function determineEnabledFeatures(context: {
       if (context.placement?.plan?.hasLeadAccess) {
         features.push("LEAD_ACCESS", "PAID_REQUESTS");
       }
-      if (context.placement?.plan?.storiesPerMonth > 0) {
+      if (context.placement?.plan?.storiesPerMonth && context.placement.plan.storiesPerMonth > 0) {
         features.push("STORIES");
       }
       if (context.placement?.plan?.hasPriorityBoost) {
@@ -397,14 +398,14 @@ function generateWarnings(context: {
 }): string[] {
   const warnings: string[] = [];
   
-  if (context.contract?.status === "EXPIRING") {
+  if (context.contract?.status === "EXPIRING" && context.contract.endsAt) {
     const daysUntilEnd = Math.ceil(
       (context.contract.endsAt.getTime() - context.now.getTime()) / (1000 * 60 * 60 * 24)
     );
     warnings.push(`Договор истекает через ${daysUntilEnd} дн.`);
   }
   
-  if (context.placement?.status === "EXPIRING") {
+  if (context.placement?.status === "EXPIRING" && context.placement.endsAt) {
     const daysUntilEnd = Math.ceil(
       (context.placement.endsAt.getTime() - context.now.getTime()) / (1000 * 60 * 60 * 24)
     );

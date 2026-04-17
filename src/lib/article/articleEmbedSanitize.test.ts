@@ -18,5 +18,5 @@ const bad = resolveArticleEmbed('<script>alert(1)</script><iframe src="https://e
 assert.strictEqual(bad.sanitizedHtml, "");
 assert.strictEqual(bad.provider, "unknown");
 
-// eslint-disable-next-line no-console
+ 
 console.log("articleEmbedSanitize OK");

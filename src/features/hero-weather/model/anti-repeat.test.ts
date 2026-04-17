@@ -158,5 +158,5 @@ import { loadAntiRepeatState, pruneAntiRepeatState, saveAntiRepeatState } from "
   }
 }
 
-// eslint-disable-next-line no-console
+ 
 console.log("anti-repeat tests: OK");

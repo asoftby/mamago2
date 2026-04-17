@@ -22,6 +22,18 @@ export default async function OnboardingPage() {
   // 2. Check existing business profile
   const existingBusiness = await getOwnedBusinessProfile(user.id);
   
+  // Normalize Business entity to OnboardingForm initialData shape
+  const normalizedInitialData = existingBusiness
+    ? {
+        unp: existingBusiness.unp ?? undefined,
+        legalName: existingBusiness.legalName ?? undefined,
+        phone: existingBusiness.phone ?? null,
+        contactPhoneVerifiedAt: existingBusiness.contactPhoneVerifiedAt
+          ? existingBusiness.contactPhoneVerifiedAt.toISOString()
+          : null,
+      }
+    : null;
+  
   if (existingBusiness) {
     const verificationStatus = getEffectiveVerificationStatus(existingBusiness);
     
@@ -91,7 +103,7 @@ export default async function OnboardingPage() {
           )}
 
           <OnboardingForm
-            initialData={existingBusiness}
+            initialData={normalizedInitialData}
             accountPhoneE164={user.phoneE164 ?? null}
             initialBusinessContactOtpState={initialBusinessContactOtpState}
           />

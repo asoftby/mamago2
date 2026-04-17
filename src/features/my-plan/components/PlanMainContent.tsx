@@ -8,8 +8,7 @@ import { Calendar, Plus } from "lucide-react";
 import { ModalCloseButton } from "@/components/ui/modal-close-button";
 import { RecommendationCard } from "./RecommendationCard";
 import type { PlanItemWithActivity } from "../types/event";
-import type { PlanSlot, PlanSlotType } from "../hooks/useMyPlan";
-import { AGE_GROUPS } from "@/features/filters/age/ageGroups";
+import type { PlanSlotType } from "../hooks/useMyPlan";
 import type { MyPlanIdea } from "../hooks/useMyPlan";
 import { useOptionalCity } from "@/contexts/CityContext";
 import { useFamilyPersona } from "@/contexts/FamilyPersonaContext";
@@ -41,10 +40,8 @@ interface PlanChildChip {
 }
 
 interface PlanMainContentProps {
-  planSlots: PlanSlot[]; // Deprecated: kept for backward compatibility
   selectedDate: string;
   onChangeDate?: (date: string) => void;
-  weekDates?: string[];
   planItemsByDate?: Record<string, PlanItemWithActivity[]>;
   todayIso?: string;
   layout?: "default" | "desktop";
@@ -59,13 +56,6 @@ interface PlanMainContentProps {
   ) => void;
   selectedAgeRanges: AgeRangeSelection[];
   onChangeSelectedAgeRanges: (ranges: AgeRangeSelection[]) => void;
-  autoAgeValues: string[];
-  // Deprecated: slot-based functions kept for backward compatibility
-  onCycleSlotAlternative?: (periodId: PlanSlotType) => void;
-  onCycleSlotAlternativePrev?: (periodId: PlanSlotType) => void;
-  onMarkSlotSaved?: (slot: PlanSlotType, item: PlanItemWithActivity) => void;
-  onClearSlotSaved?: (slot: PlanSlotType, itemId: string) => void;
-  onOpenSlotSuggestion?: (slot: PlanSlotType) => void;
   ideas?: MyPlanIdea[];
   ideasLoading?: boolean;
   onAddIdeaToPlan?: (idea: MyPlanIdea) => Promise<{ ok: boolean; slot?: PlanSlotType }>;
@@ -88,18 +78,6 @@ function addDaysIso(iso: string, days: number): string {
   return `${yy}-${mm}-${dd}`;
 }
 
-function ageLabel(birthDate?: string): string {
-  if (!birthDate) return "";
-  const b = new Date(birthDate);
-  if (Number.isNaN(b.getTime())) return "";
-  const now = new Date();
-  let y = now.getFullYear() - b.getFullYear();
-  const m = now.getMonth() - b.getMonth();
-  if (m < 0 || (m === 0 && now.getDate() < b.getDate())) y -= 1;
-  if (y < 0) return "";
-  return `${y} лет`;
-}
-
 function toGenitiveName(name: string): string {
   const n = name.trim();
   if (!n) return name;
@@ -114,11 +92,6 @@ function toGenitiveName(name: string): string {
   if (lower.endsWith("й")) return `${n.slice(0, -1)}я`;
   if (lower.endsWith("ь")) return `${n.slice(0, -1)}я`;
   return `${n}а`;
-}
-
-function ageToGroupValue(years: number): string | null {
-  const group = AGE_GROUPS.find((g) => years >= g.min && (g.max == null || years <= g.max));
-  return group?.value ?? null;
 }
 
 type PersonaForCopy = {
@@ -262,26 +235,16 @@ function weekdayForNa(date: Date): string {
 }
 
 export function PlanMainContent({
-  planSlots,
   selectedDate,
   onChangeDate,
-  weekDates,
   planItemsByDate,
   todayIso,
   layout = "default",
-  onAddItemToPlan,
   onRemoveItemFromPlan,
   childrenList,
   selectedChildIds,
-  onChangeSelectedChildIds,
   selectedAgeRanges,
   onChangeSelectedAgeRanges,
-  autoAgeValues,
-  onCycleSlotAlternative,
-  onCycleSlotAlternativePrev,
-  onMarkSlotSaved,
-  onClearSlotSaved,
-  onOpenSlotSuggestion,
   ideas = [],
   ideasLoading = false,
   onAddIdeaToPlan,
@@ -298,10 +261,6 @@ export function PlanMainContent({
   const cityCtx = useOptionalCity();
   const city = cityCtx?.citySlug ?? params?.city ?? "minsk";
   const family = useFamilyPersona();
-  const primaryAdultPersonaId = family?.primaryAdultPersonaId ?? null;
-  const adultSelected =
-    !!primaryAdultPersonaId &&
-    !!family?.selectedPersonaIds.includes(primaryAdultPersonaId);
   const isDesktop = layout === "desktop";
   const [removingIdeaActivityId, setRemovingIdeaActivityId] = useState<string | null>(null);
   const [addingActivityId, setAddingActivityId] = useState<string | null>(null);
@@ -314,10 +273,6 @@ export function PlanMainContent({
   const [showAudienceSheet, setShowAudienceSheet] = useState(false);
   const [showDayScenario, setShowDayScenario] = useState(false);
 
-  const handleAddToPlan = (item: PlanItemWithActivity) => {
-    onAddItemToPlan?.(item);
-  };
-
   const handleRemoveFromPlan = async (itemId: string) => {
     if (!onRemoveItemFromPlan) return;
     try {
@@ -329,15 +284,7 @@ export function PlanMainContent({
     }
   };
 
-  const handleShowMoreAlternatives = () => {
-    // Deprecated: no more slot-based alternatives
-  };
 
-  const handleShowPrevAlternative = () => {
-    // Deprecated: no more slot-based alternatives
-  };
-
-  const dateObj = new Date(selectedDate + "T12:00:00");
 
   // Персоны для audience selector (must be declared before use)
   const personas = useMemo(() => {
@@ -605,7 +552,7 @@ export function PlanMainContent({
     return personas.filter((p) => selectedPersonaIds.includes(p.id)).length === 0;
   }, [selectedPersonaIds, personas]);
 
-  const dayItems = planItemsByDate?.[selectedDate] ?? [];
+  const dayItems = useMemo(() => planItemsByDate?.[selectedDate] ?? [], [planItemsByDate, selectedDate]);
 
   const inPlanActivityIds = useMemo(() => {
     const ids = new Set<string>();

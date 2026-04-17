@@ -191,7 +191,7 @@ export function PlaceLocationPicker({
     lat: number;
     lng: number;
     formattedAddr: string;
-    addressJson: Record<string, unknown>[];
+    addressJson: google.maps.GeocoderAddressComponent[];
   }) => {
     // Update location state
     setLocation({

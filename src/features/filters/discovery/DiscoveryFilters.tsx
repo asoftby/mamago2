@@ -12,6 +12,7 @@ import { CardSelect } from "@/components/ui/card-select";
 import { CardMultiSelect } from "@/components/ui/card-multiselect";
 import { X, SlidersHorizontal } from "lucide-react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
+import type { WhenValue } from "@/components/ui/when-select";
 
 // Define Option type locally or import
 type Option = { value: string; label: string };
@@ -218,7 +219,7 @@ export function DiscoveryFilters({
       if (isNaN(fromDate.getTime())) return null;
       if (applied.dateTo) {
         const toDate = new Date(applied.dateTo);
-        if (isNaN(toDate.getTime())) return fromDate;
+        if (isNaN(toDate.getTime())) return { from: fromDate, to: new Date() };
         return { from: fromDate, to: toDate };
       }
       return fromDate;
@@ -257,7 +258,7 @@ export function DiscoveryFilters({
   };
   
   // Handlers for Desktop (Immediate Apply)
-  const handleWhenChangeDesktop = (val: string | Date | { from: Date; to: Date } | null) => {
+  const handleWhenChangeDesktop = (val: WhenValue) => {
       let patch: Partial<DiscoveryFiltersType> = {};
       if (!val) {
           patch = { dateFrom: null, dateTo: null, whenPreset: null };
@@ -313,10 +314,6 @@ export function DiscoveryFilters({
           open={sheetOpen}
           onOpenChange={setSheetOpen}
           filters={{
-             when: applied.whenPreset === "TODAY" ? "today"
-               : applied.whenPreset === "TOMORROW" ? "tomorrow"
-               : applied.whenPreset === "WEEKEND" ? "weekend"
-               : (applied.dateFrom ? (applied.dateTo ? { from: new Date(applied.dateFrom), to: new Date(applied.dateTo) } : new Date(applied.dateFrom)) : null),
              age: applied.age,
              metro: applied.metro,
              district: applied.district,

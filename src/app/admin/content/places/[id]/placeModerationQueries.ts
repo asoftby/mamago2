@@ -58,6 +58,12 @@ const placeGeoAndAuthor = {
       business: { select: { name: true } },
     },
   },
+  ownerBusiness: {
+    select: {
+      id: true,
+      name: true,
+    },
+  },
 } as const;
 
 /** Скаляры + связи без openingHours — очередь PENDING / DRAFT и т.д. (PlaceModerationView не использует часы). */

@@ -233,12 +233,13 @@ export function PlaceWizardFixed({ place: initialPlace, initialStep, moderationM
         
         // Remove fields that have been reverted to original values
         const filteredChanges: Partial<Place> = {};
-        for (const [key, value] of Object.entries(newPendingChanges)) {
-          const originalValue = (originalPlace as Record<string, unknown>)[key];
-          // Only keep the change if it's different from original
-          if (!deepEqual(normalizePlaceData(value), normalizePlaceData(originalValue))) {
-            filteredChanges[key as keyof Place] = value as Place[keyof Place];
+        const assignIfChanged = <K extends keyof Place>(k: K, v: Place[K]) => {
+          if (!deepEqual(normalizePlaceData(v), normalizePlaceData(originalPlace[k]))) {
+            filteredChanges[k] = v;
           }
+        };
+        for (const key of Object.keys(newPendingChanges) as (keyof Place)[]) {
+          assignIfChanged(key, newPendingChanges[key] as Place[typeof key]);
         }
         
         console.log("[PlaceWizard] Updated pendingChanges:", {

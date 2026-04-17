@@ -59,3 +59,7 @@ notes/
 # local lint reports
 lint-errors*.txt
 lint-errors*.json
+
+# local diagnostic logs
+build-errors.txt
+ts-errors.txt

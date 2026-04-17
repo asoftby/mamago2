@@ -9,7 +9,7 @@
  * 3. Manual fallback: Return null, UI prompts user to select city
  */
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
+ 
 import prisma from "@/lib/prisma";
 
 const EARTH_RADIUS_KM = 6371;
