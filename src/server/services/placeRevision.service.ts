@@ -1,5 +1,5 @@
 import prisma from "@/lib/prisma";
-import type { Role, PlaceRevision } from "@prisma/client";
+import type { Role } from "@prisma/client";
 import { PlaceRevisionStatus, LocationSource, PlaceKind, Prisma } from "@prisma/client";
 import { canManagePlaceAsync } from "@/lib/auth/placeAccess";
 import type { PlaceImage, PlaceRevisionImage, TempMedia, OpeningHoursRule, OpeningHoursInterval } from "../types";
@@ -280,12 +280,12 @@ export async function savePlaceRevisionDraft(
   // Filter out null values from validData (Prisma expects undefined for optional fields)
   const validDataFiltered = Object.fromEntries(
     Object.entries(validData).filter(([, v]) => v !== null)
-  ) as Record<string, unknown>;
+  ) as Prisma.AtLeast<Prisma.PlaceRevisionUpdateInput, 'id'>;
 
   // Update revision with only valid PlaceRevision fields
   const updatedRevision = await prisma.placeRevision.update({
     where: { id: revisionId },
-    data: validDataFiltered as any,
+    data: validDataFiltered,
     include: {
       images: {
         orderBy: { sortOrder: "asc" },
