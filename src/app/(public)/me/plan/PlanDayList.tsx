@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { CalendarDays, Trash2, ExternalLink } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { publicActivityPath } from "@/lib/business/eventPublicLink";
 import type { SerializedPlanItem } from "./PlanPageClient";
 

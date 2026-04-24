@@ -6,9 +6,9 @@ import { cn } from "@/lib/utils";
 import { Container } from "@/components/ui/Container";
 import { WeekCalendar } from "./WeekCalendar";
 import { PlanDayList } from "./PlanDayList";
-import { RecommendationsSection } from "./RecommendationsSection";
 import { PlanProfileCompletionGate } from "./PlanProfileCompletionGate";
-import { MINSK_ACTIVITIES } from "@/mocks/activities.minsk";
+import { Button } from "@/components/ui/button";
+import { BellRing, ChevronRight } from "lucide-react";
 import type { PlanActivityPublicAvailability } from "@/lib/plan/publicVisibility";
 
 export type SerializedPlanItem = {
@@ -33,13 +33,56 @@ type Props = {
   initialItems: SerializedPlanItem[];
   ideaActivityIds: string[];
   childrenAges: number[];
+  activeReminder?: {
+    id: string;
+    title: string;
+    body: string;
+    ctaLabel: string | null;
+    ctaAction: string | null;
+    createdAt: string;
+    isRead: boolean;
+  } | null;
 };
 
 function getTodayISO() {
   return new Date().toISOString().split("T")[0];
 }
 
-export function PlanPageClient({ initialItems, ideaActivityIds, childrenAges }: Props) {
+function PlanReminderBanner({
+  reminder,
+}: {
+  reminder: NonNullable<Props["activeReminder"]>;
+}) {
+  const href = reminder.ctaAction || "/me/plan";
+
+  return (
+    <div className="mb-5 rounded-3xl border border-[#F3D7C8] bg-[#FFF6F1] p-4 shadow-[0_8px_24px_rgba(239,135,89,0.08)]">
+      <div className="flex items-start gap-3">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white/80 text-[#D56F47]">
+          <BellRing className="h-5 w-5" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold text-neutral-900">{reminder.title}</p>
+          <p className="mt-1 text-sm leading-6 text-neutral-600">{reminder.body}</p>
+          <div className="mt-3">
+            <Button
+              asChild
+              size="sm"
+              className="rounded-full bg-[#EF8759] px-4 text-white hover:bg-[#e67747]"
+            >
+              <Link href={href} className="inline-flex items-center gap-1.5">
+                {reminder.ctaLabel || "Открыть план"}
+                <ChevronRight className="h-4 w-4" />
+              </Link>
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function PlanPageClient({ initialItems, activeReminder }: Props) {
   const todayISO = getTodayISO();
   const [selectedDate, setSelectedDate] = useState(todayISO);
   const [items, setItems] = useState(initialItems);
@@ -55,41 +98,8 @@ export function PlanPageClient({ initialItems, ideaActivityIds, childrenAges }: 
 
   const dayItems = itemsByDate[selectedDate] ?? [];
 
-  // Ideas from mock data (in real app: fetch by ideaActivityIds)
-  const ideaRecs = useMemo(() => {
-    return MINSK_ACTIVITIES.filter((a) => ideaActivityIds.includes(a.id)).slice(0, 4);
-  }, [ideaActivityIds]);
-
-  // Family recs: filter by children ages
-  const familyRecs = useMemo(() => {
-    if (childrenAges.length === 0) return MINSK_ACTIVITIES.slice(0, 4);
-    const minAge = Math.min(...childrenAges);
-    const maxAge = Math.max(...childrenAges);
-    return MINSK_ACTIVITIES.filter(
-      (a) => a.ageFrom <= maxAge && a.ageTo >= minAge
-    ).slice(0, 4);
-  }, [childrenAges]);
-
-  // General recs: just a few from mock, excluding already planned
-  const plannedIds = new Set(items.map((i) => i.activityId).filter(Boolean));
-  const generalRecs = MINSK_ACTIVITIES.filter((a) => !plannedIds.has(a.id)).slice(0, 4);
-
   const handleRemoveItem = (itemId: string) => {
     setItems((prev) => prev.filter((i) => i.id !== itemId));
-  };
-
-  const handleItemAdded = (newItem: SerializedPlanItem) => {
-    setItems((prev) => {
-      // Replace if same activityId exists, otherwise add
-      const exists = prev.findIndex((i) => i.activityId === newItem.activityId);
-      if (exists >= 0) {
-        const next = [...prev];
-        next[exists] = newItem;
-        return next;
-      }
-      return [...prev, newItem];
-    });
-    setSelectedDate(newItem.date);
   };
 
   return (
@@ -110,6 +120,8 @@ export function PlanPageClient({ initialItems, ideaActivityIds, childrenAges }: 
           </p>
         </div>
 
+        {activeReminder ? <PlanReminderBanner reminder={activeReminder} /> : null}
+
         {/* Week Calendar */}
         <WeekCalendar
           selectedDate={selectedDate}
@@ -126,16 +138,6 @@ export function PlanPageClient({ initialItems, ideaActivityIds, childrenAges }: 
           />
         </div>
 
-        {/* Recommendations */}
-        <div className="mt-8">
-          <RecommendationsSection
-            selectedDate={selectedDate}
-            ideaRecs={ideaRecs}
-            familyRecs={familyRecs}
-            generalRecs={generalRecs}
-            onItemAdded={handleItemAdded}
-          />
-        </div>
       </Container>
     </div>
   );

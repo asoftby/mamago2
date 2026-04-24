@@ -1,11 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useMemo, useState } from "react";
-import { useParams, usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Button } from "@/components/ui/button";
-import { Calendar, Plus } from "lucide-react";
-import { ModalCloseButton } from "@/components/ui/modal-close-button";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { RecommendationCard } from "./RecommendationCard";
 import type { PlanItemWithActivity } from "../types/event";
 import type { PlanSlotType } from "../hooks/useMyPlan";
@@ -14,24 +11,28 @@ import { useOptionalCity } from "@/contexts/CityContext";
 import { useFamilyPersona } from "@/contexts/FamilyPersonaContext";
 import { getCityLocativePhrase } from "@/lib/city/cityDisplayNames";
 import type { AgeRangeSelection } from "@/features/filters/discovery/childrenScope.store";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { WeekCalendarStrip } from "./WeekCalendarStrip";
 import { publicActivityPath } from "@/lib/business/eventPublicLink";
 import { QuickAddChildModal } from "@/components/children/QuickAddChildModal";
 import { QuickAddAdultModal } from "@/components/adults/QuickAddAdultModal";
 import { PlanAudienceCompact } from "./PlanAudienceCompact";
-import { PlanAudienceSheet } from "./PlanAudienceSheet";
 import { DayScenarioModal } from "./DayScenarioModal";
 import { AddPersonaTypeModal } from "./AddPersonaTypeModal";
 import { PlanOnboardingPromoBanner } from "./PlanOnboardingPromoBanner";
 import { AddParticipantModal } from "@/components/children/AddParticipantModal";
-import { PlanIdeasBlock } from "./PlanIdeasBlock";
-import { PlanRecommendationsBlock } from "./PlanRecommendationsBlock";
+import { MyPlanHeader } from "./MyPlanHeader";
+import { RecommendationDecisionBlock } from "./RecommendationDecisionBlock";
+import { BuildScenarioButton } from "./BuildScenarioButton";
+import { ManualChoiceButton } from "./ManualChoiceButton";
 import {
   isPlanSuggestionMockId,
-  mergePlanSuggestionsWithMocks,
 } from "../lib/mockPlanSuggestions";
 import { sortPlanItemsForDay } from "../lib/sortPlanItemsForDay";
+import {
+  MAX_PLAN_ITEMS_PER_SLOT,
+  pickItemForSlotExcluding,
+} from "../lib/recommendationPool";
 
 interface PlanChildChip {
   id: string;
@@ -66,6 +67,8 @@ interface PlanMainContentProps {
   onAddSuggestionToPlan?: (
     activity: NonNullable<MyPlanIdea["activity"]>,
   ) => Promise<{ ok: boolean }>;
+  /** Фоновая подгрузка выбранной даты (для smooth-перехода без резкого прыжка блока). */
+  dateLoading?: boolean;
   onRequestClose?: () => void;
 }
 
@@ -217,8 +220,76 @@ function buildRecommendationsSectionHeading(
   return `mamaGo рекомендации для ${forWhom} ${whenRu}`;
 }
 
+function joinNamesRu(names: string[]): string {
+  if (names.length <= 1) return names[0] ?? "";
+  if (names.length === 2) return `${names[0]} и ${names[1]}`;
+  if (names.length === 3) return `${names[0]}, ${names[1]} и ${names[2]}`;
+  return `${names[0]}, ${names[1]} и ${names[2]}`;
+}
+
+function buildAutoPlanCtaTitle(input: {
+  selectedDate: string;
+  todayKey: string;
+  selectedPersonaIds: string[];
+  personas: PersonaForCopy[];
+}): string {
+  const when = input.selectedDate === input.todayKey ? "сегодня" : "этот день";
+  const selected = input.personas.filter((p) =>
+    input.selectedPersonaIds.includes(p.id),
+  );
+  const names = selected
+    .map((p) => p.displayName?.trim())
+    .filter((v): v is string => Boolean(v));
+
+  if (names.length === 0) return `Составить план на ${when}`;
+  return `Составить план на ${when} для ${joinNamesRu(names.map(toGenitiveName))}`;
+}
+
+function buildAutoPlanHint(input: {
+  selectedDate: string;
+  todayKey: string;
+  selectedPersonaIds: string[];
+  personas: PersonaForCopy[];
+  isFreeSearch: boolean;
+}): string {
+  if (input.isFreeSearch) return "Предлагаю варианты: утро, день, вечер.";
+
+  const when = input.selectedDate === input.todayKey ? "сегодня" : "этот день";
+  const selected = input.personas.filter((p) => input.selectedPersonaIds.includes(p.id));
+  const names = selected
+    .map((p) => p.displayName?.trim())
+    .filter((v): v is string => Boolean(v));
+
+  if (names.length === 0) return "Предлагаю варианты: утро, день, вечер.";
+  return `На ${when} для ${joinNamesRu(names.map(toGenitiveName))} предлагаю варианты:`;
+}
+
 const RECOMMENDATIONS_BLOCK_SUBTITLE =
   "Подобрано на основании ваших интересов и предпочтений";
+
+function formatRecommendationHeading(selectedDate: string, todayKey: string): string {
+  const d = new Date(selectedDate + "T12:00:00");
+  const dayMonth = d.toLocaleDateString("ru-RU", {
+    day: "numeric",
+    month: "long",
+  });
+  if (selectedDate === todayKey) return "Вот что я рекомендую на сегодня";
+  if (selectedDate === addDaysIso(todayKey, 1)) return "Вот что я рекомендую на завтра";
+  return `Вот что я рекомендую на ${dayMonth}`;
+}
+
+function buildParticipantSummaryLabels(
+  selectedPersonaIds: string[],
+  personas: PersonaForCopy[],
+): string[] {
+  const selected = personas.filter((persona) => selectedPersonaIds.includes(persona.id));
+  if (selected.length === 0) {
+    return [];
+  }
+  return selected.map((persona) =>
+    persona.kind === "adult" ? "Я" : persona.displayName.trim() || "Ребёнок",
+  );
+}
 
 function weekdayForNa(date: Date): string {
   const weekday = date.toLocaleDateString("ru-RU", { weekday: "long" }).toLowerCase();
@@ -240,6 +311,7 @@ export function PlanMainContent({
   planItemsByDate,
   todayIso,
   layout = "default",
+  onAddItemToPlan,
   onRemoveItemFromPlan,
   childrenList,
   selectedChildIds,
@@ -252,14 +324,14 @@ export function PlanMainContent({
   planSuggestions = [],
   suggestionsLoading = false,
   onAddSuggestionToPlan,
+  dateLoading = false,
   onRequestClose,
 }: PlanMainContentProps) {
-  const params = useParams() as { city?: string };
   const pathname = usePathname();
   const router = useRouter();
   const currentSearchParams = useSearchParams();
   const cityCtx = useOptionalCity();
-  const city = cityCtx?.citySlug ?? params?.city ?? "minsk";
+  const city = cityCtx?.citySlug ?? "minsk";
   const family = useFamilyPersona();
   const isDesktop = layout === "desktop";
   const [removingIdeaActivityId, setRemovingIdeaActivityId] = useState<string | null>(null);
@@ -272,15 +344,29 @@ export function PlanMainContent({
   const [showAdultParticipantModal, setShowAdultParticipantModal] = useState(false);
   const [showAudienceSheet, setShowAudienceSheet] = useState(false);
   const [showDayScenario, setShowDayScenario] = useState(false);
+  const [autoPlanDraft, setAutoPlanDraft] = useState<
+    Array<{ slot: "morning" | "afternoon" | "evening"; item: PlanItemWithActivity }>
+  >([]);
+  const [autoPlanGeneration, setAutoPlanGeneration] = useState(0);
+  const [autoPlanCursor, setAutoPlanCursor] = useState(0);
+  const [autoPlanLocalAddedIds, setAutoPlanLocalAddedIds] = useState<string[]>([]);
+  const [autoPlanLocalSlotAdds, setAutoPlanLocalSlotAdds] = useState<
+    Record<"morning" | "afternoon" | "evening", number>
+  >({
+    morning: 0,
+    afternoon: 0,
+    evening: 0,
+  });
+  const [isAutoPlanGenerating, setIsAutoPlanGenerating] = useState(false);
 
   const handleRemoveFromPlan = async (itemId: string) => {
     if (!onRemoveItemFromPlan) return;
     try {
       const result = onRemoveItemFromPlan(itemId);
       const ok = result instanceof Promise ? await result : true;
-      if (!ok) toast.error("Не удалось убрать из плана");
+      if (!ok) toast.error("Не получилось убрать событие из плана");
     } catch {
-      toast.error("Не удалось убрать из плана");
+      toast.error("Не получилось убрать событие из плана");
     }
   };
 
@@ -436,6 +522,13 @@ export function PlanMainContent({
     return `/${city}/events?${qp.toString()}`;
   };
 
+  const buildIdeasHref = () => {
+    const qp = new URLSearchParams();
+    qp.set("planDate", selectedDate);
+    qp.set("returnTo", returnTo);
+    return `/ideas?${qp.toString()}`;
+  };
+
   const handleFindAndAddClick = (event: React.MouseEvent<HTMLAnchorElement>) => {
     event.preventDefault();
     const href = buildFindAndAddHref();
@@ -445,6 +538,125 @@ export function PlanMainContent({
       router.push(href);
     }, 0);
   };
+
+  const handleOpenCatalog = useCallback(() => {
+    const href = buildFindAndAddHref();
+    onRequestClose?.();
+    window.setTimeout(() => {
+      router.push(href);
+    }, 0);
+  }, [buildFindAndAddHref, onRequestClose, router]);
+
+  const handleOpenIdeasFlow = useCallback(() => {
+    const href = buildIdeasHref();
+    onRequestClose?.();
+    window.setTimeout(() => {
+      router.push(href);
+    }, 0);
+  }, [buildIdeasHref, onRequestClose, router]);
+
+  const dayItems = useMemo(() => planItemsByDate?.[selectedDate] ?? [], [planItemsByDate, selectedDate]);
+
+  const slotFromStartsAt = useCallback(
+    (
+      startsAt: Date | string | null | undefined,
+    ): "morning" | "afternoon" | "evening" | null => {
+      if (!startsAt) return null;
+      const d = startsAt instanceof Date ? startsAt : new Date(startsAt);
+      if (Number.isNaN(d.getTime())) return null;
+      const h = d.getHours();
+      if (h < 12) return "morning";
+      if (h < 18) return "afternoon";
+      return "evening";
+    },
+    [],
+  );
+
+  const daySlotCounts = useMemo(() => {
+    const counts: Record<"morning" | "afternoon" | "evening", number> = {
+      morning: 0,
+      afternoon: 0,
+      evening: 0,
+    };
+    for (const item of dayItems) {
+      const slot = slotFromStartsAt(item.startsAt);
+      if (slot) counts[slot] += 1;
+    }
+    return {
+      morning: counts.morning + autoPlanLocalSlotAdds.morning,
+      afternoon: counts.afternoon + autoPlanLocalSlotAdds.afternoon,
+      evening: counts.evening + autoPlanLocalSlotAdds.evening,
+    };
+  }, [dayItems, slotFromStartsAt, autoPlanLocalSlotAdds]);
+
+  const handleBuildAutoPlan = useCallback(() => {
+    const allSlots: Array<"morning" | "afternoon" | "evening"> = [
+      "morning",
+      "afternoon",
+      "evening",
+    ];
+    const slots = allSlots.filter((slot) => daySlotCounts[slot] < MAX_PLAN_ITEMS_PER_SLOT);
+    const selectedChildren = childrenList
+      .filter((c) => selectedChildIds.includes(c.id))
+      .map((c) => ({
+        id: c.id,
+        birthDate: c.birthDate ?? new Date().toISOString(),
+        systemInterests: [] as string[],
+      }));
+    const recChildren =
+      selectedChildren.length > 0
+        ? selectedChildren
+        : childrenList.map((c) => ({
+            id: c.id,
+            birthDate: c.birthDate ?? new Date().toISOString(),
+            systemInterests: [] as string[],
+          }));
+
+    const exclude = new Set([
+      ...(planItemsByDate?.[selectedDate] ?? [])
+        .map((i) => i.activityId)
+        .filter((v): v is string => Boolean(v)),
+      ...autoPlanLocalAddedIds,
+    ]);
+
+    const draft = slots.map((slot) => {
+      const item = pickItemForSlotExcluding(
+        slot,
+        recChildren,
+        "all",
+        autoPlanCursor,
+        selectedDate,
+        [...exclude],
+      );
+      if (item.activityId) exclude.add(item.activityId);
+      return { slot, item };
+    });
+
+    setAutoPlanDraft(draft);
+    setAutoPlanGeneration((v) => v + 1);
+    setAutoPlanCursor((v) => v + 1);
+  }, [
+    autoPlanCursor,
+    autoPlanLocalAddedIds,
+    childrenList,
+    daySlotCounts,
+    selectedChildIds,
+    planItemsByDate,
+    selectedDate,
+  ]);
+
+  const handleDecideRecommendations = useCallback(() => {
+    setIsAutoPlanGenerating(true);
+    handleBuildAutoPlan();
+    window.setTimeout(() => {
+      document
+        .getElementById("plan-recommendation-results")
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 120);
+    window.setTimeout(() => {
+      setIsAutoPlanGenerating(false);
+    }, 1300);
+  }, [handleBuildAutoPlan]);
 
   const handleRemoveIdea = async (activityId: string) => {
     if (!onRemoveIdea) return;
@@ -496,12 +708,12 @@ export function PlanMainContent({
       try {
         const result = await onAddIdeaToPlan(idea);
         if (!result.ok) {
-          toast.error("Не удалось добавить в план");
+          toast.error("Не получилось выполнить действие");
         } else {
           toast.success("Добавлено в план");
         }
       } catch {
-        toast.error("Не удалось добавить в план");
+        toast.error("Не получилось выполнить действие");
       } finally {
         setAddingActivityId(null);
       }
@@ -512,24 +724,41 @@ export function PlanMainContent({
   const handleAddSuggestionToPlan = useCallback(
     async (activity: NonNullable<MyPlanIdea["activity"]>) => {
       if (isPlanSuggestionMockId(activity.id)) {
-        toast.info(
-          "Это пример из подборки — выберите событие в каталоге ниже или по кнопке «Добавить ещё».",
-        );
-        return;
+        if (!onAddItemToPlan) {
+          toast.info(
+            "Это пример из подборки — выберите событие в каталоге ниже или по кнопке «Добавить ещё».",
+          );
+          return false;
+        }
+        const synthetic: PlanItemWithActivity = {
+          id: `mock-plan-${activity.id}-${Date.now()}`,
+          userId: "me",
+          activityId: activity.id,
+          date: selectedDate,
+          startsAt: null,
+          title: activity.title,
+          coverImageUrl: activity.coverImageUrl ?? null,
+          createdAt: new Date(),
+          activity,
+        };
+        onAddItemToPlan(synthetic);
+        toast.success("Добавлено в план");
+        return true;
       }
       if (
         (planItemsByDate?.[selectedDate] ?? []).some(
           (i) => i.activityId === activity.id,
         )
       ) {
-        return;
+        return false;
       }
-      if (!onAddSuggestionToPlan) return;
+      if (!onAddSuggestionToPlan) return false;
       setAddingActivityId(activity.id);
       try {
         const result = await onAddSuggestionToPlan(activity);
         if (!result.ok) {
-          toast.error("Не удалось добавить в план");
+          toast.error("Не получилось выполнить действие");
+          return false;
         } else {
           requestAnimationFrame(() => {
             document.getElementById("my-plan-recommendations")?.scrollTo({
@@ -537,14 +766,16 @@ export function PlanMainContent({
               behavior: "smooth",
             });
           });
+          return true;
         }
       } catch {
-        toast.error("Не удалось добавить в план");
+        toast.error("Не получилось выполнить действие");
+        return false;
       } finally {
         setAddingActivityId(null);
       }
     },
-    [onAddSuggestionToPlan, selectedDate, planItemsByDate],
+    [onAddItemToPlan, onAddSuggestionToPlan, selectedDate, planItemsByDate],
   );
 
   const isFreeSearchMode = useMemo(() => {
@@ -552,7 +783,11 @@ export function PlanMainContent({
     return personas.filter((p) => selectedPersonaIds.includes(p.id)).length === 0;
   }, [selectedPersonaIds, personas]);
 
-  const dayItems = useMemo(() => planItemsByDate?.[selectedDate] ?? [], [planItemsByDate, selectedDate]);
+  const hasDateSnapshot = useMemo(
+    () => Object.prototype.hasOwnProperty.call(planItemsByDate ?? {}, selectedDate),
+    [planItemsByDate, selectedDate],
+  );
+  const isPendingDateHydration = dateLoading && !hasDateSnapshot;
 
   const inPlanActivityIds = useMemo(() => {
     const ids = new Set<string>();
@@ -567,95 +802,181 @@ export function PlanMainContent({
     [dayItems],
   );
 
-  const totalPlannedCount = useMemo(
-    () => dayItems.length,
-    [dayItems],
-  );
+  const totalPlannedCount = useMemo(() => {
+    const existingActivityIds = new Set(
+      dayItems.map((item) => item.activityId).filter((value): value is string => Boolean(value)),
+    );
+    const pendingLocalAdds = autoPlanLocalAddedIds.filter((id) => !existingActivityIds.has(id)).length;
+    return dayItems.length + pendingLocalAdds;
+  }, [dayItems, autoPlanLocalAddedIds]);
 
   /** «Сценарий дня» — когда в дне больше двух событий (три и более). */
   const canOpenDayScenario = useMemo(() => {
     return totalPlannedCount > 2;
   }, [totalPlannedCount]);
 
-  const dayEmpty = dayItems.length === 0;
-  const hasSavedIdeas = ideas.length > 0;
-  /** Пустой день: идеи + плейсхолдер загрузки */
-  const showIdeasOnEmptyDay = dayEmpty && (hasSavedIdeas || ideasLoading);
+  const todayKey = todayIso ?? new Date().toISOString().split("T")[0];
+  const slotLabel: Record<"morning" | "afternoon" | "evening", string> = {
+    morning: "Утро",
+    afternoon: "День",
+    evening: "Вечер",
+  };
 
-  const planSuggestionsForBlock = useMemo(
-    () => mergePlanSuggestionsWithMocks(planSuggestions, 5),
-    [planSuggestions],
+  useEffect(() => {
+    setAutoPlanDraft([]);
+    setAutoPlanGeneration(0);
+    setAutoPlanCursor(0);
+    setAutoPlanLocalAddedIds([]);
+    setAutoPlanLocalSlotAdds({ morning: 0, afternoon: 0, evening: 0 });
+  }, [selectedDate, selectedPersonaIds]);
+
+  const participantLabels = useMemo(
+    () => buildParticipantSummaryLabels(selectedPersonaIds, personas),
+    [selectedPersonaIds, personas],
   );
 
-  const todayKey = todayIso ?? new Date().toISOString().split("T")[0];
-
-  const planHeaderTitle = useMemo(
-    () => formatPlanHeaderTitle(selectedDate, todayKey),
+  const recommendationHeading = useMemo(
+    () => formatRecommendationHeading(selectedDate, todayKey),
     [selectedDate, todayKey],
   );
 
-  const planHeaderSubtitle = useMemo(
-    () =>
-      buildPlanHeaderSubtitle(
-        selectedPersonaIds,
-        personas,
-        isFreeSearchMode,
-        city,
-      ),
-    [selectedPersonaIds, personas, isFreeSearchMode, city],
-  );
+  const recommendationAudienceLine =
+    participantLabels.length > 0 ? participantLabels.join(" + ") : "Свободный поиск";
 
-  const recommendationsSectionHeading = useMemo(
-    () =>
-      buildRecommendationsSectionHeading(
-        selectedPersonaIds,
-        personas,
-        isFreeSearchMode,
-        selectedDate,
-        todayKey,
-      ),
-    [selectedPersonaIds, personas, isFreeSearchMode, selectedDate, todayKey],
-  );
+  const dayPartSections = useMemo(() => {
+    const sections: Record<
+      "morning" | "afternoon" | "evening",
+      Array<
+        | { kind: "planned"; item: PlanItemWithActivity }
+        | { kind: "recommended"; item: PlanItemWithActivity }
+      >
+    > = {
+      morning: [],
+      afternoon: [],
+      evening: [],
+    };
 
-  const catalogCtaHint =
-    "Откроем каталог «Куда пойти» с этой датой и с учётом участников, выбранных выше.";
+    for (const item of dayItemsSorted) {
+      const slot = slotFromStartsAt(item.startsAt) ?? "afternoon";
+      sections[slot].push({ kind: "planned", item });
+    }
+
+    for (const draft of autoPlanDraft) {
+      sections[draft.slot].push({ kind: "recommended", item: draft.item });
+    }
+
+    return (["morning", "afternoon", "evening"] as const)
+      .map((slot) => ({
+        slot,
+        label: slotLabel[slot],
+        entries: sections[slot],
+      }))
+      .filter((section) => section.entries.length > 0);
+  }, [autoPlanDraft, dayItemsSorted, slotFromStartsAt]);
+
+  const showRecommendationResults = dayPartSections.length > 0;
+
+  const renderRecommendationArea = (compact: boolean) => {
+    if (isPendingDateHydration) {
+      return (
+        <div className="animate-pulse rounded-[26px] border border-neutral-200 bg-white p-4 shadow-sm">
+          <div className="h-4 w-44 rounded bg-neutral-200" />
+          <div className="mt-3 h-3 w-52 rounded bg-neutral-100" />
+          <div className="mt-4 h-24 rounded-[22px] bg-neutral-100/80" />
+        </div>
+      );
+    }
+
+    if (!showRecommendationResults) {
+      return null;
+    }
+
+    const recommendationCards = dayPartSections.flatMap((section) =>
+      section.entries.map((entry) => ({
+        ...entry,
+        slot: section.slot,
+      })),
+    );
+
+    return (
+      <div id="plan-recommendation-results" className="space-y-4">
+        <section
+          className={compact ? "space-y-3 px-1" : "space-y-3 px-1"}
+          aria-label="Подходит вашим детям"
+        >
+          <div>
+            <h3 className={compact ? "text-xl font-semibold tracking-tight text-neutral-900" : "text-2xl font-semibold tracking-tight text-neutral-900"}>
+              Подходит вашим детям
+            </h3>
+            <p className="mt-1 text-sm text-neutral-500">Подобрано по возрасту и интересам</p>
+          </div>
+        </section>
+
+        <section className={compact ? "space-y-3" : "space-y-3"}>
+          {recommendationCards.map((entry) => (
+              <RecommendationCard
+                key={`${entry.slot}-${entry.kind}-${entry.item.id}`}
+                item={entry.item}
+                isInPlan={entry.kind === "planned"}
+                onRemoveFromPlan={
+                  entry.kind === "planned"
+                    ? () => handleRemoveFromPlan(entry.item.id)
+                    : undefined
+                }
+                onAddToPlan={
+                  entry.kind === "recommended"
+                    ? async () => {
+                        if (!entry.item.activity) return;
+                        const ok = await handleAddSuggestionToPlan(entry.item.activity);
+                        if (!ok) return;
+                        if (entry.item.activityId) {
+                          setAutoPlanLocalAddedIds((prev) =>
+                            prev.includes(entry.item.activityId!)
+                              ? prev
+                              : [...prev, entry.item.activityId!],
+                          );
+                        }
+                        setAutoPlanLocalSlotAdds((prev) => ({
+                          ...prev,
+                          [entry.slot]: prev[entry.slot] + 1,
+                        }));
+                        setAutoPlanDraft((prev) =>
+                          prev.filter((draft) => draft.item.id !== entry.item.id),
+                        );
+                      }
+                    : undefined
+                }
+              />
+            ))}
+        </section>
+      </div>
+    );
+  };
+
+  const renderBottomActions = () => (
+    <div className="space-y-3">
+      {canOpenDayScenario ? (
+        <BuildScenarioButton onClick={() => setShowDayScenario(true)} />
+      ) : null}
+      <ManualChoiceButton onClick={handleOpenCatalog} />
+    </div>
+  );
 
   if (isDesktop) {
     return (
-      <div className="flex h-full min-h-0 flex-col bg-neutral-50">
-        <div className="sticky top-0 z-20 flex-shrink-0 space-y-3 bg-neutral-50 px-8 pb-2 pt-6">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0 space-y-0.5 pr-2">
-              <h2 className="text-2xl font-bold tracking-tight text-neutral-900">
-                {planHeaderTitle}
-              </h2>
-              <p className="mb-0 min-h-[2.25rem] max-w-2xl text-sm leading-snug text-neutral-600 line-clamp-2">
-                {planHeaderSubtitle}
-              </p>
-            </div>
-            <ModalCloseButton
-              type="button"
-              onClick={() => onRequestClose?.()}
-              className="shrink-0"
-              aria-label="Закрыть мой план"
-            />
-          </div>
-
-          {onChangeDate ? (
-            <WeekCalendarStrip
-              selectedDate={selectedDate}
-              onChangeDate={onChangeDate}
-              showArrows
-            />
-          ) : null}
-
+      <div className="flex h-full min-h-0 flex-col bg-[#FFFDFC]">
+        <div className="sticky top-0 z-20 flex-shrink-0 bg-[#FFFDFC] px-8 pb-3 pt-6">
+          <MyPlanHeader onClose={onRequestClose} />
         </div>
 
         <div
           id="my-plan-recommendations"
-          className="min-h-0 flex-1 space-y-3 overflow-y-auto scroll-mt-4 bg-white px-8 pb-1.5 pt-1"
+          className="min-h-0 flex-1 space-y-4 overflow-y-auto px-8 pb-6 pt-1"
         >
-          {/* Компактный блок аудитории */}
+          {onChangeDate ? (
+            <WeekCalendarStrip selectedDate={selectedDate} onChangeDate={onChangeDate} showArrows />
+          ) : null}
+
           <PlanAudienceCompact
             selectedPersonaIds={selectedPersonaIds}
             personas={personas}
@@ -679,117 +1000,18 @@ export function PlanMainContent({
             />
           ) : null}
 
-          <div className="space-y-4">
-            {dayEmpty ? (
-              <div className="flex flex-row items-start gap-4 rounded-2xl border border-neutral-200 bg-white p-5 shadow-sm">
-                <Calendar className="h-10 w-10 shrink-0 text-neutral-400" strokeWidth={1.25} />
-                <div className="min-w-0">
-                  <h3 className="font-semibold text-neutral-900">День пока пустой</h3>
-                  <p className="mt-1 text-sm leading-relaxed text-neutral-500">
-                    Добавьте событие из каталога либо выберите вариант в блоках ниже.
-                  </p>
-                </div>
-              </div>
-            ) : null}
+          <RecommendationDecisionBlock
+            onDecide={handleDecideRecommendations}
+            onIdeas={handleOpenIdeasFlow}
+            ideasCount={ideas.length}
+            hasGenerated={autoPlanGeneration > 0}
+            isGenerating={isAutoPlanGenerating}
+          />
 
-            {!dayEmpty ? (
-              <div className="space-y-3">
-                {dayItemsSorted.map((planItem) => (
-                  <div key={planItem.id} className="animate-mg-plan-day-item-in">
-                    <RecommendationCard
-                      item={planItem}
-                      isInPlan
-                      onRemoveFromPlan={() =>
-                        handleRemoveFromPlan(planItem.id)
-                      }
-                    />
-                  </div>
-                ))}
-                <Link
-                  href={buildFindAndAddHref()}
-                  className="flex w-full items-center justify-center gap-2 rounded-xl border border-neutral-200 bg-white px-4 py-3 text-sm font-semibold text-neutral-900 shadow-sm transition-colors hover:bg-neutral-50"
-                  onClick={(event) => handleFindAndAddClick(event)}
-                >
-                  <Plus className="h-4 w-4 shrink-0" strokeWidth={2} />
-                  Добавить ещё
-                </Link>
-                <p className="text-center text-[11px] text-neutral-500 sm:text-xs">
-                  {catalogCtaHint}
-                </p>
-              </div>
-            ) : null}
+          {renderRecommendationArea(false)}
 
-            {showIdeasOnEmptyDay ? (
-              <PlanIdeasBlock
-                ideas={ideas}
-                city={city}
-                loading={ideasLoading && !hasSavedIdeas}
-                addingActivityId={addingActivityId}
-                removingActivityId={removingIdeaActivityId}
-                onAddToPlan={handleAddIdeaToPlan}
-                onRemoveIdea={handleRemoveIdea}
-                onOpenActivity={handleIdeaOpenClick}
-                onAllIdeasClick={handleIdeasPageClick}
-              />
-            ) : null}
-
-            <PlanRecommendationsBlock
-              heading={recommendationsSectionHeading}
-              subtitle={RECOMMENDATIONS_BLOCK_SUBTITLE}
-              activities={planSuggestionsForBlock}
-              city={city}
-              loading={suggestionsLoading}
-              addingActivityId={addingActivityId}
-              inPlanActivityIds={inPlanActivityIds}
-              onAddToPlan={handleAddSuggestionToPlan}
-              onOpenActivity={handleIdeaOpenClick}
-              seeMoreHref={buildFindAndAddHref()}
-            />
-
-            {dayEmpty ? (
-              <div className="rounded-2xl border border-neutral-200 bg-neutral-50/90 p-1.5">
-                <Link
-                  href={buildFindAndAddHref()}
-                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-neutral-900 px-4 py-3.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-neutral-800"
-                  onClick={(event) => handleFindAndAddClick(event)}
-                >
-                  <Plus className="h-4 w-4 shrink-0" strokeWidth={2} />
-                  Добавить событие
-                </Link>
-                <p className="px-2 pb-1 pt-2.5 text-center text-[11px] leading-snug text-neutral-500 sm:text-xs">
-                  {catalogCtaHint}
-                </p>
-              </div>
-            ) : null}
-
-            {hasSavedIdeas && !dayEmpty ? (
-              <PlanIdeasBlock
-                ideas={ideas}
-                city={city}
-                addingActivityId={addingActivityId}
-                removingActivityId={removingIdeaActivityId}
-                onAddToPlan={handleAddIdeaToPlan}
-                onRemoveIdea={handleRemoveIdea}
-                onOpenActivity={handleIdeaOpenClick}
-                onAllIdeasClick={handleIdeasPageClick}
-              />
-            ) : null}
-          </div>
+          {renderBottomActions()}
         </div>
-
-        {canOpenDayScenario ? (
-          <div className="flex-shrink-0 space-y-3 border-t border-neutral-200 bg-white px-8 py-5">
-            <Button
-              onClick={() => setShowDayScenario(true)}
-              className="h-12 w-full bg-neutral-900 text-base font-semibold hover:bg-neutral-800"
-            >
-              Сценарий дня
-            </Button>
-            <p className="text-center text-xs text-neutral-500">
-              Откройте красивый таймлайн собранного дня
-            </p>
-          </div>
-        ) : null}
 
         <AddPersonaTypeModal
           open={showAddPersonaTypeModal}
@@ -824,25 +1046,12 @@ export function PlanMainContent({
           }}
         />
 
-        <PlanAudienceSheet
-          open={showAudienceSheet}
-          onOpenChange={setShowAudienceSheet}
-          personas={personas}
-          selectedPersonaIds={selectedPersonaIds}
-          onSelectionChange={(ids) => {
-            if (family?.setSelectedPersonaIds) {
-              family.setSelectedPersonaIds(ids);
-            }
-          }}
-          layout="desktop"
-        />
-
         <DayScenarioModal
           open={showDayScenario}
           onOpenChange={setShowDayScenario}
           date={selectedDate}
           city={city}
-          audienceLabel={selectedChildrenLabel}
+          participantLabels={participantLabels}
           items={dayItemsSorted}
           layout="desktop"
         />
@@ -851,42 +1060,21 @@ export function PlanMainContent({
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-neutral-50">
-      <div className="flex-shrink-0 border-b border-neutral-200 bg-white/95 px-4 pb-3 pt-6 backdrop-blur supports-[backdrop-filter]:bg-white/85">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0 pr-1">
-            <h2 className="text-lg font-semibold leading-snug text-neutral-900">
-              {planHeaderTitle}
-            </h2>
-            <p className="mb-0 mt-1 min-h-[2.25rem] text-sm leading-snug text-neutral-600 line-clamp-2">
-              {planHeaderSubtitle}
-            </p>
-          </div>
-          <ModalCloseButton
-            type="button"
-            onClick={() => onRequestClose?.()}
-            className="shrink-0"
-            aria-label="Закрыть мой план"
-          />
-        </div>
+    <div className="flex h-full min-h-0 flex-col bg-[#FFFDFC]">
+      <div className="flex-shrink-0 border-b border-neutral-200 bg-white/90 px-4 pb-3 pt-6 backdrop-blur supports-[backdrop-filter]:bg-white/85">
+        <MyPlanHeader onClose={onRequestClose} compact />
       </div>
 
       <div
         id="my-plan-recommendations"
-        className="flex-1 space-y-3 overflow-y-auto scroll-mt-4 bg-white px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-3"
+        className="flex-1 space-y-4 overflow-y-auto bg-[#FFFDFC] px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-3"
       >
-        {/* Календарь */}
         {onChangeDate ? (
           <div className="pb-1">
-            <WeekCalendarStrip
-              selectedDate={selectedDate}
-              onChangeDate={onChangeDate}
-              compact
-            />
+            <WeekCalendarStrip selectedDate={selectedDate} onChangeDate={onChangeDate} compact />
           </div>
         ) : null}
 
-        {/* Компактный блок аудитории */}
         <PlanAudienceCompact
           selectedPersonaIds={selectedPersonaIds}
           personas={personas}
@@ -911,116 +1099,19 @@ export function PlanMainContent({
           />
         ) : null}
 
-        {dayEmpty ? (
-          <div className="flex flex-row items-start gap-3 rounded-2xl border border-neutral-200 bg-neutral-50/80 p-4">
-            <Calendar className="h-9 w-9 shrink-0 text-neutral-400" strokeWidth={1.25} />
-            <div className="min-w-0">
-              <h3 className="font-semibold text-neutral-900">День пока пустой</h3>
-              <p className="mt-1 text-sm leading-relaxed text-neutral-500">
-                Добавьте событие из каталога либо выберите вариант в блоках ниже.
-              </p>
-            </div>
-          </div>
-        ) : null}
-
-        {!dayEmpty ? (
-          <div className="space-y-3">
-            {dayItemsSorted.map((planItem) => (
-              <div key={planItem.id} className="animate-mg-plan-day-item-in">
-                <RecommendationCard
-                  item={planItem}
-                  isInPlan
-                  onRemoveFromPlan={() =>
-                    handleRemoveFromPlan(planItem.id)
-                  }
-                />
-              </div>
-            ))}
-            <Link
-              href={buildFindAndAddHref()}
-              className="flex w-full items-center justify-center gap-2 rounded-xl border border-neutral-200 bg-white px-4 py-3 text-sm font-semibold text-neutral-900 shadow-sm transition-colors hover:bg-neutral-50"
-              onClick={(event) => handleFindAndAddClick(event)}
-            >
-              <Plus className="h-4 w-4 shrink-0" strokeWidth={2} />
-              Добавить ещё
-            </Link>
-            <p className="text-center text-[11px] text-neutral-500">{catalogCtaHint}</p>
-          </div>
-        ) : null}
-
-        {showIdeasOnEmptyDay ? (
-          <PlanIdeasBlock
-            ideas={ideas}
-            city={city}
-            compact
-            loading={ideasLoading && !hasSavedIdeas}
-            addingActivityId={addingActivityId}
-            removingActivityId={removingIdeaActivityId}
-            onAddToPlan={handleAddIdeaToPlan}
-            onRemoveIdea={handleRemoveIdea}
-            onOpenActivity={handleIdeaOpenClick}
-            onAllIdeasClick={handleIdeasPageClick}
-          />
-        ) : null}
-
-        <PlanRecommendationsBlock
-          heading={recommendationsSectionHeading}
-          subtitle={RECOMMENDATIONS_BLOCK_SUBTITLE}
-          activities={planSuggestionsForBlock}
-          city={city}
-          loading={suggestionsLoading}
+        <RecommendationDecisionBlock
+          onDecide={handleDecideRecommendations}
+          onIdeas={handleOpenIdeasFlow}
+          ideasCount={ideas.length}
+          hasGenerated={autoPlanGeneration > 0}
+          isGenerating={isAutoPlanGenerating}
           compact
-          addingActivityId={addingActivityId}
-          inPlanActivityIds={inPlanActivityIds}
-          onAddToPlan={handleAddSuggestionToPlan}
-          onOpenActivity={handleIdeaOpenClick}
-          seeMoreHref={buildFindAndAddHref()}
         />
 
-        {dayEmpty ? (
-          <div className="rounded-2xl border border-neutral-200 bg-neutral-50/90 p-1.5">
-            <Link
-              href={buildFindAndAddHref()}
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-neutral-900 px-4 py-3.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-neutral-800"
-              onClick={(event) => handleFindAndAddClick(event)}
-            >
-              <Plus className="h-4 w-4 shrink-0" strokeWidth={2} />
-              Добавить событие
-            </Link>
-            <p className="px-2 pb-1 pt-2.5 text-center text-[11px] leading-snug text-neutral-500">
-              {catalogCtaHint}
-            </p>
-          </div>
-        ) : null}
+        {renderRecommendationArea(true)}
 
-        {hasSavedIdeas && !dayEmpty ? (
-          <PlanIdeasBlock
-            ideas={ideas}
-            city={city}
-            compact
-            addingActivityId={addingActivityId}
-            removingActivityId={removingIdeaActivityId}
-            onAddToPlan={handleAddIdeaToPlan}
-            onRemoveIdea={handleRemoveIdea}
-            onOpenActivity={handleIdeaOpenClick}
-            onAllIdeasClick={handleIdeasPageClick}
-          />
-        ) : null}
+        {renderBottomActions()}
       </div>
-
-      {canOpenDayScenario ? (
-        <div className="flex-shrink-0 space-y-3 border-t bg-white px-6 py-4">
-          <Button
-            onClick={() => setShowDayScenario(true)}
-            className="h-12 w-full bg-gray-900 text-base font-semibold hover:bg-gray-800"
-          >
-            Сценарий дня
-          </Button>
-          <p className="text-center text-xs text-gray-500">
-            Откройте красивый таймлайн собранного дня
-          </p>
-        </div>
-      ) : null}
 
       <AddPersonaTypeModal
         open={showAddPersonaTypeModal}
@@ -1055,25 +1146,12 @@ export function PlanMainContent({
         }}
       />
 
-      <PlanAudienceSheet
-        open={showAudienceSheet}
-        onOpenChange={setShowAudienceSheet}
-        personas={personas}
-        selectedPersonaIds={selectedPersonaIds}
-        onSelectionChange={(ids) => {
-          if (family?.setSelectedPersonaIds) {
-            family.setSelectedPersonaIds(ids);
-          }
-        }}
-        layout="default"
-      />
-
       <DayScenarioModal
         open={showDayScenario}
         onOpenChange={setShowDayScenario}
         date={selectedDate}
         city={city}
-        audienceLabel={selectedChildrenLabel}
+        participantLabels={participantLabels}
         items={dayItemsSorted}
         layout="default"
       />

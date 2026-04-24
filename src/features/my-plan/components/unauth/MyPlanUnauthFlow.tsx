@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import { AuthForm } from "@/components/auth/AuthForm";
 import { MyPlanFlowShell } from "./MyPlanFlowShell";

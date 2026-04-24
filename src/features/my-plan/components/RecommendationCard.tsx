@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { MediaCover } from "@/components/ui/media-cover";
 import { Check, Plus, RefreshCw, Sparkles, X } from "lucide-react";
@@ -11,6 +10,8 @@ import { publicActivityPath } from "@/lib/business/eventPublicLink";
 import { resolveActivityParticipationCta } from "@/lib/plan/resolveActivityParticipationCta";
 import type { PlanItemWithActivity } from "../types/event";
 import { formatActivityAddressLine } from "../lib/formatActivityAddress";
+import { useOptionalCity } from "@/contexts/CityContext";
+import { DEFAULT_CITY_SLUG } from "@/lib/city/resolveCityContext";
 
 interface RecommendationCardProps {
   item: PlanItemWithActivity;
@@ -53,8 +54,8 @@ export function RecommendationCard({
 
   const noMoreAlternatives =
     alternativesCount !== undefined && alternativesCount <= 1;
-  const params = useParams() as { city?: string };
-  const city = params?.city ?? "minsk";
+  const cityCtx = useOptionalCity();
+  const city = cityCtx?.citySlug ?? DEFAULT_CITY_SLUG;
   const activityDetailHref = item.activity?.id
     ? publicActivityPath(item.activity.id, city, item.activity.slug)
     : null;
@@ -110,11 +111,11 @@ export function RecommendationCard({
   return (
     <div
       className={cn(
-        "flex flex-col gap-3 overflow-hidden rounded-2xl border bg-white p-4 shadow-sm transition-colors",
+        "flex flex-col gap-3 overflow-hidden rounded-[24px] border p-4 shadow-sm transition-all",
         "sm:gap-4 sm:p-5",
         isInPlan
-          ? "border-primary"
-          : "border-dashed border-[#D4D4D8] bg-[#FAFAFA] [border-image:none]",
+          ? "border-primary bg-white"
+          : "border-dashed border-[#D4D4D8] bg-[#FCFCFC] opacity-[0.74] hover:opacity-100 [border-image:none]",
       )}
     >
       {isInPlan ? (
@@ -128,7 +129,7 @@ export function RecommendationCard({
         <div className="inline-flex w-fit max-w-full shrink-0 items-center rounded-full border border-neutral-300 bg-transparent px-3 py-1.5">
           <Sparkles className="mr-1.5 h-3.5 w-3.5 shrink-0 text-primary" />
           <p className="text-[11px] font-medium leading-none tracking-wide text-primary/90">
-            Рекомендация от <span className="font-semibold text-neutral-900">mamaGo</span>
+            Рекомендовано <span className="font-semibold text-neutral-900">mamaGo</span>
           </p>
         </div>
       )}
@@ -208,7 +209,7 @@ export function RecommendationCard({
               >
                 {showVariantControls ? (
                   <div className="col-start-1 row-start-1 flex items-center gap-1.5">
-                    <Button
+                  <Button
                       type="button"
                       variant="outline"
                       size="sm"

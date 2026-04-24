@@ -44,6 +44,7 @@ export function WeekCalendarStrip({
 
   const weekDays = useMemo(() => getWeekDays(visibleWeekStart), [visibleWeekStart]);
   const monthLabel = useMemo(() => buildWeekMonthLabel(weekDays, selectedDate), [weekDays, selectedDate]);
+  const todayIso = new Date().toISOString().split("T")[0] ?? "";
 
   const shiftWeek = (dir: 1 | -1) => {
     const nextStart = dir === 1 ? getNextWeekStart(visibleWeekStart) : getPrevWeekStart(visibleWeekStart);
@@ -118,6 +119,7 @@ export function WeekCalendarStrip({
             {weekDays.map((iso) => {
               const d = new Date(`${iso}T12:00:00`);
               const selected = iso === selectedDate;
+              const isPast = iso < todayIso;
               return (
                 <button
                   key={iso}
@@ -129,7 +131,10 @@ export function WeekCalendarStrip({
                     month: "long",
                   })}
                   onClick={() => onChangeDate?.(iso)}
-                  className="relative flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-full py-2.5 text-neutral-700"
+                  className={cn(
+                    "relative flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-full py-2.5 text-neutral-700",
+                    isPast && !selected && "opacity-45",
+                  )}
                 >
                   {selected ? (
                     <motion.span
@@ -141,7 +146,11 @@ export function WeekCalendarStrip({
                   <span
                     className={cn(
                       "relative z-10 text-[11px] font-medium uppercase leading-none transition-colors duration-200",
-                      selected ? "text-primary-foreground/90" : "text-neutral-400",
+                      selected
+                        ? "text-primary-foreground/90"
+                        : isPast
+                          ? "text-neutral-400/80"
+                          : "text-neutral-400",
                     )}
                   >
                     {WEEKDAY_SHORT_RU[d.getDay()]}
@@ -149,7 +158,11 @@ export function WeekCalendarStrip({
                   <span
                     className={cn(
                       "relative z-10 text-[15px] font-semibold tabular-nums leading-none transition-colors duration-200",
-                      selected ? "text-primary-foreground" : "text-neutral-900",
+                      selected
+                        ? "text-primary-foreground"
+                        : isPast
+                          ? "text-neutral-500"
+                          : "text-neutral-900",
                     )}
                   >
                     {d.getDate()}

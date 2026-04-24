@@ -4,6 +4,7 @@ import { listAllPlanItems } from "@/server/services/plan.service";
 import { prisma } from "@/lib/prisma";
 import { PlanPageClient } from "./PlanPageClient";
 import { getPlanActivityPublicAvailability } from "@/lib/plan/publicVisibility";
+import { getLatestActivePlanReminderNotification } from "@/server/services/notification.service";
 
 export default async function PlanPage() {
   const user = await getCurrentUser();
@@ -35,6 +36,8 @@ export default async function PlanPage() {
       return today.getFullYear() - birth.getFullYear();
     });
 
+  const activeReminder = await getLatestActivePlanReminderNotification(user.id);
+
   // Serialize plan items (dates need to be strings for client)
   const serializedItems = planItems.map((item) => ({
     id: item.id,
@@ -61,6 +64,19 @@ export default async function PlanPage() {
       initialItems={serializedItems}
       ideaActivityIds={ideaActivityIds}
       childrenAges={childrenAges}
+      activeReminder={
+        activeReminder
+          ? {
+              id: activeReminder.id,
+              title: activeReminder.title,
+              body: activeReminder.body,
+              ctaLabel: activeReminder.ctaLabel,
+              ctaAction: activeReminder.ctaAction,
+              createdAt: activeReminder.createdAt.toISOString(),
+              isRead: activeReminder.isRead,
+            }
+          : null
+      }
     />
   );
 }

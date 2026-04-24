@@ -48,11 +48,19 @@ export function MyPlanPanelContent({
   } = useMyPlan();
 
   const [addErr, setAddErr] = useState<string | null>(() => null);
+  const [isDateLoading, setIsDateLoading] = useState(false);
 
   /** Подтягиваем план с сервера при открытии и при смене даты — единый источник с БД + live после add. */
   useEffect(() => {
     if (!open) return;
-    void refetchPlanForDate(selectedPlanDate);
+    let cancelled = false;
+    setIsDateLoading(true);
+    void refetchPlanForDate(selectedPlanDate).finally(() => {
+      if (!cancelled) setIsDateLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [open, selectedPlanDate, refetchPlanForDate]);
 
   if (isLoading || accessPhase === "loading") {
@@ -73,6 +81,7 @@ export function MyPlanPanelContent({
       onChangeDate={setSelectedPlanDate}
       planItemsByDate={planItemsByDate}
       todayIso={todayIso}
+      onAddItemToPlan={markSlotSaved}
       childrenList={children.map((c) => ({ id: c.id, name: c.name, birthDate: c.birthDate }))}
       selectedChildIds={selectedChildIds}
       onChangeSelectedChildIds={setSelectedChildIds}
@@ -85,6 +94,8 @@ export function MyPlanPanelContent({
       planSuggestions={planSuggestions}
       suggestionsLoading={suggestionsLoading}
       onAddSuggestionToPlan={addActivityToPlanFromSuggestion}
+      onRemoveItemFromPlan={clearSlotSaved}
+      dateLoading={isDateLoading}
       onRequestClose={onRequestClose}
     />
   );

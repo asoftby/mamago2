@@ -10,7 +10,6 @@ import {
   useRef,
   type ReactNode,
 } from "react";
-import { useParams } from "next/navigation";
 import { useOptionalCity } from "@/contexts/CityContext";
 import { useFamilyPersona } from "@/contexts/FamilyPersonaContext";
 import { useDiscoveryFilters } from "@/features/filters/discovery/filters.store";
@@ -95,9 +94,8 @@ export function useMyPlan() {
 }
 
 function useMyPlanStore() {
-  const params = useParams() as { city?: string };
   const cityCtx = useOptionalCity();
-  const citySlug = cityCtx?.citySlug ?? params?.city ?? "minsk";
+  const citySlug = cityCtx?.citySlug ?? "minsk";
   const { applied: locationApplied, actions: discoveryActions } = useDiscoveryFilters();
   const { options: locationOptions } = useDiscoveryFilterOptions(citySlug);
   const { isAuthenticated, isLoading: authLoading } = useAuthMe();
