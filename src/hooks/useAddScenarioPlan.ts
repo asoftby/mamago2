@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import type { ScenarioStep } from "@/features/me/lib/dayScenario";
 import { findPlacement, type ScheduledItem, type PlacementResult } from "@/features/me/lib/dayScheduler";
 

@@ -20,7 +20,7 @@ import {
 } from "@/lib/family/wholeFamilyPreset";
 import { MY_PLAN_REG_FOCUS_CHILD_SESSION_KEY } from "@/lib/family/postMyPlanRegistrationFocus";
 import { AUTH_STATE_CHANGED_EVENT } from "@/lib/auth/client";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 
 const STORAGE_SELECTED = "mamago:selectedPersonaIds";
 

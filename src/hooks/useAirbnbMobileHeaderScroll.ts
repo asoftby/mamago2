@@ -38,9 +38,12 @@ const DIRECTION_DELTA_PX = 0.75;
 /**
  * На узком экране (max-width): поведение хедера при скролле.
  * В режиме `scrollDirectionMode` — скрытие вниз / показ вверх; иначе — по позиции scrollY.
+ * 
+ * ВАЖНО: Этот хук больше НЕ должен использоваться для полного скрытия header.
+ * Он предназначен только для анимации табов и других внутренних элементов.
  */
 export function useAirbnbMobileHeaderScroll({
-  maxWidthPx = 1023,
+  maxWidthPx = 768, // Изменено с 1023 на 768 - только для реально мобильных устройств
   searchSurfaceOpen,
   reduceMotion,
   scrollDirectionMode = false,

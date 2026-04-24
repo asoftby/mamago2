@@ -1,12 +1,16 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { resolveSubdomainMiddlewareDecision } from "@/lib/routing/subdomainMiddleware";
+import { resolveSurfaceFromHostAndPathname } from "@/lib/routing/surface";
+import { stripPublicDiscoverySearchParams } from "@/lib/routing/publicDiscoverySearchParams";
 
 export function middleware(request: NextRequest) {
   const host = request.headers.get("host") || "";
   const url = request.nextUrl;
   const pathname = url.pathname;
-  const search = url.search;
+  const surface = resolveSurfaceFromHostAndPathname(host, pathname);
+  const search =
+    surface === "admin" ? stripPublicDiscoverySearchParams(url.search) : url.search;
 
   // Early return for Next.js static assets and system files
   if (
@@ -32,7 +36,13 @@ export function middleware(request: NextRequest) {
 
   if (decision.kind === "rewrite") {
     url.pathname = decision.pathname;
+    url.search = search;
     return NextResponse.rewrite(url);
+  }
+
+  if (surface === "admin" && search !== url.search) {
+    url.search = search;
+    return NextResponse.redirect(url);
   }
 
   return NextResponse.next();

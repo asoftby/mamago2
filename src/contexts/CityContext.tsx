@@ -2,7 +2,6 @@
 
 import {
   createContext,
-  Suspense,
   useCallback,
   useContext,
   useEffect,
@@ -10,14 +9,19 @@ import {
   useState,
 } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { getCityFromPath } from "@/lib/intent";
 import { appendCityQuery as appendCityQueryToHref } from "@/lib/city/appendCityQuery";
-import { resolveCitySlug } from "@/lib/city/resolveCitySlug";
+import {
+  DEFAULT_CITY_SLUG,
+  type ResolvedCityContext,
+  resolveCityContext,
+} from "@/lib/city/resolveCityContext";
+import { usePublicCityOptions } from "@/lib/city/usePublicCityOptions";
 
 const STORAGE_KEY = "mamago.selectedCity";
 
-type CityContextValue = {
+type CityContextValue = ResolvedCityContext & {
   citySlug: string;
+  cityName: string;
   setCity: (slug: string) => void;
   appendCityQuery: (href: string) => string;
 };
@@ -28,6 +32,7 @@ function CityProviderInner({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const router = useRouter();
+  const { cities } = usePublicCityOptions();
   const [storedCity, setStoredCity] = useState<string | null>(() => {
     try {
       return localStorage.getItem(STORAGE_KEY);
@@ -36,24 +41,41 @@ function CityProviderInner({ children }: { children: React.ReactNode }) {
     }
   });
 
-  // Sync storedCity when pathname changes (extract city from path)
-  const cityFromPath = useMemo(() => getCityFromPath(pathname), [pathname]);
-  
+  const cityFromQuery = searchParams.get("city");
+  const resolvedCity = useMemo(
+    () =>
+      resolveCityContext({
+        pathname,
+        cityFromQuery,
+        preferredCitySlug: storedCity,
+        allowedCitySlugs: cities.map((city) => city.slug),
+      }),
+    [pathname, cityFromQuery, storedCity, cities],
+  );
+
+  const citySlug = resolvedCity.citySlug ?? DEFAULT_CITY_SLUG;
+  const cityName = resolvedCity.cityName ?? citySlug;
+
   useEffect(() => {
-    if (!cityFromPath) return;
+    if (resolvedCity.source !== "route" || !resolvedCity.citySlug) return;
     try {
-      localStorage.setItem(STORAGE_KEY, cityFromPath);
+      localStorage.setItem(STORAGE_KEY, resolvedCity.citySlug);
     } catch {
       /* ignore */
     }
-    queueMicrotask(() => setStoredCity(cityFromPath));
-  }, [cityFromPath]);
+    queueMicrotask(() => setStoredCity(resolvedCity.citySlug));
+  }, [resolvedCity]);
 
-  const cityFromQuery = searchParams.get("city");
-  const citySlug = useMemo(
-    () => resolveCitySlug(pathname, cityFromQuery, storedCity),
-    [pathname, cityFromQuery, storedCity],
-  );
+  useEffect(() => {
+    if (process.env.NODE_ENV !== "production") {
+      console.debug("[CityContext] city resolved", {
+        pathname,
+        cityFromQuery,
+        storedCity,
+        resolvedCity,
+      });
+    }
+  }, [pathname, cityFromQuery, storedCity, resolvedCity]);
 
   const setCity = useCallback(
     (slug: string) => {
@@ -74,34 +96,21 @@ function CityProviderInner({ children }: { children: React.ReactNode }) {
   );
 
   const value = useMemo(
-    () => ({ citySlug, setCity, appendCityQuery }),
-    [citySlug, setCity, appendCityQuery],
+    () => ({ ...resolvedCity, citySlug, cityName, setCity, appendCityQuery }),
+    [resolvedCity, citySlug, cityName, setCity, appendCityQuery],
   );
 
-  return (
-    <CityContext.Provider value={value}>{children}</CityContext.Provider>
-  );
+  return <CityContext.Provider value={value}>{children}</CityContext.Provider>;
 }
 
 export function CityProvider({ children }: { children: React.ReactNode }) {
-  return (
-    <Suspense
-      fallback={<div className="min-h-screen flex flex-col bg-background" />}
-    >
-      <CityProviderInner>{children}</CityProviderInner>
-    </Suspense>
-  );
+  return <CityProviderInner>{children}</CityProviderInner>;
 }
 
-/** Контекст города (null, если не внутри CityProvider). */
 export function useOptionalCity(): CityContextValue | null {
   return useContext(CityContext);
 }
 
-/**
- * Город для ссылок и навигации. Если провайдера нет (редкий SSR / граница RSC),
- * slug берётся из pathname + дефолт minsk — без падения.
- */
 export function useCity(): CityContextValue {
   const ctx = useOptionalCity();
   const pathname = usePathname();
@@ -109,9 +118,19 @@ export function useCity(): CityContextValue {
 
   return useMemo(() => {
     if (ctx) return ctx;
-    const citySlug = resolveCitySlug(pathname, null, null);
+
+    const resolvedCity = resolveCityContext({
+      pathname,
+      cityFromQuery: null,
+      preferredCitySlug: null,
+    });
+    const citySlug = resolvedCity.citySlug ?? DEFAULT_CITY_SLUG;
+    const cityName = resolvedCity.cityName ?? citySlug;
+
     return {
+      ...resolvedCity,
       citySlug,
+      cityName,
       setCity: (slug: string) => {
         try {
           localStorage.setItem(STORAGE_KEY, slug);

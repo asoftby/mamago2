@@ -11,6 +11,8 @@ export interface ActivityMock {
   id: string;
   /** Публичный slug события (SEO), если есть в БД */
   slug?: string | null;
+  /** Канонический city slug публичной страницы события. */
+  citySlug?: string | null;
   type: ActivityType;
   /** Раздел сайта (иконка в хедере на странице публикации); иначе выводится из `type` */
   discoveryIntent?: Intent;

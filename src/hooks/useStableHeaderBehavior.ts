@@ -77,29 +77,14 @@ export function useStableHeaderBehavior(options: UseStableHeaderBehaviorOptions 
   const exitCompactY = Math.max(8, scrollThreshold - scrollHysteresisPx);
 
   const [state, setState] = useState<StableHeaderBehaviorState>(() => {
-    if (typeof window === "undefined") {
-      return {
-        mode: "expanded-top",
-        activePanel: "none",
-        showSearchSurface: false,
-        isScrolled: false,
-        scrollProgress: 0,
-      };
-    }
-    const y = window.scrollY;
-    const progress = Math.min(1, y / scrollThreshold);
-    const mobile = window.matchMedia("(max-width: 1023px)").matches;
-    const mode: HeaderMode = mobile
-      ? "expanded-top"
-      : y >= enterCompactY
-        ? "compact"
-        : "expanded-top";
     return {
-      mode,
+      // Keep the first client render deterministic with SSR to avoid hydration mismatch.
+      // Real scroll/media-query state is applied right after mount by scroll handlers.
+      mode: "expanded-top",
       activePanel: "none",
       showSearchSurface: false,
-      isScrolled: y > 10,
-      scrollProgress: progress,
+      isScrolled: false,
+      scrollProgress: 0,
     };
   });
 
@@ -108,7 +93,7 @@ export function useStableHeaderBehavior(options: UseStableHeaderBehaviorOptions 
   const actionsRef = useRef<StableHeaderBehaviorActions>(null!);
   const stateRef = useRef(state);
   const forceExpandedUntilRef = useRef<number>(0);
-  /** Ниже lg: компактная строка отключена — скрытие через translate (см. useAirbnbMobileHeaderScroll). */
+  /** Ниже lg: десктопный compact-режим отключён, мобильный header живёт отдельно и остаётся sticky. */
   const isMobileLayoutRef = useRef(false);
 
   useEffect(() => {

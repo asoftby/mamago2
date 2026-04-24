@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { SAVED_TOAST_PARAM, SAVED_TOAST_VALUE } from "@/lib/backoffice/saveFlow";
 
 /**
