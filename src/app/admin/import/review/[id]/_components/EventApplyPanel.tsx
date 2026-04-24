@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { applyImportEventRecord } from "../../../actions";
+import { ActivityModerationShortcut } from "./ActivityModerationShortcut";
 
 interface Props {
   importedRecordId: string;
@@ -25,6 +26,7 @@ export function EventApplyPanel({
   const [result, setResult] = useState<{
     success: boolean;
     activityId?: string;
+    activitySlug?: string;
     appliedFields?: string[];
     skippedFields?: string[];
     emptyFields?: string[];
@@ -111,6 +113,16 @@ export function EventApplyPanel({
             {result.activityId && (
               <div className="text-xs text-green-700">
                 Activity ID: <span className="font-mono">{result.activityId}</span>
+              </div>
+            )}
+            {result.activitySlug && (
+              <div className="text-xs text-green-700">
+                Slug события: <span className="font-mono">{result.activitySlug}</span>
+              </div>
+            )}
+            {result.activityId && (
+              <div className="pt-2">
+                <ActivityModerationShortcut activityId={result.activityId} />
               </div>
             )}
             {result.appliedFields && result.appliedFields.length > 0 && (

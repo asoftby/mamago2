@@ -15,6 +15,7 @@ import { parseEventEditorStepQuery } from "@/lib/business/eventEditorStepQuery";
 import { TOTAL_EVENT_WIZARD_STEPS } from "@/components/business/wizard/event/eventWizardSteps.config";
 import { buildSurfaceRedirectDestination } from "@/lib/routing/surface";
 import { getCurrentRequestRoutingContext } from "@/lib/routing/requestContext";
+import { ExternalLink } from "lucide-react";
 
 function surfaceFromUserRole(role: string): ContentEditorSurface {
   return role === "ADMIN" || role === "MODERATOR" ? "admin" : "business";
@@ -89,6 +90,39 @@ export default async function EditorEditEventPage({
     },
   });
 
+  const importContext = await prisma.importedRecord.findFirst({
+    where: { publishedActivityId: event.id },
+    orderBy: { updatedAt: "desc" },
+    select: {
+      sourceUrl: true,
+      canonicalSourceUrl: true,
+      source: {
+        select: {
+          name: true,
+          slug: true,
+          baseUrl: true,
+        },
+      },
+    },
+  });
+
+  const originalUrl =
+    importContext?.canonicalSourceUrl ??
+    importContext?.sourceUrl ??
+    importContext?.source.baseUrl ??
+    null;
+  const originalLink = originalUrl ? (
+    <a
+      href={originalUrl}
+      target="_blank"
+      rel="noreferrer noopener"
+      className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+    >
+      Открыть оригинал
+      <ExternalLink className="h-3.5 w-3.5" aria-hidden />
+    </a>
+  ) : null;
+
   const surface = surfaceFromUserRole(user.role);
   const nav = defaultEditorNav(surface, "event");
   const backHref = resolveEditorReturnDestination({
@@ -117,6 +151,7 @@ export default async function EditorEditEventPage({
       title="Редактирование события"
       backHref={backHref}
       surface={surface}
+      headerAction={originalLink}
     >
       <EventWizard
         mode="edit"

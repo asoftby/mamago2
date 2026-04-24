@@ -1,5 +1,5 @@
 import Link from "next/link";
-import prisma from "@/lib/prisma";
+import { prismaBase } from "@/lib/prisma";
 import { formatDistanceToNow } from "date-fns";
 import { ru } from "date-fns/locale";
 import type { ImportEntityType, ImportRunStatus } from "@prisma/client";
@@ -13,6 +13,19 @@ import {
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
+
+type ImportRunsDb = {
+  importRun?: {
+    findMany: (args: unknown) => Promise<any[]>;
+  };
+  importSource?: {
+    findMany: (args: unknown) => Promise<Array<{ id: string; name: string }>>;
+  };
+};
+
+function getImportRunsDb(): ImportRunsDb {
+  return prismaBase as unknown as ImportRunsDb;
+}
 
 function parseStatus(raw: string | undefined): ImportRunStatus | undefined {
   const valid: ImportRunStatus[] = ["PENDING", "RUNNING", "COMPLETED", "FAILED", "CANCELLED"];
@@ -37,6 +50,11 @@ async function getRuns(filters: {
   sourceId?: string;
   archiveFilter: ArchiveFilter;
 }) {
+  const db = getImportRunsDb();
+  if (!db.importRun) {
+    return [];
+  }
+
   const archiveWhere =
     filters.archiveFilter === "active"
       ? { isArchived: false }
@@ -44,7 +62,7 @@ async function getRuns(filters: {
       ? { isArchived: true }
       : {};
 
-  return prisma.importRun.findMany({
+  return db.importRun.findMany({
     where: {
       ...archiveWhere,
       ...(filters.status ? { status: filters.status } : {}),
@@ -63,7 +81,12 @@ async function getRuns(filters: {
 }
 
 async function getSources() {
-  return prisma.importSource.findMany({
+  const db = getImportRunsDb();
+  if (!db.importSource) {
+    return [];
+  }
+
+  return db.importSource.findMany({
     where: { archivedAt: null },
     select: { id: true, name: true },
     orderBy: { name: "asc" },
@@ -83,6 +106,7 @@ export default async function ImportRunsPage({
     sourceId: sp.source || undefined,
     archiveFilter,
   };
+  const importRuntimeReady = Boolean(getImportRunsDb().importRun && getImportRunsDb().importSource);
 
   const [runs, sources] = await Promise.all([getRuns(filters), getSources()]);
   const hasFilters = sp.status || sp.entity || sp.source || sp.archive;
@@ -95,6 +119,16 @@ export default async function ImportRunsPage({
           Прогон показывает технический результат одного запуска импорта. Это отдельный слой между источником и импортированными объектами.
         </p>
       </div>
+
+      {!importRuntimeReady && (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5">
+          <div className="text-sm font-semibold text-amber-950">История запусков временно недоступна</div>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-amber-900">
+            Import runs скрыты в safe mode, потому что текущий Prisma client не содержит import-модели. Экран остаётся
+            доступным без server error и показывает пустое состояние вместо падения.
+          </p>
+        </div>
+      )}
 
       <div className="rounded-2xl border border-gray-200 bg-white p-4">
         <form method="GET" className="flex flex-wrap items-end gap-3">

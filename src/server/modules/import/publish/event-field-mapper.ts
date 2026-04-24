@@ -8,6 +8,7 @@
  */
 
 import type { NormalizedEventImport } from "../types";
+import { detectAgeBuckets, getAgeRangeFromBuckets } from "@/lib/age/ageMapping";
 
 // ── ActivityType whitelist ────────────────────────────────────────────────────
 
@@ -85,48 +86,6 @@ export function resolveEventShortDesc(nd: NormalizedEventImport): string | null 
     const lastSpace = truncated.lastIndexOf(" ");
     return (lastSpace > 80 ? truncated.slice(0, lastSpace) : truncated).trimEnd() + "…";
   }
-  return null;
-}
-
-// ── Age parsing ───────────────────────────────────────────────────────────────
-
-/**
- * Best-effort parse ageText → { ageMinMonths, ageMaxMonths }.
- * "4-10 лет" → { min: 48, max: 120 }
- * "от 3 лет" → { min: 36, max: null }
- * "до 12 лет" → { min: null, max: 144 }
- * Если не парсится — возвращает null (не fail apply).
- */
-export function parseAgeText(ageText: string): { ageMinMonths: number | null; ageMaxMonths: number | null } | null {
-  const t = ageText.toLowerCase().trim();
-
-  // "X-Y лет" или "X–Y лет"
-  const rangeMatch = t.match(/(\d+)\s*[-–]\s*(\d+)/);
-  if (rangeMatch) {
-    return {
-      ageMinMonths: parseInt(rangeMatch[1]) * 12,
-      ageMaxMonths: parseInt(rangeMatch[2]) * 12,
-    };
-  }
-
-  // "от X лет"
-  const fromMatch = t.match(/от\s+(\d+)/);
-  if (fromMatch) {
-    return { ageMinMonths: parseInt(fromMatch[1]) * 12, ageMaxMonths: null };
-  }
-
-  // "до X лет"
-  const toMatch = t.match(/до\s+(\d+)/);
-  if (toMatch) {
-    return { ageMinMonths: null, ageMaxMonths: parseInt(toMatch[1]) * 12 };
-  }
-
-  // "X+" или "X лет+"
-  const plusMatch = t.match(/(\d+)\s*\+/);
-  if (plusMatch) {
-    return { ageMinMonths: parseInt(plusMatch[1]) * 12, ageMaxMonths: null };
-  }
-
   return null;
 }
 
@@ -217,6 +176,7 @@ export interface MappedActivityFields {
   priceText?: string;
   priceFrom?: number;
   priceTo?: number;
+  ageTags?: string[];
   ageMinMonths?: number;
   ageMaxMonths?: number;
   scheduleJson?: object;
@@ -303,17 +263,6 @@ export async function mapNormalizedToActivity(
     }
   }
 
-  // Age
-  if (nd.ageText) {
-    const parsed = parseAgeText(nd.ageText);
-    if (parsed) {
-      if (parsed.ageMinMonths != null) fields.ageMinMonths = parsed.ageMinMonths;
-      if (parsed.ageMaxMonths != null) fields.ageMaxMonths = parsed.ageMaxMonths;
-    } else {
-      warnings.push(`ageText "${nd.ageText}" could not be parsed — age fields will be empty`);
-    }
-  }
-
   // Schedule
   const scheduleJson = buildMinimalScheduleJson(
     nd.startAt,
@@ -322,6 +271,28 @@ export async function mapNormalizedToActivity(
     nd.occurrenceLines,
   );
   if (scheduleJson) fields.scheduleJson = scheduleJson;
+
+  const ageDetection = detectAgeBuckets(nd.ageText);
+  if (ageDetection.suggestedBuckets.length > 0) {
+    fields.ageTags = ageDetection.suggestedBuckets;
+    const range = getAgeRangeFromBuckets(ageDetection.suggestedBuckets);
+    if (range.ageMinMonths != null) fields.ageMinMonths = range.ageMinMonths;
+    if (range.ageMaxMonths != null) fields.ageMaxMonths = range.ageMaxMonths;
+  } else if (nd.ageText) {
+    warnings.push(`ageText "${nd.ageText}" could not be confidently mapped to age buckets`);
+  }
+
+  if (fields.scheduleJson && typeof fields.scheduleJson === "object") {
+    fields.scheduleJson = {
+      ...(fields.scheduleJson as Record<string, unknown>),
+      ageDetection,
+    };
+  } else if (ageDetection.raw) {
+    fields.scheduleJson = {
+      _importSource: true,
+      ageDetection,
+    };
+  }
 
   // nextOccurrenceAt — из startAt если парсится
   if (nd.startAt) {
@@ -361,6 +332,7 @@ export function filterActivityNonDestructiveUpdates(
   const onlyIfEmpty: (keyof MappedActivityFields)[] = [
     "title", "type", "scheduleMode",
     "priceText", "priceFrom", "priceTo",
+    "ageTags",
     "ageMinMonths", "ageMaxMonths",
     "scheduleJson", "nextOccurrenceAt",
     "cityId",

@@ -35,7 +35,18 @@ export default async function ImportSourcesPage({
 }) {
   const sp = await searchParams;
   const view = parseSourceView(sp.view);
-  const sources = await listImportSources({ includeArchived: true, includeInactive: true });
+  let sources: Awaited<ReturnType<typeof listImportSources>> = [];
+  let importRuntimeReady = true;
+
+  try {
+    sources = await listImportSources({
+      includeArchived: true,
+      includeInactive: true,
+    });
+  } catch (error) {
+    importRuntimeReady = false;
+    console.error("import sources: safe mode fallback activated", error);
+  }
 
   const activeSources = sources.filter((source) => source.isActive && !source.archivedAt);
   const inactiveSources = sources.filter((source) => !source.isActive && !source.archivedAt);
@@ -69,6 +80,17 @@ export default async function ImportSourcesPage({
         </div>
         <CreateSourceModal devMode={DEV_MODE} />
       </div>
+
+      {!importRuntimeReady && (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5">
+          <div className="text-sm font-semibold text-amber-950">Источники временно недоступны в этой сборке</div>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-amber-900">
+            Список открыт в safe mode: import-модели сейчас не подключены в Prisma client, поэтому данные по источникам
+            временно не загружаются. Экран остаётся доступным без server error, а рабочая навигация по import-разделу не
+            обрывается.
+          </p>
+        </div>
+      )}
 
       <div className="grid gap-3 md:grid-cols-3">
         <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">

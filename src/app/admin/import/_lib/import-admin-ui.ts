@@ -129,6 +129,7 @@ export function getImportedObjectStage(params: {
   reviewStatus: ImportReviewStatus;
   publishedPlaceId?: string | null;
   publishedActivityId?: string | null;
+  linkRecovery?: { reason: string } | null;
   hasReviewTask?: boolean;
 }) {
   if (params.hasReviewTask === false) {
@@ -137,6 +138,14 @@ export function getImportedObjectStage(params: {
       tone: "bg-rose-100 text-rose-800",
       helper:
         "У каждой ImportedRecord должна быть ImportReviewTask. Отсутствие задачи — нарушение инварианта (возможны старые данные или прямое вмешательство в БД).",
+    };
+  }
+
+  if (params.linkRecovery) {
+    return {
+      label: "Связь потеряна",
+      tone: "bg-amber-100 text-amber-900",
+      helper: "Связанная сущность была удалена. Импортный объект снова доступен для обработки.",
     };
   }
 

@@ -7,6 +7,7 @@ import prisma from "@/lib/prisma";
 import type { ImportReviewTask, ImportReviewTaskStatus } from "@prisma/client";
 import type { ReviewDecisionPayload } from "../types";
 import * as repo from "../repositories/import-review-task.repository";
+import { ensureActiveImportDecisionTarget } from "./import-link-reconciliation.service";
 
 export async function getPendingTasks(params?: {
   limit?: number;
@@ -69,6 +70,18 @@ export async function applyDecision(
     REJECTED:         "REJECTED",
     DEFERRED:         "DEFERRED",
   };
+
+  if (
+    (payload.decision === "APPROVED_UPDATE" || payload.decision === "APPROVED_MERGE") &&
+    payload.targetEntityId &&
+    payload.targetEntityType
+  ) {
+    await ensureActiveImportDecisionTarget({
+      entityType: payload.targetEntityType,
+      entityId: payload.targetEntityId,
+      db: prisma,
+    });
+  }
 
   const [updatedTask] = await prisma.$transaction([
     prisma.importReviewTask.update({

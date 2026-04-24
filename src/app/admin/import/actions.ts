@@ -29,6 +29,7 @@ import type { ImportSourceType, ImportEntityType, ImportSourceStatus } from "@pr
 import { revalidatePath } from "next/cache";
 import prisma from "@/lib/prisma";
 import { type ImportSource } from "@prisma/client";
+import { reconcileImportedRecordLinkById, reconcileImportedRecordLinks } from "@/server/modules/import/services/import-link-reconciliation.service";
 
 function requireAdmin(role: string) {
   if (role !== "ADMIN" && role !== "MODERATOR") {
@@ -166,6 +167,7 @@ export async function applyImportRecord(importedRecordId: string): Promise<{
 export async function applyImportEventRecord(importedRecordId: string): Promise<{
   success: boolean;
   activityId?: string;
+  activitySlug?: string;
   appliedFields?: string[];
   skippedFields?: string[];
   emptyFields?: string[];
@@ -186,6 +188,7 @@ export async function applyImportEventRecord(importedRecordId: string): Promise<
 
     const applyResult = result as {
       placeId: string; // reused field — contains activityId for EVENT
+      activitySlug?: string;
       appliedFields: string[];
       skippedFields: string[];
       emptyFields: string[];
@@ -194,6 +197,7 @@ export async function applyImportEventRecord(importedRecordId: string): Promise<
     return {
       success: true,
       activityId: applyResult.placeId,
+      activitySlug: applyResult.activitySlug,
       appliedFields: applyResult.appliedFields,
       skippedFields: applyResult.skippedFields,
       emptyFields: applyResult.emptyFields,
@@ -205,7 +209,29 @@ export async function applyImportEventRecord(importedRecordId: string): Promise<
 export async function submitReviewDecision(
   taskId: string,
   payload: Omit<ReviewDecisionPayload, "reviewerUserId" | "reviewedAt">,
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{
+  success: boolean;
+  error?: string;
+  data?: {
+    task: {
+      id: string;
+      status: string;
+      suggestedAction: string | null;
+      reviewedAt: string | null;
+      priority: number;
+      notes: string | null;
+      reviewerUserId: string | null;
+      decision: string | null;
+    };
+    importedRecord: {
+      id: string;
+      reviewStatus: string;
+      reviewDecision: ReviewDecisionPayload | null;
+      publishedPlaceId: string | null;
+      publishedActivityId: string | null;
+    };
+  };
+}> {
   try {
     const user = await getCurrentUser();
     if (!user) return { success: false, error: "Unauthorized" };
@@ -217,8 +243,56 @@ export async function submitReviewDecision(
       reviewedAt: new Date().toISOString(),
     });
 
+    const updatedTask = await prisma.importReviewTask.findUnique({
+      where: { id: taskId },
+      select: {
+        id: true,
+        status: true,
+        suggestedAction: true,
+        reviewedAt: true,
+        priority: true,
+        notes: true,
+        reviewerUserId: true,
+        decision: true,
+        importedRecord: {
+          select: {
+            id: true,
+            reviewStatus: true,
+            reviewDecision: true,
+            publishedPlaceId: true,
+            publishedActivityId: true,
+          },
+        },
+      },
+    });
+
+    if (!updatedTask) {
+      return { success: false, error: "ImportReviewTask not found after update" };
+    }
+
     revalidatePath("/admin/import/review");
-    return { success: true };
+    return {
+      success: true,
+      data: {
+        task: {
+          id: updatedTask.id,
+          status: updatedTask.status,
+          suggestedAction: updatedTask.suggestedAction,
+          reviewedAt: updatedTask.reviewedAt?.toISOString() ?? null,
+          priority: updatedTask.priority,
+          notes: updatedTask.notes,
+          reviewerUserId: updatedTask.reviewerUserId,
+          decision: updatedTask.decision,
+        },
+        importedRecord: {
+          id: updatedTask.importedRecord.id,
+          reviewStatus: updatedTask.importedRecord.reviewStatus,
+          reviewDecision: (updatedTask.importedRecord.reviewDecision as ReviewDecisionPayload | null) ?? null,
+          publishedPlaceId: updatedTask.importedRecord.publishedPlaceId,
+          publishedActivityId: updatedTask.importedRecord.publishedActivityId,
+        },
+      },
+    };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : "Unknown error" };
   }
@@ -263,14 +337,15 @@ export async function deleteReviewTaskAction(
       where: { id: taskId },
       include: {
         importedRecord: {
-          select: { id: true, publishedPlaceId: true, publishedActivityId: true },
+          select: { id: true, publishedPlaceId: true, publishedActivityId: true, reviewDecision: true, applyResult: true },
         },
       },
     });
 
     if (!task) return { success: false, error: "Task not found" };
 
-    const rec = task.importedRecord;
+    const rec = await reconcileImportedRecordLinkById(task.importedRecord.id);
+    if (!rec) return { success: false, error: "Imported record not found" };
     if (rec.publishedPlaceId || rec.publishedActivityId) {
       return {
         success: false,
@@ -296,10 +371,7 @@ export async function deleteImportedRecordAction(
     if (!user) return { success: false, error: "Unauthorized" };
     requireAdmin(user.role);
 
-    const record = await prisma.importedRecord.findUnique({
-      where: { id: importedRecordId },
-      select: { id: true, publishedPlaceId: true, publishedActivityId: true },
-    });
+    const record = await reconcileImportedRecordLinkById(importedRecordId);
 
     if (!record) return { success: false, error: "Imported record not found" };
 
@@ -329,10 +401,12 @@ export async function bulkDeleteImportedRecords(
 
     const records = await prisma.importedRecord.findMany({
       where: { id: { in: importedRecordIds } },
-      select: { id: true, publishedPlaceId: true, publishedActivityId: true },
+      select: { id: true, publishedPlaceId: true, publishedActivityId: true, reviewDecision: true, applyResult: true },
     });
 
-    const appliedRecords = records.filter((record) =>
+    const reconciledRecords = await reconcileImportedRecordLinks(records, prisma);
+
+    const appliedRecords = reconciledRecords.filter((record) =>
       record.publishedPlaceId || record.publishedActivityId,
     );
 

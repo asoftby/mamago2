@@ -25,6 +25,11 @@ import { loadFieldOverrides, loadActivityFieldOverrides, applyOverrideFilter, is
 import { lookupCityId } from "../publish/city-lookup";
 import { lookupVenuePlace } from "../publish/venue-place-lookup";
 import { assignActivitySlugIfMissing } from "@/lib/slug/activitySlugService";
+import {
+  clearRecoveryFromReviewDecision,
+  ensureActiveImportDecisionTarget,
+  reconcileImportedRecordLinkById,
+} from "./import-link-reconciliation.service";
 
 // ── Apply result payload (stored in ImportedRecord.applyResult) ───────────────
 
@@ -34,6 +39,7 @@ interface ApplyResultPayload {
   decision: string;
   placeId?: string;
   activityId?: string;
+  activitySlug?: string;
   appliedFields: string[];
   skippedFields: string[];
   emptyFields: string[];
@@ -60,7 +66,7 @@ async function validateAndLoad(
   importedRecordId: string,
   expectedEntityType: "PLACE" | "EVENT",
 ): Promise<ValidatedApplyContext | PlaceApplyValidationError> {
-  const record = await prisma.importedRecord.findUnique({ where: { id: importedRecordId } });
+  const record = await reconcileImportedRecordLinkById(importedRecordId, prisma);
 
   if (!record) return { success: false, recordId: importedRecordId, reason: "ImportedRecord not found" };
   if (record.entityTypeHint !== expectedEntityType) return { success: false, recordId: importedRecordId, reason: `entityTypeHint is ${record.entityTypeHint}, expected ${expectedEntityType}` };
@@ -78,6 +84,17 @@ async function validateAndLoad(
     !decision.targetEntityId
   ) {
     return { success: false, recordId: importedRecordId, reason: `decision ${decision.decision} requires targetEntityId` };
+  }
+  if (
+    (decision.decision === "APPROVED_UPDATE" || decision.decision === "APPROVED_MERGE") &&
+    decision.targetEntityId &&
+    decision.targetEntityType
+  ) {
+    await ensureActiveImportDecisionTarget({
+      entityType: decision.targetEntityType,
+      entityId: decision.targetEntityId,
+      db: prisma,
+    });
   }
 
   return {
@@ -156,11 +173,18 @@ async function persistPlaceApplyResult(
   placeId: string,
   payload: Omit<ApplyResultPayload, "placeId" | "activityId">,
 ): Promise<void> {
+  const existing = await prisma.importedRecord.findUnique({
+    where: { id: recordId },
+    select: { reviewDecision: true },
+  });
   await prisma.importedRecord.update({
     where: { id: recordId },
     data: {
       publishedPlaceId: placeId,
       applyResult: { ...payload, placeId } as object,
+      ...(clearRecoveryFromReviewDecision(existing?.reviewDecision) !== undefined
+        ? { reviewDecision: clearRecoveryFromReviewDecision(existing?.reviewDecision) }
+        : {}),
     },
   });
 }
@@ -170,11 +194,18 @@ async function persistActivityApplyResult(
   activityId: string,
   payload: Omit<ApplyResultPayload, "placeId" | "activityId">,
 ): Promise<void> {
+  const existing = await prisma.importedRecord.findUnique({
+    where: { id: recordId },
+    select: { reviewDecision: true },
+  });
   await prisma.importedRecord.update({
     where: { id: recordId },
     data: {
       publishedActivityId: activityId,
       applyResult: { ...payload, activityId } as object,
+      ...(clearRecoveryFromReviewDecision(existing?.reviewDecision) !== undefined
+        ? { reviewDecision: clearRecoveryFromReviewDecision(existing?.reviewDecision) }
+        : {}),
     },
   });
 }
@@ -353,6 +384,7 @@ async function createActivityFromImport(
   if (fields.priceText)        { createData.priceText        = fields.priceText;        appliedFields.push("priceText"); }
   if (fields.priceFrom != null){ createData.priceFrom        = fields.priceFrom;        appliedFields.push("priceFrom"); }
   if (fields.priceTo != null)  { createData.priceTo          = fields.priceTo;          appliedFields.push("priceTo"); }
+  if (fields.ageTags?.length)  { createData.ageTags          = fields.ageTags;          appliedFields.push("ageTags"); }          else emptyFields.push("ageTags");
   if (fields.ageMinMonths != null){ createData.ageMinMonths  = fields.ageMinMonths;     appliedFields.push("ageMinMonths"); }     else emptyFields.push("ageMinMonths");
   if (fields.ageMaxMonths != null){ createData.ageMaxMonths  = fields.ageMaxMonths;     appliedFields.push("ageMaxMonths"); }     else emptyFields.push("ageMaxMonths");
   if (fields.scheduleJson)     { createData.scheduleJson     = fields.scheduleJson;     appliedFields.push("scheduleJson"); }     else emptyFields.push("scheduleJson");
@@ -382,6 +414,12 @@ async function createActivityFromImport(
     // slug не критичен для apply; публичный URL всё равно работает по id
   }
 
+  const createdActivity = await prisma.activity.findUnique({
+    where: { id: activity.id },
+    select: { slug: true },
+  });
+  const activitySlug = createdActivity?.slug ?? undefined;
+
   // Создать EventVenue если есть venue/address данные
   if (nd.venueName || nd.addressText) {
     await prisma.eventVenue.create({
@@ -400,10 +438,20 @@ async function createActivityFromImport(
   await persistActivityApplyResult(record.id, activity.id, {
     appliedAt: new Date().toISOString(), appliedByUserId: actorUserId,
     decision: "APPROVED_CREATE", appliedFields, skippedFields: [], emptyFields,
+    activitySlug,
     warnings: warnings.length > 0 ? warnings : undefined,
   });
 
-  return { success: true, recordId: record.id, decision: "APPROVED_CREATE", placeId: activity.id, appliedFields, skippedFields: [], emptyFields };
+  return {
+    success: true,
+    recordId: record.id,
+    decision: "APPROVED_CREATE",
+    placeId: activity.id,
+    activitySlug,
+    appliedFields,
+    skippedFields: [],
+    emptyFields,
+  };
 }
 
 // ── EVENT UPDATE ──────────────────────────────────────────────────────────────
@@ -454,6 +502,12 @@ async function updateExistingActivityFromImport(
     await prisma.activity.update({ where: { id: targetActivityId }, data: allowed as never });
   }
 
+  const updatedActivity = await prisma.activity.findUnique({
+    where: { id: targetActivityId },
+    select: { slug: true },
+  });
+  const activitySlug = updatedActivity?.slug ?? undefined;
+
   const emptyFields = Object.keys(fields).filter(
     (k) => !(k in candidateUpdates) && !skippedNonDestructive.some((s) => s.startsWith(k)),
   );
@@ -461,11 +515,21 @@ async function updateExistingActivityFromImport(
   await persistActivityApplyResult(record.id, targetActivityId, {
     appliedAt: new Date().toISOString(), appliedByUserId: actorUserId,
     decision: "APPROVED_UPDATE", appliedFields: Object.keys(allowed), skippedFields: allSkipped, emptyFields,
+    activitySlug,
     warnings: warnings.length > 0 ? warnings : undefined,
     note: Object.keys(allowed).length === 0 ? "No fields updated — all blocked or empty" : undefined,
   });
 
-  return { success: true, recordId: record.id, decision: "APPROVED_UPDATE", placeId: targetActivityId, appliedFields: Object.keys(allowed), skippedFields: allSkipped, emptyFields };
+  return {
+    success: true,
+    recordId: record.id,
+    decision: "APPROVED_UPDATE",
+    placeId: targetActivityId,
+    activitySlug,
+    appliedFields: Object.keys(allowed),
+    skippedFields: allSkipped,
+    emptyFields,
+  };
 }
 
 // ── EVENT MERGE ───────────────────────────────────────────────────────────────
@@ -501,6 +565,7 @@ async function mergeImportedRecordIntoActivity(
     ["priceText", fields.priceText],
     ["priceFrom", fields.priceFrom],
     ["priceTo", fields.priceTo],
+    ["ageTags", fields.ageTags],
     ["ageMinMonths", fields.ageMinMonths],
     ["ageMaxMonths", fields.ageMaxMonths],
   ];
@@ -524,12 +589,28 @@ async function mergeImportedRecordIntoActivity(
     await prisma.activity.update({ where: { id: targetActivityId }, data: mergeAllowed as never });
   }
 
+  const mergedActivity = await prisma.activity.findUnique({
+    where: { id: targetActivityId },
+    select: { slug: true },
+  });
+  const activitySlug = mergedActivity?.slug ?? undefined;
+
   await persistActivityApplyResult(record.id, targetActivityId, {
     appliedAt: new Date().toISOString(), appliedByUserId: actorUserId,
     decision: "APPROVED_MERGE", appliedFields: Object.keys(mergeAllowed), skippedFields: allSkipped, emptyFields,
+    activitySlug,
     warnings: [...(warnings.length > 0 ? warnings : []), "scheduleJson/nextOccurrenceAt not touched in MERGE"],
     note: Object.keys(mergeAllowed).length === 0 ? "No fields merged — all non-empty or locked in target" : undefined,
   });
 
-  return { success: true, recordId: record.id, decision: "APPROVED_MERGE", placeId: targetActivityId, appliedFields: Object.keys(mergeAllowed), skippedFields: allSkipped, emptyFields };
+  return {
+    success: true,
+    recordId: record.id,
+    decision: "APPROVED_MERGE",
+    placeId: targetActivityId,
+    activitySlug,
+    appliedFields: Object.keys(mergeAllowed),
+    skippedFields: allSkipped,
+    emptyFields,
+  };
 }

@@ -9,14 +9,11 @@ import type {
   NormalizedEventImport,
   PlaceMatchCandidate,
   EventMatchCandidate,
-  ReviewDecisionPayload,
 } from "@/server/modules/import/types";
-import { ReviewDecisionPanel } from "./_components/ReviewDecisionPanel";
-import { ApplyPanel } from "./_components/ApplyPanel";
-import { EventApplyPanel } from "./_components/EventApplyPanel";
-import { ApplyResultBlock } from "./_components/ApplyResultBlock";
 import { ReviewDetailActions } from "./_components/ReviewDetailActions";
 import { ImportEventMediaIngest } from "./_components/ImportEventMediaIngest";
+import { ReviewDetailWorkflow } from "./_components/ReviewDetailWorkflow";
+import { reconcileImportedRecordLinks } from "@/server/modules/import/services/import-link-reconciliation.service";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -69,9 +66,10 @@ async function getReviewEntry(id: string) {
   });
 
   if (taskRow) {
-    const { importedRecord, ...reviewTask } = taskRow;
+    const [reconciledRecord] = await reconcileImportedRecordLinks([taskRow.importedRecord], prisma);
+    const { importedRecord: _ignored, ...reviewTask } = taskRow;
     return {
-      importedRecord,
+      importedRecord: reconciledRecord,
       reviewTask,
     };
   }
@@ -87,9 +85,13 @@ async function getReviewEntry(id: string) {
   if (!record) return null;
 
   const { reviewTask, ...importedRecord } = record;
+  const [reconciledRecord] = await reconcileImportedRecordLinks([importedRecord], prisma);
 
   return {
-    importedRecord,
+    importedRecord: {
+      ...importedRecord,
+      ...reconciledRecord,
+    },
     reviewTask,
   };
 }
@@ -116,6 +118,48 @@ async function getActivitiesForCandidates(ids: string[]) {
       venue: { select: { title: true, addressLine: true, kind: true } },
     },
   });
+}
+
+async function getApplyActorLabel(
+  applyResult: import("@/server/modules/import/types").ImportApplyResultPayload | null,
+) {
+  const userId = applyResult?.appliedByUserId?.trim();
+  if (!userId) return null;
+
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { role: true, email: true },
+  });
+
+  if (!user) return userId;
+  return `${user.role} — ${user.email}`;
+}
+
+async function resolveApplyResultWithSlug(params: {
+  entityType: string | null;
+  publishedActivityId: string | null;
+  applyResult: import("@/server/modules/import/types").ImportApplyResultPayload | null;
+}) {
+  const { entityType, publishedActivityId, applyResult } = params;
+  if (!applyResult || entityType !== "EVENT" || applyResult.activitySlug) {
+    return applyResult;
+  }
+
+  const activityId = applyResult.activityId ?? publishedActivityId ?? null;
+  if (!activityId) return applyResult;
+
+  const activity = await prisma.activity.findUnique({
+    where: { id: activityId },
+    select: { slug: true },
+  });
+
+  if (!activity?.slug) return applyResult;
+
+  return {
+    ...applyResult,
+    activityId,
+    activitySlug: activity.slug,
+  } satisfies import("@/server/modules/import/types").ImportApplyResultPayload;
 }
 
 // ── Shared UI helpers ─────────────────────────────────────────────────────────
@@ -182,31 +226,12 @@ function QualityBar({ score }: { score: number }) {
   );
 }
 
-const ACTION_COLORS: Record<string, string> = {
-  CREATE_NEW: "bg-blue-100 text-blue-800",
-  UPDATE_EXISTING: "bg-yellow-100 text-yellow-800",
-  MERGE: "bg-purple-100 text-purple-800",
-  REJECT: "bg-red-100 text-red-800",
-};
 const MATCH_COLORS: Record<string, string> = {
   NO_MATCH: "bg-blue-50 text-blue-700",
   MATCHED: "bg-green-100 text-green-800",
   AMBIGUOUS: "bg-yellow-100 text-yellow-800",
   FAILED: "bg-red-100 text-red-800",
   PENDING: "bg-gray-100 text-gray-600",
-};
-const TASK_STATUS_COLORS: Record<string, string> = {
-  PENDING: "bg-orange-100 text-orange-800",
-  IN_PROGRESS: "bg-blue-100 text-blue-800",
-  COMPLETED: "bg-green-100 text-green-800",
-  CANCELLED: "bg-gray-100 text-gray-600",
-};
-const DECISION_COLORS: Record<string, string> = {
-  APPROVED_CREATE: "bg-blue-100 text-blue-800",
-  APPROVED_UPDATE: "bg-yellow-100 text-yellow-800",
-  APPROVED_MERGE: "bg-purple-100 text-purple-800",
-  REJECTED: "bg-red-100 text-red-800",
-  DEFERRED: "bg-gray-100 text-gray-600",
 };
 
 // ── Source block (shared) ─────────────────────────────────────────────────────
@@ -650,11 +675,16 @@ export default async function ReviewDetailPage({
   const activityMap = Object.fromEntries(activityDetails.map((a) => [a.id, a]));
 
   const nd = rec.normalizedData as (NormalizedPlaceImport | NormalizedEventImport) | null;
-  const isResolved = task ? task.status === "COMPLETED" || task.status === "CANCELLED" : false;
-  const isApproved = rec.reviewStatus === "APPROVED";
   const isAlreadyApplied = !!rec.publishedPlaceId || !!rec.publishedActivityId;
-  const reviewDecision = rec.reviewDecision as ReviewDecisionPayload | null;
-  const applyResult = rec.applyResult as import("@/server/modules/import/types").ImportApplyResultPayload | null;
+  const resolvedApplyResult = await resolveApplyResultWithSlug({
+    entityType,
+    publishedActivityId: rec.publishedActivityId,
+    applyResult:
+      (rec.applyResult as import("@/server/modules/import/types").ImportApplyResultPayload | null) ?? null,
+  });
+  const applyActorLabel = await getApplyActorLabel(
+    resolvedApplyResult,
+  );
 
   const entityBadgeClass = isEventRecord
     ? "bg-violet-100 text-violet-800"
@@ -690,17 +720,14 @@ export default async function ReviewDetailPage({
               {nd?.title ?? <span className="text-gray-400 italic">Без названия</span>}
             </h1>
           </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            {task && <Badge value={task.status} colorMap={TASK_STATUS_COLORS} />}
-            {task?.suggestedAction && <Badge value={task.suggestedAction} colorMap={ACTION_COLORS} />}
-            {rec.matchStatus && <Badge value={rec.matchStatus} colorMap={MATCH_COLORS} />}
-          </div>
+          {rec.matchStatus && (
+            <div className="flex items-center gap-2 flex-wrap">
+              <Badge value={rec.matchStatus} colorMap={MATCH_COLORS} />
+            </div>
+          )}
         </div>
         <div className="text-right text-xs text-gray-400 shrink-0">
           <div>priority: {task?.priority ?? "—"}</div>
-          {task?.reviewedAt && (
-            <div className="mt-0.5">reviewed: {format(task.reviewedAt, "dd MMM yyyy HH:mm", { locale: ru })}</div>
-          )}
         </div>
       </div>
 
@@ -739,92 +766,45 @@ export default async function ReviewDetailPage({
         />
       )}
 
-      {/* D. Review meta */}
-      <Section title="Review meta">
-        <Field label="Entity type"
-          value={entityType ? <span className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-medium ${entityBadgeClass}`}>{entityType}</span> : null}
-        />
-        <Field label="Suggested action"
-          value={task?.suggestedAction ? <Badge value={task.suggestedAction} colorMap={ACTION_COLORS} /> : null}
-        />
-        <Field label="Match status"
-          value={rec.matchStatus ? <Badge value={rec.matchStatus} colorMap={MATCH_COLORS} /> : null}
-        />
-        <Field
-          label="Task status"
-          value={
-            task ? (
-              <Badge value={task.status} colorMap={TASK_STATUS_COLORS} />
-            ) : (
-              <span className="text-rose-700 font-medium">Нет задачи (ошибка пайплайна)</span>
-            )
-          }
-        />
-        <Field label="Quality score"
-          value={rec.qualityScore != null ? `${(rec.qualityScore * 100).toFixed(0)}%` : null}
-        />
-        <Field label="Confidence score"
-          value={rec.confidenceScore != null ? `${(rec.confidenceScore * 100).toFixed(0)}%` : null}
-        />
-        <Field label="Priority" value={task ? String(task.priority) : "—"} />
-        {task?.notes && <Field label="Notes" value={task.notes} />}
-        {task?.reviewerUserId && <Field label="Reviewer" value={task.reviewerUserId} />}
-        {isResolved && task?.decision && (
-          <Field label="Decision" value={<Badge value={task.decision} colorMap={DECISION_COLORS} />} />
-        )}
-      </Section>
-
-      {/* Decision panel — показывается пока задача не завершена */}
-      {task && !isResolved && (
-        <ReviewDecisionPanel
-          taskId={task.id}
-          entityType={entityType === "EVENT" ? "EVENT" : "PLACE"}
-          suggestedAction={task.suggestedAction ?? undefined}
-          candidates={rawCandidates}
-        />
-      )}
-
-      {/* Apply panel — PLACE */}
-      {isApproved && !isAlreadyApplied && reviewDecision && !isEventRecord && (
-        <ApplyPanel
-          importedRecordId={rec.id}
-          decision={reviewDecision.decision}
-          targetEntityId={reviewDecision.targetEntityId}
-        />
-      )}
-
-      {/* Apply panel — EVENT */}
-      {isApproved && !isAlreadyApplied && isEventRecord && reviewDecision && (
-        <EventApplyPanel
-          importedRecordId={rec.id}
-          decision={reviewDecision.decision}
-          targetEntityId={reviewDecision.targetEntityId}
-          typeCandidate={(nd as NormalizedEventImport)?.typeCandidate}
-          scheduleModeCandidate={(nd as NormalizedEventImport)?.scheduleModeCandidate}
-          venueName={(nd as NormalizedEventImport)?.venueName}
-        />
-      )}
-
-      {/* Apply result */}
-      {applyResult && (
-        <ApplyResultBlock
-          applyResult={applyResult}
-          entityType={isEventRecord ? "EVENT" : "PLACE"}
-        />
-      )}
-
-      {rec.publishedPlaceId && (
-        <div className="rounded-lg border border-green-200 bg-green-50 p-4 text-sm text-green-800">
-          ✅ Применено. Place ID:{" "}
-          <a href={`/admin/content/places/${rec.publishedPlaceId}`}
-            className="font-mono underline hover:text-green-900">{rec.publishedPlaceId}</a>
-        </div>
-      )}
-      {rec.publishedActivityId && (
-        <div className="rounded-lg border border-violet-200 bg-violet-50 p-4 text-sm text-violet-800">
-          ✅ Применено. Activity ID: <span className="font-mono">{rec.publishedActivityId}</span>
-        </div>
-      )}
+      <ReviewDetailWorkflow
+        task={
+          task
+            ? {
+                id: task.id,
+                status: task.status,
+                suggestedAction: task.suggestedAction,
+                reviewedAt: task.reviewedAt ? task.reviewedAt.toISOString() : null,
+                priority: task.priority,
+                notes: task.notes,
+                reviewerUserId: task.reviewerUserId,
+                decision: task.decision,
+              }
+            : null
+        }
+        importedRecord={{
+          id: rec.id,
+          reviewStatus: rec.reviewStatus,
+          reviewDecision: rec.reviewDecision as import("@/server/modules/import/types").ReviewDecisionPayload | null,
+          publishedPlaceId: rec.publishedPlaceId,
+          publishedActivityId: rec.publishedActivityId,
+          applyResult: resolvedApplyResult,
+        }}
+        entityType={entityType === "EVENT" ? "EVENT" : "PLACE"}
+        applyActorLabel={applyActorLabel}
+        candidates={rawCandidates}
+        matchStatus={rec.matchStatus}
+        qualityScore={rec.qualityScore}
+        confidenceScore={rec.confidenceScore}
+        normalizedEventData={
+          nd && nd.entityType === "EVENT"
+            ? {
+                typeCandidate: nd.typeCandidate,
+                scheduleModeCandidate: nd.scheduleModeCandidate,
+                venueName: nd.venueName,
+              }
+            : null
+        }
+      />
     </div>
   );
 }

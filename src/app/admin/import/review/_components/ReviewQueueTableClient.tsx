@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import type {
   ImportEntityType,
   ImportMatchStatus,
@@ -11,6 +11,7 @@ import type {
   ImportReviewTaskStatus,
   ImportSuggestedAction,
 } from "@prisma/client";
+import type { ImportLinkRecoveryPayload } from "@/server/modules/import/types";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Trash2, X } from "lucide-react";
@@ -38,6 +39,7 @@ type ReviewQueueRow = {
     normalizedTitle: string | null;
     publishedPlaceId: string | null;
     publishedActivityId: string | null;
+    linkRecovery: ImportLinkRecoveryPayload | null;
     reviewStatus: ImportReviewStatus;
     source: {
       id: string;
@@ -147,6 +149,7 @@ export function ReviewQueueTableClient({ records }: Props) {
                 reviewStatus: rec.reviewStatus,
                 publishedPlaceId: rec.publishedPlaceId,
                 publishedActivityId: rec.publishedActivityId,
+                linkRecovery: rec.linkRecovery,
                 hasReviewTask: Boolean(task),
               });
               const canDelete = !linkedEntityId;
@@ -220,13 +223,19 @@ export function ReviewQueueTableClient({ records }: Props) {
                       </Link>
                     ) : rec.publishedActivityId ? (
                       <span className="font-medium text-emerald-700">Event #{rec.publishedActivityId}</span>
+                    ) : rec.linkRecovery ? (
+                      <span className="text-amber-700">
+                        Связанная сущность была удалена
+                      </span>
                     ) : rec.reviewStatus === "APPROVED" ? (
                       <span className="text-emerald-700">Ещё не создана</span>
                     ) : (
                       <span className="text-gray-500">Пока нет</span>
                     )}
                     <p className="mt-2 max-w-xs text-xs leading-5 text-gray-500">
-                      {canDelete
+                      {rec.linkRecovery
+                        ? "Импортный объект снова доступен для удаления, новой публикации или повторной привязки."
+                        : canDelete
                         ? "Можно удалить, если сырой импорт больше не нужен."
                         : "Удаление отключено: объект уже связан с сущностью каталога."}
                     </p>

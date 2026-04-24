@@ -1,15 +1,19 @@
+"use client";
 
 import { format } from "date-fns";
 import { ru } from "date-fns/locale";
 import type { ImportApplyResultPayload } from "@/server/modules/import/types";
+import { ActivityModerationShortcut } from "./ActivityModerationShortcut";
 
 interface Props {
   applyResult: ImportApplyResultPayload;
   entityType: "PLACE" | "EVENT";
+  appliedByLabel?: string | null;
 }
 
-export function ApplyResultBlock({ applyResult, entityType }: Props) {
-  const entityId = applyResult.placeId;
+export function ApplyResultBlock({ applyResult, entityType, appliedByLabel }: Props) {
+  const entityId =
+    entityType === "EVENT" ? applyResult.activityId ?? applyResult.placeId : applyResult.placeId;
   const entityLabel = entityType === "EVENT" ? "ID события" : "ID места";
   const borderClass = entityType === "EVENT" ? "border-violet-200 bg-violet-50" : "border-green-200 bg-green-50";
   const headerClass = entityType === "EVENT" ? "bg-violet-100 border-violet-200 text-violet-900" : "bg-green-100 border-green-200 text-green-900";
@@ -29,6 +33,22 @@ export function ApplyResultBlock({ applyResult, entityType }: Props) {
           <div className="flex gap-3">
             <span className="text-xs text-gray-500 w-36 shrink-0 pt-0.5">{entityLabel}</span>
             <span className="font-mono text-xs text-gray-900 break-all">{entityId}</span>
+          </div>
+        )}
+
+        {entityType === "EVENT" && applyResult.activitySlug && (
+          <div className="flex gap-3">
+            <span className="text-xs text-gray-500 w-36 shrink-0 pt-0.5">Slug события</span>
+            <span className="font-mono text-xs text-gray-900 break-all">{applyResult.activitySlug}</span>
+          </div>
+        )}
+
+        {entityType === "EVENT" && entityId && (
+          <div className="flex gap-3">
+            <span className="text-xs text-gray-500 w-36 shrink-0 pt-0.5">Быстрое действие</span>
+            <div className="min-w-0">
+              <ActivityModerationShortcut activityId={entityId} />
+            </div>
           </div>
         )}
 
@@ -95,7 +115,7 @@ export function ApplyResultBlock({ applyResult, entityType }: Props) {
         {/* Actor */}
         <div className="flex gap-3 pt-1 border-t border-gray-200 mt-2">
           <span className="text-xs text-gray-400 w-36 shrink-0">Кто применил</span>
-          <span className="text-xs text-gray-500 font-mono">{applyResult.appliedByUserId}</span>
+          <span className="text-xs text-gray-500">{appliedByLabel ?? applyResult.appliedByUserId}</span>
         </div>
       </div>
     </div>

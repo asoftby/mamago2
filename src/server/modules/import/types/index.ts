@@ -270,8 +270,16 @@ export interface ReviewDecisionPayload {
   /** ID кандидата из matchCandidates, выбранного ревьюером */
   selectedCandidateId?: string | null;
   notes?: string | null;
+  recovery?: ImportLinkRecoveryPayload | null;
   reviewedAt: string; // ISO string
   reviewerUserId: string;
+}
+
+export interface ImportLinkRecoveryPayload {
+  detachedAt: string;
+  invalidLinkedEntityId: string;
+  invalidLinkedEntityType: "PLACE" | "ACTIVITY";
+  reason: string;
 }
 
 // ─── Quality scoring ──────────────────────────────────────────────────────────
@@ -330,6 +338,8 @@ export interface PlaceApplyResult {
   decision: "APPROVED_CREATE" | "APPROVED_UPDATE" | "APPROVED_MERGE";
   /** ID Place (новый или существующий) */
   placeId: string;
+  /** Final slug for EVENT apply flows (stored for UI shortcut/result block) */
+  activitySlug?: string;
   /** Поля, которые были записаны */
   appliedFields: string[];
   /** Поля, пропущенные из-за ImportFieldOverride или title policy */
@@ -354,7 +364,9 @@ export interface ImportApplyResultPayload {
   appliedAt: string;
   appliedByUserId: string;
   decision: string;
-  placeId: string;
+  placeId?: string;
+  activityId?: string;
+  activitySlug?: string;
   appliedFields: string[];
   skippedFields: string[];
   emptyFields: string[];

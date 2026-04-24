@@ -1,5 +1,5 @@
 import Link from "next/link";
-import prisma from "@/lib/prisma";
+import { prismaBase } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import { formatDistanceToNow } from "date-fns";
 import { ru } from "date-fns/locale";
@@ -7,6 +7,27 @@ import { formatImportEntity, importEntityBadgeClasses, runStatusClasses, runStat
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
+
+type ImportDashboardDb = {
+  importSource?: {
+    count: (args: unknown) => Promise<number>;
+  };
+  importRun?: {
+    count: (args: unknown) => Promise<number>;
+    findMany: (args: unknown) => Promise<any[]>;
+  };
+  importReviewTask?: {
+    count: (args: unknown) => Promise<number>;
+  };
+  importedRecord?: {
+    groupBy: (args: unknown) => Promise<Array<{ runId: string | null; _count: { _all: number } }>>;
+  };
+  $queryRaw: <T = unknown>(query: TemplateStringsArray | Prisma.Sql, ...values: unknown[]) => Promise<T>;
+};
+
+function getImportDashboardDb(): ImportDashboardDb {
+  return prismaBase as unknown as ImportDashboardDb;
+}
 
 /** Границы «сегодня» в локальной TZ процесса — как раньше при isToday(parsed appliedAt). */
 function getLocalDayRange(): { dayStart: Date; nextDayStart: Date } {
@@ -18,9 +39,10 @@ function getLocalDayRange(): { dayStart: Date; nextDayStart: Date } {
 }
 
 async function countAppliedToday(): Promise<number> {
+  const db = getImportDashboardDb();
   const { dayStart, nextDayStart } = getLocalDayRange();
   try {
-    const rows = await prisma.$queryRaw<[{ c: bigint }]>(
+    const rows = await db.$queryRaw<[{ c: bigint }]>(
       Prisma.sql`
         SELECT COUNT(*)::bigint AS c
         FROM "ImportedRecord"
@@ -39,18 +61,41 @@ async function countAppliedToday(): Promise<number> {
 }
 
 async function getDashboardData() {
+  const db = getImportDashboardDb();
+  const hasImportDelegates =
+    Boolean(db.importSource) &&
+    Boolean(db.importRun) &&
+    Boolean(db.importReviewTask) &&
+    Boolean(db.importedRecord);
+
+  if (!hasImportDelegates) {
+    return {
+      allSources: 0,
+      activeSources: 0,
+      inactiveSources: 0,
+      runsToday: 0,
+      failedRunsToday: 0,
+      pendingReview: 0,
+      appliedToday: await countAppliedToday(),
+      recentRuns: [],
+      pendingByRunId: new Map<string, number>(),
+      appliedByRunId: new Map<string, number>(),
+      importRuntimeReady: false,
+    };
+  }
+
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
   const [allSources, activeSources, inactiveSources, runsToday, failedRunsToday, pendingReview, recentRuns, appliedToday] =
     await Promise.all([
-      prisma.importSource.count({ where: { archivedAt: null } }),
-      prisma.importSource.count({ where: { isActive: true, archivedAt: null } }),
-      prisma.importSource.count({ where: { isActive: false, archivedAt: null } }),
-      prisma.importRun.count({ where: { createdAt: { gte: today }, isArchived: false } }),
-      prisma.importRun.count({ where: { status: "FAILED", createdAt: { gte: today }, isArchived: false } }),
-      prisma.importReviewTask.count({ where: { status: { in: ["PENDING", "IN_PROGRESS"] } } }),
-      prisma.importRun.findMany({
+      db.importSource!.count({ where: { archivedAt: null } }),
+      db.importSource!.count({ where: { isActive: true, archivedAt: null } }),
+      db.importSource!.count({ where: { isActive: false, archivedAt: null } }),
+      db.importRun!.count({ where: { createdAt: { gte: today }, isArchived: false } }),
+      db.importRun!.count({ where: { status: "FAILED", createdAt: { gte: today }, isArchived: false } }),
+      db.importReviewTask!.count({ where: { status: { in: ["PENDING", "IN_PROGRESS"] } } }),
+      db.importRun!.findMany({
         where: { isArchived: false },
         orderBy: { createdAt: "desc" },
         take: 8,
@@ -67,12 +112,12 @@ async function getDashboardData() {
 
   if (runIds.length > 0) {
     const [pendingGroups, appliedGroups] = await Promise.all([
-      prisma.importedRecord.groupBy({
+      db.importedRecord!.groupBy({
         by: ["runId"],
         where: { runId: { in: runIds }, reviewStatus: "PENDING" },
         _count: { _all: true },
       }),
-      prisma.importedRecord.groupBy({
+      db.importedRecord!.groupBy({
         by: ["runId"],
         where: {
           runId: { in: runIds },
@@ -105,6 +150,7 @@ async function getDashboardData() {
     recentRuns,
     pendingByRunId,
     appliedByRunId,
+    importRuntimeReady: true,
   };
 }
 
@@ -130,6 +176,17 @@ export default async function ImportDashboardPage() {
           </Link>
         </div>
       </div>
+
+      {!dashboard.importRuntimeReady && (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5">
+          <div className="text-sm font-semibold text-amber-950">Импорт временно недоступен в этой сборке</div>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-amber-900">
+            Экран открыт в безопасном режиме: import-модели сейчас не подключены в Prisma client, поэтому статистика и
+            история запусков временно пустые. Навигация по разделу остаётся доступной, а страницы больше не падают с
+            server error.
+          </p>
+        </div>
+      )}
 
       <div className="grid gap-3 md:grid-cols-4">
         <KpiCard label="Активные источники" value={dashboard.activeSources} helper={`${dashboard.inactiveSources} отключено`} tone="blue" href="/admin/import/sources" />

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { toast } from "@/lib/toast";
 import { submitReviewDecision } from "../../../actions";
 import type { PlaceMatchCandidate, EventMatchCandidate } from "@/server/modules/import/types";
 
@@ -13,6 +13,39 @@ interface Props {
   entityType: EntityType;
   suggestedAction?: string;
   candidates: (PlaceMatchCandidate | EventMatchCandidate)[];
+  onSaved?: (data: {
+    task: {
+      id: string;
+      status: string;
+      suggestedAction: string | null;
+      reviewedAt: string | null;
+      priority: number;
+      notes: string | null;
+      reviewerUserId: string | null;
+      decision: string | null;
+    };
+    importedRecord: {
+      id: string;
+      reviewStatus: string;
+      reviewDecision: {
+        decision: "APPROVED_CREATE" | "APPROVED_UPDATE" | "APPROVED_MERGE" | "REJECTED" | "DEFERRED";
+        targetEntityId: string | null;
+        targetEntityType: "PLACE" | "ACTIVITY" | null;
+        selectedCandidateId?: string | null;
+        notes?: string | null;
+        recovery?: {
+          detachedAt: string;
+          invalidLinkedEntityId: string;
+          invalidLinkedEntityType: "PLACE" | "ACTIVITY";
+          reason: string;
+        } | null;
+        reviewedAt: string;
+        reviewerUserId: string;
+      } | null;
+      publishedPlaceId: string | null;
+      publishedActivityId: string | null;
+    };
+  }) => void;
 }
 
 // Labels adapt to entity type
@@ -43,8 +76,7 @@ function getDecisionConfig(entityType: EntityType) {
   ];
 }
 
-export function ReviewDecisionPanel({ taskId, entityType, suggestedAction, candidates }: Props) {
-  const router = useRouter();
+export function ReviewDecisionPanel({ taskId, entityType, suggestedAction, candidates, onSaved }: Props) {
   const [selected, setSelected] = useState<Decision | null>(null);
   const [targetCandidateId, setTargetCandidateId] = useState<string>("");
   const [notes, setNotes] = useState("");
@@ -77,10 +109,14 @@ export function ReviewDecisionPanel({ taskId, entityType, suggestedAction, candi
     setLoading(false);
 
     if (result.success) {
-      router.push("/admin/import/review");
-      router.refresh();
+      toast.success("Решение сохранено");
+      if (result.data) {
+        onSaved?.(result.data);
+      }
     } else {
-      setError(result.error ?? "Unknown error");
+      const message = result.error ?? "Unknown error";
+      setError(message);
+      toast.error(message);
     }
   }
 
