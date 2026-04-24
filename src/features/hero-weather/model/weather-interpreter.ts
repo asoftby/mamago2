@@ -6,14 +6,7 @@ import type {
   TimeOfDay,
   HeroWeatherContext,
 } from "./types";
-
-// ── helpers ───────────────────────────────────────────────────────────────────
-
-function getTimeOfDay(hour: number): TimeOfDay {
-  if (hour >= 6 && hour <= 11) return "morning";
-  if (hour >= 12 && hour <= 17) return "day";
-  return "evening";
-}
+import { resolveDayTime } from "../lib/weather-scenario-layer";
 
 /** Среднее по непустым числам */
 function avg(values: (number | null)[]): number | null {
@@ -34,6 +27,7 @@ function max(values: (number | null)[]): number | null {
 function resolveScenario(slot: WeatherHourSlot): WeatherScenario {
   const {
     apparentTemperature: feels,
+    windSpeed,
     windGusts,
     precipitation,
     precipitationProbability: rainProb,
@@ -58,8 +52,12 @@ function resolveScenario(slot: WeatherHourSlot): WeatherScenario {
   // Rain likely
   if (rainProb !== null && rainProb >= 60) return "rain_indoor";
 
-  // Strong gusts
-  if (windGusts !== null && windGusts >= 15) return "windy_caution";
+  // Wind caution: account for both sustained wind and gusts.
+  // In practice, strong sustained wind can feel uncomfortable even when gust peak
+  // is slightly below the old threshold.
+  if ((windSpeed !== null && windSpeed >= 10) || (windGusts !== null && windGusts >= 12)) {
+    return "windy_caution";
+  }
 
   // Heat
   if (feels !== null && feels > 27) return "hot_caution";
@@ -113,8 +111,7 @@ export function interpretWeather(
   raw: WeatherRawData,
   now: Date,
 ): HeroWeatherContext {
-  const hour = now.getHours();
-  const timeOfDay = getTimeOfDay(hour);
+  const timeOfDay = resolveDayTime(now);
 
   // 1. Severe warnings take priority
   const severeWarning = raw.warnings?.find((w) => w.severity === "severe");
@@ -127,6 +124,7 @@ export function interpretWeather(
       timeOfDay,
       emoji: emojiFromScenario(scenario),
       hasWarning: true,
+      maxTemperatureC: raw.current.temperature,
     };
   }
 
@@ -180,6 +178,13 @@ export function interpretWeather(
   const scenario = resolveScenario(analysisSlot);
   const activityBias = biasFromScenario(scenario);
   const emoji = emojiFromScenario(scenario);
+  const maxTemperatureC = max([
+    analysisSlot.temperature,
+    analysisSlot.apparentTemperature,
+    raw.current.temperature,
+    raw.current.apparentTemperature,
+    ...raw.hourly.slice(0, 12).flatMap((slot) => [slot.temperature, slot.apparentTemperature]),
+  ]);
 
-  return { scenario, activityBias, timeOfDay, emoji, hasWarning };
+  return { scenario, activityBias, timeOfDay, emoji, hasWarning, maxTemperatureC };
 }

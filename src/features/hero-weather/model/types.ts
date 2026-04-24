@@ -36,7 +36,7 @@ export type WeatherScenario =
 
 export type ActivityBias = "outdoor" | "indoor" | "mixed" | "caution";
 
-export type TimeOfDay = "morning" | "day" | "evening";
+export type TimeOfDay = "morning" | "day" | "evening" | "night";
 
 export type HeroWeatherContext = {
   scenario: WeatherScenario;
@@ -44,4 +44,5 @@ export type HeroWeatherContext = {
   timeOfDay: TimeOfDay;
   emoji: string;
   hasWarning: boolean;
+  maxTemperatureC: number | null;
 };

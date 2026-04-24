@@ -144,7 +144,7 @@ function maybeEveningSoftening(
   subtitle: string,
   timeOfDay: TimeOfDay,
 ): { microcopy: string; subtitle: string } {
-  if (timeOfDay !== "evening") {
+  if (timeOfDay !== "evening" && timeOfDay !== "night") {
     return { microcopy, subtitle };
   }
 

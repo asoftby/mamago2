@@ -10,8 +10,6 @@ export type HeroGreetingProps = {
 };
 
 export function HeroGreeting({ model }: HeroGreetingProps) {
-  const showDebug = process.env.NODE_ENV === "development";
-
   return (
     <motion.div
       className="relative px-1"
@@ -22,8 +20,12 @@ export function HeroGreeting({ model }: HeroGreetingProps) {
       data-hero-weather-scenario={model.weatherScenario}
     >
       {model.microcopy ? (
-        <p className="flex items-center gap-3 text-base font-normal tracking-tight text-neutral-500 [text-wrap:balance]">
-          <HeroMoodIcon scenario={model.weatherScenario} />
+        <p className="flex items-center gap-3 text-sm font-medium tracking-tight text-neutral-600 sm:text-[15px] [text-wrap:balance]">
+          <HeroMoodIcon
+            scenario={model.weatherScenario}
+            timeOfDay={model.timeOfDay}
+            maxTemperatureC={model.maxTemperatureC}
+          />
           <span className="min-w-0 whitespace-pre-wrap">
             {stripLeadingMicrocopyEmoji(model.microcopy)}
           </span>
@@ -42,12 +44,6 @@ export function HeroGreeting({ model }: HeroGreetingProps) {
         </p>
       ) : null}
 
-      {showDebug && model.debug ? (
-        <p
-          className="mt-3 font-mono text-[10px] text-neutral-400/90"
-          data-hero-debug="1"
-        >{`scenario=${model.debug.scenario} · time=${model.debug.timeOfDay} · persona=${model.debug.personaMode} · wx=${model.debug.weatherSource}`}</p>
-      ) : null}
     </motion.div>
   );
 }

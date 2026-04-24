@@ -7,6 +7,11 @@ import { interpretWeather } from "../model/weather-interpreter";
 import type { ActivityBias, TimeOfDay } from "../model/types";
 import { getCityCoordsBySlug, getDefaultBelarusFallbackCoords } from "./belarus-city-coordinates";
 import { weatherDiagLog } from "./weather-diag-log";
+import {
+  getWeatherCopy,
+  resolveHomeWeatherScenario,
+  type HomeWeatherScenario,
+} from "./weather-scenario-layer";
 
 export type HeroDebugWeatherSource = "mock" | "open-meteo" | "fallback";
 
@@ -16,11 +21,13 @@ export type HeroGreetingModel = {
   subtitle: string;
   emoji: string;
   weatherScenario: string;
+  weatherDayScenario: HomeWeatherScenario;
+  maxTemperatureC: number | null;
   activityBias: ActivityBias;
   timeOfDay: TimeOfDay;
   personaMode: HeroPersonaContext["mode"];
   cityName?: string;
-  /** Hint for feed ranking / filters below the hero (not wired yet). */
+  /** Hint for feed ranking / filters below the hero. */
   preferredContext?: "outdoor" | "indoor" | "mixed" | "caution";
   debug?: {
     scenario: string;
@@ -108,11 +115,18 @@ export function scenarioToPreferredContext(
 export function getFallbackHeroModel(overrides?: Partial<Pick<HeroGreetingModel, "cityName" | "personaMode">>): HeroGreetingModel {
   const personaMode = overrides?.personaMode ?? "guest";
   return {
-    microcopy: "✨ Сегодня можно выбрать что-то приятное",
+    microcopy: getWeatherCopy({
+      emoji: "⛅",
+      scenario: "cloudy_mixed",
+      timeOfDay: "day",
+      maxTemperatureC: null,
+    }),
     title: "Давай найдём что-нибудь для семьи",
     subtitle: "Уже собрала варианты, чтобы выбирать было проще",
     emoji: "✨",
     weatherScenario: "unknown",
+    weatherDayScenario: "cloudy_mixed",
+    maxTemperatureC: null,
     activityBias: "mixed",
     timeOfDay: "day",
     personaMode,
@@ -198,13 +212,24 @@ export async function getHeroContext(input?: {
     });
 
     const src = weatherSourceFromProvider(provider);
+    const weatherDayScenario = resolveHomeWeatherScenario({
+      scenario: wx.scenario,
+      maxTemperatureC: wx.maxTemperatureC,
+    });
 
     return {
-      microcopy: generated.microcopy,
+      microcopy: getWeatherCopy({
+        emoji: wx.emoji,
+        scenario: weatherDayScenario,
+        timeOfDay: wx.timeOfDay,
+        maxTemperatureC: wx.maxTemperatureC,
+      }),
       title: generated.title,
       subtitle: generated.subtitle,
       emoji: wx.emoji,
       weatherScenario: wx.scenario,
+      weatherDayScenario,
+      maxTemperatureC: wx.maxTemperatureC,
       activityBias: wx.activityBias,
       timeOfDay: wx.timeOfDay,
       personaMode: persona.mode,
@@ -215,7 +240,11 @@ export async function getHeroContext(input?: {
         timeOfDay: wx.timeOfDay,
         personaMode: persona.mode,
         weatherSource: src,
-        selectedIds: generated.selection,
+        selectedIds: {
+          microcopyId: `weather-summary:${wx.scenario}:${Math.round(wx.maxTemperatureC ?? 0)}`,
+          titleId: generated.selection.titleId,
+          subtitleId: generated.selection.subtitleId,
+        },
       },
     };
   } catch (e) {
