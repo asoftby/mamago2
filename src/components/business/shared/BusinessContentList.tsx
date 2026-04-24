@@ -3,7 +3,7 @@
 import { useState, useEffect, ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { ConfirmDestructiveActionDialog } from "@/components/ui/confirm-destructive-action-dialog";
 import { Button } from "@/components/ui/button";
 import { BusinessEmptyState } from "@/components/business/ui/BusinessEmptyState";

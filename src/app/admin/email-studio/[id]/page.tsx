@@ -1,14 +1,13 @@
-import { EmailTemplateEditorClient } from "@/components/admin/email-studio/EmailTemplateEditorClient";
+import { redirect } from "next/navigation";
+import { adminPath } from "@/lib/routing/surface";
 
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
-
-export default async function AdminEmailStudioTemplatePage({
-  params,
-}: {
+type PageProps = {
   params: Promise<{ id: string }>;
-}) {
-  const { id } = await params;
+};
 
-  return <EmailTemplateEditorClient templateId={id} />;
+export default async function AdminEmailStudioEditorCompatibilityPage({
+  params,
+}: PageProps) {
+  const { id } = await params;
+  redirect(adminPath(`/communications/email-studio/${id}`));
 }

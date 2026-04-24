@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/server";
 import { getMyBusiness } from "@/server/business/getMyBusiness";
 import { getEffectiveVerificationStatus } from "@/server/services/businessStatusMap";
+import { getBusinessBillingSummary } from "@/server/services/billing/billingBusiness.service";
 import { BusinessShell } from "@/components/business/layout/BusinessShell";
 import { headers } from "next/headers";
 import { buildSurfaceRedirectDestination } from "@/lib/routing/surface";
@@ -86,12 +87,18 @@ export default async function ProtectedBusinessLayout({
     );
   }
 
+  const billingSummary = await getBusinessBillingSummary(business.id);
+  const businessBalanceBYN =
+    billingSummary?.account.depositBalance?.toNumber() ?? 0;
+
   return (
     <BusinessShell
       user={{
         id: user.id,
         email: user.email,
         role: user.role,
+        hasApprovedBusinessProfile: true,
+        businessBalanceBYN,
       }}
     >
       {children}

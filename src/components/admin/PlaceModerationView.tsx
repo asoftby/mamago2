@@ -10,7 +10,7 @@ import { MapPin, Navigation, Phone, Globe, Instagram, ArrowLeft, ExternalLink } 
 import { formatDistance } from "@/lib/formatDistance";
 import { formatDistanceToNow } from "date-fns";
 import { ru } from "date-fns/locale";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { formatAgeKeys } from "@/lib/config/ages";
 import { getPlacePublicUrl } from "@/lib/placePublicUrl";
 import { PlaceDangerZone } from "@/components/admin/moderation/PlaceDangerZone";

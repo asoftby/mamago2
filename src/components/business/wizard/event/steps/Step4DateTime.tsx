@@ -4,69 +4,81 @@ import { useState, useEffect } from "react";
 import { EventScheduleList } from "@/components/admin/event-schedule/EventScheduleList";
 import type { EventScheduleItem } from "@/components/admin/event-schedule/types";
 import type { EventFormData } from "../types";
+import { Button } from "@/components/ui/button";
+import { createDefaultScheduleItem } from "../defaults";
+
+const DEBUG_EDITOR = process.env.NODE_ENV !== "production";
+
+function debugScheduleStepLog(message: string, payload?: Record<string, unknown>) {
+  if (!DEBUG_EDITOR) return;
+  if (payload) {
+    console.debug(`[EventEditorScheduleStep] ${message}`, payload);
+    return;
+  }
+  console.debug(`[EventEditorScheduleStep] ${message}`);
+}
 
 interface Step4DateTimeProps {
   data: EventFormData;
   onChange: (updates: Partial<EventFormData>) => void;
   isEditable: boolean;
+  eventId?: string;
 }
 
-export function Step4DateTime({ data, onChange, isEditable }: Step4DateTimeProps) {
-  // Initialize schedule items from data
-  const [scheduleItems, setScheduleItems] = useState<EventScheduleItem[]>(() => {
-    if (data.dates.length === 0) {
-      return [
-        {
-          id: "default",
-          isMultiDay: false,
-          date: null,
-          allDay: data.allDay,
-          startTime: data.startTime || "10:00",
-          endTime: data.endTime || "18:00",
-          recurringEnabled: data.repeatEnabled,
-          recurrenceInterval: 1,
-          recurrenceUnit: data.repeatUnit || "week",
-          recurrenceUntil: data.repeatUntil,
-        },
-      ];
-    }
+export function Step4DateTime({ data, onChange, isEditable, eventId }: Step4DateTimeProps) {
+  const [importedScheduleItems, setImportedScheduleItems] = useState<string[]>([]);
+  const [showAllImportedItems, setShowAllImportedItems] = useState(false);
+  const scheduleItems =
+    Array.isArray(data.scheduleItems) && data.scheduleItems.length > 0
+      ? data.scheduleItems
+      : [createDefaultScheduleItem()];
 
-    return data.dates.map((date, index) => ({
-      id: `date-${index}`,
-      isMultiDay: false,
-      date,
-      allDay: data.allDay,
-      startTime: data.startTime || "10:00",
-      endTime: data.endTime || "18:00",
-      recurringEnabled: data.repeatEnabled,
-      recurrenceInterval: 1,
-      recurrenceUnit: data.repeatUnit || "week",
-      recurrenceUntil: data.repeatUntil,
-    }));
-  });
-
-  // Sync changes back to EventFormData
-  useEffect(() => {
-    const dates: string[] = [];
-    scheduleItems.forEach((item) => {
-      if (item.date) {
-        dates.push(item.date);
-      }
+  const handleScheduleItemsChange = (nextItems: EventScheduleItem[]) => {
+    const firstItem = nextItems[0] ?? createDefaultScheduleItem();
+    debugScheduleStepLog("schedule items changed", {
+      itemsCount: nextItems.length,
+      firstDate: firstItem.date,
+      allDates: nextItems.map((item) => item.date),
     });
+    onChange({
+      scheduleItems: nextItems,
+      scheduleMode: nextItems.length > 1 ? "multiple" : "single",
+      dates: nextItems.map((item) => item.date).filter((date): date is string => Boolean(date)),
+      allDay: firstItem.allDay,
+      startTime: firstItem.startTime,
+      endTime: firstItem.endTime,
+      repeatEnabled: firstItem.recurringEnabled,
+      repeatUnit: firstItem.recurrenceUnit,
+      repeatUntil: firstItem.recurrenceUntil,
+    });
+  };
 
-    const firstItem = scheduleItems[0];
-    if (firstItem) {
-      onChange({
-        dates: dates.length > 0 ? dates : [],
-        allDay: firstItem.allDay,
-        startTime: firstItem.startTime,
-        endTime: firstItem.endTime,
-        repeatEnabled: firstItem.recurringEnabled,
-        repeatUnit: firstItem.recurrenceUnit,
-        repeatUntil: firstItem.recurrenceUntil,
-      });
+  useEffect(() => {
+    if (!eventId) {
+      setImportedScheduleItems([]);
+      return;
     }
-  }, [scheduleItems, onChange]);
+
+    let cancelled = false;
+    (async () => {
+      const response = await fetch(`/api/business/events/${eventId}/schedule-source`, {
+        credentials: "include",
+      });
+      if (!response.ok) return;
+      const payload = (await response.json()) as { items?: string[] };
+      if (!cancelled) {
+        setImportedScheduleItems(Array.isArray(payload.items) ? payload.items : []);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [eventId]);
+
+  const visibleImportedItems = showAllImportedItems
+    ? importedScheduleItems
+    : importedScheduleItems.slice(0, 5);
 
   return (
     <div className="space-y-6">
@@ -77,9 +89,46 @@ export function Step4DateTime({ data, onChange, isEditable }: Step4DateTimeProps
         </p>
       </div>
 
+      {importedScheduleItems.length > 0 ? (
+        <div className="rounded-xl border border-sky-200 bg-sky-50/60 p-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-semibold text-sky-950">Даты и время из источника</h3>
+              <p className="mt-1 text-[12px] text-sky-900/70">
+                Это данные, которые парсер уже нашёл в источнике. Их можно использовать как ориентир при ручной проверке.
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-4 space-y-2">
+            {visibleImportedItems.map((item) => (
+              <div
+                key={item}
+                className="rounded-lg border border-sky-100 bg-white px-3 py-2 text-sm text-slate-800"
+              >
+                {item}
+              </div>
+            ))}
+          </div>
+
+          {importedScheduleItems.length > 5 ? (
+            <div className="mt-4">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => setShowAllImportedItems((prev) => !prev)}
+              >
+                {showAllImportedItems ? "Свернуть" : "Показать все"}
+              </Button>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
       <EventScheduleList
         items={scheduleItems}
-        onChange={setScheduleItems}
+        onChange={handleScheduleItemsChange}
         disabled={!isEditable}
       />
     </div>

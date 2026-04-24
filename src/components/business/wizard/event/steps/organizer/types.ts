@@ -1,23 +1,29 @@
 // Organizer Step Types
 
 export interface OrganizerData {
-  mode: "business" | "existing" | "custom";
+  mode: "existing" | "import" | "manual";
   id: string | null;
   name: string;
-  description: string;
+  description?: string;
+  unp?: string;
   phone: string;
   website: string;
-  logoUrl: string | null;
+  instagram: string;
+  logoUrl?: string | null;
 }
 
 export interface ExistingOrganizer {
   id: string;
   name: string;
   description?: string;
+  unp?: string;
   phone?: string;
   website?: string;
+  instagram?: string;
   logoUrl?: string;
-  isVerified: boolean;
+  isVerified?: boolean;
+  createdFrom?: "import" | "manual";
+  linkedBusinessId?: string | null;
 }
 
 export interface BusinessProfile {

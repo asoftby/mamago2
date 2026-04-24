@@ -12,8 +12,11 @@ import { isCinemaEventCategorySlug } from "@/lib/business/eventCategoryCinema";
 import { normalizeParticipationMode } from "./participationCtaLabels";
 import { normalizePricingMode } from "./pricingMode";
 import { normalizePhoneToE164 } from "@/lib/phone/e164";
-import { createDefaultSocialLink } from "./defaults";
+import { createDefaultScheduleItem, createDefaultSocialLink } from "./defaults";
 import { computeEventShortDesc } from "@/lib/business/eventShortDesc";
+import { detectAgeBuckets } from "@/lib/age/ageMapping";
+import { sortAgeKeys } from "@/lib/config/ages";
+import type { EventOrganizerInput } from "@/lib/business/eventOrganizer";
 
 export type ActivityWithRelations = Activity & {
   id: string;
@@ -46,6 +49,15 @@ export type ActivityWithRelations = Activity & {
     metro?: string | null;
   } | null;
   owner?: { name?: string | null } | null;
+  organizer?: {
+    id: string;
+    name: string;
+    unp?: string | null;
+    phone?: string | null;
+    website?: string | null;
+    instagram?: string | null;
+    createdFrom?: "IMPORT" | "MANUAL";
+  } | null;
   programCategoryLinks?: Array<{ categoryId: string }>;
 };
 
@@ -87,6 +99,43 @@ export function mapEventToFormData(event: ActivityWithRelations): EventFormData 
   formData.ageRangeIds = Array.isArray(scheduleJson.ageRangeIds)
     ? (scheduleJson.ageRangeIds as string[])
     : [];
+  const rawAgeDetection = scheduleJson.ageDetection;
+  if (rawAgeDetection && typeof rawAgeDetection === "object") {
+    const detection = rawAgeDetection as Record<string, unknown>;
+    const raw = typeof detection.raw === "string" ? detection.raw : null;
+    formData.ageDetection = raw
+      ? detectAgeBuckets(raw)
+      : {
+          raw: null,
+          confidence:
+            detection.confidence === "high" ||
+            detection.confidence === "medium" ||
+            detection.confidence === "low" ||
+            detection.confidence === "none"
+              ? detection.confidence
+              : "none",
+          suggestedBuckets: [],
+          normalizedLabel: null,
+          parsedMinAge: null,
+          parsedMaxAge: null,
+        };
+  } else {
+    formData.ageDetection = detectAgeBuckets(
+      typeof scheduleJson.importedAgeText === "string" ? scheduleJson.importedAgeText : null,
+    );
+  }
+  formData.ageDetectionUserOverride =
+    typeof scheduleJson.ageDetectionUserOverride === "boolean"
+      ? scheduleJson.ageDetectionUserOverride
+      : false;
+  formData.ageDetectionAutoApplied =
+    typeof scheduleJson.ageDetectionAutoApplied === "boolean"
+      ? scheduleJson.ageDetectionAutoApplied
+      : !formData.ageDetectionUserOverride &&
+        formData.ageDetection?.confidence === "high" &&
+        formData.ageRangeIds.length > 0 &&
+        sortAgeKeys(formData.ageRangeIds).join("|") ===
+          sortAgeKeys(formData.ageDetection?.suggestedBuckets ?? []).join("|");
   formData.categorySlug =
     (typeof scheduleJson.categorySlug === "string" ? scheduleJson.categorySlug : null) ?? null;
   formData.categoryPathLabel =
@@ -198,6 +247,9 @@ export function mapEventToFormData(event: ActivityWithRelations): EventFormData 
   }
 
   formData.categoryIds = formData.categoryId ? [formData.categoryId] : [];
+  if (formData.ageRangeIds.length === 0 && formData.ageTags.length > 0) {
+    formData.ageRangeIds = [...formData.ageTags];
+  }
 
   // Step 2: Description
   formData.fullDescription = event.description || "";
@@ -238,6 +290,29 @@ export function mapEventToFormData(event: ActivityWithRelations): EventFormData 
   formData.repeatUntil =
     typeof scheduleJson.repeatUntil === "string" ? scheduleJson.repeatUntil : null;
 
+  const scheduleItemsRaw = Array.isArray(scheduleJson.scheduleItems)
+    ? scheduleJson.scheduleItems
+    : null;
+  formData.scheduleItems =
+    scheduleItemsRaw && scheduleItemsRaw.length > 0
+      ? (scheduleItemsRaw as EventFormData["scheduleItems"])
+      : formData.dates.length > 0
+        ? formData.dates.map((date, index) => ({
+            id: `date-${index}`,
+            isMultiDay: false,
+            date,
+            dateEnd: null,
+            allDay: formData.allDay,
+            startTime: formData.startTime || "10:00",
+            endTime: formData.endTime || "18:00",
+            recurringEnabled: formData.repeatEnabled,
+            recurrenceInterval: 1,
+            recurrenceUnit: formData.repeatUnit || "week",
+            recurrenceUntil: formData.repeatUntil,
+            isCollapsed: false,
+          }))
+        : [createDefaultScheduleItem()];
+
   // Step 5: Pricing & Participation
   const priceTextRaw = typeof event.priceText === "string" ? event.priceText : "";
   const priceFromDb = event.priceFrom != null ? Number(event.priceFrom) : null;
@@ -265,6 +340,14 @@ export function mapEventToFormData(event: ActivityWithRelations): EventFormData 
   formData.ticketLink = typeof scheduleJson.ticketLink === "string" ? scheduleJson.ticketLink : "";
 
   formData.participationMode = normalizeParticipationMode(scheduleJson.participationMode);
+  formData.prebookMethod =
+    scheduleJson.prebookMethod === "phone" || scheduleJson.prebookMethod === "link"
+      ? scheduleJson.prebookMethod
+      : null;
+  formData.prebookPhone =
+    typeof scheduleJson.prebookPhone === "string" ? scheduleJson.prebookPhone : "";
+  formData.prebookUrl =
+    typeof scheduleJson.prebookUrl === "string" ? scheduleJson.prebookUrl : "";
 
   formData.simpleBookingDate =
     typeof scheduleJson.simpleBookingDate === "string"
@@ -317,6 +400,12 @@ export function mapEventToFormData(event: ActivityWithRelations): EventFormData 
 
   // Step 7: Contacts
   const contacts = scheduleJson.contacts as Record<string, unknown> | undefined;
+  formData.contactMode =
+    contacts?.mode === "override"
+      ? "override"
+      : event.venue?.placeId || event.placeId
+        ? "inherit"
+        : "override";
   formData.phone = normalizePhoneToE164(
     typeof contacts?.phone === "string" ? contacts.phone : "",
   );
@@ -334,11 +423,38 @@ export function mapEventToFormData(event: ActivityWithRelations): EventFormData 
 
   // Step 8: Organizer
   const org = scheduleJson.organizer as Record<string, unknown> | undefined;
-  formData.organizerMode = (org?.mode as EventFormData["organizerMode"]) || "business";
+  const organizerModeRaw = typeof org?.mode === "string" ? org.mode : null;
+  formData.organizerMode =
+    organizerModeRaw === "existing" ||
+    organizerModeRaw === "import" ||
+    organizerModeRaw === "manual"
+      ? organizerModeRaw
+      : event.organizerId
+        ? "existing"
+        : "manual";
+  formData.organizerId =
+    event.organizer?.id ??
+    (typeof org?.id === "string" ? org.id : null) ??
+    null;
   formData.organizerName =
-    (typeof org?.name === "string" ? org.name : null) || event.owner?.name || "";
-  formData.organizerDescription =
-    typeof org?.description === "string" ? org.description : "";
+    event.organizer?.name ??
+    (typeof org?.name === "string" ? org.name : null) ??
+    "";
+  formData.organizerUnp =
+    event.organizer?.unp ??
+    (typeof org?.unp === "string" ? org.unp : "") ??
+    "";
+  formData.organizerPhone =
+    normalizePhoneToE164(
+      event.organizer?.phone ??
+        (typeof org?.phone === "string" ? org.phone : ""),
+    );
+  formData.organizerWebsite =
+    event.organizer?.website ??
+    (typeof org?.website === "string" ? org.website : "");
+  formData.organizerInstagram =
+    event.organizer?.instagram ??
+    (typeof org?.instagram === "string" ? org.instagram : "");
 
   return formData;
 }
@@ -359,6 +475,7 @@ type EventPayload = {
   priceDetails?: string;
   currency: string;
   coverImageId: string | null;
+  galleryMediaIds: string[];
   venue: {
     kind: string | null;
     placeId: string | null;
@@ -375,6 +492,8 @@ type EventPayload = {
     district?: string;
     metro?: string;
   };
+  organizerId?: string | null;
+  organizerInput?: EventOrganizerInput | null;
 };
 
 /**
@@ -382,6 +501,15 @@ type EventPayload = {
  * Used when creating or updating event
  */
 export function buildEventPayload(data: EventFormData): EventPayload {
+  const normalizedScheduleItems =
+    Array.isArray(data.scheduleItems) && data.scheduleItems.length > 0
+      ? data.scheduleItems
+      : [createDefaultScheduleItem()];
+  const firstScheduleItem = normalizedScheduleItems[0] ?? createDefaultScheduleItem();
+  const normalizedDates = normalizedScheduleItems
+    .map((item) => item.date)
+    .filter((date): date is string => Boolean(date));
+
   const categoryIds = data.categoryId ? [data.categoryId] : [];
 
   const subcategoryIdsByCategoryId: Record<string, string[]> = {};
@@ -453,6 +581,9 @@ export function buildEventPayload(data: EventFormData): EventPayload {
       categorySlug: data.categorySlug || undefined,
       categoryPathLabel: data.categoryPathLabel || undefined,
       ageRangeIds: data.ageRangeIds,
+      ageDetection: data.ageDetection,
+      ageDetectionUserOverride: data.ageDetectionUserOverride,
+      ageDetectionAutoApplied: data.ageDetectionAutoApplied,
 
       ...(Object.keys(genreMap).length > 0 ? { genresByCategoryId: genreMap } : {}),
 
@@ -460,25 +591,36 @@ export function buildEventPayload(data: EventFormData): EventPayload {
 
       reelsUrl: data.reelsUrl,
 
-      scheduleMode: data.scheduleMode,
-      dates: data.dates,
-      allDay: data.allDay,
-      startTime: data.startTime,
-      endTime: data.endTime,
-      repeatEnabled: data.repeatEnabled,
-      repeatUnit: data.repeatUnit,
-      repeatUntil: data.repeatUntil,
+      scheduleMode:
+        normalizedScheduleItems.length > 1 || data.scheduleMode === "multiple"
+          ? "multiple"
+          : "single",
+      scheduleItems: normalizedScheduleItems,
+      dates: normalizedDates,
+      allDay: firstScheduleItem.allDay,
+      startTime: firstScheduleItem.startTime,
+      endTime: firstScheduleItem.endTime,
+      repeatEnabled: firstScheduleItem.recurringEnabled,
+      repeatUnit: firstScheduleItem.recurrenceUnit,
+      repeatUntil: firstScheduleItem.recurrenceUntil,
 
       pricingMode: data.pricingMode,
       priceDetails: data.priceDetails,
       ticketLink: data.ticketLink,
       participationMode: normalizeParticipationMode(data.participationMode),
+      prebookMethod: data.prebookMethod,
+      prebookPhone: normalizePhoneToE164(data.prebookPhone),
+      prebookUrl: data.prebookUrl,
       simpleBookingDate: data.simpleBookingDate,
       simpleBookingTime: data.simpleBookingTime,
       simpleBookingCapacity: data.simpleBookingCapacity,
       timeSlots: data.timeSlots,
 
       contacts: {
+        mode:
+          data.venueKind === "PLACE" && data.placeId && data.contactMode !== "override"
+            ? "inherit"
+            : "override",
         phone: normalizePhoneToE164(data.phone),
         website: data.website,
         socialLinks: data.socialLinks.filter((l) => l.url.trim().length > 0),
@@ -486,8 +628,12 @@ export function buildEventPayload(data: EventFormData): EventPayload {
 
       organizer: {
         mode: data.organizerMode,
+        id: data.organizerId,
         name: data.organizerName,
-        description: data.organizerDescription,
+        unp: data.organizerUnp,
+        phone: normalizePhoneToE164(data.organizerPhone),
+        website: data.organizerWebsite,
+        instagram: data.organizerInstagram,
       },
     },
 
@@ -509,6 +655,7 @@ export function buildEventPayload(data: EventFormData): EventPayload {
     currency: "BYN",
 
     coverImageId: data.coverImage,
+    galleryMediaIds: Array.isArray(data.gallery) ? data.gallery.filter(Boolean) : [],
 
     venue: {
       kind: data.venueKind,
@@ -528,6 +675,16 @@ export function buildEventPayload(data: EventFormData): EventPayload {
       district: data.district,
       metro: data.metro,
     },
+    organizerId: data.organizerMode === "existing" ? data.organizerId : null,
+    organizerInput: {
+      mode: data.organizerMode,
+      organizerId: data.organizerId,
+      name: data.organizerName,
+      unp: data.organizerUnp,
+      phone: normalizePhoneToE164(data.organizerPhone),
+      website: data.organizerWebsite,
+      instagram: data.organizerInstagram,
+    },
   };
 
   return payload;
@@ -538,6 +695,7 @@ type EventChanges = {
   description?: string;
   ageTags?: string[];
   coverImageId?: string | null;
+  galleryMediaIds?: string[];
   scheduleJson?: Record<string, unknown>;
   priceFrom?: number | null;
   priceTo?: number | null;
@@ -567,6 +725,10 @@ export function extractChanges(current: EventFormData, original: EventFormData):
 
   if (current.coverImage !== original.coverImage) {
     changes.coverImageId = current.coverImage;
+  }
+
+  if (JSON.stringify(current.gallery) !== JSON.stringify(original.gallery)) {
+    changes.galleryMediaIds = current.gallery;
   }
 
   // For simplicity, always update scheduleJson if any schedule-related field changed

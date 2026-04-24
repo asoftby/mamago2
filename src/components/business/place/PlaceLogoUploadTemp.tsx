@@ -8,7 +8,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Upload, X, Loader2 } from "lucide-react";
 import { useImageUpload } from "@/hooks/useImageUpload";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 
 interface PlaceLogoUploadTempProps {
   wizardSessionId: string;

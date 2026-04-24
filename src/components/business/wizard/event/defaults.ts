@@ -1,6 +1,7 @@
 // Event Wizard Defaults
 
 import type { EventFormData, SocialLink } from "./types";
+import type { EventScheduleItem } from "@/components/admin/event-schedule/types";
 import { isRichTextMeaningful } from "@/lib/richtext/utils";
 
 /** Одна стартовая строка соцсетей (Instagram, URL пустой). */
@@ -9,6 +10,23 @@ export function createDefaultSocialLink(id?: string): SocialLink {
     id: id ?? `social-${Date.now()}`,
     network: "instagram",
     url: "",
+  };
+}
+
+export function createDefaultScheduleItem(id = "default"): EventScheduleItem {
+  return {
+    id,
+    isMultiDay: false,
+    date: null,
+    dateEnd: null,
+    allDay: false,
+    startTime: "10:00",
+    endTime: "18:00",
+    recurringEnabled: false,
+    recurrenceInterval: 1,
+    recurrenceUnit: "week",
+    recurrenceUntil: null,
+    isCollapsed: false,
   };
 }
 
@@ -24,6 +42,16 @@ export function getDefaultFormData(): EventFormData {
     primaryRootHasChildren: false,
     ageRangeIds: [],
     ageTags: [],
+    ageDetection: {
+      raw: null,
+      confidence: "none",
+      suggestedBuckets: [],
+      normalizedLabel: null,
+      parsedMinAge: null,
+      parsedMaxAge: null,
+    },
+    ageDetectionUserOverride: false,
+    ageDetectionAutoApplied: false,
     interestIds: [],
     genreSlugByRootCategoryId: {},
     categorySlug: null,
@@ -44,6 +72,7 @@ export function getDefaultFormData(): EventFormData {
     // Step 4: Schedule (MVP: common time for all dates)
     scheduleMode: "single",
     dates: [],
+    scheduleItems: [createDefaultScheduleItem()],
     allDay: false,
     startTime: "10:00",
     endTime: "18:00",
@@ -57,6 +86,9 @@ export function getDefaultFormData(): EventFormData {
     priceDetails: "",
     ticketLink: "",
     participationMode: "walk-in",
+    prebookMethod: null,
+    prebookPhone: "",
+    prebookUrl: "",
     simpleBookingDate: null,
     simpleBookingTime: null,
     simpleBookingCapacity: null,
@@ -92,18 +124,19 @@ export function getDefaultFormData(): EventFormData {
     venueNote: "",
     
     // Step 7: Contacts
+    contactMode: "inherit",
     phone: "",
     website: "",
     socialLinks: [createDefaultSocialLink("social-initial")],
     
     // Step 8: Organizer
-    organizerMode: "business",
+    organizerMode: "manual",
     organizerId: null,
     organizerName: "",
-    organizerDescription: "",
+    organizerUnp: "",
     organizerPhone: "",
     organizerWebsite: "",
-    organizerLogoUrl: null,
+    organizerInstagram: "",
   };
 }
 

@@ -3,6 +3,7 @@
 import type { Dispatch, SetStateAction } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ArrowDown, ArrowUp, Grip, Loader2, Plus, Rocket, Save, Send, Trash2 } from "lucide-react";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { EmailTemplatePreviewPanel } from "@/components/admin/email-studio/EmailTemplatePreviewPanel";
@@ -40,6 +41,11 @@ import {
   type EmailTemplateStatus,
   type EmailTemplateType,
 } from "@/features/email-studio/lib";
+import {
+  getEmailTemplateClassification,
+  getEmailTemplateClassificationLabel,
+  getEmailTemplateTypeRuLabel,
+} from "@/features/email-studio/lib/presentation";
 import { useUnsavedChangesNavigationGuard } from "@/hooks/use-unsaved-changes-navigation-guard";
 
 type EmailTemplateEditorRecord = {
@@ -89,29 +95,6 @@ const BLOCK_TYPE_OPTIONS: EmailBlockType[] = [
 ];
 
 type PreviewPreset = "new-user" | "user-with-child" | "plan-reminder" | "empty-state";
-
-function typeLabel(type: EmailTemplateType): string {
-  switch (type) {
-    case "WELCOME":
-      return "Приветственное письмо";
-    case "VERIFY_EMAIL":
-      return "Подтверждение email";
-    case "RESET_PASSWORD":
-      return "Сброс пароля";
-    case "PLAN_REMINDER":
-      return "Напоминание о плане";
-    case "WEEKLY_DIGEST":
-      return "Еженедельный дайджест";
-    case "PROMO_CAMPAIGN":
-      return "Промо-кампания";
-    case "CUSTOM":
-      return "Кастомный шаблон";
-    default: {
-      const neverType: never = type;
-      return neverType;
-    }
-  }
-}
 
 function blockTypeLabel(type: EmailBlockType): string {
   switch (type) {
@@ -523,6 +506,7 @@ function BlockCard({
 }
 
 export function EmailTemplateEditorClient({ templateId }: { templateId: string }) {
+  const router = useRouter();
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [editor, setEditor] = useState<EditorState | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -533,6 +517,9 @@ export function EmailTemplateEditorClient({ templateId }: { templateId: string }
   const [publishError, setPublishError] = useState<string | null>(null);
   const [publishMessage, setPublishMessage] = useState<string | null>(null);
   const [publishWarning, setPublishWarning] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [previewPreset, setPreviewPreset] = useState<PreviewPreset>("new-user");
   const [sendTestOpen, setSendTestOpen] = useState(false);
   const [newBlockType, setNewBlockType] = useState<EmailBlockType>("text");
@@ -664,6 +651,29 @@ export function EmailTemplateEditorClient({ templateId }: { templateId: string }
     }
   }
 
+  async function handleDeleteTemplate() {
+    setDeleting(true);
+    setDeleteError(null);
+    setSaveError(null);
+    setPublishError(null);
+
+    try {
+      const response = await fetch(`/api/admin/email-templates/${templateId}`, {
+        method: "DELETE",
+      });
+      if (!response.ok) {
+        throw new Error(await readErrorMessage(response));
+      }
+      setDeleteDialogOpen(false);
+      router.push("/admin/communications/email-studio");
+      router.refresh();
+    } catch (error) {
+      setDeleteError(error instanceof Error ? error.message : "Не удалось удалить шаблон.");
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   function handleBlockChange(blockId: string, nextBlock: EmailBlock) {
     patchDocument((document) => ({
       ...document,
@@ -717,9 +727,9 @@ export function EmailTemplateEditorClient({ templateId }: { templateId: string }
         <AdminPageHeader
           title="Email Studio"
           subtitle="Загружаем редактор…"
-          backHref="/admin/email-studio"
+          backHref="/admin/communications/email-studio"
         />
-        <div className="grid gap-6 xl:grid-cols-[320px_minmax(0,1fr)_320px]">
+        <div className="grid gap-6">
           {Array.from({ length: 3 }).map((_, index) => (
             <Card key={index}>
               <CardContent className="space-y-4 pt-6">
@@ -740,7 +750,7 @@ export function EmailTemplateEditorClient({ templateId }: { templateId: string }
         <AdminPageHeader
           title="Email Studio"
           subtitle="Не удалось открыть редактор."
-          backHref="/admin/email-studio"
+          backHref="/admin/communications/email-studio"
         />
         <Card>
           <CardContent className="space-y-4 pt-6">
@@ -752,7 +762,7 @@ export function EmailTemplateEditorClient({ templateId }: { templateId: string }
                 Повторить
               </Button>
               <Button variant="outline" asChild>
-                <Link href="/admin/email-studio">Назад к шаблонам</Link>
+                <Link href="/admin/communications/email-studio">Назад к шаблонам</Link>
               </Button>
             </div>
           </CardContent>
@@ -766,8 +776,10 @@ export function EmailTemplateEditorClient({ templateId }: { templateId: string }
       <div className="space-y-6 p-6 md:p-4">
         <AdminPageHeader
           title={editor.name || "Новый шаблон"}
-          subtitle={`Обновлён ${formatDate(editor.updatedAt)}`}
-          backHref="/admin/email-studio"
+          subtitle={`${getEmailTemplateTypeRuLabel(editor.type)} · ${getEmailTemplateClassificationLabel(
+            getEmailTemplateClassification(editor.type),
+          )} · Обновлён ${formatDate(editor.updatedAt)}`}
+          backHref="/admin/communications/email-studio"
           actions={
             <>
               <Button
@@ -782,7 +794,7 @@ export function EmailTemplateEditorClient({ templateId }: { templateId: string }
                 type="button"
                 variant="outline"
                 onClick={() => void handlePublish()}
-                disabled={publishing || dirty || editor.status === "ARCHIVED"}
+                disabled={publishing || dirty || deleting || editor.status === "ARCHIVED"}
               >
                 {publishing ? (
                   <Loader2 className="size-4 animate-spin" />
@@ -795,11 +807,21 @@ export function EmailTemplateEditorClient({ templateId }: { templateId: string }
                 {saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
                 Сохранить
               </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => setDeleteDialogOpen(true)}
+                disabled={saving || publishing || deleting}
+                className="text-red-600 hover:bg-red-50 hover:text-red-700"
+              >
+                {deleting ? <Loader2 className="size-4 animate-spin" /> : <Trash2 className="size-4" />}
+                Удалить
+              </Button>
             </>
           }
         />
 
-        <div className="grid gap-6 xl:grid-cols-[320px_minmax(0,1fr)_320px]">
+        <div className="grid gap-6">
           <div className="space-y-6">
             <Card>
               <CardHeader>
@@ -834,6 +856,11 @@ export function EmailTemplateEditorClient({ templateId }: { templateId: string }
                     ⚠️ {publishWarning}
                   </div>
                 ) : null}
+                {deleteError ? (
+                  <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                    {deleteError}
+                  </div>
+                ) : null}
 
                 <div className="space-y-2">
                   <Label htmlFor="template-name">Название шаблона</Label>
@@ -856,7 +883,7 @@ export function EmailTemplateEditorClient({ templateId }: { templateId: string }
                     <SelectContent>
                       {TEMPLATE_TYPE_OPTIONS.map((type) => (
                         <SelectItem key={type} value={type}>
-                          {typeLabel(type)}
+                          {getEmailTemplateTypeRuLabel(type)}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -1008,6 +1035,31 @@ export function EmailTemplateEditorClient({ templateId }: { templateId: string }
           <AlertDialogFooter>
             <AlertDialogCancel>Остаться</AlertDialogCancel>
             <AlertDialogAction onClick={confirmLeave}>Уйти без сохранения</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Удалить шаблон?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Шаблон и все его версии будут удалены без возможности восстановления.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Отмена</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(event) => {
+                event.preventDefault();
+                void handleDeleteTemplate();
+              }}
+              disabled={deleting}
+              className="bg-red-600 text-white hover:bg-red-700"
+            >
+              {deleting ? <Loader2 className="size-4 animate-spin" /> : <Trash2 className="size-4" />}
+              Удалить
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

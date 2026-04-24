@@ -42,6 +42,7 @@ export function PlaceSearchAutocomplete({
   const [results, setResults] = useState<PlaceResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
+  const [hasSearched, setHasSearched] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
   
   const inputRef = useRef<HTMLInputElement>(null);
@@ -52,11 +53,14 @@ export function PlaceSearchAutocomplete({
   const searchPlaces = useCallback(async (searchQuery: string) => {
     if (searchQuery.length < 2) {
       setResults([]);
+      setHasSearched(false);
       setIsOpen(false);
       return;
     }
 
     setIsSearching(true);
+    setHasSearched(false);
+    setIsOpen(true);
     
     try {
       const response = await fetch(
@@ -69,11 +73,13 @@ export function PlaceSearchAutocomplete({
       
       const data = await response.json();
       setResults(data.results || []);
+      setHasSearched(true);
       setIsOpen(true);
       setHighlightedIndex(-1);
     } catch (error) {
       console.error("[PlaceSearchAutocomplete] Search error:", error);
       setResults([]);
+      setHasSearched(true);
     } finally {
       setIsSearching(false);
     }
@@ -91,6 +97,7 @@ export function PlaceSearchAutocomplete({
       }, 300);
     } else {
       setResults([]);
+      setHasSearched(false);
       setIsOpen(false);
     }
 
@@ -153,14 +160,17 @@ export function PlaceSearchAutocomplete({
     onPlaceSelect(place);
     setQuery(place.title);
     setIsOpen(false);
+    setHasSearched(false);
   };
 
   const handleCreateNew = () => {
     onCreateNew(query.trim()); // Передаем текущий query
     setIsOpen(false);
+    setHasSearched(false);
   };
 
-  const showDropdown = isOpen && (results.length > 0 || query.length >= 2);
+  const showDropdown = isOpen && query.trim().length >= 2;
+  const showEmptyState = hasSearched && !isSearching && results.length === 0;
 
   return (
     <div className="relative">
@@ -174,7 +184,7 @@ export function PlaceSearchAutocomplete({
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={handleKeyDown}
           onFocus={() => {
-            if (query.length >= 2 && results.length > 0) {
+            if (query.trim().length >= 2) {
               setIsOpen(true);
             }
           }}
@@ -191,12 +201,25 @@ export function PlaceSearchAutocomplete({
       {showDropdown && (
         <div
           ref={dropdownRef}
-          className="absolute z-50 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg"
+          className="absolute left-0 right-0 top-full z-50 mt-2 w-full rounded-lg border border-gray-200 bg-white shadow-lg"
         >
-          <div className="max-h-[300px] overflow-y-auto">
-            {/* Search Results */}
-            {results.length > 0 && (
-              <div className="py-1">
+          <div className="flex max-h-[320px] min-h-[168px] flex-col overflow-hidden">
+            <div className="min-h-0 flex-1 overflow-y-auto">
+              {isSearching && (
+                <div className="flex min-h-[112px] items-center justify-center px-4 py-6">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>Ищем места…</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Search Results */}
+              {!isSearching && results.length > 0 && (
+                <div className="py-2">
+                  <div className="px-4 pb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    Результаты поиска
+                  </div>
                 {results.map((place, index) => (
                   <button
                     key={place.id}
@@ -242,46 +265,54 @@ export function PlaceSearchAutocomplete({
                     </div>
                   </button>
                 ))}
-              </div>
-            )}
-
-            {/* No Results */}
-            {results.length === 0 && query.length >= 2 && !isSearching && (
-              <div className="px-4 py-3 text-sm text-muted-foreground">
-                Места не найдены
-              </div>
-            )}
-
-            {/* Divider */}
-            {results.length > 0 && (
-              <div className="border-t border-gray-200" />
-            )}
-
-            {/* Create New Option */}
-            <button
-              type="button"
-              onClick={handleCreateNew}
-              className={cn(
-                "flex w-full items-center gap-3 px-4 py-3 text-left transition-colors",
-                highlightedIndex === results.length
-                  ? "bg-primary/5"
-                  : "hover:bg-gray-50"
+                </div>
               )}
-            >
-              <div className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-primary/10">
-                <Plus className="h-3 w-3 text-primary" />
-              </div>
-              <div>
-                <div className="font-medium text-gray-900">
-                  Создать новое место
+
+              {/* No Results */}
+              {showEmptyState && (
+                <div className="flex min-h-[112px] items-center px-4 py-6">
+                  <div className="space-y-1">
+                    <div className="text-sm font-medium text-gray-900">Места не найдены</div>
+                    <div className="text-sm text-muted-foreground">
+                      Попробуйте другое название или создайте новое место.
+                    </div>
+                  </div>
                 </div>
-                <div className="text-sm text-muted-foreground">
-                  {query.length >= 2
-                    ? `Создать место "${query}"`
-                    : "Добавить место вручную"}
+              )}
+
+              {!isSearching && !hasSearched && (
+                <div className="flex min-h-[112px] items-center px-4 py-6 text-sm text-muted-foreground">
+                  Начните вводить название для поиска
                 </div>
-              </div>
-            </button>
+              )}
+            </div>
+
+            <div className="border-t border-gray-200 p-2">
+              <button
+                type="button"
+                onClick={handleCreateNew}
+                className={cn(
+                  "flex w-full items-center gap-3 rounded-md px-3 py-3 text-left transition-colors",
+                  highlightedIndex === results.length
+                    ? "bg-primary/5"
+                    : "hover:bg-gray-50"
+                )}
+              >
+                <div className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-primary/10">
+                  <Plus className="h-3 w-3 text-primary" />
+                </div>
+                <div className="min-w-0">
+                  <div className="font-medium text-gray-900">
+                    Создать новое место
+                  </div>
+                  <div className="truncate text-sm text-muted-foreground">
+                    {query.length >= 2
+                      ? `Создать место "${query}"`
+                      : "Добавить место вручную"}
+                  </div>
+                </div>
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -10,7 +10,7 @@ import { Step4Contacts } from "../[id]/edit/steps/Step4Contacts";
 import { SaveDraftDialog } from "./components/SaveDraftDialog";
 import { isMeaningfulDraft } from "./utils/isMeaningfulDraft";
 import { AlertCircle, X } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { Button } from "@/components/ui/button";
 import type { Place, PlaceImage, Prisma } from "@prisma/client";
 import { ContentStatus, PlaceKind } from "@prisma/client";

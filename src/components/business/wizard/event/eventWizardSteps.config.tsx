@@ -330,6 +330,12 @@ export const EVENT_WIZARD_STEPS: WizardStepConfig<EventFormData>[] = [
         const hasSlots = data.timeSlots?.dates?.some(d => d.slots.length > 0);
         if (!hasSlots) return false;
       }
+
+      if (data.participationMode === "prebook") {
+        if (!data.prebookMethod) return false;
+        if (data.prebookMethod === "phone" && !data.prebookPhone?.trim()) return false;
+        if (data.prebookMethod === "link" && !data.prebookUrl?.trim()) return false;
+      }
       
       return true;
     },
@@ -359,6 +365,7 @@ export const EVENT_WIZARD_STEPS: WizardStepConfig<EventFormData>[] = [
         "external-link": "Покупка по ссылке",
         "time-slots": "Запись по времени",
         "walk-in": "Узнать подробнее",
+        "prebook": "Предварительная запись",
       };
       const effectiveParticipation = data.participationMode;
       items.push({
@@ -391,6 +398,15 @@ export const EVENT_WIZARD_STEPS: WizardStepConfig<EventFormData>[] = [
           const hasSlots = data.timeSlots?.dates?.some(d => d.slots.length > 0);
           if (!hasSlots) {
             missing.push("Расписание со слотами");
+          }
+        }
+        if (data.participationMode === "prebook") {
+          if (!data.prebookMethod) {
+            missing.push("Способ предварительной записи");
+          } else if (data.prebookMethod === "phone" && !data.prebookPhone?.trim()) {
+            missing.push("Телефон для записи");
+          } else if (data.prebookMethod === "link" && !data.prebookUrl?.trim()) {
+            missing.push("Ссылка на запись");
           }
         }
       }
@@ -449,21 +465,27 @@ export const EVENT_WIZARD_STEPS: WizardStepConfig<EventFormData>[] = [
       },
       {
         label: "Тип",
-        value: data.organizerMode === "business" ? "Мой бизнес" : 
-               data.organizerMode === "existing" ? "Существующий" : "Новый",
-      },
-      {
-        label: "Описание",
-        value: data.organizerDescription 
-          ? `${data.organizerDescription.length} символов` 
-          : "Не указано",
+        value:
+          data.organizerMode === "existing"
+            ? "Найденный"
+            : data.organizerMode === "import"
+              ? "Из источника"
+              : "Новый",
       },
       ...(data.organizerPhone ? [{
         label: "Телефон",
         value: data.organizerPhone,
       }] : []),
+      ...(data.organizerUnp ? [{
+        label: "УНП",
+        value: data.organizerUnp,
+      }] : []),
       ...(data.organizerWebsite ? [{
         label: "Сайт",
+        value: "Указан",
+      }] : []),
+      ...(data.organizerInstagram ? [{
+        label: "Instagram",
         value: "Указан",
       }] : []),
     ],

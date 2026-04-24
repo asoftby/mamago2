@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { formatDistance } from "date-fns";
 import { ru } from "date-fns/locale";
 import { Image as ImageIcon, Loader2 } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import type { MediaAssetKind, MediaAssetStatus, MediaEntityType } from "@prisma/client";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";

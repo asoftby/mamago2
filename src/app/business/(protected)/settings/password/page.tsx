@@ -1,6 +1,6 @@
 export { metadata } from "@/app/settings/password/page";
-import { renderPasswordSettingsPage } from "@/features/settings/server/renderers";
+import { redirect } from "next/navigation";
 
 export default async function BusinessPasswordSettingsPage() {
-  return renderPasswordSettingsPage("BUSINESS");
+  redirect("/settings/password");
 }

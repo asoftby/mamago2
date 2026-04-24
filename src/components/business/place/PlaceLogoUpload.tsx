@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { Upload, X, Loader2 } from "lucide-react";
 import { useImageUpload, type UploadedImage } from "@/hooks/useImageUpload";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 
 interface PlaceLogoUploadProps {
   placeId: string;

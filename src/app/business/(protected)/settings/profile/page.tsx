@@ -1,6 +1,6 @@
 export { metadata } from "@/app/settings/profile/page";
-import { renderProfileSettingsPage } from "@/features/settings/server/renderers";
+import { redirect } from "next/navigation";
 
 export default async function BusinessProfileSettingsPage() {
-  return renderProfileSettingsPage("BUSINESS");
+  redirect("/settings/account?from=business");
 }

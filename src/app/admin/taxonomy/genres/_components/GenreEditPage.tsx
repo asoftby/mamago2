@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Save, Trash2 } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { useAutoSlug } from "@/hooks/useAutoSlug";
 import { messageFromApiError } from "@/lib/admin/messageFromApiError";
 import {

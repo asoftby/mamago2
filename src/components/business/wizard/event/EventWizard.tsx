@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  Suspense,
   useState,
   useEffect,
   useLayoutEffect,
@@ -9,9 +8,9 @@ import {
   useMemo,
   useRef,
 } from "react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { ContentStatus, Activity } from "@prisma/client";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import {
   FormWizardShell,
   FormWizardHeader,
@@ -25,14 +24,15 @@ import { canPublishContentDirectly } from "@/lib/auth/businessContentAccess";
 import { useWizardSession } from "@/hooks/useWizardSession";
 
 import type { EventFormData, EventWizardMode } from "./types";
-import { getDefaultFormData, hasMeaningfulContent } from "./defaults";
+import { hasMeaningfulContent } from "./defaults";
 import { validateStep, validateForSubmit, validateForDraft } from "./validation";
-import { mapEventToFormData, buildEventPayload, type ActivityWithRelations } from "./mappers";
+import { buildEventPayload } from "./mappers";
 import {
   EVENT_WIZARD_STEPS,
   getStepLabel,
   TOTAL_EVENT_WIZARD_STEPS,
 } from "./eventWizardSteps.config";
+import { useEventEditorDraft } from "./useEventEditorDraft";
 
 import { Step9Review } from "./steps/Step9Review";
 import { EventSubmitModerationSuccessDialog } from "./EventSubmitModerationSuccessDialog";
@@ -46,7 +46,6 @@ import {
   type ContentEditorSurface,
 } from "@/lib/content-editor/types";
 import {
-  setEventEditorSession,
   clearEventEditorReturnStep,
   readEventEditorReturnStep,
 } from "@/lib/business/eventEditorReturnStep";
@@ -77,12 +76,30 @@ interface EventWizardProps {
 const LOCAL_STORAGE_KEY = "event-wizard-draft";
 const CURRENT_STEP_STORAGE_KEY = "event-wizard-current-step";
 const TOTAL_STEPS = TOTAL_EVENT_WIZARD_STEPS;
+const DEBUG_EDITOR = process.env.NODE_ENV !== "production";
+
+function debugEditorLog(message: string, payload?: Record<string, unknown>) {
+  if (!DEBUG_EDITOR) return;
+  if (payload) {
+    console.debug(`[EventEditor] ${message}`, payload);
+    return;
+  }
+  console.debug(`[EventEditor] ${message}`);
+}
 
 function eventSlugFromSubmitBody(body: unknown): string | null {
   if (!body || typeof body !== "object") return null;
   const ev = (body as { event?: { slug?: unknown } }).event;
   const s = ev?.slug;
   return typeof s === "string" && s.trim().length > 0 ? s.trim() : null;
+}
+
+function eventPublicPathFromSubmitBody(body: unknown): string | null {
+  if (!body || typeof body !== "object") return null;
+  const ev = (body as { event?: { publicPath?: unknown } }).event;
+  return typeof ev?.publicPath === "string" && ev.publicPath.trim().length > 0
+    ? ev.publicPath.trim()
+    : null;
 }
 
 function apiErrorMessage(body: unknown, fallback: string): string {
@@ -124,7 +141,6 @@ function EventWizardInner({
 }: EventWizardProps) {
   const router = useRouter();
   const pathname = usePathname();
-  const searchParams = useSearchParams();
   const surface: ContentEditorSurface = editorSurface ?? "business";
   const nav: ContentEditorNav = {
     ...defaultEditorNav(surface, "event"),
@@ -149,11 +165,14 @@ function EventWizardInner({
   const [eventId, setEventId] = useState<string | null>(
     mode === "edit" && event ? event.id : null
   );
-  const [formData, setFormData] = useState<EventFormData>(() => {
-    if (mode === "edit" && event) {
-      return mapEventToFormData(event as unknown as ActivityWithRelations);
-    }
-    return getDefaultFormData();
+  const {
+    draft: formData,
+    patchDraft: patchFormData,
+    clearPersistedDraft,
+  } = useEventEditorDraft({
+    mode,
+    event,
+    persistenceKey: eventId ?? event?.id ?? "new",
   });
 
   /** Новое создание: не восстанавливаем незавершённое заполнение из localStorage. */
@@ -173,10 +192,38 @@ function EventWizardInner({
   /** sessionStorage для шага — один раз на смену `eventId`, только если в URL нет `step`. */
   const sessionHydratedForEventRef = useRef<string | null>(null);
 
-  /**
-   * Строка `step` из query (примитив) — в deps эффектов вместо объекта `searchParams`.
-   */
-  const stepQuery = searchParams.get("step") ?? "";
+  useEffect(() => {
+    debugEditorLog("wizard mounted", {
+      mode,
+      eventId: event?.id ?? null,
+      pathname,
+      initialEditStep: initialEditStep ?? null,
+    });
+    return () => {
+      debugEditorLog("wizard unmounted", {
+        mode,
+        eventId: event?.id ?? null,
+        pathname,
+      });
+    };
+  }, [event?.id, initialEditStep, mode, pathname]);
+
+  useEffect(() => {
+    if (!DEBUG_EDITOR || typeof window === "undefined") return;
+
+    const handleSubmitCapture = (submitEvent: Event) => {
+      const form = submitEvent.target as HTMLFormElement | null;
+      debugEditorLog("native submit captured", {
+        defaultPrevented: submitEvent.defaultPrevented,
+        action: form?.action ?? null,
+        method: form?.method ?? null,
+        id: form?.id ?? null,
+      });
+    };
+
+    window.addEventListener("submit", handleSubmitCapture, true);
+    return () => window.removeEventListener("submit", handleSubmitCapture, true);
+  }, []);
 
   /**
    * state ← URL / session. На клиенте сначала читаем `window.location`: после клика по Link
@@ -188,9 +235,10 @@ function EventWizardInner({
       typeof window !== "undefined"
         ? new URLSearchParams(window.location.search).get("step")
         : null;
-    const q = (raw ?? searchParams.get("step") ?? "") || "";
+    const q = raw ?? "";
     const parsed = parseEventEditorStepQuery(q || null);
     if (parsed != null) {
+      debugEditorLog("step restored from url", { parsed, eventId });
       setCurrentStep(parsed);
       clearEventEditorReturnStep();
       return;
@@ -199,10 +247,27 @@ function EventWizardInner({
       sessionHydratedForEventRef.current = eventId;
       const fromStore = readEventEditorReturnStep(eventId);
       if (fromStore != null && fromStore >= 1 && fromStore <= TOTAL_STEPS) {
+        debugEditorLog("step restored from session", { fromStore, eventId });
         setCurrentStep(fromStore);
       }
     }
-  }, [mode, eventId, stepQuery]);
+  }, [mode, eventId]);
+
+  useEffect(() => {
+    if (mode !== "edit" || typeof window === "undefined") return;
+
+    const handlePopState = () => {
+      const raw = new URLSearchParams(window.location.search).get("step");
+      const parsed = parseEventEditorStepQuery(raw);
+      if (parsed != null) {
+        debugEditorLog("step updated from popstate", { parsed });
+        setCurrentStep(parsed);
+      }
+    };
+
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, [mode]);
 
   /**
    * state → URL. Зависимости без `searchParams`: берём актуальные query из `window`,
@@ -214,8 +279,11 @@ function EventWizardInner({
     const params = new URLSearchParams(window.location.search);
     if (params.get("step") === String(currentStep)) return;
     params.set("step", String(currentStep));
-    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
-  }, [currentStep, mode, eventId, pathname, router]);
+    const nextSearch = params.toString();
+    const nextHref = nextSearch.length > 0 ? `${pathname}?${nextSearch}` : pathname;
+    debugEditorLog("replaceState step sync", { currentStep, nextHref });
+    window.history.replaceState(window.history.state, "", nextHref);
+  }, [currentStep, mode, eventId, pathname]);
 
   // Wizard session for temp media (без записи в БД до явного сохранения)
   const { wizardSessionId, clearSession } = useWizardSession({
@@ -248,8 +316,8 @@ function EventWizardInner({
 
   // Update form data
   const handleChange = useCallback((updates: Partial<EventFormData>) => {
-    setFormData(prev => ({ ...prev, ...updates }));
-  }, []);
+    patchFormData(updates);
+  }, [patchFormData]);
 
   // Navigation
   const handleNext = () => {
@@ -294,6 +362,7 @@ function EventWizardInner({
 
   // Save as draft
   const handleSaveDraft = async () => {
+    debugEditorLog("save draft started", { mode, eventId, currentStep });
     const draftCheck = validateForDraft(formData);
     if (!draftCheck.isValid) {
       toast.error(draftCheck.errors[0] ?? "Заполните обязательные поля");
@@ -319,19 +388,6 @@ function EventWizardInner({
 
         toast.success("Изменения сохранены");
         setLastSaved(new Date());
-
-        // Если есть returnTo, всегда возвращаемся туда после сохранения
-        if (returnTo) {
-          router.push(returnTo);
-          return;
-        }
-
-        // Если нет returnTo, используем старую логику
-        if (mode === "edit") {
-          setEventEditorSession(eventId, { returnStep: currentStep });
-          router.push(`/me/events/${eventId}/preview`);
-          return;
-        }
       } else {
         // Create new draft
         const response = await fetch("/api/business/events", {
@@ -351,6 +407,9 @@ function EventWizardInner({
         if (onComplete) {
           onComplete(data.event.id);
         } else {
+          debugEditorLog("router.push after create draft", {
+            href: editorEventEditHref(data.event.id),
+          });
           router.push(editorEventEditHref(data.event.id));
         }
       }
@@ -361,6 +420,7 @@ function EventWizardInner({
       if (mode === "create" && typeof window !== "undefined") {
         localStorage.removeItem(LOCAL_STORAGE_KEY);
         localStorage.removeItem(CURRENT_STEP_STORAGE_KEY);
+        clearPersistedDraft();
       }
     } catch (error: unknown) {
       console.error("Save draft error:", error);
@@ -372,6 +432,7 @@ function EventWizardInner({
 
   /** Опубликованное событие: финальный шаг — сохранить, отправить на проверку, редирект на карточку. */
   const handlePublishedReviewSave = async () => {
+    debugEditorLog("published review save started", { eventId, currentStep });
     const validation = validateForSubmit(formData);
     if (!validation.isValid) {
       toast.error("Заполните все обязательные поля");
@@ -405,11 +466,10 @@ function EventWizardInner({
       }
 
       const submitBody = await submitResponse.json();
-      const href = publicActivityPath(
-        tid,
-        formData.city,
-        eventSlugFromSubmitBody(submitBody),
-      );
+      const href =
+        eventPublicPathFromSubmitBody(submitBody) ??
+        publicActivityPath(tid, formData.city, eventSlugFromSubmitBody(submitBody));
+      debugEditorLog("router.push to public activity", { href });
       router.push(href);
       toast.success(
         canPublishContentDirectly(userRole)
@@ -420,6 +480,7 @@ function EventWizardInner({
       if (mode === "create" && typeof window !== "undefined") {
         localStorage.removeItem(LOCAL_STORAGE_KEY);
         localStorage.removeItem(CURRENT_STEP_STORAGE_KEY);
+        clearPersistedDraft();
       }
     } catch (error: unknown) {
       console.error("Published review save error:", error);
@@ -431,6 +492,7 @@ function EventWizardInner({
 
   // Submit for moderation
   const handleSubmit = async () => {
+    debugEditorLog("submit started", { mode, eventId, currentStep });
     // Validate before submit
     const validation = validateForSubmit(formData);
     
@@ -476,6 +538,7 @@ function EventWizardInner({
           if (mode === "create" && typeof window !== "undefined") {
             localStorage.removeItem(LOCAL_STORAGE_KEY);
             localStorage.removeItem(CURRENT_STEP_STORAGE_KEY);
+            clearPersistedDraft();
           }
           setModerationSuccessEventId(newId);
           setModerationSuccessModalOpen(true);
@@ -485,9 +548,11 @@ function EventWizardInner({
           if (mode === "create" && typeof window !== "undefined") {
             localStorage.removeItem(LOCAL_STORAGE_KEY);
             localStorage.removeItem(CURRENT_STEP_STORAGE_KEY);
+            clearPersistedDraft();
           }
           setPublishedActivityHref(
-            publicActivityPath(newId, formData.city, eventSlugFromSubmitBody(submitBody)),
+            eventPublicPathFromSubmitBody(submitBody) ??
+              publicActivityPath(newId, formData.city, eventSlugFromSubmitBody(submitBody)),
           );
           setPublishedSuccessModalOpen(true);
           return;
@@ -501,11 +566,15 @@ function EventWizardInner({
 
         if (mode === "create" && typeof window !== "undefined") {
           localStorage.removeItem(LOCAL_STORAGE_KEY);
+          clearPersistedDraft();
         }
 
         if (onComplete) {
           onComplete(newId);
         } else {
+          debugEditorLog("router.push after create submit", {
+            href: afterSubmitDestination,
+          });
           router.push(afterSubmitDestination);
         }
         return;
@@ -536,6 +605,7 @@ function EventWizardInner({
         if (mode === "create" && typeof window !== "undefined") {
           localStorage.removeItem(LOCAL_STORAGE_KEY);
           localStorage.removeItem(CURRENT_STEP_STORAGE_KEY);
+          clearPersistedDraft();
         }
         setModerationSuccessEventId(targetId);
         setModerationSuccessModalOpen(true);
@@ -545,9 +615,11 @@ function EventWizardInner({
         if (mode === "create" && typeof window !== "undefined") {
           localStorage.removeItem(LOCAL_STORAGE_KEY);
           localStorage.removeItem(CURRENT_STEP_STORAGE_KEY);
+          clearPersistedDraft();
         }
         setPublishedActivityHref(
-          publicActivityPath(targetId, formData.city, eventSlugFromSubmitBody(submitBody)),
+          eventPublicPathFromSubmitBody(submitBody) ??
+            publicActivityPath(targetId, formData.city, eventSlugFromSubmitBody(submitBody)),
         );
         setPublishedSuccessModalOpen(true);
         return;
@@ -562,18 +634,20 @@ function EventWizardInner({
       if (mode === "create" && typeof window !== "undefined") {
         localStorage.removeItem(LOCAL_STORAGE_KEY);
         localStorage.removeItem(CURRENT_STEP_STORAGE_KEY);
+        clearPersistedDraft();
       }
       
       if (onComplete) {
         onComplete(targetId);
       } else if (mode === "create") {
+        debugEditorLog("navigate after submit", { href: afterSubmitDestination, reason: "create" });
         navigateToCompatibleHref(router, afterSubmitDestination);
       } else if (returnTo) {
+        debugEditorLog("navigate after submit", { href: returnTo, reason: "returnTo" });
         navigateToCompatibleHref(router, returnTo);
       } else if (surface === "admin") {
+        debugEditorLog("navigate after submit", { href: nav.afterSubmitListPath, reason: "admin surface" });
         navigateToCompatibleHref(router, nav.afterSubmitListPath);
-      } else {
-        router.refresh();
       }
     } catch (error: unknown) {
       console.error("Submit error:", error);
@@ -616,20 +690,17 @@ function EventWizardInner({
       isEditable,
     };
     
-    // Add wizardSessionId for media step
-    if (currentStep === 3) {
-      return <StepComponent {...commonProps} wizardSessionId={wizardSessionId} />;
-    }
-    
-    // Add userRole and business for organizer step
-    if (currentStep === 8) {
-      return <StepComponent 
-        {...commonProps} 
-        userRole={{ 
-          role: userRole || "BUSINESS_OWNER", 
-          business 
-        }} 
-      />;
+    // Add import-aware context for steps that depend on the current event entity
+    if (
+      stepConfig.key === "media" ||
+      stepConfig.key === "schedule" ||
+      stepConfig.key === "contacts" ||
+      stepConfig.key === "organizer"
+    ) {
+      if (stepConfig.key === "organizer") {
+        return <StepComponent {...commonProps} eventId={eventId ?? event?.id} />;
+      }
+      return <StepComponent {...commonProps} wizardSessionId={wizardSessionId} eventId={eventId ?? event?.id} />;
     }
     
     return <StepComponent {...commonProps} />;
@@ -737,16 +808,5 @@ function EventWizardInner({
 }
 
 export function EventWizard(props: EventWizardProps) {
-  return (
-    <Suspense
-      fallback={
-        <div
-          className="min-h-[50vh] rounded-xl bg-muted/25"
-          aria-hidden
-        />
-      }
-    >
-      <EventWizardInner {...props} />
-    </Suspense>
-  );
+  return <EventWizardInner {...props} />;
 }

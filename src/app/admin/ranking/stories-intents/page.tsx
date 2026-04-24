@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { Toggle } from "@/components/ui/Toggle";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";

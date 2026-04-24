@@ -3,6 +3,7 @@
 import { RichTextEditor } from "@/components/editor/RichTextEditor";
 import { getRichTextLength } from "@/lib/richtext/utils";
 import type { EventFormData } from "../types";
+import { DescriptionAiRewriteHelper } from "./DescriptionAiRewriteHelper";
 
 interface Step2DescriptionProps {
   data: EventFormData;
@@ -32,6 +33,12 @@ export function Step2Description({ data, onChange, isEditable }: Step2Descriptio
             {fullDescLength} символов
           </span>
         </div>
+        <DescriptionAiRewriteHelper
+          title={data.title}
+          value={data.fullDescription}
+          isEditable={isEditable}
+          onApply={(html) => onChange({ fullDescription: html })}
+        />
         <RichTextEditor
           value={data.fullDescription}
           onChange={(html) => onChange({ fullDescription: html })}

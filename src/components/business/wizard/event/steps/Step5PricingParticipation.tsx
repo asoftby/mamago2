@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { ScheduleEditor } from "@/components/schedule-editor/ScheduleEditor";
-import { Ticket, Clock, Info, type LucideIcon } from "lucide-react";
+import { Ticket, Clock, Info, PhoneCall, type LucideIcon } from "lucide-react";
 import type { EventFormData } from "../types";
 import {
   FIXED_PARTICIPATION_CTA_PREVIEW,
@@ -50,6 +50,12 @@ export function Step5PricingParticipation({
       description: "Пользователь выбирает удобный слот",
       icon: Clock,
     },
+    {
+      value: "prebook",
+      label: "Предварительная запись",
+      description: "Пользователь записывается заранее по телефону или по ссылке",
+      icon: PhoneCall,
+    },
   ];
 
   const selectedParticipation = normalizeParticipationMode(
@@ -57,7 +63,16 @@ export function Step5PricingParticipation({
   );
 
   const setParticipation = (value: ParticipationModeUi) => {
-    onChange({ participationMode: value });
+    onChange({
+      participationMode: value,
+      ...(value !== "prebook"
+        ? {
+            prebookMethod: null,
+            prebookPhone: "",
+            prebookUrl: "",
+          }
+        : {}),
+    });
   };
 
   return (
@@ -190,6 +205,82 @@ export function Step5PricingParticipation({
                           value={data.timeSlots}
                           onChange={(timeSlots) => onChange({ timeSlots })}
                         />
+                      </div>
+                    )}
+
+                    {item.value === "prebook" && (
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          <Label>Способ записи</Label>
+                          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                            {[
+                              {
+                                value: "phone" as const,
+                                label: "По телефону",
+                                description: "Кнопка откроет набор номера",
+                              },
+                              {
+                                value: "link" as const,
+                                label: "По ссылке",
+                                description: "Кнопка откроет внешнюю форму записи",
+                              },
+                            ].map((method) => {
+                              const active = data.prebookMethod === method.value;
+                              return (
+                                <button
+                                  key={method.value}
+                                  type="button"
+                                  onClick={() =>
+                                    onChange({
+                                      prebookMethod: method.value,
+                                      ...(method.value === "phone"
+                                        ? { prebookUrl: "" }
+                                        : { prebookPhone: "" }),
+                                    })
+                                  }
+                                  disabled={!isEditable}
+                                  className={cn(
+                                    "rounded-lg border px-4 py-3 text-left transition-colors",
+                                    active
+                                      ? "border-primary bg-primary/5"
+                                      : "border-border bg-background hover:border-primary/40",
+                                  )}
+                                >
+                                  <div className="text-sm font-medium text-foreground">{method.label}</div>
+                                  <div className="mt-1 text-[12px] text-muted-foreground">{method.description}</div>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        {data.prebookMethod === "phone" && (
+                          <div className="space-y-2">
+                            <Label htmlFor="prebookPhone">Телефон для записи</Label>
+                            <Input
+                              id="prebookPhone"
+                              type="tel"
+                              value={data.prebookPhone}
+                              onChange={(e) => onChange({ prebookPhone: e.target.value })}
+                              placeholder="+375 29 123 45 67"
+                              disabled={!isEditable}
+                            />
+                          </div>
+                        )}
+
+                        {data.prebookMethod === "link" && (
+                          <div className="space-y-2">
+                            <Label htmlFor="prebookUrl">Ссылка на запись</Label>
+                            <Input
+                              id="prebookUrl"
+                              type="url"
+                              value={data.prebookUrl}
+                              onChange={(e) => onChange({ prebookUrl: e.target.value })}
+                              placeholder="https://..."
+                              disabled={!isEditable}
+                            />
+                          </div>
+                        )}
                       </div>
                     )}
 

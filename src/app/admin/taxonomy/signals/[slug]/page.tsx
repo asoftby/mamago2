@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ChevronDown, ChevronUp, Save, Trash2 } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { useAutoSlug } from "@/hooks/useAutoSlug";
 import { FilterSelect } from "@/components/ui/filter-select";
 import { messageFromApiError } from "@/lib/admin/messageFromApiError";

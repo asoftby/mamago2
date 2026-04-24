@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { X } from "lucide-react";
 import { GoogleMapsService } from "@/services/googleMaps";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 
 interface EventLocationMapModalProps {
   isOpen: boolean;

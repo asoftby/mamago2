@@ -1,22 +1,15 @@
-import { Suspense } from "react";
-import Link from "next/link";
 import prisma from "@/lib/prisma";
 import { ActivityType } from "@prisma/client";
 import { Badge } from "@/components/ui/badge";
 import { formatDistanceToNow } from "date-fns";
 import { ru } from "date-fns/locale";
-import { FileText, RefreshCw, Calendar, Tag } from "lucide-react";
+import { ModerationQueueTable, type ModerationQueueTableItem } from "./_components/ModerationQueueTable";
 
 const QUEUE_RETURN = "/admin/moderation/queue";
 
-interface QueueItem {
-  id: string;
+interface QueueItem extends ModerationQueueTableItem {
   kind: "PLACE" | "PLACE_UPDATE" | "EVENT" | "OFFER";
-  title: string;
-  cityName: string | null;
-  businessName: string;
   submittedAt: Date;
-  reviewHref: string;
 }
 
 async function getQueueItems(): Promise<QueueItem[]> {
@@ -118,6 +111,7 @@ async function getQueueItems(): Promise<QueueItem[]> {
 
   const eventItems: QueueItem[] = pendingEvents.map((ev) => ({
     id: ev.id,
+    moderationId: ev.id,
     kind: "EVENT" as const,
     title: ev.title,
     cityName:
@@ -125,38 +119,45 @@ async function getQueueItems(): Promise<QueueItem[]> {
       (ev.cityId ? eventCityNameById.get(ev.cityId) ?? null : null),
     businessName: ev.owner.business?.name || ev.owner.email,
     submittedAt: ev.createdAt,
+    submittedAtLabel: formatDistanceToNow(ev.createdAt, { addSuffix: true, locale: ru }),
     reviewHref: `/editor/event/${ev.id}/edit?returnTo=${encodeURIComponent(QUEUE_RETURN)}`,
   }));
 
   const offerItems: QueueItem[] = pendingOffers.map((offer) => ({
     id: offer.id,
+    moderationId: offer.id,
     kind: "OFFER",
     title: offer.title,
     cityName: offer.place.city?.name ?? null,
     businessName:
       offer.place.createdBy.business?.name || offer.place.createdBy.email,
     submittedAt: offer.createdAt,
+    submittedAtLabel: formatDistanceToNow(offer.createdAt, { addSuffix: true, locale: ru }),
     reviewHref: `/editor/offer/${offer.id}/edit?returnTo=${encodeURIComponent(QUEUE_RETURN)}`,
   }));
 
   const placeItems: QueueItem[] = pendingPlaces.map((place) => ({
     id: place.id,
+    moderationId: place.id,
     kind: "PLACE",
     title: place.title,
     cityName: place.city?.name || null,
     businessName: place.createdBy.business?.name || place.createdBy.email,
     submittedAt: place.createdAt,
+    submittedAtLabel: formatDistanceToNow(place.createdAt, { addSuffix: true, locale: ru }),
     reviewHref: `/admin/content/places/${place.id}`,
   }));
 
   const revisionItems: QueueItem[] = pendingRevisions.map((revision) => ({
     id: revision.place.id,
+    moderationId: revision.id,
     kind: "PLACE_UPDATE",
     title: revision.title || "Без названия",
     cityName: revision.place.city?.name || null,
     businessName:
       revision.place.createdBy.business?.name || revision.place.createdBy.email,
     submittedAt: revision.submittedAt || new Date(),
+    submittedAtLabel: formatDistanceToNow(revision.submittedAt || new Date(), { addSuffix: true, locale: ru }),
     reviewHref: `/admin/content/places/${revision.place.id}?mode=revision`,
   }));
 
@@ -168,92 +169,6 @@ async function getQueueItems(): Promise<QueueItem[]> {
   ];
   items.sort((a, b) => a.submittedAt.getTime() - b.submittedAt.getTime());
   return items;
-}
-
-function TypeCell({ kind }: { kind: QueueItem["kind"] }) {
-  if (kind === "PLACE") {
-    return (
-      <div className="flex items-center gap-2">
-        <FileText className="w-4 h-4 text-blue-600" />
-        <span className="font-medium text-blue-600">Место</span>
-      </div>
-    );
-  }
-  if (kind === "PLACE_UPDATE") {
-    return (
-      <div className="flex items-center gap-2">
-        <RefreshCw className="w-4 h-4 text-amber-600" />
-        <span className="font-medium text-amber-600">Изменение</span>
-      </div>
-    );
-  }
-  if (kind === "EVENT") {
-    return (
-      <div className="flex items-center gap-2">
-        <Calendar className="w-4 h-4 text-violet-600" />
-        <span className="font-medium text-violet-600">Событие</span>
-      </div>
-    );
-  }
-  return (
-    <div className="flex items-center gap-2">
-      <Tag className="w-4 h-4 text-emerald-600" />
-      <span className="font-medium text-emerald-600">Предложение</span>
-    </div>
-  );
-}
-
-function QueueTable({ items }: { items: QueueItem[] }) {
-  if (items.length === 0) {
-    return (
-      <div className="text-center py-12 text-gray-500 border border-gray-200 rounded-lg bg-white">
-        <p className="text-lg font-medium mb-2">Очередь пуста</p>
-        <p className="text-sm">
-          Нет сущностей, ожидающих модерации (места, события, предложения)
-        </p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
-      <table className="w-full text-sm">
-        <thead className="bg-gray-50 border-b border-gray-200">
-          <tr>
-            <th className="px-4 py-3 text-left font-medium text-gray-700">Тип</th>
-            <th className="px-4 py-3 text-left font-medium text-gray-700">Название</th>
-            <th className="px-4 py-3 text-left font-medium text-gray-700">Город</th>
-            <th className="px-4 py-3 text-left font-medium text-gray-700">Автор</th>
-            <th className="px-4 py-3 text-left font-medium text-gray-700">Подано</th>
-            <th className="px-4 py-3 text-left font-medium text-gray-700">Действия</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-gray-200">
-          {items.map((item) => (
-            <tr key={`${item.kind}-${item.id}`} className="hover:bg-gray-50">
-              <td className="px-4 py-3">
-                <TypeCell kind={item.kind} />
-              </td>
-              <td className="px-4 py-3 font-medium text-gray-900">{item.title}</td>
-              <td className="px-4 py-3 text-gray-600">{item.cityName || "—"}</td>
-              <td className="px-4 py-3 text-gray-600">{item.businessName}</td>
-              <td className="px-4 py-3 text-gray-600">
-                {formatDistanceToNow(item.submittedAt, { addSuffix: true, locale: ru })}
-              </td>
-              <td className="px-4 py-3">
-                <Link
-                  href={item.reviewHref}
-                  className="text-blue-600 hover:text-blue-800 font-medium"
-                >
-                  Открыть
-                </Link>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
 }
 
 export default async function ModerationQueuePage() {
@@ -273,9 +188,7 @@ export default async function ModerationQueuePage() {
         </Badge>
       </div>
 
-      <Suspense fallback={<div className="text-sm text-gray-500">Загрузка…</div>}>
-        <QueueTable items={items} />
-      </Suspense>
+      <ModerationQueueTable items={items} />
     </div>
   );
 }

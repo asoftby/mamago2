@@ -3,19 +3,21 @@
 import { useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Search, Building2, CheckCircle } from "lucide-react";
+import { Search, Users } from "lucide-react";
 import type { ExistingOrganizer } from "./types";
 
 interface OrganizerSearchSelectProps {
   selectedOrganizer: ExistingOrganizer | null;
   onSelect: (organizer: ExistingOrganizer | null) => void;
   isEditable: boolean;
+  showHeader?: boolean;
 }
 
 export function OrganizerSearchSelect({ 
   selectedOrganizer, 
   onSelect, 
-  isEditable 
+  isEditable,
+  showHeader = true,
 }: OrganizerSearchSelectProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<ExistingOrganizer[]>([]);
@@ -33,7 +35,7 @@ export function OrganizerSearchSelect({
     const timer = setTimeout(async () => {
       try {
         const res = await fetch(
-          `/api/admin/b2b/partners?query=${encodeURIComponent(searchQuery)}&limit=10`,
+          `/api/admin/organizers?query=${encodeURIComponent(searchQuery)}&limit=10`,
           { signal: controller.signal },
         );
 
@@ -66,21 +68,18 @@ export function OrganizerSearchSelect({
     return (
       <div className="p-4 bg-green-50 rounded-lg border border-green-200">
         <div className="flex items-start gap-3">
-          <div className="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center flex-shrink-0">
-            <Building2 className="w-5 h-5 text-green-600" />
+            <div className="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center flex-shrink-0">
+            <Users className="w-5 h-5 text-green-600" />
           </div>
           <div className="flex-1">
             <div className="flex items-center gap-2">
               <h3 className="font-medium text-green-900">{selectedOrganizer.name}</h3>
-              {selectedOrganizer.isVerified && (
-                <CheckCircle className="w-4 h-4 text-green-600" />
-              )}
             </div>
-            {selectedOrganizer.description && (
-              <p className="text-sm text-green-700 mt-1">{selectedOrganizer.description}</p>
-            )}
             {selectedOrganizer.phone && (
               <p className="text-sm text-green-600 mt-1">{selectedOrganizer.phone}</p>
+            )}
+            {selectedOrganizer.website && (
+              <p className="text-sm text-green-700 mt-1">{selectedOrganizer.website}</p>
             )}
           </div>
           {isEditable && (
@@ -99,10 +98,12 @@ export function OrganizerSearchSelect({
 
   return (
     <div>
-      <div className="mb-4">
-        <h3 className="text-sm font-medium text-primary">Поиск организатора</h3>
-        <p className="text-sm text-primary/80">Найдите существующего организатора</p>
-      </div>
+      {showHeader ? (
+        <div className="mb-4">
+          <h3 className="text-sm font-medium text-primary">Поиск организатора</h3>
+          <p className="text-sm text-primary/80">Найдите существующего организатора</p>
+        </div>
+      ) : null}
 
       <div className="space-y-4">
         <div>
@@ -113,7 +114,7 @@ export function OrganizerSearchSelect({
               id="organizer-search"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Введите название организации..."
+              placeholder="Введите имя организатора..."
               className="pl-10"
               disabled={!isEditable}
             />
@@ -139,17 +140,17 @@ export function OrganizerSearchSelect({
                   >
                     <div className="flex items-start gap-3">
                       <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
-                        <Building2 className="w-4 h-4 text-gray-600" />
+                        <Users className="w-4 h-4 text-gray-600" />
                       </div>
                       <div className="flex-1">
                         <div className="flex items-center gap-2">
                           <span className="font-medium text-sm">{organizer.name}</span>
-                          {organizer.isVerified && (
-                            <CheckCircle className="w-4 h-4 text-green-600" />
-                          )}
                         </div>
-                        {organizer.description && (
-                          <p className="text-xs text-gray-600 mt-1">{organizer.description}</p>
+                        {organizer.phone && (
+                          <p className="text-xs text-gray-600 mt-1">{organizer.phone}</p>
+                        )}
+                        {organizer.website && (
+                          <p className="text-xs text-gray-500 mt-1">{organizer.website}</p>
                         )}
                       </div>
                     </div>

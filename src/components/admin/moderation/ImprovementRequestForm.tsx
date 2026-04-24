@@ -13,7 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { DateTimePicker } from "@/components/ui/date-time-picker";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 
 interface ImprovementRequestFormProps {
   placeId: string;

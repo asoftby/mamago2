@@ -8,7 +8,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Upload, X, Loader2, GripVertical } from "lucide-react";
 import { useImageUpload } from "@/hooks/useImageUpload";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import {
   DndContext,
   closestCenter,

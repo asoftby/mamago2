@@ -3,12 +3,18 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Copy, ExternalLink, Loader2, Plus, RefreshCw, Rocket } from "lucide-react";
+import { Copy, ExternalLink, Loader2, Plus, RefreshCw, Rocket, Trash2 } from "lucide-react";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { EmailTemplateStatusBadge } from "@/components/admin/email-studio/EmailTemplateStatusBadge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import type { EmailTemplateStatus, EmailTemplateType } from "@/features/email-studio/lib";
+import {
+  getEmailTemplateClassification,
+  getEmailTemplateClassificationLabel,
+  getEmailTemplateStatusDescription,
+  getEmailTemplateTypeRuLabel,
+} from "@/features/email-studio/lib/presentation";
 
 type EmailTemplateListRow = {
   id: string;
@@ -28,7 +34,7 @@ type TemplatesResponse = {
 };
 
 type MutationState = {
-  kind: "create" | "duplicate" | "publish" | null;
+  kind: "create" | "duplicate" | "publish" | "delete" | null;
   templateId: string | null;
 };
 
@@ -40,29 +46,6 @@ function formatDate(value: string): string {
     hour: "2-digit",
     minute: "2-digit",
   }).format(new Date(value));
-}
-
-function getTypeLabel(type: EmailTemplateType): string {
-  switch (type) {
-    case "WELCOME":
-      return "Welcome";
-    case "VERIFY_EMAIL":
-      return "Verify email";
-    case "RESET_PASSWORD":
-      return "Reset password";
-    case "PLAN_REMINDER":
-      return "Plan reminder";
-    case "WEEKLY_DIGEST":
-      return "Weekly digest";
-    case "PROMO_CAMPAIGN":
-      return "Promo campaign";
-    case "CUSTOM":
-      return "Custom";
-    default: {
-      const neverType: never = type;
-      return neverType;
-    }
-  }
 }
 
 async function readErrorMessage(response: Response): Promise<string> {
@@ -128,7 +111,7 @@ export function EmailTemplatesPageClient() {
       }
 
       const data = (await response.json()) as { template: EmailTemplateListRow };
-      router.push(`/admin/email-studio/${data.template.id}`);
+      router.push(`/admin/communications/email-studio/${data.template.id}`);
     } catch (createError) {
       setError(createError instanceof Error ? createError.message : "Не удалось создать шаблон.");
     } finally {
@@ -197,6 +180,35 @@ export function EmailTemplatesPageClient() {
       await loadTemplates();
     } catch (publishError) {
       setError(publishError instanceof Error ? publishError.message : "Не удалось опубликовать шаблон.");
+    } finally {
+      setMutationState({ kind: null, templateId: null });
+    }
+  }
+
+  async function handleDeleteTemplate(templateId: string) {
+    const target = templates.find((item) => item.id === templateId);
+    const label = target?.name?.trim() || "этот шаблон";
+    const isConfirmed = window.confirm(`Удалить шаблон "${label}"? Это действие нельзя отменить.`);
+    if (!isConfirmed) return;
+
+    setMutationState({ kind: "delete", templateId });
+    setActionMessage(null);
+    setActionWarning(null);
+    setError(null);
+
+    try {
+      const response = await fetch(`/api/admin/email-templates/${templateId}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        throw new Error(await readErrorMessage(response));
+      }
+
+      setActionMessage(`Шаблон "${label}" удалён.`);
+      await loadTemplates();
+    } catch (deleteError) {
+      setError(deleteError instanceof Error ? deleteError.message : "Не удалось удалить шаблон.");
     } finally {
       setMutationState({ kind: null, templateId: null });
     }
@@ -296,6 +308,8 @@ export function EmailTemplatesPageClient() {
                     mutationState.kind === "publish" && mutationState.templateId === template.id;
                   const isDuplicating =
                     mutationState.kind === "duplicate" && mutationState.templateId === template.id;
+                  const isDeleting =
+                    mutationState.kind === "delete" && mutationState.templateId === template.id;
 
                   return (
                     <tr key={template.id} className="align-top hover:bg-muted/20">
@@ -306,10 +320,24 @@ export function EmailTemplatesPageClient() {
                         </div>
                       </td>
                       <td className="px-4 py-4 text-muted-foreground">
-                        {getTypeLabel(template.type)}
+                        <div className="space-y-1">
+                          <div className="text-foreground">
+                            {getEmailTemplateTypeRuLabel(template.type)}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {getEmailTemplateClassificationLabel(
+                              getEmailTemplateClassification(template.type),
+                            )}
+                          </div>
+                        </div>
                       </td>
                       <td className="px-4 py-4">
-                        <EmailTemplateStatusBadge status={template.status} />
+                        <div className="space-y-1">
+                          <EmailTemplateStatusBadge status={template.status} />
+                          <div className="max-w-[220px] text-xs text-muted-foreground">
+                            {getEmailTemplateStatusDescription(template.status)}
+                          </div>
+                        </div>
                       </td>
                       <td className="px-4 py-4 text-muted-foreground">
                         {formatDate(template.updatedAt)}
@@ -318,7 +346,7 @@ export function EmailTemplatesPageClient() {
                       <td className="px-4 py-4">
                         <div className="flex justify-end gap-2">
                           <Button variant="outline" size="sm" asChild>
-                            <Link href={`/admin/email-studio/${template.id}`}>
+                            <Link href={`/admin/communications/email-studio/${template.id}`}>
                               <ExternalLink className="size-4" />
                               Открыть
                             </Link>
@@ -340,6 +368,20 @@ export function EmailTemplatesPageClient() {
                             {isPublishing ? <Loader2 className="size-4 animate-spin" /> : <Rocket className="size-4" />}
                             Опубликовать
                           </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => void handleDeleteTemplate(template.id)}
+                            disabled={isMutating || isDeleting}
+                            className="text-red-600 hover:bg-red-50 hover:text-red-700"
+                          >
+                            {isDeleting ? (
+                              <Loader2 className="size-4 animate-spin" />
+                            ) : (
+                              <Trash2 className="size-4" />
+                            )}
+                            Удалить
+                          </Button>
                         </div>
                       </td>
                     </tr>
@@ -357,7 +399,7 @@ export function EmailTemplatesPageClient() {
     <div className="space-y-6 p-6 md:p-4">
       <AdminPageHeader
         title="Email Studio"
-        subtitle="Блочные email-шаблоны с единым pipeline для preview, test send и production render."
+        subtitle="Часть домена «Коммуникации»: шаблоны, preview, тестовая отправка и версии в одном потоке."
         showBackButton={false}
         actions={
           <Button onClick={() => void handleCreateTemplate()} disabled={isMutating}>

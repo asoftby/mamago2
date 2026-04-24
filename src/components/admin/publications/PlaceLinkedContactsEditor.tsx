@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import type { Place } from "@prisma/client";
 import { PlaceInstagramField, PlacePhoneWebsiteFields } from "@/components/business/wizard/place/steps/placeContactFields";
 import type { PlaceFormData } from "@/components/business/wizard/place/types";

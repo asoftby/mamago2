@@ -5,7 +5,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useBackofficeSavedToast } from "@/hooks/useBackofficeSavedToast";
 import { RETURN_TO_PARAM } from "@/lib/backoffice/saveFlow";
 import { Label } from "@/components/ui/typography";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { useAutoSlug } from "@/hooks/useAutoSlug";
 import { orderEventCategoriesForDisplay } from "@/lib/taxonomy/eventCategoryHierarchy";
 import { messageFromApiError } from "@/lib/admin/messageFromApiError";

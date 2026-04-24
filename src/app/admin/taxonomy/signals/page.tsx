@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { useAutoSlug } from "@/hooks/useAutoSlug";
 import { orderSignalDefinitionsForDisplay } from "@/lib/taxonomy/signalHierarchy";
 import { messageFromApiError } from "@/lib/admin/messageFromApiError";

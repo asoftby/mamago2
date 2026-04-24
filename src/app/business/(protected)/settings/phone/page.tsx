@@ -1,6 +1,6 @@
 export { metadata } from "@/app/settings/phone/page";
-import { renderPhoneSettingsPage } from "@/features/settings/server/renderers";
+import { redirect } from "next/navigation";
 
 export default async function BusinessPhoneSettingsPage() {
-  return renderPhoneSettingsPage("BUSINESS");
+  redirect("/settings/phone");
 }

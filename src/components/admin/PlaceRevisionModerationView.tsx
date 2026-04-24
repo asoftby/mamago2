@@ -14,7 +14,7 @@ import { ArrowLeft, MapPin, Navigation, ExternalLink } from "lucide-react";
 import { formatDistance } from "@/lib/formatDistance";
 import { formatDistanceToNow } from "date-fns";
 import { ru } from "date-fns/locale";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import {
   compareFields,
   compareImages,

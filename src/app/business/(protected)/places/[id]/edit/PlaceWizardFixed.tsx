@@ -16,7 +16,7 @@ import {
   canGoToPrevStep,
   validateStep3,
 } from "./utils/stepValidation";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { useWizardSession } from "@/hooks/useWizardSession";
 import { Badge } from "@/components/ui/badge";
 import type { OpeningHoursData } from "@/components/openingHours";

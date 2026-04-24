@@ -7,7 +7,7 @@ import { ContentStatus } from "@prisma/client";
 import { formatDistanceToNow } from "date-fns";
 import { ru } from "date-fns/locale";
 import { Loader2 } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -27,7 +27,7 @@ import type { ArticleEditorSnapshot } from "@/lib/article/articleAdminTypes";
 import type { ArticleContentPayload } from "@/lib/publications/articleMvp";
 import { ArticleBlocksMvpEditor } from "@/components/admin/articles/ArticleBlocksMvpEditor";
 import { ArticleEditorCoverField } from "@/components/admin/articles/ArticleEditorCoverField";
-import { cityNameFromSlug, matchCitySlugFromContext } from "@/lib/article/articleEditorBasics";
+import { matchCitySlugFromContext } from "@/lib/article/articleEditorBasics";
 import { useHydrated } from "@/hooks/use-hydrated";
 import { useUnsavedChangesNavigationGuard } from "@/hooks/use-unsaved-changes-navigation-guard";
 import {
@@ -813,7 +813,7 @@ export function ArticleEditorClient({
                   value={citySlugForSelect || "__none__"}
                   onValueChange={(v) => {
                     if (v === "__none__") setCityContext("");
-                    else setCityContext(cityNameFromSlug(v, cities));
+                    else setCityContext(v);
                   }}
                 >
                   <SelectTrigger id="article-city" className="w-full">

@@ -78,8 +78,11 @@ const NAV_SECTIONS: NavSection[] = [
     })),
   },
   {
-    title: "Email Studio",
-    items: [{ label: "Templates", href: adminPath("/email-studio") }],
+    title: "Communications",
+    items: [
+      { label: "Overview", href: adminPath("/communications") },
+      { label: "Email Studio", href: adminPath("/communications/email-studio") },
+    ],
   },
   {
     title: "Discovery",

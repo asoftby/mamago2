@@ -21,6 +21,17 @@ import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import type { EventScheduleItem, EventScheduleCardProps } from "./types";
 
+const DEBUG_EDITOR = process.env.NODE_ENV !== "production";
+
+function debugScheduleLog(message: string, payload?: Record<string, unknown>) {
+  if (!DEBUG_EDITOR) return;
+  if (payload) {
+    console.debug(`[EventEditorSchedule] ${message}`, payload);
+    return;
+  }
+  console.debug(`[EventEditorSchedule] ${message}`);
+}
+
 export function EventScheduleCard({
   item,
   onChange,
@@ -54,10 +65,21 @@ export function EventScheduleCard({
 
   // Handle date selection from calendar
   const handleDateSelect = (date: Date | null) => {
+    debugScheduleLog("date select fired", {
+      scheduleItemId: item.id,
+      isMultiDay: item.isMultiDay,
+      selectedDate: date ? date.toISOString() : null,
+      currentDate: item.date,
+      currentDateEnd: item.dateEnd ?? null,
+    });
     if (date) {
       if (!item.isMultiDay) {
         // Single date mode - save immediately
         const dateStr = dateToLocalString(date);
+        debugScheduleLog("single date applied", {
+          scheduleItemId: item.id,
+          nextDate: dateStr,
+        });
         handleUpdate({ date: dateStr });
         setIsDatePickerOpen(false);
       } else {
@@ -102,6 +124,11 @@ export function EventScheduleCard({
         updates.dateEnd = endStr;
       }
       
+      debugScheduleLog("multi-day range applied", {
+        scheduleItemId: item.id,
+        start: updates.date ?? null,
+        end: updates.dateEnd ?? null,
+      });
       handleUpdate(updates);
       // Reset temp state
       setTempStartDate(null);

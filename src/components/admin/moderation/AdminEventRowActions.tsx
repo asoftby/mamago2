@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { Eye, Pencil, Trash2 } from "lucide-react";
 import { ContentStatus } from "@prisma/client";
 import {
@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { navigateToSurface } from "@/lib/routing/clientNavigation";
 
 type Props = {
   eventId: string;
@@ -48,7 +49,6 @@ export function AdminEventRowActions({ eventId, status, returnTo }: Props) {
 
   const copy = deleteCopy(status);
   const editHref = `/editor/event/${eventId}/edit?returnTo=${encodeURIComponent(returnTo)}`;
-  const viewHref = `/me/events/${eventId}/preview`;
 
   const handleDelete = async () => {
     setLoading(true);
@@ -61,11 +61,11 @@ export function AdminEventRowActions({ eventId, status, returnTo }: Props) {
         const j = await res.json().catch(() => ({}));
         throw new Error(typeof j.error === "string" ? j.error : "Не удалось удалить событие");
       }
-      toast.success("Событие удалено");
+      toast.success("Событие удалено из каталога");
       setOpen(false);
       router.refresh();
     } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : "Ошибка удаления");
+      toast.error(e instanceof Error ? e.message : "Не получилось выполнить действие");
     } finally {
       setLoading(false);
     }
@@ -79,9 +79,20 @@ export function AdminEventRowActions({ eventId, status, returnTo }: Props) {
       <Link href={editHref} className={iconBtn} title="Редактировать" aria-label="Редактировать">
         <Pencil className="w-4 h-4" />
       </Link>
-      <Link href={viewHref} className={iconBtn} title="Просмотр" aria-label="Просмотр как для пользователя">
+      <button
+        type="button"
+        onClick={() =>
+          navigateToSurface(router, {
+            targetSurface: "public",
+            targetPath: `/me/events/${eventId}/preview`,
+          })
+        }
+        className={iconBtn}
+        title="Просмотр"
+        aria-label="Просмотр как для пользователя"
+      >
         <Eye className="w-4 h-4" />
-      </Link>
+      </button>
       <button
         type="button"
         onClick={() => setOpen(true)}

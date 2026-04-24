@@ -298,6 +298,24 @@ function validateStep6(data: EventFormData): ValidationResult {
         errors.push("Добавьте хотя бы одну дату со слотами");
       }
     }
+
+    if (data.participationMode === "prebook") {
+      if (!data.prebookMethod) {
+        errors.push("Выберите способ предварительной записи");
+      } else if (data.prebookMethod === "phone") {
+        if (!data.prebookPhone || data.prebookPhone.trim().length === 0) {
+          errors.push("Укажите телефон для записи");
+        } else if (!isValidPhone(data.prebookPhone)) {
+          errors.push("Некорректный телефон для записи");
+        }
+      } else if (data.prebookMethod === "link") {
+        if (!data.prebookUrl || data.prebookUrl.trim().length === 0) {
+          errors.push("Укажите ссылку на запись");
+        } else if (!isValidUrl(data.prebookUrl)) {
+          errors.push("Некорректная ссылка на запись");
+        }
+      }
+    }
   }
 
   // Validate CTA type - removed, now auto-determined from participationMode
@@ -307,7 +325,14 @@ function validateStep6(data: EventFormData): ValidationResult {
     ((data.pricingMode === "fixed" || data.pricingMode === "from") ? data.price?.trim() : true) &&
     data.participationMode &&
     (data.participationMode === "external-link" ? data.ticketLink?.trim() : true) &&
-    (data.participationMode === "time-slots" ? data.timeSlots?.dates?.some(d => d.slots.length > 0) : true)
+    (data.participationMode === "time-slots" ? data.timeSlots?.dates?.some(d => d.slots.length > 0) : true) &&
+    (data.participationMode === "prebook"
+      ? data.prebookMethod === "phone"
+        ? Boolean(data.prebookPhone?.trim())
+        : data.prebookMethod === "link"
+          ? Boolean(data.prebookUrl?.trim())
+          : false
+      : true)
   );
 
   return {
@@ -369,6 +394,10 @@ function validateStep8(data: EventFormData): ValidationResult {
     errors.push("Выберите организатора из списка");
   }
 
+  if (data.organizerUnp && !/^\d{9}$/.test(data.organizerUnp)) {
+    warnings.push("УНП должен содержать 9 цифр");
+  }
+
   if (data.organizerPhone && !isValidPhone(data.organizerPhone)) {
     warnings.push("Введите корректный номер телефона");
   }
@@ -377,8 +406,12 @@ function validateStep8(data: EventFormData): ValidationResult {
     warnings.push("Проверьте формат веб-сайта");
   }
 
-  if (!data.organizerDescription || data.organizerDescription.trim().length === 0) {
-    warnings.push("Рекомендуется добавить описание организатора");
+  if (
+    data.organizerInstagram &&
+    !isValidUrl(data.organizerInstagram) &&
+    !data.organizerInstagram.trim().startsWith("@")
+  ) {
+    warnings.push("Проверьте формат Instagram");
   }
 
   const isComplete = data.organizerName.trim().length >= 2 && 

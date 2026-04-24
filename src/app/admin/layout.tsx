@@ -4,6 +4,7 @@ import { AdminSidebar } from "@/components/admin/AdminSidebar";
 import { getCurrentUser } from "@/lib/auth/server";
 import { getModerationNavCounts } from "@/lib/admin/getModerationNavCounts";
 import { getB2bPendingVerificationCount } from "@/lib/admin/getB2bPendingVerificationCount";
+import { getImportPendingReviewCount } from "@/lib/admin/getImportPendingReviewCount";
 import type { ModerationNavCounts } from "@/lib/admin/moderationSidebarConfig";
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
@@ -47,13 +48,15 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   let moderationCounts: ModerationNavCounts = EMPTY_MODERATION_COUNTS;
   let b2bPendingVerificationCount = 0;
+  let importPendingReviewCount = 0;
   try {
-    [moderationCounts, b2bPendingVerificationCount] = await Promise.all([
+    [moderationCounts, b2bPendingVerificationCount, importPendingReviewCount] = await Promise.all([
       getModerationNavCounts(),
       getB2bPendingVerificationCount(),
+      getImportPendingReviewCount(),
     ]);
   } catch (e) {
-    console.error("admin layout: moderation / b2b counts failed:", e);
+    console.error("admin layout: counts failed:", e);
   }
 
   return (
@@ -72,6 +75,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           <AdminSidebar
             moderationCounts={moderationCounts}
             b2bPendingVerificationCount={b2bPendingVerificationCount}
+            importPendingReviewCount={importPendingReviewCount}
           />
         </div>
 

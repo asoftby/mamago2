@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { Trash2, AlertTriangle } from "lucide-react";
 
 interface PlaceDangerZoneProps {

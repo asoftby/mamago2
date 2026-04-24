@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { CircleCheck } from "lucide-react";
 import {
   Dialog,
@@ -12,6 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { PrimaryButton } from "@/components/ui/PrimaryButton";
 import { Button } from "@/components/ui/button";
+import { navigateToSurface } from "@/lib/routing/clientNavigation";
 
 type EventSubmitModerationSuccessDialogProps = {
   open: boolean;
@@ -24,6 +26,8 @@ export function EventSubmitModerationSuccessDialog({
   onOpenChange,
   eventId,
 }: EventSubmitModerationSuccessDialogProps) {
+  const router = useRouter();
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="gap-6 sm:max-w-md" showCloseButton>
@@ -45,8 +49,17 @@ export function EventSubmitModerationSuccessDialog({
           </div>
         </DialogHeader>
         <DialogFooter className="flex-col gap-2 sm:flex-col">
-          <PrimaryButton className="w-full" asChild>
-            <Link href={`/me/events/${eventId}/preview`}>Смотреть, что получилось</Link>
+          <PrimaryButton
+            className="w-full"
+            type="button"
+            onClick={() =>
+              navigateToSurface(router, {
+                targetSurface: "public",
+                targetPath: `/me/events/${eventId}/preview`,
+              })
+            }
+          >
+            Смотреть, что получилось
           </PrimaryButton>
           <Button variant="outline" className="w-full rounded-[16px] py-[14px] h-auto font-semibold" asChild>
             <Link href="/me/events">К списку событий</Link>

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useBackofficeSavedToast } from "@/hooks/useBackofficeSavedToast";
 import { RETURN_TO_PARAM } from "@/lib/backoffice/saveFlow";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { useAutoSlug } from "@/hooks/useAutoSlug";
 import { messageFromApiError } from "@/lib/admin/messageFromApiError";
 import {

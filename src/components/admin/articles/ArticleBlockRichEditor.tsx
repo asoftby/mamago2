@@ -5,7 +5,7 @@ import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Bold, Italic, Link2, List, ListOrdered, Redo, Undo } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import {
   articleBlockHtmlForEditor,

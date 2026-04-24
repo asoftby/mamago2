@@ -13,6 +13,7 @@ import type { ComponentType } from "react";
 import { FilterSelect } from "@/components/ui/filter-select";
 import { straightQuotesToGuillemets } from "@/lib/text/straightQuotesToGuillemets";
 import { SYSTEM_INTERESTS } from "@/lib/config/interests";
+import { AGE_OPTIONS, sortAgeKeys } from "@/lib/config/ages";
 
 type DiscoveryEventCategory = {
   id: string;
@@ -43,12 +44,13 @@ type PublicInterestOption = {
 };
 
 /** Совпадает с prisma/seed.ts (сигнал age) — если API недоступен или пустой. */
-const FALLBACK_AGE_OPTIONS: PublicAgeOption[] = [
-  { id: "fb-age-0-3", label: "0–3 года", value: "0-3", order: 1, active: true },
-  { id: "fb-age-3-5", label: "3–5 лет", value: "3-5", order: 2, active: true },
-  { id: "fb-age-5-8", label: "6–10 лет", value: "5-8", order: 3, active: true },
-  { id: "fb-age-8-12", label: "10+ лет", value: "8-12", order: 4, active: true },
-];
+const FALLBACK_AGE_OPTIONS: PublicAgeOption[] = AGE_OPTIONS.map((option) => ({
+  id: option.id ?? `fb-age-${option.key}`,
+  label: option.label,
+  value: option.key,
+  order: option.order,
+  active: option.active,
+}));
 
 function buildFallbackInterestOptions(): PublicInterestOption[] {
   return SYSTEM_INTERESTS.map((it, i) => ({
@@ -200,6 +202,14 @@ export function Step1Basics({ data, onChange, isEditable }: Step1BasicsProps) {
   }, [data.categoryId]);
 
   const supportsProgram = Boolean(primaryRoot?.supportsProgram);
+  const ageDetection = data.ageDetection ?? {
+    raw: null,
+    confidence: "none" as const,
+    suggestedBuckets: [],
+    normalizedLabel: null,
+    parsedMinAge: null,
+    parsedMaxAge: null,
+  };
 
   const programSelectableItems: ChipItem[] = useMemo(() => {
     const flat: DiscoveryEventCategory[] = [];
@@ -399,12 +409,65 @@ export function Step1Basics({ data, onChange, isEditable }: Step1BasicsProps) {
     return ch.map((c) => ({ value: c.id, label: c.nameRu }));
   }, [primaryRoot]);
 
+  useEffect(() => {
+    if (!isEditable) return;
+    if (ageDetection.confidence !== "high") return;
+    if (data.ageDetectionUserOverride) return;
+    if (ageDetection.suggestedBuckets.length === 0) return;
+
+    const next = sortAgeKeys([...ageDetection.suggestedBuckets]);
+    const current = sortAgeKeys([...(data.ageRangeIds ?? [])]);
+    if (current.join("|") === next.join("|") && data.ageDetectionAutoApplied) return;
+
+    onChange({
+      ageRangeIds: next,
+      ageTags: next,
+      ageDetectionAutoApplied: true,
+    });
+  }, [
+    ageDetection.confidence,
+    ageDetection.suggestedBuckets,
+    data.ageDetectionAutoApplied,
+    data.ageDetectionUserOverride,
+    data.ageRangeIds,
+    isEditable,
+    onChange,
+  ]);
+
+  const applyAgeBuckets = (
+    buckets: string[],
+    {
+      userOverride,
+      autoApplied,
+    }: {
+      userOverride: boolean;
+      autoApplied: boolean;
+    },
+  ) => {
+    const next = sortAgeKeys([...buckets]);
+    // Keep `ageTags` synchronized for existing Activity.ai/recommendations pipeline
+    onChange({
+      ageRangeIds: next,
+      ageTags: next,
+      ageDetectionUserOverride: userOverride,
+      ageDetectionAutoApplied: autoApplied,
+    });
+  };
+
   const toggleAge = (ageValue: string) => {
     const next = data.ageRangeIds.includes(ageValue)
       ? data.ageRangeIds.filter((v) => v !== ageValue)
       : [...data.ageRangeIds, ageValue];
-    // Keep `ageTags` synchronized for existing Activity.ai/recommendations pipeline
-    onChange({ ageRangeIds: next, ageTags: next });
+    applyAgeBuckets(next, { userOverride: true, autoApplied: false });
+  };
+
+  const clearAgeSelection = () => {
+    onChange({
+      ageRangeIds: [],
+      ageTags: [],
+      ageDetectionUserOverride: true,
+      ageDetectionAutoApplied: false,
+    });
   };
 
   const selectedInterestIds = data.interestIds ?? [];
@@ -423,13 +486,46 @@ export function Step1Basics({ data, onChange, isEditable }: Step1BasicsProps) {
     onChange({ interestIds: [...selectedInterestIds, interestValue] });
   };
 
-  const ageItems: ChipItem[] = ageOptions.map((o) => ({
-    id: o.value,
-    label: o.label,
-    active: data.ageRangeIds.includes(o.value),
-    disabled: !isEditable || loading,
-    onClick: () => isEditable && toggleAge(o.value),
-  }));
+  const suggestedAgeLabel =
+    ageDetection.suggestedBuckets.length > 0
+      ? ageOptions
+          .filter((option) => ageDetection.suggestedBuckets.includes(option.value))
+          .map((option) => option.label)
+          .join(", ")
+      : "";
+
+  const normalizedAgeLabel = ageDetection.normalizedLabel ?? ageDetection.raw;
+  const isExactParsedRange =
+    ageDetection.parsedMinAge != null && ageDetection.parsedMaxAge != null;
+  const hasSuggestedAgeBuckets = ageDetection.suggestedBuckets.length > 0;
+  const hasAppliedAgeBuckets = data.ageRangeIds.length > 0;
+  const isAutoAppliedAge =
+    data.ageDetectionAutoApplied &&
+    ageDetection.confidence === "high" &&
+    hasAppliedAgeBuckets;
+  const showSuggestedAgePreview =
+    hasSuggestedAgeBuckets &&
+    !hasAppliedAgeBuckets &&
+    !isAutoAppliedAge &&
+    !data.ageDetectionUserOverride &&
+    (ageDetection.confidence === "high" || ageDetection.confidence === "medium");
+
+  const ageItems: ChipItem[] = ageOptions.map((o) => {
+    const isActive = data.ageRangeIds.includes(o.value);
+    const isPreview =
+      showSuggestedAgePreview && ageDetection.suggestedBuckets.includes(o.value);
+
+    return {
+      id: o.value,
+      label: o.label,
+      active: isActive,
+      disabled: !isEditable || loading,
+      onClick: () => isEditable && toggleAge(o.value),
+      className: isPreview && !isActive
+        ? "!border-amber-300 !bg-transparent !text-amber-900"
+        : undefined,
+    };
+  });
 
   const interestItems: ChipItem[] = interestOptions.map((o) => {
     const active = selectedInterestIds.includes(o.value);
@@ -508,6 +604,107 @@ export function Step1Basics({ data, onChange, isEditable }: Step1BasicsProps) {
             Для кого подходит это событие
           </p>
         </div>
+        {ageDetection.confidence === "high" && ageDetection.raw && isAutoAppliedAge ? (
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 px-3 py-2 text-[12px] text-emerald-900">
+            <p className="font-medium">
+              Автоматически выбрано: {normalizedAgeLabel ?? ageDetection.raw}{" "}
+              <span className="font-normal">(можно изменить)</span>
+            </p>
+            {!isExactParsedRange && suggestedAgeLabel ? (
+              <p className="mt-0.5 text-emerald-800/90">Выбраны группы: {suggestedAgeLabel}</p>
+            ) : null}
+            <div className="mt-2 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={clearAgeSelection}
+                disabled={!isEditable}
+                className="text-[12px] font-medium text-emerald-900 underline underline-offset-2 disabled:opacity-50"
+              >
+                Очистить выбор
+              </button>
+            </div>
+          </div>
+        ) : null}
+        {ageDetection.confidence === "high" && ageDetection.raw && !isAutoAppliedAge ? (
+          <div className="rounded-xl border border-amber-200 bg-amber-50/80 px-3 py-2 text-[12px] text-amber-950">
+            <p className="font-medium">
+              Найдена точная рекомендация: {normalizedAgeLabel ?? ageDetection.raw}
+            </p>
+            <p className="mt-0.5 text-amber-900/90">
+              Это рекомендация, а не выбранное значение. При необходимости примените или измените вручную.
+            </p>
+            {!isExactParsedRange && suggestedAgeLabel ? (
+              <p className="mt-0.5 text-amber-900/80">Рекомендуемые группы: {suggestedAgeLabel}</p>
+            ) : null}
+            <div className="mt-2 flex flex-wrap gap-3">
+              <button
+                type="button"
+                onClick={() =>
+                  applyAgeBuckets(ageDetection.suggestedBuckets, {
+                    userOverride: true,
+                    autoApplied: false,
+                  })
+                }
+                disabled={!isEditable || ageDetection.suggestedBuckets.length === 0}
+                className="font-medium text-amber-950 underline underline-offset-2 disabled:opacity-50"
+              >
+                Применить
+              </button>
+              <button
+                type="button"
+                onClick={clearAgeSelection}
+                disabled={!isEditable}
+                className="font-medium text-amber-950 underline underline-offset-2 disabled:opacity-50"
+              >
+                Очистить выбор
+              </button>
+            </div>
+          </div>
+        ) : null}
+        {ageDetection.confidence === "medium" && ageDetection.raw ? (
+          <div className="rounded-xl border border-amber-200 bg-amber-50/80 px-3 py-2 text-[12px] text-amber-950">
+            <p className="font-medium">Есть рекомендация по возрасту</p>
+            <p className="mt-0.5 text-amber-900/90">
+              Найдено: {ageDetection.raw}. Подтвердите вручную.
+            </p>
+            {suggestedAgeLabel ? (
+              <p className="mt-0.5 text-amber-900/80">Рекомендуем: {suggestedAgeLabel}</p>
+            ) : null}
+            <div className="mt-2 flex flex-wrap gap-3">
+              <button
+                type="button"
+                onClick={() =>
+                  applyAgeBuckets(ageDetection.suggestedBuckets, {
+                    userOverride: true,
+                    autoApplied: false,
+                  })
+                }
+                disabled={!isEditable || ageDetection.suggestedBuckets.length === 0}
+                className="font-medium text-amber-950 underline underline-offset-2 disabled:opacity-50"
+              >
+                Применить
+              </button>
+              <button
+                type="button"
+                onClick={clearAgeSelection}
+                disabled={!isEditable}
+                className="font-medium text-amber-950 underline underline-offset-2 disabled:opacity-50"
+              >
+                Очистить выбор
+              </button>
+            </div>
+          </div>
+        ) : null}
+        {ageDetection.confidence === "none" ? (
+          <div className="rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-2 text-[12px] text-slate-700">
+            Возраст не указан. Выберите вручную.
+          </div>
+        ) : null}
+        {ageDetection.confidence === "low" && ageDetection.raw ? (
+          <div className="rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-2 text-[12px] text-slate-700">
+            Возраст найден, но распознан неуверенно: {ageDetection.raw}. Выберите вручную.
+          </div>
+        ) : null}
         <ChipsRow
           layout="wrap"
           aria-label="Возрастные группы"

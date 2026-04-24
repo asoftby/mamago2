@@ -1,6 +1,11 @@
 // Event Wizard Types
 
 import type { EventFormatPreset } from "@/lib/business/eventFormatSignals";
+import type { EventScheduleItem } from "@/components/admin/event-schedule/types";
+import type {
+  AgeBucket,
+  AgeDetectionConfidence,
+} from "@/lib/age/ageMapping";
 
 export type EventWizardMode = "create" | "edit";
 
@@ -32,6 +37,18 @@ export interface EventFormData {
   ageRangeIds: string[];
   /** Значения сигнала age для поля Activity.ageTags (синхронизируется с ageRangeIds) */
   ageTags: string[];
+  ageDetection?: {
+    raw: string | null;
+    confidence: AgeDetectionConfidence;
+    suggestedBuckets: AgeBucket[];
+    normalizedLabel: string | null;
+    parsedMinAge: number | null;
+    parsedMaxAge: number | null;
+  };
+  /** Отключает авто-применение после первого осознанного действия пользователя. */
+  ageDetectionUserOverride: boolean;
+  /** Показывает, что текущее значение было именно автоприменено, а не выбрано вручную. */
+  ageDetectionAutoApplied: boolean;
   /** id/values опций сигнала interests (Discovery / Signals, axis INTERESTS) */
   interestIds: string[];
   /**
@@ -63,6 +80,7 @@ export interface EventFormData {
   // Step 4: Schedule (MVP: all dates use common time)
   scheduleMode: "single" | "multiple";
   dates: string[]; // YYYY-MM-DD
+  scheduleItems: EventScheduleItem[];
   allDay: boolean;
   startTime: string; // HH:mm - common for all dates
   endTime: string; // HH:mm - common for all dates
@@ -76,7 +94,10 @@ export interface EventFormData {
   priceDetails: string; // Optional details for "from" mode (e.g., different ticket categories)
   ticketLink: string;
   /** Как попасть на событие (3 сценария; при загрузке старых данных нормализуется в маппере) */
-  participationMode: "external-link" | "time-slots" | "walk-in";
+  participationMode: "external-link" | "time-slots" | "walk-in" | "prebook";
+  prebookMethod: "phone" | "link" | null;
+  prebookPhone: string;
+  prebookUrl: string;
 
   // Simple booking fields
   simpleBookingDate: string | null; // YYYY-MM-DD
@@ -128,18 +149,19 @@ export interface EventFormData {
   venueNote: string;
   
   // Step 7: Contacts
+  contactMode: "inherit" | "override";
   phone: string;
   website: string;
   socialLinks: SocialLink[];
   
   // Step 8: Organizer
-  organizerMode: "business" | "existing" | "custom";
-  organizerId: string | null; // For existing organizers
+  organizerMode: "existing" | "import" | "manual";
+  organizerId: string | null;
   organizerName: string;
-  organizerDescription: string;
+  organizerUnp: string;
   organizerPhone: string;
   organizerWebsite: string;
-  organizerLogoUrl: string | null;
+  organizerInstagram: string;
 }
 
 export interface SocialLink {

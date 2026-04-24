@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/typography";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Plus } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { useAutoSlug } from "@/hooks/useAutoSlug";
 import { messageFromApiError } from "@/lib/admin/messageFromApiError";
 import { cn } from "@/lib/utils";

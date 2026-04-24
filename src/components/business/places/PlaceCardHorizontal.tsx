@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Trash2, MapPin, Navigation, Archive, ArchiveRestore, AlertTriangle, Pencil } from "lucide-react";
 import { formatDistance } from "@/lib/formatDistance";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { Badge } from "@/components/ui/badge";
 import { calculateUrgency } from "@/lib/improvementRequest/urgency";
 import { BusinessChip } from "@/components/business/ui/BusinessChip";

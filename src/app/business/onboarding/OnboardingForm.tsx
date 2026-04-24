@@ -2,10 +2,11 @@
 
 import { useActionState, useRef, useState, useEffect } from "react";
 import { useFormStatus } from "react-dom";
-import { createBusinessAction, lookupLegalNameByUnp } from "./actions";
+import { createBusinessAction } from "./actions";
 import { PrimaryButton } from "@/components/ui/PrimaryButton";
 import { Input } from "@/components/ui/input";
 import { PhoneVerificationField } from "@/components/phone/PhoneVerificationField";
+import { UnpLookupField } from "@/components/business/UnpLookupField";
 import {
   loadDraft,
   saveDraft,
@@ -70,8 +71,6 @@ export function OnboardingForm({
   const [unp, setUnp] = useState(initialData?.unp || "");
   const [legalName, setLegalName] = useState(initialData?.legalName || "");
   const [isLegalNameTouched, setIsLegalNameTouched] = useState(!!initialData?.legalName);
-  const [isLookupLoading, setIsLookupLoading] = useState(false);
-  const [lookupError, setLookupError] = useState("");
   
   const [phoneE164, setPhoneE164] = useState(() =>
     defaultPhoneFromProps(initialData, accountPhoneE164)
@@ -80,26 +79,7 @@ export function OnboardingForm({
     defaultVerifiedPhoneFromProps(initialData)
   );
   
-  const lookupTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  /** Обратный отсчёт 0:59…0:00 на время запроса к ЕГР/ГРП */
-  const [unpLookupSecondsLeft, setUnpLookupSecondsLeft] = useState<number | null>(null);
-
-  useEffect(() => {
-    if (!isLookupLoading) {
-      setUnpLookupSecondsLeft(null);
-      return;
-    }
-    setUnpLookupSecondsLeft(59);
-    const id = window.setInterval(() => {
-      setUnpLookupSecondsLeft((s) => {
-        if (s === null) return null;
-        return s <= 0 ? 0 : s - 1;
-      });
-    }, 1000);
-    return () => window.clearInterval(id);
-  }, [isLookupLoading]);
 
   // Load draft on mount (only if no initialData)
   useEffect(() => {
@@ -147,66 +127,9 @@ export function OnboardingForm({
     }, 400); // 400ms debounce
   };
 
-  const handleUnpChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value.replace(/\D/g, "").slice(0, 9); // Only digits, max 9
+  const handleUnpChange = (value: string) => {
     setUnp(value);
-    setLookupError("");
-
-    // Save UNP to draft
     debouncedSave({ unp: value });
-
-    // Clear existing timeout
-    if (lookupTimeoutRef.current) {
-      clearTimeout(lookupTimeoutRef.current);
-    }
-
-    // Only lookup if we have exactly 9 digits
-    if (value.length === 9) {
-      lookupTimeoutRef.current = setTimeout(() => {
-        handleUnpLookup(value);
-      }, 700); // 700ms debounce
-    }
-  };
-
-  const handleUnpBlur = () => {
-    // On blur, if we have 9 digits and haven't looked up yet, do it immediately
-    if (unp.length === 9 && !isLookupLoading) {
-      if (lookupTimeoutRef.current) {
-        clearTimeout(lookupTimeoutRef.current);
-      }
-      handleUnpLookup(unp);
-    }
-  };
-
-  const handleUnpLookup = async (unpValue: string) => {
-    setIsLookupLoading(true);
-    setLookupError("");
-
-    try {
-      const result = await lookupLegalNameByUnp(unpValue);
-
-      if (result.legalName) {
-        // Found - prefill if user hasn't manually edited
-        if (!isLegalNameTouched) {
-          setLegalName(result.legalName);
-        }
-
-        // Save company data to draft
-        saveDraft({
-          companyData: {
-            legalName: result.legalName,
-            source: result.source,
-          },
-        });
-      } else {
-        // Not found - show soft message, don't block form
-        setLookupError("Не удалось определить автоматически. Проверьте УНП или заполните название вручную.");
-      }
-    } catch (error) {
-      setLookupError("Не удалось выполнить поиск. Заполните название вручную.");
-    } finally {
-      setIsLookupLoading(false);
-    }
   };
 
   const handleLegalNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -257,58 +180,28 @@ export function OnboardingForm({
   return (
     <form action={formAction} className="space-y-6">
       <div>
-        <label
-          htmlFor="unp"
-          className="block text-sm font-medium text-gray-700 mb-2"
-        >
-          УНП (Учетный номер плательщика)
-        </label>
-        <div className="relative">
-          <Input
-            type="text"
-            id="unp"
-            name="unp"
-            required
-            value={unp}
-            onChange={handleUnpChange}
-            onBlur={handleUnpBlur}
-            pattern="[0-9]{9}"
-            maxLength={9}
-            className="pr-10"
-            placeholder="123456789"
-          />
-          {isLookupLoading && (
-            <div className="absolute right-3 top-1/2 -translate-y-1/2">
-              <div className="animate-spin h-5 w-5 border-2 border-primary border-t-transparent rounded-full"></div>
-            </div>
-          )}
-        </div>
-        {isLookupLoading && (
-          <div className="mt-1 space-y-0.5 text-xs text-gray-600">
-            <p>
-              Определяем организацию по УНП…{" "}
-              <span className="tabular-nums font-medium text-gray-800">
-                {unpLookupSecondsLeft !== null
-                  ? `${Math.floor(unpLookupSecondsLeft / 60)}:${(unpLookupSecondsLeft % 60).toString().padStart(2, "0")}`
-                  : "0:59"}
-              </span>
-            </p>
-            <p className="text-gray-500">
-              Обычно это занимает около минуты. Пожалуйста, подождите.
-            </p>
-          </div>
-        )}
-        {lookupError && (
-          <p className="mt-1 text-xs text-amber-600">{lookupError}</p>
-        )}
-        {state && !state.ok && state.fieldErrors?.unp && (
-          <p className="mt-1 text-sm text-red-600">
-            {state.fieldErrors.unp[0]}
-          </p>
-        )}
-        {!isLookupLoading && !lookupError && (
-          <p className="mt-1 text-xs text-gray-500">9 цифр</p>
-        )}
+        <UnpLookupField
+          id="unp"
+          name="unp"
+          label="УНП (Учетный номер плательщика)"
+          value={unp}
+          required
+          onValueChange={handleUnpChange}
+          fieldError={state && !state.ok ? state.fieldErrors?.unp?.[0] : undefined}
+          onResolved={(result) => {
+            if (result.legalName && !isLegalNameTouched) {
+              setLegalName(result.legalName);
+            }
+            if (result.legalName) {
+              saveDraft({
+                companyData: {
+                  legalName: result.legalName,
+                  source: result.source ?? undefined,
+                },
+              });
+            }
+          }}
+        />
       </div>
 
       <div>

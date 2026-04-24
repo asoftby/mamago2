@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ContentStatus } from "@prisma/client";
 import { Loader2 } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { ActivityCardEntityPicker } from "@/components/admin/articles/ActivityCardEntityPicker";
 import { ArticleBlockRichEditor } from "@/components/admin/articles/ArticleBlockRichEditor";
 import { ArticleEditorCoverField } from "@/components/admin/articles/ArticleEditorCoverField";

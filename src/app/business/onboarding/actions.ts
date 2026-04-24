@@ -6,22 +6,11 @@ import { z, ZodError } from "zod";
 import { getCurrentUser } from "@/lib/auth/server";
 import { getOwnedBusinessProfile } from "@/server/business/getMyBusiness";
 import prisma from "@/lib/prisma";
-import { resolveCompanyByUnp } from "@/server/company/resolveByUnp";
 import { notifyAdminBusinessVerificationPending } from "@/lib/admin/notifyAdminBusinessVerification";
 import {
   isBusinessContactPhoneVerifiedForUser,
   normalizeBusinessContactPhone,
 } from "@/lib/phone-verification/businessContactVerification";
-
-// Server action for UNP lookup
-export async function lookupLegalNameByUnp(unp: string) {
-  const result = await resolveCompanyByUnp(unp);
-  // Return only legalName and source (no debug info to client)
-  return {
-    legalName: result.legalName,
-    source: result.source,
-  };
-}
 
 type ActionState =
   | { ok: true }
