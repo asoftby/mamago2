@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
-import { ActivityType } from "@prisma/client";
+import { ActivityType, Prisma } from "@prisma/client";
 import { canCreateBusinessContent } from "@/lib/auth/businessContentAccess";
 import {
   canManageActivityById,
@@ -16,6 +16,9 @@ import { fetchActivityEventRowSummary } from "@/lib/activity/fetchActivityEventR
 import { assignActivitySlugIfMissing } from "@/lib/slug/activitySlugService";
 import { validateEventProgramCategories } from "@/lib/business/validateEventProgramCategories";
 import { assertBusinessEventPrimaryCategory } from "@/lib/business/validatePrimaryEventCategory";
+import { replaceActivityGalleryFromMediaIds } from "@/lib/business/syncEventGalleryFromMediaIds";
+import { resolveEventOrganizer } from "@/lib/business/eventOrganizer";
+import { prismaBase } from "@/lib/prisma";
 
 /**
  * GET /api/business/events/[id]
@@ -78,6 +81,7 @@ export async function GET(
             startsAt: "asc",
           },
         },
+        organizer: true,
         filterOptions: true,
         venue: true,
       },
@@ -201,10 +205,28 @@ export async function PATCH(
       );
     }
 
-    const nextScheduleJson =
+    let nextScheduleJson =
       body.scheduleJson !== undefined
         ? ((body.scheduleJson ?? {}) as Record<string, unknown>)
         : ((existing.scheduleJson ?? {}) as Record<string, unknown>);
+    const organizerResolution =
+      body.organizerInput && typeof body.organizerInput === "object"
+        ? await resolveEventOrganizer(prismaBase, body.organizerInput)
+        : {
+            organizerId: existing.organizerId ?? null,
+            organizerSnapshot:
+              nextScheduleJson.organizer && typeof nextScheduleJson.organizer === "object"
+                ? (nextScheduleJson.organizer as Record<string, unknown>)
+                : null,
+          };
+    if (body.organizerInput !== undefined) {
+      nextScheduleJson = {
+        ...nextScheduleJson,
+        ...(organizerResolution.organizerSnapshot
+          ? { organizer: organizerResolution.organizerSnapshot }
+          : {}),
+      };
+    }
     const nextPrimaryRootCategoryId =
       typeof nextScheduleJson.categoryId === "string" ? nextScheduleJson.categoryId : null;
     const nextPrimaryLeafCategoryId =
@@ -232,7 +254,7 @@ export async function PATCH(
         description: body.description,
         ageTags: body.ageTags,
         scheduleMode: body.scheduleMode,
-        scheduleJson: body.scheduleJson,
+        scheduleJson: nextScheduleJson as Prisma.InputJsonValue,
         // Event category (leaf: subcategory if selected, otherwise root)
         eventCategoryId:
           typeof body.eventCategoryId === "string" ? body.eventCategoryId : undefined,
@@ -252,6 +274,7 @@ export async function PATCH(
         priceText: body.priceText,
         currency: body.currency,
         coverImageId: body.coverImageId,
+        organizerId: organizerResolution.organizerId,
         ...(mergedPlaceId !== undefined ? { placeId: mergedPlaceId } : {}),
         ...(nextBusinessId !== undefined ? { businessId: nextBusinessId } : {}),
       },
@@ -268,7 +291,17 @@ export async function PATCH(
     });
 
     if (body.scheduleJson !== undefined) {
-      await replaceActivitySessionsFromScheduleJson(event.id, body.scheduleJson);
+      await replaceActivitySessionsFromScheduleJson(event.id, nextScheduleJson);
+    }
+
+    if (body.galleryMediaIds !== undefined) {
+      await replaceActivityGalleryFromMediaIds(
+        event.id,
+        Array.isArray(body.galleryMediaIds)
+          ? body.galleryMediaIds.filter((mediaId: unknown): mediaId is string => typeof mediaId === "string")
+          : [],
+        typeof body.coverImageId === "string" ? body.coverImageId : event.coverImageId,
+      );
     }
 
     if (body.venue !== undefined) {

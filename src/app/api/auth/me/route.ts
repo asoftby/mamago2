@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import { prisma } from "@/lib/prisma";
+import { getMyBusiness } from "@/server/business/getMyBusiness";
+import { getEffectiveVerificationStatus } from "@/server/services/businessStatusMap";
 
 /**
  * GET /api/auth/me
@@ -17,7 +19,15 @@ export async function GET() {
       );
     }
 
-    return NextResponse.json(user);
+    const business = await getMyBusiness(user.id);
+    const hasApprovedBusinessProfile = business
+      ? getEffectiveVerificationStatus(business) === "APPROVED"
+      : false;
+
+    return NextResponse.json({
+      ...user,
+      hasApprovedBusinessProfile,
+    });
   } catch (error) {
     console.error("Get current user error:", error);
     return NextResponse.json(

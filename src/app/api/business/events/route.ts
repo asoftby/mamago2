@@ -16,6 +16,9 @@ import { excludeDeletedEvents, excludeGhostEventDrafts } from "@/lib/business/ev
 import { validateEventProgramCategories } from "@/lib/business/validateEventProgramCategories";
 import { assertBusinessEventPrimaryCategory } from "@/lib/business/validatePrimaryEventCategory";
 import { assignActivitySlugIfMissing } from "@/lib/slug/activitySlugService";
+import { replaceActivityGalleryFromMediaIds } from "@/lib/business/syncEventGalleryFromMediaIds";
+import { resolveEventOrganizer } from "@/lib/business/eventOrganizer";
+import { prismaBase } from "@/lib/prisma";
 
 /**
  * POST /api/business/events
@@ -48,8 +51,18 @@ export async function POST(request: NextRequest) {
       (body.scheduleJson && typeof body.scheduleJson === "object")
         ? (body.scheduleJson as Record<string, unknown>)
         : {};
+    const organizerResolution =
+      body.organizerInput && typeof body.organizerInput === "object"
+        ? await resolveEventOrganizer(prismaBase, body.organizerInput)
+        : { organizerId: typeof body.organizerId === "string" ? body.organizerId : null, organizerSnapshot: null };
+    const scheduleJsonWithOrganizer: Record<string, unknown> = {
+      ...scheduleJsonUnknown,
+      ...(organizerResolution.organizerSnapshot
+        ? { organizer: organizerResolution.organizerSnapshot }
+        : {}),
+    };
     const primaryRootCategoryId =
-      typeof scheduleJsonUnknown.categoryId === "string" ? scheduleJsonUnknown.categoryId : null;
+      typeof scheduleJsonWithOrganizer.categoryId === "string" ? scheduleJsonWithOrganizer.categoryId : null;
     const primaryLeafCategoryId =
       typeof body.eventCategoryId === "string" ? body.eventCategoryId : null;
 
@@ -103,7 +116,7 @@ export async function POST(request: NextRequest) {
         
         // Schedule
         scheduleMode: ScheduleMode.MULTI_DATE,
-        scheduleJson: (body.scheduleJson ?? {}) as Prisma.InputJsonValue,
+        scheduleJson: scheduleJsonWithOrganizer as Prisma.InputJsonValue,
         
         // Event category (leaf: subcategory if selected, otherwise root)
         eventCategoryId:
@@ -132,10 +145,16 @@ export async function POST(request: NextRequest) {
         
         // Business
         businessId: resolvedBusinessId,
+        organizerId: organizerResolution.organizerId,
       },
     });
 
     await replaceActivitySessionsFromScheduleJson(event.id, event.scheduleJson);
+    await replaceActivityGalleryFromMediaIds(
+      event.id,
+      Array.isArray(body.galleryMediaIds) ? body.galleryMediaIds.filter((id: unknown): id is string => typeof id === "string") : [],
+      typeof body.coverImageId === "string" ? body.coverImageId : null,
+    );
     if (body.venue !== undefined) {
       await syncEventVenueAndActivityCity(
         event.id,

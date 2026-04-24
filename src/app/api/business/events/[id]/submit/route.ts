@@ -11,6 +11,7 @@ import { canManageActivityById } from "@/lib/auth/activityAccess";
 import { replaceActivitySessionsFromScheduleJson } from "@/lib/business/syncEventActivitySessions";
 import { assignActivitySlugIfMissing } from "@/lib/slug/activitySlugService";
 import { ensurePublishedActivityHasSlug } from "@/lib/slug/publishSlugGuards";
+import { resolveCanonicalEventPublicPathById } from "@/lib/business/resolveCanonicalEventPublicPath";
 
 /**
  * POST /api/business/events/[id]/submit
@@ -139,6 +140,7 @@ export async function POST(
       where: { id: event.id },
       select: { slug: true },
     });
+    const publicPath = await resolveCanonicalEventPublicPathById(event.id);
 
     return NextResponse.json({
       success: true,
@@ -147,6 +149,7 @@ export async function POST(
         title: event.title,
         status: event.status,
         slug: slugRow?.slug ?? null,
+        publicPath,
       },
     });
   } catch (error: unknown) {

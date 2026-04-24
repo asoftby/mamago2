@@ -9,6 +9,7 @@ import prisma from "@/lib/prisma";
 import { ContentStatus } from "@prisma/client";
 import { canCreateBusinessContent } from "@/lib/auth/businessContentAccess";
 import { canManagePlaceAsync } from "@/lib/auth/placeAccess";
+import { detachImportedRecordsForCatalogEntity } from "@/server/modules/import/services/import-link-reconciliation.service";
 
 export async function DELETE(
   request: NextRequest,
@@ -62,6 +63,14 @@ export async function DELETE(
     }
 
     // Delete the place (hard delete for now)
+    await detachImportedRecordsForCatalogEntity(
+      {
+        entityType: "PLACE",
+        entityId: id,
+        reason: "Связанный Place был удалён и больше не считается активной сущностью каталога.",
+      },
+      prisma,
+    );
     await prisma.place.delete({
       where: { id },
     });

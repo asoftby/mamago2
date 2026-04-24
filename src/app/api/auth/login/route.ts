@@ -23,6 +23,7 @@ export async function POST(request: NextRequest) {
     const user = await prisma.user.findFirst({
       where: {
         email: { equals: email, mode: "insensitive" },
+        deletedAt: null,
       },
     });
 

@@ -17,6 +17,83 @@ export type EventMediaLibraryItem = {
   showImportBadge: boolean;
 };
 
+function normalizeImportedImageUrl(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  if (trimmed.startsWith("//")) return `https:${trimmed}`;
+  return null;
+}
+
+function extractImportedEventMedia(normalizedData: unknown): {
+  coverUrl: string | null;
+  galleryUrls: string[];
+} {
+  if (!normalizedData || typeof normalizedData !== "object" || Array.isArray(normalizedData)) {
+    return { coverUrl: null, galleryUrls: [] };
+  }
+
+  const raw = normalizedData as Record<string, unknown>;
+  const mainImageUrl = normalizeImportedImageUrl(raw.mainImageUrl);
+  const galleryUrls = Array.isArray(raw.imageUrls)
+    ? raw.imageUrls
+        .map((item) => normalizeImportedImageUrl(item))
+        .filter((item): item is string => Boolean(item))
+    : [];
+
+  const fallbackCoverUrl = mainImageUrl ?? galleryUrls[0] ?? null;
+
+  const dedupedGallery = galleryUrls.filter(
+    (url, index, arr) => arr.indexOf(url) === index && url !== fallbackCoverUrl,
+  );
+
+  return {
+    coverUrl: fallbackCoverUrl,
+    galleryUrls: dedupedGallery,
+  };
+}
+
+function extractImportedEventMediaFromRawPayload(rawPayload: unknown): {
+  coverUrl: string | null;
+  galleryUrls: string[];
+} {
+  if (!rawPayload || typeof rawPayload !== "object" || Array.isArray(rawPayload)) {
+    return { coverUrl: null, galleryUrls: [] };
+  }
+
+  const raw = rawPayload as Record<string, unknown>;
+  const coverCandidates = [
+    raw.mainImageUrl,
+    raw.mainImage,
+    raw.ogImage,
+    raw.coverImage,
+    raw.poster,
+    raw.posterUrl,
+  ];
+
+  const coverUrl =
+    coverCandidates.map((value) => normalizeImportedImageUrl(value)).find((value): value is string => Boolean(value)) ??
+    null;
+
+  const galleryCandidates = [raw.images, raw.imageUrls, raw.photos, raw.gallery].find((value) => Array.isArray(value));
+  const galleryUrls = Array.isArray(galleryCandidates)
+    ? galleryCandidates
+        .map((value) => normalizeImportedImageUrl(value))
+        .filter((value): value is string => Boolean(value))
+    : [];
+
+  const fallbackCoverUrl = coverUrl ?? galleryUrls[0] ?? null;
+  const dedupedGallery = galleryUrls.filter(
+    (url, index, arr) => arr.indexOf(url) === index && url !== fallbackCoverUrl,
+  );
+
+  return {
+    coverUrl: fallbackCoverUrl,
+    galleryUrls: dedupedGallery,
+  };
+}
+
 /**
  * GET /api/business/events/[id]/media-library
  * Медиа, связанные с событием: usages, обложка, галерея (по совпадению publicUrl).
@@ -40,6 +117,7 @@ export async function GET(
     where: { id: activityId, type: ActivityType.EVENT },
     select: {
       coverImageId: true,
+      coverImageUrl: true,
       images: { orderBy: { sortOrder: "asc" }, select: { url: true } },
     },
   });
@@ -50,8 +128,23 @@ export async function GET(
 
   const linkedImport = await prisma.importedRecord.findFirst({
     where: { publishedActivityId: activityId },
-    select: { id: true },
+    orderBy: { updatedAt: "desc" },
+    select: { id: true, normalizedData: true, rawPayload: true },
   });
+  const importedMediaFromRecord = extractImportedEventMedia(linkedImport?.normalizedData);
+  const importedMediaFromRaw = extractImportedEventMediaFromRawPayload(linkedImport?.rawPayload);
+  const importedMedia = {
+    coverUrl:
+      importedMediaFromRecord.coverUrl ??
+      importedMediaFromRaw.coverUrl ??
+      normalizeImportedImageUrl(activity.coverImageUrl),
+    galleryUrls:
+      importedMediaFromRecord.galleryUrls.length > 0
+        ? importedMediaFromRecord.galleryUrls
+        : importedMediaFromRaw.galleryUrls.length > 0
+          ? importedMediaFromRaw.galleryUrls
+          : [...new Set(activity.images.map((item) => normalizeImportedImageUrl(item.url)).filter(Boolean))],
+  };
 
   const usages = await getEntityMediaUsages(MediaEntityType.EVENT, activityId);
 
@@ -127,5 +220,6 @@ export async function GET(
   return NextResponse.json({
     items,
     linkedImport: Boolean(linkedImport),
+    importedMedia,
   });
 }
