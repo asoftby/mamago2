@@ -12,6 +12,7 @@ import { getCurrentUser } from "@/lib/auth/server";
 import { editorEventEditHref } from "@/lib/content-editor/types";
 import { buildEventJsonLd } from "@/lib/seo/schema/buildEventJsonLd";
 import { AnalyticsDetailBeacon } from "@/components/analytics/AnalyticsDetailBeacon";
+import { resolveCanonicalEventPublicPathBySlugOrId } from "@/lib/business/resolveCanonicalEventPublicPath";
 
 interface EventPublicPageProps {
   params: Promise<{ city: string; slugOrId: string }>;
@@ -60,6 +61,12 @@ export async function generateMetadata({ params, searchParams }: EventPublicPage
   const fromDb = await loadPublicActivityForCityPage(city, slugOrId);
   if (fromDb?._redirectToSlug) {
     permanentRedirect(`/${city}/events/${fromDb._redirectToSlug}${searchParamsToSuffix(sp)}`);
+  }
+  if (!fromDb) {
+    const canonicalPath = await resolveCanonicalEventPublicPathBySlugOrId(slugOrId);
+    if (canonicalPath && canonicalPath !== `/${city}/events/${slugOrId}`) {
+      permanentRedirect(`${canonicalPath}${searchParamsToSuffix(sp)}`);
+    }
   }
 
   if (!fromDb) return {};
@@ -139,6 +146,11 @@ export default async function CityEventPublicPage({ params, searchParams }: Even
         <EventPageView data={data} />
       </>
     );
+  }
+
+  const canonicalPath = await resolveCanonicalEventPublicPathBySlugOrId(slugOrId);
+  if (canonicalPath && canonicalPath !== `/${city}/events/${slugOrId}`) {
+    permanentRedirect(`${canonicalPath}${searchParamsToSuffix(sp)}`);
   }
 
   const activity = city === "minsk" ? MINSK_ACTIVITIES.find((a) => a.id === slugOrId) : undefined;

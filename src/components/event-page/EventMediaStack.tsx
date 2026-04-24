@@ -1,6 +1,4 @@
 "use client";
-
-import Image from "next/image";
 import { cn } from "@/lib/utils";
 import type { EventPageMedia } from "@/lib/event/eventPageTypes";
 
@@ -20,29 +18,15 @@ export function EventMediaStack({
     <div className={cn("flex w-full flex-col gap-6", className)}>
       {/* 1) Poster — portrait anchor (narrow column); remote URLs как в MediaCover (вне next/image allowlist) */}
       <div className="w-full max-w-[280px] sm:max-w-[300px] lg:max-w-[266px]">
-        <div
-          className="relative w-full overflow-hidden rounded-[18px] bg-muted shadow-[var(--shadow-card)]"
-          style={{ aspectRatio: "2 / 3" }}
-        >
-          {isRemoteAbsolute ? (
-            // eslint-disable-next-line @next/next/no-img-element -- произвольные CDN / storage вне remotePatterns
-            <img
-              src={posterUrl}
-              alt={posterAlt}
-              className="absolute inset-0 h-full w-full object-cover"
-              loading="eager"
-              decoding="async"
-            />
-          ) : (
-            <Image
-              src={posterUrl}
-              alt={posterAlt}
-              fill
-              sizes="(max-width: 1024px) min(300px, 88vw), 266px"
-              className="object-cover"
-              priority
-            />
-          )}
+        <div className="w-full overflow-hidden rounded-[18px] bg-muted shadow-[var(--shadow-card)]">
+          {/* eslint-disable-next-line @next/next/no-img-element -- произвольные URL и естественная высота постера */}
+          <img
+            src={posterUrl}
+            alt={posterAlt}
+            className="block h-auto w-full object-contain"
+            loading={isRemoteAbsolute ? "eager" : "lazy"}
+            decoding="async"
+          />
         </div>
       </div>
 

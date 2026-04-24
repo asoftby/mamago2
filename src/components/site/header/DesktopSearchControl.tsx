@@ -3,6 +3,7 @@
 import { useRef, RefObject, useEffect, useMemo, useState } from "react";
 import { MapPin, Calendar, Users, X } from "lucide-react";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import type { DiscoveryFilters } from "@/features/filters/discovery/filters.store";
 import { useDiscoveryFilters } from "@/features/filters/discovery/filters.store";
@@ -17,7 +18,6 @@ import {
   resolveFamilyAgeMode,
 } from "@/lib/family/familyAgeMode";
 import { togglePersonaId } from "@/lib/family/togglePersonaSelection";
-import { toast } from "sonner";
 import { LocationPanel, DatePanel, AgePanel } from "./search-segments";
 import { Portal } from "@/components/ui/portal";
 import { useDropdownPosition } from "@/hooks/useDropdownPosition";
@@ -384,11 +384,10 @@ function DiscoveryDesktopSearchControl({
   embeddedInHeader = false,
   hideSecondaryFilters = false,
 }: DiscoveryDesktopSearchControlProps) {
-  /** Вторичная панель «Фильтры» зависит от пропсов/контекста; без отложенного рендера возможен hydration mismatch (SSR vs первый клиент). */
-  const [secondaryFiltersMounted, setSecondaryFiltersMounted] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return true;
-  });
+  const router = useRouter();
+  /** Вторичная панель «Фильтры» рендерится после mount, чтобы SSR и первый CSR были идентичны. */
+  const [secondaryFiltersMounted, setSecondaryFiltersMounted] = useState(false);
+  const [pendingCitySlug, setPendingCitySlug] = useState(citySlug);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const locationRef = useRef<HTMLButtonElement>(null);
@@ -396,7 +395,7 @@ function DiscoveryDesktopSearchControl({
   const ageRef = useRef<HTMLButtonElement>(null);
   
   const { applied, actions } = useDiscoveryFilters();
-  const { options: apiOptions } = useDiscoveryFilterOptions(citySlug);
+  const { options: apiOptions } = useDiscoveryFilterOptions(pendingCitySlug);
   const { isAuthenticated, isLoading: authLoading } = useAuthMe();
   const family = useFamilyPersona();
   const profileChildren: ProfileChildFilterOption[] =
@@ -486,6 +485,32 @@ function DiscoveryDesktopSearchControl({
     formDisplayFilters.age,
   ]);
 
+  useEffect(() => {
+    setPendingCitySlug(citySlug);
+  }, [citySlug]);
+
+  useEffect(() => {
+    setSecondaryFiltersMounted(true);
+  }, []);
+
+  const buildCityDiscoveryHref = (nextCitySlug: string) => {
+    if (!currentIntent) return `/${nextCitySlug}`;
+    const intentConfig =
+      DISCOVERY_INTENT_CONFIG[currentIntent as keyof typeof DISCOVERY_INTENT_CONFIG];
+    return intentConfig?.href(nextCitySlug) ?? `/${nextCitySlug}`;
+  };
+
+  const commitCitySelection = (nextCitySlug: string) => {
+    if (nextCitySlug === citySlug) return;
+    if (process.env.NODE_ENV !== "production") {
+      console.debug("[Home/CityDropdown] city commit", {
+        from: citySlug,
+        to: nextCitySlug,
+      });
+    }
+    router.push(buildCityDiscoveryHref(nextCitySlug), { scroll: false });
+  };
+
   /**
    * Toggle persona selection - same logic as in My Plan
    */
@@ -563,7 +588,11 @@ function DiscoveryDesktopSearchControl({
   
   // Build location display text
   const getLocationText = () => {
-    const cityPhrase = getCityLocativePhrase(citySlug);
+    const effectiveCitySlug =
+      mode === "expanded" && activePanel === "where"
+        ? pendingCitySlug
+        : citySlug;
+    const cityPhrase = getCityLocativePhrase(effectiveCitySlug);
     const nearbyPart = formDisplayFilters.nearby ? "Поблизости" : null;
     
     let metroOrDistrictPart: string | null = null;
@@ -583,7 +612,7 @@ function DiscoveryDesktopSearchControl({
   const getDateText = () => {
     if (formDisplayFilters.whenPreset === "TODAY") return "Сегодня";
     if (formDisplayFilters.whenPreset === "TOMORROW") return "Завтра";
-    if (formDisplayFilters.whenPreset === "WEEKEND") return "Выходные";
+    if (formDisplayFilters.whenPreset === "WEEKEND") return "На выходных";
     
     if (formDisplayFilters.dateFrom) {
       const fromDate = new Date(formDisplayFilters.dateFrom);
@@ -684,7 +713,7 @@ function DiscoveryDesktopSearchControl({
       if (target.closest('[data-slot="dialog-content"]')) return;
       if (target.closest('[data-slot="dialog-overlay"]')) return;
 
-      // Любой другой клик - закрываем панель
+      // Любой другой клик - только закрываем панель
       onPanelClose();
       actions.close(); // Revert draft when closing
     };
@@ -862,7 +891,7 @@ function DiscoveryDesktopSearchControl({
               <Users className="h-4 w-4 text-gray-400 flex-shrink-0" />
               <div className="flex flex-col items-start min-w-0 flex-1">
                 <span className="text-xs font-medium text-gray-900">Для кого?</span>
-                <span className="text-sm text-gray-600 truncate w-full text-left">
+                <span className="text-sm text-gray-600 truncate w-full text-left" suppressHydrationWarning>
                   {whoPrimaryLine}
                 </span>
               </div>
@@ -915,7 +944,16 @@ function DiscoveryDesktopSearchControl({
                 }}
               >
                 <LocationPanel
-                  citySlug={citySlug}
+                  citySlug={pendingCitySlug}
+                  selectedCitySlug={pendingCitySlug}
+                  onCityPick={(slug) => {
+                    if (slug === pendingCitySlug) {
+                      return;
+                    }
+                    setPendingCitySlug(slug);
+                    actions.setDraft({ nearby: false, metro: null, district: null });
+                    commitCitySelection(slug);
+                  }}
                   searchText=""
                   onSearchTextChange={() => {}}
                   onClose={() => {
@@ -1065,7 +1103,7 @@ function CompactSearchSummary({
   const dateLine = (() => {
     if (applied.whenPreset === "TODAY") return "Сегодня";
     if (applied.whenPreset === "TOMORROW") return "Завтра";
-    if (applied.whenPreset === "WEEKEND") return "Выходные";
+    if (applied.whenPreset === "WEEKEND") return "На выходных";
     if (applied.dateFrom) {
       const fromDate = new Date(applied.dateFrom);
       if (applied.dateTo && applied.dateFrom !== applied.dateTo) {
@@ -1120,7 +1158,7 @@ function CompactSearchSummary({
           <FallbackIcon className="h-[21px] w-[21px] text-gray-400" />
         )}
       </div>
-      <span className="text-sm text-gray-700 truncate flex-1">
+      <span className="text-sm text-gray-700 truncate flex-1" suppressHydrationWarning>
         {summaryText}
       </span>
     </>

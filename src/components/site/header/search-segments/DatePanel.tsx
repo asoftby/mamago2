@@ -43,7 +43,7 @@ export function DatePanel({ onClose, applied, actions }: DatePanelProps) {
           patch = { whenPreset: "TOMORROW", dateFrom: null, dateTo: null };
         }
       } else if (val === 'weekend') {
-        // Если уже выбраны "Выходные", отжимаем кнопку
+        // Если уже выбрано "На выходных", отжимаем кнопку
         if (applied.whenPreset === "WEEKEND") {
           patch = { dateFrom: null, dateTo: null, whenPreset: null };
         } else {
@@ -114,7 +114,7 @@ export function DatePanel({ onClose, applied, actions }: DatePanelProps) {
   const quickOptions = [
     { id: "today", label: "Сегодня", value: "today" },
     { id: "tomorrow", label: "Завтра", value: "tomorrow" },
-    { id: "weekend", label: "Выходные", value: "weekend" },
+    { id: "weekend", label: "На выходных", value: "weekend" },
   ];
 
   return (

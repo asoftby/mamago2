@@ -1,76 +1,90 @@
 "use client";
 
 import Link from "next/link";
+import { useMemo } from "react";
 import { ActivityCard } from "@/components/activity/ActivityCard";
 import { RouteCard } from "@/components/routes/RouteCard";
 import { CityHomeSection } from "@/features/city-home/components/CityHomeSection";
 import { HorizontalCardRow } from "@/features/city-home/components/HorizontalCardRow";
-import { MINSK_JOURNAL_PREVIEW } from "@/features/city-home/data/minskCityHome";
 import { useCity } from "@/contexts/CityContext";
-import { getCityDisplayName } from "@/lib/city/cityLabels";
-import { formatRuShortDayMonth } from "@/lib/formatters/date";
+import { useFamilyPersona } from "@/contexts/FamilyPersonaContext";
+import { getCityLocativePhrase } from "@/lib/city/cityDisplayNames";
+import { formatRuShortDayMonth, formatRuShortDayMonthRange } from "@/lib/formatters/date";
 import type { ActivityMock } from "@/mocks/activity.types";
-import { MOCK_ROUTES } from "@/mocks/routes.mock";
+import type { MockRoute } from "@/mocks/routes.mock";
 import { cn } from "@/lib/utils";
-
-/** Превью «Занятия» — только из БД (пока пусто, без моков). */
-const CLASSES_PREVIEW = [] as ActivityMock[];
-
-const ROUTES_PREVIEW = MOCK_ROUTES.filter((r) => r.cityName === "Минск").slice(0, 6);
+import type { CityHomeJournalArticle } from "@/server/article/listCityHomeArticles";
+import { useDiscoveryFilters } from "@/features/filters/discovery/filters.store";
+import {
+  buildAudienceLabel,
+  buildMainTitle,
+} from "@/features/city-home/lib/audiencePersonalization";
+import { applyPersonaRanking } from "@/features/city-home/lib/personaRanking";
 
 const cardShell =
   "shrink-0 snap-start w-[42vw] min-w-[156px] max-w-[220px] sm:max-w-[240px] " +
   // Desktop: exactly 4 cards per row width (gap-6 => 3 * 1.5rem = 4.5rem)
   "lg:w-[calc((100%-4.5rem)/4)] lg:max-w-none";
 
-import { useFamilyPersona } from "@/contexts/FamilyPersonaContext";
-import { useDiscoveryFilters } from "@/features/filters/discovery/filters.store";
+function buildKudaSectionTitle(input: {
+  citySlug: string;
+  whenPreset: "TODAY" | "TOMORROW" | "WEEKEND" | null;
+  dateFrom: string | null;
+  dateTo: string | null;
+}): string {
+  const cityPart = getCityLocativePhrase(input.citySlug);
 
-function whenLabel(preset: string | null): string | null {
-  if (preset === "TODAY") return "сегодня";
-  if (preset === "TOMORROW") return "завтра";
-  if (preset === "WEEKEND") return "на выходные";
-  return null;
-}
-
-function kudaTitle(citySlug: string): string {
-  const name = getCityDisplayName(citySlug);
-  return citySlug === "minsk"
-    ? "Куда пойти сегодня в Минске"
-    : `Куда пойти сегодня — ${name}`;
-}
-
-function useReactiveKudaTitle(citySlug: string): string {
-  const family = useFamilyPersona();
-  const { applied } = useDiscoveryFilters();
-
-  const personas = family?.personas ?? [];
-  const selectedIds = family?.selectedPersonaIds ?? [];
-  const loading = family?.loading ?? true;
-
-  if (loading) return kudaTitle(citySlug);
-
-  const selected = personas.filter((p) => selectedIds.includes(p.id));
-  const children = selected.filter((p) => p.kind === "child");
-  const when = whenLabel(applied.whenPreset);
-
-  if (children.length === 1) {
-    const name = children[0]!.displayName;
-    return when ? `Для ${name} ${when}` : `Для ${name}`;
+  if (input.whenPreset === "TODAY") {
+    return `Куда пойти сегодня ${cityPart}`;
   }
-  if (children.length > 1) {
-    return when ? `Для детей ${when}` : "Для детей";
+
+  if (input.whenPreset === "TOMORROW") {
+    return `Куда пойти завтра ${cityPart}`;
   }
-  if (when) {
-    return `Куда пойти ${when}`;
+
+  if (input.whenPreset === "WEEKEND") {
+    return `Куда пойти на выходных ${cityPart}`;
   }
-  return kudaTitle(citySlug);
+
+  if (input.dateFrom && input.dateTo) {
+    const range = formatRuShortDayMonthRange(input.dateFrom, input.dateTo);
+    return range ? `Куда пойти ${range} ${cityPart}` : `Куда пойти ${cityPart}`;
+  }
+
+  if (input.dateFrom) {
+    const dateLabel = formatRuShortDayMonth(input.dateFrom);
+    return dateLabel ? `Куда пойти ${dateLabel} ${cityPart}` : `Куда пойти ${cityPart}`;
+  }
+
+  return `Куда пойти ${cityPart}`;
 }
 
 export function CityHomeKudaSection({ activities }: { activities: ActivityMock[] }) {
   const { citySlug, appendCityQuery } = useCity();
-  const title = useReactiveKudaTitle(citySlug);
-  const preview = activities;
+  const { applied } = useDiscoveryFilters();
+  const family = useFamilyPersona();
+  const baseTitle = buildKudaSectionTitle({
+    citySlug,
+    whenPreset: applied.whenPreset,
+    dateFrom: applied.dateFrom,
+    dateTo: applied.dateTo,
+  });
+  const audienceLabel = buildAudienceLabel({
+    selectedPersonaIds: family?.selectedPersonaIds ?? [],
+    personas: family?.personas ?? [],
+  });
+  const title = buildMainTitle({
+    baseTitle,
+    audienceLabel,
+  });
+  const preview = useMemo(
+    () =>
+      applyPersonaRanking(activities, {
+        personas: family?.personas ?? [],
+        selectedPersonaIds: family?.selectedPersonaIds ?? [],
+      }),
+    [activities, family?.personas, family?.selectedPersonaIds],
+  );
 
   if (preview.length === 0) {
     return (
@@ -116,16 +130,36 @@ export function CityHomeKudaSection({ activities }: { activities: ActivityMock[]
   );
 }
 
-export function CityHomeClassesSection() {
+export function CityHomeClassesSection({
+  cityName,
+  activities,
+  mode,
+}: {
+  cityName: string;
+  activities: ActivityMock[];
+  mode: "local" | "nearby" | "empty";
+}) {
   const { citySlug, appendCityQuery } = useCity();
-  const preview =
-    citySlug === "minsk" ? CLASSES_PREVIEW : ([] as typeof CLASSES_PREVIEW);
+  const family = useFamilyPersona();
+  const preview = useMemo(
+    () =>
+      applyPersonaRanking(activities, {
+        personas: family?.personas ?? [],
+        selectedPersonaIds: family?.selectedPersonaIds ?? [],
+      }),
+    [activities, family?.personas, family?.selectedPersonaIds],
+  );
 
-  if (preview.length === 0) return null;
+  if (mode === "empty" || preview.length === 0) {
+    return null;
+  }
 
   return (
     <CityHomeSection
-      title="Занятия"
+      title={mode === "local" ? `Занятия ${getCityLocativePhrase(citySlug)}` : "Занятия рядом"}
+      subtitle={
+        mode === "nearby" ? `В ${cityName} пока немного вариантов — посмотрите рядом` : undefined
+      }
       actionLabel="Все занятия"
       actionHref={appendCityQuery(`/${citySlug}/classes`)}
       actionIconButton
@@ -151,16 +185,24 @@ export function CityHomeClassesSection() {
   );
 }
 
-export function CityHomeRoutesSection() {
+export function CityHomeRoutesSection({
+  routes,
+  mode,
+}: {
+  routes: MockRoute[];
+  mode: "local" | "nearby" | "empty";
+}) {
   const { citySlug, appendCityQuery } = useCity();
-  const preview =
-    citySlug === "minsk" ? ROUTES_PREVIEW : ([] as typeof ROUTES_PREVIEW);
+  const preview = routes;
 
-  if (preview.length === 0) return null;
+  if (mode === "empty" || preview.length === 0) {
+    return null;
+  }
 
   return (
     <CityHomeSection
-      title="Маршруты"
+      title={mode === "local" ? `Маршруты ${getCityLocativePhrase(citySlug)}` : "Маршруты рядом"}
+      subtitle={mode === "nearby" ? "Подобрали маршруты недалеко от вас" : undefined}
       actionLabel="Все маршруты"
       actionHref={appendCityQuery(`/${citySlug}/routes`)}
       actionIconButton
@@ -176,19 +218,27 @@ export function CityHomeRoutesSection() {
   );
 }
 
-export function CityHomeJournalSection() {
-  const { appendCityQuery } = useCity();
-  if (MINSK_JOURNAL_PREVIEW.length === 0) return null;
+export function CityHomeJournalSection({
+  articles,
+}: {
+  articles: CityHomeJournalArticle[];
+}) {
+  const { citySlug, appendCityQuery } = useCity();
+
+  if (articles.length === 0) {
+    return null;
+  }
 
   return (
     <CityHomeSection
       title="Статьи и обзоры"
+      subtitle={`Материалы ${getCityLocativePhrase(citySlug)}`}
       actionLabel="В журнал"
       actionHref={appendCityQuery("/blog")}
       actionIconButton
     >
       <HorizontalCardRow>
-        {MINSK_JOURNAL_PREVIEW.map((a) => (
+        {articles.map((a) => (
           <Link
             key={a.slug}
             href={`/blog/${a.slug}`}

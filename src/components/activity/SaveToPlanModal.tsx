@@ -6,13 +6,18 @@ import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import {
   CalendarDays, CalendarCheck, CalendarClock,
   Bookmark, BookmarkCheck, ChevronRight, ChevronLeft,
   ExternalLink, Pencil, Trash2,
 } from "lucide-react";
 import { DatePicker } from "@/components/ui/date-picker";
+import {
+  addDaysLocal,
+  formatLocalPlanDate,
+  getLocalDateKey,
+} from "@/lib/date/localDateKey";
 
 export type SaveScenario =
   | { kind: "confirm"; title: string; dateLabel: string; timeLabel: string; dateISO: string; slotId?: string | null }
@@ -38,13 +43,9 @@ export interface SaveToPlanModalProps {
 
 type ModalView = "quick" | "calendar";
 
-function getTodayISO() { return new Date().toISOString().split("T")[0]; }
-function getTomorrowISO() { const d = new Date(); d.setDate(d.getDate() + 1); return d.toISOString().split("T")[0]; }
-function formatDateRu(iso: string) { return new Date(iso).toLocaleDateString("ru-RU", { day: "numeric", month: "long" }); }
-
 function toastPlan(dateISO: string) {
   toast.success("Добавлено в план", {
-    description: `Активность сохранена на ${formatDateRu(dateISO)}`,
+    description: `Активность сохранена на ${formatLocalPlanDate(dateISO, "ru-RU")}`,
     action: { label: "Открыть план", onClick: () => { window.location.href = "/me/plan"; } },
     duration: 4000,
   });
@@ -107,7 +108,7 @@ function CalendarView({ onBack, onSelect }: { onBack: () => void; onSelect: (iso
   const [value, setValue] = React.useState<Date | null>(null);
   const handleConfirm = () => {
     if (!value) return;
-    const iso = value.toISOString().split("T")[0]!;
+    const iso = getLocalDateKey(value);
     onSelect(iso);
   };
   return (
@@ -129,8 +130,8 @@ interface QuickViewProps {
   onPlan: (iso: string) => void; onIdea: () => void; onRemoveIdea: () => void; onSwitchCalendar: () => void;
 }
 function QuickView({ isIdea, inPlan, planDate, onPlan, onIdea, onRemoveIdea, onSwitchCalendar }: QuickViewProps) {
-  const todayISO = getTodayISO();
-  const tomorrowISO = getTomorrowISO();
+  const todayISO = getLocalDateKey();
+  const tomorrowISO = addDaysLocal(todayISO, 1);
   return (
     <div className="px-4 py-4 space-y-4">
       <div className="space-y-2">
@@ -138,7 +139,7 @@ function QuickView({ isIdea, inPlan, planDate, onPlan, onIdea, onRemoveIdea, onS
         {inPlan && planDate ? (
           <StatusCard
             icon={<CalendarCheck className="w-4 h-4" />}
-            title={`Уже в плане на ${formatDateRu(planDate)}`}
+            title={`Уже в плане на ${formatLocalPlanDate(planDate, "ru-RU")}`}
             subtitle="Вы можете изменить дату или открыть план"
             actions={[
               { label: "Изменить дату", icon: <Pencil className="w-3 h-3" />, onClick: onSwitchCalendar },
@@ -147,8 +148,8 @@ function QuickView({ isIdea, inPlan, planDate, onPlan, onIdea, onRemoveIdea, onS
           />
         ) : (
           <>
-            <ActionRow icon={<CalendarCheck className="w-5 h-5" />} title="Сегодня" subtitle={`Добавить в план на ${formatDateRu(todayISO)}`} onClick={() => onPlan(todayISO)} />
-            <ActionRow icon={<CalendarDays className="w-5 h-5" />} title="Завтра" subtitle={`Добавить в план на ${formatDateRu(tomorrowISO)}`} onClick={() => onPlan(tomorrowISO)} />
+            <ActionRow icon={<CalendarCheck className="w-5 h-5" />} title="Сегодня" subtitle={`Добавить в план на ${formatLocalPlanDate(todayISO, "ru-RU")}`} onClick={() => onPlan(todayISO)} />
+            <ActionRow icon={<CalendarDays className="w-5 h-5" />} title="Завтра" subtitle={`Добавить в план на ${formatLocalPlanDate(tomorrowISO, "ru-RU")}`} onClick={() => onPlan(tomorrowISO)} />
             <ActionRow icon={<CalendarClock className="w-5 h-5" />} title="Выбрать дату" subtitle="Открыть календарь и выбрать день" onClick={onSwitchCalendar} />
           </>
         )}
@@ -274,7 +275,7 @@ export function SaveToPlanPickerBody({
               {isIdea ? "Уже в идеях" : "В идеи"}
             </Button>
             <Button size="lg" className="flex-1 rounded-2xl font-semibold" onClick={handleConfirmPlan} disabled={!!inPlan}>
-              {inPlan && planDate ? `На ${formatDateRu(planDate)}` : "Добавить в план"}
+              {inPlan && planDate ? `На ${formatLocalPlanDate(planDate, "ru-RU")}` : "Добавить в план"}
             </Button>
           </div>
         </>

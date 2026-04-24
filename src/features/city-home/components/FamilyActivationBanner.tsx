@@ -96,7 +96,7 @@ export function FamilyActivationBanner() {
 
         <div className="space-y-3 pr-1">
           <h2 className="text-base font-semibold leading-snug text-neutral-900 sm:text-lg">
-            Подберём идеи для вашей семьи 👨‍👩‍👧
+            Подберём идеи для вашей семьи
           </h2>
           <p className="text-sm leading-relaxed text-neutral-600">
             Добавьте ребёнка и интересы — получите персональные рекомендации и

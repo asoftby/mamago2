@@ -5,7 +5,7 @@ import { Heart } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSaveEventOnboarding } from "@/hooks/useSaveEventOnboarding";
 import { SaveEventOnboarding } from "@/components/onboarding/SaveEventOnboarding";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 
 export interface SaveEventButtonProps {
   /** Activity ID */

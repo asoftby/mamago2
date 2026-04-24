@@ -3,7 +3,7 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { CheckCircle2 } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { ModalCloseButton } from "@/components/ui/modal-close-button";
 import { CompactSaveAuthPanel } from "@/components/auth/CompactSaveAuthPanel";
 import { SaveFlowContainer } from "./SaveFlowContainer";

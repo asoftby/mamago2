@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { useChildInterests } from "@/hooks/useChildInterests";
 import {

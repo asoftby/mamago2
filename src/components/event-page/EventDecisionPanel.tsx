@@ -53,7 +53,7 @@ export function EventDecisionPanel({
         <EventBreadcrumbs items={data.breadcrumbs} />
 
         {data.categoryLabel && (
-          <span className="inline-flex w-fit rounded-full border border-border/70 bg-background px-3 py-1 text-xs font-medium text-muted-foreground">
+          <span className="inline-flex w-fit rounded-full border border-[#F2B39A] bg-[#FFF7F3] px-4 pt-[6px] pb-1 text-[11px] font-semibold uppercase tracking-[0.04em] text-[#F07F55]">
             {data.categoryLabel}
           </span>
         )}

@@ -16,9 +16,7 @@ export default function PublicGroupLayout({
       <CityProvider>
         <PublicationIntentProvider>
           <div className="flex min-h-screen flex-col bg-white">
-            <Suspense fallback={<div className="h-16 bg-white" />}>
-              <SiteHeader />
-            </Suspense>
+            <SiteHeader />
 
             <PublicLayoutBody>{children}</PublicLayoutBody>
 

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSetPublicationIntent } from "@/contexts/PublicationIntentContext";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import {
   Dialog,
   DialogContent,
@@ -181,7 +181,7 @@ export function EventPageView({ data }: { data: EventPageData }) {
         }
         await loadSaveStatus();
       } catch (e) {
-        toast.error("Не удалось сохранить", {
+        toast.error("Не получилось выполнить действие", {
           description: "Попробуйте еще раз",
         });
         throw e;
@@ -211,7 +211,7 @@ export function EventPageView({ data }: { data: EventPageData }) {
           description: `Событие добавлено на ${formatPlanDateRu(dateISO)}`,
         });
       } catch {
-        toast.error("Не удалось добавить в план", {
+        toast.error("Не получилось выполнить действие", {
           description: "Попробуйте еще раз",
         });
       }

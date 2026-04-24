@@ -1,11 +1,12 @@
 "use client";
 
-import { Suspense } from "react";
+import { Suspense, useEffect } from "react";
 import { usePathname } from "next/navigation";
 import { PublicFooter } from "@/components/shell/PublicFooter";
 import { MobileBottomNav } from "@/components/mobile/MobileBottomNav";
 import { shouldHideMobileBottomNav } from "@/lib/intent";
 import { cn } from "@/lib/utils";
+import { useNavigationReloadDebug } from "@/hooks/useNavigationReloadDebug";
 
 const MOBILE_MAIN_BOTTOM =
   "pb-[calc(5.75rem+env(safe-area-inset-bottom))] lg:pb-0";
@@ -17,6 +18,18 @@ const MOBILE_MAIN_BOTTOM =
 export function PublicLayoutBody({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const hideBottomBar = shouldHideMobileBottomNav(pathname);
+  useNavigationReloadDebug(process.env.NODE_ENV !== "production");
+
+  useEffect(() => {
+    if (process.env.NODE_ENV !== "production") {
+      console.debug("[Home/PublicLayoutBody] mounted", { pathname });
+    }
+    return () => {
+      if (process.env.NODE_ENV !== "production") {
+        console.debug("[Home/PublicLayoutBody] unmounted", { pathname });
+      }
+    };
+  }, [pathname]);
 
   return (
     <>

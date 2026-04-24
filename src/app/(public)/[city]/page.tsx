@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { CityShell } from "@/components/city/CityShell";
+import CityHomePage from "@/features/city-home/pages/CityHomePage";
 import { buildCityHomeCanonicalToEvents } from "@/lib/seo/cityKudaListingMetadata";
 
 interface PageProps {
@@ -18,13 +18,7 @@ export async function generateMetadata({
 
 export default async function CityPage({ params, searchParams }: PageProps) {
   const { city: citySlug } = await params;
-  const resolvedSearchParams = await searchParams;
+  await searchParams;
 
-  return (
-    <CityShell 
-      citySlug={citySlug} 
-      intent="kuda"
-      searchParams={resolvedSearchParams}
-    />
-  );
+  return <CityHomePage citySlug={citySlug} />;
 }

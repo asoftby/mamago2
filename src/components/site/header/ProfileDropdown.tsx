@@ -18,14 +18,24 @@ export type ProfileDropdownProps = {
   onLogout: () => void;
   onNavigate: () => void;
   onGoToSettings: () => void;
+  onSwitchMode: (next: AccountMode) => void;
+  onGoToHome: () => void;
+  onGoToPersonalProfile: () => void;
+  onGoToPersonalIdeas: () => void;
   onGoToAdminAccount: () => void;
   onGoToBusinessAccount: () => void;
-  onGoToPersonalProfile: () => void;
-  onGoToPersonalAccount: () => void;
   onGoToPersonalPlan: () => void;
+  onGoToPersonalNotifications: () => void;
   onGoToBusinessDashboard: () => void;
-  onGoToBusinessPlaces: () => void;
-  onGoToBusinessCommercial: () => void;
+  onGoToBusinessRoot: () => void;
+  onGoToBusinessPublications: () => void;
+  onGoToBusinessBookings: () => void;
+  onGoToBusinessClients: () => void;
+  onGoToBusinessAnalytics: () => void;
+  onGoToBusinessPromotion: () => void;
+  onGoToBusinessBilling: () => void;
+  hasBusinessProfile: boolean;
+  businessBalanceBYN?: number;
 };
 
 export function ProfileDropdown({
@@ -39,14 +49,24 @@ export function ProfileDropdown({
   onLogout,
   onNavigate,
   onGoToSettings,
+  onSwitchMode,
+  onGoToHome,
+  onGoToPersonalProfile,
+  onGoToPersonalIdeas,
   onGoToAdminAccount,
   onGoToBusinessAccount,
-  onGoToPersonalProfile,
-  onGoToPersonalAccount,
   onGoToPersonalPlan,
+  onGoToPersonalNotifications,
   onGoToBusinessDashboard,
-  onGoToBusinessPlaces,
-  onGoToBusinessCommercial,
+  onGoToBusinessRoot,
+  onGoToBusinessPublications,
+  onGoToBusinessBookings,
+  onGoToBusinessClients,
+  onGoToBusinessAnalytics,
+  onGoToBusinessPromotion,
+  onGoToBusinessBilling,
+  hasBusinessProfile,
+  businessBalanceBYN,
 }: ProfileDropdownProps) {
   const initials = userInitialsFromEmail(user.email);
   const model = buildPublicSiteAccountModel({
@@ -55,14 +75,24 @@ export function ProfileDropdown({
     initials,
     onNavigate,
     onGoToSettings,
+    onSwitchMode,
+    onGoToHome,
+    onGoToPersonalProfile,
+    onGoToPersonalIdeas,
     onGoToAdminAccount,
     onGoToBusinessAccount,
-    onGoToPersonalAccount,
-    onGoToPersonalProfile,
     onGoToPersonalPlan,
+    onGoToPersonalNotifications,
     onGoToBusinessDashboard,
-    onGoToBusinessPlaces,
-    onGoToBusinessCommercial,
+    onGoToBusinessRoot,
+    onGoToBusinessPublications,
+    onGoToBusinessBookings,
+    onGoToBusinessClients,
+    onGoToBusinessAnalytics,
+    onGoToBusinessPromotion,
+    onGoToBusinessBilling,
+    hasBusinessProfile,
+    businessBalanceBYN,
     onLogout,
     loggingOut,
   });

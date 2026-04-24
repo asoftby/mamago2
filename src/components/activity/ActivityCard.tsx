@@ -2,21 +2,23 @@
 
 import React from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { MediaCover } from "@/components/ui/media-cover";
-import { Badge } from "@/components/ui/badge";
 import { H3, Caption } from "@/components/ui/typography";
 import { SaveHeart } from "@/features/save/SaveHeart";
 import { SaveToPlanResult } from "./SaveToPlanModal";
 import { formatRuShortDayMonthRange } from "@/lib/formatters/date";
 import { formatPrice, formatPriceFrom } from "@/lib/formatters/format-price";
 import { publicActivityPath } from "@/lib/business/eventPublicLink";
+import { useOptionalCity } from "@/contexts/CityContext";
+import { DEFAULT_CITY_SLUG } from "@/lib/city/resolveCityContext";
 
 type DomainActivity = {
   id: string;
   /** Публичный slug события; если нет — в ссылке используется id */
   slug?: string | null;
+  /** Канонический city slug для публичной страницы события. */
+  citySlug?: string | null;
   title: string;
   image: string;
   coverImage?: string | null;
@@ -71,6 +73,7 @@ type AdapterProps =
       className?: string;
       /** Соотношение сторон обложки (`MediaCover`), по умолчанию `4/5` */
       coverRatio?: string;
+      variant?: "default" | "poster-feed";
       saveMeta?: ActivitySaveMeta;
       onSaveResult?: (result: SaveToPlanResult) => void;
     }
@@ -86,20 +89,23 @@ type AdapterProps =
       reviewsCount?: number;
       className?: string;
       coverRatio?: string;
+      variant?: "default" | "poster-feed";
       saveMeta?: ActivitySaveMeta;
       onSaveResult?: (result: SaveToPlanResult) => void;
     };
 
 export function ActivityCard(props: AdapterProps) {
-  const params = useParams() as { city?: string };
-  const city = params?.city || "minsk";
+  const cityCtx = useOptionalCity();
+  const city = cityCtx?.citySlug ?? DEFAULT_CITY_SLUG;
   const coverRatio = props.coverRatio ?? "4/5";
+  const variant = props.variant ?? "default";
 
   const base =
     "activity" in props
       ? {
           id: props.activity.id,
           slug: props.activity.slug,
+          citySlug: props.activity.citySlug,
           title: props.activity.title,
           image: props.activity.coverImage ?? props.activity.image ?? null,
           meta: [
@@ -127,6 +133,7 @@ export function ActivityCard(props: AdapterProps) {
       : {
           id: props.id,
           slug: undefined,
+          citySlug: undefined,
           title: props.title,
           image: props.image,
           meta: [
@@ -147,7 +154,7 @@ export function ActivityCard(props: AdapterProps) {
           onSaveResult: props.onSaveResult,
         };
 
-  const href = publicActivityPath(base.id, city, base.slug);
+  const href = publicActivityPath(base.id, base.citySlug ?? city, base.slug);
 
   const showRating =
     typeof base.rating === "number" &&
@@ -161,38 +168,54 @@ export function ActivityCard(props: AdapterProps) {
     .filter(Boolean)
     .join(" • ");
 
+  if (variant === "poster-feed") {
+    return (
+      <article className={cn("group relative mb-6 break-inside-avoid select-none", base.className)}>
+        <Link href={href} className="block transition-transform duration-200 hover:-translate-y-0.5">
+          <div className="relative overflow-hidden rounded-[28px] bg-[linear-gradient(180deg,#f7f2ea_0%,#efe7dc_100%)]">
+            {base.image ? (
+              <img
+                src={base.image}
+                alt={base.title}
+                className="block h-auto w-full object-contain"
+                loading="lazy"
+              />
+            ) : (
+              <div className="aspect-[4/5] w-full bg-gradient-to-br from-stone-100 via-stone-50 to-stone-200" />
+            )}
+            {base.saveMeta && (
+              <div className="absolute right-3 top-3 z-10">
+                <SaveHeart
+                  activityId={base.id}
+                  activityTitle={base.title}
+                  coverImageUrl={base.image}
+                />
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-1 px-1.5 pb-1 pt-2.5">
+            <H3
+              as="span"
+              className="block text-[13px] font-semibold leading-4.5 text-neutral-900 transition-colors duration-150 group-hover:text-primary line-clamp-2 md:text-[14px]"
+            >
+              {base.title}
+            </H3>
+            {base.meta && (
+              <Caption className="block text-[11px] text-neutral-500 line-clamp-1 md:text-[12px]">
+                {base.meta}
+              </Caption>
+            )}
+          </div>
+        </Link>
+      </article>
+    );
+  }
+
   return (
     <div className={cn("group relative select-none", base.className)}>
       <Link href={href} className="block">
         <MediaCover imageUrl={base.image} ratio={coverRatio}>
-          {(base.geoBadge ||
-            base.ageHintBadge ||
-            (base.badges?.length ?? 0) > 0) && (
-            <div className="absolute top-3 left-3 z-10 flex max-w-[min(100%-5rem,15rem)] flex-col gap-1.5 items-start">
-              {base.geoBadge && (
-                <Badge
-                  className="border border-neutral-200/90 bg-neutral-100/95 px-2.5 py-0.5 text-xs font-medium text-neutral-700 shadow-sm backdrop-blur-sm"
-                >
-                  {base.geoBadge}
-                </Badge>
-              )}
-              {base.ageHintBadge && (
-                <Badge
-                  className="border border-slate-200/90 bg-slate-50/95 px-2.5 py-0.5 text-xs font-medium text-slate-800 shadow-sm backdrop-blur-sm"
-                >
-                  {base.ageHintBadge}
-                </Badge>
-              )}
-              {base.badges?.slice(0, base.geoBadge || base.ageHintBadge ? 1 : 2).map((b, i) => (
-                <Badge
-                  key={i}
-                  className="bg-white/90 text-foreground shadow-sm border-none backdrop-blur-sm px-2.5 py-0.5 text-xs font-medium"
-                >
-                  {b}
-                </Badge>
-              ))}
-            </div>
-          )}
         </MediaCover>
 
         <div className="mt-2.5 px-1">

@@ -1,13 +1,12 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { motion, useReducedMotion } from "framer-motion";
 import { Search } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useAirbnbMobileHeaderScroll } from "@/hooks/useAirbnbMobileHeaderScroll";
 import {
   STABLE_HEADER_BLOCK1_DEFAULT_PX,
   STABLE_HEADER_BLOCK2_PX,
@@ -16,7 +15,6 @@ import {
 import {
   getIntentFromPath,
   getDiscoveryIntentForPublicationPath,
-  isCityHubPath,
   isPublicationDetailPath,
 } from "@/lib/intent";
 import { getSiteHeaderVariant } from "@/lib/site/siteHeaderVariant";
@@ -82,12 +80,6 @@ export function SiteHeaderShell() {
     scrollHysteresisPx: 16,
     headerRef,
   });
-  /** В разделе discovery (`/{city}/events` и т.д.): скрываем хедер при скролле вниз, показываем при скролле вверх */
-  const airbnbMobile = useAirbnbMobileHeaderScroll({
-    searchSurfaceOpen: hb.showSearchSurface,
-    reduceMotion,
-    scrollDirectionMode: routeIntent !== null,
-  });
   const centerFadeDuration = reduceMotion ? 0.01 : 0.34;
   const publicationIntent = usePublicationIntent();
   const isPublicationPage = isPublicationDetailPath(pathname);
@@ -99,12 +91,22 @@ export function SiteHeaderShell() {
   const tabsIntent = isPublicationPage ? null : routeIntent ?? null;
   const { citySlug } = useCity();
   const [searchOverlayOpen, setSearchOverlayOpen] = useState(false);
-  const isCityHubRoute = isCityHubPath(pathname);
   const expandedSearchVariant =
     isPublicationPage ? "cityHub" : "discovery";
   const compactSearchVariant =
     isPublicationPage ? "cityHub" : "discovery";
   const shouldShowIntentTabs = true;
+
+  useEffect(() => {
+    if (process.env.NODE_ENV !== "production") {
+      console.debug("[Home/Header] mounted", { pathname });
+    }
+    return () => {
+      if (process.env.NODE_ENV !== "production") {
+        console.debug("[Home/Header] unmounted", { pathname });
+      }
+    };
+  }, [pathname]);
 
   /** Вторая строка (сегментированный поиск): на посадочных не показываем. */
   const showExpandedSearchRow = !hb.showAirbnbCompactBar;
@@ -155,28 +157,12 @@ export function SiteHeaderShell() {
         ref={headerRef}
         data-header-shell
         className={cn(
-          "relative z-50 m-0 w-full",
+          "sticky top-0 z-50 m-0 w-full",
           "bg-gradient-to-b from-white to-[#F7F7F7]",
           "border-b border-[#EBEBEB]",
-          /* На мобилке transform от scroll (hideRatio) — без transition-transform; только тень. */
-          airbnbMobile.enabled
-            ? "transition-shadow duration-300 ease-out will-change-transform"
-            : "transition-shadow duration-300 ease-out",
+          "transition-shadow duration-300 ease-out",
           hb.isScrolled ? "shadow-md" : "shadow-sm",
-          airbnbMobile.enabled &&
-            airbnbMobile.fullyHidden &&
-            "pointer-events-none",
         )}
-        aria-hidden={
-          airbnbMobile.enabled && airbnbMobile.fullyHidden ? true : undefined
-        }
-        style={
-          airbnbMobile.enabled
-            ? ({
-                transform: `translate3d(0, calc(-100% * ${airbnbMobile.hideRatio}), 0)`,
-              } as React.CSSProperties)
-            : undefined
-        }
       >
         <div
           className="relative w-full"
@@ -218,21 +204,6 @@ export function SiteHeaderShell() {
               <div className="relative isolate h-20 w-full min-w-0 justify-self-stretch px-0">
                 {isLandingHeader ? (
                   <div className="absolute inset-0 z-[1] flex items-center justify-center px-1">
-                    {intentTabsRow}
-                  </div>
-                ) : airbnbMobile.enabled ? (
-                  <div
-                    className="absolute inset-0 z-[1] flex items-center justify-center px-1 will-change-[opacity,transform]"
-                    style={{
-                      opacity: airbnbMobile.tabsOpacity,
-                      transform: `translate3d(0, ${-10 * (1 - airbnbMobile.tabsOpacity)}px, 0)`,
-                      pointerEvents:
-                        hb.showAirbnbCompactBar || airbnbMobile.tabsOpacity < 0.04
-                          ? "none"
-                          : "auto",
-                    }}
-                    aria-hidden={airbnbMobile.tabsOpacity < 0.04}
-                  >
                     {intentTabsRow}
                   </div>
                 ) : (
@@ -332,40 +303,25 @@ export function SiteHeaderShell() {
           </div>
 
           {/* Вторая строка: сегментированный поиск — не на посадочных */}
-          {!isLandingHeader &&
-            (airbnbMobile.enabled ? (
-              <div
-                data-header-block1
-                data-search-surface
-                className="w-full shrink-0 overflow-hidden bg-transparent"
-                style={{
-                  maxHeight: SEARCH_ROW_MAX_PX,
-                  opacity: 1,
-                  pointerEvents: showExpandedSearchRow ? "auto" : "none",
-                }}
-                aria-hidden={!showExpandedSearchRow}
-              >
-                {expandedSearchRowInner}
-              </div>
-            ) : (
-              <motion.div
-                data-header-block1
-                data-search-surface
-                initial={false}
-                animate={{
-                  maxHeight: showExpandedSearchRow ? SEARCH_ROW_MAX_PX : 0,
-                  opacity: showExpandedSearchRow ? 1 : 0,
-                }}
-                transition={searchRowTransition(reduceMotion)}
-                className="w-full shrink-0 overflow-hidden bg-transparent will-change-[max-height,opacity]"
-                style={{
-                  pointerEvents: showExpandedSearchRow ? "auto" : "none",
-                }}
-                aria-hidden={!showExpandedSearchRow}
-              >
-                {expandedSearchRowInner}
-              </motion.div>
-            ))}
+          {!isLandingHeader && (
+            <motion.div
+              data-header-block1
+              data-search-surface
+              initial={false}
+              animate={{
+                maxHeight: showExpandedSearchRow ? SEARCH_ROW_MAX_PX : 0,
+                opacity: showExpandedSearchRow ? 1 : 0,
+              }}
+              transition={searchRowTransition(reduceMotion)}
+              className="w-full shrink-0 overflow-hidden bg-transparent will-change-[max-height,opacity]"
+              style={{
+                pointerEvents: showExpandedSearchRow ? "auto" : "none",
+              }}
+              aria-hidden={!showExpandedSearchRow}
+            >
+              {expandedSearchRowInner}
+            </motion.div>
+          )}
         </div>
       </header>
       {!isLandingHeader ? (

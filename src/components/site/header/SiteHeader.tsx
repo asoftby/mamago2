@@ -11,10 +11,10 @@ import { MobileHeader } from "./MobileHeader";
 export function SiteHeader() {
   return (
     <>
-      <div className="m-0 hidden p-0 lg:block">
+      <div className="m-0 hidden p-0 lg:contents">
         <DesktopHeader />
       </div>
-      <div className="block lg:hidden">
+      <div className="contents lg:hidden">
         <MobileHeader />
       </div>
     </>
