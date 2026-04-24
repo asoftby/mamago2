@@ -3,8 +3,9 @@
  */
 
 // Map city slugs to their display names in prepositional case (в + city)
-const CITY_DISPLAY_NAMES: Record<string, string> = {
+export const CITY_DISPLAY_NAMES: Record<string, string> = {
   minsk: "Минске",
+  "marina-gorka": "Марьиной Горке",
   brest: "Бресте",
   gomel: "Гомеле",
   grodno: "Гродно",
@@ -13,8 +14,9 @@ const CITY_DISPLAY_NAMES: Record<string, string> = {
 };
 
 /** Именительный падеж для подзаголовков («Алексей · Минск») */
-const CITY_NOMINATIVE: Record<string, string> = {
+export const CITY_NOMINATIVE: Record<string, string> = {
   minsk: "Минск",
+  "marina-gorka": "Марьина Горка",
   brest: "Брест",
   gomel: "Гомель",
   grodno: "Гродно",
@@ -25,6 +27,8 @@ const CITY_NOMINATIVE: Record<string, string> = {
 export function getCityNominativeName(citySlug: string): string {
   return CITY_NOMINATIVE[citySlug.toLowerCase()] ?? citySlug;
 }
+
+export const KNOWN_CITY_SLUGS = Object.freeze(Object.keys(CITY_NOMINATIVE));
 
 /**
  * Get city display name in prepositional case (for use with "в")

@@ -1,13 +1,14 @@
 import type { LucideIcon } from "lucide-react";
 import {
   BarChart3,
-  Bell,
-  CreditCard,
-  FileText,
+  Briefcase,
+  CalendarDays,
+  CircleHelp,
+  ClipboardList,
   LayoutDashboard,
-  MapPin,
   Megaphone,
   Users,
+  Wallet,
 } from "lucide-react";
 import { buildBusinessPath } from "@/lib/routing/surface";
 
@@ -35,100 +36,88 @@ export type BusinessNavItem =
 export const businessRoute = (path: string) => buildBusinessPath(path);
 
 export const BUSINESS_DASHBOARD_HREF = businessRoute("/dashboard");
-export const BUSINESS_INBOX_HREF = businessRoute("/inbox");
+export const BUSINESS_ROOT_HREF = businessRoute("/");
 export const BUSINESS_EVENTS_HREF = businessRoute("/events");
-export const BUSINESS_OFFERS_HREF = businessRoute("/offers");
-export const BUSINESS_PLACES_HREF = businessRoute("/places");
-export const BUSINESS_PROMOTION_OVERVIEW_HREF = businessRoute("/promotion");
-export const BUSINESS_PROMOTION_CAMPAIGNS_HREF = businessRoute("/promotion/campaigns");
-export const BUSINESS_PROMOTION_PLACEMENTS_HREF = businessRoute("/promotion/placements");
+export const BUSINESS_INBOX_HREF = businessRoute("/inbox");
 export const BUSINESS_TEAM_HREF = businessRoute("/team");
+export const BUSINESS_PROMOTION_OVERVIEW_HREF = businessRoute("/promotion");
+export const BUSINESS_BILLING_TRANSACTIONS_HREF = businessRoute("/billing/transactions");
 export const BUSINESS_BILLING_PLAN_HREF = businessRoute("/billing/plan");
-export const BUSINESS_CONTRACTS_HREF = businessRoute("/documents/contracts");
-export const BUSINESS_ACTS_HREF = businessRoute("/documents/acts");
+export const BUSINESS_SETTINGS_HREF = businessRoute("/settings");
 
 export const businessNavigation: BusinessNavItem[] = [
   {
     type: "item",
-    label: "Dashboard",
+    label: "Панель управления",
     href: BUSINESS_DASHBOARD_HREF,
     icon: LayoutDashboard,
     match: [businessRoute("/dashboard")],
   },
   {
     type: "item",
-    label: "Входящие",
+    label: "Мой бизнес",
+    href: BUSINESS_ROOT_HREF,
+    icon: Briefcase,
+    match: [businessRoute("/")],
+  },
+  {
+    type: "item",
+    label: "Публикации",
+    href: BUSINESS_EVENTS_HREF,
+    icon: ClipboardList,
+    match: [businessRoute("/events")],
+  },
+  {
+    type: "item",
+    label: "Записи и заказы",
     href: BUSINESS_INBOX_HREF,
-    icon: Bell,
+    icon: CalendarDays,
     match: [businessRoute("/inbox")],
   },
   {
-    type: "group",
-    label: "Publications",
-    icon: BarChart3,
-    children: [
-      { label: "Events", href: BUSINESS_EVENTS_HREF },
-      { label: "Offers", href: BUSINESS_OFFERS_HREF },
-    ],
-    match: [businessRoute("/events"), businessRoute("/offers")],
-  },
-  {
     type: "item",
-    label: "Places",
-    href: BUSINESS_PLACES_HREF,
-    icon: MapPin,
-    match: [businessRoute("/places")],
-  },
-  {
-    type: "group",
-    label: "Promotion",
-    icon: Megaphone,
-    children: [
-      { label: "Overview", href: BUSINESS_PROMOTION_OVERVIEW_HREF },
-      { label: "Campaigns", href: BUSINESS_PROMOTION_CAMPAIGNS_HREF },
-      { label: "Placements", href: BUSINESS_PROMOTION_PLACEMENTS_HREF },
-    ],
-    match: [
-      businessRoute("/promotion"),
-      businessRoute("/promotion/campaigns"),
-      businessRoute("/promotion/placements"),
-      businessRoute("/commercial"),
-    ],
-  },
-  {
-    type: "item",
-    label: "Team",
+    label: "Клиенты",
     href: BUSINESS_TEAM_HREF,
     icon: Users,
     match: [businessRoute("/team")],
   },
   {
     type: "item",
-    label: "Billing",
-    href: BUSINESS_BILLING_PLAN_HREF,
-    icon: CreditCard,
+    label: "Аналитика",
+    href: BUSINESS_DASHBOARD_HREF,
+    icon: BarChart3,
+    match: [businessRoute("/dashboard")],
+  },
+  {
+    type: "item",
+    label: "Продвижение",
+    href: BUSINESS_PROMOTION_OVERVIEW_HREF,
+    icon: Megaphone,
+    match: [businessRoute("/promotion"), businessRoute("/commercial")],
+  },
+  {
+    type: "item",
+    label: "Платежи и выплаты",
+    href: BUSINESS_BILLING_TRANSACTIONS_HREF,
+    icon: Wallet,
     match: [businessRoute("/billing")],
   },
   {
-    type: "group",
-    label: "Documents",
-    icon: FileText,
-    children: [
-      { label: "Contracts", href: BUSINESS_CONTRACTS_HREF },
-      { label: "Acts", href: BUSINESS_ACTS_HREF },
-    ],
-    match: [businessRoute("/documents"), businessRoute("/documents/contracts"), businessRoute("/documents/acts")],
+    type: "item",
+    label: "Настройки и помощь",
+    href: BUSINESS_SETTINGS_HREF,
+    icon: CircleHelp,
+    match: [businessRoute("/settings")],
   },
 ];
 
 export const businessQuickActions = {
   dashboard: BUSINESS_DASHBOARD_HREF,
-  places: BUSINESS_PLACES_HREF,
+  root: BUSINESS_ROOT_HREF,
   events: BUSINESS_EVENTS_HREF,
-  offers: BUSINESS_OFFERS_HREF,
+  inbox: BUSINESS_INBOX_HREF,
   promotion: BUSINESS_PROMOTION_OVERVIEW_HREF,
   team: BUSINESS_TEAM_HREF,
-  billing: BUSINESS_BILLING_PLAN_HREF,
-  contracts: BUSINESS_CONTRACTS_HREF,
-  acts: BUSINESS_ACTS_HREF,
+  billing: BUSINESS_BILLING_TRANSACTIONS_HREF,
+  settings: BUSINESS_SETTINGS_HREF,
 };

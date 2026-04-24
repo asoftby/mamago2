@@ -1,3 +1,8 @@
+import {
+  DEFAULT_CITY_SLUG,
+  resolveRouteCitySlug,
+} from "@/lib/city/resolveCityContext";
+import { KNOWN_CITY_SLUGS } from "@/lib/city/cityDisplayNames";
 import { DISCOVERY_INTENT_ITEMS } from "@/lib/discovery/discoveryIntentConfig";
 
 export type Intent = "kuda" | "classes" | "birthday" | "routes";
@@ -15,18 +20,20 @@ export const INTENT_ITEMS: IntentItem[] = DISCOVERY_INTENT_ITEMS.map(config => (
   href: config.href,
 }));
 
+export { DEFAULT_CITY_SLUG };
+
 /** Список городов с городским хабом `/{city}` */
-export const VALID_CITY_SLUGS = ["minsk"] as const;
+export const VALID_CITY_SLUGS = KNOWN_CITY_SLUGS;
 
 /** Главная страница текущего города-флагмана (первый slug в `VALID_CITY_SLUGS`) */
-export const DEFAULT_CITY_HUB_PATH = `/${VALID_CITY_SLUGS[0]}`;
+export const DEFAULT_CITY_HUB_PATH = `/${DEFAULT_CITY_SLUG}`;
 
 export type CitySlug = (typeof VALID_CITY_SLUGS)[number];
 
 export function isCityHubPath(pathname: string | null): boolean {
   if (!pathname) return false;
   const segments = pathname.split("/").filter(Boolean);
-  return segments.length === 1 && VALID_CITY_SLUGS.includes(segments[0] as CitySlug);
+  return segments.length === 1 && resolveRouteCitySlug(pathname) !== null;
 }
 
 /**
@@ -37,7 +44,7 @@ export function isPublicationDetailPath(pathname: string | null): boolean {
   if (!pathname) return false;
   const segments = pathname.split("/").filter(Boolean);
   if (segments.length < 3) return false;
-  if (!(VALID_CITY_SLUGS as readonly string[]).includes(segments[0] ?? "")) {
+  if (resolveRouteCitySlug(pathname) === null) {
     return false;
   }
   const section = segments[1];
@@ -150,6 +157,10 @@ export function getIntentFromPath(pathname: string | null): Intent | null {
     return null;
   }
 
+  if (resolveRouteCitySlug(pathname) === null) {
+    return null;
+  }
+
   /** Детальные страницы /city/events/… и т.д. */
   if (segments.length > 2) return null;
 
@@ -166,40 +177,15 @@ export function getIntentFromPath(pathname: string | null): Intent | null {
   return null;
 }
 
-// List of known non-city route prefixes
-const NON_CITY_ROUTES = [
-  "me",
-  "login",
-  "register",
-  "forgot-password",
-  "reset-password",
-  "places",
-  "ui-test",
-  "account",
-  "admin",
-  "business",
-  "api",
-  "_next",
-];
+/**
+ * Discovery listing pages only.
+ * City hub `/{city}` intentionally excluded: it has discovery-flavored UI,
+ * but should not auto-sync listing filters into the URL.
+ */
+export function isDiscoveryListingPath(pathname: string | null): boolean {
+  return getIntentFromPath(pathname) !== null;
+}
 
 export function getCityFromPath(pathname: string | null): string | null {
-  if (!pathname) return null;
-  
-  const segments = pathname.split('/').filter(Boolean);
-  const firstSegment = segments[0];
-  
-  if (!firstSegment) return null;
-  
-  // Check if first segment is a known non-city route
-  if (NON_CITY_ROUTES.includes(firstSegment)) {
-    return null;
-  }
-  
-  if ((VALID_CITY_SLUGS as readonly string[]).includes(firstSegment)) {
-    return firstSegment;
-  }
-  
-  // Unknown segment - could be a new city or invalid route
-  // Return null to be safe
-  return null;
+  return resolveRouteCitySlug(pathname);
 }

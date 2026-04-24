@@ -100,6 +100,11 @@ export async function validateSession(
 
   const user = session.user;
 
+  if (user.deletedAt) {
+    await prisma.session.delete({ where: { id: session.id } });
+    return null;
+  }
+
   // Check user status
   if (user.status === "BANNED") {
     // Delete session for banned users

@@ -6,7 +6,7 @@ import { appendBirthdayBuilderAuthParam } from "@/lib/auth/appendBirthdayBuilder
 import { getPostAuthRedirect } from "@/lib/auth/postAuthRedirect";
 import { notifyAuthStateChanged, notifyNotificationsChanged } from "@/lib/auth/client";
 import { navigateToCompatibleHref } from "@/lib/routing/clientNavigation";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { VERIFICATION_EMAIL_SEND_FAILED_AFTER_REGISTRATION_TOAST } from "@/lib/auth/registrationVerificationToast";
 
 export type AuthFlowMode = "login" | "register";
@@ -92,7 +92,6 @@ export function useAuthCredentialsFlow({
       }
       notifyAuthStateChanged();
       await Promise.resolve(onAuthSuccess?.());
-      router.refresh();
       notifyNotificationsChanged();
       if (embedded) {
         return;

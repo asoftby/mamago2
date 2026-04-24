@@ -4,6 +4,7 @@ import prisma from "@/lib/prisma";
 import { parseArticleContentJson } from "@/lib/publications/articleMvp";
 import { BREAKING_NEWS_SUBTITLE } from "@/lib/publications/breakingNewsArticle";
 import { PublicationStatus, PublicationType, type PublicationListRow } from "@/lib/publications/domain";
+import { cityNameFromSlug } from "@/lib/article/articleEditorBasics";
 
 function mapStatus(s: ContentStatus): (typeof PublicationStatus)[keyof typeof PublicationStatus] {
   switch (s) {
@@ -58,8 +59,13 @@ export async function listArticlesForPublicationsIndex(): Promise<PublicationLis
   let coverImageIdById = new Map<string, string | null>();
   let cityContextById = new Map<string, string | null>();
   let authorUserIdById = new Map<string, string | null>();
+  let cityCatalog: { id: string; name: string; slug: string }[] = [];
   if (rows.length > 0) {
     const ids = rows.map((r) => r.id);
+    cityCatalog = await prisma.city.findMany({
+      orderBy: { name: "asc" },
+      select: { id: true, name: true, slug: true },
+    });
     try {
       const extra = await prisma.$queryRaw<
         Array<{ id: string; authorLabel: string | null; views: bigint | number | null }>
@@ -130,6 +136,10 @@ export async function listArticlesForPublicationsIndex(): Promise<PublicationLis
         : authorLineFromUser(authorUserById.get(r.id));
     const coverId = coverImageIdById.get(r.id);
     const isBreakingNews = r.subtitle === BREAKING_NEWS_SUBTITLE;
+    const rawCityContext = cityContextById.get(r.id)?.trim() || "";
+    const normalizedCityLabel = rawCityContext
+      ? cityNameFromSlug(rawCityContext, cityCatalog) || rawCityContext
+      : "—";
     return {
       id: r.id,
       title: r.title,
@@ -138,7 +148,7 @@ export async function listArticlesForPublicationsIndex(): Promise<PublicationLis
       status: mapStatus(r.status),
       authorLabel,
       authorUserId: authorUserIdById.get(r.id) ?? null,
-      cityOrContext: cityContextById.get(r.id)?.trim() || "—",
+      cityOrContext: normalizedCityLabel,
       publishedAt: r.publishedAt?.toISOString() ?? null,
       views: viewsById.get(r.id) ?? 0,
       updatedAt: r.updatedAt.toISOString(),

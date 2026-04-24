@@ -1,6 +1,6 @@
 "use client";
 
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { UndoCountdownToastContent } from "@/components/ui/undo-countdown-toast";
 
 type Pending = {
@@ -51,7 +51,7 @@ export function startUndoableHardDelete(args: {
       onCommitSuccess?.();
     } catch (e) {
       onCommitError?.(e);
-      toast.error("Не удалось удалить. Обновите страницу и попробуйте снова.");
+      toast.error("Не получилось выполнить действие. Обновите страницу и попробуйте снова.");
       onUndoRestore();
     }
   }, durationMs);

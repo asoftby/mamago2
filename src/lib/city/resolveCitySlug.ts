@@ -1,4 +1,4 @@
-import { getCityFromPath } from "@/lib/intent";
+import { DEFAULT_CITY_SLUG, resolveCityContext } from "@/lib/city/resolveCityContext";
 
 /**
  * Priority: city from URL path → `city` query → persisted choice → minsk.
@@ -8,5 +8,11 @@ export function resolveCitySlug(
   cityFromQuery: string | null,
   storedCity: string | null,
 ): string {
-  return getCityFromPath(pathname) || cityFromQuery || storedCity || "minsk";
+  return (
+    resolveCityContext({
+      pathname,
+      cityFromQuery,
+      preferredCitySlug: storedCity,
+    }).citySlug ?? DEFAULT_CITY_SLUG
+  );
 }

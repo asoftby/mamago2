@@ -1,6 +1,6 @@
 import { SeoCanonicalSource } from "@prisma/client";
 import prisma from "@/lib/prisma";
-import { publicActivityPath } from "@/lib/business/eventPublicLink";
+import { resolveCanonicalEventPublicPathById } from "@/lib/business/resolveCanonicalEventPublicPath";
 
 function absoluteBase(): string {
   return (process.env.NEXT_PUBLIC_APP_URL || "https://mamago.by").replace(/\/$/, "");
@@ -14,15 +14,15 @@ export async function syncActivityCanonical(activityId: string): Promise<void> {
     where: { id: activityId },
     select: {
       id: true,
-      slug: true,
       seoCanonicalSource: true,
-      place: { select: { city: { select: { slug: true } } } },
+      slug: true,
     },
   });
   if (!row || row.seoCanonicalSource === SeoCanonicalSource.MANUAL) return;
 
-  const citySlug = row.place?.city?.slug ?? "minsk";
-  const path = publicActivityPath(row.id, citySlug, row.slug);
+  const path =
+    (await resolveCanonicalEventPublicPathById(row.id)) ??
+    `/minsk/events/${row.slug?.trim() || row.id}`;
   const absolute = `${absoluteBase()}${path}`;
   const hasSlug = !!row.slug?.trim();
 

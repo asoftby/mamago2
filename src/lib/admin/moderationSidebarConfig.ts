@@ -33,6 +33,13 @@ export interface ModerationNavCounts {
   offers?: number;
 }
 
+export const MODERATION_NAV_COUNTS: ModerationNavCounts = {
+  queueTotal: 0,
+  places: 0,
+  events: 0,
+  offers: 0,
+};
+
 export function getModerationItemCount(
   id: ModerationNavItemId,
   counts: ModerationNavCounts,

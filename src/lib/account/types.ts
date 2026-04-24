@@ -3,6 +3,10 @@ export type AccountMenuUser = {
   id: string;
   email: string;
   role: string;
+  /** true when partner business exists and is APPROVED */
+  hasApprovedBusinessProfile?: boolean;
+  /** Business deposit balance in BYN for account dropdown (business surface only) */
+  businessBalanceBYN?: number;
   displayName?: string | null;
   avatarUrl?: string | null;
   /** Семейная персона (primary adult) — тот же источник, что блок «Моя семья» */

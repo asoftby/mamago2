@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import type { Activity, ActivitySession, ActivityType, ScheduleMode, User } from "@prisma/client";
 import { canManageActivityById } from "@/lib/auth/activityAccess";
+import { detachImportedRecordsForCatalogEntity } from "@/server/modules/import/services/import-link-reconciliation.service";
 
 export type CreateActivityInput = {
   title: string;
@@ -137,6 +138,14 @@ export async function listBusinessActivities(
  * Delete an activity
  */
 export async function deleteActivity(activityId: string): Promise<void> {
+  await detachImportedRecordsForCatalogEntity(
+    {
+      entityType: "ACTIVITY",
+      entityId: activityId,
+      reason: "Связанное событие было удалено и больше не считается активной сущностью каталога.",
+    },
+    prisma,
+  );
   await prisma.activity.delete({
     where: { id: activityId },
   });

@@ -14,6 +14,7 @@ import {
   SEO_ROBOTS_INDEX_FOLLOW,
   SEO_ROBOTS_NOINDEX_FOLLOW,
 } from "@/lib/admin/seo/entities/robotsConstants";
+import { resolveCanonicalCitySlugForEvent } from "@/lib/business/eventPublicLink";
 
 const EVENT_LIST_LIMIT = 500;
 
@@ -35,6 +36,7 @@ export const eventProvider: SeoEntityProvider = {
         slug: true,
         title: true,
         shortDesc: true,
+        cityId: true,
         status: true,
         updatedAt: true,
         seoH1: true,
@@ -43,12 +45,33 @@ export const eventProvider: SeoEntityProvider = {
         seoCanonicalUrl: true,
         seoCanonicalSource: true,
         seoRobots: true,
+        venue: { select: { cityId: true } },
         place: { select: { city: { select: { slug: true } } } },
       },
     });
 
+    const cityIds = Array.from(
+      new Set(
+        activities
+          .flatMap((a) => [a.cityId, a.venue?.cityId])
+          .filter((value): value is string => typeof value === "string" && value.length > 0),
+      ),
+    );
+    const cityRows =
+      cityIds.length > 0
+        ? await prisma.city.findMany({
+            where: { id: { in: cityIds } },
+            select: { id: true, slug: true },
+          })
+        : [];
+    const citySlugById = new Map(cityRows.map((row) => [row.id, row.slug]));
+
     return activities.map((a) => {
-      const citySlug = a.place?.city?.slug ?? "minsk";
+      const citySlug = resolveCanonicalCitySlugForEvent({
+        activityCitySlug: a.cityId ? citySlugById.get(a.cityId) ?? null : null,
+        placeCitySlug: a.place?.city?.slug ?? null,
+        venueCitySlug: a.venue?.cityId ? citySlugById.get(a.venue.cityId) ?? null : null,
+      });
       const published = a.status === ContentStatus.PUBLISHED;
       const path = publicActivityPath(a.id, citySlug, a.slug);
       const canonical = a.seoCanonicalUrl?.trim() || path;
@@ -91,6 +114,7 @@ export const eventProvider: SeoEntityProvider = {
         title: true,
         shortDesc: true,
         slug: true,
+        cityId: true,
         status: true,
         seoTitle: true,
         seoDescription: true,
@@ -101,12 +125,25 @@ export const eventProvider: SeoEntityProvider = {
         seoOgDescription: true,
         seoOgImage: true,
         seoRobots: true,
+        venue: { select: { cityId: true } },
         seoJsonLdOverride: true,
         place: { select: { city: { select: { slug: true } } } },
       },
     });
     if (!a) return null;
-    const citySlug = a.place?.city?.slug ?? "minsk";
+    const [activityCity, venueCity] = await Promise.all([
+      a.cityId
+        ? prisma.city.findUnique({ where: { id: a.cityId }, select: { slug: true } })
+        : Promise.resolve(null),
+      a.venue?.cityId
+        ? prisma.city.findUnique({ where: { id: a.venue.cityId }, select: { slug: true } })
+        : Promise.resolve(null),
+    ]);
+    const citySlug = resolveCanonicalCitySlugForEvent({
+      activityCitySlug: activityCity?.slug ?? null,
+      placeCitySlug: a.place?.city?.slug ?? null,
+      venueCitySlug: venueCity?.slug ?? null,
+    });
     const urlDiagnostics = buildEventEntityDiagnostics({
       activityId: a.id,
       title: a.title,
@@ -193,4 +230,3 @@ export const eventProvider: SeoEntityProvider = {
     return buildEventJsonLd({ activity: loaded, citySlug, publicBase });
   },
 };
-

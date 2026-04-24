@@ -5,6 +5,7 @@
 
 type ParticipationMode =
   | "external-link"
+  | "prebook"
   | "time-slots"
   | "simple-booking"
   | "request"
@@ -15,6 +16,7 @@ type CTAType = "details" | "book" | "slot" | "buy" | "request" | "route";
 
 export function getCtaFromParticipationMode(participationMode: ParticipationMode): CTAType {
   if (participationMode === "external-link") return "buy";
+  if (participationMode === "prebook") return "book";
   if (participationMode === "time-slots") return "slot";
   // «Узнать подробнее» и все legacy-режимы → основная CTA «Подробнее»
   if (

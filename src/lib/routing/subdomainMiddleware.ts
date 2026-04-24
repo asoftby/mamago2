@@ -1,3 +1,5 @@
+import { stripPublicDiscoverySearchParams } from "@/lib/routing/publicDiscoverySearchParams";
+
 export type MiddlewareDecision =
   | { kind: "next" }
   | { kind: "rewrite"; pathname: string }
@@ -83,6 +85,7 @@ export function resolveSubdomainMiddlewareDecision(params: {
 
   const isBusinessHost = isHost(host, ["business.mamago.local", "business.mamago.by"]);
   const isAdminHost = isHost(host, ["admin.mamago.local", "admin.mamago.by"]);
+  const adminSafeSearch = isAdminHost ? stripPublicDiscoverySearchParams(search) : search;
 
   if (isBusinessHost || isAdminHost) {
     if (pathname === "/business" || pathname.startsWith("/business/")) {
@@ -93,7 +96,7 @@ export function resolveSubdomainMiddlewareDecision(params: {
           protocol,
           host,
           pathname: strippedPathname,
-          search,
+          search: adminSafeSearch,
         }),
       };
     }
@@ -106,7 +109,7 @@ export function resolveSubdomainMiddlewareDecision(params: {
           protocol,
           host,
           pathname: strippedPathname,
-          search,
+          search: adminSafeSearch,
         }),
       };
     }
@@ -118,7 +121,7 @@ export function resolveSubdomainMiddlewareDecision(params: {
           host,
           protocol,
           pathname,
-          search,
+          search: adminSafeSearch,
           publicAppUrl,
         }),
       };
@@ -133,7 +136,7 @@ export function resolveSubdomainMiddlewareDecision(params: {
           host,
           protocol,
           pathname,
-          search,
+          search: adminSafeSearch,
           publicAppUrl,
         }),
       };
@@ -153,7 +156,7 @@ export function resolveSubdomainMiddlewareDecision(params: {
           host,
           protocol,
           pathname,
-          search,
+          search: adminSafeSearch,
           publicAppUrl,
         }),
       };

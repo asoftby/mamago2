@@ -7,6 +7,7 @@
 
 import prisma from "@/lib/prisma";
 import { getPlaceForOwner } from "./place.service";
+import { detachImportedRecordsForCatalogEntity } from "@/server/modules/import/services/import-link-reconciliation.service";
 
 /**
  * Archive a Place (soft delete)
@@ -37,6 +38,15 @@ export async function archivePlace(placeId: string, userId: string) {
       archivedByUserId: userId,
     },
   });
+
+  await detachImportedRecordsForCatalogEntity(
+    {
+      entityType: "PLACE",
+      entityId: placeId,
+      reason: "Связанный Place заархивирован и больше не считается активной сущностью каталога.",
+    },
+    prisma,
+  );
 
   console.log(`[ARCHIVE] Place ${placeId} archived by user ${userId}`);
   

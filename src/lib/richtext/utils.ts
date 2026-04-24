@@ -86,3 +86,31 @@ export function sanitizeHtml(html: string): string {
   console.warn("sanitizeHtml: HTML sanitization not yet implemented!");
   return html;
 }
+
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+export function plainTextToRichTextHtml(text: string): string {
+  const normalized = text.replace(/\r\n/g, "\n").trim();
+  if (!normalized) return "<p></p>";
+
+  const paragraphs = normalized
+    .split(/\n{2,}/)
+    .map((paragraph) => paragraph.trim())
+    .filter(Boolean);
+
+  if (paragraphs.length === 0) return "<p></p>";
+
+  return paragraphs
+    .map((paragraph) => {
+      const html = escapeHtml(paragraph).replace(/\n/g, "<br />");
+      return `<p>${html}</p>`;
+    })
+    .join("");
+}

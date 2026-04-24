@@ -1,5 +1,6 @@
 import { Prisma } from "@prisma/client";
 import prisma, { searchIndexer } from "@/lib/prisma";
+import { detachImportedRecordsForCatalogEntity } from "@/server/modules/import/services/import-link-reconciliation.service";
 
 /**
  * Убеждаемся, что в PostgreSQL у enum "ContentStatus" есть значение DELETED.
@@ -51,5 +52,13 @@ export async function softDeleteActivityById(id: string): Promise<void> {
   if (n !== 1) {
     throw new Error(`Activity not found: ${id}`);
   }
+  await detachImportedRecordsForCatalogEntity(
+    {
+      entityType: "ACTIVITY",
+      entityId: id,
+      reason: "Связанное событие было удалено и больше не считается активной сущностью каталога.",
+    },
+    prisma,
+  );
   await searchIndexer.upsertActivity(id);
 }

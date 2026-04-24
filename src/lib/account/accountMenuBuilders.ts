@@ -1,12 +1,10 @@
 import {
-  Briefcase,
-  ClipboardList,
   CalendarDays,
-  LayoutDashboard,
-  MapPin,
+  Lightbulb,
+  Bell,
+  User,
   Settings,
   Shield,
-  User,
   UserCircle,
 } from "lucide-react";
 import type { AccountMenuUser } from "@/lib/account/types";
@@ -29,12 +27,22 @@ export function buildPublicSiteAccountModel(input: {
   onGoToSettings: () => void;
   onGoToAdminAccount: () => void;
   onGoToBusinessAccount: () => void;
-  onGoToPersonalAccount: () => void;
+  onSwitchMode: (next: AccountMode) => void;
+  onGoToHome: () => void;
   onGoToPersonalProfile: () => void;
+  onGoToPersonalIdeas: () => void;
   onGoToPersonalPlan: () => void;
+  onGoToPersonalNotifications: () => void;
   onGoToBusinessDashboard: () => void;
-  onGoToBusinessPlaces: () => void;
-  onGoToBusinessCommercial: () => void;
+  onGoToBusinessRoot: () => void;
+  onGoToBusinessPublications: () => void;
+  onGoToBusinessBookings: () => void;
+  onGoToBusinessClients: () => void;
+  onGoToBusinessAnalytics: () => void;
+  onGoToBusinessPromotion: () => void;
+  onGoToBusinessBilling: () => void;
+  hasBusinessProfile: boolean;
+  businessBalanceBYN?: number;
   onLogout: () => void | Promise<void>;
   loggingOut: boolean;
 }): AccountDropdownModel {
@@ -45,13 +53,15 @@ export function buildPublicSiteAccountModel(input: {
     onNavigate,
     onGoToSettings,
     onGoToAdminAccount,
-    onGoToBusinessAccount,
-    onGoToPersonalAccount,
+    onSwitchMode,
     onGoToPersonalProfile,
+    onGoToPersonalIdeas,
     onGoToPersonalPlan,
-    onGoToBusinessDashboard,
-    onGoToBusinessPlaces,
-    onGoToBusinessCommercial,
+    onGoToPersonalNotifications,
+    onGoToBusinessBilling,
+    onGoToBusinessAccount,
+    hasBusinessProfile,
+    businessBalanceBYN,
     onLogout,
     loggingOut,
   } = input;
@@ -77,9 +87,18 @@ export function buildPublicSiteAccountModel(input: {
         key: "profile",
         type: "button",
         label: "Профиль",
-        icon: User,
+        icon: UserCircle,
         onClick: () => {
           onGoToPersonalProfile();
+        },
+      },
+      {
+        key: "ideas",
+        type: "button",
+        label: "Мои идеи",
+        icon: Lightbulb,
+        onClick: () => {
+          onGoToPersonalIdeas();
         },
       },
       {
@@ -89,6 +108,24 @@ export function buildPublicSiteAccountModel(input: {
         icon: CalendarDays,
         onClick: () => {
           onGoToPersonalPlan();
+        },
+      },
+      {
+        key: "notifications",
+        type: "button",
+        label: "Уведомления",
+        icon: Bell,
+        onClick: () => {
+          onGoToPersonalNotifications();
+        },
+      },
+      {
+        key: "settings",
+        type: "button",
+        label: "Настройки",
+        icon: Settings,
+        onClick: () => {
+          onGoToSettings();
         },
       },
     ];
@@ -106,24 +143,25 @@ export function buildPublicSiteAccountModel(input: {
             },
           },
         ]
-      : [
-          {
-            key: "to-business",
-            type: "button",
-            label: "Перейти в Бизнес-аккаунт",
-            icon: Briefcase,
-            variant: "accent",
-            onClick: () => {
-              onGoToBusinessAccount();
-            },
-          },
-        ];
+      : undefined;
 
     return {
       header,
       mainItems,
       contextItems,
-      onGoToSettings,
+      mode,
+      onSwitchMode,
+      businessModeAvailable: hasBusinessProfile,
+      businessLabel: "MamaGo",
+      ctaBlock: hasBusinessProfile
+        ? undefined
+        : {
+            title: "Нужен бизнес-профиль?",
+            actionLabel: "Подключить бизнес",
+            onAction: () => {
+              onGoToBusinessAccount();
+            },
+          },
       onLogout,
       logoutMode: "fetch",
       loggingOut,
@@ -136,46 +174,37 @@ export function buildPublicSiteAccountModel(input: {
     header,
     mainItems: [
       {
-        key: "dash",
+        key: "business-settings-help",
         type: "button",
-        label: "Дашборд",
-        icon: LayoutDashboard,
+        label: "Аккаунт и настройки",
+        icon: Settings,
         onClick: () => {
-          onGoToBusinessDashboard();
-        },
-      },
-      {
-        key: "places",
-        type: "button",
-        label: "Мои места",
-        icon: MapPin,
-        onClick: () => {
-          onGoToBusinessPlaces();
-        },
-      },
-      {
-        key: "commercial",
-        type: "button",
-        label: "Продвижение",
-        icon: ClipboardList,
-        onClick: () => {
-          onGoToBusinessCommercial();
+          onGoToSettings();
         },
       },
     ],
-    contextItems: [
-      {
-        key: "to-personal",
-        type: "button",
-        label: "Перейти в Личный аккаунт",
-        icon: User,
-        variant: "accent",
-        onClick: () => {
-          onGoToPersonalAccount();
-        },
-      },
-    ],
-    onGoToSettings,
+    contextItems: isAdminRole(user.role)
+      ? [
+          {
+            key: "admin",
+            type: "button",
+            label: "Перейти в админ-панель",
+            icon: Shield,
+            variant: "accent",
+            onClick: () => {
+              onGoToAdminAccount();
+            },
+          },
+        ]
+      : undefined,
+    mode,
+    onSwitchMode,
+    businessModeAvailable: true,
+    businessLabel: "MamaGo",
+    businessBalanceBYN,
+    onTopUpBalance: () => {
+      onGoToBusinessBilling();
+    },
     onLogout,
     logoutMode: "fetch",
     loggingOut,

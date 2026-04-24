@@ -6,6 +6,8 @@
  * Path prefixes remain in place as compatibility fallbacks and internal routes.
  */
 
+import { stripPublicDiscoverySearchParamsFromPath } from "@/lib/routing/publicDiscoverySearchParams";
+
 export type AppSurface = "public" | "admin" | "business";
 
 /** Canonical path prefix for the admin UI (App Router). */
@@ -89,7 +91,10 @@ export function normalizeTargetPathForSurface(surface: AppSurface, path: string)
 
   const { pathname, search, hash } = splitPathQueryAndHash(path);
   const normalizedPathname = stripSurfacePrefix(pathname, surface);
-  return `${normalizedPathname}${search}${hash}`;
+  const normalizedPath = `${normalizedPathname}${search}${hash}`;
+  return surface === "admin"
+    ? stripPublicDiscoverySearchParamsFromPath(normalizedPath)
+    : normalizedPath;
 }
 
 function parseHost(host: string): { hostname: string; port: string } {
@@ -171,10 +176,14 @@ export function buildSurfaceRedirectDestination(params: {
       : params.targetSurface === "business"
         ? buildBusinessPath(params.targetPath)
         : buildPublicPath(params.targetPath);
+  const normalizedInternalPath =
+    params.targetSurface === "admin"
+      ? stripPublicDiscoverySearchParamsFromPath(internalPath)
+      : internalPath;
 
   const resolvedHost = resolveSupportedBaseHost(params.currentHost ?? undefined);
   if (!resolvedHost) {
-    return internalPath;
+    return normalizedInternalPath;
   }
 
   const protocol = inferProtocol(
@@ -183,7 +192,7 @@ export function buildSurfaceRedirectDestination(params: {
   );
   const targetHost = getSurfaceHost(params.targetSurface, resolvedHost.baseHost);
   const hostWithPort = resolvedHost.port ? `${targetHost}:${resolvedHost.port}` : targetHost;
-  const visiblePath = buildExternalPathForSurface(params.targetSurface, internalPath);
+  const visiblePath = buildExternalPathForSurface(params.targetSurface, normalizedInternalPath);
 
   return `${protocol}://${hostWithPort}${visiblePath}`;
 }

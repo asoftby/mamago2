@@ -91,6 +91,8 @@ export type PlanItemWithActivity = {
   } | null;
 };
 
+export type PlanReminderCandidate = PlanItemWithActivity;
+
 /**
  * Add or update an activity in user's plan for a specific date.
  * If the same activity already exists in the plan (any date), updates the date.
@@ -272,6 +274,25 @@ export async function listPlanItemsByDate(
     },
     orderBy: { startsAt: "asc" },
   })) as PlanItemWithActivity[];
+}
+
+export async function listPlanItemsDueForReminder(args: {
+  windowStart: Date;
+  windowEnd: Date;
+}): Promise<PlanReminderCandidate[]> {
+  return (await prisma.planItem.findMany({
+    where: {
+      activityId: { not: null },
+      startsAt: {
+        gte: args.windowStart,
+        lte: args.windowEnd,
+      },
+    },
+    include: {
+      activity: { select: planActivitySelect },
+    },
+    orderBy: { startsAt: "asc" },
+  })) as PlanReminderCandidate[];
 }
 
 /**

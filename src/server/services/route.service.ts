@@ -80,6 +80,23 @@ export async function listPublicRoutesByCity(cityId: string): Promise<RouteWithS
   });
 }
 
+/** List published public routes filtered by several nearby cities */
+export async function listPublicRoutesByCityIds(cityIds: string[]): Promise<RouteWithStops[]> {
+  if (cityIds.length === 0) return [];
+  return prisma.route.findMany({
+    where: { status: "PUBLISHED", visibility: "PUBLIC", cityId: { in: cityIds } },
+    include: {
+      city: { select: { id: true, name: true } },
+      author: { select: { id: true, email: true } },
+      stops: {
+        orderBy: { order: "asc" },
+        include: { place: { select: { id: true, title: true, formattedAddr: true, shortAddress: true, city: { select: { name: true } } } } },
+      },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+}
+
 /** Get single route by slug */
 export async function getRouteBySlug(slug: string): Promise<RouteWithStops | null> {
   return prisma.route.findUnique({

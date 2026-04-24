@@ -48,6 +48,17 @@ function isAbsoluteDestination(href: string): boolean {
   return href.startsWith("http://") || href.startsWith("https://");
 }
 
+function toSameOriginRelativePathOrNull(href: string): string | null {
+  if (typeof window === "undefined" || !isAbsoluteDestination(href)) return null;
+  try {
+    const target = new URL(href);
+    if (target.origin !== window.location.origin) return null;
+    return `${target.pathname}${target.search}${target.hash}`;
+  } catch {
+    return null;
+  }
+}
+
 export function buildClientCompatibleDestination(
   href: string,
   context?: {
@@ -78,6 +89,16 @@ export function navigateToCompatibleHref(
   options?: { replace?: boolean },
 ): string {
   const destination = buildCurrentBrowserCompatibleDestination(href);
+  const sameOriginRelative = toSameOriginRelativePathOrNull(destination);
+
+  if (sameOriginRelative) {
+    if (options?.replace) {
+      router.replace(sameOriginRelative);
+    } else {
+      router.push(sameOriginRelative);
+    }
+    return destination;
+  }
 
   if (typeof window !== "undefined" && isAbsoluteDestination(destination)) {
     if (options?.replace) {
@@ -109,6 +130,16 @@ export function navigateToSurface(
     params.targetSurface,
     params.targetPath,
   );
+  const sameOriginRelative = toSameOriginRelativePathOrNull(href);
+
+  if (sameOriginRelative) {
+    if (params.replace) {
+      router.replace(sameOriginRelative);
+    } else {
+      router.push(sameOriginRelative);
+    }
+    return href;
+  }
 
   if (typeof window !== "undefined" && isAbsoluteDestination(href)) {
     if (params.replace) {

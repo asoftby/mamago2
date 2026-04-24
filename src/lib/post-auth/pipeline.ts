@@ -1,4 +1,6 @@
-import { toast } from "sonner";
+"use client";
+
+import { toast } from "@/lib/toast";
 import type { AuthEntryPoint } from "./types";
 import { getPostAuthContext, clearPostAuthContext } from "./storage";
 import { executePendingPostAuthAction } from "./executePendingAction";

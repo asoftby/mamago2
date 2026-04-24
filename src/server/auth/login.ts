@@ -28,8 +28,11 @@ export async function loginUser(
   const normalizedEmail = validated.email.toLowerCase().trim();
 
   // Find user
-  const user = await prisma.user.findUnique({
-    where: { email: normalizedEmail },
+  const user = await prisma.user.findFirst({
+    where: {
+      email: normalizedEmail,
+      deletedAt: null,
+    },
   });
 
   if (!user) {

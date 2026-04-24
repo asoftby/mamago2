@@ -1,0 +1,428 @@
+import { adminPath } from "@/lib/routing/surface";
+import type { AdminSidebarNavItem, AdminSidebarGroup } from "./adminSidebarTypes";
+import {
+  LayoutDashboard,
+  Shield,
+  Users,
+  Briefcase,
+  CreditCard,
+  FileText,
+  Image,
+  Filter,
+  MapPin,
+  Globe,
+  BarChart2,
+  ChartColumn,
+  Megaphone,
+  Download,
+} from "lucide-react";
+
+/**
+ * Admin Sidebar Navigation Configuration
+ * 
+ * Architecture:
+ * - Top-level sections are standalone items or groups
+ * - Each section has: id, label, href, icon, optional children
+ * - Groups are collapsible sections with multiple sub-items
+ * - Order determines display order in sidebar
+ */
+
+// === STANDALONE NAV ITEMS ===
+
+export const NAV_MAIN: AdminSidebarNavItem = {
+  id: "main",
+  label: "Главная",
+  href: adminPath(""),
+  icon: LayoutDashboard,
+};
+
+export const NAV_COMMUNICATIONS: AdminSidebarNavItem = {
+  id: "communications",
+  label: "Коммуникации",
+  href: adminPath("/communications"),
+  icon: Megaphone,
+  children: [
+    {
+      id: "communications-overview",
+      label: "Обзор",
+      href: adminPath("/communications"),
+      matchers: [{ type: "exact", value: adminPath("/communications") }],
+    },
+    {
+      id: "communications-email-studio",
+      label: "Email Studio",
+      href: adminPath("/communications/email-studio"),
+      matchers: [{ type: "prefix", value: adminPath("/communications/email-studio") }],
+    },
+    {
+      id: "communications-notification-deliveries",
+      label: "Deliveries",
+      href: adminPath("/communications/notifications/deliveries"),
+      matchers: [{ type: "prefix", value: adminPath("/communications/notifications/deliveries") }],
+    },
+  ],
+};
+
+export const NAV_ANALYTICS: AdminSidebarNavItem = {
+  id: "analytics",
+  label: "Analytics",
+  href: adminPath("/analytics"),
+  icon: ChartColumn,
+};
+
+// === IMPORT SECTION (STANDALONE TOP-LEVEL) ===
+
+export const NAV_IMPORT: AdminSidebarNavItem = {
+  id: "import",
+  label: "Импорт",
+  href: adminPath("/import"),
+  icon: Download,
+  children: [
+    {
+      id: "import-overview",
+      label: "Обзор",
+      href: adminPath("/import"),
+      matchers: [{ type: "exact", value: adminPath("/import") }],
+    },
+    {
+      id: "import-sources",
+      label: "Источники",
+      href: adminPath("/import/sources"),
+      matchers: [{ type: "prefix", value: adminPath("/import/sources") }],
+    },
+    {
+      id: "import-runs",
+      label: "Запуски",
+      href: adminPath("/import/runs"),
+      matchers: [{ type: "prefix", value: adminPath("/import/runs") }],
+    },
+    {
+      id: "import-queue",
+      label: "Очередь",
+      href: adminPath("/import/review"),
+      matchers: [{ type: "prefix", value: adminPath("/import/review") }],
+      badgeCountKey: "importPendingReviewCount",
+    },
+    {
+      id: "import-debug",
+      label: "Debug",
+      href: adminPath("/import/debug/parser"),
+      matchers: [{ type: "prefix", value: adminPath("/import/debug") }],
+    },
+  ],
+};
+
+// === GROUPS WITH SUB-ITEMS ===
+
+export const GROUP_MODERATION: AdminSidebarGroup = {
+  id: "moderation",
+  label: "Модерация",
+  icon: Shield,
+  children: [
+    {
+      id: "moderation-queue",
+      label: "Очередь",
+      href: adminPath("/moderation/queue"),
+      matchers: [{ type: "prefix", value: adminPath("/moderation/queue") }],
+      badgeCountKey: "queueTotal",
+    },
+  ],
+};
+
+export const GROUP_USERS: AdminSidebarGroup = {
+  id: "users",
+  label: "Пользователи",
+  icon: Users,
+  children: [
+    {
+      id: "users-list",
+      label: "Пользователи",
+      href: adminPath("/users"),
+      matchers: [{ type: "prefix", value: adminPath("/users") }],
+    },
+  ],
+};
+
+export const GROUP_B2B: AdminSidebarGroup = {
+  id: "b2b",
+  label: "B2B",
+  icon: Briefcase,
+  children: [
+    {
+      id: "b2b-requests",
+      label: "Заявки",
+      href: adminPath("/b2b/requests"),
+      matchers: [{ type: "prefix", value: adminPath("/b2b/requests") }],
+      badgeCountKey: "b2bPendingVerificationCount",
+    },
+    {
+      id: "b2b-partners",
+      label: "Контрагенты",
+      href: adminPath("/b2b/partners"),
+      matchers: [{ type: "prefix", value: adminPath("/b2b/partners") }],
+    },
+  ],
+};
+
+export const GROUP_BILLING: AdminSidebarGroup = {
+  id: "billing",
+  label: "Биллинг",
+  icon: CreditCard,
+  children: [
+    {
+      id: "billing-overview",
+      label: "Обзор",
+      href: adminPath("/billing"),
+      matchers: [{ type: "prefix", value: adminPath("/billing") }],
+    },
+    {
+      id: "billing-transactions",
+      label: "Транзакции",
+      href: adminPath("/billing/transactions"),
+      matchers: [{ type: "prefix", value: adminPath("/billing/transactions") }],
+    },
+    {
+      id: "billing-businesses",
+      label: "Балансы",
+      href: adminPath("/billing/businesses"),
+      matchers: [{ type: "prefix", value: adminPath("/billing/businesses") }],
+    },
+    {
+      id: "billing-plans",
+      label: "Тарифы",
+      href: adminPath("/billing/plans"),
+      matchers: [{ type: "prefix", value: adminPath("/billing/plans") }],
+    },
+  ],
+};
+
+export const GROUP_COMMERCIAL: AdminSidebarGroup = {
+  id: "commercial",
+  label: "Коммерция",
+  icon: FileText,
+  children: [
+    {
+      id: "commercial-overview",
+      label: "Обзор",
+      href: adminPath("/commercial"),
+      matchers: [{ type: "prefix", value: adminPath("/commercial") }],
+    },
+    {
+      id: "commercial-contracts",
+      label: "Договоры",
+      href: adminPath("/commercial/contracts"),
+      matchers: [{ type: "prefix", value: adminPath("/commercial/contracts") }],
+    },
+    {
+      id: "commercial-placements",
+      label: "Размещения",
+      href: adminPath("/commercial/placements"),
+      matchers: [{ type: "prefix", value: adminPath("/commercial/placements") }],
+    },
+    {
+      id: "commercial-service-placements",
+      label: "Услуги",
+      href: adminPath("/commercial/service-placements"),
+      matchers: [{ type: "prefix", value: adminPath("/commercial/service-placements") }],
+    },
+  ],
+};
+
+export const GROUP_CONTENT: AdminSidebarGroup = {
+  id: "content",
+  label: "Контент",
+  icon: Image,
+  children: [
+    {
+      id: "content-events",
+      label: "События",
+      href: adminPath("/content/events"),
+      matchers: [{ type: "prefix", value: adminPath("/content/events") }],
+    },
+    {
+      id: "content-places",
+      label: "Места",
+      href: adminPath("/content/places"),
+      matchers: [{ type: "prefix", value: adminPath("/content/places") }],
+    },
+    {
+      id: "content-offers",
+      label: "Предложения",
+      href: adminPath("/content/offers"),
+      matchers: [{ type: "prefix", value: adminPath("/content/offers") }],
+    },
+    {
+      id: "content-publications",
+      label: "Публикации",
+      href: adminPath("/content/publications"),
+      matchers: [{ type: "prefix", value: adminPath("/content/publications") }],
+    },
+    {
+      id: "content-media",
+      label: "Медиатека",
+      href: adminPath("/media"),
+      matchers: [{ type: "prefix", value: adminPath("/media") }],
+    },
+  ],
+};
+
+export const GROUP_DISCOVERY: AdminSidebarGroup = {
+  id: "discovery",
+  label: "Discovery",
+  icon: Filter,
+  children: [
+    {
+      id: "discovery-signals",
+      label: "Сигналы",
+      href: adminPath("/taxonomy/signals"),
+      matchers: [{ type: "prefix", value: adminPath("/taxonomy/signals") }],
+    },
+    {
+      id: "discovery-categories",
+      label: "Категории",
+      href: adminPath("/taxonomy/categories"),
+      matchers: [{ type: "prefix", value: adminPath("/taxonomy/categories") }],
+    },
+    {
+      id: "discovery-occasions",
+      label: "Поводы",
+      href: adminPath("/discovery/occasions"),
+      matchers: [{ type: "prefix", value: adminPath("/discovery/occasions") }],
+    },
+    {
+      id: "discovery-genres",
+      label: "Жанры",
+      href: adminPath("/taxonomy/genres"),
+      matchers: [{ type: "prefix", value: adminPath("/taxonomy/genres") }],
+    },
+    {
+      id: "discovery-filters",
+      label: "Фильтры",
+      href: adminPath("/discovery/filters"),
+      matchers: [{ type: "prefix", value: adminPath("/discovery/filters") }],
+    },
+  ],
+};
+
+export const GROUP_RANKING: AdminSidebarGroup = {
+  id: "ranking",
+  label: "Ranking",
+  icon: BarChart2,
+  children: [
+    {
+      id: "ranking-stories-intents",
+      label: "Stories Intents",
+      href: adminPath("/ranking/stories-intents"),
+      matchers: [{ type: "prefix", value: adminPath("/ranking/stories-intents") }],
+    },
+    {
+      id: "ranking-weights",
+      label: "Ranking Weights",
+      href: adminPath("/ranking/weights"),
+      matchers: [{ type: "prefix", value: adminPath("/ranking/weights") }],
+    },
+    {
+      id: "ranking-boost",
+      label: "Boost Rules",
+      href: adminPath("/ranking/boost"),
+      matchers: [{ type: "prefix", value: adminPath("/ranking/boost") }],
+    },
+  ],
+};
+
+export const GROUP_GEOGRAPHY: AdminSidebarGroup = {
+  id: "geography",
+  label: "География",
+  icon: MapPin,
+  children: [
+    {
+      id: "geography-cities",
+      label: "Города",
+      href: adminPath("/taxonomy/cities"),
+      matchers: [{ type: "prefix", value: adminPath("/taxonomy/cities") }],
+    },
+    {
+      id: "geography-districts",
+      label: "Районы",
+      href: adminPath("/taxonomy/districts"),
+      matchers: [{ type: "prefix", value: adminPath("/taxonomy/districts") }],
+    },
+    {
+      id: "geography-metro",
+      label: "Станции метро",
+      href: adminPath("/taxonomy/metro-stations"),
+      matchers: [{ type: "prefix", value: adminPath("/taxonomy/metro-stations") }],
+    },
+  ],
+};
+
+export const GROUP_SEO: AdminSidebarGroup = {
+  id: "seo",
+  label: "SEO",
+  icon: Globe,
+  children: [
+    {
+      id: "seo-dashboard",
+      label: "Dashboard",
+      href: adminPath("/seo"),
+      matchers: [{ type: "exact", value: adminPath("/seo") }],
+    },
+    {
+      id: "seo-pages",
+      label: "SEO Pages",
+      href: adminPath("/seo/pages"),
+      matchers: [{ type: "prefix", value: adminPath("/seo/pages") }],
+    },
+    {
+      id: "seo-redirects",
+      label: "Redirects",
+      href: adminPath("/seo/redirects"),
+      matchers: [{ type: "prefix", value: adminPath("/seo/redirects") }],
+    },
+    {
+      id: "seo-templates",
+      label: "Templates",
+      href: adminPath("/seo/templates"),
+      matchers: [{ type: "prefix", value: adminPath("/seo/templates") }],
+    },
+    {
+      id: "seo-schema",
+      label: "Structured Data",
+      href: adminPath("/seo/schema"),
+      matchers: [{ type: "prefix", value: adminPath("/seo/schema") }],
+    },
+    {
+      id: "seo-sitemap",
+      label: "Sitemap",
+      href: adminPath("/seo/sitemap"),
+      matchers: [{ type: "prefix", value: adminPath("/seo/sitemap") }],
+    },
+  ],
+};
+
+// === FULL SIDEBAR CONFIGURATION ===
+
+/**
+ * Complete sidebar navigation structure
+ * Order determines display order in sidebar
+ */
+export const ADMIN_SIDEBAR_CONFIG: readonly (AdminSidebarNavItem | AdminSidebarGroup)[] = [
+  NAV_MAIN,
+  GROUP_MODERATION,
+  GROUP_USERS,
+  GROUP_B2B,
+  GROUP_BILLING,
+  GROUP_COMMERCIAL,
+  GROUP_CONTENT,
+  NAV_COMMUNICATIONS,
+  GROUP_DISCOVERY,
+  GROUP_RANKING,
+  NAV_ANALYTICS,
+  GROUP_GEOGRAPHY,
+  GROUP_SEO,
+  NAV_IMPORT, // Import is now a standalone top-level section
+];
+
+// === TYPE EXPORTS ===
+
+export type { AdminSidebarNavItem, AdminSidebarGroup } from "./adminSidebarTypes";

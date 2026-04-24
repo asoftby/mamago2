@@ -8,6 +8,11 @@ import { resolveActivityCoverUrl } from "@/lib/event/resolveActivityCoverUrl";
 import type { ActivityMock } from "@/mocks/activity.types";
 import { getEventEngagementScores } from "@/server/discovery/eventEngagementScores";
 import { normalizePricingMode } from "@/components/business/wizard/event/pricingMode";
+import {
+  getWeatherRankingBoost,
+  type HomeWeatherScenario,
+} from "@/features/hero-weather/lib/weather-scenario-layer";
+import type { TimeOfDay } from "@/features/hero-weather/model/types";
 
 function ageBoundsFromActivity(a: {
   ageTags: string[];
@@ -109,7 +114,7 @@ function mapActivityRowToCard(
     nextOccurrenceAt: Date | null;
     ownerUserId: string;
     cityId: string | null;
-    place: { cityId: string | null } | null;
+    place: { cityId: string | null; city: { slug: string } | null } | null;
     venue: { cityId: string | null } | null;
     eventCategory: { nameRu: string } | null;
     images: Array<{ id: string; url: string }>;
@@ -118,6 +123,7 @@ function mapActivityRowToCard(
   ownerFirst: boolean,
   hubPrimaryCityId: string,
   engagementScore: number,
+  citySlugById: Map<string, string>,
 ): ActivityMock {
   const { ageFrom, ageTo } = ageBoundsFromActivity(a);
   const cover =
@@ -139,10 +145,14 @@ function mapActivityRowToCard(
   const listingCityId = resolveListingCityIdForKudaBadge(a);
   const geoBadge =
     listingCityId && listingCityId !== hubPrimaryCityId ? "За городом" : undefined;
+  const citySlug =
+    a.place?.city?.slug ??
+    (listingCityId ? citySlugById.get(listingCityId) ?? null : null);
 
   return {
     id: a.id,
     slug: a.slug,
+    citySlug,
     type: "EVENT_FIXED",
     discoveryIntent: "kuda",
     title: a.title,
@@ -180,7 +190,13 @@ export async function getKudaDiscoveryFeed(
   cityId: string,
   citySlug: string,
   currentUserId: string | null,
-  options?: { take?: number },
+  options?: {
+    take?: number;
+    weather?: {
+      scenario: HomeWeatherScenario;
+      timeOfDay: TimeOfDay;
+    };
+  },
 ): Promise<ActivityMock[]> {
   /** Больше кандидатов в ответе — клиент ранжирует по возрасту + показывает второй слой по engagement. */
   const take = options?.take ?? 80;
@@ -208,33 +224,55 @@ export async function getKudaDiscoveryFeed(
       images: { orderBy: { sortOrder: "asc" }, take: GALLERY_FOR_COVER },
       sessions: { orderBy: { startsAt: "asc" }, take: 100 },
       eventCategory: { select: { nameRu: true } },
-      place: { select: { cityId: true } },
+      place: { select: { cityId: true, city: { select: { slug: true } } } },
       venue: { select: { cityId: true } },
     },
   });
 
+  const cityIds = Array.from(
+    new Set(
+      rows
+        .flatMap((row) => [row.cityId, row.place?.cityId, row.venue?.cityId])
+        .filter((value): value is string => typeof value === "string" && value.length > 0),
+    ),
+  );
+  const cityRows =
+    cityIds.length > 0
+      ? await prisma.city.findMany({
+          where: { id: { in: cityIds } },
+          select: { id: true, slug: true },
+        })
+      : [];
+  const citySlugById = new Map(cityRows.map((row) => [row.id, row.slug]));
+
   const scoreMap = await getEventEngagementScores(rows.map((r) => r.id));
+  const ownerUserIdById = new Map(rows.map((row) => [row.id, row.ownerUserId]));
 
-  rows.sort((a, b) => {
-    const aMine = currentUserId && a.ownerUserId === currentUserId ? 0 : 1;
-    const bMine = currentUserId && b.ownerUserId === currentUserId ? 0 : 1;
-    if (aMine !== bMine) return aMine - bMine;
-    const sa = scoreMap.get(a.id) ?? 0;
-    const sb = scoreMap.get(b.id) ?? 0;
-    if (sa !== sb) return sb - sa;
-    const ta = a.nextOccurrenceAt?.getTime() ?? a.createdAt.getTime();
-    const tb = b.nextOccurrenceAt?.getTime() ?? b.createdAt.getTime();
-    return tb - ta;
-  });
-
-  const sliced = rows.slice(0, take);
-
-  return sliced.map((a) =>
+  const cards = rows.map((a) =>
     mapActivityRowToCard(
       a,
       Boolean(currentUserId && a.ownerUserId === currentUserId),
       primaryCityId,
       scoreMap.get(a.id) ?? 0,
+      citySlugById,
     ),
   );
+
+  cards.sort((a, b) => {
+    const aMine = currentUserId && ownerUserIdById.get(a.id) === currentUserId ? 0 : 1;
+    const bMine = currentUserId && ownerUserIdById.get(b.id) === currentUserId ? 0 : 1;
+    if (aMine !== bMine) return aMine - bMine;
+
+    const aWeatherBoost = options?.weather ? getWeatherRankingBoost(a, options.weather) : 0;
+    const bWeatherBoost = options?.weather ? getWeatherRankingBoost(b, options.weather) : 0;
+    const aRank = (a.engagementScore ?? 0) + aWeatherBoost;
+    const bRank = (b.engagementScore ?? 0) + bWeatherBoost;
+    if (aRank !== bRank) return bRank - aRank;
+
+    const ta = a.dateStart ? new Date(a.dateStart).getTime() : 0;
+    const tb = b.dateStart ? new Date(b.dateStart).getTime() : 0;
+    return tb - ta;
+  });
+
+  return cards.slice(0, take);
 }

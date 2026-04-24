@@ -42,6 +42,17 @@ export async function loadEventForWizard(eventId: string) {
       owner: {
         select: { id: true, email: true },
       },
+      organizer: {
+        select: {
+          id: true,
+          name: true,
+          unp: true,
+          phone: true,
+          website: true,
+          instagram: true,
+          createdFrom: true,
+        },
+      },
       filterOptions: true,
     },
   });
