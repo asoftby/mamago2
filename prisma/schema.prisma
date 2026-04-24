@@ -28,6 +28,7 @@ model User {
   emailVerifiedAt               DateTime?
   lastVerificationEmailSentAt   DateTime?
   lastLoginAt                   DateTime?
+  deletedAt                     DateTime?
   status                        UserStatus                   @default(ACTIVE)
   statusReason                  String?
   suspendedUntil                DateTime?
@@ -76,6 +77,7 @@ model User {
   createdEmailTemplateVersions  EmailTemplateVersion[]       @relation("EmailTemplateVersionCreatedBy")
   moderationLogs                ModerationLog[]              @relation("ModerationReviewer")
   notifications                 Notification[]
+  notificationDeliveries        NotificationDelivery[]
   phoneOtps                     PhoneOtp[]
   archivedPlaces                Place[]                      @relation("PlaceArchiver")
   createdPlaces                 Place[]                      @relation("PlaceCreator")
@@ -486,6 +488,9 @@ model City {
   id                String          @id @default(cuid())
   name              String
   slug              String          @unique
+  isActive          Boolean         @default(true)
+  isVisibleInCityFilter Boolean     @default(true)
+  priority          Int             @default(0)
   lat               Float?
   lng               Float?
   createdAt         DateTime        @default(now())
@@ -498,12 +503,14 @@ model City {
   metroMaxDistanceM Int?
   radiusKm          Float?
   districts         District[]
+  importSources     ImportSource[]  @relation("ImportSourceCity")
   metroStations     MetroStation[]
   places            Place[]         @relation("PlaceCity")
   placeRevisions    PlaceRevision[] @relation("PlaceRevisionCity")
   routes            Route[]
 
   @@index([slug])
+  @@index([isActive, isVisibleInCityFilter, priority])
   @@index([googleName])
 }
 
@@ -590,7 +597,9 @@ model Activity {
   business             Business?                 @relation("ActivityBusiness", fields: [businessId], references: [id])
   eventCategory        EventCategory?            @relation(fields: [eventCategoryId], references: [id])
   metroStation         MetroStation?             @relation(fields: [metroStationId], references: [id])
+  organizerId          String?
   owner                User                      @relation("ActivityOwner", fields: [ownerUserId], references: [id], onDelete: Cascade)
+  organizer            Organizer?                @relation(fields: [organizerId], references: [id], onDelete: SetNull)
   place                Place?                    @relation("PlaceActivities", fields: [placeId], references: [id], onDelete: Restrict)
   filterOptions        ActivityFilterOption[]
   images               ActivityImage[]
@@ -598,6 +607,7 @@ model Activity {
   sessions             ActivitySession[]
   slugHistory          ActivitySlugHistory[]
   venue                EventVenue?
+  importedRecords      ImportedRecord[]          @relation("ImportedRecordActivity")
   planItems            PlanItem[]
 
   @@index([placeId])
@@ -610,6 +620,7 @@ model Activity {
   @@index([businessId])
   @@index([cityId])
   @@index([eventCategoryId])
+  @@index([organizerId])
   @@index([slug])
 }
 
@@ -726,6 +737,7 @@ model Business {
   verificationLogs        BusinessVerificationLog[]
   commercialNotifications CommercialNotification[]
   places                  Place[]                    @relation("BusinessPlaces")
+  organizers              Organizer[]
   promotions              Promotion[]
   claimRequests           PlaceClaimRequest[]        @relation("ClaimedPlaces")
 
@@ -733,6 +745,25 @@ model Business {
   @@index([status])
   @@index([verificationStatus])
   @@index([operationalStatus])
+}
+
+model Organizer {
+  id               String               @id @default(cuid())
+  name             String
+  unp              String?
+  phone            String?
+  website          String?
+  instagram        String?
+  createdFrom      OrganizerCreatedFrom @default(MANUAL)
+  linkedBusinessId String?
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+  activities       Activity[]
+  linkedBusiness   Business?            @relation(fields: [linkedBusinessId], references: [id], onDelete: SetNull)
+
+  @@index([name])
+  @@unique([unp])
+  @@index([linkedBusinessId])
 }
 
 /// Участники бизнеса (команда). Параллельно Business.ownerUserId (канон владельца для MVP/биллинга).
@@ -854,6 +885,7 @@ model Place {
   ownerBusinessId              String?
   activities                   Activity[]          @relation("PlaceActivities")
   eventVenues                  EventVenue[]
+  importedRecords              ImportedRecord[]    @relation("ImportedRecordPlace")
   offers                       Offer[]
   archivedBy                   User?               @relation("PlaceArchiver", fields: [archivedByUserId], references: [id])
   city                         City?               @relation("PlaceCity", fields: [cityId], references: [id])
@@ -1056,6 +1088,7 @@ model Notification {
   userId     String
   audience   NotificationAudience?
   type       NotificationType
+  scenario   NotificationScenario?
   title      String
   body       String
   entityType String?
@@ -1073,6 +1106,7 @@ model Notification {
   deliveries NotificationDelivery[]
 
   @@index([userId, audience, createdAt])
+  @@index([userId, scenario, createdAt])
   @@index([userId, isPinned, createdAt])
   @@index([userId, isRead, createdAt])
   @@index([userId, seenAt])
@@ -1947,18 +1981,26 @@ model StoryIntentConfig {
 /// IN_APP is always created. EMAIL/TELEGRAM are created when dispatch is attempted.
 model NotificationDelivery {
   id             String                     @id @default(cuid())
-  notificationId String
+  notificationId String?
+  userId         String
+  scenario       NotificationScenario?
   channel        NotificationChannel
   status         NotificationDeliveryStatus @default(PENDING)
+  dedupeKey      String?
   errorMessage   String?
+  payloadJson    Json?
   sentAt         DateTime?
   createdAt      DateTime                   @default(now())
   updatedAt      DateTime                   @updatedAt
-  notification   Notification               @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  notification   Notification?              @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  user           User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([notificationId, channel])
   @@index([notificationId])
+  @@index([userId, scenario, channel])
+  @@index([dedupeKey])
   @@index([channel, status])
+  @@index([scenario, channel, status])
   @@index([status, createdAt])
 }
 
@@ -2177,6 +2219,11 @@ enum ScheduleMode {
   RECURRING
   ON_DEMAND
   ALWAYS
+}
+
+enum OrganizerCreatedFrom {
+  IMPORT
+  MANUAL
 }
 
 enum LocationSource {
@@ -2527,8 +2574,267 @@ enum NotificationDeliveryStatus {
   SKIPPED
 }
 
+enum NotificationScenario {
+  PLAN_EVENT_2H_BEFORE
+}
+
 enum DevTelegramBusinessApplicationStatus {
   PENDING
   CONFIRMED
   REJECTED
+}
+
+enum ImportSourceType {
+  WEBSITE
+  RSS_FEED
+  JSON_API
+  CSV_FILE
+  SITEMAP
+  MANUAL
+}
+
+enum ImportSourceStatus {
+  ACTIVE
+  PAUSED
+  DISABLED
+  ERROR
+}
+
+enum ImportEntityType {
+  PLACE
+  EVENT
+  OFFER
+}
+
+enum ImportFetchStrategy {
+  HTML_SCRAPE
+  RSS
+  JSON_API
+  CSV
+  SITEMAP_CRAWL
+  MANUAL_UPLOAD
+}
+
+enum ImportRunStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum ImportTriggerType {
+  MANUAL
+  SCHEDULED
+  WEBHOOK
+}
+
+enum ImportParseStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  SKIPPED
+}
+
+enum ImportNormalizeStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  SKIPPED
+}
+
+enum ImportMatchStatus {
+  PENDING
+  MATCHED
+  NO_MATCH
+  AMBIGUOUS
+  SKIPPED
+}
+
+enum ImportReviewStatus {
+  PENDING
+  IN_REVIEW
+  APPROVED
+  REJECTED
+  SKIPPED
+}
+
+enum ImportReviewTaskStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum ImportSuggestedAction {
+  CREATE_NEW
+  UPDATE_EXISTING
+  MERGE
+  REJECT
+  SKIP
+}
+
+enum ImportDecision {
+  APPROVED_CREATE
+  APPROVED_UPDATE
+  APPROVED_MERGE
+  REJECTED
+  DEFERRED
+}
+
+enum ImportFieldLockMode {
+  LOCKED
+  PREFER_IMPORT
+  PREFER_MANUAL
+}
+
+/// Источник импорта (сайт, фид, API и т.д.)
+model ImportSource {
+  id                  String              @id @default(cuid())
+  name                String
+  slug                String              @unique
+  type                ImportSourceType
+  status              ImportSourceStatus  @default(ACTIVE)
+  baseUrl             String?
+  parserKey           String?
+  fetchStrategy       ImportFetchStrategy @default(HTML_SCRAPE)
+  isTrusted           Boolean             @default(false)
+  isAutoUpdate        Boolean             @default(false)
+  defaultEntity       ImportEntityType?
+  rateLimitMs         Int?
+  notes               String?
+  lastRunAt           DateTime?
+  lastSuccessAt       DateTime?
+  lastErrorAt         DateTime?
+  lastErrorMessage    String?
+  cityId              String?
+  isActive            Boolean             @default(true)
+  archivedAt          DateTime?
+  crawlMaxPages       Int?
+  crawlMaxDetailLinks Int?
+  crawlMaxRecords     Int?
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+
+  city    City?            @relation("ImportSourceCity", fields: [cityId], references: [id])
+  runs    ImportRun[]
+  records ImportedRecord[]
+
+  @@index([status])
+  @@index([type])
+  @@index([cityId])
+  @@index([archivedAt])
+  @@index([isActive])
+}
+
+/// Один запуск импорта из источника
+model ImportRun {
+  id            String            @id @default(cuid())
+  sourceId      String
+  status        ImportRunStatus   @default(PENDING)
+  startedAt     DateTime?
+  finishedAt    DateTime?
+  totalFetched  Int               @default(0)
+  totalParsed   Int               @default(0)
+  totalCreated  Int               @default(0)
+  totalUpdated  Int               @default(0)
+  totalSkipped  Int               @default(0)
+  totalRejected Int               @default(0)
+  totalErrors   Int               @default(0)
+  triggerType   ImportTriggerType @default(MANUAL)
+  triggerUserId String?
+  errorMessage  String?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  isArchived    Boolean           @default(false)
+
+  source  ImportSource   @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  records ImportedRecord[]
+
+  @@index([sourceId])
+  @@index([status])
+  @@index([sourceId, status])
+  @@index([createdAt])
+  @@index([isArchived])
+}
+
+/// Одна импортированная запись (сырые данные + статусы pipeline)
+model ImportedRecord {
+  id                  String                @id @default(cuid())
+  sourceId            String
+  runId               String?
+  externalId          String?
+  sourceUrl           String?
+  canonicalSourceUrl  String?
+  entityTypeHint      ImportEntityType?
+  rawPayload          Json?
+  rawText             String?
+  contentHash         String?
+  sourceUpdatedAt     DateTime?
+  parseStatus         ImportParseStatus     @default(PENDING)
+  normalizeStatus     ImportNormalizeStatus @default(PENDING)
+  matchStatus         ImportMatchStatus     @default(PENDING)
+  reviewStatus        ImportReviewStatus    @default(PENDING)
+  confidenceScore     Float?
+  qualityScore        Float?
+  normalizedData      Json?
+  matchCandidates     Json?
+  reviewDecision      Json?
+  publishedPlaceId    String?
+  publishedActivityId String?
+  errorMessage        String?
+  fetchedAt           DateTime?
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+  applyResult         Json?
+
+  reviewTask         ImportReviewTask?
+  publishedActivity  Activity?    @relation("ImportedRecordActivity", fields: [publishedActivityId], references: [id])
+  publishedPlace     Place?       @relation("ImportedRecordPlace", fields: [publishedPlaceId], references: [id])
+  run                ImportRun?   @relation(fields: [runId], references: [id])
+  source             ImportSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+
+  @@index([sourceId, reviewStatus])
+  @@index([sourceId, externalId])
+  @@index([contentHash])
+  @@index([runId])
+  @@index([parseStatus])
+  @@index([normalizeStatus])
+  @@index([matchStatus])
+}
+
+/// Задача ревью для конкретной импортированной записи
+model ImportReviewTask {
+  id               String                 @id @default(cuid())
+  importedRecordId String                 @unique
+  status           ImportReviewTaskStatus @default(PENDING)
+  priority         Int                    @default(0)
+  suggestedAction  ImportSuggestedAction?
+  decision         ImportDecision?
+  reviewerUserId   String?
+  reviewedAt       DateTime?
+  notes            String?
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+
+  importedRecord ImportedRecord @relation(fields: [importedRecordId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@index([priority])
+  @@index([status, priority])
+}
+
+/// Блокировка поля сущности от перезаписи при повторном импорте
+model ImportFieldOverride {
+  id              String              @id @default(cuid())
+  entityType      ImportEntityType
+  entityId        String
+  fieldName       String
+  lockMode        ImportFieldLockMode @default(LOCKED)
+  reason          String?
+  createdByUserId String?
+  createdAt       DateTime            @default(now())
+
+  @@index([entityType, entityId])
+  @@unique([entityType, entityId, fieldName])
 }
