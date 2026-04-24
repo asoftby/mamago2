@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { Bell, Building2, Lock, Mail, Smartphone, User } from "lucide-react";
+import { Bell, Building2, Lock, Mail, Shield, Smartphone, User } from "lucide-react";
 import { SettingsLinkRow } from "@/components/settings/SettingsLinkRow";
 import { maskPhoneForDisplay } from "@/lib/phone/display";
 import { buildSettingsSectionHref } from "@/lib/settings/registry";
@@ -41,6 +41,7 @@ const SECTION_ICONS: Record<SettingsSectionId, typeof User> = {
   email: Mail,
   password: Lock,
   phone: Smartphone,
+  privacy: Shield,
 };
 
 export function SettingsHomeClient({ context }: { context: SettingsContext }) {
@@ -48,7 +49,7 @@ export function SettingsHomeClient({ context }: { context: SettingsContext }) {
     () =>
       context.viewer.phoneE164
         ? maskPhoneForDisplay(context.viewer.phoneE164)
-        : "Не привязан",
+        : "Не указан",
     [context.viewer.phoneE164]
   );
 
@@ -60,12 +61,13 @@ export function SettingsHomeClient({ context }: { context: SettingsContext }) {
   const descriptions: Partial<Record<SettingsSectionId, string>> = {
     profile: usernameLabel(context),
     company: context.businessContext?.name ?? "Компания",
-    "user-notifications": "Сайт, почта и Telegram",
+    "user-notifications": "Настройте уведомления, которые хотите получать",
     "business-notifications": "Статусы модерации и каналы бизнеса",
-    "admin-notifications": "Операторские уведомления и служебные каналы",
+    "admin-notifications": "Напоминания, рекомендации и важные сообщения",
     email: context.viewer.email,
     password: "Сменить пароль",
     phone: maskedPhone,
+    privacy: "Управляйте данными и удалением аккаунта",
   };
 
   return (
@@ -92,6 +94,16 @@ export function SettingsHomeClient({ context }: { context: SettingsContext }) {
           })}
         </CardSection>
       ))}
+      {context.surfaceScope === "BUSINESS" ? (
+        <CardSection title="Аккаунт">
+          <SettingsLinkRow
+            href="/settings/account?from=business"
+            icon={Shield}
+            label="Аккаунт и безопасность"
+            description="Имя, вход, пароль, телефон и конфиденциальность"
+          />
+        </CardSection>
+      ) : null}
     </div>
   );
 }

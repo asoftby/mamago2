@@ -31,7 +31,7 @@ export function resolveCanonicalSettingsScope(
     return "ADMIN";
   }
 
-  if (routeKey === "company" || context.permissions.canAccessBusinessSettings) {
+  if (routeKey === "company") {
     return "BUSINESS";
   }
 

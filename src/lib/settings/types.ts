@@ -10,7 +10,8 @@ export type SettingsSectionId =
   | "admin-notifications"
   | "email"
   | "password"
-  | "phone";
+  | "phone"
+  | "privacy";
 
 export type SettingsRouteKey =
   | "profile"
@@ -18,7 +19,8 @@ export type SettingsRouteKey =
   | "notifications"
   | "email"
   | "password"
-  | "phone";
+  | "phone"
+  | "privacy";
 
 export type SettingsSectionOwnership = "COMMON" | "USER" | "BUSINESS" | "ADMIN";
 
@@ -27,7 +29,8 @@ export type SettingsSectionGroup =
   | "organization"
   | "notifications"
   | "security"
-  | "operations";
+  | "operations"
+  | "privacy";
 
 export interface SettingsViewer {
   id: string;

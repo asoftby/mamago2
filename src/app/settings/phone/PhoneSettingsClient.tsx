@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { AlertTriangle, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -255,7 +255,7 @@ export function PhoneSettingsClient(props: {
           Номер телефона используется для:
         </p>
         <ul className="mt-3 space-y-2 text-sm text-neutral-700">
-          <li>Отзывы — чтобы подтвердить, что вы были на мероприятии</li>
+          <li>Отзывов — чтобы подтвердить, что вы были на мероприятии</li>
           <li>Заявок — автозаполнение контактной информации при бронировании</li>
         </ul>
       </div>

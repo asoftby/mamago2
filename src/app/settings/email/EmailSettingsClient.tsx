@@ -1,6 +1,6 @@
 "use client";
 
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { Mail } from "lucide-react";
 import { useAuthMe } from "@/lib/auth/useAuthMe";
 import { useResendVerificationEmail } from "@/features/email-verification/hooks/useResendVerificationEmail";

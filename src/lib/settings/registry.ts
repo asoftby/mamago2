@@ -11,13 +11,14 @@ export const SETTINGS_SECTION_GROUP_LABELS: Record<SettingsSectionGroup, string>
   organization: "Компания",
   notifications: "Уведомления",
   security: "Безопасность",
-  operations: "Операции",
+  operations: "УВЕДОМЛЕНИЯ",
+  privacy: "Конфиденциальность",
 };
 
 export const SETTINGS_SECTION_REGISTRY: readonly SettingsSectionDefinition[] = [
   {
     id: "profile",
-    title: "Аватар и ник",
+    title: "Имя и аватар",
     description: "Имя, аватар и основной профиль",
     group: "profile",
     order: 10,
@@ -39,8 +40,8 @@ export const SETTINGS_SECTION_REGISTRY: readonly SettingsSectionDefinition[] = [
   },
   {
     id: "user-notifications",
-    title: "Каналы уведомлений",
-    description: "Сайт, почта и Telegram для личного аккаунта",
+    title: "Уведомления",
+    description: "Напоминания, рекомендации и важные сообщения",
     group: "notifications",
     order: 30,
     ownership: "USER",
@@ -61,9 +62,9 @@ export const SETTINGS_SECTION_REGISTRY: readonly SettingsSectionDefinition[] = [
   },
   {
     id: "admin-notifications",
-    title: "Операторские уведомления",
-    description: "Внутренние и административные уведомления",
-    group: "operations",
+    title: "Уведомления",
+    description: "Напоминания, рекомендации и важные сообщения",
+    group: "notifications",
     order: 30,
     ownership: "ADMIN",
     surfaceScopes: ["ADMIN"],
@@ -102,6 +103,17 @@ export const SETTINGS_SECTION_REGISTRY: readonly SettingsSectionDefinition[] = [
     surfaceScopes: ["USER", "BUSINESS", "ADMIN"],
     routeKey: "phone",
     routeSegment: "phone",
+  },
+  {
+    id: "privacy",
+    title: "Конфиденциальность",
+    description: "Ваши данные, персонализация и удаление аккаунта",
+    group: "privacy",
+    order: 70,
+    ownership: "COMMON",
+    surfaceScopes: ["USER", "BUSINESS", "ADMIN"],
+    routeKey: "privacy",
+    routeSegment: "privacy",
   },
 ] as const;
 

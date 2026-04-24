@@ -10,6 +10,10 @@ export function getVisibleSettingsSections(
 ): SettingsSectionDefinition[] {
   return SETTINGS_SECTION_REGISTRY
     .filter((section) => section.surfaceScopes.includes(context.surfaceScope))
+    .filter((section) => {
+      if (context.surfaceScope !== "BUSINESS") return true;
+      return section.ownership === "BUSINESS";
+    })
     .filter((section) => section.isVisible?.(context) ?? true)
     .sort((a, b) => a.order - b.order);
 }
