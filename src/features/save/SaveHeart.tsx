@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import { Heart } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { SaveActivityFlowAdaptive } from "@/components/activity/SaveActivityFlowAdaptive";
 import type { SaveToPlanResult } from "@/components/activity/SaveToPlanModal";
 import { persistActivitySave } from "@/features/save/persistActivitySave";
@@ -96,7 +96,7 @@ export function SaveHeart({
         onSaveChange?.(true);
         triggerAnimation();
       } catch (e) {
-        toast.error("Не удалось сохранить", {
+        toast.error("Не получилось выполнить действие", {
           description: "Попробуйте ещё раз",
         });
         throw e;

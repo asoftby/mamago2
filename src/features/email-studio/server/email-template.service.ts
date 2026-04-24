@@ -351,4 +351,11 @@ export async function archiveTemplate(id: string): Promise<EmailTemplateWithDocu
   return mapTemplateRow(archived as EmailTemplatePrismaRecord);
 }
 
+export async function deleteTemplate(id: string): Promise<void> {
+  await requireTemplateById(id);
+  await prisma.emailTemplate.delete({
+    where: { id },
+  });
+}
+
 export { createVersionSnapshot };

@@ -6,7 +6,7 @@ import { InventoryGrid } from "../_components/InventoryGrid";
 import { RenderSafe } from "../_components/RenderSafe";
 import { ActivityCard } from "@/components/activity/ActivityCard";
 import { SaveToPlanResult } from "@/components/activity/SaveToPlanModal";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 
 export function ActivitySection() {
   const handleSaveResult = (result: SaveToPlanResult, cardName: string) => {

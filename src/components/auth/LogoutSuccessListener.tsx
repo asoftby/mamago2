@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { clearLogoutClientStorage } from "@/lib/auth/logoutClientCleanup";
 
 /**
@@ -22,7 +22,7 @@ export function LogoutSuccessListener() {
     if (handled.current) return;
     handled.current = true;
     clearLogoutClientStorage();
-    toast.success("You have been logged out");
+    toast.success("Вы вышли из аккаунта");
     const next = new URLSearchParams(searchParams.toString());
     next.delete("loggedOut");
     const q = next.toString();

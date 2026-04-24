@@ -12,7 +12,7 @@ import { checkAddonCompatibility } from "../../lib/compatibility";
 import { AddRemoveButton } from "../AddRemoveButton";
 import { BuilderProgress } from "../BuilderProgress";
 import { AlertCircle, Sparkles, Eye } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import type { OfferLayer } from "../../../types/birthday";
 import { generatePersonalRecommendation } from "../../lib/offerPersonalRecommendation";

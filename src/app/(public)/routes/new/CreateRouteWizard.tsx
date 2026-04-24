@@ -17,7 +17,7 @@ import {
   ArrowLeft, Plus, Trash2, MapPin,
   Globe, Lock, Link2,
 } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

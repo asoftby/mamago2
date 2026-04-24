@@ -7,11 +7,16 @@ import { Button } from "@/components/ui/button";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { CalendarCheck, CalendarDays, CalendarClock, Bookmark, ChevronLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { DatePicker } from "@/components/ui/date-picker";
 import { useSaveRouteOnboarding } from "@/hooks/useSaveRouteOnboarding";
 import { SaveRouteOnboarding } from "@/components/onboarding/SaveRouteOnboarding";
 import { useRouter } from "next/navigation";
+import {
+  addDaysLocal,
+  formatLocalPlanDate,
+  getLocalDateKey,
+} from "@/lib/date/localDateKey";
 
 type Props = {
   open: boolean;
@@ -24,12 +29,6 @@ type Props = {
   allowSaveToIdeas?: boolean;
   isAuthenticated: boolean;
 };
-
-function getTodayISO() { return new Date().toISOString().split("T")[0]; }
-function getTomorrowISO() { const d = new Date(); d.setDate(d.getDate() + 1); return d.toISOString().split("T")[0]; }
-function formatDateRu(iso: string) {
-  return new Date(iso).toLocaleDateString("ru-RU", { day: "numeric", month: "long" });
-}
 
 type View = "quick" | "datepicker";
 
@@ -69,7 +68,7 @@ function PlanContent({
       // Show success toast
       if (result.savedTo === "plan" && result.date) {
         toast.success("Маршрут добавлен в план", {
-          description: `Сохранено на ${formatDateRu(result.date)}`,
+          description: `Сохранено на ${formatLocalPlanDate(result.date, "ru-RU")}`,
           action: {
             label: "Открыть план",
             onClick: () => router.push("/?myPlan=open"),
@@ -124,7 +123,7 @@ function PlanContent({
   const handleDatePickerConfirm = useCallback(() => {
     if (!selectedDate) return;
     
-    const dateISO = selectedDate.toISOString().split("T")[0];
+    const dateISO = getLocalDateKey(selectedDate);
     handleSave(dateISO);
   }, [selectedDate, handleSave]);
 
@@ -179,20 +178,22 @@ function PlanContent({
     );
   }
 
+  const todayISO = getLocalDateKey();
+  const tomorrowISO = addDaysLocal(todayISO, 1);
   const options = [
     {
       icon: <CalendarCheck className="w-5 h-5" />,
       title: "Сегодня",
-      subtitle: `Добавить на ${formatDateRu(getTodayISO())}`,
-      onClick: () => handleSave(getTodayISO()),
+      subtitle: `Добавить на ${formatLocalPlanDate(todayISO, "ru-RU")}`,
+      onClick: () => handleSave(todayISO),
       iconBg: "bg-neutral-900",
       iconColor: "text-white",
     },
     {
       icon: <CalendarDays className="w-5 h-5" />,
       title: "Завтра",
-      subtitle: `Добавить на ${formatDateRu(getTomorrowISO())}`,
-      onClick: () => handleSave(getTomorrowISO()),
+      subtitle: `Добавить на ${formatLocalPlanDate(tomorrowISO, "ru-RU")}`,
+      onClick: () => handleSave(tomorrowISO),
       iconBg: "bg-neutral-900",
       iconColor: "text-white",
     },

@@ -11,6 +11,7 @@ import { useFamilyPersona } from "@/contexts/FamilyPersonaContext";
 import { notifyAuthStateChanged } from "@/lib/auth/client";
 import { cn } from "@/lib/utils";
 import { navigateToSurface } from "@/lib/routing/clientNavigation";
+import { resolveHasBusinessProfile } from "@/lib/account/isBusinessAccountRole";
 import {
   getNavIconButtonClassName,
   type NavIconChrome,
@@ -62,7 +63,6 @@ export function MobileProfileSheet({
           targetPath: "/",
           replace: true,
         });
-        router.refresh();
       }
     } finally {
       setLoggingOut(false);
@@ -186,7 +186,10 @@ export function MobileProfileSheet({
     );
   }
 
-  const isBusinessPartner = user.role === "BUSINESS_OWNER";
+  const isBusinessPartner = resolveHasBusinessProfile({
+    role: user.role,
+    hasApprovedBusinessProfile: user.hasApprovedBusinessProfile,
+  });
 
   return (
     <ProfileDropdown
@@ -221,9 +224,39 @@ export function MobileProfileSheet({
       onLogout={handleLogout}
       onNavigate={() => setMenuOpen(false)}
       onGoToSettings={() =>
+        mode === "business"
+          ? navigateToSurface(router, {
+              targetSurface: "business",
+              targetPath: "/settings",
+            })
+          : navigateToSurface(router, {
+              targetSurface: "public",
+              targetPath: "/me/settings",
+            })
+      }
+      onSwitchMode={(next) => {
+        if (next === "business") {
+          goToBusinessAccount(isBusinessPartner);
+          return;
+        }
+        goToPersonalAccount();
+      }}
+      onGoToHome={() =>
         navigateToSurface(router, {
           targetSurface: "public",
-          targetPath: "/me/settings",
+          targetPath: "/",
+        })
+      }
+      onGoToPersonalProfile={() =>
+        navigateToSurface(router, {
+          targetSurface: "public",
+          targetPath: "/me",
+        })
+      }
+      onGoToPersonalIdeas={() =>
+        navigateToSurface(router, {
+          targetSurface: "public",
+          targetPath: "/me/ideas",
         })
       }
       onGoToAdminAccount={() =>
@@ -233,17 +266,16 @@ export function MobileProfileSheet({
         })
       }
       onGoToBusinessAccount={() => goToBusinessAccount(isBusinessPartner)}
-      onGoToPersonalProfile={() =>
-        navigateToSurface(router, {
-          targetSurface: "public",
-          targetPath: "/me",
-        })
-      }
-      onGoToPersonalAccount={goToPersonalAccount}
       onGoToPersonalPlan={() =>
         navigateToSurface(router, {
           targetSurface: "public",
           targetPath: "/me/plan",
+        })
+      }
+      onGoToPersonalNotifications={() =>
+        navigateToSurface(router, {
+          targetSurface: "public",
+          targetPath: "/settings/notifications",
         })
       }
       onGoToBusinessDashboard={() =>
@@ -252,18 +284,50 @@ export function MobileProfileSheet({
           targetPath: "/dashboard",
         })
       }
-      onGoToBusinessPlaces={() =>
+      onGoToBusinessRoot={() =>
         navigateToSurface(router, {
           targetSurface: "business",
-          targetPath: "/places",
+          targetPath: "/",
         })
       }
-      onGoToBusinessCommercial={() =>
+      onGoToBusinessPublications={() =>
+        navigateToSurface(router, {
+          targetSurface: "business",
+          targetPath: "/events",
+        })
+      }
+      onGoToBusinessBookings={() =>
+        navigateToSurface(router, {
+          targetSurface: "business",
+          targetPath: "/inbox",
+        })
+      }
+      onGoToBusinessClients={() =>
+        navigateToSurface(router, {
+          targetSurface: "business",
+          targetPath: "/team",
+        })
+      }
+      onGoToBusinessAnalytics={() =>
+        navigateToSurface(router, {
+          targetSurface: "business",
+          targetPath: "/dashboard",
+        })
+      }
+      onGoToBusinessPromotion={() =>
         navigateToSurface(router, {
           targetSurface: "business",
           targetPath: "/promotion",
         })
       }
+      onGoToBusinessBilling={() =>
+        navigateToSurface(router, {
+          targetSurface: "business",
+          targetPath: "/billing/transactions",
+        })
+      }
+      hasBusinessProfile={isBusinessPartner}
+      businessBalanceBYN={user.businessBalanceBYN}
     />
   );
 }

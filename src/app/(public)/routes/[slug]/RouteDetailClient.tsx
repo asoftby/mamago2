@@ -13,7 +13,7 @@ import { BUDGET_LABELS, type MockRoute } from "@/mocks/routes.mock";
 import { ShareSheet } from "@/components/routes/ShareSheet";
 import { SaveActivityFlowAdaptive } from "@/components/activity/SaveActivityFlowAdaptive";
 import type { SaveToPlanResult } from "@/components/activity/SaveToPlanModal";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { RouteMapHero } from "@/components/routes/RouteMapHero";
 import { useAuthMe } from "@/features/birthday/builder/hooks/useAuthMe";
 

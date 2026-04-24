@@ -4,7 +4,7 @@ import { useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { SaveActivityFlowAdaptive } from "@/components/activity/SaveActivityFlowAdaptive";
 import type { SaveToPlanResult } from "@/components/activity/SaveToPlanModal";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 
 export interface SaveEventOnboardingProps {
   /** Is modal open */

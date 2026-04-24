@@ -6,7 +6,7 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { cn } from "@/lib/utils";
 import { Link2, Send, MessageCircle, Phone, Check } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import type { MockRoute } from "@/mocks/routes.mock";
 import { BUDGET_LABELS } from "@/mocks/routes.mock";
 import { formatAgeKeysShort } from "@/lib/config/ages";

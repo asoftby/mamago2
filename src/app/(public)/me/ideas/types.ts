@@ -11,6 +11,7 @@ export type IdeaItem = {
     ageRange?: string;
     dateStart?: string;
     dateEnd?: string;
+    priceLabel?: string;
   };
   planAvailability?: PlanActivityPublicAvailability;
   isPlanned: boolean;

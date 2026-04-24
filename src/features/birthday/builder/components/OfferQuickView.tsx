@@ -13,7 +13,7 @@ import { checkAddonCompatibility } from "../lib/compatibility";
 import { AddRemoveButton } from "./AddRemoveButton";
 import { Star, AlertCircle } from "lucide-react";
 import { ModalCloseButton } from "@/components/ui/modal-close-button";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import type { BirthdayOffer } from "../../types/birthday";
 import { formatConcreteOfferPrice } from "../../lib/formatOfferPrice";

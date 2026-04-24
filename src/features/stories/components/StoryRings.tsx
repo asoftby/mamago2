@@ -3,6 +3,7 @@
 import { StoryRingItem } from "./StoryRingItem";
 import { StoryModal } from "./StoryModal";
 import { useStoryViewer } from "../hooks/useStoryViewer";
+import { resolveStoryRingCoverUrl } from "../lib/resolveStoryRingCoverUrl";
 import type { StoryCollection } from "../types/story";
 
 interface StoryRingsProps {
@@ -28,7 +29,6 @@ export function StoryRings({ stories }: StoryRingsProps) {
 
   return (
     <>
-      {/* Rings row */}
       <div
         className="flex gap-3 overflow-x-auto no-scrollbar px-1 pb-1"
         style={{ scrollbarWidth: "none" }}
@@ -37,14 +37,14 @@ export function StoryRings({ stories }: StoryRingsProps) {
           <StoryRingItem
             key={story.id}
             title={story.title}
-            emoji={story.emoji}
             seen={seenIds.has(story.id)}
+            coverImageUrl={resolveStoryRingCoverUrl(story)}
+            imagePriority={index === 0}
             onClick={() => open(index)}
           />
         ))}
       </div>
 
-      {/* Modal viewer */}
       {isOpen && activeStory && activeStoryIndex !== null && (
         <StoryModal
           activeStory={activeStory}

@@ -48,7 +48,7 @@ function getReplyTo(): string {
   return replyTo;
 }
 
-type EmailKind = "verify-email" | "password-reset" | "welcome";
+type EmailKind = "verify-email" | "password-reset" | "welcome" | "notification";
 
 async function sendViaResend(
   kind: EmailKind,
@@ -90,6 +90,43 @@ async function sendViaResend(
 }
 
 export class EmailService {
+  async sendNotificationEmail(params: {
+    to: string;
+    subject: string;
+    title: string;
+    body: string;
+    ctaLabel?: string | null;
+    ctaUrl?: string | null;
+  }): Promise<{ status: "SENT" | "SKIPPED"; reason?: string }> {
+    const debugTo = getDebugRedirectTo();
+    const actualTo = debugTo ?? params.to;
+
+    if (!isEmailEnabled()) {
+      console.info("[email] notification send skipped (EMAIL_ENABLED is not true)", {
+        kind: "notification",
+        intendedTo: params.to,
+        actualTo,
+        debugRedirect: Boolean(debugTo),
+        subject: params.subject,
+      });
+      return { status: "SKIPPED", reason: "EMAIL_DISABLED" };
+    }
+
+    await sendViaResend(
+      "notification",
+      params.to,
+      params.subject,
+      <TransactionalNotificationTemplate
+        title={params.title}
+        body={params.body}
+        ctaLabel={params.ctaLabel}
+        ctaUrl={params.ctaUrl}
+      />,
+    );
+
+    return { status: "SENT" };
+  }
+
   async sendVerifyEmail(params: { to: string; token: string }): Promise<void> {
     const debugTo = getDebugRedirectTo();
     const actualTo = debugTo ?? params.to;
@@ -209,3 +246,47 @@ export class EmailService {
 }
 
 export const emailService = new EmailService();
+
+function TransactionalNotificationTemplate(props: {
+  title: string;
+  body: string;
+  ctaLabel?: string | null;
+  ctaUrl?: string | null;
+}) {
+  return (
+    <html>
+      <body
+        style={{
+          fontFamily: "Arial, sans-serif",
+          maxWidth: 560,
+          margin: "0 auto",
+          padding: 24,
+          color: "#1F1F1F",
+        }}
+      >
+        <h2 style={{ marginBottom: 8 }}>{props.title}</h2>
+        <p style={{ color: "#555", lineHeight: 1.6 }}>{props.body}</p>
+        {props.ctaUrl ? (
+          <p style={{ marginTop: 20 }}>
+            <a
+              href={props.ctaUrl}
+              style={{
+                display: "inline-block",
+                background: "#EF8759",
+                color: "#fff",
+                padding: "10px 20px",
+                borderRadius: 8,
+                textDecoration: "none",
+                fontWeight: 600,
+              }}
+            >
+              {props.ctaLabel || "Открыть"}
+            </a>
+          </p>
+        ) : null}
+        <hr style={{ marginTop: 32, border: "none", borderTop: "1px solid #eee" }} />
+        <p style={{ fontSize: 12, color: "#aaa" }}>mamaGo — семейный помощник</p>
+      </body>
+    </html>
+  );
+}

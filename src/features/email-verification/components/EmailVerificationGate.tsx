@@ -1,7 +1,7 @@
 "use client";
 
 import { useMediaQuery } from "react-responsive";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import {
   Dialog,
   DialogContent,

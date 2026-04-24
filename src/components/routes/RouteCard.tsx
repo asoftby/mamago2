@@ -13,7 +13,7 @@ import { AnalyticsCardViewTracker } from "@/components/analytics/AnalyticsCardVi
 import { useAuthMe } from "@/features/birthday/builder/hooks/useAuthMe";
 import { SaveActivityFlowAdaptive } from "@/components/activity/SaveActivityFlowAdaptive";
 import type { SaveToPlanResult } from "@/components/activity/SaveToPlanModal";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { useRouter } from "next/navigation";
 
 type Props = {

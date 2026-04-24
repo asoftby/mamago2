@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { toast as sonnerToast } from "sonner";
+import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 
 export type UndoCountdownToastContentProps = {
@@ -64,7 +64,7 @@ export function UndoCountdownToastContent({
           )}
           onClick={() => {
             onUndo();
-            sonnerToast.dismiss(toastId);
+            toast.dismiss(toastId);
           }}
         >
           {undoLabel}

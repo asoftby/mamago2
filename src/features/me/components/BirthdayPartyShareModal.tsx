@@ -14,7 +14,7 @@ import {
   Send,
   Share2,
 } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 
 /** Ограничение длины, чтобы не превысить лимит GET в браузере */

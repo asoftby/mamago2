@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo } from "react";
-import { useParams } from "next/navigation";
 import { ActivityCard } from "@/components/activity/ActivityCard";
 import { AnalyticsCardViewTracker } from "@/components/analytics/AnalyticsCardViewTracker";
 import {
@@ -14,6 +13,8 @@ import { formatRuShortDayMonthRange } from "@/lib/formatters/date";
 import type { ActivityMock } from "@/mocks/activity.types";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { useOptionalCity } from "@/contexts/CityContext";
+import { DEFAULT_CITY_SLUG } from "@/lib/city/resolveCityContext";
 
 type DiscoveryActivitiesGridProps = {
   activities: ActivityMock[];
@@ -34,16 +35,23 @@ function filtersSignature(f: DiscoveryFilters): string {
   });
 }
 
+function masonrySkeletonAspect(index: number): string {
+  const variants = [
+    "aspect-[4/5]",
+    "aspect-[3/4]",
+    "aspect-[5/7]",
+    "aspect-[4/6]",
+  ];
+  return variants[index % variants.length] ?? "aspect-[4/5]";
+}
+
 export function DiscoveryActivitiesGrid({
   activities,
   className,
   coverRatio,
 }: DiscoveryActivitiesGridProps) {
-  const params = useParams() as { city?: string };
-  const citySlug =
-    typeof params?.city === "string" && params.city.length > 0
-      ? params.city
-      : "minsk";
+  const cityCtx = useOptionalCity();
+  const citySlug = cityCtx?.citySlug ?? DEFAULT_CITY_SLUG;
   const ratio = coverRatio ?? "4/5";
   const { applied, actions, derived } = useDiscoveryFilters();
   const debounced = useDebouncedValue(applied, 400);
@@ -55,8 +63,8 @@ export function DiscoveryActivitiesGrid({
   );
 
   const renderCard = (activity: (typeof activities)[number]) => (
-    <AnalyticsCardViewTracker
-      key={activity.id}
+      <AnalyticsCardViewTracker
+        key={activity.id}
       entityType="EVENT"
       entityId={activity.id}
       vertical="CITY"
@@ -64,7 +72,9 @@ export function DiscoveryActivitiesGrid({
       meta={{ section: "afisha" }}
     >
       <ActivityCard
+        className="mb-0 h-full"
         coverRatio={ratio}
+        variant="poster-feed"
         activity={activity}
         saveMeta={{
           title: activity.title,
@@ -104,14 +114,19 @@ export function DiscoveryActivitiesGrid({
       )}
 
       {!showEmpty && (
-      <div className={cn("grid gap-6 grid-cols-2 md:grid-cols-4")}>
+      <div
+        className={cn(
+          "grid grid-cols-2 gap-5 lg:grid-cols-4",
+          className,
+        )}
+      >
         {isPending
           ? Array.from({ length: 8 }).map((_, i) => (
               <div
                 key={i}
                 className={cn(
-                  "rounded-2xl bg-neutral-100 animate-pulse",
-                  ratio === "1/1" ? "aspect-square" : "aspect-[4/5]",
+                  "overflow-hidden rounded-[28px] bg-neutral-100 animate-pulse",
+                  ratio === "1/1" ? "aspect-square" : masonrySkeletonAspect(i),
                 )}
                 aria-hidden
               />
@@ -125,7 +140,9 @@ export function DiscoveryActivitiesGrid({
           <h2 className="px-1 text-[15px] font-semibold text-muted-foreground">
             {secondaryHeading}
           </h2>
-          <div className="grid gap-6 grid-cols-2 md:grid-cols-4">
+          <div
+            className="grid grid-cols-2 gap-5 lg:grid-cols-4"
+          >
             {secondary.map(renderCard)}
           </div>
         </div>

@@ -17,7 +17,7 @@ import {
 import { OfferRecommendationBlock } from "../../../components/OfferRecommendationBlock";
 import { formatConcreteOfferPrice } from "../../../lib/formatOfferPrice";
 import { Star } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 
 type BuilderHook = BirthdayBuilderWithGate;

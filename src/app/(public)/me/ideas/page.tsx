@@ -29,6 +29,10 @@ async function getUserIdeas(userId: string): Promise<IdeaItem[]> {
       type: true,
       coverImageUrl: true,
       ageLabel: true,
+      ageMinMonths: true,
+      priceText: true,
+      priceFrom: true,
+      currency: true,
       status: true,
       nextOccurrenceAt: true,
       sessions: {
@@ -68,6 +72,18 @@ async function getUserIdeas(userId: string): Promise<IdeaItem[]> {
       const dateStart = session?.startsAt?.toISOString().split("T")[0];
       const dateEnd = undefined;
       const plannedDate = plannedMap.get(idea.activityId);
+      const priceLabel =
+        activity.priceText?.trim() ||
+        (activity.priceFrom === 0
+          ? "Бесплатно"
+          : activity.priceFrom != null
+            ? `${activity.priceFrom} ${(activity.currency || "BYN").trim()}`
+            : undefined);
+      const ageRange =
+        activity.ageLabel?.trim() ||
+        (activity.ageMinMonths != null
+          ? `${Math.max(0, Math.floor(activity.ageMinMonths / 12))}+`
+          : undefined);
 
       return {
         id: idea.id,
@@ -77,9 +93,10 @@ async function getUserIdeas(userId: string): Promise<IdeaItem[]> {
           type: activity.type as IdeaItem["activity"]["type"],
           coverImageUrl: activity.coverImageUrl ?? undefined,
           city: activity.place?.city?.name ?? undefined,
-          ageRange: activity.ageLabel ?? undefined,
+          ageRange,
           dateStart,
           dateEnd,
+          priceLabel,
         },
         planAvailability: getPlanActivityPublicAvailability(activity),
         isPlanned: !!plannedDate,

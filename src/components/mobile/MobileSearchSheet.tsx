@@ -15,7 +15,7 @@ import {
 import { ChevronDown } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { ModalCloseButton } from "@/components/ui/modal-close-button";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import {
   useDiscoveryFilters,

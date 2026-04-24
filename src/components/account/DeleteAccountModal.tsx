@@ -2,8 +2,8 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
-import { AlertTriangle, Trash2 } from "lucide-react";
+import { toast } from "@/lib/toast";
+import { AlertTriangle } from "lucide-react";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import {
   Dialog,
@@ -22,13 +22,12 @@ type Props = {
 
 function DeleteAccountBody({ onClose }: { onClose: () => void }) {
   const router = useRouter();
-  const [confirmed, setConfirmed] = React.useState(false);
   const [loading, setLoading] = React.useState(false);
 
   const handleDelete = async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/user/delete", {
+      const res = await fetch("/api/me/delete", {
         method: "POST",
         credentials: "include",
       });
@@ -41,103 +40,28 @@ function DeleteAccountBody({ onClose }: { onClose: () => void }) {
         toast.success("Ваш профиль удалён");
       }, 300);
     } catch {
-      toast.error("Ошибка удаления профиля. Попробуйте снова");
+      toast.error("Не получилось выполнить действие. Попробуйте снова");
       setLoading(false);
     }
   };
 
   return (
-    <div className="flex flex-col gap-5 px-12 pb-6 pt-2 sm:px-14">
-      {/* Icon + title */}
-      <div className="flex flex-col items-center gap-3 pt-2 text-center">
+    <div className="flex flex-col gap-6 px-8 pb-6 pt-4 sm:px-10">
+      <div className="flex flex-col items-center gap-3 text-center">
         <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-50">
           <AlertTriangle className="h-6 w-6 text-red-500" />
         </div>
         <div>
-          <h2 className="text-[17px] font-semibold text-neutral-900">Удалить профиль?</h2>
-          <p className="mt-1 text-sm text-neutral-500">
-            Мы удалим ваш профиль и связанные с ним персональные данные
+          <h2 className="text-[17px] font-semibold text-neutral-900">Удалить аккаунт</h2>
+          <p className="mt-1 text-sm text-neutral-600">
+            Вы уверены, что хотите удалить аккаунт?
+            <br />
+            Это действие нельзя отменить
           </p>
         </div>
       </div>
 
-      {/* What will be deleted */}
-      <div className="rounded-2xl border border-red-100 bg-red-50/60 px-4 py-3.5 text-left">
-        <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-red-600">
-          Будут удалены
-        </h3>
-        <ul className="m-0 list-none space-y-1.5 p-0 text-sm text-neutral-700">
-          {[
-            "Аккаунт и профиль",
-            "Данные о детях и семье",
-            "«Мой план», идеи, сохранения и сценарии",
-            "Персональные настройки и уведомления",
-            "Привязка Telegram и активные сессии",
-          ].map((item) => (
-            <li key={item} className="flex items-start gap-2.5">
-              <span
-                className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-red-400"
-                aria-hidden
-              />
-              <span className="min-w-0 flex-1 leading-snug">{item}</span>
-            </li>
-          ))}
-        </ul>
-      </div>
-
-      {/* What may remain */}
-      <div className="rounded-2xl border border-neutral-100 bg-neutral-50 px-4 py-3.5 text-left">
-        <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-neutral-500">
-          Может остаться в системе
-        </h3>
-        <ul className="m-0 list-none space-y-1.5 p-0 text-sm text-neutral-600">
-          {[
-            "Обезличенная статистика без привязки к личности",
-            "Данные, которые мы обязаны хранить по закону",
-          ].map((item) => (
-            <li key={item} className="flex items-start gap-2.5">
-              <span
-                className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-neutral-300"
-                aria-hidden
-              />
-              <span className="min-w-0 flex-1 leading-snug">{item}</span>
-            </li>
-          ))}
-        </ul>
-      </div>
-
-      {/* Confirmation checkbox */}
-      <label className="flex cursor-pointer items-start gap-3">
-        <input
-          type="checkbox"
-          checked={confirmed}
-          onChange={(e) => setConfirmed(e.target.checked)}
-          disabled={loading}
-          className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer accent-red-500"
-        />
-        <span className="text-sm text-neutral-700">
-          Я понимаю, что это действие необратимо
-        </span>
-      </label>
-
-      {/* Buttons */}
       <div className="flex flex-col gap-2.5">
-        <Button
-          variant="destructive"
-          size="lg"
-          className="w-full rounded-2xl font-semibold"
-          disabled={!confirmed || loading}
-          onClick={handleDelete}
-        >
-          {loading ? (
-            "Удаление…"
-          ) : (
-            <>
-              <Trash2 className="mr-2 h-4 w-4" />
-              Удалить профиль
-            </>
-          )}
-        </Button>
         <Button
           variant="outline"
           size="lg"
@@ -146,6 +70,15 @@ function DeleteAccountBody({ onClose }: { onClose: () => void }) {
           onClick={onClose}
         >
           Отмена
+        </Button>
+        <Button
+          variant="destructive"
+          size="lg"
+          className="w-full rounded-2xl font-semibold"
+          disabled={loading}
+          onClick={handleDelete}
+        >
+          {loading ? "Удаление..." : "Удалить аккаунт"}
         </Button>
       </div>
     </div>

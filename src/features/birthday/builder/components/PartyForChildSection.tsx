@@ -49,7 +49,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { SavedProfileChildCard } from "./SavedProfileChildCard";
 import { DatePicker } from "@/components/ui/date-picker";
 import { useMediaQuery } from "@/hooks/useMediaQuery";

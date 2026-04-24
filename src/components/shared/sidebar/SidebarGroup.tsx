@@ -19,7 +19,8 @@ export function SidebarGroup({
   defaultOpen = false,
   hasAttention = false,
 }: SidebarGroupProps) {
-  const [isOpen, setIsOpen] = useState(defaultOpen);
+  // Keep the first SSR/CSR render deterministic to avoid hydration mismatch.
+  const [isOpen, setIsOpen] = useState(false);
 
   useEffect(() => {
     setIsOpen(defaultOpen);

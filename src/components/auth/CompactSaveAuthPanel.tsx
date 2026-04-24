@@ -8,7 +8,7 @@ import { appendBirthdayBuilderAuthParam } from "@/lib/auth/appendBirthdayBuilder
 import { getPostAuthRedirect } from "@/lib/auth/postAuthRedirect";
 import { notifyPostAuthSync } from "@/lib/auth/client";
 import { navigateToCompatibleHref } from "@/lib/routing/clientNavigation";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { VERIFICATION_EMAIL_SEND_FAILED_AFTER_REGISTRATION_TOAST } from "@/lib/auth/registrationVerificationToast";
 import { ModalCloseButton } from "@/components/ui/modal-close-button";
 
@@ -124,7 +124,6 @@ export function CompactSaveAuthPanel({
           const target = appendBirthdayBuilderAuthParam(raw);
           navigateToCompatibleHref(router, target, { replace: true });
         }
-        router.refresh();
         return;
       }
 
@@ -153,7 +152,6 @@ export function CompactSaveAuthPanel({
         const target = appendBirthdayBuilderAuthParam(raw);
         navigateToCompatibleHref(router, target, { replace: true });
       }
-      router.refresh();
     } catch {
       setError("Ошибка сети");
     } finally {

@@ -13,6 +13,7 @@ import {
   getCityFromPath,
   getIntentFromPath,
   getDiscoveryIntentForPublicationPath,
+  isDiscoveryListingPath,
   shouldHideMobileBottomNav,
   type Intent,
 } from "@/lib/intent";
@@ -307,6 +308,7 @@ export function useDiscoveryFilters() {
   useEffect(() => {
     const intent = getIntentFromPath(pathname);
     if (!intent || !cityForSession) return;
+    if (!isDiscoveryListingPath(pathname)) return;
     if (isDiscoveryFiltersEmpty(appliedFromUrl)) return;
     saveDiscoveryFiltersSession(cityForSession, intent, appliedFromUrl);
   }, [pathname, cityForSession, appliedFromUrl]);
@@ -315,9 +317,17 @@ export function useDiscoveryFilters() {
   useEffect(() => {
     const intent = getIntentFromPath(pathname);
     if (!intent || !cityForSession) return;
+    if (!isDiscoveryListingPath(pathname)) return;
     if (hasDiscoveryFilterParamsInUrl(searchParams)) return;
     const stored = loadDiscoveryFiltersSession(cityForSession, intent);
     if (!stored || isDiscoveryFiltersEmpty(stored)) return;
+    if (process.env.NODE_ENV !== "production") {
+      console.debug("[DiscoveryFilters] restoring stored filters into listing URL", {
+        pathname,
+        cityForSession,
+        intent,
+      });
+    }
     writeAppliedToUrl(router, pathname, searchParams, stored, "replace");
   }, [pathname, cityForSession, searchParams, router]);
 
