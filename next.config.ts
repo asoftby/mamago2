@@ -1,5 +1,30 @@
 import type { NextConfig } from "next";
 
+const defaultDevOrigins = [
+  "http://localhost:3000",
+  "http://127.0.0.1:3000",
+  "http://mamago.local:3000",
+  "http://admin.mamago.local:3000",
+  "http://business.mamago.local:3000",
+  "localhost:3000",
+  "127.0.0.1:3000",
+  "mamago.local:3000",
+  "admin.mamago.local:3000",
+  "business.mamago.local:3000",
+  "mamago.local",
+  "admin.mamago.local",
+  "business.mamago.local",
+];
+
+const envDevOrigins = (process.env.NEXT_DEV_ALLOWED_ORIGINS ?? "")
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean);
+
+const allowedDevOrigins = Array.from(
+  new Set([...defaultDevOrigins, ...envDevOrigins]),
+);
+
 const nextConfig: NextConfig = {
   /* config options here */
   // В dev React Compiler сильно раздувает время компиляции страниц (десятки секунд TTFB).
@@ -25,6 +50,10 @@ const nextConfig: NextConfig = {
         protocol: "https",
         hostname: "**.unsplash.com",
       },
+      {
+        protocol: "https",
+        hostname: "family.by",
+      },
     ],
   },
 
@@ -35,14 +64,8 @@ const nextConfig: NextConfig = {
     },
   },
 
-  /** Доступ к dev с другого устройства в LAN (через IP), иначе /_next/* может не грузиться */
-  ...(process.env.NEXT_DEV_ALLOWED_ORIGINS?.trim()
-    ? {
-        allowedDevOrigins: process.env.NEXT_DEV_ALLOWED_ORIGINS.split(",")
-          .map((s) => s.trim())
-          .filter(Boolean),
-      }
-    : {}),
+  /** Доступ к dev с localhost / кастомного local-domain / LAN без поломанной загрузки `/_next/*`. */
+  allowedDevOrigins,
 };
 
 export default nextConfig;
