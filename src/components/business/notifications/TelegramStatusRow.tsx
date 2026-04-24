@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useRef } from "react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { CheckCircle2, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 

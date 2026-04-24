@@ -3,7 +3,7 @@
 import { useEffect, useState, useTransition } from "react";
 import { Bell, Loader2, Mail, Send } from "lucide-react";
 import { NotificationChannel, type NotificationType } from "@prisma/client";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { Toggle } from "@/components/ui/Toggle";
 import { Button } from "@/components/ui/button";
 import {

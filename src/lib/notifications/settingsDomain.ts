@@ -81,8 +81,8 @@ const CHANNEL_DEFAULT_PRESETS: Record<NotificationSettingsDefaultKind, ChannelDe
   // USER surface — new model
   USER_SECURITY:         { inApp: true,  email: true,  telegram: false },
   USER_REMINDERS:        { inApp: true,  email: false, telegram: true  },
-  USER_RECOMMENDATIONS:  { inApp: true,  email: false, telegram: false },
-  USER_NEWS:             { inApp: true,  email: false, telegram: false },
+  USER_RECOMMENDATIONS:  { inApp: true,  email: false, telegram: true  },
+  USER_NEWS:             { inApp: false, email: false, telegram: false },
   // BUSINESS / ADMIN — unchanged
   BUSINESS_DECISION:     { inApp: true,  email: true,  telegram: false },
   BUSINESS_ACTION:       { inApp: true,  email: true,  telegram: false },
@@ -96,20 +96,13 @@ const SILENT_CHANNELS: ChannelDefaults = {
 };
 
 const NOTIFICATION_SETTINGS_GROUP_DEFINITIONS: readonly NotificationSettingsGroupDefinition[] = [
-  // USER surface — new 2-group model
+  // USER surface — compact single-group matrix
   {
     id: "user-important",
     surface: "USER",
-    title: "Важное",
-    description: "Безопасность аккаунта и напоминания о событиях",
+    title: "Уведомления",
+    description: "Выберите, какие уведомления и в какой канал отправлять.",
     order: 10,
-  },
-  {
-    id: "user-for-you",
-    surface: "USER",
-    title: "Для вас",
-    description: "Персональные рекомендации и новости сервиса",
-    order: 20,
   },
   // BUSINESS surface — unchanged
   {
@@ -151,8 +144,8 @@ const NOTIFICATION_SETTINGS_GROUP_DEFINITIONS: readonly NotificationSettingsGrou
   {
     id: "admin-operations",
     surface: "ADMIN",
-    title: "Операции и модерация",
-    description: "Служебные уведомления для операторской поверхности",
+    title: "Уведомления",
+    description: "Напоминания, рекомендации и важные сообщения",
     order: 10,
   },
 ] as const;
@@ -170,8 +163,8 @@ const NOTIFICATION_SETTINGS_TYPE_DEFINITIONS: readonly NotificationSettingsTypeD
   // They exist only as compatibility input — see userNotificationEvents.ts.
   {
     type: "SYSTEM",
-    label: "Аккаунт и безопасность",
-    description: "Вход, пароль и важные изменения аккаунта",
+    label: "Системные",
+    description: "Безопасность и важные изменения",
     audience: "USER",
     surface: "USER",
     groupId: "user-important",
@@ -181,7 +174,7 @@ const NOTIFICATION_SETTINGS_TYPE_DEFINITIONS: readonly NotificationSettingsTypeD
   {
     type: "REMINDER",
     label: "Напоминания",
-    description: "О событиях и запланированных активностях",
+    description: "О запланированных событиях",
     audience: "USER",
     surface: "USER",
     groupId: "user-important",
@@ -190,21 +183,21 @@ const NOTIFICATION_SETTINGS_TYPE_DEFINITIONS: readonly NotificationSettingsTypeD
   },
   {
     type: "RECOMMENDATION",
-    label: "Рекомендации для вас",
-    description: "Подходящие идеи по интересам семьи",
+    label: "Рекомендации",
+    description: "Подборки и идеи для вас и детей",
     audience: "USER",
     surface: "USER",
-    groupId: "user-for-you",
+    groupId: "user-important",
     order: 30,
     defaultKind: "USER_RECOMMENDATIONS",
   },
   {
     type: "NEWS",
-    label: "Новости mamaGo",
-    description: "Обновления сервиса и важные объявления",
+    label: "Новое и интересное",
+    description: "Новые события, места и предложения",
     audience: "USER",
     surface: "USER",
-    groupId: "user-for-you",
+    groupId: "user-important",
     order: 40,
     defaultKind: "USER_NEWS",
   },

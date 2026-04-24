@@ -16,6 +16,7 @@ import {
 } from "@/lib/notifications/settingsDomain";
 import {
   getNotificationSettingsSurfaceData,
+  NotificationSettingsValidationError,
   updateNotificationSettingsChannelValue,
 } from "@/server/services/notificationSettings.service";
 import { getTelegramLinkStatus } from "@/server/services/telegramLink.service";
@@ -122,13 +123,24 @@ export async function PATCH(req: NextRequest) {
     );
   }
 
-  await updateNotificationSettingsChannelValue({
-    userId: context.viewer.id,
-    surface,
-    notificationType,
-    channel: parsed.data.channel,
-    enabled: parsed.data.enabled,
-  });
+  try {
+    await updateNotificationSettingsChannelValue({
+      userId: context.viewer.id,
+      surface,
+      notificationType,
+      channel: parsed.data.channel,
+      enabled: parsed.data.enabled,
+    });
+  } catch (error) {
+    if (error instanceof NotificationSettingsValidationError) {
+      return NextResponse.json(
+        { error: error.code, message: error.message },
+        { status: 400 },
+      );
+    }
+
+    throw error;
+  }
 
   return NextResponse.json({ ok: true });
 }

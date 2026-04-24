@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef } from "react";
 import { Mail } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { SystemNotificationCard } from "@/features/notifications/components/SystemNotificationCard";
 import { useAuthMe } from "@/lib/auth/useAuthMe";
 import { useResendVerificationEmail } from "@/features/email-verification/hooks/useResendVerificationEmail";

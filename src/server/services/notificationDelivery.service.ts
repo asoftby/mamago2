@@ -41,7 +41,7 @@ export async function dispatchDelivery(
   );
 
   await Promise.allSettled([
-    handleInApp(notification.id, channels.inApp),
+    handleInApp(notification.id, user.id, channels.inApp),
     handleEmail(notification, user, channels.email),
     handleTelegram(notification.id, channels.telegram),
   ]);
@@ -49,11 +49,12 @@ export async function dispatchDelivery(
 
 // ── IN_APP ────────────────────────────────────────────────────────────────────
 
-async function handleInApp(notificationId: string, enabled: boolean): Promise<void> {
+async function handleInApp(notificationId: string, userId: string, enabled: boolean): Promise<void> {
   try {
     await prisma.notificationDelivery.upsert({
       where: { notificationId_channel: { notificationId, channel: "IN_APP" } },
       create: {
+        userId,
         notificationId,
         channel: "IN_APP",
         status: enabled ? "SENT" : "SKIPPED",
@@ -79,6 +80,7 @@ async function handleEmail(
     const delivery = await prisma.notificationDelivery.upsert({
       where: { notificationId_channel: { notificationId: notification.id, channel: "EMAIL" } },
       create: {
+        userId: user.id,
         notificationId: notification.id,
         channel: "EMAIL",
         status: enabled ? "PENDING" : "SKIPPED",
@@ -143,6 +145,7 @@ async function handleTelegram(notificationId: string, enabled: boolean): Promise
     const delivery = await prisma.notificationDelivery.upsert({
       where: { notificationId_channel: { notificationId, channel: "TELEGRAM" } },
       create: {
+        userId: notification.userId,
         notificationId,
         channel: "TELEGRAM",
         status: enabled ? "PENDING" : "SKIPPED",

@@ -486,6 +486,36 @@ export async function getUnreadCount(
   return prisma.notification.count({ where });
 }
 
+export async function getLatestActivePlanReminderNotification(
+  userId: string,
+  now = new Date(),
+) {
+  const activeSince = new Date(now.getTime() - 6 * 60 * 60 * 1000);
+
+  return prisma.notification.findFirst({
+    where: {
+      userId,
+      scenario: "PLAN_EVENT_2H_BEFORE",
+      audience: "USER",
+      entityType: "PLAN_ITEM",
+      createdAt: { gte: activeSince },
+    },
+    orderBy: [{ isRead: "asc" }, { createdAt: "desc" }],
+    select: {
+      id: true,
+      title: true,
+      body: true,
+      ctaLabel: true,
+      ctaAction: true,
+      createdAt: true,
+      isRead: true,
+      scenario: true,
+      entityType: true,
+      entityId: true,
+    },
+  });
+}
+
 /** После подключения Telegram — скрыть WELCOME из UI и снять непрочитанность. */
 export async function markWelcomeNotificationsRead(userId: string) {
   const now = new Date();

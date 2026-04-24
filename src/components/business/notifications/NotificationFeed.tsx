@@ -7,7 +7,7 @@ import { ru } from "date-fns/locale";
 import { Bell } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { displayWelcomeNotificationTitle } from "@/lib/notifications/welcomeNotification";
 import { getNotificationHref } from "@/lib/notifications/routing";
 import type { NotificationApiRow } from "@/lib/notifications/types";

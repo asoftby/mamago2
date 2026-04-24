@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useRef } from "react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { Send } from "lucide-react";
 import { SystemNotificationCard } from "@/features/notifications/components/SystemNotificationCard";
 import { trackNotificationEvent } from "@/lib/notifications/notificationAnalytics";
