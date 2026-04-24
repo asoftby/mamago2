@@ -15,11 +15,15 @@ import type {
   ImportEntityType,
   ImportReviewStatus,
   ImportReviewTaskStatus,
+  Prisma,
 } from "@prisma/client";
 import { prismaBase } from "@/lib/prisma";
 import { ReviewQueueTableClient } from "./_components/ReviewQueueTableClient";
 import { ImportReviewFilters } from "./_components/ImportReviewFilters";
-import { reconcileImportedRecordLinks } from "@/server/modules/import/services/import-link-reconciliation.service";
+import {
+  reconcileImportedRecordLinks,
+  type ImportedRecordLinkSnapshot,
+} from "@/server/modules/import/services/import-link-reconciliation.service";
 import type { ReviewDecisionPayload } from "@/server/modules/import/types";
 
 export const dynamic = "force-dynamic";
@@ -28,9 +32,37 @@ export const revalidate = 0;
 type QueueStageFilter = "PENDING" | "IN_PROGRESS" | "COMPLETED";
 type QueueStageParam = QueueStageFilter | "ALL";
 
+const importReviewImportedRecordSelect = {
+  id: true,
+  createdAt: true,
+  sourceUrl: true,
+  entityTypeHint: true,
+  qualityScore: true,
+  confidenceScore: true,
+  matchStatus: true,
+  normalizedData: true,
+  publishedPlaceId: true,
+  publishedActivityId: true,
+  reviewDecision: true,
+  applyResult: true,
+  reviewStatus: true,
+  source: { select: { id: true, name: true, slug: true } },
+  reviewTask: {
+    select: {
+      id: true,
+      status: true,
+      suggestedAction: true,
+    },
+  },
+} satisfies Prisma.ImportedRecordSelect;
+
+type ImportReviewImportedRecordPrismaRow = Prisma.ImportedRecordGetPayload<{
+  select: typeof importReviewImportedRecordSelect;
+}>;
+
 type ImportAdminDb = {
   importedRecord?: {
-    findMany: (args: unknown) => Promise<any[]>;
+    findMany: (args: unknown) => Promise<unknown[]>;
     count: (args: unknown) => Promise<number>;
   };
   importSource?: {
@@ -132,7 +164,7 @@ async function getImportedObjects(filters: {
     return [];
   }
 
-  const records = await db.importedRecord.findMany({
+  const records = (await db.importedRecord.findMany({
     where: {
       ...(buildStageWhere(filters.stage) ?? {}),
       ...(filters.sourceId ? { sourceId: filters.sourceId } : {}),
@@ -140,30 +172,8 @@ async function getImportedObjects(filters: {
     },
     orderBy: [{ createdAt: "desc" }],
     take: 100,
-    select: {
-      id: true,
-      createdAt: true,
-      sourceUrl: true,
-      entityTypeHint: true,
-      qualityScore: true,
-      confidenceScore: true,
-      matchStatus: true,
-      normalizedData: true,
-      publishedPlaceId: true,
-      publishedActivityId: true,
-      reviewDecision: true,
-      applyResult: true,
-      reviewStatus: true,
-      source: { select: { id: true, name: true, slug: true } },
-      reviewTask: {
-        select: {
-          id: true,
-          status: true,
-          suggestedAction: true,
-        },
-      },
-    },
-  });
+    select: importReviewImportedRecordSelect,
+  })) as ImportReviewImportedRecordPrismaRow[];
 
   return reconcileImportedRecordLinks(records, prismaBase);
 }
@@ -180,7 +190,7 @@ async function getQueueStats() {
     };
   }
 
-  const linkedRecords = await db.importedRecord.findMany({
+  const linkedRecords = (await db.importedRecord.findMany({
     where: {
       OR: [
         { publishedPlaceId: { not: null } },
@@ -194,7 +204,7 @@ async function getQueueStats() {
       reviewDecision: true,
       applyResult: true,
     },
-  });
+  })) as ImportedRecordLinkSnapshot[];
   const reconciledLinkedRecords = await reconcileImportedRecordLinks(
     linkedRecords,
     prismaBase,

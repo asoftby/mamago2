@@ -73,7 +73,6 @@ export async function resolveCanonicalEventPublicPathBySlugOrId(
     select: {
       id: true,
       slug: true,
-      city: { select: { slug: true } },
       cityId: true,
       place: { select: { city: { select: { slug: true } } } },
       venue: {
@@ -87,7 +86,7 @@ export async function resolveCanonicalEventPublicPathBySlugOrId(
 
   if (!activity) return null;
 
-  const activityCitySlug = activity.city?.slug ?? (await citySlugById(activity.cityId));
+  const activityCitySlug = await citySlugById(activity.cityId);
   const venueCitySlug =
     activity.venue?.place?.city?.slug ?? (await citySlugById(activity.venue?.cityId));
 

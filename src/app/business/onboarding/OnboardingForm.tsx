@@ -89,7 +89,9 @@ export function OnboardingForm({
     }
 
     const draft = loadDraft();
-    if (draft) {
+    if (!draft) return;
+
+    queueMicrotask(() => {
       console.log("📋 Loading draft:", draft);
 
       if (draft.unp) {
@@ -113,7 +115,7 @@ export function OnboardingForm({
       ) {
         setVerifiedPhoneE164(draft.verifiedPhoneE164);
       }
-    }
+    });
   }, [initialData, accountPhoneE164]);
 
   // Debounced save helper

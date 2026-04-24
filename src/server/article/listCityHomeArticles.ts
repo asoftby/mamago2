@@ -26,13 +26,11 @@ function extractArticlePlainText(raw: unknown, excerpt: string | null): string {
   const blockText = content.blocks
     .map((block) => {
       switch (block.type) {
-        case "title":
         case "intro":
         case "quote":
         case "heading":
-          return "text" in block ? block.text : "";
         case "text":
-          return block.markdown;
+          return block.text;
         default:
           return "";
       }

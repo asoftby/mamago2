@@ -97,7 +97,8 @@ export function AccountDropdownContent({
   sheetLayout = false,
 }: AccountDropdownContentProps) {
   const adminContextRow = contextItems?.find(
-    (row) => row.key === "admin" && row.type === "button",
+    (row): row is Extract<AccountMenuRow, { type: "button" }> =>
+      row.key === "admin" && row.type === "button",
   );
   const hasRoleSwitcher =
     !!mode &&

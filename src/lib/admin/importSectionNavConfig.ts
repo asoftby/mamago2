@@ -39,6 +39,3 @@ export const IMPORT_SECTION_NAV_CONFIG: AdminSectionNavConfig = {
     },
   ],
 };
-
-// Re-export for sidebar config
-export { IMPORT_SECTION_NAV_CONFIG as IMPORT_SECTION_NAV_CONFIG };

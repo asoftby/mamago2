@@ -44,6 +44,9 @@ export const BUSINESS_PROMOTION_OVERVIEW_HREF = businessRoute("/promotion");
 export const BUSINESS_BILLING_TRANSACTIONS_HREF = businessRoute("/billing/transactions");
 export const BUSINESS_BILLING_PLAN_HREF = businessRoute("/billing/plan");
 export const BUSINESS_SETTINGS_HREF = businessRoute("/settings");
+export const BUSINESS_CONTRACTS_HREF = businessRoute("/documents/contracts");
+export const BUSINESS_ACTS_HREF = businessRoute("/documents/acts");
+export const BUSINESS_OFFERS_HREF = businessRoute("/offers");
 
 export const businessNavigation: BusinessNavItem[] = [
   {

@@ -2,7 +2,11 @@ import Link from "next/link";
 import { prismaBase } from "@/lib/prisma";
 import { formatDistanceToNow } from "date-fns";
 import { ru } from "date-fns/locale";
-import type { ImportEntityType, ImportRunStatus } from "@prisma/client";
+import type {
+  ImportEntityType,
+  ImportReviewStatus,
+  ImportRunStatus,
+} from "@prisma/client";
 import { RunRowActions } from "./_components/RunRowActions";
 import {
   formatImportEntity,
@@ -14,9 +18,37 @@ import {
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
+type ImportRunRecordStub = {
+  applyResult: unknown;
+  reviewStatus: ImportReviewStatus;
+};
+
+type ImportRunListRow = {
+  id: string;
+  status: ImportRunStatus;
+  createdAt: Date;
+  startedAt: Date | null;
+  finishedAt: Date | null;
+  errorMessage: string | null;
+  isArchived: boolean;
+  totalFetched: number;
+  totalParsed: number;
+  totalCreated: number;
+  totalErrors: number;
+  source: {
+    id: string;
+    name: string;
+    slug: string;
+    defaultEntity: ImportEntityType | null;
+    isActive: boolean;
+    archivedAt: Date | null;
+  };
+  records: ImportRunRecordStub[];
+};
+
 type ImportRunsDb = {
   importRun?: {
-    findMany: (args: unknown) => Promise<any[]>;
+    findMany: (args: unknown) => Promise<ImportRunListRow[]>;
   };
   importSource?: {
     findMany: (args: unknown) => Promise<Array<{ id: string; name: string }>>;
@@ -49,7 +81,7 @@ async function getRuns(filters: {
   entityType?: ImportEntityType;
   sourceId?: string;
   archiveFilter: ArchiveFilter;
-}) {
+}): Promise<ImportRunListRow[]> {
   const db = getImportRunsDb();
   if (!db.importRun) {
     return [];

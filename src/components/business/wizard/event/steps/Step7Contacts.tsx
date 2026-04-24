@@ -54,7 +54,9 @@ export function Step7Contacts({ data, onChange, isEditable, eventId }: Step7Cont
 
   useEffect(() => {
     if (!hasLinkedPlace || !data.placeId) {
-      setPlaceContacts(null);
+      queueMicrotask(() => {
+        setPlaceContacts(null);
+      });
       return;
     }
 
@@ -85,7 +87,9 @@ export function Step7Contacts({ data, onChange, isEditable, eventId }: Step7Cont
 
   useEffect(() => {
     if (!eventId) {
-      setImportContacts(null);
+      queueMicrotask(() => {
+        setImportContacts(null);
+      });
       return;
     }
 

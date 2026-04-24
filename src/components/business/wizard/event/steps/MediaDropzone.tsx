@@ -108,6 +108,7 @@ export const MediaDropzone = forwardRef<MediaDropzoneHandle, MediaDropzoneProps>
           className,
         )}
       >
+        {/* eslint-disable-next-line react-hooks/refs -- openFilePicker reads inputRef only when invoked from user events */}
         {children({ openFilePicker })}
       </div>
     </>

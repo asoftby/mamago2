@@ -54,9 +54,12 @@ export function MyPlanPanelContent({
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
-    setIsDateLoading(true);
-    void refetchPlanForDate(selectedPlanDate).finally(() => {
-      if (!cancelled) setIsDateLoading(false);
+    queueMicrotask(() => {
+      if (cancelled) return;
+      setIsDateLoading(true);
+      void refetchPlanForDate(selectedPlanDate).finally(() => {
+        if (!cancelled) setIsDateLoading(false);
+      });
     });
     return () => {
       cancelled = true;

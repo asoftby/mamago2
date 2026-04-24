@@ -79,6 +79,7 @@ export function useEventEditorDraft(params: {
     }
   }, [storageKey]);
 
+  /* eslint-disable react-hooks/set-state-in-effect -- one-shot sessionStorage vs server draft hydration; ref gate pairs with persist effect */
   useEffect(() => {
     if (typeof window === "undefined") return;
     if (hydratedKeyRef.current === storageKey) return;
@@ -102,6 +103,7 @@ export function useEventEditorDraft(params: {
 
     hydratedKeyRef.current = storageKey;
   }, [initialDraft, params.event?.id, params.mode, storageKey]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   useEffect(() => {
     if (typeof window === "undefined") return;

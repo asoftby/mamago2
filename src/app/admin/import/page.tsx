@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { prismaBase } from "@/lib/prisma";
+import type { ImportEntityType, ImportRunStatus } from "@prisma/client";
 import { Prisma } from "@prisma/client";
 import { formatDistanceToNow } from "date-fns";
 import { ru } from "date-fns/locale";
@@ -8,13 +9,24 @@ import { formatImportEntity, importEntityBadgeClasses, runStatusClasses, runStat
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
+type ImportDashboardRecentRun = {
+  id: string;
+  createdAt: Date;
+  status: ImportRunStatus;
+  source: {
+    id: string;
+    name: string;
+    defaultEntity: ImportEntityType | null;
+  };
+};
+
 type ImportDashboardDb = {
   importSource?: {
     count: (args: unknown) => Promise<number>;
   };
   importRun?: {
     count: (args: unknown) => Promise<number>;
-    findMany: (args: unknown) => Promise<any[]>;
+    findMany: (args: unknown) => Promise<ImportDashboardRecentRun[]>;
   };
   importReviewTask?: {
     count: (args: unknown) => Promise<number>;

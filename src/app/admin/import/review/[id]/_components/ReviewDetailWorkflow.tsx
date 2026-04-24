@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { format } from "date-fns";
 import { ru } from "date-fns/locale";
 import type {
@@ -129,10 +129,10 @@ export function ReviewDetailWorkflow({
   const reviewDecision = importedRecord.reviewDecision;
   const linkRecovery = reviewDecision?.recovery ?? null;
 
-  const reviewedAtLabel = useMemo(() => {
-    if (!task?.reviewedAt) return null;
-    return format(new Date(task.reviewedAt), "dd MMM yyyy HH:mm", { locale: ru });
-  }, [task?.reviewedAt]);
+  const reviewedAtLabel =
+    task?.reviewedAt == null
+      ? null
+      : format(new Date(task.reviewedAt), "dd MMM yyyy HH:mm", { locale: ru });
 
   return (
     <>

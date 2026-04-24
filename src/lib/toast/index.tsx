@@ -8,6 +8,8 @@ import {
   type LiquidNotificationVariant,
 } from "@/components/ui/liquid-notification";
 
+type ToastMessage = Parameters<typeof sonnerToast>[0];
+
 function isAction(x: Action | React.ReactNode | undefined): x is Action {
   return (
     typeof x === "object" &&
@@ -29,42 +31,45 @@ function asStringDescription(
 
 function pickPrimaryAction(data?: ExternalToast) {
   if (!data) return undefined;
-  if (data.action && isAction(data.action)) {
+  const { action, cancel } = data;
+  if (action && isAction(action)) {
+    const a = action;
     return {
-      label: String(data.action.label),
+      label: String(a.label),
       run: () => {
         const ev = {
           preventDefault: () => {},
           stopPropagation: () => {},
           nativeEvent: new MouseEvent("click"),
         } as unknown as React.MouseEvent<HTMLButtonElement>;
-        data.action!.onClick!(ev);
+        a.onClick(ev);
       },
     };
   }
-  if (data.cancel && isAction(data.cancel)) {
+  if (cancel && isAction(cancel)) {
+    const c = cancel;
     return {
-      label: String(data.cancel.label),
+      label: String(c.label),
       run: () => {
         const ev = {
           preventDefault: () => {},
           stopPropagation: () => {},
           nativeEvent: new MouseEvent("click"),
         } as unknown as React.MouseEvent<HTMLButtonElement>;
-        data.cancel!.onClick!(ev);
+        c.onClick(ev);
       },
     };
   }
   return undefined;
 }
 
-function isSimpleMessage(message: React.ReactNode): message is string | number {
+function isSimpleMessage(message: ToastMessage): message is string | number {
   return typeof message === "string" || typeof message === "number";
 }
 
 function delegateNative(
   variant: LiquidNotificationVariant,
-  message: React.ReactNode,
+  message: ToastMessage,
   data?: ExternalToast,
 ) {
   switch (variant) {
@@ -83,7 +88,7 @@ function delegateNative(
 
 function pushLiquid(
   variant: LiquidNotificationVariant,
-  message: React.ReactNode,
+  message: ToastMessage,
   data?: ExternalToast,
 ) {
   if (!isSimpleMessage(message)) {
@@ -117,7 +122,7 @@ function pushLiquid(
   );
 }
 
-function baseToast(message: React.ReactNode, data?: ExternalToast) {
+function baseToast(message: ToastMessage, data?: ExternalToast) {
   if (isSimpleMessage(message)) {
     return pushLiquid("brand", message, data);
   }
@@ -125,15 +130,15 @@ function baseToast(message: React.ReactNode, data?: ExternalToast) {
 }
 
 export const toast = Object.assign(baseToast, {
-  success: (message: React.ReactNode, data?: ExternalToast) =>
+  success: (message: ToastMessage, data?: ExternalToast) =>
     pushLiquid("success", message, data),
-  error: (message: React.ReactNode, data?: ExternalToast) =>
+  error: (message: ToastMessage, data?: ExternalToast) =>
     pushLiquid("error", message, data),
-  warning: (message: React.ReactNode, data?: ExternalToast) =>
+  warning: (message: ToastMessage, data?: ExternalToast) =>
     pushLiquid("warning", message, data),
-  info: (message: React.ReactNode, data?: ExternalToast) =>
+  info: (message: ToastMessage, data?: ExternalToast) =>
     pushLiquid("info", message, data),
-  message: (message: React.ReactNode, data?: ExternalToast) =>
+  message: (message: ToastMessage, data?: ExternalToast) =>
     pushLiquid("brand", message, data),
   loading: sonnerToast.loading,
   promise: sonnerToast.promise,
@@ -141,4 +146,4 @@ export const toast = Object.assign(baseToast, {
   custom: sonnerToast.custom,
   getHistory: sonnerToast.getHistory,
   getToasts: sonnerToast.getToasts,
-});
+}) as typeof sonnerToast;

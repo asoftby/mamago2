@@ -55,7 +55,9 @@ export function Step4DateTime({ data, onChange, isEditable, eventId }: Step4Date
 
   useEffect(() => {
     if (!eventId) {
-      setImportedScheduleItems([]);
+      queueMicrotask(() => {
+        setImportedScheduleItems([]);
+      });
       return;
     }
 
