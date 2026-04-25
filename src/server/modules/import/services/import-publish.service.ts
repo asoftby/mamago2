@@ -373,11 +373,12 @@ async function createActivityFromImport(
     title: fields.title,
     shortDesc: fields.shortDesc,
     type: fields.type,
+    format: fields.format,
     scheduleMode: fields.scheduleMode,
     ownerUserId: actorUserId,
     status: "PENDING",
   };
-  appliedFields.push("title", "shortDesc", "type", "scheduleMode", "ownerUserId", "status");
+  appliedFields.push("title", "shortDesc", "type", "format", "scheduleMode", "ownerUserId", "status");
 
   if (fields.description)      { createData.description      = fields.description;      appliedFields.push("description"); }      else emptyFields.push("description");
   if (fields.cityId)           { createData.cityId           = fields.cityId;           appliedFields.push("cityId"); }           else emptyFields.push("cityId");
@@ -562,6 +563,7 @@ async function mergeImportedRecordIntoActivity(
   const mergeableFields: [string, unknown][] = [
     ["description", fields.description],
     ["cityId", fields.cityId],
+    ["format", fields.format],
     ["priceText", fields.priceText],
     ["priceFrom", fields.priceFrom],
     ["priceTo", fields.priceTo],

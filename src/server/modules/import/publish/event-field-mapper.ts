@@ -9,6 +9,8 @@
 
 import type { NormalizedEventImport } from "../types";
 import { detectAgeBuckets, getAgeRangeFromBuckets } from "@/lib/age/ageMapping";
+import { DEFAULT_ACTIVITY_FORMAT, normalizeActivityFormat } from "@/domain/activities/activity-format";
+import type { ActivityFormat } from "@prisma/client";
 
 // ── ActivityType whitelist ────────────────────────────────────────────────────
 
@@ -170,6 +172,7 @@ export interface MappedActivityFields {
   title: string;
   shortDesc: string;
   type: ActivityType;
+  format: ActivityFormat;
   scheduleMode: ScheduleMode;
   description?: string;
   cityId?: string | null;
@@ -246,7 +249,13 @@ export async function mapNormalizedToActivity(
   }
 
   // ── Опциональные ────────────────────────────────────────────────────────
-  const fields: MappedActivityFields = { title, shortDesc, type, scheduleMode };
+  const fields: MappedActivityFields = {
+    title,
+    shortDesc,
+    type,
+    format: normalizeActivityFormat(nd.formatCandidate, DEFAULT_ACTIVITY_FORMAT),
+    scheduleMode,
+  };
 
   if (nd.description?.trim()) fields.description = nd.description.trim();
   if (cityId) fields.cityId = cityId;
@@ -330,7 +339,7 @@ export function filterActivityNonDestructiveUpdates(
 
   // Поля, которые обновляются только если existing пустой
   const onlyIfEmpty: (keyof MappedActivityFields)[] = [
-    "title", "type", "scheduleMode",
+    "title", "type", "format", "scheduleMode",
     "priceText", "priceFrom", "priceTo",
     "ageTags",
     "ageMinMonths", "ageMaxMonths",

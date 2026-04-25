@@ -93,6 +93,7 @@ export interface NormalizedEventImport extends NormalizedImportPayload {
    * Маппинг в enum — Phase EVENT-publish.
    */
   typeCandidate?: string;
+  formatCandidate?: "OFFLINE" | "ONLINE" | "HYBRID";
   /**
    * Кандидат для Activity.scheduleMode (ONE_TIME | MULTI_DATE | RECURRING | ON_DEMAND | ALWAYS).
    * Маппинг в enum — Phase EVENT-publish.

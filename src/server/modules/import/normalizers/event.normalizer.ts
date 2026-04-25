@@ -122,6 +122,43 @@ function extractScheduleModeCandidate(raw: RawPayload): string | undefined {
   return aliases[normalized] ?? raw_val;
 }
 
+function detectFormatCandidate(raw: RawPayload): "OFFLINE" | "ONLINE" | "HYBRID" {
+  const haystack = [
+    extractString(raw, "title", "name", "eventTitle"),
+    extractString(raw, "venue", "venueName", "location", "place", "площадка"),
+    extractString(raw, "addressText", "address", "addressLine", "formattedAddress", "addr"),
+    extractString(raw, "fullDescription", "description", "body", "text"),
+    extractString(raw, "scheduleText", "schedule", "timing", "расписание"),
+    extractString(raw, "onlineUrl", "onlineLink", "streamUrl", "zoomLink", "webinarLink"),
+  ]
+    .filter((value): value is string => typeof value === "string" && value.trim().length > 0)
+    .join(" \n")
+    .toLowerCase();
+
+  const onlineSignals = [
+    "онлайн",
+    "online",
+    "zoom",
+    "webinar",
+    "вебинар",
+    "трансляция",
+    "стрим",
+    "youtube live",
+    "meet.google",
+    "google meet",
+  ];
+  const hasOnlineSignal = onlineSignals.some((signal) => haystack.includes(signal));
+
+  const hasPhysicalPlace = Boolean(
+    extractString(raw, "venue", "venueName", "location", "place", "площадка") ||
+      extractString(raw, "addressText", "address", "addressLine", "formattedAddress", "addr"),
+  );
+
+  if (hasOnlineSignal && hasPhysicalPlace) return "HYBRID";
+  if (hasOnlineSignal) return "ONLINE";
+  return "OFFLINE";
+}
+
 // ─── Main normalizer ──────────────────────────────────────────────────────────
 
 export interface EventNormalizerInput {
@@ -168,6 +205,7 @@ export function normalizeEventPayload(input: EventNormalizerInput): EventNormali
 
   const typeCandidate = extractTypeCandidate(rawPayload);
   if (!typeCandidate) warnings.push("typeCandidate missing — Activity.type will need manual mapping");
+  const formatCandidate = detectFormatCandidate(rawPayload);
 
   const scheduleModeCandidate = extractScheduleModeCandidate(rawPayload);
   if (!scheduleModeCandidate) warnings.push("scheduleModeCandidate missing — Activity.scheduleMode will need manual mapping");
@@ -242,6 +280,7 @@ export function normalizeEventPayload(input: EventNormalizerInput): EventNormali
     shortDescCandidate,
     description,
     typeCandidate,
+    formatCandidate,
     scheduleModeCandidate,
     venueName,
     addressText,

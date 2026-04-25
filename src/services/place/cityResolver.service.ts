@@ -42,8 +42,10 @@ function haversineKm(
 }
 
 /**
- * Extract city name and country code from Google address_components
- * Priority: locality > administrative_area_level_2 > administrative_area_level_1
+ * Extract city name and country code from Google address_components.
+ *
+ * ВАЖНО: Разрешены только locality и postal_town.
+ * administrative_area_level_* ЗАПРЕЩЕНЫ — это области/регионы, не города.
  */
 function extractCityFromAddressComponents(
   addressComponents: Array<{ long_name: string; short_name: string; types: string[] }>
@@ -59,14 +61,11 @@ function extractCityFromAddressComponents(
     countryCode = countryComponent.short_name || null;
   }
 
-  // Extract city name with priority
-  const priorities = [
-    "locality",
-    "administrative_area_level_2",
-    "administrative_area_level_1",
-  ];
+  // Only locality and postal_town are valid city sources.
+  // administrative_area_level_* are regions/oblasts — NOT cities.
+  const allowedTypes = ["locality", "postal_town"];
 
-  for (const type of priorities) {
+  for (const type of allowedTypes) {
     const component = addressComponents.find((c) => c.types?.includes(type));
     if (component?.long_name) {
       cityName = component.long_name;
