@@ -692,12 +692,13 @@ function EventWizardInner({
     
     // Add import-aware context for steps that depend on the current event entity
     if (
+      stepConfig.key === "location" ||
       stepConfig.key === "media" ||
       stepConfig.key === "schedule" ||
       stepConfig.key === "contacts" ||
       stepConfig.key === "organizer"
     ) {
-      if (stepConfig.key === "organizer") {
+      if (stepConfig.key === "organizer" || stepConfig.key === "location") {
         return <StepComponent {...commonProps} eventId={eventId ?? event?.id} />;
       }
       return <StepComponent {...commonProps} wizardSessionId={wizardSessionId} eventId={eventId ?? event?.id} />;

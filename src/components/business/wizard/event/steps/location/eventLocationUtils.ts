@@ -22,8 +22,9 @@ export function extractCityFromAddressComponents(addressComponents: AddressCompo
   for (const component of addressComponents) {
     const types = component.types || [];
     
-    // Look for city/locality
-    if (types.includes('locality') || types.includes('administrative_area_level_2')) {
+    // Look for city/locality — ONLY locality is allowed, NOT administrative_area_level_2
+    // administrative_area_level_2 can be a district/rayon, not a city
+    if (types.includes('locality')) {
       cityId = component.long_name;
     }
     

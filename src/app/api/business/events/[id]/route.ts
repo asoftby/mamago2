@@ -19,6 +19,7 @@ import { assertBusinessEventPrimaryCategory } from "@/lib/business/validatePrima
 import { replaceActivityGalleryFromMediaIds } from "@/lib/business/syncEventGalleryFromMediaIds";
 import { resolveEventOrganizer } from "@/lib/business/eventOrganizer";
 import { prismaBase } from "@/lib/prisma";
+import { DEFAULT_ACTIVITY_FORMAT, normalizeActivityFormat } from "@/domain/activities/activity-format";
 
 /**
  * GET /api/business/events/[id]
@@ -250,6 +251,10 @@ export async function PATCH(
       },
       data: {
         title: body.title,
+        format:
+          body.format !== undefined
+            ? normalizeActivityFormat(body.format, DEFAULT_ACTIVITY_FORMAT)
+            : undefined,
         shortDesc,
         description: body.description,
         ageTags: body.ageTags,

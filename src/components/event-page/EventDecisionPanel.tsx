@@ -10,14 +10,22 @@ import { EventFactsChips } from "./EventFactsChips";
 import { EventVenueLocationRows } from "./EventVenueLocationRows";
 import { OwnerEditDropdown } from "./OwnerEditDropdown";
 
+/** Возраст: рядом с категорией, только текст, чёрный. */
+const decisionHeroAgeTextClass =
+  "inline-flex items-center text-[15px] font-medium uppercase tracking-[0.04em] tabular-nums text-neutral-950";
+
+/** Персиковый pill категории в шапке решения. */
+const decisionHeroCategoryPillClass =
+  "inline-flex w-fit items-center rounded-full border border-[#F2B39A] bg-[#FFF7F3] px-4 pt-[6px] pb-1 text-[11px] font-semibold uppercase tracking-[0.04em] text-[#F07F55] tabular-nums";
+
 type EventDecisionPanelProps = {
   data: Pick<
     EventPageData,
     | "id"
     | "breadcrumbs"
+    | "ageFromBadge"
     | "categoryLabel"
     | "title"
-    | "subtitle"
     | "factChips"
     | "priceLabel"
     | "venue"
@@ -52,20 +60,20 @@ export function EventDecisionPanel({
       <div className={cn("-m-1 space-y-4 rounded-2xl p-1", pr?.hero)}>
         <EventBreadcrumbs items={data.breadcrumbs} />
 
-        {data.categoryLabel && (
-          <span className="inline-flex w-fit rounded-full border border-[#F2B39A] bg-[#FFF7F3] px-4 pt-[6px] pb-1 text-[11px] font-semibold uppercase tracking-[0.04em] text-[#F07F55]">
-            {data.categoryLabel}
-          </span>
+        {(data.ageFromBadge || data.categoryLabel) && (
+          <div className="flex flex-wrap items-center gap-2">
+            {data.ageFromBadge ? (
+              <span className={decisionHeroAgeTextClass}>{data.ageFromBadge}</span>
+            ) : null}
+            {data.categoryLabel ? (
+              <span className={decisionHeroCategoryPillClass}>{data.categoryLabel}</span>
+            ) : null}
+          </div>
         )}
 
-        <div className="space-y-3">
-          <h1 className="text-balance text-[28px] font-semibold leading-tight tracking-tight text-foreground sm:text-[32px] lg:text-[34px]">
-            {data.title}
-          </h1>
-          <p className="text-pretty text-[15px] leading-relaxed text-muted-foreground sm:text-base">
-            {data.subtitle}
-          </p>
-        </div>
+        <h1 className="text-balance text-[28px] font-semibold leading-tight tracking-tight text-foreground sm:text-[32px] lg:text-[34px]">
+          {data.title}
+        </h1>
 
         <EventFactsChips chips={data.factChips} />
       </div>
@@ -92,18 +100,22 @@ export function EventDecisionPanel({
           >
             <div className="flex gap-2">
               <MapPin className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                   Где
                 </p>
                 <p className="mt-0.5 text-[15px] font-medium text-foreground">
                   {data.venue?.name ?? venueShort}
                 </p>
+                {data.venue ? (
+                  <EventVenueLocationRows
+                    venue={data.venue}
+                    variant="compact"
+                    className="mt-1.5"
+                  />
+                ) : null}
               </div>
             </div>
-            {data.venue && (
-              <EventVenueLocationRows venue={data.venue} variant="compact" />
-            )}
             {!data.venue && venueShort && (
               <p className="text-[13px] text-muted-foreground pl-6">{venueShort}</p>
             )}

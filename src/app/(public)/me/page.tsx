@@ -17,6 +17,8 @@ import Link from "next/link";
 import { MapPin, Plus } from "lucide-react";
 import { BUDGET_LABELS } from "@/mocks/routes.mock";
 import { buildAdultPreferenceDisplayLine } from "@/lib/adultPersonaSignals/buildAdultPreferenceLine";
+import { cn } from "@/lib/utils";
+import { peachPrimaryCtaLinkClassName } from "@/lib/peachPrimaryCtaLink";
 
 type PageProps = {
   searchParams: Promise<{ date?: string }>;
@@ -151,9 +153,12 @@ export default async function MePage({ searchParams }: PageProps) {
                 <p className="text-sm text-neutral-400">У вас пока нет маршрутов</p>
                 <Link
                   href="/routes/new"
-                  className="mt-3 inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-neutral-900 text-white text-sm font-medium hover:bg-neutral-700 transition-colors"
+                  className={cn(
+                    peachPrimaryCtaLinkClassName(),
+                    "mt-3",
+                  )}
                 >
-                  <Plus className="w-4 h-4" />
+                  <Plus className="h-4 w-4 transition-transform duration-200 group-hover:scale-110 sm:h-[18px] sm:w-[18px]" />
                   Создать первый маршрут
                 </Link>
               </div>

@@ -14,19 +14,22 @@ import type { ModerationNavCounts } from "@/lib/admin/moderationSidebarConfig";
 import { useAccountMode } from "@/contexts/AccountModeContext";
 import { AccountDropdown } from "@/components/account/AccountDropdown";
 import { buildAdminAccountModel } from "@/lib/account/accountMenuBuilders";
-import { userInitialsFromEmail } from "@/lib/account/userInitials";
+import { accountProfileTriggerLetter } from "@/lib/account/userInitials";
 import { useHydrated } from "@/hooks/use-hydrated";
 import { navigateToSurface } from "@/lib/routing/clientNavigation";
 import { useRouter } from "next/navigation";
 
 interface AdminHeaderProps {
   userEmail?: string;
+  /** Как в личном кабинете: из профиля пользователя, иначе показываем префикс email */
+  userDisplayName?: string | null;
   moderationCounts: ModerationNavCounts;
   b2bPendingVerificationCount?: number;
 }
 
 export function AdminHeader({
   userEmail,
+  userDisplayName,
   moderationCounts,
   b2bPendingVerificationCount = 0,
 }: AdminHeaderProps) {
@@ -37,32 +40,28 @@ export function AdminHeader({
   const { goToPersonalAccount } = useAccountMode();
   const hydrated = useHydrated();
 
-  const profileInitials = userInitialsFromEmail(userEmail);
+  const profileLetter = accountProfileTriggerLetter(userDisplayName, userEmail);
 
   const profileModel = useMemo(
     () =>
       buildAdminAccountModel({
         userEmail: userEmail ?? "",
-        initials: profileInitials,
-        goToAdminSettings: () =>
+        userDisplayName,
+        initials: profileLetter,
+        goToPersonalAccount,
+        goToAdminHome: () =>
           navigateToSurface(router, {
             targetSurface: "admin",
-            targetPath: "/settings",
+            targetPath: "/",
           }),
-        goToProfile: () =>
-          navigateToSurface(router, {
-            targetSurface: "public",
-            targetPath: "/profile",
-          }),
-        goToPersonalAccount,
         onNavigate: () => setProfileOpen(false),
       }),
-    [userEmail, profileInitials, router, goToPersonalAccount],
+    [userEmail, userDisplayName, profileLetter, router, goToPersonalAccount],
   );
 
   const profileTrigger = (
-    <span className="flex h-full w-full items-center justify-center rounded-full bg-neutral-500 text-[11px] font-semibold text-white">
-      {profileInitials}
+    <span className="flex h-full w-full items-center justify-center rounded-full bg-gray-100 text-[11px] font-semibold text-gray-700">
+      {profileLetter}
     </span>
   );
 
@@ -110,7 +109,7 @@ export function AdminHeader({
                         HEADER_CHROME_ICON_BUTTON_CLASS,
                         "overflow-hidden p-0",
                       )}
-                      aria-label="Профиль"
+                      aria-label="Мой аккаунт"
                       aria-expanded={profileOpen}
                       aria-haspopup="dialog"
                     >

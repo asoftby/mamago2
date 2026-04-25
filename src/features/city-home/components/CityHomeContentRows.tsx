@@ -232,7 +232,6 @@ export function CityHomeJournalSection({
   return (
     <CityHomeSection
       title="Статьи и обзоры"
-      subtitle={`Материалы ${getCityLocativePhrase(citySlug)}`}
       actionLabel="В журнал"
       actionHref={appendCityQuery("/blog")}
       actionIconButton

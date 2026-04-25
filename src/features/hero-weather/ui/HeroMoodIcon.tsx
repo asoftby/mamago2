@@ -9,6 +9,7 @@ export type HeroMoodIconProps = {
   timeOfDay?: TimeOfDay;
   maxTemperatureC?: number | null;
   className?: string;
+  size?: number;
 };
 
 export function HeroMoodIcon({
@@ -16,6 +17,7 @@ export function HeroMoodIcon({
   timeOfDay = "day",
   maxTemperatureC = null,
   className,
+  size = 28,
 }: HeroMoodIconProps) {
   const dayScenario = resolveHomeWeatherScenario({
     scenario: typeof scenario === "string" ? (scenario as WeatherScenario) : scenario,
@@ -34,9 +36,9 @@ export function HeroMoodIcon({
       <img
         src={`/meteocons/fill/${iconName}.svg`}
         alt=""
-        className="size-7 object-contain"
-        width={28}
-        height={28}
+        className="object-contain"
+        width={size}
+        height={size}
         loading="eager"
         decoding="async"
       />

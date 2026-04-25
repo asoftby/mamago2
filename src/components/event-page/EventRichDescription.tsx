@@ -10,7 +10,7 @@ interface EventRichDescriptionProps {
   htmlContent: string;
   /** Plain text fallback for preview */
   plainTextSummary?: string;
-  /** Minimum height in pixels to show "Read more" button */
+  /** Max height (px) of the collapsed block before «Читать полностью». */
   collapsedHeight?: number;
   className?: string;
 }
@@ -30,7 +30,7 @@ interface EventRichDescriptionProps {
 export function EventRichDescription({
   htmlContent,
   plainTextSummary,
-  collapsedHeight = 120,
+  collapsedHeight = 240,
   className,
 }: EventRichDescriptionProps) {
   const [isExpanded, setIsExpanded] = useState(false);

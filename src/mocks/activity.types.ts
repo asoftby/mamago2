@@ -1,4 +1,5 @@
 import type { Intent } from "@/lib/intent";
+import type { ActivityFormat } from "@prisma/client";
 
 export type ActivityType = 
   | 'EVENT_FIXED'      // Событие с фиксированной датой/временем (Спектакль)
@@ -13,6 +14,7 @@ export interface ActivityMock {
   slug?: string | null;
   /** Канонический city slug публичной страницы события. */
   citySlug?: string | null;
+  format?: ActivityFormat | null;
   type: ActivityType;
   /** Раздел сайта (иконка в хедере на странице публикации); иначе выводится из `type` */
   discoveryIntent?: Intent;

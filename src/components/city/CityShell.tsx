@@ -6,6 +6,7 @@ import { listPublicRoutesByCity } from "@/server/services/route.service";
 import { MOCK_ROUTES } from "@/mocks/routes.mock";
 import { getCurrentUser } from "@/lib/auth/server";
 import { getKudaDiscoveryFeed } from "@/server/discovery/kudaDiscoveryFeed";
+import { parseActivityFormatQuery } from "@/domain/activities/activity-format";
 
 interface CityShellProps {
   citySlug: string;
@@ -22,7 +23,16 @@ export async function CityShell({ citySlug, intent, searchParams }: CityShellPro
 
   let discoveryActivities = undefined;
   if (intent === "kuda" || intent === "birthday") {
-    discoveryActivities = await getKudaDiscoveryFeed(city.id, city.slug, user?.id ?? null);
+    const formatParam = Array.isArray(searchParams.format)
+      ? searchParams.format[0]
+      : searchParams.format;
+    const nearbyParam = Array.isArray(searchParams.nearby)
+      ? searchParams.nearby[0]
+      : searchParams.nearby;
+    discoveryActivities = await getKudaDiscoveryFeed(city.id, city.slug, user?.id ?? null, {
+      format: parseActivityFormatQuery(typeof formatParam === "string" ? formatParam : null),
+      nearby: nearbyParam === "true",
+    });
   }
 
   // For routes intent, load routes data server-side

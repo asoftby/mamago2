@@ -1,4 +1,4 @@
-import { ActivityType } from "@prisma/client";
+import { ActivityFormat, ActivityType } from "@prisma/client";
 import type { Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { getPublicListingActivityWhere } from "@/server/public/publicContentVisibility";
@@ -113,6 +113,7 @@ function mapActivityRowToCard(
     coverImageUrl: string | null;
     nextOccurrenceAt: Date | null;
     ownerUserId: string;
+    format: ActivityFormat;
     cityId: string | null;
     place: { cityId: string | null; city: { slug: string } | null } | null;
     venue: { cityId: string | null } | null;
@@ -153,6 +154,7 @@ function mapActivityRowToCard(
     id: a.id,
     slug: a.slug,
     citySlug,
+    format: a.format,
     type: "EVENT_FIXED",
     discoveryIntent: "kuda",
     title: a.title,
@@ -192,6 +194,8 @@ export async function getKudaDiscoveryFeed(
   currentUserId: string | null,
   options?: {
     take?: number;
+    format?: ActivityFormat | null;
+    nearby?: boolean;
     weather?: {
       scenario: HomeWeatherScenario;
       timeOfDay: TimeOfDay;
@@ -207,6 +211,11 @@ export async function getKudaDiscoveryFeed(
   const where: Prisma.ActivityWhereInput = {
     AND: [
       { type: ActivityType.EVENT },
+      ...(options?.format
+        ? [{ format: options.format }]
+        : options?.nearby
+          ? [{ format: { in: [ActivityFormat.OFFLINE, ActivityFormat.HYBRID] } }]
+          : []),
       activityInAnyOfCitiesWhere(expandedCityIds),
       ...pubParts,
     ],

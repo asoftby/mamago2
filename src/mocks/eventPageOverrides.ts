@@ -7,6 +7,7 @@ import type { EventPageData } from "@/lib/event/eventPageTypes";
 export type EventPageOverride = Partial<
   Pick<
     EventPageData,
+    | "ageFromBadge"
     | "factChips"
     | "importantFacts"
     | "whyGo"

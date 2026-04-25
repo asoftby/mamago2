@@ -26,7 +26,7 @@
 - **Card**: `0 6px 18px rgba(0,0,0,0.06)`
 
 ## Typography
-**Font Family**: Manrope
+**Font Family (UI / sans)**: NT Somic
 
 | Role | Size / Weight | Description |
 |------|---------------|-------------|

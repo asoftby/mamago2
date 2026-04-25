@@ -49,17 +49,15 @@ function MyPlanProviderInner() {
   }, [isAuthenticated]);
 
   const handleOpenMyPlan = useCallback(() => {
-    if (authLoading) return;
-
     if (!isAuthenticated) {
       trackPostAuthEvent("my_plan_entry_opened", { source: "my_plan" });
       unauthSurfaceRef.current = "auth";
       setPlanOpen(true);
       return;
     }
-
+    // Открываем мгновенно — данные загрузятся внутри модалки через skeleton
     setPlanOpen(true);
-  }, [authLoading, isAuthenticated]);
+  }, [isAuthenticated]);
 
   useEffect(() => {
     const onOpenRequested = () => {

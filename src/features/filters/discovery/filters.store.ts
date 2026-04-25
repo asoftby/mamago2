@@ -17,6 +17,7 @@ import {
   shouldHideMobileBottomNav,
   type Intent,
 } from "@/lib/intent";
+import { parseActivityFormatQuery, serializeActivityFormatQuery } from "@/domain/activities/activity-format";
 
 export type WhenPreset = "TODAY" | "TOMORROW" | "WEEKEND" | null;
 
@@ -26,6 +27,7 @@ export type DiscoveryFilters = {
   dateTo: string | null;
   whenPreset: WhenPreset;
   age: string[];
+  format: "OFFLINE" | "ONLINE" | "HYBRID" | null;
   metro: string | null;
   district: string | null;
   nearby: boolean;
@@ -36,6 +38,7 @@ export const defaultFilters: DiscoveryFilters = {
   dateTo: null,
   whenPreset: null,
   age: [],
+  format: null,
   metro: null,
   district: null,
   nearby: false,
@@ -47,6 +50,7 @@ export function isDiscoveryFiltersEmpty(f: DiscoveryFilters): boolean {
     !f.dateTo &&
     !f.whenPreset &&
     f.age.length === 0 &&
+    !f.format &&
     !f.metro &&
     !f.district &&
     !f.nearby
@@ -124,6 +128,7 @@ function hasDiscoveryFilterParamsInUrl(
     searchParams.get("when") ||
     searchParams.get("preset") ||
     searchParams.get("age") ||
+    searchParams.get("format") ||
     searchParams.get("metro") ||
     searchParams.get("district") ||
     searchParams.get("nearby") === "true"
@@ -152,6 +157,10 @@ export function mergeDiscoveryPatch(
     if (next.dateFrom || next.dateTo) {
       next.whenPreset = null;
     }
+  }
+
+  if (next.format === "ONLINE") {
+    next.nearby = false;
   }
 
   return next;
@@ -197,6 +206,7 @@ export function parseAppliedFromUrl(
     : null;
 
   const district = searchParams.get("district") || null;
+  const format = parseActivityFormatQuery(searchParams.get("format"));
 
   const nearby = searchParams.get("nearby") === "true";
 
@@ -215,6 +225,7 @@ export function parseAppliedFromUrl(
     dateTo: dTo || null,
     whenPreset,
     age: mappedAge,
+    format,
     metro,
     district,
     nearby,
@@ -243,6 +254,10 @@ function writeAppliedToUrl(
 
   if (next.age.length > 0) params.set("age", next.age.join(","));
   else params.delete("age");
+
+  const formatQuery = serializeActivityFormatQuery(next.format);
+  if (formatQuery) params.set("format", formatQuery);
+  else params.delete("format");
 
   if (next.metro) params.set("metro", next.metro);
   else params.delete("metro");
@@ -411,6 +426,7 @@ export function useDiscoveryFilters() {
       !!filters.dateTo ||
       !!filters.whenPreset ||
       filters.age.length > 0 ||
+      !!filters.format ||
       !!filters.metro ||
       !!filters.district ||
       filters.nearby;
@@ -418,6 +434,7 @@ export function useDiscoveryFilters() {
     const activeCount =
       (filters.dateFrom || filters.dateTo || filters.whenPreset ? 1 : 0) +
       (filters.age.length > 0 ? 1 : 0) +
+      (filters.format ? 1 : 0) +
       (filters.metro ? 1 : 0) +
       (filters.district ? 1 : 0) +
       (filters.nearby ? 1 : 0);
@@ -431,6 +448,15 @@ export function useDiscoveryFilters() {
           : `Возраст: ${filters.age.length}`
         : "Возраст";
 
+    const formatLabel =
+      filters.format === "OFFLINE"
+        ? "Офлайн"
+        : filters.format === "ONLINE"
+          ? "Онлайн"
+          : filters.format === "HYBRID"
+            ? "Гибрид"
+            : "Формат";
+
     const metroLabel = filters.metro || "Метро";
 
     const districtLabel = filters.district || "Район";
@@ -441,6 +467,7 @@ export function useDiscoveryFilters() {
       labels: {
         dateLabel,
         ageLabel,
+        formatLabel,
         metroLabel,
         districtLabel,
       },

@@ -13,7 +13,6 @@ import {
 import { useOptionalCity } from "@/contexts/CityContext";
 import { useFamilyPersona } from "@/contexts/FamilyPersonaContext";
 import { useDiscoveryFilters } from "@/features/filters/discovery/filters.store";
-import { useDiscoveryFilterOptions } from "@/features/filters/discovery/filters.api";
 import { useChildrenScope } from "@/features/filters/discovery/childrenScope.store";
 
 function todayISO(): string {
@@ -24,8 +23,6 @@ import type { PlanItemWithActivity } from "../types/event";
 import { normalizePlanItemsFromApi } from "../lib/normalizePlanItemFromApi";
 import { sortPlanItemsForDay } from "../lib/sortPlanItemsForDay";
 import {
-  countSelectableCandidatesForSlot,
-  getCandidatesForSlot,
   MAX_PLAN_ITEMS_PER_SLOT,
   pickItemForSlot,
   pickItemForSlotExcluding,
@@ -97,7 +94,9 @@ function useMyPlanStore() {
   const cityCtx = useOptionalCity();
   const citySlug = cityCtx?.citySlug ?? "minsk";
   const { applied: locationApplied, actions: discoveryActions } = useDiscoveryFilters();
-  const { options: locationOptions } = useDiscoveryFilterOptions(citySlug);
+  // Не вызываем useDiscoveryFilterOptions здесь — он делает fetch при каждом mount.
+  // locationOptions нужны только для фильтрации по metro/district, которая некритична для открытия.
+  const locationOptions = useMemo(() => ({ metros: [] as { value: string; label: string }[], districts: [] as { value: string; label: string }[] }), []);
   const { isAuthenticated, isLoading: authLoading } = useAuthMe();
   const family = useFamilyPersona();
 
@@ -210,8 +209,9 @@ function useMyPlanStore() {
       setChildren([]);
       return;
     }
-    void refetchChildren();
-  }, [isAuthenticated, authLoading, refetchChildren]);
+    // Children уже загружены в FamilyPersonaContext — не дублируем запрос при mount.
+    // refetchChildren вызывается явно только после создания нового ребёнка.
+  }, [isAuthenticated, authLoading]);
 
   const refetchIdeas = useCallback(async (): Promise<MyPlanIdea[]> => {
     if (!isAuthenticated) {
@@ -312,8 +312,9 @@ function useMyPlanStore() {
       setPlanSuggestions([]);
       return;
     }
-    void refetchPlanSuggestions();
-  }, [isAuthenticated, authLoading, refetchPlanSuggestions]);
+    // Suggestions загружаются только по явному запросу (кнопка "Реши за меня")
+    // Не грузим при mount — это ускоряет открытие модалки
+  }, [isAuthenticated, authLoading]);
 
   const selectedPersonaIdsForPlan = useMemo(
     () => family?.selectedPersonaIds ?? [],

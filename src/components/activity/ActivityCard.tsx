@@ -12,6 +12,8 @@ import { formatPrice, formatPriceFrom } from "@/lib/formatters/format-price";
 import { publicActivityPath } from "@/lib/business/eventPublicLink";
 import { useOptionalCity } from "@/contexts/CityContext";
 import { DEFAULT_CITY_SLUG } from "@/lib/city/resolveCityContext";
+import type { ActivityFormat } from "@prisma/client";
+import { getActivityFormatLabel } from "@/domain/activities/activity-format";
 
 type DomainActivity = {
   id: string;
@@ -19,6 +21,7 @@ type DomainActivity = {
   slug?: string | null;
   /** Канонический city slug для публичной страницы события. */
   citySlug?: string | null;
+  format?: ActivityFormat | null;
   title: string;
   image: string;
   coverImage?: string | null;
@@ -106,6 +109,7 @@ export function ActivityCard(props: AdapterProps) {
           id: props.activity.id,
           slug: props.activity.slug,
           citySlug: props.activity.citySlug,
+          format: props.activity.format,
           title: props.activity.title,
           image: props.activity.coverImage ?? props.activity.image ?? null,
           meta: [
@@ -134,6 +138,7 @@ export function ActivityCard(props: AdapterProps) {
           id: props.id,
           slug: undefined,
           citySlug: undefined,
+          format: null,
           title: props.title,
           image: props.image,
           meta: [
@@ -183,6 +188,11 @@ export function ActivityCard(props: AdapterProps) {
             ) : (
               <div className="aspect-[4/5] w-full bg-gradient-to-br from-stone-100 via-stone-50 to-stone-200" />
             )}
+            {base.format && (
+              <div className="absolute bottom-3 left-3 rounded-full bg-white/92 px-2.5 py-1 text-[11px] font-medium text-neutral-900 shadow-sm backdrop-blur">
+                {getActivityFormatLabel(base.format)}
+              </div>
+            )}
             {base.saveMeta && (
               <div className="absolute right-3 top-3 z-10">
                 <SaveHeart
@@ -217,6 +227,13 @@ export function ActivityCard(props: AdapterProps) {
       <Link href={href} className="block">
         <MediaCover imageUrl={base.image} ratio={coverRatio}>
         </MediaCover>
+        {base.format && (
+          <div className="mt-2 px-1">
+            <span className="inline-flex rounded-full bg-neutral-100 px-2.5 py-1 text-[11px] font-medium text-neutral-700">
+              {getActivityFormatLabel(base.format)}
+            </span>
+          </div>
+        )}
 
         <div className="mt-2.5 px-1">
           <H3

@@ -12,6 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import type { EventPageData } from "@/lib/event/eventPageTypes";
 import { formatRuSessionHero } from "@/lib/event/eventPageFormat";
+import { formatVenueAddressForPublicDisplay } from "@/lib/event/formatVenueAddressForDisplay";
 import { isFavorite, toggleFavorite } from "@/lib/favorites";
 import { publicActivityPath } from "@/lib/business/eventPublicLink";
 import { SaveActivityFlowAdaptive } from "@/components/activity/SaveActivityFlowAdaptive";
@@ -19,13 +20,10 @@ import type { SaveToPlanResult } from "@/components/activity/SaveToPlanModal";
 import { useAuthMe } from "@/features/birthday/builder/hooks/useAuthMe";
 import { EventRichDescription } from "./EventRichDescription";
 import { EventDecisionPanel } from "./EventDecisionPanel";
-import { EventFactsGrid } from "./EventFactsGrid";
-import { EventGoodFit } from "./EventGoodFit";
 import { EventMediaStack } from "./EventMediaStack";
 import { EventPlanDayCta } from "./EventPlanDayCta";
 import { EventSessionSelector } from "./EventSessionSelector";
 import { EventStickyActionBar } from "./EventStickyActionBar";
-import { EventWhyGo } from "./EventWhyGo";
 import { SimilarEventsSection } from "./SimilarEventsSection";
 import { PublicationStatsPanel } from "@/components/publication-stats";
 import { postAnalyticsEvent } from "@/lib/analytics/client";
@@ -33,7 +31,8 @@ import { postAnalyticsEvent } from "@/lib/analytics/client";
 function venueOneLine(data: EventPageData): string | undefined {
   const v = data.venue;
   if (!v) return undefined;
-  const parts = [v.name, v.address].filter(Boolean);
+  const addr = v.address ? formatVenueAddressForPublicDisplay(v.address) : "";
+  const parts = [v.name, addr].filter(Boolean);
   return parts.join(" · ");
 }
 
@@ -98,6 +97,12 @@ export function EventPageView({ data }: { data: EventPageData }) {
       month: "long",
     });
   }, []);
+
+  const saveQuickdateScenario = useMemo(() => {
+    const base = { kind: "quickdate" as const, title: data.title };
+    if (availablePlanDates.length !== 1) return base;
+    return { ...base, eventPlanDateISO: availablePlanDates[0]! };
+  }, [availablePlanDates, data.title]);
 
   const loadSaveStatus = useCallback(async () => {
     try {
@@ -225,11 +230,11 @@ export function EventPageView({ data }: { data: EventPageData }) {
       return;
     }
     if (availablePlanDates.length === 1) {
-      void addToPlanByDate(availablePlanDates[0]!);
+      setSaveModalOpen(true);
       return;
     }
     setPlanDateChooserOpen(true);
-  }, [addToPlanByDate, availablePlanDates]);
+  }, [availablePlanDates]);
 
   const handleBuy = useCallback(() => {
     setIsSecondaryLoading(true);
@@ -296,19 +301,15 @@ export function EventPageView({ data }: { data: EventPageData }) {
               onSave={handleSave}
             />
 
-            <EventWhyGo items={data.whyGo} />
-            <EventFactsGrid facts={data.importantFacts} />
+            <EventRichDescription
+              htmlContent={data.about.descriptionHtml || ""}
+              plainTextSummary={data.about.summary}
+            />
             <EventSessionSelector
               sessions={sessions}
               selectedId={selectedId}
               onSelect={setSelectedId}
             />
-            <EventRichDescription
-              htmlContent={data.about.descriptionHtml || ""}
-              plainTextSummary={data.about.summary}
-              collapsedHeight={120}
-            />
-            <EventGoodFit items={data.goodFit} />
             <EventPlanDayCta
               citySlug={data.citySlug}
               nearbyHref={data.planDayLinks?.nearbyHref}
@@ -366,7 +367,7 @@ export function EventPageView({ data }: { data: EventPageData }) {
         open={saveModalOpen}
         onOpenChange={setSaveModalOpen}
         isAuthenticated={isAuthenticated}
-        scenario={{ kind: "quickdate", title: data.title }}
+        scenario={saveQuickdateScenario}
         onPersist={handleSaveToPlanConfirm}
         isIdea={saveStatus.isIdea}
         inPlan={saveStatus.inPlan}

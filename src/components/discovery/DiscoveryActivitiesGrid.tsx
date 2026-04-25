@@ -29,6 +29,7 @@ function filtersSignature(f: DiscoveryFilters): string {
     dt: f.dateTo,
     wp: f.whenPreset,
     age: f.age,
+    format: f.format,
     metro: f.metro,
     district: f.district,
     nearby: f.nearby,

@@ -35,10 +35,30 @@ export type AdultPersonaProps = {
 
 const CARD_W =
   "w-[min(100%,var(--family-card-w))] min-w-[184px] max-w-[230px] shrink-0 sm:w-[207px]";
-const AVATAR = "h-12 w-12 rounded-full shrink-0 flex items-center justify-center text-base font-semibold";
+const AVATAR =
+  "h-12 w-12 rounded-full shrink-0 flex items-center justify-center text-base font-semibold leading-none";
 const ROW_SCROLL =
   "flex gap-3 overflow-x-auto no-scrollbar -mx-1 px-1 pb-1 scroll-smooth snap-x snap-mandatory sm:snap-none";
-const TRANSITION = "transition-colors duration-150 ease-out";
+const TRANSITION = "transition-all duration-200 ease-out";
+
+/** Карточка участника: полупрозрачное «стекло» + blur (читается на фоне Surface). */
+const GLASS_MEMBER_CARD = cn(
+  "group relative text-left rounded-2xl border px-4 py-3.5",
+  "border-white/60 bg-white/35 shadow-[inset_0_1px_0_rgba(255,255,255,0.85),0_10px_36px_-10px_rgba(15,23,42,0.1)]",
+  "backdrop-blur-xl backdrop-saturate-150",
+  TRANSITION,
+  "hover:border-white/80 hover:bg-white/48 hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.95),0_14px_44px_-12px_rgba(15,23,42,0.12)]",
+  "active:scale-[0.99] active:bg-white/30",
+  "cursor-pointer snap-start",
+);
+
+const GLASS_ADD_CARD = cn(
+  "flex items-center gap-3 rounded-2xl border-2 border-dashed px-4 py-3.5",
+  "border-white/45 bg-white/20 shadow-[inset_0_1px_0_rgba(255,255,255,0.5)] backdrop-blur-lg backdrop-saturate-150",
+  TRANSITION,
+  "text-neutral-500 hover:border-primary/40 hover:bg-primary/[0.12] hover:text-primary hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.65),0_8px_28px_-8px_rgba(239,135,89,0.18)]",
+  "active:scale-[0.99] cursor-pointer snap-start",
+);
 
 function getAgeLine(birthDate: Date | null): string {
   if (!birthDate || Number.isNaN(birthDate.getTime())) return "Возраст не указан";
@@ -157,10 +177,7 @@ export function ChildrenCard({
             onClick={openEditAdult}
             className={cn(
               CARD_W,
-              "group relative text-left rounded-2xl border border-neutral-200/90 bg-white px-4 py-3.5 shadow-sm",
-              TRANSITION,
-              "hover:bg-neutral-50/90 hover:border-neutral-300/80 active:bg-neutral-100/80",
-              "cursor-pointer snap-start",
+              GLASS_MEMBER_CARD,
               highlightAdult && "animate-in fade-in zoom-in-95 duration-300",
             )}
             aria-label="Редактировать профиль взрослого"
@@ -168,15 +185,20 @@ export function ChildrenCard({
             <span
               className={cn(
                 "absolute right-2.5 top-2.5 flex h-8 w-8 items-center justify-center rounded-xl",
-                "text-neutral-400 hover:text-neutral-700",
+                "text-neutral-500 hover:text-neutral-800 bg-white/40 backdrop-blur-sm hover:bg-white/60",
                 "opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-150",
               )}
               aria-hidden
             >
               <Pencil className="h-3.5 w-3.5" />
             </span>
-            <div className="flex gap-3 pr-7">
-              <div className={cn(AVATAR, "bg-primary/10 text-primary overflow-hidden ring-1 ring-black/[0.04]")}>
+            <div className="flex items-center gap-3 pr-7">
+              <div
+                className={cn(
+                  AVATAR,
+                  "bg-white/55 text-primary backdrop-blur-sm overflow-hidden ring-1 ring-white/70 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]",
+                )}
+              >
                 {adult.avatarUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
@@ -185,7 +207,9 @@ export function ChildrenCard({
                     className="h-full w-full object-cover"
                   />
                 ) : (
-                  <span>{adult.initialChar.toUpperCase()}</span>
+                  <span className="flex h-full w-full items-center justify-center">
+                    {adult.initialChar.toUpperCase()}
+                  </span>
                 )}
               </div>
               <div className="min-w-0 flex-1">
@@ -212,10 +236,7 @@ export function ChildrenCard({
                 onClick={() => openEditChild(child)}
                 className={cn(
                   CARD_W,
-                  "group relative text-left rounded-2xl border border-neutral-200/90 bg-white px-4 py-3.5 shadow-sm",
-                  TRANSITION,
-                  "hover:bg-neutral-50/90 hover:border-neutral-300/80 active:bg-neutral-100/80",
-                  "cursor-pointer snap-start",
+                  GLASS_MEMBER_CARD,
                   highlightChildId === child.id &&
                     "animate-in fade-in zoom-in-95 duration-300",
                 )}
@@ -224,21 +245,23 @@ export function ChildrenCard({
                 <span
                   className={cn(
                     "absolute right-2.5 top-2.5 flex h-8 w-8 items-center justify-center rounded-xl",
-                    "text-neutral-400 hover:text-neutral-700",
+                    "text-neutral-500 hover:text-neutral-800 bg-white/40 backdrop-blur-sm hover:bg-white/60",
                     "opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-150",
                   )}
                   aria-hidden
                 >
                   <Pencil className="h-3.5 w-3.5" />
                 </span>
-                <div className="flex gap-3 pr-7">
+                <div className="flex items-center gap-3 pr-7">
                   <div
                     className={cn(
                       AVATAR,
-                      "bg-gradient-to-br from-primary/15 to-primary/5 text-primary ring-1 ring-black/[0.04]",
+                      "bg-gradient-to-br from-white/70 via-primary/12 to-primary/25 text-primary backdrop-blur-sm ring-1 ring-white/65 shadow-[inset_0_1px_0_rgba(255,255,255,0.85)]",
                     )}
                   >
-                    <span>{child.name.charAt(0).toUpperCase()}</span>
+                    <span className="flex h-full w-full items-center justify-center">
+                      {child.name.charAt(0).toUpperCase()}
+                    </span>
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-semibold text-neutral-900 truncate whitespace-nowrap">
@@ -257,19 +280,13 @@ export function ChildrenCard({
           <button
             type="button"
             onClick={openAdd}
-            className={cn(
-              CARD_W,
-              "flex items-center gap-3 rounded-2xl px-4 py-3.5 border-2 border-dashed border-neutral-200",
-              "text-neutral-400 hover:border-primary/45 hover:text-primary hover:bg-primary/[0.03]",
-              TRANSITION,
-              "cursor-pointer snap-start",
-            )}
+            className={cn(CARD_W, GLASS_ADD_CARD)}
             aria-label="Добавить участника"
           >
             <div
               className={cn(
                 AVATAR,
-                "border-2 border-dashed border-current bg-transparent text-current",
+                "border-2 border-dashed border-current/80 bg-white/25 text-current backdrop-blur-sm",
               )}
             >
               <Plus className="h-5 w-5 stroke-[2.5]" />

@@ -193,7 +193,7 @@ export async function getHeroContext(input?: {
     }
 
     const now = new Date();
-    const wx = interpretWeather(raw, now);
+    const wx = interpretWeather(raw, now, tz);
 
     const persona: HeroPersonaContext = {
       mode: personaMode,

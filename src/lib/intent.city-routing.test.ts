@@ -28,6 +28,6 @@ assert.equal(getIntentFromPath("/unknown-city/events"), null);
 assert.equal(isPublicationDetailPath("/minsk/events/master-klass"), true);
 assert.equal(isPublicationDetailPath("/minsk/activity/abc123"), true);
 assert.equal(isPublicationDetailPath("/me/events/master-klass"), false);
-assert.equal(isPublicationDetailPath("/unknown-city/events/master-klass"), false);
+assert.equal(isPublicationDetailPath("/unknown-city/events/master-klass"), true);
 
 console.log("intent city routing tests: OK");

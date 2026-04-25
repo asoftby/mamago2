@@ -36,6 +36,7 @@ function isNewRow(n: NotificationApiRow): boolean {
 /**
  * Единый список уведомлений: без табов, без авто-прочтения по таймеру.
  * При первом открытии панели — POST mark-open (seenAt), без перезагрузки страницы.
+ * Показывает ВСЕ уведомления, доступные пользователю (USER + BUSINESS + ADMIN).
  */
 export function NotificationFeed({
   open,
@@ -60,7 +61,7 @@ export function NotificationFeed({
         limit: String(PAGE_SIZE),
         offset: String(startOffset),
       });
-      if (stream) params.set("stream", stream);
+      // Don't pass stream parameter — fetch ALL accessible notifications
       const res = await fetch(`/api/notifications?${params.toString()}`, {
         credentials: "include",
       });
@@ -117,12 +118,12 @@ export function NotificationFeed({
       setOffset(startOffset + rows.length);
       return data;
     },
-    [stream],
+    [],
   );
 
   const runMarkOpenAndSync = useCallback(async () => {
     const params = new URLSearchParams();
-    if (stream) params.set("stream", stream);
+    // Don't pass stream parameter — mark ALL accessible notifications as seen
     const markRes = await fetch(`/api/notifications/mark-open?${params.toString()}`, {
       method: "POST",
       credentials: "include",
@@ -142,13 +143,14 @@ export function NotificationFeed({
         isRead: true,
       })),
     );
-  }, [stream, onNotificationRead]);
+  }, [onNotificationRead]);
 
   const bootstrap = useCallback(async () => {
     try {
       setLoading(true);
       await fetchPage(0, false);
-      await runMarkOpenAndSync();
+      // Не блокируем первичный рендер списка: mark-open запускаем в фоне.
+      void runMarkOpenAndSync();
     } catch (error) {
       console.error("Failed to fetch notifications:", error);
       toast.error("Не удалось загрузить уведомления");
@@ -158,14 +160,9 @@ export function NotificationFeed({
   }, [fetchPage, runMarkOpenAndSync]);
 
   useEffect(() => {
-    if (!open) {
-      setNotifications([]);
-      setOffset(0);
-      setHasMore(false);
-      return;
-    }
+    if (!open) return;
     void bootstrap();
-  }, [open, stream, bootstrap]);
+  }, [open, bootstrap]);
 
   useEffect(() => {
     const handler = () => {
@@ -226,9 +223,27 @@ export function NotificationFeed({
       case "ANNOUNCEMENT":
         return "📣";
       case "SYSTEM":
+        // Проверяем, если это уведомление о подтверждении email
+        if (n.title.includes("почта подтверждена") || n.title.includes("email")) {
+          return "✉️";
+        }
         return "⚙️";
       default:
         return "📢";
+    }
+  };
+
+  const getNotificationContextBadge = (n: NotificationApiRow): { label: string; color: string } | null => {
+    if (!n.audience) return null;
+    
+    switch (n.audience) {
+      case "BUSINESS":
+        return { label: "Бизнес", color: "bg-blue-100 text-blue-700" };
+      case "ADMIN":
+        return { label: "Админ", color: "bg-purple-100 text-purple-700" };
+      case "USER":
+      default:
+        return null; // Don't show badge for USER (default context)
     }
   };
 
@@ -262,6 +277,7 @@ export function NotificationFeed({
     const link = getNotificationHref(notification);
     const icon = getNotificationIcon(notification);
     const isNew = isNewRow(notification);
+    const contextBadge = getNotificationContextBadge(notification);
 
     return (
       <div
@@ -284,6 +300,7 @@ export function NotificationFeed({
               notification={notification}
               icon={icon}
               isNew={isNew}
+              contextBadge={contextBadge}
             />
           </Link>
         ) : (
@@ -299,6 +316,7 @@ export function NotificationFeed({
               notification={notification}
               icon={icon}
               isNew={isNew}
+              contextBadge={contextBadge}
             />
           </div>
         )}
@@ -315,14 +333,14 @@ export function NotificationFeed({
     >
       <ScrollArea className="max-h-[min(56vh,520px)] flex-1 bg-white">
         <div className="divide-y divide-gray-100 bg-white">
-          {showInlineTelegramPrompt ? (
-            <div className="border-b border-gray-100 bg-white p-4">
-              <TelegramPromptBanner />
-            </div>
-          ) : null}
           {showInlineEmailVerificationPrompt ? (
             <div className="border-b border-gray-100 bg-white p-4">
               <EmailVerificationPromptBanner onDismiss={dismissEmailVerificationPrompt} />
+            </div>
+          ) : null}
+          {showInlineTelegramPrompt ? (
+            <div className="border-b border-gray-100 bg-white p-4">
+              <TelegramPromptBanner />
             </div>
           ) : null}
           {notifications.map((n) => renderRow(n))}
@@ -349,26 +367,37 @@ function FeedRowContent({
   notification,
   icon,
   isNew,
+  contextBadge,
 }: {
   notification: NotificationApiRow;
   icon: string;
   isNew: boolean;
+  contextBadge?: { label: string; color: string } | null;
 }) {
   return (
     <div className="flex gap-3">
       <div className="flex-shrink-0 text-2xl">{icon}</div>
       <div className="min-w-0 flex-1">
         <div className="flex items-start justify-between gap-2">
-          <p
-            className={cn(
-              "text-sm text-gray-900",
-              isNew ? "font-semibold" : "font-medium text-gray-700",
-            )}
-          >
-            {notification.type === "WELCOME"
-              ? displayWelcomeNotificationTitle(notification.title)
-              : notification.title}
-          </p>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <p
+                className={cn(
+                  "text-sm text-gray-900",
+                  isNew ? "font-semibold" : "font-medium text-gray-700",
+                )}
+              >
+                {notification.type === "WELCOME"
+                  ? displayWelcomeNotificationTitle(notification.title)
+                  : notification.title}
+              </p>
+              {contextBadge && (
+                <span className={cn("text-xs font-medium px-2 py-0.5 rounded", contextBadge.color)}>
+                  {contextBadge.label}
+                </span>
+              )}
+            </div>
+          </div>
           {isNew ? (
             <span className="mt-0.5 shrink-0 rounded-full bg-[#EF8759]/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#C65D2E]">
               Новое

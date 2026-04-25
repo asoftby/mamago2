@@ -1,5 +1,6 @@
 import {
   DEFAULT_CITY_SLUG,
+  isReservedTopLevelSegment,
   resolveRouteCitySlug,
 } from "@/lib/city/resolveCityContext";
 import { KNOWN_CITY_SLUGS } from "@/lib/city/cityDisplayNames";
@@ -39,14 +40,14 @@ export function isCityHubPath(pathname: string | null): boolean {
 /**
  * Карточка публикации в городе: `/{city}/activity/...`, `/{city}/events/{slug|id}`.
  * (Витрина `/city/events` без slug — не деталь.)
+ * Первый сегмент — любой незарезервированный slug (город из витрины), не только KNOWN_CITY_SLUGS.
  */
 export function isPublicationDetailPath(pathname: string | null): boolean {
   if (!pathname) return false;
   const segments = pathname.split("/").filter(Boolean);
   if (segments.length < 3) return false;
-  if (resolveRouteCitySlug(pathname) === null) {
-    return false;
-  }
+  const hub = segments[0];
+  if (!hub || isReservedTopLevelSegment(hub)) return false;
   const section = segments[1];
   return section === "activity" || section === "events";
 }
@@ -66,6 +67,16 @@ export function shouldHideMobileBottomNav(pathname: string | null): boolean {
   if (segments[0] === "offers") return true;
   if (segments[0] === "p") return true;
   if (segments[0] === "routes" && segments[1] !== "new") return true;
+
+  /** Превью события в кабинете — полноэкранная карточка, без нижней навигации и FAB «Мой план». */
+  if (
+    segments[0] === "me" &&
+    segments[1] === "events" &&
+    segments.length >= 4 &&
+    segments[3] === "preview"
+  ) {
+    return true;
+  }
 
   return isPublicationDetailPath(pathname);
 }

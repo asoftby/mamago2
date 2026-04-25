@@ -31,6 +31,7 @@ type MobileFilterSheetProps = {
   onReset: () => void;
   
   ageOptions: Option[];
+  formatOptions: Option[];
   metroOptions: Option[];
   districtOptions: Option[];
   
@@ -93,6 +94,7 @@ export function MobileFilterSheet({
   onDone,
   onReset,
   ageOptions,
+  formatOptions,
   metroOptions,
   districtOptions,
 }: MobileFilterSheetProps) {
@@ -100,6 +102,7 @@ export function MobileFilterSheet({
   // Local state for which nested sheet is open
   const [dateSheetOpen, setDateSheetOpen] = React.useState(false);
   const [ageSheetOpen, setAgeSheetOpen] = React.useState(false);
+  const [formatSheetOpen, setFormatSheetOpen] = React.useState(false);
   const [metroSheetOpen, setMetroSheetOpen] = React.useState(false);
   const [districtSheetOpen, setDistrictSheetOpen] = React.useState(false);
 
@@ -220,6 +223,34 @@ export function MobileFilterSheet({
                  showSearch={false}
                  layoutVariant="age-masonry"
                />
+            </div>
+
+            <div className="w-full">
+              <TriggerButton
+                label="Формат"
+                valueLabel={getSingleLabel(draft.format, formatOptions, "Любой")}
+                isActive={!!draft.format}
+                onClick={() => setFormatSheetOpen(true)}
+                onClear={() => setDraft({ format: null })}
+              />
+              <MobileSelectSheet
+                open={formatSheetOpen}
+                onOpenChange={setFormatSheetOpen}
+                title="Формат"
+                options={formatOptions}
+                selectedValues={draft.format ? [draft.format] : []}
+                onSelect={(val) => {
+                  setDraft({
+                    format: val as DiscoveryFiltersType["format"],
+                    ...(val === "ONLINE" ? { nearby: false } : {}),
+                  });
+                  setFormatSheetOpen(false);
+                }}
+                onClear={() => setDraft({ format: null })}
+                isMulti={false}
+                placeholderSearch="Поиск формата..."
+                showSearch={false}
+              />
             </div>
 
             {/* Metro */}

@@ -1,4 +1,4 @@
-import type { AccountMenuUser } from "@/components/site/header/AccountMenuBody";
+import type { AccountMenuUser } from "@/lib/account/types";
 import { BusinessHeader } from "./BusinessHeader";
 import { BusinessSidebar } from "./BusinessSidebar";
 

@@ -26,12 +26,12 @@ export function BusinessSidebar({ onNavigate, variant = "sidebar" }: BusinessSid
   return (
     <aside className="w-full lg:w-[248px] h-full border-r border-stone-200/80 bg-white/75 backdrop-blur">
       <nav className={variant === "sheet" ? "flex flex-col gap-1.5 p-4" : "sticky top-16 flex flex-col gap-1.5 p-4"}>
-        {businessNavigation.map((item) => {
+        {businessNavigation.map((item, index) => {
           if (item.type === "item") {
             const patterns = item.match ?? [item.href];
             return (
               <SidebarItem
-                key={item.href}
+                key={`${item.href}:${item.label}:${index}`}
                 href={item.href}
                 icon={item.icon}
                 label={item.label}
@@ -55,9 +55,9 @@ export function BusinessSidebar({ onNavigate, variant = "sidebar" }: BusinessSid
               label={item.label}
               defaultOpen={defaultOpen}
             >
-              {item.children.map((child) => (
+              {item.children.map((child, childIndex) => (
                 <SidebarSubItem
-                  key={child.href}
+                  key={`${child.href}:${child.label}:${childIndex}`}
                   href={child.href}
                   label={child.label}
                   isActive={

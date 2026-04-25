@@ -1,19 +1,14 @@
 "use client";
 
-import { Building2, MapPin, TrainFront } from "lucide-react";
-import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { EventPageVenue } from "@/lib/event/eventPageTypes";
+import { formatVenueAddressForPublicDisplay } from "@/lib/event/formatVenueAddressForDisplay";
+import { googleDirectionsUrlFromVenue } from "@/lib/maps/googleDirectionsUrl";
 
-const ROWS: {
-  key: keyof Pick<EventPageVenue, "address" | "metro" | "district">;
-  label: string;
-  Icon: LucideIcon;
-}[] = [
-  { key: "address", label: "Адрес", Icon: MapPin },
-  { key: "metro", label: "Метро", Icon: TrainFront },
-  { key: "district", label: "Район", Icon: Building2 },
-];
+const ROW_KEYS: (keyof Pick<
+  EventPageVenue,
+  "address" | "metro" | "district"
+>)[] = ["address", "metro", "district"];
 
 export function EventVenueLocationRows({
   venue,
@@ -25,8 +20,9 @@ export function EventVenueLocationRows({
   /** compact — плотнее, для hero-карточки */
   variant?: "default" | "compact";
 }) {
-  const hasAny = ROWS.some((r) => Boolean(venue[r.key]));
-  if (!hasAny) return null;
+  const hasAny = ROW_KEYS.some((k) => Boolean(venue[k]));
+  const directionsHref = googleDirectionsUrlFromVenue(venue);
+  if (!hasAny && !directionsHref) return null;
 
   return (
     <div
@@ -36,37 +32,53 @@ export function EventVenueLocationRows({
         className
       )}
     >
-      {ROWS.map(({ key, label, Icon }) => {
-        const value = venue[key];
+      {ROW_KEYS.map((key) => {
+        const raw = venue[key];
+        if (!raw) return null;
+        const value =
+          key === "address"
+            ? formatVenueAddressForPublicDisplay(raw)
+            : raw;
         if (!value) return null;
         return (
-          <div key={key} className="flex gap-3">
-            <span
+          <div key={key} className="min-w-0">
+            <p
               className={cn(
-                "mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground",
-                variant === "compact" && "size-7"
+                "text-[14px] leading-snug text-foreground",
+                variant === "compact" && "text-[13px]"
               )}
             >
-              <Icon
-                className={cn("size-4", variant === "compact" && "size-3.5")}
-              />
-            </span>
-            <div className="min-w-0">
-              <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                {label}
-              </p>
-              <p
+              {value}
+            </p>
+            {key === "address" && directionsHref ? (
+              <a
+                href={directionsHref}
+                target="_blank"
+                rel="noopener noreferrer"
                 className={cn(
-                  "mt-0.5 text-[14px] leading-snug text-foreground",
-                  variant === "compact" && "text-[13px]"
+                  "mt-2.5 inline-block w-fit font-medium text-foreground underline decoration-dashed decoration-primary decoration-2 underline-offset-[4px] hover:text-foreground/75",
+                  variant === "compact" ? "text-[13px]" : "text-[14px]",
                 )}
               >
-                {value}
-              </p>
-            </div>
+                Как добраться?
+              </a>
+            ) : null}
           </div>
         );
       })}
+      {directionsHref && !venue.address?.trim() ? (
+        <a
+          href={directionsHref}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={cn(
+            "mt-2.5 inline-block w-fit font-medium text-foreground underline decoration-dashed decoration-primary decoration-2 underline-offset-[4px] hover:text-foreground/75",
+            variant === "compact" ? "text-[13px]" : "text-[14px]",
+          )}
+        >
+          Как добраться?
+        </a>
+      ) : null}
     </div>
   );
 }

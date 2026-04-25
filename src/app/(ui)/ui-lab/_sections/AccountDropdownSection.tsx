@@ -46,15 +46,14 @@ export function AccountDropdownSection() {
     mode: "personal",
     initials: "ПР",
     onNavigate: noop,
-    onGoToSettings: noop,
     onGoToAdminAccount: noop,
     onGoToBusinessAccount: noop,
     onSwitchMode: noop,
     onGoToHome: noop,
-    onGoToPersonalProfile: noop,
+    onGoToPersonalAccount: noop,
     onGoToPersonalIdeas: noop,
     onGoToPersonalPlan: noop,
-    onGoToPersonalNotifications: noop,
+    onGoToSettings: noop,
     onGoToBusinessDashboard: noop,
     onGoToBusinessRoot: noop,
     onGoToBusinessPublications: noop,
@@ -73,15 +72,14 @@ export function AccountDropdownSection() {
     mode: "personal",
     initials: "АД",
     onNavigate: noop,
-    onGoToSettings: noop,
     onGoToAdminAccount: noop,
     onGoToBusinessAccount: noop,
     onSwitchMode: noop,
     onGoToHome: noop,
-    onGoToPersonalProfile: noop,
+    onGoToPersonalAccount: noop,
     onGoToPersonalIdeas: noop,
     onGoToPersonalPlan: noop,
-    onGoToPersonalNotifications: noop,
+    onGoToSettings: noop,
     onGoToBusinessDashboard: noop,
     onGoToBusinessRoot: noop,
     onGoToBusinessPublications: noop,
@@ -100,15 +98,14 @@ export function AccountDropdownSection() {
     mode: "business",
     initials: "БИ",
     onNavigate: noop,
-    onGoToSettings: noop,
     onGoToAdminAccount: noop,
     onGoToBusinessAccount: noop,
     onSwitchMode: noop,
     onGoToHome: noop,
-    onGoToPersonalProfile: noop,
+    onGoToPersonalAccount: noop,
     onGoToPersonalIdeas: noop,
     onGoToPersonalPlan: noop,
-    onGoToPersonalNotifications: noop,
+    onGoToSettings: noop,
     onGoToBusinessDashboard: noop,
     onGoToBusinessRoot: noop,
     onGoToBusinessPublications: noop,
@@ -124,10 +121,10 @@ export function AccountDropdownSection() {
 
   const adminApp = buildAdminAccountModel({
     userEmail: "admin@example.com",
-    initials: "АД",
-    goToAdminSettings: noop,
-    goToProfile: noop,
+    userDisplayName: "Алексей",
+    initials: "А",
     goToPersonalAccount: noop,
+    goToAdminHome: noop,
     onNavigate: noop,
   });
 
@@ -191,8 +188,8 @@ export function AccountDropdownSection() {
           <div className="space-y-3">
             <h4 className="text-sm font-semibold text-gray-900">Админка (admin)</h4>
             <p className="text-xs text-muted-foreground">
-              Профиль и настройки; акцент — «Перейти в личный аккаунт»; выход через POST
-              (form), в демо ниже для статики используется та же вёрстка.
+              Мой аккаунт и настройки; переключатель «Личный / Админ-панель» как на /me; выход через
+              POST (form).
             </p>
             <DropdownChrome>
               <AccountDropdownContent {...pickContent(adminApp)} />

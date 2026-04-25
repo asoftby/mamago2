@@ -14,6 +14,10 @@ import { FilterSelect } from "@/components/ui/filter-select";
 import { straightQuotesToGuillemets } from "@/lib/text/straightQuotesToGuillemets";
 import { SYSTEM_INTERESTS } from "@/lib/config/interests";
 import { AGE_OPTIONS, sortAgeKeys } from "@/lib/config/ages";
+import {
+  ACTIVITY_FORMAT_OPTIONS,
+  getActivityFormatOption,
+} from "@/domain/activities/activity-format";
 
 type DiscoveryEventCategory = {
   id: string;
@@ -318,6 +322,23 @@ export function Step1Basics({ data, onChange, isEditable }: Step1BasicsProps) {
     };
   });
 
+  const formatItems: ChipItem[] = ACTIVITY_FORMAT_OPTIONS.map((option) => {
+    const active = data.format === option.value;
+    return {
+      id: option.value,
+      label: option.label,
+      active,
+      disabled: !isEditable || loading,
+      onClick: () => {
+        if (!isEditable || loading) return;
+        onChange({ format: option.value });
+      },
+      className: "disabled:!opacity-[0.4] disabled:!pointer-events-none",
+    };
+  });
+
+  const selectedFormat = getActivityFormatOption(data.format);
+
   const renderCategoryIcon = (iconKey: string | null | undefined) => {
     const key = iconKey?.trim() ?? "";
     if (!key) return null;
@@ -562,6 +583,22 @@ export function Step1Basics({ data, onChange, isEditable }: Step1BasicsProps) {
           placeholder="Введите название события"
           disabled={!isEditable}
         />
+      </div>
+
+      <div className="space-y-2">
+        <div>
+          <Label>
+            Формат участия <span className="text-red-500">*</span>
+          </Label>
+          <p className="mt-1 text-[12px] text-muted-foreground">
+            Как пользователь может участвовать в событии
+          </p>
+        </div>
+        <ChipsRow layout="wrap" aria-label="Формат участия" items={formatItems} />
+        <div className="flex items-center gap-2 rounded-xl border border-orange-100 bg-orange-50/70 px-3 py-2 text-[12px] text-orange-950">
+          <selectedFormat.icon className="h-4 w-4 shrink-0 text-orange-500" />
+          <span>{selectedFormat.description}</span>
+        </div>
       </div>
 
       {/* Event format / atmosphere — multi select */}

@@ -267,7 +267,12 @@ export function NotificationPreferencesClient({
           <h2 className="text-sm font-semibold text-neutral-900">Уведомления</h2>
         </div>
 
-        <div className="hidden grid-cols-[minmax(0,1fr)_88px_88px_88px] gap-3 border-b border-neutral-100 px-6 py-3 text-xs font-medium uppercase tracking-[0.08em] text-neutral-400 md:grid">
+        <div
+          className={cn(
+            "grid-cols-[minmax(0,1fr)_88px_88px_88px] gap-3 border-b border-neutral-100 px-6 py-3 text-xs font-medium uppercase tracking-[0.08em] text-neutral-400",
+            embedded ? "hidden" : "hidden md:grid",
+          )}
+        >
           <span>Тип уведомлений</span>
           {CHANNEL_OPTIONS.map((channel) => (
             <span key={channel.key} className="text-center">
@@ -288,7 +293,14 @@ export function NotificationPreferencesClient({
                 key={definition.notificationType}
                 className="px-5 py-4 sm:px-6 sm:py-5"
               >
-                <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_88px_88px_88px] md:items-center">
+                <div
+                  className={cn(
+                    "grid gap-4",
+                    embedded
+                      ? ""
+                      : "md:grid-cols-[minmax(0,1fr)_88px_88px_88px] md:items-center",
+                  )}
+                >
                   <div className="min-w-0">
                     <div className="flex items-start gap-3">
                       <div className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-orange-50 text-orange-500">
@@ -305,7 +317,12 @@ export function NotificationPreferencesClient({
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-2 md:contents">
+                  <div
+                    className={cn(
+                      "grid grid-cols-3 gap-2",
+                      embedded ? "" : "md:contents",
+                    )}
+                  >
                     {CHANNEL_OPTIONS.map((channel) => {
                       const telegramToggleBlocked =
                         channel.key === "TELEGRAM" &&
@@ -319,9 +336,17 @@ export function NotificationPreferencesClient({
                       return (
                         <div
                           key={channel.key}
-                          className="flex flex-col items-center gap-2 rounded-2xl bg-stone-50/70 px-3 py-3 md:bg-transparent md:px-0 md:py-0"
+                          className={cn(
+                            "flex flex-col items-center gap-2 rounded-2xl bg-stone-50/70 px-3 py-3",
+                            embedded ? "" : "md:bg-transparent md:px-0 md:py-0",
+                          )}
                         >
-                          <span className="text-[11px] font-medium text-neutral-500 md:hidden">
+                          <span
+                            className={cn(
+                              "text-[11px] font-medium text-neutral-500",
+                              embedded ? "" : "md:hidden",
+                            )}
+                          >
                             {channel.shortTitle}
                           </span>
                           <Toggle

@@ -1,10 +1,15 @@
-import type { EventVenueKind } from "@prisma/client";
+import type { ActivityFormat, EventVenueKind } from "@prisma/client";
 import type { Intent } from "@/lib/intent";
 import { DEFAULT_CITY_HUB_PATH } from "@/lib/intent";
 import { extractPlainTextFromHtml } from "@/lib/richtext/utils";
 import { resolveActivityCoverUrl } from "@/lib/event/resolveActivityCoverUrl";
-import { formatPrice, formatPriceFrom } from "@/lib/formatters/format-price";
+import { formatPriceFrom } from "@/lib/formatters/format-price";
 import type { EventPageData } from "./eventPageTypes";
+import {
+  getActivityFormatDetailLabel,
+  getActivityFormatLabel,
+} from "@/domain/activities/activity-format";
+import { ageFromPlusBadgeFromAgeTags } from "@/lib/event/activityAgeBounds";
 
 const FALLBACK_POSTER = "/mock/activity/anderson.svg";
 
@@ -21,6 +26,7 @@ export type ActivityForEventPageInput = {
   title: string;
   shortDesc: string;
   description: string | null;
+  format: ActivityFormat;
   ageTags: string[];
   priceText: string | null;
   priceFrom: number | null;
@@ -77,14 +83,12 @@ function priceLabel(activity: Pick<ActivityForEventPageInput, "priceText" | "pri
 
 function factChipsFromActivity(activity: ActivityForEventPageInput): EventPageData["factChips"] {
   const chips: EventPageData["factChips"] = [];
-  for (const tag of activity.ageTags.slice(0, 4)) {
+  /** Офлайн — базовый сценарий, отдельный бэйдж не показываем. */
+  if (activity.format !== "OFFLINE") {
     chips.push({
-      id: `age-${tag}`,
-      label: tag.includes("–") || tag.includes("-") ? `${tag} лет` : tag,
+      id: "format",
+      label: getActivityFormatLabel(activity.format),
     });
-  }
-  if (chips.length === 0) {
-    chips.push({ id: "fmt", label: "Событие" });
   }
   return chips;
 }
@@ -105,11 +109,17 @@ function importantFactsFromActivity(activity: ActivityForEventPageInput): EventP
       value: activity.eventCategory.nameRu,
     });
   }
+  rows.push({
+    id: "format",
+    label: "Формат",
+    value: getActivityFormatDetailLabel(activity.format),
+  });
   return rows;
 }
 
 function venueFromActivity(activity: ActivityForEventPageInput): EventPageData["venue"] | undefined {
   if (activity.venue) {
+    if (activity.format === "ONLINE") return undefined;
     const v = activity.venue;
     if (v.kind === "PLACE" && v.place) {
       return {
@@ -129,6 +139,7 @@ function venueFromActivity(activity: ActivityForEventPageInput): EventPageData["
     }
   }
   if (activity.place) {
+    if (activity.format === "ONLINE") return undefined;
     return {
       name: activity.place.title,
       address: activity.place.formattedAddr ?? undefined,
@@ -196,6 +207,7 @@ export function buildEventPageDataFromPrismaActivity(
     slug: activity.slug ?? null,
     citySlug,
     discoveryIntent: discoveryIntentForActivity(),
+    ageFromBadge: ageFromPlusBadgeFromAgeTags(activity.ageTags),
     categoryLabel: activity.eventCategory?.nameRu,
     title: activity.title,
     subtitle: activity.shortDesc,
@@ -225,7 +237,7 @@ export function buildEventPageDataFromPrismaActivity(
     priceDetails: activity.priceDetails ?? undefined,
     cta: {
       planLabel: "В план",
-      buyLabel: "Купить билет",
+      buyLabel: activity.format === "ONLINE" ? "Участвовать онлайн" : "Купить билет",
       saveLabel: "В идеи",
     },
     ownerEditHref: options?.ownerEditHref,

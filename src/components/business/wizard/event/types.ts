@@ -1,5 +1,6 @@
 // Event Wizard Types
 
+import type { ActivityFormat } from "@prisma/client";
 import type { EventFormatPreset } from "@/lib/business/eventFormatSignals";
 import type { EventScheduleItem } from "@/components/admin/event-schedule/types";
 import type {
@@ -16,6 +17,7 @@ export type EventWizardMode = "create" | "edit";
 export interface EventFormData {
   // Step 1: Basics
   title: string;
+  format: ActivityFormat;
   /** Пресет «как проходит событие» → при сохранении маппится в сигналы в scheduleJson */
   eventFormats: EventFormatPreset[];
   /**

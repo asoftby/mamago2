@@ -38,3 +38,30 @@ export function ageBoundsFromActivityFields(a: {
 export function ageFromPlusLabelFromBounds(ageFrom: number): string {
   return `${ageFrom}+`;
 }
+
+/**
+ * Минимальный нижний предел по всем диапазонам в `ageTags` (`5-7`, `12+`, …) — для бэйджа на странице события.
+ */
+export function ageFromPlusBadgeFromAgeTags(ageTags: string[]): string | undefined {
+  let minLo: number | null = null;
+  for (const tag of ageTags) {
+    const t = tag.trim();
+    const range = t.match(/^(\d+)\s*[-–]\s*(\d+)/);
+    if (range) {
+      const lo = Number.parseInt(range[1]!, 10);
+      if (Number.isFinite(lo)) {
+        minLo = minLo === null ? lo : Math.min(minLo, lo);
+      }
+      continue;
+    }
+    const plus = t.match(/^(\d+)\s*\+/);
+    if (plus) {
+      const y = Number.parseInt(plus[1]!, 10);
+      if (Number.isFinite(y)) {
+        minLo = minLo === null ? y : Math.min(minLo, y);
+      }
+    }
+  }
+  if (minLo === null) return undefined;
+  return ageFromPlusLabelFromBounds(minLo);
+}

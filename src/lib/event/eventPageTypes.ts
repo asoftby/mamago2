@@ -66,6 +66,8 @@ export type EventPageData = {
   citySlug: string;
   /** Раздел (Куда пойти / Занятия / …) — для хедера на странице публикации */
   discoveryIntent: Intent;
+  /** Бэйдж «5+» из возрастных диапазонов — перед категорией в шапке решения. */
+  ageFromBadge?: string;
   categoryLabel?: string;
   title: string;
   subtitle: string;

@@ -110,8 +110,9 @@ function emojiFromScenario(scenario: WeatherScenario): string {
 export function interpretWeather(
   raw: WeatherRawData,
   now: Date,
+  timezone?: string,
 ): HeroWeatherContext {
-  const timeOfDay = resolveDayTime(now);
+  const timeOfDay = resolveDayTime(now, timezone);
 
   // 1. Severe warnings take priority
   const severeWarning = raw.warnings?.find((w) => w.severity === "severe");

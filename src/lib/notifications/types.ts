@@ -28,6 +28,8 @@ export type NotificationApiRow = {
   seenAt: string | null;
   createdAt: string;
   userId?: string;
+  /** Контекст уведомления: USER, BUSINESS, ADMIN */
+  audience?: string | null;
 };
 
 /**

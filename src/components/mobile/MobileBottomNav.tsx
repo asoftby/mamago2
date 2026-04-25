@@ -12,7 +12,7 @@ import { MobileProfileSheet } from "@/components/mobile/MobileProfileSheet";
 import { PlanPillNavButton } from "@/components/mobile/PlanPillNavButton";
 import { useCity } from "@/contexts/CityContext";
 import { useFamilyPersona } from "@/contexts/FamilyPersonaContext";
-import { useUnreadNotificationCount } from "@/hooks/useUnreadNotificationCount";
+import { useUserNotificationBadgeCount } from "@/features/notifications/hooks/useUserNotificationBadgeCount";
 import { requestOpenMyPlan } from "@/lib/my-plan/myPlanOpenIntent";
 import { cn } from "@/lib/utils";
 
@@ -43,8 +43,7 @@ export function MobileBottomNav({
   const { citySlug } = useCity();
   const family = useFamilyPersona();
   const isAuthenticated = !family?.loading && !!family?.menuUser;
-  const { unreadCount, refresh: refreshUnreadCount } =
-    useUnreadNotificationCount();
+  const { displayUnreadCount, refreshUnreadCount } = useUserNotificationBadgeCount();
   const [notificationsOpen, setNotificationsOpen] = useState(false);
 
   const resolvedProfileAvatar =
@@ -64,8 +63,6 @@ export function MobileBottomNav({
       !pathname.startsWith("/me/day"));
   const isProfileActive =
     isMeHubOrProfileSection ||
-    pathname === "/profile" ||
-    pathname.startsWith("/profile/") ||
     pathname.startsWith("/business") ||
     pathname.startsWith("/admin");
 
@@ -122,10 +119,10 @@ export function MobileBottomNav({
               <span
                 className={cn(
                   "relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-colors duration-200",
-                  unreadCount > 0 && "animate-nav-notify-pulse",
+                  displayUnreadCount > 0 && "animate-nav-notify-pulse",
                   isNotificationsActive
                     ? "bg-[#EF8759]/22"
-                    : unreadCount > 0
+                    : displayUnreadCount > 0
                       ? "bg-[#EF8759]/24"
                       : "bg-neutral-600/45",
                 )}
@@ -133,24 +130,24 @@ export function MobileBottomNav({
                 <Bell
                   className={cn(
                     "h-[22px] w-[22px] transition-colors duration-200",
-                    isNotificationsActive || unreadCount > 0
+                    isNotificationsActive || displayUnreadCount > 0
                       ? "text-[#FFB090]"
                       : "text-neutral-300",
                   )}
                   strokeWidth={
-                    isNotificationsActive || unreadCount > 0 ? 1.35 : 1.2
+                    isNotificationsActive || displayUnreadCount > 0 ? 1.35 : 1.2
                   }
                   absoluteStrokeWidth
                 />
               </span>
-              {unreadCount > 0 && (
+              {displayUnreadCount > 0 && (
                 <span
                   className={cn(
                     "absolute -right-0.5 -top-0.5 flex min-h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[#EF8759] px-1 text-[10px] font-semibold leading-none text-white shadow-sm ring-2 ring-neutral-900/95",
                   )}
                   aria-hidden
                 >
-                  {unreadCount > 9 ? "9+" : unreadCount}
+                  {displayUnreadCount > 9 ? "9+" : displayUnreadCount}
                 </span>
               )}
             </button>

@@ -71,12 +71,12 @@ export function WeekCalendar({ selectedDate, onSelect, itemsByDate }: Props) {
             <button
               key={dateStr}
               type="button"
-              disabled={isPast}
+              aria-disabled={isPast}
               onClick={() => onSelect(dateStr)}
               className={cn(
                 "relative flex flex-col items-center justify-center py-2.5 px-1 rounded-xl transition-all",
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900/20",
-                isPast && !isSelected && "cursor-not-allowed opacity-45",
+                isPast && !isSelected && "opacity-45",
                 isPast && !isSelected && "hover:bg-transparent",
                 isSelected
                   ? "bg-neutral-900 text-white"

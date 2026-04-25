@@ -18,6 +18,7 @@ export type NotificationsModalProps = {
 
 /**
  * Мобильная оболочка: bottom sheet. На десктопе не рендерится — там Popover в NotificationsDropdown.
+ * Показывает ВСЕ уведомления, доступные пользователю.
  */
 export function NotificationsModal({
   open,
@@ -41,7 +42,6 @@ export function NotificationsModal({
       >
         <SheetTitle className="sr-only">Уведомления</SheetTitle>
         <NotificationsPanel
-          key={String(open)}
           open={open}
           stream={stream}
           onNotificationRead={onNotificationRead}

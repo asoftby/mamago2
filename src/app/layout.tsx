@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Manrope, Geist_Mono, Literata, Noto_Serif, PT_Serif } from "next/font/google";
+import { Geist_Mono, Literata, Noto_Serif, PT_Serif } from "next/font/google";
 import { headers } from "next/headers";
 import "./globals.css";
 import { Sonner } from "@/components/ui/sonner";
@@ -10,13 +10,8 @@ import { MyPlanProvider } from "@/components/MyPlanProvider";
 import { CookieConsentProvider } from "@/components/providers/cookie-consent-provider";
 import { SaveIntentProvider } from "@/lib/save/SaveIntentContext";
 import { resolveSurfaceFromHostAndPathname } from "@/lib/routing/surface";
-
-const manrope = Manrope({
-  variable: "--font-manrope",
-  subsets: ["latin", "cyrillic"],
-  display: "swap",
-  preload: true,
-});
+import { CityProvider } from "@/contexts/CityContext";
+import { WeatherProvider } from "@/contexts/WeatherContext";
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
@@ -24,7 +19,7 @@ const geistMono = Geist_Mono({
 });
 
 const literata = Literata({
-  variable: "--font-serif",
+  variable: "--font-literata",
   subsets: ["latin", "cyrillic"],
   display: "swap",
   style: ["normal", "italic"],
@@ -72,17 +67,21 @@ export default async function RootLayout({
   return (
     <html lang="ru">
       <body
-        className={`${manrope.variable} ${geistMono.variable} ${literata.variable} ${notoSerif.variable} ${ptSerif.variable} antialiased font-sans min-h-screen text-foreground`}
+        className={`${geistMono.variable} ${literata.variable} ${notoSerif.variable} ${ptSerif.variable} antialiased font-nt-somic font-sans min-h-screen text-foreground`}
       >
         <SaveIntentProvider>
           <AccountModeProvider>
-            <FamilyPersonaProvider>
-              <CookieConsentProvider>
-                <FamilyDerivedAgeSync />
-                {children}
-                {shouldMountMyPlanProvider ? <MyPlanProvider /> : null}
-              </CookieConsentProvider>
-            </FamilyPersonaProvider>
+            <CityProvider>
+              <WeatherProvider>
+                <FamilyPersonaProvider>
+                  <CookieConsentProvider>
+                    <FamilyDerivedAgeSync />
+                    {children}
+                    {shouldMountMyPlanProvider ? <MyPlanProvider /> : null}
+                  </CookieConsentProvider>
+                </FamilyPersonaProvider>
+              </WeatherProvider>
+            </CityProvider>
           </AccountModeProvider>
         </SaveIntentProvider>
         <Sonner />

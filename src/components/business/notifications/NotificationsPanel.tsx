@@ -21,6 +21,7 @@ export type NotificationsPanelProps = {
 
 /**
  * Тело центра уведомлений: единый список + настройки. Без табов «Новые / Прочитанные».
+ * Показывает ВСЕ уведомления, доступные пользователю.
  */
 export function NotificationsPanel({
   onClose,

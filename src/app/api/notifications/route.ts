@@ -18,6 +18,7 @@ import type { NotificationStreamFilter } from "@/server/services/notification.se
 import { getTelegramLinkStatus } from "@/server/services/telegramLink.service";
 import {
   countUnifiedNotifications,
+  getAccessibleSurfacesForUser,
   getReadNotifications,
   getUnifiedNotificationFeed,
   getUnreadCount,
@@ -50,7 +51,18 @@ export async function GET(req: NextRequest) {
 
     const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(limitRaw, 100) : 15;
 
-    const queryOpts = { telegramConnected: telegramStatus.linked };
+    // Get accessible surfaces for this user
+    // Note: business relation needs to be checked separately if needed
+    const accessibleSurfaces = getAccessibleSurfacesForUser({
+      id: user.id,
+      role: user.role,
+      business: null, // TODO: fetch business relation if needed
+    });
+
+    const queryOpts = { 
+      telegramConnected: telegramStatus.linked,
+      accessibleSurfaces,
+    };
 
     if (readOnly && unreadOnly) {
       return NextResponse.json(

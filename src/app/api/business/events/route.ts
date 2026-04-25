@@ -19,6 +19,7 @@ import { assignActivitySlugIfMissing } from "@/lib/slug/activitySlugService";
 import { replaceActivityGalleryFromMediaIds } from "@/lib/business/syncEventGalleryFromMediaIds";
 import { resolveEventOrganizer } from "@/lib/business/eventOrganizer";
 import { prismaBase } from "@/lib/prisma";
+import { DEFAULT_ACTIVITY_FORMAT, normalizeActivityFormat } from "@/domain/activities/activity-format";
 
 /**
  * POST /api/business/events
@@ -108,6 +109,7 @@ export async function POST(request: NextRequest) {
         
         // Basic info
         title,
+        format: normalizeActivityFormat(body.format, DEFAULT_ACTIVITY_FORMAT),
         shortDesc: computeEventShortDesc({ title, fullDescriptionHtml: description }),
         description,
         

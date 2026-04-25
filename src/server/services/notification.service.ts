@@ -28,6 +28,28 @@ import { dispatchDelivery } from "./notificationDelivery.service";
 
 export type NotificationStreamFilter = "user" | "business";
 
+/**
+ * Determine which notification surfaces (audiences) are accessible to a user.
+ * This is the canonical source for "what notifications should this user see".
+ */
+export function getAccessibleSurfacesForUser(user: {
+  id: string;
+  role: string;
+  business?: { id: string } | null;
+}): Array<"USER" | "BUSINESS" | "ADMIN"> {
+  const surfaces: Array<"USER" | "BUSINESS" | "ADMIN"> = ["USER"];
+  
+  if (user.business) {
+    surfaces.push("BUSINESS");
+  }
+  
+  if (user.role === "ADMIN") {
+    surfaces.push("ADMIN");
+  }
+  
+  return surfaces;
+}
+
 function mergeStreamFilter(
   base: Prisma.NotificationWhereInput,
   stream?: NotificationStreamFilter,
@@ -50,6 +72,20 @@ function mergeHideWelcomeWhenTelegramConnected(
   return {
     AND: [base, { NOT: { type: "WELCOME" } }],
   };
+}
+
+/**
+ * Filter notifications by accessible surfaces (audiences).
+ * This replaces stream-based filtering with audience-based filtering.
+ */
+function mergeAccessibleSurfacesFilter(
+  base: Prisma.NotificationWhereInput,
+  accessibleSurfaces: Array<"USER" | "BUSINESS" | "ADMIN">,
+): Prisma.NotificationWhereInput {
+  if (accessibleSurfaces.length === 0) {
+    return { ...base, audience: { in: [] } };
+  }
+  return { ...base, audience: { in: accessibleSurfaces } };
 }
 
 interface CreateNotificationParams {
@@ -117,6 +153,21 @@ export async function notifyWelcomeNewUser(userId: string) {
     title: WELCOME_NOTIFICATION_TITLE,
     body: WELCOME_NOTIFICATION_BODY,
     isPinned: true,
+  });
+}
+
+/**
+ * Send notification after successful email verification.
+ * Uses SYSTEM type — account security event.
+ */
+export async function notifyEmailVerified(userId: string) {
+  return createNotification({
+    userId,
+    type: "SYSTEM",
+    audience: "USER",
+    title: "Ваша почта подтверждена",
+    body: "Теперь вы можете получать важные уведомления и восстанавливать доступ к аккаунту.",
+    isPinned: false,
   });
 }
 
@@ -348,6 +399,8 @@ export async function notifyBusinessNeedsInfo(
 export type UserNotificationsQueryOptions = {
   /** Если true — не отдаём WELCOME в списке (история в БД сохраняется). */
   telegramConnected?: boolean;
+  /** Accessible surfaces (audiences) for the user */
+  accessibleSurfaces?: Array<"USER" | "BUSINESS" | "ADMIN">;
 };
 
 const notificationListOrderBy = [
@@ -358,6 +411,7 @@ const notificationListOrderBy = [
 /**
  * Единая лента: сначала непросмотренные (seenAt IS NULL), затем просмотренные;
  * внутри группы — закрепы выше, далее createdAt desc.
+ * Фильтрует по accessible surfaces вместо stream.
  */
 export async function getUnifiedNotificationFeed(
   userId: string,
@@ -366,10 +420,17 @@ export async function getUnifiedNotificationFeed(
   stream?: NotificationStreamFilter,
   options?: UserNotificationsQueryOptions,
 ): Promise<NotificationModel[]> {
-  const where = mergeHideWelcomeWhenTelegramConnected(
-    mergeStreamFilter({ userId }, stream),
-    options?.telegramConnected,
-  );
+  // If accessible surfaces are provided, use them; otherwise fall back to stream-based filtering
+  let where: Prisma.NotificationWhereInput;
+  
+  if (options?.accessibleSurfaces && options.accessibleSurfaces.length > 0) {
+    where = mergeAccessibleSurfacesFilter({ userId }, options.accessibleSurfaces);
+  } else {
+    where = mergeStreamFilter({ userId }, stream);
+  }
+  
+  where = mergeHideWelcomeWhenTelegramConnected(where, options?.telegramConnected);
+  
   return prisma.notification.findMany({
     where,
     orderBy: [
@@ -387,10 +448,16 @@ export async function countUnifiedNotifications(
   stream?: NotificationStreamFilter,
   options?: UserNotificationsQueryOptions,
 ): Promise<number> {
-  const where = mergeHideWelcomeWhenTelegramConnected(
-    mergeStreamFilter({ userId }, stream),
-    options?.telegramConnected,
-  );
+  let where: Prisma.NotificationWhereInput;
+  
+  if (options?.accessibleSurfaces && options.accessibleSurfaces.length > 0) {
+    where = mergeAccessibleSurfacesFilter({ userId }, options.accessibleSurfaces);
+  } else {
+    where = mergeStreamFilter({ userId }, stream);
+  }
+  
+  where = mergeHideWelcomeWhenTelegramConnected(where, options?.telegramConnected);
+  
   return prisma.notification.count({ where });
 }
 
@@ -401,10 +468,17 @@ export async function markUnseenNotificationsAsSeen(
   options?: UserNotificationsQueryOptions,
 ) {
   const now = new Date();
-  const where = mergeHideWelcomeWhenTelegramConnected(
-    mergeStreamFilter({ userId, seenAt: null }, stream),
-    options?.telegramConnected,
-  );
+  
+  let where: Prisma.NotificationWhereInput;
+  
+  if (options?.accessibleSurfaces && options.accessibleSurfaces.length > 0) {
+    where = mergeAccessibleSurfacesFilter({ userId, seenAt: null }, options.accessibleSurfaces);
+  } else {
+    where = mergeStreamFilter({ userId, seenAt: null }, stream);
+  }
+  
+  where = mergeHideWelcomeWhenTelegramConnected(where, options?.telegramConnected);
+  
   return prisma.notification.updateMany({
     where,
     data: { seenAt: now, isRead: true, readAt: now },
@@ -417,10 +491,16 @@ export async function getUnreadNotifications(
   options?: UserNotificationsQueryOptions,
   take?: number,
 ) {
-  const where = mergeHideWelcomeWhenTelegramConnected(
-    mergeStreamFilter({ userId, seenAt: null }, stream),
-    options?.telegramConnected,
-  );
+  let where: Prisma.NotificationWhereInput;
+  
+  if (options?.accessibleSurfaces && options.accessibleSurfaces.length > 0) {
+    where = mergeAccessibleSurfacesFilter({ userId, seenAt: null }, options.accessibleSurfaces);
+  } else {
+    where = mergeStreamFilter({ userId, seenAt: null }, stream);
+  }
+  
+  where = mergeHideWelcomeWhenTelegramConnected(where, options?.telegramConnected);
+  
   return prisma.notification.findMany({
     where,
     orderBy: notificationListOrderBy,
@@ -435,10 +515,16 @@ export async function getReadNotifications(
   stream?: NotificationStreamFilter,
   options?: UserNotificationsQueryOptions,
 ) {
-  const where = mergeHideWelcomeWhenTelegramConnected(
-    mergeStreamFilter({ userId, seenAt: { not: null } }, stream),
-    options?.telegramConnected,
-  );
+  let where: Prisma.NotificationWhereInput;
+  
+  if (options?.accessibleSurfaces && options.accessibleSurfaces.length > 0) {
+    where = mergeAccessibleSurfacesFilter({ userId, seenAt: { not: null } }, options.accessibleSurfaces);
+  } else {
+    where = mergeStreamFilter({ userId, seenAt: { not: null } }, stream);
+  }
+  
+  where = mergeHideWelcomeWhenTelegramConnected(where, options?.telegramConnected);
+  
   return prisma.notification.findMany({
     where,
     orderBy: notificationListOrderBy,
@@ -479,10 +565,16 @@ export async function getUnreadCount(
   stream?: NotificationStreamFilter,
   options?: UserNotificationsQueryOptions,
 ): Promise<number> {
-  const where = mergeHideWelcomeWhenTelegramConnected(
-    mergeStreamFilter({ userId, seenAt: null }, stream),
-    options?.telegramConnected,
-  );
+  let where: Prisma.NotificationWhereInput;
+  
+  if (options?.accessibleSurfaces && options.accessibleSurfaces.length > 0) {
+    where = mergeAccessibleSurfacesFilter({ userId, seenAt: null }, options.accessibleSurfaces);
+  } else {
+    where = mergeStreamFilter({ userId, seenAt: null }, stream);
+  }
+  
+  where = mergeHideWelcomeWhenTelegramConnected(where, options?.telegramConnected);
+  
   return prisma.notification.count({ where });
 }
 

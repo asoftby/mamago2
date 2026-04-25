@@ -308,11 +308,29 @@ function formatSignedTemperature(temp: number | null): string {
   return `${rounded > 0 ? "+" : ""}${rounded}°`;
 }
 
-export function resolveDayTime(now: Date): TimeOfDay {
-  const hour = now.getHours();
+export function resolveDayTime(now: Date, timezone?: string): TimeOfDay {
+  let hour: number;
+
+  if (timezone) {
+    // Get local hour in the given timezone using Intl
+    try {
+      const parts = new Intl.DateTimeFormat("en-US", {
+        timeZone: timezone,
+        hour: "numeric",
+        hour12: false,
+      }).formatToParts(now);
+      const hourPart = parts.find((p) => p.type === "hour");
+      hour = hourPart ? parseInt(hourPart.value, 10) : now.getHours();
+    } catch {
+      hour = now.getHours();
+    }
+  } else {
+    hour = now.getHours();
+  }
+
   if (hour >= 6 && hour <= 11) return "morning";
   if (hour >= 12 && hour <= 17) return "day";
-  if (hour >= 18 && hour <= 22) return "evening";
+  if (hour >= 18 && hour <= 21) return "evening";
   return "night";
 }
 

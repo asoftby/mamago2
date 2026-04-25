@@ -69,7 +69,7 @@ function TypographySpecimen() {
         <p className="text-xs text-muted-foreground font-sans mb-2">H1 — Article title</p>
         <h1
           className="text-3xl md:text-4xl lg:text-5xl font-semibold leading-tight tracking-tight text-foreground"
-          style={{ fontFamily: "var(--font-serif)" }}
+          style={{ fontFamily: "var(--font-literata)" }}
         >
           Как провести выходные с детьми в Минске
         </h1>
@@ -77,7 +77,7 @@ function TypographySpecimen() {
 
       {/* Subtitle */}
       <div className="mb-8 pb-6 border-b border-border/50">
-        <p className="text-xs text-muted-foreground font-sans mb-2">Subtitle / dek — Manrope</p>
+        <p className="text-xs text-muted-foreground font-sans mb-2">Subtitle / dek — NT Somic</p>
         <p className="text-lg md:text-xl text-muted-foreground leading-relaxed font-sans">
           От парков до мастер-классов — собрали лучшее для семейного уикенда
         </p>
@@ -85,7 +85,7 @@ function TypographySpecimen() {
 
       {/* Meta */}
       <div className="mb-8 pb-6 border-b border-border/50">
-        <p className="text-xs text-muted-foreground font-sans mb-2">Meta row — Manrope</p>
+        <p className="text-xs text-muted-foreground font-sans mb-2">Meta row — NT Somic</p>
         <div className="flex items-center gap-2 text-sm text-muted-foreground font-sans">
           <span className="text-primary font-medium uppercase tracking-wide text-xs">Идеи</span>
           <span className="opacity-30">·</span>
@@ -100,7 +100,7 @@ function TypographySpecimen() {
         <p className="text-xs text-muted-foreground font-sans mb-2">H2 — Section heading</p>
         <h2
           className="text-2xl md:text-3xl font-semibold leading-snug text-foreground"
-          style={{ fontFamily: "var(--font-serif)" }}
+          style={{ fontFamily: "var(--font-literata)" }}
         >
           Мастер-классы: руки в дело
         </h2>
@@ -111,7 +111,7 @@ function TypographySpecimen() {
         <p className="text-xs text-muted-foreground font-sans mb-2">H3 — Sub-section</p>
         <h3
           className="text-xl font-semibold leading-snug text-foreground"
-          style={{ fontFamily: "var(--font-serif)" }}
+          style={{ fontFamily: "var(--font-literata)" }}
         >
           Как добраться и что взять с собой
         </h3>
@@ -122,7 +122,7 @@ function TypographySpecimen() {
         <p className="text-xs text-muted-foreground font-sans mb-2">Body text — Literata 17–18px, lh 1.75</p>
         <p
           className="text-[1.0625rem] md:text-[1.125rem] leading-[1.75] md:leading-[1.8] text-foreground"
-          style={{ fontFamily: "var(--font-serif)" }}
+          style={{ fontFamily: "var(--font-literata)" }}
         >
           Минск — город, в котором всегда есть что открыть заново. Особенно если рядом дети, которым нужны впечатления, движение и немного волшебства. Мы собрали семь идей для насыщенных выходных.
         </p>
@@ -133,7 +133,7 @@ function TypographySpecimen() {
         <p className="text-xs text-muted-foreground font-sans mb-2">Blockquote — italic Literata</p>
         <blockquote
           className="border-l-[3px] border-primary pl-5 py-1 italic text-[1.0625rem] leading-[1.75] text-muted-foreground"
-          style={{ fontFamily: "var(--font-serif)" }}
+          style={{ fontFamily: "var(--font-literata)" }}
         >
           Лучшие воспоминания детства — это не вещи, а моменты. Дайте детям время, пространство и немного глины.
         </blockquote>
@@ -144,7 +144,7 @@ function TypographySpecimen() {
         <p className="text-xs text-muted-foreground font-sans mb-2">List — Literata</p>
         <ul
           className="list-disc pl-5 space-y-1.5 text-[1.0625rem] leading-[1.75] text-foreground"
-          style={{ fontFamily: "var(--font-serif)" }}
+          style={{ fontFamily: "var(--font-literata)" }}
         >
           <li>Работает ежедневно с 10:00 до 18:00</li>
           <li>Вход для детей до 5 лет — бесплатно</li>
@@ -157,7 +157,7 @@ function TypographySpecimen() {
         <p className="text-xs text-muted-foreground font-sans mb-2">Link — Literata</p>
         <p
           className="text-[1.0625rem] leading-[1.75] text-foreground"
-          style={{ fontFamily: "var(--font-serif)" }}
+          style={{ fontFamily: "var(--font-literata)" }}
         >
           Подробнее о маршруте читайте в нашем{" "}
           <a href="#" className="text-primary underline underline-offset-[3px] decoration-[1px] hover:decoration-2">
@@ -376,12 +376,12 @@ export function ArticlePublicationSection() {
         </h2>
         <p className="text-muted-foreground max-w-2xl">
           Visual source of truth for <code className="text-sm bg-muted px-1.5 py-0.5 rounded">/blog</code> pages.
-          Literata for long-form reading, Manrope for product cards and UI.
+          Literata for long-form reading, NT Somic for product cards and UI.
           All embedded blocks share a unified article card shell.
         </p>
         <div className="mt-3 flex flex-wrap gap-2 text-xs font-mono">
           <span className="bg-muted px-2 py-1 rounded">Literata — reading</span>
-          <span className="bg-muted px-2 py-1 rounded">Manrope — product UI</span>
+          <span className="bg-muted px-2 py-1 rounded">NT Somic — product UI</span>
           <span className="bg-muted px-2 py-1 rounded">max-w-2xl reading column</span>
           <span className="bg-muted px-2 py-1 rounded">article-body CSS class</span>
         </div>
@@ -392,7 +392,7 @@ export function ArticlePublicationSection() {
         <div>
           <h3 className="text-xl font-semibold mb-1">1. Typography System</h3>
           <p className="text-sm text-muted-foreground">
-            Literata for all reading content. Manrope for meta, subtitles, and product UI.
+            Literata for all reading content. NT Somic for meta, subtitles, and product UI.
           </p>
         </div>
         <TypographySpecimen />
@@ -403,7 +403,7 @@ export function ArticlePublicationSection() {
         <div>
           <h3 className="text-xl font-semibold mb-1">2. Article Embedded Card Shell</h3>
           <p className="text-sm text-muted-foreground">
-            One unified shell, four content variations. White surface, soft shadow, rounded-2xl, Manrope inside.
+            One unified shell, four content variations. White surface, soft shadow, rounded-2xl, NT Somic inside.
           </p>
         </div>
         <CardShellAnatomy />

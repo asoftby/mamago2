@@ -1,10 +1,15 @@
 import type { ActivityMock } from "@/mocks/activity.types";
 import { publicActivityPath } from "@/lib/business/eventPublicLink";
 import { formatRuShortDayMonth } from "@/lib/formatters/date";
-import { formatPrice, formatPriceFrom } from "@/lib/formatters/format-price";
+import { formatPriceFrom } from "@/lib/formatters/format-price";
 import { EVENT_PAGE_OVERRIDES } from "@/mocks/eventPageOverrides";
 import type { EventPageData } from "./eventPageTypes";
 import { mapActivityToDiscoveryIntent } from "./mapActivityToDiscoveryIntent";
+import {
+  getActivityFormatDetailLabel,
+  getActivityFormatLabel,
+} from "@/domain/activities/activity-format";
+import { ageFromPlusLabelFromBounds } from "@/lib/event/activityAgeBounds";
 
 function priceLabelFromMock(a: ActivityMock): string {
   if (a.priceMin === 0) return "Бесплатно";
@@ -20,14 +25,11 @@ function defaultSessions(a: ActivityMock): EventPageData["sessions"] {
 
 function defaultFactChips(a: ActivityMock): EventPageData["factChips"] {
   const chips: EventPageData["factChips"] = [];
-  if (a.ageFrom != null && a.ageTo != null) {
-    chips.push({ id: "age", label: `${a.ageFrom}–${a.ageTo} лет` });
+  if (a.format && a.format !== "OFFLINE") {
+    chips.push({ id: "format", label: getActivityFormatLabel(a.format) });
   }
   if (a.tags.includes("outdoor")) chips.push({ id: "out", label: "На улице" });
   else chips.push({ id: "in", label: "В помещении" });
-  if (a.type === "EVENT_FIXED") chips.push({ id: "fmt", label: "Событие" });
-  else if (a.type === "CLASS_SCHEDULE")
-    chips.push({ id: "fmt", label: "Занятие" });
   return chips.slice(0, 5);
 }
 
@@ -43,7 +45,7 @@ function defaultImportantFacts(a: ActivityMock): EventPageData["importantFacts"]
   rows.push({
     id: "fmt",
     label: "Формат",
-    value: a.badge ?? "Семейный досуг",
+    value: a.format ? getActivityFormatDetailLabel(a.format) : a.badge ?? "Семейный досуг",
   });
   if (a.dateStart) {
     rows.push({
@@ -150,6 +152,7 @@ export function buildEventPageData(
     slug: null,
     citySlug,
     discoveryIntent: mapActivityToDiscoveryIntent(activity),
+    ageFromBadge: o?.ageFromBadge ?? ageFromPlusLabelFromBounds(activity.ageFrom),
     categoryLabel: activity.badge,
     title: activity.title,
     subtitle:

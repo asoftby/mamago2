@@ -9,6 +9,7 @@ import { shouldShowTelegramPrompt } from "@/lib/user/shouldShowTelegramPrompt";
 import type { NotificationStreamFilter } from "@/server/services/notification.service";
 import { getTelegramLinkStatus } from "@/server/services/telegramLink.service";
 import {
+  getAccessibleSurfacesForUser,
   getUnreadCount,
   getWelcomeIsRead,
   markUnseenNotificationsAsSeen,
@@ -32,7 +33,19 @@ export async function POST(req: NextRequest) {
 
     const { searchParams } = new URL(req.url);
     const stream = parseStream(searchParams.get("stream"));
-    const queryOpts = { telegramConnected: telegramStatus.linked };
+    
+    // Get accessible surfaces for this user
+    // Note: business relation needs to be checked separately if needed
+    const accessibleSurfaces = getAccessibleSurfacesForUser({
+      id: user.id,
+      role: user.role,
+      business: null, // TODO: fetch business relation if needed
+    });
+    
+    const queryOpts = { 
+      telegramConnected: telegramStatus.linked,
+      accessibleSurfaces,
+    };
 
     const result = await markUnseenNotificationsAsSeen(user.id, stream, queryOpts);
 

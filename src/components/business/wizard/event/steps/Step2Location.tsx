@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { MapPinIcon, TruckIcon, ClockIcon, Loader2, Search } from "lucide-react";
+import { MapPinIcon, TruckIcon, ClockIcon, Loader2, Search, Sparkles } from "lucide-react";
 import type { EventFormData } from "../types";
 import { PlaceSearchAutocomplete } from "./location/PlaceSearchAutocomplete";
 import { QuickPlaceCreate } from "./location/QuickPlaceCreate";
@@ -15,6 +15,7 @@ interface Step2LocationProps {
   data: EventFormData;
   onChange: (updates: Partial<EventFormData>) => void;
   isEditable: boolean;
+  eventId?: string | null;
 }
 
 interface UserPlace {
@@ -34,11 +35,19 @@ interface UserPlace {
   metroDistanceM: number | null;
 }
 
-export function Step2Location({ data, onChange, isEditable }: Step2LocationProps) {
+type ImportLocationHint = {
+  venueName: string;
+  addressText: string;
+  cityName: string;
+};
+
+export function Step2Location({ data, onChange, isEditable, eventId }: Step2LocationProps) {
   const [userPlaces, setUserPlaces] = useState<UserPlace[]>([]);
   const [isLoadingPlaces, setIsLoadingPlaces] = useState(true);
   const [placesError, setPlacesError] = useState<string | null>(null);
   const [mobileConcreteSnapshot, setMobileConcreteSnapshot] = useState<Partial<EventFormData> | null>(null);
+  const [importHint, setImportHint] = useState<ImportLocationHint | null>(null);
+  const [isLoadingImportHint, setIsLoadingImportHint] = useState(false);
   
   // New state for quick place creation
   const [showQuickCreate, setShowQuickCreate] = useState(false);
@@ -153,6 +162,50 @@ export function Step2Location({ data, onChange, isEditable }: Step2LocationProps
   useEffect(() => {
     fetchUserPlaces();
   }, []);
+
+  useEffect(() => {
+    if (!eventId) return;
+    let isActive = true;
+    const controller = new AbortController();
+
+    async function loadLocationHint() {
+      setIsLoadingImportHint(true);
+      try {
+        const response = await fetch(`/api/business/events/${eventId}/location-source`, {
+          signal: controller.signal,
+        });
+        if (!response.ok) return;
+        const payload = (await response.json()) as Partial<ImportLocationHint>;
+        if (!isActive) return;
+
+        const venueName = typeof payload.venueName === "string" ? payload.venueName.trim() : "";
+        const addressText = typeof payload.addressText === "string" ? payload.addressText.trim() : "";
+        const cityName = typeof payload.cityName === "string" ? payload.cityName.trim() : "";
+
+        if (!venueName && !addressText && !cityName) {
+          setImportHint(null);
+          return;
+        }
+
+        setImportHint({
+          venueName,
+          addressText,
+          cityName,
+        });
+      } catch (error) {
+        if ((error as Error).name === "AbortError") return;
+        console.error("[Step2Location] Failed to load location import hint:", error);
+      } finally {
+        if (isActive) setIsLoadingImportHint(false);
+      }
+    }
+
+    void loadLocationHint();
+    return () => {
+      isActive = false;
+      controller.abort();
+    };
+  }, [eventId]);
 
   // Check if any concrete location is defined (for TBD restriction)
   const hasConcreteLocation = Boolean(
@@ -297,6 +350,35 @@ export function Step2Location({ data, onChange, isEditable }: Step2LocationProps
           <Search className="h-4 w-4" />
           Найти или создать место
         </Label>
+
+        {isLoadingImportHint && (
+          <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-800">
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            Ищем подсказку локации из источника парсинга...
+          </div>
+        )}
+
+        {importHint && (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+            <div className="flex items-start gap-2.5">
+              <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-amber-700" />
+              <div className="min-w-0">
+                <div className="text-[11px] font-semibold uppercase tracking-wide text-amber-700">
+                  Из источника парсинга
+                </div>
+                {importHint.venueName ? (
+                  <div className="mt-1 text-sm font-medium text-amber-950">{importHint.venueName}</div>
+                ) : null}
+                {importHint.addressText ? (
+                  <div className="mt-1 text-sm text-amber-900">{importHint.addressText}</div>
+                ) : null}
+                {importHint.cityName ? (
+                  <div className="mt-1 text-[12px] text-amber-700">{importHint.cityName}</div>
+                ) : null}
+              </div>
+            </div>
+          </div>
+        )}
         
         {!showQuickCreate ? (
           <>

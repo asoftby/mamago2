@@ -102,6 +102,12 @@ export function ConversionEventPageView({ data }: { data: EventPageData }) {
     });
   }, []);
 
+  const saveQuickdateScenario = useMemo(() => {
+    const base = { kind: "quickdate" as const, title: data.title };
+    if (availablePlanDates.length !== 1) return base;
+    return { ...base, eventPlanDateISO: availablePlanDates[0]! };
+  }, [availablePlanDates, data.title]);
+
   const loadSaveStatus = useCallback(async () => {
     try {
       const res = await fetch(`/api/save/status?activityId=${data.id}`);
@@ -464,7 +470,6 @@ export function ConversionEventPageView({ data }: { data: EventPageData }) {
             <EventRichDescription
               htmlContent={data.about.descriptionHtml || ""}
               plainTextSummary={data.about.summary}
-              collapsedHeight={120}
             />
           </div>
         </div>
@@ -545,7 +550,7 @@ export function ConversionEventPageView({ data }: { data: EventPageData }) {
         open={saveModalOpen}
         onOpenChange={setSaveModalOpen}
         isAuthenticated={isAuthenticated}
-        scenario={{ kind: "quickdate", title: data.title }}
+        scenario={saveQuickdateScenario}
         onPersist={handleSaveToPlanConfirm}
         isIdea={saveStatus.isIdea}
         inPlan={saveStatus.inPlan}

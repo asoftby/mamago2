@@ -22,7 +22,12 @@ import {
 export type SaveScenario =
   | { kind: "confirm"; title: string; dateLabel: string; timeLabel: string; dateISO: string; slotId?: string | null }
   | { kind: "timeslots"; title: string; dateLabel: string; dateISO: string; slots: { id: string; label: string }[] }
-  | { kind: "quickdate"; title: string };
+  | {
+      kind: "quickdate";
+      title: string;
+      /** Одна дата сеанса (страница события): «В план» = на эту дату или в идеи, без «сегодня/завтра». */
+      eventPlanDateISO?: string;
+    };
 
 export type SaveToPlanResult =
   | { action: "plan"; dateISO: string; timeSlotId?: string | null }
@@ -125,11 +130,37 @@ function CalendarView({ onBack, onSelect }: { onBack: () => void; onSelect: (iso
   );
 }
 
-interface QuickViewProps {
-  isIdea: boolean; inPlan: boolean; planDate: string | null; planStartsAt: string | null;
-  onPlan: (iso: string) => void; onIdea: () => void; onRemoveIdea: () => void; onSwitchCalendar: () => void;
+function formatEventSessionPlanSubtitle(iso: string): string {
+  return new Date(`${iso}T12:00:00`).toLocaleDateString("ru-RU", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  });
 }
-function QuickView({ isIdea, inPlan, planDate, onPlan, onIdea, onRemoveIdea, onSwitchCalendar }: QuickViewProps) {
+
+interface QuickViewProps {
+  isIdea: boolean;
+  inPlan: boolean;
+  planDate: string | null;
+  planStartsAt: string | null;
+  /** YYYY-MM-DD единственного сеанса — только «на дату проведения», без сегодня/завтра. */
+  eventPlanDateISO?: string | null;
+  onPlan: (iso: string) => void;
+  onIdea: () => void;
+  onRemoveIdea: () => void;
+  onSwitchCalendar: () => void;
+}
+function QuickView({
+  isIdea,
+  inPlan,
+  planDate,
+  planStartsAt: _planStartsAt,
+  eventPlanDateISO,
+  onPlan,
+  onIdea,
+  onRemoveIdea,
+  onSwitchCalendar,
+}: QuickViewProps) {
   const todayISO = getLocalDateKey();
   const tomorrowISO = addDaysLocal(todayISO, 1);
   return (
@@ -145,6 +176,13 @@ function QuickView({ isIdea, inPlan, planDate, onPlan, onIdea, onRemoveIdea, onS
               { label: "Изменить дату", icon: <Pencil className="w-3 h-3" />, onClick: onSwitchCalendar },
               { label: "Открыть план", icon: <ExternalLink className="w-3 h-3" />, onClick: () => { window.location.href = "/me/plan"; } },
             ]}
+          />
+        ) : eventPlanDateISO ? (
+          <ActionRow
+            icon={<CalendarCheck className="w-5 h-5" />}
+            title="На дату проведения"
+            subtitle={`Добавить в план на ${formatEventSessionPlanSubtitle(eventPlanDateISO)}`}
+            onClick={() => onPlan(eventPlanDateISO)}
           />
         ) : (
           <>
@@ -226,8 +264,24 @@ export function SaveToPlanPickerBody({
   };
 
   const isQuickdate = scenario.kind === "quickdate";
-  const headerTitle = view === "calendar" ? "Выберите дату" : isQuickdate ? "Куда сохранить активность?" : scenario.kind === "timeslots" ? "Выберите время" : "Добавить в план?";
-  const headerSubtitle = view === "calendar" ? "Активность будет добавлена в ваш план" : isQuickdate ? "Выберите дату для плана или сохраните в идеи" : null;
+  const eventPlanDateISO =
+    scenario.kind === "quickdate" ? scenario.eventPlanDateISO ?? null : null;
+  const headerTitle =
+    view === "calendar"
+      ? "Выберите дату"
+      : isQuickdate
+        ? "Куда сохранить активность?"
+        : scenario.kind === "timeslots"
+          ? "Выберите время"
+          : "Добавить в план?";
+  const headerSubtitle =
+    view === "calendar"
+      ? "Активность будет добавлена в ваш план"
+      : isQuickdate
+        ? eventPlanDateISO
+          ? "На дату проведения или сохраните в идеи"
+          : "Выберите дату для плана или сохраните в идеи"
+        : null;
 
   return (
     <div className="flex flex-col">
@@ -239,8 +293,17 @@ export function SaveToPlanPickerBody({
         view === "calendar" ? (
           <CalendarView onBack={() => setView("quick")} onSelect={(iso) => { setView("quick"); handlePlan(iso); }} />
         ) : (
-          <QuickView isIdea={isIdea} inPlan={inPlan} planDate={planDate} planStartsAt={planStartsAt}
-            onPlan={handlePlan} onIdea={handleIdea} onRemoveIdea={handleRemoveIdea} onSwitchCalendar={() => setView("calendar")} />
+          <QuickView
+            isIdea={isIdea}
+            inPlan={inPlan}
+            planDate={planDate}
+            planStartsAt={planStartsAt}
+            eventPlanDateISO={eventPlanDateISO}
+            onPlan={handlePlan}
+            onIdea={handleIdea}
+            onRemoveIdea={handleRemoveIdea}
+            onSwitchCalendar={() => setView("calendar")}
+          />
         )
       ) : (
         <>

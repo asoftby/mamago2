@@ -15,6 +15,12 @@ export type SystemNotificationCardProps = {
   actionLabel?: string;
   /** Обработчик клика по кнопке действия */
   onAction?: () => void;
+  /** Явно отключить primary action */
+  actionDisabled?: boolean;
+  /** Вторичное действие (текстовая ссылка рядом с primary action) */
+  secondaryActionLabel?: string;
+  /** Обработчик вторичного действия */
+  onSecondaryAction?: () => void;
   /** Обработчик закрытия (крестик) */
   onDismiss?: () => void;
   /** Показывать ли крестик */
@@ -66,6 +72,9 @@ export function SystemNotificationCard({
   description,
   actionLabel,
   onAction,
+  actionDisabled = false,
+  secondaryActionLabel,
+  onSecondaryAction,
   onDismiss,
   dismissible = false,
   loading = false,
@@ -118,27 +127,37 @@ export function SystemNotificationCard({
         actionCompact ? (
           <div className={cn("flex gap-3", dismissible && "pr-7")}>
             <span className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
-            <div className="flex min-w-0 flex-1 justify-start">
+            <div className="flex min-w-0 flex-1 items-center justify-start gap-3">
               <Button
                 type="button"
                 size="xs"
-                disabled={loading}
+                disabled={loading || actionDisabled}
                 className="w-auto shrink-0 bg-[#EF8759] text-white hover:bg-[#e07040]"
                 onClick={onAction}
               >
-                {loading ? "Загрузка…" : actionLabel}
+                {loading ? "Отправляем" : actionLabel}
               </Button>
+              {secondaryActionLabel && onSecondaryAction ? (
+                <button
+                  type="button"
+                  onClick={onSecondaryAction}
+                  disabled={loading}
+                  className="text-xs font-medium text-neutral-700 underline decoration-neutral-400 underline-offset-2 transition-colors hover:text-neutral-900 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {secondaryActionLabel}
+                </button>
+              ) : null}
             </div>
           </div>
         ) : (
           <Button
             type="button"
             size="sm"
-            disabled={loading}
+            disabled={loading || actionDisabled}
             className="w-full bg-[#EF8759] text-white hover:bg-[#e07040]"
             onClick={onAction}
           >
-            {loading ? "Загрузка…" : actionLabel}
+            {loading ? "Отправляем" : actionLabel}
           </Button>
         )
       )}

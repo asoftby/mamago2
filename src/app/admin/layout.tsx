@@ -60,10 +60,11 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 font-sans antialiased">
       {/* Global Header */}
       <AdminHeader
         userEmail={user.email || undefined}
+        userDisplayName={user.displayName}
         moderationCounts={moderationCounts}
         b2bPendingVerificationCount={b2bPendingVerificationCount}
       />

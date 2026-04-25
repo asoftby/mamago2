@@ -25,6 +25,14 @@ function sortByEngagementThenStable(list: ActivityMock[]): ActivityMock[] {
   });
 }
 
+function activityMatchesFormat(
+  activity: ActivityMock,
+  format: "OFFLINE" | "ONLINE" | "HYBRID" | null,
+): boolean {
+  if (!format) return true;
+  return (activity.format ?? "OFFLINE") === format;
+}
+
 function buildAgeHintBadge(
   a: ActivityMock,
   ranges: Array<{ min: number; max: number }>,
@@ -59,9 +67,13 @@ export function partitionDiscoveryFeed(
   filters: DiscoveryFilters,
   activities: ActivityMock[],
 ): DiscoveryFeedPartition {
+  const formatFiltered = activities.filter((activity) =>
+    activityMatchesFormat(activity, filters.format),
+  );
+
   if (!filters.age.length) {
     return {
-      primary: sortByEngagementThenStable(activities),
+      primary: sortByEngagementThenStable(formatFiltered),
       secondary: [],
       secondaryHeading: null,
     };
@@ -72,7 +84,7 @@ export function partitionDiscoveryFeed(
     .filter((r): r is { min: number; max: number } => r !== null);
   if (!ranges.length) {
     return {
-      primary: sortByEngagementThenStable(activities),
+      primary: sortByEngagementThenStable(formatFiltered),
       secondary: [],
       secondaryHeading: null,
     };
@@ -81,14 +93,14 @@ export function partitionDiscoveryFeed(
   const matched: ActivityMock[] = [];
   const mismatched: ActivityMock[] = [];
 
-  for (const a of activities) {
+  for (const a of formatFiltered) {
     if (activityOverlapsAgeRanges(a, ranges)) matched.push(a);
     else mismatched.push(a);
   }
 
   if (matched.length === 0) {
     return {
-      primary: sortByEngagementThenStable(activities),
+      primary: sortByEngagementThenStable(formatFiltered),
       secondary: [],
       secondaryHeading: null,
     };

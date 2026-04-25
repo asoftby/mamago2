@@ -1,17 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { User } from "lucide-react";
-import type { AccountMenuUser } from "@/components/site/header/AccountMenuBody";
+import type { AccountMenuUser } from "@/lib/account/types";
 import { DefaultAuthModal } from "@/components/auth/DefaultAuthModal";
 import { ProfileDropdown } from "@/components/site/header/ProfileDropdown";
 import { useAccountMode } from "@/contexts/AccountModeContext";
 import { useFamilyPersona } from "@/contexts/FamilyPersonaContext";
 import { notifyAuthStateChanged } from "@/lib/auth/client";
 import { cn } from "@/lib/utils";
-import { navigateToSurface } from "@/lib/routing/clientNavigation";
 import { resolveHasBusinessProfile } from "@/lib/account/isBusinessAccountRole";
+import { useProfileDropdownHandlers } from "@/lib/account/useProfileDropdownHandlers";
 import {
   getNavIconButtonClassName,
   type NavIconChrome,
@@ -21,9 +20,7 @@ export type MobileProfileSheetProps = {
   isProfileActive: boolean;
   profileBadgeCount?: number;
   profileAvatarUrl?: string | null;
-  /** Совпадает с размером иконок в bottom bar (5 пунктов) */
   compact?: boolean;
-  /** Тёмный стеклянный бар (MobileBottomNav) */
   chrome?: NavIconChrome;
 };
 
@@ -34,9 +31,7 @@ export function MobileProfileSheet({
   compact = false,
   chrome = "light",
 }: MobileProfileSheetProps) {
-  const router = useRouter();
-  const { mode, goToBusinessAccount, goToPersonalAccount, hydrated } =
-    useAccountMode();
+  const { mode, hydrated } = useAccountMode();
   const family = useFamilyPersona();
   const user: AccountMenuUser | null | undefined = family
     ? family.loading
@@ -48,29 +43,14 @@ export function MobileProfileSheet({
   const [guestAuthOpen, setGuestAuthOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
 
-  const handleLogout = async () => {
-    setLoggingOut(true);
-    try {
-      const res = await fetch("/api/auth/logout", {
-        method: "POST",
-        credentials: "same-origin",
-      });
-      if (res.ok || res.redirected) {
-        setMenuOpen(false);
-        notifyAuthStateChanged();
-        navigateToSurface(router, {
-          targetSurface: "public",
-          targetPath: "/",
-          replace: true,
-        });
-      }
-    } finally {
-      setLoggingOut(false);
-    }
-  };
+  const handlers = useProfileDropdownHandlers({
+    user,
+    loggingOut,
+    setLoggingOut,
+    closeMenu: () => setMenuOpen(false),
+  });
 
-  const resolvedProfileAvatar =
-    profileAvatarUrl ?? user?.avatarUrl ?? undefined;
+  const resolvedProfileAvatar = profileAvatarUrl ?? user?.avatarUrl ?? undefined;
   const showBadge = profileBadgeCount > 0;
   const size = compact ? "compact" : "default";
 
@@ -201,7 +181,7 @@ export function MobileProfileSheet({
       trigger={
         <button
           type="button"
-          aria-label="Профиль"
+          aria-label="Мой аккаунт"
           aria-expanded={menuOpen}
           aria-haspopup="dialog"
           className={triggerClass}
@@ -220,114 +200,10 @@ export function MobileProfileSheet({
           )}
         </button>
       }
-      loggingOut={loggingOut}
-      onLogout={handleLogout}
       onNavigate={() => setMenuOpen(false)}
-      onGoToSettings={() =>
-        mode === "business"
-          ? navigateToSurface(router, {
-              targetSurface: "business",
-              targetPath: "/settings",
-            })
-          : navigateToSurface(router, {
-              targetSurface: "public",
-              targetPath: "/me/settings",
-            })
-      }
-      onSwitchMode={(next) => {
-        if (next === "business") {
-          goToBusinessAccount(isBusinessPartner);
-          return;
-        }
-        goToPersonalAccount();
-      }}
-      onGoToHome={() =>
-        navigateToSurface(router, {
-          targetSurface: "public",
-          targetPath: "/",
-        })
-      }
-      onGoToPersonalProfile={() =>
-        navigateToSurface(router, {
-          targetSurface: "public",
-          targetPath: "/me",
-        })
-      }
-      onGoToPersonalIdeas={() =>
-        navigateToSurface(router, {
-          targetSurface: "public",
-          targetPath: "/me/ideas",
-        })
-      }
-      onGoToAdminAccount={() =>
-        navigateToSurface(router, {
-          targetSurface: "admin",
-          targetPath: "/",
-        })
-      }
-      onGoToBusinessAccount={() => goToBusinessAccount(isBusinessPartner)}
-      onGoToPersonalPlan={() =>
-        navigateToSurface(router, {
-          targetSurface: "public",
-          targetPath: "/me/plan",
-        })
-      }
-      onGoToPersonalNotifications={() =>
-        navigateToSurface(router, {
-          targetSurface: "public",
-          targetPath: "/settings/notifications",
-        })
-      }
-      onGoToBusinessDashboard={() =>
-        navigateToSurface(router, {
-          targetSurface: "business",
-          targetPath: "/dashboard",
-        })
-      }
-      onGoToBusinessRoot={() =>
-        navigateToSurface(router, {
-          targetSurface: "business",
-          targetPath: "/",
-        })
-      }
-      onGoToBusinessPublications={() =>
-        navigateToSurface(router, {
-          targetSurface: "business",
-          targetPath: "/events",
-        })
-      }
-      onGoToBusinessBookings={() =>
-        navigateToSurface(router, {
-          targetSurface: "business",
-          targetPath: "/inbox",
-        })
-      }
-      onGoToBusinessClients={() =>
-        navigateToSurface(router, {
-          targetSurface: "business",
-          targetPath: "/team",
-        })
-      }
-      onGoToBusinessAnalytics={() =>
-        navigateToSurface(router, {
-          targetSurface: "business",
-          targetPath: "/dashboard",
-        })
-      }
-      onGoToBusinessPromotion={() =>
-        navigateToSurface(router, {
-          targetSurface: "business",
-          targetPath: "/promotion",
-        })
-      }
-      onGoToBusinessBilling={() =>
-        navigateToSurface(router, {
-          targetSurface: "business",
-          targetPath: "/billing/transactions",
-        })
-      }
       hasBusinessProfile={isBusinessPartner}
       businessBalanceBYN={user.businessBalanceBYN}
+      {...handlers}
     />
   );
 }

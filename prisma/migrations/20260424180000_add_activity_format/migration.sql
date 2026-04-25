@@ -1,0 +1,4 @@
+CREATE TYPE "ActivityFormat" AS ENUM ('OFFLINE', 'ONLINE', 'HYBRID');
+
+ALTER TABLE "Activity"
+ADD COLUMN "format" "ActivityFormat" NOT NULL DEFAULT 'OFFLINE';

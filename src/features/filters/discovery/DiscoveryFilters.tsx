@@ -13,6 +13,7 @@ import { CardMultiSelect } from "@/components/ui/card-multiselect";
 import { X, SlidersHorizontal } from "lucide-react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import type { WhenValue } from "@/components/ui/when-select";
+import { ACTIVITY_FORMAT_OPTIONS } from "@/domain/activities/activity-format";
 
 // Define Option type locally or import
 type Option = { value: string; label: string };
@@ -55,6 +56,10 @@ export function DiscoveryFilters({
   const ageOptions = ageOptionsProp || canonicalAgeOptions;
   const metroOptions = metroOptionsProp || apiOptions.metros.map(o => ({ value: o.value, label: o.label }));
   const districtOptions = districtOptionsProp || apiOptions.districts.map(o => ({ value: o.value, label: o.label }));
+  const formatOptions = ACTIVITY_FORMAT_OPTIONS.map((option) => ({
+    value: option.value,
+    label: option.label,
+  }));
   
   // Use forceUIMode if present, otherwise use media query (only after mount)
   const isMobile = forceUIMode 
@@ -85,7 +90,7 @@ export function DiscoveryFilters({
     
     // Call onChange when any filter value changes
     onChange?.();
-  }, [applied.dateFrom, applied.dateTo, applied.whenPreset, applied.age, applied.metro, applied.district, onChange]);
+  }, [applied.dateFrom, applied.dateTo, applied.whenPreset, applied.age, applied.format, applied.metro, applied.district, onChange]);
 
   // --- Mobile Pill Label & Value Computation ---
   const MONTHS_RU = ["янв.", "фев.", "мар.", "апр.", "май", "июн.", "июл.", "авг.", "сен.", "окт.", "ноя.", "дек."];
@@ -141,8 +146,9 @@ export function DiscoveryFilters({
   const ageActive = (applied.age?.length ?? 0) > 0;
   const metroActive = !!applied.metro;
   const districtActive = !!applied.district;
+  const formatActive = !!applied.format;
   
-  const otherCategoriesActive = whenActive || metroActive || districtActive;
+  const otherCategoriesActive = whenActive || metroActive || districtActive || formatActive;
   
   const buildAgeLabel = (): string | null => {
     if (applied.age.length === 0) return null;
@@ -185,11 +191,13 @@ export function DiscoveryFilters({
   const ageLabel = buildAgeLabel();
   const metroLabel = resolveOptionLabel(metroOptions, applied.metro);
   const districtLabel = resolveOptionLabel(districtOptions, applied.district);
+  const formatLabel = resolveOptionLabel(formatOptions, applied.format);
   
   // Build ordered list of active categories (stable priority)
   const cats = [
     whenLabel ? { key: "when", label: whenLabel } : null,
     ageLabel ? { key: "age", label: ageLabel } : null,
+    formatLabel ? { key: "format", label: formatLabel } : null,
     metroLabel ? { key: "metro", label: metroLabel } : null,
     districtLabel ? { key: "district", label: districtLabel } : null,
   ].filter((c): c is { key: string; label: string } => c !== null);
@@ -245,6 +253,7 @@ export function DiscoveryFilters({
     
     // Age
     if (nextApplied.age.length > 0) params.set("age", nextApplied.age.join(",")); else params.delete("age");
+    if (nextApplied.format) params.set("format", nextApplied.format.toLowerCase()); else params.delete("format");
     
     // Metro (now single value)
     if (nextApplied.metro) params.set("metro", nextApplied.metro); else params.delete("metro");
@@ -294,6 +303,13 @@ export function DiscoveryFilters({
     updateUrlImmediately({ metro: value });
   };
 
+  const handleFormatChange = (value: string | null) => {
+    updateUrlImmediately({
+      format: (value as DiscoveryFiltersType["format"]) ?? null,
+      ...(value === "ONLINE" ? { nearby: false } : {}),
+    });
+  };
+
   const handleDistrictChange = (value: string | null) => {
     updateUrlImmediately({ district: value });
   };
@@ -321,6 +337,7 @@ export function DiscoveryFilters({
              dateFrom: applied.dateFrom,
              dateTo: applied.dateTo,
              whenPreset: applied.whenPreset,
+             format: applied.format,
           }}
           draft={applied}
           setDraft={setDraft}
@@ -331,6 +348,7 @@ export function DiscoveryFilters({
           ageOptions={ageOptions}
           metroOptions={metroOptions}
           districtOptions={districtOptions}
+          formatOptions={formatOptions}
         />
       </div>
     );
@@ -374,6 +392,17 @@ export function DiscoveryFilters({
         applyMode="manual"
         closeOnApply={true}
         optionsLayout="masonry"
+      />
+
+      <CardSelect
+        label="Формат"
+        options={formatOptions}
+        value={applied.format}
+        onChange={handleFormatChange}
+        allowClear
+        className={desktopTriggerClass}
+        uiMode="desktop"
+        variant="card"
       />
 
       {/* Metro Select (SINGLE) - using default trigger (card variant matches FilterFieldPill) */}

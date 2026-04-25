@@ -1,7 +1,7 @@
 // Event Wizard Data Mappers
 
 import type { EventFormData } from "./types";
-import type { Activity } from "@prisma/client";
+import type { Activity, ActivityFormat } from "@prisma/client";
 import type { Prisma } from "@prisma/client";
 import { getDefaultFormData } from "./defaults";
 import {
@@ -17,6 +17,7 @@ import { computeEventShortDesc } from "@/lib/business/eventShortDesc";
 import { detectAgeBuckets } from "@/lib/age/ageMapping";
 import { sortAgeKeys } from "@/lib/config/ages";
 import type { EventOrganizerInput } from "@/lib/business/eventOrganizer";
+import { DEFAULT_ACTIVITY_FORMAT, normalizeActivityFormat } from "@/domain/activities/activity-format";
 
 export type ActivityWithRelations = Activity & {
   id: string;
@@ -70,6 +71,7 @@ export function mapEventToFormData(event: ActivityWithRelations): EventFormData 
 
   // Step 1: Basics
   formData.title = event.title || "";
+  formData.format = normalizeActivityFormat(event.format, DEFAULT_ACTIVITY_FORMAT);
   formData.ageTags = Array.isArray(event.ageTags) ? event.ageTags : [];
 
   const scheduleJson = (event.scheduleJson || {}) as Record<string, unknown>;
@@ -464,6 +466,7 @@ type EventPayload = {
   shortDesc: string;
   description: string;
   type: "EVENT";
+  format: ActivityFormat;
   ageTags: string[];
   scheduleMode: "MULTI_DATE";
   eventCategoryId?: string;
@@ -547,6 +550,7 @@ export function buildEventPayload(data: EventFormData): EventPayload {
     description: data.fullDescription,
 
     type: "EVENT",
+    format: normalizeActivityFormat(data.format, DEFAULT_ACTIVITY_FORMAT),
 
     ageTags: data.ageTags,
 
@@ -693,6 +697,7 @@ export function buildEventPayload(data: EventFormData): EventPayload {
 type EventChanges = {
   title?: string;
   description?: string;
+  format?: ActivityFormat;
   ageTags?: string[];
   coverImageId?: string | null;
   galleryMediaIds?: string[];
@@ -717,6 +722,10 @@ export function extractChanges(current: EventFormData, original: EventFormData):
 
   if (current.fullDescription !== original.fullDescription) {
     changes.description = current.fullDescription;
+  }
+
+  if (current.format !== original.format) {
+    changes.format = current.format;
   }
 
   if (JSON.stringify(current.ageTags) !== JSON.stringify(original.ageTags)) {

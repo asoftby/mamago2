@@ -9,12 +9,12 @@ import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { CreatePublicationQuickMenu } from "@/components/shared/CreatePublicationQuickMenu";
 import { NotificationsDropdown } from "@/components/site/header/NotificationsDropdown";
 import { ProfileDropdown } from "@/components/site/header/ProfileDropdown";
-import type { AccountMenuUser } from "@/components/site/header/AccountMenuBody";
+import type { AccountMenuUser } from "@/lib/account/types";
 import { HEADER_CHROME_ICON_BUTTON_CLASS } from "@/components/site/header/headerIconButtonClass";
 import { useAccountMode } from "@/contexts/AccountModeContext";
 import { cn } from "@/lib/utils";
-import { navigateToSurface } from "@/lib/routing/clientNavigation";
 import { resolveHasBusinessProfile } from "@/lib/account/isBusinessAccountRole";
+import { useProfileDropdownHandlers } from "@/lib/account/useProfileDropdownHandlers";
 import { BusinessSidebar } from "./BusinessSidebar";
 
 function userInitials(email: string): string {
@@ -36,43 +36,24 @@ interface BusinessHeaderProps {
 export function BusinessHeader({ user }: BusinessHeaderProps) {
   const router = useRouter();
   const narrow = useNarrowViewport();
-  const { mode, goToBusinessAccount, goToPersonalAccount, hydrated } =
-    useAccountMode();
+  const { mode, hydrated } = useAccountMode();
   const [menuOpen, setMenuOpen] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
 
-  const handleLogout = async () => {
-    setLoggingOut(true);
-    try {
-      const res = await fetch("/api/auth/logout", {
-        method: "POST",
-        credentials: "same-origin",
-      });
-      if (res.ok || res.redirected) {
-        setMenuOpen(false);
-        navigateToSurface(router, {
-          targetSurface: "public",
-          targetPath: "/",
-          replace: true,
-        });
-      }
-    } finally {
-      setLoggingOut(false);
-    }
-  };
+  const handlers = useProfileDropdownHandlers({
+    user,
+    loggingOut,
+    setLoggingOut,
+    closeMenu: () => setMenuOpen(false),
+  });
 
   const initials = userInitials(user.email);
   const isBusinessPartner = resolveHasBusinessProfile({
     role: user.role,
     hasApprovedBusinessProfile: user.hasApprovedBusinessProfile,
   });
-  const notificationContext =
-    !hydrated
-      ? "business"
-      : mode === "personal"
-        ? "user"
-        : "business";
+  const notificationContext = !hydrated ? "business" : mode === "personal" ? "user" : "business";
 
   const trigger = (
     <Button
@@ -126,111 +107,10 @@ export function BusinessHeader({ user }: BusinessHeaderProps) {
               onOpenChange={setMenuOpen}
               narrow={narrow}
               trigger={trigger}
-              loggingOut={loggingOut}
-              onLogout={handleLogout}
               onNavigate={() => setMenuOpen(false)}
-              onGoToSettings={() =>
-                navigateToSurface(router, {
-                  targetSurface: "business",
-                  targetPath: "/settings",
-                })
-              }
-              onSwitchMode={(next) => {
-                if (next === "business") {
-                  goToBusinessAccount(isBusinessPartner);
-                  return;
-                }
-                goToPersonalAccount();
-              }}
-              onGoToHome={() =>
-                navigateToSurface(router, {
-                  targetSurface: "public",
-                  targetPath: "/",
-                })
-              }
-              onGoToPersonalProfile={() =>
-                navigateToSurface(router, {
-                  targetSurface: "public",
-                  targetPath: "/me",
-                })
-              }
-              onGoToPersonalIdeas={() =>
-                navigateToSurface(router, {
-                  targetSurface: "public",
-                  targetPath: "/me/ideas",
-                })
-              }
-              onGoToAdminAccount={() =>
-                navigateToSurface(router, {
-                  targetSurface: "admin",
-                  targetPath: "/",
-                })
-              }
-              onGoToBusinessAccount={() =>
-                goToBusinessAccount(isBusinessPartner)
-              }
-              onGoToPersonalPlan={() =>
-                navigateToSurface(router, {
-                  targetSurface: "public",
-                  targetPath: "/me/plan",
-                })
-              }
-              onGoToPersonalNotifications={() =>
-                navigateToSurface(router, {
-                  targetSurface: "public",
-                  targetPath: "/settings/notifications",
-                })
-              }
-              onGoToBusinessDashboard={() =>
-                navigateToSurface(router, {
-                  targetSurface: "business",
-                  targetPath: "/dashboard",
-                })
-              }
-              onGoToBusinessRoot={() =>
-                navigateToSurface(router, {
-                  targetSurface: "business",
-                  targetPath: "/",
-                })
-              }
-              onGoToBusinessPublications={() =>
-                navigateToSurface(router, {
-                  targetSurface: "business",
-                  targetPath: "/events",
-                })
-              }
-              onGoToBusinessBookings={() =>
-                navigateToSurface(router, {
-                  targetSurface: "business",
-                  targetPath: "/inbox",
-                })
-              }
-              onGoToBusinessClients={() =>
-                navigateToSurface(router, {
-                  targetSurface: "business",
-                  targetPath: "/team",
-                })
-              }
-              onGoToBusinessAnalytics={() =>
-                navigateToSurface(router, {
-                  targetSurface: "business",
-                  targetPath: "/dashboard",
-                })
-              }
-              onGoToBusinessPromotion={() =>
-                navigateToSurface(router, {
-                  targetSurface: "business",
-                  targetPath: "/promotion",
-                })
-              }
-              onGoToBusinessBilling={() =>
-                navigateToSurface(router, {
-                  targetSurface: "business",
-                  targetPath: "/billing/transactions",
-                })
-              }
               hasBusinessProfile={isBusinessPartner}
               businessBalanceBYN={user.businessBalanceBYN}
+              {...handlers}
             />
           </div>
         </div>

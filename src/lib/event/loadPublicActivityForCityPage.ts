@@ -100,6 +100,7 @@ export async function loadPublicActivityForCityPage(
     title: activity.title,
     shortDesc: activity.shortDesc,
     description: activity.description,
+    format: activity.format,
     ageTags: activity.ageTags,
     priceText: activity.priceText,
     priceFrom: activity.priceFrom,

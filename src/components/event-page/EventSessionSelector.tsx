@@ -16,10 +16,13 @@ export function EventSessionSelector({
   onSelect: (id: string) => void;
   className?: string;
 }) {
+  const titleOneOrUnknown = "Дата и время проведения";
+  const titleMany = "Даты и время проведения события";
+
   if (sessions.length === 0) {
     return (
       <Section
-        title="Дата и время"
+        title={titleOneOrUnknown}
         className={cn("py-8 md:py-10", className)}
       >
         <p className="rounded-2xl border border-dashed border-border/80 bg-muted/20 px-4 py-6 text-center text-sm text-muted-foreground">
@@ -32,7 +35,7 @@ export function EventSessionSelector({
   if (sessions.length === 1) {
     const s = sessions[0];
     return (
-      <Section title="Дата и время" className={cn("py-8 md:py-10", className)}>
+      <Section title={titleOneOrUnknown} className={cn("py-8 md:py-10", className)}>
         <div className="rounded-2xl border border-border/60 bg-card/60 px-5 py-4 shadow-sm">
           <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
             Сеанс
@@ -47,7 +50,7 @@ export function EventSessionSelector({
 
   return (
     <Section
-      title="Выберите время"
+      title={titleMany}
       subtitle="Слот влияет на напоминания и оформление в плане"
       className={cn("py-8 md:py-10", className)}
     >
