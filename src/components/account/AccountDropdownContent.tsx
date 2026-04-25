@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Building2, Check, LogOut, UserRound } from "lucide-react";
+import { Building2, Check, LogOut, Shield, UserRound } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   accountDropdownIconClass,
@@ -20,15 +20,17 @@ function RowIcon({ Icon }: { Icon: AccountMenuRow["icon"] }) {
 function MenuRow({
   row,
   onNavigate,
+  rowClassName,
 }: {
   row: AccountMenuRow;
   onNavigate?: () => void;
+  rowClassName?: string;
 }) {
   if (row.type === "link") {
     const rowClass =
       row.variant === "accent" ? accountDropdownRowAccent : accountDropdownRowDefault;
     return (
-      <Link href={row.href} className={rowClass} onClick={onNavigate}>
+      <Link href={row.href} className={cn(rowClass, rowClassName)} onClick={onNavigate}>
         <RowIcon Icon={row.icon} />
         {row.label}
       </Link>
@@ -39,7 +41,7 @@ function MenuRow({
   return (
     <button
       type="button"
-      className={rowClass}
+      className={cn(rowClass, rowClassName)}
       onClick={() => {
         row.onClick();
         onNavigate?.();
@@ -66,6 +68,14 @@ export type AccountDropdownContentProps = {
     actionLabel: string;
     onAction: () => void;
   };
+  /**
+   * Админ-хост: тот же визуальный переключатель, что у роли ADMIN на публичном сайте
+   * (`rounded-xl bg-primary/10` + «Личный аккаунт» / «Админ-панель»).
+   */
+  adminPersonalSwitcher?: {
+    onGoPersonal: () => void;
+    onGoAdmin: () => void;
+  };
   /** Для logoutMode `fetch` (по умолчанию) */
   onLogout?: () => void | Promise<void>;
   /** form POST на /api/auth/logout (админка) — onLogout не используется */
@@ -90,6 +100,7 @@ export function AccountDropdownContent({
   businessBalanceBYN,
   onTopUpBalance,
   ctaBlock,
+  adminPersonalSwitcher,
   onLogout,
   logoutMode = "fetch",
   loggingOut,
@@ -107,6 +118,11 @@ export function AccountDropdownContent({
   const contextItemsWithoutAdmin = contextItems?.filter(
     (row) => !(row.key === "admin" && row.type === "button"),
   );
+  /** Без переключателя ролей (админка): контекст — в той же полосе, что у /me под шапкой */
+  const preNavContextItems =
+    !hasRoleSwitcher && contextItemsWithoutAdmin && contextItemsWithoutAdmin.length > 0
+      ? contextItemsWithoutAdmin
+      : null;
 
   return (
     <div className="flex flex-col bg-white">
@@ -130,7 +146,14 @@ export function AccountDropdownContent({
               className="h-10 w-10 shrink-0 rounded-full object-cover ring-1 ring-black/[0.06]"
             />
           ) : (
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
+            <div
+              className={cn(
+                "flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-semibold",
+                adminPersonalSwitcher
+                  ? "bg-gray-100 text-gray-700"
+                  : "bg-primary/10 text-primary",
+              )}
+            >
               {header.displayName.charAt(0).toUpperCase()}
             </div>
           )}
@@ -153,9 +176,49 @@ export function AccountDropdownContent({
         </div>
       </div>
 
+      {adminPersonalSwitcher ? (
+        <div className="border-b border-gray-200 p-2">
+          <div className="rounded-xl bg-gray-100 p-1">
+            <button
+              type="button"
+              className={cn(
+                accountDropdownRowDefault,
+                "w-full justify-between rounded-lg",
+              )}
+              onClick={() => {
+                adminPersonalSwitcher.onGoPersonal();
+                onNavigate?.();
+              }}
+            >
+              <span className="inline-flex items-center gap-2">
+                <UserRound className={accountDropdownIconClass} aria-hidden />
+                Личный аккаунт
+              </span>
+            </button>
+            <button
+              type="button"
+              className={cn(
+                accountDropdownRowDefault,
+                "mt-1 w-full justify-between rounded-lg bg-white shadow-sm",
+              )}
+              onClick={() => {
+                adminPersonalSwitcher.onGoAdmin();
+                onNavigate?.();
+              }}
+            >
+              <span className="inline-flex items-center gap-2">
+                <Shield className={accountDropdownIconClass} aria-hidden />
+                Админ-панель
+              </span>
+              <Check className="h-4 w-4 text-primary" aria-hidden />
+            </button>
+          </div>
+        </div>
+      ) : null}
+
       {hasRoleSwitcher ? (
         <div className="border-b border-gray-200 p-2">
-          <div className="rounded-xl bg-gray-50 p-1">
+          <div className="rounded-xl bg-primary/10 p-1">
             <button
               type="button"
               className={cn(
@@ -239,6 +302,24 @@ export function AccountDropdownContent({
         </div>
       ) : null}
 
+      {preNavContextItems ? (
+        <div className="border-b border-gray-200 p-2">
+          <div className="rounded-xl bg-primary/10 p-1">
+            {preNavContextItems.map((row, index) => (
+              <MenuRow
+                key={row.key}
+                row={row}
+                onNavigate={onNavigate}
+                rowClassName={cn(
+                  "w-full justify-between rounded-lg",
+                  index > 0 && "mt-1",
+                )}
+              />
+            ))}
+          </div>
+        </div>
+      ) : null}
+
       <nav className="flex flex-col p-2" aria-label="Меню аккаунта">
         <AppMenu
           mode={mode ?? "personal"}
@@ -249,7 +330,7 @@ export function AccountDropdownContent({
         />
       </nav>
 
-      {contextItemsWithoutAdmin && contextItemsWithoutAdmin.length > 0 ? (
+      {!preNavContextItems && contextItemsWithoutAdmin && contextItemsWithoutAdmin.length > 0 ? (
         <div className="border-t border-gray-200 px-2 py-1">
           {contextItemsWithoutAdmin.map((row) => (
             <MenuRow key={row.key} row={row} onNavigate={onNavigate} />
@@ -259,16 +340,16 @@ export function AccountDropdownContent({
 
       {ctaBlock ? (
         <div className="border-t border-gray-200 px-3 py-3">
-          <div className="rounded-xl border border-amber-200 bg-amber-50/70 p-3">
+          <div className="rounded-xl border border-blue-200 bg-blue-50 p-3">
             <div className="flex items-center justify-between gap-3">
-              <p className="text-xs font-medium text-amber-900">{ctaBlock.title}</p>
-              <div className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-amber-100 text-amber-700">
+              <p className="text-xs font-medium text-blue-900">{ctaBlock.title}</p>
+              <div className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-blue-100 text-blue-700">
                 <Building2 className="h-4 w-4" aria-hidden />
               </div>
             </div>
             <button
               type="button"
-              className="mt-2 text-xs font-semibold text-amber-700 hover:text-amber-800"
+              className="mt-2 text-xs font-semibold text-blue-700 hover:text-blue-800"
               onClick={() => {
                 ctaBlock.onAction();
                 onNavigate?.();

@@ -1,11 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { CircleUser } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DefaultAuthModal } from "@/components/auth/DefaultAuthModal";
-import type { AccountMenuUser } from "@/components/site/header/AccountMenuBody";
+import type { AccountMenuUser } from "@/lib/account/types";
 import { HEADER_CHROME_ICON_BUTTON_CLASS } from "@/components/site/header/headerIconButtonClass";
 import { NotificationsDropdown } from "@/components/site/header/NotificationsDropdown";
 import { ProfileDropdown } from "@/components/site/header/ProfileDropdown";
@@ -14,18 +13,12 @@ import { useFamilyPersona } from "@/contexts/FamilyPersonaContext";
 import { cn } from "@/lib/utils";
 import { useNarrowViewport } from "@/hooks/useNarrowViewport";
 import { notifyAuthStateChanged } from "@/lib/auth/client";
-import { navigateToSurface } from "@/lib/routing/clientNavigation";
 import { resolveHasBusinessProfile } from "@/lib/account/isBusinessAccountRole";
+import { useProfileDropdownHandlers } from "@/lib/account/useProfileDropdownHandlers";
 
-/**
- * Меню профиля: только отображение primary adult persona из FamilyPersonaContext
- * (единый источник с блоком «Моя семья»), без отдельного fetch / редактирования персоны здесь.
- */
 export function HeaderAccountMenu() {
-  const router = useRouter();
   const narrow = useNarrowViewport();
-  const { mode, goToBusinessAccount, goToPersonalAccount, hydrated } =
-    useAccountMode();
+  const { mode, hydrated } = useAccountMode();
   const family = useFamilyPersona();
   const user: AccountMenuUser | null | undefined = family
     ? family.loading
@@ -36,32 +29,15 @@ export function HeaderAccountMenu() {
   const [loggingOut, setLoggingOut] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [guestAuthOpen, setGuestAuthOpen] = useState(false);
-  /** Первый paint на клиенте совпадает с SSR; иначе FamilyPersona успевает дать guest до гидрации → mismatch span/button. */
   const [mounted, setMounted] = useState(false);
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  useEffect(() => { setMounted(true); }, []);
 
-  const handleLogout = async () => {
-    setLoggingOut(true);
-    try {
-      const res = await fetch("/api/auth/logout", {
-        method: "POST",
-        credentials: "same-origin",
-      });
-      if (res.ok || res.redirected) {
-        setUserMenuOpen(false);
-        notifyAuthStateChanged();
-        navigateToSurface(router, {
-          targetSurface: "public",
-          targetPath: "/",
-          replace: true,
-        });
-      }
-    } finally {
-      setLoggingOut(false);
-    }
-  };
+  const handlers = useProfileDropdownHandlers({
+    user,
+    loggingOut,
+    setLoggingOut,
+    closeMenu: () => setUserMenuOpen(false),
+  });
 
   if (!mounted || user === undefined) {
     return (
@@ -71,10 +47,7 @@ export function HeaderAccountMenu() {
           variant="ghost"
           size="icon"
           disabled
-          className={cn(
-            HEADER_CHROME_ICON_BUTTON_CLASS,
-            "pointer-events-none opacity-60",
-          )}
+          className={cn(HEADER_CHROME_ICON_BUTTON_CLASS, "pointer-events-none opacity-60")}
           aria-label="Загрузка профиля"
           aria-busy="true"
         >
@@ -122,8 +95,7 @@ export function HeaderAccountMenu() {
     role: user.role,
     hasApprovedBusinessProfile: user.hasApprovedBusinessProfile,
   });
-  const notificationContext =
-    hydrated && mode === "business" ? "business" : "user";
+  const notificationContext = hydrated && mode === "business" ? "business" : "user";
 
   const userTrigger = (
     <Button
@@ -137,11 +109,7 @@ export function HeaderAccountMenu() {
     >
       {user.avatarUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={user.avatarUrl}
-          alt=""
-          className="h-full w-full rounded-full object-cover"
-        />
+        <img src={user.avatarUrl} alt="" className="h-full w-full rounded-full object-cover" />
       ) : (
         <span className="flex h-full w-full items-center justify-center rounded-full bg-primary/10 text-[11px] font-semibold text-primary">
           {avatarLetter}
@@ -158,7 +126,6 @@ export function HeaderAccountMenu() {
           triggerClassName={cn("inline-flex", HEADER_CHROME_ICON_BUTTON_CLASS)}
         />
       )}
-
       <ProfileDropdown
         mode={hydrated ? mode : "personal"}
         user={user}
@@ -166,116 +133,10 @@ export function HeaderAccountMenu() {
         onOpenChange={setUserMenuOpen}
         narrow={narrow}
         trigger={userTrigger}
-        loggingOut={loggingOut}
-        onLogout={handleLogout}
         onNavigate={() => setUserMenuOpen(false)}
-        onGoToSettings={() =>
-          mode === "business"
-            ? navigateToSurface(router, {
-                targetSurface: "business",
-                targetPath: "/settings",
-              })
-            : navigateToSurface(router, {
-                targetSurface: "public",
-                targetPath: "/me/settings",
-              })
-        }
-        onSwitchMode={(next) => {
-          if (next === "business") {
-            goToBusinessAccount(isBusinessPartner);
-            return;
-          }
-          goToPersonalAccount();
-        }}
-        onGoToHome={() =>
-          navigateToSurface(router, {
-            targetSurface: "public",
-            targetPath: "/",
-          })
-        }
-        onGoToPersonalProfile={() =>
-          navigateToSurface(router, {
-            targetSurface: "public",
-            targetPath: "/me",
-          })
-        }
-        onGoToPersonalIdeas={() =>
-          navigateToSurface(router, {
-            targetSurface: "public",
-            targetPath: "/me/ideas",
-          })
-        }
-        onGoToAdminAccount={() =>
-          navigateToSurface(router, {
-            targetSurface: "admin",
-            targetPath: "/",
-          })
-        }
-        onGoToBusinessAccount={() =>
-          goToBusinessAccount(isBusinessPartner)
-        }
-        onGoToPersonalPlan={() =>
-          navigateToSurface(router, {
-            targetSurface: "public",
-            targetPath: "/me/plan",
-          })
-        }
-        onGoToPersonalNotifications={() =>
-          navigateToSurface(router, {
-            targetSurface: "public",
-            targetPath: "/settings/notifications",
-          })
-        }
-        onGoToBusinessDashboard={() =>
-          navigateToSurface(router, {
-            targetSurface: "business",
-            targetPath: "/dashboard",
-          })
-        }
-        onGoToBusinessRoot={() =>
-          navigateToSurface(router, {
-            targetSurface: "business",
-            targetPath: "/",
-          })
-        }
-        onGoToBusinessPublications={() =>
-          navigateToSurface(router, {
-            targetSurface: "business",
-            targetPath: "/events",
-          })
-        }
-        onGoToBusinessBookings={() =>
-          navigateToSurface(router, {
-            targetSurface: "business",
-            targetPath: "/inbox",
-          })
-        }
-        onGoToBusinessClients={() =>
-          navigateToSurface(router, {
-            targetSurface: "business",
-            targetPath: "/team",
-          })
-        }
-        onGoToBusinessAnalytics={() =>
-          navigateToSurface(router, {
-            targetSurface: "business",
-            targetPath: "/dashboard",
-          })
-        }
-        onGoToBusinessPromotion={() =>
-          navigateToSurface(router, {
-            targetSurface: "business",
-            targetPath: "/promotion",
-          })
-        }
-        onGoToBusinessBilling={() =>
-          navigateToSurface(router, {
-            targetSurface: "business",
-            targetPath: "/billing/transactions",
-          })
-        }
         hasBusinessProfile={isBusinessPartner}
         businessBalanceBYN={user.businessBalanceBYN}
+        {...handlers}
       />
     </div>
   );

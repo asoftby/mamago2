@@ -21,7 +21,7 @@ export function getProfileDestination(params: {
   /** Единая точка входа в личный кабинет — без редиректов по роли. */
   return buildSurfaceRedirectDestination({
     targetSurface: "public",
-    targetPath: "/profile",
+    targetPath: "/me",
     currentHost: params.host,
     currentProtocol: params.protocol,
   });

@@ -96,6 +96,8 @@ export function SiteHeaderShell() {
   const compactSearchVariant =
     isPublicationPage ? "cityHub" : "discovery";
   const shouldShowIntentTabs = true;
+  const isCityHomePage =
+    pathname === `/${citySlug}` || pathname === `/${citySlug}/`;
 
   useEffect(() => {
     if (process.env.NODE_ENV !== "production") {
@@ -185,20 +187,36 @@ export function SiteHeaderShell() {
               )}
             >
               <div className="flex min-w-0 items-center justify-self-start">
-                <Link
-                  href={`/${citySlug}`}
-                  className="flex shrink-0 items-center rounded-lg p-0.5 transition-opacity hover:opacity-90"
-                  aria-label="MamaGo — на главную"
-                >
-                  <Image
-                    src="/favico_mamago.webp"
-                    alt="MamaGo"
-                    width={100}
-                    height={100}
-                    priority
-                    className="h-8 w-auto md:h-9"
-                  />
-                </Link>
+                {isCityHomePage ? (
+                  <span
+                    className="flex shrink-0 items-center rounded-lg p-0.5"
+                    aria-label="MamaGo"
+                  >
+                    <Image
+                      src="/favico_mamago.webp"
+                      alt="MamaGo"
+                      width={100}
+                      height={100}
+                      priority
+                      className="h-8 w-auto md:h-9"
+                    />
+                  </span>
+                ) : (
+                  <Link
+                    href={`/${citySlug}`}
+                    className="flex shrink-0 items-center rounded-lg p-0.5 transition-opacity hover:opacity-90"
+                    aria-label="MamaGo — на главную"
+                  >
+                    <Image
+                      src="/favico_mamago.webp"
+                      alt="MamaGo"
+                      width={100}
+                      height={100}
+                      priority
+                      className="h-8 w-auto md:h-9"
+                    />
+                  </Link>
+                )}
               </div>
 
               <div className="relative isolate h-20 w-full min-w-0 justify-self-stretch px-0">

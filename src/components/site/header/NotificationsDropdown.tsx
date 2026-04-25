@@ -11,6 +11,7 @@ import {
 import { NotificationsModal } from "@/components/business/notifications/NotificationsModal";
 import { NotificationsPanel } from "@/components/business/notifications/NotificationsPanel";
 import { NotificationsBellPopover } from "@/components/business/notifications/NotificationsBellPopover";
+import { useUserNotificationBadgeCount } from "@/features/notifications/hooks/useUserNotificationBadgeCount";
 import type { HeaderChromeContext } from "@/lib/header/chromeContext";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { cn } from "@/lib/utils";
@@ -50,6 +51,11 @@ function PersonalNotificationsDropdown({
 }: NotificationsDropdownProps) {
   const stream = context === "business" ? "business" : "user";
   const isDesktop = useMediaQuery("(min-width: 1024px)");
+  const isUserStream = stream === "user";
+  const {
+    displayUnreadCount: userDisplayUnreadCount,
+    refreshUnreadCount: refreshUserUnreadCount,
+  } = useUserNotificationBadgeCount();
 
   const [open, setOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -57,7 +63,7 @@ function PersonalNotificationsDropdown({
   const fetchUnreadCount = useCallback(async () => {
     try {
       const params = new URLSearchParams({ limit: "1" });
-      params.set("stream", stream);
+      // Don't pass stream parameter — fetch ALL accessible notifications
       const res = await fetch(`/api/notifications?${params.toString()}`, {
         credentials: "include",
       });
@@ -68,16 +74,18 @@ function PersonalNotificationsDropdown({
     } catch (error) {
       console.error("Failed to fetch unread count:", error);
     }
-  }, [stream]);
+  }, []);
 
   useEffect(() => {
+    if (isUserStream) return;
     const id = window.setTimeout(() => {
       void fetchUnreadCount();
     }, 0);
     return () => window.clearTimeout(id);
-  }, [fetchUnreadCount]);
+  }, [fetchUnreadCount, isUserStream]);
 
   useEffect(() => {
+    if (isUserStream) return;
     const sync = () => void fetchUnreadCount();
     window.addEventListener(AUTH_STATE_CHANGED_EVENT, sync);
     window.addEventListener(NOTIFICATIONS_CHANGED_EVENT, sync);
@@ -85,20 +93,23 @@ function PersonalNotificationsDropdown({
       window.removeEventListener(AUTH_STATE_CHANGED_EVENT, sync);
       window.removeEventListener(NOTIFICATIONS_CHANGED_EVENT, sync);
     };
-  }, [fetchUnreadCount]);
+  }, [fetchUnreadCount, isUserStream]);
 
   useEffect(() => {
     if (!open) return;
-    const id = window.setTimeout(() => {
-      void fetchUnreadCount();
-    }, 0);
+    const id = window.setTimeout(
+      () => void (isUserStream ? refreshUserUnreadCount() : fetchUnreadCount()),
+      0,
+    );
     return () => window.clearTimeout(id);
-  }, [open, fetchUnreadCount]);
+  }, [open, fetchUnreadCount, isUserStream, refreshUserUnreadCount]);
+
+  const displayUnreadCount = isUserStream ? userDisplayUnreadCount : unreadCount;
 
   const badge =
-    unreadCount > 0 ? (
+    displayUnreadCount > 0 ? (
       <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs font-bold text-white">
-        {unreadCount > 9 ? "9+" : unreadCount}
+        {displayUnreadCount > 9 ? "9+" : displayUnreadCount}
       </span>
     ) : null;
 
@@ -128,14 +139,13 @@ function PersonalNotificationsDropdown({
           <PopoverContent
             align="end"
             sideOffset={8}
-            className="w-[min(100vw-1.5rem,400px)] max-w-[400px] p-0 shadow-lg"
+            className="w-[min(100vw-1.5rem,480px)] max-w-[480px] overflow-hidden rounded-[24px] border border-neutral-200/90 p-0 shadow-[0_20px_60px_rgba(15,23,42,0.14)]"
           >
             <NotificationsPanel
-              key={String(open)}
               open={open}
               stream={stream}
-              showHeaderClose={false}
-              onNotificationRead={fetchUnreadCount}
+              showHeaderClose
+              onNotificationRead={isUserStream ? refreshUserUnreadCount : fetchUnreadCount}
               onClose={() => setOpen(false)}
             />
           </PopoverContent>
@@ -151,7 +161,7 @@ function PersonalNotificationsDropdown({
         open={open}
         onOpenChange={setOpen}
         stream={stream}
-        onNotificationRead={fetchUnreadCount}
+        onNotificationRead={isUserStream ? refreshUserUnreadCount : fetchUnreadCount}
       />
     </div>
   );

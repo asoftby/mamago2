@@ -1,8 +1,6 @@
 import {
   CalendarDays,
   Lightbulb,
-  Bell,
-  User,
   Settings,
   Shield,
   UserCircle,
@@ -24,15 +22,14 @@ export function buildPublicSiteAccountModel(input: {
   mode: AccountMode;
   initials: string;
   onNavigate: () => void;
-  onGoToSettings: () => void;
   onGoToAdminAccount: () => void;
   onGoToBusinessAccount: () => void;
   onSwitchMode: (next: AccountMode) => void;
   onGoToHome: () => void;
-  onGoToPersonalProfile: () => void;
+  onGoToPersonalAccount: () => void;
   onGoToPersonalIdeas: () => void;
   onGoToPersonalPlan: () => void;
-  onGoToPersonalNotifications: () => void;
+  onGoToSettings: () => void;
   onGoToBusinessDashboard: () => void;
   onGoToBusinessRoot: () => void;
   onGoToBusinessPublications: () => void;
@@ -51,13 +48,12 @@ export function buildPublicSiteAccountModel(input: {
     mode,
     initials,
     onNavigate,
-    onGoToSettings,
     onGoToAdminAccount,
     onSwitchMode,
-    onGoToPersonalProfile,
+    onGoToPersonalAccount,
     onGoToPersonalIdeas,
     onGoToPersonalPlan,
-    onGoToPersonalNotifications,
+    onGoToSettings,
     onGoToBusinessBilling,
     onGoToBusinessAccount,
     hasBusinessProfile,
@@ -68,7 +64,6 @@ export function buildPublicSiteAccountModel(input: {
 
   const emailPrefix = user.email?.split("@")[0] ?? user.email ?? "";
   const displayName = user.displayName?.trim() || emailPrefix;
-
   const roleRu = mapFamilyRoleToLabel(user.familyRole ?? undefined);
   const personaSubtitle = roleRu || null;
 
@@ -84,40 +79,25 @@ export function buildPublicSiteAccountModel(input: {
   if (mode === "personal") {
     const mainItems: AccountMenuRow[] = [
       {
-        key: "profile",
+        key: "account",
         type: "button",
-        label: "Профиль",
+        label: "Личный аккаунт",
         icon: UserCircle,
-        onClick: () => {
-          onGoToPersonalProfile();
-        },
+        onClick: () => { onGoToPersonalAccount(); },
       },
       {
         key: "ideas",
         type: "button",
         label: "Мои идеи",
         icon: Lightbulb,
-        onClick: () => {
-          onGoToPersonalIdeas();
-        },
+        onClick: () => { onGoToPersonalIdeas(); },
       },
       {
         key: "plan",
         type: "button",
         label: "Мой план",
         icon: CalendarDays,
-        onClick: () => {
-          onGoToPersonalPlan();
-        },
-      },
-      {
-        key: "notifications",
-        type: "button",
-        label: "Уведомления",
-        icon: Bell,
-        onClick: () => {
-          onGoToPersonalNotifications();
-        },
+        onClick: () => { onGoToPersonalPlan(); },
       },
       {
         key: "settings",
@@ -138,9 +118,7 @@ export function buildPublicSiteAccountModel(input: {
             label: "Перейти в админ-панель",
             icon: Shield,
             variant: "accent",
-            onClick: () => {
-              onGoToAdminAccount();
-            },
+            onClick: () => { onGoToAdminAccount(); },
           },
         ]
       : undefined;
@@ -158,9 +136,7 @@ export function buildPublicSiteAccountModel(input: {
         : {
             title: "Нужен бизнес-профиль?",
             actionLabel: "Подключить бизнес",
-            onAction: () => {
-              onGoToBusinessAccount();
-            },
+            onAction: () => { onGoToBusinessAccount(); },
           },
       onLogout,
       logoutMode: "fetch",
@@ -169,20 +145,11 @@ export function buildPublicSiteAccountModel(input: {
     };
   }
 
+  // business mode
   return {
     sheetTitle: "Бизнес-аккаунт",
     header,
-    mainItems: [
-      {
-        key: "business-settings-help",
-        type: "button",
-        label: "Аккаунт и настройки",
-        icon: Settings,
-        onClick: () => {
-          onGoToSettings();
-        },
-      },
-    ],
+    mainItems: [],
     contextItems: isAdminRole(user.role)
       ? [
           {
@@ -191,9 +158,7 @@ export function buildPublicSiteAccountModel(input: {
             label: "Перейти в админ-панель",
             icon: Shield,
             variant: "accent",
-            onClick: () => {
-              onGoToAdminAccount();
-            },
+            onClick: () => { onGoToAdminAccount(); },
           },
         ]
       : undefined,
@@ -202,9 +167,7 @@ export function buildPublicSiteAccountModel(input: {
     businessModeAvailable: true,
     businessLabel: "MamaGo",
     businessBalanceBYN,
-    onTopUpBalance: () => {
-      onGoToBusinessBilling();
-    },
+    onTopUpBalance: () => { onGoToBusinessBilling(); },
     onLogout,
     logoutMode: "fetch",
     loggingOut,
@@ -213,68 +176,70 @@ export function buildPublicSiteAccountModel(input: {
 }
 
 /**
- * Админка: профиль, настройки, переход в личный кабинет, выход (form).
+ * Админка: переключатель режимов (Личный / Админ) + выход (form POST).
  */
 export function buildAdminAccountModel(input: {
   userEmail: string;
+  userDisplayName?: string | null;
   initials: string;
-  goToAdminSettings: () => void;
-  goToProfile: () => void;
   goToPersonalAccount: () => void;
+  goToAdminHome: () => void;
   onNavigate: () => void;
 }): AccountDropdownModel {
-  const {
-    userEmail,
-    initials,
-    goToAdminSettings,
-    goToProfile,
-    goToPersonalAccount,
-    onNavigate,
-  } = input;
+  const { userEmail, userDisplayName, initials, goToPersonalAccount, goToAdminHome, onNavigate } = input;
+
+  const emailPrefix = userEmail.split("@")[0] ?? userEmail;
+  const displayName = userDisplayName?.trim() || emailPrefix;
 
   return {
-    sheetTitle: "Профиль",
+    sheetTitle: "Мой аккаунт",
     header: {
       email: userEmail,
-      displayName: userEmail.split("@")[0] ?? userEmail,
+      displayName,
       initials,
       roleLabel: "Администратор",
       avatarUrl: null,
     },
-    mainItems: [
-      {
-        key: "profile",
-        type: "button",
-        label: "Профиль",
-        icon: UserCircle,
-        onClick: () => {
-          goToProfile();
-        },
-      },
-      {
-        key: "settings",
-        type: "button",
-        label: "Настройки",
-        icon: Settings,
-        onClick: () => {
-          goToAdminSettings();
-        },
-      },
-    ],
-    contextItems: [
-      {
-        key: "to-personal",
-        type: "button",
-        label: "Перейти в личный аккаунт",
-        icon: User,
-        variant: "accent",
-        onClick: () => {
-          goToPersonalAccount();
-        },
-      },
-    ],
+    mainItems: [],
+    adminPersonalSwitcher: {
+      onGoPersonal: goToPersonalAccount,
+      onGoAdmin: goToAdminHome,
+    },
     logoutMode: "form",
     loggingOut: false,
     onNavigate,
   };
+}
+
+/**
+ * Business surface: меню в шапке бизнес-кабинета.
+ * Тонкая обёртка над buildPublicSiteAccountModel с mode="business" —
+ * сохраняет текущее поведение, но даёт явную точку входа для business surface.
+ */
+export function buildBusinessAccountModel(input: {
+  user: AccountMenuUser;
+  initials: string;
+  onNavigate: () => void;
+  onGoToAdminAccount: () => void;
+  onGoToBusinessAccount: () => void;
+  onSwitchMode: (next: AccountMode) => void;
+  onGoToHome: () => void;
+  onGoToPersonalAccount: () => void;
+  onGoToPersonalIdeas: () => void;
+  onGoToPersonalPlan: () => void;
+  onGoToSettings: () => void;
+  onGoToBusinessDashboard: () => void;
+  onGoToBusinessRoot: () => void;
+  onGoToBusinessPublications: () => void;
+  onGoToBusinessBookings: () => void;
+  onGoToBusinessClients: () => void;
+  onGoToBusinessAnalytics: () => void;
+  onGoToBusinessPromotion: () => void;
+  onGoToBusinessBilling: () => void;
+  hasBusinessProfile: boolean;
+  businessBalanceBYN?: number;
+  onLogout: () => void | Promise<void>;
+  loggingOut: boolean;
+}): AccountDropdownModel {
+  return buildPublicSiteAccountModel({ ...input, mode: "business" });
 }

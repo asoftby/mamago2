@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { AccountDropdown } from "@/components/account/AccountDropdown";
 import type { AccountMenuUser } from "@/lib/account/types";
 import type { AccountMode } from "@/contexts/AccountModeContext";
-import { buildPublicSiteAccountModel } from "@/lib/account/accountMenuBuilders";
+import { buildPublicSiteAccountModel, buildBusinessAccountModel } from "@/lib/account/accountMenuBuilders";
 import { userInitialsFromEmail } from "@/lib/account/userInitials";
 
 export type ProfileDropdownProps = {
@@ -15,17 +15,14 @@ export type ProfileDropdownProps = {
   narrow: boolean;
   trigger: ReactNode;
   loggingOut: boolean;
-  onLogout: () => void;
+  onLogout: () => void | Promise<void>;
   onNavigate: () => void;
-  onGoToSettings: () => void;
-  onSwitchMode: (next: AccountMode) => void;
-  onGoToHome: () => void;
-  onGoToPersonalProfile: () => void;
+  onGoToPersonalAccount: () => void;
   onGoToPersonalIdeas: () => void;
+  onGoToPersonalPlan: () => void;
+  onGoToSettings: () => void;
   onGoToAdminAccount: () => void;
   onGoToBusinessAccount: () => void;
-  onGoToPersonalPlan: () => void;
-  onGoToPersonalNotifications: () => void;
   onGoToBusinessDashboard: () => void;
   onGoToBusinessRoot: () => void;
   onGoToBusinessPublications: () => void;
@@ -34,6 +31,8 @@ export type ProfileDropdownProps = {
   onGoToBusinessAnalytics: () => void;
   onGoToBusinessPromotion: () => void;
   onGoToBusinessBilling: () => void;
+  onSwitchMode: (next: AccountMode) => void;
+  onGoToHome: () => void;
   hasBusinessProfile: boolean;
   businessBalanceBYN?: number;
 };
@@ -48,15 +47,12 @@ export function ProfileDropdown({
   loggingOut,
   onLogout,
   onNavigate,
-  onGoToSettings,
-  onSwitchMode,
-  onGoToHome,
-  onGoToPersonalProfile,
+  onGoToPersonalAccount,
   onGoToPersonalIdeas,
+  onGoToPersonalPlan,
+  onGoToSettings,
   onGoToAdminAccount,
   onGoToBusinessAccount,
-  onGoToPersonalPlan,
-  onGoToPersonalNotifications,
   onGoToBusinessDashboard,
   onGoToBusinessRoot,
   onGoToBusinessPublications,
@@ -65,24 +61,22 @@ export function ProfileDropdown({
   onGoToBusinessAnalytics,
   onGoToBusinessPromotion,
   onGoToBusinessBilling,
+  onSwitchMode,
+  onGoToHome,
   hasBusinessProfile,
   businessBalanceBYN,
 }: ProfileDropdownProps) {
   const initials = userInitialsFromEmail(user.email);
-  const model = buildPublicSiteAccountModel({
+  const builderInput = {
     user,
-    mode,
     initials,
     onNavigate,
-    onGoToSettings,
-    onSwitchMode,
-    onGoToHome,
-    onGoToPersonalProfile,
+    onGoToPersonalAccount,
     onGoToPersonalIdeas,
+    onGoToPersonalPlan,
+    onGoToSettings,
     onGoToAdminAccount,
     onGoToBusinessAccount,
-    onGoToPersonalPlan,
-    onGoToPersonalNotifications,
     onGoToBusinessDashboard,
     onGoToBusinessRoot,
     onGoToBusinessPublications,
@@ -91,11 +85,18 @@ export function ProfileDropdown({
     onGoToBusinessAnalytics,
     onGoToBusinessPromotion,
     onGoToBusinessBilling,
+    onSwitchMode,
+    onGoToHome,
     hasBusinessProfile,
     businessBalanceBYN,
     onLogout,
     loggingOut,
-  });
+  };
+
+  const model =
+    mode === "business"
+      ? buildBusinessAccountModel(builderInput)
+      : buildPublicSiteAccountModel({ ...builderInput, mode });
 
   return (
     <AccountDropdown
