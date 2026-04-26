@@ -77,8 +77,9 @@ export function ModerationQueueTable({
   }
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
-      <table className="w-full text-sm">
+    <div className="rounded-2xl border border-stone-200 bg-white shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
+      <div className="overflow-x-auto">
+        <table className="min-w-[900px] w-full text-sm">
         <thead className="border-b border-stone-200 bg-stone-50/80">
           <tr>
             <th className="px-4 py-3 text-left font-medium text-stone-600">Тип</th>
@@ -105,7 +106,8 @@ export function ModerationQueueTable({
             </tr>
           ))}
         </tbody>
-      </table>
+        </table>
+      </div>
     </div>
   );
 }

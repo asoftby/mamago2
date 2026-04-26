@@ -184,10 +184,11 @@ export async function applyImportEventRecord(importedRecordId: string): Promise<
       return { success: false, error: (result as { reason: string }).reason };
     }
 
-    revalidatePath("/admin/import/review");
+    // Минимальный revalidate — только страница ревью, не весь каталог
+    revalidatePath(`/admin/import/review/${importedRecordId}`);
 
     const applyResult = result as {
-      placeId: string; // reused field — contains activityId for EVENT
+      placeId: string;
       activitySlug?: string;
       appliedFields: string[];
       skippedFields: string[];

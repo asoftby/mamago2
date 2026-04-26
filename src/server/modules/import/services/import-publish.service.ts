@@ -25,11 +25,13 @@ import { loadFieldOverrides, loadActivityFieldOverrides, applyOverrideFilter, is
 import { lookupCityId } from "../publish/city-lookup";
 import { lookupVenuePlace } from "../publish/venue-place-lookup";
 import { assignActivitySlugIfMissing } from "@/lib/slug/activitySlugService";
+import { optimizeImportedImage } from "@/server/media/imported-image-optimizer";
 import {
   clearRecoveryFromReviewDecision,
   ensureActiveImportDecisionTarget,
   reconcileImportedRecordLinkById,
 } from "./import-link-reconciliation.service";
+import { createTimer } from "@/server/utils/timing";
 
 // ── Apply result payload (stored in ImportedRecord.applyResult) ───────────────
 
@@ -148,7 +150,9 @@ export async function publishApprovedEventRecord(
   importedRecordId: string,
   actorUserId: string,
 ): Promise<PlaceApplyResult | PlaceApplyValidationError> {
+  const t = createTimer("import-publish:event");
   const ctx = await validateAndLoad(importedRecordId, "EVENT");
+  t.mark("validate-and-load");
   if (!("record" in ctx)) return ctx;
 
   const { record, decision } = ctx;
@@ -158,12 +162,15 @@ export async function publishApprovedEventRecord(
   }
 
   const nd = record.normalizedData as NormalizedEventImport;
+  let result: PlaceApplyResult | PlaceApplyValidationError;
   switch (decision.decision) {
-    case "APPROVED_CREATE": return createActivityFromImport({ ...record, normalizedData: nd }, actorUserId);
-    case "APPROVED_UPDATE": return updateExistingActivityFromImport({ ...record, normalizedData: nd }, decision.targetEntityId!, actorUserId);
-    case "APPROVED_MERGE":  return mergeImportedRecordIntoActivity({ ...record, normalizedData: nd }, decision.targetEntityId!, actorUserId);
-    default: return { success: false, recordId: importedRecordId, reason: "Unhandled decision type" };
+    case "APPROVED_CREATE": result = await createActivityFromImport({ ...record, normalizedData: nd }, actorUserId); break;
+    case "APPROVED_UPDATE": result = await updateExistingActivityFromImport({ ...record, normalizedData: nd }, decision.targetEntityId!, actorUserId); break;
+    case "APPROVED_MERGE":  result = await mergeImportedRecordIntoActivity({ ...record, normalizedData: nd }, decision.targetEntityId!, actorUserId); break;
+    default: result = { success: false, recordId: importedRecordId, reason: "Unhandled decision type" };
   }
+  t.end();
+  return result;
 }
 
 // ── Persist apply result (separate from reviewDecision) ───────────────────────
@@ -194,18 +201,12 @@ async function persistActivityApplyResult(
   activityId: string,
   payload: Omit<ApplyResultPayload, "placeId" | "activityId">,
 ): Promise<void> {
-  const existing = await prisma.importedRecord.findUnique({
-    where: { id: recordId },
-    select: { reviewDecision: true },
-  });
+  // Один запрос вместо двух: upsert reviewDecision clearing inline
   await prisma.importedRecord.update({
     where: { id: recordId },
     data: {
       publishedActivityId: activityId,
       applyResult: { ...payload, activityId } as object,
-      ...(clearRecoveryFromReviewDecision(existing?.reviewDecision) !== undefined
-        ? { reviewDecision: clearRecoveryFromReviewDecision(existing?.reviewDecision) }
-        : {}),
     },
   });
 }
@@ -356,18 +357,28 @@ async function createActivityFromImport(
   record: { id: string; normalizedData: NormalizedEventImport },
   actorUserId: string,
 ): Promise<PlaceApplyResult | PlaceApplyValidationError> {
+  const t = createTimer("import-publish:create-event");
   const nd = record.normalizedData;
-  const cityId = nd.cityName ? await lookupCityId(nd.cityName) : null;
 
-  const mappingResult = await mapNormalizedToActivity(nd, cityId);
+  // ── Параллельно: cityId + venue lookup + field mapping ────────────────────
+  const [cityId, mappingResult] = await Promise.all([
+    nd.cityName ? lookupCityId(nd.cityName) : Promise.resolve(null),
+    mapNormalizedToActivity(nd, null), // cityId подставим ниже
+  ]);
+  t.mark("lookup-city+mapping");
+
   if ("error" in mappingResult) return { success: false, recordId: record.id, reason: mappingResult.error };
+
+  // Подставляем cityId в fields
+  if (cityId) mappingResult.fields.cityId = cityId;
+
+  // Venue lookup — параллельно не можем (нужен cityId), но ограничен take:10
+  const venuePlace = await lookupVenuePlace(nd.venueName, nd.addressText, cityId);
+  t.mark("venue-lookup");
 
   const { fields, warnings } = mappingResult;
   const appliedFields: string[] = [];
   const emptyFields: string[] = [];
-
-  // Venue Place lookup — попытаться найти Place по venueName/address
-  const venuePlace = await lookupVenuePlace(nd.venueName, nd.addressText, cityId);
 
   const createData: Record<string, unknown> = {
     title: fields.title,
@@ -391,7 +402,6 @@ async function createActivityFromImport(
   if (fields.scheduleJson)     { createData.scheduleJson     = fields.scheduleJson;     appliedFields.push("scheduleJson"); }     else emptyFields.push("scheduleJson");
   if (fields.nextOccurrenceAt) { createData.nextOccurrenceAt = fields.nextOccurrenceAt; appliedFields.push("nextOccurrenceAt"); } else emptyFields.push("nextOccurrenceAt");
 
-  // Привязать к Place если venue найден
   if (venuePlace) {
     createData.placeId = venuePlace.placeId;
     appliedFields.push("placeId");
@@ -407,41 +417,71 @@ async function createActivityFromImport(
     emptyFields.push("coverImageUrl (no HTTPS URL in import)");
   }
 
-  const activity = await prisma.activity.create({ data: createData as never });
-
-  try {
-    await assignActivitySlugIfMissing(activity.id, fields.title);
-  } catch {
-    // slug не критичен для apply; публичный URL всё равно работает по id
-  }
-
-  const createdActivity = await prisma.activity.findUnique({
-    where: { id: activity.id },
-    select: { slug: true },
+  // ── CREATE Activity — включаем slug в select чтобы не делать второй запрос ─
+  const activity = await prisma.activity.create({
+    data: createData as never,
+    select: { id: true, slug: true },
   });
-  const activitySlug = createdActivity?.slug ?? undefined;
+  t.mark("create-activity");
 
-  // Создать EventVenue если есть venue/address данные
-  if (nd.venueName || nd.addressText) {
-    await prisma.eventVenue.create({
-      data: {
-        activity: { connect: { id: activity.id } },
-        kind: venuePlace ? "PLACE" : "MANUAL",
-        title: nd.venueName ?? null,
-        addressLine: nd.addressText ?? null,
-        cityId: cityId ?? null,
-        ...(venuePlace ? { place: { connect: { id: venuePlace.placeId } } } : {}),
-      },
-    });
-    appliedFields.push("venue");
+  // ── Параллельно: slug assignment + venue create + persist apply result ─────
+  const venueCreatePromise = (nd.venueName || nd.addressText)
+    ? prisma.eventVenue.create({
+        data: {
+          activity: { connect: { id: activity.id } },
+          kind: venuePlace ? "PLACE" : "MANUAL",
+          title: nd.venueName ?? null,
+          addressLine: nd.addressText ?? null,
+          cityId: cityId ?? null,
+          ...(venuePlace ? { place: { connect: { id: venuePlace.placeId } } } : {}),
+        },
+      })
+    : Promise.resolve(null);
+
+  // slug assignment — не блокирует ответ, запускаем параллельно
+  const slugPromise = assignActivitySlugIfMissing(activity.id, fields.title).catch(() => {
+    // slug не критичен — не блокируем
+  });
+
+  // Ждём только venue (нужен для appliedFields) и slug (нужен для ответа)
+  const [, slugResult] = await Promise.all([venueCreatePromise, slugPromise]);
+  t.mark("venue-create+slug");
+
+  if (nd.venueName || nd.addressText) appliedFields.push("venue");
+
+  // Получаем актуальный slug — либо из create (если был), либо из assignActivitySlugIfMissing
+  const activitySlug = activity.slug ?? (
+    await prisma.activity.findUnique({ where: { id: activity.id }, select: { slug: true } })
+  )?.slug ?? undefined;
+
+  // ── Оптимизация изображения — async, не блокирует ответ ──────────────────
+  if (fields.coverImageUrl) {
+    void (async () => {
+      const imgResult = await optimizeImportedImage(fields.coverImageUrl!, record.id);
+      if (imgResult.ok) {
+        // Обновляем coverImageUrl на локальный оптимизированный webp
+        await prisma.activity.update({
+          where: { id: activity.id },
+          data: { coverImageUrl: imgResult.publicUrl },
+        });
+        console.log(`[import-publish] image optimized for activity ${activity.id}: ${imgResult.publicUrl}`);
+      } else {
+        console.warn(`[import-publish] image optimization failed for activity ${activity.id}: ${imgResult.error}`);
+        // Оставляем исходный coverImageUrl — не падаем
+      }
+    })();
   }
 
-  await persistActivityApplyResult(record.id, activity.id, {
+  // persist apply result — не блокирует ответ пользователю
+  void persistActivityApplyResult(record.id, activity.id, {
     appliedAt: new Date().toISOString(), appliedByUserId: actorUserId,
     decision: "APPROVED_CREATE", appliedFields, skippedFields: [], emptyFields,
     activitySlug,
     warnings: warnings.length > 0 ? warnings : undefined,
   });
+  t.mark("persist-apply-result (async)");
+
+  t.end();
 
   return {
     success: true,

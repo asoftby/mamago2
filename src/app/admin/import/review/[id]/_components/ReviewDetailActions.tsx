@@ -21,7 +21,17 @@ interface Props {
   isApplied: boolean;
 }
 
-export function ReviewDetailActions({ importedRecordId, isApplied }: Props) {
+type DeleteImportedRecordButtonProps = {
+  importedRecordId: string;
+  isApplied: boolean;
+  className?: string;
+};
+
+export function DeleteImportedRecordButton({
+  importedRecordId,
+  isApplied,
+  className,
+}: DeleteImportedRecordButtonProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -44,7 +54,10 @@ export function ReviewDetailActions({ importedRecordId, isApplied }: Props) {
     <>
       <button
         onClick={() => setOpen(true)}
-        className="inline-flex items-center gap-2 rounded-lg border border-red-200 px-3 py-1.5 text-sm text-red-700 transition hover:bg-red-50"
+        className={
+          className ??
+          "inline-flex items-center gap-2 rounded-lg border border-red-200 px-3 py-1.5 text-sm text-red-700 transition hover:bg-red-50"
+        }
       >
         <Trash2 className="h-4 w-4" />
         Удалить импортированный объект
@@ -68,4 +81,8 @@ export function ReviewDetailActions({ importedRecordId, isApplied }: Props) {
       </AlertDialog>
     </>
   );
+}
+
+export function ReviewDetailActions({ importedRecordId, isApplied }: Props) {
+  return <DeleteImportedRecordButton importedRecordId={importedRecordId} isApplied={isApplied} />;
 }

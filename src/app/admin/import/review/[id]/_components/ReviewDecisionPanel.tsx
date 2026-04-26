@@ -4,12 +4,15 @@ import { useState } from "react";
 import { toast } from "@/lib/toast";
 import { submitReviewDecision } from "../../../actions";
 import type { PlaceMatchCandidate, EventMatchCandidate } from "@/server/modules/import/types";
+import { DeleteImportedRecordButton } from "./ReviewDetailActions";
 
 type Decision = "APPROVED_CREATE" | "APPROVED_UPDATE" | "APPROVED_MERGE";
 type EntityType = "PLACE" | "EVENT";
 
 interface Props {
   taskId: string;
+  importedRecordId: string;
+  isApplied: boolean;
   entityType: EntityType;
   suggestedAction?: string;
   candidates: (PlaceMatchCandidate | EventMatchCandidate)[];
@@ -76,7 +79,15 @@ function getDecisionConfig(entityType: EntityType) {
   ];
 }
 
-export function ReviewDecisionPanel({ taskId, entityType, suggestedAction, candidates, onSaved }: Props) {
+export function ReviewDecisionPanel({
+  taskId,
+  importedRecordId,
+  isApplied,
+  entityType,
+  suggestedAction,
+  candidates,
+  onSaved,
+}: Props) {
   const [selected, setSelected] = useState<Decision | null>(null);
   const [targetCandidateId, setTargetCandidateId] = useState<string>("");
   const [notes, setNotes] = useState("");
@@ -249,6 +260,11 @@ export function ReviewDecisionPanel({ taskId, entityType, suggestedAction, candi
               ? "Activity не будет изменена до фазы публикации"
               : "Place не будет изменён до фазы публикации"}
           </p>
+          <DeleteImportedRecordButton
+            importedRecordId={importedRecordId}
+            isApplied={isApplied}
+            className="ml-auto inline-flex items-center gap-2 rounded-lg border border-red-200 px-3 py-1.5 text-sm text-red-700 transition hover:bg-red-50"
+          />
         </div>
       </div>
     </div>

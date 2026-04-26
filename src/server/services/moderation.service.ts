@@ -281,7 +281,7 @@ export async function approveActivity(
 ): Promise<void> {
   const activity = await prisma.activity.findUnique({
     where: { id: activityId },
-    select: { status: true, title: true, businessId: true },
+    select: { status: true, title: true, businessId: true, scheduleJson: true, ownerUserId: true },
   });
 
   if (!activity) throw new Error("Activity not found");
@@ -289,12 +289,52 @@ export async function approveActivity(
     throw new Error(`Cannot approve from status: ${activity.status}`);
   }
 
-  await prisma.$transaction([
-    prisma.activity.update({ where: { id: activityId }, data: { status: "PUBLISHED" } }),
-    prisma.moderationLog.create({
-      data: { entityType: "ACTIVITY", entityId: activityId, action: "APPROVE", message: message || "Approved", reviewedByUserId },
-    }),
-  ]);
+  const scheduleJson =
+    activity.scheduleJson && typeof activity.scheduleJson === "object" && !Array.isArray(activity.scheduleJson)
+      ? (activity.scheduleJson as Record<string, unknown>)
+      : {};
+
+  const { resolvePendingLocationOnPublish } = await import("@/lib/business/resolvePendingLocationOnPublish");
+
+  const { placeId: resolvedPlaceId, placeCreated, updatedScheduleJson } =
+    await prisma.$transaction(async (tx) => {
+      const result = await resolvePendingLocationOnPublish(
+        tx,
+        activityId,
+        scheduleJson,
+        activity.ownerUserId,
+        activity.businessId ?? null,
+      );
+
+      await tx.activity.update({
+        where: { id: activityId },
+        data: {
+          status: "PUBLISHED",
+          scheduleJson: result.updatedScheduleJson as never,
+          ...(result.placeId !== null ? { placeId: result.placeId } : {}),
+        },
+      });
+
+      await tx.moderationLog.create({
+        data: {
+          entityType: "ACTIVITY",
+          entityId: activityId,
+          action: "APPROVE",
+          message: message || "Approved",
+          reviewedByUserId,
+        },
+      });
+
+      return result;
+    });
+
+  // Назначаем slug новому Place (вне транзакции — идемпотентно)
+  if (placeCreated && resolvedPlaceId) {
+    const { assignSlugOnPublish } = await import("@/lib/slug/placeSlugService");
+    await assignSlugOnPublish(resolvedPlaceId).catch((e) =>
+      console.error("[moderation] assignSlugOnPublish failed:", e),
+    );
+  }
 
   const { ensurePublishedActivityHasSlug } = await import("@/lib/slug/publishSlugGuards");
   await ensurePublishedActivityHasSlug(activityId);

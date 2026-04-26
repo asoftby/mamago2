@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { EmptyBlock } from "@/components/admin/ui/StateBlock";
 import {
   ArrowRight,
   CheckCircle2,
