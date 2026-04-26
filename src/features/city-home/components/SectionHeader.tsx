@@ -32,7 +32,7 @@ export function SectionHeader({
         useIconButton &&
           cn(
             "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full",
-            "bg-neutral-200 text-neutral-900 transition-colors hover:bg-neutral-300/90",
+            "bg-primary/10 text-primary transition-colors hover:bg-primary/15",
             "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
           ),
         !useIconButton &&

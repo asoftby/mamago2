@@ -1,7 +1,8 @@
 "use client";
 
 import Image from "next/image";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { useState, useEffect } from "react";
+import { ChevronLeft, ChevronRight, ImageOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { StoryProgress } from "./StoryProgress";
 import type { StoryCollection, StoryItem } from "../types/story";
@@ -30,19 +31,46 @@ export function StoryModalVisual({
   onPrev,
 }: StoryModalVisualProps) {
   const isFirst = !prevItem && activeItemIndex === 0;
+  const [imgLoaded, setImgLoaded] = useState(false);
+  const [imgError, setImgError] = useState(false);
+  const imgKey = `${currentItem.id}-${currentItem.image}`;
+
+  // Reset image state when item changes
+  useEffect(() => {
+    setImgLoaded(false);
+    setImgError(false);
+  }, [imgKey]);
 
   return (
     <div className="relative w-full h-full overflow-hidden bg-neutral-950 select-none">
 
-      {/* ── Main image — full width ── */}
-      <Image
-        src={currentItem.image}
-        alt={currentItem.title}
-        fill
-        className="object-cover"
-        sizes="(max-width: 768px) 100vw, 420px"
-        priority
-      />
+      {/* ── Skeleton / placeholder while loading ── */}
+      {!imgLoaded && !imgError && (
+        <div className="absolute inset-0 z-[1] bg-neutral-900 animate-pulse" />
+      )}
+
+      {/* ── Error fallback ── */}
+      {imgError && (
+        <div className="absolute inset-0 z-[1] flex flex-col items-center justify-center gap-2 bg-neutral-900">
+          <ImageOff className="h-8 w-8 text-neutral-600" />
+          <p className="text-xs text-neutral-500">Изображение не загрузилось</p>
+        </div>
+      )}
+
+      {/* ── Main image ── */}
+      {currentItem.image && !imgError && (
+        <Image
+          key={imgKey}
+          src={currentItem.image}
+          alt={currentItem.title}
+          fill
+          className={cn("object-cover transition-opacity duration-300", imgLoaded ? "opacity-100" : "opacity-0")}
+          sizes="(max-width: 768px) 100vw, 420px"
+          priority
+          onLoad={() => setImgLoaded(true)}
+          onError={() => { setImgLoaded(false); setImgError(true); }}
+        />
+      )}
 
       {/* ── Top gradient ── */}
       <div className="absolute inset-x-0 top-0 h-28 z-[2] bg-gradient-to-b from-black/60 via-black/15 to-transparent pointer-events-none" />

@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 import type { WeatherScenario, TimeOfDay } from "../model/types";
 import { resolveHomeWeatherScenario, getWeatherIconName } from "../lib/weather-scenario-layer";
@@ -24,6 +25,14 @@ export function HeroMoodIcon({
     maxTemperatureC,
   });
   const iconName = getWeatherIconName({ scenario: dayScenario, timeOfDay });
+  const fallbackIconName = timeOfDay === "night" ? "overcast-night" : "overcast-day";
+  const primarySrc = useMemo(() => `/meteocons/fill/${iconName}.svg`, [iconName]);
+  const fallbackSrc = useMemo(() => `/meteocons/fill/${fallbackIconName}.svg`, [fallbackIconName]);
+  const [imgSrc, setImgSrc] = useState(primarySrc);
+
+  useEffect(() => {
+    setImgSrc(primarySrc);
+  }, [primarySrc]);
 
   return (
     <span
@@ -34,13 +43,18 @@ export function HeroMoodIcon({
       aria-hidden
     >
       <img
-        src={`/meteocons/fill/${iconName}.svg`}
+        src={imgSrc}
         alt=""
         className="object-contain"
         width={size}
         height={size}
         loading="eager"
         decoding="async"
+        onError={() => {
+          if (imgSrc !== fallbackSrc) {
+            setImgSrc(fallbackSrc);
+          }
+        }}
       />
     </span>
   );

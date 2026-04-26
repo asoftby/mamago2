@@ -11,6 +11,8 @@ export interface DatePickerProps {
   className?: string;
   disabled?: boolean;
   disablePast?: boolean;
+  /** Ограничить выбор только этими датами (YYYY-MM-DD). */
+  allowedDateKeys?: string[] | null;
   placeholder?: string;
   showAge?: boolean; // New prop to show age calculation
 }
@@ -21,6 +23,7 @@ export function DatePicker({
   className,
   disabled = false,
   disablePast = true,
+  allowedDateKeys = null,
   placeholder = "Выберите дату",
   showAge = false,
 }: DatePickerProps) {
@@ -50,8 +53,27 @@ export function DatePicker({
     return `${years} лет`;
   };
 
-  // Generate year options (from current year - 25 to current year for children)
+  const allowedDateSet = React.useMemo(
+    () => new Set((allowedDateKeys ?? []).filter(Boolean)),
+    [allowedDateKeys],
+  );
+  const hasDateRestriction = allowedDateSet.size > 0;
+
+  // Generate year options:
+  // - default legacy behavior (birth-date-like range)
+  // - if restricted dates are provided, derive years from them.
   const yearOptions = React.useMemo(() => {
+    if (hasDateRestriction) {
+      const years = new Set<number>();
+      for (const key of allowedDateSet) {
+        const [year] = key.split("-");
+        const y = Number(year);
+        if (Number.isFinite(y)) years.add(y);
+      }
+      const sorted = Array.from(years).sort((a, b) => a - b);
+      if (sorted.length === 0) return [now.getFullYear()];
+      return sorted;
+    }
     const currentYear = now.getFullYear();
     const years = [];
     // For children, typically 0-18 years old, but allow up to 25 years back
@@ -59,7 +81,7 @@ export function DatePicker({
       years.push(y);
     }
     return years;
-  }, [now]);
+  }, [allowedDateSet, hasDateRestriction, now]);
 
   const firstDay = new Date(year, month, 1);
   const startOffset = (firstDay.getDay() === 0 ? 7 : firstDay.getDay()) - 1;
@@ -72,8 +94,14 @@ export function DatePicker({
     return date < todayStart;
   };
 
+  const isBlockedByRestriction = (day: number): boolean => {
+    if (!hasDateRestriction) return false;
+    const key = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    return !allowedDateSet.has(key);
+  };
+
   const handleDateClick = (day: number) => {
-    if (disabled || isPastDate(day)) return;
+    if (disabled || isPastDate(day) || isBlockedByRestriction(day)) return;
     const newDate = new Date(year, month, day);
     onDateChange?.(newDate);
   };
@@ -200,6 +228,7 @@ export function DatePicker({
             const today = isToday(day);
             const selected = isSelected(day);
             const past = isPastDate(day);
+            const blocked = isBlockedByRestriction(day);
 
             return (
               <button
@@ -211,10 +240,10 @@ export function DatePicker({
                   "disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent",
                   today && !selected && "ring-2 ring-primary/30 text-primary bg-primary/5",
                   selected && "bg-primary text-primary-foreground hover:bg-primary/90 shadow-md",
-                  past && "text-gray-300 cursor-not-allowed hover:bg-transparent"
+                  (past || blocked) && "text-gray-300 cursor-not-allowed hover:bg-transparent"
                 )}
                 onClick={() => handleDateClick(day)}
-                disabled={disabled || past}
+                disabled={disabled || past || blocked}
               >
                 {day}
               </button>

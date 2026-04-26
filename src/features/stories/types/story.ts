@@ -27,4 +27,9 @@ export type StoryCollection = {
   /** Emoji or icon name shown in the ring */
   emoji?: string;
   items: StoryItem[];
+  /**
+   * Precomputed cover URLs for the ring collage (up to 4).
+   * If not set, resolveStoryRingCoverUrl falls back to items[0].image.
+   */
+  coverImageUrls?: string[];
 };

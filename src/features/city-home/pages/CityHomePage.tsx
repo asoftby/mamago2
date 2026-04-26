@@ -120,7 +120,7 @@ export default async function CityHomePage({ citySlug }: CityHomePageProps) {
           <ActivationBannerHost />
         </div>
 
-        <StoriesSection />
+        <StoriesSection cityId={city.id} citySlug={city.slug} />
 
         <CityHomeKudaSection activities={kudaPreview} />
 

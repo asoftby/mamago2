@@ -25,6 +25,10 @@ const cardShell =
   "shrink-0 snap-start w-[42vw] min-w-[156px] max-w-[220px] sm:max-w-[240px] " +
   // Desktop: exactly 4 cards per row width (gap-6 => 3 * 1.5rem = 4.5rem)
   "lg:w-[calc((100%-4.5rem)/4)] lg:max-w-none";
+const kudaCardShell =
+  "shrink-0 snap-start w-[42vw] min-w-[156px] max-w-[220px] sm:max-w-[240px] " +
+  // Desktop: exactly 5 cards per row width (gap-6 => 4 * 1.5rem = 6rem)
+  "lg:w-[calc((100%-6rem)/5)] lg:max-w-none";
 
 function buildKudaSectionTitle(input: {
   citySlug: string;
@@ -112,7 +116,7 @@ export function CityHomeKudaSection({ activities }: { activities: ActivityMock[]
     >
       <HorizontalCardRow>
         {preview.map((activity) => (
-          <div key={activity.id} className={cardShell}>
+          <div key={activity.id} className={kudaCardShell}>
             <ActivityCard
               activity={activity}
               saveMeta={{
@@ -236,13 +240,16 @@ export function CityHomeJournalSection({
       actionHref={appendCityQuery("/blog")}
       actionIconButton
     >
-      <HorizontalCardRow>
-        {articles.map((a) => (
+      <HorizontalCardRow className="flex-wrap overflow-visible pe-0 snap-none sm:flex-nowrap sm:overflow-x-auto sm:pe-0 sm:snap-x sm:snap-mandatory">
+        {articles.map((a, index) => (
           <Link
             key={a.slug}
             href={`/blog/${a.slug}`}
             className={cn(
               cardShell,
+              index === 0
+                ? "w-full min-w-0 max-w-none sm:w-[42vw] sm:min-w-[156px] sm:max-w-[240px]"
+                : "w-[calc((100%-0.75rem)/2)] min-w-0 max-w-none sm:w-[42vw] sm:min-w-[156px] sm:max-w-[240px]",
               "rounded-2xl border border-neutral-200 bg-white p-4 hover:border-neutral-300 hover:bg-neutral-50/80 transition-colors",
             )}
           >
