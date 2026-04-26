@@ -224,7 +224,7 @@ export function ActivityCardEntityPicker({
               initialName={q.trim()}
               onCancel={() => setShowCreatePlace(false)}
               onPlaceCreated={(place) => {
-                onChangeId(place.id);
+                if (place.id) onChangeId(place.id);
                 setShowCreatePlace(false);
                 setResults([]);
                 setReplaceOpen(false);

@@ -11,6 +11,7 @@ import {
 } from "@/lib/content-editor/types";
 import { buildSurfaceRedirectDestination } from "@/lib/routing/surface";
 import { getCurrentRequestRoutingContext } from "@/lib/routing/requestContext";
+import { getEventStep1Taxonomies } from "@/server/admin/activities/get-activity-form-data";
 
 function surfaceFromUserRole(role: string): ContentEditorSurface {
   return role === "ADMIN" || role === "MODERATOR" ? "admin" : "business";
@@ -45,6 +46,7 @@ export default async function EditorNewEventPage({
   });
 
   const { returnTo } = await searchParams;
+  const initialStep1Taxonomies = await getEventStep1Taxonomies();
   const surface = surfaceFromUserRole(user.role);
   const nav = defaultEditorNav(surface, "event");
   const backHref = resolveEditorReturnDestination({
@@ -82,6 +84,7 @@ export default async function EditorNewEventPage({
         editorSurface={surface}
         contentEditorNav={nav}
         returnTo={returnTo}
+        initialStep1Taxonomies={initialStep1Taxonomies}
       />
     </ContentEditorChrome>
   );

@@ -1,6 +1,7 @@
 // Event Wizard Data Mappers
 
 import type { EventFormData } from "./types";
+import type { PendingLocation } from "./types";
 import type { Activity, ActivityFormat } from "@prisma/client";
 import type { Prisma } from "@prisma/client";
 import { getDefaultFormData } from "./defaults";
@@ -61,6 +62,50 @@ export type ActivityWithRelations = Activity & {
   } | null;
   programCategoryLinks?: Array<{ categoryId: string }>;
 };
+
+/**
+ * Применяет данные из pendingLocation в UI-поля formData.
+ * Вызывается при загрузке черновика из сервера.
+ */
+function applyPendingLocationToFormData(formData: EventFormData, pending: PendingLocation): void {
+  switch (pending.mode) {
+    case "EXISTING_PLACE":
+      formData.locationSource = "PLACE";
+      formData.venueKind = "PLACE";
+      formData.placeId = pending.placeId ?? null;
+      formData.venueName = pending.title ?? "";
+      formData.address = pending.address ?? "";
+      formData.city = pending.city ?? "";
+      formData.lat = pending.lat ?? null;
+      formData.lng = pending.lng ?? null;
+      break;
+    case "NEW_PLACE":
+    case "PARSED_LOCATION":
+      formData.locationSource = "MANUAL";
+      formData.venueKind = "MANUAL";
+      formData.placeId = null;
+      formData.venueName = pending.title ?? "";
+      formData.address = pending.address ?? "";
+      formData.city = pending.city ?? "";
+      formData.lat = pending.lat ?? null;
+      formData.lng = pending.lng ?? null;
+      break;
+    case "OFFSITE":
+      formData.locationSource = null;
+      formData.venueKind = "MOBILE";
+      formData.placeId = null;
+      formData.venueName = "";
+      formData.address = "";
+      break;
+    case "TBA":
+      formData.locationSource = null;
+      formData.venueKind = "TBD";
+      formData.placeId = null;
+      formData.venueName = "";
+      formData.address = "";
+      break;
+  }
+}
 
 /**
  * Map Activity entity to EventFormData
@@ -400,7 +445,33 @@ export function mapEventToFormData(event: ActivityWithRelations): EventFormData 
     formData.venueKind = null;
   }
 
-  // Step 7: Contacts
+  // pendingLocation — единственный источник правды до публикации.
+  // Читаем из scheduleJson и восстанавливаем в formData.
+  const rawPendingLocation = scheduleJson.pendingLocation;
+  if (rawPendingLocation && typeof rawPendingLocation === "object" && !Array.isArray(rawPendingLocation)) {
+    const pl = rawPendingLocation as Record<string, unknown>;
+    const plMode = pl.mode;
+    if (
+      plMode === "EXISTING_PLACE" ||
+      plMode === "NEW_PLACE" ||
+      plMode === "PARSED_LOCATION" ||
+      plMode === "OFFSITE" ||
+      plMode === "TBA"
+    ) {
+      const pending: PendingLocation = { mode: plMode };
+      if (typeof pl.placeId === "string") pending.placeId = pl.placeId;
+      if (typeof pl.title === "string") pending.title = pl.title;
+      if (typeof pl.address === "string") pending.address = pl.address;
+      if (typeof pl.city === "string") pending.city = pl.city;
+      if (typeof pl.lat === "number") pending.lat = pl.lat;
+      if (typeof pl.lng === "number") pending.lng = pl.lng;
+      if (pl.source === "manual" || pl.source === "parser") pending.source = pl.source;
+      if (pl.raw !== undefined) pending.raw = pl.raw;
+      formData.pendingLocation = pending;
+      applyPendingLocationToFormData(formData, pending);
+    }
+  }
+
   const contacts = scheduleJson.contacts as Record<string, unknown> | undefined;
   formData.contactMode =
     contacts?.mode === "override"
@@ -639,6 +710,9 @@ export function buildEventPayload(data: EventFormData): EventPayload {
         website: data.organizerWebsite,
         instagram: data.organizerInstagram,
       },
+
+      // pendingLocation — единственный источник правды о локации до публикации
+      ...(data.pendingLocation ? { pendingLocation: data.pendingLocation } : {}),
     },
 
     priceFrom:
@@ -777,9 +851,15 @@ export function extractChanges(current: EventFormData, original: EventFormData):
     current.districtAutoId !== original.districtAutoId ||
     current.districtManualId !== original.districtManualId ||
     current.metroAutoId !== original.metroAutoId ||
-    current.metroManualId !== original.metroManualId
+    current.metroManualId !== original.metroManualId ||
+    JSON.stringify(current.pendingLocation) !== JSON.stringify(original.pendingLocation)
   ) {
     changes.venue = buildEventPayload(current).venue;
+    // Включаем pendingLocation в scheduleJson при изменении локации
+    changes.scheduleJson = {
+      ...(changes.scheduleJson ?? {}),
+      ...(current.pendingLocation ? { pendingLocation: current.pendingLocation } : { pendingLocation: null }),
+    };
   }
 
   return changes;

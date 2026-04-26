@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Search, MapPin, Building2, Loader2, Plus } from "lucide-react";
+import { Search, MapPin, Building2, Loader2, PenLine } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
@@ -272,9 +272,9 @@ export function PlaceSearchAutocomplete({
               {showEmptyState && (
                 <div className="flex min-h-[112px] items-center px-4 py-6">
                   <div className="space-y-1">
-                    <div className="text-sm font-medium text-gray-900">Места не найдены</div>
+                    <div className="text-sm font-medium text-gray-900">Место не найдено</div>
                     <div className="text-sm text-muted-foreground">
-                      Попробуйте другое название или создайте новое место.
+                      Попробуйте другое название или укажите адрес вручную.
                     </div>
                   </div>
                 </div>
@@ -298,17 +298,17 @@ export function PlaceSearchAutocomplete({
                     : "hover:bg-gray-50"
                 )}
               >
-                <div className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-primary/10">
-                  <Plus className="h-3 w-3 text-primary" />
+                <div className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-muted">
+                  <PenLine className="h-3 w-3 text-muted-foreground" />
                 </div>
                 <div className="min-w-0">
                   <div className="font-medium text-gray-900">
-                    Создать новое место
+                    Указать адрес вручную
                   </div>
                   <div className="truncate text-sm text-muted-foreground">
                     {query.length >= 2
-                      ? `Создать место "${query}"`
-                      : "Добавить место вручную"}
+                      ? `Использовать "${query}" как название`
+                      : "Ввести название и адрес"}
                   </div>
                 </div>
               </button>

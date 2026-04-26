@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -13,18 +14,97 @@ import {
   type ParticipationModeUi,
 } from "../participationCtaLabels";
 import { cn } from "@/lib/utils";
+import { normalizePhoneToE164 } from "@/lib/phone/e164";
+
+function normalizeForDisplay(value: string): string {
+  const e164 = normalizePhoneToE164(value);
+  const digits = e164.replace(/\D/g, "");
+  if (!digits.startsWith("375") || digits.length < 12) return e164;
+  const local = digits.slice(3);
+  const aa = local.slice(0, 2);
+  const bbb = local.slice(2, 5);
+  const cc = local.slice(5, 7);
+  const dd = local.slice(7, 9);
+  return `+375 ${aa} ${bbb}-${cc}-${dd}`;
+}
 
 interface Step5PricingParticipationProps {
   data: EventFormData;
   onChange: (updates: Partial<EventFormData>) => void;
   isEditable: boolean;
+  eventId?: string;
 }
 
 export function Step5PricingParticipation({
   data,
   onChange,
   isEditable,
+  eventId,
 }: Step5PricingParticipationProps) {
+  const [importPhones, setImportPhones] = useState<string[]>([]);
+  const [highlightPhoneField, setHighlightPhoneField] = useState(false);
+  const phoneInputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    if (!eventId) {
+      setImportPhones([]);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const response = await fetch(`/api/business/events/${eventId}/contact-source`, {
+          credentials: "include",
+        });
+        if (!response.ok) {
+          if (!cancelled) setImportPhones([]);
+          return;
+        }
+        const payload = (await response.json()) as { phone?: string; phones?: string[] };
+        const candidates = [
+          ...(Array.isArray(payload.phones) ? payload.phones : []),
+          ...(typeof payload.phone === "string" ? [payload.phone] : []),
+        ]
+          .map((value) => value.trim())
+          .filter((value) => value.length > 0);
+        const normalized = [...new Set(candidates.map((phone) => normalizeForDisplay(phone)).filter(Boolean))];
+        if (!cancelled) setImportPhones(normalized);
+      } catch {
+        if (!cancelled) setImportPhones([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [eventId]);
+
+  const visibleImportPhones = useMemo(() => importPhones.slice(0, 3), [importPhones]);
+  const hiddenImportPhonesCount = Math.max(0, importPhones.length - visibleImportPhones.length);
+
+  const selectedParticipation = normalizeParticipationMode(
+    data.participationMode ?? "walk-in",
+  );
+
+  const canShowPhoneImportBlock =
+    selectedParticipation === "prebook" &&
+    data.prebookMethod === "phone" &&
+    importPhones.length > 0;
+
+  const applyPhoneFromSource = (value: string) => {
+    const normalized = normalizePhoneToE164(value);
+    onChange({ prebookPhone: normalized });
+    requestAnimationFrame(() => {
+      phoneInputRef.current?.focus();
+      setHighlightPhoneField(true);
+    });
+  };
+
+  useEffect(() => {
+    if (!highlightPhoneField) return;
+    const timeout = setTimeout(() => setHighlightPhoneField(false), 1400);
+    return () => clearTimeout(timeout);
+  }, [highlightPhoneField]);
+
   /** walk-in первым — совпадает с дефолтом формы и не выглядит как «выбран билет по умолчанию». */
   const participationItems: Array<{
     value: ParticipationModeUi;
@@ -57,10 +137,6 @@ export function Step5PricingParticipation({
       icon: PhoneCall,
     },
   ];
-
-  const selectedParticipation = normalizeParticipationMode(
-    data.participationMode ?? "walk-in",
-  );
 
   const setParticipation = (value: ParticipationModeUi) => {
     onChange({
@@ -255,16 +331,67 @@ export function Step5PricingParticipation({
                         </div>
 
                         {data.prebookMethod === "phone" && (
-                          <div className="space-y-2">
+                          <div className="space-y-3">
                             <Label htmlFor="prebookPhone">Телефон для записи</Label>
-                            <Input
-                              id="prebookPhone"
-                              type="tel"
-                              value={data.prebookPhone}
-                              onChange={(e) => onChange({ prebookPhone: e.target.value })}
-                              placeholder="+375 29 123 45 67"
-                              disabled={!isEditable}
-                            />
+                            <div
+                              className={cn(
+                                "rounded-lg border border-transparent p-0.5 transition-colors",
+                                highlightPhoneField && "border-emerald-300 bg-emerald-50/60",
+                              )}
+                            >
+                              <Input
+                                id="prebookPhone"
+                                ref={phoneInputRef}
+                                type="tel"
+                                value={data.prebookPhone}
+                                onChange={(e) => onChange({ prebookPhone: e.target.value })}
+                                placeholder="+375 29 123 45 67"
+                                disabled={!isEditable}
+                              />
+                            </div>
+                            {canShowPhoneImportBlock ? (
+                              <div className="rounded-xl border border-sky-200 bg-sky-50/60 p-3">
+                                <div className="mb-2">
+                                  <p className="text-sm font-semibold text-sky-950">Контакты из источника</p>
+                                  <p className="text-[12px] text-sky-900/70">Найдено в импортированных данных</p>
+                                </div>
+                                <div className="space-y-2">
+                                  {visibleImportPhones.map((phone) => (
+                                    <div
+                                      key={phone}
+                                      className="flex items-center justify-between gap-3 rounded-lg border border-sky-100 bg-white px-3 py-2"
+                                    >
+                                      <span className="text-sm text-slate-800">{phone}</span>
+                                      <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="outline"
+                                        disabled={!isEditable}
+                                        onClick={() => applyPhoneFromSource(phone)}
+                                      >
+                                        Применить
+                                      </Button>
+                                    </div>
+                                  ))}
+                                </div>
+                                {hiddenImportPhonesCount > 0 ? (
+                                  <p className="mt-2 text-[12px] text-sky-900/70">И ещё {hiddenImportPhonesCount}</p>
+                                ) : null}
+                                {importPhones.length === 1 ? (
+                                  <div className="mt-2">
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      variant="secondary"
+                                      disabled={!isEditable}
+                                      onClick={() => applyPhoneFromSource(importPhones[0]!)}
+                                    >
+                                      Вставить из источника
+                                    </Button>
+                                  </div>
+                                ) : null}
+                              </div>
+                            ) : null}
                           </div>
                         )}
 

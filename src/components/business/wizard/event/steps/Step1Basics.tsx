@@ -14,38 +14,17 @@ import { FilterSelect } from "@/components/ui/filter-select";
 import { straightQuotesToGuillemets } from "@/lib/text/straightQuotesToGuillemets";
 import { SYSTEM_INTERESTS } from "@/lib/config/interests";
 import { AGE_OPTIONS, sortAgeKeys } from "@/lib/config/ages";
+import type {
+  DiscoveryEventCategory,
+  EventStep1Taxonomies,
+  PublicAgeOption,
+  PublicGenreOption,
+  PublicInterestOption,
+} from "./step1Taxonomies";
 import {
   ACTIVITY_FORMAT_OPTIONS,
   getActivityFormatOption,
 } from "@/domain/activities/activity-format";
-
-type DiscoveryEventCategory = {
-  id: string;
-  nameRu: string;
-  slug: string;
-  icon?: string | null;
-  supportsProgram?: boolean;
-  selectableInProgram?: boolean;
-  parentId: string | null;
-  sortOrder: number;
-  children?: DiscoveryEventCategory[];
-};
-
-type PublicAgeOption = {
-  id: string;
-  label: string;
-  value: string;
-  order: number;
-  active: boolean;
-};
-
-type PublicInterestOption = {
-  id: string;
-  label: string;
-  value: string;
-  order: number;
-  active: boolean;
-};
 
 /** Совпадает с prisma/seed.ts (сигнал age) — если API недоступен или пустой. */
 const FALLBACK_AGE_OPTIONS: PublicAgeOption[] = AGE_OPTIONS.map((option) => ({
@@ -66,31 +45,39 @@ function buildFallbackInterestOptions(): PublicInterestOption[] {
   }));
 }
 
-type PublicGenreOption = {
-  id: string;
-  title: string;
-  slug: string;
-  sortOrder: number;
-  isActive: boolean;
-};
-
 interface Step1BasicsProps {
   data: EventFormData;
   onChange: (updates: Partial<EventFormData>) => void;
   isEditable: boolean;
+  initialTaxonomies?: EventStep1Taxonomies;
 }
 
-export function Step1Basics({ data, onChange, isEditable }: Step1BasicsProps) {
-  const [rootCategories, setRootCategories] = useState<DiscoveryEventCategory[]>([]);
-  const [ageOptions, setAgeOptions] = useState<PublicAgeOption[]>([]);
-  const [interestOptions, setInterestOptions] = useState<PublicInterestOption[]>([]);
+export function Step1Basics({
+  data,
+  onChange,
+  isEditable,
+  initialTaxonomies,
+}: Step1BasicsProps) {
+  const [rootCategories, setRootCategories] = useState<DiscoveryEventCategory[]>(
+    initialTaxonomies?.categories ?? [],
+  );
+  const [ageOptions, setAgeOptions] = useState<PublicAgeOption[]>(
+    initialTaxonomies?.ageOptions ?? [],
+  );
+  const [interestOptions, setInterestOptions] = useState<PublicInterestOption[]>(
+    initialTaxonomies?.interestOptions ?? [],
+  );
   /** Жанры по id корневой категории (после выбора категории). */
   const [genresByCategoryId, setGenresByCategoryId] = useState<
     Record<string, PublicGenreOption[]>
-  >({});
-  const [loading, setLoading] = useState(true);
+  >(initialTaxonomies?.genresByCategoryId ?? {});
+  const [loading, setLoading] = useState(!initialTaxonomies);
 
   useEffect(() => {
+    if (initialTaxonomies) {
+      setLoading(false);
+      return;
+    }
     let alive = true;
     async function load() {
       setLoading(true);
@@ -153,7 +140,7 @@ export function Step1Basics({ data, onChange, isEditable }: Step1BasicsProps) {
     return () => {
       alive = false;
     };
-  }, []);
+  }, [initialTaxonomies]);
 
   const primaryLeafId = data.subcategoryId ?? data.categoryId;
 
@@ -180,9 +167,12 @@ export function Step1Basics({ data, onChange, isEditable }: Step1BasicsProps) {
     let cancelled = false;
     const cid = data.categoryId;
     if (!cid) {
-      setGenresByCategoryId({});
+      setGenresByCategoryId((current) =>
+        Object.keys(current).length === 0 ? current : {},
+      );
       return;
     }
+    if (genresByCategoryId[cid]) return;
 
     void (async () => {
       const next: Record<string, PublicGenreOption[]> = {};
@@ -203,7 +193,7 @@ export function Step1Basics({ data, onChange, isEditable }: Step1BasicsProps) {
     return () => {
       cancelled = true;
     };
-  }, [data.categoryId]);
+  }, [data.categoryId, genresByCategoryId]);
 
   const supportsProgram = Boolean(primaryRoot?.supportsProgram);
   const ageDetection = data.ageDetection ?? {

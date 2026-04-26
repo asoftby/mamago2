@@ -16,6 +16,7 @@ import { TOTAL_EVENT_WIZARD_STEPS } from "@/components/business/wizard/event/eve
 import { buildSurfaceRedirectDestination } from "@/lib/routing/surface";
 import { getCurrentRequestRoutingContext } from "@/lib/routing/requestContext";
 import { ExternalLink } from "lucide-react";
+import { getEventStep1Taxonomies } from "@/server/admin/activities/get-activity-form-data";
 
 function surfaceFromUserRole(role: string): ContentEditorSurface {
   return role === "ADMIN" || role === "MODERATOR" ? "admin" : "business";
@@ -56,6 +57,10 @@ export default async function EditorEditEventPage({
       : undefined;
 
   const { event, eventForWizard } = await loadEventForWizard(id);
+  const initialStep1Taxonomies = await getEventStep1Taxonomies({
+    selectedCategoryId: eventForWizard?.eventCategoryId ?? null,
+  });
+
 
   if (!event || !eventForWizard) {
     notFound();
@@ -163,6 +168,7 @@ export default async function EditorEditEventPage({
         contentEditorNav={nav}
         returnTo={returnTo}
         initialEditStep={initialEditStep}
+        initialStep1Taxonomies={initialStep1Taxonomies}
       />
     </ContentEditorChrome>
   );

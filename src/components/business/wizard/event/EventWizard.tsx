@@ -51,6 +51,7 @@ import {
 } from "@/lib/business/eventEditorReturnStep";
 import { parseEventEditorStepQuery } from "@/lib/business/eventEditorStepQuery";
 import { navigateToCompatibleHref } from "@/lib/routing/clientNavigation";
+import type { EventStep1Taxonomies } from "./steps/step1Taxonomies";
 
 interface EventWizardProps {
   mode: EventWizardMode;
@@ -71,6 +72,7 @@ interface EventWizardProps {
   returnTo?: string;
   /** Серверный `?step=` — чтобы не было гонки с URL-sync (state=1 затирал ?step=N). */
   initialEditStep?: number;
+  initialStep1Taxonomies?: EventStep1Taxonomies;
 }
 
 const LOCAL_STORAGE_KEY = "event-wizard-draft";
@@ -138,6 +140,7 @@ function EventWizardInner({
   contentEditorNav,
   returnTo,
   initialEditStep,
+  initialStep1Taxonomies,
 }: EventWizardProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -695,6 +698,7 @@ function EventWizardInner({
       stepConfig.key === "location" ||
       stepConfig.key === "media" ||
       stepConfig.key === "schedule" ||
+      stepConfig.key === "pricing" ||
       stepConfig.key === "contacts" ||
       stepConfig.key === "organizer"
     ) {
@@ -704,6 +708,10 @@ function EventWizardInner({
       return <StepComponent {...commonProps} wizardSessionId={wizardSessionId} eventId={eventId ?? event?.id} />;
     }
     
+    if (stepConfig.key === "basics") {
+      return <StepComponent {...commonProps} initialTaxonomies={initialStep1Taxonomies} />;
+    }
+
     return <StepComponent {...commonProps} />;
   };
 

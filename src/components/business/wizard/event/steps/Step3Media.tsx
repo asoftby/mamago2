@@ -70,6 +70,8 @@ type ImportedMedia = {
   galleryUrls: string[];
 };
 
+type MediaStatus = "loading" | "loaded" | "empty";
+
 function ImportBadge({ className }: { className?: string }) {
   return (
     <span
@@ -214,6 +216,7 @@ export function Step3Media({
   const [isDraggingGallery, setIsDraggingGallery] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
   const [importedMedia, setImportedMedia] = useState<ImportedMedia>({ coverUrl: null, galleryUrls: [] });
+  const [mediaStatus, setMediaStatus] = useState<MediaStatus>("empty");
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerMode, setPickerMode] = useState<"cover" | "gallery">("cover");
   const [pickerLoading, setPickerLoading] = useState(false);
@@ -271,17 +274,31 @@ export function Step3Media({
   }, []);
 
   useEffect(() => {
-    if (!eventId) return;
+    if (!eventId) {
+      setImportedMedia({ coverUrl: null, galleryUrls: [] });
+      setMediaStatus("empty");
+      return;
+    }
     let cancelled = false;
+    setMediaStatus("loading");
     (async () => {
-      const res = await fetch(`/api/business/events/${eventId}/media-library`, { credentials: "include" });
-      if (!res.ok) return;
-      const payload = (await res.json()) as { importedMedia?: ImportedMedia };
-      if (!cancelled) {
-        setImportedMedia({
+      try {
+        const res = await fetch(`/api/business/events/${eventId}/media-library`, { credentials: "include" });
+        if (!res.ok) {
+          if (!cancelled) setMediaStatus("empty");
+          return;
+        }
+        const payload = (await res.json()) as { importedMedia?: ImportedMedia };
+        if (cancelled) return;
+        const next = {
           coverUrl: payload.importedMedia?.coverUrl ?? null,
           galleryUrls: payload.importedMedia?.galleryUrls ?? [],
-        });
+        };
+        setImportedMedia(next);
+        const hasAny = Boolean(next.coverUrl) || next.galleryUrls.length > 0;
+        setMediaStatus(hasAny ? "loaded" : "empty");
+      } catch {
+        if (!cancelled) setMediaStatus("empty");
       }
     })();
     return () => {
@@ -643,54 +660,92 @@ export function Step3Media({
         </p>
       </div>
 
-      {importedCoverCandidateUrl ? (
+      {eventId ? (
         <div className="rounded-xl border border-sky-200 bg-sky-50/70 p-4">
           <div className="mb-3 flex items-center gap-2">
             <h3 className="text-sm font-semibold text-sky-950">Изображение из источника</h3>
-            <ImportBadge />
+            {mediaStatus === "loaded" ? <ImportBadge /> : null}
           </div>
           <div className="grid gap-4 md:grid-cols-[220px_minmax(0,1fr)]">
-            <div className="overflow-hidden rounded-xl border border-sky-100 bg-white">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={importedCoverCandidateUrl}
-                alt="Постер из источника"
-                className="aspect-square w-full object-cover"
-              />
-            </div>
-            <div className="flex flex-col justify-between gap-4">
-              <div className="space-y-2">
-                <p className="text-sm font-medium text-sky-950">Постер найден в источнике</p>
-                <p className="text-[12px] text-sky-900/75">
-                  Это изображение можно сразу использовать как обложку события.
-                </p>
-                <p className="text-[12px] text-sky-900/60">
-                  При применении изображение будет сохранено в медиатеку.
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  type="button"
-                  size="sm"
-                  disabled={!isEditable || isApplyingImportedCover}
-                  onClick={() => void applyImportedCover(importedCoverCandidateUrl)}
-                >
-                  {isApplyingImportedCover ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                  {data.coverImage || coverPreview ? "Заменить на изображение из источника" : "Применить как обложку"}
-                </Button>
-              </div>
-              {chosenImportedCoverUrl === importedCoverCandidateUrl ? (
-                <div className="inline-flex w-fit items-center gap-2 rounded-full bg-emerald-100 px-3 py-1 text-[12px] font-medium text-emerald-800">
-                  <Check className="h-3.5 w-3.5" />
-                  Обложка выбрана из источника
+            {mediaStatus === "loading" ? (
+              <>
+                <div className="overflow-hidden rounded-xl border border-sky-100 bg-white">
+                  <div className="aspect-square w-full animate-pulse bg-sky-100/70" />
                 </div>
-              ) : null}
-            </div>
+                <div className="flex min-h-[220px] flex-col justify-between gap-4">
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-sky-950">Загружаем изображение из источника</p>
+                    <p className="text-[12px] text-sky-900/75">
+                      Это может занять несколько секунд. Изображение появится автоматически.
+                    </p>
+                  </div>
+                  <div className="inline-flex w-fit items-center gap-2 rounded-full bg-sky-100 px-3 py-1 text-[12px] font-medium text-sky-800">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    Загружаем...
+                  </div>
+                </div>
+              </>
+            ) : null}
+
+            {mediaStatus === "loaded" && importedCoverCandidateUrl ? (
+              <>
+                <div className="overflow-hidden rounded-xl border border-sky-100 bg-white">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={importedCoverCandidateUrl}
+                    alt="Постер из источника"
+                    className="aspect-square w-full object-cover"
+                  />
+                </div>
+                <div className="flex min-h-[220px] flex-col justify-between gap-4">
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-sky-950">Постер найден в источнике</p>
+                    <p className="text-[12px] text-sky-900/75">
+                      Это изображение можно сразу использовать как обложку события.
+                    </p>
+                    <p className="text-[12px] text-sky-900/60">
+                      При применении изображение будет сохранено в медиатеку.
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      disabled={!isEditable || isApplyingImportedCover}
+                      onClick={() => void applyImportedCover(importedCoverCandidateUrl)}
+                    >
+                      {isApplyingImportedCover ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                      {data.coverImage || coverPreview ? "Заменить на изображение из источника" : "Применить как обложку"}
+                    </Button>
+                  </div>
+                  {chosenImportedCoverUrl === importedCoverCandidateUrl ? (
+                    <div className="inline-flex w-fit items-center gap-2 rounded-full bg-emerald-100 px-3 py-1 text-[12px] font-medium text-emerald-800">
+                      <Check className="h-3.5 w-3.5" />
+                      Обложка выбрана из источника
+                    </div>
+                  ) : null}
+                </div>
+              </>
+            ) : null}
+
+            {mediaStatus === "empty" ? (
+              <>
+                <div className="overflow-hidden rounded-xl border border-sky-100 bg-white">
+                  <div className="aspect-square w-full bg-sky-100/40" />
+                </div>
+                <div className="flex min-h-[220px] flex-col justify-center gap-2">
+                  <p className="text-sm font-medium text-sky-950">Изображение не найдено</p>
+                  <p className="text-[12px] text-sky-900/75">
+                    Вы можете загрузить изображение вручную или выбрать из медиатеки.
+                  </p>
+                </div>
+              </>
+            ) : null}
           </div>
         </div>
       ) : null}
 
-      {importedGalleryCandidates.length > 0 ? (
+      {mediaStatus === "loaded" && importedGalleryCandidates.length > 0 ? (
         <div className="rounded-xl border border-sky-200 bg-sky-50/50 p-4">
           <div className="mb-3 flex items-center gap-2">
             <h3 className="text-sm font-semibold text-sky-950">Дополнительные изображения из источника</h3>

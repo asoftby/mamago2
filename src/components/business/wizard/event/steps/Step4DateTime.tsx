@@ -1,10 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { EventScheduleList } from "@/components/admin/event-schedule/EventScheduleList";
 import type { EventScheduleItem } from "@/components/admin/event-schedule/types";
 import type { EventFormData } from "../types";
-import { Button } from "@/components/ui/button";
 import { createDefaultScheduleItem } from "../defaults";
 
 const DEBUG_EDITOR = process.env.NODE_ENV !== "production";
@@ -27,7 +26,6 @@ interface Step4DateTimeProps {
 
 export function Step4DateTime({ data, onChange, isEditable, eventId }: Step4DateTimeProps) {
   const [importedScheduleItems, setImportedScheduleItems] = useState<string[]>([]);
-  const [showAllImportedItems, setShowAllImportedItems] = useState(false);
   const scheduleItems =
     Array.isArray(data.scheduleItems) && data.scheduleItems.length > 0
       ? data.scheduleItems
@@ -78,9 +76,36 @@ export function Step4DateTime({ data, onChange, isEditable, eventId }: Step4Date
     };
   }, [eventId]);
 
-  const visibleImportedItems = showAllImportedItems
-    ? importedScheduleItems
-    : importedScheduleItems.slice(0, 5);
+  const normalizedImportedItems = useMemo(() => {
+    const hasTime = (value: string) => /\b\d{1,2}:\d{2}\b/.test(value);
+    const toKey = (value: string) =>
+      value
+        .toLowerCase()
+        .replace(/\b\d{4}\s*г\.?/g, "")
+        .replace(/[.,]/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+
+    const byKey = new Map<string, string>();
+    for (const raw of importedScheduleItems) {
+      const item = raw.trim();
+      if (!item) continue;
+      const key = toKey(item);
+      const prev = byKey.get(key);
+      if (!prev) {
+        byKey.set(key, item);
+        continue;
+      }
+      if (hasTime(item) && !hasTime(prev)) {
+        byKey.set(key, item);
+      } else if (item.length > prev.length) {
+        byKey.set(key, item);
+      }
+    }
+    return Array.from(byKey.values());
+  }, [importedScheduleItems]);
+
+  const visibleImportedItems = normalizedImportedItems.slice(0, 1);
 
   return (
     <div className="space-y-6">
@@ -91,7 +116,7 @@ export function Step4DateTime({ data, onChange, isEditable, eventId }: Step4Date
         </p>
       </div>
 
-      {importedScheduleItems.length > 0 ? (
+      {normalizedImportedItems.length > 0 ? (
         <div className="rounded-xl border border-sky-200 bg-sky-50/60 p-4">
           <div className="flex items-center justify-between gap-3">
             <div>
@@ -113,18 +138,6 @@ export function Step4DateTime({ data, onChange, isEditable, eventId }: Step4Date
             ))}
           </div>
 
-          {importedScheduleItems.length > 5 ? (
-            <div className="mt-4">
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                onClick={() => setShowAllImportedItems((prev) => !prev)}
-              >
-                {showAllImportedItems ? "Свернуть" : "Показать все"}
-              </Button>
-            </div>
-          ) : null}
         </div>
       ) : null}
 

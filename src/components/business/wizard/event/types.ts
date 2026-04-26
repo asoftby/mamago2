@@ -11,6 +11,29 @@ import type {
 export type EventWizardMode = "create" | "edit";
 
 /**
+ * Pending location — единственный источник правды о локации до публикации.
+ * Хранится в scheduleJson.pendingLocation, Place в БД не создаётся.
+ */
+export type PendingLocationMode =
+  | "EXISTING_PLACE"
+  | "NEW_PLACE"
+  | "PARSED_LOCATION"
+  | "OFFSITE"
+  | "TBA";
+
+export interface PendingLocation {
+  mode: PendingLocationMode;
+  placeId?: string;
+  title?: string;
+  address?: string;
+  city?: string;
+  lat?: number;
+  lng?: number;
+  source?: "manual" | "parser";
+  raw?: unknown;
+}
+
+/**
  * Complete Event Form Data
  * Covers all 9 steps of the wizard
  */
@@ -149,6 +172,12 @@ export interface EventFormData {
   
   source: "PLACE" | "ADDRESS_INPUT" | "MAP_PICKER" | "MOBILE" | "TBD" | null;
   venueNote: string;
+
+  /**
+   * Pending location — единственный источник правды о локации до публикации.
+   * Хранится в scheduleJson.pendingLocation. Place в БД не создаётся.
+   */
+  pendingLocation: PendingLocation | null;
   
   // Step 7: Contacts
   contactMode: "inherit" | "override";

@@ -124,6 +124,7 @@ export function getDefaultFormData(): EventFormData {
     
     source: null,
     venueNote: "",
+    pendingLocation: null,
     
     // Step 7: Contacts
     contactMode: "inherit",

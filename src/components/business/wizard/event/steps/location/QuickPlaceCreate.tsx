@@ -5,37 +5,38 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Loader2, X, CheckCircle2 } from "lucide-react";
-import { createQuickPlaceDraft } from "@/lib/places/quickPlaceCreateClient";
-import type { QuickPlaceCreateSource } from "@/lib/places/quickPlaceCreateClient";
 import { cn } from "@/lib/utils";
 import { EventLocationSearchInput } from "./EventLocationSearchInput";
 import { EventLocationMapModal } from "./EventLocationMapModal";
+import { enrichEventLocation } from "./eventLocationUtils";
+
+interface LocationData {
+  id?: string;
+  title: string;
+  address: string;
+  fullAddress: string;
+  cityId: string | null;
+  cityName: string | null;
+  citySlug: string | null;
+  lat: number | null;
+  lng: number | null;
+  districtId: string | null;
+  districtName: string | null;
+  metroId: string | null;
+  metroName: string | null;
+  metroDistanceM: number | null;
+}
 
 interface QuickPlaceCreateProps {
-  onPlaceCreated: (place: {
-    id: string;
-    title: string;
-    address: string;
-    fullAddress: string;
-    cityId: string | null;
-    cityName: string | null;
-    citySlug: string | null;
-    lat: number | null;
-    lng: number | null;
-    districtId: string | null;
-    districtName: string | null;
-    metroId: string | null;
-    metroName: string | null;
-    metroDistanceM: number | null;
-  }) => void;
+  onPlaceCreated: (location: LocationData) => void;
   onCancel: () => void;
   initialName?: string;
   /** Встроенный вид (редактор статьи): без «карточки события», без полноэкранной карты по умолчанию */
   embedded?: boolean;
   /** Карта: полноэкранный оверлей или встроенный блок */
   mapLayout?: "modal" | "inline";
-  /** Тот же POST /api/business/places, различается только shortDesc по умолчанию */
-  placeCreateSource?: QuickPlaceCreateSource;
+  /** Источник создания (для аналитики/логов, не влияет на UI) */
+  placeCreateSource?: string;
 }
 
 export function QuickPlaceCreate({
@@ -44,7 +45,8 @@ export function QuickPlaceCreate({
   initialName = "",
   embedded = false,
   mapLayout = "modal",
-  placeCreateSource = "event_wizard",
+  // placeCreateSource is accepted but not used in UI
+  placeCreateSource: _placeCreateSource,
 }: QuickPlaceCreateProps) {
   const [name, setName] = useState(initialName);
   const [address, setAddress] = useState("");
@@ -53,7 +55,7 @@ export function QuickPlaceCreate({
   const [googlePlaceId, setGooglePlaceId] = useState<string | null>(null);
   const [addressJson, setAddressJson] = useState<unknown[]>([]);
   
-  const [isCreating, setIsCreating] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isMapModalOpen, setIsMapModalOpen] = useState(false);
   
@@ -114,45 +116,43 @@ export function QuickPlaceCreate({
       return;
     }
 
-    setIsCreating(true);
+    setIsSaving(true);
     setError(null);
 
     try {
-      const createdPlace = await createQuickPlaceDraft({
-        title: name.trim(),
-        formattedAddr: address,
+      // Enrich location data with district/metro
+      const enrichment = await enrichEventLocation({
         lat,
         lng,
-        googlePlaceId,
+        formattedAddr: address,
         addressJson,
-        source: placeCreateSource,
       });
 
+      // Return location data WITHOUT creating Place in database
       onPlaceCreated({
-        id: createdPlace.id,
-        title: createdPlace.title,
-        address: createdPlace.formattedAddr || createdPlace.customAddress || "",
-        fullAddress: createdPlace.formattedAddr || createdPlace.customAddress || "",
-        cityId: createdPlace.cityId,
+        title: name.trim(),
+        address: address,
+        fullAddress: address,
+        cityId: enrichment?.cityId || null,
         cityName: null,
         citySlug: null,
-        lat: createdPlace.lat,
-        lng: createdPlace.lng,
-        districtId: createdPlace.districtAutoId || createdPlace.districtManualId,
-        districtName: null,
-        metroId: createdPlace.metroAutoId || createdPlace.metroManualId,
-        metroName: null,
-        metroDistanceM: createdPlace.metroAutoDistanceM || createdPlace.metroManualDistanceM,
+        lat,
+        lng,
+        districtId: enrichment?.districtAutoId || null,
+        districtName: enrichment?.districtName || null,
+        metroId: enrichment?.metroAutoId || null,
+        metroName: enrichment?.metroName || null,
+        metroDistanceM: enrichment?.metroAutoDistanceM || null,
       });
     } catch (err) {
-      console.error("[QuickPlaceCreate] Create error:", err);
-      setError(err instanceof Error ? err.message : "Ошибка создания места");
+      console.error("[QuickPlaceCreate] Save error:", err);
+      setError(err instanceof Error ? err.message : "Ошибка сохранения локации");
     } finally {
-      setIsCreating(false);
+      setIsSaving(false);
     }
   };
 
-  const canCreate = name.trim().length > 0 && lat !== null && lng !== null;
+  const canSave = name.trim().length > 0 && lat !== null && lng !== null;
 
   return (
     <div
@@ -165,12 +165,12 @@ export function QuickPlaceCreate({
     >
       <div className="mb-4 flex items-center justify-between">
         <h3 className={cn("font-semibold text-gray-900", embedded ? "text-base" : "text-lg")}>
-          Создать новое место
+          Указать локацию вручную
         </h3>
         <button
           type="button"
           onClick={onCancel}
-          disabled={isCreating}
+          disabled={isSaving}
           className="rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 disabled:opacity-50"
         >
           <X className="h-5 w-5" />
@@ -189,7 +189,7 @@ export function QuickPlaceCreate({
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Детский центр Песочница"
-            disabled={isCreating}
+            disabled={isSaving}
             className="mt-1"
           />
         </div>
@@ -203,14 +203,14 @@ export function QuickPlaceCreate({
             <EventLocationSearchInput
               ref={addressInputRef}
               onPlaceSelect={handleAddressSelect}
-              disabled={isCreating}
+              disabled={isSaving}
               initialValue={address}
               placeholder="Притыцкого 12 или выберите на карте"
             />
             <button
               type="button"
               onClick={() => setIsMapModalOpen(true)}
-              disabled={isCreating}
+              disabled={isSaving}
               className="text-sm text-muted-foreground underline decoration-dashed decoration-primary underline-offset-4 hover:text-muted-foreground hover:decoration-primary/80 disabled:opacity-50"
             >
               {mapLayout === "inline" ? "Открыть карту и выбрать точку" : "Выбрать точку на карте"}
@@ -241,32 +241,30 @@ export function QuickPlaceCreate({
           <Button
             type="button"
             onClick={handleCreate}
-            disabled={!canCreate || isCreating}
+            disabled={!canSave || isSaving}
             className="flex-1"
           >
-            {isCreating ? (
+            {isSaving ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Создаю...
+                Сохраняю...
               </>
             ) : (
-              "Создать место"
+              "Использовать эту локацию"
             )}
           </Button>
           <Button
             type="button"
             variant="outline"
             onClick={onCancel}
-            disabled={isCreating}
+            disabled={isSaving}
           >
             Отмена
           </Button>
         </div>
 
         <p className="text-xs text-muted-foreground">
-          {embedded
-            ? "Место сохраняется как черновик в общей базе; карточку можно дополнить в разделе «Места»."
-            : "После создания место будет доступно для использования в событиях. Вы сможете дополнить информацию о месте позже в разделе «Места»."}
+          Место будет создано или привязано к существующему при публикации события.
         </p>
       </div>
 

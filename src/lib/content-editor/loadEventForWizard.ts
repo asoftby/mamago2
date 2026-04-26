@@ -54,6 +54,12 @@ export async function loadEventForWizard(eventId: string) {
         },
       },
       filterOptions: true,
+      programCategoryLinks: {
+        select: { categoryId: true },
+      },
+      eventCategory: {
+        select: { id: true, parentId: true, slug: true, nameRu: true },
+      },
     },
   });
 

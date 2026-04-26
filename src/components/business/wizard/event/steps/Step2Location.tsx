@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { MapPinIcon, TruckIcon, ClockIcon, Loader2, Search, Sparkles } from "lucide-react";
 import type { EventFormData } from "../types";
+import type { PendingLocation } from "../types";
 import { PlaceSearchAutocomplete } from "./location/PlaceSearchAutocomplete";
 import { QuickPlaceCreate } from "./location/QuickPlaceCreate";
 import { formatEventLocationAddress } from "./location/eventLocationUtils";
@@ -69,32 +70,36 @@ export function Step2Location({ data, onChange, isEditable, eventId }: Step2Loca
     metroName: string | null;
     metroDistanceM: number | null;
   }) => {
-    console.log('[Step2Location] Selecting place from search:', place);
-    
+    const pending: PendingLocation = {
+      mode: "EXISTING_PLACE",
+      placeId: place.id,
+      title: place.title,
+      address: place.fullAddress || place.address,
+      city: place.cityId || place.citySlug || undefined,
+      lat: place.lat ?? undefined,
+      lng: place.lng ?? undefined,
+      source: "manual",
+    };
+
     onChange({
-      // Set location source to PLACE
+      pendingLocation: pending,
       locationSource: "PLACE",
       venueKind: "PLACE",
       placeId: place.id,
       venueName: place.title,
       address: place.fullAddress || place.address,
-      city: place.cityId || place.citySlug || "", // Prefer cityId, fallback to slug
+      city: place.cityId || place.citySlug || "",
       lat: place.lat,
       lng: place.lng,
       source: "PLACE",
-      
-      // Use place's district and metro data directly
       districtAutoId: place.districtId,
       districtManualId: null,
       districtName: place.districtName,
-      
       metroAutoId: place.metroId,
       metroAutoDistanceM: place.metroDistanceM,
       metroManualId: null,
       metroManualDistanceM: null,
       metroName: place.metroName,
-      
-      // Clear legacy fields
       district: place.districtName || "",
       metro: place.metroName || "",
     });
@@ -102,9 +107,8 @@ export function Step2Location({ data, onChange, isEditable, eventId }: Step2Loca
     setShowQuickCreate(false);
   };
 
-  // Handle quick place creation
-  const handleQuickPlaceCreated = (place: {
-    id: string;
+  // Handle quick place creation - now just saves location data temporarily
+  const handleQuickPlaceCreated = (location: {
     title: string;
     address: string;
     fullAddress: string;
@@ -118,13 +122,40 @@ export function Step2Location({ data, onChange, isEditable, eventId }: Step2Loca
     metroName: string | null;
     metroDistanceM: number | null;
   }) => {
-    console.log('[Step2Location] Quick place created:', place);
+    const pending: PendingLocation = {
+      mode: "NEW_PLACE",
+      title: location.title,
+      address: location.fullAddress || location.address,
+      city: location.cityId || location.citySlug || undefined,
+      lat: location.lat ?? undefined,
+      lng: location.lng ?? undefined,
+      source: "manual",
+    };
+
+    onChange({
+      pendingLocation: pending,
+      locationSource: "MANUAL",
+      venueKind: "MANUAL",
+      placeId: null,
+      venueName: location.title,
+      address: location.fullAddress || location.address,
+      city: location.cityId || location.citySlug || "",
+      lat: location.lat,
+      lng: location.lng,
+      source: "ADDRESS_INPUT",
+      districtAutoId: location.districtId,
+      districtManualId: null,
+      districtName: location.districtName,
+      metroAutoId: location.metroId,
+      metroAutoDistanceM: location.metroDistanceM,
+      metroManualId: null,
+      metroManualDistanceM: null,
+      metroName: location.metroName,
+      district: location.districtName || "",
+      metro: location.metroName || "",
+    });
     
-    // Select the newly created place
-    handleSearchPlaceSelect(place);
-    
-    // Reload user places to include the new one
-    fetchUserPlaces();
+    handleCloseQuickCreate();
   };
 
   // Handle opening quick create with initial name from search
@@ -221,32 +252,36 @@ export function Step2Location({ data, onChange, isEditable, eventId }: Step2Loca
 
   // Handle place selection from user's places
   const handlePlaceSelect = (place: UserPlace) => {
-    console.log('[Step2Location] Selecting place:', place);
-    
+    const pending: PendingLocation = {
+      mode: "EXISTING_PLACE",
+      placeId: place.id,
+      title: place.title,
+      address: place.fullAddress || place.address,
+      city: place.cityId || place.citySlug || undefined,
+      lat: place.lat ?? undefined,
+      lng: place.lng ?? undefined,
+      source: "manual",
+    };
+
     onChange({
-      // Set location source to PLACE
+      pendingLocation: pending,
       locationSource: "PLACE",
       venueKind: "PLACE",
       placeId: place.id,
       venueName: place.title,
       address: place.fullAddress || place.address,
-      city: place.cityId || place.citySlug, // Prefer cityId, fallback to slug
+      city: place.cityId || place.citySlug,
       lat: place.lat,
       lng: place.lng,
       source: "PLACE",
-      
-      // Use place's district and metro data directly (priority over auto-detection)
-      districtAutoId: place.districtId, // Store as auto since it comes from place
-      districtManualId: null, // Clear manual override
+      districtAutoId: place.districtId,
+      districtManualId: null,
       districtName: place.districtName,
-      
-      metroAutoId: place.metroId, // Store as auto since it comes from place
+      metroAutoId: place.metroId,
       metroAutoDistanceM: place.metroDistanceM,
-      metroManualId: null, // Clear manual override
+      metroManualId: null,
       metroManualDistanceM: null,
       metroName: place.metroName,
-      
-      // Clear legacy fields
       district: place.districtName || "",
       metro: place.metroName || "",
     });
@@ -254,7 +289,12 @@ export function Step2Location({ data, onChange, isEditable, eventId }: Step2Loca
 
   // Handle special cases
   const handleSpecialCase = (venueKind: "MOBILE" | "TBD") => {
+    const pending: PendingLocation = {
+      mode: venueKind === "MOBILE" ? "OFFSITE" : "TBA",
+    };
+
     onChange({
+      pendingLocation: pending,
       locationSource: null,
       venueKind,
       placeId: null,
@@ -264,14 +304,12 @@ export function Step2Location({ data, onChange, isEditable, eventId }: Step2Loca
       lat: null,
       lng: null,
       source: venueKind,
-      // Reset all geo fields
       districtAutoId: null,
       districtManualId: null,
       metroAutoId: null,
       metroManualId: null,
       district: "",
       metro: "",
-      // Keep note value so toggling does not erase user input.
       venueNote: data.venueNote,
     });
   };
@@ -287,8 +325,8 @@ export function Step2Location({ data, onChange, isEditable, eventId }: Step2Loca
           venueKind: mobileConcreteSnapshot.venueKind ?? null,
         });
       } else {
-        // Fallback: just clear special case
         onChange({
+          pendingLocation: null,
           locationSource: null,
           venueKind: null,
           placeId: null,
@@ -311,6 +349,7 @@ export function Step2Location({ data, onChange, isEditable, eventId }: Step2Loca
 
     // Toggle ON: save current state and switch to MOBILE
     setMobileConcreteSnapshot({
+      pendingLocation: data.pendingLocation,
       locationSource: data.locationSource,
       venueKind: data.venueKind,
       placeId: data.placeId,
@@ -375,6 +414,9 @@ export function Step2Location({ data, onChange, isEditable, eventId }: Step2Loca
                 {importHint.cityName ? (
                   <div className="mt-1 text-[12px] text-amber-700">{importHint.cityName}</div>
                 ) : null}
+                <div className="mt-2 text-[11px] text-amber-600">
+                  Место будет создано или привязано к существующему при публикации события.
+                </div>
               </div>
             </div>
           </div>
@@ -421,7 +463,6 @@ export function Step2Location({ data, onChange, isEditable, eventId }: Step2Loca
       {/* Block 1: My Places */}
       <div className="space-y-3">
         <Label>Мои места</Label>
-        
         {isLoadingPlaces && (
           <div className="flex items-center gap-2 p-4 text-[12px] text-muted-foreground">
             <Loader2 className="w-4 h-4 animate-spin" />
@@ -514,17 +555,30 @@ export function Step2Location({ data, onChange, isEditable, eventId }: Step2Loca
             <div className="flex items-center gap-3">
               <ClockIcon className="w-5 h-5 text-muted-foreground" />
               <div>
-                <div className="font-medium">Локация будет объявлена позже</div>
+                <div className="font-medium">Адрес уточняется</div>
                 <div className="text-[12px] text-muted-foreground">
-                  {hasConcreteLocation 
+                  {hasConcreteLocation
                     ? "Недоступно: уже выбрана конкретная локация"
-                    : "Место проведения пока не определено"
-                  }
+                    : "Место проведения будет объявлено позже"}
                 </div>
               </div>
             </div>
           </button>
         </div>
+
+        {/* Active state badges */}
+        {data.venueKind === "MOBILE" && (
+          <div className="flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-[12px] text-blue-800">
+            <TruckIcon className="h-3.5 w-3.5 shrink-0" />
+            <span>Выездное событие — конкретный адрес не указывается</span>
+          </div>
+        )}
+        {data.venueKind === "TBD" && (
+          <div className="flex items-center gap-2 rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-[12px] text-orange-800">
+            <ClockIcon className="h-3.5 w-3.5 shrink-0" />
+            <span>Адрес уточняется — будет объявлен позже</span>
+          </div>
+        )}
       </div>
 
       {/* Optional Note for MOBILE/TBD */}
