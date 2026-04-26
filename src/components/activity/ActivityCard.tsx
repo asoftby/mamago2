@@ -188,17 +188,13 @@ export function ActivityCard(props: AdapterProps) {
             ) : (
               <div className="aspect-[4/5] w-full bg-gradient-to-br from-stone-100 via-stone-50 to-stone-200" />
             )}
-            {base.format && (
-              <div className="absolute bottom-3 left-3 rounded-full bg-white/92 px-2.5 py-1 text-[11px] font-medium text-neutral-900 shadow-sm backdrop-blur">
-                {getActivityFormatLabel(base.format)}
-              </div>
-            )}
             {base.saveMeta && (
               <div className="absolute right-3 top-3 z-10">
                 <SaveHeart
                   activityId={base.id}
                   activityTitle={base.title}
                   coverImageUrl={base.image}
+                  eventPlanDateISO={base.saveMeta?.dateISO ?? null}
                 />
               </div>
             )}
@@ -227,14 +223,6 @@ export function ActivityCard(props: AdapterProps) {
       <Link href={href} className="block">
         <MediaCover imageUrl={base.image} ratio={coverRatio}>
         </MediaCover>
-        {base.format && (
-          <div className="mt-2 px-1">
-            <span className="inline-flex rounded-full bg-neutral-100 px-2.5 py-1 text-[11px] font-medium text-neutral-700">
-              {getActivityFormatLabel(base.format)}
-            </span>
-          </div>
-        )}
-
         <div className="mt-2.5 px-1">
           <H3
             as="span"
@@ -257,6 +245,7 @@ export function ActivityCard(props: AdapterProps) {
             activityId={base.id}
             activityTitle={base.title}
             coverImageUrl={base.image}
+            eventPlanDateISO={base.saveMeta?.dateISO ?? null}
           />
         </div>
       )}

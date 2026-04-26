@@ -2,34 +2,98 @@
 
 import { useMemo } from "react";
 import { CalendarDays, ChevronRight } from "lucide-react";
-import { useAuthMe } from "@/features/birthday/builder/hooks/useAuthMe";
 import { useMyPlan } from "../hooks/useMyPlan";
 import { cn } from "@/lib/utils";
+import { format, isToday, isTomorrow, parseISO } from "date-fns";
+import { ru } from "date-fns/locale";
 
 interface MyPlanWidgetProps {
   onOpen: () => void;
 }
 
-function formatTodayPlanSubtitle(count: number): string {
-  if (count === 0) return "Пока ничего не запланировано";
+// ─── Pluralization ────────────────────────────────────────────────────────────
+
+function pluralEvents(count: number): string {
   const mod10 = count % 10;
   const mod100 = count % 100;
-  if (mod10 === 1 && mod100 !== 11) return `${count} событие сегодня`;
-  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) {
-    return `${count} события сегодня`;
-  }
-  return `${count} событий сегодня`;
+  if (mod10 === 1 && mod100 !== 11) return `${count} событие`;
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return `${count} события`;
+  return `${count} событий`;
 }
 
-export function MyPlanWidget({ onOpen }: MyPlanWidgetProps) {
-  const { todayCount } = useMyPlan();
-  const { isAuthenticated, isLoading: authLoading } = useAuthMe();
+function formatNextDate(dateStr: string): string {
+  const d = parseISO(dateStr);
+  if (isTomorrow(d)) return "завтра";
+  return format(d, "d MMMM", { locale: ru });
+}
 
-  const subtitle = useMemo(() => {
-    if (authLoading) return "Загрузка…";
-    if (!isAuthenticated) return "Войдите, чтобы планировать";
-    return formatTodayPlanSubtitle(todayCount);
-  }, [authLoading, isAuthenticated, todayCount]);
+// ─── State machine ────────────────────────────────────────────────────────────
+
+type WidgetState =
+  | { kind: "loading" }
+  | { kind: "unauthenticated" }
+  | { kind: "empty" }
+  | { kind: "today"; count: number }
+  | { kind: "week"; count: number }
+  | { kind: "next"; dateStr: string; title: string | null };
+
+function resolveWidgetState(input: {
+  authLoading: boolean;
+  isAuthenticated: boolean;
+  todayCount: number;
+  weekItemsCount: number;
+  nextPlanItem: { date: string; item: { title: string | null } } | null;
+}): WidgetState {
+  const { authLoading, isAuthenticated, todayCount, weekItemsCount, nextPlanItem } = input;
+
+  if (authLoading) return { kind: "loading" };
+  if (!isAuthenticated) return { kind: "unauthenticated" };
+  if (todayCount > 0) return { kind: "today", count: todayCount };
+  if (weekItemsCount > 0) return { kind: "week", count: weekItemsCount };
+  if (nextPlanItem) return { kind: "next", dateStr: nextPlanItem.date, title: nextPlanItem.item.title };
+  return { kind: "empty" };
+}
+
+function stateToText(state: WidgetState): { subtitle: string; badge: number | null } {
+  switch (state.kind) {
+    case "loading":
+      return { subtitle: "Загрузка…", badge: null };
+    case "unauthenticated":
+      return { subtitle: "Войдите, чтобы планировать", badge: null };
+    case "empty":
+      return { subtitle: "Пока ничего не запланировано", badge: null };
+    case "today":
+      return { subtitle: `Сегодня: ${pluralEvents(state.count)}`, badge: state.count };
+    case "week":
+      return { subtitle: `На неделе: ${pluralEvents(state.count)}`, badge: state.count };
+    case "next":
+      return { subtitle: `Ближайшее: ${formatNextDate(state.dateStr)}`, badge: null };
+  }
+}
+
+// ─── Component ────────────────────────────────────────────────────────────────
+
+export function MyPlanWidget({ onOpen }: MyPlanWidgetProps) {
+  const { todayCount, weekItemsCount, nextPlanItem, authLoading, isLoading } = useMyPlan();
+
+  // isAuthenticated: если не loading и todayCount/weekItemsCount доступны — значит авторизован
+  // Используем isLoading из store вместо отдельного useAuthMe
+  const isAuthenticated = !isLoading && !authLoading;
+
+  const widgetState = useMemo(
+    () =>
+      resolveWidgetState({
+        authLoading: authLoading || isLoading,
+        isAuthenticated,
+        todayCount,
+        weekItemsCount,
+        nextPlanItem,
+      }),
+    [authLoading, isLoading, isAuthenticated, todayCount, weekItemsCount, nextPlanItem],
+  );
+
+  const { subtitle, badge } = stateToText(widgetState);
+  const hasItems = widgetState.kind === "today" || widgetState.kind === "week" || widgetState.kind === "next";
 
   return (
     <div className="fixed bottom-4 right-4 z-50 hidden w-[min(100vw-2rem,280px)] max-w-[min(100vw-2rem,280px)] lg:block animate-in fade-in slide-in-from-bottom-4">
@@ -44,15 +108,32 @@ export function MyPlanWidget({ onOpen }: MyPlanWidgetProps) {
         )}
       >
         <div className="flex items-center gap-3 min-w-0 flex-1">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/8 text-white/95 ring-1 ring-white/10 backdrop-blur-sm">
-            <CalendarDays className="h-[18px] w-[18px]" strokeWidth={1.8} aria-hidden />
+          {/* Icon + badge */}
+          <div className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/8 text-white/95 ring-1 ring-white/10 backdrop-blur-sm">
+            <CalendarDays
+              className={cn("h-[18px] w-[18px]", hasItems && "text-[#EF8759]")}
+              strokeWidth={1.8}
+              aria-hidden
+            />
+            {badge !== null && badge > 0 && (
+              <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#EF8759] px-1 text-[9px] font-bold leading-none text-white shadow-sm">
+                {badge > 9 ? "9+" : badge}
+              </span>
+            )}
           </div>
 
           <div className="min-w-0 flex-1 text-left">
             <h2 className="text-sm font-semibold leading-tight tracking-[-0.02em]">
               Мой план
             </h2>
-            <p className="mt-0.5 text-[11px] leading-snug text-white/60">{subtitle}</p>
+            <p
+              className={cn(
+                "mt-0.5 text-[11px] leading-snug truncate",
+                hasItems ? "text-[#EF8759]/80" : "text-white/60",
+              )}
+            >
+              {subtitle}
+            </p>
           </div>
         </div>
 

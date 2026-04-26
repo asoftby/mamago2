@@ -8,11 +8,14 @@ import { SaveActivityFlowAdaptive } from "@/components/activity/SaveActivityFlow
 import type { SaveToPlanResult } from "@/components/activity/SaveToPlanModal";
 import { persistActivitySave } from "@/features/save/persistActivitySave";
 import { useAuthMe } from "@/features/birthday/builder/hooks/useAuthMe";
+import { getLocalDateKey } from "@/lib/date/localDateKey";
 
 type SaveHeartProps = {
   activityId: string;
   activityTitle: string;
   coverImageUrl?: string | null;
+  /** Если известна единственная дата сеанса, показываем в модалке только её для «В план». */
+  eventPlanDateISO?: string | null;
   className?: string;
   onSaveChange?: (isSaved: boolean) => void;
 };
@@ -25,10 +28,19 @@ function formatPlanDateRu(iso: string) {
   });
 }
 
+function normalizePlanDateISO(value?: string | null): string | undefined {
+  if (!value) return undefined;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return undefined;
+  return getLocalDateKey(parsed);
+}
+
 export function SaveHeart({
   activityId,
   activityTitle,
   coverImageUrl,
+  eventPlanDateISO,
   className,
   onSaveChange,
 }: SaveHeartProps) {
@@ -36,6 +48,7 @@ export function SaveHeart({
   const [flowOpen, setFlowOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isAnimating, setIsAnimating] = useState(false);
+  const [eventPlanDateOptions, setEventPlanDateOptions] = useState<string[]>([]);
   const [saveStatus, setSaveStatus] = useState({
     isIdea: false,
     inPlan: false,
@@ -44,6 +57,7 @@ export function SaveHeart({
   });
 
   const isSaved = saveStatus.isIdea || saveStatus.inPlan;
+  const normalizedEventPlanDateISO = normalizePlanDateISO(eventPlanDateISO);
 
   const checkSaveStatus = useCallback(async () => {
     try {
@@ -69,6 +83,25 @@ export function SaveHeart({
     if (!flowOpen) return;
     void checkSaveStatus();
   }, [flowOpen, checkSaveStatus]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadPlanDates = async () => {
+      try {
+        const res = await fetch(`/api/save/available-plan-dates?activityId=${activityId}`);
+        if (!res.ok) return;
+        const payload = (await res.json()) as { dates?: string[] };
+        if (cancelled) return;
+        setEventPlanDateOptions(Array.isArray(payload.dates) ? payload.dates : []);
+      } catch {
+        if (!cancelled) setEventPlanDateOptions([]);
+      }
+    };
+    void loadPlanDates();
+    return () => {
+      cancelled = true;
+    };
+  }, [activityId]);
 
   const handlePersist = useCallback(
     async (result: SaveToPlanResult) => {
@@ -146,7 +179,12 @@ export function SaveHeart({
         open={flowOpen}
         onOpenChange={setFlowOpen}
         isAuthenticated={isAuthenticated}
-        scenario={{ kind: "quickdate", title: activityTitle }}
+        scenario={{
+          kind: "quickdate",
+          title: activityTitle,
+          eventPlanDateISO: normalizedEventPlanDateISO,
+          eventPlanDateOptions: eventPlanDateOptions,
+        }}
         onPersist={handlePersist}
         isIdea={saveStatus.isIdea}
         inPlan={saveStatus.inPlan}

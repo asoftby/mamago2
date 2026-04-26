@@ -27,6 +27,8 @@ export type SaveScenario =
       title: string;
       /** Одна дата сеанса (страница события): «В план» = на эту дату или в идеи, без «сегодня/завтра». */
       eventPlanDateISO?: string;
+      /** Набор доступных дат события (YYYY-MM-DD). */
+      eventPlanDateOptions?: string[];
     };
 
 export type SaveToPlanResult =
@@ -109,7 +111,15 @@ function StatusCard({ icon, title, subtitle, actions }: StatusCardProps) {
   );
 }
 
-function CalendarView({ onBack, onSelect }: { onBack: () => void; onSelect: (iso: string) => void }) {
+function CalendarView({
+  onBack,
+  onSelect,
+  allowedDateKeys,
+}: {
+  onBack: () => void;
+  onSelect: (iso: string) => void;
+  allowedDateKeys?: string[] | null;
+}) {
   const [value, setValue] = React.useState<Date | null>(null);
   const handleConfirm = () => {
     if (!value) return;
@@ -122,6 +132,7 @@ function CalendarView({ onBack, onSelect }: { onBack: () => void; onSelect: (iso
         value={value}
         onDateChange={setValue}
         disablePast
+        allowedDateKeys={allowedDateKeys}
       />
       <Button size="lg" className="w-full rounded-2xl font-semibold" disabled={!value} onClick={handleConfirm}>
         Сохранить в план
@@ -138,6 +149,14 @@ function formatEventSessionPlanSubtitle(iso: string): string {
   });
 }
 
+function normalizePlanDateISO(value?: string | null): string | null {
+  if (!value) return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return getLocalDateKey(parsed);
+}
+
 interface QuickViewProps {
   isIdea: boolean;
   inPlan: boolean;
@@ -145,6 +164,8 @@ interface QuickViewProps {
   planStartsAt: string | null;
   /** YYYY-MM-DD единственного сеанса — только «на дату проведения», без сегодня/завтра. */
   eventPlanDateISO?: string | null;
+  /** Доступные даты события (YYYY-MM-DD). Для multi-date сценария. */
+  eventPlanDateOptions?: string[];
   onPlan: (iso: string) => void;
   onIdea: () => void;
   onRemoveIdea: () => void;
@@ -156,6 +177,7 @@ function QuickView({
   planDate,
   planStartsAt: _planStartsAt,
   eventPlanDateISO,
+  eventPlanDateOptions,
   onPlan,
   onIdea,
   onRemoveIdea,
@@ -163,6 +185,18 @@ function QuickView({
 }: QuickViewProps) {
   const todayISO = getLocalDateKey();
   const tomorrowISO = addDaysLocal(todayISO, 1);
+  const normalizedOptions = React.useMemo(() => {
+    const unique = new Set((eventPlanDateOptions ?? []).map((d) => normalizePlanDateISO(d)).filter(Boolean));
+    return Array.from(unique).sort() as string[];
+  }, [eventPlanDateOptions]);
+  const upcomingOptions = React.useMemo(
+    () => normalizedOptions.filter((d) => d >= todayISO),
+    [normalizedOptions, todayISO],
+  );
+  const nearestTwo = upcomingOptions.slice(0, 2);
+  const isSingleEventDate = Boolean(eventPlanDateISO);
+  const hasMultiEventDates = !isSingleEventDate && upcomingOptions.length > 0;
+
   return (
     <div className="px-4 py-4 space-y-4">
       <div className="space-y-2">
@@ -177,13 +211,33 @@ function QuickView({
               { label: "Открыть план", icon: <ExternalLink className="w-3 h-3" />, onClick: () => { window.location.href = "/me/plan"; } },
             ]}
           />
-        ) : eventPlanDateISO ? (
+        ) : isSingleEventDate ? (
           <ActionRow
             icon={<CalendarCheck className="w-5 h-5" />}
             title="На дату проведения"
-            subtitle={`Добавить в план на ${formatEventSessionPlanSubtitle(eventPlanDateISO)}`}
-            onClick={() => onPlan(eventPlanDateISO)}
+            subtitle={`Добавить в план на ${formatEventSessionPlanSubtitle(eventPlanDateISO ?? "")}`}
+            onClick={() => onPlan(eventPlanDateISO ?? "")}
           />
+        ) : hasMultiEventDates ? (
+          <>
+            {nearestTwo.map((iso, index) => (
+              <ActionRow
+                key={iso}
+                icon={<CalendarCheck className="w-5 h-5" />}
+                title={index === 0 ? "Ближайшая дата" : "Следующая дата"}
+                subtitle={`Добавить в план на ${formatEventSessionPlanSubtitle(iso)}`}
+                onClick={() => onPlan(iso)}
+              />
+            ))}
+            {upcomingOptions.length > 2 ? (
+              <ActionRow
+                icon={<CalendarClock className="w-5 h-5" />}
+                title="Выбрать дату"
+                subtitle="Показать все даты из расписания"
+                onClick={onSwitchCalendar}
+              />
+            ) : null}
+          </>
         ) : (
           <>
             <ActionRow icon={<CalendarCheck className="w-5 h-5" />} title="Сегодня" subtitle={`Добавить в план на ${formatLocalPlanDate(todayISO, "ru-RU")}`} onClick={() => onPlan(todayISO)} />
@@ -264,8 +318,11 @@ export function SaveToPlanPickerBody({
   };
 
   const isQuickdate = scenario.kind === "quickdate";
-  const eventPlanDateISO =
-    scenario.kind === "quickdate" ? scenario.eventPlanDateISO ?? null : null;
+  const eventPlanDateISO = normalizePlanDateISO(
+    scenario.kind === "quickdate" ? scenario.eventPlanDateISO ?? null : null,
+  );
+  const eventPlanDateOptions =
+    scenario.kind === "quickdate" ? scenario.eventPlanDateOptions ?? [] : [];
   const headerTitle =
     view === "calendar"
       ? "Выберите дату"
@@ -291,7 +348,14 @@ export function SaveToPlanPickerBody({
       </div>
       {isQuickdate ? (
         view === "calendar" ? (
-          <CalendarView onBack={() => setView("quick")} onSelect={(iso) => { setView("quick"); handlePlan(iso); }} />
+          <CalendarView
+            onBack={() => setView("quick")}
+            onSelect={(iso) => {
+              setView("quick");
+              handlePlan(iso);
+            }}
+            allowedDateKeys={eventPlanDateOptions}
+          />
         ) : (
           <QuickView
             isIdea={isIdea}
@@ -299,6 +363,7 @@ export function SaveToPlanPickerBody({
             planDate={planDate}
             planStartsAt={planStartsAt}
             eventPlanDateISO={eventPlanDateISO}
+            eventPlanDateOptions={eventPlanDateOptions}
             onPlan={handlePlan}
             onIdea={handleIdea}
             onRemoveIdea={handleRemoveIdea}

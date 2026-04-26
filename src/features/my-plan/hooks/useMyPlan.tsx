@@ -348,6 +348,14 @@ function useMyPlanStore() {
     [isAuthenticated, authLoading],
   );
 
+  const today = todayISO();
+
+  // Загружаем план на сегодня при mount — чтобы compact widget сразу показывал актуальные данные
+  useEffect(() => {
+    if (!isAuthenticated || authLoading) return;
+    void refetchPlanForDate(today);
+  }, [isAuthenticated, authLoading, refetchPlanForDate, today]);
+
   const postActivityToPlan = useCallback(
     async (input: {
       activityId: string;
@@ -560,7 +568,6 @@ function useMyPlanStore() {
     return acc;
   }, {});
 
-  const today = todayISO();
   const todayItems = planItemsByDate[today] || [];
 
   const filteredItems = planItems.filter(
@@ -638,6 +645,21 @@ function useMyPlanStore() {
     searchQuery,
     setSearchQuery,
     todayCount: isAuthenticated ? (planItemsByDateMap[today] ?? []).length : 0,
+    /** Суммарное кол-во элементов на ближайшие 7 дней (включая сегодня) */
+    weekItemsCount: isAuthenticated
+      ? weekDates.reduce((sum, d) => sum + (planItemsByDateMap[d]?.length ?? 0), 0)
+      : 0,
+    /** Ближайший элемент плана после сегодня (для compact widget) */
+    nextPlanItem: isAuthenticated
+      ? (() => {
+          for (const d of weekDates) {
+            if (d <= today) continue; // пропускаем сегодня и прошлое
+            const items = planItemsByDateMap[d];
+            if (items && items.length > 0) return { date: d, item: items[0] };
+          }
+          return null;
+        })()
+      : null,
     planSlots,
     cycleSlotAlternative,
     cycleSlotAlternativePrev,
