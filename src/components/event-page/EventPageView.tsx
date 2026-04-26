@@ -99,7 +99,11 @@ export function EventPageView({ data }: { data: EventPageData }) {
   }, []);
 
   const saveQuickdateScenario = useMemo(() => {
-    const base = { kind: "quickdate" as const, title: data.title };
+    const base = {
+      kind: "quickdate" as const,
+      title: data.title,
+      eventPlanDateOptions: availablePlanDates,
+    };
     if (availablePlanDates.length !== 1) return base;
     return { ...base, eventPlanDateISO: availablePlanDates[0]! };
   }, [availablePlanDates, data.title]);
