@@ -36,7 +36,20 @@ ci: add build check on pull request
 
 ---
 
-## Before Push Checklist
+## Automated Checks
+
+These checks run automatically via [Husky](https://typicode.github.io/husky/) git hooks.
+
+### commit-msg
+
+Every commit message is validated by [commitlint](https://commitlint.js.org/) against the rules in `commitlint.config.cjs`.
+A commit with an invalid message (wrong prefix, subject too long, etc.) will be rejected immediately.
+
+### pre-push
+
+`pnpm build` runs before every `git push`.
+The push is blocked if the build fails, preventing broken code from reaching the remote.
+
 
 - [ ] `pnpm build` passes with no errors
 - [ ] `git status` is clean — no untracked or uncommitted files
