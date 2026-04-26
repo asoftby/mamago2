@@ -115,6 +115,19 @@ function parseHost(host: string): { hostname: string; port: string } {
   return { hostname: normalized.toLowerCase(), port: "" };
 }
 
+/**
+ * Dev-only local-network host detection for LAN testing.
+ * Accepts hostname without port (e.g. "192.168.1.10").
+ */
+export function isDevLocalHost(hostname: string): boolean {
+  if (process.env.NODE_ENV !== "development") return false;
+  if (!hostname) return false;
+
+  if (hostname === "localhost" || hostname === "127.0.0.1") return true;
+  if (hostname.startsWith("192.168.") || hostname.startsWith("10.")) return true;
+  return /^172\.(1[6-9]|2\d|3[0-1])\./u.test(hostname);
+}
+
 function resolveSupportedBaseHost(host: string | undefined): {
   baseHost: (typeof SUPPORTED_SURFACE_BASE_HOSTS)[number];
   port: string;
@@ -122,7 +135,7 @@ function resolveSupportedBaseHost(host: string | undefined): {
   if (!host) return null;
 
   const { hostname, port } = parseHost(host);
-  if (!hostname || hostname === "localhost" || hostname === "127.0.0.1") {
+  if (!hostname || isDevLocalHost(hostname)) {
     return null;
   }
 

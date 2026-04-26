@@ -8,6 +8,17 @@ import { parseContentImportContactsHint } from "@/lib/content-editor/importConta
 
 export const runtime = "nodejs";
 
+function extractPhones(raw: unknown): string[] {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return [];
+  const o = raw as Record<string, unknown>;
+  const directPhones = Array.isArray(o.phones)
+    ? o.phones.filter((v): v is string => typeof v === "string" && v.trim().length > 0)
+    : [];
+  const singlePhone =
+    typeof o.phone === "string" && o.phone.trim().length > 0 ? [o.phone.trim()] : [];
+  return [...new Set([...singlePhone, ...directPhones.map((p) => p.trim())])];
+}
+
 export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
@@ -43,9 +54,17 @@ export async function GET(
   const normalizedHint = parseContentImportContactsHint(linkedImport?.normalizedData);
   const rawHint = parseContentImportContactsHint(linkedImport?.rawPayload);
   const hint = normalizedHint ?? rawHint;
+  const phones = [
+    ...new Set([
+      ...(hint?.phone ? [hint.phone] : []),
+      ...extractPhones(linkedImport?.normalizedData),
+      ...extractPhones(linkedImport?.rawPayload),
+    ]),
+  ];
 
   return NextResponse.json({
     phone: hint?.phone ?? "",
+    phones,
     website: hint?.website ?? "",
     socialUrls: hint?.socialUrls ?? [],
   });

@@ -12,6 +12,8 @@ import { replaceActivitySessionsFromScheduleJson } from "@/lib/business/syncEven
 import { assignActivitySlugIfMissing } from "@/lib/slug/activitySlugService";
 import { ensurePublishedActivityHasSlug } from "@/lib/slug/publishSlugGuards";
 import { resolveCanonicalEventPublicPathById } from "@/lib/business/resolveCanonicalEventPublicPath";
+import { resolvePendingLocationOnPublish } from "@/lib/business/resolvePendingLocationOnPublish";
+import { assignSlugOnPublish } from "@/lib/slug/placeSlugService";
 
 /**
  * POST /api/business/events/[id]/submit
@@ -122,15 +124,43 @@ export async function POST(
         ? ContentStatus.PENDING_UPDATE
         : ContentStatus.PENDING;
 
-    const event = await prisma.activity.update({
-      where: {
-        id,
-      },
-      data: {
-        status: nextStatus,
-        nextOccurrenceAt,
-      },
-    });
+    // Резолвим pendingLocation и при необходимости создаём Place — всё в одной транзакции
+    const scheduleJson =
+      existing.scheduleJson && typeof existing.scheduleJson === "object" && !Array.isArray(existing.scheduleJson)
+        ? (existing.scheduleJson as Record<string, unknown>)
+        : {};
+
+    const { placeId: resolvedPlaceId, placeCreated } =
+      await prisma.$transaction(async (tx) => {
+        const result = await resolvePendingLocationOnPublish(
+          tx,
+          id,
+          scheduleJson,
+          user.id,
+          existing.businessId ?? null,
+        );
+
+        await tx.activity.update({
+          where: { id },
+          data: {
+            status: nextStatus,
+            nextOccurrenceAt,
+            scheduleJson: result.updatedScheduleJson as never,
+            ...(result.placeId !== null ? { placeId: result.placeId } : {}),
+          },
+        });
+
+        return result;
+      });
+
+    // Назначаем slug новому Place (вне транзакции — идемпотентно)
+    if (placeCreated && resolvedPlaceId) {
+      await assignSlugOnPublish(resolvedPlaceId).catch((e) =>
+        console.error("[submit] assignSlugOnPublish failed:", e),
+      );
+    }
+
+    const event = await prisma.activity.findUniqueOrThrow({ where: { id } });
 
     if (event.status === ContentStatus.PUBLISHED) {
       await ensurePublishedActivityHasSlug(event.id);

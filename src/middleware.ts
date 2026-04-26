@@ -1,13 +1,26 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { resolveSubdomainMiddlewareDecision } from "@/lib/routing/subdomainMiddleware";
-import { resolveSurfaceFromHostAndPathname } from "@/lib/routing/surface";
+import { isDevLocalHost, resolveSurfaceFromHostAndPathname } from "@/lib/routing/surface";
 import { stripPublicDiscoverySearchParams } from "@/lib/routing/publicDiscoverySearchParams";
+
+let didLogDevLocalHostDetection = false;
 
 export function middleware(request: NextRequest) {
   const host = request.headers.get("host") || "";
   const url = request.nextUrl;
   const pathname = url.pathname;
+  const hostname = host.split(":")[0]?.toLowerCase() ?? "";
+
+  if (
+    !didLogDevLocalHostDetection &&
+    isDevLocalHost(hostname) &&
+    process.env.NODE_ENV === "development"
+  ) {
+    didLogDevLocalHostDetection = true;
+    console.info("[dev-host] Local network host detected, using public surface");
+  }
+
   const surface = resolveSurfaceFromHostAndPathname(host, pathname);
   const search =
     surface === "admin" ? stripPublicDiscoverySearchParams(url.search) : url.search;

@@ -29,7 +29,7 @@ const TONE_INSTRUCTIONS: Record<"neutral" | "friendly" | "editorial" | "short", 
     "Сделай компактную, более короткую версию текста, сохранив все ключевые факты.",
 };
 
-type DeepSeekResponse = {
+type OpenRouterResponse = {
   choices?: Array<{
     message?: {
       content?: string | null;
@@ -37,7 +37,7 @@ type DeepSeekResponse = {
   }>;
 };
 
-function isDeepSeekResponse(value: unknown): value is DeepSeekResponse {
+function isOpenRouterResponse(value: unknown): value is OpenRouterResponse {
   return value !== null && typeof value === "object" && "choices" in value;
 }
 
@@ -74,6 +74,22 @@ function extractRewriteResult(content: string): string | null {
   }
 }
 
+function mapOpenRouterError(status: number, body: string): string {
+  if (status === 401 || status === 403) return "OpenRouter: ошибка авторизации";
+  if (status === 402) return "OpenRouter: недостаточно баланса";
+  if (status === 429) return "OpenRouter: превышен лимит запросов, попробуйте позже";
+  if (status >= 500) return "OpenRouter: временная ошибка провайдера, попробуйте позже";
+  const parsed = safeJsonParse(body);
+  if (parsed && typeof parsed === "object" && "error" in parsed) {
+    const err = (parsed as Record<string, unknown>).error;
+    if (typeof err === "string") return err;
+    if (err && typeof err === "object" && "message" in err && typeof (err as Record<string, unknown>).message === "string") {
+      return (err as Record<string, unknown>).message as string;
+    }
+  }
+  return `OpenRouter request failed: ${status}`;
+}
+
 export async function POST(request: NextRequest) {
   try {
     const user = await getCurrentUser();
@@ -90,29 +106,34 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const apiKey = process.env.DEEPSEEK_API_KEY?.trim();
+    const apiKey = process.env.OPENROUTER_API_KEY?.trim();
     if (!apiKey) {
-      return NextResponse.json({ error: "DEEPSEEK_API_KEY is not configured" }, { status: 500 });
+      return NextResponse.json({ error: "OpenRouter API key is not configured" }, { status: 500 });
     }
 
-    const endpoint = "https://api.deepseek.com/chat/completions";
-    const model = "deepseek-chat";
+    const endpoint = "https://openrouter.ai/api/v1/chat/completions";
+    const model = process.env.OPENROUTER_MODEL?.trim() || "openai/gpt-4o-mini";
+    const temperature = Number(process.env.OPENROUTER_TEMPERATURE ?? 0.4);
+    const maxTokens = Number(process.env.OPENROUTER_MAX_TOKENS ?? 900);
+    const siteUrl = process.env.OPENROUTER_SITE_URL || "http://mamago.local:3000";
+    const appName = process.env.OPENROUTER_APP_NAME || "mamaGo 2.0";
+
     const requestBody = {
       model,
       response_format: { type: "json_object" as const },
-      temperature: parsed.data.tone === "short" ? 0.4 : 0.6,
+      temperature: parsed.data.tone === "short" ? Math.min(temperature, 0.4) : temperature,
+      max_tokens: maxTokens,
       messages: [
         { role: "system" as const, content: SYSTEM_PROMPT },
         { role: "user" as const, content: buildUserPrompt(parsed.data) },
       ],
     };
 
-    console.log("[DeepSeek] request started", {
+    console.log("[OpenRouter] request started", {
       model,
       endpoint,
       tone: parsed.data.tone,
       entityType: parsed.data.entityType ?? "event",
-      hasApiKey: Boolean(apiKey),
       sourceLength: parsed.data.sourceText.length,
     });
 
@@ -126,6 +147,8 @@ export async function POST(request: NextRequest) {
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${apiKey}`,
+          "HTTP-Referer": siteUrl,
+          "X-Title": appName,
         },
         body: JSON.stringify(requestBody),
         signal: controller.signal,
@@ -135,50 +158,44 @@ export async function POST(request: NextRequest) {
     }
 
     const rawResponseText = await response.text();
-    console.log("[DeepSeek] response received", {
+    console.log("[OpenRouter] response received", {
       status: response.status,
       statusText: response.statusText,
-      body: rawResponseText,
     });
 
-    const payload = safeJsonParse(rawResponseText) as DeepSeekResponse | { error?: unknown } | null;
     if (!response.ok) {
-      const message =
-        payload && typeof payload === "object" && "error" in payload && typeof payload.error === "string"
-          ? payload.error
-          : `DeepSeek request failed: ${response.status} ${response.statusText}. ${rawResponseText}`;
-      console.error("[DeepSeek] request failed", {
+      const message = mapOpenRouterError(response.status, rawResponseText);
+      console.error("[OpenRouter] request failed", {
         status: response.status,
         statusText: response.statusText,
-        body: rawResponseText,
       });
       return NextResponse.json({ error: message }, { status: 502 });
     }
 
-    const content = isDeepSeekResponse(payload)
+    const payload = safeJsonParse(rawResponseText) as OpenRouterResponse | null;
+    if (!payload) {
+      console.error("[OpenRouter] JSON parse failed", {
+        status: response.status,
+        body: rawResponseText,
+      });
+      return NextResponse.json({ error: "AI did not return a valid response" }, { status: 502 });
+    }
+
+    const content = isOpenRouterResponse(payload)
       ? payload.choices?.[0]?.message?.content?.trim() ?? ""
       : "";
-    if (!payload) {
-      console.error("[DeepSeek] JSON parse failed", {
-        status: response.status,
-        statusText: response.statusText,
-        body: rawResponseText,
-      });
-    }
+
     const result = extractRewriteResult(content);
     if (!result) {
-      console.error("[DeepSeek] invalid rewrite payload", {
-        content,
-        body: rawResponseText,
-      });
+      console.error("[OpenRouter] invalid rewrite payload", { content });
       return NextResponse.json({ error: "AI did not return a valid rewrite result" }, { status: 502 });
     }
 
     return NextResponse.json({
       result,
       tone: parsed.data.tone,
-      provider: "deepseek",
-      model: "deepseek-chat",
+      provider: "openrouter",
+      model,
     });
   } catch (error) {
     if (error instanceof Error && error.name === "AbortError") {

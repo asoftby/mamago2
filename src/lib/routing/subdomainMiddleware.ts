@@ -1,4 +1,5 @@
 import { stripPublicDiscoverySearchParams } from "@/lib/routing/publicDiscoverySearchParams";
+import { isDevLocalHost } from "@/lib/routing/surface";
 
 export type MiddlewareDecision =
   | { kind: "next" }
@@ -65,21 +66,11 @@ export function resolveSubdomainMiddlewareDecision(params: {
   publicAppUrl?: string;
 }): MiddlewareDecision {
   const { host, protocol, pathname, search, publicAppUrl } = params;
-  const isLocalhost = host.startsWith("localhost") || host.startsWith("127.0.0.1");
+  const hostname = host.split(":")[0]?.toLowerCase() ?? "";
+  const isLocalhost = isDevLocalHost(hostname);
 
   if (isLocalhost) {
-    // Legacy development fallback. Canonical local dev uses mamago.local subdomains.
-    if (pathname === "/") {
-      return {
-        kind: "redirect",
-        location: buildSameHostLocation({
-          protocol,
-          host,
-          pathname: "/minsk",
-          search: "",
-        }),
-      };
-    }
+    // Dev LAN / localhost fallback: keep path as-is and treat as public surface.
     return { kind: "next" };
   }
 

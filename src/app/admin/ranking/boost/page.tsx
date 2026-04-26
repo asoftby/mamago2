@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { toast } from "@/lib/toast";
 import { Toggle } from "@/components/ui/Toggle";
 import { Input } from "@/components/ui/input";
+import { LoadingBlock } from "@/components/admin/ui/StateBlock";
 
 type BoostSettings = {
   allowBoostInToday: boolean;
@@ -79,7 +80,7 @@ export default function BoostRulesPage() {
       </div>
 
       {loading ? (
-        <div className="text-sm text-gray-400">Загрузка...</div>
+        <LoadingBlock title="Загрузка настроек буста..." compact />
       ) : (
         <div className="space-y-4">
           {/* Toggles */}

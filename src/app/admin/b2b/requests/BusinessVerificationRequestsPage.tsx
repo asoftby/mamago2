@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { BusinessVerificationSidePanel } from "./BusinessVerificationSidePanel";
+import { LoadingBlock, EmptyBlock, ErrorBlock } from "@/components/admin/ui/StateBlock";
 
 type Business = {
   id: string;
@@ -138,21 +139,21 @@ export function BusinessVerificationRequestsPage({
       <div>
         {/* Loading state */}
         {loading && (
-          <div className="text-center py-8 text-gray-500">Загрузка...</div>
+          <LoadingBlock title="Загрузка бизнесов..." compact />
         )}
 
         {/* Error state */}
         {error && (
-          <div className="bg-red-50 border border-red-200 rounded-md p-4 text-red-800">
-            {error}
-          </div>
+          <ErrorBlock title="Не удалось загрузить данные" description={error} compact />
         )}
 
         {/* Empty state */}
         {!loading && !error && businesses.length === 0 && (
-          <div className="text-center py-8 text-gray-500">
-            Нет бизнесов со статусом &quot;{STATUS_LABELS[activeStatus]}&quot;
-          </div>
+          <EmptyBlock
+            title={`Нет бизнесов со статусом «${STATUS_LABELS[activeStatus]}»`}
+            description="Попробуйте выбрать другой статус"
+            compact
+          />
         )}
 
         {/* Business list */}

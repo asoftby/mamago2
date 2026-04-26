@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Trash2, Pencil, Plus, Loader2 } from "lucide-react";
 import { toast } from "@/lib/toast";
+import { LoadingBlock, EmptyBlock } from "@/components/admin/ui/StateBlock";
 import { FilterSelect } from "@/components/ui/filter-select";
 
 type City = {
@@ -164,7 +165,7 @@ export default function DistrictsPage() {
   };
 
   if (isLoadingCities) {
-    return <div className="flex h-screen items-center justify-center"><Loader2 className="animate-spin" /></div>;
+    return <div className="flex h-screen items-center justify-center"><LoadingBlock title="Загрузка городов..." compact /></div>;
   }
 
   return (
@@ -197,9 +198,9 @@ export default function DistrictsPage() {
         </CardHeader>
         <CardContent>
           {isLoadingDistricts ? (
-            <div className="flex justify-center p-8"><Loader2 className="animate-spin" /></div>
+            <LoadingBlock title="Загрузка районов..." compact />
           ) : districts.length === 0 ? (
-            <div className="text-center text-gray-600 p-8 text-sm">Нет районов для выбранного города</div>
+            <EmptyBlock title="Нет районов для выбранного города" description="Добавьте первый район" compact />
           ) : (
             <div className="border border-gray-200 rounded-lg overflow-hidden">
               <div className="grid grid-cols-[1fr_100px] gap-4 p-4 font-medium border-b bg-gray-50 text-sm">

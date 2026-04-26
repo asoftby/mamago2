@@ -11,8 +11,8 @@
     }
   },
   "scripts": {
-    "dev": "next dev",
-    "dev:turbo": "next dev --turbo",
+    "dev": "next dev --webpack -H 0.0.0.0",
+    "dev:turbo": "next dev --turbo -H 0.0.0.0",
     "dev:webpack": "next dev",
     "email:preview": "react-email dev --dir ./emails --port 3011",
     "build": "next build",
