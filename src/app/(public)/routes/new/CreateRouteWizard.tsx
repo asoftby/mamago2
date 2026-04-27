@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 import { Container } from "@/components/ui/Container";
 import { Button } from "@/components/ui/button";
 import { AGE_OPTIONS } from "@/lib/config/ages";
-import { ImageUploader, ImagePreview } from "@/components/image/ImageUploader";
+import { ImageGalleryUploader } from "@/components/image/ImageUploader";
 import type { UploadedImage } from "@/hooks/useImageUpload";
 import {
   RouteStopLocationInput,
@@ -14,8 +14,13 @@ import {
 } from "@/components/routes/RouteStopLocationInput";
 import { deriveRouteCityFromStops } from "@/lib/routes/cityDerivation";
 import {
-  ArrowLeft, Plus, Trash2, MapPin,
-  Globe, Lock, Link2,
+  ArrowLeft,
+  Plus,
+  Trash2,
+  MapPin,
+  Globe,
+  Lock,
+  Link2,
 } from "lucide-react";
 import { toast } from "@/lib/toast";
 
@@ -30,7 +35,7 @@ export type EditableRouteStop = {
   /** User-set step label — required for publish when source is GOOGLE or MANUAL_PIN */
   customTitle?: string;
   note: string;
-  photo?: UploadedImage;
+  photos?: UploadedImage[];
 };
 
 type WizardState = {
@@ -50,15 +55,31 @@ const BUDGET_OPTIONS: { value: BudgetLevel; label: string; sub: string }[] = [
   { value: "HIGH", label: "150+ BYN", sub: "Премиум" },
 ];
 
-const VISIBILITY_OPTIONS: { value: Visibility; label: string; sub: string; icon: React.ReactNode }[] = [
-  { value: "PUBLIC", label: "Публичный", sub: "Виден всем в каталоге", icon: <Globe className="w-4 h-4" /> },
-  { value: "UNLISTED", label: "По ссылке", sub: "Только по прямой ссылке", icon: <Link2 className="w-4 h-4" /> },
-  { value: "PRIVATE", label: "Приватный", sub: "Только для вас", icon: <Lock className="w-4 h-4" /> },
+const VISIBILITY_OPTIONS: {
+  value: Visibility;
+  label: string;
+  sub: string;
+  icon: React.ReactNode;
+}[] = [
+  {
+    value: "PUBLIC",
+    label: "Публичный",
+    sub: "Виден всем в каталоге",
+    icon: <Globe className="w-4 h-4" />,
+  },
+  {
+    value: "UNLISTED",
+    label: "По ссылке",
+    sub: "Только по прямой ссылке",
+    icon: <Link2 className="w-4 h-4" />,
+  },
+  {
+    value: "PRIVATE",
+    label: "Приватный",
+    sub: "Только для вас",
+    icon: <Lock className="w-4 h-4" />,
+  },
 ];
-
-const AGE_GROUPS = AGE_OPTIONS.filter((a) =>
-  ["0-1", "1-3", "3-5", "5-7", "7-9", "9-12", "12-14"].includes(a.key)
-);
 
 // ─── Step indicator ───────────────────────────────────────────────────────────
 
@@ -73,14 +94,19 @@ function StepIndicator({ step }: { step: number }) {
               s === step
                 ? "bg-neutral-900 text-white"
                 : s < step
-                ? "bg-neutral-200 text-neutral-500"
-                : "bg-neutral-100 text-neutral-400"
+                  ? "bg-neutral-200 text-neutral-500"
+                  : "bg-neutral-100 text-neutral-400",
             )}
           >
             {s}
           </div>
           {s < 3 && (
-            <div className={cn("flex-1 h-px", s < step ? "bg-neutral-300" : "bg-neutral-100")} />
+            <div
+              className={cn(
+                "flex-1 h-px",
+                s < step ? "bg-neutral-300" : "bg-neutral-100",
+              )}
+            />
           )}
         </React.Fragment>
       ))}
@@ -111,8 +137,12 @@ function Step1({
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-bold text-neutral-900">Основа маршрута</h2>
-        <p className="text-sm text-neutral-500 mt-1">Расскажите, что это за день</p>
+        <h2 className="text-xl font-bold text-neutral-900">
+          Основная информация
+        </h2>
+        <p className="text-sm text-neutral-500 mt-1">
+          Расскажите всем про ваш маршрут
+        </p>
       </div>
 
       <div>
@@ -134,7 +164,7 @@ function Step1({
           Для кого
         </label>
         <div className="flex flex-wrap gap-2">
-          {AGE_GROUPS.map((opt) => (
+          {AGE_OPTIONS.map((opt) => (
             <button
               key={opt.key}
               onClick={() => toggleAge(opt.key)}
@@ -142,7 +172,7 @@ function Step1({
                 "px-3.5 py-2 rounded-xl text-sm font-medium transition-all border",
                 state.ageTags.includes(opt.key)
                   ? "bg-neutral-900 text-white border-neutral-900"
-                  : "bg-white text-neutral-700 border-neutral-200 hover:border-neutral-400"
+                  : "bg-white text-neutral-700 border-neutral-200 hover:border-neutral-400",
               )}
             >
               {opt.shortLabel}
@@ -164,11 +194,18 @@ function Step1({
                 "flex flex-col items-start px-4 py-3 rounded-2xl border text-left transition-all",
                 state.budgetLevel === opt.value
                   ? "bg-neutral-900 text-white border-neutral-900"
-                  : "bg-white text-neutral-700 border-neutral-200 hover:border-neutral-400"
+                  : "bg-white text-neutral-700 border-neutral-200 hover:border-neutral-400",
               )}
             >
               <span className="text-sm font-semibold">{opt.label}</span>
-              <span className={cn("text-xs mt-0.5", state.budgetLevel === opt.value ? "text-white/70" : "text-neutral-400")}>
+              <span
+                className={cn(
+                  "text-xs mt-0.5",
+                  state.budgetLevel === opt.value
+                    ? "text-white/70"
+                    : "text-neutral-400",
+                )}
+              >
                 {opt.sub}
               </span>
             </button>
@@ -176,14 +213,16 @@ function Step1({
         </div>
       </div>
 
-      <Button
-        size="lg"
-        className="w-full rounded-2xl font-semibold"
-        disabled={!canContinue}
-        onClick={onNext}
-      >
-        Продолжить
-      </Button>
+      <div className="pt-2">
+        <Button
+          size="lg"
+          className="w-full rounded-2xl font-semibold"
+          disabled={!canContinue}
+          onClick={onNext}
+        >
+          Продолжить
+        </Button>
+      </div>
     </div>
   );
 }
@@ -210,7 +249,9 @@ function StopEditor({
   // Display title in header: Place title or customTitle or fallback
   const headerTitle = isPlace
     ? stop.location!.title
-    : stop.location?.customTitle || stop.location?.title || `Точка ${index + 1}`;
+    : stop.location?.customTitle ||
+      stop.location?.title ||
+      `Точка ${index + 1}`;
 
   const noteError = hasLocation && stop.note.trim().length === 0;
 
@@ -225,7 +266,9 @@ function StopEditor({
 
     onChange({
       location: loc,
-      ...(locationChanged && loc?.source !== "PLACE" ? { customTitle: "" } : {}),
+      ...(locationChanged && loc?.source !== "PLACE"
+        ? { customTitle: "" }
+        : {}),
     });
   };
 
@@ -292,42 +335,41 @@ function StopEditor({
                   maxLength={200}
                   className={cn(
                     "w-full px-3 py-2.5 rounded-xl border bg-neutral-50 text-sm text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-neutral-900/20 transition-all resize-none",
-                    noteError ? "border-red-300 focus:border-red-400" : "border-neutral-200 focus:border-neutral-400"
+                    noteError
+                      ? "border-red-300 focus:border-red-400"
+                      : "border-neutral-200 focus:border-neutral-400",
                   )}
                 />
                 {noteError && (
-                  <p className="text-xs text-red-500 mt-1 px-1">Добавьте комментарий к точке</p>
+                  <p className="text-xs text-[#ef8855] mt-1 px-1">
+                    Добавьте комментарий к точке
+                  </p>
                 )}
               </div>
 
-              {/* Photo */}
-              {stop.photo ? (
-                <div className="relative rounded-xl overflow-hidden aspect-[16/9]">
-                  <ImagePreview
-                    image={stop.photo}
-                    onRemove={() => onChange({ photo: undefined })}
-                    className="w-full h-full"
-                  />
-                </div>
-              ) : (
-                <ImageUploader
-                  onUpload={(img) => onChange({ photo: img })}
-                  maxSizeMB={2}
-                  maxWidthOrHeight={1600}
-                  quality={0.82}
-                  className="rounded-xl overflow-hidden"
-                >
-                  <div className="flex items-center gap-3 px-4 py-3 rounded-xl border border-dashed border-neutral-200 bg-neutral-50 hover:border-neutral-400 hover:bg-white transition-all cursor-pointer">
-                    <div className="w-8 h-8 rounded-lg bg-neutral-100 flex items-center justify-center shrink-0">
-                      <MapPin className="w-4 h-4 text-neutral-400" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-neutral-600">Добавить фото точки</p>
-                      <p className="text-xs text-neutral-400 mt-0.5">Необязательно · JPEG, PNG, WebP</p>
-                    </div>
-                  </div>
-                </ImageUploader>
-              )}
+              {/* Photos */}
+              <ImageGalleryUploader
+                images={stop.photos || []}
+                onAdd={(img) =>
+                  onChange({
+                    photos: [...(stop.photos || []), img],
+                  })
+                }
+                onAddBatch={(imgs) =>
+                  onChange({
+                    photos: [...(stop.photos || []), ...imgs],
+                  })
+                }
+                onRemove={(id) =>
+                  onChange({
+                    photos: stop.photos?.filter((p) => p.id !== id),
+                  })
+                }
+                maxImages={10}
+                maxSizeMB={2}
+                maxWidthOrHeight={1600}
+                quality={0.82}
+              />
             </>
           )}
         </div>
@@ -360,7 +402,8 @@ function Step2({
   const canPublish =
     canContinue &&
     state.stops.every((s) => {
-      if (s.location?.source !== "PLACE" && !s.customTitle?.trim()) return false;
+      if (s.location?.source !== "PLACE" && !s.customTitle?.trim())
+        return false;
       return true;
     });
 
@@ -387,7 +430,7 @@ function Step2({
         source: s.location!.source,
         address: s.location!.address,
         cityName: s.location!.cityName,
-      }))
+      })),
   );
 
   return (
@@ -427,10 +470,20 @@ function Step2({
       </button>
 
       <div className="flex gap-3 pt-2">
-        <Button variant="outline" size="lg" className="flex-1 rounded-2xl border-neutral-200" onClick={onBack}>
+        <Button
+          variant="outline"
+          size="lg"
+          className="flex-1 rounded-2xl border-neutral-200"
+          onClick={onBack}
+        >
           Назад
         </Button>
-        <Button size="lg" className="flex-1 rounded-2xl font-semibold" disabled={!canContinue} onClick={() => onNext(canPublish)}>
+        <Button
+          size="lg"
+          className="flex-1 rounded-2xl font-semibold"
+          disabled={!canContinue}
+          onClick={() => onNext(canPublish)}
+        >
           Продолжить
         </Button>
       </div>
@@ -444,7 +497,6 @@ function Step3({
   state,
   onChange,
   onPublish,
-  onSaveDraft,
   onBack,
   saving,
   canPublish,
@@ -452,37 +504,50 @@ function Step3({
   state: WizardState;
   onChange: (patch: Partial<WizardState>) => void;
   onPublish: () => void;
-  onSaveDraft: () => void;
   onBack: () => void;
   saving: boolean;
   canPublish: boolean;
 }) {
-  const coverPhoto = state.stops.find((s) => s.photo)?.photo;
+  const coverPhoto = state.stops.find((s) => s.photos && s.photos.length > 0)
+    ?.photos?.[0];
 
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-bold text-neutral-900">Готово к публикации</h2>
-        <p className="text-sm text-neutral-500 mt-1">Проверьте и выберите видимость</p>
+        <h2 className="text-xl font-bold text-neutral-900">
+          Готово к публикации
+        </h2>
+        <p className="text-sm text-neutral-500 mt-1">
+          Проверьте и выберите видимость
+        </p>
       </div>
 
       {/* Preview card */}
       <div className="rounded-2xl border border-neutral-200 bg-white overflow-hidden">
         {coverPhoto && (
           <div className="aspect-[16/7] overflow-hidden">
-            <img src={coverPhoto.url} alt={state.title} className="w-full h-full object-cover" />
+            <img
+              src={coverPhoto.url}
+              alt={state.title}
+              className="w-full h-full object-cover"
+            />
           </div>
         )}
         <div className="p-4">
-          <p className="text-base font-bold text-neutral-900">{state.title || "Без названия"}</p>
+          <p className="text-base font-bold text-neutral-900">
+            {state.title || "Без названия"}
+          </p>
           <p className="text-sm text-neutral-500 mt-1">
-            {state.stops.length} {state.stops.length === 1 ? "точка" : "точки"} ·{" "}
-            {BUDGET_OPTIONS.find((b) => b.value === state.budgetLevel)?.label}
+            {state.stops.length} {state.stops.length === 1 ? "точка" : "точки"}{" "}
+            · {BUDGET_OPTIONS.find((b) => b.value === state.budgetLevel)?.label}
           </p>
           {state.ageTags.length > 0 && (
             <div className="flex flex-wrap gap-1.5 mt-2">
               {state.ageTags.map((tag) => (
-                <span key={tag} className="px-2 py-0.5 rounded-full bg-neutral-100 text-xs text-neutral-600">
+                <span
+                  key={tag}
+                  className="px-2 py-0.5 rounded-full bg-neutral-100 text-xs text-neutral-600"
+                >
                   {tag}
                 </span>
               ))}
@@ -505,26 +570,43 @@ function Step3({
                 "w-full flex items-center gap-3.5 px-4 py-3.5 rounded-2xl border text-left transition-all",
                 state.visibility === opt.value
                   ? "border-neutral-900 bg-neutral-900 text-white"
-                  : "border-neutral-200 bg-white text-neutral-700 hover:border-neutral-300"
+                  : "border-neutral-200 bg-white text-neutral-700 hover:border-neutral-300",
               )}
             >
-              <div className={cn(
-                "w-9 h-9 rounded-xl flex items-center justify-center shrink-0",
-                state.visibility === opt.value ? "bg-white/20" : "bg-neutral-100"
-              )}>
+              <div
+                className={cn(
+                  "w-9 h-9 rounded-xl flex items-center justify-center shrink-0",
+                  state.visibility === opt.value
+                    ? "bg-white/20"
+                    : "bg-neutral-100",
+                )}
+              >
                 {opt.icon}
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold">{opt.label}</p>
-                <p className={cn("text-xs mt-0.5", state.visibility === opt.value ? "text-white/70" : "text-neutral-400")}>
+                <p
+                  className={cn(
+                    "text-xs mt-0.5",
+                    state.visibility === opt.value
+                      ? "text-white/70"
+                      : "text-neutral-400",
+                  )}
+                >
                   {opt.sub}
                 </p>
               </div>
-              <div className={cn(
-                "w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0",
-                state.visibility === opt.value ? "border-white" : "border-neutral-300"
-              )}>
-                {state.visibility === opt.value && <div className="w-2 h-2 rounded-full bg-white" />}
+              <div
+                className={cn(
+                  "w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0",
+                  state.visibility === opt.value
+                    ? "border-white"
+                    : "border-neutral-300",
+                )}
+              >
+                {state.visibility === opt.value && (
+                  <div className="w-2 h-2 rounded-full bg-white" />
+                )}
               </div>
             </button>
           ))}
@@ -532,24 +614,24 @@ function Step3({
       </div>
 
       <div className="flex gap-3 pt-2">
-        <Button variant="outline" size="lg" className="rounded-2xl border-neutral-200" onClick={onBack}>
-          Назад
-        </Button>
         <Button
           variant="outline"
           size="lg"
-          className="flex-1 rounded-2xl border-neutral-200"
-          onClick={onSaveDraft}
-          disabled={saving}
+          className="rounded-2xl border-neutral-200"
+          onClick={onBack}
         >
-          Черновик
+          Назад
         </Button>
         <Button
           size="lg"
           className="flex-1 rounded-2xl font-semibold"
           onClick={onPublish}
           disabled={saving || !canPublish}
-          title={!canPublish ? "Добавьте названия для всех точек без места из каталога" : undefined}
+          title={
+            !canPublish
+              ? "Добавьте названия для всех точек без места из каталога"
+              : undefined
+          }
         >
           Опубликовать
         </Button>
@@ -561,7 +643,12 @@ function Step3({
 // ─── Wizard shell ─────────────────────────────────────────────────────────────
 
 function makeEmptyStop(): EditableRouteStop {
-  return { id: crypto.randomUUID(), location: null, note: "" };
+  return {
+    id: `stop-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+    location: null,
+    note: "",
+    photos: [],
+  };
 }
 
 const INITIAL_STATE: WizardState = {
@@ -584,22 +671,44 @@ export function CreateRouteWizard() {
   const handleSave = async (publish: boolean) => {
     setSaving(true);
     try {
+      // Проверяем название
+      if (!state.title.trim()) {
+        toast.error("Укажите название маршрута");
+        setSaving(false);
+        return;
+      }
+
+      // Для черновиков сохраняем только точки с location
+      const validStops = state.stops.filter((s) => s.location !== null);
+
+      // Дополнительная проверка для публикации
+      if (publish && validStops.length < 2) {
+        toast.error("Для публикации нужно минимум 2 остановки", {
+          description: "Добавьте ещё остановки или сохраните как черновик",
+        });
+        setSaving(false);
+        return;
+      }
+
       const body = {
         title: state.title,
         ageTags: state.ageTags,
         budgetLevel: state.budgetLevel,
         visibility: state.visibility,
         publish,
-        stops: state.stops.map((s, i) => ({
+        stops: validStops.map((s, i) => ({
           order: i + 1,
-          address: s.location?.address ?? s.location?.title ?? "",
+          address: s.location!.address,
           note: s.note,
-          photoUrl: s.photo?.url,
+          photoUrl: s.photos?.[0]?.url,
           lat: s.location?.lat,
           lng: s.location?.lng,
-          placeId: s.location?.source === "PLACE" ? s.location.placeId : undefined,
+          placeId:
+            s.location?.source === "PLACE" ? s.location.placeId : undefined,
           customTitle:
-            s.location?.source !== "PLACE" ? (s.customTitle ?? undefined) : undefined,
+            s.location?.source !== "PLACE"
+              ? (s.customTitle ?? undefined)
+              : undefined,
         })),
       };
 
@@ -611,13 +720,19 @@ export function CreateRouteWizard() {
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(err.error ?? "Ошибка сохранения");
+        const errorMessage =
+          err.error === "at least 2 stops required"
+            ? "Для публикации нужно минимум 2 остановки"
+            : err.error || "Ошибка сохранения";
+        throw new Error(errorMessage);
       }
 
       const { slug } = await res.json();
 
       toast.success(publish ? "Маршрут опубликован" : "Черновик сохранён", {
-        description: publish ? "Он появится в каталоге" : "Вы можете вернуться к нему позже",
+        description: publish
+          ? "Он появится в каталоге"
+          : "Вы можете вернуться к нему позже",
       });
 
       router.push(publish ? `/routes/${slug}` : "/routes");
@@ -639,10 +754,23 @@ export function CreateRouteWizard() {
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
-          <div>
-            <h1 className="text-lg font-bold text-neutral-900">Создать маршрут</h1>
+          <div className="flex-1">
+            <h1 className="text-lg font-bold text-neutral-900">
+              Создать маршрут
+            </h1>
             <p className="text-xs text-neutral-400">Шаг {step} из 3</p>
           </div>
+          <Button
+            variant="outline"
+            size="sm"
+            className="rounded-xl border-neutral-200"
+            disabled={
+              !state.title.trim() || state.title.trim().length < 3 || saving
+            }
+            onClick={() => handleSave(false)}
+          >
+            Сохранить черновик
+          </Button>
         </div>
 
         <StepIndicator step={step} />
@@ -654,7 +782,10 @@ export function CreateRouteWizard() {
           <Step2
             state={state}
             onChange={patch}
-            onNext={(cp) => { setStopsCanPublish(cp); setStep(3); }}
+            onNext={(cp) => {
+              setStopsCanPublish(cp);
+              setStep(3);
+            }}
             onBack={() => setStep(1)}
           />
         )}
@@ -663,7 +794,6 @@ export function CreateRouteWizard() {
             state={state}
             onChange={patch}
             onPublish={() => handleSave(true)}
-            onSaveDraft={() => handleSave(false)}
             onBack={() => setStep(2)}
             saving={saving}
             canPublish={stopsCanPublish}

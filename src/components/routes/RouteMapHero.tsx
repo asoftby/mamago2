@@ -2,8 +2,9 @@
 
 /**
  * RouteMapHero
- * Renders a Google Map with a polyline connecting all stops and numbered markers.
+ * Renders a Google Map with directions connecting all stops and numbered markers.
  * Geocodes stops that lack lat/lng. Falls back to cover image if Maps fails.
+ * Supports travelMode: "walk" | "car" — re-renders directions on change.
  */
 
 import { useEffect, useRef, useState } from "react";
@@ -21,32 +22,112 @@ interface RouteMapHeroProps {
   stops: Stop[];
   fallbackImageUrl?: string;
   className?: string;
+  travelMode?: "walk" | "car";
 }
 
-export function RouteMapHero({ stops, fallbackImageUrl, className }: RouteMapHeroProps) {
+type ResolvedStop = { stop: Stop; coords: { lat: number; lng: number } };
+
+async function resolveCoords(
+  stop: Stop,
+  geocoder: google.maps.Geocoder,
+): Promise<{ lat: number; lng: number } | null> {
+  if (stop.lat != null && stop.lng != null)
+    return { lat: stop.lat, lng: stop.lng };
+  const query = stop.address || stop.title;
+  if (!query) return null;
+  try {
+    const result = await geocoder.geocode({ address: query, region: "BY" });
+    const loc = result.results[0]?.geometry?.location;
+    if (!loc) return null;
+    return { lat: loc.lat(), lng: loc.lng() };
+  } catch {
+    return null;
+  }
+}
+
+export function RouteMapHero({
+  stops,
+  fallbackImageUrl,
+  className,
+  travelMode = "walk",
+}: RouteMapHeroProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [failed, setFailed] = useState(false);
+
+  const mapRef = useRef<google.maps.Map | null>(null);
+  const resolvedRef = useRef<ResolvedStop[]>([]);
+  const rendererRef = useRef<google.maps.DirectionsRenderer | null>(null);
+  const fallbackPolylineRef = useRef<google.maps.Polyline | null>(null);
   const initialized = useRef(false);
 
-  const resolveCoords = async (
-    stop: Stop,
-    geocoder: google.maps.Geocoder
-  ): Promise<{ lat: number; lng: number } | null> => {
-    if (stop.lat != null && stop.lng != null) return { lat: stop.lat, lng: stop.lng };
-    const query = stop.address || stop.title;
-    if (!query) return null;
+  const renderDirections = async (mode: "walk" | "car") => {
+    const map = mapRef.current;
+    const resolved = resolvedRef.current;
+    if (!map || resolved.length < 2) return;
+
+    // Clear previous renderer
+    if (rendererRef.current) {
+      rendererRef.current.setMap(null);
+      rendererRef.current = null;
+    }
+    if (fallbackPolylineRef.current) {
+      fallbackPolylineRef.current.setMap(null);
+      fallbackPolylineRef.current = null;
+    }
+
+    const strokeColor = mode === "walk" ? "#EF8759" : "#3B82F6";
+
     try {
-      const result = await geocoder.geocode({ address: query, region: "BY" });
-      const loc = result.results[0]?.geometry?.location;
-      if (!loc) return null;
-      return { lat: loc.lat(), lng: loc.lng() };
+      const directionsService = new google.maps.DirectionsService();
+
+      const renderer = new google.maps.DirectionsRenderer({
+        map,
+        suppressMarkers: true,
+        polylineOptions: {
+          strokeColor,
+          strokeWeight: 4,
+          strokeOpacity: 0.85,
+        },
+      });
+      rendererRef.current = renderer;
+
+      const origin = resolved[0]!.coords;
+      const destination = resolved[resolved.length - 1]!.coords;
+      const waypoints = resolved.slice(1, -1).map(({ coords }) => ({
+        location: new google.maps.LatLng(coords.lat, coords.lng),
+        stopover: true,
+      }));
+
+      const googleMode =
+        mode === "walk"
+          ? google.maps.TravelMode.WALKING
+          : google.maps.TravelMode.DRIVING;
+
+      const result = await directionsService.route({
+        origin,
+        destination,
+        waypoints,
+        travelMode: googleMode,
+        optimizeWaypoints: false,
+      });
+
+      renderer.setDirections(result);
     } catch {
-      return null;
+      // Fallback: plain polyline
+      const polyline = new google.maps.Polyline({
+        path: resolved.map(({ coords }) => coords),
+        map,
+        strokeColor,
+        strokeOpacity: 0.8,
+        strokeWeight: 4,
+        geodesic: true,
+      });
+      fallbackPolylineRef.current = polyline;
     }
   };
 
-  const initMap = async () => {
-    if (!containerRef.current) return;
+  const initMap = async (): Promise<boolean> => {
+    if (!containerRef.current) return false;
     try {
       const [mapsLib, markerLib, geocodingLib] = await Promise.all([
         GoogleMapsService.getMapsLibrary(),
@@ -56,18 +137,17 @@ export function RouteMapHero({ stops, fallbackImageUrl, className }: RouteMapHer
 
       const geocoder = new geocodingLib.Geocoder();
 
-      // Resolve coordinates for all stops (parallel)
       const coordResults = await Promise.all(
-        stops.map((s) => resolveCoords(s, geocoder))
+        stops.map((s) => resolveCoords(s, geocoder)),
       );
 
       const resolved = stops
         .map((s, i) => ({ stop: s, coords: coordResults[i] }))
-        .filter((x) => x.coords !== null) as { stop: Stop; coords: { lat: number; lng: number } }[];
+        .filter((x) => x.coords !== null) as ResolvedStop[];
 
-      if (resolved.length === 0) {
-        return false; // Return false to indicate failure
-      }
+      if (resolved.length === 0) return false;
+
+      resolvedRef.current = resolved;
 
       const map = new mapsLib.Map(containerRef.current, {
         mapId: process.env.NEXT_PUBLIC_GOOGLE_MAP_ID || "route_detail_hero",
@@ -76,20 +156,12 @@ export function RouteMapHero({ stops, fallbackImageUrl, className }: RouteMapHer
         zoomControl: false,
       });
 
+      mapRef.current = map;
+
       // Fit bounds
       const bounds = new google.maps.LatLngBounds();
       resolved.forEach(({ coords }) => bounds.extend(coords));
       map.fitBounds(bounds, { top: 48, right: 48, bottom: 48, left: 48 });
-
-      // Polyline
-      new mapsLib.Polyline({
-        path: resolved.map(({ coords }) => coords),
-        map,
-        strokeColor: "#1a1a1a",
-        strokeOpacity: 0.75,
-        strokeWeight: 3,
-        geodesic: true,
-      });
 
       // Numbered markers
       resolved.forEach(({ stop, coords }, i) => {
@@ -111,28 +183,42 @@ export function RouteMapHero({ stops, fallbackImageUrl, className }: RouteMapHer
           title: stop.title ?? stop.address,
         });
       });
-      
-      return true; // Success
+
+      // Initial directions
+      await renderDirections(travelMode);
+
+      return true;
     } catch {
-      return false; // Failure
+      return false;
     }
   };
 
+  // Init map once
   useEffect(() => {
     if (initialized.current) return;
     initialized.current = true;
     void initMap().then((success) => {
-      if (!success) {
-        setFailed(true);
-      }
+      if (!success) setFailed(true);
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Re-render directions on travelMode change
+  useEffect(() => {
+    if (!mapRef.current) return;
+    void renderDirections(travelMode);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [travelMode]);
 
   if (failed) {
     if (!fallbackImageUrl) return null;
     return (
       <div className={className}>
-        <img src={fallbackImageUrl} alt="" className="w-full h-full object-cover" />
+        <img
+          src={fallbackImageUrl}
+          alt=""
+          className="w-full h-full object-cover"
+        />
       </div>
     );
   }

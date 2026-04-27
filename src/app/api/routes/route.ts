@@ -42,34 +42,38 @@ export async function POST(request: NextRequest) {
     if (!title?.trim()) {
       return NextResponse.json({ error: "title is required" }, { status: 400 });
     }
-    if (!stops || stops.length < 2) {
-      return NextResponse.json({ error: "at least 2 stops required" }, { status: 400 });
+    // Для публикации требуем минимум 2 остановки, для черновика можно без них
+    if (publish && (!stops || stops.length < 2)) {
+      return NextResponse.json(
+        { error: "at least 2 stops required" },
+        { status: 400 },
+      );
     }
 
-    const result = await createRoute(
-      user?.id ?? null,
-      {
-        title: title.trim(),
-        ageTags,
-        budgetLevel,
-        visibility,
-        publish,
-        stops: stops.map((s, i) => ({
-          order: s.order ?? i + 1,
-          address: s.address ?? "",
-          note: s.note ?? "",
-          photoUrl: s.photoUrl,
-          lat: s.lat,
-          lng: s.lng,
-          placeId: s.placeId,
-          customTitle: s.customTitle,
-        })),
-      }
-    );
+    const result = await createRoute(user?.id ?? null, {
+      title: title.trim(),
+      ageTags,
+      budgetLevel,
+      visibility,
+      publish,
+      stops: stops.map((s, i) => ({
+        order: s.order ?? i + 1,
+        address: s.address ?? "",
+        note: s.note ?? "",
+        photoUrl: s.photoUrl,
+        lat: s.lat,
+        lng: s.lng,
+        placeId: s.placeId,
+        customTitle: s.customTitle,
+      })),
+    });
 
     return NextResponse.json(result, { status: 201 });
   } catch (err) {
     console.error("[API] POST /api/routes error:", err);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 },
+    );
   }
 }

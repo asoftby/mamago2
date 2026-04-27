@@ -17,7 +17,7 @@ export const dynamic = "force-dynamic";
 /** Build a human-readable address line: "Город, улица, дом" */
 function buildStopAddress(
   place: RouteWithStops["stops"][0]["place"],
-  fallback: string | null
+  fallback: string | null,
 ): string {
   if (!place) return fallback ?? "";
   const parts: string[] = [];
@@ -66,15 +66,36 @@ export default async function RouteDetailPage({ params }: Props) {
   const resolved = await findRouteBySlug(slug);
   if (resolved) {
     const db = await prisma.route.findUnique({
-    where: { id: resolved.routeId },
-    include: {
-      city: { select: { id: true, name: true } },
-      author: { select: { id: true, email: true } },
-      stops: {
-        orderBy: { order: "asc" },
-        include: { place: { select: { id: true, title: true, formattedAddr: true, shortAddress: true, city: { select: { name: true } } } } },
+      where: { id: resolved.routeId },
+      select: {
+        id: true,
+        slug: true,
+        title: true,
+        ageTags: true,
+        budgetLevel: true,
+        coverImageUrl: true,
+        authorId: true,
+        cityId: true,
+        seoJsonLdOverride: true,
+        createdAt: true,
+        updatedAt: true,
+        city: { select: { id: true, name: true } },
+        author: { select: { id: true, email: true, avatarUrl: true } },
+        stops: {
+          orderBy: { order: "asc" },
+          include: {
+            place: {
+              select: {
+                id: true,
+                title: true,
+                formattedAddr: true,
+                shortAddress: true,
+                city: { select: { name: true } },
+              },
+            },
+          },
+        },
       },
-    },
     });
     if (db) {
       if (resolved.isRedirect) {
@@ -94,8 +115,11 @@ export default async function RouteDetailPage({ params }: Props) {
           db.stops.find((s) => s.photoUrl)?.photoUrl ??
           "https://images.unsplash.com/photo-1513884923967-4b182ef1671f?q=80&w=1200",
         authorName: db.author?.email?.split("@")[0] ?? null,
+        authorAvatar: db.author?.avatarUrl ?? undefined,
         isEditorial: db.authorId === null,
         stopsCount: db.stops.length,
+        createdAt: db.createdAt?.toISOString(),
+        updatedAt: db.updatedAt?.toISOString(),
         stops: db.stops.map((s) => ({
           id: s.id,
           order: s.order,

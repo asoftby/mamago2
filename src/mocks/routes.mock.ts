@@ -3,10 +3,11 @@
 export type MockRouteStop = {
   id: string;
   order: number;
-  title?: string;      // display name (place title or customTitle)
-  address: string;     // raw address / location label (город, улица, дом)
+  title?: string; // display name (place title or customTitle)
+  address: string; // raw address / location label (город, улица, дом)
   note: string;
-  photoUrl: string;
+  photoUrl?: string; // Legacy: single photo (для обратной совместимости)
+  photos?: string[]; // New: multiple photos support
   lat?: number;
   lng?: number;
 };
@@ -20,9 +21,12 @@ export type MockRoute = {
   cityName: string;
   coverImageUrl: string;
   authorName: string | null; // null = editorial (mamaGo)
+  authorAvatar?: string;
   isEditorial: boolean;
   stopsCount: number;
   stops: MockRouteStop[];
+  createdAt?: string; // ISO date string
+  updatedAt?: string; // ISO date string
 };
 
 export const BUDGET_LABELS: Record<MockRoute["budgetLevel"], string> = {
@@ -43,8 +47,12 @@ export const MOCK_ROUTES: MockRoute[] = [
     coverImageUrl:
       "https://images.unsplash.com/photo-1513884923967-4b182ef1671f?q=80&w=1200",
     authorName: null,
+    authorAvatar:
+      "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=200",
     isEditorial: true,
     stopsCount: 4,
+    createdAt: "2024-11-10T10:00:00Z",
+    updatedAt: "2024-12-15T14:30:00Z",
     stops: [
       {
         id: "s1-1",
@@ -54,6 +62,13 @@ export const MOCK_ROUTES: MockRoute[] = [
         note: "Начните день здесь — аттракционы открываются в 10:00, очередей почти нет. Возьмите билеты на карусель сразу.",
         photoUrl:
           "https://images.unsplash.com/photo-1513884923967-4b182ef1671f?q=80&w=800",
+        photos: [
+          "https://images.unsplash.com/photo-1513884923967-4b182ef1671f?q=80&w=800",
+          "https://images.unsplash.com/photo-1560807707-8cc77767d783?q=80&w=800",
+          "https://images.unsplash.com/photo-1486299267070-83823f5448dd?q=80&w=800",
+          "https://images.unsplash.com/photo-1523627945-eba974c3e7c6?q=80&w=800",
+          "https://images.unsplash.com/photo-1544551763-46a013bb70d5?q=80&w=800",
+        ],
         lat: 53.9006,
         lng: 27.5615,
       },
@@ -104,6 +119,8 @@ export const MOCK_ROUTES: MockRoute[] = [
     authorName: null,
     isEditorial: true,
     stopsCount: 3,
+    createdAt: "2024-10-20T09:00:00Z",
+    updatedAt: "2024-12-01T11:15:00Z",
     stops: [
       {
         id: "s2-1",
@@ -125,7 +142,7 @@ export const MOCK_ROUTES: MockRoute[] = [
         photoUrl:
           "https://images.unsplash.com/photo-1485827404703-89b55fcc595e?q=80&w=800",
         lat: 53.9052,
-        lng: 27.5630,
+        lng: 27.563,
       },
       {
         id: "s2-3",
@@ -135,8 +152,8 @@ export const MOCK_ROUTES: MockRoute[] = [
         note: "Запишитесь заранее — первое занятие бесплатно. Хорошо подходит как финал дня, дети уходят с готовой поделкой.",
         photoUrl:
           "https://images.unsplash.com/photo-1589254065878-42c9da997008?q=80&w=800",
-        lat: 53.9120,
-        lng: 27.5480,
+        lat: 53.912,
+        lng: 27.548,
       },
     ],
   },
@@ -150,8 +167,11 @@ export const MOCK_ROUTES: MockRoute[] = [
     coverImageUrl:
       "https://images.unsplash.com/photo-1526676037777-05a232554f77?q=80&w=1200",
     authorName: "Анна К.",
+    authorAvatar:
+      "https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=200",
     isEditorial: false,
     stopsCount: 3,
+    createdAt: "2024-11-25T16:20:00Z",
     stops: [
       {
         id: "s3-1",
@@ -161,8 +181,8 @@ export const MOCK_ROUTES: MockRoute[] = [
         note: "Открывается в 10:00. Берите носки — без них не пустят. Час прыжков хватает детям с головой.",
         photoUrl:
           "https://images.unsplash.com/photo-1526676037777-05a232554f77?q=80&w=800",
-        lat: 53.9180,
-        lng: 27.4950,
+        lat: 53.918,
+        lng: 27.495,
       },
       {
         id: "s3-2",
@@ -172,8 +192,8 @@ export const MOCK_ROUTES: MockRoute[] = [
         note: "Трассы разной сложности — есть для малышей от 5 лет. Инструктор всегда рядом, безопасно.",
         photoUrl:
           "https://images.unsplash.com/photo-1596324916867-b8696773322d?q=80&w=800",
-        lat: 53.9210,
-        lng: 27.5020,
+        lat: 53.921,
+        lng: 27.502,
       },
       {
         id: "s3-3",
@@ -183,8 +203,8 @@ export const MOCK_ROUTES: MockRoute[] = [
         note: "Спокойная прогулка после активного дня. Дети любят фонтаны и теплицы с экзотическими растениями.",
         photoUrl:
           "https://images.unsplash.com/photo-1466692476868-aef1dfb1e735?q=80&w=800",
-        lat: 53.9270,
-        lng: 27.5890,
+        lat: 53.927,
+        lng: 27.589,
       },
     ],
   },
@@ -198,8 +218,11 @@ export const MOCK_ROUTES: MockRoute[] = [
     coverImageUrl:
       "https://images.unsplash.com/photo-1466692476868-aef1dfb1e735?q=80&w=1200",
     authorName: "Мария Л.",
+    authorAvatar:
+      "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?q=80&w=200",
     isEditorial: false,
     stopsCount: 3,
+    createdAt: "2024-12-05T13:45:00Z",
     stops: [
       {
         id: "s4-1",
@@ -209,8 +232,8 @@ export const MOCK_ROUTES: MockRoute[] = [
         note: "Начните с утренней прогулки — в будни почти пусто. Дети любят искать необычные растения.",
         photoUrl:
           "https://images.unsplash.com/photo-1466692476868-aef1dfb1e735?q=80&w=800",
-        lat: 53.9270,
-        lng: 27.5890,
+        lat: 53.927,
+        lng: 27.589,
       },
       {
         id: "s4-2",
@@ -220,8 +243,8 @@ export const MOCK_ROUTES: MockRoute[] = [
         note: "Уютное место для перерыва. Коты ручные, дети в восторге. Лучше бронировать столик.",
         photoUrl:
           "https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?q=80&w=800",
-        lat: 53.9050,
-        lng: 27.5610,
+        lat: 53.905,
+        lng: 27.561,
       },
       {
         id: "s4-3",
