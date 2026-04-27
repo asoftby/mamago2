@@ -261,6 +261,28 @@ export async function listAllPlanItems(userId: string): Promise<PlanItemWithActi
 }
 
 /**
+ * List plan items from a given date onwards (up to 90 days).
+ * Used by the upcoming plan widget.
+ */
+export async function listUpcomingPlanItems(
+  userId: string,
+  from: string
+): Promise<PlanItemWithActivity[]> {
+  const fromDate = new Date(from);
+  const toDate = new Date(fromDate);
+  toDate.setDate(toDate.getDate() + 90);
+  const toDateStr = toDate.toISOString().split("T")[0]!;
+
+  return (await prisma.planItem.findMany({
+    where: { userId, date: { gte: from, lte: toDateStr } },
+    include: {
+      activity: { select: planActivitySelect },
+    },
+    orderBy: [{ date: "asc" }, { startsAt: "asc" }],
+  })) as PlanItemWithActivity[];
+}
+
+/**
  * List all plan items for a user on a specific date
  */
 export async function listPlanItemsByDate(
