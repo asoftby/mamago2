@@ -1,6 +1,7 @@
 import {
   CalendarDays,
   Lightbulb,
+  Map,
   Settings,
   Shield,
   UserCircle,
@@ -11,8 +12,7 @@ import type { AccountMode } from "@/contexts/AccountModeContext";
 import type { AccountMenuRow } from "@/components/account/types";
 import type { AccountDropdownModel } from "@/components/account/AccountDropdown.types";
 
-const isAdminRole = (role: string) =>
-  role === "ADMIN" || role === "MODERATOR";
+const isAdminRole = (role: string) => role === "ADMIN" || role === "MODERATOR";
 
 /**
  * Публичный сайт + личный кабинет /me: меню в шапке (режим personal или business).
@@ -29,6 +29,7 @@ export function buildPublicSiteAccountModel(input: {
   onGoToPersonalAccount: () => void;
   onGoToPersonalIdeas: () => void;
   onGoToPersonalPlan: () => void;
+  onGoToPersonalRoutes: () => void;
   onGoToSettings: () => void;
   onGoToBusinessDashboard: () => void;
   onGoToBusinessRoot: () => void;
@@ -53,6 +54,7 @@ export function buildPublicSiteAccountModel(input: {
     onGoToPersonalAccount,
     onGoToPersonalIdeas,
     onGoToPersonalPlan,
+    onGoToPersonalRoutes,
     onGoToSettings,
     onGoToBusinessBilling,
     onGoToBusinessAccount,
@@ -83,21 +85,36 @@ export function buildPublicSiteAccountModel(input: {
         type: "button",
         label: "Личный аккаунт",
         icon: UserCircle,
-        onClick: () => { onGoToPersonalAccount(); },
+        onClick: () => {
+          onGoToPersonalAccount();
+        },
       },
       {
         key: "ideas",
         type: "button",
         label: "Мои идеи",
         icon: Lightbulb,
-        onClick: () => { onGoToPersonalIdeas(); },
+        onClick: () => {
+          onGoToPersonalIdeas();
+        },
       },
       {
         key: "plan",
         type: "button",
         label: "Мой план",
         icon: CalendarDays,
-        onClick: () => { onGoToPersonalPlan(); },
+        onClick: () => {
+          onGoToPersonalPlan();
+        },
+      },
+      {
+        key: "routes",
+        type: "button",
+        label: "Мои маршруты",
+        icon: Map,
+        onClick: () => {
+          onGoToPersonalRoutes();
+        },
       },
       {
         key: "settings",
@@ -118,7 +135,9 @@ export function buildPublicSiteAccountModel(input: {
             label: "Перейти в админ-панель",
             icon: Shield,
             variant: "accent",
-            onClick: () => { onGoToAdminAccount(); },
+            onClick: () => {
+              onGoToAdminAccount();
+            },
           },
         ]
       : undefined;
@@ -136,7 +155,9 @@ export function buildPublicSiteAccountModel(input: {
         : {
             title: "Нужен бизнес-профиль?",
             actionLabel: "Подключить бизнес",
-            onAction: () => { onGoToBusinessAccount(); },
+            onAction: () => {
+              onGoToBusinessAccount();
+            },
           },
       onLogout,
       logoutMode: "fetch",
@@ -158,7 +179,9 @@ export function buildPublicSiteAccountModel(input: {
             label: "Перейти в админ-панель",
             icon: Shield,
             variant: "accent",
-            onClick: () => { onGoToAdminAccount(); },
+            onClick: () => {
+              onGoToAdminAccount();
+            },
           },
         ]
       : undefined,
@@ -167,7 +190,9 @@ export function buildPublicSiteAccountModel(input: {
     businessModeAvailable: true,
     businessLabel: "MamaGo",
     businessBalanceBYN,
-    onTopUpBalance: () => { onGoToBusinessBilling(); },
+    onTopUpBalance: () => {
+      onGoToBusinessBilling();
+    },
     onLogout,
     logoutMode: "fetch",
     loggingOut,
@@ -186,7 +211,14 @@ export function buildAdminAccountModel(input: {
   goToAdminHome: () => void;
   onNavigate: () => void;
 }): AccountDropdownModel {
-  const { userEmail, userDisplayName, initials, goToPersonalAccount, goToAdminHome, onNavigate } = input;
+  const {
+    userEmail,
+    userDisplayName,
+    initials,
+    goToPersonalAccount,
+    goToAdminHome,
+    onNavigate,
+  } = input;
 
   const emailPrefix = userEmail.split("@")[0] ?? userEmail;
   const displayName = userDisplayName?.trim() || emailPrefix;
@@ -227,6 +259,7 @@ export function buildBusinessAccountModel(input: {
   onGoToPersonalAccount: () => void;
   onGoToPersonalIdeas: () => void;
   onGoToPersonalPlan: () => void;
+  onGoToPersonalRoutes: () => void;
   onGoToSettings: () => void;
   onGoToBusinessDashboard: () => void;
   onGoToBusinessRoot: () => void;

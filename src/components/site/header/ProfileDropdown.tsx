@@ -4,7 +4,10 @@ import type { ReactNode } from "react";
 import { AccountDropdown } from "@/components/account/AccountDropdown";
 import type { AccountMenuUser } from "@/lib/account/types";
 import type { AccountMode } from "@/contexts/AccountModeContext";
-import { buildPublicSiteAccountModel, buildBusinessAccountModel } from "@/lib/account/accountMenuBuilders";
+import {
+  buildPublicSiteAccountModel,
+  buildBusinessAccountModel,
+} from "@/lib/account/accountMenuBuilders";
 import { userInitialsFromEmail } from "@/lib/account/userInitials";
 
 export type ProfileDropdownProps = {
@@ -20,6 +23,7 @@ export type ProfileDropdownProps = {
   onGoToPersonalAccount: () => void;
   onGoToPersonalIdeas: () => void;
   onGoToPersonalPlan: () => void;
+  onGoToPersonalRoutes: () => void;
   onGoToSettings: () => void;
   onGoToAdminAccount: () => void;
   onGoToBusinessAccount: () => void;
@@ -50,6 +54,7 @@ export function ProfileDropdown({
   onGoToPersonalAccount,
   onGoToPersonalIdeas,
   onGoToPersonalPlan,
+  onGoToPersonalRoutes,
   onGoToSettings,
   onGoToAdminAccount,
   onGoToBusinessAccount,
@@ -74,6 +79,7 @@ export function ProfileDropdown({
     onGoToPersonalAccount,
     onGoToPersonalIdeas,
     onGoToPersonalPlan,
+    onGoToPersonalRoutes,
     onGoToSettings,
     onGoToAdminAccount,
     onGoToBusinessAccount,

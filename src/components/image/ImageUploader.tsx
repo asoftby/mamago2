@@ -6,6 +6,7 @@ import { useImageUpload, type UploadedImage } from "@/hooks/useImageUpload";
 
 interface ImageUploaderProps {
   onUpload: (image: UploadedImage) => void;
+  onUploadBatch?: (images: UploadedImage[]) => void; // For multiple files at once
   onError?: (error: string) => void;
   accept?: string;
   maxSizeMB?: number;
@@ -14,10 +15,12 @@ interface ImageUploaderProps {
   disabled?: boolean;
   className?: string;
   children?: React.ReactNode;
+  multiple?: boolean;
 }
 
 export function ImageUploader({
   onUpload,
+  onUploadBatch,
   onError,
   accept = "image/jpeg,image/png,image/webp,image/avif",
   maxSizeMB = 1,
@@ -26,23 +29,34 @@ export function ImageUploader({
   disabled = false,
   className = "",
   children,
+  multiple = true,
 }: ImageUploaderProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
 
-  const { uploadImage, uploading, progress, error } = useImageUpload({
+  const { uploadImages, uploading, progress, error } = useImageUpload({
     maxSizeMB,
     maxWidthOrHeight,
     quality,
-    onUploadComplete: onUpload,
     onUploadError: onError,
   });
 
   const handleFileSelect = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
 
-    const file = files[0];
-    await uploadImage(file);
+    // Convert FileList to array and upload all files
+    const fileArray = Array.from(files);
+    const results = await uploadImages(fileArray);
+
+    // Use batch callback if available (prevents state race condition)
+    if (onUploadBatch && results.length > 0) {
+      onUploadBatch(results);
+    } else {
+      // Fallback to individual callbacks
+      results.forEach((image) => {
+        onUpload(image);
+      });
+    }
   };
 
   const handleClick = () => {
@@ -77,6 +91,7 @@ export function ImageUploader({
         ref={fileInputRef}
         type="file"
         accept={accept}
+        multiple={multiple}
         onChange={(e) => handleFileSelect(e.target.files)}
         className="hidden"
         disabled={disabled || uploading}
@@ -122,11 +137,7 @@ export function ImageUploader({
             </div>
           )}
 
-          {error && (
-            <div className="mt-3 text-sm text-red-600">
-              {error}
-            </div>
-          )}
+          {error && <div className="mt-3 text-sm text-red-600">{error}</div>}
         </div>
       )}
     </div>
@@ -181,6 +192,7 @@ export function ImagePreview({
 interface ImageGalleryUploaderProps {
   images: UploadedImage[];
   onAdd: (image: UploadedImage) => void;
+  onAddBatch?: (images: UploadedImage[]) => void; // For multiple files at once
   onRemove: (id: string) => void;
   onReorder?: (startIndex: number, endIndex: number) => void;
   maxImages?: number;
@@ -193,6 +205,7 @@ interface ImageGalleryUploaderProps {
 export function ImageGalleryUploader({
   images,
   onAdd,
+  onAddBatch,
   onRemove,
   onReorder,
   maxImages = 10,
@@ -223,6 +236,7 @@ export function ImageGalleryUploader({
       {canAddMore && (
         <ImageUploader
           onUpload={onAdd}
+          onUploadBatch={onAddBatch}
           maxSizeMB={maxSizeMB}
           maxWidthOrHeight={maxWidthOrHeight}
           quality={quality}

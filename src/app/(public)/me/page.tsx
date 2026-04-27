@@ -15,6 +15,7 @@ import { UserGreeting } from "@/features/me/components/UserGreeting";
 import { listUserBirthdayParties } from "@/server/services/userBirthdays.service";
 import Link from "next/link";
 import { MapPin, Plus } from "lucide-react";
+import { RouteActions } from "@/features/me/components/RouteActions";
 import { BUDGET_LABELS } from "@/mocks/routes.mock";
 import { buildAdultPreferenceDisplayLine } from "@/lib/adultPersonaSignals/buildAdultPreferenceLine";
 import { cn } from "@/lib/utils";
@@ -26,7 +27,7 @@ type PageProps = {
 
 export default async function MePage({ searchParams }: PageProps) {
   const params = await searchParams;
-  
+
   // Check authentication
   const user = await getCurrentUser();
   if (!user) {
@@ -40,31 +41,31 @@ export default async function MePage({ searchParams }: PageProps) {
   });
 
   // Fetch interests separately if there are children
-  const childIds = childrenRaw.map(child => child.id);
-  
+  const childIds = childrenRaw.map((child) => child.id);
+
   type SystemInterest = { childId: string; interestSlug: string };
   type CustomInterest = { childId: string; label: string };
-  
+
   let systemInterestsData: SystemInterest[] = [];
   let customInterestsData: CustomInterest[] = [];
-  
+
   if (childIds.length > 0) {
     // Use raw queries to avoid TypeScript issues
-    systemInterestsData = await prisma.$queryRaw`
-      SELECT "childId", "interestSlug" 
-      FROM "ChildInterest" 
+    systemInterestsData = (await prisma.$queryRaw`
+      SELECT "childId", "interestSlug"
+      FROM "ChildInterest"
       WHERE "childId" = ANY(${childIds})
-    ` as SystemInterest[];
-    
-    customInterestsData = await prisma.$queryRaw`
-      SELECT "childId", "label" 
-      FROM "ChildCustomInterest" 
+    `) as SystemInterest[];
+
+    customInterestsData = (await prisma.$queryRaw`
+      SELECT "childId", "label"
+      FROM "ChildCustomInterest"
       WHERE "childId" = ANY(${childIds})
-    ` as CustomInterest[];
+    `) as CustomInterest[];
   }
 
   // Transform the data to match expected interface
-  const children = childrenRaw.map(child => ({
+  const children = childrenRaw.map((child) => ({
     id: child.id,
     name: child.name,
     birthDate: child.birthDate,
@@ -98,8 +99,15 @@ export default async function MePage({ searchParams }: PageProps) {
   const todayItems = planItemsByDate[todayDate] ?? [];
   const hour = new Date().getHours();
   const greetingWord =
-    hour < 6 ? "Доброй ночи" : hour < 12 ? "Доброе утро" : hour < 18 ? "Добрый день" : "Добрый вечер";
-  const firstName = user.displayName ?? user.email?.split("@")[0] ?? "Пользователь";
+    hour < 6
+      ? "Доброй ночи"
+      : hour < 12
+        ? "Доброе утро"
+        : hour < 18
+          ? "Добрый день"
+          : "Добрый вечер";
+  const firstName =
+    user.displayName ?? user.email?.split("@")[0] ?? "Пользователь";
   const greeting = `${greetingWord}, ${firstName}`;
 
   const preferenceDisplayLine = await buildAdultPreferenceDisplayLine({
@@ -113,7 +121,6 @@ export default async function MePage({ searchParams }: PageProps) {
     <div className="min-h-screen bg-background py-8">
       <Container className="max-w-4xl">
         <div className="space-y-6">
-
           {/* ── Greeting ── */}
           <UserGreeting greeting={greeting} />
 
@@ -138,7 +145,10 @@ export default async function MePage({ searchParams }: PageProps) {
             <div className="flex items-center justify-between px-5 py-4 border-b border-neutral-100">
               <div className="flex items-center gap-2 min-w-0">
                 <MapPin className="h-5 w-5 text-primary shrink-0" aria-hidden />
-                <h2 className="text-xl md:text-2xl font-semibold tracking-tight leading-tight text-neutral-900 truncate">Мои маршруты</h2>              </div>
+                <h2 className="text-xl md:text-2xl font-semibold tracking-tight leading-tight text-neutral-900 truncate">
+                  Мои маршруты
+                </h2>{" "}
+              </div>
               <Link
                 href="/routes/new"
                 className="flex items-center gap-1.5 text-sm font-medium text-neutral-500 hover:text-neutral-900 transition-colors"
@@ -150,13 +160,12 @@ export default async function MePage({ searchParams }: PageProps) {
 
             {userRoutes.length === 0 ? (
               <div className="px-5 py-8 text-center">
-                <p className="text-sm text-neutral-400">У вас пока нет маршрутов</p>
+                <p className="text-sm text-neutral-400">
+                  У вас пока нет маршрутов
+                </p>
                 <Link
                   href="/routes/new"
-                  className={cn(
-                    peachPrimaryCtaLinkClassName(),
-                    "mt-3",
-                  )}
+                  className={cn(peachPrimaryCtaLinkClassName(), "mt-3")}
                 >
                   <Plus className="h-4 w-4 transition-transform duration-200 group-hover:scale-110 sm:h-[18px] sm:w-[18px]" />
                   Создать первый маршрут
@@ -165,41 +174,65 @@ export default async function MePage({ searchParams }: PageProps) {
             ) : (
               <div className="divide-y divide-neutral-100">
                 {userRoutes.map((route) => (
-                  <Link
+                  <div
                     key={route.id}
-                    href={`/routes/${route.slug}`}
-                    className="flex items-center gap-4 px-5 py-4 hover:bg-neutral-50 transition-colors"
+                    className="flex items-center gap-4 px-5 py-4 hover:bg-neutral-50 transition-colors group"
                   >
-                    {/* Cover */}
-                    <div className="w-14 h-14 rounded-xl overflow-hidden bg-neutral-100 shrink-0">
-                      {route.coverImageUrl ? (
-                        <img src={route.coverImageUrl} alt={route.title} className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center">
-                          <MapPin className="w-5 h-5 text-neutral-300" />
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Info */}
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-neutral-900 truncate">{route.title}</p>
-                      <div className="flex items-center gap-3 mt-0.5 text-xs text-neutral-400">
-                        <span className="flex items-center gap-1">
-                          <MapPin className="w-3 h-3" />
-                          {route.stops.length} точки
-                        </span>
-                        <span>{BUDGET_LABELS[route.budgetLevel as keyof typeof BUDGET_LABELS] ?? route.budgetLevel}</span>
-                        <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-medium ${
-                          route.status === "PUBLISHED"
-                            ? "bg-green-50 text-green-700"
-                            : "bg-neutral-100 text-neutral-500"
-                        }`}>
-                          {route.status === "PUBLISHED" ? "Опубликован" : "Черновик"}
-                        </span>
+                    <Link
+                      href={`/routes/${route.slug}`}
+                      className="flex items-center gap-4 flex-1 min-w-0"
+                    >
+                      {/* Cover */}
+                      <div className="w-14 h-14 rounded-xl overflow-hidden bg-neutral-100 shrink-0">
+                        {route.coverImageUrl ? (
+                          <img
+                            src={route.coverImageUrl}
+                            alt={route.title}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <MapPin className="w-5 h-5 text-neutral-300" />
+                          </div>
+                        )}
                       </div>
-                    </div>
-                  </Link>
+
+                      {/* Info */}
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-neutral-900 truncate">
+                          {route.title}
+                        </p>
+                        <div className="flex items-center gap-3 mt-0.5 text-xs text-neutral-400">
+                          <span className="flex items-center gap-1">
+                            <MapPin className="w-3 h-3" />
+                            {route.stops.length} точки
+                          </span>
+                          <span>
+                            {BUDGET_LABELS[
+                              route.budgetLevel as keyof typeof BUDGET_LABELS
+                            ] ?? route.budgetLevel}
+                          </span>
+                          <span
+                            className={`px-1.5 py-0.5 rounded-full text-[10px] font-medium ${
+                              route.status === "PUBLISHED"
+                                ? "bg-green-50 text-green-700"
+                                : "bg-neutral-100 text-neutral-500"
+                            }`}
+                          >
+                            {route.status === "PUBLISHED"
+                              ? "Опубликован"
+                              : "Черновик"}
+                          </span>
+                        </div>
+                      </div>
+                    </Link>
+
+                    <RouteActions
+                      routeId={route.id}
+                      routeSlug={route.slug}
+                      routeTitle={route.title}
+                    />
+                  </div>
                 ))}
               </div>
             )}

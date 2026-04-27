@@ -53,6 +53,7 @@ export function AccountDropdownSection() {
     onGoToPersonalAccount: noop,
     onGoToPersonalIdeas: noop,
     onGoToPersonalPlan: noop,
+    onGoToPersonalRoutes: noop,
     onGoToSettings: noop,
     onGoToBusinessDashboard: noop,
     onGoToBusinessRoot: noop,
@@ -79,6 +80,7 @@ export function AccountDropdownSection() {
     onGoToPersonalAccount: noop,
     onGoToPersonalIdeas: noop,
     onGoToPersonalPlan: noop,
+    onGoToPersonalRoutes: noop,
     onGoToSettings: noop,
     onGoToBusinessDashboard: noop,
     onGoToBusinessRoot: noop,
@@ -105,6 +107,7 @@ export function AccountDropdownSection() {
     onGoToPersonalAccount: noop,
     onGoToPersonalIdeas: noop,
     onGoToPersonalPlan: noop,
+    onGoToPersonalRoutes: noop,
     onGoToSettings: noop,
     onGoToBusinessDashboard: noop,
     onGoToBusinessRoot: noop,
@@ -155,7 +158,8 @@ export function AccountDropdownSection() {
               Личный кабинет (public /me), без роли админа
             </h4>
             <p className="text-xs text-muted-foreground">
-              Основной блок — ссылки в /me; контекст — «Перейти в Бизнес-аккаунт».
+              Основной блок — ссылки в /me; контекст — «Перейти в
+              Бизнес-аккаунт».
             </p>
             <DropdownChrome>
               <AccountDropdownContent {...pickContent(personalUser)} />
@@ -167,8 +171,9 @@ export function AccountDropdownSection() {
               Личный кабинет, админ на публичном сайте
             </h4>
             <p className="text-xs text-muted-foreground">
-              «Админ панель» в контекстной группе с акцентным стилем (как «Перейти в личный
-              аккаунт» в админке); «Перейти в Бизнес-аккаунт» для администраторов скрыт.
+              «Админ панель» в контекстной группе с акцентным стилем (как
+              «Перейти в личный аккаунт» в админке); «Перейти в Бизнес-аккаунт»
+              для администраторов скрыт.
             </p>
             <DropdownChrome>
               <AccountDropdownContent {...pickContent(personalAdmin)} />
@@ -176,7 +181,9 @@ export function AccountDropdownSection() {
           </div>
 
           <div className="space-y-3">
-            <h4 className="text-sm font-semibold text-gray-900">Бизнес-аккаунт</h4>
+            <h4 className="text-sm font-semibold text-gray-900">
+              Бизнес-аккаунт
+            </h4>
             <p className="text-xs text-muted-foreground">
               Другой набор ссылок; акцент — «Перейти в Личный аккаунт».
             </p>
@@ -186,10 +193,12 @@ export function AccountDropdownSection() {
           </div>
 
           <div className="space-y-3">
-            <h4 className="text-sm font-semibold text-gray-900">Админка (admin)</h4>
+            <h4 className="text-sm font-semibold text-gray-900">
+              Админка (admin)
+            </h4>
             <p className="text-xs text-muted-foreground">
-              Мой аккаунт и настройки; переключатель «Личный / Админ-панель» как на /me; выход через
-              POST (form).
+              Мой аккаунт и настройки; переключатель «Личный / Админ-панель» как
+              на /me; выход через POST (form).
             </p>
             <DropdownChrome>
               <AccountDropdownContent {...pickContent(adminApp)} />
@@ -198,10 +207,12 @@ export function AccountDropdownSection() {
         </div>
 
         <div className="mt-10 space-y-3 border-t border-border/40 pt-8">
-          <h4 className="text-sm font-semibold text-gray-900">Состояния строки (токены)</h4>
+          <h4 className="text-sm font-semibold text-gray-900">
+            Состояния строки (токены)
+          </h4>
           <p className="text-xs text-muted-foreground">
-            default — основные пункты и «Выйти»; accent — контекстный переход (бизнес / личный
-            кабинет).
+            default — основные пункты и «Выйти»; accent — контекстный переход
+            (бизнес / личный кабинет).
           </p>
           <div
             className={cn(

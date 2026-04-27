@@ -13,6 +13,7 @@ export type ProfileDropdownHandlers = {
   onGoToPersonalAccount: () => void;
   onGoToPersonalIdeas: () => void;
   onGoToPersonalPlan: () => void;
+  onGoToPersonalRoutes: () => void;
   onGoToSettings: () => void;
   onGoToAdminAccount: () => void;
   onGoToBusinessAccount: () => void;
@@ -58,7 +59,11 @@ export function useProfileDropdownHandlers(input: {
       if (res.ok || res.redirected) {
         closeMenu();
         notifyAuthStateChanged();
-        navigateToSurface(router, { targetSurface: "public", targetPath: "/", replace: true });
+        navigateToSurface(router, {
+          targetSurface: "public",
+          targetPath: "/",
+          replace: true,
+        });
       }
     } finally {
       setLoggingOut(false);
@@ -74,11 +79,24 @@ export function useProfileDropdownHandlers(input: {
   }, [router]);
 
   const onGoToPersonalIdeas = useCallback(() => {
-    navigateToSurface(router, { targetSurface: "public", targetPath: "/me/ideas" });
+    navigateToSurface(router, {
+      targetSurface: "public",
+      targetPath: "/me/ideas",
+    });
   }, [router]);
 
   const onGoToPersonalPlan = useCallback(() => {
-    navigateToSurface(router, { targetSurface: "public", targetPath: "/me/plan" });
+    navigateToSurface(router, {
+      targetSurface: "public",
+      targetPath: "/me/plan",
+    });
+  }, [router]);
+
+  const onGoToPersonalRoutes = useCallback(() => {
+    navigateToSurface(router, {
+      targetSurface: "public",
+      targetPath: "/me/routes",
+    });
   }, [router]);
 
   const onGoToSettings = useCallback(() => {
@@ -97,7 +115,10 @@ export function useProfileDropdownHandlers(input: {
   }, [goToBusinessAccount, isBusinessPartner]);
 
   const onGoToBusinessDashboard = useCallback(() => {
-    navigateToSurface(router, { targetSurface: "business", targetPath: "/dashboard" });
+    navigateToSurface(router, {
+      targetSurface: "business",
+      targetPath: "/dashboard",
+    });
   }, [router]);
 
   const onGoToBusinessRoot = useCallback(() => {
@@ -105,42 +126,64 @@ export function useProfileDropdownHandlers(input: {
   }, [router]);
 
   const onGoToBusinessPublications = useCallback(() => {
-    navigateToSurface(router, { targetSurface: "business", targetPath: "/events" });
+    navigateToSurface(router, {
+      targetSurface: "business",
+      targetPath: "/events",
+    });
   }, [router]);
 
   const onGoToBusinessBookings = useCallback(() => {
-    navigateToSurface(router, { targetSurface: "business", targetPath: "/inbox" });
+    navigateToSurface(router, {
+      targetSurface: "business",
+      targetPath: "/inbox",
+    });
   }, [router]);
 
   const onGoToBusinessClients = useCallback(() => {
-    navigateToSurface(router, { targetSurface: "business", targetPath: "/team" });
+    navigateToSurface(router, {
+      targetSurface: "business",
+      targetPath: "/team",
+    });
   }, [router]);
 
   const onGoToBusinessAnalytics = useCallback(() => {
-    navigateToSurface(router, { targetSurface: "business", targetPath: "/dashboard" });
+    navigateToSurface(router, {
+      targetSurface: "business",
+      targetPath: "/dashboard",
+    });
   }, [router]);
 
   const onGoToBusinessPromotion = useCallback(() => {
-    navigateToSurface(router, { targetSurface: "business", targetPath: "/promotion" });
+    navigateToSurface(router, {
+      targetSurface: "business",
+      targetPath: "/promotion",
+    });
   }, [router]);
 
   const onGoToBusinessBilling = useCallback(() => {
-    navigateToSurface(router, { targetSurface: "business", targetPath: "/billing/transactions" });
+    navigateToSurface(router, {
+      targetSurface: "business",
+      targetPath: "/billing/transactions",
+    });
   }, [router]);
 
-  const onSwitchMode = useCallback((next: "personal" | "business") => {
-    if (next === "business") {
-      goToBusinessAccount(isBusinessPartner);
-    } else {
-      goToPersonalAccount();
-    }
-  }, [goToBusinessAccount, goToPersonalAccount, isBusinessPartner]);
+  const onSwitchMode = useCallback(
+    (next: "personal" | "business") => {
+      if (next === "business") {
+        goToBusinessAccount(isBusinessPartner);
+      } else {
+        goToPersonalAccount();
+      }
+    },
+    [goToBusinessAccount, goToPersonalAccount, isBusinessPartner],
+  );
 
   return {
     onGoToHome,
     onGoToPersonalAccount,
     onGoToPersonalIdeas,
     onGoToPersonalPlan,
+    onGoToPersonalRoutes,
     onGoToSettings,
     onGoToAdminAccount,
     onGoToBusinessAccount,
