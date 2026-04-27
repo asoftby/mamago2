@@ -23,6 +23,38 @@ export async function getRecentRuns(limit = 50): Promise<ImportRun[]> {
 }
 
 /**
+ * Проверяет, можно ли удалить run (ни одна запись не применена).
+ */
+export async function canDeleteImportRun(runId: string): Promise<{
+  canDelete: boolean;
+  reason?: string;
+  counts?: { applied: number };
+}> {
+  const run = await prisma.importRun.findUnique({
+    where: { id: runId },
+    select: { id: true },
+  });
+  if (!run) return { canDelete: false, reason: "Run not found" };
+
+  const applied = await prisma.importedRecord.count({
+    where: {
+      runId,
+      applyResult: { not: null as unknown as Prisma.JsonNullValueFilter },
+    },
+  });
+
+  if (applied > 0) {
+    return {
+      canDelete: false,
+      reason: "has_applied_records",
+      counts: { applied },
+    };
+  }
+
+  return { canDelete: true };
+}
+
+/**
  * Hard delete — разрешён только если ни одна запись не была применена (applyResult == null).
  * Удаляет ImportRun + связанные ImportedRecord (каскадно через onDelete: Cascade в ImportReviewTask).
  */
