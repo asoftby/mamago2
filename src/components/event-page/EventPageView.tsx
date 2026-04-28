@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSetPublicationIntent } from "@/contexts/PublicationIntentContext";
 import { toast } from "@/lib/toast";
 import {
@@ -18,6 +18,7 @@ import { publicActivityPath } from "@/lib/business/eventPublicLink";
 import { SaveActivityFlowAdaptive } from "@/components/activity/SaveActivityFlowAdaptive";
 import type { SaveToPlanResult } from "@/components/activity/SaveToPlanModal";
 import { useAuthMe } from "@/features/birthday/builder/hooks/useAuthMe";
+import { requestPlanRefetchForDate } from "@/lib/my-plan/myPlanOpenIntent";
 import { EventRichDescription } from "./EventRichDescription";
 import { EventDecisionPanel } from "./EventDecisionPanel";
 import { EventMediaStack } from "./EventMediaStack";
@@ -39,6 +40,8 @@ function venueOneLine(data: EventPageData): string | undefined {
 export function EventPageView({ data }: { data: EventPageData }) {
   const { isAuthenticated } = useAuthMe();
   const setPublicationIntent = useSetPublicationIntent();
+  const ctaRef = useRef<HTMLDivElement>(null);
+  
   useEffect(() => {
     setPublicationIntent(data.discoveryIntent);
     return () => setPublicationIntent(null);
@@ -173,6 +176,7 @@ export function EventPageView({ data }: { data: EventPageData }) {
           toast.success("Добавлено в план", {
             description: `Событие добавлено на ${formatPlanDateRu(result.dateISO)}`,
           });
+          requestPlanRefetchForDate(result.dateISO);
         } else if (result.action === "ideas") {
           const res = await fetch("/api/save/idea", {
             method: "POST",
@@ -216,6 +220,7 @@ export function EventPageView({ data }: { data: EventPageData }) {
         });
         if (!res.ok) throw new Error("plan_save_failed");
         await loadSaveStatus();
+        requestPlanRefetchForDate(dateISO);
         toast.success("Добавлено в план", {
           description: `Событие добавлено на ${formatPlanDateRu(dateISO)}`,
         });
@@ -296,14 +301,18 @@ export function EventPageView({ data }: { data: EventPageData }) {
 
           {/* Основной контент — ширина правой колонки */}
           <div className="min-w-0 lg:row-start-1 lg:col-start-2">
-            <EventDecisionPanel
-              data={data}
-              sessionLine={sessionLineHero}
-              venueShort={venueShort}
-              onPlan={handlePlan}
-              onBuy={handleBuy}
-              onSave={handleSave}
-            />
+            <div ref={ctaRef}>
+              <EventDecisionPanel
+                data={data}
+                sessionLine={sessionLineHero}
+                venueShort={venueShort}
+                onPlan={handlePlan}
+                onBuy={handleBuy}
+                onSave={handleSave}
+                isPlanned={saveStatus.inPlan}
+                planDate={saveStatus.planDate}
+              />
+            </div>
 
             <EventRichDescription
               htmlContent={data.about.descriptionHtml || ""}
@@ -351,6 +360,7 @@ export function EventPageView({ data }: { data: EventPageData }) {
       )}
 
       <EventStickyActionBar
+        ctaRef={ctaRef}
         sessionLine={sessionLineSticky}
         priceLabel={data.priceLabel}
         primaryLabel={
@@ -360,12 +370,13 @@ export function EventPageView({ data }: { data: EventPageData }) {
               : "В плане"
             : data.cta.planLabel
         }
-        secondaryLabel={data.cta.buyLabel}
+        planDate={saveStatus.planDate}
+        secondaryLabel={data.cta.purchaseUrl ? data.cta.buyLabel : undefined}
         isPlanned={saveStatus.inPlan}
         isPrimaryLoading={isPrimaryLoading}
         isSecondaryLoading={isSecondaryLoading}
         onPrimary={handlePlan}
-        onSecondary={handleBuy}
+        onSecondary={data.cta.purchaseUrl ? handleBuy : undefined}
       />
       <SaveActivityFlowAdaptive
         open={saveModalOpen}

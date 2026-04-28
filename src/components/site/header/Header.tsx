@@ -159,7 +159,8 @@ export function SiteHeaderShell() {
         ref={headerRef}
         data-header-shell
         className={cn(
-          "sticky top-0 z-50 m-0 w-full",
+          // На страницах событий хедер не sticky — не перекрывает контент при скролле
+          isPublicationPage ? "relative z-50 m-0 w-full" : "sticky top-0 z-50 m-0 w-full",
           "bg-gradient-to-b from-white to-[#F7F7F7]",
           "border-b border-[#EBEBEB]",
           "transition-shadow duration-300 ease-out",

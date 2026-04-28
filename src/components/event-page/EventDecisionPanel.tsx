@@ -1,5 +1,6 @@
 "use client";
 
+import { Check } from "lucide-react";
 import { MapPin, Navigation } from "lucide-react";
 import { PrimaryButton } from "@/components/ui/PrimaryButton";
 import { Button } from "@/components/ui/button";
@@ -37,6 +38,10 @@ type EventDecisionPanelProps = {
   onPlan: () => void;
   onBuy: () => void;
   onSave: () => void;
+  /** Событие уже в плане */
+  isPlanned?: boolean;
+  /** Дата в плане (ISO) для отображения в кнопке */
+  planDate?: string | null;
   className?: string;
   /** Классы для мягкой подсветки зон после сохранения из редактора */
   previewRegionClassName?: Partial<
@@ -51,10 +56,18 @@ export function EventDecisionPanel({
   onPlan,
   onBuy,
   onSave,
+  isPlanned = false,
+  planDate,
   className,
   previewRegionClassName,
 }: EventDecisionPanelProps) {
   const pr = previewRegionClassName;
+
+  const planLabel = isPlanned
+    ? planDate
+      ? `В плане на ${new Date(`${planDate}T12:00:00`).toLocaleDateString("ru-RU", { weekday: "long", day: "numeric", month: "long" })}`
+      : "В плане ✓"
+    : data.cta.planLabel;
   return (
     <div className={cn("flex flex-col gap-5", className)}>
       <div className={cn("-m-1 space-y-4 rounded-2xl p-1", pr?.hero)}>
@@ -161,21 +174,38 @@ export function EventDecisionPanel({
       </div>
 
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
-        <PrimaryButton
-          type="button"
-          className="h-12 min-h-[48px] w-full rounded-2xl px-6 text-[15px] sm:w-auto sm:min-w-[160px]"
-          onClick={onPlan}
-        >
-          {data.cta.planLabel}
-        </PrimaryButton>
-        <Button
-          type="button"
-          variant="outline"
-          className="h-12 w-full rounded-2xl border-border/80 px-6 text-[15px] font-semibold sm:w-auto sm:min-w-[160px]"
-          onClick={onBuy}
-        >
-          {data.cta.buyLabel}
-        </Button>
+        {isPlanned ? (
+          <Button
+            type="button"
+            variant="outline"
+            className={cn(
+              "h-12 min-h-[48px] w-full rounded-2xl px-6 text-[15px] font-semibold sm:w-auto sm:min-w-[160px]",
+              "gap-2 border-[#EF8759] bg-[#FFF7F3] text-[#EF8759] hover:bg-[#FFF0E8]",
+            )}
+            onClick={onPlan}
+          >
+            <Check className="h-4 w-4 shrink-0" />
+            {planLabel}
+          </Button>
+        ) : (
+          <PrimaryButton
+            type="button"
+            className="h-12 min-h-[48px] w-full rounded-2xl px-6 text-[15px] sm:w-auto sm:min-w-[160px]"
+            onClick={onPlan}
+          >
+            {planLabel}
+          </PrimaryButton>
+        )}
+        {data.cta.purchaseUrl ? (
+          <Button
+            type="button"
+            variant="outline"
+            className="h-12 w-full rounded-2xl border-border/80 px-6 text-[15px] font-semibold sm:w-auto sm:min-w-[160px]"
+            onClick={onBuy}
+          >
+            {data.cta.buyLabel}
+          </Button>
+        ) : null}
         {data.ownerEditHref ? (
           <OwnerEditDropdown
             eventId={data.id}

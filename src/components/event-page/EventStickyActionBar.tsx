@@ -1,54 +1,38 @@
 "use client";
 
-import { PrimaryButton } from "@/components/ui/PrimaryButton";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Check } from "lucide-react";
+import { format, parseISO } from "date-fns";
+import { ru } from "date-fns/locale";
 
 export interface EventStickyActionBarProps {
-  /** Краткая информация о дате/времени */
+  ctaRef?: React.RefObject<HTMLElement | null>;
   sessionLine?: string;
-  /** Цена для отображения */
   priceLabel: string;
-  /** Текст primary CTA */
   primaryLabel: string;
-  /** Текст secondary CTA (опционально) */
   secondaryLabel?: string;
-  /** Событие уже в плане */
   isPlanned?: boolean;
-  /** Loading состояние для primary action */
+  /** ISO дата в плане — для компактного текста на мобильном "✓ 30 апреля" */
+  planDate?: string | null;
   isPrimaryLoading?: boolean;
-  /** Loading состояние для secondary action */
   isSecondaryLoading?: boolean;
-  /** Disabled состояние для primary action */
   isPrimaryDisabled?: boolean;
-  /** Disabled состояние для secondary action */
   isSecondaryDisabled?: boolean;
-  /** Обработчик primary action */
   onPrimary: () => void;
-  /** Обработчик secondary action */
   onSecondary?: () => void;
-  /** Дополнительные классы */
   className?: string;
 }
 
-/**
- * Sticky bottom action bar для страницы события.
- * 
- * Planning-first подход:
- * - Primary CTA: "Запланировать" (всегда главное действие)
- * - Secondary CTA: "Купить билет" / "Записаться" (опционально)
- * 
- * Визуальный приоритет:
- * - Primary = filled button в brand color
- * - Secondary = outline button
- */
 export function EventStickyActionBar({
+  ctaRef,
   sessionLine,
   priceLabel,
   primaryLabel,
   secondaryLabel,
   isPlanned = false,
+  planDate,
   isPrimaryLoading = false,
   isSecondaryLoading = false,
   isPrimaryDisabled = false,
@@ -57,78 +41,90 @@ export function EventStickyActionBar({
   onSecondary,
   className,
 }: EventStickyActionBarProps) {
+  const [visible, setVisible] = useState(false);
   const hasSecondary = Boolean(secondaryLabel && onSecondary);
+
+  useEffect(() => {
+    const el = ctaRef?.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => setVisible(!(entry?.isIntersecting ?? true)),
+      { threshold: 0 },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [ctaRef]);
+
+  // Компактный текст для мобильного: "✓ 30 апреля"
+  const compactPlanLabel = planDate
+    ? format(parseISO(planDate), "d MMMM", { locale: ru })
+    : null;
 
   return (
     <div
       className={cn(
-        // Фиксация и z-index
-        "fixed inset-x-0 bottom-0 z-50",
-        // Визуальный стиль: premium blur + тень
-        "border-t border-border/60 bg-background/95 backdrop-blur-md supports-[backdrop-filter]:bg-background/85",
-        "shadow-[0_-10px_40px_rgba(15,23,42,0.08)]",
-        // Safe area для мобильных устройств
-        "pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3",
-        className
+        "fixed inset-x-0 top-0 z-40",
+        "transition-transform duration-200 ease-out",
+        visible ? "translate-y-0" : "-translate-y-full",
+        "border-b border-border/60 bg-background/95 backdrop-blur-md supports-[backdrop-filter]:bg-background/85",
+        "shadow-[0_4px_20px_rgba(15,23,42,0.08)]",
+        "pb-3 pt-[max(0.75rem,env(safe-area-inset-top))]",
+        className,
       )}
       role="region"
       aria-label="Действия с событием"
+      aria-hidden={!visible}
     >
-      <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-3 px-4 sm:flex-row sm:items-center sm:justify-between sm:gap-6 sm:px-6 lg:px-8">
-        {/* Левая часть: цена и дата */}
+      {/* Всегда одна строка: левая часть + кнопки справа */}
+      <div className="mx-auto flex w-full max-w-[1200px] items-center gap-3 px-4 sm:px-6 lg:px-8">
+        {/* Левая часть: дата и цена */}
         <div className="min-w-0 flex-1">
           {sessionLine && (
-            <p className="truncate text-[13px] text-muted-foreground">
+            <p className="truncate text-[12px] text-muted-foreground leading-tight">
               {sessionLine}
             </p>
           )}
-          <p className="text-lg font-semibold text-foreground">{priceLabel}</p>
+          <p className="text-[15px] font-semibold text-foreground leading-tight">{priceLabel}</p>
         </div>
 
-        {/* Правая часть: CTA кнопки */}
-        <div className="flex shrink-0 gap-2 sm:justify-end">
-          {/* Primary CTA: Запланировать */}
-          <PrimaryButton
+        {/* Правая часть: кнопки */}
+        <div className="flex shrink-0 items-center gap-2">
+          <Button
             type="button"
+            variant="outline"
             className={cn(
-              "h-11 flex-1 rounded-2xl px-5 text-[14px] font-semibold",
-              "sm:flex-none sm:min-w-[140px]",
-              // Если уже в плане, показываем галочку
-              isPlanned && "gap-1.5"
+              "h-9 rounded-xl px-4 text-[13px] font-semibold",
+              isPlanned
+                ? "gap-1.5 border-[#EF8759] bg-[#FFF7F3] text-[#EF8759] hover:bg-[#FFF0E8]"
+                : "border-border/80 hover:border-border hover:bg-accent/50",
             )}
             onClick={onPrimary}
             disabled={isPrimaryDisabled || isPrimaryLoading}
-            aria-label={isPlanned ? "Управление планом" : "Запланировать событие"}
           >
             {isPrimaryLoading ? (
-              <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+              <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
             ) : isPlanned ? (
               <>
-                <Check className="h-4 w-4" />
-                {primaryLabel}
+                <Check className="h-3.5 w-3.5 shrink-0" />
+                {/* Мобильный: компактно "30 апреля", десктоп: полный текст */}
+                <span className="sm:hidden">{compactPlanLabel ?? primaryLabel}</span>
+                <span className="hidden sm:inline">{primaryLabel}</span>
               </>
             ) : (
               primaryLabel
             )}
-          </PrimaryButton>
+          </Button>
 
-          {/* Secondary CTA: Купить билет / Записаться */}
           {hasSecondary && (
             <Button
               type="button"
               variant="outline"
-              className={cn(
-                "h-11 flex-1 rounded-2xl px-5 text-[14px] font-semibold",
-                "sm:flex-none sm:min-w-[140px]",
-                // Визуально вторичная кнопка
-                "border-border/80 hover:border-border hover:bg-accent/50"
-              )}
+              className="h-9 rounded-xl px-4 text-[13px] font-semibold border-border/80 hover:border-border hover:bg-accent/50"
               onClick={onSecondary}
               disabled={isSecondaryDisabled || isSecondaryLoading}
-              aria-label={secondaryLabel}
             >
               {isSecondaryLoading ? (
-                <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
               ) : (
                 secondaryLabel
               )}
