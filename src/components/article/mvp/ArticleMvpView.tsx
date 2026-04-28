@@ -168,7 +168,7 @@ export function ArticleMvpView({
               const Tag = block.level === 2 ? "h2" : "h3";
               const cls =
                 block.level === 2
-                  ? "not-prose font-[family-name:var(--font-nt-somic)] text-2xl md:text-[1.75rem] font-bold tracking-tight text-foreground mt-10 md:mt-12 mb-4 scroll-mt-28 md:scroll-mt-32"
+                  ? "not-prose font-[family-name:var(--font-sans)] text-2xl md:text-[1.75rem] font-bold tracking-tight text-foreground mt-10 md:mt-12 mb-4 scroll-mt-28 md:scroll-mt-32"
                   : "not-prose font-serif text-xl md:text-[1.35rem] font-semibold tracking-tight text-foreground mt-8 md:mt-10 mb-3 scroll-mt-28 md:scroll-mt-32";
               return (
                 <Tag id={articleHeadingAnchorId(block.id)} className={cls}>

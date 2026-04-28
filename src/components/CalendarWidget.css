@@ -1,5 +1,5 @@
 .calendar-widget {
-  font-family: 'Segoe UI', sans-serif;
+  font-family: var(--font-sans, ui-sans-serif, system-ui, sans-serif);
   background-color: #f9f9f9;
   border-radius: 16px;
   padding: 20px;

@@ -54,7 +54,7 @@ export function isPublicationDetailPath(pathname: string | null): boolean {
 
 /**
  * Страницы контента публикаций — без фиксированного mobile bottom bar
- * (статья, место, маршрут, событие, короткая ссылка).
+ * (статья, место, маршрут, короткая ссылка). Страницы событий — исключение: там bottom bar показываем.
  */
 export function shouldHideMobileBottomNav(pathname: string | null): boolean {
   if (!pathname) return false;
@@ -78,7 +78,10 @@ export function shouldHideMobileBottomNav(pathname: string | null): boolean {
     return true;
   }
 
-  return isPublicationDetailPath(pathname);
+  // Страницы событий /{city}/events/{slug} — bottom bar показываем
+  if (isPublicationDetailPath(pathname)) return false;
+
+  return false;
 }
 
 /** Админ-панель `/admin` — без виджета «Мой план» и без автo-открытия по URL. */
@@ -132,11 +135,13 @@ export function isMyPlanShellExcludedPath(pathname: string | null): boolean {
 
 /**
  * FAB «Мой план»: скрыть вне публичного shell (admin, business, editor) и там же, где скрыт mobile bottom bar
- * (детали публикаций и т.д.).
+ * (детали публикаций и т.д.), кроме страниц событий — там виджет показываем.
  */
 export function shouldHideMyPlanWidget(pathname: string | null): boolean {
   if (isStandaloneAuthPath(pathname)) return true;
   if (isMyPlanShellExcludedPath(pathname)) return true;
+  // На страницах событий виджет показываем
+  if (isPublicationDetailPath(pathname)) return false;
   return shouldHideMobileBottomNav(pathname);
 }
 

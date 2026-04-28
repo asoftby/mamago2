@@ -48,6 +48,8 @@ export type EventPageCtaConfig = {
   planLabel: string;
   buyLabel: string;
   saveLabel: string;
+  /** URL для покупки/записи. Если не задан — кнопку "Купить билет" не показываем. */
+  purchaseUrl?: string;
 };
 
 export type EventPageSimilar = {
