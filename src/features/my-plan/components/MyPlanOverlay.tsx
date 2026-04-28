@@ -2,11 +2,8 @@
 
 import { useRef } from "react";
 import { usePathname } from "next/navigation";
-import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { ResponsiveOverlay } from "@/components/ui/responsive-overlay";
-import { ModalCloseButton } from "@/components/ui/modal-close-button";
 import { MyPlanPanelContent } from "./MyPlanPanelContent";
-import { MyPlanWidgetV2 } from "./MyPlanWidgetV2";
 import { MyPlanUnauthFlow, type MyPlanUnauthSurface } from "./unauth/MyPlanUnauthFlow";
 import { appendMyPlanOpenToHref } from "@/lib/my-plan/myPlanOpenIntent";
 import { cn } from "@/lib/utils";
@@ -16,18 +13,18 @@ export type { MyPlanUnauthSurface };
 export interface MyPlanOverlayProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** После входа показываем тот же контейнер с планом без закрытия. */
   isAuthenticated: boolean;
   authNextHref?: string;
   onGuestAuthSuccess?: () => void;
   onUnauthBeforeClose?: (ctx: { surface: MyPlanUnauthSurface }) => void;
-  /** Пока идёт ProfileCompletionFlow внутри unauth — держим unauth-ветку даже при валидной сессии */
   onPostAuthCompletionPhase?: (active: boolean) => void;
 }
 
 /**
- * Единая оболочка «Мой план»: ResponsiveOverlay + цельный unauth-flow или панель плана.
- * Desktop → dialog, mobile → sheet; контент одного product flow.
+ * Единая оболочка «Мой план».
+ * Desktop → Dialog (max-w-[520px], закрытие по backdrop / Esc / X)
+ * Mobile  → Bottom Sheet (swipe down, drag handle)
+ * Контент одинаковый: MyPlanPanelContent → PlanMainContent
  */
 export function MyPlanOverlay({
   open,
@@ -39,36 +36,33 @@ export function MyPlanOverlay({
   onPostAuthCompletionPhase,
 }: MyPlanOverlayProps) {
   const pathname = usePathname();
-  const isDesktopLayout = useMediaQuery("(min-width: 768px)");
 
-  const handleTouchStartY = useRef<number | null>(null);
-  const handleTouchCurrentY = useRef<number | null>(null);
+  // Drag-to-close на mobile
+  const touchStartY = useRef<number | null>(null);
+  const touchCurrentY = useRef<number | null>(null);
 
-  const onHandleTouchStart: React.TouchEventHandler<HTMLButtonElement> = (event) => {
-    handleTouchStartY.current = event.touches[0]?.clientY ?? null;
-    handleTouchCurrentY.current = handleTouchStartY.current;
+  const onTouchStart: React.TouchEventHandler<HTMLButtonElement> = (e) => {
+    touchStartY.current = e.touches[0]?.clientY ?? null;
+    touchCurrentY.current = touchStartY.current;
   };
-  const onHandleTouchMove: React.TouchEventHandler<HTMLButtonElement> = (event) => {
-    handleTouchCurrentY.current = event.touches[0]?.clientY ?? null;
+  const onTouchMove: React.TouchEventHandler<HTMLButtonElement> = (e) => {
+    touchCurrentY.current = e.touches[0]?.clientY ?? null;
   };
-  const onHandleTouchEnd: React.TouchEventHandler<HTMLButtonElement> = () => {
-    if (handleTouchStartY.current == null || handleTouchCurrentY.current == null) return;
-    const delta = handleTouchCurrentY.current - handleTouchStartY.current;
-    if (delta > 56) onOpenChange(false);
-    handleTouchStartY.current = null;
-    handleTouchCurrentY.current = null;
+  const onTouchEnd: React.TouchEventHandler<HTMLButtonElement> = () => {
+    if (touchStartY.current == null || touchCurrentY.current == null) return;
+    if (touchCurrentY.current - touchStartY.current > 56) onOpenChange(false);
+    touchStartY.current = null;
+    touchCurrentY.current = null;
   };
-
-  const a11yTitle = "Мой план";
 
   const dragHandle = (
     <button
       type="button"
       aria-label="Потяните вниз, чтобы закрыть"
       className="absolute left-1/2 top-2 z-20 -translate-x-1/2 rounded-full p-2 md:hidden"
-      onTouchStart={onHandleTouchStart}
-      onTouchMove={onHandleTouchMove}
-      onTouchEnd={onHandleTouchEnd}
+      onTouchStart={onTouchStart}
+      onTouchMove={onTouchMove}
+      onTouchEnd={onTouchEnd}
       onClick={() => onOpenChange(false)}
     >
       <span className="block h-1 w-12 rounded-full bg-neutral-300" />
@@ -81,14 +75,16 @@ export function MyPlanOverlay({
     <ResponsiveOverlay
       open={open}
       onOpenChange={onOpenChange}
-      a11yTitle={a11yTitle}
+      a11yTitle="Мой план"
       variant="chromeless"
-      dismissible={false}
+      // Desktop: закрытие по backdrop и Esc
+      dismissible={true}
       showCloseButton={false}
       mobileTopSlot={dragHandle}
       heightMode="tall"
-      dialogContentClassName="!left-1/2 !top-1/2 !-translate-x-1/2 !-translate-y-1/2 !w-[min(92vw,760px)] !max-w-[760px] !bg-transparent !border-0 !shadow-none !p-0"
-      bodyClassName="min-h-0 !overflow-visible"
+      // Desktop: компактный modal
+      dialogContentClassName="!max-w-[520px]"
+      bodyClassName="min-h-0 overflow-hidden"
     >
       {!isAuthenticated ? (
         <MyPlanUnauthFlow
@@ -107,22 +103,12 @@ export function MyPlanOverlay({
             "animate-in fade-in-0 zoom-in-95 duration-200",
           )}
         >
-          {isDesktopLayout ? (
-            <div className="relative flex h-full min-h-0 flex-1 items-center justify-center bg-transparent p-0">
-              <ModalCloseButton
-                type="button"
-                onClick={() => onOpenChange(false)}
-                className="absolute right-5 top-5 z-20"
-              />
-              <MyPlanWidgetV2 onOpen={() => {}} mode="overlay" />
-            </div>
-          ) : (
-            <MyPlanPanelContent
-              open={open}
-              layout="default"
-              onRequestClose={() => onOpenChange(false)}
-            />
-          )}
+          {/* Единый контент для desktop и mobile */}
+          <MyPlanPanelContent
+            open={open}
+            layout="default"
+            onRequestClose={() => onOpenChange(false)}
+          />
         </div>
       )}
     </ResponsiveOverlay>

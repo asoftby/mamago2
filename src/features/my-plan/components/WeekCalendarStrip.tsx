@@ -20,6 +20,7 @@ type WeekCalendarStripProps = {
   onChangeDate?: (iso: string) => void;
   className?: string;
   compact?: boolean;
+  /** Показывать стрелки переключения недели. По умолчанию true. */
   showArrows?: boolean;
 };
 
@@ -28,7 +29,7 @@ export function WeekCalendarStrip({
   onChangeDate,
   className,
   compact = false,
-  showArrows = false,
+  showArrows = true,
 }: WeekCalendarStripProps) {
   const [visibleWeekStart, setVisibleWeekStart] = useState(() =>
     getWeekStart(selectedDate),
@@ -57,7 +58,7 @@ export function WeekCalendarStrip({
     <div
       className={cn(
         "relative rounded-3xl border border-neutral-200/80 bg-white p-3 shadow-sm",
-        compact && "rounded-none border-0 bg-transparent p-0 shadow-none",
+        compact && "rounded-none border-0 bg-transparent py-1 shadow-none",
         className,
       )}
     >
@@ -66,7 +67,7 @@ export function WeekCalendarStrip({
           <button
             type="button"
             onClick={() => shiftWeek(-1)}
-            className="absolute left-2 top-1/2 hidden h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-700 md:inline-flex"
+            className="absolute left-2 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-700"
             aria-label="Предыдущая неделя"
           >
             <ChevronLeft className="h-4 w-4" />
@@ -74,7 +75,7 @@ export function WeekCalendarStrip({
           <button
             type="button"
             onClick={() => shiftWeek(1)}
-            className="absolute right-2 top-1/2 hidden h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-700 md:inline-flex"
+            className="absolute right-2 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-700"
             aria-label="Следующая неделя"
           >
             <ChevronRight className="h-4 w-4" />
@@ -97,7 +98,7 @@ export function WeekCalendarStrip({
         </AnimatePresence>
       </div>
 
-      <div className={cn("overflow-hidden", compact ? "" : "px-8 sm:gap-2")}>
+      <div className={cn("overflow-hidden", compact ? "px-8" : "px-8 sm:gap-2")}>
         <AnimatePresence initial={false} custom={direction} mode="wait">
           <motion.div
             key={visibleWeekStart}
@@ -130,10 +131,11 @@ export function WeekCalendarStrip({
                     day: "numeric",
                     month: "long",
                   })}
-                  onClick={() => onChangeDate?.(iso)}
+                  disabled={isPast && !selected}
+                  onClick={() => !isPast && onChangeDate?.(iso)}
                   className={cn(
                     "relative flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-full py-2.5 text-neutral-700",
-                    isPast && !selected && "opacity-45",
+                    isPast && !selected && "cursor-not-allowed opacity-40",
                   )}
                 >
                   {selected ? (

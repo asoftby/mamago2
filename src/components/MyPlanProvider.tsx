@@ -8,25 +8,26 @@ import { MyPlanStateProvider } from "@/features/my-plan/hooks/useMyPlan";
 import { appendMyPlanOpenToHref, MY_PLAN_OPEN_EVENT } from "@/lib/my-plan/myPlanOpenIntent";
 import { isMyPlanShellExcludedPath, shouldHideMyPlanWidget } from "@/lib/intent";
 import { trackPostAuthEvent } from "@/lib/post-auth/analytics";
+import { PlanOverlayProvider, usePlanOverlay } from "@/lib/my-plan/usePlanOverlay";
 
 function MyPlanProviderInner() {
   const pathname = usePathname();
   const hidePlanEntry = shouldHideMyPlanWidget(pathname);
   const router = useRouter();
   const { isAuthenticated, isLoading: authLoading } = useAuthMe();
+  const { isOpen: planOpen, open: openPlan, close: closePlan } = usePlanOverlay();
   const [embeddedAuthCompleting, setEmbeddedAuthCompleting] = useState(false);
   const [postAuthCompletionActive, setPostAuthCompletionActive] = useState(false);
-  const [planOpen, setPlanOpen] = useState(false);
   const unauthSurfaceRef = useRef<MyPlanUnauthSurface>("auth");
   const prevIsAuthenticatedRef = useRef(isAuthenticated);
 
-  // Derive: close plan when on the plan page
+  // Закрываем оверлей когда пользователь на странице плана
   const isOnPlanPage = pathname === "/me/plan" || (pathname?.startsWith("/me/plan/") ?? false);
   const effectivePlanOpen = planOpen && !isOnPlanPage;
 
   const nextHref = appendMyPlanOpenToHref(pathname || "/");
 
-  // Handle URL param to open plan — setState deferred to avoid cascading render
+  // Открытие по URL param ?myPlan=open
   useEffect(() => {
     if (authLoading) return;
     if (typeof window === "undefined") return;
@@ -36,10 +37,10 @@ function MyPlanProviderInner() {
     const qs = params.toString();
     const newUrl = `${pathname || "/"}${qs ? `?${qs}` : ""}`;
     router.replace(newUrl, { scroll: false });
-    queueMicrotask(() => setPlanOpen(true));
-  }, [authLoading, isAuthenticated, router, pathname]);
+    queueMicrotask(() => openPlan());
+  }, [authLoading, isAuthenticated, router, pathname, openPlan]);
 
-  // Reset embeddedAuthCompleting when auth transitions false → true
+  // Сброс embeddedAuthCompleting при переходе unauth → auth
   useEffect(() => {
     const wasAuthenticated = prevIsAuthenticatedRef.current;
     prevIsAuthenticatedRef.current = isAuthenticated;
@@ -52,19 +53,14 @@ function MyPlanProviderInner() {
     if (!isAuthenticated) {
       trackPostAuthEvent("my_plan_entry_opened", { source: "my_plan" });
       unauthSurfaceRef.current = "auth";
-      setPlanOpen(true);
-      return;
     }
-    // Открываем мгновенно — данные загрузятся внутри модалки через skeleton
-    setPlanOpen(true);
-  }, [isAuthenticated]);
+    openPlan();
+  }, [isAuthenticated, openPlan]);
 
+  // Слушаем глобальный window event (для обратной совместимости)
   useEffect(() => {
-    const onOpenRequested = () => {
-      handleOpenMyPlan();
-    };
-    window.addEventListener(MY_PLAN_OPEN_EVENT, onOpenRequested);
-    return () => window.removeEventListener(MY_PLAN_OPEN_EVENT, onOpenRequested);
+    window.addEventListener(MY_PLAN_OPEN_EVENT, handleOpenMyPlan);
+    return () => window.removeEventListener(MY_PLAN_OPEN_EVENT, handleOpenMyPlan);
   }, [handleOpenMyPlan]);
 
   const handlePlanOpenChange = useCallback(
@@ -75,10 +71,12 @@ function MyPlanProviderInner() {
         if (!isAuthenticated && unauthSurfaceRef.current === "auth") {
           trackPostAuthEvent("completion_abandoned", { source: "my_plan" });
         }
+        closePlan();
+      } else {
+        openPlan();
       }
-      setPlanOpen(open);
     },
-    [isAuthenticated],
+    [isAuthenticated, openPlan, closePlan],
   );
 
   const handleUnauthBeforeClose = useCallback((ctx: { surface: MyPlanUnauthSurface }) => {
@@ -100,7 +98,7 @@ function MyPlanProviderInner() {
         onPostAuthCompletionPhase={setPostAuthCompletionActive}
         onGuestAuthSuccess={() => {
           setEmbeddedAuthCompleting(true);
-          setPlanOpen(true);
+          openPlan();
         }}
       />
     </MyPlanStateProvider>
@@ -112,5 +110,9 @@ export function MyPlanProvider() {
   if (isMyPlanShellExcludedPath(pathname)) {
     return null;
   }
-  return <MyPlanProviderInner />;
+  return (
+    <PlanOverlayProvider>
+      <MyPlanProviderInner />
+    </PlanOverlayProvider>
+  );
 }

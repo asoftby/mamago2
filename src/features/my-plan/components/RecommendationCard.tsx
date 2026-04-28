@@ -70,10 +70,18 @@ export function RecommendationCard({
         minute: "2-digit",
       })
     : null;
+  void timeStr; // не используется в metaLine, сохранён для возможного будущего использования
 
   const agePart = item.activity?.ageLabel ?? null;
-  const addressLine = formatActivityAddressLine(item.activity);
   const categoryLabel = item.activity?.eventCategory?.nameRu?.trim() || null;
+
+  const datePart = (() => {
+    const src = item.startsAt ?? (item.date ? new Date(item.date + "T12:00:00") : null);
+    if (!src) return null;
+    const d = src instanceof Date ? src : new Date(src);
+    if (Number.isNaN(d.getTime())) return null;
+    return d.toLocaleDateString("ru-RU", { day: "numeric", month: "long" });
+  })();
 
   const priceLabel = (() => {
     const a = item.activity;
@@ -83,12 +91,17 @@ export function RecommendationCard({
     if (a.priceFrom === 0) return "Бесплатно";
     if (a.priceFrom != null && !Number.isNaN(a.priceFrom)) {
       const cur = (a.currency || "BYN").trim();
-      return `от ${a.priceFrom} ${cur}`.trim();
+      // Форматируем число с запятой: 8 → "8,00"
+      const formatted = a.priceFrom.toLocaleString("ru-RU", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      });
+      return `от ${formatted} ${cur}`.trim();
     }
     return null;
   })();
 
-  const metaLine = [agePart, timeStr, addressLine, priceLabel].filter(Boolean).join(" • ");
+  const metaLine = [agePart, datePart, priceLabel].filter(Boolean).join(" • ");
   const totalVariants = variantTotal ?? alternativesCount ?? 0;
   const currentVariant = variantPosition ?? 1;
   const showVariantControls = !isInPlan && totalVariants > 1;
@@ -118,19 +131,31 @@ export function RecommendationCard({
           : "border-dashed border-[#D4D4D8] bg-[#FCFCFC] opacity-[0.74] hover:opacity-100 [border-image:none]",
       )}
     >
-      {isInPlan ? (
-        <div className="inline-flex w-fit max-w-full shrink-0 items-center rounded-full bg-emerald-50 px-3 py-1.5">
-          <Check className="mr-1.5 h-3.5 w-3.5 text-emerald-600" />
-          <p className="text-[11px] font-medium leading-none tracking-wide text-emerald-700">
-            Добавлено
-          </p>
-        </div>
-      ) : (
+      {!isInPlan ? (
         <div className="inline-flex w-fit max-w-full shrink-0 items-center rounded-full border border-neutral-300 bg-transparent px-3 py-1.5">
           <Sparkles className="mr-1.5 h-3.5 w-3.5 shrink-0 text-primary" />
           <p className="text-[11px] font-medium leading-none tracking-wide text-primary/90">
             Рекомендовано <span className="font-semibold text-neutral-900">mamaGo</span>
           </p>
+        </div>
+      ) : (
+        <div className="flex w-full items-center justify-between">
+          <div className="inline-flex shrink-0 items-center rounded-full bg-emerald-50 px-3 py-1.5">
+            <Check className="mr-1.5 h-3.5 w-3.5 text-emerald-600" />
+            <p className="text-[11px] font-medium leading-none tracking-wide text-emerald-700">
+              Добавлено
+            </p>
+          </div>
+          <Button
+            type="button"
+            onClick={onRemoveFromPlan}
+            variant="ghost"
+            size="sm"
+            className="h-9 shrink-0 rounded-full px-2 text-neutral-500 hover:text-neutral-700"
+          >
+            <X className="mr-1 h-4 w-4" />
+            Убрать
+          </Button>
         </div>
       )}
 
@@ -188,16 +213,6 @@ export function RecommendationCard({
                   )}
                 </Button>
               ) : null}
-              <Button
-                type="button"
-                onClick={onRemoveFromPlan}
-                variant="ghost"
-                size="sm"
-                className="h-9 shrink-0 rounded-full px-2 text-neutral-500 hover:text-neutral-700"
-              >
-                <X className="mr-1 h-4 w-4" />
-                Убрать
-              </Button>
             </>
           ) : (
             <div className="flex w-full min-w-0 justify-end sm:w-auto">

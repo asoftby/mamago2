@@ -1,10 +1,10 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { CalendarDays, ChevronRight } from "lucide-react";
 import { useMyPlan } from "../hooks/useMyPlan";
 import { cn } from "@/lib/utils";
-import { format, isToday, isTomorrow, parseISO } from "date-fns";
+import { format, isTomorrow, parseISO } from "date-fns";
 import { ru } from "date-fns/locale";
 
 interface MyPlanWidgetProps {
@@ -95,6 +95,19 @@ export function MyPlanWidget({ onOpen }: MyPlanWidgetProps) {
   const { subtitle, badge } = stateToText(widgetState);
   const hasItems = widgetState.kind === "today" || widgetState.kind === "week" || widgetState.kind === "next";
 
+  // Pulse-анимация при изменении счётчика
+  const prevBadgeRef = useRef(badge);
+  const [pulse, setPulse] = useState(false);
+  useEffect(() => {
+    if (prevBadgeRef.current !== badge && badge !== null && badge > 0) {
+      setPulse(true);
+      const t = setTimeout(() => setPulse(false), 250);
+      prevBadgeRef.current = badge;
+      return () => clearTimeout(t);
+    }
+    prevBadgeRef.current = badge;
+  }, [badge]);
+
   return (
     <div className="fixed bottom-4 right-4 z-50 hidden w-[min(100vw-2rem,280px)] max-w-[min(100vw-2rem,280px)] lg:block animate-in fade-in slide-in-from-bottom-4">
       <button
@@ -109,14 +122,22 @@ export function MyPlanWidget({ onOpen }: MyPlanWidgetProps) {
       >
         <div className="flex items-center gap-3 min-w-0 flex-1">
           {/* Icon + badge */}
-          <div className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/8 text-white/95 ring-1 ring-white/10 backdrop-blur-sm">
+          <div className={cn(
+            "relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/8 text-white/95 ring-1 ring-white/10 backdrop-blur-sm",
+            "transition-transform duration-200",
+            pulse && "scale-110",
+          )}>
             <CalendarDays
               className={cn("h-[18px] w-[18px]", hasItems && "text-[#EF8759]")}
               strokeWidth={1.8}
               aria-hidden
             />
             {badge !== null && badge > 0 && (
-              <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#EF8759] px-1 text-[9px] font-bold leading-none text-white shadow-sm">
+              <span className={cn(
+                "absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#EF8759] px-1 text-[9px] font-bold leading-none text-white shadow-sm",
+                "transition-transform duration-200",
+                pulse && "scale-125",
+              )}>
                 {badge > 9 ? "9+" : badge}
               </span>
             )}

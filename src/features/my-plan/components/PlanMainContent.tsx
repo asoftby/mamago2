@@ -24,7 +24,6 @@ import { AddParticipantModal } from "@/components/children/AddParticipantModal";
 import { MyPlanHeader } from "./MyPlanHeader";
 import { RecommendationDecisionBlock } from "./RecommendationDecisionBlock";
 import { BuildScenarioButton } from "./BuildScenarioButton";
-import { ManualChoiceButton } from "./ManualChoiceButton";
 import {
   isPlanSuggestionMockId,
 } from "../lib/mockPlanSuggestions";
@@ -523,10 +522,7 @@ export function PlanMainContent({
   };
 
   const buildIdeasHref = () => {
-    const qp = new URLSearchParams();
-    qp.set("planDate", selectedDate);
-    qp.set("returnTo", returnTo);
-    return `/ideas?${qp.toString()}`;
+    return `/my-ideas`;
   };
 
   const handleFindAndAddClick = (event: React.MouseEvent<HTMLAnchorElement>) => {
@@ -958,7 +954,6 @@ export function PlanMainContent({
       {canOpenDayScenario ? (
         <BuildScenarioButton onClick={() => setShowDayScenario(true)} />
       ) : null}
-      <ManualChoiceButton onClick={handleOpenCatalog} />
     </div>
   );
 
@@ -1002,8 +997,8 @@ export function PlanMainContent({
 
           <RecommendationDecisionBlock
             onDecide={handleDecideRecommendations}
+            onCatalog={handleOpenCatalog}
             onIdeas={handleOpenIdeasFlow}
-            ideasCount={ideas.length}
             hasGenerated={autoPlanGeneration > 0}
             isGenerating={isAutoPlanGenerating}
           />
@@ -1101,8 +1096,8 @@ export function PlanMainContent({
 
         <RecommendationDecisionBlock
           onDecide={handleDecideRecommendations}
+          onCatalog={handleOpenCatalog}
           onIdeas={handleOpenIdeasFlow}
-          ideasCount={ideas.length}
           hasGenerated={autoPlanGeneration > 0}
           isGenerating={isAutoPlanGenerating}
           compact

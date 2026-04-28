@@ -14,6 +14,7 @@ import { useOptionalCity } from "@/contexts/CityContext";
 import { useFamilyPersona } from "@/contexts/FamilyPersonaContext";
 import { useDiscoveryFilters } from "@/features/filters/discovery/filters.store";
 import { useChildrenScope } from "@/features/filters/discovery/childrenScope.store";
+import { MY_PLAN_REFETCH_DATE_EVENT } from "@/lib/my-plan/myPlanOpenIntent";
 
 function todayISO(): string {
   return new Date().toISOString().split("T")[0];
@@ -355,6 +356,16 @@ function useMyPlanStore() {
     if (!isAuthenticated || authLoading) return;
     void refetchPlanForDate(today);
   }, [isAuthenticated, authLoading, refetchPlanForDate, today]);
+
+  // Слушаем внешний запрос на рефетч конкретной даты (например, после сохранения события со страницы события)
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const date = (e as CustomEvent<{ date: string }>).detail?.date;
+      if (date) void refetchPlanForDate(date);
+    };
+    window.addEventListener(MY_PLAN_REFETCH_DATE_EVENT, handler);
+    return () => window.removeEventListener(MY_PLAN_REFETCH_DATE_EVENT, handler);
+  }, [refetchPlanForDate]);
 
   const postActivityToPlan = useCallback(
     async (input: {
@@ -750,5 +761,107 @@ function useMyPlanStore() {
     todayIso: today,
     selectedPlanDate,
     setSelectedPlanDate,
+    /**
+     * Оптимистично добавляет событие в план:
+     * 1. Мгновенно пишет в planItemsByDateMap (UI обновляется без задержки)
+     * 2. Делает POST /api/save/plan в фоне
+     * 3. После ответа сервера заменяет временный id на реальный
+     *
+     * Используется из EventPageView и любых других точек сохранения.
+     */
+    addPlanItemOptimistic: async (input: {
+      activityId: string;
+      dateISO: string;
+      title: string;
+      coverImageUrl?: string | null;
+      startsAt?: string | null;
+    }): Promise<{ ok: boolean }> => {
+      // Временный id для оптимистичного обновления
+      const tempId = `optimistic-${input.activityId}-${Date.now()}`;
+      const optimisticItem: PlanItemWithActivity = {
+        id: tempId,
+        userId: "me",
+        activityId: input.activityId,
+        date: input.dateISO,
+        startsAt: input.startsAt ? new Date(input.startsAt) : null,
+        title: input.title,
+        coverImageUrl: input.coverImageUrl ?? null,
+        createdAt: new Date(),
+        activity: null,
+      };
+
+      // 1. Мгновенное обновление UI
+      setPlanItemsByDateMap((prev) => {
+        const day = prev[input.dateISO] ?? [];
+        const withoutDup = day.filter(
+          (i) => i.activityId == null || i.activityId !== input.activityId,
+        );
+        return {
+          ...prev,
+          [input.dateISO]: sortPlanItemsForDay([...withoutDup, optimisticItem]),
+        };
+      });
+
+      try {
+        // 2. Фоновый POST
+        const res = await fetch("/api/save/plan", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({
+            activityId: input.activityId,
+            date: input.dateISO,
+            title: input.title,
+            coverImageUrl: input.coverImageUrl ?? undefined,
+            startsAt: input.startsAt ?? undefined,
+          }),
+        });
+        if (!res.ok) {
+          // Откатываем оптимистичное обновление
+          setPlanItemsByDateMap((prev) => {
+            const day = prev[input.dateISO];
+            if (!day) return prev;
+            const rolled = day.filter((i) => i.id !== tempId);
+            const out = { ...prev };
+            if (rolled.length === 0) delete out[input.dateISO];
+            else out[input.dateISO] = rolled;
+            return out;
+          });
+          return { ok: false };
+        }
+
+        // 3. Заменяем временный id на реальный из ответа сервера
+        const data = (await res.json()) as { planItem?: { id: string } };
+        const realId = data.planItem?.id;
+        if (realId) {
+          setPlanItemsByDateMap((prev) => {
+            const day = prev[input.dateISO];
+            if (!day) return prev;
+            return {
+              ...prev,
+              [input.dateISO]: day.map((i) =>
+                i.id === tempId ? { ...i, id: realId } : i,
+              ),
+            };
+          });
+        }
+
+        // Фоновый рефетч для синхронизации с сервером (без блокировки UI)
+        void refetchPlanForDate(input.dateISO);
+        return { ok: true };
+      } catch {
+        // Откатываем при ошибке сети
+        setPlanItemsByDateMap((prev) => {
+          const day = prev[input.dateISO];
+          if (!day) return prev;
+          const rolled = day.filter((i) => i.id !== tempId);
+          const out = { ...prev };
+          if (rolled.length === 0) delete out[input.dateISO];
+          else out[input.dateISO] = rolled;
+          return out;
+        });
+        return { ok: false };
+      }
+    },
   };
 }
