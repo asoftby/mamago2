@@ -24,7 +24,7 @@
   --cc-btn-height: 2.5rem;
   --cc-modal-border-radius: 1rem;
   --cc-btn-border-radius: 0.5rem;
-  --cc-font-family: var(--font-sans, "NTSomic", system-ui, sans-serif);
+  --cc-font-family: var(--font-sans, ui-sans-serif, system-ui, sans-serif);
   --cc-animation-duration: 0.25s;
   --cc-overlay-bg: rgba(31, 31, 31, 0.35);
   z-index: 10050;

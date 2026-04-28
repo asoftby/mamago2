@@ -1,99 +1,6 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
-@font-face {
-  font-family: "Craftwork Grotesk";
-  src: url("/fonts/Craftwork%20Grotesk/CraftworkGrotesk-Regular.woff") format("woff");
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: "Craftwork Grotesk";
-  src: url("/fonts/Craftwork%20Grotesk/CraftworkGrotesk-Medium.woff") format("woff");
-  font-weight: 500;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: "Craftwork Grotesk";
-  src: url("/fonts/Craftwork%20Grotesk/CraftworkGrotesk-SemiBold.woff") format("woff");
-  font-weight: 600;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: "Craftwork Grotesk";
-  src: url("/fonts/Craftwork%20Grotesk/CraftworkGrotesk-Bold.woff") format("woff");
-  font-weight: 700;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: "Craftwork Grotesk";
-  src: url("/fonts/Craftwork%20Grotesk/CraftworkGrotesk-Heavy.woff") format("woff");
-  font-weight: 800;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "NTSomic";
-  src: url("/fonts/NTSomic/NTSomic-Regular.woff2") format("woff2");
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: "NT Somic";
-  src: url("/fonts/NTSomic/NTSomic-Regular.woff2") format("woff2");
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: "NTSomic";
-  src: url("/fonts/NTSomic/NTSomic-Medium.woff2") format("woff2");
-  font-weight: 500;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: "NT Somic";
-  src: url("/fonts/NTSomic/NTSomic-Medium.woff2") format("woff2");
-  font-weight: 500;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: "NTSomic";
-  src: url("/fonts/NTSomic/NTSomic-Semibold.woff2") format("woff2");
-  font-weight: 600;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: "NT Somic";
-  src: url("/fonts/NTSomic/NTSomic-Semibold.woff2") format("woff2");
-  font-weight: 600;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: "NTSomic";
-  src: url("/fonts/NTSomic/NTSomic-Bold.woff2") format("woff2");
-  font-weight: 700;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: "NT Somic";
-  src: url("/fonts/NTSomic/NTSomic-Bold.woff2") format("woff2");
-  font-weight: 700;
-  font-style: normal;
-  font-display: swap;
-}
-
 /* Смена высоты fixed-хедера не должна двигать scroll (иначе рывок, особенно iOS Safari). */
 html {
   overflow-anchor: none;
@@ -105,10 +12,6 @@ body:has([data-slot="sheet-overlay"][data-state="open"]),
 body:has([data-slot="alert-dialog-overlay"][data-state="open"]) {
   overflow: hidden;
   overscroll-behavior: none;
-}
-/** Явный UI-sans: NT Somic (дублирует стек `--font-sans`, обходит сбои наследования `font-sans`). */
-@utility font-nt-somic {
-  font-family: var(--font-nt-somic), ui-sans-serif, system-ui, sans-serif;
 }
 
 @utility no-scrollbar {
@@ -127,8 +30,8 @@ body:has([data-slot="alert-dialog-overlay"][data-state="open"]) {
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  /* Primary UI sans: NT Somic (@font-face); generic fallbacks if files fail to load */
-  --font-sans: var(--font-nt-somic), ui-sans-serif, system-ui, sans-serif;
+  /* --font-sans не переопределяем здесь: next/font/local задаёт --font-sans на <html>.
+     Tailwind font-sans использует CSS var(--font-sans) напрямую через body. */
   --font-mono: var(--font-geist-mono);
   /* Literata задаётся на body через next/font → --font-literata (без циклической ссылки) */
   --font-serif: var(--font-literata), ui-serif, Georgia, "Times New Roman", serif;
@@ -188,8 +91,6 @@ body:has([data-slot="alert-dialog-overlay"][data-state="open"]) {
 :root {
   /* Default Shadcn/Tailwind */
   --radius: 0.625rem;
-  --font-craftwork: "Craftwork Grotesk";
-  --font-nt-somic: "NTSomic", "NT Somic";
   
   /* Design System Colors (mamaGo 2.0) */
   /* Using exact hex values where possible, but mapping to Tailwind variables */
@@ -291,6 +192,10 @@ body:has([data-slot="alert-dialog-overlay"][data-state="open"]) {
   /* Меньше «резинового» overscroll у верха/низа страницы (Safari/macOS). */
   html {
     overscroll-behavior-y: none;
+    /* next/font/local задаёт --font-sans на <html> через className.
+       Применяем его явно, чтобы шрифт наследовался во всё дерево:
+       public, admin, business, editor, auth, modals, inputs, tables. */
+    font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
   }
   body {
     @apply bg-background text-foreground;
@@ -449,7 +354,7 @@ body:has([data-slot="alert-dialog-overlay"][data-state="open"]) {
 }
 
 .article-body h2 {
-  font-family: var(--font-nt-somic);
+  font-family: var(--font-sans);
   font-size: 1.5rem;
   font-weight: 700;
   line-height: 1.3;

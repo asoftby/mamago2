@@ -37,7 +37,7 @@ export const desktopDialogShellLarge = [
 /*
  * === AUDIT: modal / sheet / overlay (кратко, 2026) ===
  *
- * Реализации Sheet (@/components/ui/sheet): MyPlanSheet(→MyPlanOverlay), AddRouteToPlanSheet,
+ * Реализации Sheet (@/components/ui/sheet): MyPlanOverlay, AddRouteToPlanSheet,
  * AccountDropdownSurface, AdminHeader, DayScenarioModal, PlanAudienceSheet,
  * AddPersonaTypeModal, PlanSuggestionsSheet, SaveToPlanModal, AdminNotificationsDropdown,
  * NotificationsDropdown, MobileSelectSheet, when-select, MobileFilterSheet, SeoTemplatesClient,

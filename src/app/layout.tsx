@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist_Mono, Literata, Noto_Serif, PT_Serif } from "next/font/google";
 import { headers } from "next/headers";
 import "./globals.css";
+import { ntSomic } from "@/lib/fonts";
 import { Sonner } from "@/components/ui/sonner";
 import { AccountModeProvider } from "@/contexts/AccountModeContext";
 import { FamilyPersonaProvider } from "@/contexts/FamilyPersonaContext";
@@ -65,9 +66,9 @@ export default async function RootLayout({
   const shouldMountMyPlanProvider = currentSurface === "public";
 
   return (
-    <html lang="ru">
+    <html lang="ru" className={ntSomic.variable}>
       <body
-        className={`${geistMono.variable} ${literata.variable} ${notoSerif.variable} ${ptSerif.variable} antialiased font-nt-somic font-sans min-h-screen text-foreground`}
+        className={`${geistMono.variable} ${literata.variable} ${notoSerif.variable} ${ptSerif.variable} antialiased min-h-screen text-foreground`}
       >
         <SaveIntentProvider>
           <AccountModeProvider>
