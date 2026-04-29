@@ -44,13 +44,34 @@ CREATE TYPE "ImportFieldLockMode" AS ENUM ('LOCKED', 'PREFER_IMPORT', 'PREFER_MA
 DROP INDEX "TelegramLinkToken_userId_expiresAt_idx";
 
 -- AlterTable
-ALTER TABLE "DevTelegramBusinessApplication" ALTER COLUMN "updatedAt" DROP DEFAULT;
+DO $$
+BEGIN
+  IF to_regclass('"DevTelegramBusinessApplication"') IS NOT NULL THEN
+    ALTER TABLE "DevTelegramBusinessApplication" ALTER COLUMN "updatedAt" DROP DEFAULT;
+  END IF;
+END $$;
 
 -- AlterTable
-ALTER TABLE "TelegramConnection" ALTER COLUMN "updatedAt" DROP DEFAULT;
+DO $$
+BEGIN
+  IF to_regclass('"TelegramConnection"') IS NOT NULL THEN
+    ALTER TABLE "TelegramConnection" ALTER COLUMN "updatedAt" DROP DEFAULT;
+  END IF;
+END $$;
 
 -- AlterTable
-ALTER TABLE "TelegramLinkToken" ALTER COLUMN "environment" DROP DEFAULT;
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'TelegramLinkToken'
+      AND column_name = 'environment'
+  ) THEN
+    ALTER TABLE "TelegramLinkToken" ALTER COLUMN "environment" DROP DEFAULT;
+  END IF;
+END $$;
 
 -- CreateTable
 CREATE TABLE "ImportSource" (
@@ -248,4 +269,3 @@ ALTER TABLE "ImportedRecord" ADD CONSTRAINT "ImportedRecord_publishedActivityId_
 
 -- AddForeignKey
 ALTER TABLE "ImportReviewTask" ADD CONSTRAINT "ImportReviewTask_importedRecordId_fkey" FOREIGN KEY ("importedRecordId") REFERENCES "ImportedRecord"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-

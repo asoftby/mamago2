@@ -53,8 +53,11 @@ public/uploads/
 .kiro/
 .react-email/
 backups/
+backups/db/
 notes/
 *.backup
+*.sql
+*.sql.gz
 
 # local lint reports
 lint-errors*.txt
