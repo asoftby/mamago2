@@ -25,6 +25,7 @@ export const OFFER_WIZARD_STEPS: WizardStepConfig<OfferFormData>[] = [
   {
     id: 1,
     key: "type",
+    shortLabel: "Тип",
     title: "Тип предложения",
     description: "Что предлагается пользователям?",
     component: Step1Type,
@@ -55,15 +56,16 @@ export const OFFER_WIZARD_STEPS: WizardStepConfig<OfferFormData>[] = [
       ];
       
       if (data.offerKind === "course") {
-        const durationLabels = {
+        const durationLabels: Record<string, string> = {
           single: "Разовое занятие",
           recurring: "Курс / регулярные занятия",
+          camp: "Лагерь / смена",
         };
         
         items.push({
           label: "Формат",
           value: data.durationType 
-            ? durationLabels[data.durationType] 
+            ? (durationLabels[data.durationType] ?? data.durationType)
             : <span className="text-red-500">Не выбран</span>,
           isMissing: !data.durationType,
         });
@@ -132,6 +134,7 @@ export const OFFER_WIZARD_STEPS: WizardStepConfig<OfferFormData>[] = [
   {
     id: 2,
     key: "information",
+    shortLabel: "Детали",
     title: "Публичная информация",
     description: "Как предложение появится в каталоге",
     component: Step2Information,
@@ -139,8 +142,7 @@ export const OFFER_WIZARD_STEPS: WizardStepConfig<OfferFormData>[] = [
     isComplete: (data) => {
       return Boolean(
         data.title.trim().length >= 3 &&
-        data.shortDescription.trim().length >= 10 &&
-        data.shortDescription.length <= 120
+        data.fullDescription.trim().length >= 10
       );
     },
     
@@ -151,11 +153,11 @@ export const OFFER_WIZARD_STEPS: WizardStepConfig<OfferFormData>[] = [
         isMissing: !data.title,
       },
       {
-        label: "Краткое описание",
-        value: data.shortDescription 
-          ? `${data.shortDescription} (${data.shortDescription.length}/120)`
+        label: "Описание",
+        value: data.fullDescription
+          ? `${data.fullDescription.replace(/<[^>]*>/g, "").slice(0, 80)}…`
           : <span className="text-red-500">Не указано</span>,
-        isMissing: !data.shortDescription,
+        isMissing: !data.fullDescription,
       },
       {
         label: "Возраст",
@@ -168,7 +170,7 @@ export const OFFER_WIZARD_STEPS: WizardStepConfig<OfferFormData>[] = [
     getMissingFields: (data) => {
       const missing: string[] = [];
       if (!data.title || data.title.trim().length < 3) missing.push("Название");
-      if (!data.shortDescription || data.shortDescription.trim().length < 10) missing.push("Краткое описание");
+      if (!data.fullDescription || data.fullDescription.trim().length < 10) missing.push("Описание");
       return missing;
     },
   },
@@ -177,6 +179,7 @@ export const OFFER_WIZARD_STEPS: WizardStepConfig<OfferFormData>[] = [
   {
     id: 3,
     key: "media",
+    shortLabel: "Фото",
     title: "Медиа",
     description: "Главное изображение и галерея",
     component: Step3Media,
@@ -206,6 +209,7 @@ export const OFFER_WIZARD_STEPS: WizardStepConfig<OfferFormData>[] = [
   {
     id: 4,
     key: "conditions",
+    shortLabel: "Условия",
     title: "Формат и условия",
     description: "Детали предложения в зависимости от типа",
     component: Step4Conditions,
@@ -213,41 +217,62 @@ export const OFFER_WIZARD_STEPS: WizardStepConfig<OfferFormData>[] = [
     isComplete: (data) => {
       if (!data.offerKind) return false;
       
-      switch (data.offerKind) {
-        case "course":
-          return Boolean(data.classDuration.trim() && data.classFormat);
-        case "birthday":
-          return Boolean(data.partyProgram.trim() && data.partyDuration.trim());
-        case "service":
-          return Boolean(data.serviceDescription.trim());
-        default:
-          return false;
+      if (data.offerKind === "course") {
+        if (!data.durationType) return false;
+        if (data.durationType === "camp") {
+          return data.campSessions.some((s) => s.dateFrom && s.dateTo);
+        }
+        return Boolean(data.classDuration.trim() && data.classFormat);
       }
+      if (data.offerKind === "birthday") {
+        return Boolean(data.partyProgram.trim() && data.partyDuration.trim());
+      }
+      if (data.offerKind === "service") {
+        return Boolean(data.serviceDescription.trim());
+      }
+      return false;
     },
     
     getSummary: (data) => {
       const items: SummaryItem[] = [];
       
       if (data.offerKind === "course") {
-        items.push(
-          {
-            label: "Продолжительность",
-            value: data.classDuration || <span className="text-red-500">Не указана</span>,
-            isMissing: !data.classDuration,
-          },
-          {
-            label: "Размер группы",
-            value: data.classGroupSize || "Не указан",
-          },
-          {
-            label: "Формат",
-            value: data.classFormat === "trial" ? "Пробное" :
-                   data.classFormat === "course" ? "Курс" :
-                   data.classFormat === "subscription" ? "Абонемент" :
-                   <span className="text-red-500">Не выбран</span>,
-            isMissing: !data.classFormat,
-          }
-        );
+        if (data.durationType === "camp") {
+          const sessionCount = data.campSessions.filter((s) => s.dateFrom && s.dateTo).length;
+          items.push(
+            {
+              label: "Смены",
+              value: sessionCount > 0
+                ? `${sessionCount} смен(а)`
+                : <span className="text-red-500">Не добавлены</span>,
+              isMissing: sessionCount === 0,
+            },
+            {
+              label: "Стоимость",
+              value: data.campPriceText || "Не указана",
+            },
+          );
+        } else {
+          items.push(
+            {
+              label: "Продолжительность",
+              value: data.classDuration || <span className="text-red-500">Не указана</span>,
+              isMissing: !data.classDuration,
+            },
+            {
+              label: "Размер группы",
+              value: data.classGroupSize || "Не указан",
+            },
+            {
+              label: "Формат",
+              value: data.classFormat === "trial" ? "Пробное" :
+                     data.classFormat === "course" ? "Курс" :
+                     data.classFormat === "subscription" ? "Абонемент" :
+                     <span className="text-red-500">Не выбран</span>,
+              isMissing: !data.classFormat,
+            }
+          );
+        }
       }
       
       if (data.offerKind === "birthday") {
@@ -302,8 +327,16 @@ export const OFFER_WIZARD_STEPS: WizardStepConfig<OfferFormData>[] = [
       } else {
         switch (data.offerKind) {
           case "course":
-            if (!data.classDuration.trim()) missing.push("Продолжительность занятия");
-            if (!data.classFormat) missing.push("Формат занятия");
+            if (!data.durationType) {
+              missing.push("Формат занятий");
+            } else if (data.durationType === "camp") {
+              if (!data.campSessions.some((s) => s.dateFrom && s.dateTo)) {
+                missing.push("Смены с датами");
+              }
+            } else {
+              if (!data.classDuration.trim()) missing.push("Продолжительность занятия");
+              if (!data.classFormat) missing.push("Формат занятия");
+            }
             break;
           case "birthday":
             if (!data.partyProgram.trim()) missing.push("Программа праздника");
@@ -323,6 +356,7 @@ export const OFFER_WIZARD_STEPS: WizardStepConfig<OfferFormData>[] = [
   {
     id: 5,
     key: "pricing",
+    shortLabel: "Цена",
     title: "Ценообразование",
     description: "Стоимость предложения",
     component: Step5Pricing,
@@ -402,16 +436,23 @@ export const OFFER_WIZARD_STEPS: WizardStepConfig<OfferFormData>[] = [
   {
     id: 6,
     key: "contacts",
-    title: "Контакты",
-    description: "Телефон, сайт и социальные сети",
+    shortLabel: "Контакты",
+    title: "Локация и контакты",
+    description: "Адрес, телефоны, сайт и социальные сети",
     component: Step6Contacts,
     
     isComplete: () => true, // Optional step
     
     getSummary: (data) => [
       {
-        label: "Телефон",
-        value: data.phone || "Не указан",
+        label: "Адрес",
+        value: data.locationAddress || "Не указан",
+      },
+      {
+        label: "Телефоны",
+        value: data.phones.length > 0
+          ? data.phones.map((p) => p.number).filter(Boolean).join(", ")
+          : "Не указаны",
       },
       {
         label: "Сайт",
@@ -430,6 +471,7 @@ export const OFFER_WIZARD_STEPS: WizardStepConfig<OfferFormData>[] = [
   {
     id: 7,
     key: "publication",
+    shortLabel: "Публикация",
     title: "Публикация",
     description: "Действие и финальные настройки",
     component: Step7Publication,

@@ -23,6 +23,7 @@ export const PLACE_WIZARD_STEPS: WizardStepConfig<PlaceFormData>[] = [
   {
     id: 1,
     key: "profile",
+    shortLabel: "Профиль",
     title: "Профиль места",
     description: "Основная информация о вашем месте",
     component: Step1Profile,
@@ -82,6 +83,7 @@ export const PLACE_WIZARD_STEPS: WizardStepConfig<PlaceFormData>[] = [
   {
     id: 2,
     key: "location",
+    shortLabel: "Место",
     title: "Локация",
     description: "Где находится ваше место",
     component: Step2Location,
@@ -124,6 +126,7 @@ export const PLACE_WIZARD_STEPS: WizardStepConfig<PlaceFormData>[] = [
   {
     id: 3,
     key: "contacts",
+    shortLabel: "Контакты",
     title: "Контакты",
     description: "Как с вами связаться",
     component: Step3Contacts,
@@ -152,6 +155,7 @@ export const PLACE_WIZARD_STEPS: WizardStepConfig<PlaceFormData>[] = [
   {
     id: 4,
     key: "photos",
+    shortLabel: "Фото",
     title: "Фотографии",
     description: "Покажите ваше место",
     component: Step4Photos,
@@ -185,6 +189,7 @@ export const PLACE_WIZARD_STEPS: WizardStepConfig<PlaceFormData>[] = [
   {
     id: 5,
     key: "openingHours",
+    shortLabel: "Часы",
     title: "Режим работы",
     description: "Когда вы работаете",
     component: Step5OpeningHours,

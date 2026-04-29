@@ -6,11 +6,11 @@ import { toast } from "@/lib/toast";
 import {
   FormWizardShell,
   FormWizardHeader,
-  FormStepSegments,
   FormPrimaryContentCard,
   FormStickyActionBar,
   formWizardPhaseFromFlags,
 } from "@/components/form-shell";
+import { WizardProgress } from "@/components/ui/wizard-progress";
 import { getBusinessFormActionLabels, businessFormCopy } from "../businessFormLabels";
 import { canPublishContentDirectly } from "@/lib/auth/businessContentAccess";
 import { useWizardSession } from "@/hooks/useWizardSession";
@@ -438,6 +438,15 @@ export function PlaceWizard({
     []
   );
 
+  const progressSteps = useMemo(
+    () => WIZARD_STEPS.map((s) => ({
+      id: s.id,
+      label: s.label,
+      isComplete: s.id < currentStep,
+    })),
+    [currentStep]
+  );
+
   const phase = formWizardPhaseFromFlags({ isSaving, isSubmitting });
 
   const actionLabels = useMemo(
@@ -461,10 +470,10 @@ export function PlaceWizard({
         trailing={lastSaved ? businessFormCopy.savedAt(lastSaved) : undefined}
       >
         <div className="space-y-3">
-          <FormStepSegments
-            segments={segments}
+          <WizardProgress
+            steps={progressSteps}
             currentStep={currentStep}
-            onStepClick={handleGoToStep}
+            onStepChange={handleGoToStep}
           />
           <div className="flex justify-end">
             <CompletionProgress data={formData} />

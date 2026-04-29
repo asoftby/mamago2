@@ -14,11 +14,11 @@ import { toast } from "@/lib/toast";
 import {
   FormWizardShell,
   FormWizardHeader,
-  FormStepSegments,
   FormPrimaryContentCard,
   FormStickyActionBar,
   formWizardPhaseFromFlags,
 } from "@/components/form-shell";
+import { WizardProgress } from "@/components/ui/wizard-progress";
 import { getBusinessFormActionLabels, businessFormCopy } from "../businessFormLabels";
 import { canPublishContentDirectly } from "@/lib/auth/businessContentAccess";
 import { useWizardSession } from "@/hooks/useWizardSession";
@@ -52,7 +52,8 @@ import {
 import { parseEventEditorStepQuery } from "@/lib/business/eventEditorStepQuery";
 import { navigateToCompatibleHref } from "@/lib/routing/clientNavigation";
 import type { EventStep1Taxonomies } from "./steps/step1Taxonomies";
-
+import { useAiEnrichment } from "./useAiEnrichment";
+import { applyAiEnrichmentToDraft } from "@/lib/event/applyAiEnrichment";
 interface EventWizardProps {
   mode: EventWizardMode;
   event?: Activity; // Event entity for edit mode
@@ -73,6 +74,10 @@ interface EventWizardProps {
   /** Серверный `?step=` — чтобы не было гонки с URL-sync (state=1 затирал ?step=N). */
   initialEditStep?: number;
   initialStep1Taxonomies?: EventStep1Taxonomies;
+  /** ImportedRecord id — enables AI enrichment button on Step 1 */
+  importedRecordId?: string | null;
+  /** Pre-fetched AI enrichment (from server) — cached, no auto-fetch */
+  initialAiEnrichment?: import("@/lib/ai/enrichEvent").EnrichmentResult | null;
 }
 
 const LOCAL_STORAGE_KEY = "event-wizard-draft";
@@ -141,6 +146,8 @@ function EventWizardInner({
   returnTo,
   initialEditStep,
   initialStep1Taxonomies,
+  importedRecordId,
+  initialAiEnrichment,
 }: EventWizardProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -194,6 +201,29 @@ function EventWizardInner({
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   /** sessionStorage для шага — один раз на смену `eventId`, только если в URL нет `step`. */
   const sessionHydratedForEventRef = useRef<string | null>(null);
+
+  // ── AI enrichment ─────────────────────────────────────────────────────────
+  const {
+    enrichment: aiEnrichment,
+    isLoading: isAiLoading,
+    isDone: isAiDone,
+    appliedFields: aiAppliedFields,
+    markManualOverride: markAiManualOverride,
+    run: runAiEnrichment,
+  } = useAiEnrichment({
+    importedRecordId,
+    initialEnrichment: initialAiEnrichment,
+  });
+
+  // Apply enrichment to draft when it first arrives (only if draft fields are empty)
+  const aiAppliedRef = useRef(false);
+  useEffect(() => {
+    if (!aiEnrichment || aiAppliedRef.current) return;
+    aiAppliedRef.current = true;
+    const patched = applyAiEnrichmentToDraft(formData, aiEnrichment);
+    patchFormData(patched);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [aiEnrichment]);
 
   useEffect(() => {
     debugEditorLog("wizard mounted", {
@@ -709,7 +739,18 @@ function EventWizardInner({
     }
     
     if (stepConfig.key === "basics") {
-      return <StepComponent {...commonProps} initialTaxonomies={initialStep1Taxonomies} />;
+      return (
+        <StepComponent
+          {...commonProps}
+          initialTaxonomies={initialStep1Taxonomies}
+          aiEnrichment={aiEnrichment}
+          aiAppliedFields={aiAppliedFields}
+          onRunAiEnrichment={importedRecordId ? runAiEnrichment : undefined}
+          onAiManualOverride={markAiManualOverride}
+          isAiLoading={isAiLoading}
+          isAiDone={isAiDone}
+        />
+      );
     }
 
     return <StepComponent {...commonProps} />;
@@ -723,12 +764,16 @@ function EventWizardInner({
     mode === "edit" && event?.status === ContentStatus.PUBLISHED;
   const isPublishedEditReview = isPublishedEdit && isReviewStep;
 
-  const segments = useMemo(
+  const progressSteps = useMemo(
     () => [
-      ...EVENT_WIZARD_STEPS.map((s) => ({ id: s.id, title: s.title })),
-      { id: TOTAL_STEPS, title: businessFormCopy.reviewStepShortTitle },
+      ...EVENT_WIZARD_STEPS.map((s) => ({
+        id: s.id,
+        label: s.shortLabel ?? s.title,
+        isComplete: s.isComplete ? s.isComplete(formData) : false,
+      })),
+      { id: TOTAL_STEPS, label: "Проверка", isComplete: false },
     ],
-    []
+    [formData]
   );
 
   const actionLabels = useMemo(() => {
@@ -765,10 +810,10 @@ function EventWizardInner({
         )}
         trailing={lastSaved ? businessFormCopy.savedAt(lastSaved) : undefined}
       >
-        <FormStepSegments
-          segments={segments}
+        <WizardProgress
+          steps={progressSteps}
           currentStep={currentStep}
-          onStepClick={handleGoToStep}
+          onStepChange={handleGoToStep}
         />
       </FormWizardHeader>
 

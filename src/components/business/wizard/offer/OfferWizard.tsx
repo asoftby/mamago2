@@ -6,11 +6,11 @@ import { toast } from "@/lib/toast";
 import {
   FormWizardShell,
   FormWizardHeader,
-  FormStepSegments,
   FormPrimaryContentCard,
   FormStickyActionBar,
   formWizardPhaseFromFlags,
 } from "@/components/form-shell";
+import { WizardProgress } from "@/components/ui/wizard-progress";
 import { getBusinessFormActionLabels, businessFormCopy } from "../businessFormLabels";
 import { canPublishContentDirectly } from "@/lib/auth/businessContentAccess";
 import { useWizardSession } from "@/hooks/useWizardSession";
@@ -392,12 +392,16 @@ export function OfferWizard({
   const submitValidation =
     currentStep === TOTAL_STEPS ? validateForSubmit(formData) : { isValid: true };
 
-  const segments = useMemo(
+  const progressSteps = useMemo(
     () => [
-      ...OFFER_WIZARD_STEPS.map((s) => ({ id: s.id, title: s.title })),
-      { id: TOTAL_STEPS, title: businessFormCopy.reviewStepShortTitle },
+      ...OFFER_WIZARD_STEPS.map((s) => ({
+        id: s.id,
+        label: s.shortLabel ?? s.title,
+        isComplete: s.isComplete ? s.isComplete(formData) : false,
+      })),
+      { id: TOTAL_STEPS, label: "Проверка", isComplete: false },
     ],
-    []
+    [formData]
   );
 
   const phase = formWizardPhaseFromFlags({ isSaving, isSubmitting });
@@ -424,10 +428,10 @@ export function OfferWizard({
         )}
         trailing={lastSaved ? businessFormCopy.savedAt(lastSaved) : undefined}
       >
-        <FormStepSegments
-          segments={segments}
+        <WizardProgress
+          steps={progressSteps}
           currentStep={currentStep}
-          onStepClick={handleGoToStep}
+          onStepChange={handleGoToStep}
         />
       </FormWizardHeader>
 

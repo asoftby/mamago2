@@ -30,6 +30,8 @@ export interface WizardStepConfig<TFormData = Record<string, unknown>> {
   id: number;
   key: string; // e.g., "basics", "description"
   title: string;
+  /** Short 1-word label for WizardProgress nav tabs (e.g. "Тип", "Фото") */
+  shortLabel?: string;
   description?: string;
   
   // Component to render for this step

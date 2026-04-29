@@ -29,6 +29,7 @@ export const EVENT_WIZARD_STEPS: WizardStepConfig<EventFormData>[] = [
   {
     id: 1,
     key: "basics",
+    shortLabel: "Основное",
     title: "Основная информация",
     description: "Название, формат события, категория и возраст",
     component: Step1Basics,
@@ -100,6 +101,7 @@ export const EVENT_WIZARD_STEPS: WizardStepConfig<EventFormData>[] = [
   {
     id: 2,
     key: "location",
+    shortLabel: "Место",
     title: "Локация",
     description: "Где проходит событие?",
     component: Step2Location,
@@ -186,6 +188,7 @@ export const EVENT_WIZARD_STEPS: WizardStepConfig<EventFormData>[] = [
   {
     id: 3,
     key: "description",
+    shortLabel: "Описание",
     title: "Описание",
     description: "Полное описание события",
     component: Step2Description,
@@ -222,6 +225,7 @@ export const EVENT_WIZARD_STEPS: WizardStepConfig<EventFormData>[] = [
   {
     id: 4,
     key: "media",
+    shortLabel: "Фото",
     title: "Медиа",
     description: "Главное изображение, галерея и видео",
     component: Step3Media,
@@ -255,6 +259,7 @@ export const EVENT_WIZARD_STEPS: WizardStepConfig<EventFormData>[] = [
   {
     id: 5,
     key: "schedule",
+    shortLabel: "Расписание",
     title: "Дата и время",
     description: "Даты проведения и расписание",
     component: Step4DateTime,
@@ -304,6 +309,7 @@ export const EVENT_WIZARD_STEPS: WizardStepConfig<EventFormData>[] = [
   {
     id: 6,
     key: "pricing",
+    shortLabel: "Цена",
     title: "Стоимость и запись",
     description: "Стоимость и как попасть на событие",
     component: Step5PricingParticipation,
@@ -419,6 +425,7 @@ export const EVENT_WIZARD_STEPS: WizardStepConfig<EventFormData>[] = [
   {
     id: 7,
     key: "contacts",
+    shortLabel: "Контакты",
     title: "Контакты",
     description: "Телефон, сайт и социальные сети",
     component: Step7Contacts,
@@ -450,6 +457,7 @@ export const EVENT_WIZARD_STEPS: WizardStepConfig<EventFormData>[] = [
   {
     id: 8,
     key: "organizer",
+    shortLabel: "Организатор",
     title: "Организатор",
     description: "Кто организует событие",
     component: Step8Organizer,
