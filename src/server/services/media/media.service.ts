@@ -7,9 +7,12 @@
 
 import { existsSync } from "fs";
 import { unlink } from "fs/promises";
-import { join } from "path";
 import { prisma } from "@/lib/prisma";
 import { MediaAssetKind, MediaAssetStatus, MediaSourceType } from "@prisma/client";
+import {
+  resolveLegacyPublicUploadPath,
+  resolveStoredMediaPath,
+} from "@/server/media/media-storage";
 
 export interface CreateMediaAssetInput {
   kind: MediaAssetKind;
@@ -171,8 +174,12 @@ export async function hardDeleteMediaAssetIfUnused(id: string): Promise<HardDele
   }
 
   if (media.publicUrl) {
-    const filePath = join(process.cwd(), "public", media.publicUrl);
-    if (existsSync(filePath)) {
+    const filePath =
+      resolveStoredMediaPath(media.publicUrl) ??
+      resolveStoredMediaPath(media.storageKey) ??
+      resolveLegacyPublicUploadPath(media.publicUrl) ??
+      resolveLegacyPublicUploadPath(media.storageKey);
+    if (filePath && existsSync(filePath)) {
       try {
         await unlink(filePath);
       } catch (err) {
