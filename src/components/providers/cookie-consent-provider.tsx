@@ -4,7 +4,7 @@
  * Инициализация CookieConsent один раз на клиенте (без SSR).
  * Подключает стили библиотеки + mamaGo overrides.
  *
- * Скрипты аналитики/маркетинга: см. AnalyticsLoader / MarketingLoader в layout.
+ * Скрипты аналитики/маркетинга: см. AnalyticsLoader / MarketingLoader.
  */
 import { useEffect } from "react";
 import { initCookieConsent } from "@/lib/cookies/consent-manager";

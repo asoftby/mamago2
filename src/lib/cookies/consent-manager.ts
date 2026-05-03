@@ -71,6 +71,7 @@ export function subscribeConsent(listener: Listener): () => void {
 /**
  * Однократная инициализация CookieConsent (dynamic import, без SSR).
  * CSS подключается в CookieConsentProvider.
+ *
  */
 export function initCookieConsent(): Promise<void> {
   if (typeof window === "undefined") {
