@@ -40,10 +40,16 @@ export async function resolveEventGalleryMediaIds(raw: string[]): Promise<string
   const or: Prisma.MediaAssetWhereInput[] = [];
   for (const e of legacy) {
     or.push({ filename: e });
-    if (e.startsWith("/uploads/") || e.startsWith("http://") || e.startsWith("https://")) {
+    if (
+      e.startsWith("/uploads/") ||
+      e.startsWith("/api/media/file/") ||
+      e.startsWith("http://") ||
+      e.startsWith("https://")
+    ) {
       or.push({ publicUrl: e });
     } else if (!e.includes("/")) {
       or.push({ publicUrl: `/uploads/${e}` });
+      or.push({ publicUrl: `/api/media/file/${e}` });
     }
   }
 

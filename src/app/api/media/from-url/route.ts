@@ -5,9 +5,6 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { writeFile, mkdir } from "fs/promises";
-import { join } from "path";
-import { existsSync } from "fs";
 import { getCurrentUser } from "@/lib/auth/server";
 import { canCreateBusinessContent } from "@/lib/auth/businessContentAccess";
 import { MediaSourceType } from "@prisma/client";
@@ -18,6 +15,7 @@ import {
   DEFAULT_IMAGE_CONFIG,
 } from "@/lib/media/imageProcessor";
 import { assertSafeRemoteImageUrl } from "@/lib/media/safeRemoteImageUrl";
+import { writeRuntimeUpload } from "@/server/media/media-storage";
 
 export const runtime = "nodejs";
 export const maxDuration = 45;
@@ -99,22 +97,17 @@ export async function POST(req: NextRequest) {
 
     const processedImageSet = await processImage(buf, mime, DEFAULT_IMAGE_CONFIG);
 
-    const uploadDir = join(process.cwd(), "public", "uploads");
-    if (!existsSync(uploadDir)) {
-      await mkdir(uploadDir, { recursive: true });
-    }
-
     const slug = `import-${url.hostname.replace(/[^a-z0-9]+/gi, "-").slice(0, 24)}`;
-    const masterFilename = generateProcessedFilename(`${slug}.jpg`);
-    const masterPath = join(uploadDir, masterFilename);
-    await writeFile(masterPath, processedImageSet.master.buffer);
-    const masterUrl = `/uploads/${masterFilename}`;
+    const masterSaved = await writeRuntimeUpload(
+      generateProcessedFilename(`${slug}.jpg`),
+      processedImageSet.master.buffer,
+    );
+    const masterFilename = masterSaved.filename;
+    const masterUrl = masterSaved.publicUrl;
 
     for (const [sizeName, sizeData] of Object.entries(processedImageSet.sizes)) {
       if (sizeData) {
-        const sizeFilename = generateProcessedFilename(`${slug}.jpg`, sizeName);
-        const sizePath = join(uploadDir, sizeFilename);
-        await writeFile(sizePath, sizeData.buffer);
+        await writeRuntimeUpload(generateProcessedFilename(`${slug}.jpg`, sizeName), sizeData.buffer);
       }
     }
 

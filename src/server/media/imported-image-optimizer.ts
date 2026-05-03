@@ -8,12 +8,10 @@
  */
 
 import { createHash } from "crypto";
-import { writeFile, mkdir } from "fs/promises";
-import { existsSync } from "fs";
-import { join } from "path";
 import sharp from "sharp";
 import { prisma } from "@/lib/prisma";
 import { MediaAssetKind, MediaAssetStatus, MediaSourceType } from "@prisma/client";
+import { writeRuntimeUpload } from "@/server/media/media-storage";
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
@@ -27,8 +25,6 @@ const ALLOWED_CONTENT_TYPES = new Set([
 ]);
 const OUTPUT_MAX_DIMENSION = 1600;
 const OUTPUT_QUALITY = 80;
-const UPLOADS_DIR = join(process.cwd(), "public", "uploads");
-const UPLOADS_PUBLIC_PREFIX = "/uploads";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -60,12 +56,6 @@ function buildFilename(recordId: string, url: string): string {
   return `imported-${recordId}-${urlHash(url)}.webp`;
 }
 
-async function ensureUploadsDir(): Promise<void> {
-  if (!existsSync(UPLOADS_DIR)) {
-    await mkdir(UPLOADS_DIR, { recursive: true });
-  }
-}
-
 // ─── Main function ────────────────────────────────────────────────────────────
 
 /**
@@ -83,12 +73,14 @@ export async function optimizeImportedImage(
   }
 
   const filename = buildFilename(importedRecordId, originalUrl);
-  const storageKey = `uploads/${filename}`;
-  const publicUrl = `${UPLOADS_PUBLIC_PREFIX}/${filename}`;
+  const upload = {
+    filename,
+    publicUrl: "",
+  };
 
   // ── Idempotency: already processed ────────────────────────────────────────
   const existing = await prisma.mediaAsset.findFirst({
-    where: { storageKey },
+    where: { filename },
     select: { id: true, publicUrl: true, width: true, height: true, sizeBytes: true },
   });
 
@@ -195,8 +187,9 @@ export async function optimizeImportedImage(
 
   // ── Save to disk ───────────────────────────────────────────────────────────
   try {
-    await ensureUploadsDir();
-    await writeFile(join(UPLOADS_DIR, filename), webpBuffer);
+    const saved = await writeRuntimeUpload(filename, webpBuffer);
+    upload.filename = saved.filename;
+    upload.publicUrl = saved.publicUrl;
   } catch (err) {
     return {
       ok: false,
@@ -217,8 +210,8 @@ export async function optimizeImportedImage(
       sizeBytes: webpBuffer.byteLength,
       width,
       height,
-      storageKey,
-      publicUrl,
+      storageKey: upload.publicUrl,
+      publicUrl: upload.publicUrl,
       sourceType: MediaSourceType.SYSTEM_GENERATED,
       alt: null,
       title: null,
@@ -232,7 +225,7 @@ export async function optimizeImportedImage(
   return {
     ok: true,
     mediaAssetId: mediaAsset.id,
-    publicUrl,
+    publicUrl: upload.publicUrl,
     width,
     height,
     sizeBytes: webpBuffer.byteLength,

@@ -21,9 +21,6 @@ export const maxDuration = 30;
 // Note: Body size limit is configured in next.config.ts
 // For App Router, use: experimental.serverActions.bodySizeLimit
 import { getCurrentUser } from "@/lib/auth/server";
-import { writeFile, mkdir } from "fs/promises";
-import { join } from "path";
-import { existsSync } from "fs";
 import { registerUploadedMedia } from "@/lib/media/mediaRegistry";
 import { MediaSourceType } from "@prisma/client";
 import {
@@ -31,6 +28,7 @@ import {
   generateProcessedFilename,
   DEFAULT_IMAGE_CONFIG,
 } from "@/lib/media/imageProcessor";
+import { writeRuntimeUpload } from "@/server/media/media-storage";
 
 export async function POST(req: NextRequest) {
   try {
@@ -105,26 +103,23 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: message }, { status: 400 });
     }
 
-    // Create upload directory
-    const uploadDir = join(process.cwd(), "public", "uploads");
-    if (!existsSync(uploadDir)) {
-      await mkdir(uploadDir, { recursive: true });
-    }
-
     // Save master image (WebP)
-    const masterFilename = generateProcessedFilename(file.name);
-    const masterPath = join(uploadDir, masterFilename);
-    await writeFile(masterPath, processedImageSet.master.buffer);
-    const masterUrl = `/uploads/${masterFilename}`;
+    const masterSaved = await writeRuntimeUpload(
+      generateProcessedFilename(file.name),
+      processedImageSet.master.buffer,
+    );
+    const masterFilename = masterSaved.filename;
+    const masterUrl = masterSaved.publicUrl;
 
     // Save responsive sizes
     const responsiveSizes: Record<string, string> = {};
     for (const [sizeName, sizeData] of Object.entries(processedImageSet.sizes)) {
       if (sizeData) {
-        const sizeFilename = generateProcessedFilename(file.name, sizeName);
-        const sizePath = join(uploadDir, sizeFilename);
-        await writeFile(sizePath, sizeData.buffer);
-        responsiveSizes[sizeName] = `/uploads/${sizeFilename}`;
+        const sizeSaved = await writeRuntimeUpload(
+          generateProcessedFilename(file.name, sizeName),
+          sizeData.buffer,
+        );
+        responsiveSizes[sizeName] = sizeSaved.publicUrl;
       }
     }
 
