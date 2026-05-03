@@ -44,14 +44,11 @@ export function Step8Organizer({
     if (!eventId) return;
 
     let isActive = true;
-    const controller = new AbortController();
 
     async function loadHint() {
       setIsLoadingHint(true);
       try {
-        const response = await fetch(`/api/business/events/${eventId}/organizer-source`, {
-          signal: controller.signal,
-        });
+        const response = await fetch(`/api/business/events/${eventId}/organizer-source`);
         if (!response.ok) {
           throw new Error(`Failed to load organizer hint: ${response.status}`);
         }
@@ -60,7 +57,6 @@ export function Step8Organizer({
           setImportHint(json.organizer ?? null);
         }
       } catch (error) {
-        if ((error as Error).name === "AbortError") return;
         console.error("[Step8Organizer] Failed to load organizer hint:", error);
       } finally {
         if (isActive) {
@@ -72,7 +68,6 @@ export function Step8Organizer({
     void loadHint();
     return () => {
       isActive = false;
-      controller.abort();
     };
   }, [eventId]);
 

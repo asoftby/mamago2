@@ -142,7 +142,7 @@ export const OFFER_WIZARD_STEPS: WizardStepConfig<OfferFormData>[] = [
     isComplete: (data) => {
       return Boolean(
         data.title.trim().length >= 3 &&
-        data.fullDescription.trim().length >= 10
+        data.shortDescription.trim().length >= 10
       );
     },
     
@@ -154,10 +154,10 @@ export const OFFER_WIZARD_STEPS: WizardStepConfig<OfferFormData>[] = [
       },
       {
         label: "Описание",
-        value: data.fullDescription
-          ? `${data.fullDescription.replace(/<[^>]*>/g, "").slice(0, 80)}…`
+        value: data.shortDescription
+          ? `${data.shortDescription.replace(/<[^>]*>/g, "").slice(0, 80)}…`
           : <span className="text-red-500">Не указано</span>,
-        isMissing: !data.fullDescription,
+        isMissing: !data.shortDescription,
       },
       {
         label: "Возраст",
@@ -170,7 +170,7 @@ export const OFFER_WIZARD_STEPS: WizardStepConfig<OfferFormData>[] = [
     getMissingFields: (data) => {
       const missing: string[] = [];
       if (!data.title || data.title.trim().length < 3) missing.push("Название");
-      if (!data.fullDescription || data.fullDescription.trim().length < 10) missing.push("Описание");
+      if (!data.shortDescription || data.shortDescription.trim().length < 10) missing.push("Описание");
       return missing;
     },
   },
@@ -219,9 +219,6 @@ export const OFFER_WIZARD_STEPS: WizardStepConfig<OfferFormData>[] = [
       
       if (data.offerKind === "course") {
         if (!data.durationType) return false;
-        if (data.durationType === "camp") {
-          return data.campSessions.some((s) => s.dateFrom && s.dateTo);
-        }
         return Boolean(data.classDuration.trim() && data.classFormat);
       }
       if (data.offerKind === "birthday") {
@@ -443,26 +440,40 @@ export const OFFER_WIZARD_STEPS: WizardStepConfig<OfferFormData>[] = [
     
     isComplete: () => true, // Optional step
     
-    getSummary: (data) => [
-      {
-        label: "Адрес",
-        value: data.locationAddress || "Не указан",
-      },
-      {
-        label: "Телефоны",
-        value: data.phones.length > 0
-          ? data.phones.map((p) => p.number).filter(Boolean).join(", ")
-          : "Не указаны",
-      },
-      {
-        label: "Сайт",
-        value: data.website || "Не указан",
-      },
-      {
-        label: "Соцсети",
-        value: `${data.socialLinks.length} шт.`,
-      },
-    ],
+    getSummary: (data) => {
+      const locationLabelByType: Record<
+        NonNullable<OfferFormData["locationType"]>,
+        string
+      > = {
+        client_location: "У клиента",
+        place: "На площадке",
+        remote: "Онлайн",
+      };
+
+      const locationSummary =
+        data.serviceDeliveryArea.trim() ||
+        (data.locationType ? locationLabelByType[data.locationType] : "") ||
+        "Не указан";
+
+      return [
+        {
+          label: "Адрес",
+          value: locationSummary,
+        },
+        {
+          label: "Телефон",
+          value: data.phone.trim() || "Не указан",
+        },
+        {
+          label: "Сайт",
+          value: data.website || "Не указан",
+        },
+        {
+          label: "Соцсети",
+          value: `${data.socialLinks.length} шт.`,
+        },
+      ];
+    },
     
     getMissingFields: () => [], // Optional step
   },

@@ -27,6 +27,10 @@ export function getDefaultFormData(): OfferFormData {
     classGroupSize: "",
     classFormat: null,
     
+    // Camp fields
+    campSessions: [],
+    campPriceText: "",
+    
     // Party fields
     partyProgram: "",
     partyDuration: "",

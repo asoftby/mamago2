@@ -19,7 +19,7 @@ interface Step1TypeProps {
 
 // CourseFormatSelector Component
 interface CourseFormatSelectorProps {
-  durationType: "single" | "recurring" | null;
+  durationType: OfferFormData["durationType"];
   onDurationTypeChange: (durationType: "single" | "recurring") => void;
   isEditable: boolean;
 }

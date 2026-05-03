@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { MapPinIcon, TruckIcon, ClockIcon, Loader2, Search, Sparkles } from "lucide-react";
+import { MapPinIcon, TruckIcon, ClockIcon, Loader2, Search, Sparkles, PlusCircle } from "lucide-react";
 import type { EventFormData } from "../types";
 import type { PendingLocation } from "../types";
 import { PlaceSearchAutocomplete } from "./location/PlaceSearchAutocomplete";
@@ -53,6 +53,7 @@ export function Step2Location({ data, onChange, isEditable, eventId }: Step2Loca
   // New state for quick place creation
   const [showQuickCreate, setShowQuickCreate] = useState(false);
   const [quickCreateInitialName, setQuickCreateInitialName] = useState("");
+  const [quickCreateInitialAddress, setQuickCreateInitialAddress] = useState("");
 
   // Handle place selection from search
   const handleSearchPlaceSelect = (place: {
@@ -107,8 +108,9 @@ export function Step2Location({ data, onChange, isEditable, eventId }: Step2Loca
     setShowQuickCreate(false);
   };
 
-  // Handle quick place creation - now just saves location data temporarily
+  // Handle quick place creation - stores pending location until publish
   const handleQuickPlaceCreated = (location: {
+    id?: string;
     title: string;
     address: string;
     fullAddress: string;
@@ -126,7 +128,12 @@ export function Step2Location({ data, onChange, isEditable, eventId }: Step2Loca
       mode: "NEW_PLACE",
       title: location.title,
       address: location.fullAddress || location.address,
-      city: location.cityId || location.citySlug || undefined,
+      city:
+        location.cityId ||
+        location.citySlug ||
+        importHint?.cityName ||
+        data.city ||
+        undefined,
       lat: location.lat ?? undefined,
       lng: location.lng ?? undefined,
       source: "manual",
@@ -139,7 +146,12 @@ export function Step2Location({ data, onChange, isEditable, eventId }: Step2Loca
       placeId: null,
       venueName: location.title,
       address: location.fullAddress || location.address,
-      city: location.cityId || location.citySlug || "",
+      city:
+        location.cityId ||
+        location.citySlug ||
+        importHint?.cityName ||
+        data.city ||
+        "",
       lat: location.lat,
       lng: location.lng,
       source: "ADDRESS_INPUT",
@@ -161,6 +173,7 @@ export function Step2Location({ data, onChange, isEditable, eventId }: Step2Loca
   // Handle opening quick create with initial name from search
   const handleOpenQuickCreate = (initialName: string) => {
     setQuickCreateInitialName(initialName);
+    setQuickCreateInitialAddress(importHint?.addressText ?? data.address ?? "");
     setShowQuickCreate(true);
   };
 
@@ -168,6 +181,35 @@ export function Step2Location({ data, onChange, isEditable, eventId }: Step2Loca
   const handleCloseQuickCreate = () => {
     setShowQuickCreate(false);
     setQuickCreateInitialName(""); // Clear initial name
+    setQuickCreateInitialAddress("");
+  };
+
+  const handleResetPendingPlace = () => {
+    onChange({
+      pendingLocation: null,
+      locationSource: null,
+      venueKind: null,
+      placeId: null,
+      venueName: "",
+      address: "",
+      city: "",
+      lat: null,
+      lng: null,
+      source: null,
+      districtAutoId: null,
+      districtManualId: null,
+      districtName: null,
+      metroAutoId: null,
+      metroAutoDistanceM: null,
+      metroManualId: null,
+      metroManualDistanceM: null,
+      metroName: null,
+      district: "",
+      metro: "",
+    });
+    setShowQuickCreate(false);
+    setQuickCreateInitialName("");
+    setQuickCreateInitialAddress("");
   };
 
   const fetchUserPlaces = async () => {
@@ -197,14 +239,11 @@ export function Step2Location({ data, onChange, isEditable, eventId }: Step2Loca
   useEffect(() => {
     if (!eventId) return;
     let isActive = true;
-    const controller = new AbortController();
 
     async function loadLocationHint() {
       setIsLoadingImportHint(true);
       try {
-        const response = await fetch(`/api/business/events/${eventId}/location-source`, {
-          signal: controller.signal,
-        });
+        const response = await fetch(`/api/business/events/${eventId}/location-source`);
         if (!response.ok) return;
         const payload = (await response.json()) as Partial<ImportLocationHint>;
         if (!isActive) return;
@@ -224,7 +263,6 @@ export function Step2Location({ data, onChange, isEditable, eventId }: Step2Loca
           cityName,
         });
       } catch (error) {
-        if ((error as Error).name === "AbortError") return;
         console.error("[Step2Location] Failed to load location import hint:", error);
       } finally {
         if (isActive) setIsLoadingImportHint(false);
@@ -234,7 +272,6 @@ export function Step2Location({ data, onChange, isEditable, eventId }: Step2Loca
     void loadLocationHint();
     return () => {
       isActive = false;
-      controller.abort();
     };
   }, [eventId]);
 
@@ -285,7 +322,13 @@ export function Step2Location({ data, onChange, isEditable, eventId }: Step2Loca
       district: place.districtName || "",
       metro: place.metroName || "",
     });
+    setShowQuickCreate(false);
   };
+
+  const pendingNewPlace =
+    data.pendingLocation?.mode === "NEW_PLACE" || data.pendingLocation?.mode === "PARSED_LOCATION"
+      ? data.pendingLocation
+      : null;
 
   // Handle special cases
   const handleSpecialCase = (venueKind: "MOBILE" | "TBD") => {
@@ -426,10 +469,15 @@ export function Step2Location({ data, onChange, isEditable, eventId }: Step2Loca
           <>
             <PlaceSearchAutocomplete
               onPlaceSelect={handleSearchPlaceSelect}
-              onCreateNew={handleOpenQuickCreate}
+              onCreatePlace={handleOpenQuickCreate}
               disabled={!isEditable}
               selectedPlaceId={data.placeId}
               placeholder="Начни вводить название места или адрес"
+              createPlaceHint={
+                importHint
+                  ? "Создать место на основе данных из источника"
+                  : null
+              }
             />
             
             {data.placeId && data.venueKind === "PLACE" && (
@@ -450,12 +498,65 @@ export function Step2Location({ data, onChange, isEditable, eventId }: Step2Loca
                 </div>
               </div>
             )}
+
+            {!data.placeId && pendingNewPlace && (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
+                <div className="flex items-start gap-3">
+                  <PlusCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-amber-700" />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <div className="font-medium text-amber-950">Новое место</div>
+                      <span className="inline-flex items-center rounded-full border border-amber-200 bg-white/80 px-2 py-0.5 text-[11px] font-medium text-amber-800">
+                        Будет создано при публикации
+                      </span>
+                    </div>
+                    <div className="mt-1 text-sm text-amber-900">{pendingNewPlace.title || data.venueName}</div>
+                    {(pendingNewPlace.address || data.address || pendingNewPlace.city || data.city) && (
+                      <div className="mt-1 text-sm text-amber-800">
+                        {formatEventLocationAddress({
+                          address: pendingNewPlace.address || data.address,
+                          city: pendingNewPlace.city || data.city,
+                        })}
+                      </div>
+                    )}
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setQuickCreateInitialName(pendingNewPlace.title || data.venueName || "");
+                          setQuickCreateInitialAddress(
+                            pendingNewPlace.address || data.address || importHint?.addressText || ""
+                          );
+                          setShowQuickCreate(true);
+                        }}
+                        disabled={!isEditable}
+                      >
+                        Изменить
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleResetPendingPlace}
+                        disabled={!isEditable}
+                      >
+                        Выбрать другое
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </>
         ) : (
           <QuickPlaceCreate
             onPlaceCreated={handleQuickPlaceCreated}
             onCancel={handleCloseQuickCreate}
             initialName={quickCreateInitialName}
+            initialAddress={quickCreateInitialAddress}
+            deferPlaceCreation
           />
         )}
       </div>

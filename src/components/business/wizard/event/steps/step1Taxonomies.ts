@@ -7,7 +7,16 @@ export type DiscoveryEventCategory = {
   selectableInProgram?: boolean;
   parentId: string | null;
   sortOrder: number;
+  options?: PublicCategoryOption[];
   children?: DiscoveryEventCategory[];
+};
+
+export type PublicCategoryOption = {
+  id: string;
+  label: string;
+  value: string;
+  order: number;
+  isActive: boolean;
 };
 
 export type PublicAgeOption = {

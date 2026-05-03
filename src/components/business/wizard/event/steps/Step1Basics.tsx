@@ -18,6 +18,7 @@ import type {
   DiscoveryEventCategory,
   EventStep1Taxonomies,
   PublicAgeOption,
+  PublicCategoryOption,
   PublicGenreOption,
   PublicInterestOption,
 } from "./step1Taxonomies";
@@ -25,6 +26,10 @@ import {
   ACTIVITY_FORMAT_OPTIONS,
   getActivityFormatOption,
 } from "@/domain/activities/activity-format";
+import { OccasionPicker } from "../../shared/OccasionPicker";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Info, Loader2, Sparkles } from "lucide-react";
+import type { EnrichmentResult } from "@/lib/ai/enrichEvent";
 
 /** Совпадает с prisma/seed.ts (сигнал age) — если API недоступен или пустой. */
 const FALLBACK_AGE_OPTIONS: PublicAgeOption[] = AGE_OPTIONS.map((option) => ({
@@ -45,11 +50,34 @@ function buildFallbackInterestOptions(): PublicInterestOption[] {
   }));
 }
 
+type AiSuggestedFields = {
+  participationFormat: boolean;
+  atmosphere: boolean;
+  interests: boolean;
+  mainCategory: boolean;
+};
+
+function AiRecommendationBadge() {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full border border-amber-200/80 bg-amber-50/70 px-2 py-0.5 text-[11px] font-normal text-amber-900/90">
+      <Sparkles className="h-3 w-3 text-amber-700/80" />
+      <span>Рекомендация ИИ · можно изменить</span>
+    </span>
+  );
+}
+
 interface Step1BasicsProps {
   data: EventFormData;
   onChange: (updates: Partial<EventFormData>) => void;
   isEditable: boolean;
   initialTaxonomies?: EventStep1Taxonomies;
+  aiEnrichment?: EnrichmentResult | null;
+  aiAppliedFields?: string[];
+  aiSuggestedFields?: AiSuggestedFields;
+  onRunAiEnrichment?: (() => Promise<void>) | undefined;
+  onAiManualOverride?: ((field: string) => void) | undefined;
+  isAiLoading?: boolean;
+  isAiDone?: boolean;
 }
 
 export function Step1Basics({
@@ -57,6 +85,13 @@ export function Step1Basics({
   onChange,
   isEditable,
   initialTaxonomies,
+  aiEnrichment,
+  aiAppliedFields = [],
+  aiSuggestedFields,
+  onRunAiEnrichment,
+  onAiManualOverride,
+  isAiLoading = false,
+  isAiDone = false,
 }: Step1BasicsProps) {
   const [rootCategories, setRootCategories] = useState<DiscoveryEventCategory[]>(
     initialTaxonomies?.categories ?? [],
@@ -172,6 +207,8 @@ export function Step1Basics({
       );
       return;
     }
+    const currentCategory = rootCategories.find((category) => category.id === cid);
+    if ((currentCategory?.options?.length ?? 0) > 0) return;
     if (genresByCategoryId[cid]) return;
 
     void (async () => {
@@ -193,7 +230,7 @@ export function Step1Basics({
     return () => {
       cancelled = true;
     };
-  }, [data.categoryId, genresByCategoryId]);
+  }, [data.categoryId, genresByCategoryId, rootCategories]);
 
   const supportsProgram = Boolean(primaryRoot?.supportsProgram);
   const ageDetection = data.ageDetection ?? {
@@ -256,6 +293,19 @@ export function Step1Basics({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [supportsProgram, primaryLeafId, programSelectableItems.map((x) => x.id).join("|")]);
 
+  const canRunAiEnrichment = Boolean(onRunAiEnrichment) && isEditable;
+  const suggestedFields: AiSuggestedFields = aiSuggestedFields ?? {
+    participationFormat: false,
+    atmosphere: false,
+    interests: false,
+    mainCategory: false,
+  };
+  const hasAnyAiSuggestion =
+    suggestedFields.participationFormat ||
+    suggestedFields.atmosphere ||
+    suggestedFields.interests ||
+    suggestedFields.mainCategory;
+
   const handleTitleChange = (e: ChangeEvent<HTMLInputElement>) => {
     onChange({ title: straightQuotesToGuillemets(e.target.value) });
   };
@@ -267,6 +317,7 @@ export function Step1Basics({
   );
 
   const toggleEventFormat = (value: EventFormatPreset) => {
+    onAiManualOverride?.("eventFormats");
     const has = selectedEventFormatsSet.has(value);
     const next = has
       ? selectedEventFormats.filter((v) => v !== value)
@@ -321,6 +372,7 @@ export function Step1Basics({
       disabled: !isEditable || loading,
       onClick: () => {
         if (!isEditable || loading) return;
+        onAiManualOverride?.("format");
         onChange({ format: option.value });
       },
       className: "disabled:!opacity-[0.4] disabled:!pointer-events-none",
@@ -353,6 +405,7 @@ export function Step1Basics({
   };
 
   const handleRootCategoryChange = (rootId: string) => {
+    onAiManualOverride?.("categoryId");
     if (!rootId) {
       onChange({
         categoryIds: [],
@@ -386,6 +439,7 @@ export function Step1Basics({
   };
 
   const handleSubcategoryChange = (childId: string) => {
+    onAiManualOverride?.("categoryId");
     const root = primaryRoot;
     if (!root || !data.categoryId) return;
     if (!childId) {
@@ -484,6 +538,7 @@ export function Step1Basics({
   const selectedInterestIds = data.interestIds ?? [];
 
   const toggleInterest = (interestValue: string) => {
+    onAiManualOverride?.("interestIds");
     const isActive = selectedInterestIds.includes(interestValue);
     if (isActive) {
       const next = selectedInterestIds.filter((v) => v !== interestValue);
@@ -491,8 +546,8 @@ export function Step1Basics({
       return;
     }
 
-    // Max 3 interests
-    if (selectedInterestIds.length >= 3) return;
+    // Max 5 interests
+    if (selectedInterestIds.length >= 5) return;
 
     onChange({ interestIds: [...selectedInterestIds, interestValue] });
   };
@@ -541,7 +596,7 @@ export function Step1Basics({
   const interestItems: ChipItem[] = interestOptions.map((o) => {
     const active = selectedInterestIds.includes(o.value);
     const disabled =
-      !isEditable || loading || (!active && selectedInterestIds.length >= 3);
+      !isEditable || loading || (!active && selectedInterestIds.length >= 5);
 
     return {
       id: o.value,
@@ -561,6 +616,65 @@ export function Step1Basics({
         </p>
       </div>
 
+      {onRunAiEnrichment ? (
+        <div className="rounded-xl border border-stone-200 bg-stone-50/70 p-4">
+          <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-stone-700" />
+                <p className="text-sm font-medium text-stone-900">
+                  AI-определение Step 1
+                </p>
+                <TooltipProvider delayDuration={100}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        type="button"
+                        className="inline-flex h-5 w-5 items-center justify-center rounded-full text-stone-500 transition hover:text-stone-800"
+                        aria-label="Как работает AI-определение"
+                      >
+                        <Info className="h-3.5 w-3.5" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top">
+                      AI определяет значения на основе описания события
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
+              <p className="text-[12px] text-stone-600">
+                Определяет формат участия, атмосферу, интересы и категорию только по уверенным сигналам.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              disabled={!canRunAiEnrichment || isAiLoading}
+              onClick={() => void onRunAiEnrichment()}
+              className="inline-flex items-center justify-center gap-2 rounded-full bg-stone-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-stone-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {isAiLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+              {isAiLoading ? "Определяем…" : "Определить автоматически"}
+            </button>
+          </div>
+
+          {isAiDone && hasAnyAiSuggestion ? (
+            <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50/80 px-3 py-2 text-[12px] text-amber-950">
+              <p className="font-medium">Частично определено автоматически</p>
+              <p className="mt-0.5 text-amber-900/90">
+                Проверьте рекомендации ИИ — всё можно изменить вручную.
+              </p>
+            </div>
+          ) : null}
+
+          {isAiDone && !hasAnyAiSuggestion && aiEnrichment ? (
+            <div className="mt-3 rounded-xl border border-slate-200 bg-white px-3 py-2 text-[12px] text-slate-700">
+              Уверенных значений для автоприменения не найдено. Остальные поля можно выбрать вручную.
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
       {/* Title */}
       <div className="space-y-2">
         <Label htmlFor="title">
@@ -577,9 +691,12 @@ export function Step1Basics({
 
       <div className="space-y-2">
         <div>
-          <Label>
-            Формат участия <span className="text-red-500">*</span>
-          </Label>
+          <div className="flex flex-wrap items-center gap-2">
+            <Label>
+              Формат участия <span className="text-red-500">*</span>
+            </Label>
+            {suggestedFields.participationFormat ? <AiRecommendationBadge /> : null}
+          </div>
           <p className="mt-1 text-[12px] text-muted-foreground">
             Как пользователь может участвовать в событии
           </p>
@@ -594,9 +711,12 @@ export function Step1Basics({
       {/* Event format / atmosphere — multi select */}
       <div className="space-y-2">
         <div>
-          <Label>
-            Как проходит событие <span className="text-red-500">*</span>
-          </Label>
+          <div className="flex flex-wrap items-center gap-2">
+            <Label>
+              Как проходит событие <span className="text-red-500">*</span>
+            </Label>
+            {suggestedFields.atmosphere ? <AiRecommendationBadge /> : null}
+          </div>
           <p className="mt-1 text-[12px] text-muted-foreground">
             Выберите формат и атмосферу события
           </p>
@@ -608,12 +728,15 @@ export function Step1Basics({
         />
       </div>
 
-      {/* Interests — multi select (max 3) */}
+      {/* Interests — multi select (max 5) */}
       <div className="space-y-2">
         <div>
-          <Label>
-            Интересы
-          </Label>
+          <div className="flex flex-wrap items-center gap-2">
+            <Label>
+              Интересы
+            </Label>
+            {suggestedFields.interests ? <AiRecommendationBadge /> : null}
+          </div>
           <p className="mt-1 text-[12px] text-muted-foreground">
             Что больше всего отражает это событие
           </p>
@@ -742,9 +865,12 @@ export function Step1Basics({
       {/* Основная категория — одиночный выбор */}
       <div className="space-y-2 w-full">
         <div>
-          <Label htmlFor="event-primary-category">
-            Основная категория <span className="text-red-500">*</span>
-          </Label>
+          <div className="flex flex-wrap items-center gap-2">
+            <Label htmlFor="event-primary-category">
+              Основная категория <span className="text-red-500">*</span>
+            </Label>
+            {suggestedFields.mainCategory ? <AiRecommendationBadge /> : null}
+          </div>
           <p className="mt-1 text-[12px] text-muted-foreground">
             Определяет тип события (что это вообще)
           </p>
@@ -780,10 +906,23 @@ export function Step1Basics({
           <div className="space-y-3 pt-2 border-t border-gray-100">
             {(() => {
               const cat = primaryRoot;
+              const categoryOptions: PublicCategoryOption[] = Array.isArray(cat.options)
+                ? cat.options.filter((option) => option.isActive).sort((a, b) => a.order - b.order)
+                : [];
               const genresForCat = genresByCategoryId[cat.id] ?? [];
-              const hasGenresForCat = genresForCat.length > 0;
+              const genreLikeItems =
+                categoryOptions.length > 0
+                  ? categoryOptions.map((option) => ({
+                      id: option.id,
+                      title: option.label,
+                      slug: option.value,
+                      sortOrder: option.order,
+                      isActive: option.isActive,
+                    }))
+                  : genresForCat;
+              const hasGenresForCat = genreLikeItems.length > 0;
               const genreMap = data.genreSlugByRootCategoryId ?? {};
-              const genreItemsForCat: ChipItem[] = genresForCat.map((g) => {
+              const genreItemsForCat: ChipItem[] = genreLikeItems.map((g) => {
                 const selectedSlug = genreMap[cat.id]?.trim() ?? "";
                 const chipActive = selectedSlug === g.slug || selectedSlug === g.title;
                 return {
@@ -793,6 +932,7 @@ export function Step1Basics({
                   disabled: !isEditable || loading,
                   onClick: () => {
                     if (!isEditable || loading) return;
+                    onAiManualOverride?.("categoryId");
                     const next = { ...genreMap };
                     if (chipActive) {
                       delete next[cat.id];
@@ -818,7 +958,9 @@ export function Step1Basics({
                 <>
                   {hasGenresForCat ? (
                     <div className="space-y-2">
-                      <Label className="text-xs">Жанр</Label>
+                      <Label className="text-xs">
+                        {categoryOptions.length > 0 ? "Категория" : "Жанр"}
+                      </Label>
                       <ChipsRow
                         layout="wrap"
                         aria-label={`Жанры — ${cat.nameRu}`}
@@ -887,6 +1029,13 @@ export function Step1Basics({
           <ChipsRow layout="wrap" aria-label="Категории программы" items={programSelectableItems} />
         </div>
       )}
+
+      {/* Актуальные поводы — компактный блок, только если есть активные */}
+      <OccasionPicker
+        value={data.occasionIds ?? []}
+        onChange={(ids) => onChange({ occasionIds: ids })}
+        disabled={!isEditable}
+      />
 
     </div>
   );

@@ -229,6 +229,7 @@ export function Step3Media({
   const [chosenImportedGalleryUrls, setChosenImportedGalleryUrls] = useState<string[]>([]);
   const [importedAssetSourceById, setImportedAssetSourceById] = useState<Record<string, string>>({});
   const [importedMediaIdBySourceUrl, setImportedMediaIdBySourceUrl] = useState<Record<string, string>>({});
+  const [trailerHint, setTrailerHint] = useState<string | null>(null);
 
   const hasInitialized = useRef(false);
   const coverDropzoneRef = useRef<MediaDropzoneHandle | null>(null);
@@ -304,6 +305,23 @@ export function Step3Media({
     return () => {
       cancelled = true;
     };
+  }, [eventId]);
+
+  // Load trailer hint from import source
+  useEffect(() => {
+    if (!eventId) { setTrailerHint(null); return; }
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/business/events/${eventId}/trailer-source`, { credentials: "include" });
+        if (!res.ok || cancelled) return;
+        const payload = (await res.json()) as { trailer?: { trailerUrl?: string } | null };
+        if (!cancelled) setTrailerHint(payload.trailer?.trailerUrl ?? null);
+      } catch {
+        // silent — trailer hint is optional
+      }
+    })();
+    return () => { cancelled = true; };
   }, [eventId]);
 
   const sourceImageUrls = [...new Set([importedMedia.coverUrl, ...importedMedia.galleryUrls].filter(Boolean))] as string[];
@@ -965,6 +983,22 @@ export function Step3Media({
 
       <div>
         <h3 className="mb-2 text-sm font-medium">Ссылка на reels / видео</h3>
+        {trailerHint && !data.reelsUrl && (
+          <div className="mb-3 flex flex-wrap items-center gap-3 rounded-xl border border-sky-200 bg-sky-50/70 px-4 py-3">
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium text-sky-950">Трейлер найден в источнике</p>
+              <p className="mt-0.5 truncate font-mono text-[11px] text-sky-700">{trailerHint}</p>
+            </div>
+            <Button
+              type="button"
+              size="sm"
+              disabled={!isEditable}
+              onClick={() => onChange({ reelsUrl: trailerHint })}
+            >
+              Использовать
+            </Button>
+          </div>
+        )}
         <Input
           type="url"
           value={data.reelsUrl || ""}

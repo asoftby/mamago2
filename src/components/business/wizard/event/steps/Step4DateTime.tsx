@@ -105,7 +105,12 @@ export function Step4DateTime({ data, onChange, isEditable, eventId }: Step4Date
     return Array.from(byKey.values());
   }, [importedScheduleItems]);
 
-  const visibleImportedItems = normalizedImportedItems.slice(0, 1);
+  const VISIBLE_LIMIT = 3;
+  const [showAllImported, setShowAllImported] = useState(false);
+  const visibleImportedItems = showAllImported
+    ? normalizedImportedItems
+    : normalizedImportedItems.slice(0, VISIBLE_LIMIT);
+  const hiddenCount = normalizedImportedItems.length - VISIBLE_LIMIT;
 
   return (
     <div className="space-y-6">
@@ -136,6 +141,24 @@ export function Step4DateTime({ data, onChange, isEditable, eventId }: Step4Date
                 {item}
               </div>
             ))}
+            {hiddenCount > 0 && !showAllImported ? (
+              <button
+                type="button"
+                onClick={() => setShowAllImported(true)}
+                className="mt-1 text-[12px] font-medium text-sky-700 hover:text-sky-900 hover:underline"
+              >
+                Показать ещё {hiddenCount}
+              </button>
+            ) : null}
+            {showAllImported && normalizedImportedItems.length > VISIBLE_LIMIT ? (
+              <button
+                type="button"
+                onClick={() => setShowAllImported(false)}
+                className="mt-1 text-[12px] font-medium text-sky-700 hover:text-sky-900 hover:underline"
+              >
+                Свернуть
+              </button>
+            ) : null}
           </div>
 
         </div>

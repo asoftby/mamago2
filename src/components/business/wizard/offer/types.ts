@@ -10,7 +10,7 @@ export type OfferWizardMode = "create" | "edit";
 export interface OfferFormData {
   // Step 1: Offer Type (was Step 2)
   offerKind: "course" | "birthday" | "service" | null;
-  durationType: "single" | "recurring" | null; // For courses only
+  durationType: "single" | "recurring" | "camp" | null; // For courses only
   
   // Service-specific fields (for SERVICE offers)
   serviceType: "торт" | "декор" | "фотограф" | "аниматор" | "шоу" | "аквагрим" | "ведущий" | "мастер_класс_на_выезд" | "другое" | null;
@@ -33,6 +33,13 @@ export interface OfferFormData {
   classDuration: string;
   classGroupSize: string;
   classFormat: "trial" | "course" | "subscription" | null;
+  
+  // Camp fields (for durationType = "camp")
+  campSessions: Array<{
+    dateFrom: string | null;
+    dateTo: string | null;
+  }>;
+  campPriceText: string;
   
   // Party fields
   partyProgram: string;

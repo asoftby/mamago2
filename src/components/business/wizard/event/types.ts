@@ -193,6 +193,9 @@ export interface EventFormData {
   organizerPhone: string;
   organizerWebsite: string;
   organizerInstagram: string;
+
+  /** Поводы, выбранные редактором (many-to-many, опционально). */
+  occasionIds: string[];
 }
 
 export interface SocialLink {

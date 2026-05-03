@@ -26,17 +26,17 @@ export function OrganizerSearchSelect({
   useEffect(() => {
     if (!searchQuery.trim()) {
       setSearchResults([]);
+      setIsSearching(false);
       return;
     }
 
+    let isActive = true;
     setIsSearching(true);
-    const controller = new AbortController();
 
     const timer = setTimeout(async () => {
       try {
         const res = await fetch(
           `/api/admin/organizers?query=${encodeURIComponent(searchQuery)}&limit=10`,
-          { signal: controller.signal },
         );
 
         if (!res.ok) {
@@ -48,19 +48,24 @@ export function OrganizerSearchSelect({
           throw new Error(json.error || "Search failed");
         }
 
-        setSearchResults(json.organizers || []);
+        if (isActive) {
+          setSearchResults(json.organizers || []);
+        }
       } catch (e) {
-        if ((e as Error).name === "AbortError") return;
         console.error("[OrganizerSearchSelect] Search error:", e);
-        setSearchResults([]);
+        if (isActive) {
+          setSearchResults([]);
+        }
       } finally {
-        setIsSearching(false);
+        if (isActive) {
+          setIsSearching(false);
+        }
       }
     }, 300);
 
     return () => {
+      isActive = false;
       clearTimeout(timer);
-      controller.abort("Component unmounted or search query changed");
     };
   }, [searchQuery]);
 

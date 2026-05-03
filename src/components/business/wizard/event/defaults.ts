@@ -140,6 +140,9 @@ export function getDefaultFormData(): EventFormData {
     organizerPhone: "",
     organizerWebsite: "",
     organizerInstagram: "",
+
+    // Occasions
+    occasionIds: [],
   };
 }
 

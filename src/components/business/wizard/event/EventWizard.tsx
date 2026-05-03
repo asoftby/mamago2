@@ -54,6 +54,14 @@ import { navigateToCompatibleHref } from "@/lib/routing/clientNavigation";
 import type { EventStep1Taxonomies } from "./steps/step1Taxonomies";
 import { useAiEnrichment } from "./useAiEnrichment";
 import { applyAiEnrichmentToDraft } from "@/lib/event/applyAiEnrichment";
+
+type AiSuggestedFields = {
+  participationFormat: boolean;
+  atmosphere: boolean;
+  interests: boolean;
+  mainCategory: boolean;
+};
+
 interface EventWizardProps {
   mode: EventWizardMode;
   event?: Activity; // Event entity for edit mode
@@ -207,23 +215,86 @@ function EventWizardInner({
     enrichment: aiEnrichment,
     isLoading: isAiLoading,
     isDone: isAiDone,
-    appliedFields: aiAppliedFields,
+    manualOverrides: aiManualOverrides,
     markManualOverride: markAiManualOverride,
     run: runAiEnrichment,
   } = useAiEnrichment({
     importedRecordId,
+    activityId: eventId ?? event?.id ?? null,
     initialEnrichment: initialAiEnrichment,
   });
+  const [aiAppliedFields, setAiAppliedFields] = useState<string[]>([]);
+  const [aiSuggestedFields, setAiSuggestedFields] = useState<AiSuggestedFields>({
+    participationFormat: false,
+    atmosphere: false,
+    interests: false,
+    mainCategory: false,
+  });
 
-  // Apply enrichment to draft when it first arrives (only if draft fields are empty)
-  const aiAppliedRef = useRef(false);
+  const handleAiManualOverride = useCallback(
+    (field: string) => {
+      setAiSuggestedFields((prev) => {
+        if (field === "format") {
+          return { ...prev, participationFormat: false };
+        }
+        if (field === "eventFormats") {
+          return { ...prev, atmosphere: false };
+        }
+        if (field === "interestIds") {
+          return { ...prev, interests: false };
+        }
+        if (field === "categoryId") {
+          return { ...prev, mainCategory: false };
+        }
+        return prev;
+      });
+      markAiManualOverride(field);
+    },
+    [markAiManualOverride],
+  );
+
+  // Apply enrichment when a new result arrives. Only untouched Step 1 fields are patched.
+  const lastAppliedEnrichmentRef = useRef<typeof aiEnrichment>(null);
   useEffect(() => {
-    if (!aiEnrichment || aiAppliedRef.current) return;
-    aiAppliedRef.current = true;
-    const patched = applyAiEnrichmentToDraft(formData, aiEnrichment);
-    patchFormData(patched);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [aiEnrichment]);
+    if (!aiEnrichment) return;
+    if (lastAppliedEnrichmentRef.current === aiEnrichment) return;
+
+    lastAppliedEnrichmentRef.current = aiEnrichment;
+
+    const { updates, appliedFields } = applyAiEnrichmentToDraft(formData, aiEnrichment, {
+      manualOverrides: aiManualOverrides,
+    });
+    setAiAppliedFields(appliedFields);
+    setAiSuggestedFields({
+      participationFormat:
+        "format" in updates && Boolean(aiEnrichment.participationFormat),
+      atmosphere:
+        "eventFormats" in updates &&
+        (aiEnrichment.atmosphereSignals?.length ?? 0) > 0,
+      interests:
+        "interestIds" in updates &&
+        (aiEnrichment.interestSignals?.length ?? 0) > 0,
+      mainCategory:
+        "categoryId" in updates && Boolean(aiEnrichment.mainCategory),
+    });
+
+    if (Object.keys(updates).length > 0) {
+      patchFormData(updates);
+    }
+
+    if (appliedFields.length > 0) {
+      toast.success(
+        aiEnrichment.partial
+          ? "Частично определено автоматически"
+          : "Поля определены автоматически",
+      );
+      return;
+    }
+
+    if (isAiDone) {
+      toast.message("AI не нашёл достаточно уверенных значений для применения");
+    }
+  }, [aiEnrichment, aiManualOverrides, formData, isAiDone, patchFormData]);
 
   useEffect(() => {
     debugEditorLog("wizard mounted", {
@@ -745,8 +816,9 @@ function EventWizardInner({
           initialTaxonomies={initialStep1Taxonomies}
           aiEnrichment={aiEnrichment}
           aiAppliedFields={aiAppliedFields}
+          aiSuggestedFields={aiSuggestedFields}
           onRunAiEnrichment={importedRecordId ? runAiEnrichment : undefined}
-          onAiManualOverride={markAiManualOverride}
+          onAiManualOverride={handleAiManualOverride}
           isAiLoading={isAiLoading}
           isAiDone={isAiDone}
         />

@@ -8,7 +8,7 @@ import { Loader2, X, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { EventLocationSearchInput } from "./EventLocationSearchInput";
 import { EventLocationMapModal } from "./EventLocationMapModal";
-import { enrichEventLocation } from "./eventLocationUtils";
+import { createQuickPlaceDraft } from "@/lib/places/quickPlaceCreateClient";
 
 interface LocationData {
   id?: string;
@@ -31,6 +31,8 @@ interface QuickPlaceCreateProps {
   onPlaceCreated: (location: LocationData) => void;
   onCancel: () => void;
   initialName?: string;
+  initialAddress?: string;
+  deferPlaceCreation?: boolean;
   /** Встроенный вид (редактор статьи): без «карточки события», без полноэкранной карты по умолчанию */
   embedded?: boolean;
   /** Карта: полноэкранный оверлей или встроенный блок */
@@ -43,13 +45,15 @@ export function QuickPlaceCreate({
   onPlaceCreated,
   onCancel,
   initialName = "",
+  initialAddress = "",
+  deferPlaceCreation = false,
   embedded = false,
   mapLayout = "modal",
   // placeCreateSource is accepted but not used in UI
   placeCreateSource: _placeCreateSource,
 }: QuickPlaceCreateProps) {
   const [name, setName] = useState(initialName);
-  const [address, setAddress] = useState("");
+  const [address, setAddress] = useState(initialAddress);
   const [lat, setLat] = useState<number | null>(null);
   const [lng, setLng] = useState<number | null>(null);
   const [googlePlaceId, setGooglePlaceId] = useState<string | null>(null);
@@ -120,33 +124,56 @@ export function QuickPlaceCreate({
     setError(null);
 
     try {
-      // Enrich location data with district/metro
-      const enrichment = await enrichEventLocation({
+      if (deferPlaceCreation) {
+        onPlaceCreated({
+          title: name.trim(),
+          address,
+          fullAddress: address,
+          cityId: null,
+          cityName: null,
+          citySlug: null,
+          lat,
+          lng,
+          districtId: null,
+          districtName: null,
+          metroId: null,
+          metroName: null,
+          metroDistanceM: null,
+        });
+        return;
+      }
+
+      const place = await createQuickPlaceDraft({
+        title: name.trim(),
+        formattedAddr: address,
         lat,
         lng,
-        formattedAddr: address,
+        googlePlaceId,
         addressJson,
+        source: embedded ? "article_editor" : "event_wizard",
       });
 
-      // Return location data WITHOUT creating Place in database
       onPlaceCreated({
+        id: place.id,
         title: name.trim(),
-        address: address,
-        fullAddress: address,
-        cityId: enrichment?.cityId || null,
+        address: place.customAddress || place.formattedAddr || address,
+        fullAddress: place.formattedAddr || place.customAddress || address,
+        cityId: place.cityId || null,
         cityName: null,
         citySlug: null,
-        lat,
-        lng,
-        districtId: enrichment?.districtAutoId || null,
-        districtName: enrichment?.districtName || null,
-        metroId: enrichment?.metroAutoId || null,
-        metroName: enrichment?.metroName || null,
-        metroDistanceM: enrichment?.metroAutoDistanceM || null,
+        lat: place.lat ?? lat,
+        lng: place.lng ?? lng,
+        districtId: place.districtManualId || place.districtAutoId || null,
+        districtName: null,
+        metroId: place.metroManualId || place.metroAutoId || null,
+        metroName: null,
+        metroDistanceM: place.metroManualId
+          ? place.metroManualDistanceM || null
+          : place.metroAutoDistanceM || null,
       });
     } catch (err) {
       console.error("[QuickPlaceCreate] Save error:", err);
-      setError(err instanceof Error ? err.message : "Ошибка сохранения локации");
+      setError(err instanceof Error ? err.message : "Ошибка создания места");
     } finally {
       setIsSaving(false);
     }
@@ -165,7 +192,7 @@ export function QuickPlaceCreate({
     >
       <div className="mb-4 flex items-center justify-between">
         <h3 className={cn("font-semibold text-gray-900", embedded ? "text-base" : "text-lg")}>
-          Указать локацию вручную
+          Создать место
         </h3>
         <button
           type="button"
@@ -247,10 +274,10 @@ export function QuickPlaceCreate({
             {isSaving ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Сохраняю...
+                {deferPlaceCreation ? "Сохраняю..." : "Создаю..."}
               </>
             ) : (
-              "Использовать эту локацию"
+              deferPlaceCreation ? "Сохранить место" : "Создать место"
             )}
           </Button>
           <Button

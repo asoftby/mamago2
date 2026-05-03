@@ -529,6 +529,14 @@ export function mapEventToFormData(event: ActivityWithRelations): EventFormData 
     event.organizer?.instagram ??
     (typeof org?.instagram === "string" ? org.instagram : "");
 
+  // Occasions — loaded from occasionLinks if present on the activity
+  const activityWithOccasions = event as unknown as {
+    occasionLinks?: Array<{ occasionId: string }>;
+  };
+  formData.occasionIds = Array.isArray(activityWithOccasions.occasionLinks)
+    ? activityWithOccasions.occasionLinks.map((l) => l.occasionId)
+    : [];
+
   return formData;
 }
 
@@ -550,6 +558,7 @@ type EventPayload = {
   currency: string;
   coverImageId: string | null;
   galleryMediaIds: string[];
+  occasionIds: string[];
   venue: {
     kind: string | null;
     placeId: string | null;
@@ -734,6 +743,7 @@ export function buildEventPayload(data: EventFormData): EventPayload {
 
     coverImageId: data.coverImage,
     galleryMediaIds: Array.isArray(data.gallery) ? data.gallery.filter(Boolean) : [],
+    occasionIds: Array.isArray(data.occasionIds) ? data.occasionIds : [],
 
     venue: {
       kind: data.venueKind,
@@ -780,6 +790,7 @@ type EventChanges = {
   priceTo?: number | null;
   priceText?: string;
   venue?: EventPayload["venue"];
+  occasionIds?: string[];
 };
 
 /**
@@ -860,6 +871,13 @@ export function extractChanges(current: EventFormData, original: EventFormData):
       ...(changes.scheduleJson ?? {}),
       ...(current.pendingLocation ? { pendingLocation: current.pendingLocation } : { pendingLocation: null }),
     };
+  }
+
+  // Occasion changes
+  const curOccasions = JSON.stringify([...(current.occasionIds ?? [])].sort());
+  const origOccasions = JSON.stringify([...(original.occasionIds ?? [])].sort());
+  if (curOccasions !== origOccasions) {
+    changes.occasionIds = current.occasionIds ?? [];
   }
 
   return changes;

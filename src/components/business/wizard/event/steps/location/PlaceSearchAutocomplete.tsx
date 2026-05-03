@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Search, MapPin, Building2, Loader2, PenLine } from "lucide-react";
+import { Search, MapPin, Building2, Loader2, Plus } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
@@ -25,18 +25,64 @@ interface PlaceResult {
 
 interface PlaceSearchAutocompleteProps {
   onPlaceSelect: (place: PlaceResult) => void;
-  onCreateNew: (initialName: string) => void; // Передаем текущий query
+  onCreatePlace: (initialName: string) => void;
   disabled?: boolean;
   placeholder?: string;
   selectedPlaceId?: string | null;
+  createPlaceHint?: string | null;
+}
+
+const GENERIC_PLACE_NAMES = [
+  "пляж",
+  "парк",
+  "лес",
+  "озеро",
+  "река",
+  "детская площадка",
+  "площадка",
+  "центр",
+  "клуб",
+  "стадион",
+  "музей",
+  "театр",
+  "кафе",
+  "ресторан",
+  "школа",
+  "сад",
+];
+
+function normalizePlaceName(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[«»"'`]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function isGenericWord(value: string): boolean {
+  const normalized = normalizePlaceName(value);
+  return GENERIC_PLACE_NAMES.some((item) => normalized === item);
+}
+
+function getPlaceNameHint(value: string): string | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  if (trimmed.length < 5) {
+    return "Добавьте чуть больше деталей в название места.";
+  }
+  if (isGenericWord(trimmed)) {
+    return "Уточните название места (например: «Пляж Дрозды»)";
+  }
+  return null;
 }
 
 export function PlaceSearchAutocomplete({
   onPlaceSelect,
-  onCreateNew,
+  onCreatePlace,
   disabled = false,
   placeholder = "Найти место по названию или адресу",
   selectedPlaceId,
+  createPlaceHint,
 }: PlaceSearchAutocompleteProps) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<PlaceResult[]>([]);
@@ -129,7 +175,7 @@ export function PlaceSearchAutocomplete({
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (!isOpen) return;
 
-    const totalItems = results.length + 1; // +1 for "Create new" option
+    const totalItems = results.length + 1;
 
     switch (e.key) {
       case "ArrowDown":
@@ -143,8 +189,7 @@ export function PlaceSearchAutocomplete({
       case "Enter":
         e.preventDefault();
         if (highlightedIndex === results.length) {
-          // "Create new" option
-          handleCreateNew();
+          handleCreatePlace();
         } else if (highlightedIndex >= 0 && highlightedIndex < results.length) {
           handleSelectPlace(results[highlightedIndex]!);
         }
@@ -163,14 +208,15 @@ export function PlaceSearchAutocomplete({
     setHasSearched(false);
   };
 
-  const handleCreateNew = () => {
-    onCreateNew(query.trim()); // Передаем текущий query
+  const handleCreatePlace = () => {
+    onCreatePlace(query.trim());
     setIsOpen(false);
     setHasSearched(false);
   };
 
   const showDropdown = isOpen && query.trim().length >= 2;
   const showEmptyState = hasSearched && !isSearching && results.length === 0;
+  const placeNameHint = getPlaceNameHint(query);
 
   return (
     <div className="relative">
@@ -270,12 +316,31 @@ export function PlaceSearchAutocomplete({
 
               {/* No Results */}
               {showEmptyState && (
-                <div className="flex min-h-[112px] items-center px-4 py-6">
-                  <div className="space-y-1">
+                <div className="px-4 py-6">
+                  <div className="space-y-3">
                     <div className="text-sm font-medium text-gray-900">Место не найдено</div>
                     <div className="text-sm text-muted-foreground">
-                      Попробуйте другое название или укажите адрес вручную.
+                      Мы создадим новое место при публикации события
                     </div>
+                    {createPlaceHint ? (
+                      <div className="text-xs text-amber-700">{createPlaceHint}</div>
+                    ) : null}
+                    {placeNameHint ? (
+                      <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                        {placeNameHint}
+                      </div>
+                    ) : null}
+                    <button
+                      type="button"
+                      onClick={handleCreatePlace}
+                      className={cn(
+                        "inline-flex items-center gap-2 rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white transition hover:bg-slate-700",
+                        highlightedIndex === results.length && "ring-2 ring-primary/20 ring-offset-2"
+                      )}
+                    >
+                      <Plus className="h-4 w-4" />
+                      {createPlaceHint ? "Создать место из данных источника" : "Создать место"}
+                    </button>
                   </div>
                 </div>
               )}
@@ -285,33 +350,6 @@ export function PlaceSearchAutocomplete({
                   Начните вводить название для поиска
                 </div>
               )}
-            </div>
-
-            <div className="border-t border-gray-200 p-2">
-              <button
-                type="button"
-                onClick={handleCreateNew}
-                className={cn(
-                  "flex w-full items-center gap-3 rounded-md px-3 py-3 text-left transition-colors",
-                  highlightedIndex === results.length
-                    ? "bg-primary/5"
-                    : "hover:bg-gray-50"
-                )}
-              >
-                <div className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-muted">
-                  <PenLine className="h-3 w-3 text-muted-foreground" />
-                </div>
-                <div className="min-w-0">
-                  <div className="font-medium text-gray-900">
-                    Указать адрес вручную
-                  </div>
-                  <div className="truncate text-sm text-muted-foreground">
-                    {query.length >= 2
-                      ? `Использовать "${query}" как название`
-                      : "Ввести название и адрес"}
-                  </div>
-                </div>
-              </button>
             </div>
           </div>
         </div>
