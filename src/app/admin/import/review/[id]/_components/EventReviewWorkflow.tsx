@@ -1,32 +1,27 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { CheckCircle2, Loader2 } from "lucide-react";
 import { toast } from "@/lib/toast";
-import { submitReviewDecision, applyImportEventRecord } from "../../../actions";
+import { approveImportedEventRecordAndOpen } from "../../../actions";
 import { DeleteImportedRecordButton } from "./ReviewDetailActions";
 import type { PlaceMatchCandidate, EventMatchCandidate } from "@/server/modules/import/types";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-
 type Decision = "APPROVED_CREATE" | "APPROVED_UPDATE" | "APPROVED_MERGE";
-
-type UiState = "deciding" | "executing" | "done" | "published";
 
 interface Props {
   taskId: string;
   importedRecordId: string;
   suggestedAction?: string | null;
+  taskStatus?: string | null;
   candidates: (PlaceMatchCandidate | EventMatchCandidate)[];
   venueName?: string | null;
-  /** Уже применённый результат (страница открыта повторно) */
   initialApplyResult?: { activityId?: string | null; activitySlug?: string | null } | null;
-  /** Уже сохранённое решение */
   initialDecision?: Decision | null;
+  initialTargetEntityId?: string | null;
 }
-
-// ─── Config ───────────────────────────────────────────────────────────────────
 
 const DECISION_OPTIONS: {
   value: Decision;
@@ -49,22 +44,10 @@ const DECISION_OPTIONS: {
   {
     value: "APPROVED_MERGE",
     label: "Объединить с существующим",
-    description: "Записи будут объединены с выбранным Activity",
+    description: "Запись будет объединена с выбранным Activity",
     requiresTarget: true,
   },
 ];
-
-const ACTION_BUTTON: Record<Decision, string> = {
-  APPROVED_CREATE: "Создать событие",
-  APPROVED_UPDATE: "Обновить событие",
-  APPROVED_MERGE: "Объединить",
-};
-
-const SUCCESS_TITLE: Record<Decision, string> = {
-  APPROVED_CREATE: "Событие создано",
-  APPROVED_UPDATE: "Событие обновлено",
-  APPROVED_MERGE: "События объединены",
-};
 
 const DECISION_LABEL: Record<Decision, string> = {
   APPROVED_CREATE: "Создать новый Activity",
@@ -72,85 +55,89 @@ const DECISION_LABEL: Record<Decision, string> = {
   APPROVED_MERGE: "Объединить с существующим Activity",
 };
 
-// ─── Component ────────────────────────────────────────────────────────────────
+const LOCKED_STATUS = new Set(["COMPLETED", "CANCELLED"]);
 
 export function EventReviewWorkflow({
   taskId,
   importedRecordId,
   suggestedAction,
+  taskStatus,
   candidates,
   venueName,
   initialApplyResult,
   initialDecision,
+  initialTargetEntityId,
 }: Props) {
-  const alreadyDone = !!initialApplyResult?.activityId;
-
-  const [uiState, setUiState] = useState<UiState>(alreadyDone ? "done" : "deciding");
+  const router = useRouter();
   const [selected, setSelected] = useState<Decision | null>(initialDecision ?? null);
-  const [targetCandidateId, setTargetCandidateId] = useState("");
+  const [targetCandidateId, setTargetCandidateId] = useState(initialTargetEntityId ?? "");
   const [notes, setNotes] = useState("");
-  const [autoPublish, setAutoPublish] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [moderationLoading, setModerationLoading] = useState<"APPROVE" | "REJECT" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [activityId, setActivityId] = useState<string | null>(initialApplyResult?.activityId ?? null);
+  const [activitySlug, setActivitySlug] = useState<string | null>(initialApplyResult?.activitySlug ?? null);
 
   const config = selected ? DECISION_OPTIONS.find((d) => d.value === selected) : null;
   const needsTarget = config?.requiresTarget ?? false;
-  const canExecute = selected !== null && (!needsTarget || targetCandidateId !== "");
-
+  const alreadyCreated = !!activityId;
+  const decisionLocked = LOCKED_STATUS.has(taskStatus ?? "") && !!initialDecision && !alreadyCreated;
+  const canExecute = alreadyCreated || (selected !== null && (!needsTarget || targetCandidateId !== ""));
   const venueText = venueName ? `«${venueName}»` : "Будет выбрана автоматически";
 
-  // ─── Execute: save decision + apply in one shot ───────────────────────────
+  const editHref = useMemo(() => {
+    if (!activityId) return null;
+    const params = new URLSearchParams({
+      returnTo: "/admin/import/review",
+      importedRecordId,
+    });
+    return `/editor/event/${activityId}/edit?${params.toString()}`;
+  }, [activityId, importedRecordId]);
 
-  async function handleExecute() {
-    if (!selected || !canExecute || loading) return;
+  const primaryLabel = alreadyCreated
+    ? "Открыть карточку"
+    : selected === "APPROVED_CREATE"
+      ? "Создать карточку и открыть"
+      : selected
+        ? "Применить и открыть карточку"
+        : "Выберите действие";
+
+  const loadingLabel = selected === "APPROVED_CREATE" ? "Создаём карточку…" : "Применяем…";
+
+  async function handlePrimaryAction() {
+    if (loading) return;
+    if (alreadyCreated && editHref) {
+      router.push(editHref);
+      return;
+    }
+    if (!selected || !canExecute) return;
+
     setLoading(true);
     setError(null);
-
     try {
-      // 1. Save decision
-      const decisionRes = await submitReviewDecision(taskId, {
+      const result = await approveImportedEventRecordAndOpen({
+        taskId,
+        importedRecordId,
         decision: selected,
-        targetEntityId: needsTarget && targetCandidateId ? targetCandidateId : null,
-        targetEntityType: needsTarget && targetCandidateId ? "ACTIVITY" : null,
-        selectedCandidateId: targetCandidateId || null,
+        targetEntityId: needsTarget ? targetCandidateId : null,
+        targetEntityType: needsTarget ? "ACTIVITY" : null,
+        selectedCandidateId: needsTarget ? targetCandidateId : null,
         notes: notes.trim() || null,
       });
 
-      if (!decisionRes.success) {
-        setError(decisionRes.error ?? "Не удалось сохранить решение");
+      if (!result.success || !result.activityId || !result.editHref) {
+        setError(result.error ?? "Не удалось открыть карточку");
         return;
       }
 
-      // 2. Apply immediately
-      const applyRes = await applyImportEventRecord(importedRecordId);
+      setActivityId(result.activityId);
+      setActivitySlug(result.activitySlug ?? null);
 
-      if (!applyRes.success) {
-        setError(applyRes.error ?? "Не удалось выполнить действие");
-        return;
-      }
-
-      const newActivityId = applyRes.activityId ?? null;
-      setActivityId(newActivityId);
-
-      // 3. Auto-publish if toggled
-      if (autoPublish && newActivityId) {
-        const pubRes = await fetch(`/api/admin/moderation/events/${newActivityId}`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "same-origin",
-          body: JSON.stringify({ action: "APPROVE" }),
-        });
-        if (pubRes.ok) {
-          setUiState("published");
-          toast.success("Событие создано и опубликовано");
-          return;
-        }
-      }
-
-      setUiState("done");
-      toast.success(SUCCESS_TITLE[selected] ?? "Готово");
+      toast.success(
+        result.reusedExisting
+          ? "Карточка уже создана. Открываем редактор…"
+          : "Карточка создана. Открываем редактор…",
+      );
+      router.push(result.editHref);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Неизвестная ошибка");
     } finally {
@@ -158,97 +145,61 @@ export function EventReviewWorkflow({
     }
   }
 
-  // ─── Moderation actions ───────────────────────────────────────────────────
-
-  async function handleModeration(action: "APPROVE" | "REJECT") {
-    if (!activityId) return;
-    setModerationLoading(action);
-    try {
-      const res = await fetch(`/api/admin/moderation/events/${activityId}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "same-origin",
-        body: JSON.stringify({
-          action,
-          comment: action === "REJECT" ? "Отклонено после import review." : undefined,
-        }),
-      });
-      const payload = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(typeof payload.error === "string" ? payload.error : "Ошибка");
-      if (action === "APPROVE") {
-        setUiState("published");
-        toast.success("Событие опубликовано");
-      } else {
-        toast.success("Событие отклонено");
-      }
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Ошибка модерации");
-    } finally {
-      setModerationLoading(null);
-    }
-  }
-
-  // ─── Render ───────────────────────────────────────────────────────────────
-
-  const isDone = uiState === "done" || uiState === "published";
-
   return (
-    <div className="rounded-lg border border-slate-200 bg-white overflow-hidden">
-      {/* Header */}
-      <div className={`px-4 py-3 border-b ${isDone ? "bg-emerald-50 border-emerald-200" : "bg-slate-50 border-slate-200"}`}>
-        <div className="flex items-center justify-between">
+    <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+      <div className={`border-b px-4 py-3 ${alreadyCreated ? "border-emerald-200 bg-emerald-50" : "border-slate-200 bg-slate-50"}`}>
+        <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            {isDone && <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />}
-            <h2 className={`text-sm font-semibold ${isDone ? "text-emerald-900" : "text-slate-800"}`}>
-              {isDone
-                ? (uiState === "published" ? "Событие опубликовано" : (selected ? SUCCESS_TITLE[selected] : "Готово"))
-                : "Принять решение"
-              }
+            {alreadyCreated ? <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" /> : null}
+            <h2 className={`text-sm font-semibold ${alreadyCreated ? "text-emerald-900" : "text-slate-800"}`}>
+              {alreadyCreated ? "Карточка готова" : "Принять решение"}
             </h2>
           </div>
-          {suggestedAction && !isDone && (
+          {suggestedAction && !alreadyCreated ? (
             <span className="text-xs text-slate-500">
               Рекомендация: <span className="font-medium text-slate-700">{suggestedAction}</span>
             </span>
-          )}
+          ) : null}
         </div>
-        {isDone && (
-          <p className="text-xs text-emerald-700 mt-0.5 ml-6">
-            Событие добавлено в каталог и готово к публикации
+        {alreadyCreated ? (
+          <p className="ml-6 mt-0.5 text-xs text-emerald-700">
+            Activity уже создан. Можно сразу открыть редактор без повторного применения.
           </p>
-        )}
+        ) : null}
       </div>
 
-      <div className="p-4 space-y-4">
-
-        {/* ── DECIDING state ── */}
-        {uiState === "deciding" && (
+      <div className="space-y-4 p-4">
+        {!alreadyCreated ? (
           <>
-            {/* Decision options */}
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-              {DECISION_OPTIONS.map((d) => (
-                <button
-                  key={d.value}
-                  type="button"
-                  onClick={() => {
-                    setSelected(d.value);
-                    if (!d.requiresTarget) setTargetCandidateId("");
-                    setError(null);
-                  }}
-                  className={`rounded-lg border-2 p-3 text-left transition ${
-                    selected === d.value
-                      ? "border-slate-900 bg-slate-50 ring-1 ring-slate-900"
-                      : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
-                  }`}
-                >
-                  <div className="text-sm font-semibold text-slate-900">{d.label}</div>
-                  <div className="mt-0.5 text-xs text-slate-500">{d.description}</div>
-                </button>
-              ))}
-            </div>
+            {!decisionLocked ? (
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                {DECISION_OPTIONS.map((d) => (
+                  <button
+                    key={d.value}
+                    type="button"
+                    onClick={() => {
+                      setSelected(d.value);
+                      if (!d.requiresTarget) setTargetCandidateId("");
+                      setError(null);
+                    }}
+                    className={`rounded-lg border-2 p-3 text-left transition ${
+                      selected === d.value
+                        ? "border-slate-900 bg-slate-50 ring-1 ring-slate-900"
+                        : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
+                    }`}
+                  >
+                    <div className="text-sm font-semibold text-slate-900">{d.label}</div>
+                    <div className="mt-0.5 text-xs text-slate-500">{d.description}</div>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+                Решение уже сохранено. Осталось применить его и открыть карточку.
+              </div>
+            )}
 
-            {/* Target candidate selector */}
-            {needsTarget && candidates.length > 0 && (
+            {needsTarget && candidates.length > 0 ? (
               <div>
                 <label className="mb-2 block text-sm font-medium text-slate-700">
                   Выберите существующий Activity <span className="text-red-500">*</span>
@@ -280,11 +231,11 @@ export function EventReviewWorkflow({
                         />
                         <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-1.5">
-                            {hasRisk && (
+                            {hasRisk ? (
                               <span className="rounded bg-orange-200 px-1.5 py-0.5 text-xs font-medium text-orange-700">
-                                ⚠ occurrence risk
+                                occurrence risk
                               </span>
-                            )}
+                            ) : null}
                             <span className="text-sm font-medium text-slate-900">{c.entityTitle}</span>
                           </div>
                           <div className="mt-0.5 text-xs text-slate-500">
@@ -296,32 +247,32 @@ export function EventReviewWorkflow({
                   })}
                 </div>
               </div>
-            )}
+            ) : null}
 
-            {needsTarget && candidates.length === 0 && (
+            {needsTarget && candidates.length === 0 ? (
               <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
                 Нет кандидатов для выбора. Используйте «Создать новое».
               </div>
-            )}
+            ) : null}
 
-            {/* Notes */}
-            <div>
-              <label className="mb-1 block text-xs font-medium text-slate-600">
-                Комментарий (необязательно)
-              </label>
-              <textarea
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                rows={2}
-                placeholder="Причина решения, замечания..."
-                className="w-full resize-none rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-400"
-              />
-            </div>
+            {!decisionLocked ? (
+              <div>
+                <label className="mb-1 block text-xs font-medium text-slate-600">
+                  Комментарий (необязательно)
+                </label>
+                <textarea
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  rows={2}
+                  placeholder="Причина решения, замечания..."
+                  className="w-full resize-none rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-400"
+                />
+              </div>
+            ) : null}
 
-            {/* Summary preview — показывается только когда выбрано решение */}
-            {selected && (
-              <div className="rounded-lg border border-slate-100 bg-slate-50 px-4 py-3 space-y-1.5 text-sm">
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">Что произойдёт</p>
+            {selected ? (
+              <div className="space-y-1.5 rounded-lg border border-slate-100 bg-slate-50 px-4 py-3 text-sm">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Что произойдёт</p>
                 <div className="flex gap-2">
                   <span className="w-20 shrink-0 text-slate-500">Тип</span>
                   <span className="font-medium text-slate-900">Событие</span>
@@ -332,42 +283,26 @@ export function EventReviewWorkflow({
                 </div>
                 <div className="flex gap-2">
                   <span className="w-20 shrink-0 text-slate-500">Площадка</span>
-                  <span className="font-medium text-slate-900">
-                    {venueText}
-                    {!venueName && <span className="ml-1 text-xs text-slate-400">(авто)</span>}
-                  </span>
+                  <span className="font-medium text-slate-900">{venueText}</span>
                 </div>
               </div>
-            )}
+            ) : null}
 
-            {/* Auto-publish toggle */}
-            <label className="flex cursor-pointer items-center gap-2.5">
-              <input
-                type="checkbox"
-                checked={autoPublish}
-                onChange={(e) => setAutoPublish(e.target.checked)}
-                className="h-4 w-4 rounded border-slate-300 accent-slate-900"
-              />
-              <span className="text-sm text-slate-700">Авто-публиковать после создания</span>
-            </label>
-
-            {/* Error */}
-            {error && (
+            {error ? (
               <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-red-700">
                 {error}
               </div>
-            )}
+            ) : null}
 
-            {/* Actions */}
             <div className="flex flex-wrap items-center gap-2 pt-1">
               <button
                 type="button"
-                onClick={handleExecute}
+                onClick={handlePrimaryAction}
                 disabled={!canExecute || loading}
                 className="inline-flex items-center justify-center gap-2 rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
               >
-                {loading && <Loader2 className="h-4 w-4 animate-spin" />}
-                {loading ? "Выполняем…" : (selected ? ACTION_BUTTON[selected] : "Выбрать действие")}
+                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                {loading ? loadingLabel : primaryLabel}
               </button>
               <DeleteImportedRecordButton
                 importedRecordId={importedRecordId}
@@ -376,73 +311,55 @@ export function EventReviewWorkflow({
               />
             </div>
           </>
-        )}
-
-        {/* ── DONE / PUBLISHED state ── */}
-        {(uiState === "done" || uiState === "published") && (
+        ) : (
           <>
-            {/* Result summary */}
-            <div className="rounded-lg border border-slate-100 bg-slate-50 px-4 py-3 space-y-1.5 text-sm">
+            <div className="space-y-1.5 rounded-lg border border-slate-100 bg-slate-50 px-4 py-3 text-sm">
               <div className="flex gap-2">
                 <span className="w-24 shrink-0 text-slate-500">Тип</span>
                 <span className="font-medium text-slate-900">Событие</span>
               </div>
-              {selected && (
+              {selected ? (
                 <div className="flex gap-2">
                   <span className="w-24 shrink-0 text-slate-500">Действие</span>
                   <span className="font-medium text-slate-900">{DECISION_LABEL[selected]}</span>
                 </div>
-              )}
+              ) : null}
               <div className="flex gap-2">
                 <span className="w-24 shrink-0 text-slate-500">Площадка</span>
                 <span className="font-medium text-slate-900">{venueText}</span>
               </div>
-              {activityId && (
+              {activityId ? (
                 <div className="flex gap-2 border-t border-slate-200 pt-1.5">
                   <span className="w-24 shrink-0 text-slate-500">Activity ID</span>
                   <span className="break-all font-mono text-xs text-slate-700">{activityId}</span>
                 </div>
-              )}
+              ) : null}
+              {activitySlug ? (
+                <div className="flex gap-2">
+                  <span className="w-24 shrink-0 text-slate-500">Slug</span>
+                  <span className="break-all font-mono text-xs text-slate-700">{activitySlug}</span>
+                </div>
+              ) : null}
             </div>
 
-            {/* Actions */}
-            {uiState === "done" && activityId && (
-              <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2">
+              {editHref ? (
                 <button
                   type="button"
-                  onClick={() => void handleModeration("APPROVE")}
-                  disabled={moderationLoading !== null}
-                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {moderationLoading === "APPROVE" && <Loader2 className="h-4 w-4 animate-spin" />}
-                  {moderationLoading === "APPROVE" ? "Публикуем…" : "Опубликовать"}
-                </button>
-                <Link
-                  href={`/editor/event/${activityId}/edit`}
-                  className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-700 transition hover:bg-slate-50"
+                  onClick={handlePrimaryAction}
+                  className="inline-flex items-center justify-center rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-700"
                 >
                   Открыть карточку
-                </Link>
-                <button
-                  type="button"
-                  onClick={() => void handleModeration("REJECT")}
-                  disabled={moderationLoading !== null}
-                  className="inline-flex items-center justify-center gap-2 rounded-lg border border-red-200 bg-white px-4 py-2.5 text-sm text-red-700 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {moderationLoading === "REJECT" && <Loader2 className="h-4 w-4 animate-spin" />}
-                  Отклонить
                 </button>
-              </div>
-            )}
+              ) : null}
 
-            {uiState === "published" && activityId && (
               <Link
-                href={`/editor/event/${activityId}/edit`}
+                href="/admin/import/review"
                 className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-700 transition hover:bg-slate-50"
               >
-                Открыть карточку
+                Назад к списку
               </Link>
-            )}
+            </div>
           </>
         )}
       </div>

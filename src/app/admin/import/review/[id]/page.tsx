@@ -322,6 +322,68 @@ function PlaceNormalizedBlock({ nd, qualityScore }: { nd: NormalizedPlaceImport;
 
 // ── EVENT normalized block ────────────────────────────────────────────────────
 
+function extractEventTime(nd: NormalizedEventImport): string | null {
+  // Try to extract time from various fields
+  const rawPayload = nd as unknown as Record<string, unknown>;
+  
+  // Check common time fields
+  const timeFields = [
+    'time',
+    'startTime',
+    'endTime',
+    'startsAt',
+    'endsAt',
+    'eventTime',
+    'timeText',
+  ];
+  
+  for (const field of timeFields) {
+    const value = rawPayload[field];
+    if (typeof value === 'string' && value.trim().length > 0) {
+      return value.trim();
+    }
+  }
+  
+  // Try to extract time from startAt/endAt ISO strings
+  if (nd.startAt) {
+    const timeMatch = nd.startAt.match(/T(\d{2}:\d{2})/);
+    if (timeMatch) {
+      const startTime = timeMatch[1];
+      
+      // Check if we have endAt with time
+      if (nd.endAt) {
+        const endTimeMatch = nd.endAt.match(/T(\d{2}:\d{2})/);
+        if (endTimeMatch) {
+          const endTime = endTimeMatch[1];
+          return `${startTime}–${endTime}`;
+        }
+      }
+      
+      return `с ${startTime}`;
+    }
+  }
+  
+  // Try to extract time from scheduleText
+  if (nd.scheduleText) {
+    // Look for time patterns like "12:00", "14:30", "с 10:00 до 18:00"
+    const timePattern = /\b(\d{1,2}:\d{2})\b/g;
+    const times = nd.scheduleText.match(timePattern);
+    
+    if (times && times.length > 0) {
+      if (times.length === 1) {
+        return `с ${times[0]}`;
+      } else if (times.length === 2) {
+        return `${times[0]}–${times[1]}`;
+      } else {
+        // Multiple times, show them all
+        return times.join(', ');
+      }
+    }
+  }
+  
+  return null;
+}
+
 function buildEventImportImageRows(nd: NormalizedEventImport) {
   const seen = new Set<string>();
   const rows: { url: string; label: string }[] = [];
@@ -352,6 +414,7 @@ function buildEventImportImageRows(nd: NormalizedEventImport) {
 
 function EventNormalizedBlock({ nd, qualityScore }: { nd: NormalizedEventImport; qualityScore: number }) {
   const importImageRows = buildEventImportImageRows(nd);
+  const eventTime = extractEventTime(nd);
 
   return (
     <Section title="Нормализованные данные — EVENT">
@@ -379,6 +442,7 @@ function EventNormalizedBlock({ nd, qualityScore }: { nd: NormalizedEventImport;
       <Field label="Город" value={nd.cityName} />
       <Field label="Начало" value={nd.startAt} />
       <Field label="Конец" value={nd.endAt} />
+      <Field label="Время проведения" value={eventTime} />
       <Field label="Расписание (текст)" value={nd.scheduleText} />
       <Field label="Возраст" value={nd.ageText} />
       <Field label="Цена" value={nd.priceText} />
@@ -439,11 +503,14 @@ function PlaceCatalogBlock({ nd }: { nd: NormalizedPlaceImport }) {
 
 function EventCatalogBlock({ nd }: { nd: NormalizedEventImport }) {
   const importImageRows = buildEventImportImageRows(nd);
+  const eventTime = extractEventTime(nd);
+  
   return (
     <Section title="Что будет создано">
       <Field label="Название" value={nd.title} />
       <Field label="Описание" value={nd.description ?? nd.shortDescCandidate} />
-      <Field label="Дата и время" value={nd.startAt ?? nd.scheduleText} />
+      <Field label="Дата проведения" value={nd.startAt ?? nd.scheduleText} />
+      <Field label="Время проведения" value={eventTime} />
       <Field label="Место" value={nd.venueName} />
       <Field label="Адрес" value={nd.addressText} />
       <Field label="Город" value={nd.cityName} />
@@ -539,6 +606,7 @@ function PlaceCandidatesBlock({
 function EventCandidatesBlock({
   candidates,
   activityMap,
+  importedRecordId,
 }: {
   candidates: EventMatchCandidate[];
   activityMap: Record<string, {
@@ -547,6 +615,7 @@ function EventCandidatesBlock({
     venue: { title: string | null; addressLine: string | null; kind: string } | null;
     cityId: string | null;
   }>;
+  importedRecordId: string;
 }) {
   return (
     <Section title="Совпадения">
@@ -592,7 +661,13 @@ function EventCandidatesBlock({
                 <div className="mt-3 flex flex-wrap gap-2">
                   <span className="rounded-lg border border-gray-200 px-2 py-1 text-xs text-gray-700">Связать</span>
                   <span className="rounded-lg border border-gray-200 px-2 py-1 text-xs text-gray-700">Обновить</span>
-                  <Link href={`/editor/event/${c.entityId}/edit?returnTo=${encodeURIComponent("/admin/import/review")}`} className="rounded-lg border border-gray-200 px-2 py-1 text-xs text-gray-700 hover:bg-gray-50">
+                  <Link
+                    href={`/editor/event/${c.entityId}/edit?${new URLSearchParams({
+                      returnTo: "/admin/import/review",
+                      importedRecordId,
+                    }).toString()}`}
+                    className="rounded-lg border border-gray-200 px-2 py-1 text-xs text-gray-700 hover:bg-gray-50"
+                  >
                     Открыть
                   </Link>
                 </div>
@@ -797,6 +872,7 @@ export default async function ReviewDetailPage({
         <EventCandidatesBlock
           candidates={rawCandidates as EventMatchCandidate[]}
           activityMap={activityMap}
+          importedRecordId={rec.id}
         />
       )}
 

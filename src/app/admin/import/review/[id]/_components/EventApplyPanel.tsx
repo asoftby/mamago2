@@ -210,7 +210,10 @@ export function EventApplyPanel({
                   Опубликовать
                 </button>
                 <Link
-                  href={`/editor/event/${result.activityId}/edit`}
+                  href={`/editor/event/${result.activityId}/edit?${new URLSearchParams({
+                    returnTo: "/admin/import/review",
+                    importedRecordId,
+                  }).toString()}`}
                   prefetch
                   className="inline-flex items-center justify-center rounded-xl border border-stone-300 px-4 py-3 text-sm text-stone-700 transition hover:bg-stone-50 w-full sm:w-auto"
                 >

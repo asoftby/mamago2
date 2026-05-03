@@ -10,7 +10,7 @@ import type {
 } from "@/server/modules/import/types";
 import { ReviewDecisionPanel } from "./ReviewDecisionPanel";
 import { ApplyPanel } from "./ApplyPanel";
-import { EventApplyPanel } from "./EventApplyPanel";
+import { EventReviewWorkflow } from "./EventReviewWorkflow";
 import { ApplyResultBlock } from "./ApplyResultBlock";
 
 type EntityType = "PLACE" | "EVENT";
@@ -77,7 +77,7 @@ export function ReviewDetailWorkflow({
         </div>
       )}
 
-      {task && !isResolved && (
+      {task && !isResolved && !isEventRecord && (
         <ReviewDecisionPanel
           taskId={task.id}
           importedRecordId={importedRecord.id}
@@ -107,11 +107,14 @@ export function ReviewDetailWorkflow({
         />
       )}
 
-      {isEventRecord && reviewDecision && (isApproved || isAlreadyApplied || !!importedRecord.applyResult) && (
-        <EventApplyPanel
+      {isEventRecord && task && (
+        <EventReviewWorkflow
+          taskId={task.id}
           importedRecordId={importedRecord.id}
-          decision={reviewDecision.decision}
-          targetEntityId={reviewDecision.targetEntityId}
+          suggestedAction={task.suggestedAction}
+          taskStatus={task.status}
+          candidates={candidates}
+          venueName={normalizedEventData?.venueName}
           initialApplyResult={
             importedRecord.applyResult
               ? {
@@ -120,9 +123,12 @@ export function ReviewDetailWorkflow({
                 }
               : null
           }
-          typeCandidate={normalizedEventData?.typeCandidate}
-          scheduleModeCandidate={normalizedEventData?.scheduleModeCandidate}
-          venueName={normalizedEventData?.venueName}
+          initialDecision={
+            reviewDecision && reviewDecision.decision !== "REJECTED" && reviewDecision.decision !== "DEFERRED"
+              ? reviewDecision.decision
+              : null
+          }
+          initialTargetEntityId={reviewDecision?.targetEntityId ?? null}
         />
       )}
 
