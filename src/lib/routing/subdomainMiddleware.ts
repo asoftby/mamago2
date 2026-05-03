@@ -106,16 +106,9 @@ export function resolveSubdomainMiddlewareDecision(params: {
     }
 
     if (isEditorRoute(pathname)) {
-      return {
-        kind: "redirect",
-        location: buildPublicLocation({
-          host,
-          protocol,
-          pathname,
-          search: adminSafeSearch,
-          publicAppUrl,
-        }),
-      };
+      // Keep the isolated content editor on the current subdomain surface.
+      // A cross-origin redirect here breaks App Router RSC navigation from admin.
+      return { kind: "next" };
     }
   }
 

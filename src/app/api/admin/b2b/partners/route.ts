@@ -64,7 +64,7 @@ export async function GET(request: NextRequest) {
       id: b.id,
       name: b.name,
       // Prefer Business.phone, fallback to owner's phoneE164.
-      phone: b.phone || b.owner.phoneE164 || undefined,
+      phone: b.phone || b.owner?.phoneE164 || undefined,
       isVerified: true,
     }));
 

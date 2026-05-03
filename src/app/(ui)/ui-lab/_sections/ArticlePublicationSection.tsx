@@ -61,7 +61,7 @@ function TypographySpecimen() {
   return (
     <div className="rounded-2xl border border-border bg-white p-8 md:p-12 max-w-2xl">
       <p className="text-xs font-medium uppercase tracking-widest text-primary mb-6 font-sans">
-        Literata — reading typography
+        Serif stack — reading typography
       </p>
 
       {/* H1 */}
@@ -69,7 +69,7 @@ function TypographySpecimen() {
         <p className="text-xs text-muted-foreground font-sans mb-2">H1 — Article title</p>
         <h1
           className="text-3xl md:text-4xl lg:text-5xl font-semibold leading-tight tracking-tight text-foreground"
-          style={{ fontFamily: "var(--font-literata)" }}
+          style={{ fontFamily: "var(--font-serif)" }}
         >
           Как провести выходные с детьми в Минске
         </h1>
@@ -100,7 +100,7 @@ function TypographySpecimen() {
         <p className="text-xs text-muted-foreground font-sans mb-2">H2 — Section heading</p>
         <h2
           className="text-2xl md:text-3xl font-semibold leading-snug text-foreground"
-          style={{ fontFamily: "var(--font-literata)" }}
+          style={{ fontFamily: "var(--font-serif)" }}
         >
           Мастер-классы: руки в дело
         </h2>
@@ -111,7 +111,7 @@ function TypographySpecimen() {
         <p className="text-xs text-muted-foreground font-sans mb-2">H3 — Sub-section</p>
         <h3
           className="text-xl font-semibold leading-snug text-foreground"
-          style={{ fontFamily: "var(--font-literata)" }}
+          style={{ fontFamily: "var(--font-serif)" }}
         >
           Как добраться и что взять с собой
         </h3>
@@ -119,10 +119,10 @@ function TypographySpecimen() {
 
       {/* Body */}
       <div className="mb-8 pb-6 border-b border-border/50">
-        <p className="text-xs text-muted-foreground font-sans mb-2">Body text — Literata 17–18px, lh 1.75</p>
+        <p className="text-xs text-muted-foreground font-sans mb-2">Body text — serif 17–18px, lh 1.75</p>
         <p
           className="text-[1.0625rem] md:text-[1.125rem] leading-[1.75] md:leading-[1.8] text-foreground"
-          style={{ fontFamily: "var(--font-literata)" }}
+          style={{ fontFamily: "var(--font-serif)" }}
         >
           Минск — город, в котором всегда есть что открыть заново. Особенно если рядом дети, которым нужны впечатления, движение и немного волшебства. Мы собрали семь идей для насыщенных выходных.
         </p>
@@ -130,10 +130,10 @@ function TypographySpecimen() {
 
       {/* Blockquote */}
       <div className="mb-8 pb-6 border-b border-border/50">
-        <p className="text-xs text-muted-foreground font-sans mb-2">Blockquote — italic Literata</p>
+        <p className="text-xs text-muted-foreground font-sans mb-2">Blockquote — italic serif</p>
         <blockquote
           className="border-l-[3px] border-primary pl-5 py-1 italic text-[1.0625rem] leading-[1.75] text-muted-foreground"
-          style={{ fontFamily: "var(--font-literata)" }}
+          style={{ fontFamily: "var(--font-serif)" }}
         >
           Лучшие воспоминания детства — это не вещи, а моменты. Дайте детям время, пространство и немного глины.
         </blockquote>
@@ -141,10 +141,10 @@ function TypographySpecimen() {
 
       {/* List */}
       <div className="mb-8 pb-6 border-b border-border/50">
-        <p className="text-xs text-muted-foreground font-sans mb-2">List — Literata</p>
+        <p className="text-xs text-muted-foreground font-sans mb-2">List — serif</p>
         <ul
           className="list-disc pl-5 space-y-1.5 text-[1.0625rem] leading-[1.75] text-foreground"
-          style={{ fontFamily: "var(--font-literata)" }}
+          style={{ fontFamily: "var(--font-serif)" }}
         >
           <li>Работает ежедневно с 10:00 до 18:00</li>
           <li>Вход для детей до 5 лет — бесплатно</li>
@@ -154,10 +154,10 @@ function TypographySpecimen() {
 
       {/* Link */}
       <div>
-        <p className="text-xs text-muted-foreground font-sans mb-2">Link — Literata</p>
+        <p className="text-xs text-muted-foreground font-sans mb-2">Link — serif</p>
         <p
           className="text-[1.0625rem] leading-[1.75] text-foreground"
-          style={{ fontFamily: "var(--font-literata)" }}
+          style={{ fontFamily: "var(--font-serif)" }}
         >
           Подробнее о маршруте читайте в нашем{" "}
           <a href="#" className="text-primary underline underline-offset-[3px] decoration-[1px] hover:decoration-2">

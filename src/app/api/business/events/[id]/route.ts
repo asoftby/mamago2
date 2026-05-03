@@ -18,6 +18,7 @@ import { validateEventProgramCategories } from "@/lib/business/validateEventProg
 import { assertBusinessEventPrimaryCategory } from "@/lib/business/validatePrimaryEventCategory";
 import { replaceActivityGalleryFromMediaIds } from "@/lib/business/syncEventGalleryFromMediaIds";
 import { resolveEventOrganizer } from "@/lib/business/eventOrganizer";
+import { syncActivityOccasions } from "@/lib/business/syncActivityOccasions";
 import { prismaBase } from "@/lib/prisma";
 import { DEFAULT_ACTIVITY_FORMAT, normalizeActivityFormat } from "@/domain/activities/activity-format";
 
@@ -85,6 +86,9 @@ export async function GET(
         organizer: true,
         filterOptions: true,
         venue: true,
+        occasionLinks: {
+          select: { occasionId: true },
+        },
       },
     });
 
@@ -317,6 +321,14 @@ export async function PATCH(
       );
     } else if (body.placeId !== undefined) {
       await syncEventVenueAndActivityCity(event.id, null, body.placeId);
+    }
+
+    // Sync occasion links (only when occasionIds is explicitly provided)
+    if (Array.isArray(body.occasionIds)) {
+      const occasionIds = body.occasionIds.filter(
+        (id: unknown): id is string => typeof id === "string",
+      );
+      await syncActivityOccasions(event.id, occasionIds);
     }
 
     return NextResponse.json({

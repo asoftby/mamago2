@@ -7,6 +7,7 @@ import prisma from "@/lib/prisma";
 import { findRouteBySlug } from "@/lib/slug/routeSlugService";
 import { buildRouteJsonLd } from "@/lib/seo/schema/buildRouteJsonLd";
 import { AnalyticsDetailBeacon } from "@/components/analytics/AnalyticsDetailBeacon";
+import { buildOgMeta } from "@/lib/seo/buildOgMeta";
 
 type Props = {
   params: Promise<{ slug: string }>;
@@ -29,33 +30,50 @@ function buildStopAddress(
 
 export async function generateMetadata({ params }: Props) {
   const { slug } = await params;
+  const publicBase = process.env.NEXT_PUBLIC_APP_URL || "https://mamago.by";
   const resolved = await findRouteBySlug(slug);
   if (resolved) {
     const db = await prisma.route.findUnique({
       where: { id: resolved.routeId },
       select: {
         title: true,
+        slug: true,
         seoTitle: true,
         seoDescription: true,
+        coverImageUrl: true,
         budgetLevel: true,
         _count: { select: { stops: true } },
+        stops: {
+          select: { photoUrl: true },
+          orderBy: { order: "asc" },
+          take: 5,
+        },
       },
     });
     if (db) {
-      return {
-        title: db.seoTitle?.trim() || `${db.title} — маршрут | mamaGo`,
-        description:
-          db.seoDescription?.trim() ||
-          `${db._count.stops} точки · ${BUDGET_LABELS[db.budgetLevel as keyof typeof BUDGET_LABELS] ?? ""}`,
-      };
+      const title = db.seoTitle?.trim() || `${db.title} — маршрут | mamaGo`;
+      const description =
+        db.seoDescription?.trim() ||
+        `${db._count.stops} точки · ${BUDGET_LABELS[db.budgetLevel as keyof typeof BUDGET_LABELS] ?? ""}`;
+      const image =
+        db.coverImageUrl ??
+        db.stops.find((s) => s.photoUrl)?.photoUrl;
+      return buildOgMeta({
+        title,
+        description,
+        image,
+        url: `${publicBase}/routes/${db.slug ?? slug}`,
+      });
     }
   }
   const mock = MOCK_ROUTES.find((r) => r.slug === slug);
   if (mock) {
-    return {
+    return buildOgMeta({
       title: `${mock.title} — маршрут в ${mock.cityName} | mamaGo`,
       description: `${mock.stopsCount} точки · ${BUDGET_LABELS[mock.budgetLevel]} · ${formatAgeKeysShort(mock.ageTags)}`,
-    };
+      image: mock.coverImageUrl,
+      url: `${publicBase}/routes/${mock.slug}`,
+    });
   }
   return {};
 }

@@ -68,7 +68,7 @@ export function MobileBottomNav({
 
   return (
     <nav
-      className="pointer-events-none fixed bottom-0 left-0 right-0 z-40"
+      className="pointer-events-none left-0 right-0 z-40"
       aria-label="Основная навигация"
     >
       <div

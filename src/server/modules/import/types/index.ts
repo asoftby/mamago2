@@ -121,6 +121,14 @@ export interface NormalizedEventImport extends NormalizedImportPayload {
   organizerName?: string;
   categoryCandidates: string[];
   /**
+   * AI-определённая категория события (если была определена автоматически).
+   * Содержит ID категории, slug, путь и уверенность AI.
+   */
+  aiDetectedCategoryId?: string | null;
+  aiDetectedCategorySlug?: string | null;
+  aiDetectedCategoryPath?: string | null;
+  aiDetectedCategoryConfidence?: number | null;
+  /**
    * Постер / главное изображение со страницы источника (URL).
    * Не создаёт MediaAsset до явного действия пользователя в редакторе.
    */
@@ -133,6 +141,8 @@ export interface NormalizedEventImport extends NormalizedImportPayload {
   website?: string;
   /** Ссылки на соцсети (полные URL) */
   socialUrls?: string[];
+  /** URL трейлера (YouTube, VK Video и т.п.) */
+  trailerUrl?: string;
 }
 
 // ─── Parser ───────────────────────────────────────────────────────────────────

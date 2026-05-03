@@ -7,9 +7,12 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { readFile } from "fs/promises";
-import { join } from "path";
 import { existsSync } from "fs";
 import { prisma } from "@/lib/prisma";
+import {
+  resolveLegacyPublicUploadPath,
+  resolveStoredMediaPath,
+} from "@/server/media/media-storage";
 
 export async function GET(
   request: NextRequest,
@@ -33,9 +36,11 @@ export async function GET(
     }
 
     // Get file path
-    const filepath = media.publicUrl?.startsWith("/uploads/")
-      ? join(process.cwd(), "public", media.publicUrl)
-      : null;
+    const filepath =
+      resolveStoredMediaPath(media.publicUrl) ??
+      resolveStoredMediaPath(media.storageKey) ??
+      resolveLegacyPublicUploadPath(media.publicUrl) ??
+      resolveLegacyPublicUploadPath(media.storageKey);
 
     if (!filepath || !existsSync(filepath)) {
       return new NextResponse("File not found", { status: 404 });

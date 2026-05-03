@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { Container } from "@/components/ui/Container";
@@ -19,8 +19,8 @@ import {
   X,
   ChevronLeft,
   ChevronRight,
-  MoreVertical,
   Edit,
+  CheckCircle2,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -34,6 +34,7 @@ import { SaveActivityFlowAdaptive } from "@/components/activity/SaveActivityFlow
 import type { SaveToPlanResult } from "@/components/activity/SaveToPlanModal";
 import { toast } from "@/lib/toast";
 import { RouteMapHero } from "@/components/routes/RouteMapHero";
+import { RouteRatingBlock } from "@/components/routes/RouteRatingBlock";
 import { useAuthMe } from "@/features/birthday/builder/hooks/useAuthMe";
 import { format, parseISO } from "date-fns";
 import { ru } from "date-fns/locale";
@@ -280,13 +281,28 @@ function StopCard({
 export function RouteDetailClient({ route }: Props) {
   const [shareOpen, setShareOpen] = useState(false);
   const [planOpen, setPlanOpen] = useState(false);
+  const [inPlan, setInPlan] = useState(false);
   const [travelMode, setTravelMode] = useState<"walk" | "car">("walk");
   const [mapFullscreen, setMapFullscreen] = useState(false);
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [galleryPhotos, setGalleryPhotos] = useState<string[]>([]);
   const [galleryInitialIndex, setGalleryInitialIndex] = useState(0);
+  const [stickyBarVisible, setStickyBarVisible] = useState(false);
+  const actionBlockRef = useRef<HTMLDivElement>(null);
   const { isAuthenticated, user } = useAuthMe();
   const isDemoRouteId = /^route-\d+$/.test(route.id);
+
+  // IntersectionObserver: sticky top bar появляется когда action block ушёл из viewport
+  useEffect(() => {
+    const el = actionBlockRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => setStickyBarVisible(!(entry?.isIntersecting ?? true)),
+      { threshold: 0 },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   // Check if user can edit this route (author or admin)
   const canEdit =
@@ -309,13 +325,15 @@ export function RouteDetailClient({ route }: Props) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          activityId: route.id,
+          routeId: route.id,
+          planRouteSlug: route.isMockRoute ? route.slug : null,
           date: result.dateISO,
           title: route.title,
           coverImageUrl: route.coverImageUrl,
         }),
       });
       if (!res.ok) throw new Error("plan_save_failed");
+      setInPlan(true);
       toast.success("Маршрут добавлен в план");
     } else if (result.action === "ideas") {
       if (isDemoRouteId) return;
@@ -347,11 +365,73 @@ export function RouteDetailClient({ route }: Props) {
 
   return (
     <>
-      <div className="min-h-screen bg-[#F8F8F7] pb-24">
-        {/* Back nav */}
-        <div className="sticky top-0 z-20 bg-[#F8F8F7]/90 backdrop-blur-sm border-b border-neutral-100">
+      {/* ── Sticky top action bar (появляется после скролла) ── */}
+      <div
+        aria-hidden={!stickyBarVisible}
+        className={cn(
+          "fixed top-0 left-0 right-0 z-40 transition-[opacity,transform] duration-200",
+          stickyBarVisible
+            ? "opacity-100 translate-y-0 pointer-events-auto"
+            : "opacity-0 -translate-y-2 pointer-events-none",
+        )}
+      >
+        <div className="bg-white/95 backdrop-blur-md border-b border-neutral-200 shadow-sm">
+          <div className="mx-auto w-full max-w-2xl px-4 sm:px-6">
+            <div className="flex items-center gap-3 min-h-14 py-2">
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-neutral-900 truncate leading-tight">
+                  Маршрут «{route.title}»
+                </p>
+                {routeStats.distance > 0 && (
+                  <div className="flex items-center gap-2 mt-0.5">
+                    {travelMode === "walk" ? (
+                      <>
+                        <span className="text-xs text-neutral-500">🔥 {routeStats.calories} ккал</span>
+                        <span className="text-xs text-neutral-300">·</span>
+                        <span className="text-xs text-neutral-500">👣 {routeStats.steps.toLocaleString("ru-RU")} шагов</span>
+                      </>
+                    ) : (
+                      <span className="text-xs text-neutral-500">🚗 {routeStats.distance.toFixed(1)} км</span>
+                    )}
+                  </div>
+                )}
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                {/* Compact plan button */}
+                <button
+                  onClick={() => !inPlan && setPlanOpen(true)}
+                  className={cn(
+                    "flex items-center gap-1.5 h-9 px-4 rounded-xl text-xs font-semibold transition-colors",
+                    inPlan
+                      ? "bg-emerald-50 text-emerald-700 border border-emerald-200 cursor-default"
+                      : "bg-neutral-900 text-white hover:bg-neutral-700",
+                  )}
+                >
+                  {inPlan ? (
+                    <><CheckCircle2 className="w-3.5 h-3.5" />В плане</>
+                  ) : (
+                    <><CalendarPlus className="w-3.5 h-3.5" />В план</>
+                  )}
+                </button>
+                {/* Compact share button */}
+                <button
+                  onClick={() => setShareOpen(true)}
+                  className="flex items-center justify-center h-9 w-9 rounded-xl border border-neutral-200 bg-white text-neutral-600 hover:bg-neutral-50 transition-colors"
+                  aria-label="Поделиться"
+                >
+                  <Share2 className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="min-h-screen bg-[#F8F8F7]">
+        {/* Back nav — НЕ sticky, уходит вверх при скролле */}
+        <div className="bg-[#F8F8F7] border-b border-neutral-100">
           <Container className="max-w-2xl">
-            <div className="flex items-center justify-between h-12">
+            <div className="flex items-center justify-between h-12 pt-[20px]">
               <Link
                 href="/routes"
                 className="flex items-center gap-1.5 text-sm font-medium text-neutral-600 hover:text-neutral-900 transition-colors"
@@ -359,11 +439,34 @@ export function RouteDetailClient({ route }: Props) {
                 <ArrowLeft className="w-4 h-4" />
                 Маршруты
               </Link>
-              {route.isEditorial && (
-                <span className="flex items-center px-2.5 py-1 rounded-full bg-[#fdf4ee] text-xs font-medium text-neutral-500">
-                  от mamaGo
-                </span>
-              )}
+              <div className="flex items-center gap-2">
+                {route.isEditorial && (
+                  <span className="flex items-center px-2.5 py-1 rounded-full bg-[#fdf4ee] text-xs font-medium text-neutral-500">
+                    от mamaGo
+                  </span>
+                )}
+                {canEdit && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-neutral-200 bg-white text-neutral-700 hover:bg-neutral-50 transition-colors text-sm font-medium">
+                        <Edit className="w-3.5 h-3.5" />
+                        Редактировать
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-56">
+                      <DropdownMenuItem asChild>
+                        <Link href={`/routes/${route.slug}/edit?step=1`} className="cursor-pointer">Основная информация</Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem asChild>
+                        <Link href={`/routes/${route.slug}/edit?step=2`} className="cursor-pointer">Точки маршрута</Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem asChild>
+                        <Link href={`/routes/${route.slug}/edit?step=3`} className="cursor-pointer">Просмотр и публикация</Link>
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
+              </div>
             </div>
           </Container>
         </div>
@@ -375,7 +478,7 @@ export function RouteDetailClient({ route }: Props) {
               "relative overflow-hidden bg-neutral-100 shadow-sm",
               mapFullscreen
                 ? "fixed inset-0 z-50 rounded-none"
-                : "rounded-2xl aspect-video",
+                : "rounded-2xl aspect-[16/13.5] md:aspect-video",
             )}
           >
             <RouteMapHero
@@ -389,10 +492,7 @@ export function RouteDetailClient({ route }: Props) {
             <div className="absolute top-3 left-3 flex items-center gap-1 bg-white/90 backdrop-blur-sm rounded-xl p-1 shadow-md border border-white/60">
               <button
                 type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setTravelMode("walk");
-                }}
+                onClick={(e) => { e.stopPropagation(); setTravelMode("walk"); }}
                 className={cn(
                   "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all",
                   travelMode === "walk"
@@ -405,10 +505,7 @@ export function RouteDetailClient({ route }: Props) {
               </button>
               <button
                 type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setTravelMode("car");
-                }}
+                onClick={(e) => { e.stopPropagation(); setTravelMode("car"); }}
                 className={cn(
                   "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all",
                   travelMode === "car"
@@ -424,23 +521,16 @@ export function RouteDetailClient({ route }: Props) {
             {/* Fullscreen toggle — top right */}
             <button
               type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                setMapFullscreen((v) => !v);
-              }}
+              onClick={(e) => { e.stopPropagation(); setMapFullscreen((v) => !v); }}
               className="absolute top-3 right-3 flex items-center justify-center w-8 h-8 rounded-xl bg-white/90 backdrop-blur-sm shadow-md border border-white/60 text-neutral-600 hover:text-neutral-900 transition-colors"
               aria-label={mapFullscreen ? "Свернуть карту" : "Развернуть карту"}
             >
-              {mapFullscreen ? (
-                <X className="w-4 h-4" />
-              ) : (
-                <Maximize2 className="w-4 h-4" />
-              )}
+              {mapFullscreen ? <X className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
             </button>
 
             {/* Overlay title card */}
             <div className="absolute bottom-0 left-0 right-0 p-3">
-              <div className="bg-white/95 backdrop-blur-md rounded-2xl px-4 py-3 shadow-lg border border-white/60 flex items-center justify-between gap-3">
+              <div className="bg-white/95 backdrop-blur-md rounded-2xl px-4 py-3 shadow-lg border border-white/60 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div className="min-w-0 flex-1">
                   <h1 className="text-base font-bold text-neutral-900 leading-snug">
                     Маршрут «{route.title}»
@@ -449,18 +539,12 @@ export function RouteDetailClient({ route }: Props) {
                     <div className="flex items-center gap-3 mt-1.5">
                       {travelMode === "walk" ? (
                         <>
-                          <span className="text-xs text-neutral-600 font-medium">
-                            🔥 {routeStats.calories} ккал
-                          </span>
+                          <span className="text-xs text-neutral-600 font-medium">🔥 {routeStats.calories} ккал</span>
                           <span className="text-xs text-neutral-400">·</span>
-                          <span className="text-xs text-neutral-600 font-medium">
-                            👣 {routeStats.steps.toLocaleString("ru-RU")} шагов
-                          </span>
+                          <span className="text-xs text-neutral-600 font-medium">👣 {routeStats.steps.toLocaleString("ru-RU")} шагов</span>
                         </>
                       ) : (
-                        <span className="text-xs text-neutral-600 font-medium">
-                          🚗 {routeStats.distance.toFixed(1)} км
-                        </span>
+                        <span className="text-xs text-neutral-600 font-medium">🚗 {routeStats.distance.toFixed(1)} км</span>
                       )}
                     </div>
                   )}
@@ -470,7 +554,7 @@ export function RouteDetailClient({ route }: Props) {
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={(e) => e.stopPropagation()}
-                  className="shrink-0 h-10 px-3 rounded-xl border border-neutral-200 bg-white text-neutral-700 hover:border-neutral-300 transition-colors flex items-center gap-1.5 text-sm font-medium"
+                  className="w-full sm:w-auto h-10 px-3 rounded-xl border border-neutral-200 bg-white text-neutral-700 hover:border-neutral-300 transition-colors flex items-center justify-center gap-1.5 text-sm font-medium"
                 >
                   <Navigation className="w-4 h-4" />
                   Google Maps
@@ -480,49 +564,65 @@ export function RouteDetailClient({ route }: Props) {
           </div>
 
           {/* Summary stats */}
-          <div className="flex items-center bg-white border border-neutral-100 rounded-2xl shadow-sm px-4 py-3">
-            {ageLabel && (
-              <>
-                <div className="flex items-center gap-2 flex-1 justify-center">
-                  <Users className="w-4 h-4 text-violet-500 shrink-0" />
-                  <span className="text-sm font-medium text-neutral-700">
-                    {ageLabel}
-                  </span>
-                </div>
-                <div className="w-px h-5 bg-neutral-200 shrink-0" />
-              </>
-            )}
-            <div className="flex items-center gap-2 flex-1 justify-center">
-              <MapPin className="w-4 h-4 text-[#EF8759] shrink-0" />
-              <span className="text-sm font-medium text-neutral-700">
-                {route.stopsCount} точки
-              </span>
+          <div className="px-4 py-3">
+            <div className="flex items-center gap-2 flex-wrap">
+              {ageLabel && (
+                <>
+                  <div className="flex items-center gap-1">
+                    <Users className="w-3.5 h-3.5 text-violet-500 shrink-0" />
+                    <span className="text-xs font-medium text-neutral-700">{ageLabel}</span>
+                  </div>
+                  <span className="text-neutral-300">|</span>
+                </>
+              )}
+              <div className="flex items-center gap-1">
+                <MapPin className="w-3.5 h-3.5 text-[#EF8759] shrink-0" />
+                <span className="text-xs font-medium text-neutral-700">{route.stopsCount} точки</span>
+              </div>
+              <span className="text-neutral-300">|</span>
+              <div className="flex items-center gap-1">
+                <Clock className="w-3.5 h-3.5 text-sky-500 shrink-0" />
+                <span className="text-xs font-medium text-neutral-700">{duration}</span>
+              </div>
+              <span className="text-neutral-300">|</span>
+              <div className="flex items-center gap-1">
+                <Wallet className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                <span className="text-xs font-medium text-neutral-700">{BUDGET_LABELS[route.budgetLevel]}</span>
+              </div>
             </div>
-            <div className="w-px h-5 bg-neutral-200 shrink-0" />
-            <div className="flex items-center gap-2 flex-1 justify-center">
-              <Clock className="w-4 h-4 text-sky-500 shrink-0" />
-              <span className="text-sm font-medium text-neutral-700">
-                {duration}
-              </span>
-            </div>
-            <div className="w-px h-5 bg-neutral-200 shrink-0" />
-            <div className="flex items-center gap-2 flex-1 justify-center">
-              <Wallet className="w-4 h-4 text-emerald-500 shrink-0" />
-              <span className="text-sm font-medium text-neutral-700">
-                {BUDGET_LABELS[route.budgetLevel]}
-              </span>
-            </div>
+          </div>
+
+          {/* ── Основной action block в контенте (наблюдаем через IntersectionObserver) ── */}
+          <div ref={actionBlockRef} className="flex gap-2">
+            <button
+              onClick={() => !inPlan && setPlanOpen(true)}
+              className={cn(
+                "flex-1 flex items-center justify-center gap-2 h-12 rounded-xl text-sm font-semibold transition-colors",
+                inPlan
+                  ? "bg-emerald-50 text-emerald-700 border border-emerald-200 cursor-default"
+                  : "bg-neutral-900 text-white hover:bg-neutral-700",
+              )}
+            >
+              {inPlan ? (
+                <><CheckCircle2 className="w-4 h-4" />В плане</>
+              ) : (
+                <><CalendarPlus className="w-4 h-4" />Добавить в план</>
+              )}
+            </button>
+            <button
+              onClick={() => setShareOpen(true)}
+              className="h-12 px-4 rounded-xl border border-neutral-200 bg-white text-neutral-700 hover:bg-neutral-50 transition-colors flex items-center gap-2 text-sm font-medium"
+            >
+              <Share2 className="w-4 h-4" />
+              Поделиться
+            </button>
           </div>
 
           {/* Author block */}
           <div className="flex items-center gap-3">
             <div className="shrink-0 h-10 w-10 rounded-full overflow-hidden bg-neutral-200 flex items-center justify-center">
               {route.authorAvatar ? (
-                <img
-                  src={route.authorAvatar}
-                  alt={route.authorName ?? "mamaGo"}
-                  className="h-full w-full object-cover"
-                />
+                <img src={route.authorAvatar} alt={route.authorName ?? "mamaGo"} className="h-full w-full object-cover" />
               ) : (
                 <span className="text-sm font-bold text-neutral-500">
                   {route.isEditorial ? "M" : (route.authorName?.[0] ?? "?")}
@@ -536,41 +636,10 @@ export function RouteDetailClient({ route }: Props) {
               {(route.updatedAt || route.createdAt) && (
                 <p className="text-xs text-neutral-400 mt-0.5">
                   {route.updatedAt ? "Обновлено" : "Создано"}{" "}
-                  {format(
-                    parseISO(route.updatedAt || route.createdAt!),
-                    "d MMMM yyyy",
-                    { locale: ru },
-                  )}
+                  {format(parseISO(route.updatedAt || route.createdAt!), "d MMMM yyyy", { locale: ru })}
                 </p>
               )}
             </div>
-            {canEdit && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-neutral-200 bg-white text-neutral-700 hover:bg-neutral-50 transition-colors text-sm font-medium">
-                    <Edit className="w-3.5 h-3.5" />
-                    Редактировать
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56">
-                  <DropdownMenuItem asChild>
-                    <Link href={`/routes/${route.slug}/edit?step=1`} className="cursor-pointer">
-                      Основная информация
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link href={`/routes/${route.slug}/edit?step=2`} className="cursor-pointer">
-                      Точки маршрута
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link href={`/routes/${route.slug}/edit?step=3`} className="cursor-pointer">
-                      Просмотр и публикация
-                    </Link>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
           </div>
 
           {/* Timeline stops */}
@@ -588,29 +657,20 @@ export function RouteDetailClient({ route }: Props) {
               />
             ))}
           </div>
-        </Container>
-      </div>
 
-      {/* Sticky mobile CTA */}
-      <div className="fixed bottom-0 left-0 right-0 z-30 flex justify-center pb-[10px]">
-        <div className="w-full max-w-2xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex gap-2 px-3 py-3 rounded-2xl bg-white/60 backdrop-blur-xl border border-white/50 shadow-lg shadow-black/10">
-            <button
-              onClick={() => setPlanOpen(true)}
-              className="flex-1 flex items-center justify-center gap-2 h-12 rounded-xl bg-neutral-900 text-white text-sm font-semibold hover:bg-neutral-700 transition-colors"
-            >
-              <CalendarPlus className="w-4 h-4" />
-              Добавить в план
-            </button>
-            <button
-              onClick={() => setShareOpen(true)}
-              className="h-12 px-4 rounded-xl border border-white/60 bg-white/50 text-neutral-700 hover:bg-white/80 transition-colors flex items-center gap-2 text-sm font-medium"
-            >
-              <Share2 className="w-4 h-4" />
-              Поделиться
-            </button>
+          {/* Rating block */}
+          <div className="mt-6">
+            <RouteRatingBlock
+              routeId={route.id}
+              likesCount={25}
+              neutralCount={15}
+              dislikesCount={4}
+              onRate={(type) => {
+                console.debug("Route rated:", type);
+              }}
+            />
           </div>
-        </div>
+        </Container>
       </div>
 
       <ShareSheet open={shareOpen} onOpenChange={setShareOpen} route={route} />

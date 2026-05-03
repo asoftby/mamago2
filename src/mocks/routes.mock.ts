@@ -259,4 +259,55 @@ export const MOCK_ROUTES: MockRoute[] = [
       },
     ],
   },
+  {
+    id: "route-5",
+    slug: "drozdy",
+    title: "Дрозды",
+    ageTags: ["5-7", "7-9", "9-12"],
+    budgetLevel: "LOW",
+    cityName: "Минск",
+    coverImageUrl:
+      "https://images.unsplash.com/photo-1469022563149-aa64dbd37dae?q=80&w=1200",
+    authorName: null,
+    authorAvatar: undefined,
+    isEditorial: true,
+    stopsCount: 3,
+    createdAt: "2026-04-20T10:00:00Z",
+    updatedAt: "2026-04-28T15:30:00Z",
+    stops: [
+      {
+        id: "d1",
+        order: 0,
+        title: "Музей Дрозды",
+        address: "Минск, ул. Дрозды, 1",
+        note: "Начните с музея — узнайте историю этого района. Входной билет 5 BYN.",
+        photoUrl:
+          "https://images.unsplash.com/photo-1564399579883-451a5d44ec6a?q=80&w=800",
+        lat: 53.92,
+        lng: 27.48,
+      },
+      {
+        id: "d2",
+        order: 1,
+        title: "Парк Дрозды",
+        address: "Минск, ул. Дрозды, 50",
+        note: "Красивый парк с озером. Идеально для пикника и прогулок. Есть детская площадка.",
+        photoUrl:
+          "https://images.unsplash.com/photo-1469022563149-aa64dbd37dae?q=80&w=800",
+        lat: 53.918,
+        lng: 27.485,
+      },
+      {
+        id: "d3",
+        order: 2,
+        title: "Кафе у озера",
+        address: "Минск, ул. Дрозды, 60",
+        note: "Завершите маршрут в уютном кафе с видом на озеро. Рекомендуем блины!",
+        photoUrl:
+          "https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?q=80&w=800",
+        lat: 53.917,
+        lng: 27.487,
+      },
+    ],
+  },
 ];

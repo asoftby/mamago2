@@ -2,13 +2,11 @@ import localFont from "next/font/local";
 
 /**
  * Единый источник правды для шрифта NTSomic.
- * next/font/local автоматически:
- * - генерирует @font-face
- * - preload-ит только нужные файлы (без лишних warning)
- * - задаёт CSS-переменную --font-sans
+ * Подключается только в root layout и используется как глобальный `--font-sans`
+ * для public, admin, business и остальных поверхностей.
  *
- * Подключается ТОЛЬКО в src/app/layout.tsx (root layout).
- * Все остальные layouts наследуют шрифт через body.
+ * preload выключен, чтобы Next.js не создавал лишние font preload hints
+ * для весов, которые могут не понадобиться на первом экране.
  */
 export const ntSomic = localFont({
   src: [
@@ -35,6 +33,6 @@ export const ntSomic = localFont({
   ],
   variable: "--font-sans",
   display: "swap",
-  preload: true,
+  preload: false,
   fallback: ["ui-sans-serif", "system-ui", "sans-serif"],
 });

@@ -85,10 +85,24 @@ export function useAuthCredentialsFlow({
       /** Post-auth pipeline (completion) должен отработать до notify — иначе UI переключится на «залогинен» раньше времени. */
       if (skipRedirectAfterAuth) {
         await Promise.resolve(onAuthSuccess?.());
+        if (process.env.NODE_ENV !== "production") {
+          console.debug("[auth] success refresh", {
+            authFlow: "credentials",
+            skipRedirectAfterAuth: true,
+            source: "useAuthCredentialsFlow.finishAuthSession",
+          });
+        }
         notifyAuthStateChanged();
         notifyNotificationsChanged();
         // Не вызываем router.refresh(): он обновляет текущий URL и гонится с router.push("/me") из runPostAuthPipeline.
         return;
+      }
+      if (process.env.NODE_ENV !== "production") {
+        console.debug("[auth] success refresh", {
+          authFlow: "credentials",
+          skipRedirectAfterAuth: false,
+          source: "useAuthCredentialsFlow.finishAuthSession",
+        });
       }
       notifyAuthStateChanged();
       await Promise.resolve(onAuthSuccess?.());

@@ -6,6 +6,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { randomId } from "@/lib/utils/randomId";
 
+const WIZARD_DEBUG = process.env.NEXT_PUBLIC_WIZARD_DEBUG === "true";
+
 interface WizardSessionOptions {
   userId?: string;
   wizardType: "place" | "activity" | "offer" | "event";
@@ -39,7 +41,9 @@ export function useWizardSession({ userId, wizardType, entityId }: WizardSession
             // Check if session is not too old (24 hours)
             const age = Date.now() - parsed.timestamp;
             if (age < 24 * 60 * 60 * 1000) {
-              console.log("[useWizardSession] Restored session:", parsed.sessionId);
+              if (WIZARD_DEBUG) {
+                console.log("[useWizardSession] Restored session:", parsed.sessionId);
+              }
               setWizardSessionId(parsed.sessionId);
               setIsLoaded(true);
               return;
@@ -58,7 +62,9 @@ export function useWizardSession({ userId, wizardType, entityId }: WizardSession
       };
       
       localStorage.setItem(sessionKey, JSON.stringify(sessionData));
-      console.log("[useWizardSession] Created new session:", newSessionId);
+      if (WIZARD_DEBUG) {
+        console.log("[useWizardSession] Created new session:", newSessionId);
+      }
       setWizardSessionId(newSessionId);
       setIsLoaded(true);
     });
@@ -71,7 +77,9 @@ export function useWizardSession({ userId, wizardType, entityId }: WizardSession
     const sessionKey = getSessionKey();
     localStorage.removeItem(sessionKey);
     
-    console.log("[useWizardSession] Cleared session:", wizardSessionId);
+    if (WIZARD_DEBUG) {
+      console.log("[useWizardSession] Cleared session:", wizardSessionId);
+    }
   }, [getSessionKey, wizardSessionId]);
 
   return {

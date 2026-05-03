@@ -832,6 +832,9 @@ export function MobileSearchSheet({
     );
   };
 
+  // Не рендерим в DOM когда закрыт — fullscreen fixed слой ловит все iOS тапы
+  if (!isOpen) return null;
+
   return (
     <div className="fixed inset-0 z-[9999] flex min-h-0 flex-col bg-white">
       <div className="sticky top-0 z-10 shrink-0 border-b border-gray-100 bg-white px-4 py-3">

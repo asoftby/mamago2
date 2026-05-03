@@ -10,7 +10,7 @@ import prisma from "@/lib/prisma";
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const user = await getCurrentUser();
@@ -19,9 +19,13 @@ export async function DELETE(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { id } = params;
+    // Next.js 15+: params is a Promise
+    const { id } = await params;
 
-    if (!id) {
+    // Fallback: extract from URL if params is empty
+    const resolvedId = id || new URL(request.url).pathname.split("/").at(-1);
+
+    if (!resolvedId) {
       return NextResponse.json(
         { error: "Route ID is required" },
         { status: 400 },
@@ -30,7 +34,7 @@ export async function DELETE(
 
     // Find the route
     const route = await prisma.route.findUnique({
-      where: { id },
+      where: { id: resolvedId },
       select: { id: true, authorId: true, title: true },
     });
 
@@ -48,7 +52,7 @@ export async function DELETE(
 
     // Delete the route (cascade will delete related stops, slug history, etc.)
     await prisma.route.delete({
-      where: { id },
+      where: { id: resolvedId },
     });
 
     return NextResponse.json(

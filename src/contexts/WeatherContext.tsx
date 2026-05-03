@@ -9,7 +9,7 @@ import {
   useMemo,
   type ReactNode,
 } from "react";
-import { useOptionalCity } from "./CityContext";
+import { useCity } from "./CityContext";
 import type { WeeklyWeatherData, DayWeather } from "@/lib/weather/types";
 
 interface WeatherContextValue {
@@ -28,9 +28,7 @@ interface WeatherContextValue {
 const WeatherContext = createContext<WeatherContextValue | null>(null);
 
 export function WeatherProvider({ children }: { children: ReactNode }) {
-  const cityCtx = useOptionalCity();
-  // No fallback — if city is unknown, don't fetch weather
-  const citySlug = cityCtx?.citySlug ?? null;
+  const { citySlug } = useCity();
 
   const [weatherData, setWeatherData] = useState<WeeklyWeatherData | null>(null);
   const [loading, setLoading] = useState(false);

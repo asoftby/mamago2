@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import { Prisma, type EventCategoryPublicationType } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth/server";
@@ -9,6 +10,7 @@ import {
   mapCategoryWithParent,
   parseEventCategoryPublicationType,
 } from "@/lib/taxonomy/eventCategoryPublicationType";
+import { EVENT_STEP1_CATEGORIES_TAG } from "@/server/admin/activities/get-activity-form-data";
 
 export const runtime = "nodejs";
 
@@ -127,6 +129,7 @@ export async function POST(req: Request) {
         _count: { select: { activities: true, children: true } },
       },
     });
+    revalidateTag(EVENT_STEP1_CATEGORIES_TAG, "max");
     return NextResponse.json(mapCategoryWithParent(created));
   } catch (e) {
     const schema = prismaToHttpResponse(e);

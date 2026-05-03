@@ -1,6 +1,11 @@
 /**
  * Тема mamaGo для vanilla-cookieconsent (#cc-main).
  * Базовые стили библиотеки импортируются в CookieConsentProvider.
+ *
+ * ВАЖНО (iOS tap fix):
+ * #cc-main по умолчанию pointer-events: none — он не должен ловить touch-события.
+ * pointer-events: auto включается ТОЛЬКО для видимых диалогов (.cm, .pm).
+ * Закрытые/невидимые слои остаются pointer-events: none.
  */
 
 #cc-main {
@@ -27,7 +32,35 @@
   --cc-font-family: var(--font-sans, ui-sans-serif, system-ui, sans-serif);
   --cc-animation-duration: 0.25s;
   --cc-overlay-bg: rgba(31, 31, 31, 0.35);
-  z-index: 10050;
+  --cc-z-index: 10050;
+  z-index: var(--cc-z-index);
+
+  /* iOS tap fix: весь #cc-main не ловит touch по умолчанию */
+  pointer-events: none !important;
+}
+
+/* Только видимые диалоги получают pointer-events.
+   vanilla-cookieconsent может ставить show-класс либо на #cc-main, либо выше. */
+#cc-main.show--consent .cm-wrapper,
+#cc-main.show--consent .cm,
+#cc-main.show--preferences .pm-wrapper,
+#cc-main.show--preferences .pm-overlay,
+#cc-main.show--preferences .pm,
+.show--consent #cc-main .cm-wrapper,
+.show--consent #cc-main .cm,
+.show--preferences #cc-main .pm-wrapper,
+.show--preferences #cc-main .pm-overlay,
+.show--preferences #cc-main .pm {
+  pointer-events: auto !important;
+}
+
+/* Явно отключаем pointer-events для закрытых/невидимых слоёв */
+#cc-main:not(.show--consent):not(.show--preferences) .cm-wrapper,
+#cc-main:not(.show--consent):not(.show--preferences) .cm,
+#cc-main:not(.show--consent):not(.show--preferences) .pm-wrapper,
+#cc-main:not(.show--consent):not(.show--preferences) .pm-overlay,
+#cc-main:not(.show--consent):not(.show--preferences) .pm {
+  pointer-events: none !important;
 }
 
 /* Компактная «карточка» на десктопе */

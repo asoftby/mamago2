@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Debug Clicks</title>
+  <style>
+    body { font-family: monospace; padding: 20px; }
+    .info { margin: 10px 0; padding: 10px; background: #f0f0f0; }
+    button { padding: 10px 20px; margin: 5px; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h1>Click Debug Tool</h1>
+  <button onclick="checkOverlays()">Check Overlays</button>
+  <button onclick="checkPointerEvents()">Check Pointer Events</button>
+  <button onclick="checkZIndex()">Check Z-Index</button>
+  <div id="output"></div>
+
+  <script>
+    function checkOverlays() {
+      const output = document.getElementById('output');
+      const overlays = [];
+      
+      // Check for fixed/absolute elements
+      const allElements = document.querySelectorAll('*');
+      allElements.forEach(el => {
+        const style = window.getComputedStyle(el);
+        if ((style.position === 'fixed' || style.position === 'absolute') && 
+            (style.width === '100vw' || style.width === '100%' || 
+             (style.left === '0px' && style.right === '0px'))) {
+          overlays.push({
+            tag: el.tagName,
+            id: el.id,
+            class: el.className,
+            position: style.position,
+            zIndex: style.zIndex,
+            pointerEvents: style.pointerEvents,
+            display: style.display,
+            visibility: style.visibility
+          });
+        }
+      });
+      
+      output.innerHTML = '<div class="info"><h2>Found Overlays:</h2><pre>' + 
+        JSON.stringify(overlays, null, 2) + '</pre></div>';
+    }
+    
+    function checkPointerEvents() {
+      const output = document.getElementById('output');
+      const x = window.innerWidth / 2;
+      const y = window.innerHeight / 2;
+      const element = document.elementFromPoint(x, y);
+      
+      output.innerHTML = '<div class="info"><h2>Element at center:</h2><pre>' + 
+        'Tag: ' + element.tagName + '\n' +
+        'ID: ' + element.id + '\n' +
+        'Class: ' + element.className + '\n' +
+        'Pointer Events: ' + window.getComputedStyle(element).pointerEvents + '\n' +
+        'Z-Index: ' + window.getComputedStyle(element).zIndex +
+        '</pre></div>';
+    }
+    
+    function checkZIndex() {
+      const output = document.getElementById('output');
+      const highZ = [];
+      
+      const allElements = document.querySelectorAll('*');
+      allElements.forEach(el => {
+        const zIndex = parseInt(window.getComputedStyle(el).zIndex);
+        if (zIndex > 1000) {
+          highZ.push({
+            tag: el.tagName,
+            id: el.id,
+            class: el.className,
+            zIndex: zIndex,
+            pointerEvents: window.getComputedStyle(el).pointerEvents
+          });
+        }
+      });
+      
+      highZ.sort((a, b) => b.zIndex - a.zIndex);
+      
+      output.innerHTML = '<div class="info"><h2>High Z-Index Elements:</h2><pre>' + 
+        JSON.stringify(highZ, null, 2) + '</pre></div>';
+    }
+  </script>
+</body>
+</html>

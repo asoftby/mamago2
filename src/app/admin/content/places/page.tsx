@@ -132,8 +132,8 @@ function PlacesTable({ places }: { places: Awaited<ReturnType<typeof getPlaces>>
                 </td>
                 <td className="px-4 py-3 text-gray-600">
                   {place.ownerBusiness?.name ||
-                    place.ownerBusiness?.owner.email ||
-                    place.createdBy.email}
+                    place.ownerBusiness?.owner?.email ||
+                    place.createdBy?.email || "—"}
                 </td>
                 <td className="px-4 py-3">
                   <Badge variant={statusConfig.variant} className={statusConfig.className}>

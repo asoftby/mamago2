@@ -13,6 +13,7 @@ import { editorEventEditHref } from "@/lib/content-editor/types";
 import { buildEventJsonLd } from "@/lib/seo/schema/buildEventJsonLd";
 import { AnalyticsDetailBeacon } from "@/components/analytics/AnalyticsDetailBeacon";
 import { resolveCanonicalEventPublicPathBySlugOrId } from "@/lib/business/resolveCanonicalEventPublicPath";
+import { buildOgMeta } from "@/lib/seo/buildOgMeta";
 
 interface EventPublicPageProps {
   params: Promise<{ city: string; slugOrId: string }>;
@@ -79,23 +80,13 @@ export async function generateMetadata({ params, searchParams }: EventPublicPage
   const description =
     fromDb.seoDescription?.trim() || fromDb.shortDesc || `Событие для детей и родителей в ${cityLabel(city)}.`;
 
-  const ogTitle = fromDb.seoOgTitle?.trim() || title;
-  const ogDescription = fromDb.seoOgDescription?.trim() || description;
-  const ogImage = fromDb.seoOgImage?.trim() || fromDb.coverImageUrl || undefined;
-
-  return {
+  return buildOgMeta({
     title,
     description,
-    alternates: canonical ? { canonical } : undefined,
+    image: fromDb.seoOgImage?.trim() || fromDb.coverImageUrl,
+    url: canonical ?? `${publicBase}/${city}/events/${fromDb.slug ?? fromDb.id}`,
     robots: parseRobots(fromDb.seoRobots) ?? { index: true, follow: true },
-    openGraph: {
-      title: ogTitle,
-      description: ogDescription,
-      url: canonical ?? undefined,
-      images: ogImage ? [{ url: ogImage }] : undefined,
-    },
-  };
-}
+  });}
 
 export default async function CityEventPublicPage({ params, searchParams }: EventPublicPageProps) {
   const { city, slugOrId } = await params;

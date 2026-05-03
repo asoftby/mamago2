@@ -15,7 +15,7 @@ type Business = {
   owner: {
     email: string;
     phoneE164: string | null;
-  };
+  } | null;
 };
 
 interface PartnersTableProps {
@@ -31,7 +31,7 @@ export function PartnersTable({ businesses }: PartnersTableProps) {
     return (
       business.name.toLowerCase().includes(query) ||
       (business.unp && business.unp.includes(query)) ||
-      business.owner.email.toLowerCase().includes(query)
+      (business.owner?.email.toLowerCase().includes(query) ?? false)
     );
   });
 
@@ -98,10 +98,10 @@ export function PartnersTable({ businesses }: PartnersTableProps) {
                     {business.unp || "—"}
                   </td>
                   <td className="px-4 py-3 text-gray-600">
-                    {business.owner.email}
+                    {business.owner?.email || "—"}
                   </td>
                   <td className="px-4 py-3 text-gray-600">
-                    {business.owner.phoneE164 || "—"}
+                    {business.owner?.phoneE164 || "—"}
                   </td>
                   <td className="px-4 py-3 text-gray-600">
                     {new Date(business.updatedAt).toLocaleDateString("ru-RU")}

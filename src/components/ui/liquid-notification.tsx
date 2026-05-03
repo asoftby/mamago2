@@ -151,16 +151,19 @@ export function LiquidNotification({
       {onClose ? (
         <button
           type="button"
-          onClick={onClose}
+          onClick={(e) => {
+            e.stopPropagation();
+            onClose();
+          }}
           aria-label="Закрыть"
           className={cn(
-            "relative flex size-9 shrink-0 items-center justify-center rounded-full",
+            "relative flex size-[27px] shrink-0 items-center justify-center rounded-full",
             "border border-white/60 bg-white/45 text-neutral-700 backdrop-blur-md",
             "shadow-sm transition-colors hover:bg-white/75 hover:text-neutral-900",
             "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#EF8759]/40 focus-visible:ring-offset-1",
           )}
         >
-          <X className="size-4 shrink-0" strokeWidth={2} aria-hidden />
+          <X className="size-3 shrink-0" strokeWidth={2} aria-hidden />
         </button>
       ) : null}
     </div>

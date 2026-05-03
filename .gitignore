@@ -48,6 +48,8 @@ scripts/tmp/
 scripts/temp/
 
 public/uploads/
+storage/uploads/*
+!storage/uploads/.gitkeep
 *.tsbuildinfo
 .ai/
 .kiro/

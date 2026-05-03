@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { SaveActivityFlowAdaptive } from "@/components/activity/SaveActivityFlowAdaptive";
 import type { SaveToPlanResult } from "@/components/activity/SaveToPlanModal";
 import { toast } from "@/lib/toast";
+import { apiFetch } from "@/lib/api/fetch";
 
 export interface SaveRouteOnboardingProps {
   /** Is modal open */
@@ -46,11 +47,11 @@ export function SaveRouteOnboarding({
 
       try {
         if (result.action === "plan") {
-          const res = await fetch("/api/save/plan", {
+          const res = await apiFetch("/api/save/plan", {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              activityId: routeId,
+              routeId: routeId,
+              planRouteSlug: routeSlug,
               date: result.dateISO,
               title: routeTitle,
             }),
@@ -71,9 +72,8 @@ export function SaveRouteOnboarding({
             date: result.dateISO,
           });
         } else if (result.action === "ideas") {
-          const res = await fetch("/api/save/idea", {
+          const res = await apiFetch("/api/save/idea", {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ activityId: routeId }),
           });
           if (!res.ok) throw new Error("idea_save_failed");
@@ -99,7 +99,7 @@ export function SaveRouteOnboarding({
         throw error;
       }
     },
-    [routeId, routeTitle, onSaveComplete, router],
+    [routeId, routeSlug, routeTitle, onSaveComplete, router],
   );
 
   const nextHref =

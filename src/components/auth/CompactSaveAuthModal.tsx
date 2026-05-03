@@ -1,6 +1,6 @@
 "use client";
 
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ModalCloseButton } from "@/components/ui/modal-close-button";
 import { cn } from "@/lib/utils";
 import { CompactSaveAuthPanel } from "@/components/auth/CompactSaveAuthPanel";
@@ -38,6 +38,9 @@ export function CompactSaveAuthModal({
       >
         <DialogHeader className="sr-only">
           <DialogTitle>{dialogTitle}</DialogTitle>
+          <DialogDescription>
+            Модальное окно для входа перед сохранением в личный список.
+          </DialogDescription>
         </DialogHeader>
 
         <div className="relative mx-auto w-full max-w-[380px]">

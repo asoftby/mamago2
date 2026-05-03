@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -74,6 +75,9 @@ export function RefinementFiltersButtonCompact({
       >
         <DialogHeader className="border-b border-border/60 px-6 py-4 text-left">
           <DialogTitle className="text-lg font-semibold">Фильтры</DialogTitle>
+          <DialogDescription className="sr-only">
+            Дополнительные фильтры для уточнения подборки событий.
+          </DialogDescription>
         </DialogHeader>
         <div className="max-h-[min(70vh,640px)] overflow-y-auto px-6 py-4">
           <SecondaryFiltersForm

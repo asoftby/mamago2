@@ -1,4 +1,4 @@
-import DOMPurify from "isomorphic-dompurify";
+import { sanitizeHtmlAllowlist } from "@/lib/article/articleBlockHtml";
 
 /** Результат разбора кода вставки для публичного рендера и предпросмотра. */
 export type ArticleEmbedResolveResult = {
@@ -127,9 +127,7 @@ function tryInstagramBlockquote(html: string): ArticleEmbedResolveResult | null 
   const permalink = getHtmlAttr(raw, "data-instgrm-permalink");
   if (!permalink || !validateInstagramPermalink(permalink)) return null;
 
-  const sanitized = DOMPurify.sanitize(raw, {
-    ALLOWED_TAGS: ["blockquote", "a", "div", "p", "span"],
-    ALLOWED_ATTR: [
+  const sanitized = sanitizeHtmlAllowlist(raw, ["blockquote", "a", "div", "p", "span"], [
       "class",
       "data-instgrm-permalink",
       "data-instgrm-version",
@@ -138,9 +136,7 @@ function tryInstagramBlockquote(html: string): ArticleEmbedResolveResult | null 
       "style",
       "target",
       "rel",
-    ],
-    ALLOW_DATA_ATTR: false,
-  });
+    ]);
   if (!/<blockquote/i.test(sanitized)) return null;
 
   return {

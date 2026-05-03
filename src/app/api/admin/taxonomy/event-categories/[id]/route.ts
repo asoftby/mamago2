@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import type { EventCategoryPublicationType } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth/server";
@@ -12,6 +13,7 @@ import {
   mapCategoryWithParent,
   parseEventCategoryPublicationType,
 } from "@/lib/taxonomy/eventCategoryPublicationType";
+import { EVENT_STEP1_CATEGORIES_TAG } from "@/server/admin/activities/get-activity-form-data";
 
 export const runtime = "nodejs";
 
@@ -235,6 +237,7 @@ export async function PATCH(req: Request, { params }: RouteParams) {
         _count: { select: { activities: true, children: true } },
       },
     });
+    revalidateTag(EVENT_STEP1_CATEGORIES_TAG, "max");
     return NextResponse.json(mapCategoryWithParent(updated));
   } catch {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -258,6 +261,7 @@ export async function DELETE(_req: Request, { params }: RouteParams) {
 
   try {
     await prisma.eventCategory.delete({ where: { id } });
+    revalidateTag(EVENT_STEP1_CATEGORIES_TAG, "max");
     return NextResponse.json({ ok: true });
   } catch {
     return NextResponse.json({ error: "Not found" }, { status: 404 });

@@ -5,6 +5,7 @@ import prisma from "@/lib/prisma";
 import { findOfferBySlug } from "@/lib/slug/offerSlugService";
 import { buildOfferJsonLd } from "@/lib/seo/schema/buildOfferJsonLd";
 import { AnalyticsDetailBeacon } from "@/components/analytics/AnalyticsDetailBeacon";
+import { buildOgMeta } from "@/lib/seo/buildOgMeta";
 
 interface OfferPageProps {
   params: Promise<{ slug: string }>;
@@ -67,25 +68,22 @@ export async function generateMetadata({ params }: OfferPageProps): Promise<Meta
 
   if (!offer) return { title: "Offer Not Found" };
 
+  const publicBase = process.env.NEXT_PUBLIC_APP_URL || "https://mamago.by";
   const title = offer.seoTitle?.trim() || offer.title;
   const description = offer.seoDescription?.trim() || offer.description || "";
-  const canonical = offer.seoCanonicalUrl?.trim() || (offer.slug ? `/offers/${offer.slug}` : null);
-
-  const ogTitle = offer.seoOgTitle?.trim() || title;
-  const ogDescription = offer.seoOgDescription?.trim() || description;
-  const ogImage = offer.seoOgImage?.trim() || offer.coverImage || undefined;
+  const canonical =
+    offer.seoCanonicalUrl?.trim() ||
+    (offer.slug ? `${publicBase}/offers/${offer.slug}` : `${publicBase}/offers/${offer.id}`);
 
   return {
-    title,
-    description,
-    alternates: canonical ? { canonical } : undefined,
-    robots: parseRobots(offer.seoRobots) ?? { index: true, follow: true },
-    openGraph: {
-      title: ogTitle,
-      description: ogDescription,
-      url: canonical ?? undefined,
-      images: ogImage ? [{ url: ogImage }] : undefined,
-    },
+    ...buildOgMeta({
+      title,
+      description,
+      image: offer.seoOgImage?.trim() || offer.coverImage,
+      url: canonical,
+      robots: parseRobots(offer.seoRobots) ?? { index: true, follow: true },
+    }),
+    alternates: offer.seoCanonicalUrl?.trim() ? { canonical: offer.seoCanonicalUrl.trim() } : undefined,
   };
 }
 

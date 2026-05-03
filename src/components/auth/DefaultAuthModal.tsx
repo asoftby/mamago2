@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "@/lib/toast";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { AuthForm } from "./AuthForm";
 import { ProfileCompletionFlow } from "@/components/post-auth/ProfileCompletionFlow";
@@ -120,6 +120,9 @@ export function DefaultAuthModal({
       >
         <DialogHeader className="sr-only">
           <DialogTitle>{dialogTitle}</DialogTitle>
+          <DialogDescription>
+            Модальное окно для входа или регистрации перед продолжением действия.
+          </DialogDescription>
         </DialogHeader>
 
         {phase === "auth" ? (

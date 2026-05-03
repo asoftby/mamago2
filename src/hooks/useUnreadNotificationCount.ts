@@ -3,9 +3,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import {
-  AUTH_STATE_CHANGED_EVENT,
   NOTIFICATIONS_CHANGED_EVENT,
 } from "@/lib/auth/client";
+import { useAuthMe } from "@/lib/auth/useAuthMe";
 
 const DEFAULT_POLL_MS = 60_000;
 
@@ -16,11 +16,18 @@ const DEFAULT_POLL_MS = 60_000;
 export function useUnreadNotificationCount(pollMs: number = DEFAULT_POLL_MS) {
   const pathname = usePathname();
   const [unreadCount, setUnreadCount] = useState(0);
+  const { status } = useAuthMe();
+  const isAuthenticated = status === "authenticated";
 
   const refresh = useCallback(async () => {
+    if (!isAuthenticated) {
+      setUnreadCount(0);
+      return;
+    }
     try {
       const res = await fetch("/api/notifications?limit=1", {
         credentials: "include",
+        cache: "no-store",
       });
       if (!res.ok) {
         setUnreadCount(0);
@@ -33,16 +40,23 @@ export function useUnreadNotificationCount(pollMs: number = DEFAULT_POLL_MS) {
     } catch {
       setUnreadCount(0);
     }
-  }, []);
+  }, [isAuthenticated]);
 
   useEffect(() => {
+    if (!isAuthenticated) {
+      setUnreadCount(0);
+      return;
+    }
     const id = window.setTimeout(() => {
       void refresh();
     }, 0);
     return () => window.clearTimeout(id);
-  }, [pathname, refresh]);
+  }, [isAuthenticated, pathname, refresh]);
 
   useEffect(() => {
+    if (!isAuthenticated) {
+      return;
+    }
     const id = window.setInterval(() => void refresh(), pollMs);
     const onVisibility = () => {
       if (document.visibilityState === "visible") void refresh();
@@ -52,17 +66,18 @@ export function useUnreadNotificationCount(pollMs: number = DEFAULT_POLL_MS) {
       window.clearInterval(id);
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [refresh, pollMs]);
+  }, [isAuthenticated, refresh, pollMs]);
 
   useEffect(() => {
+    if (!isAuthenticated) {
+      return;
+    }
     const sync = () => void refresh();
-    window.addEventListener(AUTH_STATE_CHANGED_EVENT, sync);
     window.addEventListener(NOTIFICATIONS_CHANGED_EVENT, sync);
     return () => {
-      window.removeEventListener(AUTH_STATE_CHANGED_EVENT, sync);
       window.removeEventListener(NOTIFICATIONS_CHANGED_EVENT, sync);
     };
-  }, [refresh]);
+  }, [isAuthenticated, refresh]);
 
   return { unreadCount, refresh };
 }

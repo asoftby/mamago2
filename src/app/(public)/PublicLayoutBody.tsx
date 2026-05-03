@@ -4,6 +4,7 @@ import { Suspense, useEffect } from "react";
 import { usePathname } from "next/navigation";
 import { PublicFooter } from "@/components/shell/PublicFooter";
 import { MobileBottomNav } from "@/components/mobile/MobileBottomNav";
+import { MobileBottomBarShell } from "@/components/layout/MobileBottomBarShell";
 import { shouldHideMobileBottomNav } from "@/lib/intent";
 import { cn } from "@/lib/utils";
 import { useNavigationReloadDebug } from "@/hooks/useNavigationReloadDebug";
@@ -21,11 +22,11 @@ export function PublicLayoutBody({ children }: { children: React.ReactNode }) {
   useNavigationReloadDebug(process.env.NODE_ENV !== "production");
 
   useEffect(() => {
-    if (process.env.NODE_ENV !== "production") {
+    if (process.env.NEXT_PUBLIC_PUBLIC_LAYOUT_DEBUG === "true") {
       console.debug("[Home/PublicLayoutBody] mounted", { pathname });
     }
     return () => {
-      if (process.env.NODE_ENV !== "production") {
+      if (process.env.NEXT_PUBLIC_PUBLIC_LAYOUT_DEBUG === "true") {
         console.debug("[Home/PublicLayoutBody] unmounted", { pathname });
       }
     };
@@ -48,13 +49,13 @@ export function PublicLayoutBody({ children }: { children: React.ReactNode }) {
       </div>
 
       {!hideBottomBar ? (
-        <div className="block lg:hidden">
+        <MobileBottomBarShell>
           <Suspense
             fallback={<div className="h-[5.75rem] shrink-0" aria-hidden />}
           >
             <MobileBottomNav />
           </Suspense>
-        </div>
+        </MobileBottomBarShell>
       ) : null}
     </>
   );

@@ -112,7 +112,7 @@ export default async function AdminBillingBusinessesPage() {
                     <td className="py-3 px-4">
                       <div>
                         <p className="font-medium text-gray-900">{account.business.name}</p>
-                        <p className="text-xs text-gray-500">{account.business.owner.email}</p>
+                        <p className="text-xs text-gray-500">{account.business.owner?.email || "—"}</p>
                       </div>
                     </td>
                     <td className="py-3 px-4 text-center">

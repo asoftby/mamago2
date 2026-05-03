@@ -71,6 +71,9 @@ export function startUndoableHardDelete(args: {
         }}
       />
     ),
-    { duration: durationMs },
+    {
+      duration: durationMs,
+      className: "!w-auto !max-w-none !border-0 !bg-transparent !p-0 !shadow-none",
+    },
   );
 }

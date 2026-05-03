@@ -27,7 +27,11 @@ export default async function EditorEditEventPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ returnTo?: string; step?: string | string[] }>;
+  searchParams: Promise<{
+    returnTo?: string;
+    step?: string | string[];
+    importedRecordId?: string | string[];
+  }>;
 }) {
   const routing = await getCurrentRequestRoutingContext();
   const user = await getCurrentUser();
@@ -46,6 +50,13 @@ export default async function EditorEditEventPage({
   const sp = await searchParams;
   const { returnTo } = sp;
   const stepRaw = Array.isArray(sp.step) ? sp.step[0] : sp.step;
+  const importedRecordIdRaw = Array.isArray(sp.importedRecordId)
+    ? sp.importedRecordId[0]
+    : sp.importedRecordId;
+  const explicitImportedRecordId =
+    typeof importedRecordIdRaw === "string" && importedRecordIdRaw.trim().length > 0
+      ? importedRecordIdRaw.trim()
+      : null;
   const parsedStep = parseEventEditorStepQuery(
     typeof stepRaw === "string" ? stepRaw : null,
   );
@@ -95,21 +106,42 @@ export default async function EditorEditEventPage({
     },
   });
 
-  const importContext = await prisma.importedRecord.findFirst({
-    where: { publishedActivityId: event.id },
-    orderBy: { updatedAt: "desc" },
-    select: {
-      sourceUrl: true,
-      canonicalSourceUrl: true,
-      source: {
+  const importContext = explicitImportedRecordId
+    ? await prisma.importedRecord.findUnique({
+        where: { id: explicitImportedRecordId },
         select: {
-          name: true,
-          slug: true,
-          baseUrl: true,
+          id: true,
+          publishedActivityId: true,
+          sourceUrl: true,
+          canonicalSourceUrl: true,
+          source: {
+            select: {
+              name: true,
+              slug: true,
+              baseUrl: true,
+            },
+          },
         },
-      },
-    },
-  });
+      })
+    : await prisma.importedRecord.findFirst({
+        where: { publishedActivityId: event.id },
+        orderBy: { updatedAt: "desc" },
+        select: {
+          id: true,
+          publishedActivityId: true,
+          sourceUrl: true,
+          canonicalSourceUrl: true,
+          source: {
+            select: {
+              name: true,
+              slug: true,
+              baseUrl: true,
+            },
+          },
+        },
+      });
+  const resolvedImportedRecordId =
+    importContext?.publishedActivityId === event.id ? importContext.id : null;
 
   const originalUrl =
     importContext?.canonicalSourceUrl ??
@@ -169,6 +201,7 @@ export default async function EditorEditEventPage({
         returnTo={returnTo}
         initialEditStep={initialEditStep}
         initialStep1Taxonomies={initialStep1Taxonomies}
+        importedRecordId={resolvedImportedRecordId}
       />
     </ContentEditorChrome>
   );

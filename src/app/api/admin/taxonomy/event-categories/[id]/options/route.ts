@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import { Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth/server";
 import { canManageEventCategories } from "@/lib/auth/eventCategoriesAdmin";
 import { isPrismaValidationError } from "@/lib/prisma/prismaErrorKind";
+import { EVENT_STEP1_CATEGORIES_TAG } from "@/server/admin/activities/get-activity-form-data";
 
 export const runtime = "nodejs";
 
@@ -34,6 +36,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const created = await prisma.eventCategoryOption.create({
       data: { categoryId: id, label, value, order, isActive },
     });
+    revalidateTag(EVENT_STEP1_CATEGORIES_TAG, "max");
     return NextResponse.json(created);
   } catch (e) {
     if (isPrismaValidationError(e)) {

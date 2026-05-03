@@ -107,7 +107,7 @@ function ActivitiesTable({
                 <td className="px-4 py-3 font-medium text-gray-900">{activity.title}</td>
                 <td className="px-4 py-3 text-gray-600">{cityLabel}</td>
                 <td className="px-4 py-3 text-gray-600">
-                  {activity.owner.business?.name || activity.owner.email}
+                  {activity.owner?.business?.name || activity.owner?.email || "—"}
                 </td>
                 <td className="px-4 py-3">
                   <Badge variant={statusConfig.variant} className={statusConfig.className}>

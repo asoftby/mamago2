@@ -53,6 +53,25 @@ export function isPublicationDetailPath(pathname: string | null): boolean {
 }
 
 /**
+ * Страница детали маршрута: `/routes/[slug]`.
+ * Header не должен быть sticky — уходит вверх при скролле,
+ * sticky top action bar управляется самой страницей.
+ */
+export function isRouteDetailPath(pathname: string | null): boolean {
+  if (!pathname) return false;
+  const segments = pathname.split("/").filter(Boolean);
+  return segments.length === 2 && segments[0] === "routes" && segments[1] !== "new";
+}
+
+/**
+ * Страницы где header не должен быть sticky.
+ * Используется в MobileHeader и Header (desktop).
+ */
+export function isNonStickyHeaderPath(pathname: string | null): boolean {
+  return isPublicationDetailPath(pathname) || isRouteDetailPath(pathname);
+}
+
+/**
  * Страницы контента публикаций — без фиксированного mobile bottom bar
  * (статья, место, маршрут, короткая ссылка). Страницы событий — исключение: там bottom bar показываем.
  */
@@ -66,7 +85,8 @@ export function shouldHideMobileBottomNav(pathname: string | null): boolean {
   if (segments[0] === "places") return true;
   if (segments[0] === "offers") return true;
   if (segments[0] === "p") return true;
-  if (segments[0] === "routes" && segments[1] !== "new") return true;
+  // маршруты — bottom nav показываем
+  // if (segments[0] === "routes" && segments[1] !== "new") return true;
 
   /** Превью события в кабинете — полноэкранная карточка, без нижней навигации и FAB «Мой план». */
   if (

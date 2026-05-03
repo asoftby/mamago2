@@ -30,6 +30,8 @@ import { revalidatePath } from "next/cache";
 import prisma from "@/lib/prisma";
 import { type ImportSource } from "@prisma/client";
 import { reconcileImportedRecordLinkById, reconcileImportedRecordLinks } from "@/server/modules/import/services/import-link-reconciliation.service";
+import { editorEventEditHref } from "@/lib/content-editor/types";
+import type { ImportApplyResultPayload } from "@/server/modules/import/types";
 
 function requireAdmin(role: string) {
   if (role !== "ADMIN" && role !== "MODERATOR") {
@@ -202,6 +204,146 @@ export async function applyImportEventRecord(importedRecordId: string): Promise<
       appliedFields: applyResult.appliedFields,
       skippedFields: applyResult.skippedFields,
       emptyFields: applyResult.emptyFields,
+    };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : "Unknown error" };
+  }
+}
+
+function buildImportEventEditorHref(
+  activityId: string,
+  importedRecordId?: string | null,
+): string {
+  const params = new URLSearchParams({
+    returnTo: "/admin/import/review",
+  });
+  if (importedRecordId) {
+    params.set("importedRecordId", importedRecordId);
+  }
+  return `${editorEventEditHref(activityId)}?${params.toString()}`;
+}
+
+export async function approveImportedEventRecordAndOpen(input: {
+  taskId: string;
+  importedRecordId: string;
+  decision: Extract<ReviewDecisionPayload["decision"], "APPROVED_CREATE" | "APPROVED_UPDATE" | "APPROVED_MERGE">;
+  targetEntityId?: string | null;
+  targetEntityType?: "ACTIVITY" | null;
+  selectedCandidateId?: string | null;
+  notes?: string | null;
+}): Promise<{
+  success: boolean;
+  activityId?: string;
+  activitySlug?: string;
+  editHref?: string;
+  reusedExisting?: boolean;
+  error?: string;
+}> {
+  try {
+    const user = await getCurrentUser();
+    if (!user) return { success: false, error: "Unauthorized" };
+    requireAdmin(user.role);
+
+    const importedRecord = await prisma.importedRecord.findUnique({
+      where: { id: input.importedRecordId },
+      select: {
+        id: true,
+        entityTypeHint: true,
+        publishedActivityId: true,
+        reviewDecision: true,
+        applyResult: true,
+      },
+    });
+
+    if (!importedRecord) {
+      return { success: false, error: "ImportedRecord not found" };
+    }
+
+    if (importedRecord.entityTypeHint !== "EVENT") {
+      return { success: false, error: "ImportedRecord is not an event" };
+    }
+
+    const existingApplyResult = importedRecord.applyResult as ImportApplyResultPayload | null;
+    const existingActivityId =
+      importedRecord.publishedActivityId ??
+      existingApplyResult?.activityId ??
+      null;
+
+    if (existingActivityId) {
+      const existingActivity = await prisma.activity.findUnique({
+        where: { id: existingActivityId },
+        select: { id: true, slug: true },
+      });
+      if (existingActivity) {
+        return {
+          success: true,
+          activityId: existingActivity.id,
+          activitySlug: existingActivity.slug ?? undefined,
+          editHref: buildImportEventEditorHref(existingActivity.id, importedRecord.id),
+          reusedExisting: true,
+        };
+      }
+    }
+
+    const persistedDecision = importedRecord.reviewDecision as ReviewDecisionPayload | null;
+    const sameDecisionAlreadySaved =
+      persistedDecision?.decision === input.decision &&
+      (persistedDecision?.targetEntityId ?? null) === (input.targetEntityId ?? null) &&
+      (persistedDecision?.targetEntityType ?? null) === (input.targetEntityType ?? null);
+
+    if (!sameDecisionAlreadySaved) {
+      await applyDecision(input.taskId, {
+        decision: input.decision,
+        targetEntityId: input.targetEntityId ?? null,
+        targetEntityType: input.targetEntityType ?? null,
+        selectedCandidateId: input.selectedCandidateId ?? null,
+        notes: input.notes?.trim() ? input.notes.trim() : null,
+        reviewerUserId: user.id,
+        reviewedAt: new Date().toISOString(),
+      });
+    }
+
+    const publishResult = await publishApprovedEventRecord(input.importedRecordId, user.id);
+
+    if (!publishResult.success) {
+      const reason = "reason" in publishResult ? publishResult.reason : "Не удалось применить импорт";
+      const alreadyPublishedMatch = /Already published as Activity\s+(.+)$/u.exec(reason);
+      if (alreadyPublishedMatch?.[1]) {
+        const activityId = alreadyPublishedMatch[1].trim();
+        const activity = await prisma.activity.findUnique({
+          where: { id: activityId },
+          select: { id: true, slug: true },
+        });
+        if (activity) {
+          return {
+            success: true,
+            activityId: activity.id,
+            activitySlug: activity.slug ?? undefined,
+            editHref: buildImportEventEditorHref(activity.id, importedRecord.id),
+            reusedExisting: true,
+          };
+        }
+      }
+      return { success: false, error: reason };
+    }
+
+    const activityId = publishResult.placeId;
+    const activitySlug = publishResult.activitySlug ?? (
+      await prisma.activity.findUnique({
+        where: { id: activityId },
+        select: { slug: true },
+      })
+    )?.slug ?? undefined;
+
+    revalidatePath("/admin/import/review");
+    revalidatePath(`/admin/import/review/${input.importedRecordId}`);
+
+    return {
+      success: true,
+      activityId,
+      activitySlug,
+      editHref: buildImportEventEditorHref(activityId, importedRecord.id),
+      reusedExisting: false,
     };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : "Unknown error" };

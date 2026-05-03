@@ -29,10 +29,7 @@ export async function GET(request: NextRequest) {
       });
       
       if (!city) {
-        return NextResponse.json(
-          { error: `City not found: ${citySlug}` },
-          { status: 404 }
-        );
+        return NextResponse.json({ metroStations: [] });
       }
       
       resolvedCityId = city.id;

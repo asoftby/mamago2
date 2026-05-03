@@ -3,6 +3,9 @@ import prisma from "@/lib/prisma";
 import type { EventStep1Taxonomies, PublicGenreOption } from "@/components/business/wizard/event/steps/step1Taxonomies";
 import { getGenresByCategory } from "@/lib/taxonomy/getGenresByCategory";
 
+export const EVENT_STEP1_CATEGORIES_TAG = "event-step1-categories";
+export const eventStep1GenresTag = (categoryId: string) => `event-step1-genres:${categoryId}`;
+
 const getCachedEventCategories = unstable_cache(
   async () => {
     const rows = await prisma.eventCategory.findMany({
@@ -17,6 +20,17 @@ const getCachedEventCategories = unstable_cache(
         sortOrder: true,
         supportsProgram: true,
         selectableInProgram: true,
+        options: {
+          where: { isActive: true },
+          orderBy: [{ order: "asc" }, { value: "asc" }],
+          select: {
+            id: true,
+            label: true,
+            value: true,
+            order: true,
+            isActive: true,
+          },
+        },
       },
     });
 
@@ -37,7 +51,7 @@ const getCachedEventCategories = unstable_cache(
     }));
   },
   ["admin-event-categories-v1"],
-  { revalidate: 3600 },
+  { revalidate: 3600, tags: [EVENT_STEP1_CATEGORIES_TAG] },
 );
 
 const getCachedAgeOptions = unstable_cache(
@@ -99,7 +113,7 @@ async function getCachedGenresForCategory(categoryId: string): Promise<PublicGen
       }));
     },
     [`admin-event-genres-${categoryId}`],
-    { revalidate: 3600 },
+    { revalidate: 3600, tags: [eventStep1GenresTag(categoryId)] },
   )();
 }
 

@@ -295,13 +295,13 @@ export function BusinessVerificationSidePanel({
                   <div>
                     <dt className="text-sm font-medium text-gray-500">Email</dt>
                     <dd className="mt-1 text-sm text-gray-900">
-                      {business.owner.email}
+                      {business.owner?.email || "—"}
                     </dd>
                   </div>
                   <div>
                     <dt className="text-sm font-medium text-gray-500">Телефон</dt>
                     <dd className="mt-1 text-sm text-gray-900">
-                      {business.owner.phoneE164 || "—"}
+                      {business.owner?.phoneE164 || "—"}
                     </dd>
                   </div>
                   <div>

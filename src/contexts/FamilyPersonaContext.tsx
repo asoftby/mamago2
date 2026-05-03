@@ -19,7 +19,7 @@ import {
   FAMILY_SELECTION_LIMIT_MESSAGE,
 } from "@/lib/family/wholeFamilyPreset";
 import { MY_PLAN_REG_FOCUS_CHILD_SESSION_KEY } from "@/lib/family/postMyPlanRegistrationFocus";
-import { AUTH_STATE_CHANGED_EVENT } from "@/lib/auth/client";
+import { useAuthMe } from "@/lib/auth/useAuthMe";
 import { toast } from "@/lib/toast";
 
 const STORAGE_SELECTED = "mamago:selectedPersonaIds";
@@ -100,13 +100,30 @@ type FamilyPersonaContextValue = {
 
 const FamilyPersonaContext = createContext<FamilyPersonaContextValue | null>(null);
 
+async function fetchChildrenRows() {
+  const chRes = await fetch("/api/children", {
+    credentials: "include",
+    cache: "no-store",
+  });
+  if (!chRes.ok) {
+    return [];
+  }
+
+  const data = (await chRes.json()) as {
+    children?: Array<{ id: string; name: string; birthDate?: string | null }>;
+  };
+  return Array.isArray(data.children) ? data.children : [];
+}
+
 export function FamilyPersonaProvider({ children }: { children: React.ReactNode }) {
-  const [loading, setLoading] = useState(true);
-  const [me, setMe] = useState<MeApiUser | null>(null);
+  const { user, status, isLoading: authLoading, refetch: refetchAuth } = useAuthMe();
   const [childRows, setChildRows] = useState<
     Array<{ id: string; name: string; birthDate?: string | null }>
   >([]);
+  const [childrenLoading, setChildrenLoading] = useState(false);
   const [selectedPersonaIds, setSelectedPersonaIdsState] = useState<string[]>([]);
+  const me = status === "authenticated" ? (user as MeApiUser) : null;
+  const loading = authLoading || (status === "authenticated" && childrenLoading);
 
   const personas = useMemo(
     () => (me ? buildPersonas(me, childRows) : []),
@@ -117,36 +134,32 @@ export function FamilyPersonaProvider({ children }: { children: React.ReactNode 
 
   const primaryAdultPersonaId = me?.id ?? null;
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const applyAuthenticatedState = useCallback(async (authUser: MeApiUser) => {
+    setChildrenLoading(true);
     try {
-      const [meRes, chRes] = await Promise.all([
-        fetch("/api/auth/me", { credentials: "include", cache: "no-store" }),
-        fetch("/api/children", { credentials: "include", cache: "no-store" }),
-      ]);
-      if (!meRes.ok) {
-        setMe(null);
-        setChildRows([]);
-        setSelectedPersonaIdsState([]);
-        return;
+      if (process.env.NODE_ENV !== "production") {
+        console.debug("[FamilyPersona] auth resolved", {
+          userId: authUser.id,
+          hasDisplayName: Boolean(authUser.displayName),
+          source: "AuthProvider",
+        });
       }
-      const meJson = (await meRes.json()) as MeApiUser;
-      setMe(meJson);
 
-      let children: Array<{ id: string; name: string; birthDate?: string | null }> = [];
-      if (chRes.ok) {
-        const data = (await chRes.json()) as {
-          children?: Array<{ id: string; name: string; birthDate?: string | null }>;
-        };
-        children = Array.isArray(data.children) ? data.children : [];
+      const children = await fetchChildrenRows();
+      if (process.env.NODE_ENV !== "production") {
+        console.debug("[FamilyPersona] personas refreshed", {
+          userId: authUser.id,
+          childCount: children.length,
+          source: "FamilyPersonaProvider",
+        });
       }
       setChildRows(children);
 
-      const built = buildPersonas(meJson, children);
+      const built = buildPersonas(authUser, children);
       const allIds = built.map((p) => p.id);
       const allowed = new Set(allIds);
       const stored = readStoredIds(allIds);
-      const next = normalizeStoredSelection(stored, allowed, built, meJson.id);
+      const next = normalizeStoredSelection(stored, allowed, built, authUser.id);
       setSelectedPersonaIdsState(next);
       try {
         localStorage.setItem(STORAGE_SELECTED, JSON.stringify(next));
@@ -154,17 +167,31 @@ export function FamilyPersonaProvider({ children }: { children: React.ReactNode 
         /* ignore */
       }
     } catch {
-      setMe(null);
       setChildRows([]);
       setSelectedPersonaIdsState([]);
     } finally {
-      setLoading(false);
+      setChildrenLoading(false);
     }
   }, []);
 
+  const loadChildren = useCallback(async () => {
+    if (status !== "authenticated" || !user) {
+      setChildRows([]);
+      setSelectedPersonaIdsState([]);
+      return;
+    }
+
+    await applyAuthenticatedState(user as MeApiUser);
+  }, [status, user, applyAuthenticatedState]);
+
   useEffect(() => {
-    void load();
-  }, [load]);
+    if (status !== "authenticated") {
+      setChildRows([]);
+      setSelectedPersonaIdsState([]);
+      return;
+    }
+    void loadChildren();
+  }, [status, user?.id, loadChildren]);
 
   /** Новые персоны: добавляем только если есть место (до 3), иначе оставляем ручной выбор. */
   useEffect(() => {
@@ -195,15 +222,12 @@ export function FamilyPersonaProvider({ children }: { children: React.ReactNode 
   }, [loading, allowedIds]);
 
   useEffect(() => {
-    const onAuth = () => void load();
-    const onFamily = () => void load();
-    window.addEventListener(AUTH_STATE_CHANGED_EVENT, onAuth);
+    const onFamily = () => void loadChildren();
     window.addEventListener(FAMILY_PERSONAS_CHANGED_EVENT, onFamily);
     return () => {
-      window.removeEventListener(AUTH_STATE_CHANGED_EVENT, onAuth);
       window.removeEventListener(FAMILY_PERSONAS_CHANGED_EVENT, onFamily);
     };
-  }, [load]);
+  }, [loadChildren]);
 
   const setSelectedPersonaIds = useCallback(
     (next: string[]) => {
@@ -251,22 +275,26 @@ export function FamilyPersonaProvider({ children }: { children: React.ReactNode 
     setSelectedPersonaIds(next);
   }, [loading, me, childRows, setSelectedPersonaIds]);
 
-  const menuUser: AccountMenuUser | null = me
-    ? {
-        id: me.id,
-        email: me.email,
-        role: me.role,
-        displayName: me.displayName ?? null,
-        avatarUrl: me.avatarUrl ?? null,
-        familyRole: me.familyRole ?? null,
-        ageBandLabel: me.ageBandLabel ?? null,
-        preferenceSummary: me.preferenceSummary ?? null,
-        leisureFormatSummary: me.leisureFormatSummary ?? null,
-        preferenceSignalIds: Array.isArray(me.preferenceSignalIds) ? me.preferenceSignalIds : [],
-        leisureFormatSignalId:
-          typeof me.leisureFormatSignalId === "string" ? me.leisureFormatSignalId : null,
-      }
-    : null;
+  const menuUser = useMemo<AccountMenuUser | null>(
+    () =>
+      me
+        ? {
+            id: me.id,
+            email: me.email,
+            role: me.role,
+            displayName: me.displayName ?? null,
+            avatarUrl: me.avatarUrl ?? null,
+            familyRole: me.familyRole ?? null,
+            ageBandLabel: me.ageBandLabel ?? null,
+            preferenceSummary: me.preferenceSummary ?? null,
+            leisureFormatSummary: me.leisureFormatSummary ?? null,
+            preferenceSignalIds: Array.isArray(me.preferenceSignalIds) ? me.preferenceSignalIds : [],
+            leisureFormatSignalId:
+              typeof me.leisureFormatSignalId === "string" ? me.leisureFormatSignalId : null,
+          }
+        : null,
+    [me],
+  );
 
   const childPersonasForFilter = useMemo(
     () =>
@@ -287,7 +315,15 @@ export function FamilyPersonaProvider({ children }: { children: React.ReactNode 
       setSelectedPersonaIds,
       menuUser,
       childPersonasForFilter,
-      refresh: load,
+      refresh: async () => {
+        const nextUser = await refetchAuth();
+        if (!nextUser) {
+          setChildRows([]);
+          setSelectedPersonaIdsState([]);
+          return;
+        }
+        await applyAuthenticatedState(nextUser as MeApiUser);
+      },
     }),
     [
       loading,
@@ -297,7 +333,8 @@ export function FamilyPersonaProvider({ children }: { children: React.ReactNode 
       setSelectedPersonaIds,
       menuUser,
       childPersonasForFilter,
-      load,
+      refetchAuth,
+      applyAuthenticatedState,
     ],
   );
 

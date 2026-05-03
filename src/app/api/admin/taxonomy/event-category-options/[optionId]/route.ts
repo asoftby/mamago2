@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import { Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth/server";
 import { canManageEventCategories } from "@/lib/auth/eventCategoriesAdmin";
 import { isPrismaValidationError } from "@/lib/prisma/prismaErrorKind";
+import { EVENT_STEP1_CATEGORIES_TAG } from "@/server/admin/activities/get-activity-form-data";
 
 export const runtime = "nodejs";
 
@@ -47,6 +49,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ option
       where: { id: optionId },
       data,
     });
+    revalidateTag(EVENT_STEP1_CATEGORIES_TAG, "max");
     return NextResponse.json(updated);
   } catch (e) {
     if (isPrismaValidationError(e)) {
@@ -80,6 +83,7 @@ export async function DELETE(_: Request, { params }: { params: Promise<{ optionI
   const { optionId } = await params;
   try {
     await prisma.eventCategoryOption.delete({ where: { id: optionId } });
+    revalidateTag(EVENT_STEP1_CATEGORIES_TAG, "max");
     return NextResponse.json({ ok: true });
   } catch (e) {
     if (e instanceof Prisma.PrismaClientKnownRequestError) {

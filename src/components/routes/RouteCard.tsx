@@ -35,7 +35,14 @@ export function RouteCard({ route, className, analyticsCitySlug = "minsk" }: Pro
       const res = await fetch("/api/save/plan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ activityId: route.id, date: result.dateISO, title: route.title, coverImageUrl: route.coverImageUrl }),
+        credentials: "include",
+        body: JSON.stringify({
+          routeId: route.id,
+          planRouteSlug: isDemoRouteId ? route.slug : null,
+          date: result.dateISO,
+          title: route.title,
+          coverImageUrl: route.coverImageUrl,
+        }),
       });
       if (!res.ok) throw new Error("plan_save_failed");
       toast.success("Маршрут добавлен в план", {
@@ -46,6 +53,7 @@ export function RouteCard({ route, className, analyticsCitySlug = "minsk" }: Pro
       const res = await fetch("/api/save/idea", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ activityId: route.id }),
       });
       if (!res.ok) throw new Error("idea_save_failed");

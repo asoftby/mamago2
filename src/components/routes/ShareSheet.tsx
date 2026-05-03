@@ -95,7 +95,7 @@ function ShareContent({
         />
         <div className="flex-1 min-w-0 flex flex-col justify-center">
           <p className="text-sm font-semibold text-neutral-900 line-clamp-1">
-            {route.title}
+            Маршрут «{route.title}»
           </p>
           <p className="text-xs text-neutral-500 mt-0.5 line-clamp-1">
             {subtitle}

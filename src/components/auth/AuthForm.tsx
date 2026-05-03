@@ -110,7 +110,7 @@ export function AuthForm({
               type="button"
               onClick={() => switchMode("login")}
               className={cn(
-                "flex-1 py-2.5 text-sm font-medium rounded-full transition-all duration-200",
+                "flex-1 py-2.5 text-sm font-medium rounded-full transition-all duration-200 cursor-pointer touch-manipulation",
                 mode === "login"
                   ? "bg-neutral-900 text-white shadow-sm"
                   : "text-neutral-600 hover:text-neutral-900",
@@ -122,7 +122,7 @@ export function AuthForm({
               type="button"
               onClick={() => switchMode("register")}
               className={cn(
-                "flex-1 py-2.5 text-sm font-medium rounded-full transition-all duration-200",
+                "flex-1 py-2.5 text-sm font-medium rounded-full transition-all duration-200 cursor-pointer touch-manipulation",
                 mode === "register"
                   ? "bg-neutral-900 text-white shadow-sm"
                   : "text-neutral-600 hover:text-neutral-900",

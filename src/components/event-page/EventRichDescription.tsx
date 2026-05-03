@@ -50,7 +50,6 @@ export function EventRichDescription({
     return null;
   }
 
-  // Edge case: only plain text summary, no HTML
   const displayContent = htmlContent || `<p>${plainTextSummary || ""}</p>`;
 
   return (
@@ -69,25 +68,27 @@ export function EventRichDescription({
             // Headings
             "prose-headings:font-headline prose-headings:font-semibold prose-headings:text-foreground",
             "prose-h1:text-2xl prose-h2:text-xl prose-h3:text-lg",
-            "prose-h1:mb-4 prose-h2:mb-3 prose-h3:mb-2",
-            "prose-h1:mt-6 prose-h2:mt-5 prose-h3:mt-4",
+            "prose-h1:mb-5 prose-h2:mb-4 prose-h3:mb-3",
+            "prose-h1:mt-7 prose-h2:mt-6 prose-h3:mt-5",
             // Paragraphs
-            "prose-p:text-[15px] prose-p:leading-relaxed prose-p:text-foreground",
-            "prose-p:mb-4 last:prose-p:mb-0",
+            "prose-p:text-[15px] prose-p:leading-8 prose-p:text-foreground",
+            "prose-p:my-5 first:prose-p:mt-0 last:prose-p:mb-0",
+            "[&_p+_p]:mt-6",
             // Links
             "prose-a:text-primary prose-a:font-medium prose-a:no-underline hover:prose-a:underline",
             "prose-a:transition-colors",
             // Strong/Bold
             "prose-strong:font-semibold prose-strong:text-foreground",
             // Lists
-            "prose-ul:text-[15px] prose-ul:text-foreground prose-ul:my-4",
-            "prose-ol:text-[15px] prose-ol:text-foreground prose-ol:my-4",
-            "prose-li:leading-relaxed prose-li:mb-2",
+            "prose-ul:text-[15px] prose-ul:text-foreground prose-ul:my-5",
+            "prose-ol:text-[15px] prose-ol:text-foreground prose-ol:my-5",
+            "prose-li:mb-2.5 prose-li:leading-8",
             "prose-ul:list-disc prose-ul:pl-6",
             "prose-ol:list-decimal prose-ol:pl-6",
+            "prose-li:marker:text-muted-foreground",
             // Blockquotes
             "prose-blockquote:border-l-4 prose-blockquote:border-primary/30",
-            "prose-blockquote:pl-4 prose-blockquote:italic prose-blockquote:text-muted-foreground",
+            "prose-blockquote:my-6 prose-blockquote:pl-4 prose-blockquote:italic prose-blockquote:text-muted-foreground",
             // Code
             "prose-code:text-[14px] prose-code:bg-accent prose-code:px-1.5 prose-code:py-0.5",
             "prose-code:rounded prose-code:font-mono",

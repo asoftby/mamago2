@@ -108,29 +108,31 @@ export default async function PartnerDetailPage({
     business.operationalStatus,
   );
 
-  const events = await prisma.activity.findMany({
-    where: {
-      ownerUserId: business.ownerUserId,
-      type: "EVENT",
-    },
-    select: {
-      id: true,
-      title: true,
-      status: true,
-      scheduleMode: true,
-      nextOccurrenceAt: true,
-      priceFrom: true,
-      priceTo: true,
-      priceText: true,
-      createdAt: true,
-      place: {
-        select: { title: true },
-      },
-    },
-    orderBy: {
-      createdAt: "desc",
-    },
-  });
+  const events = business.ownerUserId
+    ? await prisma.activity.findMany({
+        where: {
+          ownerUserId: business.ownerUserId,
+          type: "EVENT",
+        },
+        select: {
+          id: true,
+          title: true,
+          status: true,
+          scheduleMode: true,
+          nextOccurrenceAt: true,
+          priceFrom: true,
+          priceTo: true,
+          priceText: true,
+          createdAt: true,
+          place: {
+            select: { title: true },
+          },
+        },
+        orderBy: {
+          createdAt: "desc",
+        },
+      })
+    : [];
 
   return (
     <div className="p-6 md:p-4 space-y-6">
@@ -198,7 +200,7 @@ export default async function PartnerDetailPage({
               <div className="text-sm font-medium text-gray-500 mb-1">
                 Email владельца
               </div>
-              <div className="text-base">{business.owner.email}</div>
+              <div className="text-base">{business.owner?.email || "—"}</div>
             </div>
 
             <div>
@@ -206,7 +208,7 @@ export default async function PartnerDetailPage({
                 Телефон владельца
               </div>
               <div className="text-base">
-                {business.owner.phoneE164 || "—"}
+                {business.owner?.phoneE164 || "—"}
               </div>
             </div>
 

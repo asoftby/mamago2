@@ -18,12 +18,14 @@ async function main() {
   }
 
   const result = await prisma.businessMember.createMany({
-    data: businesses.map((b) => ({
-      businessId: b.id,
-      userId: b.ownerUserId,
-      role: BusinessMemberRole.OWNER,
-      isActive: true,
-    })),
+    data: businesses
+      .filter((b) => b.ownerUserId !== null)
+      .map((b) => ({
+        businessId: b.id,
+        userId: b.ownerUserId!,
+        role: BusinessMemberRole.OWNER,
+        isActive: true,
+      })),
     skipDuplicates: true,
   });
 

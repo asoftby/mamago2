@@ -3,7 +3,7 @@ import { getCurrentUser } from "@/lib/auth/server";
 import { getActivityCityIdForAnalytics } from "@/lib/analytics/activityCity";
 import { getSessionRowIdFromCookies } from "@/lib/analytics/getSessionRowId";
 import { trackUserEvent } from "@/server/services/analytics/AnalyticsEventService";
-import { addPlanItem, removePlanItem } from "@/server/services/plan.service";
+import { addPlanItem, addRoutePlanItem, removePlanItem } from "@/server/services/plan.service";
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,9 +13,11 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { activityId, date, startsAt, title, coverImageUrl, selectedPersonaIds, planAddSource } =
+    const { activityId, routeId, planRouteSlug, date, startsAt, title, coverImageUrl, selectedPersonaIds, planAddSource } =
       body as {
         activityId?: string;
+        routeId?: string;
+        planRouteSlug?: string;
         date?: string;
         startsAt?: string;
         title?: string;
@@ -27,20 +29,38 @@ export async function POST(request: NextRequest) {
     if (!date) {
       return NextResponse.json({ error: "date is required" }, { status: 400 });
     }
-    if (!activityId && !title) {
-      return NextResponse.json({ error: "activityId or title is required" }, { status: 400 });
+
+    // Validate that at least one entity type is provided
+    if (!activityId && !routeId && !title) {
+      return NextResponse.json(
+        { error: "activityId, routeId, or title is required" },
+        { status: 400 }
+      );
     }
 
-    const planItem = await addPlanItem(
-      user.id,
-      activityId ?? null,
-      date,
-      startsAt ? new Date(startsAt) : undefined,
-      title ?? undefined,
-      coverImageUrl ?? undefined
-    );
+    let planItem;
 
-    if (activityId) {
+    // Handle route
+    if (routeId) {
+      planItem = await addRoutePlanItem(
+        user.id,
+        routeId,
+        date,
+        planRouteSlug ?? null,
+        { title: title ?? null, coverImageUrl: coverImageUrl ?? null }
+      );
+    }
+    // Handle activity
+    else if (activityId) {
+      planItem = await addPlanItem(
+        user.id,
+        activityId,
+        date,
+        startsAt ? new Date(startsAt) : undefined,
+        title ?? undefined,
+        coverImageUrl ?? undefined
+      );
+
       const cityId = await getActivityCityIdForAnalytics(activityId);
       const sessionRowId = await getSessionRowIdFromCookies();
       const personaIds =
@@ -66,6 +86,17 @@ export async function POST(request: NextRequest) {
           ...(personaIds.length > 0 ? { selectedPersonaIds: personaIds } : {}),
         },
       });
+    }
+    // Handle fallback with title only (for external/demo routes)
+    else {
+      planItem = await addPlanItem(
+        user.id,
+        null,
+        date,
+        startsAt ? new Date(startsAt) : undefined,
+        title ?? undefined,
+        coverImageUrl ?? undefined
+      );
     }
 
     return NextResponse.json({ success: true, planItem });

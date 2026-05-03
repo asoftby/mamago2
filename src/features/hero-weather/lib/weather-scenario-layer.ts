@@ -407,7 +407,7 @@ export function getWeatherIconName(input: {
 }): string {
   switch (input.scenario) {
     case "sunny_outdoor":
-      return input.timeOfDay === "night" ? "clear-night" : "clear-day";
+      return input.timeOfDay === "night" ? "overcast-night" : "clear-day";
     case "rain_indoor":
       return "overcast-rain";
     case "windy_caution":

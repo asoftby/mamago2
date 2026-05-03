@@ -29,6 +29,10 @@ type OccasionEntry = {
   type: OccasionType;
   sortOrder: number;
   isActive: boolean;
+  startsAt: string | null;
+  endsAt: string | null;
+  boostScore: number;
+  autoSuggest: boolean;
 };
 
 export function OccasionEditPage({
@@ -168,12 +172,21 @@ function OccasionEditor({
   const nameSlug = useAutoSlug(entry.name, entry.slug, { mode: "edit" });
   const [orderInput, setOrderInput] = useState(String(entry.sortOrder));
   const [isActive, setIsActive] = useState(entry.isActive);
+  const [startsAt, setStartsAt] = useState(entry.startsAt ?? "");
+  const [endsAt, setEndsAt] = useState(entry.endsAt ?? "");
+  const [boostScore, setBoostScore] = useState(String(entry.boostScore));
+  const [autoSuggest, setAutoSuggest] = useState(entry.autoSuggest);
   const [saving, setSaving] = useState(false);
 
   const parsedOrder =
     orderInput.trim() === "" || Number.isNaN(Number(orderInput))
       ? entry.sortOrder
       : Number(orderInput);
+
+  const parsedBoost =
+    boostScore.trim() === "" || Number.isNaN(Number(boostScore))
+      ? entry.boostScore
+      : Math.max(0, Math.floor(Number(boostScore)));
 
   const patch = async (body: Record<string, unknown>) => {
     if (saving) return;
@@ -202,6 +215,10 @@ function OccasionEditor({
       slug: nameSlug.slug,
       sortOrder: parsedOrder,
       isActive,
+      startsAt: startsAt.trim() || null,
+      endsAt: endsAt.trim() || null,
+      boostScore: parsedBoost,
+      autoSuggest,
     });
   };
 
@@ -209,7 +226,11 @@ function OccasionEditor({
     nameSlug.source !== entry.name ||
     nameSlug.slug !== entry.slug ||
     parsedOrder !== entry.sortOrder ||
-    isActive !== entry.isActive;
+    isActive !== entry.isActive ||
+    (startsAt.trim() || null) !== entry.startsAt ||
+    (endsAt.trim() || null) !== entry.endsAt ||
+    parsedBoost !== entry.boostScore ||
+    autoSuggest !== entry.autoSuggest;
 
   return (
     <Card>
@@ -259,11 +280,64 @@ function OccasionEditor({
             <Checkbox checked={isActive} onCheckedChange={(c) => setIsActive(!!c)} />
             <Label>Active</Label>
           </div>
+        </div>
+
+        {/* ── Период актуальности ─────────────────────────────────────── */}
+        <div className="rounded-lg border border-gray-200 bg-gray-50/60 p-4 space-y-4">
+          <div>
+            <p className="text-sm font-semibold text-gray-800">Период актуальности</p>
+            <p className="mt-1 text-xs text-gray-500 leading-relaxed">
+              В этот период повод будет предлагаться редактору при создании событий и предложений
+              и может усиливать ранжирование связанных публикаций.
+              Без дат — справочный повод, не участвует в auto-suggest.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid gap-2">
+              <Label>Начало показа</Label>
+              <Input
+                type="date"
+                value={startsAt}
+                onChange={(e) => setStartsAt(e.target.value)}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label>Конец показа</Label>
+              <Input
+                type="date"
+                value={endsAt}
+                onChange={(e) => setEndsAt(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-end">
+            <div className="grid gap-2 w-40">
+              <Label>Boost score</Label>
+              <Input
+                type="number"
+                min={0}
+                value={boostScore}
+                onChange={(e) => setBoostScore(e.target.value)}
+                placeholder="0"
+              />
+            </div>
+            <div className="flex items-center gap-2 pb-2">
+              <Checkbox
+                checked={autoSuggest}
+                onCheckedChange={(c) => setAutoSuggest(!!c)}
+              />
+              <Label>Показывать редактору в актуальный период</Label>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex justify-end">
           <Button
             size="sm"
             onClick={handleSave}
             disabled={!hasChanges || saving}
-            className="mb-0.5"
           >
             <Save className="w-4 h-4 mr-2" />
             {saving ? "Сохранение…" : "Save"}

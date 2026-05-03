@@ -19,7 +19,6 @@ import { PublicationStatsPanel } from "@/components/publication-stats";
 import { postAnalyticsEvent } from "@/lib/analytics/client";
 
 // Новые конверсионные блоки
-import { EventHero } from "./EventHero";
 import { EventHighlights } from "./EventHighlights";
 import { EventProgram } from "./EventProgram";
 import { EventAudience } from "./EventAudience";
@@ -387,21 +386,6 @@ export function ConversionEventPageView({ data }: { data: EventPageData }) {
                 {data.title}
               </h1>
 
-              {/* Подзаголовок (value statement) */}
-              {data.subtitle && (
-                <div className="space-y-2">
-                  {data.subtitle.split('\n').map((line, idx) => (
-                    <p
-                      key={idx}
-                      className="flex items-start gap-2 text-[15px] leading-relaxed text-muted-foreground"
-                    >
-                      <span className="mt-1 text-primary">•</span>
-                      <span>{line}</span>
-                    </p>
-                  ))}
-                </div>
-              )}
-
               {/* Quick Facts (чипы) */}
               {data.factChips.length > 0 && (
                 <div className="flex flex-wrap gap-2">
@@ -473,7 +457,6 @@ export function ConversionEventPageView({ data }: { data: EventPageData }) {
             {/* Полное описание */}
             <EventRichDescription
               htmlContent={data.about.descriptionHtml || ""}
-              plainTextSummary={data.about.summary}
             />
           </div>
         </div>

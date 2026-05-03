@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import { Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth/server";
@@ -9,6 +10,7 @@ import {
   assertGenreUniqueInCategory,
   MSG_GENRE_SLUG_IN_CATEGORY,
 } from "@/server/api/admin/genreUniqueness";
+import { eventStep1GenresTag } from "@/server/admin/activities/get-activity-form-data";
 
 export const runtime = "nodejs";
 
@@ -91,6 +93,7 @@ export async function POST(req: Request) {
         category: { select: { id: true, nameRu: true, slug: true } },
       },
     });
+    revalidateTag(eventStep1GenresTag(categoryId), "max");
     return NextResponse.json(created);
   } catch (e) {
     if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {

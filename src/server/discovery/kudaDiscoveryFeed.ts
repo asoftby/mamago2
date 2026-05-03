@@ -7,6 +7,7 @@ import { resolveKudaDiscoveryCityIds } from "@/server/discovery/discoveryHubExpa
 import { resolveActivityCoverUrl } from "@/lib/event/resolveActivityCoverUrl";
 import type { ActivityMock } from "@/mocks/activity.types";
 import { getEventEngagementScores } from "@/server/discovery/eventEngagementScores";
+import { getActivityOccasionBoosts } from "@/lib/discovery/occasions";
 import { normalizePricingMode } from "@/components/business/wizard/event/pricingMode";
 import {
   getWeatherRankingBoost,
@@ -257,12 +258,15 @@ export async function getKudaDiscoveryFeed(
   const scoreMap = await getEventEngagementScores(rows.map((r) => r.id));
   const ownerUserIdById = new Map(rows.map((row) => [row.id, row.ownerUserId]));
 
+  // Occasion boost is a soft contextual ranking signal, not a visibility rule.
+  const occasionBoostMap = await getActivityOccasionBoosts(rows.map((r) => r.id));
+
   const cards = rows.map((a) =>
     mapActivityRowToCard(
       a,
       Boolean(currentUserId && a.ownerUserId === currentUserId),
       primaryCityId,
-      scoreMap.get(a.id) ?? 0,
+      (scoreMap.get(a.id) ?? 0) + (occasionBoostMap.get(a.id) ?? 0),
       citySlugById,
     ),
   );

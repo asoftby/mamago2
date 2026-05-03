@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -243,9 +243,9 @@ export function AdultActivationOverlay({
             <DialogTitle className="text-lg font-semibold text-neutral-900">
               Расскажите о себе
             </DialogTitle>
-            <p className="text-sm text-neutral-500 pt-0.5">
+            <DialogDescription className="text-sm text-neutral-500 pt-0.5">
               Сделаем рекомендации точнее
-            </p>
+            </DialogDescription>
           </DialogHeader>
           {form}
         </DialogContent>

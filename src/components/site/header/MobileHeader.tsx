@@ -17,6 +17,7 @@ import {
   getDiscoveryIntentForPublicationPath,
   isCityHubPath,
   isPublicationDetailPath,
+  isNonStickyHeaderPath,
 } from "@/lib/intent";
 import { useCity } from "@/contexts/CityContext";
 import { usePublicationIntent } from "@/contexts/PublicationIntentContext";
@@ -64,8 +65,8 @@ export function MobileHeader() {
       <header
         data-header-shell
         className={cn(
-          // На страницах событий хедер не sticky на мобильном тоже
-          isPublicationPage ? "relative z-50 w-full" : "sticky top-0 z-50 w-full",
+          // На страницах событий и деталях маршрута хедер не sticky
+          isNonStickyHeaderPath(pathname) ? "relative z-50 w-full" : "sticky top-0 z-50 w-full",
           "border-b border-[#EBEBEB] bg-gradient-to-b from-white to-[#F7F7F7] text-foreground antialiased transition-shadow duration-200",
           isScrolled && "shadow-[0_4px_20px_rgba(0,0,0,0.08)]",
         )}

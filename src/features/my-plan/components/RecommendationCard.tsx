@@ -107,6 +107,7 @@ export function RecommendationCard({
   const showVariantControls = !isInPlan && totalVariants > 1;
 
   const title = item.title || item.activity?.title || "Активность";
+  const isRoute = item.routeId || item.planRouteSlug;
 
   const titleEl = activityDetailHref ? (
     <Link
@@ -177,7 +178,11 @@ export function RecommendationCard({
 
           <div className="min-w-0 flex-1">
             <div className="min-w-0 space-y-1">
-              {categoryLabel ? (
+              {isRoute ? (
+                <p className="text-xs font-medium uppercase tracking-wider text-neutral-400">
+                  Маршрут
+                </p>
+              ) : categoryLabel ? (
                 <p className="text-xs font-medium uppercase tracking-wider text-neutral-400">
                   {categoryLabel}
                 </p>

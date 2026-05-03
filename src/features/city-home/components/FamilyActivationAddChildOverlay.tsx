@@ -8,6 +8,7 @@ import { useChildInterests } from "@/hooks/useChildInterests";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -283,9 +284,9 @@ export function FamilyActivationAddChildOverlay({
             <DialogTitle className="text-lg font-semibold text-neutral-900">
               Добавить ребёнка
             </DialogTitle>
-            <p className="text-sm text-neutral-500 pt-0.5">
+            <DialogDescription className="text-sm text-neutral-500 pt-0.5">
               Будем подбирать события точнее
-            </p>
+            </DialogDescription>
           </DialogHeader>
           {form}
         </DialogContent>

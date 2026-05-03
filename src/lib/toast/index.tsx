@@ -99,9 +99,11 @@ function pushLiquid(
   const description = asStringDescription(data?.description);
   const primary = pickPrimaryAction(data);
   const duration = data?.duration ?? 2500;
+  // Generate a stable id upfront so the close handler can reference it reliably
+  const id: string | number = data?.id ?? `lq-${Math.random().toString(36).slice(2)}`;
 
   return sonnerToast.custom(
-    (id) => (
+    () => (
       <LiquidNotification
         variant={variant}
         title={title}
@@ -115,8 +117,9 @@ function pushLiquid(
       />
     ),
     {
-      id: data?.id,
+      id,
       duration,
+      className: "!w-auto !max-w-none !border-0 !bg-transparent !p-0 !shadow-none pointer-events-auto",
       onAutoClose: data?.onAutoClose,
     },
   );

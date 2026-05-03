@@ -203,9 +203,9 @@ export function BusinessVerificationRequestsPage({
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-gray-900">
-                        {business.owner.email}
+                        {business.owner?.email || "—"}
                       </div>
-                      {business.owner.phoneE164 && (
+                      {business.owner?.phoneE164 && (
                         <div className="text-gray-500">
                           {business.owner.phoneE164}
                         </div>

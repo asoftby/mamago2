@@ -14,6 +14,7 @@ import { isPlacePubliclyVisible } from "@/lib/plan/publicVisibility";
 import { placeOwnerBusinessActiveWhere } from "@/server/public/publicContentVisibility";
 import { buildPlaceJsonLd } from "@/lib/seo/schema/buildPlaceJsonLd";
 import { AnalyticsDetailBeacon } from "@/components/analytics/AnalyticsDetailBeacon";
+import { buildOgMeta } from "@/lib/seo/buildOgMeta";
 
 interface PlacePageProps {
   params: Promise<{ slug: string }>;
@@ -31,11 +32,14 @@ export async function generateMetadata({ params }: PlacePageProps): Promise<Meta
     shortDesc: string;
     seoTitle: string | null;
     seoDescription: string | null;
+    seoOgImage: string | null;
     formattedAddr: string | null;
     customAddress: string | null;
     cityId: string | null;
     status: string;
     archivedAt: Date | null;
+    slug: string | null;
+    images: { url: string; kind: string; sortOrder: number }[];
     ownerBusiness: { operationalStatus: string } | null;
   } | null;
   
@@ -49,11 +53,18 @@ export async function generateMetadata({ params }: PlacePageProps): Promise<Meta
         shortDesc: true,
         seoTitle: true,
         seoDescription: true,
+        seoOgImage: true,
         formattedAddr: true,
         customAddress: true,
         cityId: true,
         status: true,
         archivedAt: true,
+        slug: true,
+        images: {
+          select: { url: true, kind: true, sortOrder: true },
+          orderBy: { sortOrder: "asc" },
+          take: 3,
+        },
         ownerBusiness: {
           select: {
             operationalStatus: true,
@@ -83,11 +94,18 @@ export async function generateMetadata({ params }: PlacePageProps): Promise<Meta
         shortDesc: true,
         seoTitle: true,
         seoDescription: true,
+        seoOgImage: true,
         formattedAddr: true,
         customAddress: true,
         cityId: true,
         status: true,
         archivedAt: true,
+        slug: true,
+        images: {
+          select: { url: true, kind: true, sortOrder: true },
+          orderBy: { sortOrder: "asc" },
+          take: 3,
+        },
         ownerBusiness: {
           select: {
             operationalStatus: true,
@@ -121,10 +139,18 @@ export async function generateMetadata({ params }: PlacePageProps): Promise<Meta
     cityId: place.cityId,
   });
 
-  return {
+  const publicBase = process.env.NEXT_PUBLIC_APP_URL || "https://mamago.by";
+  const coverImage =
+    place.seoOgImage?.trim() ||
+    place.images.find((i) => i.kind === "GALLERY")?.url ||
+    place.images[0]?.url;
+
+  return buildOgMeta({
     title: place.seoTitle?.trim() || displayTitle,
     description: place.seoDescription?.trim() || place.shortDesc,
-  };
+    image: coverImage,
+    url: `${publicBase}/places/${place.slug ?? place.id}`,
+  });
 }
 
 export default async function PlacePage({ params }: PlacePageProps) {

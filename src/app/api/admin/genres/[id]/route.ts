@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import { Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth/server";
@@ -9,6 +10,7 @@ import {
   assertGenreUniqueInCategory,
   MSG_GENRE_SLUG_IN_CATEGORY,
 } from "@/server/api/admin/genreUniqueness";
+import { eventStep1GenresTag } from "@/server/admin/activities/get-activity-form-data";
 
 export const runtime = "nodejs";
 
@@ -121,6 +123,10 @@ export async function PATCH(req: Request, { params }: RouteParams) {
       data,
       include: { category: { select: { id: true, nameRu: true, slug: true } } },
     });
+    revalidateTag(eventStep1GenresTag(updated.categoryId), "max");
+    if (updated.categoryId !== current.categoryId) {
+      revalidateTag(eventStep1GenresTag(current.categoryId), "max");
+    }
     return NextResponse.json(updated);
   } catch (e) {
     if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
@@ -141,7 +147,11 @@ export async function DELETE(_req: Request, { params }: RouteParams) {
 
   const { id } = await params;
   try {
+    const current = await prisma.genre.findUnique({ where: { id }, select: { categoryId: true } });
     await prisma.genre.delete({ where: { id } });
+    if (current?.categoryId) {
+      revalidateTag(eventStep1GenresTag(current.categoryId), "max");
+    }
     return NextResponse.json({ ok: true });
   } catch (e) {
     const j = prismaToHttpResponse(e);

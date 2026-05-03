@@ -10,6 +10,7 @@ import {
   FormWizardHeader,
   FormPrimaryContentCard,
   FormStickyActionBar,
+  FormStepSegments,
 } from "@/components/form-shell";
 import type { FormWizardSegment } from "@/components/form-shell";
 import { WizardProgress } from "@/components/ui/wizard-progress";

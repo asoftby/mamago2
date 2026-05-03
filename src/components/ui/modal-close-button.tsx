@@ -16,6 +16,7 @@ export const ModalCloseButton = React.forwardRef<
         "inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full",
         "bg-white text-neutral-600 shadow-sm",
         "transition-colors hover:bg-neutral-50 hover:text-neutral-900",
+        "z-[80] cursor-pointer touch-manipulation",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900/20",
         className,
       )}

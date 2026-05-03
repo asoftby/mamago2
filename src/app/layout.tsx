@@ -1,5 +1,4 @@
 import type { Metadata, Viewport } from "next";
-import { Geist_Mono, Literata, Noto_Serif, PT_Serif } from "next/font/google";
 import { headers } from "next/headers";
 import "./globals.css";
 import { ntSomic } from "@/lib/fonts";
@@ -13,35 +12,8 @@ import { SaveIntentProvider } from "@/lib/save/SaveIntentContext";
 import { resolveSurfaceFromHostAndPathname } from "@/lib/routing/surface";
 import { CityProvider } from "@/contexts/CityContext";
 import { WeatherProvider } from "@/contexts/WeatherContext";
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
-
-const literata = Literata({
-  variable: "--font-literata",
-  subsets: ["latin", "cyrillic"],
-  display: "swap",
-  style: ["normal", "italic"],
-  weight: ["400", "500", "600", "700"],
-});
-
-const notoSerif = Noto_Serif({
-  variable: "--font-noto-serif",
-  subsets: ["latin", "cyrillic"],
-  display: "swap",
-  style: ["normal", "italic"],
-  weight: ["400", "500", "600", "700"],
-});
-
-const ptSerif = PT_Serif({
-  variable: "--font-pt-serif",
-  subsets: ["latin", "cyrillic"],
-  display: "swap",
-  style: ["normal", "italic"],
-  weight: ["400", "700"],
-});
+import { AuthProvider } from "@/lib/auth/AuthProvider";
+import { getCurrentAuthState } from "@/lib/auth/getCurrentAuthState";
 
 export const metadata: Metadata = {
   title: "mamaGo 2.0",
@@ -64,26 +36,29 @@ export default async function RootLayout({
   const host = headerStore.get("x-forwarded-host") ?? headerStore.get("host") ?? undefined;
   const currentSurface = resolveSurfaceFromHostAndPathname(host, "/");
   const shouldMountMyPlanProvider = currentSurface === "public";
+  const initialAuthUser = await getCurrentAuthState();
 
   return (
     <html lang="ru" className={ntSomic.variable}>
       <body
-        className={`${geistMono.variable} ${literata.variable} ${notoSerif.variable} ${ptSerif.variable} antialiased min-h-screen text-foreground`}
+        className="antialiased min-h-screen text-foreground"
       >
         <SaveIntentProvider>
-          <AccountModeProvider>
-            <CityProvider>
-              <WeatherProvider>
-                <FamilyPersonaProvider>
-                  <CookieConsentProvider>
-                    <FamilyDerivedAgeSync />
-                    {children}
-                    {shouldMountMyPlanProvider ? <MyPlanProvider /> : null}
-                  </CookieConsentProvider>
-                </FamilyPersonaProvider>
-              </WeatherProvider>
-            </CityProvider>
-          </AccountModeProvider>
+          <AuthProvider initialUser={initialAuthUser}>
+            <AccountModeProvider>
+              <CityProvider>
+                <WeatherProvider>
+                  <FamilyPersonaProvider>
+                    <CookieConsentProvider>
+                      <FamilyDerivedAgeSync />
+                      {children}
+                      {shouldMountMyPlanProvider ? <MyPlanProvider /> : null}
+                    </CookieConsentProvider>
+                  </FamilyPersonaProvider>
+                </WeatherProvider>
+              </CityProvider>
+            </AccountModeProvider>
+          </AuthProvider>
         </SaveIntentProvider>
         <Sonner />
       </body>

@@ -7,7 +7,7 @@ import { RETURN_TO_PARAM } from "@/lib/backoffice/saveFlow";
 import { Label } from "@/components/ui/typography";
 import { toast } from "@/lib/toast";
 import { useAutoSlug } from "@/hooks/useAutoSlug";
-import { orderEventCategoriesForDisplay } from "@/lib/taxonomy/eventCategoryHierarchy";
+import { orderEventCategoriesForDisplay } from "@/lib/taxonomy/eventCategoryOrder";
 import { messageFromApiError } from "@/lib/admin/messageFromApiError";
 import {
   EVENT_CATEGORY_PUBLICATION_TYPES,

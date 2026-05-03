@@ -12,6 +12,7 @@ import { useAccountMode } from "@/contexts/AccountModeContext";
 import { useFamilyPersona } from "@/contexts/FamilyPersonaContext";
 import { cn } from "@/lib/utils";
 import { useNarrowViewport } from "@/hooks/useNarrowViewport";
+import { useHydrated } from "@/hooks/use-hydrated";
 import { notifyAuthStateChanged } from "@/lib/auth/client";
 import { resolveHasBusinessProfile } from "@/lib/account/isBusinessAccountRole";
 import { useProfileDropdownHandlers } from "@/lib/account/useProfileDropdownHandlers";
@@ -29,8 +30,17 @@ export function HeaderAccountMenu() {
   const [loggingOut, setLoggingOut] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [guestAuthOpen, setGuestAuthOpen] = useState(false);
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => { setMounted(true); }, []);
+  const headerHydrated = useHydrated();
+
+  useEffect(() => {
+    if (process.env.NODE_ENV !== "production") {
+      console.debug("[HeaderAccountMenu] auth state", {
+        isLoading: !headerHydrated || user === undefined,
+        userId: user?.id ?? null,
+        source: "FamilyPersonaContext.menuUser",
+      });
+    }
+  }, [headerHydrated, user]);
 
   const handlers = useProfileDropdownHandlers({
     user,
@@ -39,7 +49,7 @@ export function HeaderAccountMenu() {
     closeMenu: () => setUserMenuOpen(false),
   });
 
-  if (!mounted || user === undefined) {
+  if (!headerHydrated || user === undefined) {
     return (
       <div className="flex items-center gap-1.5 md:gap-2">
         <Button
@@ -81,6 +91,11 @@ export function HeaderAccountMenu() {
           title="Вход в mamaGo"
           subtitle="Планируйте лучшее время с детьми"
           onAuthSuccess={() => {
+            if (process.env.NODE_ENV !== "production") {
+              console.debug("[HeaderAccountMenu] auth modal success", {
+                source: "DefaultAuthModal.onAuthSuccess",
+              });
+            }
             setGuestAuthOpen(false);
             notifyAuthStateChanged();
           }}

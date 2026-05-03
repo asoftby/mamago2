@@ -44,8 +44,19 @@ assert.deepEqual(
     search: "",
   }),
   {
-    kind: "redirect",
-    location: "https://mamago.by/editor/place/new",
+    kind: "next",
+  },
+);
+
+assert.deepEqual(
+  resolveSubdomainMiddlewareDecision({
+    host: "admin.mamago.by",
+    protocol: "https:",
+    pathname: "/editor/event/evt_123/edit",
+    search: "?returnTo=%2Fadmin%2Fimport%2Freview",
+  }),
+  {
+    kind: "next",
   },
 );
 

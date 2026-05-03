@@ -14,6 +14,19 @@ body:has([data-slot="alert-dialog-overlay"][data-state="open"]) {
   overscroll-behavior: none;
 }
 
+/* Radix Dialog/Sheet overlay/content — pointer-events только когда open.
+   Закрытые слои не должны перехватывать тапы (особенно на iOS). */
+[data-slot="dialog-overlay"][data-state="closed"],
+[data-slot="sheet-overlay"][data-state="closed"],
+[data-slot="alert-dialog-overlay"][data-state="closed"] {
+  pointer-events: none !important;
+}
+
+[data-slot="dialog-content"][data-state="closed"],
+[data-slot="sheet-content"][data-state="closed"] {
+  pointer-events: none !important;
+}
+
 @utility no-scrollbar {
   /* Chrome, Safari and Opera */
   &::-webkit-scrollbar {
@@ -32,9 +45,9 @@ body:has([data-slot="alert-dialog-overlay"][data-state="open"]) {
   --color-foreground: var(--foreground);
   /* --font-sans не переопределяем здесь: next/font/local задаёт --font-sans на <html>.
      Tailwind font-sans использует CSS var(--font-sans) напрямую через body. */
-  --font-mono: var(--font-geist-mono);
-  /* Literata задаётся на body через next/font → --font-literata (без циклической ссылки) */
-  --font-serif: var(--font-literata), ui-serif, Georgia, "Times New Roman", serif;
+  --font-mono: ui-monospace, SFMono-Regular, SF Mono, Menlo, Monaco, Consolas,
+    "Liberation Mono", "Courier New", monospace;
+  --font-serif: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
   
   /* Sidebar */
   --color-sidebar-ring: var(--sidebar-ring);
@@ -329,7 +342,7 @@ body:has([data-slot="alert-dialog-overlay"][data-state="open"]) {
 
 /* ─── Article / Blog reading typography ─────────────────────────────────── */
 .article-body {
-  font-family: var(--font-pt-serif, var(--font-noto-serif, var(--font-literata)));
+  font-family: var(--font-serif);
   font-size: 1.0625rem; /* 17px */
   line-height: 1.75;
   color: var(--foreground);
@@ -370,7 +383,7 @@ body:has([data-slot="alert-dialog-overlay"][data-state="open"]) {
 }
 
 .article-body h3 {
-  font-family: var(--font-pt-serif, var(--font-noto-serif, var(--font-literata)));
+  font-family: var(--font-serif);
   font-size: 1.25rem;
   font-weight: 600;
   line-height: 1.4;
@@ -500,4 +513,3 @@ body:has([data-slot="alert-dialog-overlay"][data-state="open"]) {
   margin-top: 0 !important;
   margin-bottom: 0 !important;
 }
-

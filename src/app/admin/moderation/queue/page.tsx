@@ -117,7 +117,7 @@ async function getQueueItems(): Promise<QueueItem[]> {
     cityName:
       ev.place?.city?.name ??
       (ev.cityId ? eventCityNameById.get(ev.cityId) ?? null : null),
-    businessName: ev.owner.business?.name || ev.owner.email,
+    businessName: ev.owner?.business?.name || ev.owner?.email || "—",
     submittedAt: ev.createdAt,
     submittedAtLabel: formatDistanceToNow(ev.createdAt, { addSuffix: true, locale: ru }),
     reviewHref: `/editor/event/${ev.id}/edit?returnTo=${encodeURIComponent(QUEUE_RETURN)}`,

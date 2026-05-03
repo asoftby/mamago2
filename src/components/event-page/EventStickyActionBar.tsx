@@ -46,13 +46,38 @@ export function EventStickyActionBar({
 
   useEffect(() => {
     const el = ctaRef?.current;
-    if (!el) return;
+    const syncFromScroll = () => {
+      if (el) {
+        const rect = el.getBoundingClientRect();
+        setVisible(rect.bottom <= 0);
+        return;
+      }
+      setVisible(window.scrollY > 280);
+    };
+
+    syncFromScroll();
+
+    if (!("IntersectionObserver" in window) || !el) {
+      window.addEventListener("scroll", syncFromScroll, { passive: true });
+      window.addEventListener("resize", syncFromScroll);
+      return () => {
+        window.removeEventListener("scroll", syncFromScroll);
+        window.removeEventListener("resize", syncFromScroll);
+      };
+    }
+
     const observer = new IntersectionObserver(
       ([entry]) => setVisible(!(entry?.isIntersecting ?? true)),
       { threshold: 0 },
     );
     observer.observe(el);
-    return () => observer.disconnect();
+    window.addEventListener("scroll", syncFromScroll, { passive: true });
+    window.addEventListener("resize", syncFromScroll);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("scroll", syncFromScroll);
+      window.removeEventListener("resize", syncFromScroll);
+    };
   }, [ctaRef]);
 
   // Компактный текст для мобильного: "✓ 30 апреля"
@@ -65,7 +90,7 @@ export function EventStickyActionBar({
       className={cn(
         "fixed inset-x-0 top-0 z-40",
         "transition-transform duration-200 ease-out",
-        visible ? "translate-y-0" : "-translate-y-full",
+        visible ? "translate-y-0 pointer-events-auto" : "-translate-y-full pointer-events-none",
         "border-b border-border/60 bg-background/95 backdrop-blur-md supports-[backdrop-filter]:bg-background/85",
         "shadow-[0_4px_20px_rgba(15,23,42,0.08)]",
         "pb-3 pt-[max(0.75rem,env(safe-area-inset-top))]",

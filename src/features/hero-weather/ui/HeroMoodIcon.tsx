@@ -5,6 +5,26 @@ import { cn } from "@/lib/utils";
 import type { WeatherScenario, TimeOfDay } from "../model/types";
 import { resolveHomeWeatherScenario, getWeatherIconName } from "../lib/weather-scenario-layer";
 
+const AVAILABLE_WEATHER_ICONS = new Set([
+  "clear-day",
+  "overcast-day",
+  "overcast-night",
+  "overcast-rain",
+  "thunderstorms-day-rain",
+  "snowflake",
+  "thermometer-colder",
+  "thermometer-warmer",
+  "wind",
+]);
+
+function resolveAvailableWeatherIconName(
+  iconName: string,
+  timeOfDay: TimeOfDay,
+): string {
+  if (AVAILABLE_WEATHER_ICONS.has(iconName)) return iconName;
+  return timeOfDay === "night" ? "overcast-night" : "overcast-day";
+}
+
 export type HeroMoodIconProps = {
   scenario: WeatherScenario | string;
   timeOfDay?: TimeOfDay;
@@ -24,7 +44,10 @@ export function HeroMoodIcon({
     scenario: typeof scenario === "string" ? (scenario as WeatherScenario) : scenario,
     maxTemperatureC,
   });
-  const iconName = getWeatherIconName({ scenario: dayScenario, timeOfDay });
+  const iconName = resolveAvailableWeatherIconName(
+    getWeatherIconName({ scenario: dayScenario, timeOfDay }),
+    timeOfDay,
+  );
   const fallbackIconName = timeOfDay === "night" ? "overcast-night" : "overcast-day";
   const primarySrc = useMemo(() => `/meteocons/fill/${iconName}.svg`, [iconName]);
   const fallbackSrc = useMemo(() => `/meteocons/fill/${fallbackIconName}.svg`, [fallbackIconName]);

@@ -137,7 +137,7 @@ export function PlaceModerationSidebar({
             <Mail className="w-4 h-4 text-gray-500 mt-0.5 flex-shrink-0" />
             <div>
               <div className="text-gray-500">Владелец</div>
-              <div className="font-medium break-all">{place.owner.email}</div>
+              <div className="font-medium break-all">{place.owner?.email || "—"}</div>
             </div>
           </div>
 
@@ -191,7 +191,7 @@ export function PlaceModerationSidebar({
             asChild
           >
             <a
-              href={`mailto:${place.owner.email}?subject=Regarding ${place.title}`}
+              href={`mailto:${place.owner?.email}?subject=Regarding ${place.title}`}
             >
               <Mail className="w-4 h-4 mr-2" />
               Написать владельцу

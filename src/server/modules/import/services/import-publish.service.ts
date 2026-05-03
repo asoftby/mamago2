@@ -444,7 +444,7 @@ async function createActivityFromImport(
   });
 
   // Ждём только venue (нужен для appliedFields) и slug (нужен для ответа)
-  const [, slugResult] = await Promise.all([venueCreatePromise, slugPromise]);
+  await Promise.all([venueCreatePromise, slugPromise]);
   t.mark("venue-create+slug");
 
   if (nd.venueName || nd.addressText) appliedFields.push("venue");
@@ -472,14 +472,13 @@ async function createActivityFromImport(
     })();
   }
 
-  // persist apply result — не блокирует ответ пользователю
-  void persistActivityApplyResult(record.id, activity.id, {
+  await persistActivityApplyResult(record.id, activity.id, {
     appliedAt: new Date().toISOString(), appliedByUserId: actorUserId,
     decision: "APPROVED_CREATE", appliedFields, skippedFields: [], emptyFields,
     activitySlug,
     warnings: warnings.length > 0 ? warnings : undefined,
   });
-  t.mark("persist-apply-result (async)");
+  t.mark("persist-apply-result");
 
   t.end();
 

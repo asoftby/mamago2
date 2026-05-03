@@ -23,6 +23,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { OccasionType } from "@prisma/client";
 import { occasionTypeLabel } from "@/lib/taxonomy/occasionTypeLabels";
+import { isOccasionCurrentlyActive } from "@/lib/discovery/occasions";
 
 const adminFetch: RequestInit = { credentials: "include" };
 
@@ -35,7 +36,64 @@ type OccasionRow = {
   type: OccasionType;
   sortOrder: number;
   isActive: boolean;
+  startsAt: string | null;
+  endsAt: string | null;
+  boostScore: number;
+  autoSuggest: boolean;
 };
+
+/** Format YYYY-MM-DD → DD.MM */
+function fmtDate(iso: string | null): string {
+  if (!iso) return "";
+  const [, m, d] = iso.split("-");
+  return `${d}.${m}`;
+}
+
+function OccasionStatusBadge({ row }: { row: OccasionRow }) {
+  if (!row.isActive) {
+    return (
+      <span className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500">
+        inactive
+      </span>
+    );
+  }
+
+  const now = new Date();
+  const startsAt = row.startsAt ? new Date(row.startsAt + "T00:00:00Z") : null;
+  const endsAt = row.endsAt ? new Date(row.endsAt + "T23:59:59Z") : null;
+
+  const active = isOccasionCurrentlyActive(
+    {
+      isActive: row.isActive,
+      autoSuggest: row.autoSuggest,
+      startsAt,
+      endsAt,
+    },
+    now,
+  );
+
+  if (active) {
+    return (
+      <span className="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800">
+        сейчас актуален
+      </span>
+    );
+  }
+
+  if (startsAt && endsAt) {
+    return (
+      <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-800">
+        вне периода
+      </span>
+    );
+  }
+
+  return (
+    <span className="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-xs text-blue-700">
+      active
+    </span>
+  );
+}
 
 const listHref = "/admin/discovery/occasions";
 
@@ -223,6 +281,9 @@ export function OccasionsAdminPage() {
                 <th className={discoveryTh()}>Slug</th>
                 {showTypeColumn ? <th className={discoveryTh()}>Type</th> : null}
                 <th className={discoveryTh("w-20")}>Порядок</th>
+                <th className={discoveryTh()}>Период</th>
+                <th className={discoveryTh("w-28")}>Статус</th>
+                <th className={discoveryTh("w-16")}>Boost</th>
                 <th className="w-10 px-2 py-3" aria-hidden />
               </tr>
             </thead>
@@ -247,6 +308,21 @@ export function OccasionsAdminPage() {
                     <td className={discoveryTd("text-gray-700")}>{occasionTypeLabel(r.type)}</td>
                   ) : null}
                   <td className={discoveryTd("text-gray-600")}>{r.sortOrder}</td>
+                  <td className={discoveryTd("text-xs text-gray-600 font-mono")}>
+                    {r.startsAt && r.endsAt
+                      ? `${fmtDate(r.startsAt)}–${fmtDate(r.endsAt)}`
+                      : <span className="text-gray-400">без периода</span>}
+                  </td>
+                  <td className={discoveryTd()}>
+                    <OccasionStatusBadge row={r} />
+                  </td>
+                  <td className={discoveryTd("text-gray-600 text-xs")}>
+                    {r.boostScore > 0 ? (
+                      <span className="font-medium text-orange-700">+{r.boostScore}</span>
+                    ) : (
+                      <span className="text-gray-400">0</span>
+                    )}
+                  </td>
                   <DiscoveryTableChevronCell />
                 </tr>
               ))}

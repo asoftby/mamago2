@@ -12,6 +12,7 @@ import {
   extractFirstWebsiteFromRawPayload,
   extractSocialUrlsFromRawPayload,
 } from "./extract-social-urls";
+import { detectEventCategory } from "@/lib/ai/detectEventCategory";
 
 type RawPayload = Record<string, unknown>;
 
@@ -172,6 +173,17 @@ export interface EventNormalizerInput {
 export interface EventNormalizerOutput {
   normalized: NormalizedEventImport;
   warnings: string[];
+  /** AI-определённая категория (если удалось определить) */
+  aiDetectedCategory?: {
+    categoryId: string;
+    categorySlug: string;
+    categoryNameRu: string;
+    categoryPath: string;
+    rootCategoryId: string;
+    subcategoryId: string | null;
+    confidence: number;
+    reason: string;
+  } | null;
 }
 
 export function normalizeEventPayload(input: EventNormalizerInput): EventNormalizerOutput {
@@ -253,7 +265,7 @@ export function normalizeEventPayload(input: EventNormalizerInput): EventNormali
   const socialUrls = extractSocialUrlsFromRawPayload(rawPayload);
 
   const categoryCandidates = extractStringArray(rawPayload, "categories", "tags", "types", "category");
-  if (categoryCandidates.length === 0) warnings.push("categoryCandidates empty");
+  if (categoryCandidates.length === 0) warnings.push("categoryCandidates empty — will attempt AI detection");
 
   const mainImageUrl = extractString(
     rawPayload,
@@ -269,6 +281,16 @@ export function normalizeEventPayload(input: EventNormalizerInput): EventNormali
   if (mainImageUrl) {
     imageUrls = imageUrls.filter((u) => u !== mainImageUrl);
   }
+
+  const trailerUrl = extractString(
+    rawPayload,
+    "trailerUrl",
+    "trailer_url",
+    "trailer",
+    "videoUrl",
+    "video_url",
+    "reelsUrl",
+  );
 
   const normalized: NormalizedEventImport = {
     entityType: "EVENT",
@@ -298,7 +320,86 @@ export function normalizeEventPayload(input: EventNormalizerInput): EventNormali
     categoryCandidates,
     ...(mainImageUrl ? { mainImageUrl } : {}),
     imageUrls,
+    ...(trailerUrl ? { trailerUrl } : {}),
   };
 
-  return { normalized, warnings };
+  return { normalized, warnings, aiDetectedCategory: null };
+}
+
+/**
+ * Асинхронная версия normalizeEventPayload с AI-определением категории
+ * 
+ * Использует AI для автоматического определения категории события,
+ * если categoryCandidates пустой или если явно запрошено.
+ * 
+ * @param input - Входные данные для нормализации
+ * @param options - Опции: forceAiDetection = всегда использовать AI, даже если есть categoryCandidates
+ * @returns Нормализованные данные с AI-определённой категорией
+ */
+export async function normalizeEventPayloadWithAI(
+  input: EventNormalizerInput,
+  options: { forceAiDetection?: boolean } = {},
+): Promise<EventNormalizerOutput> {
+  // Сначала выполняем обычную нормализацию
+  const result = normalizeEventPayload(input);
+  const { normalized, warnings } = result;
+
+  // Проверяем, нужно ли использовать AI для определения категории
+  const shouldUseAI =
+    options.forceAiDetection ||
+    !normalized.categoryCandidates ||
+    normalized.categoryCandidates.length === 0;
+
+  if (!shouldUseAI || !normalized.title) {
+    return result;
+  }
+
+  try {
+    console.log(
+      `[Event Normalizer] Attempting AI category detection for: ${normalized.title}`,
+    );
+
+    const aiCategory = await detectEventCategory({
+      title: normalized.title,
+      description: normalized.description,
+      shortDescription: normalized.shortDescCandidate,
+      venueName: normalized.venueName,
+      addressText: normalized.addressText,
+      categoryCandidates: normalized.categoryCandidates,
+      ageText: normalized.ageText,
+      priceText: normalized.priceText,
+      scheduleText: normalized.scheduleText,
+      organizerName: normalized.organizerName,
+    });
+
+    if (aiCategory) {
+      console.log(
+        `[Event Normalizer] AI detected category: ${aiCategory.categoryPath} (confidence: ${aiCategory.confidence})`,
+      );
+
+      // Добавляем AI-определённую категорию в categoryCandidates
+      // (чтобы она была доступна в UI для выбора)
+      if (!normalized.categoryCandidates.includes(aiCategory.categoryNameRu)) {
+        normalized.categoryCandidates = [
+          aiCategory.categoryNameRu,
+          ...normalized.categoryCandidates,
+        ];
+      }
+
+      return {
+        normalized,
+        warnings,
+        aiDetectedCategory: aiCategory,
+      };
+    } else {
+      console.log(
+        `[Event Normalizer] AI could not detect category for: ${normalized.title}`,
+      );
+    }
+  } catch (error) {
+    console.error("[Event Normalizer] AI category detection failed:", error);
+    warnings.push("AI category detection failed");
+  }
+
+  return result;
 }

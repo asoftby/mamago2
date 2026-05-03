@@ -44,7 +44,7 @@ export function getNavIconButtonClassName({
   return cn(
     "relative flex shrink-0 items-center justify-center rounded-full",
     size === "compact" ? "h-11 w-11" : "h-[52px] w-[52px]",
-    "border transition-all duration-200 ease-out will-change-transform",
+    "border transition-all duration-200 ease-out will-change-transform cursor-pointer touch-manipulation",
     "active:scale-[0.96] active:transition-transform",
     chrome === "dark"
       ? isActive

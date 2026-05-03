@@ -1,6 +1,5 @@
 import { Fragment } from "react";
 import Link from "next/link";
-import Script from "next/script";
 import { ArticleHeader } from "@/components/article/ArticleHeader";
 import { ArticleContent } from "@/components/article/ArticleContent";
 import { ArticleEventCardBlock } from "@/components/article/blocks/ArticleEventCardBlock";
@@ -18,6 +17,7 @@ import {
 import { ArticleReadingScrollPadding } from "@/components/article/mvp/ArticleReadingScrollPadding";
 import { articleBlockHtmlForEditor } from "@/lib/article/articleBlockHtml";
 import { cn } from "@/lib/utils";
+import { ArticleInstagramScript } from "@/components/article/mvp/ArticleInstagramScript";
 
 /** Лёгкое оглавление: только текст и вложенный список для H3, без карточек и рамок. */
 function ArticleInlineToc({ branches }: { branches: ArticleTocBranch[] }) {
@@ -95,7 +95,7 @@ export function ArticleMvpView({
       role="article"
     >
       {needsInstagramEmbedScript ? (
-        <Script src="https://www.instagram.com/embed.js" strategy="lazyOnload" />
+        <ArticleInstagramScript />
       ) : null}
       <ArticleReadingScrollPadding extraTopRem={readingScrollPaddingExtraRem ?? 0} />
       {draftWatermark ? (

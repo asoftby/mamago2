@@ -18,6 +18,7 @@ import { assertBusinessEventPrimaryCategory } from "@/lib/business/validatePrima
 import { assignActivitySlugIfMissing } from "@/lib/slug/activitySlugService";
 import { replaceActivityGalleryFromMediaIds } from "@/lib/business/syncEventGalleryFromMediaIds";
 import { resolveEventOrganizer } from "@/lib/business/eventOrganizer";
+import { syncActivityOccasions } from "@/lib/business/syncActivityOccasions";
 import { prismaBase } from "@/lib/prisma";
 import { DEFAULT_ACTIVITY_FORMAT, normalizeActivityFormat } from "@/domain/activities/activity-format";
 
@@ -165,6 +166,14 @@ export async function POST(request: NextRequest) {
       );
     } else if (mergedPlaceId !== undefined) {
       await syncEventVenueAndActivityCity(event.id, null, mergedPlaceId);
+    }
+
+    // Sync occasion links
+    const occasionIds = Array.isArray(body.occasionIds)
+      ? body.occasionIds.filter((id: unknown): id is string => typeof id === "string")
+      : [];
+    if (occasionIds.length > 0) {
+      await syncActivityOccasions(event.id, occasionIds);
     }
 
     await assignActivitySlugIfMissing(event.id, title);

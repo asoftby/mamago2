@@ -88,6 +88,7 @@ model User {
   planItems                     PlanItem[]
   routes                        Route[]                      @relation("RouteAuthor")
   routeIdeas                    RouteIdea[]
+  routeRatings                  RouteRating[]
   sessions                      Session[]
   tempMedia                     TempMedia[]
   telegramConnections           TelegramConnection[]
@@ -402,17 +403,42 @@ model DiscoveryTaxonomyEntry {
 }
 
 model Occasion {
-  id        String       @id @default(cuid())
-  name      String
-  slug      String       @unique
-  type      OccasionType
-  isActive  Boolean      @default(true)
-  sortOrder Int          @default(0)
-  createdAt DateTime     @default(now())
-  updatedAt DateTime     @updatedAt
+  id            String       @id @default(cuid())
+  name          String
+  slug          String       @unique
+  type          OccasionType
+  isActive      Boolean      @default(true)
+  sortOrder     Int          @default(0)
+  /// Начало периода актуальности (null = без периода, справочный повод)
+  startsAt      DateTime?
+  /// Конец периода актуальности (null = без периода)
+  endsAt        DateTime?
+  /// Сила влияния на ранжирование (0 = нейтральный сигнал)
+  boostScore    Int          @default(0)
+  /// Показывать ли редактору как актуальную подсказку в wizard
+  autoSuggest   Boolean      @default(true)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  activityLinks ActivityOccasion[]
 
   @@index([sortOrder])
   @@index([type, sortOrder])
+  @@index([isActive, startsAt, endsAt])
+}
+
+/// Join table: many-to-many Activity ↔ Occasion
+model ActivityOccasion {
+  activityId String
+  occasionId String
+  createdAt  DateTime @default(now())
+
+  activity Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  occasion Occasion @relation(fields: [occasionId], references: [id], onDelete: Cascade)
+
+  @@id([activityId, occasionId])
+  @@index([occasionId])
+  @@index([activityId])
 }
 
 /// Категории событий — отдельный справочник админки «Фильтры» (не SignalDefinition / не ranking).
@@ -610,6 +636,7 @@ model Activity {
   venue                EventVenue?
   importedRecords      ImportedRecord[]          @relation("ImportedRecordActivity")
   planItems            PlanItem[]
+  occasionLinks        ActivityOccasion[]
 
   @@index([placeId])
   @@index([type])
@@ -1819,6 +1846,7 @@ model Route {
   routeIdeas         RouteIdea[]
   slugHistory        RouteSlugHistory[]
   stops              RouteStop[]
+  ratings            RouteRating[]
 
   @@index([status, visibility])
   @@index([authorId])
@@ -2844,4 +2872,23 @@ model ImportFieldOverride {
 
   @@index([entityType, entityId])
   @@unique([entityType, entityId, fieldName])
+}
+
+/// Оценки маршрутов от пользователей (уникальный голос на маршрут от пользователя/IP)
+model RouteRating {
+  id         String   @id @default(cuid())
+  routeId    String
+  ratingType String   // "like" | "neutral" | "dislike"
+  /// Идентификатор голосующего: userId (если авторизован) или IP-адрес (для гостей)
+  identifier String
+  userId     String?
+  createdAt  DateTime @default(now())
+  route      Route    @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@unique([routeId, identifier])
+  @@index([routeId])
+  @@index([routeId, ratingType])
+  @@index([identifier])
+  @@index([userId])
 }

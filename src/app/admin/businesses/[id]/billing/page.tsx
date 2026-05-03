@@ -59,7 +59,7 @@ export default async function AdminBusinessBillingPage({
         <div>
           <h1 className="text-3xl font-bold text-gray-900">{account.business.name}</h1>
           <p className="text-gray-600 mt-1">Billing & Subscriptions</p>
-          <p className="text-sm text-gray-500">{account.business.owner.email}</p>
+          <p className="text-sm text-gray-500">{account.business.owner?.email || "—"}</p>
         </div>
         <BillingAccountStatusBadge status={account.status} />
       </div>

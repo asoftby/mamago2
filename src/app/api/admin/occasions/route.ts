@@ -27,7 +27,14 @@ export async function GET() {
     const items = await prisma.occasion.findMany({
       orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
     });
-    return NextResponse.json(items);
+    // Serialize dates as YYYY-MM-DD for the admin list
+    return NextResponse.json(
+      items.map((item) => ({
+        ...item,
+        startsAt: item.startsAt ? item.startsAt.toISOString().slice(0, 10) : null,
+        endsAt: item.endsAt ? item.endsAt.toISOString().slice(0, 10) : null,
+      })),
+    );
   } catch (e) {
     const j = prismaToHttpResponse(e);
     if (j) return j;

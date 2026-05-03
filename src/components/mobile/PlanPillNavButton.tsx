@@ -50,7 +50,7 @@ export function PlanPillNavButton({
       aria-describedby={showEmptyHint ? emptyHintId : undefined}
       className={cn(
         "relative flex h-11 min-w-0 flex-1 items-center rounded-full py-0 pl-3 pr-2.5",
-        "border transition-all duration-200 ease-out will-change-transform",
+        "border transition-all duration-200 ease-out will-change-transform cursor-pointer touch-manipulation",
         "active:scale-[0.985] active:transition-transform",
         chrome === "dark"
           ? isActive

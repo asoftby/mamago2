@@ -316,7 +316,6 @@ export function EventPageView({ data }: { data: EventPageData }) {
 
             <EventRichDescription
               htmlContent={data.about.descriptionHtml || ""}
-              plainTextSummary={data.about.summary}
             />
             <EventSessionSelector
               sessions={sessions}
