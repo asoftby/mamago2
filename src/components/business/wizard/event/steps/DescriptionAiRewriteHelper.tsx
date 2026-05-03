@@ -9,6 +9,7 @@ import {
   extractPlainTextFromHtml,
   plainTextToRichTextHtml,
 } from "@/lib/richtext/utils";
+import { formatDescriptionText } from "@/lib/text/formatDescription";
 
 type RewriteTone = "neutral" | "friendly" | "editorial" | "short";
 
@@ -68,7 +69,9 @@ export function DescriptionAiRewriteHelper({
         throw new Error(payload.error || "Не удалось переписать текст");
       }
 
-      setPreviewText(payload.result);
+      // Post-process: structure into readable paragraphs
+      const formatted = formatDescriptionText(payload.result);
+      setPreviewText(formatted);
       setPreviewTone(tone);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Не удалось переписать текст");
@@ -89,6 +92,11 @@ export function DescriptionAiRewriteHelper({
     setPreviewText("");
     setPreviewTone(null);
   };
+
+  // Split into paragraphs for rendering
+  const previewParagraphs = previewText
+    ? previewText.split("\n\n").filter(Boolean)
+    : [];
 
   return (
     <div className="rounded-xl border border-stone-200 bg-stone-50/70 p-4">
@@ -154,9 +162,17 @@ export function DescriptionAiRewriteHelper({
             </div>
           </div>
 
-          <div className="mt-3 rounded-lg bg-stone-50 p-3 text-sm leading-6 text-stone-800 whitespace-pre-wrap">
-            {previewText}
+          <div className="mt-3 rounded-lg bg-stone-50 p-3 text-sm leading-6 text-stone-800 space-y-3">
+            {previewParagraphs.map((para, i) => (
+              <p key={i} className="whitespace-pre-line">
+                {para}
+              </p>
+            ))}
           </div>
+
+          <p className="mt-2 text-[11px] text-stone-400">
+            Текст автоматически разбит на абзацы для удобства чтения
+          </p>
         </div>
       ) : null}
     </div>

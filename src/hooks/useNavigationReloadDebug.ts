@@ -2,6 +2,8 @@
 
 import { useEffect } from "react";
 
+const NAV_DEBUG = process.env.NEXT_PUBLIC_NAV_DEBUG === "true";
+
 function stackTrace(): string {
   try {
     return new Error().stack ?? "(no stack)";
@@ -12,6 +14,7 @@ function stackTrace(): string {
 
 export function useNavigationReloadDebug(enabled: boolean) {
   useEffect(() => {
+    if (!NAV_DEBUG) return;
     if (!enabled || typeof window === "undefined") return;
 
     const originalPushState = window.history.pushState.bind(window.history);
@@ -55,4 +58,3 @@ export function useNavigationReloadDebug(enabled: boolean) {
     };
   }, [enabled]);
 }
-

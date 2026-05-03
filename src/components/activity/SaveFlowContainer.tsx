@@ -43,7 +43,11 @@ export function SaveFlowContainer({
   if (isDesktop) {
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-md p-0 gap-0 overflow-hidden rounded-3xl border-neutral-200" showCloseButton={false}>
+        <DialogContent
+          className="sm:max-w-md p-0 gap-0 overflow-hidden rounded-3xl border-neutral-200"
+          showCloseButton={false}
+          aria-describedby={undefined}
+        >
           <DialogHeader className="sr-only">
             <DialogTitle>{title}</DialogTitle>
           </DialogHeader>
@@ -60,7 +64,7 @@ export function SaveFlowContainer({
         side="bottom"
         showCloseButton={false}
         className={cn(
-          "fixed inset-x-0 bottom-0 z-50 flex max-h-[90vh] w-full flex-col gap-0 overflow-hidden rounded-t-3xl border-t border-neutral-100 bg-white p-0 shadow-2xl",
+          "fixed inset-x-0 bottom-0 flex max-h-[90vh] w-full flex-col gap-0 overflow-hidden rounded-t-3xl border-t border-neutral-100 bg-white p-0 shadow-2xl",
         )}
       >
         <div className="flex shrink-0 justify-center pb-1 pt-3">

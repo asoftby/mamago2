@@ -14,19 +14,39 @@ const rewriteRequestSchema = z.object({
 });
 
 const SYSTEM_PROMPT =
-  "Ты редактор текста для платформы mamaGo. Перепиши текст в заданном тоне. " +
-  "Не добавляй новые факты. Не меняй даты, цены, возраст, место. " +
-  "Не выдумывай информацию и не дополняй текст от себя. Работай только с исходным текстом.";
+  "Ты — встроенный AI-редактор в системе mamaGo. Твоя задача — переписывать описания событий так, чтобы они были понятными, структурированными и готовыми к отображению в интерфейсе.\n\n" +
+  "Это НЕ чат. Это функция rewrite внутри продукта. Ты всегда работаешь с уже существующим текстом и улучшаешь его.\n\n" +
+  "ТРЕБОВАНИЯ К ФОРМАТУ:\n" +
+  "1. Разбивай текст на короткие абзацы (2–4 строки максимум)\n" +
+  "2. Не пиши сплошным текстом\n" +
+  "3. Используй переносы строк для улучшения читаемости\n" +
+  "4. Если есть перечисления (активности, участники, зоны) — оформляй их списком через перенос строки:\n" +
+  "— пункт 1\n" +
+  "— пункт 2\n" +
+  "— пункт 3\n\n" +
+  "5. Если есть цены — ОБЯЗАТЕЛЬНО вынеси их в отдельный блок:\n" +
+  "Стоимость:\n" +
+  "— 0 BYN — дети до 5 лет\n" +
+  "— 30 BYN — общий билет\n" +
+  "— 40 BYN — единый билет\n\n" +
+  "6. Если есть расписание — оформи его отдельным блоком:\n" +
+  "Время:\n" +
+  "10:00–23:00\n\n" +
+  "7. НЕ используй markdown (**, #, списки через *, и т.д.). Только обычный текст и переносы строк\n" +
+  "8. НЕ добавляй от себя новую информацию\n" +
+  "9. НЕ сокращай важные детали\n" +
+  "10. НЕ добавляй пояснения вроде \"Вот переписанный текст\"\n\n" +
+  "РЕЗУЛЬТАТ: Верни только готовый переписанный текст с форматированием, пригодным для отображения в интерфейсе.";
 
 const TONE_INSTRUCTIONS: Record<"neutral" | "friendly" | "editorial" | "short", string> = {
   neutral:
-    "Сделай текст нейтральным, чистым и понятным. Убери рекламные формулировки и лишний пафос.",
+    "Сделай текст нейтральным, чистым и понятным. Убери рекламные формулировки и лишний пафос. Сохрани структуру с абзацами и списками.",
   friendly:
-    "Сделай текст мягким и дружелюбным, но без фамильярности и без добавления новых фактов.",
+    "Сделай текст мягким и дружелюбным, но без фамильярности. Сохрани структуру с абзацами и списками.",
   editorial:
-    "Сделай текст более афишным и живым, но строго без выдуманных деталей и без изменения фактов.",
+    "Сделай текст более афишным и живым, но строго без выдуманных деталей. Сохрани структуру с абзацами и списками.",
   short:
-    "Сделай компактную, более короткую версию текста, сохранив все ключевые факты.",
+    "Сделай компактную, более короткую версию текста, сохранив все ключевые факты. Обязательно сохрани структуру с абзацами, списками и блоками цен/времени.",
 };
 
 type OpenRouterResponse = {
@@ -55,21 +75,59 @@ function buildUserPrompt(input: z.infer<typeof rewriteRequestSchema>) {
     `Тон: ${input.tone}`,
     `Инструкция по тону: ${TONE_INSTRUCTIONS[input.tone]}`,
     input.title ? `Заголовок: ${input.title}` : null,
+    "",
     "Перепиши только исходный текст ниже.",
     "Сохрани факты, даты, цены, возрастные ограничения, место и смысл.",
-    'Верни JSON вида {"result":"..."} и ничего больше.',
+    "",
+    "ВАЖНО:",
+    "— Разбивай на абзацы по 2-4 строки",
+    "— Списки оформляй через \"—\" и переносы строк",
+    "— Цены выноси в блок \"Стоимость:\"",
+    "— Время выноси в блок \"Время:\"",
+    "— НЕ используй markdown",
+    "",
+    'Верни JSON вида {"result":"переписанный текст с переносами строк"} и ничего больше.',
+    "",
     "Исходный текст:",
     input.sourceText,
   ]
     .filter(Boolean)
-    .join("\n\n");
+    .join("\n");
 }
 
 function extractRewriteResult(content: string): string | null {
+  if (!content || content.trim().length === 0) {
+    return null;
+  }
+
   try {
+    // Try to parse as JSON first
     const parsed = JSON.parse(content) as { result?: unknown };
-    return typeof parsed.result === "string" ? parsed.result.trim() : null;
+    if (typeof parsed.result === "string" && parsed.result.trim().length > 0) {
+      return parsed.result.trim();
+    }
+    
+    // If result field is missing but we have other fields, log it
+    if (parsed && typeof parsed === "object") {
+      console.warn("[AI Rewrite] JSON parsed but no 'result' field", {
+        keys: Object.keys(parsed),
+        preview: JSON.stringify(parsed).slice(0, 200),
+      });
+    }
+    
+    return null;
   } catch {
+    // If not valid JSON, maybe AI returned plain text
+    // This shouldn't happen with response_format: json_object, but handle it gracefully
+    console.warn("[AI Rewrite] content is not valid JSON, treating as plain text", {
+      contentPreview: content.slice(0, 200),
+    });
+    
+    // Return the content as-is if it looks like rewritten text (not an error message)
+    if (content.length > 20 && !content.toLowerCase().includes("error")) {
+      return content.trim();
+    }
+    
     return null;
   }
 }
@@ -108,7 +166,14 @@ export async function POST(request: NextRequest) {
 
     const apiKey = process.env.OPENROUTER_API_KEY?.trim();
     if (!apiKey) {
-      return NextResponse.json({ error: "OpenRouter API key is not configured" }, { status: 500 });
+      console.error("[AI Rewrite] OPENROUTER_API_KEY not configured");
+      return NextResponse.json(
+        { 
+          error: "Не удалось переписать текст. Попробуйте позже.",
+          code: "AI_PROVIDER_NOT_CONFIGURED"
+        },
+        { status: 503 }
+      );
     }
 
     const endpoint = "https://openrouter.ai/api/v1/chat/completions";
@@ -129,12 +194,14 @@ export async function POST(request: NextRequest) {
       ],
     };
 
-    console.log("[OpenRouter] request started", {
+    console.log("[AI Rewrite] request started", {
+      provider: "openrouter",
       model,
       endpoint,
       tone: parsed.data.tone,
       entityType: parsed.data.entityType ?? "event",
       sourceLength: parsed.data.sourceText.length,
+      hasApiKey: !!apiKey,
     });
 
     const controller = new AbortController();
@@ -153,43 +220,152 @@ export async function POST(request: NextRequest) {
         body: JSON.stringify(requestBody),
         signal: controller.signal,
       });
+    } catch (fetchError) {
+      clearTimeout(timeout);
+      
+      if (fetchError instanceof Error && fetchError.name === "AbortError") {
+        console.error("[AI Rewrite] request timeout after 25s");
+        return NextResponse.json(
+          { error: "Не удалось переписать текст. Попробуйте позже.", code: "TIMEOUT" },
+          { status: 504 }
+        );
+      }
+      
+      console.error("[AI Rewrite] fetch error", {
+        error: fetchError instanceof Error ? fetchError.message : String(fetchError),
+        provider: "openrouter",
+      });
+      
+      return NextResponse.json(
+        { error: "Не удалось переписать текст. Попробуйте позже.", code: "NETWORK_ERROR" },
+        { status: 503 }
+      );
     } finally {
       clearTimeout(timeout);
     }
 
     const rawResponseText = await response.text();
-    console.log("[OpenRouter] response received", {
+    console.log("[AI Rewrite] response received", {
+      provider: "openrouter",
       status: response.status,
       statusText: response.statusText,
+      bodyLength: rawResponseText.length,
     });
 
     if (!response.ok) {
       const message = mapOpenRouterError(response.status, rawResponseText);
-      console.error("[OpenRouter] request failed", {
+      console.error("[AI Rewrite] provider error", {
+        provider: "openrouter",
         status: response.status,
         statusText: response.statusText,
+        errorMessage: message,
+        bodyPreview: rawResponseText.slice(0, 200),
       });
-      return NextResponse.json({ error: message }, { status: 502 });
+      
+      return NextResponse.json(
+        { 
+          error: "Не удалось переписать текст. Попробуйте позже.",
+          code: "PROVIDER_ERROR",
+          details: message
+        },
+        { status: 502 }
+      );
     }
 
     const payload = safeJsonParse(rawResponseText) as OpenRouterResponse | null;
     if (!payload) {
-      console.error("[OpenRouter] JSON parse failed", {
+      console.error("[AI Rewrite] invalid JSON response", {
+        provider: "openrouter",
         status: response.status,
-        body: rawResponseText,
+        bodyPreview: rawResponseText.slice(0, 200),
       });
-      return NextResponse.json({ error: "AI did not return a valid response" }, { status: 502 });
+      
+      return NextResponse.json(
+        { error: "Не удалось переписать текст. Попробуйте позже.", code: "INVALID_RESPONSE" },
+        { status: 502 }
+      );
     }
 
-    const content = isOpenRouterResponse(payload)
-      ? payload.choices?.[0]?.message?.content?.trim() ?? ""
-      : "";
+    // Extract content from OpenRouter response
+    // Support multiple formats: choices[0].message.content or choices[0].text
+    let content = "";
+    
+    if (isOpenRouterResponse(payload) && payload.choices && payload.choices.length > 0) {
+      const firstChoice = payload.choices[0];
+      
+      // Try message.content first (standard format)
+      if (firstChoice.message?.content) {
+        const rawContent = firstChoice.message.content;
+        
+        // Handle string content
+        if (typeof rawContent === "string") {
+          content = rawContent.trim();
+        }
+        // Handle array content (some models return array of content parts)
+        else if (Array.isArray(rawContent)) {
+          content = (rawContent as Array<unknown>)
+            .map((part: unknown) => {
+              if (typeof part === "string") return part;
+              if (part && typeof part === "object" && "text" in part) {
+                return String((part as { text: unknown }).text);
+              }
+              return "";
+            })
+            .join("")
+            .trim();
+        }
+      }
+      // Fallback: try text field (some models use this)
+      else if ("text" in firstChoice && typeof (firstChoice as { text?: unknown }).text === "string") {
+        content = ((firstChoice as { text: string }).text).trim();
+      }
+    }
 
+    // Debug logging if content extraction failed
+    if (!content) {
+      console.error("[AI Rewrite] failed to extract content", {
+        provider: "openrouter",
+        status: response.status,
+        topLevelKeys: payload ? Object.keys(payload) : [],
+        hasChoices: !!(payload && "choices" in payload),
+        choicesLength: Array.isArray((payload as any)?.choices) ? (payload as any).choices.length : 0,
+        firstChoiceKeys: (payload as any)?.choices?.[0] ? Object.keys((payload as any).choices[0]) : [],
+        messageKeys: (payload as any)?.choices?.[0]?.message ? Object.keys((payload as any).choices[0].message) : [],
+        contentType: typeof (payload as any)?.choices?.[0]?.message?.content,
+        contentPreview: typeof (payload as any)?.choices?.[0]?.message?.content === "string"
+          ? (payload as any).choices[0].message.content.slice(0, 300)
+          : JSON.stringify((payload as any)?.choices?.[0]?.message?.content).slice(0, 300),
+        rawBodyPreview: rawResponseText.slice(0, 300),
+      });
+      
+      return NextResponse.json(
+        { error: "Не удалось переписать текст. Попробуйте позже.", code: "INVALID_RESULT" },
+        { status: 502 }
+      );
+    }
+
+    // Extract the actual rewritten text from JSON response
     const result = extractRewriteResult(content);
     if (!result) {
-      console.error("[OpenRouter] invalid rewrite payload", { content });
-      return NextResponse.json({ error: "AI did not return a valid rewrite result" }, { status: 502 });
+      console.error("[AI Rewrite] failed to parse result JSON", {
+        provider: "openrouter",
+        contentLength: content.length,
+        contentPreview: content.slice(0, 300),
+        contentType: typeof content,
+      });
+      
+      return NextResponse.json(
+        { error: "Не удалось переписать текст. Попробуйте позже.", code: "INVALID_RESULT" },
+        { status: 502 }
+      );
     }
+
+    console.log("[AI Rewrite] success", {
+      provider: "openrouter",
+      model,
+      tone: parsed.data.tone,
+      resultLength: result.length,
+    });
 
     return NextResponse.json({
       result,
@@ -198,11 +374,14 @@ export async function POST(request: NextRequest) {
       model,
     });
   } catch (error) {
-    if (error instanceof Error && error.name === "AbortError") {
-      return NextResponse.json({ error: "AI request timed out" }, { status: 504 });
-    }
-
-    console.error("AI rewrite error:", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    console.error("[AI Rewrite] unexpected error", {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    });
+    
+    return NextResponse.json(
+      { error: "Не удалось переписать текст. Попробуйте позже.", code: "INTERNAL_ERROR" },
+      { status: 500 }
+    );
   }
 }
