@@ -38,6 +38,7 @@ const createOfferSchema = z.object({
   website: z.string().optional(),
   bookingInstructions: z.string().optional(),
   status: z.enum(["DRAFT", "PENDING", "PUBLISHED"]).default("DRAFT"),
+  discoverySignalIds: z.array(z.string()).default([]),
 });
 
 export async function POST(request: NextRequest) {
@@ -92,6 +93,7 @@ export async function POST(request: NextRequest) {
           priceText,
           ageMinMonths: data.ageMinMonths,
           ageMaxMonths: data.ageMaxMonths,
+          discoverySignalIds: data.discoverySignalIds,
           status: data.status,
           ...(data.status === "PUBLISHED" ? { publishedAt: new Date() } : {}),
         },

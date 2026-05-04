@@ -59,6 +59,9 @@ export function getDefaultFormData(): OfferFormData {
     ctaPhone: "",
     ctaLink: "",
     ctaInstructions: "",
+
+    // Signals (DISCOVERY domain, entityType=OFFER)
+    signalIds: [],
     
     // Booking Settings (only for ctaType = "забронировать")
     bookingSettings: {

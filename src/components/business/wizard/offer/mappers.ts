@@ -125,6 +125,7 @@ export function mapOfferToFormData(offer: {
   priceText: string | null;
   ageMinMonths: number | null;
   ageMaxMonths: number | null;
+  discoverySignalIds?: string[];
 }): OfferFormData {
   const defaults = getDefaultFormData();
   return {
@@ -138,5 +139,6 @@ export function mapOfferToFormData(offer: {
     singlePrice: offer.priceFrom != null ? String(offer.priceFrom) : "",
     singleCurrency: "BYN",
     singlePriceLabel: offer.priceText ?? "",
+    signalIds: offer.discoverySignalIds ?? [],
   };
 }

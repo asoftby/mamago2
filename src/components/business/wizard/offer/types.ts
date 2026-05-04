@@ -71,6 +71,9 @@ export interface OfferFormData {
   ctaPhone: string;
   ctaLink: string;
   ctaInstructions: string;
+
+  /** Сигналы DISCOVERY домена (entityType=OFFER), опционально. */
+  signalIds: string[];
   
   // Booking Settings (only for ctaType = "забронировать")
   bookingSettings: {

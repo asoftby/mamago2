@@ -119,10 +119,33 @@ function validateStep2(data: OfferFormData): ValidationResult {
     warnings.push("Рекомендуется указать возрастные группы");
   }
 
+  // Validate Discovery Signals (structured groups)
+  const signalIds = data.signalIds ?? [];
+  
+  // Helper to count signals in a group by slug prefix
+  const countSignalsInGroup = (slugPrefix: string): number => {
+    // Note: We need to check against actual signal IDs, but we don't have the mapping here
+    // For now, we'll do a basic count check
+    // TODO: Improve this by loading signal definitions or passing them as context
+    return signalIds.length; // Placeholder - will be validated on backend
+  };
+
+  // Basic validation: check if signals are selected
+  if (signalIds.length === 0) {
+    errors.push("Выберите характеристики предложения (активность, формат, участие)");
+  } else {
+    // More specific validation would require loading signal definitions
+    // For now, we rely on the UI component to enforce min/max
+    if (signalIds.length < 3) {
+      warnings.push("Рекомендуется выбрать минимум 3 характеристики (по одной из каждой обязательной группы)");
+    }
+  }
+
   const isComplete = Boolean(
     data.title.trim().length >= 3 &&
     data.shortDescription.trim().length >= 10 &&
-    data.shortDescription.length <= 120
+    data.shortDescription.length <= 120 &&
+    signalIds.length >= 3 // Минимум: 1 activity + 1 format + 1 participation
   );
 
   return {

@@ -7,6 +7,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { ChipsRow, type ChipItem } from "@/components/ui/chips-row";
 import { AGE_OPTIONS } from "@/lib/config/ages";
 import type { OfferFormData } from "../types";
+import { StructuredDiscoverySignalPicker } from "../../shared/StructuredDiscoverySignalPicker";
+import { SignalEntityType } from "@prisma/client";
 
 interface Step2InformationProps {
   data: OfferFormData;
@@ -88,6 +90,7 @@ export function Step2Information({ data, onChange, isEditable }: Step2Informatio
       <div className="space-y-2">
         <Label>Возрастные группы</Label>
         <ChipsRow
+          layout="masonry"
           items={AGE_OPTIONS.map((ageOption): ChipItem => ({
             id: ageOption.key,
             label: ageOption.shortLabel,
@@ -101,26 +104,60 @@ export function Step2Information({ data, onChange, isEditable }: Step2Informatio
         </p>
       </div>
 
-      {/* Preview */}
-      {data.title && data.shortDescription && (
-        <div className="bg-gray-50 border rounded-lg p-4">
-          <h4 className="font-medium mb-2">Превью в каталоге</h4>
-          <div className="bg-white border rounded-lg p-4">
-            <h5 className="font-medium mb-2">{data.title}</h5>
-            <p className="text-sm text-muted-foreground mb-3">{data.shortDescription}</p>
-            <div className="flex items-center justify-between text-xs">
-              <span className="text-muted-foreground">
-                Предложение
-              </span>
-              {data.ageGroups.length > 0 && (
-                <span className="text-muted-foreground">
-                  {data.ageGroups.join(", ")}
-                </span>
-              )}
-            </div>
-          </div>
+      {/* Discovery Signals - Structured */}
+      <div className="space-y-4">
+        <div>
+          <h3 className="text-lg font-semibold mb-1">Характеристики предложения</h3>
+          <p className="text-sm text-muted-foreground">
+            Помогают пользователям найти это предложение в каталоге
+          </p>
         </div>
-      )}
+
+        <StructuredDiscoverySignalPicker
+          entityType={SignalEntityType.OFFER}
+          value={data.signalIds ?? []}
+          onChange={(ids) => onChange({ signalIds: ids })}
+          disabled={!isEditable}
+          groupConfigs={[
+            {
+              slug: "discovery-activity",
+              title: "Чем будут заниматься",
+              required: true,
+              min: 1,
+              max: 4,
+              helperText: "Основные виды активности",
+            },
+            {
+              slug: "discovery-format",
+              title: "Где проходит",
+              required: true,
+              min: 1,
+              helperText: "Формат проведения",
+            },
+            {
+              slug: "discovery-participation",
+              title: "Как проходит",
+              required: true,
+              min: 1,
+              helperText: "Формат участия",
+            },
+            {
+              slug: "discovery-intention",
+              title: "Для чего это подходит",
+              required: false,
+              max: 3,
+              helperText: "Сценарии использования (опционально)",
+            },
+            {
+              slug: "discovery-feature",
+              title: "Особенности",
+              required: false,
+              max: 5,
+              helperText: "Дополнительные преимущества (опционально)",
+            },
+          ]}
+        />
+      </div>
     </div>
   );
 }

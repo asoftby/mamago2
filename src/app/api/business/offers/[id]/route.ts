@@ -32,6 +32,7 @@ const updateOfferSchema = z.object({
   website: z.string().optional(),
   bookingInstructions: z.string().optional(),
   status: z.enum(["DRAFT", "PENDING", "PUBLISHED"]).optional(),
+  discoverySignalIds: z.array(z.string()).optional(),
 });
 
 export async function GET(
@@ -132,6 +133,7 @@ export async function PATCH(
     if (data.ageMinMonths !== undefined) updateData.ageMinMonths = data.ageMinMonths;
     if (data.ageMaxMonths !== undefined) updateData.ageMaxMonths = data.ageMaxMonths;
     if (data.coverImage !== undefined) updateData.coverImage = data.coverImage;
+    if (data.discoverySignalIds !== undefined) updateData.discoverySignalIds = data.discoverySignalIds;
     if (data.status !== undefined) {
       updateData.status = data.status;
       if (data.status === "PUBLISHED") {

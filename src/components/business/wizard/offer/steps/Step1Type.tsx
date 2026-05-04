@@ -3,11 +3,8 @@
 
 import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { GraduationCap, PartyPopper, Wrench } from "lucide-react";
-import { StableCardSelector, StableCardSelectorSmall } from "@/components/ui/stable-card-selector";
+import { GraduationCap, PartyPopper, Sparkles } from "lucide-react";
+import { StableCardSelector } from "@/components/ui/stable-card-selector";
 import type { OfferFormData } from "../types";
 import { determineIntent } from "../defaults";
 
@@ -168,8 +165,6 @@ function ServiceChildSettings({
 }
 
 export function Step1Type({ data, onChange, isEditable }: Step1TypeProps) {
-  const [helperText, setHelperText] = useState("");
-
   const handleOfferKindChange = (offerKind: "course" | "birthday" | "service") => {
     onChange({
       offerKind,
@@ -208,7 +203,7 @@ export function Step1Type({ data, onChange, isEditable }: Step1TypeProps) {
       value: "service" as const,
       label: "Услуга",
       description: "Отдельная услуга: торт, декор, фотограф, аниматор и другие услуги",
-      icon: Wrench,
+      icon: Sparkles,
     },
   ];
 
@@ -244,7 +239,7 @@ export function Step1Type({ data, onChange, isEditable }: Step1TypeProps) {
       <div>
         <h2 className="text-xl font-semibold mb-2">Тип предложения</h2>
         <p className="text-muted-foreground">
-          Что именно предлагается пользователям?
+          Выберите формат предложения — это определит дальнейшие шаги
         </p>
       </div>
 
@@ -258,19 +253,6 @@ export function Step1Type({ data, onChange, isEditable }: Step1TypeProps) {
         >
           {renderNestedContent}
         </StableCardSelector>
-
-        {/* Helper Section */}
-        <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-          <h4 className="font-medium text-gray-900 mb-2">Не уверены что выбрать?</h4>
-          <p className="text-sm text-gray-600 mb-3">Напишите что вы предлагаете</p>
-          <Input
-            placeholder="Например: курс, день рождения, торт, аниматор"
-            value={helperText}
-            onChange={(e) => setHelperText(e.target.value)}
-            disabled={!isEditable}
-            className="bg-white"
-          />
-        </div>
 
         {/* Auto-determined Intent Preview */}
         {data.offerKind && (
