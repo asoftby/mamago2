@@ -10,7 +10,7 @@
  * Run: pnpm db:seed:system
  */
 
-import { PrismaClient, type OccasionType } from "@prisma/client";
+import { PrismaClient, type OccasionType, type SignalDomain, type SignalEntityType } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
@@ -33,6 +33,150 @@ async function upsertSignal(
       create: { definitionId: def.id, value: o.value, label: o.label, order: o.order, isActive: true },
     });
   }
+}
+
+async function upsertDomainSignal(
+  slug: string,
+  title: string,
+  domain: "PROFILE" | "DISCOVERY" | "RECOMMENDATION",
+  order: number,
+) {
+  return prisma.signalDefinition.upsert({
+    where: { slug },
+    update: {
+      title,
+      titleEn: title,
+      domain,
+      order,
+      isActive: true,
+      isSystem: true,
+      parentId: null,
+      status: "ACTIVE",
+      entityTypes: [],
+    },
+    create: {
+      slug,
+      title,
+      titleEn: title,
+      domain,
+      order,
+      isActive: true,
+      isSystem: true,
+      parentId: null,
+      status: "ACTIVE",
+      entityTypes: [],
+    },
+  });
+}
+
+async function upsertSignalWithDomain(
+  slug: string,
+  title: string,
+  domain: SignalDomain,
+  entityTypes: SignalEntityType[],
+  order: number,
+  options: Array<{ value: string; label: string; order: number }> = [],
+  parentSlug?: string,
+) {
+  // Найдем родителя если указан
+  let parentId: string | null = null;
+  if (parentSlug) {
+    const parent = await prisma.signalDefinition.findUnique({
+      where: { slug: parentSlug },
+    });
+    if (parent) {
+      parentId = parent.id;
+    }
+  }
+
+  const def = await prisma.signalDefinition.upsert({
+    where: { slug },
+    update: {
+      title,
+      titleEn: title,
+      domain,
+      entityTypes,
+      parentId,
+      order,
+      isActive: true,
+      isSystem: true,
+      status: "ACTIVE",
+    },
+    create: {
+      slug,
+      title,
+      titleEn: title,
+      domain,
+      entityTypes,
+      parentId,
+      order,
+      isActive: true,
+      isSystem: true,
+      status: "ACTIVE",
+    },
+  });
+
+  // Создаем опции если есть
+  for (const o of options) {
+    await prisma.signalOption.upsert({
+      where: { definitionId_value: { definitionId: def.id, value: o.value } },
+      update: { label: o.label, order: o.order, isActive: true },
+      create: { definitionId: def.id, value: o.value, label: o.label, order: o.order, isActive: true },
+    });
+  }
+
+  return def;
+}
+
+async function upsertSignalGroupRoot(slug: string, title: string, order: number) {
+  return prisma.signalDefinition.upsert({
+    where: { slug },
+    update: {
+      title,
+      titleEn: title,
+      order,
+      isActive: true,
+      isSystem: true,
+      parentId: null,
+    },
+    create: {
+      slug,
+      title,
+      titleEn: title,
+      order,
+      isActive: true,
+      isSystem: true,
+      parentId: null,
+    },
+  });
+}
+
+async function upsertSignalGroupChild(
+  parentId: string,
+  slug: string,
+  title: string,
+  order: number,
+) {
+  await prisma.signalDefinition.upsert({
+    where: { slug },
+    update: {
+      title,
+      titleEn: title,
+      parentId,
+      order,
+      isActive: true,
+      isSystem: true,
+    },
+    create: {
+      slug,
+      title,
+      titleEn: title,
+      parentId,
+      order,
+      isActive: true,
+      isSystem: true,
+    },
+  });
 }
 
 const APPROVED_OCCASIONS: Array<{
@@ -84,29 +228,20 @@ async function main() {
   // ── Signals (SYSTEM) ──────────────────────────────────────────────────────
   console.log("  → Signals");
 
-  await upsertSignal("tempo", "Tempo", 0, [
-    { value: "slow",   label: "Медленно",  order: 1 },
-    { value: "medium", label: "Умеренно",  order: 2 },
-    { value: "fast",   label: "Быстро",    order: 3 },
-  ]);
+  // Доменные корневые узлы
+  await upsertDomainSignal("domain-profile", "Профиль", "PROFILE", -3);
+  await upsertDomainSignal("domain-discovery", "Discovery", "DISCOVERY", -2);
+  await upsertDomainSignal("domain-recommendation", "Рекомендации", "RECOMMENDATION", -1);
 
-  await upsertSignal("energy", "Energy", 1, [
-    { value: "low",    label: "Низкая",    order: 1 },
-    { value: "medium", label: "Средняя",   order: 2 },
-    { value: "high",   label: "Высокая",   order: 3 },
-  ]);
-
-  // age signal: canonical source for birthday builder + ranking
-  // Keys must match AGE_GROUPS in src/features/filters/age/ageGroups.ts
-  await upsertSignal("age", "Возраст", 2, [
+  // ═══ PROFILE DOMAIN ═══
+  await upsertSignalWithDomain("age", "Возраст", "PROFILE", ["USER"], 1, [
     { value: "0-3",  label: "0–3 года",  order: 1 },
     { value: "3-5",  label: "3–5 лет",   order: 2 },
     { value: "5-8",  label: "6–10 лет",  order: 3 },
     { value: "8-12", label: "10+ лет",   order: 4 },
   ]);
 
-  // Интересы события (мастер бизнеса / API /api/public/signals/interests) — значения = slug, как у SYSTEM_INTERESTS в коде
-  await upsertSignal("interests", "Интересы", 3, [
+  await upsertSignalWithDomain("interests", "Интересы", "PROFILE", ["USER"], 2, [
     { value: "sport", label: "Спорт", order: 1 },
     { value: "music", label: "Музыка", order: 2 },
     { value: "art", label: "Рисование", order: 3 },
@@ -122,65 +257,44 @@ async function main() {
     { value: "quiet-activities", label: "Спокойные занятия", order: 13 },
   ]);
 
-  /** Иерархия: корень = группа, дети = чипы профиля взрослого (не путать с tempo/energy). */
-  async function upsertSignalGroupRoot(slug: string, title: string, order: number) {
-    return prisma.signalDefinition.upsert({
-      where: { slug },
-      update: {
-        title,
-        titleEn: title,
-        order,
-        isActive: true,
-        isSystem: true,
-        parentId: null,
-      },
-      create: {
-        slug,
-        title,
-        titleEn: title,
-        order,
-        isActive: true,
-        isSystem: true,
-        parentId: null,
-      },
-    });
-  }
-  async function upsertSignalGroupChild(
-    parentId: string,
-    slug: string,
-    title: string,
-    order: number,
-  ) {
-    await prisma.signalDefinition.upsert({
-      where: { slug },
-      update: {
-        title,
-        titleEn: title,
-        parentId,
-        order,
-        isActive: true,
-        isSystem: true,
-      },
-      create: {
-        slug,
-        title,
-        titleEn: title,
-        parentId,
-        order,
-        isActive: true,
-        isSystem: true,
-      },
-    });
-  }
+  // Preferences группа (корень + дети)
+  const preferencesRoot = await upsertSignalWithDomain("preferences", "Предпочтения", "PROFILE", ["USER"], 3);
+  await upsertSignalWithDomain("preferences-aesthetics", "Эстетика", "PROFILE", ["USER"], 1, [], "preferences");
+  await upsertSignalWithDomain("preferences-coffee", "Кофе", "PROFILE", ["USER"], 2, [], "preferences");
+  await upsertSignalWithDomain("preferences-family", "Семейно", "PROFILE", ["USER"], 3, [], "preferences");
 
-  const preferencesRoot = await upsertSignalGroupRoot("preferences", "Предпочтения", 10);
-  await upsertSignalGroupChild(preferencesRoot.id, "preferences-aesthetics", "Эстетика", 1);
-  await upsertSignalGroupChild(preferencesRoot.id, "preferences-coffee", "Кофе", 2);
-  await upsertSignalGroupChild(preferencesRoot.id, "preferences-calm", "Спокойно", 3);
-  await upsertSignalGroupChild(preferencesRoot.id, "preferences-active", "Активно", 4);
-  await upsertSignalGroupChild(preferencesRoot.id, "preferences-family", "Семейно", 5);
-  await upsertSignalGroupChild(preferencesRoot.id, "preferences-creative", "Творчество", 6);
+  // ═══ DISCOVERY DOMAIN ═══
+  // Format группа
+  const formatRoot = await upsertSignalWithDomain("format", "Формат", "DISCOVERY", ["PLACE", "EVENT", "ROUTE"], 1);
+  await upsertSignalWithDomain("format-indoor", "В помещении", "DISCOVERY", ["PLACE", "EVENT", "ROUTE"], 1, [], "format");
+  await upsertSignalWithDomain("format-outdoor", "На улице", "DISCOVERY", ["PLACE", "EVENT", "ROUTE"], 2, [], "format");
+  await upsertSignalWithDomain("format-online", "Онлайн", "DISCOVERY", ["PLACE", "EVENT", "ROUTE"], 3, [], "format");
 
+  // Activity группа
+  const activityRoot = await upsertSignalWithDomain("activity", "Активность", "DISCOVERY", ["PLACE", "EVENT", "ROUTE"], 2);
+  await upsertSignalWithDomain("activity-active", "Активно", "DISCOVERY", ["PLACE", "EVENT", "ROUTE"], 1, [], "activity");
+  await upsertSignalWithDomain("activity-creative", "Творчество", "DISCOVERY", ["PLACE", "EVENT", "ROUTE"], 2, [], "activity");
+  await upsertSignalWithDomain("activity-educational", "Образовательно", "DISCOVERY", ["PLACE", "EVENT", "ROUTE"], 3, [], "activity");
+  await upsertSignalWithDomain("activity-entertainment", "Развлечения", "DISCOVERY", ["PLACE", "EVENT", "ROUTE"], 4, [], "activity");
+  await upsertSignalWithDomain("activity-food", "Еда", "DISCOVERY", ["PLACE", "EVENT", "ROUTE", "OFFER"], 5, [], "activity");
+  await upsertSignalWithDomain("activity-calm", "Спокойно", "DISCOVERY", ["PLACE", "EVENT", "ROUTE"], 6, [], "activity");
+  await upsertSignalWithDomain("activity-social", "Социально", "DISCOVERY", ["PLACE", "EVENT", "ROUTE"], 7, [], "activity");
+
+  // ═══ RECOMMENDATION DOMAIN ═══
+  await upsertSignalWithDomain("tempo", "Tempo", "RECOMMENDATION", [], 1, [
+    { value: "slow",   label: "Медленно",  order: 1 },
+    { value: "medium", label: "Умеренно",  order: 2 },
+    { value: "fast",   label: "Быстро",    order: 3 },
+  ]);
+
+  await upsertSignalWithDomain("energy", "Energy", "RECOMMENDATION", [], 2, [
+    { value: "low",    label: "Низкая",    order: 1 },
+    { value: "medium", label: "Средняя",   order: 2 },
+    { value: "high",   label: "Высокая",   order: 3 },
+  ]);
+
+  // ═══ LEGACY SIGNALS (для обратной совместимости) ═══
+  // Старые сигналы остаются для совместимости, но помечены как DEPRECATED в миграции
   const leisureRoot = await upsertSignalGroupRoot("leisure-format", "Формат досуга", 11);
   await upsertSignalGroupChild(leisureRoot.id, "leisure-format-home", "Дома", 1);
   await upsertSignalGroupChild(leisureRoot.id, "leisure-format-outdoor", "На улице", 2);

@@ -12,8 +12,10 @@ import { ChevronDown, ChevronUp, Save, Trash2 } from "lucide-react";
 import { toast } from "@/lib/toast";
 import { useAutoSlug } from "@/hooks/useAutoSlug";
 import { FilterSelect } from "@/components/ui/filter-select";
+import { CardMultiSelect } from "@/components/ui/card-multiselect";
 import { messageFromApiError } from "@/lib/admin/messageFromApiError";
 import { slugifyLabelToValue } from "@/lib/slugifyLabelToValue";
+import { SignalDomain, SignalEntityType, SignalStatus } from "@prisma/client";
 import { cn } from "@/lib/utils";
 
 const adminFetch: RequestInit = { credentials: "include" };
@@ -39,6 +41,11 @@ type SignalRow = {
   isFeatured: boolean;
   parentId: string | null;
   parent: { id: string; title: string; slug: string } | null;
+  domain: SignalDomain | null;
+  entityTypes: SignalEntityType[];
+  status: SignalStatus;
+  replacedById: string | null;
+  replacedBy: { id: string; title: string; slug: string } | null;
   options: Option[];
   _count: { children: number; options: number };
 };
@@ -59,7 +66,7 @@ export default function EditSignalPage() {
     try {
       const [resOne, resAll] = await Promise.all([
         fetch(`/api/admin/signals/${slug}`, adminFetch),
-        fetch("/api/admin/signals", adminFetch),
+        fetch("/api/admin/signals?includeDeprecated=true", adminFetch),
       ]);
       if (!resAll.ok) {
         const err = await resAll.json().catch(() => ({}));
@@ -168,6 +175,12 @@ function SignalEditor({
   const [isActive, setIsActive] = useState(signal.isActive);
   const [isFeatured, setIsFeatured] = useState(signal.isFeatured);
   const [parentId, setParentId] = useState<string | null>(signal.parentId);
+  
+  // New domain architecture fields
+  const [domain, setDomain] = useState<SignalDomain | null>(signal.domain);
+  const [entityTypes, setEntityTypes] = useState<SignalEntityType[]>(signal.entityTypes || []);
+  const [status, setStatus] = useState<SignalStatus>(signal.status || SignalStatus.ACTIVE);
+  const [replacedById, setReplacedById] = useState<string | null>(signal.replacedById);
 
   const [newOptLabel, setNewOptLabel] = useState("");
   const [newOptValue, setNewOptValue] = useState("");
@@ -179,6 +192,35 @@ function SignalEditor({
   const [removingOptionIds, setRemovingOptionIds] = useState<string[]>([]);
 
   const hasChildren = signal._count.children > 0;
+
+  // Entity type options for multi-select
+  const entityTypeOptions = Object.values(SignalEntityType).map(type => ({
+    value: type,
+    label: type
+  }));
+
+  // Domain options for select
+  const domainOptions = [
+    { value: "", label: "— No Domain —" },
+    ...Object.values(SignalDomain).map(d => ({
+      value: d,
+      label: d.charAt(0) + d.slice(1).toLowerCase()
+    }))
+  ];
+
+  // Status options for select
+  const statusOptions = Object.values(SignalStatus).map(s => ({
+    value: s,
+    label: s.charAt(0) + s.slice(1).toLowerCase()
+  }));
+
+  // Replacement signal options (exclude current signal and deprecated signals)
+  const replacementOptions = [
+    { value: "", label: "— No Replacement —" },
+    ...roots
+      .filter(r => r.id !== signal.id && r.status === SignalStatus.ACTIVE)
+      .map(r => ({ value: r.id, label: r.title }))
+  ];
 
   useEffect(() => {
     setOptions(signal.options ?? []);
@@ -220,6 +262,10 @@ function SignalEditor({
       isActive,
       isFeatured,
       parentId,
+      domain: domain || null,
+      entityTypes,
+      status,
+      replacedById: replacedById || null,
     });
   };
 
@@ -383,6 +429,55 @@ function SignalEditor({
       </CardHeader>
       <CardContent className="space-y-6">
         {parentSelect}
+
+        {/* Domain Architecture Fields */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid gap-1">
+            <Label className="text-xs">Domain</Label>
+            <FilterSelect
+              value={domain || ""}
+              placeholder="— No Domain —"
+              options={domainOptions}
+              onChange={(v) => setDomain(v as SignalDomain || null)}
+            />
+          </div>
+          <div className="grid gap-1">
+            <Label className="text-xs">Status</Label>
+            <FilterSelect
+              value={status}
+              options={statusOptions}
+              onChange={(v) => setStatus(v as SignalStatus)}
+            />
+          </div>
+        </div>
+
+        <div className="grid gap-1">
+          <Label className="text-xs">Entity Types</Label>
+          <CardMultiSelect
+            placeholder="Select entity types..."
+            values={entityTypes}
+            onChange={(values: string[]) => setEntityTypes(values as SignalEntityType[])}
+            options={entityTypeOptions}
+            allowClear
+          />
+        </div>
+
+        {status === SignalStatus.DEPRECATED && (
+          <div className="grid gap-1">
+            <Label className="text-xs">Replaced By</Label>
+            <FilterSelect
+              value={replacedById || ""}
+              placeholder="— No Replacement —"
+              options={replacementOptions}
+              onChange={(v) => setReplacedById(v || null)}
+            />
+            {signal.replacedBy && (
+              <p className="text-xs text-gray-600 mt-1">
+                Currently replaced by: <strong>{signal.replacedBy.title}</strong>
+              </p>
+            )}
+          </div>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
           <div className="grid gap-2 md:col-span-2">

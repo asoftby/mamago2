@@ -6,6 +6,7 @@ import { toast } from "@/lib/toast";
 import { useAutoSlug } from "@/hooks/useAutoSlug";
 import { orderSignalDefinitionsForDisplay } from "@/lib/taxonomy/signalHierarchy";
 import { messageFromApiError } from "@/lib/admin/messageFromApiError";
+import { SignalDomain, SignalEntityType, SignalStatus } from "@prisma/client";
 import {
   DiscoveryTaxonomyPageShell,
   DiscoveryTaxonomyPageHeader,
@@ -19,6 +20,8 @@ import {
   discoveryTd,
   discoveryTableRowClass,
 } from "@/components/admin/discovery";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
 const adminFetch: RequestInit = { credentials: "include" };
@@ -32,6 +35,11 @@ type SignalRow = {
   parentId: string | null;
   parent: { id: string; title: string; slug: string } | null;
   order: number;
+  domain: SignalDomain | null;
+  entityTypes: SignalEntityType[];
+  status: SignalStatus;
+  replacedById: string | null;
+  replacedBy: { id: string; title: string; slug: string } | null;
   _count: { children: number; options: number };
 };
 
@@ -39,14 +47,21 @@ export default function SignalsPage() {
   const router = useRouter();
   const [signals, setSignals] = useState<SignalRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<string>("all");
 
   const [createParentId, setCreateParentId] = useState<string | null>(null);
   const newSignal = useAutoSlug("", "");
 
-  const fetchSignals = async () => {
+  const fetchSignals = async (domain?: SignalDomain) => {
     setLoading(true);
     try {
-      const res = await fetch("/api/admin/signals", adminFetch);
+      const params = new URLSearchParams();
+      params.set("includeDeprecated", "true"); // Show all signals in admin
+      if (domain) {
+        params.set("domain", domain);
+      }
+      
+      const res = await fetch(`/api/admin/signals?${params.toString()}`, adminFetch);
       if (res.ok) {
         const data = await res.json();
         setSignals(data);
@@ -60,8 +75,9 @@ export default function SignalsPage() {
   };
 
   useEffect(() => {
-    fetchSignals();
-  }, []);
+    const domain = activeTab === "all" ? undefined : activeTab as SignalDomain;
+    fetchSignals(domain);
+  }, [activeTab]);
 
   const roots = useMemo(
     () => signals.filter((s) => s.parentId == null),
@@ -95,7 +111,8 @@ export default function SignalsPage() {
     });
     if (res.ok) {
       newSignal.hydrate("", "");
-      fetchSignals();
+      const domain = activeTab === "all" ? undefined : activeTab as SignalDomain;
+      fetchSignals(domain);
       toast.success("Сигнал создан");
     } else {
       const err = await res.json().catch(() => ({}));
@@ -107,6 +124,43 @@ export default function SignalsPage() {
     router.push(EDIT_SIGNAL_HREF(slug));
   };
 
+  const formatEntityTypes = (entityTypes: SignalEntityType[]) => {
+    if (entityTypes.length === 0) return "—";
+    return entityTypes.join(", ");
+  };
+
+  const formatDomain = (domain: SignalDomain | null) => {
+    if (!domain) return "—";
+    const labels = {
+      [SignalDomain.PROFILE]: "Profile",
+      [SignalDomain.DISCOVERY]: "Discovery", 
+      [SignalDomain.RECOMMENDATION]: "Recommendation"
+    };
+    return labels[domain] || domain;
+  };
+
+  const getStatusBadge = (status: SignalStatus, replacedBy?: { title: string; slug: string } | null) => {
+    if (status === SignalStatus.DEPRECATED) {
+      return (
+        <div className="flex flex-col gap-1">
+          <Badge variant="secondary" className="text-xs bg-gray-200 text-gray-600">
+            DEPRECATED
+          </Badge>
+          {replacedBy && (
+            <span className="text-xs text-gray-500">
+              → {replacedBy.title}
+            </span>
+          )}
+        </div>
+      );
+    }
+    return (
+      <Badge variant="default" className="text-xs bg-green-100 text-green-800">
+        ACTIVE
+      </Badge>
+    );
+  };
+
   return (
     <DiscoveryTaxonomyPageShell>
       <DiscoveryTaxonomyPageHeader
@@ -115,89 +169,123 @@ export default function SignalsPage() {
       />
 
       <div className="space-y-6">
-        <DiscoveryCreateCard title="Create New Signal">
-          <DiscoveryParentSelector
-            label="Родительский сигнал"
-            helperText="Не выбрано — корневая группа; выбран корень — создаётся под-сигнал."
-            value={createParentId}
-            onChange={setCreateParentId}
-            roots={parentRootOptions}
-            emptyLabel="— Корневой сигнал —"
-          />
-          <DiscoveryTitleSlugCreateRow
-            titleLabel="Title"
-            auto={newSignal}
-            onCreate={createSignal}
-            titlePlaceholder="Например: Energy"
-            slugPlaceholder="energy"
-          />
-        </DiscoveryCreateCard>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full grid-cols-4">
+            <TabsTrigger value="all">All Signals</TabsTrigger>
+            <TabsTrigger value={SignalDomain.PROFILE}>Profile</TabsTrigger>
+            <TabsTrigger value={SignalDomain.DISCOVERY}>Discovery</TabsTrigger>
+            <TabsTrigger value={SignalDomain.RECOMMENDATION}>Recommendation</TabsTrigger>
+          </TabsList>
 
-        {loading ? (
-          <div className="text-sm text-gray-600">Loading...</div>
-        ) : ordered.length === 0 ? (
-          <DiscoveryEmptyState
-            title="Пока нет сигналов"
-            description="Создайте корневую группу сигнала или под-сигнал с помощью формы выше."
-          />
-        ) : (
-          <DiscoveryTaxonomyTable>
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
-                <th className={discoveryTh()}>Название</th>
-                <th className={discoveryTh()}>Slug</th>
-                <th className={discoveryTh()}>Родитель</th>
-                <th className={discoveryTh("w-20")}>Порядок</th>
-                <th className={discoveryTh("w-24")}>Используется</th>
-                <th className="w-10 px-2 py-3" aria-hidden />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {ordered.map((s) => (
-                <tr
-                  key={s.id}
-                  role="link"
-                  tabIndex={0}
-                  className={discoveryTableRowClass(!!s.parentId)}
-                  onClick={() => goToEdit(s.slug)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      goToEdit(s.slug);
-                    }
-                  }}
-                >
-                  <td className={discoveryTd()}>
-                    <span
-                      className={cn(
-                        "inline-flex items-center gap-2",
-                        s.parentId && "pl-6 border-l-2 border-blue-300 ml-1",
-                      )}
-                    >
-                      {s.parentId ? (
-                        <span className="text-blue-500 text-xs font-mono" aria-hidden>
-                          └
-                        </span>
-                      ) : null}
-                      <span className="font-medium text-gray-900">{s.title}</span>
-                    </span>
-                  </td>
-                  <td className={cn(discoveryTd(), "font-mono text-xs text-gray-700")}>{s.slug}</td>
-                  <td className={discoveryTd("text-gray-600")}>
-                    {s.parent ? (
-                      <span>{s.parent.title}</span>
-                    ) : (
-                      <span className="text-gray-400">—</span>
-                    )}
-                  </td>
-                  <td className={discoveryTd("text-gray-600")}>{s.order}</td>
-                  <td className={discoveryTd("text-gray-600")}>{s._count.options}</td>
-                  <DiscoveryTableChevronCell />
-                </tr>
-              ))}
-            </tbody>
-          </DiscoveryTaxonomyTable>
-        )}
+          <TabsContent value={activeTab} className="space-y-6">
+            <DiscoveryCreateCard title="Create New Signal">
+              <DiscoveryParentSelector
+                label="Родительский сигнал"
+                helperText="Не выбрано — корневая группа; выбран корень — создаётся под-сигнал."
+                value={createParentId}
+                onChange={setCreateParentId}
+                roots={parentRootOptions}
+                emptyLabel="— Корневой сигнал —"
+              />
+              <DiscoveryTitleSlugCreateRow
+                titleLabel="Title"
+                auto={newSignal}
+                onCreate={createSignal}
+                titlePlaceholder="Например: Energy"
+                slugPlaceholder="energy"
+              />
+            </DiscoveryCreateCard>
+
+            {loading ? (
+              <div className="text-sm text-gray-600">Loading...</div>
+            ) : ordered.length === 0 ? (
+              <DiscoveryEmptyState
+                title="Пока нет сигналов"
+                description="Создайте корневую группу сигнала или под-сигнал с помощью формы выше."
+              />
+            ) : (
+              <DiscoveryTaxonomyTable>
+                <thead className="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <th className={discoveryTh()}>Название</th>
+                    <th className={discoveryTh()}>Slug</th>
+                    <th className={discoveryTh()}>Domain</th>
+                    <th className={discoveryTh()}>Entity Types</th>
+                    <th className={discoveryTh()}>Status</th>
+                    <th className={discoveryTh()}>Родитель</th>
+                    <th className={discoveryTh("w-20")}>Порядок</th>
+                    <th className={discoveryTh("w-24")}>Используется</th>
+                    <th className="w-10 px-2 py-3" aria-hidden />
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {ordered.map((s) => {
+                    const isDeprecated = s.status === SignalStatus.DEPRECATED;
+                    return (
+                      <tr
+                        key={s.id}
+                        role="link"
+                        tabIndex={isDeprecated ? -1 : 0}
+                        className={cn(
+                          discoveryTableRowClass(!!s.parentId),
+                          isDeprecated && "opacity-60 cursor-not-allowed bg-gray-50"
+                        )}
+                        onClick={() => !isDeprecated && goToEdit(s.slug)}
+                        onKeyDown={(e) => {
+                          if (!isDeprecated && (e.key === "Enter" || e.key === " ")) {
+                            e.preventDefault();
+                            goToEdit(s.slug);
+                          }
+                        }}
+                      >
+                        <td className={discoveryTd()}>
+                          <span
+                            className={cn(
+                              "inline-flex items-center gap-2",
+                              s.parentId && "pl-6 border-l-2 border-blue-300 ml-1",
+                              isDeprecated && "text-gray-500"
+                            )}
+                          >
+                            {s.parentId ? (
+                              <span className="text-blue-500 text-xs font-mono" aria-hidden>
+                                └
+                              </span>
+                            ) : null}
+                            <span className={cn("font-medium", isDeprecated ? "text-gray-500" : "text-gray-900")}>
+                              {s.title}
+                            </span>
+                          </span>
+                        </td>
+                        <td className={cn(discoveryTd(), "font-mono text-xs", isDeprecated ? "text-gray-500" : "text-gray-700")}>
+                          {s.slug}
+                        </td>
+                        <td className={discoveryTd("text-gray-600")}>
+                          {formatDomain(s.domain)}
+                        </td>
+                        <td className={discoveryTd("text-gray-600")}>
+                          <span className="text-xs">{formatEntityTypes(s.entityTypes)}</span>
+                        </td>
+                        <td className={discoveryTd()}>
+                          {getStatusBadge(s.status, s.replacedBy)}
+                        </td>
+                        <td className={discoveryTd("text-gray-600")}>
+                          {s.parent ? (
+                            <span>{s.parent.title}</span>
+                          ) : (
+                            <span className="text-gray-400">—</span>
+                          )}
+                        </td>
+                        <td className={discoveryTd("text-gray-600")}>{s.order}</td>
+                        <td className={discoveryTd("text-gray-600")}>{s._count.options}</td>
+                        <DiscoveryTableChevronCell />
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </DiscoveryTaxonomyTable>
+            )}
+          </TabsContent>
+        </Tabs>
       </div>
     </DiscoveryTaxonomyPageShell>
   );

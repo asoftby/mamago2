@@ -38,6 +38,8 @@ model User {
   leisureFormatSignalId         String?
   /// Дочерние SignalDefinition (parent.slug = preferences), макс. 3 в UI
   preferenceSignalIds           String[]                     @default([])
+  /// Сигналы PROFILE домена, ID SignalDefinition
+  profileSignalIds              String[]                     @default([])
   /// Роль в семье (блок «Моя семья»): MOM | DAD | GRANDMA | GRANDPA | ADULT
   familyRole                    String?
   ageBandLabel                  String?
@@ -333,12 +335,26 @@ model SignalDefinition {
   parentId   String?
   /// True = seeded by system, cannot be deleted, key (slug) is immutable
   isSystem   Boolean            @default(false)
+  /// Домен применения сигнала
+  domain     SignalDomain?
+  /// Типы сущностей, к которым применяется сигнал
+  entityTypes SignalEntityType[]
+  /// Статус сигнала (активный или устаревший)
+  status     SignalStatus       @default(ACTIVE)
+  /// ID сигнала, который заменяет текущий (для устаревших сигналов)
+  replacedById String?
   parent     SignalDefinition?  @relation("SignalDefinitionHierarchy", fields: [parentId], references: [id], onDelete: Restrict)
   children   SignalDefinition[] @relation("SignalDefinitionHierarchy")
+  /// Сигнал, который заменяет текущий
+  replacedBy SignalDefinition?  @relation("SignalReplacement", fields: [replacedById], references: [id])
+  /// Сигналы, которые заменяет текущий
+  replaces   SignalDefinition[] @relation("SignalReplacement")
   options    SignalOption[]
 
   @@index([order])
   @@index([parentId, order])
+  @@index([domain])
+  @@index([status])
 }
 
 model SignalOption {
@@ -446,7 +462,7 @@ model EventCategory {
   id                   String                       @id @default(cuid())
   nameRu               String
   nameEn               String
-  slug                 String                       @unique
+  slug                 String
   icon                 String?
   sortOrder            Int                          @default(0)
   isActive             Boolean                      @default(true)
@@ -467,9 +483,11 @@ model EventCategory {
   activityProgramLinks ActivityProgramCategory[]
   parent               EventCategory?               @relation("EventCategoryChildren", fields: [parentId], references: [id], onDelete: Restrict)
   children             EventCategory[]              @relation("EventCategoryChildren")
-  options              EventCategoryOption[]
   genres               Genre[]
+  placePrimary         Place[]                      @relation("PlacePrimaryCategory")
+  placeSubcategories   PlaceSubcategory[]           @relation("PlaceSubcategoryCategory")
 
+  @@unique([publicationType, slug])
   @@index([sortOrder])
   @@index([isActive, sortOrder])
   @@index([parentId])
@@ -495,19 +513,6 @@ model Genre {
   @@unique([categoryId, slug])
   @@index([categoryId, sortOrder])
   @@index([categoryId, isActive, sortOrder])
-}
-
-model EventCategoryOption {
-  id         String        @id @default(cuid())
-  categoryId String
-  label      String
-  value      String
-  order      Int           @default(0)
-  isActive   Boolean       @default(true)
-  category   EventCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-
-  @@unique([categoryId, value])
-  @@index([categoryId, isActive, order])
 }
 
 model City {
@@ -637,6 +642,8 @@ model Activity {
   importedRecords      ImportedRecord[]          @relation("ImportedRecordActivity")
   planItems            PlanItem[]
   occasionLinks        ActivityOccasion[]
+  /// Сигналы DISCOVERY домена (entityType=EVENT или OFFER), ID SignalDefinition
+  discoverySignalIds   String[]                     @default([])
 
   @@index([placeId])
   @@index([type])
@@ -911,6 +918,10 @@ model Place {
   seoCanonicalSource           SeoCanonicalSource  @default(FALLBACK)
   createdByUserId              String
   ownerBusinessId              String?
+  /// Основная категория места (EventCategory с publicationType=PLACE, parentId=null)
+  primaryCategoryId            String?
+  /// Сигналы DISCOVERY домена (entityType=PLACE), ID SignalDefinition
+  discoverySignalIds           String[]                     @default([])
   activities                   Activity[]          @relation("PlaceActivities")
   eventVenues                  EventVenue[]
   importedRecords              ImportedRecord[]    @relation("ImportedRecordPlace")
@@ -933,6 +944,8 @@ model Place {
   revisions                    PlaceRevision[]
   slugHistory                  PlaceSlugHistory[]
   routeStops                   RouteStop[]
+  primaryCategory              EventCategory?      @relation("PlacePrimaryCategory", fields: [primaryCategoryId], references: [id])
+  subcategories                PlaceSubcategory[]
 
   @@unique([createdByUserId, createRequestId])
   @@index([createdByUserId])
@@ -952,6 +965,22 @@ model Place {
   @@index([archivedByUserId])
   @@index([archivedAt])
   @@index([status, revisionRequestedAt])
+  @@index([primaryCategoryId])
+}
+
+/// Подкатегории места (EventCategory с publicationType=PLACE, parentId=primaryCategoryId).
+/// position=0 — основная подкатегория. Максимум 3 записи на место.
+model PlaceSubcategory {
+  placeId    String
+  categoryId String
+  /// Порядок выбора: 0 = основная подкатегория
+  position   Int           @default(0)
+  place      Place         @relation(fields: [placeId], references: [id], onDelete: Cascade)
+  category   EventCategory @relation("PlaceSubcategoryCategory", fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@id([placeId, categoryId])
+  @@index([placeId, position])
+  @@index([categoryId])
 }
 
 model PlaceGroup {
@@ -1448,6 +1477,8 @@ model Offer {
   slug                     String?            @unique
   slugUpdatedAt            DateTime?
   seoCanonicalSource       SeoCanonicalSource @default(FALLBACK)
+  /// Сигналы DISCOVERY домена (entityType=OFFER), ID SignalDefinition
+  discoverySignalIds       String[]           @default([])
   boosts                   Boost[]
   openingHours             OpeningHours?      @relation(fields: [openingHoursId], references: [id])
   place                    Place              @relation(fields: [placeId], references: [id], onDelete: Cascade)
@@ -2068,6 +2099,26 @@ model DevTelegramBusinessApplication {
 
   @@index([userId, createdAt])
   @@index([status, createdAt])
+}
+
+enum SignalDomain {
+  PROFILE
+  DISCOVERY
+  RECOMMENDATION
+}
+
+enum SignalEntityType {
+  PLACE
+  EVENT
+  OFFER
+  ROUTE
+  ARTICLE
+  USER
+}
+
+enum SignalStatus {
+  ACTIVE
+  DEPRECATED
 }
 
 enum Role {
@@ -2891,4 +2942,55 @@ model RouteRating {
   @@index([routeId, ratingType])
   @@index([identifier])
   @@index([userId])
+}
+
+// =====================================================
+// RELEASE MANAGEMENT
+// =====================================================
+
+/// Релизы системы (версии, changelog)
+model Release {
+  id          String        @id @default(cuid())
+  version     String        @unique
+  title       String
+  description String?
+  status      ReleaseStatus @default(DRAFT)
+  isCurrent   Boolean       @default(false)
+  releasedAt  DateTime?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  notes       ReleaseNote[]
+
+  @@index([status])
+  @@index([releasedAt])
+  @@index([isCurrent])
+}
+
+/// Заметки релиза (features, fixes, improvements)
+model ReleaseNote {
+  id          String          @id @default(cuid())
+  releaseId   String
+  type        ReleaseNoteType
+  title       String
+  description String?
+  order       Int             @default(0)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  release     Release         @relation(fields: [releaseId], references: [id], onDelete: Cascade)
+
+  @@index([releaseId])
+  @@index([order])
+}
+
+enum ReleaseStatus {
+  DRAFT
+  PUBLISHED
+}
+
+enum ReleaseNoteType {
+  FEATURE
+  FIX
+  IMPROVEMENT
+  BREAKING
+  INTERNAL
 }

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { Prisma } from "@prisma/client";
+import { Prisma, SignalDomain, SignalEntityType, SignalStatus } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth/server";
 import { canManageSignalDefinitions } from "@/lib/auth/signalDefinitionsAdmin";
@@ -35,14 +35,40 @@ function jsonFromDbUnavailable(e: unknown): NextResponse | null {
   return null;
 }
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
     const user = await getCurrentUser();
     if (!user || !canManageSignalDefinitions(user.role)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
+    const url = new URL(req.url);
+    const domain = url.searchParams.get("domain");
+    const entityType = url.searchParams.get("entityType");
+    const includeDeprecated = url.searchParams.get("includeDeprecated") === "true";
+
+    // Build where clause
+    const where: any = {};
+    
+    // By default, return only ACTIVE signals unless includeDeprecated is true
+    if (!includeDeprecated) {
+      where.status = "ACTIVE";
+    }
+
+    // Filter by domain if provided
+    if (domain) {
+      where.domain = domain;
+    }
+
+    // Filter by entityType if provided (check if entityTypes array contains the type)
+    if (entityType) {
+      where.entityTypes = {
+        has: entityType
+      };
+    }
+
     const items = await prisma.signalDefinition.findMany({
+      where,
       orderBy: [{ parentId: "asc" }, { order: "asc" }, { id: "asc" }],
       include: {
         parent: { select: { id: true, title: true, slug: true } },
@@ -89,6 +115,23 @@ export async function POST(req: Request) {
     const isActive = Boolean(body.isActive ?? true);
     const isFeatured = Boolean(body.isFeatured ?? false);
 
+    // New fields for domain architecture
+    const domain = body.domain && Object.values(SignalDomain).includes(body.domain) 
+      ? body.domain as SignalDomain 
+      : null;
+    
+    const entityTypes = Array.isArray(body.entityTypes) 
+      ? body.entityTypes.filter((type: any) => Object.values(SignalEntityType).includes(type))
+      : [];
+    
+    const status = body.status && Object.values(SignalStatus).includes(body.status)
+      ? body.status as SignalStatus
+      : SignalStatus.ACTIVE;
+    
+    const replacedById = body.replacedById && typeof body.replacedById === "string" 
+      ? body.replacedById 
+      : null;
+
     if (!title) {
       return NextResponse.json({ error: "title is required" }, { status: 400 });
     }
@@ -116,6 +159,19 @@ export async function POST(req: Request) {
       );
     }
 
+    // Validate replacedById if provided
+    if (replacedById) {
+      const replacedSignal = await prisma.signalDefinition.findUnique({
+        where: { id: replacedById },
+      });
+      if (!replacedSignal) {
+        return NextResponse.json(
+          { error: "replacedById references non-existent signal" },
+          { status: 400 }
+        );
+      }
+    }
+
     const created = await prisma.signalDefinition.create({
       data: {
         slug,
@@ -126,6 +182,10 @@ export async function POST(req: Request) {
         isActive,
         isFeatured,
         parentId,
+        domain,
+        entityTypes,
+        status,
+        replacedById,
       },
       include: {
         parent: { select: { id: true, title: true, slug: true } },

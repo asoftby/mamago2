@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { Prisma } from "@prisma/client";
+import { Prisma, SignalDomain, SignalEntityType, SignalStatus } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth/server";
 import { canManageSignalDefinitions } from "@/lib/auth/signalDefinitionsAdmin";
@@ -176,6 +176,56 @@ export async function PATCH(req: Request, { params }: RouteParams) {
   }
   if (body.isActive !== undefined) data.isActive = Boolean(body.isActive);
   if (body.isFeatured !== undefined) data.isFeatured = Boolean(body.isFeatured);
+
+  // New fields for domain architecture
+  if (body.domain !== undefined) {
+    if (body.domain === null) {
+      data.domain = null;
+    } else if (Object.values(SignalDomain).includes(body.domain)) {
+      data.domain = body.domain;
+    } else {
+      return NextResponse.json({ error: "Invalid domain value" }, { status: 400 });
+    }
+  }
+
+  if (body.entityTypes !== undefined) {
+    if (Array.isArray(body.entityTypes)) {
+      const validTypes = body.entityTypes.filter((type: any) => 
+        Object.values(SignalEntityType).includes(type)
+      );
+      data.entityTypes = validTypes;
+    } else {
+      return NextResponse.json({ error: "entityTypes must be an array" }, { status: 400 });
+    }
+  }
+
+  if (body.status !== undefined) {
+    if (Object.values(SignalStatus).includes(body.status)) {
+      data.status = body.status;
+    } else {
+      return NextResponse.json({ error: "Invalid status value" }, { status: 400 });
+    }
+  }
+
+  if (body.replacedById !== undefined) {
+    if (body.replacedById === null) {
+      data.replacedById = null;
+    } else if (typeof body.replacedById === "string") {
+      // Validate that the referenced signal exists
+      const replacedSignal = await prisma.signalDefinition.findUnique({
+        where: { id: body.replacedById },
+      });
+      if (!replacedSignal) {
+        return NextResponse.json(
+          { error: "replacedById references non-existent signal" },
+          { status: 400 }
+        );
+      }
+      data.replacedById = body.replacedById;
+    } else {
+      return NextResponse.json({ error: "replacedById must be a string or null" }, { status: 400 });
+    }
+  }
 
   if (Object.keys(data).length === 0) {
     return NextResponse.json({ error: "No fields to update" }, { status: 400 });
