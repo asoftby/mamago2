@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useRef } from "react";
+import { useState } from "react";
 import { toast } from "@/lib/toast";
 import { CheckCircle2, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useTelegramConnectionStatus } from "@/hooks/useTelegramConnectionStatus";
 
 type Props = {
   connected: boolean;
@@ -11,47 +12,21 @@ type Props = {
   onConnected?: () => void;
 };
 
-const POLL_INTERVAL_MS = 2000;
-const POLL_TIMEOUT_MS = 120_000;
-
 /**
  * Статус / CTA Telegram внутри модалки настроек.
  * После открытия бота запускает polling статуса и вызывает onConnected при успехе.
  */
 export function TelegramStatusRow({ connected, onConnected }: Props) {
-  const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const pollStartRef = useRef<number>(0);
+  const [isPolling, setIsPolling] = useState(false);
 
-  const stopPolling = useCallback(() => {
-    if (pollTimerRef.current) {
-      clearInterval(pollTimerRef.current);
-      pollTimerRef.current = null;
-    }
-  }, []);
-
-  const startPolling = useCallback(() => {
-    stopPolling();
-    pollStartRef.current = Date.now();
-
-    pollTimerRef.current = setInterval(async () => {
-      if (Date.now() - pollStartRef.current > POLL_TIMEOUT_MS) {
-        stopPolling();
-        return;
-      }
-
-      try {
-        const res = await fetch("/api/settings/telegram/status", { credentials: "include" });
-        if (!res.ok) return;
-        const json = (await res.json()) as { linked?: boolean };
-        if (json.linked) {
-          stopPolling();
-          onConnected?.();
-        }
-      } catch {
-        // ignore transient errors, keep polling
-      }
-    }, POLL_INTERVAL_MS);
-  }, [stopPolling, onConnected]);
+  useTelegramConnectionStatus({
+    enabled: true,
+    polling: isPolling,
+    onConnected: (status) => {
+      setIsPolling(false);
+      onConnected?.();
+    },
+  });
 
   const handleConnect = async () => {
     try {
@@ -64,7 +39,9 @@ export function TelegramStatusRow({ connected, onConnected }: Props) {
         throw new Error(json.error || "Не удалось подготовить Telegram");
       }
       window.open(json.url, "_blank", "noopener,noreferrer");
-      startPolling();
+      
+      // Start polling for connection status
+      setIsPolling(true);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Не удалось открыть Telegram");
     }

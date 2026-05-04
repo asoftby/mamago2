@@ -62,8 +62,17 @@ export class TelegramWebhookService {
 
     const text = message.text?.trim();
 
+    // Dev logging: received message
+    if (process.env.NODE_ENV !== "production") {
+      console.log("[telegram:webhook] handleMessage chatId=%s from_id=%s text=%s",
+        chatId, message.from?.id ?? "unknown", text ?? "(no text)");
+    }
+
     // Not a /start command at all — ignore silently
     if (!text?.startsWith("/start")) {
+      if (process.env.NODE_ENV !== "production") {
+        console.log("[telegram:webhook] Not a /start command, ignoring");
+      }
       return;
     }
 
@@ -71,27 +80,23 @@ export class TelegramWebhookService {
     const parts = text.split(/\s+/, 2);
     const payload = parts[1]?.trim() || null;
 
-    // Diagnostic logging — remove after confirming /start works end-to-end
+    // Dev logging: extracted payload
     if (process.env.NODE_ENV !== "production") {
-      console.log("[webhook:diag] handleMessage chat_id=%s text=%s extracted_payload=%s",
-        chatId, text, payload ?? "(none — plain /start)");
+      console.log("[telegram:webhook] /start command detected - payload=%s", payload ?? "(none)");
     }
 
     // Plain /start without link token — greet and explain
     if (!payload || !payload.startsWith("link_")) {
       if (process.env.NODE_ENV !== "production") {
-        console.log("[webhook:diag] /start without link_ → sending instructions to chat_id=%s", chatId);
+        console.log("[telegram:webhook] Plain /start without link_ payload, sending instructions");
       }
       try {
         await this.channel.sendMessage({
           chatId,
           text: "Откройте ссылку из mamaGo, чтобы подключить Telegram к вашему аккаунту.",
         });
-        if (process.env.NODE_ENV !== "production") {
-          console.log("[webhook:diag] sendMessage OK for chat_id=%s", chatId);
-        }
       } catch (e) {
-        console.error("[telegram webhook] failed to send instructions message", e);
+        console.error("[telegram:webhook] Failed to send instructions message", e);
       }
       return;
     }
@@ -101,16 +106,28 @@ export class TelegramWebhookService {
     const telegramFirstName = message.from?.first_name ?? null;
     const telegramUsername = message.from?.username ?? null;
 
+    // Dev logging: extracted token and user info
+    if (process.env.NODE_ENV !== "production") {
+      console.log("[telegram:webhook] Extracted link token=%s telegramUserId=%s username=%s firstName=%s",
+        token, telegramUserId, telegramUsername ?? "(none)", telegramFirstName ?? "(none)");
+    }
+
     if (!telegramUserId) {
+      console.error("[telegram:webhook] ERROR: No telegramUserId in message.from");
       try {
         await this.channel.sendMessage({
           chatId,
           text: "Не удалось определить ваш Telegram-профиль. Попробуйте ещё раз.",
         });
       } catch (e) {
-        console.error("[telegram webhook] failed to send profile error message", e);
+        console.error("[telegram:webhook] Failed to send profile error message", e);
       }
       return;
+    }
+
+    // Dev logging: calling consumeTelegramLinkToken
+    if (process.env.NODE_ENV !== "production") {
+      console.log("[telegram:webhook] Calling consumeTelegramLinkToken with token=%s", token);
     }
 
     const result = await consumeTelegramLinkToken({
@@ -121,6 +138,12 @@ export class TelegramWebhookService {
       telegramFirstName,
     });
 
+    // Dev logging: result
+    if (process.env.NODE_ENV !== "production") {
+      console.log("[telegram:webhook] consumeTelegramLinkToken result: ok=%s reason=%s userId=%s",
+        result.ok, result.ok ? "success" : (result as { reason: string }).reason, result.ok ? result.userId : "n/a");
+    }
+
     try {
       await this.channel.sendMessage({
         chatId,
@@ -129,7 +152,7 @@ export class TelegramWebhookService {
           : "Ссылка устарела или уже использована. Запросите новую в настройках уведомлений.",
       });
     } catch (e) {
-      console.error("[telegram webhook] failed to send reply after link attempt", e);
+      console.error("[telegram:webhook] Failed to send reply after link attempt", e);
     }
   }
 

@@ -17,6 +17,7 @@ export async function POST(request: NextRequest) {
   if (config.webhookSecret) {
     const incoming = request.headers.get("x-telegram-bot-api-secret-token");
     if (incoming !== config.webhookSecret) {
+      console.error("[telegram:webhook] ERROR: Invalid webhook secret");
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
   }
@@ -25,29 +26,35 @@ export async function POST(request: NextRequest) {
   try {
     rawBody = await request.json();
   } catch {
+    console.error("[telegram:webhook] ERROR: Invalid JSON in request body");
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
   const update = rawBody as TelegramUpdate;
 
-  // Diagnostic logging — remove after confirming /start works end-to-end
-  const isDev = process.env.NODE_ENV !== "production";
-  if (isDev) {
+  // Dev logging: incoming update
+  if (process.env.NODE_ENV !== "production") {
     const msg = update.message;
-    console.log("[webhook:diag] update_id=%s type=%s text=%s chat_id=%s",
-      (rawBody as Record<string, unknown>).update_id ?? "?",
-      msg ? "message" : update.callback_query ? "callback_query" : "unknown",
-      msg?.text ?? "(none)",
-      msg?.chat?.id ?? "?",
-    );
+    const updateId = (rawBody as Record<string, unknown>).update_id ?? "?";
+    const updateType = msg ? "message" : update.callback_query ? "callback_query" : "unknown";
+    const text = msg?.text ?? "(none)";
+    const chatId = msg?.chat?.id ?? "?";
+    
+    console.log("[telegram:webhook] Received update_id=%s type=%s text=%s chatId=%s",
+      updateId, updateType, text, chatId);
   }
 
   try {
     const service = new TelegramWebhookService();
     await service.handleUpdate(update);
+    
+    if (process.env.NODE_ENV !== "production") {
+      console.log("[telegram:webhook] Update processed successfully");
+    }
+    
     return NextResponse.json({ ok: true });
   } catch (error) {
-    console.error("[telegram webhook]", error);
+    console.error("[telegram:webhook] ERROR: Failed to process update", error);
     return NextResponse.json({ error: "Webhook error" }, { status: 500 });
   }
 }

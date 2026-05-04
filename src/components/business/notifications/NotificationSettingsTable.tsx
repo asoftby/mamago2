@@ -22,6 +22,7 @@ import {
   type NotificationSettingsSurface,
   type NotificationSettingsSurfaceData,
 } from "@/lib/notifications/settingsDomain";
+import { useTelegramConnectionStatus } from "@/hooks/useTelegramConnectionStatus";
 
 type Props = {
   surface?: NotificationSettingsSurface;
@@ -81,9 +82,43 @@ export function NotificationSettingsTable({
   const [pendingKey, setPendingKey] = useState<string | null>(null);
   const [isLinkingTelegram, setIsLinkingTelegram] = useState(false);
   const [isUnlinkingTelegram, setIsUnlinkingTelegram] = useState(false);
-  const [isPollingTelegram, setIsPollingTelegram] = useState(false);
   const [unlinkDialogOpen, setUnlinkDialogOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
+
+  // Use unified Telegram status hook with controlled polling
+  const [isPolling, setIsPolling] = useState(false);
+  const { status: telegramStatus } = useTelegramConnectionStatus({
+    enabled: true,
+    polling: isPolling,
+    onConnected: (status) => {
+      setIsPolling(false);
+      setData((prev) =>
+        prev
+          ? {
+              ...prev,
+              telegramConnected: true,
+              telegramUsername: status.username,
+            }
+          : prev,
+      );
+      toast.success("Telegram подключён");
+    },
+  });
+
+  // Sync telegram status from hook to data state
+  useEffect(() => {
+    if (telegramStatus && data) {
+      setData((prev) =>
+        prev
+          ? {
+              ...prev,
+              telegramConnected: telegramStatus.linked,
+              telegramUsername: telegramStatus.username,
+            }
+          : prev,
+      );
+    }
+  }, [telegramStatus, data]);
 
   useEffect(() => {
     if (initialData) return;
@@ -111,48 +146,6 @@ export function NotificationSettingsTable({
       alive = false;
     };
   }, [initialData, surface]);
-
-  useEffect(() => {
-    if (!isPollingTelegram) return;
-
-    let stopped = false;
-    const timer = window.setInterval(async () => {
-      try {
-        const res = await fetch("/api/settings/telegram/status", {
-          credentials: "include",
-          cache: "no-store",
-        });
-
-        if (!res.ok) return;
-
-        const json = (await res.json()) as {
-          linked?: boolean;
-          username?: string;
-        };
-
-        if (stopped || !json.linked) return;
-
-        setData((prev) =>
-          prev
-            ? {
-                ...prev,
-                telegramConnected: true,
-                telegramUsername: json.username,
-              }
-            : prev,
-        );
-        setIsPollingTelegram(false);
-        toast.success("Telegram подключён");
-      } catch {
-        // Quiet polling: keep existing UI state and try again on the next tick.
-      }
-    }, 3000);
-
-    return () => {
-      stopped = true;
-      window.clearInterval(timer);
-    };
-  }, [isPollingTelegram]);
 
   const handleToggle = (
     notificationType: NotificationType,
@@ -241,7 +234,9 @@ export function NotificationSettingsTable({
       }
 
       window.open(json.url, "_blank", "noopener,noreferrer");
-      setIsPollingTelegram(true);
+      
+      // Start polling for connection status
+      setIsPolling(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Не удалось начать подключение Telegram");
     } finally {
@@ -354,9 +349,9 @@ export function NotificationSettingsTable({
             variant="outline"
             className="shrink-0 rounded-xl bg-white"
             onClick={handleConnectTelegram}
-            disabled={isLinkingTelegram || isPollingTelegram}
+            disabled={isLinkingTelegram || isPolling}
           >
-            {isLinkingTelegram || isPollingTelegram ? (
+            {isLinkingTelegram || isPolling ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
                 {isLinkingTelegram ? "Открываем…" : "Ожидаем подключение…"}
