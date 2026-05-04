@@ -33,7 +33,6 @@ export const PLACE_WIZARD_STEPS: WizardStepConfig<PlaceFormData>[] = [
       data.shortDesc?.trim() &&
       data.description?.trim() &&
       data.category &&
-      data.activityTypes?.length > 0 &&
       data.ageTags?.length > 0 &&
       data.visitFormats?.length > 0
     ),
@@ -58,12 +57,6 @@ export const PLACE_WIZARD_STEPS: WizardStepConfig<PlaceFormData>[] = [
           ? sortAgeKeys(data.ageTags).join(", ")
           : "Не указан",
       },
-      {
-        label: "Типы активностей",
-        value: data.activityTypes?.length > 0 
-          ? data.activityTypes.join(", ")
-          : "Не указаны",
-      },
     ],
     
     getMissingFields: (data) => {
@@ -72,7 +65,6 @@ export const PLACE_WIZARD_STEPS: WizardStepConfig<PlaceFormData>[] = [
       if (!data.shortDesc?.trim()) missing.push("Краткое описание");
       if (!data.description?.trim()) missing.push("Полное описание");
       if (!data.category) missing.push("Категория");
-      if (!data.activityTypes?.length) missing.push("Типы активностей");
       if (!data.ageTags?.length) missing.push("Возрастные группы");
       if (!data.visitFormats?.length) missing.push("Формат посещения");
       return missing;

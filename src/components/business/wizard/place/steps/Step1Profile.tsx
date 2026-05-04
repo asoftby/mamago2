@@ -1,14 +1,34 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { ChipsRow, type ChipItem } from "@/components/ui/chips-row";
-import { AGE_OPTIONS } from "@/lib/config/ages";
 import { FilterSelect } from "@/components/ui/filter-select";
-import { PLACE_CATEGORIES, VISIT_FORMATS, ACTIVITY_TYPES } from "../config";
+import { AGE_OPTIONS } from "@/lib/config/ages";
+import { VISIT_FORMATS } from "../config";
 import type { PlaceFormData } from "../types";
+import { SignalEntityType } from "@prisma/client";
+
+const MAX_SUBCATEGORIES = 3;
+
+type PlaceCategoryChild = {
+  id: string;
+  nameRu: string;
+  slug: string;
+  sortOrder: number;
+  parentId: string;
+};
+
+type PlaceCategoryRoot = {
+  id: string;
+  nameRu: string;
+  slug: string;
+  sortOrder: number;
+  parentId: null;
+  children: PlaceCategoryChild[];
+};
 
 interface Step1ProfileProps {
   data: PlaceFormData;
@@ -18,22 +38,62 @@ interface Step1ProfileProps {
 
 export function Step1Profile({ data, onChange, isEditable = true }: Step1ProfileProps) {
   const [title, setTitle] = useState(() => data.title);
-  const [category, setCategory] = useState(() => data.category);
   const [shortDesc, setShortDesc] = useState(() => data.shortDesc);
   const [description, setDescription] = useState(() => data.description || "");
   const [showFullDescription, setShowFullDescription] = useState(false);
   const [ageTags, setAgeTags] = useState<string[]>(() => data.ageTags || []);
   const [visitFormats, setVisitFormats] = useState<string[]>(() => data.visitFormats || []);
-  const [activityTypes, setActivityTypes] = useState<string[]>(() => data.activityTypes || []);
 
+  // Category state
+  const [primaryCategoryId, setPrimaryCategoryId] = useState<string>(() => data.primaryCategoryId ?? "");
+  const [subcategoryIds, setSubcategoryIds] = useState<string[]>(() => data.subcategoryIds ?? []);
+
+  // Categories from DB
+  const [dbCategories, setDbCategories] = useState<PlaceCategoryRoot[] | null>(null);
+
+  useEffect(() => {
+    fetch("/api/public/place-categories")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((json) => {
+        if (Array.isArray(json?.categories) && json.categories.length > 0) {
+          setDbCategories(json.categories as PlaceCategoryRoot[]);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  // Handlers
   const handleTitleChange = (value: string) => {
     setTitle(value);
     onChange({ title: value });
   };
 
-  const handleCategoryChange = (value: string) => {
-    setCategory(value);
-    onChange({ category: value });
+  const handlePrimaryCategoryChange = (id: string) => {
+    setPrimaryCategoryId(id);
+    // Reset subcategories when root changes
+    setSubcategoryIds([]);
+    const root = dbCategories?.find((r) => r.id === id);
+    onChange({
+      primaryCategoryId: id || null,
+      subcategoryIds: [],
+      // Keep legacy category field in sync with root slug
+      category: root?.slug ?? "",
+    });
+  };
+
+  const handleToggleSubcategory = (categoryId: string) => {
+    if (!isEditable) return;
+    setSubcategoryIds((prev) => {
+      let next: string[];
+      if (prev.includes(categoryId)) {
+        next = prev.filter((id) => id !== categoryId);
+      } else {
+        if (prev.length >= MAX_SUBCATEGORIES) return prev; // guard
+        next = [...prev, categoryId];
+      }
+      onChange({ subcategoryIds: next });
+      return next;
+    });
   };
 
   const handleShortDescChange = (value: string) => {
@@ -62,16 +122,53 @@ export function Step1Profile({ data, onChange, isEditable = true }: Step1Profile
     onChange({ visitFormats: newFormats });
   };
 
-  const toggleActivityType = (type: string) => {
-    const newTypes = activityTypes.includes(type)
-      ? activityTypes.filter((t) => t !== type)
-      : [...activityTypes, type];
-    setActivityTypes(newTypes);
-    onChange({ activityTypes: newTypes });
-  };
+  // Dropdown options for root categories
+  const rootSelectOptions = useMemo(
+    () => (dbCategories ?? []).map((c) => ({ value: c.id, label: c.nameRu })),
+    [dbCategories],
+  );
+
+  // Current root category
+  const primaryRoot = useMemo(
+    () => dbCategories?.find((r) => r.id === primaryCategoryId) ?? null,
+    [dbCategories, primaryCategoryId],
+  );
+
+  // Subcategory chips
+  const subCategoryItems: ChipItem[] = useMemo(() => {
+    if (!primaryRoot || primaryRoot.children.length === 0) return [];
+    const atMax = subcategoryIds.length >= MAX_SUBCATEGORIES;
+    return primaryRoot.children.map((child, idx) => {
+      const isSelected = subcategoryIds.includes(child.id);
+      const isMain = subcategoryIds[0] === child.id;
+      const isDisabled = !isEditable || (!isSelected && atMax);
+
+      const label = isMain ? (
+        <span className="flex items-center gap-1.5">
+          {child.nameRu}
+          <span className="text-[10px] font-semibold uppercase tracking-wide bg-primary/15 text-primary rounded px-1 py-0.5 leading-none">
+            Основная
+          </span>
+        </span>
+      ) : (
+        child.nameRu
+      );
+
+      return {
+        id: child.id,
+        label,
+        active: isSelected,
+        disabled: isDisabled,
+        onClick: () => handleToggleSubcategory(child.id),
+        className: "!min-h-[2.25rem] !px-3 !text-[13px]",
+      };
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [primaryRoot, subcategoryIds, isEditable]);
 
   return (
     <div className="space-y-6">
+      {/* Title */}
       <div>
         <Label htmlFor="title">Название *</Label>
         <Input
@@ -84,30 +181,59 @@ export function Step1Profile({ data, onChange, isEditable = true }: Step1Profile
         />
       </div>
 
-      <div>
-        <Label htmlFor="category">Категория *</Label>
-        <div className="mt-2">
-          <FilterSelect
-            id="category"
-            value={category}
-            placeholder="Выберите категорию"
-            options={PLACE_CATEGORIES.map((cat) => ({
-              value: cat.value,
-              label: cat.label,
-            }))}
-            onChange={handleCategoryChange}
-            disabled={!isEditable}
-          />
+      {/* Category */}
+      <div className="space-y-3">
+        <div>
+          <Label htmlFor="place-category">Категория *</Label>
+          <p className="text-xs text-muted-foreground mt-0.5">Основной тип места</p>
         </div>
+
+        <FilterSelect
+          id="place-category"
+          aria-label="Основная категория места"
+          value={primaryCategoryId}
+          options={rootSelectOptions}
+          onChange={handlePrimaryCategoryChange}
+          placeholder="Выберите категорию"
+          disabled={!isEditable || !dbCategories}
+        />
+
+        {/* Subcategories */}
+        {primaryRoot && primaryRoot.children.length > 0 && (
+          <div className="space-y-2 pt-1">
+            <div className="flex items-center justify-between">
+              <Label className="text-xs">
+                Подкатегории <span className="text-red-500">*</span>
+              </Label>
+              <span className="text-xs text-muted-foreground">
+                {subcategoryIds.length}/{MAX_SUBCATEGORIES} выбрано
+              </span>
+            </div>
+            <p className="text-xs text-muted-foreground -mt-1">
+              Выберите от 1 до {MAX_SUBCATEGORIES} подкатегорий. Первая выбранная — основная.
+            </p>
+            <ChipsRow
+              layout="masonry"
+              aria-label="Подкатегории места"
+              items={subCategoryItems}
+            />
+            {subcategoryIds.length >= MAX_SUBCATEGORIES && (
+              <p className="text-xs text-amber-600">
+                Можно выбрать не больше {MAX_SUBCATEGORIES} подкатегорий
+              </p>
+            )}
+          </div>
+        )}
       </div>
 
+      {/* Short description */}
       <div>
         <Label htmlFor="shortDesc">Короткое описание *</Label>
         <Input
           id="shortDesc"
           value={shortDesc}
           onChange={(e) => handleShortDescChange(e.target.value)}
-          placeholder="Краткое описание для карточки"
+          placeholder=""
           className="mt-2"
           maxLength={100}
           disabled={!isEditable}
@@ -117,6 +243,7 @@ export function Step1Profile({ data, onChange, isEditable = true }: Step1Profile
         </p>
       </div>
 
+      {/* Description */}
       <div>
         <Label htmlFor="description">Описание *</Label>
         <Textarea
@@ -145,6 +272,7 @@ export function Step1Profile({ data, onChange, isEditable = true }: Step1Profile
         </div>
       </div>
 
+      {/* Age */}
       <div>
         <Label>Возраст *</Label>
         <div className="mt-2">
@@ -164,6 +292,7 @@ export function Step1Profile({ data, onChange, isEditable = true }: Step1Profile
         </p>
       </div>
 
+      {/* Visit formats */}
       <div>
         <Label>Формат посещения *</Label>
         <div className="mt-2">
@@ -180,25 +309,6 @@ export function Step1Profile({ data, onChange, isEditable = true }: Step1Profile
         </div>
         <p className="text-xs text-muted-foreground mt-1">
           Выберите хотя бы один формат посещения
-        </p>
-      </div>
-
-      <div>
-        <Label>Типы активностей *</Label>
-        <div className="mt-2">
-          <ChipsRow
-            layout="masonry"
-            items={ACTIVITY_TYPES.map((type): ChipItem => ({
-              id: type,
-              label: type,
-              active: activityTypes.includes(type),
-              disabled: !isEditable,
-              onClick: () => isEditable && toggleActivityType(type),
-            }))}
-          />
-        </div>
-        <p className="text-xs text-muted-foreground mt-1">
-          Выберите хотя бы один тип активности
         </p>
       </div>
     </div>

@@ -19,7 +19,10 @@ export interface PlaceFormData {
   description: string | null;
   ageTags: string[];
   visitFormats: string[];
-  activityTypes: string[];
+  /// Новая структура категорий: ID корневой категории (EventCategory, publicationType=PLACE)
+  primaryCategoryId: string | null;
+  /// Упорядоченный массив ID подкатегорий (position=index). Первый = основная подкатегория.
+  subcategoryIds: string[];
   
   // Step 2: Location
   lat: number | null;
@@ -54,7 +57,7 @@ export interface PlaceFormData {
   // Temp media tracking (for create mode)
   tempLogoMediaId?: string | null;
   tempGalleryMediaIds?: string[];
-  
+
   // Step 5: Opening Hours
   openingHoursId: string | null;
   openingHoursData: OpeningHoursData | null;

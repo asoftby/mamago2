@@ -2,7 +2,7 @@ import type { PlaceFormData, StepValidation } from "./types";
 
 /**
  * Validate Step 1: Profile
- * Required: title, category, shortDesc, description, ageTags, visitFormats, activityTypes
+ * Required: title, category, shortDesc, description, ageTags, visitFormats
  */
 export function validateStep1(data: PlaceFormData): StepValidation {
   const errors: string[] = [];
@@ -13,6 +13,18 @@ export function validateStep1(data: PlaceFormData): StepValidation {
   
   if (!data.category) {
     errors.push("Категория обязательна");
+  }
+  
+  if (!data.primaryCategoryId) {
+    errors.push("Выберите основную категорию");
+  }
+  
+  if (!data.subcategoryIds || data.subcategoryIds.length === 0) {
+    errors.push("Выберите хотя бы одну подкатегорию");
+  }
+  
+  if (data.subcategoryIds && data.subcategoryIds.length > 3) {
+    errors.push("Можно выбрать не больше 3 подкатегорий");
   }
   
   if (!data.shortDesc || data.shortDesc.trim().length === 0) {
@@ -29,10 +41,6 @@ export function validateStep1(data: PlaceFormData): StepValidation {
   
   if (!data.visitFormats || data.visitFormats.length === 0) {
     errors.push("Выберите хотя бы один формат посещения");
-  }
-  
-  if (!data.activityTypes || data.activityTypes.length === 0) {
-    errors.push("Выберите хотя бы один тип активности");
   }
   
   return {

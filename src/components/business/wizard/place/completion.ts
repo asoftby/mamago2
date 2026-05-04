@@ -15,7 +15,6 @@ const FIELD_WEIGHTS = {
   lat: 8,
   lng: 8,
   ageTags: 8,
-  activityTypes: 8,
   
   // Valuable fields (medium-low weight)
   logoImageId: 6,
@@ -107,14 +106,6 @@ export function getPlaceCompletion(data: PlaceFormData): CompletionResult {
     completedFields.push("ageTags");
   } else {
     missingFields.push({ field: "ageTags", weight: FIELD_WEIGHTS.ageTags, label: "Возраст" });
-  }
-  
-  // Check activity types
-  if (data.activityTypes && data.activityTypes.length > 0) {
-    achievedScore += FIELD_WEIGHTS.activityTypes;
-    completedFields.push("activityTypes");
-  } else {
-    missingFields.push({ field: "activityTypes", weight: FIELD_WEIGHTS.activityTypes, label: "Типы активностей" });
   }
   
   // Check logo

@@ -654,7 +654,7 @@ export function PlaceRevisionModerationView({
               
               {/* Secondary CTA: Admin technical access */}
               <a
-                href={`/admin/places/${place.id}`}
+                href={`/admin/content/places/${place.id}`}
                 className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 text-sm font-medium rounded-md hover:bg-gray-50"
               >
                 Открыть в админке

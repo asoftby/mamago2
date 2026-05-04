@@ -178,8 +178,9 @@ export default async function PlaceModerationPage({
         shortDesc: place.shortDesc,
         description: place.description,
         ageTags: place.ageTags || [],
-        activityTypes: place.activityTypes || [],
         visitFormats: place.visitFormats || [],
+        primaryCategoryId: place.primaryCategoryId ?? null,
+        subcategoryIds: [],
         lat: place.lat,
         lng: place.lng,
         googlePlaceId: place.googlePlaceId,
@@ -384,5 +385,11 @@ export default async function PlaceModerationPage({
   }
 
   // Show regular place moderation view (for PENDING, NEEDS_REVISION, REJECTED, DRAFT)
-  return <PlaceModerationView place={place} />;
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <div className="max-w-7xl mx-auto px-6 py-8">
+        <PlaceModerationView place={place} />
+      </div>
+    </div>
+  );
 }

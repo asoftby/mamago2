@@ -148,20 +148,21 @@ export async function POST(request: NextRequest) {
     const place = await prisma.place.create({
       data: {
         createdByUserId: user.id,
-        ownerBusinessId: businessId, // Set business owner if user has business
+        ownerBusinessId: businessId,
         createRequestId,
         status: status as ContentStatus,
-        slug, // Add SEO-friendly slug
+        slug,
         
         // Step 1 fields
         title: d.title,
-        shortAddress, // Add short address for disambiguation
+        shortAddress,
         category: d.category,
         shortDesc: d.shortDesc,
         description: d.description || null,
         ageTags: d.ageTags || [],
         visitFormats: d.visitFormats || [],
-        activityTypes: d.activityTypes || [],
+        primaryCategoryId: d.primaryCategoryId || null,
+        discoverySignalIds: Array.isArray(d.discoverySignalIds) ? d.discoverySignalIds : [],
         
         // Step 2 fields
         lat: d.lat || null,
@@ -196,6 +197,19 @@ export async function POST(request: NextRequest) {
     });
 
     console.log("[places/POST] ✅ Created place:", place.id, "status:", place.status);
+
+    // Save subcategories if provided
+    const subcategoryIds: string[] = Array.isArray(d.subcategoryIds) ? d.subcategoryIds.slice(0, 3) : [];
+    if (subcategoryIds.length > 0) {
+      await prisma.placeSubcategory.createMany({
+        data: subcategoryIds.map((categoryId: string, position: number) => ({
+          placeId: place.id,
+          categoryId,
+          position,
+        })),
+        skipDuplicates: true,
+      });
+    }
 
     // Attach temp media if wizardSessionId provided
     if (d.wizardSessionId) {

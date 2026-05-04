@@ -37,6 +37,10 @@ export async function GET(
         images: {
           orderBy: { sortOrder: "asc" },
         },
+        subcategories: {
+          orderBy: { position: "asc" },
+          select: { categoryId: true, position: true },
+        },
         parentPlace: {
           select: {
             id: true,
@@ -193,12 +197,13 @@ export async function PATCH(
     if (body.instagramUrl !== undefined) updateData.instagramUrl = body.instagramUrl ? String(body.instagramUrl) : null;
     if (body.ageTags !== undefined) updateData.ageTags = Array.isArray(body.ageTags) ? body.ageTags : [];
     if (body.visitFormats !== undefined) updateData.visitFormats = Array.isArray(body.visitFormats) ? body.visitFormats : [];
-    if (body.activityTypes !== undefined) updateData.activityTypes = Array.isArray(body.activityTypes) ? body.activityTypes : [];
     if (body.placeKind !== undefined) updateData.placeKind = body.placeKind;
     if (body.parentPlaceId !== undefined) updateData.parentPlaceId = body.parentPlaceId;
     if (body.floor !== undefined) updateData.floor = body.floor ? String(body.floor) : null;
     if (body.unit !== undefined) updateData.unit = body.unit ? String(body.unit) : null;
     if (body.unitLabel !== undefined) updateData.unitLabel = body.unitLabel ? String(body.unitLabel) : null;
+    if (body.primaryCategoryId !== undefined) updateData.primaryCategoryId = body.primaryCategoryId || null;
+    if (body.discoverySignalIds !== undefined) updateData.discoverySignalIds = Array.isArray(body.discoverySignalIds) ? body.discoverySignalIds : [];
 
     // Log for debugging
     console.log("[place-patch] Update data:", updateData);
@@ -207,6 +212,22 @@ export async function PATCH(
       where: { id },
       data: updateData,
     });
+
+    // Update subcategories if provided
+    if (Array.isArray(body.subcategoryIds)) {
+      const subcategoryIds: string[] = body.subcategoryIds.slice(0, 3);
+      await prisma.placeSubcategory.deleteMany({ where: { placeId: id } });
+      if (subcategoryIds.length > 0) {
+        await prisma.placeSubcategory.createMany({
+          data: subcategoryIds.map((categoryId: string, position: number) => ({
+            placeId: id,
+            categoryId,
+            position,
+          })),
+          skipDuplicates: true,
+        });
+      }
+    }
 
     // Auto-assign slug on first meaningful title fill (idempotent).
     if (body.title !== undefined) {

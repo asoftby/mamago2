@@ -4,7 +4,11 @@ import { getDefaultFormData } from "./defaults";
 import { mapToUIState } from "@/lib/openingHours";
 import type { OpeningHoursWithRelations } from "@/server/services/openingHours/openingHours.types";
 
-type PlaceWithRelations = Place & { images?: PrismaPlaceImage[]; openingHours?: OpeningHoursWithRelations | null };
+type PlaceWithRelations = Place & {
+  images?: PrismaPlaceImage[];
+  openingHours?: OpeningHoursWithRelations | null;
+  subcategories?: Array<{ categoryId: string; position: number }>;
+};
 
 /**
  * Map Place entity from database to form data
@@ -30,7 +34,12 @@ export function mapPlaceToFormData(
     description: place.description,
     ageTags: place.ageTags || [],
     visitFormats: place.visitFormats || [],
-    activityTypes: place.activityTypes || [],
+    primaryCategoryId: place.primaryCategoryId ?? null,
+    subcategoryIds: place.subcategories
+      ? [...place.subcategories]
+          .sort((a, b) => a.position - b.position)
+          .map((s) => s.categoryId)
+      : [],
     
     // Step 2: Location
     lat: place.lat,
@@ -85,7 +94,6 @@ export function buildPlacePayload(data: PlaceFormData): Partial<Place> {
     description: data.description,
     ageTags: data.ageTags,
     visitFormats: data.visitFormats,
-    activityTypes: data.activityTypes,
     
     // Step 2: Location
     lat: data.lat,

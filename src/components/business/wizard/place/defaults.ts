@@ -13,7 +13,8 @@ export function getDefaultFormData(): PlaceFormData {
     description: null,
     ageTags: [],
     visitFormats: [],
-    activityTypes: [],
+    primaryCategoryId: null,
+    subcategoryIds: [],
     
     // Step 2: Location
     lat: null,
@@ -40,7 +41,7 @@ export function getDefaultFormData(): PlaceFormData {
     logoImageId: null,
     logoUrl: null,
     images: [],
-    
+
     // Step 5: Opening Hours
     openingHoursId: null,
     openingHoursData: null,
@@ -89,7 +90,7 @@ export function hasMeaningfulContent(data: PlaceFormData): boolean {
   }
   
   // Check tags
-  if (data.ageTags.length > 0 || data.visitFormats.length > 0 || data.activityTypes.length > 0) {
+  if (data.ageTags.length > 0 || data.visitFormats.length > 0) {
     return true;
   }
   
