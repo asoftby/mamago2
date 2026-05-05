@@ -50,14 +50,6 @@ function messageFromApiError(body: unknown, status: number): string {
   return status ? `Ошибка ${status}` : "Не удалось сохранить";
 }
 
-type EventCategoryOptionRow = {
-  id: string;
-  label: string;
-  value: string;
-  order: number;
-  isActive: boolean;
-};
-
 type EventCategory = {
   id: string;
   slug: string;
@@ -72,7 +64,6 @@ type EventCategory = {
   selectableInProgram: boolean;
   parentId: string | null;
   parent: { id: string; nameRu: string; slug: string; type?: EventCategoryPublicationType } | null;
-  options: EventCategoryOptionRow[];
   _count: { activities: number; children: number };
 };
 
@@ -262,9 +253,6 @@ function EventCategoryEditor({
   const [selectableInProgram, setSelectableInProgram] = useState(category.selectableInProgram);
   const [parentId, setParentId] = useState<string | null>(category.parentId);
 
-  const [newOptLabel, setNewOptLabel] = useState("");
-  const [newOptValue, setNewOptValue] = useState("");
-  const [isValueEditedManually, setIsValueEditedManually] = useState(false);
   const [savingMain, setSavingMain] = useState(false);
 
   useEffect(() => {
@@ -339,67 +327,6 @@ function EventCategoryEditor({
       toast.error(messageFromApiError(err, res.status));
     }
   };
-
-  const createOption = async (label: string, value: string) => {
-    const res = await fetch(`/api/admin/taxonomy/event-categories/${category.id}/options`, {
-      ...adminFetch,
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ label, value }),
-    });
-    if (res.ok) {
-      await onReload();
-      toast.success("Опция добавлена");
-    } else {
-      const err = await res.json().catch(() => ({}));
-      toast.error(messageFromApiError(err, res.status));
-    }
-  };
-
-  const updateOption = async (optionId: string, data: Partial<EventCategoryOptionRow>) => {
-    const res = await fetch(`/api/admin/taxonomy/event-category-options/${optionId}`, {
-      ...adminFetch,
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
-    });
-    if (res.ok) {
-      await onReload();
-      toast.success("Опция сохранена");
-    } else {
-      const err = await res.json().catch(() => ({}));
-      toast.error(messageFromApiError(err, res.status));
-    }
-  };
-
-  const deleteOption = async (optionId: string) => {
-    if (!confirm("Удалить опцию?")) return;
-    const res = await fetch(`/api/admin/taxonomy/event-category-options/${optionId}`, {
-      ...adminFetch,
-      method: "DELETE",
-    });
-    if (res.ok) {
-      await onReload();
-      toast.success("Опция удалена");
-    } else {
-      const err = await res.json().catch(() => ({}));
-      toast.error(messageFromApiError(err, res.status));
-    }
-  };
-
-  const handleAddOption = () => {
-    const label = newOptLabel.trim();
-    const value = newOptValue.trim();
-    if (!label) return;
-    const finalValue = value || slugifyLabelToValue(label);
-    if (!finalValue) return;
-    createOption(label, finalValue);
-    setNewOptLabel("");
-    setNewOptValue("");
-    setIsValueEditedManually(false);
-  };
-
-  const options = category.options ?? [];
 
   const parentSelect = hasChildren ? (
     <div className="grid gap-1 max-w-md">
@@ -550,107 +477,7 @@ function EventCategoryEditor({
             </span>
           ) : null}
         </p>
-
-        <div className="border border-gray-200 rounded-lg p-4 bg-gray-50 space-y-4">
-          <h3 className="text-sm font-semibold text-gray-700">Options</h3>
-
-          <div className="space-y-2">
-            {options.map((opt) => (
-              <OptionRow key={opt.id} option={opt} onUpdate={updateOption} onDelete={deleteOption} />
-            ))}
-          </div>
-
-          <div className="flex gap-2 items-end pt-2 border-t">
-            <div className="grid gap-1 flex-1">
-              <Label className="text-xs">Label</Label>
-              <Input
-                value={newOptLabel}
-                onChange={(e) => {
-                  const nextLabel = e.target.value;
-                  setNewOptLabel(nextLabel);
-                  if (!isValueEditedManually) {
-                    setNewOptValue(slugifyLabelToValue(nextLabel));
-                  }
-                }}
-                placeholder="Label"
-                className="h-8 text-sm"
-              />
-            </div>
-            <div className="grid gap-1 flex-1">
-              <Label className="text-xs">Value</Label>
-              <Input
-                value={newOptValue}
-                onChange={(e) => {
-                  const nextValue = e.target.value;
-                  setNewOptValue(nextValue);
-                  const trimmed = nextValue.trim();
-                  setIsValueEditedManually(trimmed.length > 0);
-                }}
-                placeholder="value"
-                className="h-8 text-sm"
-              />
-            </div>
-            <Button size="sm" variant="secondary" onClick={handleAddOption}>
-              Add
-            </Button>
-          </div>
-        </div>
       </CardContent>
     </Card>
-  );
-}
-
-function OptionRow({
-  option,
-  onUpdate,
-  onDelete,
-}: {
-  option: EventCategoryOptionRow;
-  onUpdate: (id: string, data: Partial<EventCategoryOptionRow>) => void;
-  onDelete: (id: string) => void;
-}) {
-  const [label, setLabel] = useState(option.label);
-  const [value, setValue] = useState(option.value);
-  const [order, setOrder] = useState(option.order);
-  const [isActive, setIsActive] = useState(option.isActive);
-
-  const hasChanges =
-    label !== option.label ||
-    value !== option.value ||
-    order !== option.order ||
-    isActive !== option.isActive;
-
-  const handleSave = () => {
-    onUpdate(option.id, { label, value, order, isActive });
-  };
-
-  return (
-    <div className="flex items-center gap-2 bg-background p-2 rounded border">
-      <Input
-        value={label}
-        onChange={(e) => setLabel(e.target.value)}
-        className="h-8 text-sm flex-[2]"
-      />
-      <Input
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        className="h-8 text-sm font-mono flex-[2]"
-      />
-      <Input
-        type="number"
-        value={order}
-        onChange={(e) => setOrder(Number(e.target.value))}
-        className="h-8 text-sm w-16"
-      />
-      <Checkbox checked={isActive} onCheckedChange={(c) => setIsActive(!!c)} />
-      {hasChanges && (
-        <Button size="icon-xs" onClick={handleSave}>
-          <Save className="w-3 h-3" />
-        </Button>
-      )}
-      <Button size="icon-xs" variant="ghost" onClick={() => onDelete(option.id)}>
-        <Trash2 className="w-3 h-3 text-muted-foreground hover:text-destructive" />
-      </Button>
-    </div>
   );
 }

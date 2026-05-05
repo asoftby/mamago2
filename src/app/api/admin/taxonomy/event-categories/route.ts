@@ -29,7 +29,6 @@ export async function GET(req: Request) {
       orderBy: [{ parentId: "asc" }, { sortOrder: "asc" }, { id: "asc" }],
       include: {
         parent: { select: { id: true, nameRu: true, slug: true, publicationType: true } },
-        options: { orderBy: [{ order: "asc" }, { value: "asc" }] },
         _count: { select: { activities: true, children: true } },
       },
     });
@@ -125,7 +124,6 @@ export async function POST(req: Request) {
       },
       include: {
         parent: { select: { id: true, nameRu: true, slug: true, publicationType: true } },
-        options: { orderBy: [{ order: "asc" }, { value: "asc" }] },
         _count: { select: { activities: true, children: true } },
       },
     });

@@ -30,7 +30,6 @@ export async function GET(_req: Request, { params }: RouteParams) {
     where: { id },
     include: {
       parent: { select: { id: true, nameRu: true, slug: true, publicationType: true } },
-      options: { orderBy: [{ order: "asc" }, { value: "asc" }] },
       _count: { select: { activities: true, children: true } },
     },
   });
@@ -233,7 +232,6 @@ export async function PATCH(req: Request, { params }: RouteParams) {
       data,
       include: {
         parent: { select: { id: true, nameRu: true, slug: true, publicationType: true } },
-        options: { orderBy: [{ order: "asc" }, { value: "asc" }] },
         _count: { select: { activities: true, children: true } },
       },
     });

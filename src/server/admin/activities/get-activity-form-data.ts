@@ -20,17 +20,6 @@ const getCachedEventCategories = unstable_cache(
         sortOrder: true,
         supportsProgram: true,
         selectableInProgram: true,
-        options: {
-          where: { isActive: true },
-          orderBy: [{ order: "asc" }, { value: "asc" }],
-          select: {
-            id: true,
-            label: true,
-            value: true,
-            order: true,
-            isActive: true,
-          },
-        },
       },
     });
 
