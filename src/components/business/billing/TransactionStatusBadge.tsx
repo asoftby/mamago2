@@ -1,6 +1,6 @@
 import { CheckCircle, Clock, XCircle, RotateCcw } from "lucide-react";
-import type { TransactionStatus } from "@/lib/mocks/businessBilling";
-import { getTransactionStatusLabel } from "@/lib/mocks/businessBilling";
+import type { TransactionStatus } from "@/lib/business/billing";
+import { getTransactionStatusLabel } from "@/lib/business/billing";
 import { BusinessChip } from "@/components/business/ui/BusinessChip";
 
 interface TransactionStatusBadgeProps {

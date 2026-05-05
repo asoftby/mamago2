@@ -131,7 +131,7 @@ Old quiz still works at: `http://localhost:3000/birthday`
 
 ### To complete full migration:
 
-1. **More mock data** — Currently only 7 offers, need full 36
+1. **Real data source** — Connect offers from API/DB
 2. **Filtering logic** — Apply age/budget/guests filters to candidates
 3. **Ranking logic** — Sort by featured/rating
 4. **"Показать другие" action** — Refresh candidates
@@ -188,7 +188,7 @@ removeSelectedOffer(offerId)
 ## Next Steps
 
 1. Test full flow in browser
-2. Add remaining mock offers
+2. Add real offers through the content pipeline
 3. Implement filtering/ranking
 4. Add mobile polish
 5. Switch main route

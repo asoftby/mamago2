@@ -46,17 +46,11 @@ export function formatWhoHeaderSummary(params: {
   const selectedPersonas = selectedPersonaIds
     .map((id) => byId.get(id))
     .filter((p): p is FamilyPersona => !!p);
-  
-  // Filter out adults with incomplete profiles
+
   const names = selectedPersonas
-    .filter((p) => {
-      // Exclude adults with incomplete profiles
-      if (p.kind === "adult" && p.isProfileComplete === false) {
-        return false;
-      }
-      return true;
-    })
-    .map((p) => p.displayName.trim() || "…")
+    .map((p) =>
+      p.kind === "adult" ? "Я" : (p.displayName.trim() || "…"),
+    )
     .filter(Boolean);
 
   if (hasSelectedChildren) {

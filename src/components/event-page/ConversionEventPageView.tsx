@@ -24,7 +24,6 @@ import { EventProgram } from "./EventProgram";
 import { EventAudience } from "./EventAudience";
 import { EventIncludes } from "./EventIncludes";
 import { EventLocation } from "./EventLocation";
-import { EventReviews } from "./EventReviews";
 import { EventRichDescription } from "./EventRichDescription";
 import { EventStickyActionBar } from "./EventStickyActionBar";
 import { EventSessionSelector } from "./EventSessionSelector";
@@ -270,30 +269,6 @@ export function ConversionEventPageView({ data }: { data: EventPageData }) {
     return [];
   }, [data.priceDetails]);
 
-  const mockReviews = [
-    {
-      id: "1",
-      author: "Анна М.",
-      date: "Октябрь 2024",
-      rating: 5,
-      text: "Отличный мастер-класс! Ребёнок был в восторге, всё понятно объяснили. Кулич получился вкусный!",
-    },
-    {
-      id: "2",
-      author: "Дмитрий К.",
-      date: "Сентябрь 2024",
-      rating: 5,
-      text: "Прекрасная атмосфера, профессиональный подход. Рекомендую всем, кто хочет научиться печь.",
-    },
-    {
-      id: "3",
-      author: "Елена П.",
-      date: "Август 2024",
-      rating: 4,
-      text: "Хорошее мероприятие, но хотелось бы больше времени на практику. В целом довольны.",
-    },
-  ];
-
   return (
     <div className="min-h-screen bg-background pb-[calc(6.5rem+env(safe-area-inset-bottom))] lg:pb-28">
       <div className="mx-auto w-full max-w-[1200px] px-4 pt-6 sm:px-6 sm:pt-8 lg:px-8 lg:pt-10">
@@ -446,13 +421,6 @@ export function ConversionEventPageView({ data }: { data: EventPageData }) {
 
             {/* Где проходит */}
             {data.venue && <EventLocation venue={data.venue} />}
-
-            {/* Отзывы */}
-            <EventReviews
-              reviews={mockReviews}
-              averageRating={4.9}
-              totalCount={127}
-            />
 
             {/* Полное описание */}
             <EventRichDescription

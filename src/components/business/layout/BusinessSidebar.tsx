@@ -2,6 +2,7 @@
 
 import { usePathname } from "next/navigation";
 import { SidebarItem } from "@/components/shared/sidebar/SidebarItem";
+import { SidebarPublicSiteEntry } from "@/components/shared/sidebar/SidebarPublicSiteEntry";
 import { SidebarGroup } from "@/components/shared/sidebar/SidebarGroup";
 import { SidebarSubItem } from "@/components/shared/sidebar/SidebarSubItem";
 import {
@@ -26,6 +27,11 @@ export function BusinessSidebar({ onNavigate, variant = "sidebar" }: BusinessSid
   return (
     <aside className="w-full lg:w-[248px] h-full border-r border-stone-200/80 bg-white/75 backdrop-blur">
       <nav className={variant === "sheet" ? "flex flex-col gap-1.5 p-4" : "sticky top-16 flex flex-col gap-1.5 p-4"}>
+        <SidebarPublicSiteEntry
+          onNavigate={onNavigate}
+          separatorClassName="border-stone-200/80"
+          chromeTone="business"
+        />
         {businessNavigation.map((item, index) => {
           if (item.type === "item") {
             const patterns = item.match ?? [item.href];

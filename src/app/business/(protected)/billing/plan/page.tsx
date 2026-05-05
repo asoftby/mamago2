@@ -1,11 +1,6 @@
 import { getCurrentUser } from "@/lib/auth/server";
 import { redirect } from "next/navigation";
-import {
-  formatDate,
-  mockCurrentPlan,
-  mockPaymentMethod,
-  mockPlanHistory,
-} from "@/lib/mocks/businessBilling";
+import { EMPTY_BILLING_STATE, formatDate } from "@/lib/business/billing";
 import { formatPrice } from "@/lib/formatters/format-price";
 import { CheckCircle, CreditCard, Info } from "lucide-react";
 import { TransactionStatusBadge } from "@/components/business/billing/TransactionStatusBadge";
@@ -15,6 +10,7 @@ import { getCurrentRequestRoutingContext } from "@/lib/routing/requestContext";
 import { BusinessSurfaceCard } from "@/components/business/ui/BusinessSurfaceCard";
 import { BusinessChip } from "@/components/business/ui/BusinessChip";
 import { Button } from "@/components/ui/button";
+import { BusinessEmptyState } from "@/components/business/ui/BusinessEmptyState";
 
 export default async function BillingPlanPage() {
   const routing = await getCurrentRequestRoutingContext();
@@ -30,8 +26,13 @@ export default async function BillingPlanPage() {
     );
   }
 
-  const plan = mockCurrentPlan;
-  const paymentMethod = mockPaymentMethod;
+  const plan = EMPTY_BILLING_STATE.plan;
+  const paymentMethod = EMPTY_BILLING_STATE.paymentMethod;
+  const planHistory = EMPTY_BILLING_STATE.planHistory;
+  console.log("[API] real data used", {
+    endpoint: "business-billing-plan",
+    empty: plan === null,
+  });
 
   return (
     <div className="space-y-6">
@@ -40,6 +41,15 @@ export default async function BillingPlanPage() {
         title="Тариф и подписка"
         description="Здесь видно, какой план сейчас подключён, что входит в подписку и когда произойдёт следующее списание."
       />
+
+      {!plan ? (
+        <BusinessEmptyState
+          icon={<CreditCard className="h-7 w-7" />}
+          title="Тариф пока не подключён"
+          description="Реальная биллинговая интеграция ещё не настроена. Здесь появятся тариф, способ оплаты и история продлений после подключения провайдера."
+        />
+      ) : (
+        <>
 
       <BusinessSurfaceCard className="p-6 md:p-7">
         <h2 className="mb-6 text-xl font-semibold tracking-tight text-stone-950">
@@ -74,7 +84,7 @@ export default async function BillingPlanPage() {
               <div>
                 <p className="text-sm text-stone-500">Следующее списание</p>
                 <p className="text-lg font-semibold text-stone-950">
-                  {formatDate(plan.nextBillingDate)}
+                  {plan.nextBillingDate ? formatDate(plan.nextBillingDate) : "Не запланировано"}
                 </p>
               </div>
               <div>
@@ -95,10 +105,10 @@ export default async function BillingPlanPage() {
                 </div>
                 <div>
                   <p className="font-medium text-stone-950">
-                    {paymentMethod.brand} •••• {paymentMethod.last4}
+                    {paymentMethod ? `${paymentMethod.brand} •••• ${paymentMethod.last4}` : "Не подключён"}
                   </p>
                   <p className="text-sm text-stone-500">
-                    Истекает {paymentMethod.expiryMonth}/{paymentMethod.expiryYear}
+                    {paymentMethod ? `Истекает ${paymentMethod.expiryMonth}/${paymentMethod.expiryYear}` : "Способ оплаты не подключён"}
                   </p>
                 </div>
               </div>
@@ -161,7 +171,7 @@ export default async function BillingPlanPage() {
               </tr>
             </thead>
             <tbody>
-              {mockPlanHistory.map((item) => (
+              {planHistory.map((item) => (
                 <tr
                   key={item.id}
                   className="border-b border-stone-100 transition-colors hover:bg-stone-50/70"
@@ -190,7 +200,7 @@ export default async function BillingPlanPage() {
           <Info className="mt-0.5 h-5 w-5 flex-shrink-0 text-blue-600" />
           <div className="text-sm text-blue-900">
             <p className="mb-1 font-medium">
-              Следующее автосписание произойдет {formatDate(plan.nextBillingDate)}
+              Следующее автосписание: {plan.nextBillingDate ? formatDate(plan.nextBillingDate) : "не запланировано"}
             </p>
             <p className="text-blue-700">
               Вы можете изменить тариф или отключить автопродление до даты
@@ -199,6 +209,8 @@ export default async function BillingPlanPage() {
           </div>
         </div>
       </BusinessSurfaceCard>
+        </>
+      )}
     </div>
   );
 }

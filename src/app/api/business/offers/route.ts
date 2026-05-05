@@ -67,6 +67,27 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "Place not found" }, { status: 404 });
       }
 
+      // Check image uniqueness within place
+      if (data.coverImage) {
+        const existingOfferWithCover = await prisma.offer.findFirst({
+          where: {
+            placeId: place.id,
+            coverImage: data.coverImage,
+          },
+        });
+        
+        if (existingOfferWithCover) {
+          return NextResponse.json(
+            { error: "Это изображение уже используется в другом предложении" },
+            { status: 400 }
+          );
+        }
+      }
+      
+      // Check gallery images uniqueness (if gallery field exists in schema)
+      // Note: This assumes gallery is stored as a JSON array field
+      // Adjust based on actual schema implementation
+
       // Map offer kind to database enum
       const dbKind = data.kind === "EVENT_TICKET" ? "EVENT" : "SERVICE";
 

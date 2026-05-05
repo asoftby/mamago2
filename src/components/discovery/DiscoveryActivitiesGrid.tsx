@@ -10,7 +10,7 @@ import {
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { partitionDiscoveryFeed } from "@/lib/discovery/partitionDiscoveryFeed";
 import { formatRuShortDayMonthRange } from "@/lib/formatters/date";
-import type { ActivityMock } from "@/mocks/activity.types";
+import type { ActivityMock } from "@/types/activity";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useOptionalCity } from "@/contexts/CityContext";

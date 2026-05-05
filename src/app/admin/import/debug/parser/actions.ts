@@ -4,11 +4,8 @@ import { getParser } from "@/server/modules/import/parsers/registry";
 import { normalizePlacePayload } from "@/server/modules/import/normalizers/place.normalizer";
 import { normalizeEventPayload } from "@/server/modules/import/normalizers/event.normalizer";
 import { scorePlaceImport, scoreEventImport } from "@/server/modules/import/services/import-quality.service";
-import type { NormalizedPlaceImport, NormalizedEventImport } from "@/server/modules/import/types";
 
-/**
- * Dev-only: запустить парсер + нормализацию без записи в БД.
- */
+/** Запустить нормализацию raw payload без записи в БД. */
 export async function runParserDebug(input: {
   parserKey: string;
   rawPayload?: Record<string, unknown>;
@@ -49,75 +46,10 @@ export async function runParserDebug(input: {
       }
     }
 
-    // Иначе — запустить mock parser целиком
-    const mockSource = {
-      id: "debug",
-      name: "Debug",
-      slug: "debug",
-      type: "MANUAL" as const,
-      status: "ACTIVE" as const,
-      baseUrl: null,
-      parserKey: input.parserKey,
-      fetchStrategy: "MANUAL_UPLOAD" as const,
-      isTrusted: false,
-      isAutoUpdate: false,
-      defaultEntity: null,
-      rateLimitMs: null,
-      notes: null,
-      lastRunAt: null,
-      lastSuccessAt: null,
-      lastErrorAt: null,
-      lastErrorMessage: null,
-      cityId: null,
-      isActive: true,
-      archivedAt: null,
-      crawlMaxPages: null,
-      crawlMaxDetailLinks: null,
-      crawlMaxRecords: null,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-
-    const parserResult = await parser.parse(mockSource);
-
-    // Нормализуем первую запись для preview
-    let normalized: NormalizedPlaceImport | NormalizedEventImport | undefined;
-    let qualityScore: number | undefined;
-    let warnings: string[] | undefined;
-
-    if (parserResult.records.length > 0) {
-      const first = parserResult.records[0];
-      const entityType = input.parserKey.includes("event") ? "EVENT" : "PLACE";
-
-      if (entityType === "PLACE") {
-        const result = normalizePlacePayload({
-          rawPayload: first.rawPayload,
-          sourceSlug: "debug",
-          sourceUrl: first.sourceUrl,
-          externalId: first.externalId,
-        });
-        normalized = result.normalized;
-        warnings = result.warnings;
-        qualityScore = scorePlaceImport(result.normalized).score;
-      } else {
-        const result = normalizeEventPayload({
-          rawPayload: first.rawPayload,
-          sourceSlug: "debug",
-          sourceUrl: first.sourceUrl,
-          externalId: first.externalId,
-        });
-        normalized = result.normalized;
-        warnings = result.warnings;
-        qualityScore = scoreEventImport(result.normalized).score;
-      }
-    }
-
     return {
       success: true,
-      parsed: parserResult.records,
-      normalized,
-      qualityScore,
-      warnings,
+      parsed: [],
+      warnings: ["Raw payload is required; parser execution without input has been removed."],
     };
   } catch (err) {
     return {

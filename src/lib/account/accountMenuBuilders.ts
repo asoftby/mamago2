@@ -201,7 +201,7 @@ export function buildPublicSiteAccountModel(input: {
 }
 
 /**
- * Админка: переключатель режимов (Личный / Админ) + выход (form POST).
+ * Админка: переключатель режимов (Личный / Админ / Бизнес) + выход (form POST).
  */
 export function buildAdminAccountModel(input: {
   userEmail: string;
@@ -209,6 +209,9 @@ export function buildAdminAccountModel(input: {
   initials: string;
   goToPersonalAccount: () => void;
   goToAdminHome: () => void;
+  goToBusinessAccount?: () => void;
+  hasBusinessProfile?: boolean;
+  businessLabel?: string;
   onNavigate: () => void;
 }): AccountDropdownModel {
   const {
@@ -217,12 +220,54 @@ export function buildAdminAccountModel(input: {
     initials,
     goToPersonalAccount,
     goToAdminHome,
+    goToBusinessAccount,
+    hasBusinessProfile = false,
+    businessLabel = "MamaGo",
     onNavigate,
   } = input;
 
   const emailPrefix = userEmail.split("@")[0] ?? userEmail;
   const displayName = userDisplayName?.trim() || emailPrefix;
 
+  // Если у админа есть бизнес-профиль, используем полный переключатель с тремя режимами
+  if (hasBusinessProfile && goToBusinessAccount) {
+    return {
+      sheetTitle: "Мой аккаунт",
+      header: {
+        email: userEmail,
+        displayName,
+        initials,
+        roleLabel: "Администратор",
+        avatarUrl: null,
+      },
+      mainItems: [],
+      mode: "personal", // Текущий режим определяется в AdminHeader
+      onSwitchMode: (next) => {
+        if (next === "personal") {
+          goToPersonalAccount();
+        } else if (next === "business") {
+          goToBusinessAccount();
+        }
+      },
+      businessModeAvailable: true,
+      businessLabel,
+      contextItems: [
+        {
+          key: "admin",
+          type: "button",
+          icon: Shield,
+          label: "Админ-панель",
+          variant: "default",
+          onClick: goToAdminHome,
+        },
+      ],
+      logoutMode: "form",
+      loggingOut: false,
+      onNavigate,
+    };
+  }
+
+  // Для админов без бизнес-профиля - упрощённый переключатель
   return {
     sheetTitle: "Мой аккаунт",
     header: {

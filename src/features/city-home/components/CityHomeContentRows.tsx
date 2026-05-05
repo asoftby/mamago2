@@ -10,8 +10,8 @@ import { useCity } from "@/contexts/CityContext";
 import { useFamilyPersona } from "@/contexts/FamilyPersonaContext";
 import { getCityLocativePhrase } from "@/lib/city/cityDisplayNames";
 import { formatRuShortDayMonth, formatRuShortDayMonthRange } from "@/lib/formatters/date";
-import type { ActivityMock } from "@/mocks/activity.types";
-import type { MockRoute } from "@/mocks/routes.mock";
+import type { ActivityMock } from "@/types/activity";
+import type { PublicRouteCardModel } from "@/components/routes/types";
 import { cn } from "@/lib/utils";
 import type { CityHomeJournalArticle } from "@/server/article/listCityHomeArticles";
 import { useDiscoveryFilters } from "@/features/filters/discovery/filters.store";
@@ -193,7 +193,7 @@ export function CityHomeRoutesSection({
   routes,
   mode,
 }: {
-  routes: MockRoute[];
+  routes: PublicRouteCardModel[];
   mode: "local" | "nearby" | "empty";
 }) {
   const { citySlug, appendCityQuery } = useCity();

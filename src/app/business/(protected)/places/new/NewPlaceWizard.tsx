@@ -452,8 +452,8 @@ export function NewPlaceWizard() {
   }, [localDraft, createRequestId, wizardSessionId, router, clearLocal, clearSession]);
 
   const handleStepClick = (targetStep: number) => {
-    // Create mock place for validation
-    const mockPlaceForValidation = {
+    // Create draft place for validation
+    const draftPlaceForValidation = {
       id: "new",
       ownerUserId: "new",
       status: ContentStatus.DRAFT,
@@ -469,7 +469,7 @@ export function NewPlaceWizard() {
       updatedAt: new Date(),
     } as unknown as PlaceWithImages;
     
-    if (!canGoToStep(targetStep, currentStep, mockPlaceForValidation)) {
+    if (!canGoToStep(targetStep, currentStep, draftPlaceForValidation)) {
       return;
     }
     setCurrentStep(targetStep);
@@ -479,7 +479,7 @@ export function NewPlaceWizard() {
     if (currentStep === 4) {
       // Last step - submit for moderation
       submitForModeration();
-    } else if (canGoToNextStep(currentStep, mockPlace)) {
+    } else if (canGoToNextStep(currentStep, draftPlace)) {
       setCurrentStep(currentStep + 1);
     } else {
       toast.error("Заполните обязательные поля для продолжения");
@@ -492,8 +492,8 @@ export function NewPlaceWizard() {
     }
   };
 
-  // Create a mock place object for step components compatibility
-  const mockPlace = useMemo(() => ({
+  // Create a draft place object for step components compatibility
+  const draftPlace = useMemo(() => ({
     id: "new",
     ownerUserId: user?.id || "new",
     status: ContentStatus.DRAFT,
@@ -564,7 +564,7 @@ export function NewPlaceWizard() {
     updatedAt: new Date(),
   } as unknown as PlaceWithImages), [user?.id, createRequestId, localDraft]);
 
-  const canGoNext = currentStep === 4 ? true : canGoToNextStep(currentStep, mockPlace);
+  const canGoNext = currentStep === 4 ? true : canGoToNextStep(currentStep, draftPlace);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -578,15 +578,15 @@ export function NewPlaceWizard() {
         onStepClick={handleStepClick}
         onSaveDraft={() => saveDraft()}
         canGoNext={canGoNext}
-        getStepStatus={(step) => getStepStatus(step, currentStep, mockPlace)}
-        place={mockPlace}
+        getStepStatus={(step) => getStepStatus(step, currentStep, draftPlace)}
+        place={draftPlace}
       />
 
       <div className="max-w-4xl mx-auto px-4 py-8">
 
         {currentStep === 1 && (
           <Step1Profile
-            place={mockPlace}
+            place={draftPlace}
             onUpdate={handleUpdate}
             onNext={handleNext}
             canNext={canGoNext}
@@ -595,7 +595,7 @@ export function NewPlaceWizard() {
 
         {currentStep === 2 && (
           <Step2Location
-            place={mockPlace}
+            place={draftPlace}
             onUpdate={handleUpdate}
             onPrev={handlePrev}
             onNext={handleNext}
@@ -605,8 +605,8 @@ export function NewPlaceWizard() {
 
         {currentStep === 3 && sessionLoaded && (
           <Step3Photos
-            place={mockPlace}
-            images={mockPlace.images}
+            place={draftPlace}
+            images={draftPlace.images}
             wizardSessionId={wizardSessionId}
             onUpdate={handleUpdate}
             onPrev={handlePrev}
@@ -617,7 +617,7 @@ export function NewPlaceWizard() {
 
         {currentStep === 4 && (
           <Step4Contacts
-            place={mockPlace}
+            place={draftPlace}
             onUpdate={handleUpdate}
             onPrev={handlePrev}
             onSubmit={submitForModeration}

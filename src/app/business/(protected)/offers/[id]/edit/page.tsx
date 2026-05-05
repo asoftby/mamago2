@@ -30,9 +30,12 @@ export default async function EditOfferPage({ params, searchParams }: EditOfferP
   const { id } = await params;
   const sp = await searchParams;
   const qs = new URLSearchParams();
-  if (sp.returnTo && typeof sp.returnTo === "string") {
-    qs.set("returnTo", sp.returnTo);
-  }
+  // Use provided returnTo or default to business offers list
+  const returnTo = typeof sp.returnTo === "string" 
+    ? sp.returnTo 
+    : "/business/offers";
+  qs.set("returnTo", returnTo);
+  
   const q = qs.toString();
   redirect(
     buildSurfaceRedirectDestination({

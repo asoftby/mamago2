@@ -38,9 +38,12 @@ export function HeaderAccountMenu() {
         isLoading: !headerHydrated || user === undefined,
         userId: user?.id ?? null,
         source: "FamilyPersonaContext.menuUser",
+        mode,
+        hydrated,
+        pathname: typeof window !== "undefined" ? window.location.pathname : "SSR",
       });
     }
-  }, [headerHydrated, user]);
+  }, [headerHydrated, user, mode, hydrated]);
 
   const handlers = useProfileDropdownHandlers({
     user,
@@ -134,7 +137,7 @@ export function HeaderAccountMenu() {
   );
 
   return (
-    <div className="flex min-w-0 items-center justify-end gap-1.5 md:gap-2">
+    <div className="hidden min-w-0 items-center justify-end gap-1.5 md:flex md:gap-2">
       {user && (
         <NotificationsDropdown
           context={notificationContext}

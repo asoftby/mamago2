@@ -1,46 +1,77 @@
+/**
+ * GET /api/public/event-categories
+ * 
+ * Возвращает категории и жанры для Event (publicationType = EVENT).
+ * Структура: корневые категории с вложенными жанрами.
+ */
+
 import { NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
+import { prisma } from "@/lib/prisma";
 
-export const runtime = "nodejs";
-
-/** Публичный read-only список категорий событий для мастера (корни + дети, только активные). */
 export async function GET() {
   try {
-    const rows = await prisma.eventCategory.findMany({
-      where: { isActive: true, publicationType: "EVENT" },
-      orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
+    // Получаем все активные категории EVENT (только корневые)
+    const categories = await prisma.eventCategory.findMany({
+      where: {
+        publicationType: "EVENT",
+        isActive: true,
+        parentId: null, // только корневые
+      },
       select: {
         id: true,
         nameRu: true,
+        nameEn: true,
         slug: true,
         icon: true,
-        parentId: true,
         sortOrder: true,
-        supportsProgram: true,
-        selectableInProgram: true,
+      },
+      orderBy: {
+        sortOrder: "asc",
       },
     });
 
-    const roots = rows.filter((r) => r.parentId == null);
-    const childrenByParent = new Map<string, typeof rows>();
-    for (const r of rows) {
-      if (r.parentId) {
-        const list = childrenByParent.get(r.parentId) ?? [];
-        list.push(r);
-        childrenByParent.set(r.parentId, list);
-      }
-    }
+    // Получаем жанры для каждой категории
+    const categoriesWithGenres = await Promise.all(
+      categories.map(async (category) => {
+        const genres = await prisma.genre.findMany({
+          where: {
+            categoryId: category.id,
+            isActive: true,
+          },
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            sortOrder: true,
+          },
+          orderBy: {
+            sortOrder: "asc",
+          },
+        });
 
-    const categories = roots.map((root) => ({
-      ...root,
-      children: (childrenByParent.get(root.id) ?? []).sort(
-        (a, b) => a.sortOrder - b.sortOrder || a.id.localeCompare(b.id),
-      ),
-    }));
+        return {
+          id: category.id,
+          nameRu: category.nameRu,
+          nameEn: category.nameEn,
+          slug: category.slug,
+          icon: category.icon,
+          sortOrder: category.sortOrder,
+          genres: genres.map((genre) => ({
+            id: genre.id,
+            nameRu: genre.name,
+            slug: genre.slug,
+            sortOrder: genre.sortOrder,
+          })),
+        };
+      })
+    );
 
-    return NextResponse.json({ categories });
-  } catch (e) {
-    console.error("[public/event-categories]", e);
-    return NextResponse.json({ categories: [] as unknown[], error: "fetch_failed" }, { status: 200 });
+    return NextResponse.json({ categories: categoriesWithGenres });
+  } catch (error) {
+    console.error("[event-categories] Error:", error);
+    return NextResponse.json(
+      { error: "Failed to fetch event categories" },
+      { status: 500 }
+    );
   }
 }

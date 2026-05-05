@@ -5,7 +5,7 @@ import Image from "next/image";
 import type { BirthdayBuilderWithGate } from "../../hooks/useBirthdayBuilderWithGate";
 import { BirthdayOptionCard } from "../../../components/cards/BirthdayOptionCard";
 import { OfferQuickView } from "../OfferQuickView";
-import { mockBirthdayOffers } from "../../../data/mockBirthdayOffers";
+import { birthdayOffers } from "../../../data/birthdayOffers";
 import { filterBirthdayOffers } from "../../../lib/filterBirthdayOffers";
 import { isVenueBoundAddon, checkAddonCompatibility } from "../../lib/compatibility";
 import { AddRemoveButton } from "../AddRemoveButton";
@@ -52,7 +52,7 @@ export function StepPlace({ builder }: { builder: BuilderHook }) {
   const baseOffers = useMemo(() => {
     if (!placeType || placeType !== "VENUE") return [];
 
-    const venueOffers = mockBirthdayOffers.filter(
+    const venueOffers = birthdayOffers.filter(
       (o) => o.layer === "BASE" && o.formatTags?.includes("VENUE")
     );
     const filtered = filterBirthdayOffers(venueOffers, {
@@ -76,7 +76,7 @@ export function StepPlace({ builder }: { builder: BuilderHook }) {
   const quickAddOffers = useMemo(() => {
     if (!selectedBase || placeType !== "VENUE") return [];
 
-    const addons = mockBirthdayOffers.filter(
+    const addons = birthdayOffers.filter(
       (o) => o.layer !== "BASE" && isVenueBoundAddon(o, selectedBase)
     );
 
@@ -353,7 +353,7 @@ export function StepPlace({ builder }: { builder: BuilderHook }) {
         onClose={() => setQuickViewOfferId(null)}
         offer={
           quickViewOfferId
-            ? mockBirthdayOffers.find((o) => o.id === quickViewOfferId) ?? null
+            ? birthdayOffers.find((o) => o.id === quickViewOfferId) ?? null
             : null
         }
         builder={builder}

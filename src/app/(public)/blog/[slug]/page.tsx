@@ -56,18 +56,6 @@ async function getArticle(slug: string): Promise<ArticleVm | null> {
       _seo: a,
     };
   }
-  if (slug === "demo-premium-article") {
-    return {
-      slug,
-      title: "Как провести выходные с детьми в Минске: 7 идей",
-      subtitle:
-        "От парков до мастер-классов — собрали лучшее для семейного уикенда",
-      category: "Идеи",
-      readTime: 5,
-      publishedAt: "2026-03-10",
-      heroImage: null,
-    };
-  }
   return null;
 }
 

@@ -1,6 +1,8 @@
 import { SeoTemplatesClient } from "@/components/admin/seo/SeoTemplatesClient";
-import { MOCK_SEO_TEMPLATES } from "@/lib/admin/seo/seoTemplateMock";
+import { getSeoTemplates } from "@/lib/admin/seo/data/seoAdminData";
 
-export default function AdminSeoTemplatesPage() {
-  return <SeoTemplatesClient initialTemplates={MOCK_SEO_TEMPLATES} />;
+export default async function AdminSeoTemplatesPage() {
+  const templates = await getSeoTemplates();
+  console.log("[API] real data used", { endpoint: "admin-seo-templates", count: templates.length });
+  return <SeoTemplatesClient initialTemplates={templates} />;
 }

@@ -5,12 +5,12 @@ import { runParserDebug } from "../actions";
 
 interface Props {
   parserKeys: string[];
-  fixtures: Record<string, unknown>;
+  rawSamples: Record<string, unknown>;
 }
 
-export function ParserDebugClient({ parserKeys, fixtures }: Props) {
+export function ParserDebugClient({ parserKeys, rawSamples }: Props) {
   const [parserKey, setParserKey] = useState(parserKeys[0] ?? "");
-  const [selectedFixture, setSelectedFixture] = useState<string>("");
+  const [selectedSample, setSelectedSample] = useState<string>("");
   const [rawInput, setRawInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<{
@@ -22,10 +22,10 @@ export function ParserDebugClient({ parserKeys, fixtures }: Props) {
     error?: string;
   } | null>(null);
 
-  function handleFixtureSelect(key: string) {
-    setSelectedFixture(key);
-    if (key && fixtures[key]) {
-      setRawInput(JSON.stringify(fixtures[key], null, 2));
+  function handleSampleSelect(key: string) {
+    setSelectedSample(key);
+    if (key && rawSamples[key]) {
+      setRawInput(JSON.stringify(rawSamples[key], null, 2));
     } else {
       setRawInput("");
     }
@@ -62,21 +62,21 @@ export function ParserDebugClient({ parserKeys, fixtures }: Props) {
             </select>
           </div>
           <div>
-            <label className="block text-xs text-gray-500 mb-1">Fixture (optional)</label>
+            <label className="block text-xs text-gray-500 mb-1">Raw sample (optional)</label>
             <select
-              value={selectedFixture}
-              onChange={(e) => handleFixtureSelect(e.target.value)}
+              value={selectedSample}
+              onChange={(e) => handleSampleSelect(e.target.value)}
               className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400"
             >
-              <option value="">— выбрать fixture —</option>
-              {Object.keys(fixtures).map((k) => <option key={k} value={k}>{k}</option>)}
+              <option value="">— выбрать sample —</option>
+              {Object.keys(rawSamples).map((k) => <option key={k} value={k}>{k}</option>)}
             </select>
           </div>
         </div>
 
         <div>
           <label className="block text-xs text-gray-500 mb-1">
-            Raw payload (JSON) — оставьте пустым для запуска mock parser целиком
+            Raw payload (JSON)
           </label>
           <textarea
             value={rawInput}

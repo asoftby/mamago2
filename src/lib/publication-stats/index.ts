@@ -25,4 +25,4 @@ export {
   getVisibleSectionsForRole,
   PUBLICATION_STATS_ALLOWED_ROLES,
 } from "./visibility";
-export { buildMockPublicationStats } from "./mock";
+export { buildEmptyPublicationStats } from "./empty";

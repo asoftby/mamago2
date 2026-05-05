@@ -28,7 +28,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { BUDGET_LABELS, type MockRoute } from "@/mocks/routes.mock";
+import { BUDGET_LABELS, type PublicRouteCardModel } from "@/components/routes/types";
 import { ShareSheet } from "@/components/routes/ShareSheet";
 import { SaveActivityFlowAdaptive } from "@/components/activity/SaveActivityFlowAdaptive";
 import type { SaveToPlanResult } from "@/components/activity/SaveToPlanModal";
@@ -39,9 +39,9 @@ import { useAuthMe } from "@/features/birthday/builder/hooks/useAuthMe";
 import { format, parseISO } from "date-fns";
 import { ru } from "date-fns/locale";
 
-type Props = { route: MockRoute & { isMockRoute?: boolean } };
+type Props = { route: PublicRouteCardModel };
 
-function buildGoogleMapsUrl(stops: MockRoute["stops"]): string {
+function buildGoogleMapsUrl(stops: PublicRouteCardModel["stops"]): string {
   const withCoords = stops.filter((s) => s.lat != null && s.lng != null);
   if (withCoords.length === 0) {
     const q = stops.map((s) => encodeURIComponent(s.address)).join("/");
@@ -89,7 +89,7 @@ function calculateDistance(
 }
 
 function calculateRouteStats(
-  stops: MockRoute["stops"],
+  stops: PublicRouteCardModel["stops"],
   travelMode: "walk" | "car",
 ) {
   let totalDistance = 0;
@@ -196,7 +196,7 @@ function StopCard({
   isLast,
   onPhotoClick,
 }: {
-  stop: MockRoute["stops"][number];
+  stop: PublicRouteCardModel["stops"][number];
   index: number;
   isLast: boolean;
   onPhotoClick?: (photos: string[], photoIndex: number) => void;
@@ -290,7 +290,6 @@ export function RouteDetailClient({ route }: Props) {
   const [stickyBarVisible, setStickyBarVisible] = useState(false);
   const actionBlockRef = useRef<HTMLDivElement>(null);
   const { isAuthenticated, user } = useAuthMe();
-  const isDemoRouteId = /^route-\d+$/.test(route.id);
 
   // IntersectionObserver: sticky top bar появляется когда action block ушёл из viewport
   useEffect(() => {
@@ -306,7 +305,6 @@ export function RouteDetailClient({ route }: Props) {
 
   // Check if user can edit this route (author or admin)
   const canEdit =
-    !isDemoRouteId &&
     user &&
     (route.authorName === user.email ||
       user.role === "ADMIN" ||
@@ -326,7 +324,7 @@ export function RouteDetailClient({ route }: Props) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           routeId: route.id,
-          planRouteSlug: route.isMockRoute ? route.slug : null,
+          planRouteSlug: route.slug,
           date: result.dateISO,
           title: route.title,
           coverImageUrl: route.coverImageUrl,
@@ -336,7 +334,6 @@ export function RouteDetailClient({ route }: Props) {
       setInPlan(true);
       toast.success("Маршрут добавлен в план");
     } else if (result.action === "ideas") {
-      if (isDemoRouteId) return;
       const res = await fetch("/api/save/idea", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

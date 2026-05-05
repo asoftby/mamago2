@@ -5,13 +5,20 @@ import { listPlanSuggestionsForCity } from "@/server/services/planSuggestions.se
 
 /**
  * GET /api/plan/suggestions?city=minsk&date=YYYY-MM-DD&exclude=id1,id2&ageRanges=1-3,3-5
- * Стартовые варианты для «Мой план» (город + публичные события), без «ИИ-сценария».
+ * Рекомендации для «Мой план» только для **авторизованных**;
+ * гость использует POST /api/plan/generate с anonymousId и квотой на сервере.
  */
 export async function GET(request: NextRequest) {
   try {
     const user = await getCurrentUser();
     if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json(
+        {
+          error: "Unauthorized",
+          hint: "Используйте POST /api/plan/generate для гостевой подборки.",
+        },
+        { status: 401 },
+      );
     }
 
     const { searchParams } = new URL(request.url);
@@ -47,6 +54,10 @@ export async function GET(request: NextRequest) {
       ...(ageRangesParam.length > 0
         ? { ageRangeValues: ageRangesParam }
         : {}),
+    });
+    console.log("[API] real data used", {
+      endpoint: "/api/plan/suggestions",
+      count: activities.length,
     });
 
     return NextResponse.json({ suggestions: activities });

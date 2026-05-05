@@ -93,7 +93,7 @@ export function NewBusinessDashboard({ data }: NewBusinessDashboardProps) {
           promotionHref={data.hrefs.promotion}
           variant="primary"
           label="Пополнить баланс"
-          className="sm:shrink-0"
+          className="w-full sm:w-auto sm:shrink-0"
         />
       </BusinessSurfaceCard>
 

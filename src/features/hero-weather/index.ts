@@ -10,7 +10,6 @@ export type {
 
 export { interpretWeather } from "./model/weather-interpreter";
 export type { WeatherProvider } from "./api/weather-provider";
-export { MockWeatherProvider } from "./api/mock-weather-provider";
 export { OpenMeteoWeatherProvider, mapOpenMeteoToWeatherRawData } from "./api/open-meteo-provider";
 export {
   getWeatherProvider,

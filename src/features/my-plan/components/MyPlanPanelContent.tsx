@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useAuthMe } from "@/features/birthday/builder/hooks/useAuthMe";
 import { useMyPlan } from "../hooks/useMyPlan";
 import { PlanMainContent } from "./PlanMainContent";
+import { GuestMyPlanPanel } from "./GuestMyPlanPanel";
 
 interface MyPlanPanelContentProps {
   open: boolean;
@@ -18,25 +20,17 @@ export function MyPlanPanelContent({
   const {
     isLoading,
     accessPhase,
-    planSlots,
     children,
     selectedChildIds,
     setSelectedChildIds,
     selectedAgeRanges,
     setSelectedAgeRanges,
-    autoAgeValues,
-    createChild,
-    submittingChild,
     selectedPlanDate,
     setSelectedPlanDate,
-    weekDates,
     planItemsByDate,
     todayIso,
-    cycleSlotAlternative,
-    cycleSlotAlternativePrev,
     markSlotSaved,
     clearSlotSaved,
-    openSlotSuggestion,
     ideas,
     ideasLoading,
     addIdeaToPlan,
@@ -47,12 +41,13 @@ export function MyPlanPanelContent({
     refetchPlanForDate,
   } = useMyPlan();
 
-  const [addErr, setAddErr] = useState<string | null>(() => null);
+  const { isAuthenticated, isLoading: authMeLoading } = useAuthMe();
+
   const [isDateLoading, setIsDateLoading] = useState(false);
 
-  /** Подтягиваем план с сервера при открытии и при смене даты — единый источник с БД + live после add. */
+  /** Подтягиваем план с сервера при открытии и при смене даты — только для авторизованных */
   useEffect(() => {
-    if (!open) return;
+    if (!open || !isAuthenticated) return;
     let cancelled = false;
     queueMicrotask(() => {
       if (cancelled) return;
@@ -64,7 +59,29 @@ export function MyPlanPanelContent({
     return () => {
       cancelled = true;
     };
-  }, [open, selectedPlanDate, refetchPlanForDate]);
+  }, [open, isAuthenticated, selectedPlanDate, refetchPlanForDate]);
+
+  if (authMeLoading) {
+    return (
+      <div className="flex min-h-[320px] flex-1 items-center justify-center">
+        <div className="px-6 text-center">
+          <div className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-2 border-gray-300 border-t-primary" />
+          <p className="text-gray-600">Загружаем ваш план...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <GuestMyPlanPanel
+        layout={layout}
+        onRequestClose={onRequestClose}
+        setSelectedPlanDate={setSelectedPlanDate}
+        todayIso={todayIso}
+      />
+    );
+  }
 
   if (isLoading || accessPhase === "loading") {
     return (

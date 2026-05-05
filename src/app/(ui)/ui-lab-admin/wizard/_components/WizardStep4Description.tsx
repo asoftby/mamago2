@@ -14,9 +14,6 @@ interface Props {
 
 type AiState = "idle" | "loading" | "success" | "error";
 
-const MOCK_REWRITE =
-  "Приглашаем детей на увлекательные занятия в уютной студии! Опытные педагоги помогут раскрыть творческий потенциал каждого ребёнка. Занятия проходят в небольших группах, что позволяет уделить внимание каждому участнику. Подходит для детей от 4 до 12 лет.";
-
 export function WizardStep4Description({ value, onChange }: Props) {
   const [aiState, setAiState] = useState<AiState>("idle");
   const [aiMessage, setAiMessage] = useState("");
@@ -31,20 +28,10 @@ export function WizardStep4Description({ value, onChange }: Props) {
       setTimeout(() => setAiState("idle"), 2500);
       return;
     }
-    setAiState("loading");
-    setAiMessage("");
-    setTimeout(() => {
-      // 80% success, 20% error for demo
-      if (Math.random() > 0.2) {
-        onChange(MOCK_REWRITE);
-        setAiState("success");
-        setAiMessage("Текст улучшен с помощью AI");
-      } else {
-        setAiState("error");
-        setAiMessage("Не удалось улучшить текст. Попробуйте ещё раз.");
-      }
-      setTimeout(() => setAiState("idle"), 3000);
-    }, 1400);
+    void onChange;
+    setAiState("error");
+    setAiMessage("AI rewrite endpoint не подключён");
+    setTimeout(() => setAiState("idle"), 3000);
   };
 
   return (

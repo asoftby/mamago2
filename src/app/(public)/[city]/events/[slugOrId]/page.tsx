@@ -3,8 +3,6 @@ import type { Metadata } from "next";
 import { permanentRedirect } from "next/navigation";
 import { Container } from "@/components/ui/Container";
 import { EventPageView } from "@/components/event-page";
-import { attachSimilarEvents, buildEventPageData } from "@/lib/event/buildEventPageData";
-import { MINSK_ACTIVITIES } from "@/mocks/activities.minsk";
 import { loadPublicActivityForCityPage } from "@/lib/event/loadPublicActivityForCityPage";
 import { ContentStatus } from "@prisma/client";
 import { buildEventPageDataFromPrismaActivity } from "@/lib/event/buildEventPageDataFromPrisma";
@@ -144,18 +142,12 @@ export default async function CityEventPublicPage({ params, searchParams }: Even
     permanentRedirect(`${canonicalPath}${searchParamsToSuffix(sp)}`);
   }
 
-  const activity = city === "minsk" ? MINSK_ACTIVITIES.find((a) => a.id === slugOrId) : undefined;
-  if (!activity) {
-    return (
-      <Container className="pt-20 text-center">
-        <h1 className="text-2xl font-bold">Событие не найдено</h1>
-        <Link href={`/${city}`} className="mt-4 block text-primary hover:underline">
-          На главную
-        </Link>
-      </Container>
-    );
-  }
-
-  const data = attachSimilarEvents(buildEventPageData(activity, city), MINSK_ACTIVITIES, city, 4);
-  return <EventPageView key={activity.id} data={data} />;
+  return (
+    <Container className="pt-20 text-center">
+      <h1 className="text-2xl font-bold">Событие не найдено</h1>
+      <Link href={`/${city}`} className="mt-4 block text-primary hover:underline">
+        На главную
+      </Link>
+    </Container>
+  );
 }

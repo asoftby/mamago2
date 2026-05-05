@@ -128,7 +128,7 @@ export async function addPlanItem(
 }
 
 /**
- * Добавить маршрут в план на дату (дедупликация по userId + routeId или по slug для демо без Route).
+ * Добавить маршрут в план на дату (дедупликация по userId + routeId).
  */
 export async function addRoutePlanItem(
   userId: string,
@@ -171,44 +171,9 @@ export async function addRoutePlanItem(
     });
   }
 
-  const slug = routeSlug?.trim();
-  const title = options?.title?.trim();
-  if (!slug || !title) {
-    throw new Error("Route not found");
-  }
-
-  const coverRaw = options?.coverImageUrl?.trim();
-  const cover = coverRaw && coverRaw.length > 0 ? coverRaw : null;
-
-  const existingStandalone = await prisma.planItem.findFirst({
-    where: { userId, routeId: null, planRouteSlug: slug },
-    select: { id: true },
-  });
-  if (existingStandalone) {
-    return prisma.planItem.update({
-      where: { id: existingStandalone.id },
-      data: {
-        date,
-        title,
-        coverImageUrl: cover,
-        activityId: null,
-      },
-      select: { id: true },
-    });
-  }
-
-  return prisma.planItem.create({
-    data: {
-      userId,
-      routeId: null,
-      planRouteSlug: slug,
-      activityId: null,
-      date,
-      title,
-      coverImageUrl: cover,
-    },
-    select: { id: true },
-  });
+  void routeSlug;
+  void options;
+  throw new Error("Route not found");
 }
 
 /**

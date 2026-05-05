@@ -7,20 +7,19 @@ import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { cn } from "@/lib/utils";
 import { Link2, Send, Share2, Check } from "lucide-react";
 import { toast } from "@/lib/toast";
-import type { MockRoute } from "@/mocks/routes.mock";
-import { BUDGET_LABELS } from "@/mocks/routes.mock";
+import { BUDGET_LABELS, type PublicRouteCardModel } from "@/components/routes/types";
 
 type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  route: MockRoute;
+  route: PublicRouteCardModel;
 };
 
 function ShareContent({
   route,
   onClose,
 }: {
-  route: MockRoute;
+  route: PublicRouteCardModel;
   onClose: () => void;
 }) {
   const [copied, setCopied] = React.useState(false);

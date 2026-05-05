@@ -52,6 +52,16 @@ export function isPublicationDetailPath(pathname: string | null): boolean {
   return section === "activity" || section === "events";
 }
 
+/** Конструктор дня рождения в городе: `/{city}/birthday/make`. */
+export function isBirthdayMakeWizardPath(pathname: string | null): boolean {
+  if (!pathname) return false;
+  const segments = pathname.split("/").filter(Boolean);
+  if (segments.length < 3) return false;
+  const hub = segments[0];
+  if (!hub || isReservedTopLevelSegment(hub)) return false;
+  return segments[1] === "birthday" && segments[2] === "make";
+}
+
 /**
  * Страница детали маршрута: `/routes/[slug]`.
  * Header не должен быть sticky — уходит вверх при скролле,
@@ -160,6 +170,7 @@ export function isMyPlanShellExcludedPath(pathname: string | null): boolean {
 export function shouldHideMyPlanWidget(pathname: string | null): boolean {
   if (isStandaloneAuthPath(pathname)) return true;
   if (isMyPlanShellExcludedPath(pathname)) return true;
+  if (isBirthdayMakeWizardPath(pathname)) return true;
   // На страницах событий виджет показываем
   if (isPublicationDetailPath(pathname)) return false;
   return shouldHideMobileBottomNav(pathname);

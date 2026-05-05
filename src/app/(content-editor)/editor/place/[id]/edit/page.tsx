@@ -9,11 +9,13 @@ import {
   type ContentEditorSurface,
 } from "@/lib/content-editor/types";
 import { loadPlaceForWizard } from "@/lib/content-editor/loadPlaceForWizard";
-import { buildSurfaceRedirectDestination } from "@/lib/routing/surface";
+import { buildSurfaceRedirectDestination, resolveSurfaceFromHostAndPathname } from "@/lib/routing/surface";
 import { getCurrentRequestRoutingContext } from "@/lib/routing/requestContext";
 
-function surfaceFromUserRole(role: string): ContentEditorSurface {
-  return role === "ADMIN" || role === "MODERATOR" ? "admin" : "business";
+function surfaceFromHostAndPath(host: string | undefined, pathname: string): ContentEditorSurface {
+  const resolved = resolveSurfaceFromHostAndPathname(host, pathname);
+  // Editor is only available on business and admin surfaces
+  return resolved === "admin" ? "admin" : "business";
 }
 
 export default async function EditorEditPlacePage({
@@ -71,7 +73,7 @@ export default async function EditorEditPlacePage({
     );
   }
 
-  const surface = surfaceFromUserRole(user.role);
+  const surface = surfaceFromHostAndPath(routing.currentHost, `/editor/place/${id}/edit`);
   const nav = defaultNavForSurface(surface);
   const backHref = resolveEditorReturnDestination({
     surface,

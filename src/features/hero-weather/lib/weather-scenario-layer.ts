@@ -1,4 +1,4 @@
-import type { ActivityMock } from "@/mocks/activity.types";
+import type { ActivityMock } from "@/types/activity";
 import type { TimeOfDay, WeatherScenario } from "../model/types";
 
 export type HomeWeatherScenario =

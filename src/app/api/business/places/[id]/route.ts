@@ -11,6 +11,7 @@ import { getActiveRevision } from "@/server/services/placeRevision.service";
 import { canCreateBusinessContent } from "@/lib/auth/businessContentAccess";
 import { canManagePlaceAsync } from "@/lib/auth/placeAccess";
 import { assignPlaceSlugIfMissing } from "@/lib/slug/placeSlugService";
+import { validatePlaceCategoriesDraft } from "@/lib/validation/placeCategoryValidation";
 
 export async function GET(
   request: NextRequest,
@@ -151,6 +152,7 @@ export async function PATCH(
         createdByUserId: true,
         ownerBusinessId: true,
         status: true,
+        primaryCategoryId: true,
       },
     });
 
@@ -182,6 +184,25 @@ export async function PATCH(
     }
 
     const body = await request.json();
+
+    // Валидация категорий если они обновляются
+    if (body.primaryCategoryId !== undefined || body.subcategoryIds !== undefined) {
+      const categoryValidation = await validatePlaceCategoriesDraft({
+        primaryCategoryId: body.primaryCategoryId ?? existing.primaryCategoryId,
+        subcategoryIds: body.subcategoryIds,
+      });
+
+      if (!categoryValidation.valid) {
+        return NextResponse.json(
+          {
+            error: "CATEGORY_VALIDATION_ERROR",
+            message: categoryValidation.error,
+            details: categoryValidation.details,
+          },
+          { status: 400 }
+        );
+      }
+    }
 
     // Lenient validation for autosave - only check types/formats
     const updateData: Record<string, unknown> = {};

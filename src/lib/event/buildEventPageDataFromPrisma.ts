@@ -11,7 +11,7 @@ import {
 } from "@/domain/activities/activity-format";
 import { ageFromPlusBadgeFromAgeTags } from "@/lib/event/activityAgeBounds";
 
-const FALLBACK_POSTER = "/mock/activity/anderson.svg";
+const FALLBACK_POSTER = "/og-default.jpg";
 
 /**
  * Minimal activity shape for {@link buildEventPageDataFromPrismaActivity}

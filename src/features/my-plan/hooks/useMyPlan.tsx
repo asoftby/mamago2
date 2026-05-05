@@ -14,6 +14,7 @@ import { useOptionalCity } from "@/contexts/CityContext";
 import { useFamilyPersona } from "@/contexts/FamilyPersonaContext";
 import { useDiscoveryFilters } from "@/features/filters/discovery/filters.store";
 import { useChildrenScope } from "@/features/filters/discovery/childrenScope.store";
+import { AGE_GROUPS } from "@/features/filters/age/ageGroups";
 import { MY_PLAN_REFETCH_DATE_EVENT } from "@/lib/my-plan/myPlanOpenIntent";
 
 function todayISO(): string {
@@ -328,6 +329,10 @@ function useMyPlanStore() {
     async (date: string) => {
       if (!isAuthenticated || authLoading) return;
       const gen = ++planDayFetchGen.current;
+      setPlanItemsByDateMap((prev) => {
+        if (Object.prototype.hasOwnProperty.call(prev, date)) return prev;
+        return { ...prev, [date]: [] };
+      });
       try {
         const res = await fetch(
           `/api/save/plan/day?date=${encodeURIComponent(date)}`,
@@ -356,6 +361,90 @@ function useMyPlanStore() {
     if (!isAuthenticated || authLoading) return;
     void refetchPlanForDate(today);
   }, [isAuthenticated, authLoading, refetchPlanForDate, today]);
+
+  /**
+   * Reverse sync: Monitor Header age filter changes and update My Plan mode
+   * 
+   * Rules:
+   * - If Header age is cleared → My Plan enters FREE_SEARCH (clear personas)
+   * - If Header age is selected → My Plan enters AGE_FILTER_SEARCH (don't create children)
+   * - Never delete profile children, just change selection mode
+   */
+  useEffect(() => {
+    if (!isAuthenticated || !family || family.loading) return;
+
+    const headerAge = locationApplied.age ?? [];
+    const currentPersonaIds = family.selectedPersonaIds ?? [];
+    const personas = family.personas ?? [];
+
+    // Helper: Calculate age from birth date
+    const getAgeYears = (birthDate: string | null | undefined): number | null => {
+      if (!birthDate) return null;
+      const birth = new Date(birthDate);
+      if (Number.isNaN(birth.getTime())) return null;
+
+      const now = new Date();
+      let age = now.getFullYear() - birth.getFullYear();
+      const monthDiff = now.getMonth() - birth.getMonth();
+
+      if (monthDiff < 0 || (monthDiff === 0 && now.getDate() < birth.getDate())) {
+        age--;
+      }
+
+      return age >= 0 ? age : null;
+    };
+
+    // Helper: Find age group for a given age
+    const findAgeGroupByYears = (ageYears: number): string | null => {
+      for (const group of AGE_GROUPS) {
+        if (group.max === null) {
+          if (ageYears >= group.min) return group.value;
+        } else if (ageYears >= group.min && ageYears <= group.max) {
+          return group.value;
+        }
+      }
+      return null;
+    };
+
+    // Build expected audience from current personas
+    const currentAudience = new Set<string>();
+    for (const personaId of currentPersonaIds) {
+      const persona = personas.find((p) => p.id === personaId);
+      if (!persona) continue;
+
+      if (persona.kind === "adult") {
+        currentAudience.add("18+");
+      } else if (persona.kind === "child") {
+        const ageYears = getAgeYears(persona.birthDate);
+        if (ageYears !== null) {
+          const groupId = findAgeGroupByYears(ageYears);
+          if (groupId) {
+            currentAudience.add(groupId);
+          }
+        }
+      }
+    }
+
+    // If header age is empty, enter free search mode
+    if (headerAge.length === 0) {
+      // Only clear if we're not already in free search
+      if (currentPersonaIds.length > 0) {
+        family.setSelectedPersonaIds([]);
+      }
+      return;
+    }
+
+    // If header age is selected, check if current personas match
+    const headerAgeSet = new Set(headerAge);
+    const audienceMatches =
+      currentAudience.size === headerAgeSet.size &&
+      Array.from(currentAudience).every((a) => headerAgeSet.has(a));
+
+    // If mismatch, enter age_filter_search mode (clear personas but keep profile data)
+    if (!audienceMatches && currentPersonaIds.length > 0) {
+      family.setSelectedPersonaIds([]);
+    }
+  }, [isAuthenticated, locationApplied.age, family]);
 
   // Слушаем внешний запрос на рефетч конкретной даты (например, после сохранения события со страницы события)
   useEffect(() => {
@@ -443,7 +532,7 @@ function useMyPlanStore() {
       if (metroLabel && !address.includes(metroLabel)) return false;
       if (districtLabel && !address.includes(districtLabel)) return false;
 
-      // nearby is part of shared state; demo recommendations do not have coordinates,
+      // nearby is part of shared state; recommendations do not have coordinates,
       // so we keep list stable and only apply city/metro/district filters.
       return true;
     });
@@ -497,13 +586,10 @@ function useMyPlanStore() {
         const day = prev[selectedPlanDate];
         if (!day) return prev;
         const updated = day.filter((i) => i.id !== itemId);
-        const out = { ...prev };
-        if (updated.length === 0) {
-          delete out[selectedPlanDate];
-        } else {
-          out[selectedPlanDate] = updated;
-        }
-        return out;
+        return {
+          ...prev,
+          [selectedPlanDate]: updated,
+        };
       });
     },
     [selectedPlanDate],
@@ -635,6 +721,7 @@ function useMyPlanStore() {
 
   return {
     isLoading,
+    isAuthenticated,
     accessPhase,
     authLoading,
     profileLoading,

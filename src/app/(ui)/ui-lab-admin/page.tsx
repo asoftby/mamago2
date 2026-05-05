@@ -6,14 +6,11 @@ import { PageStructureSection } from "./_sections/PageStructureSection";
 import { ToolbarsSection } from "./_sections/ToolbarsSection";
 import { KpiCardsSection } from "./_sections/KpiCardsSection";
 import { ContentShellsSection } from "./_sections/ContentShellsSection";
-import { TablesSection } from "./_sections/TablesSection";
 import { ListsQueuesSection } from "./_sections/ListsQueuesSection";
 import { StatesSection } from "./_sections/StatesSection";
 import { FormsSection } from "./_sections/FormsSection";
 import { OverlaysSection } from "./_sections/OverlaysSection";
 import { EventScheduleSection } from "./_sections/EventScheduleSection";
-import { BookingModuleSection } from "./_sections/BookingModuleSection";
-import { ScheduleEditorSection } from "./_sections/ScheduleEditorSection";
 import { ActivityFormBuilderSection } from "./_sections/ActivityFormBuilderSection";
 
 export default function AdminUILabPage() {
@@ -39,14 +36,11 @@ export default function AdminUILabPage() {
         <ToolbarsSection />
         <KpiCardsSection />
         <ContentShellsSection />
-        <TablesSection />
         <ListsQueuesSection />
         <StatesSection />
         <FormsSection />
         <OverlaysSection />
         <EventScheduleSection />
-        <BookingModuleSection />
-        <ScheduleEditorSection />
         <ActivityFormBuilderSection />
       </div>
     </div>

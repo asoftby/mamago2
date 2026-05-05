@@ -64,7 +64,7 @@ export function OffersList({ offers, currentView }: OffersListProps) {
       currentView={currentView}
       emptyIcon={<Tag className="w-8 h-8 text-gray-400" />}
       emptyTitle="Предложений пока нет"
-      emptyDescription="Добавьте первое предложение, чтобы быстро протестировать спрос и увидеть, какие офферы действительно приводят интерес и обращения."
+      emptyDescription="Добавьте первое предложение, чтобы семьи могли быстрее понять выгоду и оставить заявку или перейти к записи."
       addButtonText="Добавить предложение"
       addButtonHref="/business/offers/new"
       renderItem={(offer, handlers) => (

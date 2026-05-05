@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { Menu, X } from "lucide-react";
 import { useNarrowViewport } from "@/hooks/useNarrowViewport";
-import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { CreatePublicationQuickMenu } from "@/components/shared/CreatePublicationQuickMenu";
@@ -15,26 +14,14 @@ import { useAccountMode } from "@/contexts/AccountModeContext";
 import { cn } from "@/lib/utils";
 import { resolveHasBusinessProfile } from "@/lib/account/isBusinessAccountRole";
 import { useProfileDropdownHandlers } from "@/lib/account/useProfileDropdownHandlers";
+import { accountProfileTriggerLetter } from "@/lib/account/userInitials";
 import { BusinessSidebar } from "./BusinessSidebar";
-
-function userInitials(email: string): string {
-  const local = email.split("@")[0] ?? "?";
-  const cleaned = local.replace(/[._-]+/g, " ").trim();
-  const parts = cleaned.split(/\s+/).filter(Boolean);
-  if (parts.length >= 2) {
-    const a = parts[0]![0];
-    const b = parts[parts.length - 1]![0];
-    return (a + b).toUpperCase();
-  }
-  return cleaned.slice(0, 2).toUpperCase() || "?";
-}
 
 interface BusinessHeaderProps {
   user: AccountMenuUser;
 }
 
 export function BusinessHeader({ user }: BusinessHeaderProps) {
-  const router = useRouter();
   const narrow = useNarrowViewport();
   const { mode, hydrated } = useAccountMode();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -48,7 +35,7 @@ export function BusinessHeader({ user }: BusinessHeaderProps) {
     closeMenu: () => setMenuOpen(false),
   });
 
-  const initials = userInitials(user.email);
+  const triggerLetter = accountProfileTriggerLetter(user.displayName, user.email);
   const isBusinessPartner = resolveHasBusinessProfile({
     role: user.role,
     hasApprovedBusinessProfile: user.hasApprovedBusinessProfile,
@@ -65,8 +52,8 @@ export function BusinessHeader({ user }: BusinessHeaderProps) {
       aria-haspopup="dialog"
       aria-expanded={menuOpen}
     >
-      <span className="flex h-full w-full items-center justify-center rounded-full bg-neutral-500 text-[11px] font-semibold text-white">
-        {initials}
+      <span className="flex h-full w-full items-center justify-center rounded-full bg-sky-100 text-[11px] font-semibold text-sky-900">
+        {triggerLetter}
       </span>
     </Button>
   );

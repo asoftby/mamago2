@@ -7,7 +7,7 @@ import {
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { cn } from "@/lib/utils";
-import { NotificationsPanel } from "./NotificationsPanel";
+import { NotificationsMenuContent } from "@/components/site/header/NotificationsMenuContent";
 
 export type NotificationsModalProps = {
   open: boolean;
@@ -26,7 +26,7 @@ export function NotificationsModal({
   stream = "user",
   onNotificationRead,
 }: NotificationsModalProps) {
-  const isDesktop = useMediaQuery("(min-width: 1024px)");
+  const isDesktop = useMediaQuery("(min-width: 768px)");
   if (isDesktop) return null;
 
   return (
@@ -41,7 +41,7 @@ export function NotificationsModal({
         )}
       >
         <SheetTitle className="sr-only">Уведомления</SheetTitle>
-        <NotificationsPanel
+        <NotificationsMenuContent
           open={open}
           stream={stream}
           onNotificationRead={onNotificationRead}

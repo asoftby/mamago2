@@ -25,6 +25,10 @@ import {
   nextResponseFromBusinessAccessError,
   requireBusinessPermission,
 } from "@/server/permissions/business-permissions";
+import {
+  validatePlaceCategories,
+  validatePlaceCategoriesDraft,
+} from "@/lib/validation/placeCategoryValidation";
 
 async function finalizePublishedPlaceSlugIfNeeded(placeId: string, isPublished: boolean) {
   if (!isPublished) return;
@@ -90,6 +94,40 @@ export async function POST(request: NextRequest) {
       if (!t || !c || !s) {
         return NextResponse.json(
           { error: "VALIDATION_ERROR", message: "data.title, data.category, and data.shortDesc are required" },
+          { status: 400 }
+        );
+      }
+
+      // Валидация категорий для PENDING/PUBLISHED
+      const categoryValidation = await validatePlaceCategories({
+        primaryCategoryId: data.primaryCategoryId,
+        subcategoryIds: data.subcategoryIds,
+      });
+
+      if (!categoryValidation.valid) {
+        return NextResponse.json(
+          {
+            error: "CATEGORY_VALIDATION_ERROR",
+            message: categoryValidation.error,
+            details: categoryValidation.details,
+          },
+          { status: 400 }
+        );
+      }
+    } else {
+      // Валидация категорий для DRAFT (более мягкая)
+      const categoryValidation = await validatePlaceCategoriesDraft({
+        primaryCategoryId: data.primaryCategoryId,
+        subcategoryIds: data.subcategoryIds,
+      });
+
+      if (!categoryValidation.valid) {
+        return NextResponse.json(
+          {
+            error: "CATEGORY_VALIDATION_ERROR",
+            message: categoryValidation.error,
+            details: categoryValidation.details,
+          },
           { status: 400 }
         );
       }

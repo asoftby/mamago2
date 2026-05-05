@@ -10,18 +10,7 @@ interface Props {
   onChange: (url: string | null) => void;
 }
 
-// Mock images for the "media library" picker
-const MOCK_LIBRARY = [
-  "https://images.unsplash.com/photo-1503454537195-1dcabb73ffb9?w=400&q=80",
-  "https://images.unsplash.com/photo-1516627145497-ae6968895b74?w=400&q=80",
-  "https://images.unsplash.com/photo-1488521787991-ed7bbaae773c?w=400&q=80",
-  "https://images.unsplash.com/photo-1555252333-9f8e92e65df9?w=400&q=80",
-  "https://images.unsplash.com/photo-1560969184-10fe8719e047?w=400&q=80",
-  "https://images.unsplash.com/photo-1596464716127-f2a82984de30?w=400&q=80",
-];
-
 export function WizardStep3Cover({ coverUrl, onChange }: Props) {
-  const [libraryOpen, setLibraryOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -30,18 +19,12 @@ export function WizardStep3Cover({ coverUrl, onChange }: Props) {
     e.target.value = "";
     if (!file) return;
 
-    // Mock upload: create object URL for preview
     setUploading(true);
     const url = URL.createObjectURL(file);
     setTimeout(() => {
       onChange(url);
       setUploading(false);
     }, 800);
-  };
-
-  const handlePickFromLibrary = (url: string) => {
-    onChange(url);
-    setLibraryOpen(false);
   };
 
   return (
@@ -103,15 +86,6 @@ export function WizardStep3Cover({ coverUrl, onChange }: Props) {
               )}
               {uploading ? "Загружаем…" : "Загрузить"}
             </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              disabled={uploading}
-              onClick={() => setLibraryOpen(true)}
-            >
-              Выбрать из медиатеки
-            </Button>
           </div>
         </div>
       ) : (
@@ -140,14 +114,6 @@ export function WizardStep3Cover({ coverUrl, onChange }: Props) {
             <Button
               type="button"
               size="sm"
-              variant="outline"
-              onClick={() => setLibraryOpen(true)}
-            >
-              Выбрать из медиатеки
-            </Button>
-            <Button
-              type="button"
-              size="sm"
               variant="ghost"
               className="text-destructive hover:text-destructive"
               onClick={() => onChange(null)}
@@ -159,38 +125,6 @@ export function WizardStep3Cover({ coverUrl, onChange }: Props) {
         </div>
       )}
 
-      {/* Mock library picker */}
-      {libraryOpen && (
-        <div className="rounded-xl border border-gray-200 bg-white shadow-md">
-          <div className="flex items-center justify-between border-b px-4 py-3">
-            <p className="text-sm font-semibold">Медиатека (mock)</p>
-            <button
-              type="button"
-              onClick={() => setLibraryOpen(false)}
-              className="text-xs text-muted-foreground hover:text-foreground"
-            >
-              Закрыть
-            </button>
-          </div>
-          <div className="grid grid-cols-3 gap-2 p-4">
-            {MOCK_LIBRARY.map((url) => (
-              <button
-                key={url}
-                type="button"
-                onClick={() => handlePickFromLibrary(url)}
-                className="group relative aspect-square overflow-hidden rounded-lg border border-gray-200 bg-muted focus:outline-none focus:ring-2 focus:ring-[#EF8759]"
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={url}
-                  alt=""
-                  className="h-full w-full object-cover transition group-hover:opacity-90"
-                />
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   );
 }

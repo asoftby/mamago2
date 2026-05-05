@@ -1,5 +1,5 @@
 import type { FamilyPersona } from "@/lib/family/familyPersonaTypes";
-import type { ActivityMock } from "@/mocks/activity.types";
+import type { ActivityMock } from "@/types/activity";
 
 type PersonaRankingInput = {
   personas: FamilyPersona[];

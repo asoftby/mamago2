@@ -16,7 +16,7 @@ import { listUserBirthdayParties } from "@/server/services/userBirthdays.service
 import Link from "next/link";
 import { MapPin, Plus } from "lucide-react";
 import { RouteActions } from "@/features/me/components/RouteActions";
-import { BUDGET_LABELS } from "@/mocks/routes.mock";
+import { BUDGET_LABELS } from "@/components/routes/types";
 import { buildAdultPreferenceDisplayLine } from "@/lib/adultPersonaSignals/buildAdultPreferenceLine";
 import { cn } from "@/lib/utils";
 import { peachPrimaryCtaLinkClassName } from "@/lib/peachPrimaryCtaLink";

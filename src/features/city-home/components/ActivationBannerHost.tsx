@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useCallback, useSyncExternalStore, useEffect } from "react";
+import { useState, useCallback, useSyncExternalStore } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { X, Users, Sparkles } from "lucide-react";
 import { useFamilyPersona } from "@/contexts/FamilyPersonaContext";
 import { FamilyActivationAddChildOverlay } from "./FamilyActivationAddChildOverlay";
 import { AdultActivationOverlay } from "./AdultActivationOverlay";
+import { requestOpenMyPlan } from "@/lib/my-plan/myPlanOpenIntent";
 
 // ── dismiss state ─────────────────────────────────────────────────────────────
 
@@ -13,8 +14,11 @@ const CHILD_SESSION_KEY = "mamago:childBannerDismissed";
 const ADULT_LS_KEY = "mamago:adultBannerDismissCount";
 const ADULT_MAX_DISMISS = 3;
 
+const GUEST_BANNER_SESSION_KEY = "mamago:guestPlanBannerDismissed";
+
 const childListeners = new Set<() => void>();
 const adultListeners = new Set<() => void>();
+const guestListeners = new Set<() => void>();
 
 function getChildDismissed() {
   if (typeof window === "undefined") return false;
@@ -23,6 +27,22 @@ function getChildDismissed() {
 function getAdultDismissCount() {
   if (typeof window === "undefined") return 0;
   try { return parseInt(localStorage.getItem(ADULT_LS_KEY) ?? "0", 10) || 0; } catch { return 0; }
+}
+
+function getGuestDismissed() {
+  if (typeof window === "undefined") return false;
+  try {
+    return sessionStorage.getItem(GUEST_BANNER_SESSION_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function subscribeGuestDismiss(onStoreChange: () => void) {
+  guestListeners.add(onStoreChange);
+  return () => {
+    guestListeners.delete(onStoreChange);
+  };
 }
 
 // ── animation variants ────────────────────────────────────────────────────────
@@ -122,6 +142,11 @@ export function ActivationBannerHost() {
     getAdultDismissCount,
     () => 0,
   );
+  const guestDismissed = useSyncExternalStore(
+    subscribeGuestDismiss,
+    getGuestDismissed,
+    () => false,
+  );
 
   const [childOpen, setChildOpen] = useState(false);
   const [adultOpen, setAdultOpen] = useState(false);
@@ -157,6 +182,15 @@ export function ActivationBannerHost() {
     adultListeners.forEach((fn) => fn());
   }, []);
 
+  const dismissGuest = useCallback(() => {
+    try {
+      sessionStorage.setItem(GUEST_BANNER_SESSION_KEY, "1");
+    } catch {
+      /* ignore */
+    }
+    guestListeners.forEach((fn) => fn());
+  }, []);
+
   const handleChildSuccess = useCallback(async () => {
     await family?.refresh();
   }, [family]);
@@ -165,7 +199,30 @@ export function ActivationBannerHost() {
     await family?.refresh();
   }, [family]);
 
-  if (loading || !menuUser) return null;
+  if (loading) return null;
+
+  if (!menuUser) {
+    if (guestDismissed) return null;
+    return (
+      <motion.div
+        key="guest-plan"
+        variants={bannerVariants}
+        initial="hidden"
+        animate="visible"
+        exit="exit"
+      >
+        <BannerShell
+          icon={<Sparkles className="h-5 w-5 text-[#EF8759]" strokeWidth={1.75} />}
+          title="Подберём идеи для вашей семьи"
+          description="Соберём готовый сценарий дня — регистрация нужна только чтобы сохранить план"
+          ctaLabel="Реши за меня"
+          ctaStyle="primary"
+          onCta={() => requestOpenMyPlan()}
+          onDismiss={dismissGuest}
+        />
+      </motion.div>
+    );
+  }
 
   return (
     <>

@@ -6,7 +6,6 @@ import { cn } from "@/lib/utils";
 import type { MyPlanIdea } from "../hooks/useMyPlan";
 import { publicActivityPath } from "@/lib/business/eventPublicLink";
 import { activityTypeLabelRu } from "@/lib/activity/activityTypeLabelsRu";
-import { isPlanSuggestionMockId } from "../lib/mockPlanSuggestions";
 
 type Activity = NonNullable<MyPlanIdea["activity"]>;
 
@@ -49,7 +48,6 @@ export type PlanRecommendationsBlockProps = {
     event: React.MouseEvent<HTMLAnchorElement>,
     activity: { id: string; slug?: string | null },
   ) => void;
-  /** Каталог для ссылок-примеров (моки) */
   seeMoreHref: string;
 };
 
@@ -65,7 +63,6 @@ export function PlanRecommendationsBlock({
   inPlanActivityIds,
   onAddToPlan,
   onOpenActivity,
-  seeMoreHref,
 }: PlanRecommendationsBlockProps) {
   const slice = activities.slice(0, maxItems);
   /** Не подменяем список на «Подбираем…», если уже есть строки — иначе скачок при смене чипов. */
@@ -142,7 +139,6 @@ export function PlanRecommendationsBlock({
               const meta = formatRecMeta(activity);
               const typeLabel = activityTypeLabelRu(activity.type);
               const busy = addingActivityId === activity.id;
-              const isMock = isPlanSuggestionMockId(activity.id);
               const inPlan = inPlanActivityIds.has(activity.id);
 
               return (
@@ -150,26 +146,17 @@ export function PlanRecommendationsBlock({
                   key={activity.id}
                   className={cn(
                     "flex items-center gap-2 rounded-xl border px-2.5 py-2 sm:gap-3 sm:px-3",
-                    isMock
-                      ? "border-dashed border-neutral-200/90 bg-neutral-50/50"
-                      : "border-neutral-100/90 bg-neutral-50/60",
+                    "border-neutral-100/90 bg-neutral-50/60",
                   )}
                 >
                   <div className="min-w-0 flex-1">
                     <Link
                       href={
-                        isMock
-                          ? seeMoreHref
-                          : publicActivityPath(activity.id, city, activity.slug)
+                        publicActivityPath(activity.id, city, activity.slug)
                       }
                       className="line-clamp-2 text-left text-sm font-medium leading-tight text-neutral-900 hover:text-neutral-700"
                       onClick={(e) => onOpenActivity(e, activity)}
                     >
-                      {isMock ? (
-                        <span className="mr-1.5 inline-block rounded-md border border-neutral-200 bg-white px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-neutral-500">
-                          Пример
-                        </span>
-                      ) : null}
                       {activity.title}
                     </Link>
                     <p className="mt-0.5 line-clamp-2 text-[11px] leading-relaxed text-neutral-500 sm:text-xs">

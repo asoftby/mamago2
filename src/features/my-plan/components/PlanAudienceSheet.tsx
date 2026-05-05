@@ -117,7 +117,7 @@ export function PlanAudienceSheet({
               Для кого планируем?
             </h2>
             <p className="mt-1 text-sm text-neutral-500">
-              Выберите участников или режим &quot;Для всех&quot;
+              Выберите участников или режим &quot;Свободный поиск&quot;
             </p>
           </div>
           <ModalCloseButton
@@ -131,7 +131,7 @@ export function PlanAudienceSheet({
       {/* Content */}
       <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
         <div className="space-y-6">
-          {/* Режим "Для всех" */}
+          {/* Режим "Свободный поиск" */}
           <div>
             <button
               type="button"
@@ -157,7 +157,7 @@ export function PlanAudienceSheet({
                 />
               </div>
               <div className="min-w-0 flex-1 text-left">
-                <p className="font-medium text-neutral-900">Для всех</p>
+                <p className="font-medium text-neutral-900">Свободный поиск</p>
                 <p className="mt-1 text-xs leading-relaxed text-neutral-500">
                   Без учёта профилей и интересов
                 </p>

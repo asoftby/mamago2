@@ -4,7 +4,7 @@ import { getBillingOverview, getBusinessesRequiringAttention } from "@/server/se
 import { DollarSign, TrendingUp, CheckCircle, XCircle, Users, AlertTriangle } from "lucide-react";
 import { BillingKpiCard } from "@/components/admin/billing/BillingKpiCard";
 import Link from "next/link";
-import { formatDateTime } from "@/lib/mocks/businessBilling";
+import { formatDateTime } from "@/lib/business/billing";
 import { formatPrice, formatTransactionAmount } from "@/lib/formatters/format-price";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 

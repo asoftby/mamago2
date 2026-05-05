@@ -9,7 +9,7 @@ import type {
   BirthdayBudgetGroup,
   BirthdayCandidateGroup,
 } from "../types/birthday";
-import { mockBirthdayOffers } from "../data/mockBirthdayOffers";
+import { birthdayOffers } from "../data/birthdayOffers";
 import { filterBirthdayOffers } from "../lib/filterBirthdayOffers";
 import { groupBirthdayCandidates } from "../lib/groupBirthdayCandidates";
 
@@ -28,7 +28,7 @@ export function useBirthdayQuiz() {
   const [state, setState] = useState<BirthdayQuizState>(initialState);
 
   const filteredOffers = useMemo(() => {
-    return filterBirthdayOffers(mockBirthdayOffers, {
+    return filterBirthdayOffers(birthdayOffers, {
       ageGroup: state.ageGroup,
       format: state.format,
       guestsGroup: state.guestsGroup,

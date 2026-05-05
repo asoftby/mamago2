@@ -11,11 +11,13 @@ import {
 } from "@/lib/content-editor/types";
 import { loadOfferForWizard } from "@/lib/content-editor/loadOfferForWizard";
 import { canEditOfferForUser } from "@/lib/permissions/offerEditPermissions";
-import { buildSurfaceRedirectDestination } from "@/lib/routing/surface";
+import { buildSurfaceRedirectDestination, resolveSurfaceFromHostAndPathname } from "@/lib/routing/surface";
 import { getCurrentRequestRoutingContext } from "@/lib/routing/requestContext";
 
-function surfaceFromUserRole(role: string): ContentEditorSurface {
-  return role === "ADMIN" || role === "MODERATOR" ? "admin" : "business";
+function surfaceFromHostAndPath(host: string | undefined, pathname: string): ContentEditorSurface {
+  const resolved = resolveSurfaceFromHostAndPathname(host, pathname);
+  // Editor is only available on business and admin surfaces
+  return resolved === "admin" ? "admin" : "business";
 }
 
 export default async function EditorEditOfferPage({
@@ -86,7 +88,7 @@ export default async function EditorEditOfferPage({
     );
   }
 
-  const surface = surfaceFromUserRole(user.role);
+  const surface = surfaceFromHostAndPath(routing.currentHost, `/editor/offer/${id}/edit`);
   const nav = defaultEditorNav(surface, "offer");
   const backHref = resolveEditorReturnDestination({
     surface,

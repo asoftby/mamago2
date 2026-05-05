@@ -21,6 +21,7 @@ import { resolveEventOrganizer } from "@/lib/business/eventOrganizer";
 import { syncActivityOccasions } from "@/lib/business/syncActivityOccasions";
 import { prismaBase } from "@/lib/prisma";
 import { DEFAULT_ACTIVITY_FORMAT, normalizeActivityFormat } from "@/domain/activities/activity-format";
+import { validateEventSignals } from "@/lib/event/eventSignalMapping";
 
 /**
  * POST /api/business/events
@@ -79,6 +80,34 @@ export async function POST(request: NextRequest) {
       programCategoryIds: body.programCategoryIds,
     });
 
+    // Validate and process discovery signals
+    let discoverySignalIds: string[] = [];
+    if (Array.isArray(body.discoverySignalIds) && body.discoverySignalIds.length > 0) {
+      const signalIds = body.discoverySignalIds.filter((id: unknown): id is string => typeof id === "string");
+      
+      // Validate signals
+      const validation = await validateEventSignals(signalIds, prisma);
+      if (!validation.valid) {
+        return NextResponse.json(
+          { error: validation.error || "Invalid signals" },
+          { status: 400 }
+        );
+      }
+      
+      // Remove duplicates
+      discoverySignalIds = Array.from(new Set(signalIds));
+    }
+
+    // Process genre slugs
+    const genreSlugs: string[] = [];
+    if (Array.isArray(body.genreSlugs)) {
+      for (const slug of body.genreSlugs) {
+        if (typeof slug === "string" && genreSlugs.length < 3) {
+          genreSlugs.push(slug);
+        }
+      }
+    }
+
     let resolvedBusinessId: string | null =
       typeof body.businessId === "string" ? body.businessId : null;
 
@@ -124,6 +153,10 @@ export async function POST(request: NextRequest) {
         // Event category (leaf: subcategory if selected, otherwise root)
         eventCategoryId:
           typeof body.eventCategoryId === "string" ? body.eventCategoryId : undefined,
+        // Genre slugs (max 3)
+        genreSlugs,
+        // Discovery signals
+        discoverySignalIds,
         programCategoryLinks:
           programCategoryIds.length > 0
             ? {

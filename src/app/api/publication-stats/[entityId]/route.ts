@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { Role } from "@prisma/client";
 import { getCurrentUser } from "@/lib/auth/server";
-import { buildMockPublicationStats } from "@/lib/publication-stats/mock";
+import { buildEmptyPublicationStats } from "@/lib/publication-stats/empty";
 import {
   DEFAULT_PUBLICATION_STATS_PERIOD,
   parsePublicationStatsPeriod,
@@ -11,7 +11,7 @@ import { canViewPublicationStats } from "@/lib/publication-stats/visibility";
 /**
  * GET /api/publication-stats/[entityId]?path=&period=
  * Статистика публикации — admin и business owner (этап 1).
- * Данные: пока mock, структура — как у будущего агрегатора.
+ * Данные: реальный агрегатор ещё не подключён, поэтому возвращаем честное пустое состояние.
  */
 export async function GET(
   request: Request,
@@ -34,6 +34,10 @@ export async function GET(
   const period =
     parsePublicationStatsPeriod(periodRaw) ?? DEFAULT_PUBLICATION_STATS_PERIOD;
 
-  const payload = buildMockPublicationStats(entityId, path, user, period);
+  const payload = buildEmptyPublicationStats(entityId, path, user, period);
+  console.log("[API] real data used", {
+    endpoint: "/api/publication-stats/[entityId]",
+    empty: true,
+  });
   return NextResponse.json(payload);
 }

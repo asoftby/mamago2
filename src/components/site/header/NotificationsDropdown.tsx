@@ -9,8 +9,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { NotificationsModal } from "@/components/business/notifications/NotificationsModal";
-import { NotificationsPanel } from "@/components/business/notifications/NotificationsPanel";
-import { NotificationsBellPopover } from "@/components/business/notifications/NotificationsBellPopover";
+import { NotificationsMenuContent } from "@/components/site/header/NotificationsMenuContent";
 import { useUserNotificationBadgeCount } from "@/features/notifications/hooks/useUserNotificationBadgeCount";
 import type { HeaderChromeContext } from "@/lib/header/chromeContext";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
@@ -21,36 +20,21 @@ import {
 } from "@/lib/auth/client";
 
 export type NotificationsDropdownProps = {
-  /** Публичный сайт — личные уведомления; кабинет партнёра — бизнес */
+  /** Публичный сайт / админка → лента user; кабинет партнёра (режим business) → stream business в настройках */
   context: HeaderChromeContext;
   triggerClassName?: string;
 };
 
 /**
- * Колокол в шапке: desktop — dropdown (Popover), mobile — тот же контент в bottom sheet через NotificationsModal.
+ * Колокол: desktop — Popover с {@link NotificationsPanel}, mobile — тот же контент в sheet ({@link NotificationsModal}).
+ * Один UI для user, admin и business (различается только stream настроек: user vs business).
  */
 export function NotificationsDropdown({
   context,
   triggerClassName,
 }: NotificationsDropdownProps) {
-  if (context === "business") {
-    return <NotificationsBellPopover triggerClassName={triggerClassName} />;
-  }
-
-  return (
-    <PersonalNotificationsDropdown
-      context={context}
-      triggerClassName={triggerClassName}
-    />
-  );
-}
-
-function PersonalNotificationsDropdown({
-  context,
-  triggerClassName,
-}: NotificationsDropdownProps) {
   const stream = context === "business" ? "business" : "user";
-  const isDesktop = useMediaQuery("(min-width: 1024px)");
+  const isDesktop = useMediaQuery("(min-width: 768px)");
   const isUserStream = stream === "user";
   const {
     displayUnreadCount: userDisplayUnreadCount,
@@ -63,7 +47,6 @@ function PersonalNotificationsDropdown({
   const fetchUnreadCount = useCallback(async () => {
     try {
       const params = new URLSearchParams({ limit: "1" });
-      // Don't pass stream parameter — fetch ALL accessible notifications
       const res = await fetch(`/api/notifications?${params.toString()}`, {
         credentials: "include",
       });
@@ -129,6 +112,14 @@ function PersonalNotificationsDropdown({
     ),
   };
 
+  const panelProps = {
+    open,
+    stream: stream as "user" | "business",
+    showHeaderClose: true as const,
+    onNotificationRead: isUserStream ? refreshUserUnreadCount : fetchUnreadCount,
+    onClose: () => setOpen(false),
+  };
+
   if (isDesktop) {
     return (
       <div data-notifications-dropdown>
@@ -141,13 +132,7 @@ function PersonalNotificationsDropdown({
             sideOffset={8}
             className="w-[min(100vw-1.5rem,480px)] max-w-[480px] overflow-hidden rounded-[24px] border border-neutral-200/90 p-0 shadow-[0_20px_60px_rgba(15,23,42,0.14)]"
           >
-            <NotificationsPanel
-              open={open}
-              stream={stream}
-              showHeaderClose
-              onNotificationRead={isUserStream ? refreshUserUnreadCount : fetchUnreadCount}
-              onClose={() => setOpen(false)}
-            />
+            <NotificationsMenuContent {...panelProps} />
           </PopoverContent>
         </Popover>
       </div>
@@ -161,7 +146,7 @@ function PersonalNotificationsDropdown({
         open={open}
         onOpenChange={setOpen}
         stream={stream}
-        onNotificationRead={isUserStream ? refreshUserUnreadCount : fetchUnreadCount}
+        onNotificationRead={panelProps.onNotificationRead}
       />
     </div>
   );

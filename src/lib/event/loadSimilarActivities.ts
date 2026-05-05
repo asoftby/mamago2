@@ -20,7 +20,7 @@ import { formatPriceFrom } from "@/lib/formatters/format-price";
 import { resolveActivityCoverUrl } from "@/lib/event/resolveActivityCoverUrl";
 import type { EventPageSimilar } from "@/lib/event/eventPageTypes";
 
-const FALLBACK_IMAGE = "/mock/activity/anderson.svg";
+const FALLBACK_IMAGE = "/og-default.jpg";
 
 type SimilarRow = {
   id: string;

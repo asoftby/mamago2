@@ -6,6 +6,7 @@
  * Path prefixes remain in place as compatibility fallbacks and internal routes.
  */
 
+import { getCanonicalPublicAppUrl } from "@/lib/config/publicAppUrl";
 import { stripPublicDiscoverySearchParamsFromPath } from "@/lib/routing/publicDiscoverySearchParams";
 
 export type AppSurface = "public" | "admin" | "business";
@@ -118,10 +119,24 @@ function parseHost(host: string): { hostname: string; port: string } {
 /**
  * Dev-only local-network host detection for LAN testing.
  * Accepts hostname without port (e.g. "192.168.1.10").
+ * 
+ * NOTE: Does NOT treat *.mamago.local or *.mamago.by as "dev local" 
+ * because those are our supported base hosts that need proper subdomain routing.
  */
 export function isDevLocalHost(hostname: string): boolean {
   if (process.env.NODE_ENV !== "development") return false;
   if (!hostname) return false;
+
+  // Check if this is one of our supported base hosts or their subdomains
+  for (const baseHost of SUPPORTED_SURFACE_BASE_HOSTS) {
+    if (
+      hostname === baseHost ||
+      hostname === `admin.${baseHost}` ||
+      hostname === `business.${baseHost}`
+    ) {
+      return false; // These need proper host-based routing
+    }
+  }
 
   if (hostname === "localhost" || hostname === "127.0.0.1") return true;
   if (hostname.startsWith("192.168.") || hostname.startsWith("10.")) return true;
@@ -208,6 +223,31 @@ export function buildSurfaceRedirectDestination(params: {
   const visiblePath = buildExternalPathForSurface(params.targetSurface, normalizedInternalPath);
 
   return `${protocol}://${hostWithPort}${visiblePath}`;
+}
+
+/** Витрина по умолчанию при переходе из admin/business на публичный сайт (город). */
+export const PUBLIC_SITE_DEFAULT_ENTRY_PATH = "/minsk";
+
+/**
+ * Абсолютный URL публичной витрины (учитывает admin.* / business.* → основной хост).
+ * Если хост не распознан как поддоменная схема mamago — добавляет {@link getCanonicalPublicAppUrl}.
+ */
+export function buildPublicSiteEntryUrl(params: {
+  currentHost?: string | null;
+  currentProtocol?: string | null;
+}): string {
+  const dest = buildSurfaceRedirectDestination({
+    targetSurface: "public",
+    targetPath: PUBLIC_SITE_DEFAULT_ENTRY_PATH,
+    currentHost: params.currentHost ?? undefined,
+    currentProtocol: params.currentProtocol ?? undefined,
+  });
+  if (dest.startsWith("http://") || dest.startsWith("https://")) {
+    return dest;
+  }
+  const base = getCanonicalPublicAppUrl().replace(/\/+$/u, "");
+  const path = dest.startsWith("/") ? dest : `/${dest}`;
+  return `${base}${path}`;
 }
 
 /**

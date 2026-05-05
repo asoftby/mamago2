@@ -130,6 +130,16 @@ export function navigateToSurface(
     params.targetSurface,
     params.targetPath,
   );
+  
+  if (process.env.NODE_ENV !== "production") {
+    console.log("[navigateToSurface]", {
+      targetSurface: params.targetSurface,
+      targetPath: params.targetPath,
+      href,
+      currentOrigin: typeof window !== "undefined" ? window.location.origin : "SSR",
+    });
+  }
+  
   const sameOriginRelative = toSameOriginRelativePathOrNull(href);
 
   if (sameOriginRelative) {

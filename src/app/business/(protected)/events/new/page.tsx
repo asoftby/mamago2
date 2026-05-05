@@ -32,9 +32,12 @@ export default async function NewEventPage({
 
   const sp = await searchParams;
   const qs = new URLSearchParams();
-  if (sp.returnTo && typeof sp.returnTo === "string") {
-    qs.set("returnTo", sp.returnTo);
-  }
+  // Use provided returnTo or default to business events list
+  const returnTo = typeof sp.returnTo === "string" 
+    ? sp.returnTo 
+    : "/business/events";
+  qs.set("returnTo", returnTo);
+  
   const q = qs.toString();
   redirect(
     buildSurfaceRedirectDestination({

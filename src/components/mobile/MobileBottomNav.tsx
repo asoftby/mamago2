@@ -3,13 +3,14 @@
 import { useState } from "react";
 import { Bell } from "lucide-react";
 import { usePathname } from "next/navigation";
-import { NotificationsModal } from "@/components/business/notifications/NotificationsModal";
 import {
   getNavIconButtonClassName,
   NavIconButton,
 } from "@/components/mobile/NavIconButton";
+import { MobileMenuSheet } from "@/components/mobile/MobileMenuSheet";
 import { MobileProfileSheet } from "@/components/mobile/MobileProfileSheet";
 import { PlanPillNavButton } from "@/components/mobile/PlanPillNavButton";
+import { NotificationsMenuContent } from "@/components/site/header/NotificationsMenuContent";
 import { useCity } from "@/contexts/CityContext";
 import { useFamilyPersona } from "@/contexts/FamilyPersonaContext";
 import { useUserNotificationBadgeCount } from "@/features/notifications/hooks/useUserNotificationBadgeCount";
@@ -43,8 +44,9 @@ export function MobileBottomNav({
   const { citySlug } = useCity();
   const family = useFamilyPersona();
   const isAuthenticated = !family?.loading && !!family?.menuUser;
+  const guestPlanPromo = !family?.loading && !family?.menuUser;
   const { displayUnreadCount, refreshUnreadCount } = useUserNotificationBadgeCount();
-  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [activeSheet, setActiveSheet] = useState<null | "notifications" | "profile">(null);
 
   const resolvedProfileAvatar =
     profileAvatarUrl ?? family?.menuUser?.avatarUrl ?? undefined;
@@ -55,13 +57,14 @@ export function MobileBottomNav({
   const isHomeActive = pathname === homeHref;
   const isPlanActive =
     pathname.startsWith("/me/plan") || pathname.startsWith("/me/day");
-  const isNotificationsActive = notificationsOpen;
+  const isNotificationsActive = activeSheet === "notifications";
   const isMeHubOrProfileSection =
     pathname === "/me" ||
     (pathname.startsWith("/me/") &&
       !pathname.startsWith("/me/plan") &&
       !pathname.startsWith("/me/day"));
   const isProfileActive =
+    activeSheet === "profile" ||
     isMeHubOrProfileSection ||
     pathname.startsWith("/business") ||
     pathname.startsWith("/admin");
@@ -100,6 +103,7 @@ export function MobileBottomNav({
             onOpenMyPlan={requestOpenMyPlan}
             badgeCount={planBadgeCount}
             hasPlannedEvents={hasPlannedEvents ?? false}
+            guestPlanPromo={guestPlanPromo}
             className="min-w-0 flex-1"
             chrome="dark"
           />
@@ -108,8 +112,8 @@ export function MobileBottomNav({
             <button
               type="button"
               aria-label="Уведомления"
-              aria-expanded={notificationsOpen}
-              onClick={() => setNotificationsOpen(true)}
+              aria-expanded={activeSheet === "notifications"}
+              onClick={() => setActiveSheet("notifications")}
               className={getNavIconButtonClassName({
                 isActive: isNotificationsActive,
                 size: NAV_ICON_SIZE,
@@ -153,17 +157,27 @@ export function MobileBottomNav({
             </button>
           )}
           {isAuthenticated && (
-            <NotificationsModal
-              open={notificationsOpen}
-              onOpenChange={setNotificationsOpen}
-              stream="user"
-              onNotificationRead={() => {
-                void refreshUnreadCount();
-              }}
-            />
+            <MobileMenuSheet
+              open={activeSheet === "notifications"}
+              onOpenChange={(open) => setActiveSheet(open ? "notifications" : null)}
+              title="Уведомления"
+              showTitleBar={false}
+              bodyClassName="pb-0"
+            >
+              <NotificationsMenuContent
+                open={activeSheet === "notifications"}
+                stream="user"
+                onNotificationRead={() => {
+                  void refreshUnreadCount();
+                }}
+                onClose={() => setActiveSheet(null)}
+              />
+            </MobileMenuSheet>
           )}
 
           <MobileProfileSheet
+            open={activeSheet === "profile"}
+            onOpenChange={(open) => setActiveSheet(open ? "profile" : null)}
             isProfileActive={isProfileActive}
             profileBadgeCount={profileBadgeCount}
             profileAvatarUrl={resolvedProfileAvatar}

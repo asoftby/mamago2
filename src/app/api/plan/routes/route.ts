@@ -26,6 +26,7 @@ export async function POST(request: NextRequest) {
       title,
       coverImageUrl,
     });
+    console.log("[API] real data used", { endpoint: "/api/plan/routes" });
 
     return NextResponse.json({ success: true, planItem });
   } catch (error) {

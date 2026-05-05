@@ -4,7 +4,6 @@ import { Container } from "@/components/ui/Container";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { H1, H2, H3, Body, Caption } from "@/components/ui/typography";
-import { ActivityCard } from "@/components/activity/ActivityCard";
 import { CardSelect } from "@/components/ui/card-select";
 import { CardMultiSelect } from "@/components/ui/card-multiselect";
 import { WhenSelect } from "@/components/ui/when-select";
@@ -47,29 +46,6 @@ export default function UiTestPage() {
           </div>
         </section>
 
-        <section className="space-y-2">
-          <H2>ActivityCard (Portrait 4:5)</H2>
-          <div className="grid grid-cols-2 gap-4 md:grid-cols-1 md:gap-6">
-            <ActivityCard
-              id="place-1"
-              title="Семейное кафе «Андерсон»"
-              image="/mock/activity/anderson.svg"
-              badge="Популярное"
-              age="0+"
-              dateLabel="10:00–22:00"
-              priceLabel="от 30 BYN"
-              rating={4.8}
-            />
-            <ActivityCard
-              id="event-1"
-              title="Жаночы дзень"
-              image="/mock/activity/zanocy-dzen.svg"
-              age="0+"
-              dateLabel="8 марта"
-              priceLabel="Минск • Дукорский маёнтак"
-            />
-          </div>
-        </section>
       </Container>
     </main>
   );

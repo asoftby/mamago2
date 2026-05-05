@@ -1,11 +1,12 @@
 import type { DiscoveryFilters } from "@/features/filters/discovery/filters.store";
-import type { ActivityMock } from "@/mocks/activity.types";
+import type { ActivityMock } from "@/types/activity";
 import { AGE_GROUPS } from "@/features/filters/age/ageGroups";
 
 function ageRangeFromGroupId(id: string): { min: number; max: number } | null {
   const g = AGE_GROUPS.find((x) => x.value === id);
   if (!g) return null;
-  return { min: g.min, max: g.max ?? 18 };
+  /** 18+ и др. без верхней границы — как у карточек с ageTo 99 в ленте */
+  return { min: g.min, max: g.max ?? 99 };
 }
 
 function activityOverlapsAgeRanges(

@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -35,13 +35,22 @@ export function WeekCalendarStrip({
     getWeekStart(selectedDate),
   );
   const [direction, setDirection] = useState<1 | -1>(1);
-  const activePillLayoutId = useId();
+  const prevSyncedWeekStartRef = useRef<string | null>(null);
+  /** После mount включаем slide-in только при смене недели — без рывка на холодной загрузке. */
+  const enableWeekEnterMotion = useRef(false);
+  useEffect(() => {
+    enableWeekEnterMotion.current = true;
+  }, []);
 
-  // Sync visibleWeekStart when selectedDate changes externally
-  const nextStart = getWeekStart(selectedDate);
-  if (nextStart !== visibleWeekStart) {
-    setVisibleWeekStart(nextStart);
-  }
+  useEffect(() => {
+    const ws = getWeekStart(selectedDate);
+    const prev = prevSyncedWeekStartRef.current;
+    if (prev != null && prev !== ws) {
+      setDirection(ws.localeCompare(prev) >= 0 ? 1 : -1);
+    }
+    prevSyncedWeekStartRef.current = ws;
+    setVisibleWeekStart(ws);
+  }, [selectedDate]);
 
   const weekDays = useMemo(() => getWeekDays(visibleWeekStart), [visibleWeekStart]);
   const monthLabel = useMemo(() => buildWeekMonthLabel(weekDays, selectedDate), [weekDays, selectedDate]);
@@ -58,7 +67,8 @@ export function WeekCalendarStrip({
     <div
       className={cn(
         "relative rounded-3xl border border-neutral-200/80 bg-white p-3 shadow-sm",
-        compact && "rounded-none border-0 bg-transparent py-1 shadow-none",
+        compact &&
+          "rounded-none border-0 bg-transparent px-0 py-1 shadow-none",
         className,
       )}
     >
@@ -67,7 +77,7 @@ export function WeekCalendarStrip({
           <button
             type="button"
             onClick={() => shiftWeek(-1)}
-            className="absolute left-2 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-700"
+            className="absolute left-0 top-1/2 z-20 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-700"
             aria-label="Предыдущая неделя"
           >
             <ChevronLeft className="h-4 w-4" />
@@ -75,7 +85,7 @@ export function WeekCalendarStrip({
           <button
             type="button"
             onClick={() => shiftWeek(1)}
-            className="absolute right-2 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-700"
+            className="absolute right-0 top-1/2 z-20 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-700"
             aria-label="Следующая неделя"
           >
             <ChevronRight className="h-4 w-4" />
@@ -83,97 +93,109 @@ export function WeekCalendarStrip({
         </>
       ) : null}
 
-      <div className="mb-2 text-center">
+      <div className="relative mb-2 min-h-[14px] text-center">
         <AnimatePresence mode="wait" initial={false}>
           <motion.p
             key={monthLabel}
-            initial={{ opacity: 0, y: 4 }}
+            initial={{ opacity: 0, y: 3 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -4 }}
-            transition={{ duration: 0.18 }}
-            className="inline-block text-[11px] font-medium uppercase leading-none text-neutral-400"
+            exit={{ opacity: 0, y: -3 }}
+            transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+            className="pointer-events-none absolute inset-x-0 top-0 text-[11px] font-medium uppercase leading-none text-neutral-400"
           >
             {monthLabel}
           </motion.p>
         </AnimatePresence>
       </div>
 
-      <div className={cn("overflow-hidden", compact ? "px-8" : "px-8 sm:gap-2")}>
-        <AnimatePresence initial={false} custom={direction} mode="wait">
-          <motion.div
-            key={visibleWeekStart}
-            custom={direction}
-            initial={{ x: direction > 0 ? 42 : -42, opacity: 0.96 }}
-            animate={{ x: 0, opacity: 1 }}
-            exit={{ x: direction > 0 ? -42 : 42, opacity: 0.96 }}
-            transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
-            drag="x"
-            dragElastic={0.1}
-            dragConstraints={{ left: 0, right: 0 }}
-            onDragEnd={(_, info) => {
-              const threshold = 44;
-              if (info.offset.x <= -threshold) shiftWeek(1);
-              if (info.offset.x >= threshold) shiftWeek(-1);
-            }}
-            className="flex items-stretch justify-between gap-1"
-          >
-            {weekDays.map((iso) => {
-              const d = new Date(`${iso}T12:00:00`);
-              const selected = iso === selectedDate;
-              const isPast = iso < todayIso;
-              return (
-                <button
-                  key={iso}
-                  type="button"
-                  aria-pressed={selected}
-                  aria-label={d.toLocaleDateString("ru-RU", {
-                    weekday: "long",
-                    day: "numeric",
-                    month: "long",
-                  })}
-                  disabled={isPast && !selected}
-                  onClick={() => !isPast && onChangeDate?.(iso)}
+      <div
+        className={cn(
+          "relative z-0 isolate overflow-hidden",
+          compact ? "min-h-11 px-8" : "min-h-11 px-8 sm:gap-2",
+        )}
+      >
+        <motion.div
+          key={visibleWeekStart}
+          initial={
+            enableWeekEnterMotion.current
+              ? { x: direction > 0 ? 28 : -28, opacity: 0.88 }
+              : false
+          }
+          animate={{ x: 0, opacity: 1 }}
+          transition={{ duration: 0.26, ease: [0.22, 1, 0.36, 1] }}
+          drag="x"
+          dragElastic={0.1}
+          dragConstraints={{ left: 0, right: 0 }}
+          onDragEnd={(_, info) => {
+            const threshold = 44;
+            if (info.offset.x <= -threshold) shiftWeek(1);
+            if (info.offset.x >= threshold) shiftWeek(-1);
+          }}
+          className={cn(
+            "absolute top-0 flex items-center justify-between gap-1",
+            compact
+              ? "left-1/2 w-[85%] max-w-full -translate-x-1/2"
+              : "inset-x-0",
+          )}
+        >
+          {weekDays.map((iso) => {
+            const d = new Date(`${iso}T12:00:00`);
+            const selected = iso === selectedDate;
+            const isPast = iso < todayIso;
+            return (
+              <button
+                key={iso}
+                type="button"
+                aria-pressed={selected}
+                aria-label={d.toLocaleDateString("ru-RU", {
+                  weekday: "long",
+                  day: "numeric",
+                  month: "long",
+                })}
+                disabled={isPast && !selected}
+                onClick={() => !isPast && onChangeDate?.(iso)}
+                className={cn(
+                  "relative flex h-11 min-h-11 min-w-0 flex-1 shrink-0 flex-col items-center justify-center gap-0.5 rounded-none text-neutral-700",
+                  "outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                  isPast && !selected && "cursor-not-allowed opacity-40",
+                )}
+              >
+                {selected ? (
+                  <span
+                    aria-hidden
+                    className={cn(
+                      "pointer-events-none absolute left-1/2 top-1/2 z-0 size-11 aspect-square -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary",
+                    )}
+                  />
+                ) : null}
+                <span
                   className={cn(
-                    "relative flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-full py-2.5 text-neutral-700",
-                    isPast && !selected && "cursor-not-allowed opacity-40",
+                    "relative z-10 text-[10px] font-medium uppercase leading-none transition-colors duration-300 ease-out",
+                    selected
+                      ? "text-primary-foreground"
+                      : isPast
+                        ? "text-neutral-400/80"
+                        : "text-neutral-400",
                   )}
                 >
-                  {selected ? (
-                    <motion.span
-                      layoutId={`week-active-pill-${activePillLayoutId}`}
-                      className="absolute inset-0 rounded-full bg-primary shadow-sm"
-                      transition={{ type: "spring", stiffness: 420, damping: 34, mass: 0.36 }}
-                    />
-                  ) : null}
-                  <span
-                    className={cn(
-                      "relative z-10 text-[11px] font-medium uppercase leading-none transition-colors duration-200",
-                      selected
-                        ? "text-primary-foreground/90"
-                        : isPast
-                          ? "text-neutral-400/80"
-                          : "text-neutral-400",
-                    )}
-                  >
-                    {WEEKDAY_SHORT_RU[d.getDay()]}
-                  </span>
-                  <span
-                    className={cn(
-                      "relative z-10 text-[15px] font-semibold tabular-nums leading-none transition-colors duration-200",
-                      selected
-                        ? "text-primary-foreground"
-                        : isPast
-                          ? "text-neutral-500"
-                          : "text-neutral-900",
-                    )}
-                  >
-                    {d.getDate()}
-                  </span>
-                </button>
-              );
-            })}
-          </motion.div>
-        </AnimatePresence>
+                  {WEEKDAY_SHORT_RU[d.getDay()]}
+                </span>
+                <span
+                  className={cn(
+                    "relative z-10 text-[14px] font-semibold tabular-nums leading-none transition-colors duration-300 ease-out",
+                    selected
+                      ? "text-primary-foreground"
+                      : isPast
+                        ? "text-neutral-500"
+                        : "text-neutral-900",
+                  )}
+                >
+                  {d.getDate()}
+                </span>
+              </button>
+            );
+          })}
+        </motion.div>
       </div>
     </div>
   );

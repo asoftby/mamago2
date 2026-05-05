@@ -2,6 +2,7 @@
 
 import { usePathname } from "next/navigation";
 import { SidebarItem } from "@/components/shared/sidebar/SidebarItem";
+import { SidebarPublicSiteEntry } from "@/components/shared/sidebar/SidebarPublicSiteEntry";
 import { SidebarGroup } from "@/components/shared/sidebar/SidebarGroup";
 import { SidebarSubItem } from "@/components/shared/sidebar/SidebarSubItem";
 import {
@@ -90,6 +91,7 @@ export function AdminSidebar({
     <aside className="w-full lg:w-[260px] bg-white">
       {/* Navigation */}
       <nav className="flex flex-col gap-1.5 p-4">
+        <SidebarPublicSiteEntry onNavigate={onNavigate} />
         {ADMIN_SIDEBAR_CONFIG.map((item) => {
           if ("children" in item) {
             // It's a group

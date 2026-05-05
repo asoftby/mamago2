@@ -57,22 +57,6 @@ export function AgePanel({
   /** Только при выбранных детях-персонах возраст производный и чипы заблокированы. */
   const ageReadOnly = ageMode === "derived";
 
-  const toGenitiveName = (name: string): string => {
-    const n = name.trim();
-    if (!n) return name;
-    const lower = n.toLowerCase();
-    if (lower.endsWith("а")) {
-      const base = n.slice(0, -1);
-      const prev = base.slice(-1).toLowerCase();
-      const ending = ["г", "к", "х", "ж", "ч", "ш", "щ"].includes(prev) ? "и" : "ы";
-      return `${base}${ending}`;
-    }
-    if (lower.endsWith("я")) return `${n.slice(0, -1)}и`;
-    if (lower.endsWith("й")) return `${n.slice(0, -1)}я`;
-    if (lower.endsWith("ь")) return `${n.slice(0, -1)}я`;
-    return `${n}а`;
-  };
-
   const handleAgeToggle = (ageValue: string) => {
     if (ageReadOnly) return;
     const currentAges = applied.age ?? [];
@@ -104,7 +88,8 @@ export function AgePanel({
     };
   });
 
-  const showAdultChip = !!primaryAdult && !!onToggleAdult && primaryAdult.isProfileComplete === true;
+  /** Основной взрослый (личный аккаунт) — как в «Мой план»: всегда чип «Я». */
+  const showAdultChip = !!primaryAdult && !!onToggleAdult;
 
   const showChildrenBlock = (availableChildren.length > 0 && !!onToggleChild) || showAdultChip;
 
@@ -165,7 +150,7 @@ export function AgePanel({
                     : "",
                 ].join(" ")}
               >
-                {primaryAdult.displayName}
+                Я
               </button>
             );
           }

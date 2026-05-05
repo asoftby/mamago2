@@ -131,7 +131,7 @@ export function DashboardOnboarding({ data }: DashboardOnboardingProps) {
           <BusinessSurfaceCard className="p-6">
             <div className="mb-4 flex items-center justify-between">
               <p className="text-sm font-semibold text-stone-800">Что нового в mamaGo</p>
-              <Link href={data.hrefs.inbox} className="text-xs text-stone-400 hover:text-stone-600 transition">
+              <Link href={data.hrefs.bookings} className="text-xs text-stone-400 hover:text-stone-600 transition">
                 Все входящие →
               </Link>
             </div>

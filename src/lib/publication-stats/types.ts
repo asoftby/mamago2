@@ -1,6 +1,6 @@
 /**
  * Типы статистики публикации (publication.stats) — production-oriented,
- * совместимы с mock и будущим API.
+ * совместимы с текущим пустым состоянием и будущим API.
  */
 
 import type { PublicationStatsPeriod } from "./period";

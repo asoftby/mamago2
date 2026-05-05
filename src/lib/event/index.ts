@@ -9,8 +9,4 @@ export type {
   EventPageVenue,
 } from "./eventPageTypes";
 export { formatRuSessionHero, formatRuSessionSlot } from "./eventPageFormat";
-export {
-  attachSimilarEvents,
-  buildEventPageData,
-} from "./buildEventPageData";
 export { buildEventPageDataFromPrismaActivity } from "./buildEventPageDataFromPrisma";

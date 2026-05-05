@@ -26,8 +26,6 @@ function parseSourceView(raw: string | undefined): SourceView {
   return "active";
 }
 
-const DEV_MODE = process.env.NODE_ENV === "development";
-
 export default async function ImportSourcesPage({
   searchParams,
 }: {
@@ -78,7 +76,7 @@ export default async function ImportSourcesPage({
             Отключённый источник не участвует в новых прогонах, но сохраняет историю для аудита и повторной проверки.
           </p>
         </div>
-        <CreateSourceModal devMode={DEV_MODE} />
+        <CreateSourceModal />
       </div>
 
       {!importRuntimeReady && (
@@ -250,7 +248,7 @@ export default async function ImportSourcesPage({
                         >
                           История прогонов
                         </Link>
-                        <EditSourceModal source={source} devMode={DEV_MODE} />
+                        <EditSourceModal source={source} />
                         {!isArchived && source.isActive && <SourceActionsCell sourceId={source.id} parserKey={source.parserKey} />}
                         {!isArchived && source.isActive && <DeactivateSourceButton sourceId={source.id} sourceName={source.name} />}
                         {!isArchived && !source.isActive && <ActivateSourceButton sourceId={source.id} sourceName={source.name} />}

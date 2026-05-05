@@ -9,6 +9,7 @@ import type { ModerationNavCounts } from "@/lib/admin/moderationSidebarConfig";
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { buildSurfaceRedirectDestination } from "@/lib/routing/surface";
+import prisma from "@/lib/prisma";
 
 const EMPTY_MODERATION_COUNTS: ModerationNavCounts = {
   queueTotal: 0,
@@ -46,6 +47,22 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     );
   }
 
+  // Check if user has approved business profile
+  let hasApprovedBusinessProfile = false;
+  try {
+    const business = await prisma.business.findUnique({
+      where: { ownerUserId: user.id },
+      select: { isVerified: true, operationalStatus: true },
+    });
+    hasApprovedBusinessProfile = !!(
+      business &&
+      business.isVerified &&
+      business.operationalStatus === "ACTIVE"
+    );
+  } catch (e) {
+    console.error("admin layout: business check failed:", e);
+  }
+
   let moderationCounts: ModerationNavCounts = EMPTY_MODERATION_COUNTS;
   let b2bPendingVerificationCount = 0;
   let importPendingReviewCount = 0;
@@ -65,6 +82,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       <AdminHeader
         userEmail={user.email || undefined}
         userDisplayName={user.displayName}
+        hasApprovedBusinessProfile={hasApprovedBusinessProfile}
         moderationCounts={moderationCounts}
         b2bPendingVerificationCount={b2bPendingVerificationCount}
       />

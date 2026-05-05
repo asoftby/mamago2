@@ -1,23 +1,17 @@
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
 
 export const metadata = {
   title: "Журнал — mamaGo",
   description: "Идеи для прогулок, маршруты и советы для семей с детьми",
 };
 
-// Placeholder articles — replace with DB query later
-const articles = [
-  {
-    slug: "demo-premium-article",
-    title: "Как провести выходные с детьми в Минске: 7 идей",
-    subtitle: "От парков до мастер-классов — собрали лучшее для семейного уикенда",
-    category: "Идеи",
-    readTime: 5,
-    publishedAt: "2026-03-10",
-    cover: null,
-  },
-];
+const articles: Array<{
+  slug: string;
+  title: string;
+  subtitle: string | null;
+  category: string;
+  readTime: number;
+}> = [];
 
 export default function BlogPage() {
   return (
@@ -35,7 +29,11 @@ export default function BlogPage() {
       </div>
 
       <div className="divide-y divide-border">
-        {articles.map((a) => (
+        {articles.length === 0 ? (
+          <p className="py-7 text-sm text-muted-foreground">
+            В журнале пока нет опубликованных статей.
+          </p>
+        ) : articles.map((a) => (
           <Link
             key={a.slug}
             href={`/blog/${a.slug}`}
@@ -57,7 +55,7 @@ export default function BlogPage() {
               </p>
             )}
             <span className="inline-flex items-center gap-1 text-sm text-primary mt-1">
-              Читать <ArrowRight className="w-3.5 h-3.5" />
+              Читать
             </span>
           </Link>
         ))}

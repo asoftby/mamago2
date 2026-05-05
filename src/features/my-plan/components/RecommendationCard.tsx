@@ -249,15 +249,16 @@ export function RecommendationCard({
                 ) : null}
                 <Button
                   type="button"
+                  variant="default"
                   onClick={onAddToPlan}
                   size="sm"
                   className={cn(
-                    "row-start-1 h-9 min-w-0 self-start rounded-full bg-neutral-900 px-6 text-sm font-medium text-white hover:bg-neutral-800",
+                    "row-start-1 h-9 min-w-0 self-start rounded-full px-6 text-sm font-medium",
                     showVariantControls ? "col-start-2" : "col-start-1",
                   )}
                 >
                   <Plus className="mr-1.5 h-4 w-4 shrink-0" />
-                  Добавить
+                  Добавить в план
                 </Button>
                 {noMoreAlternatives && showVariantControls ? (
                   <p className="col-start-1 row-start-2 w-full min-w-0 text-center text-xs leading-tight text-neutral-400">

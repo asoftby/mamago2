@@ -409,7 +409,7 @@ export function LayoutContractSection() {
                 <span className="text-red-600 font-bold">✗</span>
                 <div>
                   <p className="font-medium text-gray-900">Bad: Fake link</p>
-                  <p className="text-gray-600">Links to non-existent route or shows mock data</p>
+                  <p className="text-gray-600">Links to non-existent route or shows placeholder data</p>
                 </div>
               </div>
             </div>

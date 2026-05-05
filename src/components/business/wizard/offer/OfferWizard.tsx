@@ -175,6 +175,12 @@ export function OfferWizard({
   };
 
   const handlePrev = () => {
+    // On first step, go back to where user came from
+    if (currentStep === 1) {
+      router.push(afterSubmitDestination);
+      return;
+    }
+    
     if (currentStep > 1) {
       setCurrentStep(prev => prev - 1);
     }
@@ -386,7 +392,7 @@ export function OfferWizard({
   };
 
   const canNext = currentStep < TOTAL_STEPS;
-  const canPrev = currentStep > 1;
+  const canPrev = true; // Always show back button (on step 1 it goes to returnTo)
   const isReviewStep = currentStep === TOTAL_STEPS;
 
   const submitValidation =

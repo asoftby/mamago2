@@ -7,7 +7,7 @@ import { AlertCircle, ArrowLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getSystemInterestLabel } from "@/lib/config/interests";
 import { getDisplayedAgeLabel } from "../lib/ageSignalMapper";
-import { mockBirthdayOffers } from "../../data/mockBirthdayOffers";
+import { birthdayOffers } from "../../data/birthdayOffers";
 import type { BirthdayBudgetGroup, OfferLayer } from "../../types/birthday";
 import type { BuilderStep, OfferConflict } from "../types/builder";
 import { getBudgetRange, formatBudgetRange } from "../lib/budgetRanges";
@@ -75,7 +75,7 @@ const NEXT_STEP_PHRASE: Partial<Record<BuilderStep, string>> = {
 
 function hasAddonInLayer(selectedAddonIds: string[], layer: OfferLayer): boolean {
   return selectedAddonIds.some((id) => {
-    const o = mockBirthdayOffers.find((x) => x.id === id);
+    const o = birthdayOffers.find((x) => x.id === id);
     return o?.layer === layer;
   });
 }

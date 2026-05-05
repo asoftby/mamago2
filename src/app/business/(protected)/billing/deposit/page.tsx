@@ -1,13 +1,11 @@
 import { getCurrentUser } from "@/lib/auth/server";
 import { redirect } from "next/navigation";
 import {
+  EMPTY_BILLING_STATE,
   formatDate,
   formatDateTime,
   getTransactionTypeLabel,
-  mockDeposit,
-  mockTransactions,
-  mockUsageStats,
-} from "@/lib/mocks/businessBilling";
+} from "@/lib/business/billing";
 import { formatPrice } from "@/lib/formatters/format-price";
 import {
   AlertCircle,
@@ -40,16 +38,20 @@ export default async function BillingDepositPage() {
     );
   }
 
-  const deposit = mockDeposit;
-  const stats = mockUsageStats;
+  const deposit = EMPTY_BILLING_STATE.deposit;
+  const stats = EMPTY_BILLING_STATE.usageStats;
   const isLowBalance = deposit.balance < deposit.lowBalanceThreshold;
-  const recentTransactions = mockTransactions
+  const recentTransactions = EMPTY_BILLING_STATE.transactions
     .filter((transaction) =>
       ["deposit_topup", "lead_charge", "promotion_charge", "refund"].includes(
         transaction.type,
       ),
     )
     .slice(0, 10);
+  console.log("[API] real data used", {
+    endpoint: "business-billing-deposit",
+    empty: recentTransactions.length === 0,
+  });
 
   const transactionsHref = buildSurfaceRedirectDestination({
     targetSurface: "business",
@@ -159,8 +161,8 @@ export default async function BillingDepositPage() {
           <BillingStatCard
             icon={Wallet}
             label="Последнее списание"
-            value={formatPrice(stats.lastCharge.amount)}
-            subtitle={formatDate(stats.lastCharge.date)}
+            value={stats.lastCharge.amount == null ? "—" : formatPrice(stats.lastCharge.amount)}
+            subtitle={stats.lastCharge.date ? formatDate(stats.lastCharge.date) : "Нет операций"}
           />
         </div>
       </div>
@@ -170,7 +172,11 @@ export default async function BillingDepositPage() {
           Последние операции
         </h2>
         <div className="space-y-3">
-          {recentTransactions.map((transaction) => (
+          {recentTransactions.length === 0 ? (
+            <p className="text-sm text-stone-500">
+              Операций пока нет. Здесь появятся реальные пополнения и списания после подключения биллинга.
+            </p>
+          ) : recentTransactions.map((transaction) => (
             <div
               key={transaction.id}
               className="flex items-center justify-between rounded-[22px] border border-stone-200 bg-stone-50/70 p-4 transition-colors hover:border-stone-300 hover:bg-white"

@@ -228,19 +228,6 @@ export async function enrichEventLocation(data: {
         // Ignore error parsing error
       }
       
-      // Return mock data for development if API fails
-      if (process.env.NODE_ENV === "development") {
-        console.log('[enrichEventLocation] Using mock enrichment data for development');
-        return {
-          cityId: "minsk",
-          districtAutoId: "district-1",
-          metroAutoId: "metro-1",
-          metroAutoDistanceM: 500,
-          districtName: "Центральный",
-          metroName: "Площадь Победы",
-        };
-      }
-      
       return null;
     }
 
@@ -256,19 +243,6 @@ export async function enrichEventLocation(data: {
   } catch (err) {
     console.error('[enrichEventLocation] Error:', err);
     
-    // Return mock data for development if API fails
-    if (process.env.NODE_ENV === "development") {
-      console.log('[enrichEventLocation] Using mock enrichment data for development');
-      return {
-        cityId: "minsk",
-        districtAutoId: "district-1",
-        metroAutoId: "metro-1",
-        metroAutoDistanceM: 500,
-        districtName: "Центральный",
-        metroName: "Площадь Победы",
-      };
-    }
-    
     return null;
   }
 }
@@ -282,45 +256,4 @@ export function formatDistance(distanceM: number): string {
   } else {
     return `${(distanceM / 1000).toFixed(1)} км`;
   }
-}
-
-/**
- * Mock geocoding for development (replace with real service in production)
- */
-export async function mockGeocode(address: string): Promise<{
-  lat: number;
-  lng: number;
-  formattedAddress: string;
-  cityId: string;
-  district?: string;
-} | null> {
-  // Mock implementation - in production, use real geocoding service
-  console.log('[mockGeocode] Geocoding address:', address);
-  
-  // Return mock Minsk coordinates
-  return {
-    lat: 53.9045 + (Math.random() - 0.5) * 0.01, // Add small random offset
-    lng: 27.5615 + (Math.random() - 0.5) * 0.01,
-    formattedAddress: address + ', Минск, Беларусь',
-    cityId: 'Минск',
-    district: 'Центральный',
-  };
-}
-
-/**
- * Mock reverse geocoding for development
- */
-export async function mockReverseGeocode(lat: number, lng: number): Promise<{
-  formattedAddress: string;
-  cityId: string;
-  district?: string;
-} | null> {
-  console.log('[mockReverseGeocode] Reverse geocoding coordinates:', lat, lng);
-  
-  // Mock implementation
-  return {
-    formattedAddress: `Координаты: ${lat.toFixed(6)}, ${lng.toFixed(6)}, Минск, Беларусь`,
-    cityId: 'Минск',
-    district: 'Центральный',
-  };
 }

@@ -7,7 +7,7 @@ import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { CreatePublicationQuickMenu } from "@/components/shared/CreatePublicationQuickMenu";
 import { HEADER_CHROME_ICON_BUTTON_CLASS } from "@/components/site/header/headerIconButtonClass";
 import { cn } from "@/lib/utils";
-import { AdminNotificationsDropdown } from "./notifications/AdminNotificationsDropdown";
+import { NotificationsDropdown } from "@/components/site/header/NotificationsDropdown";
 import { AdminSidebar } from "./AdminSidebar";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import type { ModerationNavCounts } from "@/lib/admin/moderationSidebarConfig";
@@ -23,6 +23,7 @@ interface AdminHeaderProps {
   userEmail?: string;
   /** Как в личном кабинете: из профиля пользователя, иначе показываем префикс email */
   userDisplayName?: string | null;
+  hasApprovedBusinessProfile?: boolean;
   moderationCounts: ModerationNavCounts;
   b2bPendingVerificationCount?: number;
 }
@@ -30,6 +31,7 @@ interface AdminHeaderProps {
 export function AdminHeader({
   userEmail,
   userDisplayName,
+  hasApprovedBusinessProfile = false,
   moderationCounts,
   b2bPendingVerificationCount = 0,
 }: AdminHeaderProps) {
@@ -37,7 +39,7 @@ export function AdminHeader({
   const [profileOpen, setProfileOpen] = useState(false);
   const router = useRouter();
   const isMobile = useMediaQuery("(max-width: 1023px)");
-  const { goToPersonalAccount } = useAccountMode();
+  const { goToPersonalAccount, goToBusinessAccount } = useAccountMode();
   const hydrated = useHydrated();
 
   const profileLetter = accountProfileTriggerLetter(userDisplayName, userEmail);
@@ -54,9 +56,22 @@ export function AdminHeader({
             targetSurface: "admin",
             targetPath: "/",
           }),
+        goToBusinessAccount: hasApprovedBusinessProfile
+          ? () => goToBusinessAccount(true)
+          : undefined,
+        hasBusinessProfile: hasApprovedBusinessProfile,
+        businessLabel: "MamaGo",
         onNavigate: () => setProfileOpen(false),
       }),
-    [userEmail, userDisplayName, profileLetter, router, goToPersonalAccount],
+    [
+      userEmail,
+      userDisplayName,
+      profileLetter,
+      router,
+      goToPersonalAccount,
+      goToBusinessAccount,
+      hasApprovedBusinessProfile,
+    ],
   );
 
   const profileTrigger = (
@@ -92,14 +107,16 @@ export function AdminHeader({
             {hydrated ? (
               <>
                 <CreatePublicationQuickMenu />
-                <AdminNotificationsDropdown
-                  b2bPendingVerificationCount={b2bPendingVerificationCount}
+                <NotificationsDropdown
+                  context="admin"
+                  triggerClassName={HEADER_CHROME_ICON_BUTTON_CLASS}
                 />
 
                 <AccountDropdown
                   open={profileOpen}
                   onOpenChange={setProfileOpen}
                   narrow={!!isMobile}
+                  chromeTone="admin"
                   trigger={
                     <Button
                       type="button"

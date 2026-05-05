@@ -221,24 +221,18 @@ export function useChildrenScope(params: {
     const fromChildren = childDerivedRanges.map((r) => r.range);
     const adultId = familySync?.primaryAdultPersonaId;
     
-    // Добавляем 18+ если взрослый выбран и этот диапазон применён
     if (
       !adultId ||
       !familySync ||
       familySync.loading ||
-      !familySync.selectedPersonaIds.includes(adultId) ||
-      !appliedAgeRanges.includes("18+")
+      !familySync.selectedPersonaIds.includes(adultId)
     ) {
       return fromChildren;
     }
-    
+
     if (fromChildren.includes("18+")) return fromChildren;
     return [...fromChildren, "18+"];
-  }, [
-    childDerivedRanges,
-    appliedAgeRanges,
-    familySync,
-  ]);
+  }, [childDerivedRanges, familySync]);
 
   return {
     citySlug,

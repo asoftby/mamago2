@@ -4,7 +4,7 @@ import { useState, useMemo } from "react";
 import type { BirthdayBuilderWithGate } from "../../hooks/useBirthdayBuilderWithGate";
 import { BirthdayOfferCard } from "../../../components/cards/BirthdayOfferCard";
 import { OfferQuickView } from "../OfferQuickView";
-import { mockBirthdayOffers } from "../../../data/mockBirthdayOffers";
+import { birthdayOffers } from "../../../data/birthdayOffers";
 import { filterBirthdayOffers } from "../../../lib/filterBirthdayOffers";
 import { rankBirthdayOffers } from "../../../lib/rankBirthdayOffers";
 import { isVenueBoundAddon } from "../../lib/compatibility";
@@ -50,7 +50,7 @@ export function StepAddons({ builder }: { builder: BuilderHook }) {
 
   // Filter addons by layer + quiz inputs (soft filtering), exclude incompatible
   const { recommendedOffers, otherOffers, allOffers } = useMemo(() => {
-    const byLayer = mockBirthdayOffers.filter((o) => o.layer === config.layer);
+    const byLayer = birthdayOffers.filter((o) => o.layer === config.layer);
     const format =
       placeType === "HOME" || placeType === "OUTDOOR" || placeType === "VENUE"
         ? (placeType as "HOME" | "VENUE" | "OUTDOOR")

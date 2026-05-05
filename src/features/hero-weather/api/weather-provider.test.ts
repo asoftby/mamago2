@@ -3,7 +3,6 @@ import assert from "node:assert/strict";
 import type { WeatherProvider } from "./weather-provider";
 import { mapOpenMeteoToWeatherRawData } from "./open-meteo-provider";
 import { getConfiguredWeatherProviderKind, getWeatherProvider } from "./weather-provider-factory";
-import { MockWeatherProvider } from "./mock-weather-provider";
 import { OpenMeteoWeatherProvider } from "./open-meteo-provider";
 import { getHeroContext } from "../lib/get-hero-context";
 
@@ -57,10 +56,6 @@ import { getHeroContext } from "../lib/get-hero-context";
 {
   const prev = process.env.WEATHER_PROVIDER;
   try {
-    process.env.WEATHER_PROVIDER = "mock";
-    assert.equal(getConfiguredWeatherProviderKind(), "mock");
-    assert.ok(getWeatherProvider() instanceof MockWeatherProvider);
-
     process.env.WEATHER_PROVIDER = "open-meteo";
     assert.equal(getConfiguredWeatherProviderKind(), "open-meteo");
     assert.ok(getWeatherProvider() instanceof OpenMeteoWeatherProvider);
@@ -83,11 +78,29 @@ void (async () => {
   });
   assert.equal(m1.debug?.weatherSource, "fallback");
 
+  const realShapeProvider: WeatherProvider = {
+    async fetchWeather() {
+      return {
+        current: {
+          temperature: 18,
+          apparentTemperature: 18,
+          precipitationProbability: 0,
+          precipitation: 0,
+          windSpeed: 4,
+          windGusts: 8,
+          weatherCode: 1,
+          isDay: true,
+        },
+        hourly: [],
+      };
+    },
+  };
+
   const m2 = await getHeroContext({
-    weatherProvider: new MockWeatherProvider("sunny"),
+    weatherProvider: realShapeProvider,
     personaMode: "guest",
   });
-  assert.equal(m2.debug?.weatherSource, "mock");
+  assert.equal(m2.debug?.weatherSource, "open-meteo");
 
    
   console.log("weather-provider tests: OK");

@@ -16,10 +16,10 @@ import { getCurrentUser } from "@/lib/auth/server";
 import { getKudaDiscoveryFeed } from "@/server/discovery/kudaDiscoveryFeed";
 import { listPublicRoutesByCity, listPublicRoutesByCityIds } from "@/server/services/route.service";
 import { getCityNominativeName } from "@/lib/city/cityDisplayNames";
-import { MOCK_ROUTES } from "@/mocks/routes.mock";
 import { listCityHomeArticles } from "@/server/article/listCityHomeArticles";
 import { listNearbyCities } from "@/server/city/listNearbyCities";
 import { getClassesDiscoveryFeed } from "@/server/discovery/classesDiscoveryFeed";
+import type { PublicRouteCardModel } from "@/components/routes/types";
 
 interface CityHomePageProps {
   citySlug: string;
@@ -66,7 +66,7 @@ export default async function CityHomePage({ citySlug }: CityHomePageProps) {
     }).catch(() => []),
   ]);
 
-  const mapRoutePreview = (r: (typeof localRoutes)[number]) => ({
+  const mapRoutePreview = (r: (typeof localRoutes)[number]): PublicRouteCardModel => ({
     id: r.id,
     slug: r.slug,
     title: r.title,
@@ -93,20 +93,14 @@ export default async function CityHomePage({ citySlug }: CityHomePageProps) {
 
   const localRoutesPreview = localRoutes.map(mapRoutePreview);
   const nearbyRoutesPreviewDb = nearbyRoutes.map(mapRoutePreview);
-
-  const mockForCity = MOCK_ROUTES.filter(
-    (r) => r.cityName.toLowerCase() === city.name.toLowerCase(),
-  );
-  const localRouteItems = [
-    ...localRoutesPreview,
-    ...mockForCity.filter((m) => !localRoutesPreview.some((r) => r.slug === m.slug)),
-  ].slice(0, 6);
-  const nearbyCityNames = new Set(nearbyCities.map((c) => c.name.toLowerCase()));
-  const nearbyMockRoutes = MOCK_ROUTES.filter((r) => nearbyCityNames.has(r.cityName.toLowerCase()));
-  const nearbyRouteItems = [
-    ...nearbyRoutesPreviewDb,
-    ...nearbyMockRoutes.filter((m) => !nearbyRoutesPreviewDb.some((r) => r.slug === m.slug)),
-  ].slice(0, 6);
+  const localRouteItems = localRoutesPreview.slice(0, 6);
+  const nearbyRouteItems = nearbyRoutesPreviewDb.slice(0, 6);
+  console.log("[API] real data used", {
+    endpoint: "city-home-routes",
+    city: city.slug,
+    localCount: localRouteItems.length,
+    nearbyCount: nearbyRouteItems.length,
+  });
 
   const classesMode = localClasses.length > 0 ? "local" : nearbyClasses.length > 0 ? "nearby" : "empty";
   const routesMode = localRouteItems.length > 0 ? "local" : nearbyRouteItems.length > 0 ? "nearby" : "empty";

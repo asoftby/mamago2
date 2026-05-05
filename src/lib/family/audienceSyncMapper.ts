@@ -80,8 +80,8 @@ export function mapPlanParticipantsToAudience(
     if (!persona) continue;
 
     if (persona.kind === "adult") {
-      // Взрослый → 18+
-      ageGroups.add("18_plus");
+      // Взрослый → ключ как в URL / discovery (`AGE_GROUPS[].value`)
+      ageGroups.add("18+");
     } else if (persona.kind === "child") {
       // Ребёнок → его возрастная группа
       const ageYears = getAgeYears(persona.birthDate);

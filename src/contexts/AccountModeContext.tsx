@@ -66,9 +66,14 @@ export function AccountModeProvider({ children }: { children: React.ReactNode })
   const goToBusinessAccount = useCallback(
     (isBusinessPartner: boolean) => {
       setMode("business");
-      navigateToSurface(router, {
+      const destination = navigateToSurface(router, {
         targetSurface: "business",
         targetPath: isBusinessPartner ? "/dashboard" : "/onboarding",
+      });
+      console.log("[AccountMode] Navigating to business:", {
+        isBusinessPartner,
+        destination,
+        currentHost: typeof window !== "undefined" ? window.location.host : "SSR",
       });
     },
     [router, setMode],
@@ -89,6 +94,16 @@ export function AccountModeProvider({ children }: { children: React.ReactNode })
     if (mode !== "personal") return;
     if (!shouldRedirectPersonalModeAwayFromBusiness(pathname)) return;
     queueMicrotask(() => setMode("business"));
+  }, [hydrated, mode, pathname, setMode]);
+
+  // Обратная синхронизация: бизнес-режим + URL личного аккаунта → переключаем на personal
+  useEffect(() => {
+    if (!hydrated) return;
+    if (mode !== "business") return;
+    // Если мы НЕ на бизнес-странице, переключаем на personal
+    if (pathname.startsWith(BUSINESS_PATH_PREFIX)) return;
+    if (pathname.startsWith("/admin")) return; // Админка не трогаем
+    queueMicrotask(() => setMode("personal"));
   }, [hydrated, mode, pathname, setMode]);
 
   const value = useMemo(

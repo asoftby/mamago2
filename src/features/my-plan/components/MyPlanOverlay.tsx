@@ -1,43 +1,22 @@
 "use client";
 
 import { useRef } from "react";
-import { usePathname } from "next/navigation";
 import { ResponsiveOverlay } from "@/components/ui/responsive-overlay";
 import { MyPlanPanelContent } from "./MyPlanPanelContent";
-import { MyPlanUnauthFlow, type MyPlanUnauthSurface } from "./unauth/MyPlanUnauthFlow";
-import { appendMyPlanOpenToHref } from "@/lib/my-plan/myPlanOpenIntent";
 import { cn } from "@/lib/utils";
-
-export type { MyPlanUnauthSurface };
 
 export interface MyPlanOverlayProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  isAuthenticated: boolean;
-  authNextHref?: string;
-  onGuestAuthSuccess?: () => void;
-  onUnauthBeforeClose?: (ctx: { surface: MyPlanUnauthSurface }) => void;
-  onPostAuthCompletionPhase?: (active: boolean) => void;
 }
 
 /**
  * Единая оболочка «Мой план».
- * Desktop → Dialog (max-w-[520px], закрытие по backdrop / Esc / X)
+ * Desktop → Dialog (max-w ~572px — на ~10% шире 520px, закрытие по backdrop / Esc / X)
  * Mobile  → Bottom Sheet (swipe down, drag handle)
- * Контент одинаковый: MyPlanPanelContent → PlanMainContent
+ * Контент: MyPlanPanelContent → PlanMainContent (авторизованные) или GuestMyPlanPanel (гость).
  */
-export function MyPlanOverlay({
-  open,
-  onOpenChange,
-  isAuthenticated,
-  authNextHref,
-  onGuestAuthSuccess,
-  onUnauthBeforeClose,
-  onPostAuthCompletionPhase,
-}: MyPlanOverlayProps) {
-  const pathname = usePathname();
-
-  // Drag-to-close на mobile
+export function MyPlanOverlay({ open, onOpenChange }: MyPlanOverlayProps) {
   const touchStartY = useRef<number | null>(null);
   const touchCurrentY = useRef<number | null>(null);
 
@@ -69,48 +48,31 @@ export function MyPlanOverlay({
     </button>
   );
 
-  const resolvedNextHref = authNextHref ?? appendMyPlanOpenToHref(pathname || "/");
-
   return (
     <ResponsiveOverlay
       open={open}
       onOpenChange={onOpenChange}
       a11yTitle="Мой план"
       variant="chromeless"
-      // Desktop: закрытие по backdrop и Esc
       dismissible={true}
       showCloseButton={false}
       mobileTopSlot={dragHandle}
       heightMode="tall"
-      // Desktop: компактный modal
-      dialogContentClassName="!max-w-[520px]"
+      dialogContentClassName="!max-w-[572px]"
       bodyClassName="min-h-0 overflow-hidden"
     >
-      {!isAuthenticated ? (
-        <MyPlanUnauthFlow
+      <div
+        className={cn(
+          "flex min-h-0 flex-1 flex-col",
+          "animate-in fade-in-0 duration-150",
+        )}
+      >
+        <MyPlanPanelContent
           open={open}
+          layout="default"
           onRequestClose={() => onOpenChange(false)}
-          nextHref={resolvedNextHref}
-          onAuthSuccess={onGuestAuthSuccess}
-          onBeforeClose={onUnauthBeforeClose}
-          onPostAuthCompletionPhase={onPostAuthCompletionPhase}
         />
-      ) : (
-        <div
-          key="plan"
-          className={cn(
-            "flex min-h-0 flex-1 flex-col",
-            "animate-in fade-in-0 zoom-in-95 duration-200",
-          )}
-        >
-          {/* Единый контент для desktop и mobile */}
-          <MyPlanPanelContent
-            open={open}
-            layout="default"
-            onRequestClose={() => onOpenChange(false)}
-          />
-        </div>
-      )}
+      </div>
     </ResponsiveOverlay>
   );
 }

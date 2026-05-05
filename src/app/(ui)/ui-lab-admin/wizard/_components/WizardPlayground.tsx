@@ -204,7 +204,7 @@ function SubmittedState({ onReset }: { onReset: () => void }) {
         <div className="text-5xl">🎉</div>
         <h2 className="text-xl font-bold">Предложение опубликовано!</h2>
         <p className="text-sm text-muted-foreground">
-          Это mock-состояние Wizard Playground. В реальном wizard здесь будет редирект на страницу предложения.
+          Это состояние Wizard Playground. В реальном wizard здесь будет редирект на страницу предложения.
         </p>
         <Button onClick={onReset} variant="outline" className="w-full">
           Начать заново

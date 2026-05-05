@@ -4,7 +4,8 @@ import { useState } from "react";
 import { User } from "lucide-react";
 import type { AccountMenuUser } from "@/lib/account/types";
 import { DefaultAuthModal } from "@/components/auth/DefaultAuthModal";
-import { ProfileDropdown } from "@/components/site/header/ProfileDropdown";
+import { MobileMenuSheet } from "@/components/mobile/MobileMenuSheet";
+import { ProfileMenuContent } from "@/components/site/header/ProfileMenuContent";
 import { useAccountMode } from "@/contexts/AccountModeContext";
 import { useFamilyPersona } from "@/contexts/FamilyPersonaContext";
 import { notifyAuthStateChanged } from "@/lib/auth/client";
@@ -17,6 +18,8 @@ import {
 } from "@/components/mobile/NavIconButton";
 
 export type MobileProfileSheetProps = {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
   isProfileActive: boolean;
   profileBadgeCount?: number;
   profileAvatarUrl?: string | null;
@@ -25,6 +28,8 @@ export type MobileProfileSheetProps = {
 };
 
 export function MobileProfileSheet({
+  open,
+  onOpenChange,
   isProfileActive,
   profileBadgeCount = 0,
   profileAvatarUrl,
@@ -39,7 +44,6 @@ export function MobileProfileSheet({
       : family.menuUser
     : undefined;
 
-  const [menuOpen, setMenuOpen] = useState(false);
   const [guestAuthOpen, setGuestAuthOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
 
@@ -47,7 +51,7 @@ export function MobileProfileSheet({
     user,
     loggingOut,
     setLoggingOut,
-    closeMenu: () => setMenuOpen(false),
+    closeMenu: () => onOpenChange(false),
   });
 
   const resolvedProfileAvatar = profileAvatarUrl ?? user?.avatarUrl ?? undefined;
@@ -172,38 +176,43 @@ export function MobileProfileSheet({
   });
 
   return (
-    <ProfileDropdown
-      mode={hydrated ? mode : "personal"}
-      user={user}
-      open={menuOpen}
-      onOpenChange={setMenuOpen}
-      narrow
-      trigger={
-        <button
-          type="button"
-          aria-label="Мой аккаунт"
-          aria-expanded={menuOpen}
-          aria-haspopup="dialog"
-          className={triggerClass}
-        >
-          {inner}
-          {showBadge && (
-            <span
-              className={cn(
-                "absolute -right-0.5 -top-0.5 flex min-h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[#EF8759] px-1 text-[10px] font-semibold leading-none text-white shadow-sm ring-2",
-                chrome === "dark" ? "ring-neutral-900/95" : "ring-white/90",
-              )}
-              aria-hidden
-            >
-              {profileBadgeCount > 9 ? "9+" : profileBadgeCount}
-            </span>
-          )}
-        </button>
-      }
-      onNavigate={() => setMenuOpen(false)}
-      hasBusinessProfile={isBusinessPartner}
-      businessBalanceBYN={user.businessBalanceBYN}
-      {...handlers}
-    />
+    <div className="relative flex shrink-0 items-center justify-center">
+      <button
+        type="button"
+        aria-label="Мой аккаунт"
+        aria-expanded={open}
+        aria-haspopup="dialog"
+        className={triggerClass}
+        onClick={() => onOpenChange(true)}
+      >
+        {inner}
+        {showBadge && (
+          <span
+            className={cn(
+              "absolute -right-0.5 -top-0.5 flex min-h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[#EF8759] px-1 text-[10px] font-semibold leading-none text-white shadow-sm ring-2",
+              chrome === "dark" ? "ring-neutral-900/95" : "ring-white/90",
+            )}
+            aria-hidden
+          >
+            {profileBadgeCount > 9 ? "9+" : profileBadgeCount}
+          </span>
+        )}
+      </button>
+      <MobileMenuSheet
+        open={open}
+        onOpenChange={onOpenChange}
+        title="Профиль"
+      >
+        <ProfileMenuContent
+          mode={hydrated ? mode : "personal"}
+          user={user}
+          onNavigate={() => onOpenChange(false)}
+          hasBusinessProfile={isBusinessPartner}
+          businessBalanceBYN={user.businessBalanceBYN}
+          sheetLayout
+          {...handlers}
+        />
+      </MobileMenuSheet>
+    </div>
   );
 }

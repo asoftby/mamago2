@@ -65,37 +65,8 @@ export function EventLocationPicker({
       setMetroStations(metroRes);
       console.log("[EventLocationPicker] Loaded", districtsRes.length, "districts and", metroRes.length, "metro stations");
       
-      // If no data loaded and we're in development, show mock data
-      if (process.env.NODE_ENV === "development" && districtsRes.length === 0 && metroRes.length === 0) {
-        console.log("[EventLocationPicker] No data from API, using mock data for development");
-        setDistricts([
-          { id: "district-1", name: "Центральный" },
-          { id: "district-2", name: "Советский" },
-          { id: "district-3", name: "Первомайский" },
-        ]);
-        setMetroStations([
-          { id: "metro-1", name: "Площадь Победы" },
-          { id: "metro-2", name: "Октябрьская" },
-          { id: "metro-3", name: "Немига" },
-        ]);
-      }
     } catch (err) {
       console.error("[EventLocationPicker] Load geo options error:", err);
-      
-      // Fallback to mock data in development
-      if (process.env.NODE_ENV === "development") {
-        console.log("[EventLocationPicker] API error, using mock data for development");
-        setDistricts([
-          { id: "district-1", name: "Центральный" },
-          { id: "district-2", name: "Советский" },
-          { id: "district-3", name: "Первомайский" },
-        ]);
-        setMetroStations([
-          { id: "metro-1", name: "Площадь Победы" },
-          { id: "metro-2", name: "Октябрьская" },
-          { id: "metro-3", name: "Немига" },
-        ]);
-      }
     }
   }, [cityId]);
 

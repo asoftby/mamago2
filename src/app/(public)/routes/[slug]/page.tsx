@@ -1,6 +1,5 @@
 import { notFound, permanentRedirect } from "next/navigation";
-import { MOCK_ROUTES, BUDGET_LABELS } from "@/mocks/routes.mock";
-import { formatAgeKeysShort } from "@/lib/config/ages";
+import { BUDGET_LABELS } from "@/components/routes/types";
 import { type RouteWithStops } from "@/server/services/route.service";
 import { RouteDetailClient } from "./RouteDetailClient";
 import prisma from "@/lib/prisma";
@@ -66,15 +65,6 @@ export async function generateMetadata({ params }: Props) {
       });
     }
   }
-  const mock = MOCK_ROUTES.find((r) => r.slug === slug);
-  if (mock) {
-    return buildOgMeta({
-      title: `${mock.title} — маршрут в ${mock.cityName} | mamaGo`,
-      description: `${mock.stopsCount} точки · ${BUDGET_LABELS[mock.budgetLevel]} · ${formatAgeKeysShort(mock.ageTags)}`,
-      image: mock.coverImageUrl,
-      url: `${publicBase}/routes/${mock.slug}`,
-    });
-  }
   return {};
 }
 
@@ -124,7 +114,6 @@ export default async function RouteDetailPage({ params }: Props) {
         id: db.id,
         slug: db.slug,
         title: db.title,
-        isMockRoute: false as const,
         ageTags: db.ageTags,
         budgetLevel: db.budgetLevel,
         cityName: db.city?.name ?? "Минск",
@@ -172,21 +161,6 @@ export default async function RouteDetailPage({ params }: Props) {
         </>
       );
     }
-  }
-
-  const mock = MOCK_ROUTES.find((r) => r.slug === slug);
-  if (mock) {
-    return (
-      <>
-        <AnalyticsDetailBeacon
-          entityType="ROUTE"
-          entityId={mock.id}
-          vertical="WEEKEND"
-          citySlug="minsk"
-        />
-        <RouteDetailClient route={{ ...mock, isMockRoute: true }} />
-      </>
-    );
   }
 
   notFound();

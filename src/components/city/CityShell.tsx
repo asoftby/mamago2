@@ -3,10 +3,10 @@ import prisma from "@/lib/prisma";
 import { CityDiscoveryShell } from "./CityDiscoveryShell";
 import { Intent } from "@/lib/intent";
 import { listPublicRoutesByCity } from "@/server/services/route.service";
-import { MOCK_ROUTES } from "@/mocks/routes.mock";
 import { getCurrentUser } from "@/lib/auth/server";
 import { getKudaDiscoveryFeed } from "@/server/discovery/kudaDiscoveryFeed";
 import { parseActivityFormatQuery } from "@/domain/activities/activity-format";
+import type { PublicRouteCardModel } from "@/components/routes/types";
 
 interface CityShellProps {
   citySlug: string;
@@ -39,7 +39,7 @@ export async function CityShell({ citySlug, intent, searchParams }: CityShellPro
   let routesData = undefined;
   if (intent === "routes") {
     const dbRoutes = await listPublicRoutesByCity(city.id).catch(() => []);
-    const realRoutes = dbRoutes.map((r) => ({
+    const realRoutes: PublicRouteCardModel[] = dbRoutes.map((r) => ({
       id: r.id,
       slug: r.slug,
       title: r.title,
@@ -64,14 +64,12 @@ export async function CityShell({ citySlug, intent, searchParams }: CityShellPro
       })),
     }));
 
-    // Merge DB routes with mock fallback (no duplicates by slug)
-    const mockForCity = MOCK_ROUTES.filter(
-      (r) => r.cityName.toLowerCase() === city.name.toLowerCase()
-    );
-    routesData = [
-      ...realRoutes,
-      ...mockForCity.filter((m) => !realRoutes.some((r) => r.slug === m.slug)),
-    ];
+    console.log("[API] real data used", {
+      endpoint: "city-shell-routes",
+      city: city.slug,
+      count: realRoutes.length,
+    });
+    routesData = realRoutes;
   }
 
   return (

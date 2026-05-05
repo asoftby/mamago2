@@ -3,32 +3,13 @@ import prisma from "@/lib/prisma";
 import { getPublicListingActivityWhere } from "@/server/public/publicContentVisibility";
 import { activityInAnyOfCitiesWhere } from "@/server/discovery/activityInCityWhere";
 import { resolveActivityCoverUrl } from "@/lib/event/resolveActivityCoverUrl";
-import type { ActivityMock } from "@/mocks/activity.types";
+import type { ActivityMock } from "@/types/activity";
 import {
   getWeatherRankingBoost,
   type HomeWeatherScenario,
 } from "@/features/hero-weather/lib/weather-scenario-layer";
 import type { TimeOfDay } from "@/features/hero-weather/model/types";
-
-function ageBoundsFromActivity(a: {
-  ageTags: string[];
-  ageMinMonths: number | null;
-  ageMaxMonths: number | null;
-}): { ageFrom: number; ageTo: number } {
-  if (a.ageMinMonths != null && a.ageMaxMonths != null) {
-    return {
-      ageFrom: Math.max(0, Math.floor(a.ageMinMonths / 12)),
-      ageTo: Math.min(99, Math.ceil(a.ageMaxMonths / 12)),
-    };
-  }
-  for (const tag of a.ageTags) {
-    const m = tag.match(/^(\d+)\s*[-–]\s*(\d+)/);
-    if (m) {
-      return { ageFrom: parseInt(m[1], 10), ageTo: parseInt(m[2], 10) };
-    }
-  }
-  return { ageFrom: 0, ageTo: 12 };
-}
+import { ageBoundsFromActivityFields } from "@/lib/event/activityAgeBounds";
 
 function discoveryCardDatesFromActivity(a: {
   nextOccurrenceAt: Date | null;
@@ -106,7 +87,7 @@ export async function getClassesDiscoveryFeed(
   const citySlugById = new Map(cityRows.map((row) => [row.id, row.slug]));
 
   const cards = rows.map((a) => {
-    const { ageFrom, ageTo } = ageBoundsFromActivity(a);
+    const { ageFrom, ageTo } = ageBoundsFromActivityFields(a);
     const cover =
       resolveActivityCoverUrl({
         coverImageId: a.coverImageId,

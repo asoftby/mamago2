@@ -29,7 +29,7 @@ Clean rewrite of birthday constructor with proper base/addon separation and conf
   - `compatibility?: OfferCompatibility` — Compatibility constraints
 
 ### Mock Data
-- `data/mockBirthdayOffers.ts` — Updated 7 sample offers with:
+- `data/birthdayOffers.ts` — Updated 7 sample offers with:
   - `layer` field
   - `businessId` field
   - `venueIncludes` array

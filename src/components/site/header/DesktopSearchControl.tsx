@@ -1025,7 +1025,7 @@ function DiscoveryDesktopSearchControl({
                   availableChildren={showChildrenPreset ? profileChildren : []}
                   onToggleChild={showChildrenPreset ? toggleChild : undefined}
                   primaryAdult={
-                    family?.personas?.[0]?.kind === "adult" && family.personas[0].isProfileComplete === true
+                    family?.personas?.[0]?.kind === "adult"
                       ? {
                           id: family.personas[0].id,
                           displayName: family.personas[0].displayName,

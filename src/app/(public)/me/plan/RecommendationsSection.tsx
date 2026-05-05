@@ -6,7 +6,7 @@ import { Plus } from "lucide-react";
 import { SaveToPlanModal } from "@/components/activity/SaveToPlanModal";
 import type { SaveToPlanResult } from "@/components/activity/SaveToPlanModal";
 import type { SerializedPlanItem } from "./PlanPageClient";
-import type { ActivityMock } from "@/mocks/activity.types";
+import type { ActivityMock } from "@/types/activity";
 import { formatPrice as formatPriceAmount, formatPriceFrom } from "@/lib/formatters/format-price";
 
 type RecommendationCardProps = {

@@ -11,6 +11,8 @@
  */
 
 import { PrismaClient, type OccasionType, type SignalDomain, type SignalEntityType } from "@prisma/client";
+import { seedPlaceCategories } from "./seed/place-categories";
+import { seedEventCategories } from "./seed/event-categories";
 
 const prisma = new PrismaClient();
 
@@ -509,6 +511,12 @@ async function main() {
       },
     });
   }
+
+  // ── Place Categories ──────────────────────────────────────────────────────
+  await seedPlaceCategories();
+
+  // ── Event Categories ──────────────────────────────────────────────────────
+  await seedEventCategories();
 
   console.log("✅ System seed complete.");
   console.log("   Demo/content data: run pnpm db:seed:demo");

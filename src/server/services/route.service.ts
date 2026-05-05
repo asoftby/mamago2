@@ -115,7 +115,7 @@ export async function getRouteBySlug(slug: string): Promise<RouteWithStops | nul
 
 /**
  * Resolve a Route for save-to-plan / ideas: by id first, then by slug (including slug history).
- * Covers mock page ids like "route-1" when the same slug exists in the database.
+ * Resolves current slug and slug history to a persisted route.
  */
 export async function resolveRouteForUserSave(
   routeId: string,

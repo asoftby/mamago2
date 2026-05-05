@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { ActivityGrid } from "@/components/activity/ActivityGrid";
 import { Chip } from "@/components/ui/Chip";
-import { ActivityMock } from "@/mocks/activity.types";
+import { ActivityMock } from "@/types/activity";
 import { getFavorites, toggleFavorite } from "@/lib/localFavorites";
 
 interface CityFeedClientProps {

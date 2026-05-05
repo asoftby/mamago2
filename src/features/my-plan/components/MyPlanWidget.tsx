@@ -59,7 +59,7 @@ function stateToText(state: WidgetState): { subtitle: string; badge: number | nu
     case "loading":
       return { subtitle: "Загрузка…", badge: null };
     case "unauthenticated":
-      return { subtitle: "Войдите, чтобы планировать", badge: null };
+      return { subtitle: "Подберём активности под вас", badge: null };
     case "empty":
       return { subtitle: "Пока ничего не запланировано", badge: null };
     case "today":
@@ -74,11 +74,14 @@ function stateToText(state: WidgetState): { subtitle: string; badge: number | nu
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export function MyPlanWidget({ onOpen }: MyPlanWidgetProps) {
-  const { todayCount, weekItemsCount, nextPlanItem, authLoading, isLoading } = useMyPlan();
-
-  // isAuthenticated: если не loading и todayCount/weekItemsCount доступны — значит авторизован
-  // Используем isLoading из store вместо отдельного useAuthMe
-  const isAuthenticated = !isLoading && !authLoading;
+  const {
+    todayCount,
+    weekItemsCount,
+    nextPlanItem,
+    authLoading,
+    isLoading,
+    isAuthenticated,
+  } = useMyPlan();
 
   const widgetState = useMemo(
     () =>
@@ -145,7 +148,9 @@ export function MyPlanWidget({ onOpen }: MyPlanWidgetProps) {
 
           <div className="min-w-0 flex-1 text-left">
             <h2 className="text-sm font-semibold leading-tight tracking-[-0.02em]">
-              Мой план
+              {widgetState.kind === "unauthenticated"
+                ? "Мой план за 10 секунд"
+                : "Мой план"}
             </h2>
             <p
               className={cn(

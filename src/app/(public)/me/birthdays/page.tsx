@@ -5,8 +5,9 @@ import { listUserBirthdayParties } from "@/server/services/userBirthdays.service
 import { Container } from "@/components/ui/Container";
 import { Surface } from "@/components/ui/surface";
 import { H2, BodyMuted } from "@/components/ui/typography";
-import { Button } from "@/components/ui/button";
-import { ArrowLeft } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { peachPrimaryCtaLinkClassName } from "@/lib/peachPrimaryCtaLink";
+import { ArrowLeft, PartyPopper } from "lucide-react";
 import type { UserBirthdayParty } from "@/features/me/types/userBirthdayParty";
 import { sortPartiesForProfile } from "@/features/me/lib/userBirthdayPartyUi";
 import { BirthdayPartyCard } from "@/features/me/components/BirthdayPartyCard";
@@ -53,9 +54,13 @@ export default async function MeBirthdaysPage() {
             <BodyMuted className="mb-4">
               Пока нет праздников — создайте сценарий в конструкторе.
             </BodyMuted>
-            <Button asChild>
-              <Link href="/birthday">Создать праздник</Link>
-            </Button>
+            <Link
+              href="/birthday"
+              className={cn(peachPrimaryCtaLinkClassName(), "mt-3")}
+            >
+              <PartyPopper className="h-4 w-4 transition-transform duration-200 group-hover:scale-110 sm:h-[18px] sm:w-[18px]" aria-hidden />
+              Создать праздник
+            </Link>
           </Surface>
         ) : (
           <div className="space-y-8">

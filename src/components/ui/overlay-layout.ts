@@ -39,7 +39,7 @@ export const desktopDialogShellLarge = [
  *
  * Реализации Sheet (@/components/ui/sheet): MyPlanOverlay, AddRouteToPlanSheet,
  * AccountDropdownSurface, AdminHeader, DayScenarioModal, PlanAudienceSheet,
- * AddPersonaTypeModal, PlanSuggestionsSheet, SaveToPlanModal, AdminNotificationsDropdown,
+ * AddPersonaTypeModal, PlanSuggestionsSheet, SaveToPlanModal,
  * NotificationsDropdown, MobileSelectSheet, when-select, MobileFilterSheet, SeoTemplatesClient,
  * MobileDateSheet, StructuredDataCenterClient, BirthdayBuilderStickyBar, OfferQuickView,
  * PartyForChildSection, ShareSheet, FilterControl.

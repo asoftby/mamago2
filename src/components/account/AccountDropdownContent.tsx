@@ -11,6 +11,7 @@ import {
 import { AppMenu } from "@/components/account/AppMenu";
 import type { AccountDropdownHeaderModel, AccountMenuRow } from "@/components/account/types";
 import type { AccountMode } from "@/contexts/AccountModeContext";
+import { getCurrentBrowserAppContextWithPath } from "@/lib/routing/appContext";
 
 function RowIcon({ Icon }: { Icon: AccountMenuRow["icon"] }) {
   const Cmp = Icon;
@@ -69,8 +70,7 @@ export type AccountDropdownContentProps = {
     onAction: () => void;
   };
   /**
-   * Админ-хост: тот же визуальный переключатель, что у роли ADMIN на публичном сайте
-   * (`rounded-xl bg-primary/10` + «Личный аккаунт» / «Админ-панель»).
+   * Админ-хост: переключатель «Личный аккаунт» / «Админ-панель» (`chromeTone="admin"` даёт серый лоток).
    */
   adminPersonalSwitcher?: {
     onGoPersonal: () => void;
@@ -87,6 +87,11 @@ export type AccountDropdownContentProps = {
    * Не задаётся в билдерах — прокидывается из AccountDropdown при narrow.
    */
   sheetLayout?: boolean;
+  /**
+   * Визуал как у кнопки профиля: `user` — публика (peach primary/10); `admin` — админка (серый); `business` — кабинет партнёра (пастельный синий).
+   * @default "user"
+   */
+  chromeTone?: "user" | "admin" | "business";
 };
 
 export function AccountDropdownContent({
@@ -106,7 +111,13 @@ export function AccountDropdownContent({
   loggingOut,
   onNavigate,
   sheetLayout = false,
+  chromeTone = "user",
 }: AccountDropdownContentProps) {
+  // Determine current app context from hostname/pathname
+  const currentContext = typeof window !== "undefined" 
+    ? getCurrentBrowserAppContextWithPath() 
+    : "personal";
+
   const adminContextRow = contextItems?.find(
     (row): row is Extract<AccountMenuRow, { type: "button" }> =>
       row.key === "admin" && row.type === "button",
@@ -123,6 +134,20 @@ export function AccountDropdownContent({
     !hasRoleSwitcher && contextItemsWithoutAdmin && contextItemsWithoutAdmin.length > 0
       ? contextItemsWithoutAdmin
       : null;
+
+  const switcherTrayClass =
+    chromeTone === "admin"
+      ? "rounded-xl bg-gray-100 p-1"
+      : chromeTone === "business"
+        ? "rounded-xl bg-sky-100/85 p-1"
+        : "rounded-xl bg-primary/10 p-1";
+
+  const avatarFallbackInnerClass =
+    chromeTone === "admin"
+      ? "flex h-full w-full items-center justify-center rounded-full bg-gray-100 text-[11px] font-semibold text-gray-700"
+      : chromeTone === "business"
+        ? "flex h-full w-full items-center justify-center rounded-full bg-sky-100 text-[11px] font-semibold text-sky-900"
+        : "flex h-full w-full items-center justify-center rounded-full bg-primary/10 text-[11px] font-semibold text-primary";
 
   return (
     <div className="flex flex-col bg-white">
@@ -146,15 +171,10 @@ export function AccountDropdownContent({
               className="h-10 w-10 shrink-0 rounded-full object-cover ring-1 ring-black/[0.06]"
             />
           ) : (
-            <div
-              className={cn(
-                "flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-semibold",
-                adminPersonalSwitcher
-                  ? "bg-gray-100 text-gray-700"
-                  : "bg-primary/10 text-primary",
-              )}
-            >
-              {header.displayName.charAt(0).toUpperCase()}
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full border border-gray-200 bg-white text-gray-700 shadow-sm">
+              <span className={avatarFallbackInnerClass}>
+                {header.displayName.charAt(0).toUpperCase()}
+              </span>
             </div>
           )}
           <div className="min-w-0 flex-1">
@@ -178,12 +198,13 @@ export function AccountDropdownContent({
 
       {adminPersonalSwitcher ? (
         <div className="border-b border-gray-200 p-2">
-          <div className="rounded-xl bg-gray-100 p-1">
+          <div className={switcherTrayClass}>
             <button
               type="button"
               className={cn(
                 accountDropdownRowDefault,
                 "w-full justify-between rounded-lg",
+                currentContext === "personal" && "bg-white shadow-sm",
               )}
               onClick={() => {
                 adminPersonalSwitcher.onGoPersonal();
@@ -194,12 +215,16 @@ export function AccountDropdownContent({
                 <UserRound className={accountDropdownIconClass} aria-hidden />
                 Личный аккаунт
               </span>
+              {currentContext === "personal" ? (
+                <Check className="h-4 w-4 text-primary" aria-hidden />
+              ) : null}
             </button>
             <button
               type="button"
               className={cn(
                 accountDropdownRowDefault,
-                "mt-1 w-full justify-between rounded-lg bg-white shadow-sm",
+                "mt-1 w-full justify-between rounded-lg",
+                currentContext === "admin" && "bg-white shadow-sm",
               )}
               onClick={() => {
                 adminPersonalSwitcher.onGoAdmin();
@@ -210,7 +235,9 @@ export function AccountDropdownContent({
                 <Shield className={accountDropdownIconClass} aria-hidden />
                 Админ-панель
               </span>
-              <Check className="h-4 w-4 text-primary" aria-hidden />
+              {currentContext === "admin" ? (
+                <Check className="h-4 w-4 text-primary" aria-hidden />
+              ) : null}
             </button>
           </div>
         </div>
@@ -218,13 +245,13 @@ export function AccountDropdownContent({
 
       {hasRoleSwitcher ? (
         <div className="border-b border-gray-200 p-2">
-          <div className="rounded-xl bg-primary/10 p-1">
+          <div className={switcherTrayClass}>
             <button
               type="button"
               className={cn(
                 accountDropdownRowDefault,
                 "w-full justify-between rounded-lg",
-                mode === "personal" && "bg-white shadow-sm",
+                currentContext === "personal" && "bg-white shadow-sm",
               )}
               onClick={() => {
                 onSwitchMode("personal");
@@ -235,12 +262,16 @@ export function AccountDropdownContent({
                 <UserRound className={accountDropdownIconClass} aria-hidden />
                 Личный аккаунт
               </span>
-              {mode === "personal" ? <Check className="h-4 w-4 text-primary" /> : null}
+              {currentContext === "personal" ? <Check className="h-4 w-4 text-primary" /> : null}
             </button>
             {adminContextRow ? (
               <button
                 type="button"
-                className={cn(accountDropdownRowDefault, "mt-1 w-full justify-between rounded-lg")}
+                className={cn(
+                  accountDropdownRowDefault,
+                  "mt-1 w-full justify-between rounded-lg",
+                  currentContext === "admin" && "bg-white shadow-sm",
+                )}
                 onClick={() => {
                   adminContextRow.onClick();
                   onNavigate?.();
@@ -250,6 +281,9 @@ export function AccountDropdownContent({
                   <adminContextRow.icon className={accountDropdownIconClass} aria-hidden />
                   Админ-панель
                 </span>
+                {currentContext === "admin" ? (
+                  <Check className="h-4 w-4 text-primary" />
+                ) : null}
               </button>
             ) : null}
             {businessModeAvailable ? (
@@ -258,7 +292,7 @@ export function AccountDropdownContent({
                 className={cn(
                   accountDropdownRowDefault,
                   "mt-1 w-full justify-between rounded-lg",
-                  mode === "business" && "bg-white shadow-sm",
+                  currentContext === "business" && "bg-white shadow-sm",
                 )}
                 onClick={() => {
                   onSwitchMode("business");
@@ -269,7 +303,7 @@ export function AccountDropdownContent({
                   <Building2 className={accountDropdownIconClass} aria-hidden />
                   Бизнес: {businessLabel}
                 </span>
-                {mode === "business" ? <Check className="h-4 w-4 text-primary" /> : null}
+                {currentContext === "business" ? <Check className="h-4 w-4 text-primary" /> : null}
               </button>
             ) : null}
           </div>
@@ -290,7 +324,7 @@ export function AccountDropdownContent({
             ) : null}
             <button
               type="button"
-              className="mt-2 inline-flex rounded-md bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary/90"
+              className="mt-2 inline-flex items-center justify-center gap-1 rounded-xl bg-stone-900 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-stone-800 active:scale-[0.98]"
               onClick={() => {
                 onTopUpBalance?.();
                 onNavigate?.();
@@ -304,7 +338,7 @@ export function AccountDropdownContent({
 
       {preNavContextItems ? (
         <div className="border-b border-gray-200 p-2">
-          <div className="rounded-xl bg-primary/10 p-1">
+          <div className={switcherTrayClass}>
             {preNavContextItems.map((row, index) => (
               <MenuRow
                 key={row.key}

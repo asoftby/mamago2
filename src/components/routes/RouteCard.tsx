@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { H3, Caption } from "@/components/ui/typography";
 import { Heart } from "lucide-react";
 import { formatAgeKeysShort } from "@/lib/config/ages";
-import { BUDGET_LABELS, type MockRoute } from "@/mocks/routes.mock";
+import { BUDGET_LABELS, type PublicRouteCardModel } from "@/components/routes/types";
 import { AnalyticsCardViewTracker } from "@/components/analytics/AnalyticsCardViewTracker";
 import { useAuthMe } from "@/features/birthday/builder/hooks/useAuthMe";
 import { SaveActivityFlowAdaptive } from "@/components/activity/SaveActivityFlowAdaptive";
@@ -17,7 +17,7 @@ import { toast } from "@/lib/toast";
 import { useRouter } from "next/navigation";
 
 type Props = {
-  route: MockRoute;
+  route: PublicRouteCardModel;
   className?: string;
   /** Для аналитики CARD_VIEW (город листинга) */
   analyticsCitySlug?: string;
@@ -26,7 +26,6 @@ type Props = {
 export function RouteCard({ route, className, analyticsCitySlug = "minsk" }: Props) {
   const [planOpen, setPlanOpen] = useState(false);
   const { isAuthenticated } = useAuthMe();
-  const isDemoRouteId = /^route-\d+$/.test(route.id);
   const router = useRouter();
 
   const handlePersist = async (result: SaveToPlanResult) => {
@@ -38,7 +37,7 @@ export function RouteCard({ route, className, analyticsCitySlug = "minsk" }: Pro
         credentials: "include",
         body: JSON.stringify({
           routeId: route.id,
-          planRouteSlug: isDemoRouteId ? route.slug : null,
+          planRouteSlug: route.slug,
           date: result.dateISO,
           title: route.title,
           coverImageUrl: route.coverImageUrl,
@@ -49,7 +48,6 @@ export function RouteCard({ route, className, analyticsCitySlug = "minsk" }: Pro
         action: { label: "Открыть план", onClick: () => router.push("/?myPlan=open") },
       });
     } else if (result.action === "ideas") {
-      if (isDemoRouteId) return;
       const res = await fetch("/api/save/idea", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

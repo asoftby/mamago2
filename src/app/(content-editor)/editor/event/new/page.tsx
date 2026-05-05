@@ -9,12 +9,14 @@ import {
   resolveEditorReturnDestination,
   type ContentEditorSurface,
 } from "@/lib/content-editor/types";
-import { buildSurfaceRedirectDestination } from "@/lib/routing/surface";
+import { buildSurfaceRedirectDestination, resolveSurfaceFromHostAndPathname } from "@/lib/routing/surface";
 import { getCurrentRequestRoutingContext } from "@/lib/routing/requestContext";
 import { getEventStep1Taxonomies } from "@/server/admin/activities/get-activity-form-data";
 
-function surfaceFromUserRole(role: string): ContentEditorSurface {
-  return role === "ADMIN" || role === "MODERATOR" ? "admin" : "business";
+function surfaceFromHostAndPath(host: string | undefined, pathname: string): ContentEditorSurface {
+  const resolved = resolveSurfaceFromHostAndPathname(host, pathname);
+  // Editor is only available on business and admin surfaces
+  return resolved === "admin" ? "admin" : "business";
 }
 
 export default async function EditorNewEventPage({
@@ -47,7 +49,7 @@ export default async function EditorNewEventPage({
 
   const { returnTo } = await searchParams;
   const initialStep1Taxonomies = await getEventStep1Taxonomies();
-  const surface = surfaceFromUserRole(user.role);
+  const surface = surfaceFromHostAndPath(routing.currentHost, "/editor/event/new");
   const nav = defaultEditorNav(surface, "event");
   const backHref = resolveEditorReturnDestination({
     surface,
@@ -56,19 +58,16 @@ export default async function EditorNewEventPage({
     ...routing,
   });
 
-  const businessProps = business
-    ? {
-        id: business.id,
-        name: business.name,
-        description: business.legalName || undefined,
-        phone: business.phone || undefined,
-      }
-    : {
-        id: "mock-business-1",
-        name: "Мой бизнес",
-        description: "Описание бизнеса",
-        phone: "+375 29 123 45 67",
-      };
+  if (!business) {
+    redirect("/business");
+  }
+
+  const businessProps = {
+    id: business.id,
+    name: business.name,
+    description: business.legalName || undefined,
+    phone: business.phone || undefined,
+  };
 
   return (
     <ContentEditorChrome

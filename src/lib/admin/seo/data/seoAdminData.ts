@@ -1,6 +1,6 @@
 /**
  * Точки входа данных SEO Control Center.
- * Сейчас возвращают моки; замените тело на `fetch` / RPC к бэкенду.
+ * Возвращают реальные данные, а для неподключённых агрегатов — честные пустые состояния.
  */
 import type {
   ManualRedirect,
@@ -18,15 +18,16 @@ import type {
 } from "../domain/types";
 
 export async function getSeoDashboardSummary(): Promise<SeoDashboardSummary> {
-  const { MOCK_SEO_DASHBOARD_SUMMARY } = await import("../mocks/dashboard");
-  return MOCK_SEO_DASHBOARD_SUMMARY;
+  return {
+    kpis: [],
+    systemStatuses: [],
+    attentionItems: [],
+  };
 }
 
 export async function getSeoPages(): Promise<SeoPage[]> {
-  const { MOCK_SEO_PAGES } = await import("../mocks/pages");
   const { getAllEntitySeoPages } = await import("./getEntitySeoPages");
-  const entity = await getAllEntitySeoPages();
-  return [...entity, ...MOCK_SEO_PAGES];
+  return getAllEntitySeoPages();
 }
 
 export async function getRedirectCenterData(): Promise<{
@@ -34,17 +35,15 @@ export async function getRedirectCenterData(): Promise<{
   manual: ManualRedirect[];
   unmatched: UnmatchedUrl[];
 }> {
-  const m = await import("../mocks/redirects");
   return {
-    automatic: m.MOCK_AUTOMATIC_REDIRECTS,
-    manual: m.MOCK_MANUAL_REDIRECTS,
-    unmatched: m.MOCK_UNMATCHED_URLS,
+    automatic: [],
+    manual: [],
+    unmatched: [],
   };
 }
 
 export async function getSeoTemplates(): Promise<SeoTemplate[]> {
-  const { MOCK_SEO_TEMPLATES } = await import("../mocks/templates");
-  return MOCK_SEO_TEMPLATES;
+  return [];
 }
 
 export async function getStructuredDataCenterData(): Promise<{
@@ -52,11 +51,10 @@ export async function getStructuredDataCenterData(): Promise<{
   templates: SchemaTemplate[];
   validation: SchemaValidationIssue[];
 }> {
-  const m = await import("../mocks/schema");
   return {
-    overviewCards: m.MOCK_SCHEMA_OVERVIEW_CARDS,
-    templates: m.MOCK_SCHEMA_TEMPLATES,
-    validation: m.MOCK_SCHEMA_VALIDATION,
+    overviewCards: [],
+    templates: [],
+    validation: [],
   };
 }
 
@@ -65,10 +63,20 @@ export async function getSitemapRobotsData(): Promise<{
   sections: SitemapSectionStatus[];
   robots: RobotsIndexationSettings;
 }> {
-  const m = await import("../mocks/sitemap");
   return {
-    status: m.MOCK_SITEMAP_STATUS,
-    sections: m.MOCK_SITEMAP_SECTIONS,
-    robots: m.MOCK_ROBOTS_SETTINGS,
+    status: {
+      sitemapUrl: "/sitemap.xml",
+      lastGeneratedAt: "",
+      indexedPagesCount: 0,
+      includedSectionsSummary: [],
+      regenerationStatus: "idle",
+    },
+    sections: [],
+    robots: {
+      allowIndexing: true,
+      noindexEnvironments: ["development", "preview"],
+      robotsStatus: "missing",
+      futureControlsNote: "Настройки robots будут загружаться из реального сервиса.",
+    },
   };
 }

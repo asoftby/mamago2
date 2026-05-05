@@ -5,11 +5,7 @@ import { SeoDashboardKpiCard } from "@/components/admin/seo/SeoDashboardKpiCard"
 import { SeoSystemStatusCard } from "@/components/admin/seo/SeoSystemStatusCard";
 import { SeoDashboardSection } from "@/components/admin/seo/SeoDashboardSection";
 import { SeoPageHeader } from "@/components/admin/seo/primitives/SeoPageHeader";
-import {
-  SEO_DASHBOARD_KPIS,
-  SEO_SYSTEM_STATUS,
-  SEO_ATTENTION_ITEMS,
-} from "@/lib/admin/seo/mocks/dashboard";
+import { getSeoDashboardSummary } from "@/lib/admin/seo/data/seoAdminData";
 import { SEO_CONTROL_NAV } from "@/lib/admin/seoNavConfig";
 import { cn } from "@/lib/utils";
 
@@ -27,7 +23,10 @@ const severityStyles = {
   low: "border-l-gray-300 bg-gray-50/80",
 };
 
-export default function AdminSeoDashboardPage() {
+export default async function AdminSeoDashboardPage() {
+  const summary = await getSeoDashboardSummary();
+  console.log("[API] real data used", { endpoint: "admin-seo-dashboard", empty: true });
+
   return (
     <div className="space-y-10 pb-8">
       <SeoPageHeader
@@ -51,10 +50,10 @@ export default function AdminSeoDashboardPage() {
         description="Сводные показатели по состоянию SEO-системы (данные будут из API)"
       >
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-          {SEO_DASHBOARD_KPIS.map((kpi) => (
+          {summary.kpis.map((kpi) => (
             <SeoDashboardKpiCard
               key={kpi.id}
-              icon={kpi.icon}
+              icon={Globe}
               label={kpi.label}
               value={kpi.value}
               hint={kpi.hint}
@@ -69,7 +68,7 @@ export default function AdminSeoDashboardPage() {
         description="Ключевые подсистемы и их готовность"
       >
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {SEO_SYSTEM_STATUS.map((row) => (
+          {summary.systemStatuses.map((row) => (
             <SeoSystemStatusCard
               key={row.id}
               title={row.title}
@@ -85,7 +84,7 @@ export default function AdminSeoDashboardPage() {
         description="Очередь проверок и исправлений"
       >
         <ul className="divide-y divide-gray-100 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-          {SEO_ATTENTION_ITEMS.map((item) => (
+          {summary.attentionItems.map((item) => (
             <li key={item.id}>
               <div
                 className={cn(

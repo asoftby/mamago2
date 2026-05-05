@@ -3,13 +3,9 @@
 import { useEffect, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { createImportSourceAction } from "../../actions";
-import { getProductionParsers, getAllParsers } from "@/server/modules/import/parsers/parser-definitions";
+import { getProductionParsers } from "@/server/modules/import/parsers/parser-definitions";
 import { useAutoSlug } from "@/hooks/useAutoSlug";
 import { normalizeTaxonomySlug, transliterateToSlug } from "@/lib/taxonomy/transliterateToSlug";
-
-interface Props {
-  devMode?: boolean;
-}
 
 const CREATE_SOURCE_MODAL_PARAM = "createSource";
 
@@ -26,7 +22,7 @@ const PLACEHOLDERS = {
   },
 } as const;
 
-export function CreateSourceModal({ devMode = false }: Props) {
+export function CreateSourceModal() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -46,7 +42,7 @@ export function CreateSourceModal({ devMode = false }: Props) {
   const [parserKey, setParserKey] = useState("");
   const [notes, setNotes] = useState("");
 
-  const parsers = devMode ? getAllParsers() : getProductionParsers();
+  const parsers = getProductionParsers();
   const filteredParsers = parsers.filter((p) => p.entityType === entityType);
   const placeholders = PLACEHOLDERS[entityType];
   const open = searchParams.get(CREATE_SOURCE_MODAL_PARAM) === "1";
@@ -203,7 +199,7 @@ export function CreateSourceModal({ devMode = false }: Props) {
                   <option value="">— выбрать парсер —</option>
                   {filteredParsers.map((p) => (
                     <option key={p.key} value={p.key}>
-                      {p.label}{p.devOnly ? " [dev]" : ""}
+                      {p.label}
                     </option>
                   ))}
                 </select>

@@ -3,7 +3,7 @@ import type { WeatherHourSlot, WeatherRawData } from "../model/types";
 import { fetchJsonWithTimeout } from "../lib/fetch-json-with-timeout";
 import { weatherDiagLog } from "../lib/weather-diag-log";
 
-/** Open-Meteo returns wind in km/h; interpreter thresholds match m/s-style magnitudes from legacy mock. */
+/** Open-Meteo returns wind in km/h; interpreter thresholds are calibrated separately. */
 const KMH_TO_MS = 1 / 3.6;
 
 export type OpenMeteoForecastJson = {

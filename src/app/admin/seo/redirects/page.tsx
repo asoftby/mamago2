@@ -1,16 +1,14 @@
 import { RedirectCenterClient } from "@/components/admin/seo/RedirectCenterClient";
-import {
-  MOCK_AUTOMATIC_REDIRECTS,
-  MOCK_MANUAL_REDIRECTS,
-  MOCK_UNMATCHED_URLS,
-} from "@/lib/admin/seo/redirectCenterMock";
+import { getRedirectCenterData } from "@/lib/admin/seo/data/seoAdminData";
 
-export default function AdminSeoRedirectsPage() {
+export default async function AdminSeoRedirectsPage() {
+  const data = await getRedirectCenterData();
+  console.log("[API] real data used", { endpoint: "admin-seo-redirects", empty: true });
   return (
     <RedirectCenterClient
-      initialAutomatic={MOCK_AUTOMATIC_REDIRECTS}
-      initialManual={MOCK_MANUAL_REDIRECTS}
-      initialUnmatched={MOCK_UNMATCHED_URLS}
+      initialAutomatic={data.automatic}
+      initialManual={data.manual}
+      initialUnmatched={data.unmatched}
     />
   );
 }

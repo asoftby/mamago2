@@ -55,7 +55,7 @@ export function renderNotificationTelegramMessage(
           [
             {
               text: "Открыть в кабинете",
-              url: `${getPublicAppBaseUrl()}/business/inbox`,
+              url: `${getPublicAppBaseUrl()}/business/bookings`,
             },
           ],
         ],
@@ -99,7 +99,7 @@ export function renderDevBusinessApplicationMessage(
         [
           {
             text: "Открыть в кабинете",
-            url: `${getPublicAppBaseUrl()}/business/inbox`,
+            url: `${getPublicAppBaseUrl()}/business/bookings`,
           },
         ],
       ],

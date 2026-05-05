@@ -57,7 +57,7 @@ export type DashboardData = {
     leads: string;
     publications: string;
     promotion: string;
-    inbox: string;
+    bookings: string;
     newPublication: string;
     settings: string;
   };
@@ -250,17 +250,17 @@ function PublicationsCard({
 
 function InboxPreviewBlock({
   items,
-  inboxHref,
+  bookingsHref,
 }: {
   items: DashboardData["inboxPreview"];
-  inboxHref: string;
+  bookingsHref: string;
 }) {
   return (
     <BusinessSurfaceCard className="flex flex-col gap-4 p-6 min-h-[196px]">
       <div className="flex items-center justify-between">
         <p className="text-sm font-semibold text-stone-800">Что нового в mamaGo</p>
         <Link
-        href={inboxHref}
+        href={bookingsHref}
         className="text-xs text-stone-400 hover:text-stone-600 transition"
       >
         Все входящие →
@@ -442,7 +442,7 @@ export function DashboardClient({ data, defaultPeriod = "week" }: DashboardClien
           </div>
 
           {/* Inbox — full width, above KPI cards, reduced height */}
-          <InboxPreviewBlock items={data.inboxPreview} inboxHref={data.hrefs.inbox} />
+          <InboxPreviewBlock items={data.inboxPreview} bookingsHref={data.hrefs.bookings} />
 
           {/* Period switcher — below inbox, above KPI cards */}
           <DashboardPeriodSwitcher value={period} onChange={setPeriod} />

@@ -1,5 +1,5 @@
 import type { Intent } from "@/lib/intent";
-import type { ActivityMock } from "@/mocks/activity.types";
+import type { ActivityMock } from "@/types/activity";
 
 /**
  * Раздел discovery (иконка в компактном поиске), к которому относится публикация.

@@ -1,9 +1,9 @@
 import { Container } from "@/components/ui/Container";
 import { RouteCard } from "@/components/routes/RouteCard";
-import { MOCK_ROUTES } from "@/mocks/routes.mock";
 import { listPublicRoutes } from "@/server/services/route.service";
 import Link from "next/link";
 import { Plus } from "lucide-react";
+import type { PublicRouteCardModel } from "@/components/routes/types";
 
 export const metadata = {
   title: "Маршруты — mamaGo",
@@ -13,11 +13,10 @@ export const metadata = {
 export const dynamic = "force-dynamic";
 
 export default async function RoutesPage() {
-  // Real DB routes
   const dbRoutes = await listPublicRoutes().catch(() => []);
+  console.log("[API] real data used", { endpoint: "routes-page", count: dbRoutes.length });
 
-  // Convert DB routes to MockRoute shape for RouteCard
-  const realRoutes = dbRoutes.map((r) => ({
+  const routes: PublicRouteCardModel[] = dbRoutes.map((r) => ({
     id: r.id,
     slug: r.slug,
     title: r.title,
@@ -42,12 +41,6 @@ export default async function RoutesPage() {
     })),
   }));
 
-  // Merge all routes, real first then mock fallback
-  const allRoutes = [
-    ...realRoutes,
-    ...MOCK_ROUTES.filter((m) => !realRoutes.some((r) => r.slug === m.slug)),
-  ];
-
   return (
     <div className="min-h-screen bg-[#F8F8F7]">
       <Container className="py-8 pb-20">
@@ -67,11 +60,17 @@ export default async function RoutesPage() {
           </Link>
         </div>
 
-        <div className="grid gap-6 grid-cols-2 md:grid-cols-4">
-          {allRoutes.map((route) => (
-            <RouteCard key={route.id} route={route} />
-          ))}
-        </div>
+        {routes.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-neutral-200 bg-white p-8 text-center text-sm text-neutral-500">
+            Пока нет опубликованных маршрутов.
+          </div>
+        ) : (
+          <div className="grid gap-6 grid-cols-2 md:grid-cols-4">
+            {routes.map((route) => (
+              <RouteCard key={route.id} route={route} />
+            ))}
+          </div>
+        )}
       </Container>
     </div>
   );

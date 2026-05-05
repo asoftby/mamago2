@@ -1,10 +1,13 @@
 import { BusinessSurfaceCard } from "@/components/business/ui/BusinessSurfaceCard";
+import { cn } from "@/lib/utils";
 
 interface BusinessSectionHeaderProps {
   eyebrow?: string;
   title: string;
   description: string;
   actions?: React.ReactNode;
+  /** Цвет eyebrow: 'default' (серый) или 'primary' */
+  eyebrowVariant?: "default" | "primary";
 }
 
 export function BusinessSectionHeader({
@@ -12,6 +15,7 @@ export function BusinessSectionHeader({
   title,
   description,
   actions,
+  eyebrowVariant = "default",
 }: BusinessSectionHeaderProps) {
   return (
     <BusinessSurfaceCard className="relative overflow-hidden px-6 py-6 md:px-7 md:py-7">
@@ -19,7 +23,12 @@ export function BusinessSectionHeader({
       <div className="relative flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div className="max-w-3xl space-y-2">
         {eyebrow ? (
-          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-stone-400">
+          <p
+            className={cn(
+              "text-[11px] font-semibold uppercase tracking-[0.2em]",
+              eyebrowVariant === "primary" ? "text-primary" : "text-stone-400"
+            )}
+          >
             {eyebrow}
           </p>
         ) : null}

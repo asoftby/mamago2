@@ -3,8 +3,9 @@
 import Link from "next/link";
 import { Surface } from "@/components/ui/surface";
 import { H2, BodyMuted } from "@/components/ui/typography";
-import { Button } from "@/components/ui/button";
 import { PartyPopper } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { peachPrimaryCtaLinkClassName } from "@/lib/peachPrimaryCtaLink";
 import type { UserBirthdayParty } from "@/features/me/types/userBirthdayParty";
 import { takePreviewParties } from "@/features/me/lib/userBirthdayPartyUi";
 import { BirthdayPartyCard } from "./BirthdayPartyCard";
@@ -46,9 +47,13 @@ export function MyBirthdaysCard({ parties }: MyBirthdaysCardProps) {
           <BodyMuted className="mb-4 max-w-md mx-auto text-sm">
             Здесь появятся черновики и отправленные заявки на дни рождения.
           </BodyMuted>
-          <Button asChild className="h-11">
-            <Link href="/birthday">Создать праздник</Link>
-          </Button>
+          <Link
+            href="/birthday"
+            className={cn(peachPrimaryCtaLinkClassName(), "mt-3")}
+          >
+            <PartyPopper className="h-4 w-4 transition-transform duration-200 group-hover:scale-110 sm:h-[18px] sm:w-[18px]" aria-hidden />
+            Создать праздник
+          </Link>
         </div>
       )}
     </Surface>

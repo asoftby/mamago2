@@ -135,7 +135,7 @@ export function useProfileDropdownHandlers(input: {
   const onGoToBusinessBookings = useCallback(() => {
     navigateToSurface(router, {
       targetSurface: "business",
-      targetPath: "/inbox",
+      targetPath: "/bookings",
     });
   }, [router]);
 

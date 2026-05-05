@@ -27,18 +27,8 @@ export default async function ProtectedBusinessLayout({
     );
   }
 
-  if (user.role === "ADMIN" || user.role === "MODERATOR") {
-    redirect(
-      buildSurfaceRedirectDestination({
-        targetSurface: "admin",
-        targetPath: "/",
-        currentHost: host,
-        currentProtocol: protocol,
-      }),
-    );
-  }
-
   // 2. Partner cabinet: active BusinessMember (OWNER/MANAGER), else owned row; see getPartnerCabinetBusiness.
+  // NOTE: ADMIN/MODERATOR users CAN have business access via BusinessMember - don't block by role.
   const business = await getMyBusiness(user.id);
 
   if (!business) {

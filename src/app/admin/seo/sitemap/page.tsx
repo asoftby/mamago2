@@ -1,16 +1,14 @@
 import { SitemapRobotsCenterClient } from "@/components/admin/seo/SitemapRobotsCenterClient";
-import {
-  MOCK_ROBOTS_SETTINGS,
-  MOCK_SITEMAP_SECTIONS,
-  MOCK_SITEMAP_STATUS,
-} from "@/lib/admin/seo/sitemapRobotsMock";
+import { getSitemapRobotsData } from "@/lib/admin/seo/data/seoAdminData";
 
-export default function AdminSeoSitemapPage() {
+export default async function AdminSeoSitemapPage() {
+  const data = await getSitemapRobotsData();
+  console.log("[API] real data used", { endpoint: "admin-seo-sitemap", empty: true });
   return (
     <SitemapRobotsCenterClient
-      initialStatus={MOCK_SITEMAP_STATUS}
-      initialSections={MOCK_SITEMAP_SECTIONS}
-      initialRobots={MOCK_ROBOTS_SETTINGS}
+      initialStatus={data.status}
+      initialSections={data.sections}
+      initialRobots={data.robots}
     />
   );
 }

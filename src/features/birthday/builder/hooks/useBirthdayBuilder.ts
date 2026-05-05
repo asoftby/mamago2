@@ -17,7 +17,7 @@ import type {
 } from "../types/builder";
 import { ageYearsFromBirthDate, formatYearsRu } from "../lib/partyChildUtils";
 import { BUILDER_STEP_ORDER } from "../lib/stepOrder";
-import { mockBirthdayOffers } from "../../data/mockBirthdayOffers";
+import { birthdayOffers } from "../../data/birthdayOffers";
 import { revalidateAddons } from "../lib/compatibility";
 
 function mergeQuizDefaults(quiz: BirthdayBuilderState["quiz"]): BirthdayBuilderState["quiz"] {
@@ -119,11 +119,11 @@ export function useBirthdayBuilder(init?: { ageGroup?: BirthdayAgeGroup | null }
 
   const selectedBase = useMemo(() => {
     if (!state.selection.selectedBaseId) return null;
-    return mockBirthdayOffers.find((o) => o.id === state.selection.selectedBaseId) || null;
+    return birthdayOffers.find((o) => o.id === state.selection.selectedBaseId) || null;
   }, [state.selection.selectedBaseId]);
 
   const selectedAddons = useMemo(() => {
-    return mockBirthdayOffers.filter((o) => state.selection.selectedAddonIds.includes(o.id));
+    return birthdayOffers.filter((o) => state.selection.selectedAddonIds.includes(o.id));
   }, [state.selection.selectedAddonIds]);
 
   const allSelectedOffers = useMemo(() => {
@@ -233,10 +233,10 @@ export function useBirthdayBuilder(init?: { ageGroup?: BirthdayAgeGroup | null }
         birthDateIso: birthIso,
         interestSlugs,
       };
-      const newBase = mockBirthdayOffers.find((o) => o.id === s.selection.selectedBaseId) || null;
+      const newBase = birthdayOffers.find((o) => o.id === s.selection.selectedBaseId) || null;
       const conflicts = revalidateAddons(
         s.selection.selectedAddonIds,
-        mockBirthdayOffers,
+        birthdayOffers,
         newBase,
         s.quiz.placeType,
       );
@@ -276,12 +276,12 @@ export function useBirthdayBuilder(init?: { ageGroup?: BirthdayAgeGroup | null }
       const newBaseId =
         newPlaceType === "HOME" || newPlaceType === "OUTDOOR" ? null : s.selection.selectedBaseId;
       const newBase = newBaseId
-        ? mockBirthdayOffers.find((o) => o.id === newBaseId) || null
+        ? birthdayOffers.find((o) => o.id === newBaseId) || null
         : null;
 
       const conflicts = revalidateAddons(
         s.selection.selectedAddonIds,
-        mockBirthdayOffers,
+        birthdayOffers,
         newBase,
         newPlaceType
       );
@@ -301,12 +301,12 @@ export function useBirthdayBuilder(init?: { ageGroup?: BirthdayAgeGroup | null }
     setState((s) => {
       // Toggle behavior: if clicking same base, unselect it
       const newBaseId = s.selection.selectedBaseId === offerId ? null : offerId;
-      const newBase = newBaseId ? mockBirthdayOffers.find((o) => o.id === newBaseId) || null : null;
+      const newBase = newBaseId ? birthdayOffers.find((o) => o.id === newBaseId) || null : null;
       
       // Revalidate all addons against new base
       const conflicts = revalidateAddons(
         s.selection.selectedAddonIds,
-        mockBirthdayOffers,
+        birthdayOffers,
         newBase,
         s.quiz.placeType
       );
@@ -337,10 +337,10 @@ export function useBirthdayBuilder(init?: { ageGroup?: BirthdayAgeGroup | null }
         : [...s.selection.selectedAddonIds, offerId];
 
       // Revalidate after toggle
-      const newBase = mockBirthdayOffers.find((o) => o.id === s.selection.selectedBaseId) || null;
+      const newBase = birthdayOffers.find((o) => o.id === s.selection.selectedBaseId) || null;
       const conflicts = revalidateAddons(
         newAddonIds,
-        mockBirthdayOffers,
+        birthdayOffers,
         newBase,
         s.quiz.placeType
       );
@@ -378,10 +378,10 @@ export function useBirthdayBuilder(init?: { ageGroup?: BirthdayAgeGroup | null }
       const newAddonIds = s.selection.selectedAddonIds.filter((id) => id !== offerId);
       
       // Revalidate remaining addons
-      const newBase = mockBirthdayOffers.find((o) => o.id === s.selection.selectedBaseId) || null;
+      const newBase = birthdayOffers.find((o) => o.id === s.selection.selectedBaseId) || null;
       const conflicts = revalidateAddons(
         newAddonIds,
-        mockBirthdayOffers,
+        birthdayOffers,
         newBase,
         s.quiz.placeType
       );
@@ -401,10 +401,10 @@ export function useBirthdayBuilder(init?: { ageGroup?: BirthdayAgeGroup | null }
 
   const revalidateSelection = useCallback(() => {
     setState((s) => {
-      const newBase = mockBirthdayOffers.find((o) => o.id === s.selection.selectedBaseId) || null;
+      const newBase = birthdayOffers.find((o) => o.id === s.selection.selectedBaseId) || null;
       const conflicts = revalidateAddons(
         s.selection.selectedAddonIds,
-        mockBirthdayOffers,
+        birthdayOffers,
         newBase,
         s.quiz.placeType
       );

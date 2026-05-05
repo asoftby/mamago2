@@ -188,7 +188,7 @@ export function AccountDropdownSection() {
               Другой набор ссылок; акцент — «Перейти в Личный аккаунт».
             </p>
             <DropdownChrome>
-              <AccountDropdownContent {...pickContent(business)} />
+              <AccountDropdownContent {...pickContent(business)} chromeTone="business" />
             </DropdownChrome>
           </div>
 
@@ -201,7 +201,7 @@ export function AccountDropdownSection() {
               на /me; выход через POST (form).
             </p>
             <DropdownChrome>
-              <AccountDropdownContent {...pickContent(adminApp)} />
+              <AccountDropdownContent {...pickContent(adminApp)} chromeTone="admin" />
             </DropdownChrome>
           </div>
         </div>

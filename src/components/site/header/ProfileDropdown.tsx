@@ -1,14 +1,10 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { AccountDropdown } from "@/components/account/AccountDropdown";
+import { AccountDropdownSurface } from "@/components/account/AccountDropdownSurface";
+import { ProfileMenuContent } from "@/components/site/header/ProfileMenuContent";
 import type { AccountMenuUser } from "@/lib/account/types";
 import type { AccountMode } from "@/contexts/AccountModeContext";
-import {
-  buildPublicSiteAccountModel,
-  buildBusinessAccountModel,
-} from "@/lib/account/accountMenuBuilders";
-import { userInitialsFromEmail } from "@/lib/account/userInitials";
 
 export type ProfileDropdownProps = {
   mode: AccountMode;
@@ -71,46 +67,41 @@ export function ProfileDropdown({
   hasBusinessProfile,
   businessBalanceBYN,
 }: ProfileDropdownProps) {
-  const initials = userInitialsFromEmail(user.email);
-  const builderInput = {
-    user,
-    initials,
-    onNavigate,
-    onGoToPersonalAccount,
-    onGoToPersonalIdeas,
-    onGoToPersonalPlan,
-    onGoToPersonalRoutes,
-    onGoToSettings,
-    onGoToAdminAccount,
-    onGoToBusinessAccount,
-    onGoToBusinessDashboard,
-    onGoToBusinessRoot,
-    onGoToBusinessPublications,
-    onGoToBusinessBookings,
-    onGoToBusinessClients,
-    onGoToBusinessAnalytics,
-    onGoToBusinessPromotion,
-    onGoToBusinessBilling,
-    onSwitchMode,
-    onGoToHome,
-    hasBusinessProfile,
-    businessBalanceBYN,
-    onLogout,
-    loggingOut,
-  };
-
-  const model =
-    mode === "business"
-      ? buildBusinessAccountModel(builderInput)
-      : buildPublicSiteAccountModel({ ...builderInput, mode });
-
   return (
-    <AccountDropdown
+    <AccountDropdownSurface
       open={open}
       onOpenChange={onOpenChange}
       narrow={narrow}
       trigger={trigger}
-      {...model}
-    />
+      sheetTitle={mode === "business" ? "Бизнес-аккаунт" : "Профиль"}
+    >
+      <ProfileMenuContent
+        mode={mode}
+        user={user}
+        loggingOut={loggingOut}
+        onLogout={onLogout}
+        onNavigate={onNavigate}
+        onGoToPersonalAccount={onGoToPersonalAccount}
+        onGoToPersonalIdeas={onGoToPersonalIdeas}
+        onGoToPersonalPlan={onGoToPersonalPlan}
+        onGoToPersonalRoutes={onGoToPersonalRoutes}
+        onGoToSettings={onGoToSettings}
+        onGoToAdminAccount={onGoToAdminAccount}
+        onGoToBusinessAccount={onGoToBusinessAccount}
+        onGoToBusinessDashboard={onGoToBusinessDashboard}
+        onGoToBusinessRoot={onGoToBusinessRoot}
+        onGoToBusinessPublications={onGoToBusinessPublications}
+        onGoToBusinessBookings={onGoToBusinessBookings}
+        onGoToBusinessClients={onGoToBusinessClients}
+        onGoToBusinessAnalytics={onGoToBusinessAnalytics}
+        onGoToBusinessPromotion={onGoToBusinessPromotion}
+        onGoToBusinessBilling={onGoToBusinessBilling}
+        onSwitchMode={onSwitchMode}
+        onGoToHome={onGoToHome}
+        hasBusinessProfile={hasBusinessProfile}
+        businessBalanceBYN={businessBalanceBYN}
+        sheetLayout={narrow}
+      />
+    </AccountDropdownSurface>
   );
 }

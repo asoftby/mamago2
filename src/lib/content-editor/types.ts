@@ -68,22 +68,38 @@ export function resolveEditorReturnDestination(params: {
   currentHost?: string | null;
   currentProtocol?: string | null;
 }): string {
-  const fallback = defaultEditorNav(params.surface, params.entity).afterSubmitListPath;
-  const rawTarget = params.returnTo?.trim() || fallback;
-
-  if (
-    rawTarget.startsWith("http://") ||
-    rawTarget.startsWith("https://") ||
-    !rawTarget.startsWith("/")
-  ) {
-    return rawTarget;
+  // If returnTo is provided, use it
+  if (params.returnTo?.trim()) {
+    const rawTarget = params.returnTo.trim();
+    
+    // If it's an absolute URL or doesn't start with /, return as-is
+    if (
+      rawTarget.startsWith("http://") ||
+      rawTarget.startsWith("https://") ||
+      !rawTarget.startsWith("/")
+    ) {
+      return rawTarget;
+    }
+    
+    // Build destination based on the path's surface
+    const targetSurface = surfaceFromPathname(rawTarget);
+    return buildSurfaceRedirectDestination({
+      targetSurface,
+      targetPath: normalizeTargetPathForSurface(targetSurface, rawTarget),
+      currentHost: params.currentHost,
+      currentProtocol: params.currentProtocol,
+    });
   }
-
-  const targetSurface = surfaceFromPathname(rawTarget);
-
+  
+  // No returnTo provided - use fallback based on current surface
+  // This ensures we stay on the same surface (business → business, admin → admin)
+  const fallback = defaultEditorNav(params.surface, params.entity).afterSubmitListPath;
+  
+  // The fallback already has the correct surface prefix (/admin/... or /business/...)
+  // Build the destination to stay on the same surface
   return buildSurfaceRedirectDestination({
-    targetSurface,
-    targetPath: normalizeTargetPathForSurface(targetSurface, rawTarget),
+    targetSurface: params.surface, // Use current surface, not the one from pathname
+    targetPath: normalizeTargetPathForSurface(params.surface, fallback),
     currentHost: params.currentHost,
     currentProtocol: params.currentProtocol,
   });

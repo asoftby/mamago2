@@ -118,12 +118,15 @@ function ChipButton({
 export function ChipsRow({
   items,
   className,
+  /** Выравнивание переносимых чипов (`masonry`) по главной оси */
+  justifyWrap = "start",
   /** `scroll` — горизонтальный ряд; `wrap` — перенос; `masonry` — возраст: пилюли по ширине текста + перенос (flex-wrap), без колонок */
   layout = "scroll",
   "aria-label": ariaLabel,
 }: {
   items: ChipItem[];
   className?: string;
+  justifyWrap?: "start" | "center";
   layout?: "scroll" | "wrap" | "masonry";
   "aria-label"?: string;
 }) {
@@ -133,7 +136,10 @@ export function ChipsRow({
         <div
           role={ariaLabel ? "group" : undefined}
           aria-label={ariaLabel}
-          className="flex flex-wrap items-start gap-2 [align-content:flex-start]"
+          className={cn(
+            "flex flex-wrap items-start gap-2 [align-content:flex-start]",
+            justifyWrap === "center" && "justify-center",
+          )}
         >
           {items.map((it) => (
             <ChipButton key={it.id} it={it} layout="masonry" />

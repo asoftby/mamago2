@@ -30,9 +30,9 @@ export function DepositTopUpTrigger({
         type="button"
         onClick={() => setOpen(true)}
         className={cn(
-          "inline-flex items-center justify-center gap-1.5 rounded-xl px-4 py-2.5 text-sm font-medium transition",
+          "inline-flex items-center justify-center gap-1.5 text-sm transition",
           variant === "primary" &&
-            "border border-stone-200 bg-stone-50 text-stone-700 hover:bg-stone-100 hover:border-stone-300",
+            "rounded-2xl bg-stone-900 px-8 py-3.5 font-semibold text-white hover:bg-stone-800 active:scale-[0.98]",
           variant === "warning" &&
             "border border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-100 hover:border-amber-300",
           variant === "ghost" &&

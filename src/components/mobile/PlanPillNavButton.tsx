@@ -18,6 +18,11 @@ export type PlanPillNavButtonProps = {
   className?: string;
   /** Тёмный стеклянный бар (MobileBottomNav) */
   chrome?: "light" | "dark";
+  /**
+   * Гость: те же формулировки, что у десктопного MyPlanWidget
+   * («Мой план за 10 секунд» / «Подберём активности под вас»).
+   */
+  guestPlanPromo?: boolean;
 };
 
 /**
@@ -30,6 +35,7 @@ export function PlanPillNavButton({
   onOpenMyPlan,
   badgeCount = 0,
   hasPlannedEvents = false,
+  guestPlanPromo = false,
   className,
   chrome = "light",
 }: PlanPillNavButtonProps) {
@@ -79,7 +85,8 @@ export function PlanPillNavButton({
         <div className="flex min-w-0 flex-1 flex-col justify-center gap-0 text-left">
           <span
             className={cn(
-              "text-sm font-semibold leading-none tracking-tight",
+              "font-semibold tracking-tight",
+              guestPlanPromo ? "text-xs leading-snug line-clamp-2" : "text-sm leading-none",
               chrome === "dark"
                 ? isActive
                   ? "text-neutral-50"
@@ -89,7 +96,7 @@ export function PlanPillNavButton({
                   : "text-gray-800",
             )}
           >
-            Мой план
+            {guestPlanPromo ? "Мой план за 10 секунд" : "Мой план"}
           </span>
           {showEmptyHint && (
             <span
@@ -99,7 +106,9 @@ export function PlanPillNavButton({
                 chrome === "dark" ? "text-neutral-400" : "text-neutral-500",
               )}
             >
-              Нет событий
+              {guestPlanPromo
+                ? "Подберём активности под вас"
+                : "Нет событий — соберём за 10 секунд"}
             </span>
           )}
         </div>

@@ -31,9 +31,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate that at least one entity type is provided
-    if (!activityId && !routeId && !title) {
+    if (!activityId && !routeId) {
       return NextResponse.json(
-        { error: "activityId, routeId, or title is required" },
+        { error: "activityId or routeId is required" },
         { status: 400 }
       );
     }
@@ -87,18 +87,6 @@ export async function POST(request: NextRequest) {
         },
       });
     }
-    // Handle fallback with title only (for external/demo routes)
-    else {
-      planItem = await addPlanItem(
-        user.id,
-        null,
-        date,
-        startsAt ? new Date(startsAt) : undefined,
-        title ?? undefined,
-        coverImageUrl ?? undefined
-      );
-    }
-
     return NextResponse.json({ success: true, planItem });
   } catch (error) {
     console.error("Add plan item error:", error);

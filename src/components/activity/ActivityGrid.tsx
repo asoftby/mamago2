@@ -1,6 +1,6 @@
 import React from "react";
 import { ActivityCard } from "./ActivityCard";
-import { ActivityMock } from "@/mocks/activity.types";
+import { ActivityMock } from "@/types/activity";
 import { cn } from "@/lib/utils";
 import { formatRuShortDayMonth } from "@/lib/formatters/date";
 

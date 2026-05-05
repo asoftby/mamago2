@@ -192,7 +192,7 @@ export function EventCardHorizontal({
 
           <div className="flex flex-wrap items-center gap-3">
             <Link
-              href={`/business/events/${activity.id}/edit`}
+              href={`/business/events/${activity.id}/edit?returnTo=${encodeURIComponent("/business/events")}`}
               className="inline-flex items-center gap-1.5 rounded-2xl border border-stone-200 bg-white px-4 py-2.5 text-sm font-medium text-stone-700 transition-colors hover:border-stone-300 hover:bg-stone-50 hover:text-stone-950"
             >
               <Pencil className="w-4 h-4 shrink-0" />

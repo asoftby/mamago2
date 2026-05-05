@@ -199,6 +199,12 @@ export function PlaceWizard({
   };
 
   const handlePrev = () => {
+    // On first step, go back to where user came from
+    if (currentStep === 1) {
+      router.push(afterSubmitDestination);
+      return;
+    }
+    
     if (currentStep > 1 && canGoToPrevStep(currentStep)) {
       setCurrentStep(prev => prev - 1);
     }
@@ -430,7 +436,7 @@ export function PlaceWizard({
 
   const stepValidation = validateStep(currentStep, formData);
   const canNext = currentStep < TOTAL_STEPS;
-  const canPrev = currentStep > 1;
+  const canPrev = true; // Always show back button (on step 1 it goes to returnTo)
   const isReviewStep = currentStep === 6;
 
   const segments = useMemo(

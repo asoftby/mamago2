@@ -24,9 +24,6 @@ import { AddParticipantModal } from "@/components/children/AddParticipantModal";
 import { MyPlanHeader } from "./MyPlanHeader";
 import { RecommendationDecisionBlock } from "./RecommendationDecisionBlock";
 import { BuildScenarioButton } from "./BuildScenarioButton";
-import {
-  isPlanSuggestionMockId,
-} from "../lib/mockPlanSuggestions";
 import { sortPlanItemsForDay } from "../lib/sortPlanItemsForDay";
 import {
   MAX_PLAN_ITEMS_PER_SLOT,
@@ -669,13 +666,6 @@ export function PlanMainContent({
     activity: { id: string; slug?: string | null },
   ) => {
     event.preventDefault();
-    if (isPlanSuggestionMockId(activity.id)) {
-      onRequestClose?.();
-      window.setTimeout(() => {
-        router.push(buildFindAndAddHref());
-      }, 0);
-      return;
-    }
     const href = publicActivityPath(activity.id, city, activity.slug);
     onRequestClose?.();
     window.setTimeout(() => {
@@ -719,28 +709,6 @@ export function PlanMainContent({
 
   const handleAddSuggestionToPlan = useCallback(
     async (activity: NonNullable<MyPlanIdea["activity"]>) => {
-      if (isPlanSuggestionMockId(activity.id)) {
-        if (!onAddItemToPlan) {
-          toast.info(
-            "Это пример из подборки — выберите событие в каталоге ниже или по кнопке «Добавить ещё».",
-          );
-          return false;
-        }
-        const synthetic: PlanItemWithActivity = {
-          id: `mock-plan-${activity.id}-${Date.now()}`,
-          userId: "me",
-          activityId: activity.id,
-          date: selectedDate,
-          startsAt: null,
-          title: activity.title,
-          coverImageUrl: activity.coverImageUrl ?? null,
-          createdAt: new Date(),
-          activity,
-        };
-        onAddItemToPlan(synthetic);
-        toast.success("Добавлено в план");
-        return true;
-      }
       if (
         (planItemsByDate?.[selectedDate] ?? []).some(
           (i) => i.activityId === activity.id,
@@ -771,7 +739,7 @@ export function PlanMainContent({
         setAddingActivityId(null);
       }
     },
-    [onAddItemToPlan, onAddSuggestionToPlan, selectedDate, planItemsByDate],
+    [onAddSuggestionToPlan, selectedDate, planItemsByDate],
   );
 
   const isFreeSearchMode = useMemo(() => {
@@ -1065,7 +1033,7 @@ export function PlanMainContent({
         className="flex-1 space-y-4 overflow-y-auto bg-[#FFFDFC] px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-3"
       >
         {onChangeDate ? (
-          <div className="pb-1">
+          <div className="-mx-4 pb-1">
             <WeekCalendarStrip selectedDate={selectedDate} onChangeDate={onChangeDate} compact />
           </div>
         ) : null}

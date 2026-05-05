@@ -37,8 +37,12 @@ export const businessRoute = (path: string) => buildBusinessPath(path);
 
 export const BUSINESS_DASHBOARD_HREF = businessRoute("/dashboard");
 export const BUSINESS_ROOT_HREF = businessRoute("/");
+export const BUSINESS_PUBLICATIONS_HREF = businessRoute("/publications");
+export const BUSINESS_PUBLICATIONS_EVENTS_HREF = businessRoute("/publications/events");
+export const BUSINESS_PUBLICATIONS_PLACES_HREF = businessRoute("/publications/places");
+export const BUSINESS_PUBLICATIONS_OFFERS_HREF = businessRoute("/publications/offers");
 export const BUSINESS_EVENTS_HREF = businessRoute("/events");
-export const BUSINESS_INBOX_HREF = businessRoute("/inbox");
+export const BUSINESS_BOOKINGS_HREF = businessRoute("/bookings");
 export const BUSINESS_TEAM_HREF = businessRoute("/team");
 export const BUSINESS_PROMOTION_OVERVIEW_HREF = businessRoute("/promotion");
 export const BUSINESS_BILLING_TRANSACTIONS_HREF = businessRoute("/billing/transactions");
@@ -64,18 +68,36 @@ export const businessNavigation: BusinessNavItem[] = [
     match: [businessRoute("/")],
   },
   {
-    type: "item",
+    type: "group",
     label: "Публикации",
-    href: BUSINESS_EVENTS_HREF,
     icon: ClipboardList,
-    match: [businessRoute("/events")],
+    children: [
+      {
+        label: "События",
+        href: BUSINESS_PUBLICATIONS_EVENTS_HREF,
+      },
+      {
+        label: "Места",
+        href: BUSINESS_PUBLICATIONS_PLACES_HREF,
+      },
+      {
+        label: "Предложения",
+        href: BUSINESS_PUBLICATIONS_OFFERS_HREF,
+      },
+    ],
+    match: [
+      businessRoute("/publications"),
+      businessRoute("/publications/events"),
+      businessRoute("/publications/places"),
+      businessRoute("/publications/offers"),
+    ],
   },
   {
     type: "item",
     label: "Записи и заказы",
-    href: BUSINESS_INBOX_HREF,
+    href: BUSINESS_BOOKINGS_HREF,
     icon: CalendarDays,
-    match: [businessRoute("/inbox")],
+    match: [businessRoute("/bookings")],
   },
   {
     type: "item",
@@ -117,8 +139,12 @@ export const businessNavigation: BusinessNavItem[] = [
 export const businessQuickActions = {
   dashboard: BUSINESS_DASHBOARD_HREF,
   root: BUSINESS_ROOT_HREF,
+  publications: BUSINESS_PUBLICATIONS_HREF,
+  publicationsEvents: BUSINESS_PUBLICATIONS_EVENTS_HREF,
+  publicationsPlaces: BUSINESS_PUBLICATIONS_PLACES_HREF,
+  publicationsOffers: BUSINESS_PUBLICATIONS_OFFERS_HREF,
   events: BUSINESS_EVENTS_HREF,
-  inbox: BUSINESS_INBOX_HREF,
+  bookings: BUSINESS_BOOKINGS_HREF,
   promotion: BUSINESS_PROMOTION_OVERVIEW_HREF,
   team: BUSINESS_TEAM_HREF,
   billing: BUSINESS_BILLING_TRANSACTIONS_HREF,

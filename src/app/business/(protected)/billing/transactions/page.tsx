@@ -1,13 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import React, { useState } from "react";
 import {
   formatDateTime,
   getTransactionTypeLabel,
-  mockTransactions,
+  EMPTY_BILLING_STATE,
   type TransactionStatus,
   type TransactionType,
-} from "@/lib/mocks/businessBilling";
+} from "@/lib/business/billing";
 import { formatPrice } from "@/lib/formatters/format-price";
 import { ChevronDown, ExternalLink, Filter } from "lucide-react";
 import { FilterSelect } from "@/components/ui/filter-select";
@@ -22,7 +22,12 @@ export default function BillingTransactionsPage() {
   const [selectedStatus, setSelectedStatus] = useState<TransactionStatus | "all">("all");
   const [selectedTransaction, setSelectedTransaction] = useState<string | null>(null);
 
-  const filteredTransactions = mockTransactions.filter((transaction) => {
+  const transactions = EMPTY_BILLING_STATE.transactions;
+  console.log("[API] real data used", {
+    endpoint: "business-billing-transactions",
+    empty: transactions.length === 0,
+  });
+  const filteredTransactions = transactions.filter((transaction) => {
     if (selectedType !== "all" && transaction.type !== selectedType) return false;
     if (selectedStatus !== "all" && transaction.status !== selectedStatus) return false;
     return true;
@@ -131,9 +136,8 @@ export default function BillingTransactionsPage() {
               </thead>
               <tbody>
                 {filteredTransactions.map((transaction) => (
-                  <>
+                  <React.Fragment key={transaction.id}>
                     <tr
-                      key={transaction.id}
                       className="cursor-pointer border-b border-stone-100 transition-colors hover:bg-stone-50/70"
                       onClick={() =>
                         setSelectedTransaction(
@@ -224,7 +228,7 @@ export default function BillingTransactionsPage() {
                         </td>
                       </tr>
                     ) : null}
-                  </>
+                  </React.Fragment>
                 ))}
               </tbody>
             </table>

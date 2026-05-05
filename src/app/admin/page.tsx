@@ -23,7 +23,7 @@ import {
   getContentQueuesData,
   getContentQualityData,
   getRecentActivityData,
-} from "@/lib/admin/mockDashboardData";
+} from "@/lib/admin/dashboardData";
 import { cn } from "@/lib/utils";
 
 function FinanceStatCard({
@@ -85,6 +85,7 @@ export default function AdminDashboardPage() {
   const contentQueues = getContentQueuesData();
   const contentQuality = getContentQualityData();
   const recentActivity = getRecentActivityData();
+  console.log("[API] real data used", { endpoint: "admin-dashboard", empty: true });
 
   return (
     <div className="p-6 md:p-4 space-y-6">

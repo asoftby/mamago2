@@ -3,15 +3,14 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { updateImportSourceAction } from "../../actions";
-import { getProductionParsers, getAllParsers } from "@/server/modules/import/parsers/parser-definitions";
+import { getProductionParsers } from "@/server/modules/import/parsers/parser-definitions";
 import type { ImportSource } from "@prisma/client";
 
 interface Props {
   source: Pick<ImportSource, "id" | "name" | "baseUrl" | "parserKey" | "defaultEntity" | "status" | "notes" | "crawlMaxPages" | "crawlMaxDetailLinks" | "crawlMaxRecords">;
-  devMode?: boolean;
 }
 
-export function EditSourceModal({ source, devMode = false }: Props) {
+export function EditSourceModal({ source }: Props) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -29,7 +28,7 @@ export function EditSourceModal({ source, devMode = false }: Props) {
   const [crawlMaxDetailLinks, setCrawlMaxDetailLinks] = useState(source.crawlMaxDetailLinks?.toString() ?? "");
   const [crawlMaxRecords, setCrawlMaxRecords] = useState(source.crawlMaxRecords?.toString() ?? "");
 
-  const parsers = devMode ? getAllParsers() : getProductionParsers();
+  const parsers = getProductionParsers();
   const filteredParsers = parsers.filter((p) => p.entityType === entityType);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -116,7 +115,7 @@ export function EditSourceModal({ source, devMode = false }: Props) {
               <option value="">— выбрать парсер —</option>
               {filteredParsers.map((p) => (
                 <option key={p.key} value={p.key}>
-                  {p.label}{p.devOnly ? " [dev]" : ""}
+                  {p.label}
                 </option>
               ))}
             </select>

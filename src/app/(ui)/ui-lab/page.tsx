@@ -4,17 +4,12 @@ import { FiltersSection } from "./_sections/FiltersSection";
 import { DiscoverySection } from "./_sections/DiscoverySection";
 import { NavigationSection } from "./_sections/NavigationSection";
 import { CitySection } from "./_sections/CitySection";
-import { ActivitySection } from "./_sections/ActivitySection";
 import { NewsSection } from "./_sections/NewsSection";
 import { ShellSection } from "./_sections/ShellSection";
-import { PlanCardSection } from "./_sections/PlanCardSection";
 import { HeaderSection } from "./_sections/HeaderSection";
 import { AccountDropdownSection } from "./_sections/AccountDropdownSection";
-import { PlaceCardSection } from "./_sections/PlaceCardSection";
 import { OpeningHoursSection } from "./_sections/OpeningHoursSection";
 import { DateTimePickerSection } from "./_sections/DateTimePickerSection";
-import { ChildrenSystemSection } from "./_sections/ChildrenSystemSection";
-import { ArticlePublicationSection } from "./_sections/ArticlePublicationSection";
 import { LiquidNotificationsSection } from "./_sections/LiquidNotificationsSection";
 
 export default function UiLabPage() {
@@ -48,15 +43,10 @@ export default function UiLabPage() {
           <DiscoverySection />
           <NavigationSection />
           <CitySection />
-          <ActivitySection />
           <NewsSection />
           <ShellSection />
-          <PlanCardSection />
-          <PlaceCardSection />
           <OpeningHoursSection />
           <DateTimePickerSection />
-          <ChildrenSystemSection />
-          <ArticlePublicationSection />
           <LiquidNotificationsSection />
         </div>
       </div>

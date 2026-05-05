@@ -185,18 +185,19 @@ export function parseAppliedFromUrl(
     }
   }
 
-  const age = searchParams.get("age")?.split(",").filter(Boolean) || [];
-
-  const validAgeIds = new Set(AGE_GROUPS.map((g) => g.value));
-  const sanitizedAge = age.filter((id) => validAgeIds.has(id));
+  const ageRaw = searchParams.get("age")?.split(",").filter(Boolean) || [];
 
   const legacyAgeMap: Record<string, string> = {
     "0+": "0-1",
     "6+": "5-7",
     "12+": "12-14",
+    "18_plus": "18+",
   };
 
-  const mappedAge = sanitizedAge.map((id) => legacyAgeMap[id] || id);
+  const ageNormalized = ageRaw.map((id) => legacyAgeMap[id] ?? id);
+
+  const validAgeIds = new Set(AGE_GROUPS.map((g) => g.value));
+  const mappedAge = ageNormalized.filter((id) => validAgeIds.has(id));
 
   const metroParam = searchParams.get("metro");
   const metro = metroParam

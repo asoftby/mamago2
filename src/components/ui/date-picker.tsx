@@ -160,7 +160,7 @@ export function DatePicker({
   };
 
   return (
-    <div className={cn("w-full", className)}>
+    <div className={cn("w-full min-w-[320px]", className)}>
       {/* Selected Date Display */}
       {value && (
         <div className="mb-4 p-3 bg-primary/5 border border-primary/20 rounded-lg">
@@ -180,9 +180,9 @@ export function DatePicker({
       )}
 
       {/* Calendar */}
-      <div className="w-full rounded-lg pt-5 pb-2.5">
+      <div className="w-full rounded-lg pt-6 pb-3">
         {/* Month/Year Navigation */}
-        <div className="flex items-center justify-center mb-6">
+        <div className="flex items-center justify-center mb-7">
           <div className="flex items-center gap-2">
             <FilterSelect
               value={String(month)}
@@ -192,8 +192,8 @@ export function DatePicker({
               }))}
               onChange={handleMonthSelect}
               disabled={disabled}
-              className="min-w-[120px]"
-              selectClassName="!h-9 text-base font-medium"
+              className="min-w-[140px]"
+              selectClassName="!h-10 text-base font-medium"
               aria-label="Месяц"
             />
 
@@ -202,26 +202,26 @@ export function DatePicker({
               options={yearOptions.map((y) => ({ value: String(y), label: String(y) }))}
               onChange={handleYearSelect}
               disabled={disabled}
-              className="min-w-[80px]"
-              selectClassName="!h-9 text-base font-medium"
+              className="min-w-[90px]"
+              selectClassName="!h-10 text-base font-medium"
               aria-label="Год"
             />
           </div>
         </div>
 
         {/* Weekday Headers */}
-        <div className="grid grid-cols-7 text-center text-xs text-gray-500 font-medium mb-3">
+        <div className="grid grid-cols-7 text-center text-sm text-gray-500 font-medium mb-3">
           {["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"].map((day, i) => (
-            <div key={i} className="py-2">
+            <div key={i} className="py-2.5">
               {day}
             </div>
           ))}
         </div>
 
         {/* Calendar Grid */}
-        <div className="grid grid-cols-7 gap-2">
+        <div className="grid grid-cols-7 gap-2.5">
           {Array.from({ length: startOffset }).map((_, i) => (
-            <div key={`empty-${i}`} className="h-9" />
+            <div key={`empty-${i}`} className="h-11" />
           ))}
           {Array.from({ length: daysInMonth }).map((_, i) => {
             const day = i + 1;
@@ -235,7 +235,7 @@ export function DatePicker({
                 key={day}
                 type="button"
                 className={cn(
-                  "h-9 rounded-lg text-sm font-medium transition-all",
+                  "h-11 rounded-lg text-base font-medium transition-all",
                   "hover:bg-gray-100 active:scale-95",
                   "disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent",
                   today && !selected && "ring-2 ring-primary/30 text-primary bg-primary/5",

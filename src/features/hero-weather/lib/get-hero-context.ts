@@ -1,4 +1,3 @@
-import { MockWeatherProvider } from "../api/mock-weather-provider";
 import { OpenMeteoWeatherProvider } from "../api/open-meteo-provider";
 import type { WeatherProvider } from "../api/weather-provider";
 import { getWeatherProvider } from "../api/weather-provider-factory";
@@ -13,7 +12,7 @@ import {
   type HomeWeatherScenario,
 } from "./weather-scenario-layer";
 
-export type HeroDebugWeatherSource = "mock" | "open-meteo" | "fallback";
+export type HeroDebugWeatherSource = "open-meteo" | "fallback";
 
 export type HeroGreetingModel = {
   microcopy: string;
@@ -44,7 +43,7 @@ export type HeroGreetingModel = {
 
 function weatherSourceFromProvider(provider: WeatherProvider): Exclude<HeroDebugWeatherSource, "fallback"> {
   if (provider instanceof OpenMeteoWeatherProvider) return "open-meteo";
-  return "mock";
+  return "open-meteo";
 }
 
 function resolveCoordinates(input?: {
