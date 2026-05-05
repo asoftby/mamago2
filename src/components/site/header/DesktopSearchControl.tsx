@@ -17,6 +17,7 @@ import {
   hasSelectedChildren as familyHasSelectedChildren,
   resolveFamilyAgeMode,
 } from "@/lib/family/familyAgeMode";
+import { mapPlanParticipantsToAudience } from "@/lib/family/audienceSyncMapper";
 import { togglePersonaId } from "@/lib/family/togglePersonaSelection";
 import { LocationPanel, DatePanel, AgePanel } from "./search-segments";
 import { Portal } from "@/components/ui/portal";
@@ -527,13 +528,19 @@ function DiscoveryDesktopSearchControl({
       // If no personas left, clear age filters (enters free search mode)
       if (newIds.length === 0) {
         actions.setDraft({ age: [] });
+      } else {
+        // Sync age filters based on remaining personas
+        const newAudience = mapPlanParticipantsToAudience(newIds, family.personas ?? []);
+        actions.setDraft({ age: newAudience });
       }
     } else {
       // Select persona (exits free search mode automatically)
       const newIds = [...family.selectedPersonaIds, personaId];
       family.setSelectedPersonaIds(newIds);
-      // Clear age filters when selecting a persona
-      actions.setDraft({ age: [] });
+      
+      // Sync age filters based on new personas
+      const newAudience = mapPlanParticipantsToAudience(newIds, family.personas ?? []);
+      actions.setDraft({ age: newAudience });
     }
   };
 
