@@ -13,7 +13,7 @@ interface SignalOption {
 interface SignalChipSelectorProps {
   label: string;
   description?: string;
-  options: SignalOption[];
+  options: readonly SignalOption[];
   value: string[];
   onChange: (value: string[]) => void;
   max?: number;
@@ -94,7 +94,7 @@ export function SignalChipSelector({
   }
   
   const hasError = required && value.length < min;
-  const isAtMax = max && value.length >= max;
+  const isAtMax = typeof max === "number" && max > 0 && value.length >= max;
   
   return (
     <div className="space-y-3">

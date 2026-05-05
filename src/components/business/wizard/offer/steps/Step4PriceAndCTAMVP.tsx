@@ -72,8 +72,8 @@ export function Step4PriceAndCTAMVP({
   }, [data.placeId]);
   
   const selectedCTA = CTA_OPTIONS.find((opt) => opt.value === data.ctaType);
-  const needsPhone = selectedCTA?.needsPhone || false;
-  const needsLink = selectedCTA?.needsLink || false;
+  const needsPhone = selectedCTA ? "needsPhone" in selectedCTA && selectedCTA.needsPhone === true : false;
+  const needsLink = selectedCTA ? "needsLink" in selectedCTA && selectedCTA.needsLink === true : false;
   
   return (
     <div className="max-w-3xl mx-auto space-y-8 py-8">

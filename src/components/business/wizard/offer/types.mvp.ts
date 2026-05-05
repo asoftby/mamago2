@@ -192,9 +192,9 @@ export function applyAutoSuggestions(
   const suggestions = AUTO_SUGGESTIONS[offerKind];
   
   return {
-    activitySignals: suggestions.activity,
-    formatSignals: suggestions.format,
-    participationSignals: suggestions.participation,
+    activitySignals: [...suggestions.activity],
+    formatSignals: [...suggestions.format],
+    participationSignals: [...suggestions.participation],
     ctaType: suggestions.ctaType,
   };
 }
