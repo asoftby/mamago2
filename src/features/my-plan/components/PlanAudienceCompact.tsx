@@ -14,11 +14,11 @@ interface PlanAudienceCompactProps {
     kind: "adult" | "child";
     isProfileComplete?: boolean;
   }>;
-  /** Режим аудитории: "specific" (выбраны персоны) или "free" (свободный поиск) */
+  /** Режим аудитории: "specific" (выбраны персоны) или "free" (для всех) */
   audienceMode: "specific" | "free";
   /** Обработчик переключения персоны */
   onTogglePersona: (personaId: string) => void;
-  /** Обработчик переключения в режим "Свободный поиск" */
+  /** Обработчик переключения в режим "Для всех" */
   onToggleFreeMode: () => void;
   /** Обработчик клика на кнопку "+" */
   onAddClick: () => void;
@@ -84,7 +84,7 @@ export function PlanAudienceCompact({
               : "border-neutral-200 bg-[linear-gradient(180deg,_#ffffff_0%,_#f9f9f9_100%)] text-neutral-700 shadow-[0_4px_8px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,0.9)] hover:-translate-y-0.5 hover:shadow-[0_6px_12px_rgba(0,0,0,0.1),inset_0_1px_0_rgba(255,255,255,1)]",
           )}
         >
-          Свободный поиск
+          Для всех
         </button>
 
         <button

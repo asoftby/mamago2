@@ -157,7 +157,7 @@ export function PlanAudienceSheet({
                 />
               </div>
               <div className="min-w-0 flex-1 text-left">
-                <p className="font-medium text-neutral-900">Свободный поиск</p>
+                <p className="font-medium text-neutral-900">Для всех</p>
                 <p className="mt-1 text-xs leading-relaxed text-neutral-500">
                   Без учёта профилей и интересов
                 </p>

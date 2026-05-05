@@ -9,6 +9,7 @@ import { DISCOVERY_INTENT_CONFIG } from "@/lib/discovery/discoveryIntentConfig";
 import { formatCityTitle } from "@/lib/city/cityDisplayNames";
 import { useDiscoveryFilters } from "@/features/filters/discovery/filters.store";
 import { whenPresetPageTitleSuffix } from "@/features/filters/discovery/whenLabel";
+import { CityBirthdayCtaBlock } from "@/features/city-home/components/CityBirthdayCtaBlock";
 import type { MockRoute } from "@/mocks/routes.mock";
 import type { ActivityMock } from "@/mocks/activity.types";
 import Link from "next/link";
@@ -79,21 +80,7 @@ export function CityDiscoveryShell({
             <H1 className="px-1">{pageTitle}</H1>
           </div>
 
-          {/* CTA: Собрать праздник */}
-          <div className="rounded-2xl border border-orange-200 bg-gradient-to-br from-orange-50 to-white p-6">
-            <h2 className="text-lg font-semibold text-foreground mb-2">
-              Собрать праздник за 10 минут
-            </h2>
-            <p className="text-sm text-muted-foreground mb-4">
-              Выберите площадку, развлечения, торт и декор — всё в одном конструкторе
-            </p>
-            <Link
-              href={`/${city}/birthday/make`}
-              className="inline-flex items-center justify-center rounded-xl bg-[#EF8759] text-white px-6 py-3 text-sm font-semibold hover:bg-[#e07848] transition-colors"
-            >
-              Собрать праздник
-            </Link>
-          </div>
+          <CityBirthdayCtaBlock href={`/${city}/birthday/make`} />
 
           <DiscoveryActivitiesGrid activities={discoveryActivities ?? []} coverRatio="1/1" />
         </Container>

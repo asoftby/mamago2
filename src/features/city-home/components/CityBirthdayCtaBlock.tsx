@@ -10,7 +10,7 @@ type CityBirthdayCtaBlockProps = {
 };
 
 export function CityBirthdayCtaBlock({
-  href = "/birthday",
+  href = "/birthday/make",
   className,
 }: CityBirthdayCtaBlockProps) {
   return (
