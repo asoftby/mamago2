@@ -65,7 +65,7 @@ export function OnboardingForm({
   /** Серверное состояние escalation OTP (business contact) */
   initialBusinessContactOtpState?: BusinessContactOtpClientState;
 }) {
-  const [state, formAction] = useActionState(createBusinessAction, null);
+  const [state, formAction, isPending] = useActionState(createBusinessAction, null);
   
   // UNP lookup state
   const [unp, setUnp] = useState(initialData?.unp || "");
@@ -179,6 +179,9 @@ export function OnboardingForm({
     verifiedPhoneE164,
   });
 
+  // Only show field errors after form submission attempt
+  const showFieldErrors = state !== null && !state.ok;
+
   return (
     <form action={formAction} className="space-y-6">
       <div>
@@ -189,7 +192,7 @@ export function OnboardingForm({
           value={unp}
           required
           onValueChange={handleUnpChange}
-          fieldError={state && !state.ok ? state.fieldErrors?.unp?.[0] : undefined}
+          fieldError={showFieldErrors ? state.fieldErrors?.unp?.[0] : undefined}
           onResolved={(result) => {
             if (result.legalName && !isLegalNameTouched) {
               setLegalName(result.legalName);
@@ -224,7 +227,7 @@ export function OnboardingForm({
           maxLength={200}
           placeholder="ООО 'Детский центр Радуга'"
         />
-        {state && !state.ok && state.fieldErrors?.legalName && (
+        {showFieldErrors && state.fieldErrors?.legalName && (
           <p className="mt-1 text-sm text-red-600">
             {state.fieldErrors.legalName[0]}
           </p>
@@ -242,14 +245,14 @@ export function OnboardingForm({
         <PhoneVerificationField
           phoneE164={phoneE164}
           verifiedPhoneE164={verifiedPhoneE164}
-          fieldError={state && !state.ok ? state.fieldErrors?.phone?.[0] : undefined}
+          fieldError={showFieldErrors ? state.fieldErrors?.phone?.[0] : undefined}
           onPhoneChange={handlePhoneChange}
           onVerifiedPhoneChange={handleVerifiedPhoneChange}
           initialOtpState={initialBusinessContactOtpState}
         />
       </div>
 
-      {state && !state.ok && state.message && !state.fieldErrors && (
+      {showFieldErrors && state.message && !state.fieldErrors && (
         <div className="bg-red-50 border border-red-200 rounded-md p-4">
           <p className="text-sm text-red-800">{state.message}</p>
         </div>
