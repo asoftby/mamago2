@@ -544,9 +544,11 @@ export function PhoneVerificationField({
       {!fieldError && error && (
         <p className="text-sm text-red-600">{error}</p>
       )}
-      <p className={`text-sm ${isVerified ? "text-green-700" : "text-gray-500"}`}>
-        {helperText}
-      </p>
+      {!fieldError && !error && (
+        <p className={`text-sm ${isVerified ? "text-green-700" : "text-gray-500"}`}>
+          {helperText}
+        </p>
+      )}
     </div>
   );
 }
