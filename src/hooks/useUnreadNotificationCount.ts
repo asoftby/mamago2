@@ -37,7 +37,8 @@ export function useUnreadNotificationCount(pollMs: number = DEFAULT_POLL_MS) {
       setUnreadCount(
         typeof data.unreadCount === "number" ? data.unreadCount : 0,
       );
-    } catch {
+    } catch (error) {
+      console.error("Failed to fetch unread notification count:", error);
       setUnreadCount(0);
     }
   }, [isAuthenticated]);
