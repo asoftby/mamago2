@@ -532,6 +532,8 @@ function DiscoveryDesktopSearchControl({
       // Select persona (exits free search mode automatically)
       const newIds = [...family.selectedPersonaIds, personaId];
       family.setSelectedPersonaIds(newIds);
+      // Clear age filters when selecting a persona
+      actions.setDraft({ age: [] });
     }
   };
 
