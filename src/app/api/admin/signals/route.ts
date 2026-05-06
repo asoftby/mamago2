@@ -48,7 +48,7 @@ export async function GET(req: Request) {
     const includeDeprecated = url.searchParams.get("includeDeprecated") === "true";
 
     // Build where clause
-    const where: any = {};
+    const where: Prisma.SignalDefinitionWhereInput = {};
     
     // By default, return only ACTIVE signals unless includeDeprecated is true
     if (!includeDeprecated) {
@@ -57,13 +57,13 @@ export async function GET(req: Request) {
 
     // Filter by domain if provided
     if (domain) {
-      where.domain = domain;
+      where.domain = domain as SignalDomain;
     }
 
     // Filter by entityType if provided (check if entityTypes array contains the type)
     if (entityType) {
       where.entityTypes = {
-        has: entityType
+        has: entityType as SignalEntityType
       };
     }
 
@@ -121,7 +121,7 @@ export async function POST(req: Request) {
       : null;
     
     const entityTypes = Array.isArray(body.entityTypes) 
-      ? body.entityTypes.filter((type: any) => Object.values(SignalEntityType).includes(type))
+      ? body.entityTypes.filter((type: unknown) => Object.values(SignalEntityType).includes(type as SignalEntityType))
       : [];
     
     const status = body.status && Object.values(SignalStatus).includes(body.status)

@@ -133,14 +133,14 @@ async function testCompleteFlow() {
     console.log("\n🗑️ Testing child deletion...");
     
     // Check interests before deletion
-    interface CountRow { count: string }
+    interface CountRow { count: number }
      
     const interestsBefore = await prisma.$queryRaw<CountRow[]>`
-      SELECT COUNT(*) as count FROM "ChildInterest" WHERE "childId" = ${child.id}
+      SELECT COUNT(*)::int as count FROM "ChildInterest" WHERE "childId" = ${child.id}
     `;
      
     const customInterestsBefore = await prisma.$queryRaw<CountRow[]>`
-      SELECT COUNT(*) as count FROM "ChildCustomInterest" WHERE "childId" = ${child.id}
+      SELECT COUNT(*)::int as count FROM "ChildCustomInterest" WHERE "childId" = ${child.id}
     `;
     
     console.log(`   Interests before deletion: ${interestsBefore[0].count} system, ${customInterestsBefore[0].count} custom`);
@@ -153,11 +153,11 @@ async function testCompleteFlow() {
     // Check interests after deletion
      
     const interestsAfter = await prisma.$queryRaw<CountRow[]>`
-      SELECT COUNT(*) as count FROM "ChildInterest" WHERE "childId" = ${child.id}
+      SELECT COUNT(*)::int as count FROM "ChildInterest" WHERE "childId" = ${child.id}
     `;
      
     const customInterestsAfter = await prisma.$queryRaw<CountRow[]>`
-      SELECT COUNT(*) as count FROM "ChildCustomInterest" WHERE "childId" = ${child.id}
+      SELECT COUNT(*)::int as count FROM "ChildCustomInterest" WHERE "childId" = ${child.id}
     `;
     
     console.log(`   Interests after deletion: ${interestsAfter[0].count} system, ${customInterestsAfter[0].count} custom`);

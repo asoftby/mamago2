@@ -328,13 +328,15 @@ export async function POST(request: NextRequest) {
         status: response.status,
         topLevelKeys: payload ? Object.keys(payload) : [],
         hasChoices: !!(payload && "choices" in payload),
-        choicesLength: Array.isArray((payload as any)?.choices) ? (payload as any).choices.length : 0,
-        firstChoiceKeys: (payload as any)?.choices?.[0] ? Object.keys((payload as any).choices[0]) : [],
-        messageKeys: (payload as any)?.choices?.[0]?.message ? Object.keys((payload as any).choices[0].message) : [],
-        contentType: typeof (payload as any)?.choices?.[0]?.message?.content,
-        contentPreview: typeof (payload as any)?.choices?.[0]?.message?.content === "string"
-          ? (payload as any).choices[0].message.content.slice(0, 300)
-          : JSON.stringify((payload as any)?.choices?.[0]?.message?.content).slice(0, 300),
+        choicesLength: isOpenRouterResponse(payload) && Array.isArray(payload.choices) ? payload.choices.length : 0,
+        firstChoiceKeys: isOpenRouterResponse(payload) && payload.choices?.[0] ? Object.keys(payload.choices[0]) : [],
+        messageKeys: isOpenRouterResponse(payload) && payload.choices?.[0]?.message ? Object.keys(payload.choices[0].message) : [],
+        contentType: isOpenRouterResponse(payload) && payload.choices?.[0]?.message?.content ? typeof payload.choices[0].message.content : undefined,
+        contentPreview: isOpenRouterResponse(payload) && payload.choices?.[0]?.message?.content
+          ? typeof payload.choices[0].message.content === "string"
+            ? payload.choices[0].message.content.slice(0, 300)
+            : JSON.stringify(payload.choices[0].message.content).slice(0, 300)
+          : undefined,
         rawBodyPreview: rawResponseText.slice(0, 300),
       });
       

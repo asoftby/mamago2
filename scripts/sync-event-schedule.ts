@@ -46,9 +46,9 @@ async function main() {
   }
 
   // Get the schedule JSON
-  const scheduleJson = event.scheduleJson as Record<string, unknown>;
+  const scheduleJson = event.scheduleJson;
   
-  if (!scheduleJson || typeof scheduleJson !== "object") {
+  if (!scheduleJson || typeof scheduleJson !== "object" || Array.isArray(scheduleJson)) {
     console.error("❌ scheduleJson не найден или имеет неверный формат");
     process.exit(1);
   }
