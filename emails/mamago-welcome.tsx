@@ -29,7 +29,6 @@ function MamagoWelcome({
   ctaUrl = "https://mamago.by/me/plan",
   unsubscribeUrl,
 }: MamagoWelcomeEmailProps) {
-  const safeName = userName.trim() || "друг";
   const logoBaseUrl = (() => {
     try {
       return new URL(ctaUrl).origin;

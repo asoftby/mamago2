@@ -74,7 +74,7 @@ async function seedBilling() {
     },
   });
 
-  const yearlyPlan = await prisma.plan.upsert({
+  await prisma.plan.upsert({
     where: { code: "business_pro_yearly" },
     update: {},
     create: {

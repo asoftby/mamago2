@@ -243,7 +243,7 @@ async function seedCommercialLayer() {
   console.log("🔔 Creating commercial notifications...");
   let notificationCount = 0;
 
-  for (const [index, business] of businesses.entries()) {
+  for (const business of businesses) {
     // Get business contracts and placements
     const contracts = await prisma.businessContract.findMany({
       where: { businessId: business.id },

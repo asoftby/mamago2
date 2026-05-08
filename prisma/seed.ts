@@ -16,27 +16,6 @@ import { seedEventCategories } from "./seed/event-categories";
 
 const prisma = new PrismaClient();
 
-async function upsertSignal(
-  slug: string,
-  title: string,
-  order: number,
-  options: Array<{ value: string; label: string; order: number }>,
-) {
-  const def = await prisma.signalDefinition.upsert({
-    where: { slug },
-    update: { title, titleEn: title, isActive: true, isSystem: true, order },
-    create: { slug, title, titleEn: title, order, isActive: true, isSystem: true },
-  });
-
-  for (const o of options) {
-    await prisma.signalOption.upsert({
-      where: { definitionId_value: { definitionId: def.id, value: o.value } },
-      update: { label: o.label, order: o.order, isActive: true },
-      create: { definitionId: def.id, value: o.value, label: o.label, order: o.order, isActive: true },
-    });
-  }
-}
-
 async function upsertDomainSignal(
   slug: string,
   title: string,
@@ -260,20 +239,20 @@ async function main() {
   ]);
 
   // Preferences группа (корень + дети)
-  const preferencesRoot = await upsertSignalWithDomain("preferences", "Предпочтения", "PROFILE", ["USER"], 3);
+  await upsertSignalWithDomain("preferences", "Предпочтения", "PROFILE", ["USER"], 3);
   await upsertSignalWithDomain("preferences-aesthetics", "Эстетика", "PROFILE", ["USER"], 1, [], "preferences");
   await upsertSignalWithDomain("preferences-coffee", "Кофе", "PROFILE", ["USER"], 2, [], "preferences");
   await upsertSignalWithDomain("preferences-family", "Семейно", "PROFILE", ["USER"], 3, [], "preferences");
 
   // ═══ DISCOVERY DOMAIN ═══
   // Format группа
-  const formatRoot = await upsertSignalWithDomain("format", "Формат", "DISCOVERY", ["PLACE", "EVENT", "ROUTE"], 1);
+  await upsertSignalWithDomain("format", "Формат", "DISCOVERY", ["PLACE", "EVENT", "ROUTE"], 1);
   await upsertSignalWithDomain("format-indoor", "В помещении", "DISCOVERY", ["PLACE", "EVENT", "ROUTE"], 1, [], "format");
   await upsertSignalWithDomain("format-outdoor", "На улице", "DISCOVERY", ["PLACE", "EVENT", "ROUTE"], 2, [], "format");
   await upsertSignalWithDomain("format-online", "Онлайн", "DISCOVERY", ["PLACE", "EVENT", "ROUTE"], 3, [], "format");
 
   // Activity группа
-  const activityRoot = await upsertSignalWithDomain("activity", "Активность", "DISCOVERY", ["PLACE", "EVENT", "ROUTE"], 2);
+  await upsertSignalWithDomain("activity", "Активность", "DISCOVERY", ["PLACE", "EVENT", "ROUTE"], 2);
   await upsertSignalWithDomain("activity-active", "Активно", "DISCOVERY", ["PLACE", "EVENT", "ROUTE"], 1, [], "activity");
   await upsertSignalWithDomain("activity-creative", "Творчество", "DISCOVERY", ["PLACE", "EVENT", "ROUTE"], 2, [], "activity");
   await upsertSignalWithDomain("activity-educational", "Образовательно", "DISCOVERY", ["PLACE", "EVENT", "ROUTE"], 3, [], "activity");
