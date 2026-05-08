@@ -13,19 +13,16 @@ import {
 } from "@react-email/components";
 
 export interface MamagoWelcomeEmailProps {
-  userName?: string;
   ctaUrl?: string;
   unsubscribeUrl?: string;
 }
 
 export const PreviewProps: MamagoWelcomeEmailProps = {
-  userName: "Аня",
   ctaUrl: "https://mamago.by/me/plan",
   unsubscribeUrl: "https://mamago.by/u/demo-token",
 };
 
 function MamagoWelcome({
-  userName = "друг",
   ctaUrl = "https://mamago.by/me/plan",
   unsubscribeUrl,
 }: MamagoWelcomeEmailProps) {

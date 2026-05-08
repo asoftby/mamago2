@@ -239,7 +239,6 @@ export class EmailService {
       params.to,
       EMAIL_SUBJECTS.welcome,
       <MamagoWelcomeTemplate
-        userName={params.userName ?? undefined}
         ctaUrl={params.ctaUrl}
       />,
     );

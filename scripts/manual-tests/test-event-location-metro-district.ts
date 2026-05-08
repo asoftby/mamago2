@@ -12,7 +12,6 @@ import type { EventFormData } from "../../src/components/business/wizard/event/t
 import { 
   loadDistricts,
   loadMetroStations,
-  enrichEventLocation,
   formatDistance
 } from "../../src/components/business/wizard/event/steps/location/eventLocationUtils.js";
 
@@ -51,7 +50,7 @@ async function runTests() {
       console.log("   Sample metro:", metroStations[0]);
     }
   } catch (err) {
-    console.log("⚠️  Geo API calls failed (expected in test environment):", err.message);
+    console.log("⚠️  Geo API calls failed (expected in test environment):", err instanceof Error ? err.message : String(err));
   }
 
   // Test 3: Event form data with district and metro

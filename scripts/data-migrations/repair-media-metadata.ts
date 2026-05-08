@@ -10,7 +10,6 @@
  */
 
 import { prisma } from "../../src/lib/prisma";
-import { extractExtension } from "../../src/lib/media/extractExtension";
 import { stat } from "fs/promises";
 import { join } from "path";
 import { existsSync } from "fs";
@@ -86,7 +85,7 @@ async function repairMediaMetadata() {
             mimeFixed++;
             console.log(`  ✓ MIME: ${media.mimeType} → ${detectedMime}`);
           }
-        } catch (error) {
+        } catch {
           console.log(`  ✗ Could not detect file type`);
         }
       } else {
@@ -105,7 +104,7 @@ async function repairMediaMetadata() {
           needsUpdate = true;
           sizeFixed++;
           console.log(`  ✓ Size: ${media.sizeBytes || 0} → ${stats.size} bytes`);
-        } catch (error) {
+        } catch {
           console.log(`  ✗ Could not stat file`);
         }
       }
