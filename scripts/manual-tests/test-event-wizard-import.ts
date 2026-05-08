@@ -11,11 +11,11 @@ async function testImports() {
   try {
     console.log("1. Testing EventWizard import...");
     const { EventWizard } = await import("../../src/components/business/wizard/event/EventWizard");
-    console.log("✅ EventWizard imported successfully");
+    console.log("✅ EventWizard imported successfully:", typeof EventWizard);
 
     console.log("\n2. Testing types import...");
     const types = await import("../../src/components/business/wizard/event/types");
-    console.log("✅ Types imported successfully");
+    console.log("✅ Types imported successfully:", Object.keys(types).length, "symbols found");
 
     console.log("\n3. Testing defaults import...");
     const { getDefaultFormData } = await import("../../src/components/business/wizard/event/defaults");
@@ -31,11 +31,11 @@ async function testImports() {
 
     console.log("\n6. Testing Step2Location import...");
     const { Step2Location } = await import("../../src/components/business/wizard/event/steps/Step2Location");
-    console.log("✅ Step2Location imported successfully");
+    console.log("✅ Step2Location imported successfully:", typeof Step2Location);
 
     console.log("\n7. Testing mappers import...");
     const { buildEventPayload } = await import("../../src/components/business/wizard/event/mappers");
-    console.log("✅ Mappers imported successfully");
+    console.log("✅ Mappers imported successfully:", typeof buildEventPayload);
 
     console.log("\n8. Testing default form data creation...");
     const defaultData = getDefaultFormData();

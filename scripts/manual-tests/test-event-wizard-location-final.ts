@@ -7,7 +7,7 @@
 
 import { getDefaultFormData } from "../../src/components/business/wizard/event/defaults";
 import { validateStep2 } from "../../src/components/business/wizard/event/validation";
-import { buildEventPayload, mapEventToFormData } from "../../src/components/business/wizard/event/mappers";
+import { buildEventPayload } from "../../src/components/business/wizard/event/mappers";
 import type { EventFormData } from "../../src/components/business/wizard/event/types";
 
 console.log("🧪 Final Test: Event Wizard Location Step Implementation\n");
