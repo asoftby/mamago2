@@ -99,45 +99,94 @@ export async function getBillingTransactions(filters?: {
   return { transactions, total };
 }
 
+/**
+ * Create refund transaction (atomic operation)
+ * Refunds add money back to the account
+ */
 export async function createRefund(params: {
   parentTransactionId: string;
   amount: number;
   reason: string;
+  metadata?: Prisma.InputJsonValue;
 }) {
-  const { parentTransactionId, amount, reason } = params;
+  const { parentTransactionId, amount, reason, metadata } = params;
 
-  const parentTx = await prisma.billingTransaction.findUnique({
-    where: { id: parentTransactionId },
-  });
-
-  if (!parentTx) {
-    throw new Error("Parent transaction not found");
+  // Validate amount
+  if (amount <= 0) {
+    throw new Error("Refund amount must be positive");
   }
 
-  const refund = await prisma.billingTransaction.create({
-    data: {
-      billingAccountId: parentTx.billingAccountId,
-      type: "REFUND",
-      status: "SUCCEEDED",
-      amount,
-      currency: parentTx.currency,
-      description: `Возврат: ${reason}`,
-      parentTransactionId,
-      referenceType: parentTx.referenceType,
-      referenceId: parentTx.referenceId,
-      metadata: { reason },
-    },
-  });
-
-  // Update balance
-  await prisma.billingAccount.update({
-    where: { id: parentTx.billingAccountId },
-    data: {
-      depositBalance: {
-        increment: amount,
+  // Execute in atomic transaction
+  const result = await prisma.$transaction(async (tx) => {
+    // Get parent transaction
+    const parentTx = await tx.billingTransaction.findUnique({
+      where: { id: parentTransactionId },
+      include: {
+        childTransactions: {
+          where: { type: "REFUND" },
+        },
       },
-    },
+    });
+
+    if (!parentTx) {
+      throw new Error("Parent transaction not found");
+    }
+
+    // Validation
+    if (parentTx.status !== "SUCCEEDED") {
+      throw new Error("Can only refund succeeded transactions");
+    }
+
+    if (parentTx.type === "REFUND") {
+      throw new Error("Cannot refund a refund transaction");
+    }
+
+    // Check if already refunded
+    if (parentTx.childTransactions && parentTx.childTransactions.length > 0) {
+      throw new Error("Transaction already has a refund");
+    }
+
+    const parentAmount = Math.abs(parentTx.amount.toNumber());
+    if (amount > parentAmount) {
+      const error = new Error("Refund amount exceeds original transaction") as Error & {
+        code: string;
+        originalAmount: number;
+        requestedAmount: number;
+      };
+      error.code = "REFUND_AMOUNT_EXCEEDS_ORIGINAL";
+      error.originalAmount = parentAmount;
+      error.requestedAmount = amount;
+      throw error;
+    }
+
+    // Create refund transaction
+    const refund = await tx.billingTransaction.create({
+      data: {
+        billingAccountId: parentTx.billingAccountId,
+        type: "REFUND",
+        status: "SUCCEEDED",
+        amount, // Positive amount (adds to balance)
+        currency: parentTx.currency,
+        description: `Возврат: ${reason}`,
+        parentTransactionId,
+        referenceType: parentTx.referenceType,
+        referenceId: parentTx.referenceId,
+        metadata: metadata || { reason },
+      },
+    });
+
+    // Update balance atomically
+    await tx.billingAccount.update({
+      where: { id: parentTx.billingAccountId },
+      data: {
+        depositBalance: {
+          increment: amount,
+        },
+      },
+    });
+
+    return refund;
   });
 
-  return refund;
+  return result;
 }

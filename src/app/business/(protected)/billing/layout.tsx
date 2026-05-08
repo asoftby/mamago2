@@ -1,61 +1,29 @@
 "use client";
 
-import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { cn } from "@/lib/utils";
-import {
-  BUSINESS_BILLING_PLAN_HREF,
-  businessRoute,
-} from "@/lib/business/navigation";
-
-const billingTabs = [
-  { name: "Тариф", path: "/billing/plan", href: BUSINESS_BILLING_PLAN_HREF },
-  { name: "Депозит", path: "/billing/deposit", href: businessRoute("/billing/deposit") },
-  { name: "История операций", path: "/billing/transactions", href: businessRoute("/billing/transactions") },
-];
+import { BillingTabs } from "@/components/business/billing/BillingTabs";
 
 export default function BillingLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const pathname = usePathname();
-  const usePrefixedPaths = pathname.startsWith("/business");
-
-  const buildTabHref = (path: string) =>
-    usePrefixedPaths ? `/business${path}` : path;
-
-  const isCurrentTab = (path: string) =>
-    pathname === path || pathname === `/business${path}`;
-
   return (
     <div className="space-y-6">
-      {/* Billing Navigation Tabs */}
-      <div className="border-b border-gray-200">
-        <nav className="flex gap-6">
-          {billingTabs.map((tab) => {
-            const href = buildTabHref(tab.path);
-            const isActive = isCurrentTab(tab.path);
-            return (
-              <Link
-                key={tab.href}
-                href={href}
-                className={cn(
-                  "pb-3 px-1 border-b-2 text-sm font-medium transition-colors",
-                  isActive
-                    ? "border-gray-900 text-gray-900"
-                    : "border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300"
-                )}
-              >
-                {tab.name}
-              </Link>
-            );
-          })}
-        </nav>
+      {/* Header */}
+      <div className="px-6 pt-6">
+        <h1 className="text-2xl font-bold text-stone-950 tracking-tight">Финансы</h1>
+        <p className="text-sm text-stone-600 mt-1">
+          Управление балансом, тарифами и документами
+        </p>
       </div>
 
+      {/* Tabs Navigation */}
+      <BillingTabs />
+
       {/* Page Content */}
-      {children}
+      <div className="px-6 pb-6">
+        {children}
+      </div>
     </div>
   );
 }

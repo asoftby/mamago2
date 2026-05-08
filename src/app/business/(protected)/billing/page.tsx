@@ -1,0 +1,156 @@
+import { getCurrentUser } from "@/lib/auth/server";
+import { redirect } from "next/navigation";
+import prisma from "@/lib/prisma";
+import { getBillingAccountByBusinessId } from "@/server/services/billing/billingAccount.service";
+import { BalancePage } from "./BalancePage";
+
+// Force dynamic rendering
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
+export default async function BillingBalancePage() {
+  const user = await getCurrentUser();
+
+  if (!user) {
+    redirect("/login");
+  }
+
+  // Get user's business
+  const business = await prisma.business.findUnique({
+    where: { ownerUserId: user.id },
+    select: {
+      id: true,
+      name: true,
+    },
+  });
+
+  if (!business) {
+    redirect("/business/onboarding");
+  }
+
+  // Get billing account
+  const account = await getBillingAccountByBusinessId(business.id);
+
+  // Get recent transactions
+  const recentTransactions = account
+    ? await prisma.billingTransaction.findMany({
+        where: {
+          billingAccountId: account.id,
+        },
+        orderBy: {
+          occurredAt: "desc",
+        },
+        take: 5,
+      })
+    : [];
+
+  // Calculate stats for current month
+  const now = new Date();
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const monthTransactions = account
+    ? await prisma.billingTransaction.findMany({
+        where: {
+          billingAccountId: account.id,
+          occurredAt: {
+            gte: startOfMonth,
+          },
+          amount: {
+            lt: 0, // Only charges (negative amounts)
+          },
+          status: "SUCCEEDED",
+        },
+      })
+    : [];
+
+  const monthSpent = monthTransactions.reduce(
+    (sum, tx) => sum + Math.abs(tx.amount.toNumber()),
+    0
+  );
+  const chargesCount = monthTransactions.length;
+  const averageCharge = chargesCount > 0 ? monthSpent / chargesCount : 0;
+  const lastCharge = monthTransactions[0] || null;
+
+  // Get last top-up
+  const lastTopUp = account
+    ? await prisma.billingTransaction.findFirst({
+        where: {
+          billingAccountId: account.id,
+          type: "DEPOSIT_TOPUP",
+          status: "SUCCEEDED",
+        },
+        orderBy: {
+          occurredAt: "desc",
+        },
+      })
+    : null;
+
+  // Check if billing profile exists (for first top-up flow)
+  // TODO: Replace with real BillingProfile check when backend is ready
+  const hasBillingProfile = false; // Mock: always show requisites modal for now
+
+  // Prepare data for client component
+  const balanceData = {
+    balance: account?.depositBalance.toNumber() || 0,
+    currency: account?.currency || "BYN",
+    lowBalanceThreshold: account?.lowBalanceThreshold.toNumber() || 20,
+    lastTopUpDate: lastTopUp?.occurredAt || null,
+    lastTopUpAmount: lastTopUp ? Math.abs(lastTopUp.amount.toNumber()) : null,
+    monthlySpend: monthSpent,
+  };
+
+  const statsData = {
+    monthSpent,
+    chargesCount,
+    averageCharge,
+    lastChargeDate: lastCharge?.occurredAt || null,
+    lastChargeAmount: lastCharge ? Math.abs(lastCharge.amount.toNumber()) : null,
+  };
+
+  const transactionsData = recentTransactions.map((tx) => ({
+    id: tx.id,
+    type: tx.type,
+    typeLabel: getTransactionTypeLabel(tx.type),
+    status: mapTransactionStatus(tx.status),
+    amount: tx.amount.toNumber(),
+    description: tx.description,
+    occurredAt: tx.occurredAt,
+  }));
+
+  return (
+    <BalancePage
+      balance={balanceData}
+      stats={statsData}
+      transactions={transactionsData}
+      hasBillingProfile={hasBillingProfile}
+    />
+  );
+}
+
+// Helper functions
+function getTransactionTypeLabel(type: string): string {
+  const labels: Record<string, string> = {
+    DEPOSIT_TOPUP: "Пополнение баланса",
+    MANUAL_ADJUSTMENT: "Корректировка",
+    PROMOTION_CHARGE: "Продвижение",
+    SUBSCRIPTION_CHARGE: "Подписка",
+    SUBSCRIPTION_RENEWAL: "Продление подписки",
+    LEAD_CHARGE: "Лид",
+    FEATURE_CHARGE: "Функция",
+    CORRECTION: "Корректировка",
+    REFUND: "Возврат",
+    BONUS_CREDIT: "Бонус",
+  };
+  return labels[type] || type;
+}
+
+function mapTransactionStatus(
+  status: string
+): "completed" | "pending" | "failed" | "refunded" {
+  const mapping: Record<string, "completed" | "pending" | "failed" | "refunded"> = {
+    SUCCEEDED: "completed",
+    PENDING: "pending",
+    FAILED: "failed",
+    CANCELED: "failed",
+  };
+  return mapping[status] || "pending";
+}

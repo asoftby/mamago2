@@ -2,28 +2,18 @@ import { getCurrentUser } from "@/lib/auth/server";
 import { redirect } from "next/navigation";
 import { EMPTY_BILLING_STATE, formatDate } from "@/lib/business/billing";
 import { formatPrice } from "@/lib/formatters/format-price";
-import { CheckCircle, CreditCard, Info } from "lucide-react";
+import { CheckCircle, CreditCard, Info, Sparkles } from "lucide-react";
 import { TransactionStatusBadge } from "@/components/business/billing/TransactionStatusBadge";
-import { BusinessSectionHeader } from "@/components/business/sections/BusinessSectionHeader";
-import { buildSurfaceRedirectDestination } from "@/lib/routing/surface";
-import { getCurrentRequestRoutingContext } from "@/lib/routing/requestContext";
-import { BusinessSurfaceCard } from "@/components/business/ui/BusinessSurfaceCard";
-import { BusinessChip } from "@/components/business/ui/BusinessChip";
-import { Button } from "@/components/ui/button";
-import { BusinessEmptyState } from "@/components/business/ui/BusinessEmptyState";
+
+// Force dynamic rendering
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export default async function BillingPlanPage() {
-  const routing = await getCurrentRequestRoutingContext();
   const user = await getCurrentUser();
 
   if (!user) {
-    redirect(
-      buildSurfaceRedirectDestination({
-        targetSurface: "public",
-        targetPath: "/login",
-        ...routing,
-      }),
-    );
+    redirect("/login");
   }
 
   const plan = EMPTY_BILLING_STATE.plan;
@@ -36,179 +26,180 @@ export default async function BillingPlanPage() {
 
   return (
     <div className="space-y-6">
-      <BusinessSectionHeader
-        eyebrow="Billing"
-        title="Тариф и подписка"
-        description="Здесь видно, какой план сейчас подключён, что входит в подписку и когда произойдёт следующее списание."
-      />
-
       {!plan ? (
-        <BusinessEmptyState
-          icon={<CreditCard className="h-7 w-7" />}
-          title="Тариф пока не подключён"
-          description="Реальная биллинговая интеграция ещё не настроена. Здесь появятся тариф, способ оплаты и история продлений после подключения провайдера."
-        />
+        <div className="bg-white rounded-2xl border border-stone-200 p-12 text-center shadow-sm">
+          <div className="w-16 h-16 rounded-2xl bg-stone-100 flex items-center justify-center mx-auto mb-4">
+            <CreditCard className="w-8 h-8 text-stone-400" />
+          </div>
+          <h3 className="text-lg font-semibold text-stone-950 mb-2">
+            Тариф пока не подключён
+          </h3>
+          <p className="text-sm text-stone-600 max-w-md mx-auto">
+            Реальная биллинговая интеграция ещё не настроена. Здесь появятся тариф, способ оплаты и история продлений после подключения провайдера.
+          </p>
+        </div>
       ) : (
         <>
+          {/* Current Plan Card */}
+          <div className="bg-white rounded-2xl border border-stone-200 p-6 shadow-sm">
+            <h2 className="text-lg font-semibold text-stone-950 mb-6">
+              Текущий тариф
+            </h2>
 
-      <BusinessSurfaceCard className="p-6 md:p-7">
-        <h2 className="mb-6 text-xl font-semibold tracking-tight text-stone-950">
-          Текущий тариф
-        </h2>
-
-        <div className="mb-6 grid gap-6 md:grid-cols-2">
-          <div>
-            <div className="mb-4 flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-blue-200 bg-blue-50">
-                <CreditCard className="w-6 h-6 text-blue-600" />
-              </div>
+            <div className="grid gap-6 md:grid-cols-2">
+              {/* Left: Plan Info */}
               <div>
-                <h3 className="text-2xl font-semibold tracking-tight text-stone-950">
-                  {plan.name}
-                </h3>
-                <div className="mt-2 flex items-center gap-2">
-                  <CheckCircle className="w-4 h-4 text-green-600" />
-                  <BusinessChip tone="success">Активен</BusinessChip>
+                <div className="flex items-start gap-4 mb-6">
+                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#EF8759] to-[#EF8759]/80 flex items-center justify-center flex-shrink-0">
+                    <Sparkles className="w-7 h-7 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="text-2xl font-bold text-stone-950 mb-2">
+                      {plan.name}
+                    </h3>
+                    <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-green-100 text-green-700 border border-green-200">
+                      <CheckCircle className="w-3.5 h-3.5" />
+                      <span className="text-xs font-medium">Активен</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <div>
+                    <p className="text-xs text-stone-500 mb-1">Стоимость</p>
+                    <p className="text-lg font-semibold text-stone-950">
+                      {formatPrice(plan.price)} /{" "}
+                      {plan.period === "month" ? "месяц" : "год"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-stone-500 mb-1">Следующее списание</p>
+                    <p className="text-lg font-semibold text-stone-950">
+                      {plan.nextBillingDate ? formatDate(plan.nextBillingDate) : "Не запланировано"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-stone-500 mb-1">Автопродление</p>
+                    <p className="text-lg font-semibold text-stone-950">
+                      {plan.autoRenewal ? "Включено" : "Выключено"}
+                    </p>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <div className="space-y-4">
-              <div>
-                <p className="text-sm text-stone-500">Стоимость</p>
-                <p className="text-lg font-semibold text-stone-950">
-                  {formatPrice(plan.price)} /{" "}
-                  {plan.period === "month" ? "месяц" : "год"}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-stone-500">Следующее списание</p>
-                <p className="text-lg font-semibold text-stone-950">
-                  {plan.nextBillingDate ? formatDate(plan.nextBillingDate) : "Не запланировано"}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-stone-500">Автопродление</p>
-                <p className="text-lg font-semibold text-stone-950">
-                  {plan.autoRenewal ? "Включено" : "Выключено"}
-                </p>
+              {/* Right: Payment Method + Actions */}
+              <div className="space-y-4">
+                <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
+                  <p className="text-xs text-stone-500 mb-3">Способ оплаты</p>
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl border border-stone-200 bg-white flex items-center justify-center">
+                      <CreditCard className="w-5 h-5 text-stone-600" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-stone-950">
+                        {paymentMethod ? `${paymentMethod.brand} •••• ${paymentMethod.last4}` : "Не подключён"}
+                      </p>
+                      <p className="text-xs text-stone-500">
+                        {paymentMethod ? `Истекает ${paymentMethod.expiryMonth}/${paymentMethod.expiryYear}` : "Способ оплаты не подключён"}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <button className="w-full px-4 py-2.5 bg-[#EF8759] text-white text-sm font-medium rounded-xl hover:bg-[#EF8759]/90 transition-colors">
+                    Изменить тариф
+                  </button>
+                  <button className="w-full px-4 py-2.5 bg-white text-stone-700 text-sm font-medium border border-stone-200 rounded-xl hover:bg-stone-50 transition-colors">
+                    Обновить способ оплаты
+                  </button>
+                </div>
               </div>
             </div>
           </div>
 
-          <div>
-            <div className="mb-4 rounded-[24px] border border-stone-200 bg-stone-50/80 p-4">
-              <p className="mb-2 text-sm text-stone-500">Способ оплаты</p>
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-stone-200 bg-white">
-                  <CreditCard className="w-5 h-5 text-stone-600" />
-                </div>
-                <div>
-                  <p className="font-medium text-stone-950">
-                    {paymentMethod ? `${paymentMethod.brand} •••• ${paymentMethod.last4}` : "Не подключён"}
-                  </p>
-                  <p className="text-sm text-stone-500">
-                    {paymentMethod ? `Истекает ${paymentMethod.expiryMonth}/${paymentMethod.expiryYear}` : "Способ оплаты не подключён"}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-2">
-              <Button className="justify-center rounded-2xl bg-stone-900 hover:bg-stone-800">
-                Изменить тариф
-              </Button>
-              <Button
-                variant="outline"
-                className="justify-center rounded-2xl border-stone-200 bg-white hover:bg-stone-50"
-              >
-                Обновить способ оплаты
-              </Button>
-            </div>
-          </div>
-        </div>
-      </BusinessSurfaceCard>
-
-      <BusinessSurfaceCard className="p-6 md:p-7">
-        <h2 className="mb-4 text-xl font-semibold tracking-tight text-stone-950">
-          Возможности тарифа
-        </h2>
-        <div className="grid gap-3 md:grid-cols-2">
-          {plan.features.map((feature, index) => (
-            <div
-              key={index}
-              className="flex items-start gap-3 rounded-[22px] border border-stone-200/80 bg-stone-50/70 px-4 py-4"
-            >
-              <CheckCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-green-600" />
-              <span className="text-stone-700">{feature}</span>
-            </div>
-          ))}
-        </div>
-      </BusinessSurfaceCard>
-
-      <BusinessSurfaceCard className="overflow-hidden p-0">
-        <div className="px-6 pb-0 pt-6 md:px-7">
-          <h2 className="mb-4 text-xl font-semibold tracking-tight text-stone-950">
-            История продлений
-          </h2>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-stone-50/90">
-              <tr className="border-b border-stone-200">
-                <th className="px-5 py-3 text-left text-sm font-medium text-stone-500">
-                  Дата
-                </th>
-                <th className="px-5 py-3 text-left text-sm font-medium text-stone-500">
-                  Операция
-                </th>
-                <th className="px-5 py-3 text-right text-sm font-medium text-stone-500">
-                  Сумма
-                </th>
-                <th className="px-5 py-3 text-center text-sm font-medium text-stone-500">
-                  Статус
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {planHistory.map((item) => (
-                <tr
-                  key={item.id}
-                  className="border-b border-stone-100 transition-colors hover:bg-stone-50/70"
+          {/* Plan Features */}
+          <div className="bg-white rounded-2xl border border-stone-200 p-6 shadow-sm">
+            <h2 className="text-lg font-semibold text-stone-950 mb-4">
+              Возможности тарифа
+            </h2>
+            <div className="grid gap-3 md:grid-cols-2">
+              {plan.features.map((feature, index) => (
+                <div
+                  key={index}
+                  className="flex items-start gap-3 rounded-xl border border-stone-200 bg-stone-50 px-4 py-3"
                 >
-                  <td className="px-5 py-4 text-sm text-stone-950">
-                    {formatDate(item.date)}
-                  </td>
-                  <td className="px-5 py-4 text-sm text-stone-700">
-                    {item.operation}
-                  </td>
-                  <td className="px-5 py-4 text-right text-sm font-medium text-stone-950">
-                    {formatPrice(item.amount)}
-                  </td>
-                  <td className="px-5 py-4 text-center">
-                    <TransactionStatusBadge status={item.status} />
-                  </td>
-                </tr>
+                  <CheckCircle className="w-5 h-5 flex-shrink-0 text-green-600 mt-0.5" />
+                  <span className="text-sm text-stone-700">{feature}</span>
+                </div>
               ))}
-            </tbody>
-          </table>
-        </div>
-      </BusinessSurfaceCard>
-
-      <BusinessSurfaceCard tone="accent" className="p-4">
-        <div className="flex gap-3">
-          <Info className="mt-0.5 h-5 w-5 flex-shrink-0 text-blue-600" />
-          <div className="text-sm text-blue-900">
-            <p className="mb-1 font-medium">
-              Следующее автосписание: {plan.nextBillingDate ? formatDate(plan.nextBillingDate) : "не запланировано"}
-            </p>
-            <p className="text-blue-700">
-              Вы можете изменить тариф или отключить автопродление до даты
-              продления.
-            </p>
+            </div>
           </div>
-        </div>
-      </BusinessSurfaceCard>
+
+          {/* Renewal History */}
+          <div className="bg-white rounded-2xl border border-stone-200 shadow-sm overflow-hidden">
+            <div className="px-6 py-4 border-b border-stone-200">
+              <h2 className="text-lg font-semibold text-stone-950">
+                История продлений
+              </h2>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-stone-50">
+                  <tr className="border-b border-stone-200">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">
+                      Дата
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">
+                      Операция
+                    </th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-stone-500 uppercase tracking-wider">
+                      Сумма
+                    </th>
+                    <th className="px-6 py-3 text-center text-xs font-medium text-stone-500 uppercase tracking-wider">
+                      Статус
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-stone-100">
+                  {planHistory.map((item) => (
+                    <tr
+                      key={item.id}
+                      className="hover:bg-stone-50 transition-colors"
+                    >
+                      <td className="px-6 py-4 text-sm text-stone-950">
+                        {formatDate(item.date)}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-stone-700">
+                        {item.operation}
+                      </td>
+                      <td className="px-6 py-4 text-right text-sm font-medium text-stone-950">
+                        {formatPrice(item.amount)}
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        <TransactionStatusBadge status={item.status} />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Info Banner */}
+          <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4">
+            <div className="flex gap-3">
+              <Info className="w-5 h-5 flex-shrink-0 text-blue-600 mt-0.5" />
+              <div className="text-sm text-blue-900">
+                <p className="font-medium mb-1">
+                  Следующее автосписание: {plan.nextBillingDate ? formatDate(plan.nextBillingDate) : "не запланировано"}
+                </p>
+                <p className="text-blue-700">
+                  Вы можете изменить тариф или отключить автопродление до даты продления.
+                </p>
+              </div>
+            </div>
+          </div>
         </>
       )}
     </div>
