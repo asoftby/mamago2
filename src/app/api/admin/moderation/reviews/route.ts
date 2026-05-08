@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
     const source = searchParams.get("source");
     const hasReply = searchParams.get("hasReply");
 
-    const where: any = {};
+    const where: Record<string, unknown> = {};
 
     // Filter by status
     if (status && status !== "all") {

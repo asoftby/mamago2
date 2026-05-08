@@ -21,12 +21,14 @@ type Props = {
 export function EmailVerificationPromptBanner({ onDismiss, className }: Props) {
   const { refetch, user } = useAuthMe();
   const { resend, loading, messages } = useResendVerificationEmail();
+  const [prevUserId, setPrevUserId] = useState(user?.id);
+  const [emailSentOnce, setEmailSentOnce] = useState(() => isEmailVerificationPromptSent(user?.id));
   const viewedRef = useRef(false);
-  const [emailSentOnce, setEmailSentOnce] = useState(false);
 
-  useEffect(() => {
+  if (user?.id !== prevUserId) {
+    setPrevUserId(user?.id);
     setEmailSentOnce(isEmailVerificationPromptSent(user?.id));
-  }, [user?.id]);
+  }
 
   useEffect(() => {
     if (!viewedRef.current) {

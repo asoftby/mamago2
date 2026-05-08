@@ -67,6 +67,7 @@ export async function GET(req: Request) {
       title: d.title,
       isPublished: d.isPublished,
       searchText: d.searchText,
+      summaryLine: d.summaryLine,
       metaLine: d.metaLine,
       urlPath: d.urlPath,
       imageUrl: d.imageUrl,

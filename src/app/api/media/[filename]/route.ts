@@ -25,6 +25,7 @@ export async function GET(
     const media = await prisma.mediaAsset.findFirst({
       where: {
         OR: [
+          { id: filename },
           { filename },
           { storageKey: { endsWith: filename } },
         ],

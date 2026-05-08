@@ -2,7 +2,11 @@ import { getCurrentUser } from "@/lib/auth/server";
 import { redirect } from "next/navigation";
 import prisma from "@/lib/prisma";
 import { ActivityType } from "@prisma/client";
-import { excludeDeletedEvents, excludeGhostEventDrafts } from "@/lib/business/eventListWhere";
+import {
+  businessEventListViewWhere,
+  excludeGhostEventDrafts,
+  normalizeBusinessEventListView,
+} from "@/lib/business/eventListWhere";
 import { EventsList } from "../../events/EventsList";
 import { buildSurfaceRedirectDestination } from "@/lib/routing/surface";
 import { getCurrentRequestRoutingContext } from "@/lib/routing/requestContext";
@@ -11,7 +15,7 @@ import { getPerformanceMetricsByEntity } from "@/server/services/business/busine
 import { getMyBusiness } from "@/server/business/getMyBusiness";
 
 interface SearchParams {
-  view?: "active" | "archived";
+  view?: "active" | "archived" | "archive";
 }
 
 export default async function PublicationsEventsPage({
@@ -45,7 +49,7 @@ export default async function PublicationsEventsPage({
   }
 
   const params = await searchParams;
-  const view = params.view || "active";
+  const view = normalizeBusinessEventListView(params.view);
 
   // Fetch activities (events) for this user
   // Note: Using Activity model as data source, but presenting as "Events" in UI
@@ -56,7 +60,7 @@ export default async function PublicationsEventsPage({
         { businessId: business.id },
       ],
       type: ActivityType.EVENT,
-      ...excludeDeletedEvents(),
+      ...businessEventListViewWhere(view),
       ...excludeGhostEventDrafts(),
     },
     include: {
@@ -95,8 +99,8 @@ export default async function PublicationsEventsPage({
   return (
     <div className="space-y-6">
       <BusinessSectionHeader
-        eyebrow="PUBLICATIONS"
-        title="Events"
+        eyebrow="ПУБЛИКАЦИИ"
+        title="События"
         description="События — это регулярный входящий спрос. Здесь важно сразу видеть статус, интерес и что стоит усилить следующим."
         eyebrowVariant="primary"
       />

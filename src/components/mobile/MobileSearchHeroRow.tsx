@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type RefObject } from "react";
-import { Search, X } from "lucide-react";
+import { Loader2, Search, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export type MobileSearchHeroRowProps = {
@@ -12,6 +12,8 @@ export type MobileSearchHeroRowProps = {
   inputId?: string;
   onFocus?: () => void;
   onBlur?: () => void;
+  /** Как в десктопном SearchInput — спиннер при запросе подсказок */
+  loading?: boolean;
   /** Только вид строки (главная: открытие поиска по клику на кнопку-обёртку) */
   decorative?: boolean;
 };
@@ -27,6 +29,7 @@ export function MobileSearchHeroRow({
   inputId,
   onFocus: onFocusProp,
   onBlur: onBlurProp,
+  loading = false,
   decorative = false,
 }: MobileSearchHeroRowProps) {
   const [focused, setFocused] = useState(false);
@@ -79,6 +82,12 @@ export function MobileSearchHeroRow({
         >
           <X className="h-4 w-4" />
         </button>
+      ) : null}
+      {loading ? (
+        <Loader2
+          className="h-5 w-5 shrink-0 animate-spin text-neutral-400"
+          aria-label="Загрузка"
+        />
       ) : null}
     </div>
   );

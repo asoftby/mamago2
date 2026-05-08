@@ -65,15 +65,28 @@ export function EventsList({ activities, currentView }: EventsListProps) {
     }
   };
 
-  // Archive/unarchive will be implemented when we add archived field to Activity
-  const handleArchive = async () => {
-    // TODO: Implement when Activity model has archived field
-    console.log("Archive not yet implemented for activities");
+  const handleArchive = async (id: string) => {
+    const response = await fetch(`/api/business/events/${id}/archive`, {
+      method: "POST",
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(
+        typeof error.error === "string" ? error.error : "Не удалось архивировать событие",
+      );
+    }
   };
 
-  const handleUnarchive = async () => {
-    // TODO: Implement when Activity model has archived field
-    console.log("Unarchive not yet implemented for activities");
+  const handleUnarchive = async (id: string) => {
+    const response = await fetch(`/api/business/events/${id}/archive`, {
+      method: "DELETE",
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(
+        typeof error.error === "string" ? error.error : "Не удалось восстановить событие",
+      );
+    }
   };
 
   return (

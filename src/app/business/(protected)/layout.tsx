@@ -4,6 +4,7 @@ import { getMyBusiness } from "@/server/business/getMyBusiness";
 import { getEffectiveVerificationStatus } from "@/server/services/businessStatusMap";
 import { getBusinessBillingSummary } from "@/server/services/billing/billingBusiness.service";
 import { BusinessShell } from "@/components/business/layout/BusinessShell";
+import { Toaster } from "@/components/ui/toaster";
 import { headers } from "next/headers";
 import { buildSurfaceRedirectDestination } from "@/lib/routing/surface";
 export default async function ProtectedBusinessLayout({
@@ -92,6 +93,7 @@ export default async function ProtectedBusinessLayout({
       }}
     >
       {children}
+      <Toaster />
     </BusinessShell>
   );
 }

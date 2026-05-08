@@ -24,6 +24,7 @@ import {
   buildOfferUpdatePayload,
   mapOfferToFormData,
 } from "./mappers";
+import { createClientSavePerf } from "@/lib/perf/clientSavePerf";
 
 import { Step8Review } from "./steps/Step8Review";
 import type { Role, Offer } from "@prisma/client";
@@ -194,6 +195,7 @@ export function OfferWizard({
 
   // Save as draft
   const handleSaveDraft = async () => {
+    if (isSaving || isSubmitting) return;
     setIsSaving(true);
     
     try {
@@ -209,11 +211,16 @@ export function OfferWizard({
 
       if (offerId) {
         const payload = buildOfferUpdatePayload(formData);
+        const perf = createClientSavePerf("save-offer:client", {
+          endpoint: `/api/business/offers/${offerId}`,
+          payload,
+        });
         const response = await fetch(`/api/business/offers/${offerId}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
         });
+        perf.log({ status: response.status, mode: "save-draft" });
         
         if (!response.ok) {
           const error = await response.json();
@@ -224,13 +231,17 @@ export function OfferWizard({
           toast.error("Не выбрано место для предложения");
           return;
         }
+        const createPayload = buildOfferCreatePayload(formData, placeId, { status: "DRAFT" });
+        const perf = createClientSavePerf("save-offer:client", {
+          endpoint: "/api/business/offers",
+          payload: createPayload,
+        });
         const response = await fetch("/api/business/offers", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(
-            buildOfferCreatePayload(formData, placeId, { status: "DRAFT" })
-          ),
+          body: JSON.stringify(createPayload),
         });
+        perf.log({ status: response.status, mode: "create-draft" });
         
         if (!response.ok) {
           const error = await response.json();
@@ -263,6 +274,7 @@ export function OfferWizard({
 
   // Submit for moderation
   const handleSubmit = async () => {
+    if (isSubmitting) return;
     // Validate before submit
     const validation = validateForSubmit(formData);
     
@@ -272,6 +284,7 @@ export function OfferWizard({
       return;
     }
     
+    console.time("[publish:offer:client]");
     setIsSubmitting(true);
     
     try {
@@ -291,13 +304,17 @@ export function OfferWizard({
           return;
         }
         const finalStatus = canPublishContentDirectly(userRole) ? "PUBLISHED" : "PENDING";
+        const createPayload = buildOfferCreatePayload(formData, placeId, { status: finalStatus });
+        const perf = createClientSavePerf("publish-offer:client", {
+          endpoint: "/api/business/offers",
+          payload: createPayload,
+        });
         const createResponse = await fetch("/api/business/offers", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(
-            buildOfferCreatePayload(formData, placeId, { status: finalStatus })
-          ),
+          body: JSON.stringify(createPayload),
         });
+        perf.log({ status: createResponse.status, mode: finalStatus.toLowerCase() });
         
         if (!createResponse.ok) {
           const error = await createResponse.json();
@@ -325,11 +342,17 @@ export function OfferWizard({
         return;
       }
 
+      const updatePayload = buildOfferUpdatePayload(formData, { status: "PENDING" });
+      const perf = createClientSavePerf("publish-offer:client", {
+        endpoint: `/api/business/offers/${offerId}`,
+        payload: updatePayload,
+      });
       const response = await fetch(`/api/business/offers/${offerId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(buildOfferUpdatePayload(formData, { status: "PENDING" })),
+        body: JSON.stringify(updatePayload),
       });
+      perf.log({ status: response.status, mode: "submit" });
       
       if (!response.ok) {
         const error = await response.json();
@@ -350,13 +373,12 @@ export function OfferWizard({
         navigateToCompatibleHref(router, returnTo);
       } else if (surface === "admin") {
         navigateToCompatibleHref(router, nav.afterSubmitListPath);
-      } else {
-        router.refresh();
       }
     } catch (error: unknown) {
       console.error("Submit error:", error);
       toast.error(error instanceof Error ? error.message : "Ошибка отправки");
     } finally {
+      console.timeEnd("[publish:offer:client]");
       setIsSubmitting(false);
     }
   };

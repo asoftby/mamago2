@@ -5,7 +5,7 @@ import { useEffect, useRef } from "react";
 import { appendAntiRepeatEntry, loadAntiRepeatState, saveAntiRepeatState } from "../model/anti-repeat-store";
 import { normalizeWeatherScenario } from "../model/anti-repeat-types";
 import type { HeroGreetingModel } from "../lib/get-hero-context";
-import { HeroGreeting } from "./HeroGreeting";
+import { HeroGreetingErrorBoundary } from "./HeroGreetingErrorBoundary";
 
 export type HeroGreetingShellProps = {
   initialModel: HeroGreetingModel;
@@ -56,5 +56,5 @@ export function HeroGreetingShell({ initialModel }: HeroGreetingShellProps) {
     }
   }, []);
 
-  return <HeroGreeting model={initialModel} />;
+  return <HeroGreetingErrorBoundary model={initialModel} />;
 }

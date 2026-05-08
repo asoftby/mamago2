@@ -15,6 +15,7 @@ import { formatAgeKeys } from "@/lib/config/ages";
 import { getPlacePublicUrl } from "@/lib/placePublicUrl";
 import { PlaceDangerZone } from "@/components/admin/moderation/PlaceDangerZone";
 import { Textarea } from "@/components/ui/textarea";
+import { getFormatLabel } from "@/lib/placeChips";
 
 const STATUS_CONFIG = {
   DRAFT: { label: "Черновик", variant: "secondary" as const, className: "" },
@@ -292,7 +293,9 @@ export function PlaceModerationView({ place }: PlaceModerationViewProps) {
                 {place.visitFormats.length > 0 && (
                   <div>
                     <span className="text-sm font-medium text-gray-600">Форматы: </span>
-                    <span className="text-sm text-gray-700">{place.visitFormats.join(", ")}</span>
+                    <span className="text-sm text-gray-700">
+                      {place.visitFormats.map(getFormatLabel).join(", ")}
+                    </span>
                   </div>
                 )}
                 {place.activityTypes.length > 0 && (

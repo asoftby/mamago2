@@ -24,6 +24,8 @@ export interface UseAuthCredentialsFlowOptions {
   open: boolean;
   nextHref: string;
   initialMode?: AuthFlowMode;
+  initialEmail?: string;
+  invitationToken?: string;
   /** Вызывается после успешного login/register (может быть async). */
   onAuthSuccess?: () => void | Promise<void>;
   finishContext: AuthFinishContext;
@@ -42,6 +44,8 @@ export function useAuthCredentialsFlow({
   open,
   nextHref,
   initialMode = "login",
+  initialEmail = "",
+  invitationToken,
   onAuthSuccess,
   finishContext,
   skipRedirectAfterAuth = false,
@@ -51,7 +55,7 @@ export function useAuthCredentialsFlow({
   const embedded = finishContext === "embedded";
 
   const [mode, setMode] = useState<AuthFlowMode>(initialMode);
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(initialEmail);
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -65,16 +69,20 @@ export function useAuthCredentialsFlow({
   useEffect(() => {
     if (!open) {
       setMode(initialMode);
-      setEmail("");
+      setEmail(initialEmail);
       setPassword("");
       setShowPassword(false);
       setError("");
     }
-  }, [open, initialMode]);
+  }, [open, initialEmail, initialMode]);
 
   useEffect(() => {
     setMode(initialMode);
   }, [initialMode]);
+
+  useEffect(() => {
+    setEmail(initialEmail);
+  }, [initialEmail]);
 
   const finishAuthSession = useCallback(
     async (rawRedirect: string) => {
@@ -128,7 +136,7 @@ export function useAuthCredentialsFlow({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "same-origin",
-        body: JSON.stringify({ email: emailVal, password }),
+        body: JSON.stringify({ email: emailVal, password, invitationToken }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -138,14 +146,17 @@ export function useAuthCredentialsFlow({
         );
         return;
       }
-      const raw = nextHref ?? getPostAuthRedirect();
+      const raw =
+        typeof data.redirectTo === "string" && data.redirectTo.length > 0
+          ? data.redirectTo
+          : nextHref ?? getPostAuthRedirect();
       await finishAuthSession(raw);
     } catch {
       setError("Ошибка сети");
     } finally {
       setLoading(false);
     }
-  }, [email, password, nextHref, finishAuthSession]);
+  }, [email, password, invitationToken, nextHref, finishAuthSession]);
 
   const submitRegister = useCallback(async () => {
     setError("");
@@ -164,7 +175,7 @@ export function useAuthCredentialsFlow({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "same-origin",
-        body: JSON.stringify({ email: emailVal, password }),
+        body: JSON.stringify({ email: emailVal, password, invitationToken }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -174,14 +185,17 @@ export function useAuthCredentialsFlow({
       if (data.verificationEmailSendFailed === true) {
         toast.message(VERIFICATION_EMAIL_SEND_FAILED_AFTER_REGISTRATION_TOAST);
       }
-      const raw = nextHref ?? getPostAuthRedirect();
+      const raw =
+        typeof data.redirectTo === "string" && data.redirectTo.length > 0
+          ? data.redirectTo
+          : nextHref ?? getPostAuthRedirect();
       await finishAuthSession(raw);
     } catch {
       setError("Ошибка сети");
     } finally {
       setLoading(false);
     }
-  }, [email, password, nextHref, finishAuthSession]);
+  }, [email, password, invitationToken, nextHref, finishAuthSession]);
 
   const resetCredentials = useCallback(() => {
     setMode("login");

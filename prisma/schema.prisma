@@ -104,6 +104,9 @@ model User {
   unsubscribeTokens                 UnsubscribeToken[]               @relation("UnsubscribeTokens")
   createdBroadcasts                 AdminBroadcast[]                 @relation("AdminBroadcastCreator")
   devTelegramBusinessApplications   DevTelegramBusinessApplication[]
+  searchQueryLogs                   SearchQueryLog[]
+  createdPages                      Page[]                           @relation("PageCreatedBy")
+  updatedPages                      Page[]                           @relation("PageUpdatedBy")
 
   @@index([email])
   @@index([resetToken])
@@ -517,29 +520,31 @@ model Genre {
 }
 
 model City {
-  id                    String          @id @default(cuid())
+  id                    String            @id @default(cuid())
   name                  String
-  slug                  String          @unique
-  isActive              Boolean         @default(true)
-  isVisibleInCityFilter Boolean         @default(true)
-  priority              Int             @default(0)
+  slug                  String            @unique
+  isActive              Boolean           @default(true)
+  isVisibleInCityFilter Boolean           @default(true)
+  priority              Int               @default(0)
   lat                   Float?
   lng                   Float?
-  createdAt             DateTime        @default(now())
-  updatedAt             DateTime        @updatedAt
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
   centerLat             Float?
   centerLng             Float?
   googleName            String?
   googleNames           Json?
-  hasMetro              Boolean         @default(false)
+  hasMetro              Boolean           @default(false)
   metroMaxDistanceM     Int?
   radiusKm              Float?
   districts             District[]
-  importSources         ImportSource[]  @relation("ImportSourceCity")
+  importSources         ImportSource[]    @relation("ImportSourceCity")
   metroStations         MetroStation[]
-  places                Place[]         @relation("PlaceCity")
-  placeRevisions        PlaceRevision[] @relation("PlaceRevisionCity")
+  places                Place[]           @relation("PlaceCity")
+  placeRevisions        PlaceRevision[]   @relation("PlaceRevisionCity")
   routes                Route[]
+  searchQuickTags       SearchQuickTag[]
+  searchQueryLogs       SearchQueryLog[]
 
   @@index([slug])
   @@index([isActive, isVisibleInCityFilter, priority])
@@ -941,6 +946,13 @@ model Place {
   bookingPhone   String?
   bookingNote    String?
 
+  // Google Places данные
+  googleRating            Float?
+  googleUserRatingsTotal  Int?
+  googleReviewsJson       Json?
+  googleReviewsSyncedAt   DateTime?
+  googleMapsUri           String?
+
   activities      Activity[]          @relation("PlaceActivities")
   bookingRequests BookingRequest[]
   eventVenues     EventVenue[]
@@ -962,6 +974,7 @@ model Place {
   claimRequests   PlaceClaimRequest[]
   images          PlaceImage[]
   revisions       PlaceRevision[]
+  reviews         PlaceReview[]
   slugHistory     PlaceSlugHistory[]
   routeStops      RouteStop[]
   primaryCategory EventCategory?      @relation("PlacePrimaryCategory", fields: [primaryCategoryId], references: [id])
@@ -1001,6 +1014,39 @@ model PlaceSubcategory {
   @@id([placeId, categoryId])
   @@index([placeId, position])
   @@index([categoryId])
+}
+
+/// Отзывы о местах из разных источников (mamaGo, Google)
+model PlaceReview {
+  id                      String              @id @default(cuid())
+  placeId                 String
+  source                  PlaceReviewSource
+  sourceReviewId          String?
+  authorName              String
+  authorAvatarUrl         String?
+  rating                  Int
+  text                    String?
+  language                String?
+  publishedAt             DateTime
+  relativeTimeDescription String?
+  status                  PlaceReviewStatus   @default(PUBLISHED)
+  
+  // Ответ автора (только для mamaGo отзывов)
+  ownerReplyText          String?
+  ownerReplyAuthorId      String?
+  ownerReplyAuthorName    String?
+  ownerReplyCreatedAt     DateTime?
+  ownerReplyUpdatedAt     DateTime?
+  
+  createdAt               DateTime            @default(now())
+  updatedAt               DateTime            @updatedAt
+  place                   Place               @relation(fields: [placeId], references: [id], onDelete: Cascade)
+
+  @@unique([placeId, source, sourceReviewId])
+  @@index([placeId])
+  @@index([placeId, source])
+  @@index([status])
+  @@index([publishedAt])
 }
 
 model PlaceGroup {
@@ -1845,6 +1891,12 @@ model MediaAsset {
   caption          String?
   sourceType       MediaSourceType
   uploadedById     String?
+  /// Wizard session ID for TEMP media (null for committed media)
+  wizardSessionId  String?
+  /// Draft entity ID for TEMP media (activityId or placeId)
+  draftEntityId    String?
+  /// Draft entity type for TEMP media
+  draftEntityType  String?
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
   deletedAt        DateTime?
@@ -1859,6 +1911,9 @@ model MediaAsset {
   @@index([createdAt])
   @@index([uploadedById])
   @@index([checksum])
+  @@index([wizardSessionId, status])
+  @@index([draftEntityId, draftEntityType, status])
+  @@index([status, createdAt])
 }
 
 model MediaUsage {
@@ -1987,6 +2042,8 @@ model SearchDocument {
   entityId    String
   title       String
   searchText  String           @db.Text
+  /// Короткое описание для карточки в выпадающем поиске (плоский текст).
+  summaryLine String?
   metaLine    String
   imageUrl    String?
   urlPath     String
@@ -2364,6 +2421,17 @@ enum PlaceRevisionStatus {
   REJECTED
 }
 
+enum PlaceReviewSource {
+  MAMAGO
+  GOOGLE
+}
+
+enum PlaceReviewStatus {
+  PENDING
+  PUBLISHED
+  HIDDEN
+}
+
 enum PlaceClaimRequestStatus {
   PENDING
   APPROVED
@@ -2629,6 +2697,7 @@ enum MediaAssetKind {
 }
 
 enum MediaAssetStatus {
+  TEMP
   ACTIVE
   ORPHANED
   ARCHIVED
@@ -3110,4 +3179,169 @@ model GuestUsage {
   rateCountInMinute Int      @default(0)
 
   @@index([generationsCount])
+}
+
+/// Quick tags для поиска (отображаются под поисковой строкой)
+model SearchQuickTag {
+  id        String   @id @default(cuid())
+  title     String
+  slug      String   @unique
+  query     String
+  filters   Json?
+  cityId    String?
+  isActive  Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  city City? @relation(fields: [cityId], references: [id], onDelete: SetNull)
+
+  @@index([isActive])
+  @@index([sortOrder])
+  @@index([cityId])
+}
+
+/// Search synonyms для улучшения релевантности поиска
+model SearchSynonym {
+  id        String   @id @default(cuid())
+  source    String   @unique
+  targets   String[]
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive])
+  @@index([source])
+}
+
+/// Search query log для аналитики и zero-result tracking
+model SearchQueryLog {
+  id                String    @id @default(cuid())
+  query             String
+  resultsCount      Int
+  clickedEntityId   String?
+  clickedEntityType String?
+  cityId            String?
+  userId            String?
+  sessionId         String?
+  createdAt         DateTime  @default(now())
+
+  city City? @relation(fields: [cityId], references: [id], onDelete: SetNull)
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([query])
+  @@index([resultsCount])
+  @@index([cityId])
+  @@index([userId])
+  @@index([createdAt])
+  @@index([query, resultsCount])
+}
+
+/// Search index record для контроля качества индексации
+model SearchIndexRecord {
+  id          String                 @id @default(cuid())
+  entityId    String
+  entityType  SearchIndexEntityType
+  status      SearchIndexStatus      @default(PENDING)
+  searchable  Boolean                @default(true)
+  indexedAt   DateTime?
+  error       String?
+  createdAt   DateTime               @default(now())
+  updatedAt   DateTime               @updatedAt
+
+  @@unique([entityId, entityType])
+  @@index([entityType])
+  @@index([status])
+  @@index([searchable])
+  @@index([indexedAt])
+  @@index([entityType, status])
+}
+
+enum SearchIndexEntityType {
+  EVENT
+  PLACE
+  OFFER
+  ROUTE
+  ARTICLE
+}
+
+enum SearchIndexStatus {
+  INDEXED
+  PENDING
+  FAILED
+  EXCLUDED
+}
+
+/// Search ranking settings для управления весами поиска и рекомендаций
+model SearchRankingSettings {
+  id              String   @id @default(cuid())
+  nearbyBoost     Int      @default(50)  // 0-100: вес близости к пользователю
+  freshnessBoost  Int      @default(30)  // 0-100: вес свежести контента
+  popularityBoost Int      @default(40)  // 0-100: вес популярности (views, bookings)
+  partnerBoost    Int      @default(20)  // 0-100: вес партнерского контента
+  ageBoost        Int      @default(60)  // 0-100: вес соответствия возрасту ребенка
+  cityBoost       Int      @default(70)  // 0-100: вес соответствия городу пользователя
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([updatedAt])
+}
+
+// ============================================================================
+// PAGES MODULE
+// ============================================================================
+
+/// Управляемые страницы: юридические, маркетинговые, лендинги, FAQ, системные
+model Page {
+  id              String         @id @default(cuid())
+  slug            String         @unique
+  title           String
+  type            PageType
+  status          PageStatus     @default(DRAFT)
+  visibility      PageVisibility @default(PUBLIC)
+  excerpt         String?
+  content         String?
+  seoTitle        String?
+  seoDescription  String?
+  ogImageUrl      String?
+  publishedAt     DateTime?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  createdById     String?
+  updatedById     String?
+  
+  // Relations
+  createdBy       User?          @relation("PageCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedBy       User?          @relation("PageUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@index([slug])
+  @@index([type])
+  @@index([status])
+  @@index([visibility])
+  @@index([publishedAt])
+  @@index([createdAt])
+  @@index([updatedAt])
+  @@index([type, status])
+  @@index([status, visibility])
+}
+
+enum PageType {
+  LEGAL       // Юридические: политика, оферта, условия
+  MARKETING   // Маркетинговые: для бизнеса, рекламодателям
+  LANDING     // Лендинги и промо-страницы
+  FAQ         // Часто задаваемые вопросы
+  SYSTEM      // Системные страницы
+  SEO         // SEO-страницы
+}
+
+enum PageStatus {
+  DRAFT       // Черновик
+  PUBLISHED   // Опубликовано
+  ARCHIVED    // Архив (soft delete)
+}
+
+enum PageVisibility {
+  PUBLIC      // Публичная (в sitemap, доступна всем)
+  PRIVATE     // Приватная (не показывать публично)
+  UNLISTED    // По прямой ссылке (не в sitemap)
 }

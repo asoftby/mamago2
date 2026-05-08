@@ -32,6 +32,11 @@ export interface CreateMediaAssetInput {
   caption?: string;
   sourceType: MediaSourceType;
   uploadedById?: string;
+  // TEMP media fields
+  status?: "TEMP" | "ACTIVE";
+  wizardSessionId?: string;
+  draftEntityId?: string;
+  draftEntityType?: string;
 }
 
 export interface UpdateMediaMetadataInput {
@@ -47,7 +52,7 @@ export async function createMediaAsset(input: CreateMediaAssetInput) {
   return prisma.mediaAsset.create({
     data: {
       kind: input.kind,
-      status: MediaAssetStatus.ACTIVE,
+      status: input.status === "TEMP" ? MediaAssetStatus.TEMP : MediaAssetStatus.ACTIVE,
       filename: input.filename,
       originalName: input.originalName,
       mimeType: input.mimeType,
@@ -64,6 +69,9 @@ export async function createMediaAsset(input: CreateMediaAssetInput) {
       caption: input.caption,
       sourceType: input.sourceType,
       uploadedById: input.uploadedById,
+      wizardSessionId: input.wizardSessionId,
+      draftEntityId: input.draftEntityId,
+      draftEntityType: input.draftEntityType,
     },
   });
 }
@@ -329,6 +337,7 @@ export async function recalculateAllOrphanedStatuses() {
 export async function getMediaStats() {
   const [
     total,
+    temp,
     active,
     orphaned,
     archived,
@@ -338,6 +347,7 @@ export async function getMediaStats() {
     bySource,
   ] = await Promise.all([
     prisma.mediaAsset.count(),
+    prisma.mediaAsset.count({ where: { status: MediaAssetStatus.TEMP } }),
     prisma.mediaAsset.count({ where: { status: MediaAssetStatus.ACTIVE } }),
     prisma.mediaAsset.count({ where: { status: MediaAssetStatus.ORPHANED } }),
     prisma.mediaAsset.count({ where: { status: MediaAssetStatus.ARCHIVED } }),
@@ -356,6 +366,7 @@ export async function getMediaStats() {
   return {
     total,
     byStatus: {
+      temp,
       active,
       orphaned,
       archived,
@@ -371,4 +382,104 @@ export async function getMediaStats() {
       return acc;
     }, {} as Record<string, number>),
   };
+}
+
+/**
+ * Commit TEMP media assets to ACTIVE status
+ * Called when wizard entity (Activity/Place) is published
+ */
+export async function commitTempMediaToActive(params: {
+  wizardSessionId?: string;
+  draftEntityId?: string;
+  draftEntityType?: string;
+}) {
+  const where: {
+    status: MediaAssetStatus;
+    wizardSessionId?: string;
+    draftEntityId?: string;
+    draftEntityType?: string;
+  } = {
+    status: MediaAssetStatus.TEMP,
+  };
+
+  if (params.wizardSessionId) {
+    where.wizardSessionId = params.wizardSessionId;
+  }
+  if (params.draftEntityId) {
+    where.draftEntityId = params.draftEntityId;
+  }
+  if (params.draftEntityType) {
+    where.draftEntityType = params.draftEntityType;
+  }
+
+  const result = await prisma.mediaAsset.updateMany({
+    where,
+    data: {
+      status: MediaAssetStatus.ACTIVE,
+      // Clear wizard session fields after commit
+      wizardSessionId: null,
+      draftEntityId: null,
+      draftEntityType: null,
+    },
+  });
+
+  console.log(`✅ [MEDIA] Committed ${result.count} TEMP media assets to ACTIVE`, params);
+
+  return result;
+}
+
+/**
+ * Clean up abandoned TEMP media assets
+ * Should be called by a cron job
+ */
+export async function cleanupAbandonedTempMedia(olderThanHours = 24) {
+  const cutoffDate = new Date();
+  cutoffDate.setHours(cutoffDate.getHours() - olderThanHours);
+
+  const tempMedia = await prisma.mediaAsset.findMany({
+    where: {
+      status: MediaAssetStatus.TEMP,
+      createdAt: {
+        lt: cutoffDate,
+      },
+    },
+    select: {
+      id: true,
+      storageKey: true,
+      publicUrl: true,
+      createdAt: true,
+    },
+  });
+
+  console.log(`🧹 [MEDIA] Found ${tempMedia.length} abandoned TEMP media assets older than ${olderThanHours}h`);
+
+  let deleted = 0;
+  for (const media of tempMedia) {
+    try {
+      // Delete file from storage
+      if (media.publicUrl) {
+        const filePath =
+          resolveStoredMediaPath(media.publicUrl) ??
+          resolveStoredMediaPath(media.storageKey) ??
+          resolveLegacyPublicUploadPath(media.publicUrl) ??
+          resolveLegacyPublicUploadPath(media.storageKey);
+        if (filePath && existsSync(filePath)) {
+          await unlink(filePath);
+        }
+      }
+
+      // Delete from database
+      await prisma.mediaAsset.delete({
+        where: { id: media.id },
+      });
+
+      deleted++;
+    } catch (error) {
+      console.error(`❌ [MEDIA] Failed to delete TEMP media ${media.id}:`, error);
+    }
+  }
+
+  console.log(`✅ [MEDIA] Cleaned up ${deleted} abandoned TEMP media assets`);
+
+  return { found: tempMedia.length, deleted };
 }

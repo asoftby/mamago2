@@ -8,11 +8,15 @@ import type { EventFormData } from "../types";
 interface Step9ReviewProps {
   data: EventFormData;
   isSubmitting: boolean;
+  submitStatus?: "idle" | "validating" | "submitting" | "success" | "error";
   onGoToStep?: (step: number) => void;
 }
 
-export function Step9Review({ data, isSubmitting, onGoToStep }: Step9ReviewProps) {
+export function Step9Review({ data, isSubmitting, submitStatus = "idle", onGoToStep }: Step9ReviewProps) {
   const submitValidation = validateForSubmit(data);
+  
+  // Don't show validation errors after successful submit
+  const showValidationErrors = submitStatus !== "success";
   
   // Build review sections from config
   const reviewSections = buildReviewSections(EVENT_WIZARD_STEPS, data, validateStep);
@@ -27,7 +31,7 @@ export function Step9Review({ data, isSubmitting, onGoToStep }: Step9ReviewProps
       </div>
 
       {/* Validation Status */}
-      {!submitValidation.isValid && (
+      {showValidationErrors && !submitValidation.isValid && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-4">
           <div className="flex items-start gap-3">
             <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
@@ -45,12 +49,23 @@ export function Step9Review({ data, isSubmitting, onGoToStep }: Step9ReviewProps
         </div>
       )}
 
-      {submitValidation.isValid && (
+      {showValidationErrors && submitValidation.isValid && (
         <div className="bg-green-50 border border-green-200 rounded-lg p-4">
           <div className="flex items-center gap-3">
             <CheckCircle2 className="w-5 h-5 text-green-600" />
             <p className="text-sm text-green-900 font-medium">
               Всё окей. Публикация готова к отправке!
+            </p>
+          </div>
+        </div>
+      )}
+      
+      {submitStatus === "success" && (
+        <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+          <div className="flex items-center gap-3">
+            <CheckCircle2 className="w-5 h-5 text-green-600" />
+            <p className="text-sm text-green-900 font-medium">
+              Событие успешно опубликовано!
             </p>
           </div>
         </div>
@@ -106,7 +121,7 @@ export function Step9Review({ data, isSubmitting, onGoToStep }: Step9ReviewProps
                 )}
               </div>
               
-              {onGoToStep && !section.isComplete && (
+              {onGoToStep && !section.isComplete && submitStatus !== "success" && (
                 <button
                   type="button"
                   onClick={() => onGoToStep(section.stepId)}

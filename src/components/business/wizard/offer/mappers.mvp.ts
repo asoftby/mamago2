@@ -57,7 +57,7 @@ export function buildOfferUpdatePayloadMVP(
     ...formData.featureSignals,
   ];
   
-  const payload: Record<string, any> = {
+  const payload: Record<string, unknown> = {
     kind: mapOfferKindToDbKind(formData.offerKind),
     title: formData.title,
     shortDescription: formData.description,
@@ -145,29 +145,44 @@ function mapApiCTATypeToForm(ctaType: string): string {
  * Map offer entity to form data (MVP)
  * For edit mode
  */
-export function mapOfferToFormDataMVP(offer: any): OfferFormDataMVP {
+export function mapOfferToFormDataMVP(offer: {
+  kind: string;
+  title?: string | null;
+  shortDescription?: string | null;
+  placeId?: string | null;
+  ageMinMonths?: number | null;
+  ageMaxMonths?: number | null;
+  discoverySignals?: Array<{ slug: string }> | null;
+  singlePrice?: string | null;
+  singlePriceLabel?: string | null;
+  ctaType: string;
+  phone?: string | null;
+  website?: string | null;
+  coverImage?: string | null;
+  gallery?: string[] | null;
+}): OfferFormDataMVP {
   // Extract signals by type
   const signals = offer.discoverySignals || [];
   
   const activitySignals = signals
-    .filter((s: any) => ["educational", "creative", "active", "calm", "entertainment", "social", "food"].includes(s.slug))
-    .map((s: any) => s.slug);
+    .filter((s) => ["educational", "creative", "active", "calm", "entertainment", "social", "food"].includes(s.slug))
+    .map((s) => s.slug);
   
   const formatSignals = signals
-    .filter((s: any) => ["indoor", "outdoor", "online", "hybrid"].includes(s.slug))
-    .map((s: any) => s.slug);
+    .filter((s) => ["indoor", "outdoor", "online", "hybrid"].includes(s.slug))
+    .map((s) => s.slug);
   
   const participationSignals = signals
-    .filter((s: any) => ["individual", "group", "family"].includes(s.slug))
-    .map((s: any) => s.slug);
+    .filter((s) => ["individual", "group", "family"].includes(s.slug))
+    .map((s) => s.slug);
   
   const intentionSignals = signals
-    .filter((s: any) => ["family-time", "active-time", "relax", "explore", "eat", "walk"].includes(s.slug))
-    .map((s: any) => s.slug);
+    .filter((s) => ["family-time", "active-time", "relax", "explore", "eat", "walk"].includes(s.slug))
+    .map((s) => s.slug);
   
   const featureSignals = signals
-    .filter((s: any) => ["free", "paid", "booking-required", "age-restricted"].includes(s.slug))
-    .map((s: any) => s.slug);
+    .filter((s) => ["free", "paid", "booking-required", "age-restricted"].includes(s.slug))
+    .map((s) => s.slug);
   
   return {
     offerKind: mapDbKindToOfferKind(offer.kind),
@@ -183,7 +198,7 @@ export function mapOfferToFormDataMVP(offer: any): OfferFormDataMVP {
     featureSignals,
     priceFrom: offer.singlePrice ? parseFloat(offer.singlePrice) : null,
     priceText: offer.singlePriceLabel || "",
-    ctaType: mapApiCTATypeToForm(offer.ctaType) as any,
+    ctaType: mapApiCTATypeToForm(offer.ctaType) as OfferFormDataMVP["ctaType"],
     ctaPhone: offer.phone || "",
     ctaLink: offer.website || "",
     coverImage: offer.coverImage || null,

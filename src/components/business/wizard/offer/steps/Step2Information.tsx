@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { ChipsRow, type ChipItem } from "@/components/ui/chips-row";
 import { AGE_OPTIONS } from "@/lib/config/ages";
+import { RichDescriptionEditor } from "@/components/editor/RichDescriptionEditor";
 import type { OfferFormData } from "../types";
 import { StructuredDiscoverySignalPicker } from "../../shared/StructuredDiscoverySignalPicker";
 import { SignalEntityType } from "@prisma/client";
@@ -23,6 +24,10 @@ export function Step2Information({ data, onChange, isEditable }: Step2Informatio
 
   const handleDescriptionChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     onChange({ shortDescription: e.target.value });
+  };
+
+  const handleFullDescriptionChange = (html: string) => {
+    onChange({ description: html });
   };
 
   const handleAgeGroupsChange = (ageKey: string) => {
@@ -84,6 +89,23 @@ export function Step2Information({ data, onChange, isEditable }: Step2Informatio
             {remainingChars} символов осталось
           </p>
         </div>
+      </div>
+
+      {/* Full Description */}
+      <div className="space-y-2">
+        <Label>
+          Подробное описание <span className="text-red-500">*</span>
+        </Label>
+        <RichDescriptionEditor
+          value={data.description || ""}
+          onChange={handleFullDescriptionChange}
+          placeholder="Расскажите подробнее о предложении — что входит, как проходит, что особенного..."
+          disabled={!isEditable}
+          minHeight={200}
+        />
+        <p className="text-xs text-muted-foreground">
+          Полное описание для страницы предложения. Используйте форматирование для лучшей читаемости.
+        </p>
       </div>
 
       {/* Age Groups */}

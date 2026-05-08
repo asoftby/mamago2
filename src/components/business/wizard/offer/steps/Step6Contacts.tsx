@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
 import { Plus, Trash2 } from "lucide-react";
+import { InternationalPhoneInput } from "@/components/phone/InternationalPhoneInput";
 import type { OfferFormData, SocialLink } from "../types";
 
 interface Step6ContactsProps {
@@ -17,10 +18,6 @@ interface Step6ContactsProps {
 }
 
 export function Step6Contacts({ data, onChange, isEditable }: Step6ContactsProps) {
-  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    onChange({ phone: e.target.value });
-  };
-
   const handleWebsiteChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     onChange({ website: e.target.value });
   };
@@ -69,12 +66,11 @@ export function Step6Contacts({ data, onChange, isEditable }: Step6ContactsProps
       {/* Phone */}
       <div className="space-y-2">
         <Label htmlFor="phone">Телефон</Label>
-        <Input
+        <InternationalPhoneInput
           id="phone"
-          type="tel"
-          placeholder="+375 29 123-45-67"
           value={data.phone}
-          onChange={handlePhoneChange}
+          onChange={(value) => onChange({ phone: value })}
+          placeholder="+375 29 123 45 67"
           disabled={!isEditable}
         />
         <p className="text-xs text-muted-foreground">

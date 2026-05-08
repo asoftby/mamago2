@@ -15,11 +15,13 @@ import {
   needsRevisionActivity,
   rejectActivity,
 } from "@/server/services/moderation.service";
+import { createPublishTimer, runAfterPublishResponse } from "@/server/utils/publishPipeline";
 
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const timer = createPublishTimer("publish:event");
   try {
     const { id } = await params;
     const user = await getCurrentUser();
@@ -50,6 +52,7 @@ export async function POST(
         case "NEEDS_REVISION": await needsRevisionActivity(id, user.id, comment); break;
         case "REJECT":         await rejectActivity(id, user.id, comment); break;
       }
+      timer.mark("status");
     } catch (serviceError) {
       return NextResponse.json(
         { error: serviceError instanceof Error ? serviceError.message : "Moderation failed" },
@@ -57,10 +60,15 @@ export async function POST(
       );
     }
 
-    revalidatePath("/admin/moderation/events");
-    revalidatePath("/admin/content/events");
+    runAfterPublishResponse("publish:event", "admin moderation revalidate", () => {
+      revalidatePath("/admin/moderation/events");
+      revalidatePath("/admin/content/events");
+    });
+    timer.mark("response");
+    timer.log({ action });
     return NextResponse.json({ success: true, action });
   } catch (error) {
+    timer.log({ error: 1 });
     console.error("Activity moderation error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }

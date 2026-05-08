@@ -4,7 +4,7 @@ import { getSiteHeaderVariant } from "./siteHeaderVariant";
 
 assert.equal(getSiteHeaderVariant("/minsk"), "discovery");
 assert.equal(getSiteHeaderVariant("/minsk/events"), "discovery");
-assert.equal(getSiteHeaderVariant("/minsk/events/master-klass"), "landing");
+assert.equal(getSiteHeaderVariant("/minsk/events/master-klass"), "discovery");
 
 assert.equal(getSiteHeaderVariant("/me/ideas"), "discovery");
 assert.equal(getSiteHeaderVariant("/admin"), "discovery");

@@ -6,6 +6,7 @@ import { findOfferBySlug } from "@/lib/slug/offerSlugService";
 import { buildOfferJsonLd } from "@/lib/seo/schema/buildOfferJsonLd";
 import { AnalyticsDetailBeacon } from "@/components/analytics/AnalyticsDetailBeacon";
 import { buildOgMeta } from "@/lib/seo/buildOgMeta";
+import { RichContentRenderer } from "@/components/content/RichContentRenderer";
 
 interface OfferPageProps {
   params: Promise<{ slug: string }>;
@@ -163,9 +164,9 @@ export default async function OfferPage({ params }: OfferPageProps) {
             </p>
           )}
           {offer.description && (
-            <p className="mt-4 text-base text-foreground/80 whitespace-pre-wrap">
-              {offer.description}
-            </p>
+            <div className="mt-4">
+              <RichContentRenderer html={offer.description} />
+            </div>
           )}
         </div>
 

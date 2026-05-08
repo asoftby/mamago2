@@ -38,6 +38,7 @@ import { ArticleBlocksEditor, ArticleTocToggle } from "@/components/admin/public
 import { useHydrated } from "@/hooks/use-hydrated";
 import { useUnsavedChangesNavigationGuard } from "@/hooks/use-unsaved-changes-navigation-guard";
 import { PlaceLinkedContactsEditor } from "@/components/admin/publications/PlaceLinkedContactsEditor";
+import { createClientSavePerf } from "@/lib/perf/clientSavePerf";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -288,11 +289,16 @@ export function NewsPublicationEditor({
       try {
         const body = breakingNewsRequestBody();
         if (!hasPersistedId) {
+          const perf = createClientSavePerf("save-article:client", {
+            endpoint: "/api/admin/articles",
+            payload: body,
+          });
           const res = await fetch("/api/admin/articles", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(body),
           });
+          perf.log({ status: res.status, mode: "create-draft" });
           const data = await res.json().catch(() => ({}));
           if (!res.ok) {
             const msg =
@@ -308,15 +314,19 @@ export function NewsPublicationEditor({
             toast.success("Черновик сохранён");
           }
           router.replace(`/admin/content/publications/new?type=news&id=${encodeURIComponent(snap.id)}`);
-          router.refresh();
           return true;
         }
 
+        const perf = createClientSavePerf("save-article:client", {
+          endpoint: `/api/admin/articles/${articleId}`,
+          payload: body,
+        });
         const res = await fetch(`/api/admin/articles/${articleId}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
         });
+        perf.log({ status: res.status, mode: "save-draft" });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) {
           const msg =
@@ -331,7 +341,6 @@ export function NewsPublicationEditor({
         if (!opts?.silent) {
           toast.success("Черновик сохранён");
         }
-        router.refresh();
         return true;
       } catch (e) {
         toast.error(e instanceof Error ? e.message : "Ошибка сохранения");
@@ -355,11 +364,16 @@ export function NewsPublicationEditor({
       let id = articleId?.trim() ?? "";
       if (!id) {
         const body = breakingNewsRequestBody();
+        const perf = createClientSavePerf("save-article:client", {
+          endpoint: "/api/admin/articles",
+          payload: body,
+        });
         const res = await fetch("/api/admin/articles", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
         });
+        perf.log({ status: res.status, mode: "create-before-submit" });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) {
           const msg =
@@ -377,6 +391,12 @@ export function NewsPublicationEditor({
         if (!ok) return;
       }
 
+      const submitPerf = createClientSavePerf("publish-article:client", {
+        endpoint: isAdminEditor
+          ? `/api/admin/articles/${id}/moderate`
+          : `/api/admin/articles/${id}/submit`,
+        payload: isAdminEditor ? { decision: "publish" } : undefined,
+      });
       const res = isAdminEditor
         ? await fetch(`/api/admin/articles/${id}/moderate`, {
             method: "POST",
@@ -384,6 +404,7 @@ export function NewsPublicationEditor({
             body: JSON.stringify({ decision: "publish" }),
           })
         : await fetch(`/api/admin/articles/${id}/submit`, { method: "POST" });
+      submitPerf.log({ status: res.status, mode: isAdminEditor ? "publish" : "submit" });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         const msg =
@@ -395,14 +416,11 @@ export function NewsPublicationEditor({
         toast.error(msg);
         return;
       }
-      const refresh = await fetch(`/api/admin/articles/${id}`);
-      if (refresh.ok) {
-        const snap = (await refresh.json()) as ArticleEditorSnapshot;
-        applySnapshot(snap);
+      if (data && typeof data === "object" && "id" in data) {
+        applySnapshot(data as ArticleEditorSnapshot);
       }
       toast.success(isAdminEditor ? "Опубликовано" : "Отправлено на модерацию");
       router.replace(`/admin/content/publications/new?type=news&id=${encodeURIComponent(id)}`);
-      router.refresh();
     } finally {
       setSubmitting(false);
       setActionsBusy(false);
@@ -416,11 +434,16 @@ export function NewsPublicationEditor({
       let id = articleId?.trim() ?? "";
       if (!id) {
         const body = breakingNewsRequestBody();
+        const perf = createClientSavePerf("save-article:client", {
+          endpoint: "/api/admin/articles",
+          payload: body,
+        });
         const res = await fetch("/api/admin/articles", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
         });
+        perf.log({ status: res.status, mode: "create-before-moderate" });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) {
           toast.error(typeof data.error === "string" ? data.error : "Не удалось создать публикацию");
@@ -434,24 +457,26 @@ export function NewsPublicationEditor({
         if (!ok) return;
       }
 
+      const moderatePerf = createClientSavePerf("publish-article:client", {
+        endpoint: `/api/admin/articles/${id}/moderate`,
+        payload: { decision: action },
+      });
       const res = await fetch(`/api/admin/articles/${id}/moderate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ decision: action }),
       });
+      moderatePerf.log({ status: res.status, mode: action });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         toast.error(typeof data.error === "string" ? data.error : "Не удалось выполнить действие");
         return;
       }
-      const refresh = await fetch(`/api/admin/articles/${id}`);
-      if (refresh.ok) {
-        const snap = (await refresh.json()) as ArticleEditorSnapshot;
-        applySnapshot(snap);
+      if (data && typeof data === "object" && "id" in data) {
+        applySnapshot(data as ArticleEditorSnapshot);
       }
       toast.success(action === "publish" ? "Публикация одобрена" : "Публикация отклонена");
       router.replace(`/admin/content/publications/new?type=news&id=${encodeURIComponent(id)}`);
-      router.refresh();
     } finally {
       setModerating(false);
       setActionsBusy(false);

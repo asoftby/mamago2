@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { MapPin, Phone, Globe, Instagram, Clock } from "lucide-react";
 import { sortAgeKeys } from "@/lib/config/ages";
 import { getCategoryLabel } from "@/lib/placeCategoryLabels";
+import { getFormatLabel } from "@/lib/placeChips";
 
 interface PlacePreviewCardProps {
   place: {
@@ -122,7 +123,7 @@ export function PlacePreviewCard({ place }: PlacePreviewCardProps) {
             <div className="flex flex-wrap gap-2">
               {place.visitFormats.map((format, idx) => (
                 <Badge key={idx} className="bg-green-50 text-green-700">
-                  {format}
+                  {getFormatLabel(format)}
                 </Badge>
               ))}
             </div>

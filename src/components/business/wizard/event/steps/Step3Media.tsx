@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import {
   Check,
   GripVertical,
@@ -59,10 +59,18 @@ interface GalleryItem {
 type PickerItem = {
   id: string;
   publicUrl: string | null;
+  thumbnailUrl?: string | null;
   alt: string | null;
   title: string | null;
   fromEntity?: boolean;
   showImportBadge?: boolean;
+};
+
+type NormalizedMediaImage = {
+  id: string;
+  url: string;
+  thumbnailUrl?: string | null;
+  alt?: string | null;
 };
 
 type ImportedMedia = {
@@ -71,6 +79,55 @@ type ImportedMedia = {
 };
 
 type MediaStatus = "loading" | "loaded" | "empty";
+
+/**
+ * Get preview URL from media asset
+ * Handles various URL formats and ensures proper path
+ */
+function getMediaAssetPreviewUrl(asset: {
+  publicUrl?: string | null;
+  url?: string | null;
+  fileUrl?: string | null;
+  imageUrl?: string | null;
+  thumbnailUrl?: string | null;
+  path?: string | null;
+  id?: string;
+}): string {
+  const url =
+    asset.thumbnailUrl ||
+    asset.publicUrl ||
+    asset.url ||
+    asset.fileUrl ||
+    asset.imageUrl ||
+    asset.path ||
+    "";
+
+  if (!url) {
+    // `/api/media/:id` is served by the file proxy and supports MediaAsset id lookup.
+    if (asset.id) {
+      return `/api/media/${encodeURIComponent(asset.id)}`;
+    }
+    return "";
+  }
+
+  // If it's a relative path without leading slash, add it
+  if (!url.startsWith("/") && !url.startsWith("http://") && !url.startsWith("https://")) {
+    return `/${url}`;
+  }
+
+  return url;
+}
+
+function normalizeMediaImage(asset: PickerItem): NormalizedMediaImage | null {
+  const url = getMediaAssetPreviewUrl(asset);
+  if (!url) return null;
+  return {
+    id: asset.id,
+    url,
+    thumbnailUrl: asset.thumbnailUrl ?? null,
+    alt: asset.alt,
+  };
+}
 
 function ImportBadge({ className }: { className?: string }) {
   return (
@@ -206,10 +263,12 @@ export function Step3Media({
   data,
   onChange,
   isEditable,
-  wizardSessionId: _wizardSessionId,
   eventId,
 }: Step3MediaProps) {
-  const [coverPreview, setCoverPreview] = useState<string | null>(null);
+  const [coverPreview, setCoverPreview] = useState<string | null>(() =>
+    data.coverImage ? getMediaAssetPreviewUrl({ id: data.coverImage }) : null,
+  );
+  const [coverPreviewUnavailable, setCoverPreviewUnavailable] = useState(false);
   const [isUploadingCover, setIsUploadingCover] = useState(false);
   const [isDraggingCover, setIsDraggingCover] = useState(false);
   const [galleryItems, setGalleryItems] = useState<GalleryItem[]>([]);
@@ -259,16 +318,33 @@ export function Step3Media({
 
   useEffect(() => {
     if (!hasInitialized.current && data.gallery.length > 0) {
-      setGalleryItems(
-        data.gallery.map((id) => ({
-          id,
-          url: `/api/media/${id}`,
-          status: "done" as const,
-        })),
-      );
+      const items = data.gallery.map((id) => ({
+        id,
+        url: getMediaAssetPreviewUrl({ id }),
+        status: "done" as const,
+      }));
+      setGalleryItems(items);
       hasInitialized.current = true;
     }
   }, [data.gallery]);
+
+  useEffect(() => {
+    if (data.coverImage) {
+      const previewUrl = getMediaAssetPreviewUrl({ id: data.coverImage });
+      setCoverPreview((current) => {
+        if (current !== previewUrl) {
+          return previewUrl;
+        }
+        return current;
+      });
+    } else if (!data.coverImage && coverPreview) {
+      setCoverPreview(null);
+    }
+  }, [data.coverImage, coverPreview]);
+
+  useEffect(() => {
+    setCoverPreviewUnavailable(false);
+  }, [coverPreview, data.coverImage]);
 
   useEffect(() => {
     setIsMounted(true);
@@ -324,7 +400,10 @@ export function Step3Media({
     return () => { cancelled = true; };
   }, [eventId]);
 
-  const sourceImageUrls = [...new Set([importedMedia.coverUrl, ...importedMedia.galleryUrls].filter(Boolean))] as string[];
+  const sourceImageUrls = useMemo(
+    () => [...new Set([importedMedia.coverUrl, ...importedMedia.galleryUrls].filter(Boolean))] as string[],
+    [importedMedia.coverUrl, importedMedia.galleryUrls],
+  );
   const hasImportedSourceImages = sourceImageUrls.length > 0;
   const importedCoverCandidateUrl = importedMedia.coverUrl ?? sourceImageUrls[0] ?? null;
   const importedGalleryCandidates = sourceImageUrls.filter((url) => url !== importedCoverCandidateUrl);
@@ -432,7 +511,7 @@ export function Step3Media({
   };
 
   const togglePickerSelection = (item: PickerItem) => {
-    if (!item.publicUrl) return;
+    if (!normalizeMediaImage(item)) return;
     if (pickerMode === "cover") {
       setPickerSelection(new Set([item.id]));
       return;
@@ -447,7 +526,10 @@ export function Step3Media({
   };
 
   const applyPickerSelection = () => {
-    const selectedItems = pickerItems.filter((item) => pickerSelection.has(item.id) && item.publicUrl);
+    const selectedItems = pickerItems
+      .filter((item) => pickerSelection.has(item.id))
+      .map((item) => ({ raw: item, normalized: normalizeMediaImage(item) }))
+      .filter((item): item is { raw: PickerItem; normalized: NormalizedMediaImage } => item.normalized !== null);
     if (selectedItems.length === 0) {
       toast.message("Выберите изображение");
       return;
@@ -455,8 +537,9 @@ export function Step3Media({
 
     if (pickerMode === "cover") {
       const first = selectedItems[0];
-      onChange({ coverImage: first.id });
-      setCoverPreview(first.publicUrl);
+      onChange({ coverImage: first.raw.id });
+      setCoverPreview(first.normalized.url);
+      setCoverPreviewUnavailable(false);
       setPickerOpen(false);
       toast.success("Главное изображение выбрано");
       return;
@@ -466,10 +549,10 @@ export function Step3Media({
       const merged = [
         ...prev,
         ...selectedItems
-          .filter((item) => !prev.some((row) => row.id === item.id))
+          .filter((item) => !prev.some((row) => row.id === item.raw.id))
           .map((item) => ({
-            id: item.id,
-            url: item.publicUrl!,
+            id: item.raw.id,
+            url: item.normalized.url,
             status: "done" as const,
           })),
       ];
@@ -487,6 +570,7 @@ export function Step3Media({
     try {
       const cover = await importRemoteImage(url);
       setCoverPreview(cover.publicUrl);
+      setCoverPreviewUnavailable(false);
       setImportedAssetSourceById((prev) => ({ ...prev, [cover.mediaId]: cover.sourceUrl }));
       setImportedMediaIdBySourceUrl((prev) => ({ ...prev, [cover.sourceUrl]: cover.mediaId }));
       setChosenImportedCoverUrl(url);
@@ -575,6 +659,7 @@ export function Step3Media({
 
       const filename = uploadedImage.url.split("/").pop() || uploadedImage.id;
       setCoverPreview(uploadedImage.url);
+      setCoverPreviewUnavailable(false);
       onChange({ coverImage: filename });
       toast.success("Обложка загружена");
     } catch (error) {
@@ -647,6 +732,7 @@ export function Step3Media({
         });
       }
       setCoverPreview(null);
+      setCoverPreviewUnavailable(false);
       onChange({ coverImage: null });
       return;
     }
@@ -842,12 +928,40 @@ export function Step3Media({
             ) : coverPreview || data.coverImage ? (
               <div className="space-y-4">
                 <div className="relative inline-block">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={coverPreview || `/api/media/${data.coverImage}`}
-                    alt="Cover preview"
-                    className="mx-auto h-40 w-40 rounded-lg object-cover"
-                  />
+                  {(() => {
+                    const previewUrl =
+                      coverPreview || (data.coverImage ? getMediaAssetPreviewUrl({ id: data.coverImage }) : "");
+
+                    if (!previewUrl || coverPreviewUnavailable) {
+                      return (
+                        <div className="mx-auto flex h-40 w-40 flex-col items-center justify-center rounded-lg border-2 border-dashed border-amber-300 bg-amber-50 p-4 text-center">
+                          <p className="text-xs font-medium text-amber-900">
+                            Изображение недоступно
+                          </p>
+                          <p className="mt-1 text-[10px] text-amber-700">
+                            Выберите другое изображение из медиатеки или загрузите новый файл.
+                          </p>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={previewUrl}
+                        alt="Cover preview"
+                        className="mx-auto h-40 w-40 rounded-lg object-cover"
+                        onError={() => {
+                          console.error("[EventWizardMedia] Cover image failed to load", {
+                            src: previewUrl,
+                            coverPreview,
+                            coverImage: data.coverImage,
+                          });
+                          setCoverPreviewUnavailable(true);
+                        }}
+                      />
+                    );
+                  })()}
                   {isEditable ? (
                     <button
                       onClick={(e) => {
@@ -1037,7 +1151,8 @@ export function Step3Media({
               <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
                 {pickerItems.map((item) => {
                   const selected = pickerSelection.has(item.id);
-                  const interactive = Boolean(item.publicUrl);
+                  const normalized = normalizeMediaImage(item);
+                  const interactive = Boolean(normalized);
                   return (
                     <button
                       key={item.id}
@@ -1050,9 +1165,9 @@ export function Step3Media({
                       )}
                       onClick={() => togglePickerSelection(item)}
                     >
-                      {item.publicUrl ? (
+                      {normalized ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={item.publicUrl} alt="" className="h-full w-full object-cover transition group-hover:opacity-90" />
+                        <img src={normalized.url} alt={normalized.alt ?? ""} className="h-full w-full object-cover transition group-hover:opacity-90" />
                       ) : null}
                       {selected ? (
                         <div className="absolute inset-0 flex items-center justify-center bg-primary/20">

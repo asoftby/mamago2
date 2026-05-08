@@ -1,7 +1,7 @@
 import type { PrismaClient } from "@prisma/client";
 import { SEARCH_BOOST } from "@/lib/search/constants";
 import { articleMetaLine } from "@/lib/search/metaLines";
-import { buildSearchText } from "@/lib/search/sanitizeSearchText";
+import { buildSearchText, summarizeForSearchCard } from "@/lib/search/sanitizeSearchText";
 import type { SearchDocUpsertFields } from "./buildActivityDocument";
 
 export async function buildArticleDocument(
@@ -25,6 +25,7 @@ export async function buildArticleDocument(
   const slug = article.slug?.trim();
   const urlPath = slug ? `/blog/${slug}` : `/blog/${article.id}`;
   const metaLine = articleMetaLine(article.publishedAt);
+  const summaryLine = summarizeForSearchCard(article.subtitle ?? article.excerpt);
   const isPublished = article.status === "PUBLISHED" && Boolean(slug);
 
   return {
@@ -32,6 +33,7 @@ export async function buildArticleDocument(
     entityId: article.id,
     title: article.title,
     searchText: searchText || article.title,
+    summaryLine,
     metaLine,
     imageUrl: article.heroImage,
     urlPath,

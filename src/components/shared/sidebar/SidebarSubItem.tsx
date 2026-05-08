@@ -12,7 +12,7 @@ interface SidebarSubItemProps {
 }
 
 export function SidebarSubItem({ href, label, isActive, onClick, count }: SidebarSubItemProps) {
-  const handleClick = (e: React.MouseEvent) => {
+  const handleClick = () => {
     // Call onClick immediately before navigation
     if (onClick) {
       onClick();
@@ -32,7 +32,7 @@ export function SidebarSubItem({ href, label, isActive, onClick, count }: Sideba
           : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
       )}
     >
-      <span>{label}</span>
+      <span className={isActive ? "font-semibold" : undefined}>{label}</span>
       {count !== undefined && count > 0 && (
         <span className="flex items-center justify-center min-w-[20px] h-5 px-1.5 bg-red-500 text-white text-xs font-semibold rounded-full">
           {count > 99 ? '99+' : count}

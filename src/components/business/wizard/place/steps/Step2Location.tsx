@@ -1,6 +1,7 @@
 "use client";
 
 import { PlaceLocationPicker } from "@/components/business/place/PlaceLocationPicker";
+import { GoogleReviewsSync } from "@/components/place/GoogleReviewsSync";
 import type { PlaceFormData } from "../types";
 
 interface Step2LocationProps {
@@ -37,6 +38,18 @@ export function Step2Location({ data, onChange, isEditable = true }: Step2Locati
         onUpdate={onChange}
         disabled={!isEditable}
       />
+      
+      {/* Google Reviews Sync - только для существующих мест */}
+      {data.id && (
+        <GoogleReviewsSync
+          placeId={data.id}
+          googlePlaceId={data.googlePlaceId}
+          googleRating={data.googleRating}
+          googleUserRatingsTotal={data.googleUserRatingsTotal}
+          googleReviewsSyncedAt={data.googleReviewsSyncedAt}
+          googleMapsUri={data.googleMapsUri}
+        />
+      )}
     </div>
   );
 }

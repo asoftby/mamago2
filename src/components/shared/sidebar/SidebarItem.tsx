@@ -23,7 +23,7 @@ export function SidebarItem({
   onClick,
   hasAttention = false,
 }: SidebarItemProps) {
-  const handleClick = (e: React.MouseEvent) => {
+  const handleClick = () => {
     // Call onClick immediately before navigation
     if (onClick) {
       onClick();
@@ -61,7 +61,7 @@ export function SidebarItem({
       className={cn(
         "flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-medium transition-all duration-150",
         isActive
-          ? "bg-gray-100 text-gray-900"
+          ? "bg-primary/10 text-stone-950"
           : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
       )}
     >
@@ -69,9 +69,14 @@ export function SidebarItem({
         {hasAttention && (
           <span className="mb-[3px] w-1 h-1 bg-red-500 rounded-full flex-shrink-0" />
         )}
-        <Icon className="w-5 h-5 flex-shrink-0" />
+        <Icon
+          className={cn(
+            "w-5 h-5 flex-shrink-0",
+            isActive ? "text-primary" : "text-current"
+          )}
+        />
       </div>
-      <span>{label}</span>
+      <span className={isActive ? "font-semibold" : undefined}>{label}</span>
     </Link>
   );
 }

@@ -36,3 +36,20 @@ export function buildSearchText(parts: (string | null | undefined)[]): string {
   }
   return out.join("\n").trim();
 }
+
+const SUMMARY_MAX_LEN = 180;
+
+/** Plain-text snippet for search result cards; null if nothing usable. */
+export function summarizeForSearchCard(
+  text: string | null | undefined,
+  maxLen = SUMMARY_MAX_LEN,
+): string | null {
+  if (text == null) return null;
+  const t = stripHtml(String(text)).replace(/\s+/g, " ").trim();
+  if (!t) return null;
+  if (t.length <= maxLen) return t;
+  const slice = t.slice(0, maxLen).trimEnd();
+  const cut = slice.lastIndexOf(" ");
+  const base = cut > maxLen * 0.55 ? slice.slice(0, cut) : slice;
+  return `${base}…`;
+}

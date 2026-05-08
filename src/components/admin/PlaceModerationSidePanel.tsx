@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { X } from "lucide-react";
 import { formatAgeKeys } from "@/lib/config/ages";
 import { Textarea } from "@/components/ui/textarea";
+import { getFormatLabel } from "@/lib/placeChips";
 
 type PlaceDetail = {
   id: string;
@@ -390,7 +391,7 @@ export function PlaceModerationSidePanel({
                           Форматы:
                         </span>{" "}
                         <span className="text-sm text-gray-900">
-                          {place.visitFormats.join(", ")}
+                          {place.visitFormats.map(getFormatLabel).join(", ")}
                         </span>
                       </div>
                     )}

@@ -184,6 +184,8 @@ export function MobileSearchSheet({
   const prevIsOpenRef = useRef(false);
   /** Область прокрутки контента шита — сброс вверх при открытии, чтобы строка поиска была видна */
   const scrollRegionRef = useRef<HTMLDivElement>(null);
+  /** Длина запроса до последнего рендера — чтобы не терять выдачу из виду после scrollIntoView аккордеона. */
+  const prevSearchTrimLenRef = useRef(0);
   const prevIntentForAccordionRef = useRef<string | null>(null);
   const sectionRefs = useRef<
     Partial<Record<AccordionSection, HTMLDivElement | null>>
@@ -768,6 +770,22 @@ export function MobileSearchSheet({
     if (!isOpen) return;
     scrollRegionRef.current?.scrollTo(0, 0);
   }, [isOpen]);
+
+  /**
+   * После прокрутки к аккордеону «Когда / С кем» scrollTop остаётся большим; при вводе ≥2 символов
+   * аккордеоны скрываются и блок выдачи оказывается выше видимой области — показываем выдачу с начала.
+   */
+  useLayoutEffect(() => {
+    if (!isOpen) {
+      prevSearchTrimLenRef.current = 0;
+      return;
+    }
+    const len = searchText.trim().length;
+    if (len >= 2 && prevSearchTrimLenRef.current < 2) {
+      scrollRegionRef.current?.scrollTo(0, 0);
+    }
+    prevSearchTrimLenRef.current = len;
+  }, [isOpen, searchText]);
 
   /**
    * После «Далее» подводим следующую карточку (Когда / С кем).

@@ -4,6 +4,7 @@ import type { ReactElement } from "react";
 import MamagoWelcomeTemplate from "../../../../emails/mamago-welcome";
 import PasswordResetTemplate from "../templates/password-reset";
 import VerifyEmailTemplate from "../templates/verify-email";
+import BusinessInviteTemplate from "../templates/business-invite";
 import {
   buildPasswordResetUrl,
   buildVerifyEmailUrl,
@@ -48,7 +49,7 @@ function getReplyTo(): string {
   return replyTo;
 }
 
-type EmailKind = "verify-email" | "password-reset" | "welcome" | "notification";
+type EmailKind = "verify-email" | "password-reset" | "welcome" | "notification" | "business-invite";
 
 async function sendViaResend(
   kind: EmailKind,
@@ -240,6 +241,42 @@ export class EmailService {
       <MamagoWelcomeTemplate
         userName={params.userName ?? undefined}
         ctaUrl={params.ctaUrl}
+      />,
+    );
+  }
+
+  async sendBusinessInvite(params: {
+    to: string;
+    businessName: string;
+    inviterName?: string | null;
+    acceptUrl: string;
+    expiresInDays: number;
+  }): Promise<void> {
+    const debugTo = getDebugRedirectTo();
+    const actualTo = debugTo ?? params.to;
+
+    if (!isEmailEnabled()) {
+      console.warn("[email] ⚠️ SEND SKIPPED: EMAIL_ENABLED is not 'true'", {
+        kind: "business-invite",
+        intendedTo: params.to,
+        actualTo,
+        debugRedirect: Boolean(debugTo),
+        acceptUrl: params.acceptUrl,
+        subject: EMAIL_SUBJECTS.businessInvite,
+        hint: "Set EMAIL_ENABLED=true in .env to enable email delivery",
+      });
+      return;
+    }
+
+    await sendViaResend(
+      "business-invite",
+      params.to,
+      EMAIL_SUBJECTS.businessInvite,
+      <BusinessInviteTemplate
+        businessName={params.businessName}
+        inviterName={params.inviterName}
+        acceptUrl={params.acceptUrl}
+        expiresInDays={params.expiresInDays}
       />,
     );
   }

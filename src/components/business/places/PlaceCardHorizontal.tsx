@@ -15,13 +15,15 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Trash2, MapPin, Navigation, Archive, ArchiveRestore, AlertTriangle, Pencil } from "lucide-react";
-import { formatDistance } from "@/lib/formatDistance";
+import { Trash2, MapPin, Archive, ArchiveRestore, AlertTriangle, Pencil, BarChart3 } from "lucide-react";
 import { toast } from "@/lib/toast";
 import { Badge } from "@/components/ui/badge";
+import { getPlaceSearchAddressMetaLine } from "@/lib/placeLocationString";
 import { calculateUrgency } from "@/lib/improvementRequest/urgency";
-import { BusinessChip } from "@/components/business/ui/BusinessChip";
 import { CONTENT_STATUS_META } from "@/lib/content-status-meta";
+import { getCanonicalPublicAppUrl } from "@/lib/config/publicAppUrl";
+import { cn } from "@/lib/utils";
+import { PublicationStatisticsDialog } from "@/components/business/shared/PublicationStatisticsDialog";
 
 interface PlaceCardData {
   id: string;
@@ -31,28 +33,19 @@ interface PlaceCardData {
   status: ContentStatus;
   formattedAddr: string | null;
   customAddress: string | null;
+  slug: string | null;
+  floor?: string | null;
+  unit?: string | null;
+  unitLabel?: string | null;
   moderatorComment: string | null;
   revisionRequestedAt: Date | null;
   archivedAt?: Date | null;
   hasActiveImprovementRequests?: boolean;
-  city: {
+  city?: {
+    name: string;
     hasMetro: boolean;
     metroMaxDistanceM: number | null;
   } | null;
-  districtAuto: {
-    name: string;
-  } | null;
-  districtManual: {
-    name: string;
-  } | null;
-  metroAuto: {
-    name: string;
-  } | null;
-  metroAutoDistanceM: number | null;
-  metroManual: {
-    name: string;
-  } | null;
-  metroManualDistanceM: number | null;
   images: Array<{
     id: string;
     url: string;
@@ -72,8 +65,6 @@ interface PlaceCardData {
     dueAt: Date | null;
   }>;
   updatedAt: Date;
-  linkedEventsCount?: number;
-  linkedOffersCount?: number;
 }
 
 interface PlaceCardHorizontalProps {
@@ -83,26 +74,12 @@ interface PlaceCardHorizontalProps {
   onUnarchive?: (placeId: string) => void;
 }
 
-const REVISION_STATUS_CONFIG = {
-  DRAFT: {
-    label: "Редактирование изменений",
-    variant: "secondary" as const,
-  },
-  PENDING: {
-    label: "Изменения на проверке",
-    variant: "default" as const,
-  },
-  NEEDS_REVISION: {
-    label: "Требуются правки",
-    variant: "destructive" as const,
-  },
-};
-
 export function PlaceCardHorizontal({ place, onDelete, onArchive, onUnarchive }: PlaceCardHorizontalProps) {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showArchiveDialog, setShowArchiveDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isArchiving, setIsArchiving] = useState(false);
+  const [statisticsOpen, setStatisticsOpen] = useState(false);
 
   const statusConfig = CONTENT_STATUS_META[place.status];
   
@@ -149,7 +126,21 @@ export function PlaceCardHorizontal({ place, onDelete, onArchive, onUnarchive }:
   
   // Get display values
   const displayTitle = place.displayTitle || place.title || "Без названия";
-  const displayAddress = place.formattedAddr || place.customAddress || "Локация не задана";
+  const addressFormatted = getPlaceSearchAddressMetaLine({
+    city: place.city ? { name: place.city.name } : null,
+    shortAddress: place.shortAddress,
+    formattedAddr: place.formattedAddr,
+    customAddress: place.customAddress,
+    floor: place.floor,
+    unit: place.unit,
+    unitLabel: place.unitLabel,
+  });
+  const displayAddress =
+    addressFormatted !== "Место"
+      ? addressFormatted
+      : place.formattedAddr?.trim() ||
+        place.customAddress?.trim() ||
+        "Локация не задана";
   
   // Calculate days since revision request
   let daysSinceRevision: number | null = null;
@@ -165,28 +156,9 @@ export function PlaceCardHorizontal({ place, onDelete, onArchive, onUnarchive }:
     daysSinceRevision = Math.floor(diffMs / (1000 * 60 * 60 * 24));
   }
   
-  // District
-  const districtName = place.districtManual?.name ?? place.districtAuto?.name;
-  
-  // Metro (with distance and threshold check)
-  const metroName = place.metroManual?.name ?? place.metroAuto?.name;
-  const metroDistance = place.metroManualDistanceM ?? place.metroAutoDistanceM;
-  const cityHasMetro = place.city?.hasMetro ?? false;
-  const metroMaxDistance = place.city?.metroMaxDistanceM ?? 2500;
-  
-  const shouldShowMetro = 
-    metroName && 
-    metroDistance !== null && 
-    cityHasMetro && 
-    metroDistance <= metroMaxDistance;
-  
   // Cover image (logo or first gallery image)
   const coverImage = place.images.find(img => img.kind === "LOGO") || place.images[0];
-  const updatedLabel = new Intl.DateTimeFormat("ru-RU", {
-    day: "numeric",
-    month: "short",
-  }).format(new Date(place.updatedAt));
-  
+
   const handleDelete = async () => {
     if (!onDelete) return;
     
@@ -234,22 +206,42 @@ export function PlaceCardHorizontal({ place, onDelete, onArchive, onUnarchive }:
     }
   };
 
+  // Публичная карточка места на основном сайте (не на поддомене business)
+  const publicBase = getCanonicalPublicAppUrl().replace(/\/+$/, "");
+  const publicPath = place.slug?.trim()
+    ? `/places/${place.slug.trim()}`
+    : `/places/${place.id}`;
+  const publicPlaceHref = `${publicBase}${publicPath}`;
+  const actionButtonClass =
+    "inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-2xl px-3.5 text-sm font-medium transition-colors disabled:pointer-events-none disabled:opacity-50";
+  const neutralActionClass =
+    "border border-stone-200 bg-white text-stone-700 hover:border-stone-300 hover:bg-stone-50 hover:text-stone-950";
+  const iconActionClass =
+    "h-10 w-10 shrink-0 rounded-2xl p-0 text-stone-500 hover:bg-stone-100 hover:text-stone-900";
+  const placeMetrics = {
+    views: 0,
+    saves: 0,
+    planAdds: 0,
+    ctaClicks: 0,
+  };
+
   return (
     <>
-      <div className="group flex items-center gap-4 rounded-[26px] border border-stone-200/90 bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-all hover:border-stone-300 hover:shadow-[0_14px_32px_rgba(15,23,42,0.05)] md:p-5">
+      <div className="group flex flex-col gap-4 rounded-[26px] border border-stone-200/90 bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-all hover:border-stone-300 hover:shadow-[0_14px_32px_rgba(15,23,42,0.05)] md:flex-row md:items-center md:p-5">
         {/* Cover Image */}
-        <Link href={`/business/places/${place.id}/edit`} className="flex-shrink-0">
-          <div className="relative h-24 w-24 overflow-hidden rounded-[22px] bg-stone-100 ring-1 ring-stone-200/70">
+        <Link href={publicPlaceHref} className="flex-shrink-0 self-start md:self-center">
+          <div className="relative size-[86px] shrink-0 overflow-hidden rounded-full bg-stone-100 ring-1 ring-stone-200/70">
             {coverImage ? (
               <Image
                 src={coverImage.url}
                 alt={displayTitle}
                 fill
                 className="object-cover"
+                sizes="86px"
               />
             ) : (
               <div className="flex h-full w-full items-center justify-center text-stone-400">
-                <MapPin className="w-8 h-8" />
+                <MapPin className="h-7 w-7" />
               </div>
             )}
           </div>
@@ -257,7 +249,7 @@ export function PlaceCardHorizontal({ place, onDelete, onArchive, onUnarchive }:
 
         {/* Content */}
         <div className="flex-1 min-w-0">
-          <Link href={`/business/places/${place.id}/edit`}>
+          <Link href={publicPlaceHref}>
             <h3 className="truncate text-lg font-semibold text-stone-950 transition-colors hover:text-stone-700">
               {displayTitle}
             </h3>
@@ -314,93 +306,55 @@ export function PlaceCardHorizontal({ place, onDelete, onArchive, onUnarchive }:
             </div>
           )}
           
-          {/* Revision status badge for published places with active revisions */}
-          {hasActiveRevision && place.status === "PUBLISHED" && place.activeRevision && (
-            <div className="mt-2">
-              <span className={`inline-flex items-center rounded-full border px-3 py-1.5 text-xs font-medium ${
-                place.activeRevision.status === "DRAFT" 
-                  ? "border-blue-200 bg-blue-50 text-blue-700"
-                  : place.activeRevision.status === "PENDING"
-                  ? "border-amber-200 bg-amber-50 text-amber-700"
-                  : "border-yellow-200 bg-yellow-50 text-yellow-700"
-              }`}>
-                {REVISION_STATUS_CONFIG[place.activeRevision.status as keyof typeof REVISION_STATUS_CONFIG]?.label || place.activeRevision.status}
-              </span>
-            </div>
-          )}
-          
           {/* Inactivity warning for NEEDS_REVISION */}
           {daysSinceRevision !== null && (
             <p className="mt-1 text-xs text-amber-700">
               Отправлено на доработку {daysSinceRevision} {daysSinceRevision === 1 ? "день" : daysSinceRevision < 5 ? "дня" : "дней"} назад
             </p>
           )}
-          
-          {/* Geo Chips */}
-          {(districtName || shouldShowMetro) && (
-            <div className="flex items-center gap-2 mt-2 flex-wrap">
-              {districtName && (
-                <BusinessChip>
-                  <MapPin className="w-3 h-3" />
-                  {districtName}
-                </BusinessChip>
-              )}
-              
-              {shouldShowMetro && (
-                <BusinessChip tone="accent">
-                  <Navigation className="w-3 h-3" />
-                  {metroName} • {formatDistance(metroDistance)}
-                </BusinessChip>
-              )}
-            </div>
-          )}
-
-          <div className="mt-4 flex flex-wrap gap-2">
-            <BusinessChip>
-              Events: {place.linkedEventsCount ?? 0}
-            </BusinessChip>
-            <BusinessChip>
-              Offers: {place.linkedOffersCount ?? 0}
-            </BusinessChip>
-            <BusinessChip>
-              Обновлено {updatedLabel}
-            </BusinessChip>
-          </div>
         </div>
 
         {/* Actions */}
-        <div className="flex items-center gap-3 flex-shrink-0">
+        <div className="flex max-w-full flex-shrink-0 gap-2 overflow-x-auto pb-1 md:justify-end md:overflow-visible">
           {/* Archived Badge */}
           {place.archivedAt && (
-            <span className="rounded-full bg-stone-100 px-3 py-1.5 text-xs font-medium text-stone-500">
+            <span className="inline-flex h-10 shrink-0 items-center rounded-2xl bg-stone-100 px-3 text-xs font-medium text-stone-500">
               Архив
             </span>
           )}
 
-          {/* Edit Action (icon button) */}
+          <button
+            type="button"
+            onClick={() => setStatisticsOpen(true)}
+            className={cn(actionButtonClass, neutralActionClass)}
+          >
+            <BarChart3 className="h-4 w-4 shrink-0" />
+            Статистика
+          </button>
+
           {!place.archivedAt && displayStatus !== "PENDING" && (
-            <Link href={`/business/places/${place.id}/edit`}>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="rounded-2xl text-stone-400 hover:bg-stone-100 hover:text-stone-700"
-              >
-                <Pencil className="w-4 h-4" />
-              </Button>
+            <Link
+              href={`/business/places/${place.id}/edit`}
+              className={cn(actionButtonClass, neutralActionClass)}
+            >
+              <Pencil className="h-4 w-4 shrink-0" />
+              Редактировать
             </Link>
           )}
+
+          {/* Places cannot be promoted - only events and offers */}
 
           {/* Unarchive Action */}
           {place.archivedAt && onUnarchive && (
             <Button
-              variant="outline"
-              size="sm"
+              variant="ghost"
               onClick={handleUnarchive}
               disabled={isArchiving}
-              className="rounded-2xl border-stone-200 bg-white hover:bg-stone-50"
+              className={iconActionClass}
+              title="Восстановить"
+              aria-label="Восстановить"
             >
-              <ArchiveRestore className="w-4 h-4 mr-2" />
-              {isArchiving ? "Восстановление..." : "Восстановить"}
+              <ArchiveRestore className="h-4 w-4" />
             </Button>
           )}
 
@@ -408,11 +362,12 @@ export function PlaceCardHorizontal({ place, onDelete, onArchive, onUnarchive }:
           {!place.archivedAt && onArchive && place.status !== "DRAFT" && (
             <Button
                 variant="ghost"
-                size="sm"
                 onClick={() => setShowArchiveDialog(true)}
-                className="rounded-2xl text-stone-400 hover:bg-stone-100 hover:text-stone-700"
+                className={iconActionClass}
+                title="В архив"
+                aria-label="В архив"
               >
-              <Archive className="w-4 h-4" />
+              <Archive className="h-4 w-4" />
             </Button>
           )}
 
@@ -420,15 +375,24 @@ export function PlaceCardHorizontal({ place, onDelete, onArchive, onUnarchive }:
           {place.status === "DRAFT" && onDelete && !place.archivedAt && (
             <Button
                 variant="ghost"
-                size="sm"
                 onClick={() => setShowDeleteDialog(true)}
-                className="rounded-2xl text-stone-400 hover:bg-red-50 hover:text-red-600"
+                className="h-10 w-10 shrink-0 rounded-2xl p-0 text-stone-400 hover:bg-red-50 hover:text-red-600"
+                title="Удалить"
+                aria-label="Удалить"
               >
-              <Trash2 className="w-4 h-4" />
+              <Trash2 className="h-4 w-4" />
             </Button>
           )}
         </div>
       </div>
+
+      <PublicationStatisticsDialog
+        open={statisticsOpen}
+        onOpenChange={setStatisticsOpen}
+        title={displayTitle}
+        entityLabel="места"
+        metrics={placeMetrics}
+      />
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>

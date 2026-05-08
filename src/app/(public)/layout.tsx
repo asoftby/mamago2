@@ -1,10 +1,10 @@
 import React, { Suspense } from "react";
 import { SiteHeader } from "@/components/site/header";
 import { PublicLayoutBody } from "./PublicLayoutBody";
-import { CityProvider } from "@/contexts/CityContext";
 import { PublicationIntentProvider } from "@/contexts/PublicationIntentContext";
 import { RefinementFiltersProvider } from "@/contexts/RefinementFiltersContext";
 import { RefinementFiltersModalGlobal } from "@/components/discovery/RefinementFiltersModalGlobal";
+import { ReloadProbe } from "@/components/dev/ReloadProbe";
 
 export default function PublicGroupLayout({
   children,
@@ -13,20 +13,19 @@ export default function PublicGroupLayout({
 }) {
   return (
     <RefinementFiltersProvider>
-      <CityProvider>
-        <PublicationIntentProvider>
-          <div className="flex min-h-screen flex-col bg-white">
-            <SiteHeader />
+      <ReloadProbe />
+      <PublicationIntentProvider>
+        <div className="flex min-h-screen flex-col bg-white">
+          <SiteHeader />
 
-            <PublicLayoutBody>{children}</PublicLayoutBody>
+          <PublicLayoutBody>{children}</PublicLayoutBody>
 
-            {/* Global Refinement Modal */}
-            <Suspense fallback={null}>
-              <RefinementFiltersModalGlobal />
-            </Suspense>
-          </div>
-        </PublicationIntentProvider>
-      </CityProvider>
+          {/* Global Refinement Modal */}
+          <Suspense fallback={null}>
+            <RefinementFiltersModalGlobal />
+          </Suspense>
+        </div>
+      </PublicationIntentProvider>
     </RefinementFiltersProvider>
   );
 }

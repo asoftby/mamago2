@@ -47,13 +47,6 @@ export async function POST(req: NextRequest) {
     return jsonValidationError(parsed.error);
   }
 
-  if (!parsed.data.name) {
-    return NextResponse.json(
-      { error: "Validation error", details: { fieldErrors: { name: ["Name is required"] } } },
-      { status: 422 },
-    );
-  }
-
   try {
     const template = await createTemplate({
       name: parsed.data.name,

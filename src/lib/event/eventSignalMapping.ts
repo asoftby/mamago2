@@ -1,3 +1,5 @@
+import type { PrismaClient } from "@prisma/client";
+
 /**
  * Event Signal Mapping
  * 
@@ -349,7 +351,7 @@ export function getSuggestedEventSignals(
  */
 export async function resolveSignalSlugsToIds(
   slugs: string[],
-  prisma: any
+  prisma: Pick<PrismaClient, "signalDefinition">
 ): Promise<string[]> {
   if (slugs.length === 0) return [];
 
@@ -373,7 +375,7 @@ export async function resolveSignalSlugsToIds(
 export async function getSuggestedEventSignalIds(
   categorySlug: string | null,
   genreSlugs: string[] = [],
-  prisma: any
+  prisma: Pick<PrismaClient, "signalDefinition">
 ): Promise<string[]> {
   const suggested = getSuggestedEventSignals(categorySlug, genreSlugs);
 
@@ -392,7 +394,7 @@ export async function getSuggestedEventSignalIds(
  */
 export async function validateEventSignals(
   signalIds: string[],
-  prisma: any
+  prisma: Pick<PrismaClient, "signalDefinition">
 ): Promise<{ valid: boolean; error?: string }> {
   if (signalIds.length === 0) {
     return { valid: true };
@@ -420,11 +422,11 @@ export async function validateEventSignals(
   }
 
   // Проверяем статус
-  const inactiveSignals = signals.filter((s: any) => s.status !== "ACTIVE");
+  const inactiveSignals = signals.filter((s) => s.status !== "ACTIVE");
   if (inactiveSignals.length > 0) {
     return {
       valid: false,
-      error: `Signals не активны: ${inactiveSignals.map((s: any) => s.slug).join(", ")}`,
+      error: `Signals не активны: ${inactiveSignals.map((s) => s.slug).join(", ")}`,
     };
   }
 

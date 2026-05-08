@@ -3,6 +3,7 @@ import type { PlaceFormData, PlaceImage } from "./types";
 import { getDefaultFormData } from "./defaults";
 import { mapToUIState } from "@/lib/openingHours";
 import type { OpeningHoursWithRelations } from "@/server/services/openingHours/openingHours.types";
+import { normalizeVisitFormats } from "@/hooks/useVisitFormats";
 
 type PlaceWithRelations = Place & {
   images?: PrismaPlaceImage[];
@@ -33,7 +34,7 @@ export function mapPlaceToFormData(
     shortDesc: place.shortDesc,
     description: place.description,
     ageTags: place.ageTags || [],
-    visitFormats: place.visitFormats || [],
+    visitFormats: normalizeVisitFormats(place.visitFormats || []),
     primaryCategoryId: place.primaryCategoryId ?? null,
     subcategoryIds: place.subcategories
       ? [...place.subcategories]
@@ -55,6 +56,13 @@ export function mapPlaceToFormData(
     metroAutoDistanceM: place.metroAutoDistanceM,
     metroManualId: place.metroManualId,
     metroManualDistanceM: place.metroManualDistanceM,
+    
+    // Google Reviews
+    googleRating: place.googleRating,
+    googleUserRatingsTotal: place.googleUserRatingsTotal,
+    googleReviewsJson: place.googleReviewsJson,
+    googleReviewsSyncedAt: place.googleReviewsSyncedAt,
+    googleMapsUri: place.googleMapsUri,
     
     // Step 3: Contacts
     phone: place.phone,
@@ -85,11 +93,13 @@ export function mapPlaceToFormData(
 /**
  * Map form data to Place payload for API submission
  */
-export function buildPlacePayload(data: PlaceFormData): Partial<Place> {
+export function buildPlacePayload(data: PlaceFormData): Partial<Place> & { subcategoryIds?: string[] } {
   return {
     // Step 1: Profile
     title: data.title,
     category: data.category,
+    primaryCategoryId: data.primaryCategoryId,
+    subcategoryIds: data.subcategoryIds, // Обрабатывается отдельно в API
     shortDesc: data.shortDesc,
     description: data.description,
     ageTags: data.ageTags,
@@ -150,8 +160,8 @@ function mapPrismaImageToFormImage(image: PrismaPlaceImage): PlaceImage {
 export function extractChanges(
   current: PlaceFormData,
   original: PlaceFormData
-): Partial<Place> {
-  const changes: Partial<Place> = {};
+): Partial<Place> & { subcategoryIds?: string[] } {
+  const changes: Partial<Place> & { subcategoryIds?: string[] } = {};
   const payload = buildPlacePayload(current);
   const originalPayload = buildPlacePayload(original);
   

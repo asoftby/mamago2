@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
     const hasReply = searchParams.get("hasReply");
     const status = searchParams.get("status");
 
-    const where: any = {
+    const where: Record<string, unknown> = {
       place: {
         ownerBusinessId: business.id,
       },

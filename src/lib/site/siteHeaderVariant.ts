@@ -1,8 +1,4 @@
-import {
-  getIntentFromPath,
-  isCityHubPath,
-  isPublicationDetailPath,
-} from "@/lib/intent";
+import { getIntentFromPath, isCityHubPath } from "@/lib/intent";
 
 export type SiteHeaderVariant = "discovery" | "landing";
 
@@ -10,15 +6,14 @@ export type SiteHeaderVariant = "discovery" | "landing";
  * - **discovery** — полная строка поиска (Где / Когда / Для кого) и кнопка «Фильтры» там, где предусмотрено.
  * - **landing** — только лого, табы разделов, иконки (поиск / уведомления / профиль); без поисковой капсулы и без фильтров.
  *
- * Не используем landing на витринах `/{city}/kuda`, `/{city}/events`, … и на хабе города `/{city}`.
+ * Не используем landing на витринах `/{city}/kuda`, `/{city}/events`, … на хабе города `/{city}`
+ * и на карточках `/{city}/events/{slug}`, `/{city}/activity/...` (тот же хедер, что и в каталоге).
  */
 export function getSiteHeaderVariant(pathname: string | null): SiteHeaderVariant {
   if (!pathname) return "discovery";
 
   if (getIntentFromPath(pathname) !== null) return "discovery";
   if (isCityHubPath(pathname)) return "discovery";
-  /** Детальная карточка события/активности — посадочный хедер без второй строки поиска */
-  if (isPublicationDetailPath(pathname)) return "landing";
 
   const segments = pathname.split("/").filter(Boolean);
   const first = segments[0];

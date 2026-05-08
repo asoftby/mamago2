@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { ReviewForm } from "./ReviewForm";
+import { useHydrated } from "@/hooks/use-hydrated";
 
 interface ReviewDialogProps {
   isOpen: boolean;
@@ -20,11 +21,7 @@ export function ReviewDialog({
   placeName,
   onSuccess,
 }: ReviewDialogProps) {
-  const [isClient, setIsClient] = useState(false);
-
-  useEffect(() => {
-    setIsClient(true);
-  }, []);
+  const isHydrated = useHydrated();
 
   useEffect(() => {
     if (!isOpen || typeof document === "undefined") return;
@@ -55,7 +52,7 @@ export function ReviewDialog({
     };
   }, [isOpen]);
 
-  if (!isClient || !isOpen) {
+  if (!isHydrated || !isOpen) {
     return null;
   }
 

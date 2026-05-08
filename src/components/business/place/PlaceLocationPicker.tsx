@@ -202,6 +202,9 @@ export function PlaceLocationPicker({
       source: "google",
     });
 
+    // Trigger geo enrichment
+    await enrichLocation(data.lat, data.lng, data.addressJson);
+
     // Pass to parent for manual save
     onUpdate?.({
       lat: data.lat,
@@ -225,11 +228,69 @@ export function PlaceLocationPicker({
       source: "manual",
     });
 
+    // Trigger geo enrichment (without addressJson)
+    await enrichLocation(data.lat, data.lng, null);
+
     // Pass to parent for manual save
     onUpdate?.({
       lat: data.lat,
       lng: data.lng,
     });
+  };
+
+  /**
+   * Call geo enrichment API and update state
+   */
+  const enrichLocation = async (
+    lat: number,
+    lng: number,
+    addressJson: google.maps.GeocoderAddressComponent[] | null
+  ) => {
+    console.log("[PlaceLocationPicker] Starting geo enrichment...", { lat, lng });
+
+    try {
+      const response = await fetch("/api/geo/enrich-location", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ lat, lng, addressJson }),
+      });
+
+      if (!response.ok) {
+        console.error("[PlaceLocationPicker] Geo enrichment failed:", response.status);
+        return;
+      }
+
+      const result = await response.json();
+      console.log("[PlaceLocationPicker] Geo enrichment result:", result);
+
+      // Update state with enriched data
+      if (result.cityId) {
+        setCityId(result.cityId);
+      }
+
+      if (result.districtAutoId) {
+        setDistrictAutoId(result.districtAutoId);
+      }
+
+      if (result.metroAutoId) {
+        setMetroAutoId(result.metroAutoId);
+        setMetroAutoDistanceM(result.metroAutoDistanceM);
+      } else {
+        // Clear metro if not found
+        setMetroAutoId(null);
+        setMetroAutoDistanceM(null);
+      }
+
+      // Pass enriched data to parent
+      onUpdate?.({
+        cityId: result.cityId,
+        districtAutoId: result.districtAutoId,
+        metroAutoId: result.metroAutoId,
+        metroAutoDistanceM: result.metroAutoDistanceM,
+      });
+    } catch (err) {
+      console.error("[PlaceLocationPicker] Geo enrichment error:", err);
+    }
   };
 
   const checkForDuplicates = async () => {
@@ -247,7 +308,15 @@ export function PlaceLocationPicker({
       const response = await fetch(`/api/business/places/location/matches?${params.toString()}`);
 
       if (!response.ok) {
-        console.error("[PlaceLocationPicker] Failed to check duplicates");
+        // Only log error for unexpected status codes (not 400 for validation)
+        if (response.status !== 400) {
+          const errorText = await response.text();
+          console.error("[PlaceLocationPicker] Failed to check duplicates:", {
+            status: response.status,
+            statusText: response.statusText,
+            error: errorText,
+          });
+        }
         return;
       }
 
@@ -486,6 +555,11 @@ export function PlaceLocationPicker({
   const metroShown = metroManualId ?? metroAutoId;
   const metroDistanceShown = metroManualId ? metroManualDistanceM : metroAutoDistanceM;
 
+  // UI visibility logic
+  const hasAutoEnrichment = !!(districtAutoId || metroAutoId);
+  const showSelects = !!(location && cityId);
+  const showReadOnlyEnrichment = !!(location && hasAutoEnrichment);
+
   const metroFilterOptions = useMemo(() => {
     const out: { value: string; label: string }[] = [];
     if (
@@ -519,8 +593,8 @@ export function PlaceLocationPicker({
                 metroAutoDistanceM: metroAutoDistanceM || null,
                 metroManualId: metroManualId || null,
                 metroManualDistanceM: metroManualDistanceM || null,
-                selectsVisible: !!(location && cityId),
-                readOnlyVisible: !!(location && !cityId && (districtAutoId || districtManualId || metroAutoId || metroManualId)),
+                selectsVisible: showSelects,
+                readOnlyVisible: showReadOnlyEnrichment,
               },
               null,
               2
@@ -590,9 +664,9 @@ export function PlaceLocationPicker({
         </div>
       )}
 
-      {/* District & Metro (only show if location is set and cityId available) */}
-      {location && cityId && (
-        <div className="space-y-4">
+      {/* District & Metro Selects (only show if location is set and cityId available) */}
+      {showSelects && (
+        <div id="geo-selects" className="space-y-4">
           {/* District Select */}
           <div>
             <Label htmlFor="district">Район</Label>
@@ -703,16 +777,33 @@ export function PlaceLocationPicker({
         </div>
       )}
 
-      {/* Read-only display for enriched data (always show when available) */}
-      {location && (districtAutoId || metroAutoId) && (
-        <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 space-y-2">
-          <h4 className="text-sm font-medium text-blue-900">📍 Определено автоматически</h4>
+      {/* Read-only display for enriched data */}
+      {showReadOnlyEnrichment && (
+        <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <h4 className="text-sm font-medium text-blue-900">📍 Определено автоматически</h4>
+            {cityId && (
+              <button
+                type="button"
+                onClick={() => {
+                  // Scroll to selects section
+                  const selectsSection = document.getElementById("geo-selects");
+                  selectsSection?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+                }}
+                className="text-xs text-blue-700 hover:text-blue-800 hover:underline"
+              >
+                Изменить вручную
+              </button>
+            )}
+          </div>
           
           {districtAutoId && (
             <div className="text-sm">
               <span className="text-blue-700">Район:</span>{" "}
               <span className="text-blue-900 font-medium">
-                {districts.find(d => d.id === districtAutoId)?.name || districtAutoId}
+                {districts.find(d => d.id === districtAutoId)?.name || 
+                 initialLocation?.districtName || 
+                 districtAutoId}
               </span>
             </div>
           )}
@@ -721,11 +812,9 @@ export function PlaceLocationPicker({
             <div className="text-sm">
               <span className="text-blue-700">Метро:</span>{" "}
               <span className="text-blue-900 font-medium">
-                {/* Show name from enrichment API if available, otherwise try to find in loaded stations */}
-                {initialLocation?.metroName || 
-                 (metroStations.length > 0 
-                   ? (metroStations.find(m => m.id === metroAutoId)?.name || metroAutoId)
-                   : metroAutoId)}
+                {metroStations.find(m => m.id === metroAutoId)?.name || 
+                 initialLocation?.metroName || 
+                 metroAutoId}
                 {metroAutoDistanceM !== null && ` · ${formatDistance(metroAutoDistanceM)}`}
               </span>
             </div>
@@ -733,7 +822,7 @@ export function PlaceLocationPicker({
           
           {!districtAutoId && !metroAutoId && (
             <p className="text-xs text-blue-700">
-              Метро/район определим после выбора точки
+              Не удалось определить район и метро автоматически
             </p>
           )}
         </div>

@@ -1,10 +1,10 @@
 /**
  * POST /api/business/places - Create new Place (DRAFT or PENDING)
  * GET /api/business/places - List my Places
- * 
+ *
  * IMPORTANT: POST should only be called when user explicitly clicks "Save Draft" or "Submit"
  * Never call this automatically on page load or component mount
- * 
+ *
  * Idempotency: Uses createRequestId to prevent duplicate creation
  */
 
@@ -16,6 +16,7 @@ import { updatePlaceLocation } from "@/services/place/placeLocation.service";
 import { extractStreetName } from "@/lib/slug/slugUtils";
 import { generatePlaceSlug } from "@/lib/slug/placeSlugService";
 import { attachMediaToEntity } from "@/lib/media/mediaRegistry";
+import { isMediaAssetCuid } from "@/lib/media/isMediaAssetCuid";
 import {
   canCreateBusinessContent,
   canPublishContentDirectly,
@@ -29,6 +30,7 @@ import {
   validatePlaceCategories,
   validatePlaceCategoriesDraft,
 } from "@/lib/validation/placeCategoryValidation";
+import { createPublishTimer, runAfterPublishResponse } from "@/server/utils/publishPipeline";
 
 async function finalizePublishedPlaceSlugIfNeeded(placeId: string, isPublished: boolean) {
   if (!isPublished) return;
@@ -37,6 +39,7 @@ async function finalizePublishedPlaceSlugIfNeeded(placeId: string, isPublished: 
 }
 
 export async function POST(request: NextRequest) {
+  const timer = createPublishTimer("publish:place");
   try {
     const user = await getCurrentUser();
     if (!user || !canCreateBusinessContent(user.role)) {
@@ -141,6 +144,7 @@ export async function POST(request: NextRequest) {
           category: String(data.category ?? "").trim() || "other",
         }
       : data;
+    timer.mark("validate");
 
     // Get user's business (if exists)
     const businessId = await getUserBusinessId(user.id);
@@ -190,7 +194,7 @@ export async function POST(request: NextRequest) {
         createRequestId,
         status: status as ContentStatus,
         slug,
-        
+
         // Step 1 fields
         title: d.title,
         shortAddress,
@@ -201,7 +205,7 @@ export async function POST(request: NextRequest) {
         visitFormats: d.visitFormats || [],
         primaryCategoryId: d.primaryCategoryId || null,
         discoverySignalIds: Array.isArray(d.discoverySignalIds) ? d.discoverySignalIds : [],
-        
+
         // Step 2 fields
         lat: d.lat || null,
         lng: d.lng || null,
@@ -217,16 +221,16 @@ export async function POST(request: NextRequest) {
         metroAutoDistanceM: d.metroAutoDistanceM || null,
         metroManualId: d.metroManualId || null,
         metroManualDistanceM: d.metroManualDistanceM || null,
-        
+
         // Step 3 fields
         logoImageId: d.logoImageId || null,
-        
+
         // Step 4 fields
         phone: d.phone || null,
         website: d.website || null,
         instagramHandle: d.instagramHandle || null,
         instagramUrl: d.instagramUrl || null,
-        
+
         // Hierarchy
         placeKind: d.placeKind || PlaceKind.STANDALONE,
         floor: d.floor || null,
@@ -235,6 +239,7 @@ export async function POST(request: NextRequest) {
     });
 
     console.log("[places/POST] ✅ Created place:", place.id, "status:", place.status);
+    timer.mark("db");
 
     // Save subcategories if provided
     const subcategoryIds: string[] = Array.isArray(d.subcategoryIds) ? d.subcategoryIds.slice(0, 3) : [];
@@ -249,10 +254,12 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    let attachedLogoImageId: string | null = null;
+
     // Attach temp media if wizardSessionId provided
     if (d.wizardSessionId) {
       console.log("[places/POST] 📎 Attaching temp media from session:", d.wizardSessionId);
-      
+
       try {
         // Get all temp media for this session
         const tempMedia = await prisma.tempMedia.findMany({
@@ -273,7 +280,7 @@ export async function POST(request: NextRequest) {
         const placeImages = await Promise.all(
           tempMedia.map(async (media) => {
             const kind = media.kind === "PLACE_LOGO" ? "LOGO" : "GALLERY";
-            
+
             const placeImage = await prisma.placeImage.create({
               data: {
                 placeId: place.id,
@@ -311,6 +318,7 @@ export async function POST(request: NextRequest) {
         // Update logoImageId if logo was uploaded
         const logoImage = placeImages.find((img) => img.kind === "LOGO");
         if (logoImage) {
+          attachedLogoImageId = logoImage.id;
           await prisma.place.update({
             where: { id: place.id },
             data: { logoImageId: logoImage.id },
@@ -337,9 +345,59 @@ export async function POST(request: NextRequest) {
         // Continue - place is created, images can be uploaded later
       }
     }
+    if (!attachedLogoImageId && isMediaAssetCuid(d.logoImageId)) {
+      try {
+        const mediaAsset = await prisma.mediaAsset.findFirst({
+          where: {
+            id: d.logoImageId,
+            status: "ACTIVE",
+          },
+          select: {
+            id: true,
+            publicUrl: true,
+            width: true,
+            height: true,
+          },
+        });
+        const url = mediaAsset?.publicUrl?.trim();
+        if (mediaAsset && url) {
+          const logoImage = await prisma.placeImage.create({
+            data: {
+              placeId: place.id,
+              kind: "LOGO",
+              url,
+              width: mediaAsset.width,
+              height: mediaAsset.height,
+              sortOrder: 0,
+            },
+            select: { id: true },
+          });
 
-    // Run geo enrichment if location data exists
-    if (place.lat && place.lng) {
+          await Promise.all([
+            prisma.place.update({
+              where: { id: place.id },
+              data: { logoImageId: logoImage.id },
+            }),
+            attachMediaToEntity({
+              mediaId: mediaAsset.id,
+              entityType: MediaEntityType.PLACE,
+              entityId: place.id,
+              field: "logo",
+            }),
+          ]);
+          attachedLogoImageId = logoImage.id;
+        }
+      } catch (mediaLibraryError) {
+        console.error("[places/POST] ⚠️ Failed to attach media library logo:", mediaLibraryError);
+      }
+    }
+    timer.mark("media");
+
+    // Run geo enrichment if location data exists BUT enrichment data is missing
+    // If wizard already provided cityId/districtAutoId/metroAutoId, skip enrichment
+    const needsEnrichment = place.lat && place.lng && !place.cityId;
+
+    if (needsEnrichment) {
       console.log("[places/POST] 🌍 Running geo enrichment for place:", place.id);
       console.log("[places/POST] Location data:", {
         lat: place.lat,
@@ -348,17 +406,17 @@ export async function POST(request: NextRequest) {
         formattedAddr: place.formattedAddr,
         hasAddressJson: !!place.addressJson,
       });
-      
-      try {
+
+      runAfterPublishResponse("publish:place", "geo enrichment", async () => {
         const enrichedPlace = await updatePlaceLocation(place.id, {
-          lat: place.lat,
-          lng: place.lng,
+          lat: place.lat as number, // TypeScript: we know it's not null from needsEnrichment check
+          lng: place.lng as number, // TypeScript: we know it's not null from needsEnrichment check
           googlePlaceId: place.googlePlaceId,
           formattedAddr: place.formattedAddr,
           addressJson: place.addressJson as Record<string, unknown> | null,
           countryCode: place.countryCode,
         });
-        
+
         if (enrichedPlace) {
           console.log("[places/POST] ✅ Geo enrichment complete");
           console.log("[places/POST] Enriched data:", {
@@ -367,32 +425,30 @@ export async function POST(request: NextRequest) {
             metroAutoId: enrichedPlace.metroAutoId,
             metroAutoDistanceM: enrichedPlace.metroAutoDistanceM,
           });
-          
-          await finalizePublishedPlaceSlugIfNeeded(place.id, isPublished);
-
-          // Return enriched place with full data
-          return NextResponse.json({ 
-            place: {
-              ...place,
-              ...enrichedPlace,
-            }
-          });
         }
-      } catch (enrichError) {
-        console.error("[places/POST] ⚠️ Geo enrichment failed (non-fatal):", enrichError);
-        console.error("[places/POST] Error stack:", enrichError instanceof Error ? enrichError.stack : "No stack");
-        // Continue without enrichment - place is still created
-      }
+      });
+    } else if (place.lat && place.lng && place.cityId) {
+      console.log("[places/POST] ℹ️ Skipping geo enrichment (data already provided by wizard)");
+      console.log("[places/POST] Existing geo data:", {
+        cityId: place.cityId,
+        districtAutoId: place.districtAutoId,
+        metroAutoId: place.metroAutoId,
+        metroAutoDistanceM: place.metroAutoDistanceM,
+      });
     } else {
       console.log("[places/POST] ℹ️ Skipping geo enrichment (no location data)");
     }
 
     await finalizePublishedPlaceSlugIfNeeded(place.id, isPublished);
+    timer.mark("status");
+    timer.mark("response");
+    timer.log({ status: place.status, created: 1 });
 
     return NextResponse.json({ place });
   } catch (error) {
+    timer.log({ error: 1 });
     console.error("[places/POST] ❌ Create place error:", error);
-    
+
     // Handle unique constraint violation (shouldn't happen with idempotency check, but just in case)
     if (error instanceof Error && error.message.includes("Unique constraint")) {
       return NextResponse.json(
@@ -400,7 +456,7 @@ export async function POST(request: NextRequest) {
         { status: 409 }
       );
     }
-    
+
     return NextResponse.json(
       { error: "INTERNAL_SERVER_ERROR", message: "Failed to create place" },
       { status: 500 }

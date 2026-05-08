@@ -13,6 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { InternationalPhoneInput } from "@/components/phone/InternationalPhoneInput";
 import { cn } from "@/lib/utils";
 import type { OfferFormDataMVP } from "../types.mvp";
 
@@ -153,7 +154,7 @@ export function Step4PriceAndCTAMVP({
           </Label>
           <Select
             value={data.ctaType || undefined}
-            onValueChange={(value) => onChange({ ctaType: value as any })}
+            onValueChange={(value) => onChange({ ctaType: value as OfferFormDataMVP["ctaType"] })}
             disabled={!isEditable}
           >
             <SelectTrigger id="ctaType">
@@ -191,12 +192,11 @@ export function Step4PriceAndCTAMVP({
               <span className="text-muted-foreground ml-1">(необязательно)</span>
             )}
           </Label>
-          <Input
+          <InternationalPhoneInput
             id="ctaPhone"
-            type="tel"
             value={data.ctaPhone}
-            onChange={(e) => onChange({ ctaPhone: e.target.value })}
-            placeholder="+375 29 123-45-67"
+            onChange={(value) => onChange({ ctaPhone: value })}
+            placeholder="+375 29 123 45 67"
             disabled={!isEditable}
           />
           {placeData?.phone && data.ctaPhone === placeData.phone && (

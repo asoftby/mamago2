@@ -22,6 +22,7 @@ export interface OfferFormData {
   // Step 2: Public Information (was Step 3)
   title: string;
   shortDescription: string; // max 120 chars
+  description: string; // Rich text HTML for full description
   ageGroups: string[];
   
   // Step 3: Media (was Step 4)
@@ -133,6 +134,7 @@ export const SUBMIT_REQUIRED = {
   // Step 3
   title: true,
   shortDescription: true,
+  description: true,
   ageGroups: true,
   
   // Step 4

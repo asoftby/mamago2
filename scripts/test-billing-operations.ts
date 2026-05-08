@@ -128,16 +128,25 @@ async function testBillingOperations() {
         metadata: { test: true },
       });
       console.log("❌ Should have thrown insufficient funds error");
-    } catch (error: any) {
-      if (error.code === "INSUFFICIENT_FUNDS") {
+    } catch (error: unknown) {
+      const err = error as { 
+        code?: string; 
+        currentBalance?: number; 
+        creditLimit?: number; 
+        availableBalance?: number; 
+        requestedAmount?: number; 
+        shortfall?: number;
+        message?: string;
+      };
+      if (err.code === "INSUFFICIENT_FUNDS") {
         console.log("✅ Insufficient funds error caught correctly");
-        console.log(`   Current balance: ${error.currentBalance} BYN`);
-        console.log(`   Credit limit: ${error.creditLimit} BYN`);
-        console.log(`   Available: ${error.availableBalance} BYN`);
-        console.log(`   Requested: ${error.requestedAmount} BYN`);
-        console.log(`   Shortfall: ${error.shortfall} BYN`);
+        console.log(`   Current balance: ${err.currentBalance} BYN`);
+        console.log(`   Credit limit: ${err.creditLimit} BYN`);
+        console.log(`   Available: ${err.availableBalance} BYN`);
+        console.log(`   Requested: ${err.requestedAmount} BYN`);
+        console.log(`   Shortfall: ${err.shortfall} BYN`);
       } else {
-        console.log("❌ Wrong error type:", error.message);
+        console.log("❌ Wrong error type:", err.message);
       }
     }
     console.log();

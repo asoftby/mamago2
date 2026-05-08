@@ -3,6 +3,7 @@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { InternationalPhoneInput } from "@/components/phone/InternationalPhoneInput";
 import type { PlaceFormData } from "../types";
 
 export interface PlaceContactFieldsSharedProps {
@@ -21,12 +22,11 @@ export function PlacePhoneWebsiteFields({
     <>
       <div>
         <Label htmlFor="place-phone">Телефон</Label>
-        <Input
+        <InternationalPhoneInput
           id="place-phone"
-          type="tel"
           value={data.phone ?? ""}
-          onChange={(e) => onChange({ phone: e.target.value })}
-          placeholder="+375 29 123-45-67"
+          onChange={(value) => onChange({ phone: value })}
+          placeholder="+375 29 123 45 67"
           className="mt-2"
           disabled={!isEditable}
         />

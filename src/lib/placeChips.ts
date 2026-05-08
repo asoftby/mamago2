@@ -26,12 +26,18 @@ const CATEGORY_LABELS: Record<string, string> = {
 
 /**
  * Visit format labels mapping
- * Maps database format keys to human-readable labels
+ * Maps database format keys to human-readable Russian labels.
+ * Covers both legacy short slugs (indoor) and full slugs (format-indoor).
  */
 const FORMAT_LABELS: Record<string, string> = {
-  indoor: "Indoor",
-  outdoor: "Outdoor",
-  online: "Online",
+  // Full slugs (current)
+  "format-indoor": "В помещении",
+  "format-outdoor": "На улице",
+  "format-online": "Онлайн",
+  // Legacy short slugs (backward compat)
+  indoor: "В помещении",
+  outdoor: "На улице",
+  online: "Онлайн",
   hybrid: "Гибрид",
 };
 

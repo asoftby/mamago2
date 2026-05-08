@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { ExternalLink } from "lucide-react";
 import {
   PUBLIC_SITE_DEFAULT_ENTRY_PATH,
@@ -9,6 +9,7 @@ import {
 } from "@/lib/routing/surface";
 import { getCanonicalPublicAppUrl } from "@/lib/config/publicAppUrl";
 import { cn } from "@/lib/utils";
+import { useHydrated } from "@/hooks/use-hydrated";
 
 type SidebarPublicSiteEntryProps = {
   onNavigate?: () => void;
@@ -26,19 +27,17 @@ export function SidebarPublicSiteEntry({
   separatorClassName = "border-gray-100",
   chromeTone = "default",
 }: SidebarPublicSiteEntryProps) {
-  const [href, setHref] = useState(
-    () =>
-      `${getCanonicalPublicAppUrl().replace(/\/+$/u, "")}${PUBLIC_SITE_DEFAULT_ENTRY_PATH}`,
-  );
+  const isHydrated = useHydrated();
 
-  useEffect(() => {
-    setHref(
-      buildPublicSiteEntryUrl({
-        currentHost: window.location.host,
-        currentProtocol: window.location.protocol.replace(/:$/u, ""),
-      }),
-    );
-  }, []);
+  const href = useMemo(() => {
+    if (!isHydrated) {
+      return `${getCanonicalPublicAppUrl().replace(/\/+$/u, "")}${PUBLIC_SITE_DEFAULT_ENTRY_PATH}`;
+    }
+    return buildPublicSiteEntryUrl({
+      currentHost: window.location.host,
+      currentProtocol: window.location.protocol.replace(/:$/u, ""),
+    });
+  }, [isHydrated]);
 
   const handleClick = () => {
     onNavigate?.();

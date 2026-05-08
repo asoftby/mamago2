@@ -6,6 +6,10 @@ interface MediaStatusBadgeProps {
 
 export function MediaStatusBadge({ status }: MediaStatusBadgeProps) {
   const config = {
+    TEMP: {
+      label: "Временный",
+      className: "bg-yellow-100 text-yellow-700",
+    },
     ACTIVE: {
       label: "Активен",
       className: "bg-green-100 text-green-700",

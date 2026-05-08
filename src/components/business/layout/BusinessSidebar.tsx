@@ -18,10 +18,16 @@ interface BusinessSidebarProps {
 
 export function BusinessSidebar({ onNavigate, variant = "sidebar" }: BusinessSidebarProps) {
   const pathname = usePathname();
+  const businessPathname =
+    pathname === "/business" || pathname.startsWith("/business/")
+      ? pathname
+      : pathname === "/"
+        ? "/business/"
+        : `/business${pathname}`;
 
   const matchesPath = (patterns: string[]) =>
     patterns.some((pattern) =>
-      pathname === pattern || pathname.startsWith(`${pattern}/`)
+      businessPathname === pattern || businessPathname.startsWith(`${pattern}/`)
     );
 
   return (
@@ -43,7 +49,7 @@ export function BusinessSidebar({ onNavigate, variant = "sidebar" }: BusinessSid
                 label={item.label}
                 isActive={
                   item.href === BUSINESS_DASHBOARD_HREF
-                    ? pathname === item.href
+                    ? businessPathname === item.href || businessPathname === "/business/"
                     : matchesPath(patterns)
                 }
                 onClick={onNavigate}
@@ -53,6 +59,7 @@ export function BusinessSidebar({ onNavigate, variant = "sidebar" }: BusinessSid
 
           const groupPatterns = item.match ?? item.children.map((child) => child.href);
           const defaultOpen = matchesPath(groupPatterns);
+          const isGroupActive = defaultOpen;
 
           return (
             <SidebarGroup
@@ -60,6 +67,7 @@ export function BusinessSidebar({ onNavigate, variant = "sidebar" }: BusinessSid
               icon={item.icon}
               label={item.label}
               defaultOpen={defaultOpen}
+              isActive={isGroupActive}
             >
               {item.children.map((child, childIndex) => (
                 <SidebarSubItem
@@ -67,8 +75,8 @@ export function BusinessSidebar({ onNavigate, variant = "sidebar" }: BusinessSid
                   href={child.href}
                   label={child.label}
                   isActive={
-                    pathname === child.href ||
-                    pathname.startsWith(`${child.href}/`)
+                    businessPathname === child.href ||
+                    businessPathname.startsWith(`${child.href}/`)
                   }
                   onClick={onNavigate}
                 />

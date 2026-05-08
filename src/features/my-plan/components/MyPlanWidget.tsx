@@ -103,10 +103,15 @@ export function MyPlanWidget({ onOpen }: MyPlanWidgetProps) {
   const [pulse, setPulse] = useState(false);
   useEffect(() => {
     if (prevBadgeRef.current !== badge && badge !== null && badge > 0) {
-      setPulse(true);
+      const frame = requestAnimationFrame(() => {
+        setPulse(true);
+      });
       const t = setTimeout(() => setPulse(false), 250);
       prevBadgeRef.current = badge;
-      return () => clearTimeout(t);
+      return () => {
+        cancelAnimationFrame(frame);
+        clearTimeout(t);
+      };
     }
     prevBadgeRef.current = badge;
   }, [badge]);

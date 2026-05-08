@@ -9,6 +9,7 @@ import {
 } from "@/lib/publications/articleMvp";
 import { assignArticleSlugIfMissing, updateArticleSlug } from "@/lib/slug/articleSlugService";
 import { syncArticleCanonical } from "@/lib/seo/syncEntityCanonical";
+import { createRequestPerf } from "@/server/utils/requestPerf";
 
 export type { ArticleEditorSnapshot, ArticleSaveInput } from "@/lib/article/articleAdminTypes";
 export {
@@ -106,42 +107,28 @@ async function fetchArticleMvpEditorialColumns(id: string): Promise<{
   scheduledAt: Date | null;
   seoImageId: string | null;
 }> {
-  let coverImageId: string | null = null;
-  try {
-    const r = await prisma.$queryRaw<Array<{ coverImageId: string | null }>>(
+  const [coverImageId, cityContext, scheduledAt, seoImageId] = await Promise.all([
+    prisma.$queryRaw<Array<{ coverImageId: string | null }>>(
       Prisma.sql`SELECT "coverImageId" FROM "Article" WHERE id = ${id} LIMIT 1`,
-    );
-    coverImageId = r[0]?.coverImageId ?? null;
-  } catch {
-    /* колонки нет */
-  }
-  let cityContext: string | null = null;
-  try {
-    const r = await prisma.$queryRaw<Array<{ cityContext: string | null }>>(
+    )
+      .then((rows) => rows[0]?.coverImageId ?? null)
+      .catch(() => null),
+    prisma.$queryRaw<Array<{ cityContext: string | null }>>(
       Prisma.sql`SELECT "cityContext" FROM "Article" WHERE id = ${id} LIMIT 1`,
-    );
-    cityContext = r[0]?.cityContext ?? null;
-  } catch {
-    /* */
-  }
-  let scheduledAt: Date | null = null;
-  try {
-    const r = await prisma.$queryRaw<Array<{ scheduledAt: Date | null }>>(
+    )
+      .then((rows) => rows[0]?.cityContext ?? null)
+      .catch(() => null),
+    prisma.$queryRaw<Array<{ scheduledAt: Date | null }>>(
       Prisma.sql`SELECT "scheduledAt" FROM "Article" WHERE id = ${id} LIMIT 1`,
-    );
-    scheduledAt = r[0]?.scheduledAt ?? null;
-  } catch {
-    /* */
-  }
-  let seoImageId: string | null = null;
-  try {
-    const r = await prisma.$queryRaw<Array<{ seoImageId: string | null }>>(
+    )
+      .then((rows) => rows[0]?.scheduledAt ?? null)
+      .catch(() => null),
+    prisma.$queryRaw<Array<{ seoImageId: string | null }>>(
       Prisma.sql`SELECT "seoImageId" FROM "Article" WHERE id = ${id} LIMIT 1`,
-    );
-    seoImageId = r[0]?.seoImageId ?? null;
-  } catch {
-    /* */
-  }
+    )
+      .then((rows) => rows[0]?.seoImageId ?? null)
+      .catch(() => null),
+  ]);
   return { coverImageId, cityContext, scheduledAt, seoImageId };
 }
 
@@ -185,17 +172,25 @@ async function fetchArticleAuthorFields(
 }
 
 export async function getArticleForEditor(id: string): Promise<ArticleEditorSnapshot | null> {
+  const perf = createRequestPerf("save-article:service:get");
   const row = await prisma.article.findUnique({
     where: { id },
     select: articleSelect,
   });
+  perf.mark("db");
   if (!row) return null;
-  const mvp = await fetchArticleMvpEditorialColumns(id);
-  const coverImageUrl = await resolveMediaUrl(mvp.coverImageId);
-  const seoImageUrl = await resolveMediaUrl(mvp.seoImageId);
-  const author = await fetchArticleAuthorFields(id);
-  const nv = await fetchArticleNoindexAndViews(id);
-  return toSnapshot({
+  const [mvp, author, nv] = await Promise.all([
+    fetchArticleMvpEditorialColumns(id),
+    fetchArticleAuthorFields(id),
+    fetchArticleNoindexAndViews(id),
+  ]);
+  perf.mark("editorial");
+  const [coverImageUrl, seoImageUrl] = await Promise.all([
+    resolveMediaUrl(mvp.coverImageId),
+    resolveMediaUrl(mvp.seoImageId),
+  ]);
+  perf.mark("media");
+  const snapshot = toSnapshot({
     ...row,
     coverImageId: mvp.coverImageId,
     coverImage: mvp.coverImageId ? { publicUrl: coverImageUrl } : null,
@@ -206,6 +201,9 @@ export async function getArticleForEditor(id: string): Promise<ArticleEditorSnap
     ...author,
     ...nv,
   });
+  perf.mark("serialize");
+  perf.log({ articleId: id });
+  return snapshot;
 }
 
 async function resolveMediaUrl(id: string | null): Promise<string | null> {
@@ -219,7 +217,9 @@ async function resolveMediaUrl(id: string | null): Promise<string | null> {
 
 /** Первая запись статьи в БД (после явного «Сохранить» / «Опубликовать»). */
 export async function createArticleFromSaveInput(input: ArticleSaveInput): Promise<ArticleEditorSnapshot> {
+  const perf = createRequestPerf("save-article:service:create");
   const coverUrl = await resolveMediaUrl(input.coverImageId);
+  perf.mark("media");
   const publishedAt = input.publishedAt ? new Date(input.publishedAt) : null;
   const scheduledAt = input.scheduledAt ? new Date(input.scheduledAt) : null;
   const seoOgImageResolved = coverUrl ?? null;
@@ -249,6 +249,7 @@ export async function createArticleFromSaveInput(input: ArticleSaveInput): Promi
     },
     select: { id: true },
   });
+  perf.mark("db");
 
   if (input.slug?.trim()) {
     await updateArticleSlug(created.id, input.slug.trim(), { strict: true });
@@ -256,9 +257,12 @@ export async function createArticleFromSaveInput(input: ArticleSaveInput): Promi
     await assignArticleSlugIfMissing(created.id, input.title);
   }
   await syncArticleCanonical(created.id);
+  perf.mark("seo");
 
   const next = await getArticleForEditor(created.id);
   if (!next) throw new Error("Article missing after create");
+  perf.mark("response");
+  perf.log({ articleId: created.id, status: input.status });
   return next;
 }
 
@@ -266,10 +270,15 @@ export async function saveArticleDraft(
   id: string,
   input: ArticleSaveInput,
 ): Promise<ArticleEditorSnapshot> {
-  const coverUrl = await resolveMediaUrl(input.coverImageId);
+  const perf = createRequestPerf("save-article:service:update");
+  const [coverUrl, editorial] = await Promise.all([
+    resolveMediaUrl(input.coverImageId),
+    fetchArticleMvpEditorialColumns(id),
+  ]);
+  perf.mark("media");
   /** Legacy `seoImageId` в БД не трогаем; OG-картинка = обложка, иначе старый отдельный SEO-ассет */
-  const editorial = await fetchArticleMvpEditorialColumns(id);
   const legacySeoOgUrl = await resolveMediaUrl(editorial.seoImageId);
+  perf.mark("legacy-media");
   const seoOgImageResolved = coverUrl ?? legacySeoOgUrl ?? null;
 
   const publishedAt = input.publishedAt ? new Date(input.publishedAt) : null;
@@ -296,49 +305,30 @@ export async function saveArticleDraft(
     },
     select: { id: true },
   });
+  perf.mark("db");
 
-  try {
-    await prisma.$executeRaw(
+  await Promise.allSettled([
+    prisma.$executeRaw(
       Prisma.sql`UPDATE "Article" SET "coverImageId" = ${input.coverImageId} WHERE id = ${id}`,
-    );
-  } catch {
-    /* колонки нет */
-  }
-  try {
-    await prisma.$executeRaw(
+    ),
+    prisma.$executeRaw(
       Prisma.sql`UPDATE "Article" SET "cityContext" = ${input.cityContext} WHERE id = ${id}`,
-    );
-  } catch {
-    /* */
-  }
-  try {
-    await prisma.$executeRaw(
+    ),
+    prisma.$executeRaw(
       Prisma.sql`UPDATE "Article" SET "scheduledAt" = ${scheduledAt} WHERE id = ${id}`,
-    );
-  } catch {
-    /* */
-  }
-  try {
-    await prisma.$executeRaw(
+    ),
+    prisma.$executeRaw(
       Prisma.sql`UPDATE "Article" SET "noindex" = ${input.noindex} WHERE id = ${id}`,
-    );
-  } catch {
-    /* колонки noindex нет */
-  }
-
-  try {
-    await prisma.$executeRaw(
+    ),
+    prisma.$executeRaw(
       Prisma.sql`UPDATE "Article" SET "authorUserId" = ${input.authorUserId}, "authorLabel" = ${input.authorLabel} WHERE id = ${id}`,
-    );
-  } catch {
-    try {
+    ).catch(async () => {
       await prisma.$executeRaw(
         Prisma.sql`UPDATE "Article" SET "authorLabel" = ${input.authorLabel} WHERE id = ${id}`,
       );
-    } catch {
-      /* нет колонок в старой БД */
-    }
-  }
+    }),
+  ]);
+  perf.mark("editorial-writes");
 
   if (input.slug?.trim()) {
     await updateArticleSlug(id, input.slug.trim(), { strict: true });
@@ -347,31 +337,39 @@ export async function saveArticleDraft(
   }
 
   await syncArticleCanonical(id);
+  perf.mark("seo");
 
   const next = await getArticleForEditor(id);
   if (!next) throw new Error("Article missing after save");
+  perf.mark("response");
+  perf.log({ articleId: id, status: input.status });
   return next;
 }
 
-export async function submitArticleForModeration(id: string): Promise<void> {
+export async function submitArticleForModeration(id: string): Promise<ArticleEditorSnapshot> {
   await prisma.article.update({
     where: { id },
     data: { status: "PENDING" },
     select: { id: true },
   });
+  const next = await getArticleForEditor(id);
+  if (!next) throw new Error("Article missing after submit");
+  return next;
 }
 
 export async function moderateArticle(
   id: string,
   decision: "publish" | "reject",
-): Promise<void> {
+): Promise<ArticleEditorSnapshot> {
   if (decision === "reject") {
     await prisma.article.update({
       where: { id },
       data: { status: "REJECTED" },
       select: { id: true },
     });
-    return;
+    const rejected = await getArticleForEditor(id);
+    if (!rejected) throw new Error("Article missing after reject");
+    return rejected;
   }
   await prisma.article.update({
     where: { id },
@@ -382,4 +380,7 @@ export async function moderateArticle(
     select: { id: true },
   });
   await syncArticleCanonical(id);
+  const published = await getArticleForEditor(id);
+  if (!published) throw new Error("Article missing after publish");
+  return published;
 }

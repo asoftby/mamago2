@@ -15,6 +15,7 @@ export function getDefaultFormData(): OfferFormData {
     // Step 2: Public Information
     title: "",
     shortDescription: "",
+    description: "",
     ageGroups: [],
     
     // Step 3: Media

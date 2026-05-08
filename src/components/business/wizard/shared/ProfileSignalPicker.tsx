@@ -47,8 +47,14 @@ export function ProfileSignalPicker({
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
-    setError(null);
+    
+    // Use queueMicrotask to avoid synchronous setState in effect
+    queueMicrotask(() => {
+      if (!cancelled) {
+        setLoading(true);
+        setError(null);
+      }
+    });
 
     // Загружаем все опции (включая DEPRECATED) для отображения старых значений
     fetch("/api/public/signals/profile?includeDeprecated=true")

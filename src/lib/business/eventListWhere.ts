@@ -1,6 +1,25 @@
 import { ActivityType, ContentStatus } from "@prisma/client";
 import type { Prisma } from "@prisma/client";
 
+export type BusinessEventListView = "active" | "archived";
+
+const ACTIVE_EVENT_STATUSES: ContentStatus[] = [
+  ContentStatus.DRAFT,
+  ContentStatus.PENDING,
+  ContentStatus.PUBLISHED,
+  ContentStatus.NEEDS_REVISION,
+  ContentStatus.REJECTED,
+  ContentStatus.PENDING_UPDATE,
+  ContentStatus.SCHEDULED,
+];
+
+export function normalizeBusinessEventListView(
+  value: string | string[] | null | undefined,
+): BusinessEventListView {
+  const raw = Array.isArray(value) ? value[0] : value;
+  return raw === "archived" || raw === "archive" ? "archived" : "active";
+}
+
 /**
  * Статусы «всё кроме мягко удалённого».
  * Нельзя использовать `status: { not: DELETED }`: пока в PostgreSQL нет значения enum DELETED,
@@ -15,6 +34,16 @@ export function excludeDeletedEvents(): Prisma.ActivityWhereInput {
   return {
     status: { in: activityStatusesExcludingDeleted() },
   };
+}
+
+export function businessEventListViewWhere(
+  view: BusinessEventListView,
+): Prisma.ActivityWhereInput {
+  if (view === "archived") {
+    return { status: ContentStatus.ARCHIVED };
+  }
+
+  return { status: { in: ACTIVE_EVENT_STATUSES } };
 }
 
 /**

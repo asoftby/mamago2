@@ -115,7 +115,7 @@ export async function recordGuestSuccessfulGeneration(
     try {
       const outcome = await prisma.$transaction(
         async (tx) => {
-          let row = await tx.guestUsage.findUnique({
+          const row = await tx.guestUsage.findUnique({
             where: { anonymousId: key },
           });
 

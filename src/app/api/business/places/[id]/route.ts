@@ -12,6 +12,7 @@ import { canCreateBusinessContent } from "@/lib/auth/businessContentAccess";
 import { canManagePlaceAsync } from "@/lib/auth/placeAccess";
 import { assignPlaceSlugIfMissing } from "@/lib/slug/placeSlugService";
 import { validatePlaceCategoriesDraft } from "@/lib/validation/placeCategoryValidation";
+import { createRequestPerf } from "@/server/utils/requestPerf";
 
 export async function GET(
   request: NextRequest,
@@ -127,8 +128,10 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const perf = createRequestPerf("save-place:route:update");
   try {
     const user = await getCurrentUser();
+    perf.mark("auth");
     if (!user || !canCreateBusinessContent(user.role)) {
       return NextResponse.json(
         { error: "UNAUTHORIZED", message: "Authentication required" },
@@ -137,13 +140,16 @@ export async function PATCH(
     }
 
     const { id } = await params;
-
+    
     if (!id) {
       return NextResponse.json(
         { error: "MISSING_ID", message: "Place ID is required" },
         { status: 400 }
       );
     }
+    
+    const body = await request.json();
+    perf.mark("parse");
 
     // Check ownership
     const existing = await prisma.place.findUnique({
@@ -155,6 +161,7 @@ export async function PATCH(
         primaryCategoryId: true,
       },
     });
+    perf.mark("read");
 
     if (!existing) {
       return NextResponse.json(
@@ -173,7 +180,8 @@ export async function PATCH(
     }
 
     // If Place is PUBLISHED, edits must go through PlaceRevision
-    if (existing.status === "PUBLISHED") {
+    // Exception: ADMIN can edit published places directly
+    if (existing.status === "PUBLISHED" && user.role !== "ADMIN") {
       return NextResponse.json(
         { 
           error: "PUBLISHED_PLACE_REQUIRES_REVISION",
@@ -182,8 +190,6 @@ export async function PATCH(
         { status: 400 }
       );
     }
-
-    const body = await request.json();
 
     // Валидация категорий если они обновляются
     if (body.primaryCategoryId !== undefined || body.subcategoryIds !== undefined) {
@@ -203,6 +209,7 @@ export async function PATCH(
         );
       }
     }
+    perf.mark("validate");
 
     // Lenient validation for autosave - only check types/formats
     const updateData: Record<string, unknown> = {};
@@ -226,12 +233,25 @@ export async function PATCH(
     if (body.primaryCategoryId !== undefined) updateData.primaryCategoryId = body.primaryCategoryId || null;
     if (body.discoverySignalIds !== undefined) updateData.discoverySignalIds = Array.isArray(body.discoverySignalIds) ? body.discoverySignalIds : [];
 
-    // Log for debugging
-    console.log("[place-patch] Update data:", updateData);
+    // Location fields
+    if (body.lat !== undefined) updateData.lat = body.lat;
+    if (body.lng !== undefined) updateData.lng = body.lng;
+    if (body.googlePlaceId !== undefined) updateData.googlePlaceId = body.googlePlaceId;
+    if (body.formattedAddr !== undefined) updateData.formattedAddr = body.formattedAddr;
+    if (body.customAddress !== undefined) updateData.customAddress = body.customAddress;
+    if (body.addressJson !== undefined) updateData.addressJson = body.addressJson;
+    if (body.cityId !== undefined) updateData.cityId = body.cityId;
+    if (body.districtAutoId !== undefined) updateData.districtAutoId = body.districtAutoId;
+    if (body.districtManualId !== undefined) updateData.districtManualId = body.districtManualId;
+    if (body.metroAutoId !== undefined) updateData.metroAutoId = body.metroAutoId;
+    if (body.metroAutoDistanceM !== undefined) updateData.metroAutoDistanceM = body.metroAutoDistanceM;
+    if (body.metroManualId !== undefined) updateData.metroManualId = body.metroManualId;
+    if (body.metroManualDistanceM !== undefined) updateData.metroManualDistanceM = body.metroManualDistanceM;
 
-    const place = await prisma.place.update({
+    await prisma.place.update({
       where: { id },
       data: updateData,
+      select: { id: true },
     });
 
     // Update subcategories if provided
@@ -249,6 +269,7 @@ export async function PATCH(
         });
       }
     }
+    perf.mark("write");
 
     // Auto-assign slug on first meaningful title fill (idempotent).
     if (body.title !== undefined) {
@@ -257,6 +278,20 @@ export async function PATCH(
         await assignPlaceSlugIfMissing(id, t);
       }
     }
+    perf.mark("slug");
+
+    const place = await prisma.place.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        title: true,
+        status: true,
+        slug: true,
+        updatedAt: true,
+      },
+    });
+    perf.mark("response");
+    perf.log({ placeId: id, fields: Object.keys(updateData).length });
 
     return NextResponse.json({ place });
   } catch (error) {

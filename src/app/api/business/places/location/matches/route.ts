@@ -66,6 +66,10 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // For new places (placeId === "new"), we still check for duplicates
+    // but exclude the "new" ID from database queries
+    const isNewPlace = currentPlaceId === "new";
+
     const lat = latStr ? parseFloat(latStr) : null;
     const lng = lngStr ? parseFloat(lngStr) : null;
 
@@ -77,7 +81,8 @@ export async function GET(request: NextRequest) {
       const duplicate = await prisma.place.findFirst({
         where: {
           googlePlaceId,
-          id: { not: currentPlaceId }, // Exclude current place
+          // Only exclude current place if it's not new
+          ...(isNewPlace ? {} : { id: { not: currentPlaceId } }),
         },
         select: {
           id: true,
@@ -105,7 +110,8 @@ export async function GET(request: NextRequest) {
 
       const nearbyPlaces = await prisma.place.findMany({
         where: {
-          id: { not: currentPlaceId },
+          // Only exclude current place if it's not new
+          ...(isNewPlace ? {} : { id: { not: currentPlaceId } }),
           lat: {
             gte: lat - dLat,
             lte: lat + dLat,
@@ -147,7 +153,8 @@ export async function GET(request: NextRequest) {
       // Search in both formattedAddr and customAddress
       const addressMatches = await prisma.place.findMany({
         where: {
-          id: { not: currentPlaceId },
+          // Only exclude current place if it's not new
+          ...(isNewPlace ? {} : { id: { not: currentPlaceId } }),
           OR: [
             {
               formattedAddr: {

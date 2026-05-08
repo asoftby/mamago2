@@ -39,6 +39,13 @@ export interface PlaceFormData {
   metroManualId: string | null;
   metroManualDistanceM: number | null;
   
+  // Google Reviews (Step 2)
+  googleRating?: number | null;
+  googleUserRatingsTotal?: number | null;
+  googleReviewsJson?: Prisma.InputJsonValue | null;
+  googleReviewsSyncedAt?: Date | null;
+  googleMapsUri?: string | null;
+  
   // Display-only location fields (not persisted)
   displayDistrictName?: string | null;
   displayMetroName?: string | null;

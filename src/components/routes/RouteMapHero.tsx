@@ -207,7 +207,7 @@ export function RouteMapHero({
   useEffect(() => {
     if (!mapRef.current) return;
     void renderDirections(travelMode);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [travelMode]);
 
   if (failed) {

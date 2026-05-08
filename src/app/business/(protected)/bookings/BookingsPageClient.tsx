@@ -505,7 +505,7 @@ export function BookingsPageClient() {
                 {/* Comment */}
                 {booking.customerComment && (
                   <div className="pt-3 border-t border-stone-100">
-                    <p className="text-sm text-stone-600 italic">"{booking.customerComment}"</p>
+                    <p className="text-sm text-stone-600 italic">&quot;{booking.customerComment}&quot;</p>
                   </div>
                 )}
 

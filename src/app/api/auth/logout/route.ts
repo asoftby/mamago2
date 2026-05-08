@@ -4,17 +4,32 @@ import {
   deleteSession,
   deleteSessionCookieAction,
 } from "@/lib/auth/session";
+import { isSafeNextPath } from "@/lib/auth/isSafeNextPath";
 import { buildSurfaceRedirectDestination } from "@/lib/routing/surface";
+import {
+  normalizeTargetPathForSurface,
+  surfaceFromPathname,
+} from "@/lib/routing/surface";
 
 export async function POST(request: NextRequest) {
   const host = request.headers.get("x-forwarded-host") ?? request.headers.get("host");
   const protocol =
     request.headers.get("x-forwarded-proto") ??
     request.nextUrl.protocol.replace(/:$/u, "");
+  const nextParam = request.nextUrl.searchParams.get("next");
+
+  const targetPath =
+    typeof nextParam === "string" && isSafeNextPath(nextParam)
+      ? normalizeTargetPathForSurface(surfaceFromPathname(nextParam), nextParam)
+      : "/";
+  const targetSurface =
+    typeof nextParam === "string" && isSafeNextPath(nextParam)
+      ? surfaceFromPathname(nextParam)
+      : "public";
 
   const redirectDestination = buildSurfaceRedirectDestination({
-    targetSurface: "public",
-    targetPath: "/",
+    targetSurface,
+    targetPath,
     currentHost: host,
     currentProtocol: protocol,
   });

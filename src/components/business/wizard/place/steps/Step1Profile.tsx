@@ -3,13 +3,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { ChipsRow, type ChipItem } from "@/components/ui/chips-row";
 import { FilterSelect } from "@/components/ui/filter-select";
 import { AGE_OPTIONS } from "@/lib/config/ages";
-import { VISIT_FORMATS } from "../config";
+import { useVisitFormats, normalizeVisitFormats } from "@/hooks/useVisitFormats";
+import { RichDescriptionEditor } from "@/components/editor/RichDescriptionEditor";
+import { plainTextToRichTextHtml } from "@/lib/richtext/utils";
 import type { PlaceFormData } from "../types";
-import { SignalEntityType } from "@prisma/client";
 
 const MAX_SUBCATEGORIES = 3;
 
@@ -39,10 +39,22 @@ interface Step1ProfileProps {
 export function Step1Profile({ data, onChange, isEditable = true }: Step1ProfileProps) {
   const [title, setTitle] = useState(() => data.title);
   const [shortDesc, setShortDesc] = useState(() => data.shortDesc);
-  const [description, setDescription] = useState(() => data.description || "");
+  const [description, setDescription] = useState(() => {
+    const raw = data.description || "";
+    // Normalize plain text to HTML if needed (legacy data)
+    return raw && !/<[a-z][\s\S]*>/i.test(raw)
+      ? plainTextToRichTextHtml(raw)
+      : raw;
+  });
   const [showFullDescription, setShowFullDescription] = useState(false);
   const [ageTags, setAgeTags] = useState<string[]>(() => data.ageTags || []);
-  const [visitFormats, setVisitFormats] = useState<string[]>(() => data.visitFormats || []);
+  // Normalize legacy values (indoor → format-indoor) on init
+  const [visitFormats, setVisitFormats] = useState<string[]>(() =>
+    normalizeVisitFormats(data.visitFormats || [])
+  );
+
+  // Load visit formats from taxonomy
+  const { formats: visitFormatOptions, isLoading: formatsLoading } = useVisitFormats("PLACE");
 
   // Category state
   const [primaryCategoryId, setPrimaryCategoryId] = useState<string>(() => data.primaryCategoryId ?? "");
@@ -83,17 +95,14 @@ export function Step1Profile({ data, onChange, isEditable = true }: Step1Profile
 
   const handleToggleSubcategory = (categoryId: string) => {
     if (!isEditable) return;
-    setSubcategoryIds((prev) => {
-      let next: string[];
-      if (prev.includes(categoryId)) {
-        next = prev.filter((id) => id !== categoryId);
-      } else {
-        if (prev.length >= MAX_SUBCATEGORIES) return prev; // guard
-        next = [...prev, categoryId];
-      }
-      onChange({ subcategoryIds: next });
-      return next;
-    });
+    const next = subcategoryIds.includes(categoryId)
+      ? subcategoryIds.filter((id) => id !== categoryId)
+      : subcategoryIds.length >= MAX_SUBCATEGORIES
+        ? subcategoryIds // guard — no change
+        : [...subcategoryIds, categoryId];
+    if (next === subcategoryIds) return; // nothing changed
+    setSubcategoryIds(next);
+    onChange({ subcategoryIds: next });
   };
 
   const handleShortDescChange = (value: string) => {
@@ -101,9 +110,9 @@ export function Step1Profile({ data, onChange, isEditable = true }: Step1Profile
     onChange({ shortDesc: value });
   };
 
-  const handleDescriptionChange = (value: string) => {
-    setDescription(value);
-    onChange({ description: value });
+  const handleDescriptionChange = (html: string) => {
+    setDescription(html);
+    onChange({ description: html });
   };
 
   const toggleAgeTag = (tag: string) => {
@@ -121,7 +130,6 @@ export function Step1Profile({ data, onChange, isEditable = true }: Step1Profile
     setVisitFormats(newFormats);
     onChange({ visitFormats: newFormats });
   };
-
   // Dropdown options for root categories
   const rootSelectOptions = useMemo(
     () => (dbCategories ?? []).map((c) => ({ value: c.id, label: c.nameRu })),
@@ -146,7 +154,7 @@ export function Step1Profile({ data, onChange, isEditable = true }: Step1Profile
       const label = isMain ? (
         <span className="flex items-center gap-1.5">
           {child.nameRu}
-          <span className="text-[10px] font-semibold uppercase tracking-wide bg-primary/15 text-primary rounded px-1 py-0.5 leading-none">
+          <span className="text-[10px] font-semibold uppercase tracking-wide bg-primary/15 text-white/95 rounded px-1 py-0.5 leading-none">
             Основная
           </span>
         </span>
@@ -246,30 +254,18 @@ export function Step1Profile({ data, onChange, isEditable = true }: Step1Profile
       {/* Description */}
       <div>
         <Label htmlFor="description">Описание *</Label>
-        <Textarea
-          id="description"
-          value={description}
-          onChange={(e) => handleDescriptionChange(e.target.value)}
-          placeholder="Подробное описание места"
-          className="mt-2"
-          rows={showFullDescription ? 10 : 4}
-          maxLength={5000}
-          disabled={!isEditable}
-        />
-        <div className="flex items-center justify-between mt-1">
-          <p className="text-xs text-muted-foreground">
-            {description.length}/5000 символов
-          </p>
-          {!showFullDescription && description.length > 200 && (
-            <button
-              type="button"
-              onClick={() => setShowFullDescription(true)}
-              className="text-xs text-primary hover:underline"
-            >
-              Показать полностью
-            </button>
-          )}
+        <div className="mt-2">
+          <RichDescriptionEditor
+            value={description}
+            onChange={handleDescriptionChange}
+            placeholder="Подробное описание места — расскажите о том, что здесь можно делать, какая атмосфера, что особенного..."
+            disabled={!isEditable}
+            minHeight={180}
+          />
         </div>
+        <p className="text-xs text-muted-foreground mt-1">
+          Используйте форматирование для лучшей читаемости. Минимум 20 символов.
+        </p>
       </div>
 
       {/* Age */}
@@ -298,12 +294,12 @@ export function Step1Profile({ data, onChange, isEditable = true }: Step1Profile
         <div className="mt-2">
           <ChipsRow
             layout="masonry"
-            items={VISIT_FORMATS.map((format): ChipItem => ({
-              id: format,
-              label: format,
-              active: visitFormats.includes(format),
-              disabled: !isEditable,
-              onClick: () => isEditable && toggleVisitFormat(format),
+            items={visitFormatOptions.map((option): ChipItem => ({
+              id: option.value,
+              label: option.label,
+              active: visitFormats.includes(option.value),
+              disabled: !isEditable || formatsLoading,
+              onClick: () => isEditable && toggleVisitFormat(option.value),
             }))}
           />
         </div>

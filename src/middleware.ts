@@ -13,6 +13,21 @@ export function middleware(request: NextRequest) {
   const hostname = host.split(":")[0]?.toLowerCase() ?? "";
 
   if (
+    pathname.startsWith("/_next") ||
+    pathname.startsWith("/api") ||
+    pathname.startsWith("/favicon") ||
+    pathname.startsWith("/robots.txt") ||
+    pathname.startsWith("/sitemap.xml") ||
+    pathname.startsWith("/manifest") ||
+    pathname.startsWith("/assets") ||
+    pathname.startsWith("/images") ||
+    pathname.startsWith("/uploads") ||
+    pathname.includes(".")
+  ) {
+    return NextResponse.next();
+  }
+
+  if (
     !didLogDevLocalHostDetection &&
     isDevLocalHost(hostname) &&
     process.env.NODE_ENV === "development"
@@ -25,16 +40,6 @@ export function middleware(request: NextRequest) {
   const search =
     surface === "admin" ? stripPublicDiscoverySearchParams(url.search) : url.search;
 
-  // Early return for Next.js static assets and system files
-  if (
-    pathname.startsWith("/_next/") ||
-    pathname === "/favicon.ico" ||
-    pathname === "/robots.txt" ||
-    pathname === "/sitemap.xml"
-  ) {
-    return NextResponse.next();
-  }
-
   const decision = resolveSubdomainMiddlewareDecision({
     host,
     protocol: url.protocol,
@@ -42,6 +47,10 @@ export function middleware(request: NextRequest) {
     search,
     publicAppUrl: process.env.NEXT_PUBLIC_APP_URL,
   });
+
+  if (process.env.NODE_ENV === "development") {
+    console.info(`[middleware] ${host}${pathname} -> ${decision.kind}`, decision);
+  }
 
   if (decision.kind === "redirect") {
     return NextResponse.redirect(decision.location);
@@ -62,5 +71,7 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next|favicon.ico|robots.txt|sitemap.xml|api).*)"],
+  matcher: [
+    "/((?!api|_next/static|_next/image|_next/webpack-hmr|favicon.ico|robots.txt|sitemap.xml|manifest.webmanifest|.*\\..*).*)",
+  ],
 };

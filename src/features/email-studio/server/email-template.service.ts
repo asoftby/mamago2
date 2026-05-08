@@ -25,7 +25,7 @@ import {
 export type EmailTemplateListItem = EmailTemplateWithDocument;
 
 export type CreateEmailTemplateInput = {
-  name: string;
+  name?: string;
   type: EmailTemplateType;
   subject?: string;
   preheader?: string | null;

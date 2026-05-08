@@ -15,6 +15,7 @@ import {
   getIntentFromPath,
   getCityFromPath,
   getDiscoveryIntentForPublicationPath,
+  getDiscoveryIntentForMePath,
   isCityHubPath,
   isPublicationDetailPath,
   isNonStickyHeaderPath,
@@ -37,8 +38,13 @@ export function MobileHeader() {
   const isPublicationPage = isPublicationDetailPath(pathname);
   /** Intent из pathname, чтобы SSR и первый клиентский кадр совпадали (контекст публикации заполняется позже в useEffect). */
   const intentFromPathForPublication = getDiscoveryIntentForPublicationPath(pathname);
+  const intentFromMe = getDiscoveryIntentForMePath(pathname);
   const searchIntent =
-    routeIntent ?? publicationIntent ?? intentFromPathForPublication ?? null;
+    routeIntent ??
+    publicationIntent ??
+    intentFromPathForPublication ??
+    intentFromMe ??
+    null;
   const currentCity = getCityFromPath(pathname);
   const { citySlug } = useCity();
   const isCityHubRoute = isCityHubPath(pathname);

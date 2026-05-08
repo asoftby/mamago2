@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
     const publicationTypeParam = searchParams.get("publicationType");
 
     // Build where clause
-    const where: any = {
+    const where: Record<string, unknown> = {
       businessId: business.id,
     };
 
@@ -174,15 +174,15 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const response: any = {
+    const responseBody: Record<string, unknown> = {
       items: bookings,
     };
 
     if (weekCounts) {
-      response.weekCounts = weekCounts;
+      responseBody.weekCounts = weekCounts;
     }
 
-    return NextResponse.json(response);
+    return NextResponse.json(responseBody);
 
   } catch (error) {
     console.error("Get bookings error:", error);

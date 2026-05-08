@@ -2,13 +2,14 @@ import type { PrismaClient, SearchEntityType } from "@prisma/client";
 import { publicActivityPath } from "@/lib/business/eventPublicLink";
 import { SEARCH_BOOST } from "@/lib/search/constants";
 import { activityMetaLine } from "@/lib/search/metaLines";
-import { buildSearchText } from "@/lib/search/sanitizeSearchText";
+import { buildSearchText, summarizeForSearchCard } from "@/lib/search/sanitizeSearchText";
 
 export type SearchDocUpsertFields = {
   entityType: SearchEntityType;
   entityId: string;
   title: string;
   searchText: string;
+  summaryLine: string | null;
   metaLine: string;
   imageUrl: string | null;
   urlPath: string;
@@ -87,6 +88,7 @@ export async function buildActivityDocument(
     entityId: activity.id,
     title: activity.title,
     searchText: searchText || activity.title,
+    summaryLine: summarizeForSearchCard(activity.shortDesc),
     metaLine,
     imageUrl: activity.coverImageUrl,
     urlPath,

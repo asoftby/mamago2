@@ -26,7 +26,14 @@ export async function POST(request: NextRequest) {
     const data = createBookingSchema.parse(body);
 
     // Get publication and verify booking is enabled
-    let publication: any = null;
+    let publication: {
+      id: string;
+      bookingEnabled: boolean;
+      bookingMode?: BookingMode | null;
+      businessId?: string | null;
+      place?: { ownerBusinessId: string | null } | null;
+      ownerBusinessId?: string | null;
+    } | null = null;
     let businessId: string | null = null;
 
     if (data.publicationType === PublicationType.EVENT) {
@@ -39,7 +46,7 @@ export async function POST(request: NextRequest) {
           businessId: true,
         },
       });
-      businessId = publication?.businessId;
+      businessId = publication?.businessId ?? null;
     } else if (data.publicationType === PublicationType.OFFER) {
       publication = await prisma.offer.findUnique({
         where: { id: data.publicationId },
@@ -54,7 +61,7 @@ export async function POST(request: NextRequest) {
           },
         },
       });
-      businessId = publication?.place?.ownerBusinessId;
+      businessId = publication?.place?.ownerBusinessId ?? null;
     } else if (data.publicationType === PublicationType.PLACE) {
       publication = await prisma.place.findUnique({
         where: { id: data.publicationId },
@@ -64,7 +71,7 @@ export async function POST(request: NextRequest) {
           ownerBusinessId: true,
         },
       });
-      businessId = publication?.ownerBusinessId;
+      businessId = publication?.ownerBusinessId ?? null;
     }
 
     if (!publication) {
@@ -105,7 +112,24 @@ export async function POST(request: NextRequest) {
     }
 
     // Create booking request
-    const bookingData: any = {
+    const bookingData: {
+      businessId: string;
+      userId: string | undefined;
+      publicationType: PublicationType;
+      customerName: string;
+      customerPhone: string;
+      customerEmail: string | undefined;
+      customerComment: string | undefined;
+      adultsCount: number;
+      childrenCount: number;
+      status: BookingStatus;
+      activityId?: string;
+      offerId?: string;
+      placeId?: string;
+      selectedSessionId?: string;
+      requestedDate?: Date;
+      requestedTime?: string;
+    } = {
       businessId,
       userId: user?.id,
       publicationType: data.publicationType,

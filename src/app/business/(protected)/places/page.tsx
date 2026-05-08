@@ -133,9 +133,9 @@ export default async function PlacesPage({
   return (
     <div className="space-y-6">
       <BusinessSectionHeader
-        eyebrow="Infrastructure"
-        title="Places"
-        description="Places — это инфраструктура бизнеса. Здесь видно, какие площадки готовы к работе и сколько публикаций уже опираются на каждое место."
+        eyebrow="ИНФРАСТРУКТУРА"
+        title="Места"
+        description="Места — инфраструктура бизнеса: какие площадки готовы к работе и сколько публикаций на них опирается."
       />
 
       <PlacesList places={placesWithRevisions} currentView={view} />

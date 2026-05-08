@@ -51,8 +51,14 @@ export function DiscoverySignalPicker({
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
-    setError(null);
+    
+    // Use queueMicrotask to avoid synchronous setState in effect
+    queueMicrotask(() => {
+      if (!cancelled) {
+        setLoading(true);
+        setError(null);
+      }
+    });
 
     // Загружаем все опции (включая DEPRECATED) для отображения старых значений
     fetch(

@@ -1,3 +1,7 @@
+/** Публичный поиск (оверлей и мобильный лист) — одинаковые параметры. */
+export const PUBLIC_SEARCH_RESULTS_LIMIT = 8;
+export const PUBLIC_SEARCH_DEBOUNCE_MS = 250;
+
 /** Initial ranking boosts for global search (SearchDocument.boost). */
 export const SEARCH_BOOST = {
   activity: 1.25,

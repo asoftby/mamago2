@@ -22,6 +22,7 @@ export async function getCurrentAuthState(): Promise<AuthenticatedAppUser | null
   return {
     ...user,
     emailVerifiedAt: user.emailVerifiedAt?.toISOString() ?? null,
+    phoneVerifiedAt: user.phoneVerifiedAt?.toISOString() ?? null,
     hasApprovedBusinessProfile,
   };
 }

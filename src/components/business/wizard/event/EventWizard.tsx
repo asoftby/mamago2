@@ -12,6 +12,15 @@ import { usePathname, useRouter } from "next/navigation";
 import { ContentStatus, Activity } from "@prisma/client";
 import { toast } from "@/lib/toast";
 import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   FormWizardShell,
   FormWizardHeader,
   FormPrimaryContentCard,
@@ -19,14 +28,19 @@ import {
   formWizardPhaseFromFlags,
 } from "@/components/form-shell";
 import { WizardProgress } from "@/components/ui/wizard-progress";
+import { Button } from "@/components/ui/button";
 import { getBusinessFormActionLabels, businessFormCopy } from "../businessFormLabels";
 import { canPublishContentDirectly } from "@/lib/auth/businessContentAccess";
 import { useWizardSession } from "@/hooks/useWizardSession";
 
 import type { EventFormData, EventWizardMode } from "./types";
-import { hasMeaningfulContent } from "./defaults";
+import { getDefaultFormData } from "./defaults";
+import {
+  mapEventToFormData,
+  type ActivityWithRelations,
+  buildEventPayload,
+} from "./mappers";
 import { validateStep, validateForSubmit, validateForDraft } from "./validation";
-import { buildEventPayload } from "./mappers";
 import {
   EVENT_WIZARD_STEPS,
   getStepLabel,
@@ -54,6 +68,7 @@ import { navigateToCompatibleHref } from "@/lib/routing/clientNavigation";
 import type { EventStep1Taxonomies } from "./steps/step1Taxonomies";
 import { useAiEnrichment } from "./useAiEnrichment";
 import { applyAiEnrichmentToDraft } from "@/lib/event/applyAiEnrichment";
+import { createClientSavePerf } from "@/lib/perf/clientSavePerf";
 
 type AiSuggestedFields = {
   participationFormat: boolean;
@@ -92,6 +107,20 @@ const LOCAL_STORAGE_KEY = "event-wizard-draft";
 const CURRENT_STEP_STORAGE_KEY = "event-wizard-current-step";
 const TOTAL_STEPS = TOTAL_EVENT_WIZARD_STEPS;
 const DEBUG_EDITOR = process.env.NODE_ENV !== "production";
+
+const EVENT_SUBMITTED_OR_LIVE_STATUSES: ReadonlySet<ContentStatus> = new Set([
+  ContentStatus.PUBLISHED,
+  ContentStatus.PENDING,
+  ContentStatus.PENDING_UPDATE,
+  ContentStatus.SCHEDULED,
+]);
+
+function eventFormBaselineJson(mode: EventWizardMode, event?: Activity): string {
+  if (mode === "edit" && event) {
+    return JSON.stringify(mapEventToFormData(event as unknown as ActivityWithRelations));
+  }
+  return JSON.stringify(getDefaultFormData());
+}
 
 function debugEditorLog(message: string, payload?: Record<string, unknown>) {
   if (!DEBUG_EDITOR) return;
@@ -147,7 +176,6 @@ function EventWizardInner({
   event,
   userId,
   userRole,
-  business,
   onComplete,
   editorSurface,
   contentEditorNav,
@@ -169,6 +197,10 @@ function EventWizardInner({
   const [moderationSuccessEventId, setModerationSuccessEventId] = useState<string | null>(null);
   const [publishedSuccessModalOpen, setPublishedSuccessModalOpen] = useState(false);
   const [publishedActivityHref, setPublishedActivityHref] = useState<string | null>(null);
+  const [isLoadingGenres, setIsLoadingGenres] = useState(false);
+  const [submitStatus, setSubmitStatus] = useState<
+    "idle" | "validating" | "submitting" | "success" | "error"
+  >("idle");
   const [currentStep, setCurrentStep] = useState(() => {
     if (
       mode === "edit" &&
@@ -207,6 +239,17 @@ function EventWizardInner({
   const [isSaving, setIsSaving] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
+  const baselineJsonRef = useRef(eventFormBaselineJson(mode, event));
+  const formSnapshot = useMemo(() => JSON.stringify(formData), [formData]);
+  const unpublishedFlow =
+    mode === "create" ||
+    (event != null && !EVENT_SUBMITTED_OR_LIVE_STATUSES.has(event.status));
+  const isDirty = formSnapshot !== baselineJsonRef.current;
+  const shouldInterceptLeave = unpublishedFlow && isDirty && !isSaving && !isSubmitting;
+  const [leaveDialogOpen, setLeaveDialogOpen] = useState(false);
+  const [leaveDialogBusy, setLeaveDialogBusy] = useState(false);
+  const pendingLeaveHrefRef = useRef<string | null>(null);
+  const confirmingLeaveIntentRef = useRef(false);
   /** sessionStorage для шага — один раз на смену `eventId`, только если в URL нет `step`. */
   const sessionHydratedForEventRef = useRef<string | null>(null);
 
@@ -405,45 +448,222 @@ function EventWizardInner({
     };
   }, [mode, eventId, clearSession]);
 
-  /** Закрытие вкладки / обновление без сохранения черновика в БД */
+  /** Закрытие вкладки / обновление при несохранённых правках черновика */
   useEffect(() => {
-    if (mode !== "create" || typeof window === "undefined") return;
-    const unsaved = !eventId && hasMeaningfulContent(formData);
-    if (!unsaved) return;
+    if (!shouldInterceptLeave || typeof window === "undefined") return;
     const handler = (e: BeforeUnloadEvent) => {
       e.preventDefault();
       e.returnValue = "";
     };
     window.addEventListener("beforeunload", handler);
     return () => window.removeEventListener("beforeunload", handler);
-  }, [mode, eventId, formData]);
+  }, [shouldInterceptLeave]);
+
+  /** Переход по ссылке (в т. ч. «Назад» в шапке редактора) — перехват при несохранённом черновике */
+  useEffect(() => {
+    if (!shouldInterceptLeave) return;
+    const onClickCapture = (e: MouseEvent) => {
+      if (e.defaultPrevented || e.button !== 0) return;
+      const el = e.target as HTMLElement | null;
+      const a = el?.closest?.("a[href]") as HTMLAnchorElement | null;
+      if (!a?.href) return;
+      if (a.target === "_blank" || a.download) return;
+      try {
+        const u = new URL(a.href, window.location.href);
+        if (u.origin !== window.location.origin) return;
+        const targetFull = `${u.pathname}${u.search}${u.hash}`;
+        const currentFull = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+        if (targetFull === currentFull) return;
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        pendingLeaveHrefRef.current = targetFull;
+        setLeaveDialogOpen(true);
+      } catch {
+        /* ignore */
+      }
+    };
+    document.addEventListener("click", onClickCapture, true);
+    return () => document.removeEventListener("click", onClickCapture, true);
+  }, [shouldInterceptLeave]);
 
   // Update form data
   const handleChange = useCallback((updates: Partial<EventFormData>) => {
     patchFormData(updates);
   }, [patchFormData]);
 
+  const persistEventDraftCore = useCallback(async (): Promise<
+    | { ok: true; persistedId: string | null }
+    | { ok: false; reason: "validation" | "api"; message: string }
+  > => {
+    const draftCheck = validateForDraft(formData);
+    if (!draftCheck.isValid) {
+      return {
+        ok: false,
+        reason: "validation",
+        message: draftCheck.errors[0] ?? "Заполните обязательные поля",
+      };
+    }
+
+    const payload = buildEventPayload(formData);
+    const tid = eventId ?? (mode === "edit" && event ? event.id : null);
+
+    if (tid) {
+      const perf = createClientSavePerf("save-event:client", {
+        endpoint: `/api/business/events/${tid}`,
+        payload,
+      });
+      const response = await fetch(`/api/business/events/${tid}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      perf.log({ status: response.status, mode: "save-draft" });
+      if (!response.ok) {
+        const errorBody = await response.json();
+        return {
+          ok: false,
+          reason: "api",
+          message: apiErrorMessage(errorBody, "Не удалось сохранить"),
+        };
+      }
+      return { ok: true, persistedId: tid };
+    }
+
+    const perf = createClientSavePerf("save-event:client", {
+      endpoint: "/api/business/events",
+      payload,
+    });
+    const response = await fetch("/api/business/events", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    perf.log({ status: response.status, mode: "create-draft" });
+    if (!response.ok) {
+      const errorBody = await response.json();
+      return {
+        ok: false,
+        reason: "api",
+        message: apiErrorMessage(errorBody, "Не удалось создать черновик"),
+      };
+    }
+    const data = (await response.json()) as { event: { id: string } };
+    return { ok: true, persistedId: data.event.id };
+  }, [event, eventId, formData, mode]);
+
+  const finalizePendingNavigateAway = useCallback(() => {
+    const dest = pendingLeaveHrefRef.current;
+    pendingLeaveHrefRef.current = null;
+    if (!dest) return;
+    confirmingLeaveIntentRef.current = true;
+    setLeaveDialogOpen(false);
+    navigateToCompatibleHref(router, dest);
+    queueMicrotask(() => {
+      confirmingLeaveIntentRef.current = false;
+    });
+  }, [router]);
+
+  const onLeaveDialogOpenChange = useCallback((open: boolean) => {
+    setLeaveDialogOpen(open);
+    if (!open && !confirmingLeaveIntentRef.current) {
+      pendingLeaveHrefRef.current = null;
+    }
+  }, []);
+
+  const requestNavigateAway = useCallback(
+    (href: string) => {
+      if (!shouldInterceptLeave) {
+        navigateToCompatibleHref(router, href);
+        return;
+      }
+      pendingLeaveHrefRef.current = href;
+      setLeaveDialogOpen(true);
+    },
+    [router, shouldInterceptLeave],
+  );
+
+  const handleLeaveDiscard = useCallback(() => {
+    clearPersistedDraft();
+    if (mode === "create" && typeof window !== "undefined") {
+      try {
+        localStorage.removeItem(LOCAL_STORAGE_KEY);
+        localStorage.removeItem(CURRENT_STEP_STORAGE_KEY);
+      } catch {
+        /* ignore */
+      }
+    }
+    finalizePendingNavigateAway();
+  }, [clearPersistedDraft, finalizePendingNavigateAway, mode]);
+
+  const handleLeaveSaveDraft = useCallback(async () => {
+    setLeaveDialogBusy(true);
+    try {
+      const hadEventId = Boolean(eventId);
+      const result = await persistEventDraftCore();
+      if (!result.ok) {
+        toast.error(result.message);
+        return;
+      }
+      if (result.persistedId && !hadEventId) {
+        setEventId(result.persistedId);
+      }
+      baselineJsonRef.current = JSON.stringify(formData);
+      setLastSaved(new Date());
+      if (mode === "create" && typeof window !== "undefined") {
+        localStorage.removeItem(LOCAL_STORAGE_KEY);
+        localStorage.removeItem(CURRENT_STEP_STORAGE_KEY);
+        clearPersistedDraft();
+      }
+      toast.success(hadEventId ? "Изменения сохранены" : "Черновик сохранён");
+      finalizePendingNavigateAway();
+    } catch (error: unknown) {
+      console.error("Leave save draft error:", error);
+      toast.error(error instanceof Error ? error.message : "Ошибка сохранения");
+    } finally {
+      setLeaveDialogBusy(false);
+    }
+  }, [
+    clearPersistedDraft,
+    eventId,
+    finalizePendingNavigateAway,
+    formData,
+    mode,
+    persistEventDraftCore,
+  ]);
+
   // Navigation
   const handleNext = () => {
+    console.time("[EventWizard] navigate next step");
+
     if (currentStep >= TOTAL_STEPS) return;
+
+    // Block if genres are loading
+    if (isLoadingGenres) {
+      toast.error("Дождитесь загрузки жанров");
+      console.timeEnd("[EventWizard] navigate next step");
+      return;
+    }
 
     // Block forward navigation if current step isn't complete
     const validation = validateStep(currentStep, formData);
     if (!validation.isComplete) {
       toast.error("Заполните обязательные поля перед переходом дальше");
+      console.timeEnd("[EventWizard] navigate next step");
       return;
     }
 
     setCurrentStep((prev) => prev + 1);
+    console.timeEnd("[EventWizard] navigate next step");
   };
 
   const handlePrev = () => {
     // On first step, go back to where user came from
     if (currentStep === 1) {
-      router.push(afterSubmitDestination);
+      requestNavigateAway(afterSubmitDestination);
       return;
     }
-    
+
     if (currentStep > 1) {
       setCurrentStep(prev => prev - 1);
     }
@@ -455,6 +675,12 @@ function EventWizardInner({
     // Allow going back freely
     if (step <= currentStep) {
       setCurrentStep(step);
+      return;
+    }
+
+    // Block if genres are loading
+    if (isLoadingGenres) {
+      toast.error("Дождитесь загрузки жанров");
       return;
     }
 
@@ -472,68 +698,62 @@ function EventWizardInner({
 
   // Save as draft
   const handleSaveDraft = async () => {
+    if (isSaving || isSubmitting) return;
+    console.time("[EventWizard] save draft");
     debugEditorLog("save draft started", { mode, eventId, currentStep });
-    const draftCheck = validateForDraft(formData);
-    if (!draftCheck.isValid) {
-      toast.error(draftCheck.errors[0] ?? "Заполните обязательные поля");
-      return;
-    }
-
     setIsSaving(true);
-    
     try {
-      const payload = buildEventPayload(formData);
-      
-      if (eventId) {
-        const response = await fetch(`/api/business/events/${eventId}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-        
-        if (!response.ok) {
-          const error = await response.json();
-          throw new Error(apiErrorMessage(error, "Не удалось сохранить"));
-        }
+      const hadEventId = Boolean(eventId);
+      const result = await persistEventDraftCore();
+      console.timeEnd("[EventWizard] save draft");
 
-        toast.success("Изменения сохранены");
-        setLastSaved(new Date());
-      } else {
-        // Create new draft
-        const response = await fetch("/api/business/events", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-        
-        if (!response.ok) {
-          const errorBody = await response.json();
-          throw new Error(apiErrorMessage(errorBody, "Не удалось создать черновик"));
-        }
-        
-        const data = await response.json();
-        setEventId(data.event.id);
-        
+      if (!result.ok) {
+        toast.error(result.message);
+        return;
+      }
+
+      if (result.persistedId && !hadEventId) {
+        // First save: transition from create to edit mode
+        setEventId(result.persistedId);
+
         if (onComplete) {
-          onComplete(data.event.id);
+          onComplete(result.persistedId);
         } else {
-          debugEditorLog("router.push after create draft", {
-            href: editorEventEditHref(data.event.id),
+          // Update URL without full page reload
+          const editHref = editorEventEditHref(result.persistedId);
+          const url = new URL(editHref, window.location.origin);
+          // Preserve current step in URL
+          url.searchParams.set("step", String(currentStep));
+          const nextHref = `${url.pathname}${url.search}`;
+
+          debugEditorLog("router.replace after create draft (no reload)", {
+            href: nextHref,
+            currentStep,
           });
-          router.push(editorEventEditHref(data.event.id));
+
+          // Use replace instead of push to avoid adding to history
+          // This updates URL without triggering server-side render
+          router.replace(nextHref, { scroll: false });
         }
       }
-      
-      toast.success("Черновик сохранен");
+
+      baselineJsonRef.current = JSON.stringify(formData);
       setLastSaved(new Date());
-      
+      toast.success(hadEventId ? "Изменения сохранены" : "Черновик сохранён");
+
       if (mode === "create" && typeof window !== "undefined") {
         localStorage.removeItem(LOCAL_STORAGE_KEY);
         localStorage.removeItem(CURRENT_STEP_STORAGE_KEY);
         clearPersistedDraft();
       }
+
+      if (mode === "edit") {
+        debugEditorLog("navigate after edit save draft", { href: afterSubmitDestination });
+        navigateToCompatibleHref(router, afterSubmitDestination);
+      }
     } catch (error: unknown) {
       console.error("Save draft error:", error);
+      console.timeEnd("[EventWizard] save draft");
       toast.error(error instanceof Error ? error.message : "Ошибка сохранения");
     } finally {
       setIsSaving(false);
@@ -542,13 +762,18 @@ function EventWizardInner({
 
   /** Опубликованное событие: финальный шаг — сохранить, отправить на проверку, редирект на карточку. */
   const handlePublishedReviewSave = async () => {
+    if (isSubmitting) return;
     debugEditorLog("published review save started", { eventId, currentStep });
+    setSubmitStatus("validating");
     const validation = validateForSubmit(formData);
     if (!validation.isValid) {
+      setSubmitStatus("error");
       toast.error("Заполните все обязательные поля");
       return;
     }
 
+    console.time("[publish:event:client]");
+    setSubmitStatus("submitting");
     setIsSubmitting(true);
     try {
       const payload = buildEventPayload(formData);
@@ -557,94 +782,136 @@ function EventWizardInner({
         throw new Error("Не найден идентификатор события");
       }
 
+      const patchPerf = createClientSavePerf("save-event:client", {
+        endpoint: `/api/business/events/${tid}`,
+        payload,
+      });
       const patchResponse = await fetch(`/api/business/events/${tid}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
+      patchPerf.log({ status: patchResponse.status, mode: "pre-submit-save" });
       if (!patchResponse.ok) {
         const errorBody = await patchResponse.json();
         throw new Error(apiErrorMessage(errorBody, "Не удалось сохранить событие"));
       }
 
+      const submitPerf = createClientSavePerf("publish-event:client", {
+        endpoint: `/api/business/events/${tid}/submit`,
+      });
       const submitResponse = await fetch(`/api/business/events/${tid}/submit`, {
         method: "POST",
       });
+      submitPerf.log({ status: submitResponse.status, mode: "submit" });
       if (!submitResponse.ok) {
         const errorBody = await submitResponse.json();
         throw new Error(apiErrorMessage(errorBody, "Не удалось отправить на проверку"));
       }
 
       const submitBody = await submitResponse.json();
+
+      // Mark as success BEFORE any cleanup or navigation
+      setSubmitStatus("success");
+      setLastSaved(new Date());
+
       const href =
         eventPublicPathFromSubmitBody(submitBody) ??
         publicActivityPath(tid, formData.city, eventSlugFromSubmitBody(submitBody));
-      debugEditorLog("router.push to public activity", { href });
-      router.push(href);
+
       toast.success(
         canPublishContentDirectly(userRole)
           ? "Изменения опубликованы"
           : "Изменения сохранены и отправлены на проверку",
       );
-      setLastSaved(new Date());
+
+      // Clean up AFTER marking success
       if (mode === "create" && typeof window !== "undefined") {
         localStorage.removeItem(LOCAL_STORAGE_KEY);
         localStorage.removeItem(CURRENT_STEP_STORAGE_KEY);
         clearPersistedDraft();
       }
+
+      const destination = mode === "edit" ? afterSubmitDestination : href;
+
+      // Navigate immediately after success
+      debugEditorLog("navigate after published review save", { href: destination });
+      navigateToCompatibleHref(router, destination);
     } catch (error: unknown) {
       console.error("Published review save error:", error);
+      setSubmitStatus("error");
       toast.error(error instanceof Error ? error.message : "Ошибка сохранения");
     } finally {
+      console.timeEnd("[publish:event:client]");
       setIsSubmitting(false);
     }
   };
 
   // Submit for moderation
   const handleSubmit = async () => {
+    if (isSubmitting) return;
     debugEditorLog("submit started", { mode, eventId, currentStep });
+
     // Validate before submit
+    setSubmitStatus("validating");
     const validation = validateForSubmit(formData);
-    
+
     if (!validation.isValid) {
+      setSubmitStatus("error");
       toast.error("Заполните все обязательные поля");
       console.error("Validation errors:", validation.errors);
       return;
     }
-    
+
+    console.time("[publish:event:client]");
+    setSubmitStatus("submitting");
     setIsSubmitting(true);
-    
+
     try {
       const payload = buildEventPayload(formData);
       const targetId = eventId ?? (mode === "edit" && event ? event.id : null);
 
       if (!targetId) {
+        const createPerf = createClientSavePerf("save-event:client", {
+          endpoint: "/api/business/events",
+          payload,
+        });
         const createResponse = await fetch("/api/business/events", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
         });
-        
+        createPerf.log({ status: createResponse.status, mode: "create-before-submit" });
+
         if (!createResponse.ok) {
           const errorBody = await createResponse.json();
           throw new Error(apiErrorMessage(errorBody, "Не удалось создать событие"));
         }
-        
+
         const createData = await createResponse.json();
         const newId = createData.event.id;
         setEventId(newId);
-        
+
+        const submitPerf = createClientSavePerf("publish-event:client", {
+          endpoint: `/api/business/events/${newId}/submit`,
+        });
         const submitResponse = await fetch(`/api/business/events/${newId}/submit`, {
           method: "POST",
         });
-        
+        submitPerf.log({ status: submitResponse.status, mode: "submit" });
+
         if (!submitResponse.ok) {
           const errorBody = await submitResponse.json();
           throw new Error(apiErrorMessage(errorBody, "Не удалось отправить на модерацию"));
         }
 
         const submitBody = await submitResponse.json();
+
+        // Mark as success BEFORE any cleanup or navigation
+        setSubmitStatus("success");
+
         if (isModerationPendingSuccess(userRole, submitBody)) {
+          // Clean up AFTER marking success
           if (mode === "create" && typeof window !== "undefined") {
             localStorage.removeItem(LOCAL_STORAGE_KEY);
             localStorage.removeItem(CURRENT_STEP_STORAGE_KEY);
@@ -655,6 +922,7 @@ function EventWizardInner({
           return;
         }
         if (isPublishedSuccess(submitBody)) {
+          // Clean up AFTER marking success
           if (mode === "create" && typeof window !== "undefined") {
             localStorage.removeItem(LOCAL_STORAGE_KEY);
             localStorage.removeItem(CURRENT_STEP_STORAGE_KEY);
@@ -674,6 +942,7 @@ function EventWizardInner({
             : "Событие отправлено на модерацию",
         );
 
+        // Clean up AFTER marking success
         if (mode === "create" && typeof window !== "undefined") {
           localStorage.removeItem(LOCAL_STORAGE_KEY);
           clearPersistedDraft();
@@ -690,28 +959,42 @@ function EventWizardInner({
         return;
       }
 
+      const patchPerf = createClientSavePerf("save-event:client", {
+        endpoint: `/api/business/events/${targetId}`,
+        payload,
+      });
       const patchResponse = await fetch(`/api/business/events/${targetId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      
+      patchPerf.log({ status: patchResponse.status, mode: "pre-submit-save" });
+
       if (!patchResponse.ok) {
         const errorBody = await patchResponse.json();
         throw new Error(apiErrorMessage(errorBody, "Не удалось сохранить событие"));
       }
-      
+
+      const submitPerf = createClientSavePerf("publish-event:client", {
+        endpoint: `/api/business/events/${targetId}/submit`,
+      });
       const submitResponse = await fetch(`/api/business/events/${targetId}/submit`, {
         method: "POST",
       });
-      
+      submitPerf.log({ status: submitResponse.status, mode: "submit" });
+
       if (!submitResponse.ok) {
         const errorBody = await submitResponse.json();
         throw new Error(apiErrorMessage(errorBody, "Не удалось отправить на модерацию"));
       }
 
       const submitBody = await submitResponse.json();
+
+      // Mark as success BEFORE any cleanup or navigation
+      setSubmitStatus("success");
+
       if (isModerationPendingSuccess(userRole, submitBody)) {
+        // Clean up AFTER marking success
         if (mode === "create" && typeof window !== "undefined") {
           localStorage.removeItem(LOCAL_STORAGE_KEY);
           localStorage.removeItem(CURRENT_STEP_STORAGE_KEY);
@@ -722,6 +1005,7 @@ function EventWizardInner({
         return;
       }
       if (isPublishedSuccess(submitBody)) {
+        // Clean up AFTER marking success
         if (mode === "create" && typeof window !== "undefined") {
           localStorage.removeItem(LOCAL_STORAGE_KEY);
           localStorage.removeItem(CURRENT_STEP_STORAGE_KEY);
@@ -740,13 +1024,14 @@ function EventWizardInner({
           ? "Событие опубликовано"
           : "Событие отправлено на модерацию",
       );
-      
+
+      // Clean up AFTER marking success
       if (mode === "create" && typeof window !== "undefined") {
         localStorage.removeItem(LOCAL_STORAGE_KEY);
         localStorage.removeItem(CURRENT_STEP_STORAGE_KEY);
         clearPersistedDraft();
       }
-      
+
       if (onComplete) {
         onComplete(targetId);
       } else if (mode === "create") {
@@ -761,8 +1046,10 @@ function EventWizardInner({
       }
     } catch (error: unknown) {
       console.error("Submit error:", error);
+      setSubmitStatus("error");
       toast.error(error instanceof Error ? error.message : "Ошибка отправки");
     } finally {
+      console.timeEnd("[publish:event:client]");
       setIsSubmitting(false);
     }
   };
@@ -785,13 +1072,20 @@ function EventWizardInner({
   const renderStep = () => {
     // Review step is special case
     if (currentStep === TOTAL_STEPS) {
-      return <Step9Review data={formData} isSubmitting={isSubmitting} onGoToStep={handleGoToStep} />;
+      return (
+        <Step9Review
+          data={formData}
+          isSubmitting={isSubmitting}
+          submitStatus={submitStatus}
+          onGoToStep={handleGoToStep}
+        />
+      );
     }
-    
+
     // Find step config
     const stepConfig = EVENT_WIZARD_STEPS.find(s => s.id === currentStep);
     if (!stepConfig) return null;
-    
+
     // Render step component from config
     const StepComponent = stepConfig.component;
     const commonProps = {
@@ -799,7 +1093,7 @@ function EventWizardInner({
       onChange: handleChange,
       isEditable,
     };
-    
+
     // Add import-aware context for steps that depend on the current event entity
     if (
       stepConfig.key === "location" ||
@@ -814,7 +1108,7 @@ function EventWizardInner({
       }
       return <StepComponent {...commonProps} wizardSessionId={wizardSessionId} eventId={eventId ?? event?.id} />;
     }
-    
+
     if (stepConfig.key === "basics") {
       return (
         <StepComponent
@@ -827,6 +1121,7 @@ function EventWizardInner({
           onAiManualOverride={handleAiManualOverride}
           isAiLoading={isAiLoading}
           isAiDone={isAiDone}
+          onLoadingGenresChange={setIsLoadingGenres}
         />
       );
     }
@@ -835,7 +1130,9 @@ function EventWizardInner({
   };
 
   const canNext =
-    currentStep < TOTAL_STEPS && validateStep(currentStep, formData).isComplete;
+    currentStep < TOTAL_STEPS &&
+    validateStep(currentStep, formData).isComplete &&
+    !isLoadingGenres;
   const canPrev = true; // Always show back button (on step 1 it goes to returnTo)
   const isReviewStep = currentStep === TOTAL_STEPS;
   const isPublishedEdit =
@@ -916,7 +1213,11 @@ function EventWizardInner({
             : undefined
         }
         submitDisabled={
-          isSubmitting || isSaving || !submitValidation.isValid
+          isSubmitting ||
+          isSaving ||
+          !submitValidation.isValid ||
+          submitStatus === "success" ||
+          submitStatus === "submitting"
         }
       />
 
@@ -935,6 +1236,37 @@ function EventWizardInner({
           activityHref={publishedActivityHref}
         />
       )}
+
+      <AlertDialog open={leaveDialogOpen} onOpenChange={onLeaveDialogOpenChange}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Уйти из редактора?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Событие не опубликовано. Сохранить черновик на сервере или выйти без сохранения изменений?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-col gap-2 sm:flex-row sm:justify-end">
+            <AlertDialogCancel type="button" disabled={leaveDialogBusy}>
+              Отмена
+            </AlertDialogCancel>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={leaveDialogBusy}
+              onClick={handleLeaveDiscard}
+            >
+              Не сохранять
+            </Button>
+            <Button
+              type="button"
+              disabled={leaveDialogBusy}
+              onClick={() => void handleLeaveSaveDraft()}
+            >
+              {leaveDialogBusy ? "Сохранение..." : "Сохранить черновик"}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </FormWizardShell>
   );
 }

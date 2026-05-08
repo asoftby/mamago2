@@ -17,7 +17,14 @@ export const metadata = {
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ reset?: string; next?: string; mode?: string }>;
+  searchParams: Promise<{
+    reset?: string;
+    next?: string;
+    mode?: string;
+    email?: string;
+    invite?: string;
+    invitationToken?: string;
+  }>;
 }) {
   const params = await searchParams;
   const routing = await getCurrentRequestRoutingContext();
@@ -50,6 +57,9 @@ export default async function LoginPage({
         showResetSuccess={params?.reset === "success"}
         next={params?.next}
         initialMode={params?.mode === "register" ? "register" : "login"}
+        initialEmail={params?.email}
+        inviteKind={params?.invite}
+        invitationToken={params?.invitationToken}
       />
     </Suspense>
   );

@@ -14,6 +14,9 @@ import { CityProvider } from "@/contexts/CityContext";
 import { WeatherProvider } from "@/contexts/WeatherContext";
 import { AuthProvider } from "@/lib/auth/AuthProvider";
 import { getCurrentAuthState } from "@/lib/auth/getCurrentAuthState";
+import { PendingActionProvider } from "@/contexts/PendingActionContext";
+import { GateFlowController } from "@/components/auth/GateFlowController";
+import { MobileTapDiagnostics } from "@/components/dev/MobileTapDiagnostics";
 
 export const metadata: Metadata = {
   title: "mamaGo 2.0",
@@ -45,19 +48,23 @@ export default async function RootLayout({
       >
         <SaveIntentProvider>
           <AuthProvider initialUser={initialAuthUser}>
-            <AccountModeProvider>
-              <CityProvider>
-                <WeatherProvider>
-                  <FamilyPersonaProvider>
-                    <CookieConsentProvider>
-                      <FamilyDerivedAgeSync />
-                      {children}
-                      {shouldMountMyPlanProvider ? <MyPlanProvider /> : null}
-                    </CookieConsentProvider>
-                  </FamilyPersonaProvider>
-                </WeatherProvider>
-              </CityProvider>
-            </AccountModeProvider>
+            <PendingActionProvider>
+              <AccountModeProvider>
+                <CityProvider>
+                  <WeatherProvider>
+                    <FamilyPersonaProvider>
+                      <CookieConsentProvider>
+                        <FamilyDerivedAgeSync />
+                        {children}
+                        {shouldMountMyPlanProvider ? <MyPlanProvider /> : null}
+                        <GateFlowController />
+                        <MobileTapDiagnostics />
+                      </CookieConsentProvider>
+                    </FamilyPersonaProvider>
+                  </WeatherProvider>
+                </CityProvider>
+              </AccountModeProvider>
+            </PendingActionProvider>
           </AuthProvider>
         </SaveIntentProvider>
         <Sonner />

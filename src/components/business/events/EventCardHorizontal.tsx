@@ -3,8 +3,9 @@
 import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { usePathname, useSearchParams } from "next/navigation";
 import { ContentStatusBadge } from "@/components/business/shared/ContentStatusBadge";
-import { Pencil, Archive, ArchiveRestore, Trash2, Calendar, MapPin } from "lucide-react";
+import { Pencil, Archive, ArchiveRestore, Trash2, Calendar, MapPin, BarChart3, Zap } from "lucide-react";
 import { ContentStatus, ActivityType, ScheduleMode } from "@prisma/client";
 import {
   AlertDialog,
@@ -19,6 +20,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { BusinessChip } from "@/components/business/ui/BusinessChip";
 import { buildPromotionLaunchHref } from "@/lib/promotion/shared";
+import { PublicationStatisticsDialog } from "@/components/business/shared/PublicationStatisticsDialog";
 
 interface Activity {
   id: string;
@@ -80,11 +82,16 @@ export function EventCardHorizontal({
   onArchive,
   onUnarchive,
 }: EventCardHorizontalProps) {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [isDeleting, setIsDeleting] = useState(false);
   const [isArchiving, setIsArchiving] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [statisticsOpen, setStatisticsOpen] = useState(false);
 
   const coverImage = activity.images.find((img) => img.id);
+  const currentSearch = searchParams.toString();
+  const returnTo = `${pathname}${currentSearch ? `?${currentSearch}` : ""}`;
 
   const canDeleteEvent = activity.status !== ContentStatus.DELETED;
   const getErrorMessage = (error: unknown, fallback: string) =>
@@ -127,8 +134,17 @@ export function EventCardHorizontal({
   };
 
   const deleteCopy = deleteDialogCopy(activity.status);
+  const actionButtonClass =
+    "inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-2xl px-3.5 text-sm font-medium transition-colors disabled:pointer-events-none disabled:opacity-50";
+  const neutralActionClass =
+    "border border-stone-200 bg-white text-stone-700 hover:border-stone-300 hover:bg-stone-50 hover:text-stone-950";
+  const promoteActionClass =
+    "bg-[#C6FF72] text-stone-950 shadow-[0_8px_22px_rgba(132,204,22,0.22)] hover:bg-[#B8FF65] hover:shadow-[0_10px_28px_rgba(132,204,22,0.32)]";
+  const ghostIconActionClass =
+    "h-10 w-10 rounded-2xl text-stone-500 hover:bg-stone-100 hover:text-stone-900";
 
   return (
+    <>
     <div className="rounded-[26px] border border-stone-200/90 bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-all hover:border-stone-300 hover:shadow-[0_14px_32px_rgba(15,23,42,0.05)] md:p-5">
       <div className="flex gap-4">
         {coverImage ? (
@@ -179,23 +195,21 @@ export function EventCardHorizontal({
             <span>Обновлено {formatUpdatedAt(activity.updatedAt)}</span>
           </div>
 
-          <div className="mb-5 flex flex-wrap gap-2">
-            {activity.metrics && (
-              <>
-                <BusinessChip>Просмотры: {activity.metrics.views}</BusinessChip>
-                <BusinessChip>Сохранения: {activity.metrics.saves}</BusinessChip>
-                <BusinessChip>В план: {activity.metrics.planAdds}</BusinessChip>
-                <BusinessChip>Переходы: {activity.metrics.ctaClicks}</BusinessChip>
-              </>
-            )}
-          </div>
-
-          <div className="flex flex-wrap items-center gap-3">
-            <Link
-              href={`/business/events/${activity.id}/edit?returnTo=${encodeURIComponent("/business/events")}`}
-              className="inline-flex items-center gap-1.5 rounded-2xl border border-stone-200 bg-white px-4 py-2.5 text-sm font-medium text-stone-700 transition-colors hover:border-stone-300 hover:bg-stone-50 hover:text-stone-950"
+          <div className="flex gap-2 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-visible">
+            <button
+              type="button"
+              onClick={() => setStatisticsOpen(true)}
+              className={cn(actionButtonClass, neutralActionClass)}
             >
-              <Pencil className="w-4 h-4 shrink-0" />
+              <BarChart3 className="h-4 w-4 shrink-0" />
+              Статистика
+            </button>
+
+            <Link
+              href={`/business/events/${activity.id}/edit?returnTo=${encodeURIComponent(returnTo)}`}
+              className={cn(actionButtonClass, neutralActionClass)}
+            >
+              <Pencil className="h-4 w-4 shrink-0" />
               Редактировать
             </Link>
 
@@ -204,10 +218,37 @@ export function EventCardHorizontal({
                 publicationType: "EVENT",
                 publicationId: activity.id,
               })}
-              className="inline-flex items-center gap-1.5 rounded-2xl bg-stone-900 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-stone-800"
+              className={cn(actionButtonClass, promoteActionClass, "px-4 font-semibold")}
             >
+              <Zap className="h-4 w-4 shrink-0 fill-stone-950" />
               Продвигать
             </Link>
+
+            {onArchive && (
+              <button
+                type="button"
+                onClick={handleArchive}
+                disabled={isArchiving}
+                className={cn(actionButtonClass, ghostIconActionClass)}
+                title="В архив"
+                aria-label="В архив"
+              >
+                <Archive className="h-4 w-4" />
+              </button>
+            )}
+
+            {onUnarchive && (
+              <button
+                type="button"
+                onClick={handleUnarchive}
+                disabled={isArchiving}
+                className={cn(actionButtonClass, ghostIconActionClass)}
+                title="Восстановить"
+                aria-label="Восстановить"
+              >
+                <ArchiveRestore className="h-4 w-4" />
+              </button>
+            )}
 
             {canDeleteEvent && (
               <>
@@ -216,7 +257,8 @@ export function EventCardHorizontal({
                   onClick={() => setDeleteDialogOpen(true)}
                   disabled={isDeleting}
                   className={cn(
-                    "inline-flex items-center justify-center rounded-xl p-2 transition-colors",
+                    actionButtonClass,
+                    "h-10 w-10 rounded-2xl",
                     "text-stone-400 hover:bg-red-50 hover:text-red-600",
                     "disabled:opacity-50 disabled:pointer-events-none"
                   )}
@@ -247,31 +289,17 @@ export function EventCardHorizontal({
                 </AlertDialog>
               </>
             )}
-
-            {onArchive && (
-              <button
-                onClick={handleArchive}
-                disabled={isArchiving}
-                className="inline-flex items-center gap-1 rounded-xl px-3 py-2 text-sm text-stone-600 transition-colors hover:bg-stone-100 hover:text-stone-900 disabled:opacity-50"
-                title="В архив"
-              >
-                <Archive className="w-4 h-4" />
-              </button>
-            )}
-
-            {onUnarchive && (
-              <button
-                onClick={handleUnarchive}
-                disabled={isArchiving}
-                className="inline-flex items-center gap-1 rounded-xl px-3 py-2 text-sm text-stone-600 transition-colors hover:bg-stone-100 hover:text-stone-900 disabled:opacity-50"
-                title="Восстановить"
-              >
-                <ArchiveRestore className="w-4 h-4" />
-              </button>
-            )}
           </div>
         </div>
       </div>
     </div>
+    <PublicationStatisticsDialog
+      open={statisticsOpen}
+      onOpenChange={setStatisticsOpen}
+      title={activity.title}
+      entityLabel="события"
+      metrics={activity.metrics}
+    />
+    </>
   );
 }

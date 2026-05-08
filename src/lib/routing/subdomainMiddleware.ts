@@ -24,6 +24,10 @@ function isEditorRoute(pathname: string): boolean {
   return pathname === "/editor" || pathname.startsWith("/editor/");
 }
 
+function isPublicInviteRoute(pathname: string): boolean {
+  return pathname === "/invite/business";
+}
+
 function stripSubdomainPrefix(host: string): string {
   if (host.startsWith("business.")) {
     return host.replace(/^business\./u, "");
@@ -79,6 +83,19 @@ export function resolveSubdomainMiddlewareDecision(params: {
   const adminSafeSearch = isAdminHost ? stripPublicDiscoverySearchParams(search) : search;
 
   if (isBusinessHost || isAdminHost) {
+    if (isPublicInviteRoute(pathname)) {
+      return {
+        kind: "redirect",
+        location: buildPublicLocation({
+          host,
+          protocol,
+          pathname,
+          search: adminSafeSearch,
+          publicAppUrl,
+        }),
+      };
+    }
+
     if (pathname === "/business" || pathname.startsWith("/business/")) {
       const strippedPathname = pathname.slice("/business".length) || "/";
       return {

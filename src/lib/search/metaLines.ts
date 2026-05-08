@@ -33,17 +33,26 @@ export function activityMetaLine(args: {
   return parts.join(" · ") || "Событие";
 }
 
+import { getPlaceSearchAddressMetaLine } from "@/lib/placeLocationString";
+
 export function placeMetaLine(args: {
   cityName: string | null | undefined;
-  districtName: string | null | undefined;
   shortAddress: string | null | undefined;
   formattedAddr: string | null | undefined;
+  customAddress: string | null | undefined;
+  floor: string | null | undefined;
+  unit: string | null | undefined;
+  unitLabel: string | null | undefined;
 }): string {
-  const addr = args.shortAddress?.trim() || args.formattedAddr?.trim() || "";
-  const cityName = args.cityName?.trim();
-  const district = args.districtName?.trim();
-  const metaParts = [cityName, district || addr].filter(Boolean);
-  return metaParts.join(" · ") || "Место";
+  return getPlaceSearchAddressMetaLine({
+    city: args.cityName ? { name: args.cityName } : null,
+    shortAddress: args.shortAddress,
+    formattedAddr: args.formattedAddr,
+    customAddress: args.customAddress,
+    floor: args.floor,
+    unit: args.unit,
+    unitLabel: args.unitLabel,
+  });
 }
 
 export function offerMetaLine(args: {

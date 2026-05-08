@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { InternationalPhoneInput } from "@/components/phone/InternationalPhoneInput";
 import type { Place } from "../types";
 import { WizardStepHeader } from "../components/WizardStepHeader";
 
@@ -100,12 +101,11 @@ export function Step4Contacts({
       {/* Phone */}
       <div>
         <Label htmlFor="phone">Телефон</Label>
-        <Input
+        <InternationalPhoneInput
           id="phone"
-          type="tel"
           value={phone}
-          onChange={(e) => handlePhoneChange(e.target.value)}
-          placeholder="+375 29 123-45-67"
+          onChange={handlePhoneChange}
+          placeholder="+375 29 123 45 67"
           className="mt-2"
           disabled={!isEditable}
         />

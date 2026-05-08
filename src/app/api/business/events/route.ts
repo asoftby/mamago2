@@ -12,7 +12,11 @@ import { getUserBusinessId } from "@/lib/auth/placeAccess";
 import { replaceActivitySessionsFromScheduleJson } from "@/lib/business/syncEventActivitySessions";
 import { syncEventVenueAndActivityCity } from "@/lib/business/syncEventVenueFromWizard";
 import { computeEventShortDesc } from "@/lib/business/eventShortDesc";
-import { excludeDeletedEvents, excludeGhostEventDrafts } from "@/lib/business/eventListWhere";
+import {
+  businessEventListViewWhere,
+  excludeGhostEventDrafts,
+  normalizeBusinessEventListView,
+} from "@/lib/business/eventListWhere";
 import { validateEventProgramCategories } from "@/lib/business/validateEventProgramCategories";
 import { assertBusinessEventPrimaryCategory } from "@/lib/business/validatePrimaryEventCategory";
 import { assignActivitySlugIfMissing } from "@/lib/slug/activitySlugService";
@@ -254,12 +258,15 @@ export async function GET(request: NextRequest) {
             user.id,
             await getBusinessIdsUserCanAccess(user.id),
           );
+    const view = normalizeBusinessEventListView(
+      request.nextUrl.searchParams.get("view"),
+    );
 
     const events = await prisma.activity.findMany({
       where: {
         type: ActivityType.EVENT,
         ...manageWhere,
-        ...excludeDeletedEvents(),
+        ...businessEventListViewWhere(view),
         ...excludeGhostEventDrafts(),
       },
       orderBy: {

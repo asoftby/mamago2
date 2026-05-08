@@ -45,7 +45,9 @@ export function useUnreadNotificationCount(pollMs: number = DEFAULT_POLL_MS) {
 
   useEffect(() => {
     if (!isAuthenticated) {
-      setUnreadCount(0);
+      queueMicrotask(() => {
+        setUnreadCount(0);
+      });
       return;
     }
     const id = window.setTimeout(() => {

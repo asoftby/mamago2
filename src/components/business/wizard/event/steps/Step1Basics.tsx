@@ -78,6 +78,7 @@ interface Step1BasicsProps {
   onAiManualOverride?: ((field: string) => void) | undefined;
   isAiLoading?: boolean;
   isAiDone?: boolean;
+  onLoadingGenresChange?: (loading: boolean) => void;
 }
 
 export function Step1Basics({
@@ -92,6 +93,7 @@ export function Step1Basics({
   onAiManualOverride,
   isAiLoading = false,
   isAiDone = false,
+  onLoadingGenresChange,
 }: Step1BasicsProps) {
   const [rootCategories, setRootCategories] = useState<DiscoveryEventCategory[]>(
     initialTaxonomies?.categories ?? [],
@@ -107,6 +109,12 @@ export function Step1Basics({
     Record<string, PublicGenreOption[]>
   >(initialTaxonomies?.genresByCategoryId ?? {});
   const [loading, setLoading] = useState(!initialTaxonomies);
+  const [loadingGenres, setLoadingGenres] = useState(false);
+
+  // Notify parent about genres loading state
+  useEffect(() => {
+    onLoadingGenresChange?.(loadingGenres);
+  }, [loadingGenres, onLoadingGenresChange]);
 
   useEffect(() => {
     if (initialTaxonomies) {
@@ -205,12 +213,20 @@ export function Step1Basics({
       setGenresByCategoryId((current) =>
         Object.keys(current).length === 0 ? current : {},
       );
+      setLoadingGenres(false);
       return;
     }
     const currentCategory = rootCategories.find((category) => category.id === cid);
-    if ((currentCategory?.options?.length ?? 0) > 0) return;
-    if (genresByCategoryId[cid]) return;
+    if ((currentCategory?.options?.length ?? 0) > 0) {
+      setLoadingGenres(false);
+      return;
+    }
+    if (genresByCategoryId[cid]) {
+      setLoadingGenres(false);
+      return;
+    }
 
+    setLoadingGenres(true);
     void (async () => {
       const next: Record<string, PublicGenreOption[]> = {};
       try {
@@ -224,7 +240,10 @@ export function Step1Basics({
       } catch {
         next[cid] = [];
       }
-      if (!cancelled) setGenresByCategoryId(next);
+      if (!cancelled) {
+        setGenresByCategoryId(next);
+        setLoadingGenres(false);
+      }
     })();
 
     return () => {
@@ -961,11 +980,26 @@ export function Step1Basics({
                       <Label className="text-xs">
                         {categoryOptions.length > 0 ? "Категория" : "Жанр"}
                       </Label>
-                      <ChipsRow
-                        layout="wrap"
-                        aria-label={`Жанры — ${cat.nameRu}`}
-                        items={genreItemsForCat}
-                      />
+                      {loadingGenres ? (
+                        <div className="flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+                          <Loader2 className="h-4 w-4 animate-spin text-gray-500" />
+                          <span className="text-sm text-gray-600">Загрузка жанров...</span>
+                        </div>
+                      ) : (
+                        <ChipsRow
+                          layout="wrap"
+                          aria-label={`Жанры — ${cat.nameRu}`}
+                          items={genreItemsForCat}
+                        />
+                      )}
+                    </div>
+                  ) : loadingGenres ? (
+                    <div className="space-y-2">
+                      <Label className="text-xs">Жанр</Label>
+                      <div className="flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+                        <Loader2 className="h-4 w-4 animate-spin text-gray-500" />
+                        <span className="text-sm text-gray-600">Загрузка жанров...</span>
+                      </div>
                     </div>
                   ) : null}
 

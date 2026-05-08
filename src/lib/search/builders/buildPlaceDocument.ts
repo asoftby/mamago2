@@ -1,7 +1,7 @@
 import type { PrismaClient } from "@prisma/client";
 import { SEARCH_BOOST } from "@/lib/search/constants";
 import { placeMetaLine } from "@/lib/search/metaLines";
-import { buildSearchText } from "@/lib/search/sanitizeSearchText";
+import { buildSearchText, summarizeForSearchCard } from "@/lib/search/sanitizeSearchText";
 import type { SearchDocUpsertFields } from "./buildActivityDocument";
 
 export async function buildPlaceDocument(
@@ -36,9 +36,12 @@ export async function buildPlaceDocument(
 
   const metaLine = placeMetaLine({
     cityName: place.city?.name,
-    districtName: place.districtManual?.name,
     shortAddress: place.shortAddress,
     formattedAddr: place.formattedAddr,
+    customAddress: place.customAddress,
+    floor: place.floor,
+    unit: place.unit,
+    unitLabel: place.unitLabel,
   });
 
   const slug = place.slug?.trim();
@@ -50,6 +53,7 @@ export async function buildPlaceDocument(
     entityId: place.id,
     title: place.title,
     searchText: searchText || place.title,
+    summaryLine: summarizeForSearchCard(place.shortDesc),
     metaLine,
     imageUrl: place.images[0]?.url ?? null,
     urlPath,

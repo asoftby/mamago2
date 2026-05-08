@@ -1,6 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
+import { useLastPublicSearchQuery } from "@/hooks/useLastPublicSearchQuery";
 import type { SearchResultItem as SearchResultItemType } from "@/lib/search/types";
 import { SearchResultItem } from "./SearchResultItem";
 
@@ -43,6 +44,7 @@ export function SearchResults({
   onPopularPick: (term: string) => void;
   onSelectResult: (item: SearchResultItemType) => void;
 }) {
+  const lastSearch = useLastPublicSearchQuery();
   const showPopularEmpty = trimmedQuery.length < 2;
   const showNoResults = trimmedQuery.length >= 2 && !loading && results.length === 0;
 
@@ -54,6 +56,25 @@ export function SearchResults({
     >
       {showPopularEmpty ? (
         <div className="p-4">
+          {lastSearch ? (
+            <>
+              <p className="mb-3 text-xs font-medium uppercase tracking-wide text-neutral-400">
+                Последний поиск
+              </p>
+              <ul className="mb-5 flex flex-wrap gap-2">
+                <li className="max-w-full">
+                  <button
+                    type="button"
+                    onClick={() => onPopularPick(lastSearch)}
+                    className="max-w-full truncate rounded-full border border-neutral-200 bg-neutral-50 px-3 py-1.5 text-left text-sm text-neutral-700 transition-colors hover:bg-neutral-100"
+                    title={lastSearch}
+                  >
+                    {lastSearch}
+                  </button>
+                </li>
+              </ul>
+            </>
+          ) : null}
           <p className="mb-3 text-xs font-medium uppercase tracking-wide text-neutral-400">
             Популярное
           </p>
@@ -94,6 +115,25 @@ export function SearchResults({
         <div className="p-6 text-center">
           <p className="text-sm font-medium text-neutral-900">Ничего не найдено</p>
           <p className="mt-1 text-sm text-neutral-500">Попробуйте изменить запрос</p>
+          {lastSearch ? (
+            <div className="mt-6 text-left">
+              <p className="mb-3 text-xs font-medium uppercase tracking-wide text-neutral-400">
+                Последний поиск
+              </p>
+              <ul className="flex flex-wrap gap-2">
+                <li className="max-w-full">
+                  <button
+                    type="button"
+                    onClick={() => onPopularPick(lastSearch)}
+                    className="max-w-full truncate rounded-full border border-neutral-200 bg-neutral-50 px-3 py-1.5 text-left text-sm text-neutral-700 transition-colors hover:bg-neutral-100"
+                    title={lastSearch}
+                  >
+                    {lastSearch}
+                  </button>
+                </li>
+              </ul>
+            </div>
+          ) : null}
           <div className="mt-6">
             <p className="mb-3 text-xs font-medium uppercase tracking-wide text-neutral-400">
               Популярное

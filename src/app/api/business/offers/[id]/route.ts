@@ -11,6 +11,7 @@ import {
 import { assignOfferSlugIfMissing } from "@/lib/slug/offerSlugService";
 import { formatPriceFrom } from "@/lib/formatters/format-price";
 import { ensurePublishedOfferHasSlug } from "@/lib/slug/publishSlugGuards";
+import { createPublishTimer, runAfterPublishResponse } from "@/server/utils/publishPipeline";
 
 const updateOfferSchema = z.object({
   title: z.string().min(1).optional(),
@@ -84,6 +85,7 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const timer = createPublishTimer("publish:offer");
   try {
     const user = await getCurrentUser();
     
@@ -94,6 +96,7 @@ export async function PATCH(
     const { id } = await params;
     const body = await request.json();
     const data = updateOfferSchema.parse(body);
+    timer.mark("validate");
 
     if (data.status === "PUBLISHED" && !canPublishContentDirectly(user.role)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
@@ -101,7 +104,11 @@ export async function PATCH(
 
     const existingOffer = await prisma.offer.findUnique({
       where: { id },
-      include: {
+      select: {
+        id: true,
+        title: true,
+        priceFrom: true,
+        priceText: true,
         place: { select: { ownerBusinessId: true } },
       },
     });
@@ -148,7 +155,12 @@ export async function PATCH(
     const offer = await prisma.offer.update({
       where: { id },
       data: updateData,
-      include: {
+      select: {
+        id: true,
+        title: true,
+        status: true,
+        slug: true,
+        publishedAt: true,
         place: {
           select: {
             id: true,
@@ -157,20 +169,29 @@ export async function PATCH(
         },
       },
     });
+    timer.mark("status");
 
     if (offer.status === "PUBLISHED") {
-      await ensurePublishedOfferHasSlug(offer.id);
+      runAfterPublishResponse("publish:offer", "ensure published offer slug", () =>
+        ensurePublishedOfferHasSlug(offer.id),
+      );
     } else if (
       data.title !== undefined &&
       typeof data.title === "string" &&
       data.title.trim()
     ) {
-      await assignOfferSlugIfMissing(offer.id, data.title.trim());
+      const title = data.title.trim();
+      runAfterPublishResponse("publish:offer", "assign draft offer slug", () =>
+        assignOfferSlugIfMissing(offer.id, title),
+      );
     }
+    timer.mark("response");
+    timer.log({ status: offer.status });
 
     return NextResponse.json(offer);
 
   } catch (error) {
+    timer.log({ error: 1 });
     console.error("Update offer error:", error);
     
     if (error instanceof z.ZodError) {

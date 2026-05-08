@@ -44,6 +44,7 @@ export default async function OffersPage({
 
   const params = await searchParams;
   const view = params.view || "active";
+  const now = new Date();
 
   // Fetch offers for user's places (same ownership scope as getBusinessPlaces)
   const userPlaces = await prisma.place.findMany({
@@ -62,6 +63,13 @@ export default async function OffersPage({
     ? await prisma.offer.findMany({
         where: {
           placeId: { in: placeIds },
+          ...(view === "archived"
+            ? {
+                dateTo: { lt: now },
+              }
+            : {
+                OR: [{ dateTo: null }, { dateTo: { gte: now } }],
+              }),
         },
         include: {
           place: {
@@ -97,9 +105,9 @@ export default async function OffersPage({
   return (
     <div className="space-y-6">
       <BusinessSectionHeader
-        eyebrow="Publications"
-        title="Offers"
-        description="Offers помогают быстро превращать интерес в обращение. Здесь важно видеть, какие предложения реально сохраняют и открывают."
+        eyebrow="ИНФРАСТРУКТУРА"
+        title="Предложения"
+        description="Предложения помогают быстро превращать интерес в обращение. Здесь важно видеть, какие предложения реально сохраняют и открывают."
       />
 
       <OffersList offers={offersWithMetrics} currentView={view} />

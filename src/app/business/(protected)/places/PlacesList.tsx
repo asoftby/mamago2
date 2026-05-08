@@ -11,10 +11,16 @@ interface Place {
   status: ContentStatus;
   formattedAddr: string | null;
   customAddress: string | null;
+  slug: string | null;
+  shortAddress?: string | null;
+  floor?: string | null;
+  unit?: string | null;
+  unitLabel?: string | null;
   moderatorComment: string | null;
   revisionRequestedAt: Date | null;
   archivedAt: Date | null;
   city: {
+    name: string;
     hasMetro: boolean;
     metroMaxDistanceM: number | null;
   } | null;

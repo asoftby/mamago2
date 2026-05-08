@@ -1,7 +1,7 @@
 import type { PrismaClient } from "@prisma/client";
 import { SEARCH_BOOST } from "@/lib/search/constants";
 import { offerMetaLine } from "@/lib/search/metaLines";
-import { buildSearchText } from "@/lib/search/sanitizeSearchText";
+import { buildSearchText, summarizeForSearchCard } from "@/lib/search/sanitizeSearchText";
 import type { SearchDocUpsertFields } from "./buildActivityDocument";
 
 export async function buildOfferDocument(
@@ -38,6 +38,10 @@ export async function buildOfferDocument(
     placeTitle: offer.place.title,
   });
 
+  const summaryLine = summarizeForSearchCard(
+    offer.promoTitle ?? offer.promoDescription ?? offer.description,
+  );
+
   const slug = offer.slug?.trim();
   const urlPath = slug ? `/offers/${slug}` : `/offers/${offer.id}`;
   const isPublished = offer.status === "PUBLISHED" && Boolean(slug);
@@ -47,6 +51,7 @@ export async function buildOfferDocument(
     entityId: offer.id,
     title: offer.title,
     searchText: searchText || offer.title,
+    summaryLine,
     metaLine,
     imageUrl: offer.coverImage,
     urlPath,

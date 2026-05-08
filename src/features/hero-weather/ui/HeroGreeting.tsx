@@ -133,6 +133,7 @@ export function HeroGreeting({ model }: HeroGreetingProps) {
   }, [weather, citySlug, selectedDates, weatherTimeOfDay, model.weatherScenario]);
 
   const fallbackMicrocopy = stripLeadingMicrocopyEmoji(model.microcopy);
+  const displaySummary = weatherSummary ?? fallbackMicrocopy ?? model.microcopy;
 
   return (
     <motion.div
@@ -143,25 +144,15 @@ export function HeroGreeting({ model }: HeroGreetingProps) {
       data-hero-preferred-context={model.preferredContext ?? model.activityBias}
       data-hero-weather-scenario={model.weatherScenario}
     >
-      {weatherSummary ? (
+      {displaySummary ? (
         <p className="flex items-center gap-3 text-sm font-medium tracking-tight text-neutral-600 sm:text-[15px] [text-wrap:balance]">
           <HeroMoodIcon
-            scenario={weatherScenario}
+            scenario={weatherSummary ? weatherScenario : model.weatherScenario}
             timeOfDay={iconTimeOfDay}
             maxTemperatureC={model.maxTemperatureC}
             size={56}
           />
-          <span className="min-w-0 whitespace-pre-wrap">{weatherSummary}</span>
-        </p>
-      ) : fallbackMicrocopy ? (
-        <p className="flex items-center gap-3 text-sm font-medium tracking-tight text-neutral-600 sm:text-[15px] [text-wrap:balance]">
-          <HeroMoodIcon
-            scenario={model.weatherScenario}
-            timeOfDay={iconTimeOfDay}
-            maxTemperatureC={model.maxTemperatureC}
-            size={56}
-          />
-          <span className="min-w-0 whitespace-pre-wrap">{fallbackMicrocopy}</span>
+          <span className="min-w-0 whitespace-pre-wrap">{displaySummary}</span>
         </p>
       ) : null}
 

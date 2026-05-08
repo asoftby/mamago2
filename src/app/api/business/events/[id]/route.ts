@@ -21,6 +21,7 @@ import { resolveEventOrganizer } from "@/lib/business/eventOrganizer";
 import { syncActivityOccasions } from "@/lib/business/syncActivityOccasions";
 import { prismaBase } from "@/lib/prisma";
 import { DEFAULT_ACTIVITY_FORMAT, normalizeActivityFormat } from "@/domain/activities/activity-format";
+import { createRequestPerf } from "@/server/utils/requestPerf";
 
 /**
  * GET /api/business/events/[id]
@@ -118,9 +119,11 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const perf = createRequestPerf("save-event:route:update");
   try {
     const { id } = await params;
     const user = await getCurrentUser();
+    perf.mark("auth");
 
     if (!user || !canCreateBusinessContent(user.role)) {
       return NextResponse.json(
@@ -130,6 +133,7 @@ export async function PATCH(
     }
 
     const body = await request.json();
+    perf.mark("parse");
 
     const summary = await fetchActivityEventRowSummary(id);
     if (!summary || summary.status === "DELETED") {
@@ -152,6 +156,7 @@ export async function PATCH(
         type: ActivityType.EVENT,
       },
     });
+    perf.mark("read");
 
     if (!existing) {
       return NextResponse.json(
@@ -247,6 +252,7 @@ export async function PATCH(
       primaryLeafCategoryId: nextPrimaryLeafCategoryId,
       programCategoryIds: body.programCategoryIds,
     });
+    perf.mark("validate");
 
     // Update event
     const event = await prisma.activity.update({
@@ -288,11 +294,13 @@ export async function PATCH(
         ...(nextBusinessId !== undefined ? { businessId: nextBusinessId } : {}),
       },
     });
+    perf.mark("write");
 
     // Auto-assign slug only on first meaningful title fill (idempotent).
     if (typeof mergedTitle === "string" && mergedTitle.trim()) {
       await assignActivitySlugIfMissing(event.id, mergedTitle.trim());
     }
+    perf.mark("slug");
 
     const slugRow = await prisma.activity.findUnique({
       where: { id: event.id },
@@ -330,7 +338,10 @@ export async function PATCH(
       );
       await syncActivityOccasions(event.id, occasionIds);
     }
+    perf.mark("sync");
 
+    perf.mark("response");
+    perf.log({ eventId: event.id, status: event.status });
     return NextResponse.json({
       success: true,
       event: {

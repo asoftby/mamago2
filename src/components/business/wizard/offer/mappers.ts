@@ -59,6 +59,7 @@ export function buildOfferCreatePayload(
     kind: formKindToApiKind(data),
     title: data.title.trim() || "Новое предложение",
     shortDescription: data.shortDescription.trim() || "—",
+    description: data.description?.trim() || "",
     ...ages,
     coverImage: data.coverImage ?? undefined,
     pricingMode,
@@ -91,6 +92,7 @@ export function buildOfferUpdatePayload(
   const payload: Record<string, unknown> = {
     title: data.title.trim() || "Новое предложение",
     shortDescription: data.shortDescription.trim() || "—",
+    description: data.description?.trim() || "",
     ...ages,
     coverImage: data.coverImage ?? undefined,
     pricingMode,
@@ -134,6 +136,7 @@ export function mapOfferToFormData(offer: {
     durationType: offer.kind === "EVENT" ? "single" : null,
     title: offer.title,
     shortDescription: offer.description ?? "",
+    description: offer.description ?? "",
     coverImage: offer.coverImage,
     pricingMode: "single",
     singlePrice: offer.priceFrom != null ? String(offer.priceFrom) : "",

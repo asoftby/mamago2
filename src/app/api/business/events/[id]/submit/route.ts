@@ -8,12 +8,12 @@ import {
   canPublishContentDirectly,
 } from "@/lib/auth/businessContentAccess";
 import { canManageActivityById } from "@/lib/auth/activityAccess";
-import { replaceActivitySessionsFromScheduleJson } from "@/lib/business/syncEventActivitySessions";
 import { assignActivitySlugIfMissing } from "@/lib/slug/activitySlugService";
 import { ensurePublishedActivityHasSlug } from "@/lib/slug/publishSlugGuards";
 import { resolveCanonicalEventPublicPathById } from "@/lib/business/resolveCanonicalEventPublicPath";
 import { resolvePendingLocationOnPublish } from "@/lib/business/resolvePendingLocationOnPublish";
 import { assignSlugOnPublish } from "@/lib/slug/placeSlugService";
+import { createPublishTimer, runAfterPublishResponse } from "@/server/utils/publishPipeline";
 
 /**
  * POST /api/business/events/[id]/submit
@@ -23,6 +23,7 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const timer = createPublishTimer("publish:event");
   try {
     const { id } = await params;
     const user = await getCurrentUser();
@@ -62,8 +63,7 @@ export async function POST(
         { status: 404 }
       );
     }
-
-    await replaceActivitySessionsFromScheduleJson(existing.id, existing.scheduleJson);
+    timer.mark("db");
 
     // Validate required fields
     const errors: string[] = [];
@@ -89,15 +89,27 @@ export async function POST(
     }
 
     // Check sessions
-    const sessions = await prisma.activitySession.count({
-      where: {
-        activityId: id,
-      },
-    });
+    const now = new Date();
+    const [sessionsCount, nextUpcomingSession] = await Promise.all([
+      prisma.activitySession.count({
+        where: {
+          activityId: id,
+        },
+      }),
+      prisma.activitySession.findFirst({
+        where: {
+          activityId: id,
+          startsAt: { gte: now },
+        },
+        orderBy: { startsAt: "asc" },
+        select: { startsAt: true },
+      }),
+    ]);
 
-    if (sessions === 0) {
+    if (sessionsCount === 0) {
       errors.push("Добавьте хотя бы одну дату проведения");
     }
+    timer.mark("validate");
 
     if (errors.length > 0) {
       return NextResponse.json(
@@ -110,13 +122,7 @@ export async function POST(
       await assignActivitySlugIfMissing(id, existing.title.trim());
     }
 
-    const sessionRows = await prisma.activitySession.findMany({
-      where: { activityId: id },
-      orderBy: { startsAt: "asc" },
-    });
-    const now = new Date();
-    const nextUp = sessionRows.find((s) => s.startsAt >= now);
-    const nextOccurrenceAt = nextUp?.startsAt ?? null;
+    const nextOccurrenceAt = nextUpcomingSession?.startsAt ?? null;
 
     const nextStatus = canPublishContentDirectly(user.role)
       ? ContentStatus.PUBLISHED
@@ -152,25 +158,32 @@ export async function POST(
 
         return result;
       });
+    timer.mark("status");
 
     // Назначаем slug новому Place (вне транзакции — идемпотентно)
     if (placeCreated && resolvedPlaceId) {
-      await assignSlugOnPublish(resolvedPlaceId).catch((e) =>
-        console.error("[submit] assignSlugOnPublish failed:", e),
+      runAfterPublishResponse("publish:event", "assign place slug", () =>
+        assignSlugOnPublish(resolvedPlaceId),
       );
     }
 
-    const event = await prisma.activity.findUniqueOrThrow({ where: { id } });
+    const event = await prisma.activity.findUniqueOrThrow({
+      where: { id },
+      select: {
+        id: true,
+        title: true,
+        status: true,
+        slug: true,
+      },
+    });
 
-    if (event.status === ContentStatus.PUBLISHED) {
+    if (event.status === ContentStatus.PUBLISHED && !event.slug) {
       await ensurePublishedActivityHasSlug(event.id);
     }
 
-    const slugRow = await prisma.activity.findUnique({
-      where: { id: event.id },
-      select: { slug: true },
-    });
     const publicPath = await resolveCanonicalEventPublicPathById(event.id);
+    timer.mark("response");
+    timer.log({ status: event.status, placeCreated: placeCreated ? 1 : 0 });
 
     return NextResponse.json({
       success: true,
@@ -178,11 +191,12 @@ export async function POST(
         id: event.id,
         title: event.title,
         status: event.status,
-        slug: slugRow?.slug ?? null,
+        slug: event.slug ?? null,
         publicPath,
       },
     });
   } catch (error: unknown) {
+    timer.log({ error: 1 });
     console.error("Submit event error:", error);
     const message = error instanceof Error ? error.message : "Failed to submit event";
     return NextResponse.json({ error: message }, { status: 500 });

@@ -56,11 +56,17 @@ export async function getBusinessPlaces(
       status: true,
       formattedAddr: true,
       customAddress: true,
+      shortAddress: true,
+      floor: true,
+      unit: true,
+      unitLabel: true,
+      slug: true,
       moderatorComment: true,
       revisionRequestedAt: true,
       archivedAt: true,
       city: {
         select: {
+          name: true,
           hasMetro: true,
           metroMaxDistanceM: true,
         },

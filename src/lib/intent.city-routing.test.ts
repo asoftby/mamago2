@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 
 import {
   getCityFromPath,
+  getDiscoveryIntentForMePath,
+  getDiscoveryIntentForPublicationPath,
   getIntentFromPath,
   isCityHubPath,
   isPublicationDetailPath,
@@ -29,5 +31,11 @@ assert.equal(isPublicationDetailPath("/minsk/events/master-klass"), true);
 assert.equal(isPublicationDetailPath("/minsk/activity/abc123"), true);
 assert.equal(isPublicationDetailPath("/me/events/master-klass"), false);
 assert.equal(isPublicationDetailPath("/unknown-city/events/master-klass"), true);
+
+assert.equal(getDiscoveryIntentForPublicationPath("/minsk/events/some-slug"), "kuda");
+assert.equal(getDiscoveryIntentForPublicationPath("/minsk/activity/abc"), "kuda");
+assert.equal(getDiscoveryIntentForMePath("/me"), "kuda");
+assert.equal(getDiscoveryIntentForMePath("/me/plan"), "kuda");
+assert.equal(getDiscoveryIntentForMePath("/minsk/events"), null);
 
 console.log("intent city routing tests: OK");

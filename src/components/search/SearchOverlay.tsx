@@ -5,6 +5,11 @@ import { useRouter } from "next/navigation";
 import { Portal } from "@/components/ui/portal";
 import { cn } from "@/lib/utils";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import {
+  PUBLIC_SEARCH_DEBOUNCE_MS,
+  PUBLIC_SEARCH_RESULTS_LIMIT,
+} from "@/lib/search/constants";
+import { rememberPublicSearchQuery } from "@/lib/search/recentPublicSearch";
 import type { SearchResultItem as SearchResultItemType } from "@/lib/search/types";
 import { SearchInput } from "./SearchInput";
 import { SearchResults } from "./SearchResults";
@@ -23,7 +28,7 @@ export function SearchOverlay({
   const [activeIndex, setActiveIndex] = useState(-1);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const debounced = useDebouncedValue(query, 250);
+  const debounced = useDebouncedValue(query, PUBLIC_SEARCH_DEBOUNCE_MS);
   const trimmed = debounced.trim();
   const queryTrim = query.trim();
   const debouncing = queryTrim.length >= 2 && queryTrim !== trimmed;
@@ -53,8 +58,8 @@ export function SearchOverlay({
     (async () => {
       try {
         const res = await fetch(
-          `/api/search?q=${encodeURIComponent(trimmed)}&limit=8`,
-          { credentials: "include" },
+          `/api/search?q=${encodeURIComponent(trimmed)}&limit=${PUBLIC_SEARCH_RESULTS_LIMIT}`,
+          { credentials: "include", cache: "no-store" },
         );
         if (!res.ok || cancelled) return;
         const data = (await res.json()) as { results: SearchResultItemType[] };
@@ -77,10 +82,12 @@ export function SearchOverlay({
 
   const navigateTo = useCallback(
     (item: SearchResultItemType) => {
+      const q = query.trim();
+      if (q.length >= 2) rememberPublicSearchQuery(q);
       router.push(item.url);
       close();
     },
-    [router, close],
+    [router, close, query],
   );
 
   useEffect(() => {

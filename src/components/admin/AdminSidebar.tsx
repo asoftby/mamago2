@@ -17,6 +17,7 @@ interface AdminSidebarProps {
   moderationCounts: ModerationNavCounts;
   b2bPendingVerificationCount?: number;
   importPendingReviewCount?: number;
+  reviewsPendingCount?: number;
 }
 
 export function AdminSidebar({
@@ -24,6 +25,7 @@ export function AdminSidebar({
   moderationCounts,
   b2bPendingVerificationCount = 0,
   importPendingReviewCount = 0,
+  reviewsPendingCount = 0,
 }: AdminSidebarProps) {
   const pathname = usePathname();
 
@@ -33,6 +35,7 @@ export function AdminSidebar({
       queueTotal: moderationCounts.queueTotal,
       b2bPendingVerificationCount: b2bPendingVerificationCount,
       importPendingReviewCount: importPendingReviewCount,
+      reviewsPendingCount: reviewsPendingCount,
     };
     return counts[key];
   };

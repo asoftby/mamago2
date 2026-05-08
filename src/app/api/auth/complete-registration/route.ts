@@ -8,10 +8,16 @@ import { getCurrentUser } from "@/lib/auth/server";
 import { normalizeEmail } from "@/lib/auth/email";
 import { sendRegistrationVerificationEmail } from "@/server/auth/email-verification";
 import { sendWelcomeEmail } from "@/server/email/send-welcome-email";
+import {
+  acceptBusinessInvite,
+  getBusinessInviteAcceptanceState,
+} from "@/server/business/businessInvite.service";
+import { buildSurfaceRedirectDestination } from "@/lib/routing/surface";
 
 const bodySchema = z.object({
   email: z.string().email("Некорректный email"),
   password: z.string().min(8, "Пароль — минимум 8 символов"),
+  invitationToken: z.string().min(1).optional(),
 });
 
 const STUB_EMAIL_SUFFIX = "@pending.mamago.by";
@@ -20,8 +26,11 @@ async function sendPostRegistrationEmails(params: {
   userId: string;
   email: string;
   userName?: string | null;
+  skipVerificationEmail?: boolean;
 }): Promise<{ verificationEmailSendFailed?: true }> {
-  const emailResult = await sendRegistrationVerificationEmail(params.userId, params.email);
+  const emailResult = params.skipVerificationEmail
+    ? { verificationEmailSendFailed: false as const }
+    : await sendRegistrationVerificationEmail(params.userId, params.email);
 
   await sendWelcomeEmail({
     userId: params.userId,
@@ -41,8 +50,33 @@ async function sendPostRegistrationEmails(params: {
 export async function POST(request: NextRequest) {
   try {
     const json = await request.json();
-    const { email, password } = bodySchema.parse(json);
+    const { email, password, invitationToken } = bodySchema.parse(json);
     const normalizedEmail = normalizeEmail(email);
+    const normalizedInvitationToken = invitationToken?.trim() || null;
+
+    if (normalizedInvitationToken) {
+      const inviteState = await getBusinessInviteAcceptanceState(normalizedInvitationToken);
+      if (!inviteState.ok) {
+        const inviteErrors: Record<typeof inviteState.code, { status: number; error: string }> = {
+          INVITE_NOT_FOUND: { status: 404, error: "Приглашение недействительно или уже использовано." },
+          EXPIRED: { status: 410, error: "Срок действия приглашения истёк." },
+          REVOKED: { status: 410, error: "Приглашение было отозвано." },
+          NOT_PENDING: { status: 409, error: "Приглашение уже обработано." },
+        };
+        const inviteError = inviteErrors[inviteState.code];
+        return NextResponse.json({ error: inviteError.error, code: inviteState.code }, { status: inviteError.status });
+      }
+
+      if (normalizeEmail(inviteState.invite.email) !== normalizedEmail) {
+        return NextResponse.json(
+          {
+            error: `Приглашение отправлено на ${inviteState.invite.email}. Используйте этот email для регистрации.`,
+            code: "EMAIL_MISMATCH",
+          },
+          { status: 403 },
+        );
+      }
+    }
 
     const user = await getCurrentUser();
 
@@ -90,7 +124,43 @@ export async function POST(request: NextRequest) {
         userId: user.id,
         email: normalizedEmail,
         userName: user.displayName,
+        skipVerificationEmail: normalizedInvitationToken != null,
       });
+
+      let redirectTo: string | undefined;
+      if (normalizedInvitationToken) {
+        const inviteResult = await acceptBusinessInvite(
+          {
+            id: user.id,
+            email: normalizedEmail,
+            emailVerifiedAt: user.emailVerifiedAt,
+          },
+          normalizedInvitationToken,
+        );
+
+        if (!inviteResult.ok) {
+          const inviteErrors: Record<typeof inviteResult.code, { status: number; error: string }> = {
+            INVITE_NOT_FOUND: { status: 404, error: "Приглашение недействительно или уже использовано." },
+            EXPIRED: { status: 410, error: "Срок действия приглашения истёк." },
+            REVOKED: { status: 410, error: "Приглашение было отозвано." },
+            EMAIL_MISMATCH: { status: 403, error: "Приглашение отправлено на другой email." },
+            NOT_PENDING: { status: 409, error: "Приглашение уже обработано." },
+          };
+          const inviteError = inviteErrors[inviteResult.code];
+          return NextResponse.json({ error: inviteError.error, code: inviteResult.code }, { status: inviteError.status });
+        }
+
+        const host = request.headers.get("x-forwarded-host") ?? request.headers.get("host");
+        const protocol =
+          request.headers.get("x-forwarded-proto") ??
+          request.nextUrl.protocol.replace(/:$/u, "");
+        redirectTo = buildSurfaceRedirectDestination({
+          targetSurface: "business",
+          targetPath: "/team",
+          currentHost: host,
+          currentProtocol: protocol,
+        });
+      }
 
       return NextResponse.json({
         success: true,
@@ -99,6 +169,7 @@ export async function POST(request: NextRequest) {
           email: normalizedEmail,
           role: user.role,
         },
+        ...(redirectTo ? { redirectTo } : {}),
         ...(emailResult.verificationEmailSendFailed ? { verificationEmailSendFailed: true } : {}),
       });
     }
@@ -128,7 +199,43 @@ export async function POST(request: NextRequest) {
       userId: newUser.id,
       email: newUser.email,
       userName: newUser.displayName,
+      skipVerificationEmail: normalizedInvitationToken != null,
     });
+
+    let redirectTo: string | undefined;
+    if (normalizedInvitationToken) {
+      const inviteResult = await acceptBusinessInvite(
+        {
+          id: newUser.id,
+          email: newUser.email,
+          emailVerifiedAt: newUser.emailVerifiedAt,
+        },
+        normalizedInvitationToken,
+      );
+
+      if (!inviteResult.ok) {
+        const inviteErrors: Record<typeof inviteResult.code, { status: number; error: string }> = {
+          INVITE_NOT_FOUND: { status: 404, error: "Приглашение недействительно или уже использовано." },
+          EXPIRED: { status: 410, error: "Срок действия приглашения истёк." },
+          REVOKED: { status: 410, error: "Приглашение было отозвано." },
+          EMAIL_MISMATCH: { status: 403, error: "Приглашение отправлено на другой email." },
+          NOT_PENDING: { status: 409, error: "Приглашение уже обработано." },
+        };
+        const inviteError = inviteErrors[inviteResult.code];
+        return NextResponse.json({ error: inviteError.error, code: inviteResult.code }, { status: inviteError.status });
+      }
+
+      const host = request.headers.get("x-forwarded-host") ?? request.headers.get("host");
+      const protocol =
+        request.headers.get("x-forwarded-proto") ??
+        request.nextUrl.protocol.replace(/:$/u, "");
+      redirectTo = buildSurfaceRedirectDestination({
+        targetSurface: "business",
+        targetPath: "/team",
+        currentHost: host,
+        currentProtocol: protocol,
+      });
+    }
 
     const token = await createSession(newUser.id);
     const response = NextResponse.json({
@@ -138,6 +245,7 @@ export async function POST(request: NextRequest) {
         email: newUser.email,
         role: newUser.role,
       },
+      ...(redirectTo ? { redirectTo } : {}),
       ...(emailResult.verificationEmailSendFailed ? { verificationEmailSendFailed: true } : {}),
     });
     setSessionCookie(response, token);

@@ -13,6 +13,10 @@ export interface FormStickyActionBarProps {
   showSaveDraft: boolean;
   onSaveDraft?: () => void;
   saveDraftDisabled?: boolean;
+  /** Show "Save and Close" button (edit mode only) */
+  showSaveAndClose?: boolean;
+  onSaveAndClose?: () => void;
+  saveAndCloseDisabled?: boolean;
   /** Middle / non-review step: primary = continue */
   isReviewStep: boolean;
   onContinue?: () => void;
@@ -39,6 +43,9 @@ export function FormStickyActionBar({
   showSaveDraft,
   onSaveDraft,
   saveDraftDisabled,
+  showSaveAndClose,
+  onSaveAndClose,
+  saveAndCloseDisabled,
   isReviewStep,
   onContinue,
   continueDisabled,
@@ -73,6 +80,22 @@ export function FormStickyActionBar({
             </Button>
           )}
         </div>
+
+        {/* Center: Save and Close button (edit mode only) */}
+        {showSaveAndClose && onSaveAndClose && (
+          <div className="flex items-center justify-center">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onSaveAndClose}
+              disabled={busy || saveAndCloseDisabled}
+              className="gap-2"
+            >
+              <Save className="h-4 w-4 shrink-0" />
+              Сохранить и закрыть
+            </Button>
+          </div>
+        )}
 
         <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3">
           {showSaveDraft && onSaveDraft && (

@@ -9,6 +9,8 @@ import {
 } from "@/lib/auth/businessContentAccess";
 import { assignOfferSlugIfMissing } from "@/lib/slug/offerSlugService";
 import { formatPriceFrom } from "@/lib/formatters/format-price";
+import { ensurePublishedOfferHasSlug } from "@/lib/slug/publishSlugGuards";
+import { createPublishTimer, runAfterPublishResponse } from "@/server/utils/publishPipeline";
 
 const createOfferSchema = z.object({
   source: z.enum(["PLACE", "EVENT"]),
@@ -42,6 +44,7 @@ const createOfferSchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
+  const timer = createPublishTimer("publish:offer");
   try {
     const user = await getCurrentUser();
     
@@ -51,6 +54,7 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     const data = createOfferSchema.parse(body);
+    timer.mark("validate");
 
     if (data.status === "PUBLISHED" && !canPublishContentDirectly(user.role)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
@@ -118,12 +122,30 @@ export async function POST(request: NextRequest) {
           status: data.status,
           ...(data.status === "PUBLISHED" ? { publishedAt: new Date() } : {}),
         },
+        select: {
+          id: true,
+          title: true,
+          status: true,
+          slug: true,
+          publishedAt: true,
+        },
       });
+      timer.mark("status");
 
       // Auto-assign slug only on first meaningful title fill (idempotent).
       if (offer.title.trim()) {
-        await assignOfferSlugIfMissing(offer.id, offer.title.trim());
+        if (offer.status === "PUBLISHED") {
+          runAfterPublishResponse("publish:offer", "ensure published offer slug", () =>
+            ensurePublishedOfferHasSlug(offer.id),
+          );
+        } else {
+          runAfterPublishResponse("publish:offer", "assign draft offer slug", () =>
+            assignOfferSlugIfMissing(offer.id, offer.title.trim()),
+          );
+        }
       }
+      timer.mark("response");
+      timer.log({ status: offer.status });
 
       return NextResponse.json(offer);
     }
@@ -132,6 +154,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Event source not yet supported" }, { status: 400 });
 
   } catch (error) {
+    timer.log({ error: 1 });
     console.error("Create offer error:", error);
     
     if (error instanceof z.ZodError) {

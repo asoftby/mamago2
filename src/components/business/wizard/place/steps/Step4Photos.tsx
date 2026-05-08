@@ -3,6 +3,7 @@
 import { useCallback, useMemo } from "react";
 import { PlaceLogoUploadTemp } from "@/components/business/place/PlaceLogoUploadTemp";
 import { PlaceGalleryUploadTemp, type GalleryItem } from "@/components/business/place/PlaceGalleryUploadTemp";
+import { InstagramAvatarImport } from "@/components/business/place/InstagramAvatarImport";
 import type { PlaceFormData } from "../types";
 
 interface Step4PhotosProps {
@@ -20,6 +21,11 @@ export function Step4Photos({
 }: Step4PhotosProps) {
   const logoImage = data.images.find((img) => img.kind === "LOGO");
   const galleryImages = data.images.filter((img) => img.kind === "GALLERY");
+
+  // Show Instagram import helper if: no logo yet AND instagram handle is set
+  const hasLogo = !!(logoImage?.url || data.logoUrl);
+  const instagramHandle = data.instagramHandle?.trim() || "";
+  const showInstagramImport = !hasLogo && !!instagramHandle && !!wizardSessionId;
 
   // Convert PlaceImage[] to GalleryItem[]
   const initialGalleryItems: GalleryItem[] = useMemo(() => 
@@ -70,9 +76,21 @@ export function Step4Photos({
       {/* Logo */}
       <div>
         <h3 className="font-medium mb-2">Логотип *</h3>
-        <p className="text-sm text-muted-foreground mb-4">
+        <p className="text-sm text-muted-foreground mb-3">
           Добавьте логотип или главное фото вашего места
         </p>
+
+        {/* Instagram import helper — only when no logo and instagram is set */}
+        {showInstagramImport && (
+          <InstagramAvatarImport
+            instagramHandle={instagramHandle}
+            wizardSessionId={wizardSessionId!}
+            onImportComplete={handleLogoUploadComplete}
+            disabled={!isEditable}
+            className="mb-3"
+          />
+        )}
+
         <PlaceLogoUploadTemp
           wizardSessionId={wizardSessionId || ""}
           currentLogoUrl={logoImage?.url || data.logoUrl || undefined}

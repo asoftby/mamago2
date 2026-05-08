@@ -45,7 +45,7 @@ export function SearchResultItem({
       type="button"
       onClick={onNavigate}
       className={cn(
-        "flex w-full gap-3 rounded-xl px-3 py-2.5 text-left transition-colors",
+        "flex w-full cursor-pointer gap-3 rounded-xl px-3 py-2.5 text-left transition-colors",
         "hover:bg-neutral-50",
         active && "bg-neutral-50",
       )}
@@ -68,7 +68,9 @@ export function SearchResultItem({
         <p className="truncate text-sm font-semibold text-neutral-900">
           {highlightText(item.title, query)}
         </p>
-        <p className="text-xs text-muted-foreground">{TYPE_LABELS[item.type]}</p>
+        <p className="line-clamp-2 text-xs text-muted-foreground">
+          {item.summaryLine?.trim() ? item.summaryLine.trim() : TYPE_LABELS[item.type]}
+        </p>
         <p className="truncate text-xs text-neutral-500">{item.metaLine}</p>
       </div>
     </button>

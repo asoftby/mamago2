@@ -13,7 +13,7 @@ interface TestResult {
   test: string;
   success: boolean;
   error?: string;
-  data?: any;
+  data?: unknown;
 }
 
 async function makeRequest(path: string, options: RequestInit = {}) {

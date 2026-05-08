@@ -4,8 +4,9 @@
  *
  * ВАЖНО (iOS tap fix):
  * #cc-main по умолчанию pointer-events: none — он не должен ловить touch-события.
- * pointer-events: auto включается ТОЛЬКО для видимых диалогов (.cm, .pm).
- * Закрытые/невидимые слои остаются pointer-events: none.
+ * Но blanket-правила вида `#cc-main * { pointer-events: none }` здесь недопустимы:
+ * они делают открытую cookie modal "прозрачной" для кликов.
+ * Поэтому включаем pointer-events только для реально показанного consent/preferences UI.
  */
 
 #cc-main {
@@ -39,28 +40,71 @@
   pointer-events: none !important;
 }
 
-/* Только видимые диалоги получают pointer-events.
-   vanilla-cookieconsent может ставить show-класс либо на #cc-main, либо выше. */
-#cc-main.show--consent .cm-wrapper,
-#cc-main.show--consent .cm,
-#cc-main.show--preferences .pm-wrapper,
-#cc-main.show--preferences .pm-overlay,
-#cc-main.show--preferences .pm,
+#cc-main.cc--hidden,
+#cc-main[aria-hidden="true"] {
+  pointer-events: none !important;
+}
+
+/* Открытый consent modal: кликабельны wrapper, panel и содержимое. */
 .show--consent #cc-main .cm-wrapper,
 .show--consent #cc-main .cm,
-.show--preferences #cc-main .pm-wrapper,
-.show--preferences #cc-main .pm-overlay,
-.show--preferences #cc-main .pm {
+.show--consent #cc-main .cm *,
+.show--consent #cc-main .cm__btn,
+.show--consent #cc-main [role="dialog"] {
   pointer-events: auto !important;
 }
 
-/* Явно отключаем pointer-events для закрытых/невидимых слоёв */
-#cc-main:not(.show--consent):not(.show--preferences) .cm-wrapper,
-#cc-main:not(.show--consent):not(.show--preferences) .cm,
-#cc-main:not(.show--consent):not(.show--preferences) .pm-wrapper,
-#cc-main:not(.show--consent):not(.show--preferences) .pm-overlay,
-#cc-main:not(.show--consent):not(.show--preferences) .pm {
+/* Открытый preferences modal: кликабельны overlay, panel и содержимое. */
+.show--preferences #cc-main .pm-wrapper,
+.show--preferences #cc-main .pm-overlay,
+.show--preferences #cc-main .pm,
+.show--preferences #cc-main .pm *,
+.show--preferences #cc-main [role="dialog"] {
+  pointer-events: auto !important;
+}
+
+/* Закрытый consent UI не должен участвовать в hit-testing. */
+html:not(.show--consent) #cc-main .cm-wrapper,
+html:not(.show--consent) #cc-main .cm,
+html:not(.show--consent) #cc-main .cm *,
+html:not(.show--consent) #cc-main .cm__btn,
+html:not(.show--consent) #cc-main [role="dialog"] {
   pointer-events: none !important;
+}
+
+/* Закрытый preferences UI не должен участвовать в hit-testing. */
+html:not(.show--preferences) #cc-main .pm-wrapper,
+html:not(.show--preferences) #cc-main .pm-overlay,
+html:not(.show--preferences) #cc-main .pm,
+html:not(.show--preferences) #cc-main .pm *,
+html:not(.show--preferences) #cc-main [role="dialog"] {
+  pointer-events: none !important;
+}
+
+html:not(.show--consent) #cc-main .cm-wrapper,
+html:not(.show--consent) #cc-main .cm,
+html:not(.show--preferences) #cc-main .pm-wrapper,
+html:not(.show--preferences) #cc-main .pm-overlay,
+html:not(.show--preferences) #cc-main .pm {
+  pointer-events: none !important;
+  visibility: hidden !important;
+}
+
+html:not(.show--consent) #cc-main .cm-wrapper::before,
+html:not(.show--preferences) #cc-main .pm-overlay {
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+#cc-main .cm[aria-hidden="true"],
+#cc-main .pm[aria-hidden="true"],
+#cc-main .cm-wrapper[aria-hidden="true"],
+#cc-main .pm-wrapper[aria-hidden="true"],
+#cc-main .pm-overlay[aria-hidden="true"],
+#cc-main [role="dialog"][aria-hidden="true"] {
+  pointer-events: none !important;
+  visibility: hidden !important;
 }
 
 /* Компактная «карточка» на десктопе */

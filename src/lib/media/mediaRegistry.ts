@@ -35,6 +35,12 @@ export interface RegisterMediaInput {
   // Source
   sourceType: MediaSourceType;
   uploadedById?: string;
+  
+  // TEMP media fields
+  status?: "TEMP" | "ACTIVE";
+  wizardSessionId?: string;
+  draftEntityId?: string;
+  draftEntityType?: string;
 }
 
 export interface AttachMediaInput {
@@ -102,6 +108,10 @@ export async function registerUploadedMedia(input: RegisterMediaInput) {
     caption: input.caption,
     sourceType: input.sourceType,
     uploadedById: input.uploadedById,
+    status: input.status,
+    wizardSessionId: input.wizardSessionId,
+    draftEntityId: input.draftEntityId,
+    draftEntityType: input.draftEntityType,
   });
 }
 

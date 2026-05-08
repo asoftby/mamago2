@@ -1,5 +1,6 @@
 import prisma from "@/lib/prisma";
 import { ContentStatus, ModerationEntityType, ModerationAction, Prisma } from "@prisma/client";
+import { createPublishTimer, runAfterPublishResponse } from "@/server/utils/publishPipeline";
 
 /**
  * Log a moderation action
@@ -82,9 +83,10 @@ export async function approvePlace(
   reviewedByUserId: string,
   message?: string
 ): Promise<void> {
+  const timer = createPublishTimer("publish:place");
   const place = await prisma.place.findUnique({
     where: { id: placeId },
-    select: { status: true, title: true, createdByUserId: true },
+    select: { status: true, title: true, createdByUserId: true, slug: true },
   });
 
   if (!place) throw new Error("Place not found");
@@ -96,11 +98,14 @@ export async function approvePlace(
       data: { entityType: "PLACE", entityId: placeId, action: "APPROVE", message: message || "Approved", reviewedByUserId },
     }),
   ]);
+  timer.mark("status");
 
   const { assignSlugOnPublish } = await import("@/lib/slug/placeSlugService");
-  await assignSlugOnPublish(placeId);
-  const { ensurePublishedPlaceHasSlug } = await import("@/lib/slug/publishSlugGuards");
-  await ensurePublishedPlaceHasSlug(placeId);
+  if (!place.slug) {
+    await assignSlugOnPublish(placeId);
+  }
+  timer.mark("response");
+  timer.log({ status: "PUBLISHED", flow: "admin-approve" });
 
   // Notify creator (outside transaction, non-blocking)
   const { notifyPlaceApproved } = await import("./notification.service");
@@ -233,9 +238,10 @@ export async function publishPlaceFromDraft(
   placeId: string,
   publishedByUserId: string,
 ): Promise<void> {
+  const timer = createPublishTimer("publish:place");
   const place = await prisma.place.findUnique({
     where: { id: placeId },
-    select: { status: true, createdByUserId: true },
+    select: { status: true, createdByUserId: true, slug: true },
   });
 
   if (!place) {
@@ -267,11 +273,14 @@ export async function publishPlaceFromDraft(
       },
     }),
   ]);
+  timer.mark("status");
 
   const { assignSlugOnPublish } = await import("@/lib/slug/placeSlugService");
-  await assignSlugOnPublish(placeId);
-  const { ensurePublishedPlaceHasSlug } = await import("@/lib/slug/publishSlugGuards");
-  await ensurePublishedPlaceHasSlug(placeId);
+  if (!place.slug) {
+    await assignSlugOnPublish(placeId);
+  }
+  timer.mark("response");
+  timer.log({ status: "PUBLISHED", flow: "direct" });
 }
 
 export async function approveActivity(
@@ -279,9 +288,10 @@ export async function approveActivity(
   reviewedByUserId: string,
   message?: string
 ): Promise<void> {
+  const timer = createPublishTimer("publish:event");
   const activity = await prisma.activity.findUnique({
     where: { id: activityId },
-    select: { status: true, title: true, businessId: true, scheduleJson: true, ownerUserId: true },
+    select: { status: true, title: true, businessId: true, scheduleJson: true, ownerUserId: true, slug: true },
   });
 
   if (!activity) throw new Error("Activity not found");
@@ -327,6 +337,7 @@ export async function approveActivity(
 
       return result;
     });
+  timer.mark("status");
 
   // Назначаем slug новому Place (вне транзакции — идемпотентно)
   if (placeCreated && resolvedPlaceId) {
@@ -337,7 +348,11 @@ export async function approveActivity(
   }
 
   const { ensurePublishedActivityHasSlug } = await import("@/lib/slug/publishSlugGuards");
-  await ensurePublishedActivityHasSlug(activityId);
+  if (!activity.slug) {
+    await ensurePublishedActivityHasSlug(activityId);
+  }
+  timer.mark("response");
+  timer.log({ status: "PUBLISHED", placeCreated: placeCreated ? 1 : 0, flow: "admin-approve" });
 
   const { notifyActivityApproved } = await import("./notification.service");
   if (activity.businessId) {
@@ -420,9 +435,10 @@ export async function approveOffer(
   offerId: string,
   reviewedByUserId: string,
 ): Promise<void> {
+  const timer = createPublishTimer("publish:offer");
   const offer = await prisma.offer.findUnique({
     where: { id: offerId },
-    select: { status: true, title: true, place: { select: { ownerBusinessId: true } } },
+    select: { status: true, title: true, slug: true, place: { select: { ownerBusinessId: true } } },
   });
 
   if (!offer) throw new Error("Offer not found");
@@ -432,9 +448,18 @@ export async function approveOffer(
     where: { id: offerId },
     data: { status: "PUBLISHED", publishedAt: new Date() },
   });
+  timer.mark("status");
 
   const { ensurePublishedOfferHasSlug } = await import("@/lib/slug/publishSlugGuards");
-  await ensurePublishedOfferHasSlug(offerId);
+  if (!offer.slug) {
+    await ensurePublishedOfferHasSlug(offerId);
+  } else {
+    runAfterPublishResponse("publish:offer", "sync published offer canonical", () =>
+      ensurePublishedOfferHasSlug(offerId),
+    );
+  }
+  timer.mark("response");
+  timer.log({ status: "PUBLISHED", flow: "admin-approve" });
 
   const { notifyOfferApproved } = await import("./notification.service");
   const ownerId = offer.place?.ownerBusinessId;

@@ -58,13 +58,15 @@ function CityProviderInner({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (resolvedCity.source !== "route" || !resolvedCity.citySlug) return;
+    if (resolvedCity.citySlug === storedCity) return;
+
     try {
       localStorage.setItem(STORAGE_KEY, resolvedCity.citySlug);
     } catch {
       /* ignore */
     }
     queueMicrotask(() => setStoredCity(resolvedCity.citySlug));
-  }, [resolvedCity]);
+  }, [resolvedCity, storedCity]);
 
   useEffect(() => {
     if (process.env.NODE_ENV !== "production") {

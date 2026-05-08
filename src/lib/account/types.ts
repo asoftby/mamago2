@@ -9,6 +9,8 @@ export type AccountMenuUser = {
   businessBalanceBYN?: number;
   displayName?: string | null;
   avatarUrl?: string | null;
+  /** Phone verification timestamp (ISO string) */
+  phoneVerifiedAt?: string | null;
   /** Семейная персона (primary adult) — тот же источник, что блок «Моя семья» */
   familyRole?: string | null;
   ageBandLabel?: string | null;

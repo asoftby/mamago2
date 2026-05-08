@@ -35,6 +35,8 @@ export function MobileBottomBarShell({
         "block lg:hidden",
         // Позиционирование
         "fixed bottom-0 left-0 right-0 z-40",
+        // Скрытый shell не должен участвовать в hit-testing
+        hidden ? "pointer-events-none" : "pointer-events-auto",
         // Плавный transition
         "transition-transform duration-200 ease-in-out will-change-transform",
         // Скрытие через transform (не display:none — без прыжков)

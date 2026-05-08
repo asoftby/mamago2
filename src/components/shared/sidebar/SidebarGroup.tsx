@@ -9,6 +9,7 @@ interface SidebarGroupProps {
   label: string;
   children: React.ReactNode;
   defaultOpen?: boolean;
+  isActive?: boolean;
   hasAttention?: boolean;
 }
 
@@ -17,6 +18,7 @@ export function SidebarGroup({
   label,
   children,
   defaultOpen = false,
+  isActive = false,
   hasAttention = false,
 }: SidebarGroupProps) {
   // Keep the first SSR/CSR render deterministic to avoid hydration mismatch.
@@ -31,10 +33,12 @@ export function SidebarGroup({
       <button
         onClick={() => setIsOpen(!isOpen)}
         className={cn(
-          "w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-medium transition-all duration-150",
-          isOpen
-            ? "bg-gray-50 text-gray-900"
-            : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+          "relative w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-medium transition-all duration-150",
+          isActive
+            ? "bg-primary/10 text-stone-950"
+            : isOpen
+              ? "bg-gray-50 text-gray-900"
+              : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
         )}
       >
         <div className="relative flex flex-col items-center flex-shrink-0">
@@ -45,12 +49,18 @@ export function SidebarGroup({
               aria-hidden
             />
           )}
-          <Icon className="w-5 h-5 flex-shrink-0" />
+          <Icon
+            className={cn(
+              "w-5 h-5 flex-shrink-0",
+              isActive ? "text-primary" : "text-current"
+            )}
+          />
         </div>
         <span className="flex-1 text-left">{label}</span>
         <ChevronDown
           className={cn(
             "w-4 h-4 flex-shrink-0 transition-transform duration-200",
+            isActive ? "text-primary" : "text-current",
             isOpen && "rotate-180"
           )}
         />

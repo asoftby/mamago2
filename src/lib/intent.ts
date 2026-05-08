@@ -73,12 +73,29 @@ export function isRouteDetailPath(pathname: string | null): boolean {
   return segments.length === 2 && segments[0] === "routes" && segments[1] !== "new";
 }
 
+/** Карточка места: `/places/{slug}` или `/{city}/places/{slug}`. */
+export function isPlaceDetailPath(pathname: string | null): boolean {
+  if (!pathname) return false;
+  const segments = pathname.split("/").filter(Boolean);
+  if (segments.length === 2 && segments[0] === "places" && segments[1]) return true;
+  if (segments.length === 3) {
+    const hub = segments[0];
+    if (!hub || isReservedTopLevelSegment(hub)) return false;
+    return segments[1] === "places" && Boolean(segments[2]);
+  }
+  return false;
+}
+
 /**
  * Страницы где header не должен быть sticky.
  * Используется в MobileHeader и Header (desktop).
  */
 export function isNonStickyHeaderPath(pathname: string | null): boolean {
-  return isPublicationDetailPath(pathname) || isRouteDetailPath(pathname);
+  return (
+    isPublicationDetailPath(pathname) ||
+    isRouteDetailPath(pathname) ||
+    isPlaceDetailPath(pathname)
+  );
 }
 
 /**
@@ -190,7 +207,18 @@ export function getDiscoveryIntentForPublicationPath(
   if (s[0] === "p") return "kuda";
   if (s[0] === "routes" && s[1] !== "new") return "routes";
   if (s.length >= 3 && s[1] === "activity") return "kuda";
+  /** `/{city}/events/{slug|id}` — тот же discovery-контекст, что и витрина событий */
+  if (s.length >= 3 && s[1] === "events") return "kuda";
   return null;
+}
+
+/**
+ * Личный кабинет `/me/*`: в хедере тот же поисковый контекст, что у витрины «Куда пойти».
+ */
+export function getDiscoveryIntentForMePath(pathname: string | null): Intent | null {
+  if (!pathname) return null;
+  const segments = pathname.split("/").filter(Boolean);
+  return segments[0] === "me" ? "kuda" : null;
 }
 
 export function getIntentFromPath(pathname: string | null): Intent | null {

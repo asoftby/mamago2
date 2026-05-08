@@ -12,11 +12,13 @@ import {
   needsRevisionOffer,
   rejectOffer,
 } from "@/server/services/moderation.service";
+import { createPublishTimer } from "@/server/utils/publishPipeline";
 
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const timer = createPublishTimer("publish:offer");
   try {
     const { id } = await params;
     const user = await getCurrentUser();
@@ -47,6 +49,7 @@ export async function POST(
         case "NEEDS_REVISION": await needsRevisionOffer(id, user.id, comment); break;
         case "REJECT":         await rejectOffer(id, user.id, comment); break;
       }
+      timer.mark("status");
     } catch (serviceError) {
       return NextResponse.json(
         { error: serviceError instanceof Error ? serviceError.message : "Moderation failed" },
@@ -54,8 +57,11 @@ export async function POST(
       );
     }
 
+    timer.mark("response");
+    timer.log({ action });
     return NextResponse.json({ success: true, action });
   } catch (error) {
+    timer.log({ error: 1 });
     console.error("Offer moderation error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }

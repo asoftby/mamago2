@@ -33,7 +33,9 @@ export function useHideOnScrollDirection({
 
     // Инициализация: если уже не у верха — проверяем начальное состояние
     if (window.scrollY > topOffset) {
-      setHidden(false);
+      requestAnimationFrame(() => {
+        if (mounted.current) setHidden(false);
+      });
     }
 
     const handleScroll = () => {

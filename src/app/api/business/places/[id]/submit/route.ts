@@ -6,13 +6,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
-import { ContentStatus, PlaceKind } from "@prisma/client";
+import { ContentStatus, MediaEntityType, PlaceKind } from "@prisma/client";
 import { publishPlaceFromDraft, submitPlace } from "@/server/services/moderation.service";
 import {
   canCreateBusinessContent,
   canPublishContentDirectly,
 } from "@/lib/auth/businessContentAccess";
 import { canManagePlaceAsync } from "@/lib/auth/placeAccess";
+import { isMediaAssetCuid } from "@/lib/media/isMediaAssetCuid";
+import { createPublishTimer } from "@/server/utils/publishPipeline";
+import { attachMediaToEntity } from "@/lib/media/mediaRegistry";
 
 interface ValidationError {
   error: "VALIDATION";
@@ -24,6 +27,7 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const timer = createPublishTimer("publish:place");
   try {
     const { id } = await params;
     const user = await getCurrentUser();
@@ -31,23 +35,32 @@ export async function POST(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Get place with images and opening hours
+    // Get only fields needed for publish validation. Opening hours are not required
+    // and should not slow down the publish button.
     const place = await prisma.place.findUnique({
       where: { id },
-      include: {
-        images: true,
-        openingHours: {
-          include: {
-            rules: {
-              include: {
-                intervals: true,
-              },
-            },
-            exceptions: {
-              include: {
-                intervals: true,
-              },
-            },
+      select: {
+        id: true,
+        title: true,
+        category: true,
+        shortDesc: true,
+        logoImageId: true,
+        lat: true,
+        lng: true,
+        locationSource: true,
+        placeKind: true,
+        parentPlaceId: true,
+        floor: true,
+        unit: true,
+        status: true,
+        createdByUserId: true,
+        ownerBusinessId: true,
+        archivedAt: true,
+        slug: true,
+        images: {
+          select: {
+            id: true,
+            kind: true,
           },
         },
       },
@@ -74,6 +87,7 @@ export async function POST(
         { status: 400 }
       );
     }
+    timer.mark("db");
 
     // Strict validation
     const missing: string[] = [];
@@ -97,7 +111,22 @@ export async function POST(
 
     // Required: logoImageId (must have LOGO image)
     const logoImage = place.images.find((img) => img.kind === "LOGO");
-    if (!place.logoImageId || !logoImage) {
+    const logoFromMediaLibrary =
+      !logoImage && place.logoImageId && isMediaAssetCuid(place.logoImageId)
+        ? await prisma.mediaAsset.findFirst({
+            where: {
+              id: place.logoImageId,
+              status: "ACTIVE",
+            },
+            select: {
+              id: true,
+              publicUrl: true,
+              width: true,
+              height: true,
+            },
+          })
+        : null;
+    if (!place.logoImageId || (!logoImage && !logoFromMediaLibrary)) {
       missing.push("logoImageId");
       fields.logoImageId = "Logo image is required";
     }
@@ -138,13 +167,6 @@ export async function POST(
       console.warn(`Place ${place.id} has no gallery images`);
     }
 
-    // Optional: opening hours (not required for submission)
-    if (place.openingHours) {
-      console.log(`Place ${place.id} has opening hours: ${place.openingHours.mode}`);
-    } else {
-      console.log(`Place ${place.id} has no opening hours (optional)`);
-    }
-
     // If validation failed, return errors
     if (missing.length > 0) {
       const response: ValidationError = {
@@ -154,6 +176,35 @@ export async function POST(
       };
       return NextResponse.json(response, { status: 400 });
     }
+    timer.mark("validate");
+
+    if (!logoImage && logoFromMediaLibrary?.publicUrl?.trim()) {
+      const image = await prisma.placeImage.create({
+        data: {
+          placeId: place.id,
+          kind: "LOGO",
+          url: logoFromMediaLibrary.publicUrl,
+          width: logoFromMediaLibrary.width,
+          height: logoFromMediaLibrary.height,
+          sortOrder: 0,
+        },
+        select: { id: true },
+      });
+
+      await Promise.all([
+        prisma.place.update({
+          where: { id: place.id },
+          data: { logoImageId: image.id },
+        }),
+        attachMediaToEntity({
+          mediaId: logoFromMediaLibrary.id,
+          entityType: MediaEntityType.PLACE,
+          entityId: place.id,
+          field: "logo",
+        }),
+      ]);
+    }
+    timer.mark("media");
 
     // All validations passed — moderation queue or direct publish (admin)
     if (canPublishContentDirectly(user.role)) {
@@ -161,40 +212,27 @@ export async function POST(
     } else {
       await submitPlace(id, user.id);
     }
+    timer.mark("status");
 
-    // Fetch updated place with opening hours
     const updatedPlace = await prisma.place.findUnique({
       where: { id },
-      include: {
-        images: {
-          orderBy: { sortOrder: "asc" },
-        },
-        openingHours: {
-          include: {
-            rules: {
-              include: {
-                intervals: {
-                  orderBy: { sortOrder: "asc" },
-                },
-              },
-            },
-            exceptions: {
-              include: {
-                intervals: {
-                  orderBy: { sortOrder: "asc" },
-                },
-              },
-            },
-          },
-        },
+      select: {
+        id: true,
+        title: true,
+        status: true,
+        slug: true,
+        updatedAt: true,
       },
     });
+    timer.mark("response");
+    timer.log({ status: updatedPlace?.status ?? null });
 
     return NextResponse.json({
       success: true,
       place: updatedPlace,
     });
   } catch (error) {
+    timer.log({ error: 1 });
     console.error("Submit place error:", error);
     return NextResponse.json(
       { error: "Internal server error" },

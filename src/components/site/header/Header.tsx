@@ -15,8 +15,10 @@ import {
 import {
   getIntentFromPath,
   getDiscoveryIntentForPublicationPath,
+  getDiscoveryIntentForMePath,
   isPublicationDetailPath,
   isNonStickyHeaderPath,
+  isPlaceDetailPath,
 } from "@/lib/intent";
 import { getSiteHeaderVariant } from "@/lib/site/siteHeaderVariant";
 import { useCity } from "@/contexts/CityContext";
@@ -88,17 +90,33 @@ export function SiteHeaderShell() {
     routeIntent ??
     publicationIntent ??
     getDiscoveryIntentForPublicationPath(pathname) ??
+    getDiscoveryIntentForMePath(pathname) ??
     null;
   const tabsIntent = isPublicationPage ? null : routeIntent ?? null;
   const { citySlug } = useCity();
   const [searchOverlayOpen, setSearchOverlayOpen] = useState(false);
-  const expandedSearchVariant =
-    isPublicationPage ? "cityHub" : "discovery";
-  const compactSearchVariant =
-    isPublicationPage ? "cityHub" : "discovery";
+  const expandedSearchVariant = "discovery";
+  const compactSearchVariant = "discovery";
   const shouldShowIntentTabs = true;
   const isCityHomePage =
     pathname === `/${citySlug}` || pathname === `/${citySlug}/`;
+  const isPlacePage = isPlaceDetailPath(pathname);
+  const mountSearchOverlay = !isLandingHeader || isPlacePage;
+
+  const openGlobalSearch = () => {
+    if (isPlacePage) {
+      setSearchOverlayOpen(true);
+      return;
+    }
+    if (
+      typeof window !== "undefined" &&
+      window.matchMedia("(min-width: 1024px)").matches
+    ) {
+      setSearchOverlayOpen(true);
+    } else {
+      hb.actions.openSearchSurface();
+    }
+  };
 
   useEffect(() => {
     if (process.env.NODE_ENV !== "production") {
@@ -282,7 +300,7 @@ export function SiteHeaderShell() {
               </div>
 
               <div className="flex min-w-0 items-center justify-end justify-self-end gap-1.5 md:gap-2">
-                {isLandingHeader ? (
+                {isLandingHeader && !isPlacePage ? (
                   <Button
                     type="button"
                     variant="ghost"
@@ -302,16 +320,7 @@ export function SiteHeaderShell() {
                     size="icon"
                     className={HEADER_CHROME_ICON_BUTTON_CLASS}
                     aria-label="Поиск"
-                    onClick={() => {
-                      if (
-                        typeof window !== "undefined" &&
-                        window.matchMedia("(min-width: 1024px)").matches
-                      ) {
-                        setSearchOverlayOpen(true);
-                      } else {
-                        hb.actions.openSearchSurface();
-                      }
-                    }}
+                    onClick={openGlobalSearch}
                   >
                     <Search className="h-4 w-4" />
                   </Button>
@@ -344,7 +353,7 @@ export function SiteHeaderShell() {
           )}
         </div>
       </header>
-      {!isLandingHeader ? (
+      {mountSearchOverlay ? (
         <SearchOverlay open={searchOverlayOpen} onOpenChange={setSearchOverlayOpen} />
       ) : null}
     </>

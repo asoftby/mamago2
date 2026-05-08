@@ -31,15 +31,17 @@ export function StoryModalVisual({
   onPrev,
 }: StoryModalVisualProps) {
   const isFirst = !prevItem && activeItemIndex === 0;
+  const imgKey = `${currentItem.id}-${currentItem.image}`;
+  const [prevImgKey, setPrevImgKey] = useState(imgKey);
   const [imgLoaded, setImgLoaded] = useState(false);
   const [imgError, setImgError] = useState(false);
-  const imgKey = `${currentItem.id}-${currentItem.image}`;
 
   // Reset image state when item changes
-  useEffect(() => {
+  if (imgKey !== prevImgKey) {
+    setPrevImgKey(imgKey);
     setImgLoaded(false);
     setImgError(false);
-  }, [imgKey]);
+  }
 
   return (
     <div className="relative w-full h-full overflow-hidden bg-neutral-950 select-none">

@@ -1,7 +1,7 @@
 import type { PrismaClient } from "@prisma/client";
 import { SEARCH_BOOST } from "@/lib/search/constants";
 import { routeMetaLine } from "@/lib/search/metaLines";
-import { buildSearchText } from "@/lib/search/sanitizeSearchText";
+import { buildSearchText, summarizeForSearchCard } from "@/lib/search/sanitizeSearchText";
 import type { SearchDocUpsertFields } from "./buildActivityDocument";
 
 export async function buildRouteDocument(
@@ -24,6 +24,7 @@ export async function buildRouteDocument(
   ]);
 
   const metaLine = routeMetaLine(route.city?.name);
+  const summaryLine = summarizeForSearchCard(route.seoDescription);
   const urlPath = `/routes/${route.slug}`;
   const isPublished = route.status === "PUBLISHED" && route.visibility === "PUBLIC";
 
@@ -32,6 +33,7 @@ export async function buildRouteDocument(
     entityId: route.id,
     title: route.title,
     searchText: searchText || route.title,
+    summaryLine,
     metaLine,
     imageUrl: route.coverImageUrl,
     urlPath,

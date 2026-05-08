@@ -4,12 +4,15 @@ import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { OfferStatusBadge } from "./OfferStatusBadge";
-import { Pencil, Archive, ArchiveRestore, Trash2, Tag, MapPin, Calendar } from "lucide-react";
+import { Pencil, Archive, ArchiveRestore, Trash2, Tag, MapPin, Calendar, BarChart3, Zap } from "lucide-react";
 import { OfferStatus, OfferKind } from "@prisma/client";
 import { format } from "date-fns";
 import { ru } from "date-fns/locale";
 import { BusinessChip } from "@/components/business/ui/BusinessChip";
 import { buildPromotionLaunchHref } from "@/lib/promotion/shared";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import { PublicationStatisticsDialog } from "@/components/business/shared/PublicationStatisticsDialog";
 
 interface Offer {
   id: string;
@@ -50,6 +53,7 @@ export function OfferCardHorizontal({
 }: OfferCardHorizontalProps) {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isArchiving, setIsArchiving] = useState(false);
+  const [statisticsOpen, setStatisticsOpen] = useState(false);
   const getErrorMessage = (error: unknown, fallback: string) =>
     error instanceof Error ? error.message : fallback;
 
@@ -96,8 +100,17 @@ export function OfferCardHorizontal({
     day: "numeric",
     month: "short",
   }).format(new Date(offer.updatedAt));
+  const actionButtonClass =
+    "inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-2xl px-3.5 text-sm font-medium transition-colors disabled:pointer-events-none disabled:opacity-50";
+  const neutralActionClass =
+    "border border-stone-200 bg-white text-stone-700 hover:border-stone-300 hover:bg-stone-50 hover:text-stone-950";
+  const promoteActionClass =
+    "bg-[#C6FF72] text-stone-950 shadow-[0_8px_22px_rgba(132,204,22,0.22)] hover:bg-[#B8FF65] hover:shadow-[0_10px_28px_rgba(132,204,22,0.32)]";
+  const ghostIconActionClass =
+    "h-10 w-10 rounded-2xl text-stone-500 hover:bg-stone-100 hover:text-stone-900";
 
   return (
+    <>
     <div className="rounded-[26px] border border-stone-200/90 bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-all hover:border-stone-300 hover:shadow-[0_14px_32px_rgba(15,23,42,0.05)] md:p-5">
       <div className="flex gap-4">
         {/* Cover Image */}
@@ -160,20 +173,22 @@ export function OfferCardHorizontal({
             <span>Обновлено {updatedLabel}</span>
           </div>
 
-          <div className="mb-5 flex flex-wrap gap-2">
-            <BusinessChip>Просмотры: {offer.metrics.views}</BusinessChip>
-            <BusinessChip>Сохранения: {offer.metrics.saves}</BusinessChip>
-            <BusinessChip>В план: {offer.metrics.planAdds}</BusinessChip>
-            <BusinessChip>Переходы: {offer.metrics.ctaClicks}</BusinessChip>
-          </div>
-
           {/* Actions */}
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex gap-2 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-visible">
+            <button
+              type="button"
+              onClick={() => setStatisticsOpen(true)}
+              className={cn(actionButtonClass, neutralActionClass)}
+            >
+              <BarChart3 className="h-4 w-4 shrink-0" />
+              Статистика
+            </button>
+
             <Link
               href={`/business/offers/${offer.id}/edit`}
-              className="inline-flex items-center gap-1 rounded-2xl border border-stone-200 bg-white px-4 py-2.5 text-sm font-medium text-stone-700 transition-colors hover:border-stone-300 hover:bg-stone-50 hover:text-stone-950"
+              className={cn(actionButtonClass, neutralActionClass)}
             >
-              <Pencil className="w-4 h-4" />
+              <Pencil className="h-4 w-4 shrink-0" />
               Редактировать
             </Link>
 
@@ -182,46 +197,62 @@ export function OfferCardHorizontal({
                 publicationType: "OFFER",
                 publicationId: offer.id,
               })}
-              className="inline-flex items-center gap-1 rounded-2xl bg-stone-900 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-stone-800"
+              className={cn(actionButtonClass, promoteActionClass, "px-4 font-semibold")}
             >
+              <Zap className="h-4 w-4 shrink-0 fill-stone-950" />
               Продвигать
             </Link>
 
             {onArchive && (
               <button
+                type="button"
                 onClick={handleArchive}
                 disabled={isArchiving}
-                className="inline-flex items-center gap-1 rounded-xl px-3 py-2 text-sm text-stone-600 transition-colors hover:bg-stone-100 hover:text-stone-900 disabled:opacity-50"
+                className={cn(actionButtonClass, ghostIconActionClass)}
                 title="В архив"
+                aria-label="В архив"
               >
-                <Archive className="w-4 h-4" />
+                <Archive className="h-4 w-4" />
               </button>
             )}
 
             {onUnarchive && (
               <button
+                type="button"
                 onClick={handleUnarchive}
                 disabled={isArchiving}
-                className="inline-flex items-center gap-1 rounded-xl px-3 py-2 text-sm text-stone-600 transition-colors hover:bg-stone-100 hover:text-stone-900 disabled:opacity-50"
+                className={cn(actionButtonClass, ghostIconActionClass)}
                 title="Восстановить"
+                aria-label="Восстановить"
               >
-                <ArchiveRestore className="w-4 h-4" />
+                <ArchiveRestore className="h-4 w-4" />
               </button>
             )}
 
             {offer.status === "DRAFT" && (
-              <button
+              <Button
+                type="button"
+                variant="ghost"
                 onClick={handleDelete}
                 disabled={isDeleting}
-                className="inline-flex items-center gap-1 rounded-xl px-3 py-2 text-sm text-red-600 transition-colors hover:bg-red-50 hover:text-red-700 disabled:opacity-50"
+                className="h-10 w-10 shrink-0 rounded-2xl p-0 text-stone-400 hover:bg-red-50 hover:text-red-600"
                 title="Удалить"
+                aria-label="Удалить"
               >
-                <Trash2 className="w-4 h-4" />
-              </button>
+                <Trash2 className="h-4 w-4" />
+              </Button>
             )}
           </div>
         </div>
       </div>
     </div>
+    <PublicationStatisticsDialog
+      open={statisticsOpen}
+      onOpenChange={setStatisticsOpen}
+      title={offer.title}
+      entityLabel="предложения"
+      metrics={offer.metrics}
+    />
+    </>
   );
 }

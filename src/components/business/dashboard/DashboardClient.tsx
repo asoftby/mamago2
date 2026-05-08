@@ -83,7 +83,7 @@ function BalancePanel({
 
   return (
     <BusinessSurfaceCard
-      tone={isEmpty ? "warm" : "default"}
+      tone="default"
       className="flex flex-col gap-5 p-6"
     >
       <p className="text-xs font-semibold uppercase tracking-widest text-stone-400">Баланс</p>
@@ -93,14 +93,14 @@ function BalancePanel({
         <p
           className={cn(
             "text-4xl font-semibold tracking-tight",
-            isEmpty ? "text-orange-600" : "text-stone-950",
+            isEmpty ? "text-primary" : "text-stone-950",
           )}
         >
           {formatPrice(balance)}
         </p>
 
         {isEmpty ? (
-          <p className="mt-2 text-sm text-orange-600">
+          <p className="mt-2 text-sm text-primary">
             Недостаточно средств для продвижения
           </p>
         ) : (
@@ -113,7 +113,7 @@ function BalancePanel({
 
       {/* Low balance warning */}
       {isLow && (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+        <div className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 text-sm text-primary">
           ⚠️ Баланс заканчивается
         </div>
       )}
@@ -214,7 +214,7 @@ function PublicationsCard({
           <p className="text-3xl font-semibold tracking-tight text-stone-950">{totalPublications}</p>
           <p className="mt-1.5 text-sm text-stone-500">
             публикаций ·{" "}
-            <span className="text-amber-600 font-medium">0 активных продвижений</span>
+            <span className="text-primary font-medium">0 активных продвижений</span>
           </p>
           <p className="mt-1 text-sm text-stone-500">Запустите продвижение, чтобы получать лиды</p>
         </div>

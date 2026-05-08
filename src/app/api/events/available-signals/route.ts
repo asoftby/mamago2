@@ -56,7 +56,12 @@ export async function GET() {
     });
 
     // Если есть interests, получаем его опции
-    let interestOptions: any[] = [];
+    let interestOptions: Array<{
+      id: string;
+      slug: string;
+      title: string;
+      parentId: string;
+    }> = [];
     if (interestSignals.length > 0) {
       const interestsId = interestSignals[0].id;
       const options = await prisma.signalOption.findMany({
@@ -95,7 +100,7 @@ export async function GET() {
       : [];
 
     // Intention signals пока не реализованы в seed, возвращаем пустой массив
-    const intentionSignals: any[] = [];
+    const intentionSignals: unknown[] = [];
 
     return NextResponse.json({
       activitySignals,

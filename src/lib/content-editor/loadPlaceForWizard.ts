@@ -4,6 +4,9 @@ const placeInclude = {
   images: {
     orderBy: { sortOrder: "asc" as const },
   },
+  subcategories: {
+    orderBy: { position: "asc" as const },
+  },
   openingHours: {
     include: {
       rules: {

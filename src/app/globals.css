@@ -513,3 +513,71 @@ body:has([data-slot="alert-dialog-overlay"][data-state="open"]) {
   margin-top: 0 !important;
   margin-bottom: 0 !important;
 }
+
+/* Sanitized rich HTML rendered on site (preflight resets list markers like in ProseMirror) */
+.rich-rendered-html ul,
+.rich-rendered-html ol {
+  padding-left: 1.5rem !important;
+  list-style-position: outside !important;
+}
+
+.rich-rendered-html ul {
+  list-style-type: disc !important;
+}
+
+.rich-rendered-html ol {
+  list-style-type: decimal !important;
+}
+
+.rich-rendered-html ul li::marker {
+  color: var(--primary);
+}
+
+.rich-rendered-html ol li::marker {
+  color: var(--muted-foreground);
+}
+
+.rich-rendered-html li {
+  display: list-item !important;
+  margin-bottom: 0.5rem !important;
+}
+
+.rich-rendered-html li:last-child {
+  margin-bottom: 0 !important;
+}
+
+.rich-rendered-html li > p {
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+}
+
+/* RichDescriptionEditor — heading styles inside editor */
+.rich-description-editor .ProseMirror h2 {
+  font-size: 1.2rem !important;
+  font-weight: 700 !important;
+  line-height: 1.3 !important;
+  margin-top: 1.4em !important;
+  margin-bottom: 0.4em !important;
+  color: var(--foreground) !important;
+}
+
+.rich-description-editor .ProseMirror h3 {
+  font-size: 1.05rem !important;
+  font-weight: 600 !important;
+  line-height: 1.35 !important;
+  margin-top: 1.2em !important;
+  margin-bottom: 0.35em !important;
+  color: var(--foreground) !important;
+}
+
+.rich-description-editor .ProseMirror hr {
+  border: none !important;
+  border-top: 1px solid var(--border) !important;
+  margin: 1.5em 0 !important;
+}
+
+/* First heading at top of doc — no extra top margin */
+.rich-description-editor .ProseMirror > h2:first-child,
+.rich-description-editor .ProseMirror > h3:first-child {
+  margin-top: 0 !important;
+}

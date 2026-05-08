@@ -115,6 +115,10 @@ function validateStep2(data: OfferFormData): ValidationResult {
     errors.push("Краткое описание не должно превышать 120 символов");
   }
 
+  if (!data.description || data.description.trim().length < 20) {
+    errors.push("Подробное описание должно содержать минимум 20 символов");
+  }
+
   if (data.ageGroups.length === 0) {
     warnings.push("Рекомендуется указать возрастные группы");
   }

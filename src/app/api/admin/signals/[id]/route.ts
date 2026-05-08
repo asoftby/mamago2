@@ -190,8 +190,8 @@ export async function PATCH(req: Request, { params }: RouteParams) {
 
   if (body.entityTypes !== undefined) {
     if (Array.isArray(body.entityTypes)) {
-      const validTypes = body.entityTypes.filter((type: any) => 
-        Object.values(SignalEntityType).includes(type)
+      const validTypes = body.entityTypes.filter((type: unknown) => 
+        Object.values(SignalEntityType).includes(type as SignalEntityType)
       );
       data.entityTypes = validTypes;
     } else {

@@ -59,7 +59,9 @@ export function EmailTemplatePreviewPanel({
 
   useEffect(() => {
     const controller = new AbortController();
+    let requestStarted = false;
     const timeoutId = window.setTimeout(async () => {
+      requestStarted = true;
       setState("loading");
       setError(null);
 
@@ -96,8 +98,10 @@ export function EmailTemplatePreviewPanel({
     }, 250);
 
     return () => {
-      controller.abort();
       window.clearTimeout(timeoutId);
+      if (requestStarted && !controller.signal.aborted) {
+        controller.abort(new DOMException("Preview request superseded.", "AbortError"));
+      }
     };
   }, [document, preheader, previewPreset, subject]);
 

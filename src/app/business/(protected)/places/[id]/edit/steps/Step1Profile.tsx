@@ -4,10 +4,12 @@ import { useState, useEffect } from "react";
 import type { Place } from "@prisma/client";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { WizardStepHeader } from "../components/WizardStepHeader";
 import { FilterSelect } from "@/components/ui/filter-select";
 import { AGE_OPTIONS } from "@/lib/config/ages";
+import { useVisitFormats, normalizeVisitFormats } from "@/hooks/useVisitFormats";
+import { RichDescriptionEditor } from "@/components/editor/RichDescriptionEditor";
+import { plainTextToRichTextHtml } from "@/lib/richtext/utils";
 
 interface Step1ProfileProps {
   place: Place;
@@ -29,18 +31,27 @@ const CATEGORIES = [
   { value: "other", label: "Другое" },
 ];
 
-const VISIT_FORMATS = ["indoor", "outdoor", "online"];
 const ACTIVITY_TYPES = ["sports", "arts", "education", "entertainment", "food"];
 
 export function Step1Profile({ place, onUpdate, onNext, canNext, isEditable = true }: Step1ProfileProps) {
   const [title, setTitle] = useState(place.title);
   const [category, setCategory] = useState(place.category);
   const [shortDesc, setShortDesc] = useState(place.shortDesc);
-  const [description, setDescription] = useState(place.description || "");
+  const [description, setDescription] = useState(() => {
+    const raw = place.description || "";
+    return raw && !/<[a-z][\s\S]*>/i.test(raw)
+      ? plainTextToRichTextHtml(raw)
+      : raw;
+  });
   const [showFullDescription, setShowFullDescription] = useState(false);
   const [ageTags, setAgeTags] = useState<string[]>(place.ageTags || []);
-  const [visitFormats, setVisitFormats] = useState<string[]>(place.visitFormats || []);
+  const [visitFormats, setVisitFormats] = useState<string[]>(() =>
+    normalizeVisitFormats(place.visitFormats || [])
+  );
   const [activityTypes, setActivityTypes] = useState<string[]>(place.activityTypes || []);
+
+  // Load visit formats from taxonomy
+  const { formats: visitFormatOptions, isLoading: formatsLoading } = useVisitFormats("PLACE");
 
   const handleTitleChange = (value: string) => {
     setTitle(value);
@@ -57,9 +68,9 @@ export function Step1Profile({ place, onUpdate, onNext, canNext, isEditable = tr
     onUpdate({ shortDesc: value });
   };
 
-  const handleDescriptionChange = (value: string) => {
-    setDescription(value);
-    onUpdate({ description: value });
+  const handleDescriptionChange = (html: string) => {
+    setDescription(html);
+    onUpdate({ description: html });
   };
 
   const toggleAgeTag = (tag: string) => {
@@ -125,30 +136,18 @@ export function Step1Profile({ place, onUpdate, onNext, canNext, isEditable = tr
 
       <div>
         <Label htmlFor="description">Описание *</Label>
-        <Textarea
-          id="description"
-          value={description}
-          onChange={(e) => handleDescriptionChange(e.target.value)}
-          placeholder="Подробное описание места"
-          className="mt-2"
-          rows={showFullDescription ? 10 : 4}
-          maxLength={5000}
-          disabled={!isEditable}
-        />
-        <div className="flex items-center justify-between mt-1">
-          <p className="text-xs text-muted-foreground">
-            {description.length}/5000 символов
-          </p>
-          {!showFullDescription && description.length > 200 && (
-            <button
-              type="button"
-              onClick={() => setShowFullDescription(true)}
-              className="text-xs text-primary hover:underline"
-            >
-              Показать полностью
-            </button>
-          )}
+        <div className="mt-2">
+          <RichDescriptionEditor
+            value={description}
+            onChange={handleDescriptionChange}
+            placeholder="Подробное описание места — расскажите о том, что здесь можно делать, какая атмосфера, что особенного..."
+            disabled={!isEditable}
+            minHeight={180}
+          />
         </div>
+        <p className="text-xs text-muted-foreground mt-1">
+          Используйте форматирование для лучшей читаемости. Минимум 20 символов.
+        </p>
       </div>
 
       <div>
@@ -215,19 +214,19 @@ export function Step1Profile({ place, onUpdate, onNext, canNext, isEditable = tr
       <div>
         <Label>Формат посещения *</Label>
         <div className="flex flex-wrap gap-2 mt-2">
-          {VISIT_FORMATS.map((format) => (
+          {visitFormatOptions.map((option) => (
             <button
-              key={format}
+              key={option.value}
               type="button"
-              onClick={() => isEditable && toggleVisitFormat(format)}
-              disabled={!isEditable}
+              onClick={() => isEditable && toggleVisitFormat(option.value)}
+              disabled={!isEditable || formatsLoading}
               className={`px-3 py-1 rounded-full text-sm border transition-colors ${
-                visitFormats.includes(format)
+                visitFormats.includes(option.value)
                   ? "bg-primary text-primary-foreground border-primary"
                   : "bg-background border-input hover:border-primary"
               } ${!isEditable ? "opacity-50 cursor-not-allowed" : ""}`}
             >
-              {format}
+              {option.label}
             </button>
           ))}
         </div>

@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Get or create billing account
-    let account = await getBillingAccountByBusinessId(businessId);
+    const account = await getBillingAccountByBusinessId(businessId);
 
     if (!account) {
       // Create billing account atomically with first credit

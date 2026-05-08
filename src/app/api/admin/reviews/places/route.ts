@@ -35,7 +35,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const offset = parseInt(searchParams.get("offset") || "0");
 
     // Построить where условие
-    const where: any = {};
+    const where: Record<string, unknown> = {};
 
     if (statusParam && statusParam !== "all") {
       where.status = statusParam as PlaceReviewStatus;

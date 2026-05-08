@@ -14,9 +14,14 @@ import { cn } from "@/lib/utils";
 import { MobileSearchHeroRow } from "@/components/mobile/MobileSearchHeroRow";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { DISCOVERY_INTENT_ITEMS } from "@/lib/discovery/discoveryIntentConfig";
-import { POPULAR } from "@/components/search/SearchResults";
-import { SearchResultItem } from "@/components/search/SearchResultItem";
+import { POPULAR, SearchResults } from "@/components/search/SearchResults";
 import type { SearchResultItem as SearchResultItemType } from "@/lib/search/types";
+import {
+  PUBLIC_SEARCH_DEBOUNCE_MS,
+  PUBLIC_SEARCH_RESULTS_LIMIT,
+} from "@/lib/search/constants";
+import { rememberPublicSearchQuery } from "@/lib/search/recentPublicSearch";
+import { useLastPublicSearchQuery } from "@/hooks/useLastPublicSearchQuery";
 
 export type MobileSearchState = "idle" | "focused" | "typing";
 
@@ -30,22 +35,6 @@ export type MobileSearchProps = {
   onResultNavigate: (item: SearchResultItemType) => void;
 };
 
-function SearchResultsSkeleton() {
-  return (
-    <div className="space-y-2 px-1 py-2">
-      {Array.from({ length: 5 }, (_, i) => (
-        <div key={i} className="flex gap-3 rounded-xl px-3 py-2.5">
-          <div className="h-12 w-12 shrink-0 animate-pulse rounded-lg bg-neutral-200" />
-          <div className="flex-1 space-y-2 pt-0.5">
-            <div className="h-4 max-w-[75%] animate-pulse rounded bg-neutral-200" />
-            <div className="h-3 w-1/4 animate-pulse rounded bg-neutral-200" />
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
 export function MobileSearch({
   searchText,
   onSearchTextChange,
@@ -54,6 +43,7 @@ export function MobileSearch({
   filtersSection,
   onResultNavigate,
 }: MobileSearchProps) {
+  const lastSearch = useLastPublicSearchQuery();
   const inputRef = useRef<HTMLInputElement>(null);
   const tabsRef = useRef<(HTMLButtonElement | null)[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -61,10 +51,12 @@ export function MobileSearch({
   const [indicatorStyle, setIndicatorStyle] = useState({ left: 0, width: 0 });
   const [results, setResults] = useState<SearchResultItemType[]>([]);
   const [loading, setLoading] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(-1);
 
   const queryTrim = searchText.trim();
-  const debounced = useDebouncedValue(queryTrim, 250);
-  const debouncing = queryTrim.length >= 2 && queryTrim !== debounced;
+  const debouncedRaw = useDebouncedValue(searchText, PUBLIC_SEARCH_DEBOUNCE_MS);
+  const trimmed = debouncedRaw.trim();
+  const debouncing = queryTrim.length >= 2 && queryTrim !== trimmed;
 
   const searchState: MobileSearchState = useMemo(() => {
     if (queryTrim.length >= 2) return "typing";
@@ -81,10 +73,10 @@ export function MobileSearch({
       setIndicatorStyle({ left: 0, width: 0 });
       return;
     }
-    const activeIndex = DISCOVERY_INTENT_ITEMS.findIndex(
+    const intentTabIndex = DISCOVERY_INTENT_ITEMS.findIndex(
       (item) => item.id === selectedIntent,
     );
-    const currentTab = tabsRef.current[activeIndex];
+    const currentTab = tabsRef.current[intentTabIndex];
     if (currentTab && containerRef.current) {
       setIndicatorStyle({
         left: currentTab.offsetLeft,
@@ -96,10 +88,10 @@ export function MobileSearch({
   useEffect(() => {
     const timer = setTimeout(() => {
       if (selectedIntent == null) return;
-      const activeIndex = DISCOVERY_INTENT_ITEMS.findIndex(
+      const intentTabIndex = DISCOVERY_INTENT_ITEMS.findIndex(
         (item) => item.id === selectedIntent,
       );
-      const currentTab = tabsRef.current[activeIndex];
+      const currentTab = tabsRef.current[intentTabIndex];
       if (currentTab && containerRef.current) {
         setIndicatorStyle({
           left: currentTab.offsetLeft,
@@ -111,18 +103,20 @@ export function MobileSearch({
   }, [selectedIntent]);
 
   useEffect(() => {
-    if (debounced.length < 2) {
+    if (trimmed.length < 2) {
       setResults([]);
       setLoading(false);
+      setActiveIndex(-1);
       return;
     }
     let cancelled = false;
     setLoading(true);
+    setActiveIndex(-1);
     (async () => {
       try {
         const res = await fetch(
-          `/api/search?q=${encodeURIComponent(debounced)}&limit=10`,
-          { credentials: "include" },
+          `/api/search?q=${encodeURIComponent(trimmed)}&limit=${PUBLIC_SEARCH_RESULTS_LIMIT}`,
+          { credentials: "include", cache: "no-store" },
         );
         if (!res.ok || cancelled) return;
         const data = (await res.json()) as { results?: SearchResultItemType[] };
@@ -138,7 +132,7 @@ export function MobileSearch({
     return () => {
       cancelled = true;
     };
-  }, [debounced]);
+  }, [trimmed]);
 
   const handlePopularPick = useCallback(
     (term: string) => {
@@ -150,6 +144,15 @@ export function MobileSearch({
     [onSearchTextChange],
   );
 
+  const handleSelectResult = useCallback(
+    (item: SearchResultItemType) => {
+      const q = searchText.trim();
+      if (q.length >= 2) rememberPublicSearchQuery(q);
+      onResultNavigate(item);
+    },
+    [searchText, onResultNavigate],
+  );
+
   /** Как в разделах discovery: табы видны в idle даже до выбора раздела (хаб города). */
   const showIntentRow = searchState === "idle";
 
@@ -159,8 +162,32 @@ export function MobileSearch({
   const showAutocomplete =
     searchState === "typing" && queryTrim.length >= 2;
 
-  const showNoResults =
-    queryTrim.length >= 2 && !loading && !debouncing && results.length === 0;
+  useEffect(() => {
+    if (!showAutocomplete) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (results.length === 0 || trimmed.length < 2) return;
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setActiveIndex((i) =>
+          i < 0 ? 0 : Math.min(i + 1, results.length - 1),
+        );
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setActiveIndex((i) => (i <= 0 ? -1 : i - 1));
+      } else if (e.key === "Enter" && activeIndex >= 0 && results[activeIndex]) {
+        e.preventDefault();
+        handleSelectResult(results[activeIndex]);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [showAutocomplete, results, trimmed, activeIndex, handleSelectResult]);
+
+  useEffect(() => {
+    if (results.length > 0 && activeIndex >= results.length) {
+      setActiveIndex(results.length - 1);
+    }
+  }, [results, activeIndex]);
 
   return (
     <div className="space-y-0">
@@ -171,39 +198,21 @@ export function MobileSearch({
           inputRef={inputRef}
           onFocus={() => setInputFocused(true)}
           onBlur={() => setInputFocused(false)}
+          loading={(loading || debouncing) && queryTrim.length >= 2}
         />
       </div>
 
       {showAutocomplete ? (
         <div className="px-4 pb-4">
-          <div className="overflow-hidden rounded-2xl border border-neutral-100 bg-white shadow-sm">
-            {loading || debouncing ? <SearchResultsSkeleton /> : null}
-            {!loading &&
-            !debouncing &&
-            results.length > 0 ? (
-              <ul className="divide-y divide-neutral-100 p-1">
-                {results.map((item) => (
-                  <li key={`${item.type}-${item.id}`}>
-                    <SearchResultItem
-                      item={item}
-                      query={debounced}
-                      onNavigate={() => onResultNavigate(item)}
-                    />
-                  </li>
-                ))}
-              </ul>
-            ) : null}
-            {showNoResults ? (
-              <div className="px-4 py-8 text-center">
-                <p className="text-sm font-medium text-neutral-900">
-                  Ничего не найдено
-                </p>
-                <p className="mt-1 text-sm text-neutral-500">
-                  Попробуйте изменить запрос
-                </p>
-              </div>
-            ) : null}
-          </div>
+          <SearchResults
+            query={searchText}
+            trimmedQuery={queryTrim}
+            loading={loading || debouncing}
+            results={results}
+            activeIndex={activeIndex}
+            onPopularPick={handlePopularPick}
+            onSelectResult={handleSelectResult}
+          />
         </div>
       ) : (
         <>
@@ -279,6 +288,26 @@ export function MobileSearch({
                 "animate-in fade-in slide-in-from-top-1 px-4 pb-4 duration-200",
               )}
             >
+              {lastSearch ? (
+                <>
+                  <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-neutral-500">
+                    Последний поиск
+                  </p>
+                  <ul className="mb-5 flex flex-wrap gap-2">
+                    <li className="max-w-full">
+                      <button
+                        type="button"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => handlePopularPick(lastSearch)}
+                        className="max-w-full truncate rounded-full border border-neutral-200 bg-neutral-50 px-3.5 py-2 text-left text-sm font-medium text-neutral-800 transition-colors hover:border-[#EF8759]/35 hover:bg-[#EF8759]/8 active:scale-[0.98]"
+                        title={lastSearch}
+                      >
+                        {lastSearch}
+                      </button>
+                    </li>
+                  </ul>
+                </>
+              ) : null}
               <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-neutral-500">
                 Популярное
               </p>

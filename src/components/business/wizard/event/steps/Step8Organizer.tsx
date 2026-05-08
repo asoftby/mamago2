@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "@/lib/toast";
-import { Search, Sparkles, Plus, Phone, Globe, Instagram } from "lucide-react";
+import { Search, Sparkles, Plus, Phone, Globe, Instagram, Building2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { normalizePhoneToE164 } from "@/lib/phone/e164";
 import type { EventFormData } from "../types";
 import { OrganizerSearchSelect } from "./organizer/OrganizerSearchSelect";
 import { OrganizerCreateForm } from "./organizer/OrganizerCreateForm";
+import { BusinessOrganizerCard } from "./organizer/BusinessOrganizerCard";
 import type { ExistingOrganizer } from "./organizer/types";
 
 interface Step8OrganizerProps {
@@ -30,6 +32,50 @@ type UnpLookupState = {
 
 type OrganizerMode = EventFormData["organizerMode"];
 
+type OrganizerFromBusinessResponse = {
+  hasBusinessProfile: boolean;
+  organizer: {
+    id: string;
+    name: string;
+    unp: string | null;
+    phone: string | null;
+    website: string | null;
+    instagram: string | null;
+  } | null;
+  business?: {
+    id: string;
+    name: string;
+    legalName: string | null;
+    unp: string | null;
+    phone: string | null;
+  };
+};
+
+type Step8ModeCardId = OrganizerMode | "business";
+
+function normalizeUnpDigits(value: string): string {
+  return value.replace(/\D/g, "");
+}
+
+function businessProfileMatchesForm(
+  api: OrganizerFromBusinessResponse | null,
+  form: EventFormData,
+): boolean {
+  if (!api?.hasBusinessProfile) return false;
+  if (api.organizer) {
+    return form.organizerMode === "existing" && form.organizerId === api.organizer.id;
+  }
+  const b = api.business;
+  if (!b) return false;
+  if (form.organizerMode !== "manual") return false;
+  const expectedName = (b.legalName || b.name || "").trim();
+  const expectedUnp = normalizeUnpDigits(b.unp ?? "");
+  const formUnp = normalizeUnpDigits(form.organizerUnp);
+  if (expectedUnp && formUnp === expectedUnp) return true;
+  if (!expectedUnp && expectedName && form.organizerName.trim() === expectedName) return true;
+  return false;
+}
+
 export function Step8Organizer({
   data,
   onChange,
@@ -38,7 +84,43 @@ export function Step8Organizer({
 }: Step8OrganizerProps) {
   const [importHint, setImportHint] = useState<OrganizerImportHint | null>(null);
   const [isLoadingHint, setIsLoadingHint] = useState(false);
+  const [businessProfile, setBusinessProfile] = useState<OrganizerFromBusinessResponse | null>(null);
+  const [isLoadingBusinessProfile, setIsLoadingBusinessProfile] = useState(true);
   const [unpLookupState, setUnpLookupState] = useState<UnpLookupState | null>(null);
+
+  useEffect(() => {
+    let isActive = true;
+
+    async function loadBusinessOrganizer() {
+      setIsLoadingBusinessProfile(true);
+      try {
+        const response = await fetch("/api/business/events/organizer-from-business", {
+          credentials: "include",
+        });
+        if (!response.ok) {
+          throw new Error(`Failed to load business organizer: ${response.status}`);
+        }
+        const json = (await response.json()) as OrganizerFromBusinessResponse;
+        if (isActive) {
+          setBusinessProfile(json);
+        }
+      } catch (error) {
+        console.error("[Step8Organizer] Failed to load organizer from business:", error);
+        if (isActive) {
+          setBusinessProfile(null);
+        }
+      } finally {
+        if (isActive) {
+          setIsLoadingBusinessProfile(false);
+        }
+      }
+    }
+
+    void loadBusinessOrganizer();
+    return () => {
+      isActive = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (!eventId) return;
@@ -48,7 +130,9 @@ export function Step8Organizer({
     async function loadHint() {
       setIsLoadingHint(true);
       try {
-        const response = await fetch(`/api/business/events/${eventId}/organizer-source`);
+        const response = await fetch(`/api/business/events/${eventId}/organizer-source`, {
+          credentials: "include",
+        });
         if (!response.ok) {
           throw new Error(`Failed to load organizer hint: ${response.status}`);
         }
@@ -94,12 +178,65 @@ export function Step8Organizer({
     data.organizerWebsite,
   ]);
 
+  const applyBusinessOrganizerFromProfile = useCallback(() => {
+    if (!businessProfile?.hasBusinessProfile) {
+      toast.error("Бизнес-профиль не найден");
+      return;
+    }
+
+    if (businessProfile.organizer) {
+      const o = businessProfile.organizer;
+      onChange({
+        organizerMode: "existing",
+        organizerId: o.id,
+        organizerName: o.name,
+        organizerUnp: o.unp ?? "",
+        organizerPhone: normalizePhoneToE164(o.phone ?? ""),
+        organizerWebsite: o.website ?? "",
+        organizerInstagram: o.instagram ?? "",
+      });
+      toast.success("Подставлен организатор, привязанный к вашему бизнесу");
+      return;
+    }
+
+    const b = businessProfile.business;
+    if (b) {
+      onChange({
+        organizerMode: "manual",
+        organizerId: null,
+        organizerName: (b.legalName || b.name || "").trim(),
+        organizerUnp: b.unp ?? "",
+        organizerPhone: normalizePhoneToE164(b.phone ?? ""),
+        organizerWebsite: "",
+        organizerInstagram: "",
+      });
+      toast.success("Подставлены данные из бизнес-профиля");
+      return;
+    }
+
+    toast.error("Нет данных организатора в профиле");
+  }, [businessProfile, onChange]);
+
+  const businessCardSelected = businessProfileMatchesForm(businessProfile, data);
+
   const modeCards: Array<{
-    id: OrganizerMode;
+    id: Step8ModeCardId;
     title: string;
     subtitle: string;
     icon: typeof Search;
   }> = [
+    ...(businessProfile?.hasBusinessProfile
+      ? [
+          {
+            id: "business" as const,
+            title: "Мой бизнес-профиль",
+            subtitle: businessProfile.organizer
+              ? "Организатор уже привязан к вашей компании"
+              : "Подставить название, УНП и телефон из кабинета",
+            icon: Building2,
+          },
+        ]
+      : []),
     {
       id: "existing",
       title: "Найти организатора",
@@ -124,7 +261,12 @@ export function Step8Organizer({
     },
   ];
 
-  const handleModeChange = (mode: OrganizerMode) => {
+  const handleModeChange = (mode: Step8ModeCardId) => {
+    if (mode === "business") {
+      applyBusinessOrganizerFromProfile();
+      return;
+    }
+
     if (mode === "import" && importHint?.name) {
       onChange({
         organizerMode: "import",
@@ -217,9 +359,15 @@ export function Step8Organizer({
       </div>
 
       <div className="space-y-3">
+        {isLoadingBusinessProfile ? (
+          <div className="rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground">
+            Загружаем данные бизнес-профиля…
+          </div>
+        ) : null}
         {modeCards.map((option) => {
           const Icon = option.icon;
-          const selected = data.organizerMode === option.id;
+          const selected =
+            option.id === "business" ? businessCardSelected : data.organizerMode === option.id;
 
           return (
             <div
@@ -253,6 +401,44 @@ export function Step8Organizer({
 
               {selected ? (
                 <div className="border-t border-current/10 px-4 pb-4 pt-4">
+                  {option.id === "business" && businessProfile?.hasBusinessProfile ? (
+                    <BusinessOrganizerCard
+                      organizer={{
+                        id: businessProfile.organizer?.id,
+                        name:
+                          businessProfile.organizer?.name ??
+                          businessProfile.business?.legalName ??
+                          businessProfile.business?.name ??
+                          "",
+                        legalName: businessProfile.business?.legalName,
+                        unp:
+                          businessProfile.organizer?.unp ??
+                          businessProfile.business?.unp ??
+                          null,
+                        phone:
+                          businessProfile.organizer?.phone ?? businessProfile.business?.phone ?? null,
+                        website: businessProfile.organizer?.website ?? null,
+                        instagram: businessProfile.organizer?.instagram ?? null,
+                      }}
+                      isEditable={isEditable}
+                      onChangeOrganizer={
+                        isEditable
+                          ? () => {
+                              onChange({
+                                organizerMode: "existing",
+                                organizerId: null,
+                                organizerName: "",
+                                organizerUnp: "",
+                                organizerPhone: "",
+                                organizerWebsite: "",
+                                organizerInstagram: "",
+                              });
+                            }
+                          : undefined
+                      }
+                    />
+                  ) : null}
+
                   {option.id === "existing" ? (
                     <OrganizerSearchSelect
                       selectedOrganizer={selectedExistingOrganizer}

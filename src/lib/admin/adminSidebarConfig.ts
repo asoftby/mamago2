@@ -15,6 +15,7 @@ import {
   ChartColumn,
   Megaphone,
   Download,
+  Search,
 } from "lucide-react";
 
 /**
@@ -125,6 +126,13 @@ export const GROUP_MODERATION: AdminSidebarGroup = {
       href: adminPath("/moderation/queue"),
       matchers: [{ type: "prefix", value: adminPath("/moderation/queue") }],
       badgeCountKey: "queueTotal",
+    },
+    {
+      id: "moderation-reviews",
+      label: "Отзывы",
+      href: adminPath("/moderation/reviews"),
+      matchers: [{ type: "prefix", value: adminPath("/moderation/reviews") }],
+      badgeCountKey: "reviewsPendingCount",
     },
   ],
 };
@@ -258,10 +266,60 @@ export const GROUP_CONTENT: AdminSidebarGroup = {
       matchers: [{ type: "prefix", value: adminPath("/content/publications") }],
     },
     {
+      id: "content-pages",
+      label: "Страницы",
+      href: adminPath("/pages"),
+      matchers: [{ type: "prefix", value: adminPath("/pages") }],
+    },
+    {
       id: "content-media",
       label: "Медиатека",
       href: adminPath("/media"),
       matchers: [{ type: "prefix", value: adminPath("/media") }],
+    },
+  ],
+};
+
+export const GROUP_SEARCH: AdminSidebarGroup = {
+  id: "search",
+  label: "Поиск",
+  icon: Search,
+  children: [
+    {
+      id: "search-overview",
+      label: "Overview",
+      href: adminPath("/search"),
+      matchers: [{ type: "exact", value: adminPath("/search") }],
+    },
+    {
+      id: "search-quick-tags",
+      label: "Quick Tags",
+      href: adminPath("/search/quick-tags"),
+      matchers: [{ type: "prefix", value: adminPath("/search/quick-tags") }],
+    },
+    {
+      id: "search-synonyms",
+      label: "Synonyms",
+      href: adminPath("/search/synonyms"),
+      matchers: [{ type: "prefix", value: adminPath("/search/synonyms") }],
+    },
+    {
+      id: "search-zero-results",
+      label: "Zero Results",
+      href: adminPath("/search/zero-results"),
+      matchers: [{ type: "prefix", value: adminPath("/search/zero-results") }],
+    },
+    {
+      id: "search-index",
+      label: "Index",
+      href: adminPath("/search/index"),
+      matchers: [{ type: "prefix", value: adminPath("/search/index") }],
+    },
+    {
+      id: "search-ranking",
+      label: "Ranking",
+      href: adminPath("/search/ranking"),
+      matchers: [{ type: "prefix", value: adminPath("/search/ranking") }],
     },
   ],
 };
@@ -415,6 +473,7 @@ export const ADMIN_SIDEBAR_CONFIG: readonly (AdminSidebarNavItem | AdminSidebarG
   GROUP_COMMERCIAL,
   GROUP_CONTENT,
   NAV_COMMUNICATIONS,
+  GROUP_SEARCH,
   GROUP_DISCOVERY,
   GROUP_RANKING,
   NAV_ANALYTICS,

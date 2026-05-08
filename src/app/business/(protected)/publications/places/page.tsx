@@ -133,8 +133,8 @@ export default async function PublicationsPlacesPage({
   return (
     <div className="space-y-6">
       <BusinessSectionHeader
-        eyebrow="PUBLICATIONS"
-        title="Places"
+        eyebrow="ПУБЛИКАЦИИ"
+        title="Места"
         description="Места — это постоянная основа вашего бизнеса в mamaGo. Здесь можно управлять локациями, которые будут использоваться в событиях и предложениях."
         eyebrowVariant="primary"
       />

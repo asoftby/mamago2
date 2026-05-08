@@ -37,19 +37,29 @@ export function WeekCalendarStrip({
   const [direction, setDirection] = useState<1 | -1>(1);
   const prevSyncedWeekStartRef = useRef<string | null>(null);
   /** После mount включаем slide-in только при смене недели — без рывка на холодной загрузке. */
-  const enableWeekEnterMotion = useRef(false);
+  const [motionEnabled, setMotionEnabled] = useState(false);
   useEffect(() => {
-    enableWeekEnterMotion.current = true;
+    const t = setTimeout(() => {
+      setMotionEnabled(true);
+    }, 0);
+    return () => clearTimeout(t);
   }, []);
+
+  const [prevSelectedDate, setPrevSelectedDate] = useState(selectedDate);
+
+  if (selectedDate !== prevSelectedDate) {
+    const ws = getWeekStart(selectedDate);
+    const prevWs = getWeekStart(prevSelectedDate);
+    if (prevWs !== ws) {
+      setDirection(ws.localeCompare(prevWs) >= 0 ? 1 : -1);
+      setVisibleWeekStart(ws);
+    }
+    setPrevSelectedDate(selectedDate);
+  }
 
   useEffect(() => {
     const ws = getWeekStart(selectedDate);
-    const prev = prevSyncedWeekStartRef.current;
-    if (prev != null && prev !== ws) {
-      setDirection(ws.localeCompare(prev) >= 0 ? 1 : -1);
-    }
     prevSyncedWeekStartRef.current = ws;
-    setVisibleWeekStart(ws);
   }, [selectedDate]);
 
   const weekDays = useMemo(() => getWeekDays(visibleWeekStart), [visibleWeekStart]);
@@ -117,7 +127,7 @@ export function WeekCalendarStrip({
         <motion.div
           key={visibleWeekStart}
           initial={
-            enableWeekEnterMotion.current
+            motionEnabled
               ? { x: direction > 0 ? 28 : -28, opacity: 0.88 }
               : false
           }

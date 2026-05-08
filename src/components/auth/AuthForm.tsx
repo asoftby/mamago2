@@ -26,6 +26,12 @@ export interface AuthFormProps {
   hideCloseButton?: boolean;
   /** Стартовый сценарий full-page/modal auth. */
   initialMode?: AuthFlowMode;
+  /** Optional email prefill for trusted continuation flows such as invitations. */
+  initialEmail?: string;
+  /** Lock email field for token-bound auth flows such as invitations. */
+  emailReadOnly?: boolean;
+  /** Keep invitation token through login/register. */
+  invitationToken?: string;
   /** Внешнее уведомление над формой: reset success и т.п. */
   notice?: ReactNode;
 }
@@ -42,6 +48,9 @@ export function AuthForm({
   deferNavigation = false,
   hideCloseButton = false,
   initialMode = "login",
+  initialEmail = "",
+  emailReadOnly = false,
+  invitationToken,
   notice,
 }: AuthFormProps) {
   const resolvedSource = postAuthSource ?? getPostAuthContext()?.source;
@@ -57,6 +66,8 @@ export function AuthForm({
     skipRedirectAfterAuth: deferNavigation,
     finishContext: "modal",
     initialMode,
+    initialEmail,
+    invitationToken,
   });
 
   const {
@@ -141,6 +152,7 @@ export function AuthForm({
               placeholder="Email"
               required
               autoComplete="email"
+              readOnly={emailReadOnly}
               className={AUTH_INPUT_CLASS}
             />
 

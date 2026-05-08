@@ -122,7 +122,11 @@ export const EventLocationSearchInput = forwardRef<HTMLInputElement, EventLocati
       cleanupRef.current?.();
       cleanupRef.current = null;
       widgetRef.current = null;
-      setIsWidgetReady(false);
+      
+      // Use setTimeout to avoid synchronous setState in effect
+      setTimeout(() => {
+        setIsWidgetReady(false);
+      }, 0);
 
       const host = hostRef.current;
       if (!host) {
@@ -208,8 +212,11 @@ export const EventLocationSearchInput = forwardRef<HTMLInputElement, EventLocati
     }, [initialValue]);
 
     useEffect(() => {
-      initAutocomplete();
+      const t = setTimeout(() => {
+        void initAutocomplete();
+      }, 0);
       return () => {
+        clearTimeout(t);
         cleanupRef.current?.();
       };
     }, [initAutocomplete]);

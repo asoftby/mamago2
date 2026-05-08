@@ -111,7 +111,7 @@ export function BillingBusinessesClient({ accounts: initialAccounts }: Props) {
         {accounts.length === 0 ? (
           <div className="border border-gray-200 rounded-lg bg-white p-12 text-center">
             <p className="text-lg font-medium text-gray-900 mb-2">Billing-аккаунтов пока нет</p>
-            <p className="text-sm text-gray-600">Используйте кнопку "Пополнить баланс" выше для создания первого аккаунта</p>
+            <p className="text-sm text-gray-600">Используйте кнопку &quot;Пополнить баланс&quot; выше для создания первого аккаунта</p>
           </div>
         ) : (
           <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
@@ -143,7 +143,7 @@ export function BillingBusinessesClient({ accounts: initialAccounts }: Props) {
                           </div>
                         </td>
                         <td className="py-3 px-4 text-center">
-                          <BillingAccountStatusBadge status={account.status as any} />
+                          <BillingAccountStatusBadge status={account.status as "ACTIVE" | "SUSPENDED" | "CLOSED"} />
                         </td>
                         <td className="py-3 px-4 text-gray-700">
                           {subscription ? (

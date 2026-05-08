@@ -189,10 +189,7 @@ function QuickView({
     const unique = new Set((eventPlanDateOptions ?? []).map((d) => normalizePlanDateISO(d)).filter(Boolean));
     return Array.from(unique).sort() as string[];
   }, [eventPlanDateOptions]);
-  const upcomingOptions = React.useMemo(
-    () => normalizedOptions.filter((d) => d >= todayISO),
-    [normalizedOptions, todayISO],
-  );
+  const upcomingOptions = normalizedOptions.filter((d) => d >= todayISO);
   const nearestTwo = upcomingOptions.slice(0, 2);
   const isSingleEventDate = Boolean(eventPlanDateISO);
   const hasMultiEventDates = !isSingleEventDate && upcomingOptions.length > 0;

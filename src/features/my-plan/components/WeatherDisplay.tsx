@@ -42,26 +42,25 @@ export function WeatherDisplay({
   const iconTimeOfDay: "morning" | "day" | "evening" | "night" =
     timeOfDay === "evening" && new Date().getHours() >= 21 ? "night" : timeOfDay;
 
-  const content = useMemo(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const targetDate = new Date(date);
-    targetDate.setHours(0, 0, 0, 0);
-    const daysFromNow = differenceInDays(targetDate, today);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const targetDate = new Date(date);
+  targetDate.setHours(0, 0, 0, 0);
+  const daysFromNow = differenceInDays(targetDate, today);
 
-    if (daysFromNow > 7) {
-      return { text: formatDateOnly(date), showWeather: false, weatherCode: null as number | null };
-    }
-
+  let content;
+  if (daysFromNow > 7) {
+    content = { text: formatDateOnly(date), showWeather: false, weatherCode: null as number | null };
+  } else {
     const weatherData = weather?.getWeatherForDate(date);
     const weatherText = formatWeatherText(date, weatherData ?? null, timeOfDay, cityName);
 
     if (weatherText) {
-      return { text: weatherText, showWeather: true, weatherCode: weatherData?.[timeOfDay]?.code ?? null };
+      content = { text: weatherText, showWeather: true, weatherCode: weatherData?.[timeOfDay]?.code ?? null };
+    } else {
+      content = { text: formatDateOnly(date), showWeather: false, weatherCode: null as number | null };
     }
-
-    return { text: formatDateOnly(date), showWeather: false, weatherCode: null as number | null };
-  }, [date, timeOfDay, weather?.weatherByDate, cityName]);
+  }
 
   if (weather?.loading) {
     return (

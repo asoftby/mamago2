@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { ScheduleEditor } from "@/components/schedule-editor/ScheduleEditor";
+import { InternationalPhoneInput } from "@/components/phone/InternationalPhoneInput";
 import { Ticket, Clock, Info, PhoneCall, type LucideIcon } from "lucide-react";
 import type { EventFormData } from "../types";
 import {
@@ -42,14 +43,18 @@ export function Step5PricingParticipation({
   eventId,
 }: Step5PricingParticipationProps) {
   const [importPhones, setImportPhones] = useState<string[]>([]);
+  const [prevEventId, setPrevEventId] = useState(eventId);
   const [highlightPhoneField, setHighlightPhoneField] = useState(false);
-  const phoneInputRef = useRef<HTMLInputElement | null>(null);
 
-  useEffect(() => {
+  if (eventId !== prevEventId) {
+    setPrevEventId(eventId);
     if (!eventId) {
       setImportPhones([]);
-      return;
     }
+  }
+
+  useEffect(() => {
+    if (!eventId) return;
     let cancelled = false;
     (async () => {
       try {
@@ -93,10 +98,8 @@ export function Step5PricingParticipation({
   const applyPhoneFromSource = (value: string) => {
     const normalized = normalizePhoneToE164(value);
     onChange({ prebookPhone: normalized });
-    requestAnimationFrame(() => {
-      phoneInputRef.current?.focus();
-      setHighlightPhoneField(true);
-    });
+    setHighlightPhoneField(true);
+    setTimeout(() => setHighlightPhoneField(false), 2000);
   };
 
   useEffect(() => {
@@ -339,12 +342,10 @@ export function Step5PricingParticipation({
                                 highlightPhoneField && "border-emerald-300 bg-emerald-50/60",
                               )}
                             >
-                              <Input
+                              <InternationalPhoneInput
                                 id="prebookPhone"
-                                ref={phoneInputRef}
-                                type="tel"
                                 value={data.prebookPhone}
-                                onChange={(e) => onChange({ prebookPhone: e.target.value })}
+                                onChange={(value) => onChange({ prebookPhone: value })}
                                 placeholder="+375 29 123 45 67"
                                 disabled={!isEditable}
                               />
