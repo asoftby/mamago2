@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import { createRefund } from "@/server/services/billing/billingTransaction.service";
-import { getBillingTransactionById } from "@/server/services/billing/billingTransaction.service";
-import prisma from "@/lib/prisma";
+import { refundTransactionSchema } from "@/lib/validation/billing";
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,91 +12,30 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { transactionId, amount, reason, note } = body;
-
-    // Validation
-    if (!transactionId || !amount || !reason) {
+    
+    // Validate with Zod
+    const validation = refundTransactionSchema.safeParse(body);
+    if (!validation.success) {
       return NextResponse.json(
-        { error: "Missing required fields: transactionId, amount, reason" },
+        { error: "Validation failed", details: validation.error.issues },
         { status: 400 }
       );
     }
 
-    if (amount <= 0) {
-      return NextResponse.json(
-        { error: "Amount must be positive" },
-        { status: 400 }
-      );
-    }
+    const { transactionId, amount, reason, note } = validation.data;
 
-    // Get parent transaction
-    const parentTx = await getBillingTransactionById(transactionId);
-
-    if (!parentTx) {
-      return NextResponse.json(
-        { error: "Transaction not found" },
-        { status: 404 }
-      );
-    }
-
-    // Validation rules
-    if (parentTx.status !== "SUCCEEDED") {
-      return NextResponse.json(
-        { error: "Can only refund succeeded transactions" },
-        { status: 400 }
-      );
-    }
-
-    if (parentTx.type === "REFUND") {
-      return NextResponse.json(
-        { error: "Cannot refund a refund transaction" },
-        { status: 400 }
-      );
-    }
-
-    // Check if already refunded
-    const existingRefund = parentTx.childTransactions?.find(
-      (tx) => tx.type === "REFUND"
-    );
-
-    if (existingRefund) {
-      return NextResponse.json(
-        { error: "Transaction already has a refund" },
-        { status: 400 }
-      );
-    }
-
-    const parentAmount = Math.abs(parentTx.amount.toNumber());
-
-    if (amount > parentAmount) {
-      return NextResponse.json(
-        { 
-          error: "Refund amount cannot exceed original transaction amount",
-          originalAmount: parentAmount,
-          requestedAmount: amount,
-        },
-        { status: 400 }
-      );
-    }
-
-    // Create refund with admin metadata
+    // Create refund with admin metadata (service handles all validation and atomicity)
     const refundReason = note ? `${reason} (${note})` : reason;
-    let refund = await createRefund({
+    const refund = await createRefund({
       parentTransactionId: transactionId,
       amount,
       reason: refundReason,
-    });
-
-    // Update metadata with admin info
-    refund = await prisma.billingTransaction.update({
-      where: { id: refund.id },
-      data: {
-        metadata: {
-          ...(refund.metadata as Record<string, unknown>),
-          adminId: user.id,
-          adminEmail: user.email,
-          timestamp: new Date().toISOString(),
-        },
+      metadata: {
+        reason,
+        note,
+        adminId: user.id,
+        adminEmail: user.email,
+        timestamp: new Date().toISOString(),
       },
     });
 
@@ -111,8 +49,29 @@ export async function POST(request: NextRequest) {
     });
   } catch (error: unknown) {
     console.error("Refund error:", error);
+    
+    // Handle specific error codes
+    if (error instanceof Error) {
+      const err = error as { code?: string; originalAmount?: number; requestedAmount?: number };
+      if (err.code === "REFUND_AMOUNT_EXCEEDS_ORIGINAL") {
+        return NextResponse.json(
+          { 
+            error: "Refund amount cannot exceed original transaction amount",
+            originalAmount: err.originalAmount,
+            requestedAmount: err.requestedAmount,
+          },
+          { status: 400 }
+        );
+      }
+      
+      return NextResponse.json(
+        { error: error.message },
+        { status: 400 }
+      );
+    }
+    
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to create refund" },
+      { error: "Failed to create refund" },
       { status: 500 }
     );
   }

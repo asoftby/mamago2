@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import { getBillingAccountByBusinessId, suspendBillingAccount } from "@/server/services/billing/billingAccount.service";
+import { suspendAccountSchema } from "@/lib/validation/billing";
 
 export async function POST(request: NextRequest) {
   try {
@@ -11,15 +12,17 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { businessId, reason } = body;
-
-    // Validation
-    if (!businessId || !reason) {
+    
+    // Validate with Zod
+    const validation = suspendAccountSchema.safeParse(body);
+    if (!validation.success) {
       return NextResponse.json(
-        { error: "Missing required fields: businessId, reason" },
+        { error: "Validation failed", details: validation.error.issues },
         { status: 400 }
       );
     }
+
+    const { businessId, reason } = validation.data;
 
     // Get billing account
     const account = await getBillingAccountByBusinessId(businessId);

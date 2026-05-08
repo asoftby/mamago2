@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import { getBillingAccountByBusinessId, debitBusinessDeposit } from "@/server/services/billing/billingAccount.service";
+import { debitDepositSchema } from "@/lib/validation/billing";
 
 export async function POST(request: NextRequest) {
   try {
@@ -11,22 +12,17 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { businessId, amount, reason, note, allowNegative } = body;
-
-    // Validation
-    if (!businessId || !amount || !reason) {
+    
+    // Validate with Zod
+    const validation = debitDepositSchema.safeParse(body);
+    if (!validation.success) {
       return NextResponse.json(
-        { error: "Missing required fields: businessId, amount, reason" },
+        { error: "Validation failed", details: validation.error.issues },
         { status: 400 }
       );
     }
 
-    if (amount <= 0) {
-      return NextResponse.json(
-        { error: "Amount must be positive" },
-        { status: 400 }
-      );
-    }
+    const { businessId, amount, reason, note, allowNegative } = validation.data;
 
     // Get billing account
     const account = await getBillingAccountByBusinessId(businessId);
@@ -38,47 +34,53 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check balance if negative not allowed
     const currentBalance = account.depositBalance.toNumber();
-    const newBalance = currentBalance - amount;
 
-    if (!allowNegative && newBalance < 0) {
-      return NextResponse.json(
-        { 
-          error: "Insufficient balance",
-          currentBalance,
-          requestedAmount: amount,
-          shortfall: Math.abs(newBalance),
+    // Create debit transaction (service handles balance check and atomicity)
+    try {
+      const transaction = await debitBusinessDeposit({
+        accountId: account.id,
+        amount,
+        type: "MANUAL_ADJUSTMENT",
+        description: `Ручное списание депозита администратором: ${reason}`,
+        referenceType: "MANUAL",
+        metadata: {
+          reason,
+          note,
+          adminId: user.id,
+          adminEmail: user.email,
+          allowNegative,
+          timestamp: new Date().toISOString(),
         },
-        { status: 400 }
-      );
-    }
-
-    // Create debit transaction
-    const transaction = await debitBusinessDeposit({
-      accountId: account.id,
-      amount,
-      type: "MANUAL_ADJUSTMENT",
-      description: `Ручное списание депозита администратором: ${reason}`,
-      referenceType: "MANUAL",
-      metadata: {
-        reason,
-        note,
-        adminId: user.id,
-        adminEmail: user.email,
         allowNegative,
-        timestamp: new Date().toISOString(),
-      },
-    });
+      });
 
-    return NextResponse.json({
-      success: true,
-      transaction: {
-        id: transaction.id,
-        amount: transaction.amount.toNumber(),
-        newBalance: currentBalance - amount,
-      },
-    });
+      return NextResponse.json({
+        success: true,
+        transaction: {
+          id: transaction.id,
+          amount: transaction.amount.toNumber(),
+          newBalance: currentBalance - amount,
+        },
+      });
+    } catch (error: unknown) {
+      // Handle insufficient funds error from service
+      const err = error as { code?: string; currentBalance?: number; creditLimit?: number; availableBalance?: number; requestedAmount?: number; shortfall?: number };
+      if (err.code === "INSUFFICIENT_FUNDS") {
+        return NextResponse.json(
+          { 
+            error: "Insufficient balance",
+            currentBalance: err.currentBalance,
+            creditLimit: err.creditLimit,
+            availableBalance: err.availableBalance,
+            requestedAmount: err.requestedAmount,
+            shortfall: err.shortfall,
+          },
+          { status: 400 }
+        );
+      }
+      throw error;
+    }
   } catch (error: unknown) {
     console.error("Debit deposit error:", error);
     return NextResponse.json(

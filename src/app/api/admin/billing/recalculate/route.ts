@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import { getBillingAccountByBusinessId, recalculateDepositBalance } from "@/server/services/billing/billingAccount.service";
+import { recalculateBalanceSchema } from "@/lib/validation/billing";
 
 export async function POST(request: NextRequest) {
   try {
@@ -11,15 +12,17 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { businessId } = body;
-
-    // Validation
-    if (!businessId) {
+    
+    // Validate with Zod
+    const validation = recalculateBalanceSchema.safeParse(body);
+    if (!validation.success) {
       return NextResponse.json(
-        { error: "Missing required field: businessId" },
+        { error: "Validation failed", details: validation.error.issues },
         { status: 400 }
       );
     }
+
+    const { businessId } = validation.data;
 
     // Get billing account
     const account = await getBillingAccountByBusinessId(businessId);
