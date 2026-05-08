@@ -110,13 +110,15 @@ export async function POST(
 
     const body = await request.json().catch(() => ({}));
     const email = typeof body.email === "string" ? body.email : "";
-    const title =
-      typeof body.title === "string" && body.title.trim() ? body.title.trim() : null;
+    const position =
+      typeof body.position === "string" && body.position.trim() 
+        ? body.position.trim() 
+        : null;
 
     const result = await createBusinessInvite({
       businessId,
       email,
-      title,
+      position,
       invitedByUserId: user.id,
     });
 

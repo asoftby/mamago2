@@ -14,8 +14,13 @@ export const metadata = {
  * Команда бизнеса: участники, приглашения, форма приглашения (только владелец).
  * Route: /business/team — один бизнес на пользователя (MVP), без [businessSlug].
  */
-export default async function BusinessTeamPage() {
+export default async function BusinessTeamPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ invite?: string }>;
+}) {
   const routing = await getCurrentRequestRoutingContext();
+  const params = await searchParams;
   const user = await getCurrentUser();
   if (!user) {
     redirect(
@@ -44,6 +49,7 @@ export default async function BusinessTeamPage() {
     <BusinessTeamPageClient
       businessId={business.id}
       isOwner={isOwner}
+      inviteNotice={params.invite}
     />
   );
 }

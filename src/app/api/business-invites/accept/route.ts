@@ -1,14 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
-import { isEmailVerified, jsonEmailNotVerified } from "@/lib/auth/requireVerifiedEmail";
-import { acceptBusinessInvite } from "@/server/business/businessInvite.service";
+import {
+  acceptBusinessInvite,
+  buildBusinessInviteAcceptPath,
+} from "@/server/business/businessInvite.service";
 
 /**
- * POST /api/business-invites/accept — body: { token: string }
- * GET /api/business-invites/accept?token=... — same for email links (MVP JSON response).
+ * POST /api/business-invites/accept — JSON endpoint for authenticated client requests.
+ * GET /api/business-invites/accept?token=... — legacy invite links redirect to the public page.
  */
 
-async function runAccept(token: string | null) {
+async function runAcceptApi(token: string | null) {
   if (!token || typeof token !== "string" || !token.trim()) {
     return NextResponse.json({ error: "token is required" }, { status: 400 });
   }
@@ -16,10 +18,6 @@ async function runAccept(token: string | null) {
   const user = await getCurrentUser();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  if (!isEmailVerified(user)) {
-    return jsonEmailNotVerified();
   }
 
   const result = await acceptBusinessInvite(user, token.trim());
@@ -46,25 +44,15 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json().catch(() => ({}));
     const token = typeof body.token === "string" ? body.token : null;
-    return runAccept(token);
-  } catch (e) {
-    console.error("Accept business invite error:", e);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 },
-    );
+    return runAcceptApi(token);
+  } catch (error) {
+    console.error("Accept business invite error:", error);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
 
 export async function GET(request: NextRequest) {
-  try {
-    const token = request.nextUrl.searchParams.get("token");
-    return runAccept(token);
-  } catch (e) {
-    console.error("Accept business invite GET error:", e);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 },
-    );
-  }
+  const token = request.nextUrl.searchParams.get("token")?.trim();
+  const redirectUrl = new URL(buildBusinessInviteAcceptPath(token ?? ""), request.url);
+  return NextResponse.redirect(redirectUrl, 307);
 }
