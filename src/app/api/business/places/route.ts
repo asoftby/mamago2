@@ -17,6 +17,8 @@ import { extractStreetName } from "@/lib/slug/slugUtils";
 import { generatePlaceSlug } from "@/lib/slug/placeSlugService";
 import { attachMediaToEntity } from "@/lib/media/mediaRegistry";
 import { isMediaAssetCuid } from "@/lib/media/isMediaAssetCuid";
+import { ensureMediaAssetForStoredFileUrl } from "@/lib/media/ensureMediaAssetForStoredFileUrl";
+import { extractMediaRelativePathFromUrl } from "@/server/media/media-storage";
 import {
   canCreateBusinessContent,
   canPublishContentDirectly,
@@ -222,8 +224,8 @@ export async function POST(request: NextRequest) {
         metroManualId: d.metroManualId || null,
         metroManualDistanceM: d.metroManualDistanceM || null,
 
-        // Step 3 fields
-        logoImageId: d.logoImageId || null,
+        // Step 3: не пишем временный/чужой id — выставит аттач temp media или ветка MediaAsset
+        logoImageId: d.wizardSessionId ? null : d.logoImageId || null,
 
         // Step 4 fields
         phone: d.phone || null,
@@ -295,9 +297,27 @@ export async function POST(request: NextRequest) {
 
             // Register usage in media library
             try {
-              const mediaAsset = await prisma.mediaAsset.findUnique({
-                where: { storageKey: media.url },
+              let mediaAsset = await prisma.mediaAsset.findFirst({
+                where: {
+                  OR: [{ storageKey: media.url }, { publicUrl: media.url }],
+                },
               });
+
+              if (
+                !mediaAsset &&
+                typeof media.url === "string" &&
+                extractMediaRelativePathFromUrl(media.url)
+              ) {
+                mediaAsset = await ensureMediaAssetForStoredFileUrl({
+                  publicUrl: media.url,
+                  uploadedById: user.id,
+                  userRole: user.role,
+                  width: media.width,
+                  height: media.height,
+                  originalName:
+                    kind === "LOGO" ? "place-logo.webp" : "place-gallery.webp",
+                });
+              }
 
               if (mediaAsset) {
                 await attachMediaToEntity({

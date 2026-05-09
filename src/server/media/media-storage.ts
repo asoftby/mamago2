@@ -57,15 +57,27 @@ export function resolveMediaStorageAbsolutePath(relativePath: string): string | 
   return absolute;
 }
 
+/**
+ * Достаёт относительный путь файла в storage/uploads из URL вида
+ * `/api/media/file/<segments>` или абсолютного `https://host/api/media/file/<segments>`.
+ * Раньше обрабатывались только относительные строки — из‑за этого при сохранении
+ * полного URL в publicUrl/storageKey маршрут file/* давал 404 (authorizedPath === null).
+ */
 export function extractMediaRelativePathFromUrl(url: string | null | undefined): string | null {
-  if (!url?.startsWith(`${MEDIA_FILE_ROUTE_PREFIX}/`)) {
+  if (!url) return null;
+  const trimmed = url.trim();
+  if (!trimmed) return null;
+
+  const marker = `${MEDIA_FILE_ROUTE_PREFIX}/`;
+  const idx = trimmed.indexOf(marker);
+  if (idx === -1) {
     return null;
   }
 
-  const encoded = url.slice(MEDIA_FILE_ROUTE_PREFIX.length + 1);
-  if (!encoded) {
-    return null;
-  }
+  let encoded = trimmed.slice(idx + marker.length);
+  if (!encoded) return null;
+  encoded = encoded.split(/[?#]/)[0] ?? "";
+  if (!encoded) return null;
 
   const decoded = encoded
     .split("/")

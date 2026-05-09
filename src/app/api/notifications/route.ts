@@ -25,6 +25,7 @@ import {
   getUnreadNotifications,
   getWelcomeIsRead,
 } from "@/server/services/notification.service";
+import { resolveNotificationAudienceUser } from "@/server/notifications/resolveNotificationAudienceUser";
 
 function parseStream(
   raw: string | null,
@@ -51,13 +52,8 @@ export async function GET(req: NextRequest) {
 
     const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(limitRaw, 100) : 15;
 
-    // Get accessible surfaces for this user
-    // Note: business relation needs to be checked separately if needed
-    const accessibleSurfaces = getAccessibleSurfacesForUser({
-      id: user.id,
-      role: user.role,
-      business: null, // TODO: fetch business relation if needed
-    });
+    const audienceUser = await resolveNotificationAudienceUser(user);
+    const accessibleSurfaces = getAccessibleSurfacesForUser(audienceUser);
 
     const queryOpts = { 
       telegramConnected: telegramStatus.linked,

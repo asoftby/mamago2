@@ -64,6 +64,7 @@ export async function getBusinessPlaces(
       moderatorComment: true,
       revisionRequestedAt: true,
       archivedAt: true,
+      logoImageId: true,
       city: {
         select: {
           name: true,

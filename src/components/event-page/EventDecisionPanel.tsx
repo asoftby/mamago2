@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Check } from "lucide-react";
 import { MapPin, Navigation } from "lucide-react";
 import { PrimaryButton } from "@/components/ui/PrimaryButton";
@@ -117,9 +118,18 @@ export function EventDecisionPanel({
                 <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                   Где
                 </p>
-                <p className="mt-0.5 text-[15px] font-medium text-foreground">
-                  {data.venue?.name ?? venueShort}
-                </p>
+                {data.venue?.placeHref ? (
+                  <Link
+                    href={data.venue.placeHref}
+                    className="mt-0.5 block text-[15px] font-medium text-foreground underline-offset-2 hover:underline"
+                  >
+                    {data.venue.name ?? venueShort}
+                  </Link>
+                ) : (
+                  <p className="mt-0.5 text-[15px] font-medium text-foreground">
+                    {data.venue?.name ?? venueShort}
+                  </p>
+                )}
                 {data.venue ? (
                   <EventVenueLocationRows
                     venue={data.venue}

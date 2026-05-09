@@ -72,6 +72,8 @@ interface PlaceWizardProps {
   contentEditorNav?: Partial<ContentEditorNav>;
   /** Overrides default list/queue destination after submit */
   returnTo?: string;
+  /** Серверный `?step=` — чтобы не было гонки с начальным состоянием шага. */
+  initialEditStep?: number;
 }
 
 /** POST /api/business/places expects { createRequestId, status, data } — not a flat payload. */
@@ -106,6 +108,7 @@ export function PlaceWizard({
   editorSurface,
   contentEditorNav,
   returnTo,
+  initialEditStep,
 }: PlaceWizardProps) {
   const router = useRouter();
   const surface: ContentEditorSurface = editorSurface ?? "business";
@@ -114,7 +117,17 @@ export function PlaceWizard({
     ...contentEditorNav,
   };
   const afterSubmitDestination = returnTo ?? nav.afterSubmitListPath;
-  const [currentStep, setCurrentStep] = useState(1);
+  const [currentStep, setCurrentStep] = useState(() => {
+    if (
+      mode === "edit" &&
+      typeof initialEditStep === "number" &&
+      initialEditStep >= 1 &&
+      initialEditStep <= TOTAL_STEPS
+    ) {
+      return initialEditStep;
+    }
+    return 1;
+  });
   const [formData, setFormData] = useState<PlaceFormData>(() => {
     if (mode === "edit" && place) {
       return mapPlaceToFormData(place);

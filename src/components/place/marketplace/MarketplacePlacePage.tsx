@@ -94,6 +94,9 @@ interface MarketplacePlacePageProps {
     ownerReplyAuthorName?: string | null;
     ownerReplyCreatedAt?: Date | string | null;
   }>;
+
+  /** Показать «Редактировать» с шагами визарда (те же права, что у редактора места). */
+  ownerEditPlaceId?: string;
 }
 
 export function MarketplacePlacePage({
@@ -101,8 +104,10 @@ export function MarketplacePlacePage({
   events = [],
   offers = [],
   reviews = [],
+  ownerEditPlaceId,
 }: MarketplacePlacePageProps) {
-  const coverImage = place.images?.[0]?.url;
+  const coverImage =
+    place.images?.[0]?.url ?? place.logoUrl ?? undefined;
 
   const handleShare = () => {
     if (navigator.share) {
@@ -159,6 +164,7 @@ export function MarketplacePlacePage({
             images={place.images}
             onShareClick={handleShare}
             onSaveClick={handleSave}
+            ownerEditPlaceId={ownerEditPlaceId}
           />
         </div>
 

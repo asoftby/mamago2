@@ -2,6 +2,7 @@ import type { ActivityFormat, EventVenueKind } from "@prisma/client";
 import type { Intent } from "@/lib/intent";
 import { DEFAULT_CITY_HUB_PATH } from "@/lib/intent";
 import { extractPlainTextFromHtml } from "@/lib/richtext/utils";
+import { sanitizeRichContent } from "@/components/content/RichContentRenderer";
 import { resolveActivityCoverUrl } from "@/lib/event/resolveActivityCoverUrl";
 import { formatPriceFrom } from "@/lib/formatters/format-price";
 import type { EventPageData } from "./eventPageTypes";
@@ -39,6 +40,8 @@ export type ActivityForEventPageInput = {
   images: Array<{ id: string; url: string }>;
   sessions: Array<{ id: string; startsAt: Date }>;
   place: {
+    id: string;
+    slug: string | null;
     title: string;
     formattedAddr: string | null;
     city: { slug: string } | null;
@@ -47,7 +50,13 @@ export type ActivityForEventPageInput = {
     kind: EventVenueKind;
     title: string | null;
     addressLine: string | null;
-    place: { title: string; formattedAddr: string | null } | null;
+    place: {
+      id: string;
+      slug: string | null;
+      title: string;
+      formattedAddr: string | null;
+      city: { slug: string } | null;
+    } | null;
   } | null;
   eventCategory: { nameRu: string } | null;
 };
@@ -117,14 +126,37 @@ function importantFactsFromActivity(activity: ActivityForEventPageInput): EventP
   return rows;
 }
 
-function venueFromActivity(activity: ActivityForEventPageInput): EventPageData["venue"] | undefined {
+function eventVenueCitySlug(activity: ActivityForEventPageInput): string {
+  return (
+    activity.place?.city?.slug ??
+    activity.venue?.place?.city?.slug ??
+    DEFAULT_CITY_HUB_PATH.replace(/^\//, "")
+  );
+}
+
+function publicPlaceHref(
+  citySlug: string,
+  place: { id: string; slug: string | null },
+): string {
+  const seg = encodeURIComponent(place.slug ?? place.id);
+  return `/${citySlug}/places/${seg}`;
+}
+
+function venueFromActivity(
+  activity: ActivityForEventPageInput,
+  listingCitySlug: string,
+): EventPageData["venue"] | undefined {
+  const fallbackCity = eventVenueCitySlug(activity);
+
   if (activity.venue) {
     if (activity.format === "ONLINE") return undefined;
     const v = activity.venue;
     if (v.kind === "PLACE" && v.place) {
+      const cityForPlace = v.place.city?.slug ?? listingCitySlug ?? fallbackCity;
       return {
         name: v.place.title,
         address: v.place.formattedAddr ?? undefined,
+        placeHref: publicPlaceHref(cityForPlace, v.place),
       };
     }
     if (v.title || v.addressLine) {
@@ -140,9 +172,11 @@ function venueFromActivity(activity: ActivityForEventPageInput): EventPageData["
   }
   if (activity.place) {
     if (activity.format === "ONLINE") return undefined;
+    const cityForPlace = activity.place.city?.slug ?? listingCitySlug ?? fallbackCity;
     return {
       name: activity.place.title,
       address: activity.place.formattedAddr ?? undefined,
+      placeHref: publicPlaceHref(cityForPlace, activity.place),
     };
   }
   return undefined;
@@ -157,8 +191,8 @@ function aboutFromActivity(activity: ActivityForEventPageInput): EventPageData["
   return {
     summary,
     full: fullPlain.length > 220 ? fullPlain : undefined,
-    // Preserve HTML for rich text rendering
-    descriptionHtml: raw || undefined,
+    // Safe HTML for public/owner preview (allowlist matches TipTap output)
+    descriptionHtml: raw ? sanitizeRichContent(raw) : undefined,
   };
 }
 
@@ -184,6 +218,7 @@ export function buildEventPageDataFromPrismaActivity(
   const citySlug =
     options?.citySlug ??
     activity.place?.city?.slug ??
+    activity.venue?.place?.city?.slug ??
     DEFAULT_CITY_HUB_PATH.replace(/^\//, "");
 
   const poster =
@@ -218,7 +253,7 @@ export function buildEventPageDataFromPrismaActivity(
       posterAlt: activity.title,
     },
     sessions,
-    venue: venueFromActivity(activity),
+    venue: venueFromActivity(activity, citySlug),
     whyGo: bulletsFromText(plainDesc || activity.shortDesc, 160),
     goodFit: [
       `Если вы ищете событие с указанным возрастом: ${activity.ageTags.join(", ") || "см. описание"}.`,

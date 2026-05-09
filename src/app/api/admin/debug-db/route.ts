@@ -1,26 +1,48 @@
 import { NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
+import { getCurrentUser } from "@/lib/auth/server";
+import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
 
+/**
+ * Development-only DB connectivity check. Never expose connection strings or secrets.
+ */
 export async function GET() {
-  const url = process.env.DATABASE_URL || "NO_DATABASE_URL";
-  let now = null;
+  if (process.env.NODE_ENV === "production") {
+    return new NextResponse(null, { status: 404 });
+  }
+
+  const user = await getCurrentUser();
+  if (!user || user.role !== "ADMIN") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  let now: string | null = null;
   let counts = { signals: -1, filters: -1 };
-  
+
   try {
-    const result = await prisma.$queryRawUnsafe<{ now: Date }[]>(`select now() as now`);
+    const result = await prisma.$queryRaw<{ now: Date }[]>`
+      SELECT now() AS now
+    `;
     if (Array.isArray(result) && result.length > 0) {
-        now = result[0].now;
+      now = result[0].now.toISOString();
     }
-    
+
     counts = {
       signals: await prisma.signalDefinition.count(),
       filters: await prisma.filterDefinition.count(),
     };
   } catch (e) {
-    console.error("DB Connection Error:", e);
+    console.error("[admin/debug-db] DB check failed");
+    if (e instanceof Error) {
+      console.error(e.message);
+    }
   }
 
-  return NextResponse.json({ url, now, counts });
+  return NextResponse.json({
+    ok: true,
+    environment: "development",
+    now,
+    counts,
+  });
 }

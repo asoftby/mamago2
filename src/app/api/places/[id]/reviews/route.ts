@@ -19,24 +19,16 @@ export async function POST(
   context: RouteContext
 ): Promise<NextResponse> {
   try {
-    console.log("[create-review] Starting...");
-    
-    // Verification gate: проверка авторизации и подтверждения телефона
     const userOrError = await requirePhoneVerifiedUser();
     if (userOrError instanceof NextResponse) {
-      console.error("[create-review] Verification gate failed");
+      if (process.env.NODE_ENV !== "production") {
+        console.error("[create-review] Verification gate failed");
+      }
       return userOrError;
     }
     const user = userOrError;
 
-    console.log("[create-review] User verified:", {
-      id: user.id,
-      email: user.email,
-      phoneVerified: !!user.phoneVerifiedAt,
-    });
-
     const { id: placeId } = await context.params;
-    console.log("[create-review] Place ID:", placeId);
 
     // Получить место
     const place = await prisma.place.findUnique({
@@ -133,12 +125,14 @@ export async function POST(
       },
     });
 
-    console.log("[create-review] ✅ Review created:", {
-      id: review.id,
-      placeId: review.placeId,
-      rating: review.rating,
-      status: review.status,
-    });
+    if (process.env.NODE_ENV !== "production") {
+      console.info("[create-review] Review created", {
+        id: review.id,
+        placeId: review.placeId,
+        rating: review.rating,
+        status: review.status,
+      });
+    }
 
     return NextResponse.json({
       success: true,
@@ -149,8 +143,13 @@ export async function POST(
       },
     });
   } catch (error) {
-    console.error("[create-review] ❌ Error:", error);
-    console.error("[create-review] Error stack:", error instanceof Error ? error.stack : "No stack");
+    console.error("[create-review] Error");
+    if (error instanceof Error) {
+      console.error(error.message);
+      if (process.env.NODE_ENV !== "production" && error.stack) {
+        console.error(error.stack);
+      }
+    }
     
     return NextResponse.json(
       {

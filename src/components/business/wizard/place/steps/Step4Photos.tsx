@@ -4,7 +4,7 @@ import { useCallback, useMemo } from "react";
 import { PlaceLogoUploadTemp } from "@/components/business/place/PlaceLogoUploadTemp";
 import { PlaceGalleryUploadTemp, type GalleryItem } from "@/components/business/place/PlaceGalleryUploadTemp";
 import { InstagramAvatarImport } from "@/components/business/place/InstagramAvatarImport";
-import type { PlaceFormData } from "../types";
+import type { PlaceFormData, PlaceImage } from "../types";
 
 interface Step4PhotosProps {
   data: PlaceFormData;
@@ -22,10 +22,10 @@ export function Step4Photos({
   const logoImage = data.images.find((img) => img.kind === "LOGO");
   const galleryImages = data.images.filter((img) => img.kind === "GALLERY");
 
-  // Show Instagram import helper if: no logo yet AND instagram handle is set
   const hasLogo = !!(logoImage?.url || data.logoUrl);
   const instagramHandle = data.instagramHandle?.trim() || "";
-  const showInstagramImport = !hasLogo && !!instagramHandle && !!wizardSessionId;
+  // В режиме редактирования лого уже есть в БД — всё равно показываем импорт (замена из Instagram).
+  const showInstagramImport = !!instagramHandle && !!wizardSessionId;
 
   // Convert PlaceImage[] to GalleryItem[]
   const initialGalleryItems: GalleryItem[] = useMemo(() => 
@@ -41,12 +41,23 @@ export function Step4Photos({
 
   const handleLogoUploadComplete = useCallback((mediaId: string, url: string) => {
     console.log("[Step4Photos] Logo upload complete:", { mediaId, url });
-    onChange({ 
+    const withoutLogo = data.images.filter((img) => img.kind !== "LOGO");
+    const newLogo: PlaceImage = {
+      id: mediaId,
+      url,
+      width: null,
+      height: null,
+      blurhash: null,
+      kind: "LOGO",
+      sortOrder: 0,
+    };
+    onChange({
       logoImageId: mediaId,
       logoUrl: url,
       tempLogoMediaId: mediaId,
+      images: [...withoutLogo, newLogo],
     });
-  }, [onChange]);
+  }, [onChange, data.images]);
 
   const handleGalleryImagesChange = useCallback((galleryItems: GalleryItem[]) => {
     console.log("[Step4Photos] Gallery changed:", galleryItems.length, "images");
@@ -80,13 +91,13 @@ export function Step4Photos({
           Добавьте логотип или главное фото вашего места
         </p>
 
-        {/* Instagram import helper — only when no logo and instagram is set */}
         {showInstagramImport && (
           <InstagramAvatarImport
             instagramHandle={instagramHandle}
             wizardSessionId={wizardSessionId!}
             onImportComplete={handleLogoUploadComplete}
             disabled={!isEditable}
+            replaceExisting={hasLogo}
             className="mb-3"
           />
         )}

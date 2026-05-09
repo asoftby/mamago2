@@ -41,8 +41,10 @@ export function getAccessibleSurfacesForUser(user: {
   
   if (user.business) {
     surfaces.push("BUSINESS");
+  } else if (user.role === "BUSINESS_OWNER") {
+    surfaces.push("BUSINESS");
   }
-  
+
   if (user.role === "ADMIN") {
     surfaces.push("ADMIN");
   }

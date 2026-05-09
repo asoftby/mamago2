@@ -3,9 +3,8 @@
 /**
  * InstagramAvatarImport
  *
- * Compact helper block shown on the Logo step when:
- * - No logo is uploaded yet
- * - Instagram handle is set in the form
+ * Compact helper block shown on the Logo step when Instagram handle is set
+ * in the form (и при создании, и при редактировании — можно заменить лого).
  *
  * Allows one-click import of the Instagram profile avatar as the place logo.
  * Best-effort: shows a friendly error if Instagram is unavailable.
@@ -23,6 +22,8 @@ interface InstagramAvatarImportProps {
   onImportComplete: (mediaId: string, url: string) => void;
   disabled?: boolean;
   className?: string;
+  /** Уже есть логотип (в т.ч. при редактировании) — показываем формулировку «заменить». */
+  replaceExisting?: boolean;
 }
 
 const ERROR_MESSAGES: Record<string, string> = {
@@ -51,6 +52,7 @@ export function InstagramAvatarImport({
   onImportComplete,
   disabled = false,
   className,
+  replaceExisting = false,
 }: InstagramAvatarImportProps) {
   const [isLoading, setIsLoading] = useState(false);
 
@@ -124,7 +126,9 @@ export function InstagramAvatarImport({
         <Instagram className="h-4 w-4 shrink-0 text-muted-foreground" />
         <div className="min-w-0">
           <p className="text-sm text-foreground leading-tight">
-            Можно взять логотип из Instagram
+            {replaceExisting
+              ? "Заменить логотип из Instagram"
+              : "Можно взять логотип из Instagram"}
           </p>
           <p className="text-xs text-muted-foreground truncate">{displayHandle}</p>
         </div>
@@ -143,6 +147,8 @@ export function InstagramAvatarImport({
             <Loader2 className="h-3 w-3 mr-1.5 animate-spin" />
             Получаем…
           </>
+        ) : replaceExisting ? (
+          "Обновить из Instagram"
         ) : (
           "Получить из Instagram"
         )}

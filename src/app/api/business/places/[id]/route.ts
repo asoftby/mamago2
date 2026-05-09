@@ -218,7 +218,21 @@ export async function PATCH(
     if (body.category !== undefined) updateData.category = String(body.category);
     if (body.shortDesc !== undefined) updateData.shortDesc = String(body.shortDesc);
     if (body.description !== undefined) updateData.description = body.description ? String(body.description) : null;
-    if (body.logoImageId !== undefined) updateData.logoImageId = body.logoImageId;
+    if (body.logoImageId !== undefined) {
+      const v = body.logoImageId;
+      if (v === null) {
+        updateData.logoImageId = null;
+      } else if (typeof v === "string" && v.trim()) {
+        const vid = v.trim();
+        const placeImageOk = await prisma.placeImage.findFirst({
+          where: { placeId: id, id: vid },
+          select: { id: true },
+        });
+        if (placeImageOk) {
+          updateData.logoImageId = vid;
+        }
+      }
+    }
     if (body.phone !== undefined) updateData.phone = body.phone ? String(body.phone) : null;
     if (body.website !== undefined) updateData.website = body.website ? String(body.website) : null;
     if (body.instagramHandle !== undefined) updateData.instagramHandle = body.instagramHandle ? String(body.instagramHandle) : null;

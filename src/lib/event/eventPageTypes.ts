@@ -42,6 +42,8 @@ export type EventPageVenue = {
   landmark?: string;
   mapUrl?: string;
   routeUrl?: string;
+  /** Публичная страница места (/{city}/places/{slug|id}) */
+  placeHref?: string;
 };
 
 export type EventPageCtaConfig = {

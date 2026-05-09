@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { sanitizeRichContent } from "@/components/content/RichContentRenderer";
 import { cn } from "@/lib/utils";
 
 interface EventRichDescriptionProps {
@@ -50,7 +51,8 @@ export function EventRichDescription({
     return null;
   }
 
-  const displayContent = htmlContent || `<p>${plainTextSummary || ""}</p>`;
+  const rawDisplay = htmlContent || `<p>${plainTextSummary || ""}</p>`;
+  const displayContent = sanitizeRichContent(rawDisplay);
 
   return (
     <section className={cn("border-t border-border/40 py-10", className)}>

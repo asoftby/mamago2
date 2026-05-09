@@ -17,6 +17,7 @@ import { getCurrentAuthState } from "@/lib/auth/getCurrentAuthState";
 import { PendingActionProvider } from "@/contexts/PendingActionContext";
 import { GateFlowController } from "@/components/auth/GateFlowController";
 import { MobileTapDiagnostics } from "@/components/dev/MobileTapDiagnostics";
+import { UnreadNotificationCountProvider } from "@/contexts/UnreadNotificationCountContext";
 
 export const metadata: Metadata = {
   title: "mamaGo 2.0",
@@ -48,23 +49,25 @@ export default async function RootLayout({
       >
         <SaveIntentProvider>
           <AuthProvider initialUser={initialAuthUser}>
-            <PendingActionProvider>
-              <AccountModeProvider>
-                <CityProvider>
-                  <WeatherProvider>
-                    <FamilyPersonaProvider>
-                      <CookieConsentProvider>
-                        <FamilyDerivedAgeSync />
-                        {children}
-                        {shouldMountMyPlanProvider ? <MyPlanProvider /> : null}
-                        <GateFlowController />
-                        <MobileTapDiagnostics />
-                      </CookieConsentProvider>
-                    </FamilyPersonaProvider>
-                  </WeatherProvider>
-                </CityProvider>
-              </AccountModeProvider>
-            </PendingActionProvider>
+            <UnreadNotificationCountProvider>
+              <PendingActionProvider>
+                <AccountModeProvider>
+                  <CityProvider>
+                    <WeatherProvider>
+                      <FamilyPersonaProvider>
+                        <CookieConsentProvider>
+                          <FamilyDerivedAgeSync />
+                          {children}
+                          {shouldMountMyPlanProvider ? <MyPlanProvider /> : null}
+                          <GateFlowController />
+                          <MobileTapDiagnostics />
+                        </CookieConsentProvider>
+                      </FamilyPersonaProvider>
+                    </WeatherProvider>
+                  </CityProvider>
+                </AccountModeProvider>
+              </PendingActionProvider>
+            </UnreadNotificationCountProvider>
           </AuthProvider>
         </SaveIntentProvider>
         <Sonner />

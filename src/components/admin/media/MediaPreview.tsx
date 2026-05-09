@@ -1,15 +1,26 @@
 import { MediaAssetKind } from "@prisma/client";
 import { Image as ImageIcon, Video, FileText } from "lucide-react";
-import Image from "next/image";
 
 interface MediaPreviewProps {
   kind: MediaAssetKind;
   publicUrl?: string | null;
   filename: string;
+  /** Предпочтительно: поиск в /api/media/[filename] срабатывает по id без проблем с @ в имени и без обхода без cookie. */
+  mediaId?: string;
   size?: "sm" | "md" | "lg";
 }
 
-export function MediaPreview({ kind, publicUrl, filename, size = "sm" }: MediaPreviewProps) {
+/**
+ * Превью для админки: обычный <img>, не next/image — иначе оптимизатор тянет API без cookies
+ * и медиа без публичной linkage дают 404 в списке.
+ */
+export function MediaPreview({
+  kind,
+  publicUrl: _publicUrl,
+  filename,
+  mediaId,
+  size = "sm",
+}: MediaPreviewProps) {
   const sizeClasses = {
     sm: "w-12 h-12",
     md: "w-24 h-24",
@@ -23,17 +34,14 @@ export function MediaPreview({ kind, publicUrl, filename, size = "sm" }: MediaPr
   };
 
   if (kind === "IMAGE") {
-    // Use proxy route to serve with correct Content-Type
-    const imageUrl = `/api/media/${filename}`;
-    
+    const imageSrc = mediaId
+      ? `/api/media/${mediaId}`
+      : `/api/media/${encodeURIComponent(filename)}`;
+
     return (
       <div className={`${sizeClasses[size]} relative rounded-lg overflow-hidden bg-gray-100`}>
-        <Image
-          src={imageUrl}
-          alt={filename}
-          fill
-          className="object-cover"
-        />
+        {/* eslint-disable-next-line @next/next/no-img-element -- нужен запрос из браузера с cookies (next/image optimizer без сессии). */}
+        <img src={imageSrc} alt={filename} className="h-full w-full object-cover" />
       </div>
     );
   }

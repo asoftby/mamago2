@@ -19,6 +19,7 @@ interface Place {
   moderatorComment: string | null;
   revisionRequestedAt: Date | null;
   archivedAt: Date | null;
+  logoImageId?: string | null;
   city: {
     name: string;
     hasMetro: boolean;

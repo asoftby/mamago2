@@ -62,6 +62,8 @@ export async function loadPublicActivityForCityPage(
       // SEO fields are scalar fields on Activity, included automatically.
       place: {
         select: {
+          id: true,
+          slug: true,
           title: true,
           formattedAddr: true,
           city: { select: { slug: true } },
@@ -70,7 +72,13 @@ export async function loadPublicActivityForCityPage(
       venue: {
         include: {
           place: {
-            select: { title: true, formattedAddr: true },
+            select: {
+              id: true,
+              slug: true,
+              title: true,
+              formattedAddr: true,
+              city: { select: { slug: true } },
+            },
           },
         },
       },
@@ -116,6 +124,8 @@ export async function loadPublicActivityForCityPage(
     sessions: activity.sessions.map((s) => ({ id: s.id, startsAt: s.startsAt })),
     place: activity.place
       ? {
+          id: activity.place.id,
+          slug: activity.place.slug,
           title: activity.place.title,
           formattedAddr: activity.place.formattedAddr,
           city: activity.place.city,
@@ -128,8 +138,11 @@ export async function loadPublicActivityForCityPage(
           addressLine: activity.venue.addressLine,
           place: activity.venue.place
             ? {
+                id: activity.venue.place.id,
+                slug: activity.venue.place.slug,
                 title: activity.venue.place.title,
                 formattedAddr: activity.venue.place.formattedAddr,
+                city: activity.venue.place.city,
               }
             : null,
         }

@@ -94,10 +94,15 @@ export async function POST(request: NextRequest) {
     });
 
     if (process.env.NODE_ENV === "development" && process.env.FORCE_SMS !== "true") {
-      console.log(`[OTP dev] ${phoneE164} [${purpose}] → ${code}`);
+      console.info(`[OTP dev] purpose=${purpose} code=${code}`);
     } else {
       const smsResult = await sendQuickSms({ phoneDigits, message: `Ваш код: ${code}` });
-      console.log(`[OTP sms] sent to ${phoneE164} [${purpose}] → sms_id=${smsResult.sms_id} status=${smsResult.status}`);
+      if (process.env.NODE_ENV !== "production") {
+        console.info("[OTP sms] sent", {
+          sms_id: smsResult.sms_id,
+          status: smsResult.status,
+        });
+      }
     }
 
     return NextResponse.json({ ok: true });

@@ -3,6 +3,7 @@
 import { ArrowRight, Heart, Calendar } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
+import { isAppMediaUrl } from "@/lib/media/isAppMediaUrl";
 
 interface Offer {
   id: string;
@@ -63,6 +64,7 @@ function OfferCard({ offer }: { offer: Offer }) {
             alt={offer.title}
             fill
             sizes="280px"
+            unoptimized={isAppMediaUrl(offer.imageUrl)}
             className="object-cover transition duration-300 group-hover:scale-105"
           />
         ) : (

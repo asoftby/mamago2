@@ -23,6 +23,8 @@ import { calculateUrgency } from "@/lib/improvementRequest/urgency";
 import { CONTENT_STATUS_META } from "@/lib/content-status-meta";
 import { getCanonicalPublicAppUrl } from "@/lib/config/publicAppUrl";
 import { cn } from "@/lib/utils";
+import { isAppMediaUrl } from "@/lib/media/isAppMediaUrl";
+import { resolvePlaceLogoImage } from "@/lib/place/resolvePlaceLogoImage";
 import { PublicationStatisticsDialog } from "@/components/business/shared/PublicationStatisticsDialog";
 
 interface PlaceCardData {
@@ -40,6 +42,7 @@ interface PlaceCardData {
   moderatorComment: string | null;
   revisionRequestedAt: Date | null;
   archivedAt?: Date | null;
+  logoImageId?: string | null;
   hasActiveImprovementRequests?: boolean;
   city?: {
     name: string;
@@ -156,8 +159,9 @@ export function PlaceCardHorizontal({ place, onDelete, onArchive, onUnarchive }:
     daysSinceRevision = Math.floor(diffMs / (1000 * 60 * 60 * 24));
   }
   
-  // Cover image (logo or first gallery image)
-  const coverImage = place.images.find(img => img.kind === "LOGO") || place.images[0];
+  // Обложка: лого по logoImageId / kind LOGO, иначе первое фото
+  const logoResolved = resolvePlaceLogoImage(place.images, place.logoImageId);
+  const coverImage = logoResolved ?? place.images[0];
 
   const handleDelete = async () => {
     if (!onDelete) return;
@@ -232,13 +236,22 @@ export function PlaceCardHorizontal({ place, onDelete, onArchive, onUnarchive }:
         <Link href={publicPlaceHref} className="flex-shrink-0 self-start md:self-center">
           <div className="relative size-[86px] shrink-0 overflow-hidden rounded-full bg-stone-100 ring-1 ring-stone-200/70">
             {coverImage ? (
-              <Image
-                src={coverImage.url}
-                alt={displayTitle}
-                fill
-                className="object-cover"
-                sizes="86px"
-              />
+              isAppMediaUrl(coverImage.url) ? (
+                <img
+                  src={coverImage.url}
+                  alt={displayTitle}
+                  className="absolute inset-0 h-full w-full object-cover"
+                />
+              ) : (
+                <Image
+                  src={coverImage.url}
+                  alt={displayTitle}
+                  fill
+                  unoptimized={isAppMediaUrl(coverImage.url)}
+                  className="object-cover"
+                  sizes="86px"
+                />
+              )
             ) : (
               <div className="flex h-full w-full items-center justify-center text-stone-400">
                 <MapPin className="h-7 w-7" />
