@@ -15,10 +15,18 @@ import { getBusinessFormActionLabels, businessFormCopy } from "../businessFormLa
 import { canPublishContentDirectly } from "@/lib/auth/businessContentAccess";
 import { useWizardSession } from "@/hooks/useWizardSession";
 
-import type { OfferFormData, OfferWizardMode } from "./types";
+import type { OfferFormData, OfferWizardMode, OfferWizardStepKey } from "./types";
 import { getDefaultFormData, hasMeaningfulContent, determineIntent, suggestCTAType } from "./defaults";
 import { validateStep, validateForSubmit } from "./validation";
-import { OFFER_WIZARD_STEPS, getStepLabel, TOTAL_CONTENT_STEPS as OFFER_TOTAL_CONTENT_STEPS } from "./offerWizardSteps.config";
+import { 
+  getStepsForOfferType, 
+  getStepNumber, 
+  getTotalStepsForType,
+  isStepComplete,
+  getMissingFieldsForStep,
+  getNextStepKey,
+  getPreviousStepKey,
+} from "./offerWizardSteps.config";
 import {
   buildOfferCreatePayload,
   buildOfferUpdatePayload,
@@ -36,9 +44,18 @@ import {
 } from "@/lib/content-editor/types";
 import { navigateToCompatibleHref } from "@/lib/routing/clientNavigation";
 
+// Import step components
+import { Step1Type } from "./steps/Step1Type";
+import { Step2Information } from "./steps/Step2Information";
+import { Step3Media } from "./steps/Step3Media";
+import { Step4Conditions } from "./steps/Step4Conditions";
+import { Step5Pricing } from "./steps/Step5Pricing";
+import { Step6Contacts } from "./steps/Step6Contacts";
+import { Step7Publication } from "./steps/Step7Publication";
+
 interface OfferWizardProps {
   mode: OfferWizardMode;
-  offer?: Offer; // Offer entity for edit mode
+  offer?: Offer;
   userId: string;
   userRole?: Role;
   business?: {
@@ -50,7 +67,6 @@ interface OfferWizardProps {
     logoUrl?: string;
   };
   onComplete?: (offerId: string) => void;
-  /** Required for create — place to attach the offer (query or first owned place). */
   defaultPlaceId?: string | null;
   editorSurface?: ContentEditorSurface;
   contentEditorNav?: Partial<ContentEditorNav>;
@@ -58,7 +74,6 @@ interface OfferWizardProps {
 }
 
 const LOCAL_STORAGE_KEY = "offer-wizard-draft";
-const TOTAL_STEPS = OFFER_TOTAL_CONTENT_STEPS + 1; // Content steps + review step
 
 export function OfferWizard({
   mode,
@@ -79,21 +94,30 @@ export function OfferWizard({
     ...contentEditorNav,
   };
   const afterSubmitDestination = returnTo ?? nav.afterSubmitListPath;
-  const [currentStep, setCurrentStep] = useState(1);
-  const [offerId, setOfferId] = useState<string | null>(
-    mode === "edit" && offer ? offer.id : null
-  );
+  
   const [formData, setFormData] = useState<OfferFormData>(() => {
     if (mode === "edit" && offer) {
       return mapOfferToFormData(offer);
     }
-    
-    // Always start with defaults to prevent hydration mismatch
-    // localStorage restoration happens in useEffect
     return getDefaultFormData();
   });
   
-  // Restore from localStorage after hydration to prevent mismatch
+  // Get steps based on current offer type
+  const steps = getStepsForOfferType(formData.offerWizardType);
+  const totalSteps = steps.length;
+  
+  // Current step key (not number)
+  const [currentStepKey, setCurrentStepKey] = useState<OfferWizardStepKey>("type");
+  
+  // Normalize current step if offer type changes
+  useEffect(() => {
+    const currentStepNum = getStepNumber(formData.offerWizardType, currentStepKey);
+    if (currentStepNum === null) {
+      setCurrentStepKey("type");
+    }
+  }, [formData.offerWizardType, currentStepKey]);
+  
+  // Restore from localStorage after hydration
   useEffect(() => {
     if (mode === "create") {
       try {
@@ -101,7 +125,6 @@ export function OfferWizard({
         if (saved) {
           const parsed = JSON.parse(saved);
           const defaults = getDefaultFormData();
-          
           setFormData({
             ...defaults,
             ...parsed,
@@ -113,49 +136,45 @@ export function OfferWizard({
     }
   }, [mode]);
   
+  const [offerId, setOfferId] = useState<string | null>(
+    mode === "edit" && offer ? offer.id : null
+  );
   const [isSaving, setIsSaving] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
-  const [saveError, setSaveError] = useState<string | null>(null);
 
-  // Wizard session for temp media
   const { wizardSessionId } = useWizardSession({
     userId,
     wizardType: "offer",
     entityId: mode === "edit" ? offer?.id : undefined,
   });
 
-  // Autosave effect with debounce
+  // Autosave effect
   useEffect(() => {
     if (mode === "create" && typeof window !== "undefined") {
-      // Local autosave for create mode with debounce
       const timer = setTimeout(() => {
         if (hasMeaningfulContent(formData)) {
           try {
             localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(formData));
             setLastSaved(new Date());
-            setSaveError(null);
           } catch (e) {
             console.error("Failed to save draft:", e);
-            setSaveError("Ошибка автосохранения");
           }
         }
-      }, 2000); // 2 second debounce
+      }, 2000);
       
       return () => clearTimeout(timer);
     }
   }, [formData, mode]);
 
-  // Auto-determine intent and suggested CTA when relevant data changes
+  // Auto-determine intent and CTA
   useEffect(() => {
     if (formData.offerKind) {
-      // Auto-determine intent
       const intent = determineIntent(formData);
       if (intent && intent !== formData.intent) {
         setFormData(prev => ({ ...prev, intent }));
       }
 
-      // Auto-suggest CTA type
       const suggestedCTA = suggestCTAType(formData);
       if (suggestedCTA && !formData.ctaType) {
         setFormData(prev => ({ ...prev, ctaType: suggestedCTA }));
@@ -163,33 +182,41 @@ export function OfferWizard({
     }
   }, [formData.offerKind, formData.durationType]);
 
-  // Update form data
-  const handleChange = useCallback((updates: Partial<OfferFormData>) => {
-    setFormData(prev => ({ ...prev, ...updates }));
-  }, []);
+  const handleChange = useCallback(
+    (
+      updates:
+        | Partial<OfferFormData>
+        | ((prev: OfferFormData) => Partial<OfferFormData>),
+    ) => {
+      setFormData((prev) => {
+        const patch = typeof updates === "function" ? updates(prev) : updates;
+        return { ...prev, ...patch };
+      });
+    },
+    [],
+  );
 
-  // Navigation
+  // Navigation by step key
   const handleNext = () => {
-    if (currentStep < TOTAL_STEPS) {
-      setCurrentStep(prev => prev + 1);
+    const nextKey = getNextStepKey(formData.offerWizardType, currentStepKey);
+    if (nextKey) {
+      setCurrentStepKey(nextKey);
     }
   };
 
   const handlePrev = () => {
-    // On first step, go back to where user came from
-    if (currentStep === 1) {
+    const prevKey = getPreviousStepKey(formData.offerWizardType, currentStepKey);
+    if (prevKey) {
+      setCurrentStepKey(prevKey);
+    } else {
       router.push(afterSubmitDestination);
-      return;
-    }
-    
-    if (currentStep > 1) {
-      setCurrentStep(prev => prev - 1);
     }
   };
 
   const handleGoToStep = (step: number) => {
-    if (step >= 1 && step <= TOTAL_STEPS) {
-      setCurrentStep(step);
+    const stepDef = steps[step - 1];
+    if (stepDef) {
+      setCurrentStepKey(stepDef.key);
     }
   };
 
@@ -211,16 +238,11 @@ export function OfferWizard({
 
       if (offerId) {
         const payload = buildOfferUpdatePayload(formData);
-        const perf = createClientSavePerf("save-offer:client", {
-          endpoint: `/api/business/offers/${offerId}`,
-          payload,
-        });
         const response = await fetch(`/api/business/offers/${offerId}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
         });
-        perf.log({ status: response.status, mode: "save-draft" });
         
         if (!response.ok) {
           const error = await response.json();
@@ -232,16 +254,11 @@ export function OfferWizard({
           return;
         }
         const createPayload = buildOfferCreatePayload(formData, placeId, { status: "DRAFT" });
-        const perf = createClientSavePerf("save-offer:client", {
-          endpoint: "/api/business/offers",
-          payload: createPayload,
-        });
         const response = await fetch("/api/business/offers", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(createPayload),
         });
-        perf.log({ status: response.status, mode: "create-draft" });
         
         if (!response.ok) {
           const error = await response.json();
@@ -275,16 +292,13 @@ export function OfferWizard({
   // Submit for moderation
   const handleSubmit = async () => {
     if (isSubmitting) return;
-    // Validate before submit
     const validation = validateForSubmit(formData);
     
     if (!validation.isValid) {
       toast.error("Заполните все обязательные поля");
-      console.error("Validation errors:", validation.errors);
       return;
     }
     
-    console.time("[publish:offer:client]");
     setIsSubmitting(true);
     
     try {
@@ -305,16 +319,11 @@ export function OfferWizard({
         }
         const finalStatus = canPublishContentDirectly(userRole) ? "PUBLISHED" : "PENDING";
         const createPayload = buildOfferCreatePayload(formData, placeId, { status: finalStatus });
-        const perf = createClientSavePerf("publish-offer:client", {
-          endpoint: "/api/business/offers",
-          payload: createPayload,
-        });
         const createResponse = await fetch("/api/business/offers", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(createPayload),
         });
-        perf.log({ status: createResponse.status, mode: finalStatus.toLowerCase() });
         
         if (!createResponse.ok) {
           const error = await createResponse.json();
@@ -343,16 +352,11 @@ export function OfferWizard({
       }
 
       const updatePayload = buildOfferUpdatePayload(formData, { status: "PENDING" });
-      const perf = createClientSavePerf("publish-offer:client", {
-        endpoint: `/api/business/offers/${offerId}`,
-        payload: updatePayload,
-      });
       const response = await fetch(`/api/business/offers/${offerId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(updatePayload),
       });
-      perf.log({ status: response.status, mode: "submit" });
       
       if (!response.ok) {
         const error = await response.json();
@@ -378,66 +382,71 @@ export function OfferWizard({
       console.error("Submit error:", error);
       toast.error(error instanceof Error ? error.message : "Ошибка отправки");
     } finally {
-      console.timeEnd("[publish:offer:client]");
       setIsSubmitting(false);
     }
   };
 
-  // Determine if editable
-  const isEditable = true; // TODO: Add proper logic
+  const isEditable = true;
 
-  // Render current step (config-driven)
+  // Render current step
   const renderStep = () => {
-    // Review step is special case
-    if (currentStep === TOTAL_STEPS) {
+    if (currentStepKey === "review") {
       return <Step8Review data={formData} isSubmitting={isSubmitting} onGoToStep={handleGoToStep} />;
     }
     
-    // Find step config
-    const stepConfig = OFFER_WIZARD_STEPS.find(s => s.id === currentStep);
-    if (!stepConfig) return null;
-    
-    // Render step component from config
-    const StepComponent = stepConfig.component;
     const commonProps = {
       data: formData,
       onChange: handleChange,
       isEditable,
     };
     
-    // Add wizardSessionId for media step
-    if (currentStep === 3) {
-      return <StepComponent {...commonProps} wizardSessionId={wizardSessionId} />;
+    switch (currentStepKey) {
+      case "type":
+        return <Step1Type {...commonProps} />;
+      case "details":
+        return <Step2Information {...commonProps} />;
+      case "photo":
+        return <Step3Media {...commonProps} wizardSessionId={wizardSessionId} />;
+      case "conditions":
+        return <Step4Conditions {...commonProps} />;
+      case "campSchedule":
+        return <div className="p-4">Шаг "Смены и расписание" - в разработке</div>;
+      case "accommodation":
+        return <div className="p-4">Шаг "Размещение" - в разработке</div>;
+      case "price":
+        return <Step5Pricing {...commonProps} />;
+      case "contacts":
+        return <Step6Contacts {...commonProps} />;
+      case "publication":
+        return <Step7Publication {...commonProps} />;
+      default:
+        return null;
     }
-    
-    return <StepComponent {...commonProps} />;
   };
 
-  const canNext = currentStep < TOTAL_STEPS;
-  const canPrev = true; // Always show back button (on step 1 it goes to returnTo)
-  const isReviewStep = currentStep === TOTAL_STEPS;
+  const currentStepNum = getStepNumber(formData.offerWizardType, currentStepKey) || 1;
+  const canNext = currentStepKey !== "review" && currentStepNum < totalSteps;
+  const canPrev = true;
+  const isReviewStep = currentStepKey === "review";
 
-  const submitValidation =
-    currentStep === TOTAL_STEPS ? validateForSubmit(formData) : { isValid: true };
+  const submitValidation = isReviewStep ? validateForSubmit(formData) : { isValid: true };
 
   const progressSteps = useMemo(
     () => [
-      ...OFFER_WIZARD_STEPS.map((s) => ({
-        id: s.id,
-        label: s.shortLabel ?? s.title,
-        isComplete: s.isComplete ? s.isComplete(formData) : false,
+      ...steps.map((s, idx) => ({
+        id: idx + 1,
+        label: s.shortLabel,
+        isComplete: isStepComplete(s.key, formData),
       })),
-      { id: TOTAL_STEPS, label: "Проверка", isComplete: false },
     ],
-    [formData]
+    [formData, steps]
   );
 
   const phase = formWizardPhaseFromFlags({ isSaving, isSubmitting });
+  const actionLabels = useMemo(() => getBusinessFormActionLabels(userRole), [userRole]);
 
-  const actionLabels = useMemo(
-    () => getBusinessFormActionLabels(userRole),
-    [userRole],
-  );
+  const currentStepDef = steps.find(s => s.key === currentStepKey);
+  const stepTitle = currentStepDef?.title || "Шаг";
 
   return (
     <FormWizardShell>
@@ -448,17 +457,15 @@ export function OfferWizard({
             : businessFormCopy.offer.editTitle
         }
         subtitle={businessFormCopy.stepSubtitle(
-          currentStep,
-          TOTAL_STEPS,
-          currentStep === TOTAL_STEPS
-            ? businessFormCopy.reviewStepShortTitle
-            : getStepLabel(currentStep)
+          currentStepNum,
+          totalSteps,
+          isReviewStep ? businessFormCopy.reviewStepShortTitle : stepTitle
         )}
         trailing={lastSaved ? businessFormCopy.savedAt(lastSaved) : undefined}
       >
         <WizardProgress
           steps={progressSteps}
-          currentStep={currentStep}
+          currentStep={currentStepNum}
           onStepChange={handleGoToStep}
         />
       </FormWizardHeader>

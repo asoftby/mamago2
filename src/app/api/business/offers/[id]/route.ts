@@ -19,6 +19,11 @@ const updateOfferSchema = z.object({
   ageMinMonths: z.number().optional(),
   ageMaxMonths: z.number().optional(),
   coverImage: z.string().optional(),
+  gallery: z.array(z.string()).optional(),
+  /** Видео URL (YouTube, YouTube Shorts, Instagram Reels) */
+  videoUrl: z.string().url().optional(),
+  /** Акционное предложение (текстовое описание скидки и т.д.) */
+  promotionalOffer: z.string().optional(),
   pricingMode: z.enum(["SINGLE", "MULTIPLE"]).optional(),
   singlePrice: z.number().optional(),
   singlePriceLabel: z.string().optional(),
@@ -140,6 +145,9 @@ export async function PATCH(
     if (data.ageMinMonths !== undefined) updateData.ageMinMonths = data.ageMinMonths;
     if (data.ageMaxMonths !== undefined) updateData.ageMaxMonths = data.ageMaxMonths;
     if (data.coverImage !== undefined) updateData.coverImage = data.coverImage;
+    if (data.gallery !== undefined) updateData.galleryImages = data.gallery;
+    if (data.videoUrl !== undefined) updateData.videoUrl = data.videoUrl;
+    if (data.promotionalOffer !== undefined) updateData.promotionalOffer = data.promotionalOffer;
     if (data.discoverySignalIds !== undefined) updateData.discoverySignalIds = data.discoverySignalIds;
     if (data.status !== undefined) {
       updateData.status = data.status;

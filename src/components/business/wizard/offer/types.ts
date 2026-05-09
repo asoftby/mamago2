@@ -1,46 +1,72 @@
 // Offer Wizard Types
-// Inherits Event Wizard architecture 1-to-1
+// Refactored for multi-type support (SINGLE, REGULAR, CAMP)
 
 export type OfferWizardMode = "create" | "edit";
+
+/** Offer types for wizard */
+export type OfferWizardType = "SINGLE" | "REGULAR" | "CAMP";
+
+/** Step keys for wizard */
+export type OfferWizardStepKey =
+  | "type"
+  | "details"
+  | "photo"
+  | "conditions"
+  | "campSchedule"
+  | "accommodation"
+  | "price"
+  | "contacts"
+  | "publication"
+  | "review";
 
 /**
  * Complete Offer Form Data
  * Follows Event Wizard structure with offer-specific fields
+ * Now supports SINGLE, REGULAR, and CAMP types
  */
 export interface OfferFormData {
-  // Step 1: Offer Type (was Step 2)
-  offerKind: "course" | "birthday" | "service" | null;
-  durationType: "single" | "recurring" | "camp" | null; // For courses only
+  // Step 1: Offer Type
+  offerWizardType: OfferWizardType | null; // SINGLE, REGULAR, or CAMP
   
-  // Service-specific fields (for SERVICE offers)
+  // Legacy fields (for backward compatibility)
+  offerKind: "course" | "birthday" | "service" | null;
+  durationType: "single" | "recurring" | "camp" | null;
   serviceType: "торт" | "декор" | "фотограф" | "аниматор" | "шоу" | "аквагрим" | "ведущий" | "мастер_класс_на_выезд" | "другое" | null;
   locationType: "client_location" | "place" | "remote" | null;
-  
-  // Auto-determined intent (not user-selectable)
   intent: "куда_пойти" | "занятия" | "день_рождения" | null;
   
-  // Step 2: Public Information (was Step 3)
+  // Step 2: Details / Public Information
   title: string;
   shortDescription: string; // max 120 chars
   description: string; // Rich text HTML for full description
   ageGroups: string[];
   
-  // Step 3: Media (was Step 4)
+  // Camp-specific details (Step 2 for CAMP type)
+  campProgramType: "городской" | "выездной" | "смешанный" | null; // Only for CAMP
+  
+  // Step 3: Media
   coverImage: string | null;
   gallery: string[];
+  videoUrl: string | null; // New: YouTube, YouTube Shorts, Instagram Reels
   
-  // Step 4: Format and Conditions (was Step 5)
-  // Class fields
+  // Step 4: Conditions (for SINGLE/REGULAR) or Step 4: Camp Schedule (for CAMP)
+  // Class fields (SINGLE/REGULAR)
   classDuration: string;
   classGroupSize: string;
   classFormat: "trial" | "course" | "subscription" | null;
   
-  // Camp fields (for durationType = "camp")
+  // Camp schedule fields (CAMP only)
   campSessions: Array<{
     dateFrom: string | null;
     dateTo: string | null;
   }>;
-  campPriceText: string;
+  campSessionDuration: string; // e.g., "7 дней", "2 недели"
+  campStayDuration: string; // e.g., "с 9:00 до 17:00", "круглосуточно"
+  campPlacesCount: number | null;
+  campGroupSize: number | null;
+  campDaySchedule: string; // Description of daily schedule
+  campCanSelectDays: boolean; // Can select individual days
+  campHasExtendedCare: boolean; // Has extended care option
   
   // Party fields
   partyProgram: string;
@@ -53,21 +79,28 @@ export interface OfferFormData {
   serviceDuration: string;
   serviceDeliveryArea: string;
   
-  // Step 5: Pricing (was Step 6)
+  // Step 5 (for CAMP): Accommodation
+  accommodationProvided: boolean; // Is accommodation provided
+  accommodationType: string; // e.g., "палатки", "коттеджи", "гостиница"
+  accommodationConditions: string; // Description of living conditions
+  mealInfo: string; // Meal information
+  transferInfo: string; // Transfer information
+  whatToBring: string; // What to bring
+  
+  // Step 5/6: Pricing
   pricingMode: "single" | "multiple";
   singlePrice: string;
   singleCurrency: "BYN" | "USD" | "EUR";
   singlePriceLabel: string;
-  
-  // Multiple pricing options
   pricingOptions: PricingOption[];
+  promotionalOffer: string; // New: promotional offer text (e.g., "скидка 20% при записи до 15 мая")
   
-  // Step 6: Contacts (was Step 7)
+  // Step 6/7: Contacts
   phone: string;
   website: string;
   socialLinks: SocialLink[];
   
-  // Step 7: CTA and Publication (was Step 8)
+  // Step 7/8: CTA and Publication
   ctaType: "записаться" | "забронировать" | "купить_билет" | "отправить_заявку" | "перейти_на_сайт" | null;
   ctaPhone: string;
   ctaLink: string;

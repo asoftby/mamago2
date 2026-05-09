@@ -1,36 +1,47 @@
 // Offer Wizard Defaults
-// Inherits Event Wizard architecture 1-to-1
+// Refactored for multi-type support (SINGLE, REGULAR, CAMP)
 
 import type { OfferFormData } from "./types";
 
 export function getDefaultFormData(): OfferFormData {
   return {
     // Step 1: Offer Type
+    offerWizardType: null,
+    
+    // Legacy fields (for backward compatibility)
     offerKind: null,
     durationType: null,
     serviceType: null,
     locationType: null,
     intent: null,
     
-    // Step 2: Public Information
+    // Step 2: Details / Public Information
     title: "",
     shortDescription: "",
     description: "",
     ageGroups: [],
+    campProgramType: null,
     
     // Step 3: Media
     coverImage: null,
     gallery: [],
+    videoUrl: null,
     
-    // Step 4: Format and Conditions
+    // Step 4: Conditions / Camp Schedule
     // Class fields
     classDuration: "",
     classGroupSize: "",
     classFormat: null,
     
-    // Camp fields
+    // Camp schedule fields
     campSessions: [],
-    campPriceText: "",
+    campSessionDuration: "",
+    campStayDuration: "",
+    campPlacesCount: null,
+    campGroupSize: null,
+    campDaySchedule: "",
+    campCanSelectDays: false,
+    campHasExtendedCare: false,
     
     // Party fields
     partyProgram: "",
@@ -43,19 +54,28 @@ export function getDefaultFormData(): OfferFormData {
     serviceDuration: "",
     serviceDeliveryArea: "",
     
-    // Step 5: Pricing
+    // Step 5 (for CAMP): Accommodation
+    accommodationProvided: false,
+    accommodationType: "",
+    accommodationConditions: "",
+    mealInfo: "",
+    transferInfo: "",
+    whatToBring: "",
+    
+    // Step 5/6: Pricing
     pricingMode: "single",
     singlePrice: "",
     singleCurrency: "BYN",
     singlePriceLabel: "",
     pricingOptions: [],
+    promotionalOffer: "",
     
-    // Step 6: Contacts
+    // Step 6/7: Contacts
     phone: "",
     website: "",
     socialLinks: [],
     
-    // Step 7: CTA and Publication
+    // Step 7/8: CTA and Publication
     ctaType: null,
     ctaPhone: "",
     ctaLink: "",

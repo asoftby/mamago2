@@ -18,12 +18,18 @@ interface Step2InformationProps {
 }
 
 export function Step2Information({ data, onChange, isEditable }: Step2InformationProps) {
+  const isCampOffer = data.offerWizardType === "CAMP";
+
   const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     onChange({ title: e.target.value });
   };
 
   const handleDescriptionChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     onChange({ shortDescription: e.target.value });
+  };
+
+  const handleCampProgramTypeChange = (value: string) => {
+    onChange({ campProgramType: value as "городской" | "выездной" | "смешанный" });
   };
 
   const handleFullDescriptionChange = (html: string) => {
@@ -53,28 +59,28 @@ export function Step2Information({ data, onChange, isEditable }: Step2Informatio
       {/* Title */}
       <div className="space-y-2">
         <Label htmlFor="title">
-          Название предложения <span className="text-red-500">*</span>
+          {isCampOffer ? "Название программы" : "Название предложения"} <span className="text-red-500">*</span>
         </Label>
         <Input
           id="title"
-          placeholder="Например: Пробное занятие по рисованию"
+          placeholder={isCampOffer ? "Например: Летний IT-лагерь для детей" : "Например: Пробное занятие по рисованию"}
           value={data.title}
           onChange={handleTitleChange}
           disabled={!isEditable}
         />
         <p className="text-xs text-muted-foreground">
-          Краткое и понятное название того, что предлагается
+          {isCampOffer ? "Название программы лагеря" : "Краткое и понятное название того, что предлагается"}
         </p>
       </div>
 
       {/* Short Description */}
       <div className="space-y-2">
         <Label htmlFor="description">
-          Краткое описание <span className="text-red-500">*</span>
+          {isCampOffer ? "Описание программы" : "Краткое описание"} <span className="text-red-500">*</span>
         </Label>
         <Textarea
           id="description"
-          placeholder="Опишите кратко суть предложения, что получит клиент..."
+          placeholder={isCampOffer ? "Расскажите, чему дети научатся, как проходит программа и кому она подходит" : "Опишите кратко суть предложения, что получит клиент..."}
           value={data.shortDescription}
           onChange={handleDescriptionChange}
           disabled={!isEditable}
@@ -83,7 +89,7 @@ export function Step2Information({ data, onChange, isEditable }: Step2Informatio
         />
         <div className="flex justify-between text-xs">
           <p className="text-muted-foreground">
-            Краткое описание для превью в каталоге
+            {isCampOffer ? "Краткое описание программы для превью" : "Краткое описание для превью в каталоге"}
           </p>
           <p className={`${remainingChars < 0 ? "text-red-500" : "text-muted-foreground"}`}>
             {remainingChars} символов осталось
@@ -107,6 +113,39 @@ export function Step2Information({ data, onChange, isEditable }: Step2Informatio
           Полное описание для страницы предложения. Используйте форматирование для лучшей читаемости.
         </p>
       </div>
+
+      {/* Camp Program Type (only for CAMP) */}
+      {isCampOffer && (
+        <div className="space-y-2">
+          <Label>
+            Тип программы <span className="text-red-500">*</span>
+          </Label>
+          <div className="grid grid-cols-3 gap-3">
+            {[
+              { value: "городской", label: "Городской" },
+              { value: "выездной", label: "Выездной" },
+              { value: "смешанный", label: "Смешанный" },
+            ].map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => handleCampProgramTypeChange(option.value)}
+                disabled={!isEditable}
+                className={`p-3 rounded-lg border-2 transition-all ${
+                  data.campProgramType === option.value
+                    ? "border-orange-500 bg-orange-50"
+                    : "border-gray-200 bg-white hover:border-gray-300"
+                } ${!isEditable ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
+              >
+                <span className="font-medium text-sm">{option.label}</span>
+              </button>
+            ))}
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Выберите формат проведения программы
+          </p>
+        </div>
+      )}
 
       {/* Age Groups */}
       <div className="space-y-2">
@@ -148,6 +187,9 @@ export function Step2Information({ data, onChange, isEditable }: Step2Informatio
               min: 1,
               max: 4,
               helperText: "Основные виды активности",
+              preferredOptionValues: isCampOffer
+                ? ["discovery-activity-educational"]
+                : undefined,
             },
             {
               slug: "discovery-format",
@@ -155,6 +197,9 @@ export function Step2Information({ data, onChange, isEditable }: Step2Informatio
               required: true,
               min: 1,
               helperText: "Формат проведения",
+              preferredOptionValues: isCampOffer
+                ? ["discovery-format-indoor", "discovery-format-outdoor"]
+                : undefined,
             },
             {
               slug: "discovery-participation",
@@ -162,13 +207,27 @@ export function Step2Information({ data, onChange, isEditable }: Step2Informatio
               required: true,
               min: 1,
               helperText: "Формат участия",
+              preferredOptionValues: isCampOffer
+                ? [
+                    "discovery-participation-group",
+                    "discovery-participation-without-parents",
+                  ]
+                : undefined,
             },
             {
               slug: "discovery-intention",
               title: "Для чего это подходит",
               required: false,
-              max: 3,
+              max: isCampOffer ? 5 : 3,
               helperText: "Сценарии использования (опционально)",
+              preferredOptionValues: isCampOffer
+                ? [
+                    "discovery-intention-useful-vacation",
+                    "discovery-intention-vacation-childcare",
+                    "discovery-intention-improve-english",
+                    "discovery-intention-communication-skills",
+                  ]
+                : undefined,
             },
             {
               slug: "discovery-feature",
@@ -176,6 +235,15 @@ export function Step2Information({ data, onChange, isEditable }: Step2Informatio
               required: false,
               max: 5,
               helperText: "Дополнительные преимущества (опционально)",
+              preferredOptionValues: isCampOffer
+                ? [
+                    "discovery-feature-vacation",
+                    "discovery-feature-full-day",
+                    "discovery-feature-half-day",
+                    "discovery-feature-meals",
+                    "discovery-feature-limited",
+                  ]
+                : undefined,
             },
           ]}
         />

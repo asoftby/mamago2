@@ -277,6 +277,22 @@ export function Step5Pricing({ data, onChange, isEditable }: Step5PricingProps) 
           </div>
         </div>
       )}
+
+      {/* Promotional Offer */}
+      <div className="space-y-2">
+        <Label htmlFor="promotionalOffer">Акционное предложение (необязательно)</Label>
+        <Textarea
+          id="promotionalOffer"
+          placeholder="Например: скидка 20% при записи до 15 мая, раннее бронирование, скидка для второго ребёнка"
+          value={data.promotionalOffer || ""}
+          onChange={(e) => onChange({ promotionalOffer: e.target.value })}
+          disabled={!isEditable}
+          rows={2}
+        />
+        <p className="text-xs text-muted-foreground">
+          Опишите специальные предложения, скидки или условия
+        </p>
+      </div>
     </div>
   );
 }

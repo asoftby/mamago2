@@ -7,7 +7,7 @@ function formKindToApiKind(
 ): "VISIT" | "CLASS" | "PARTY" | "EVENT_TICKET" {
   if (data.offerKind === "birthday") return "PARTY";
   if (data.offerKind === "course") {
-    return data.durationType === "recurring" ? "CLASS" : "VISIT";
+    return data.durationType === "recurring" || data.durationType === "camp" ? "CLASS" : "VISIT";
   }
   if (data.offerKind === "service") return "VISIT";
   return "VISIT";
@@ -44,6 +44,23 @@ function ageGroupsToMonths(ageGroups: string[]): {
   return {};
 }
 
+/**
+ * Validate video URL (YouTube, YouTube Shorts, Instagram Reels)
+ */
+export function isValidVideoUrl(url: string): boolean {
+  if (!url.trim()) return true; // Optional field
+  
+  const videoUrlPatterns = [
+    /^https?:\/\/(www\.)?youtube\.com\/watch\?v=[\w-]+/,
+    /^https?:\/\/(www\.)?youtu\.be\/[\w-]+/,
+    /^https?:\/\/(www\.)?youtube\.com\/shorts\/[\w-]+/,
+    /^https?:\/\/(www\.)?instagram\.com\/reel\/[\w-]+/,
+    /^https?:\/\/(www\.)?instagram\.com\/p\/[\w-]+/,
+  ];
+  
+  return videoUrlPatterns.some((pattern) => pattern.test(url));
+}
+
 /** POST /api/business/offers — matches createOfferSchema */
 export function buildOfferCreatePayload(
   data: OfferFormData,
@@ -62,6 +79,8 @@ export function buildOfferCreatePayload(
     description: data.description?.trim() || "",
     ...ages,
     coverImage: data.coverImage ?? undefined,
+    videoUrl: data.videoUrl?.trim() || undefined,
+    promotionalOffer: data.promotionalOffer?.trim() || undefined,
     pricingMode,
     singlePrice: parsePrice(data.singlePrice),
     singlePriceLabel: data.singlePriceLabel.trim() || undefined,
@@ -75,7 +94,9 @@ export function buildOfferCreatePayload(
     phone: (data.ctaPhone || data.phone).trim() || undefined,
     website: (data.ctaLink || data.website).trim() || undefined,
     bookingInstructions: data.ctaInstructions.trim() || undefined,
+    discoverySignalIds: data.signalIds,
     status: opts?.status ?? "DRAFT",
+    gallery: data.gallery ?? [],
   };
 
   return base;
@@ -95,6 +116,8 @@ export function buildOfferUpdatePayload(
     description: data.description?.trim() || "",
     ...ages,
     coverImage: data.coverImage ?? undefined,
+    videoUrl: data.videoUrl?.trim() || undefined,
+    promotionalOffer: data.promotionalOffer?.trim() || undefined,
     pricingMode,
     singlePrice: parsePrice(data.singlePrice),
     singlePriceLabel: data.singlePriceLabel.trim() || undefined,
@@ -108,6 +131,8 @@ export function buildOfferUpdatePayload(
     phone: (data.ctaPhone || data.phone).trim() || undefined,
     website: (data.ctaLink || data.website).trim() || undefined,
     bookingInstructions: data.ctaInstructions.trim() || undefined,
+    discoverySignalIds: data.signalIds,
+    gallery: data.gallery ?? [],
   };
 
   if (opts?.status) {
@@ -123,6 +148,9 @@ export function mapOfferToFormData(offer: {
   title: string;
   description: string | null;
   coverImage: string | null;
+  galleryImages?: string[];
+  videoUrl?: string | null;
+  promotionalOffer?: string | null;
   priceFrom: number | null;
   priceText: string | null;
   ageMinMonths: number | null;
@@ -138,6 +166,9 @@ export function mapOfferToFormData(offer: {
     shortDescription: offer.description ?? "",
     description: offer.description ?? "",
     coverImage: offer.coverImage,
+    gallery: offer.galleryImages ?? [],
+    videoUrl: offer.videoUrl ?? null,
+    promotionalOffer: offer.promotionalOffer ?? "",
     pricingMode: "single",
     singlePrice: offer.priceFrom != null ? String(offer.priceFrom) : "",
     singleCurrency: "BYN",

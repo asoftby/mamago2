@@ -1515,8 +1515,12 @@ model Offer {
   title                    String
   description              String?
   coverImage               String?
+  /// Видео URL (YouTube, YouTube Shorts, Instagram Reels)
+  videoUrl                 String?
   priceFrom                Float?
   priceText                String?
+  /// Акционное предложение (текстовое описание скидки, раннего бронирования и т.д.)
+  promotionalOffer         String?
   ageMinMonths             Int?
   ageMaxMonths             Int?
   dateFrom                 DateTime?

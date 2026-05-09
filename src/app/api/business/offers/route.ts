@@ -26,6 +26,12 @@ const createOfferSchema = z.object({
   ageMinMonths: z.number().optional(),
   ageMaxMonths: z.number().optional(),
   coverImage: z.string().optional(),
+  /** Публичные URL изображений галереи (как возвращает /api/upload). */
+  gallery: z.array(z.string()).optional(),
+  /** Видео URL (YouTube, YouTube Shorts, Instagram Reels) */
+  videoUrl: z.string().url().optional(),
+  /** Акционное предложение (текстовое описание скидки и т.д.) */
+  promotionalOffer: z.string().optional(),
   pricingMode: z.enum(["SINGLE", "MULTIPLE"]),
   singlePrice: z.number().optional(),
   singlePriceLabel: z.string().optional(),
@@ -114,6 +120,9 @@ export async function POST(request: NextRequest) {
           title: data.title,
           description: data.shortDescription,
           coverImage: data.coverImage,
+          galleryImages: data.gallery ?? [],
+          videoUrl: data.videoUrl,
+          promotionalOffer: data.promotionalOffer,
           priceFrom,
           priceText,
           ageMinMonths: data.ageMinMonths,
