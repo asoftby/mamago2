@@ -226,6 +226,13 @@ async function main() {
     { label: "Провести время с ребёнком", value: "family-time", order: 6 },
     { label: "Посмотреть что-то интересное", value: "explore", order: 7 },
     { label: "Побыть на природе", value: "nature", order: 8 },
+    { label: "Провести каникулы с пользой", value: "useful-vacation", order: 9 },
+    { label: "Занять ребёнка на каникулах", value: "vacation-childcare", order: 10 },
+    { label: "Подтянуть английский", value: "improve-english", order: 11 },
+    { label: "Попробовать новое направление", value: "try-new-direction", order: 12 },
+    { label: "Развить навыки общения", value: "communication-skills", order: 13 },
+    { label: "Подготовиться к школе", value: "school-prep", order: 14 },
+    { label: "Развить самостоятельность", value: "independence", order: 15 },
   ];
 
   for (const option of intentionOptions) {
@@ -287,6 +294,13 @@ async function main() {
     { label: "В выходные", value: "weekend", order: 6 },
     { label: "Срочно / сегодня", value: "instant", order: 7 },
     { label: "Ограниченное количество мест", value: "limited", order: 8 },
+    { label: "Лагерь / смена", value: "camp", order: 9 },
+    { label: "На каникулы", value: "vacation", order: 10 },
+    { label: "На полный день", value: "full-day", order: 11 },
+    { label: "На полдня", value: "half-day", order: 12 },
+    { label: "С питанием", value: "meals", order: 13 },
+    { label: "Есть пробный день", value: "trial-day", order: 14 },
+    { label: "Сертификат после прохождения", value: "certificate", order: 15 },
   ];
 
   for (const option of featureOptions) {

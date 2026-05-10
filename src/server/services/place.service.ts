@@ -105,6 +105,7 @@ export async function getBusinessPlaces(
         },
       },
       updatedAt: true,
+      createdAt: true,
     },
     orderBy: {
       updatedAt: "desc",

@@ -1,9 +1,90 @@
 import prisma from "@/lib/prisma";
+import { stableJsonStringify } from "@/lib/json/stableJsonStringify";
+import { isServerSavePerfEnabled } from "@/server/utils/requestPerf";
 
 type ScheduleJsonLike = {
   dates?: unknown;
   startTime?: unknown;
+  scheduleItems?: unknown;
 };
+
+function extractScheduleDatesAndStartTime(scheduleJson: unknown): {
+  dates: string[];
+  startTime: string;
+} {
+  const j = scheduleJson as ScheduleJsonLike | null | undefined;
+
+  let dates: string[] =
+    j && Array.isArray(j.dates)
+      ? (j.dates as unknown[]).filter(
+          (d): d is string => typeof d === "string" && /^\d{4}-\d{2}-\d{2}$/.test(d),
+        )
+      : [];
+
+  let startTime =
+    typeof j?.startTime === "string" && /^\d{2}:\d{2}$/.test(j.startTime)
+      ? j.startTime
+      : "10:00";
+
+  if (dates.length === 0 && j && Array.isArray(j.scheduleItems)) {
+    const items = j.scheduleItems as Array<{ date?: unknown; startTime?: unknown }>;
+    dates = items
+      .map((item) => item.date)
+      .filter((d): d is string => typeof d === "string" && /^\d{4}-\d{2}-\d{2}$/.test(d));
+    const firstSt = items[0]?.startTime;
+    if (typeof firstSt === "string" && /^\d{2}:\d{2}$/.test(firstSt)) {
+      startTime = firstSt;
+    }
+  }
+
+  return { dates, startTime };
+}
+
+/**
+ * Fingerprint of schedule fields that drive ActivitySession rows (dates + time).
+ * Ignores organizer, pricing, etc. so PATCH can update JSON without deleteMany/createMany sessions.
+ */
+export function eventSessionScheduleFingerprint(scheduleJson: unknown): string {
+  const { dates, startTime } = extractScheduleDatesAndStartTime(scheduleJson);
+  const sortedDates = [...new Set(dates)].sort();
+  return stableJsonStringify({ dates: sortedDates, startTime });
+}
+
+/** Fingerprint of ActivitySession rows for comparison with {@link eventSessionScheduleFingerprint}. */
+export function eventSessionFingerprintFromStoredSessions(
+  sessions: { startsAt: Date }[],
+): string {
+  if (sessions.length === 0) {
+    return stableJsonStringify({ dates: [], startTime: "10:00" });
+  }
+  const dates: string[] = [];
+  for (const s of sessions) {
+    const d = s.startsAt;
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    dates.push(`${y}-${m}-${day}`);
+  }
+  const sortedDates = [...new Set(dates)].sort();
+  const first = sessions[0].startsAt;
+  const hh = String(first.getHours()).padStart(2, "0");
+  const mm = String(first.getMinutes()).padStart(2, "0");
+  const startTime = `${hh}:${mm}`;
+  return stableJsonStringify({ dates: sortedDates, startTime });
+}
+
+export async function activitySessionsMatchScheduleJson(
+  activityId: string,
+  scheduleJson: unknown,
+): Promise<boolean> {
+  const fromJson = eventSessionScheduleFingerprint(scheduleJson);
+  const rows = await prisma.activitySession.findMany({
+    where: { activityId },
+    orderBy: { startsAt: "asc" },
+    select: { startsAt: true },
+  });
+  return fromJson === eventSessionFingerprintFromStoredSessions(rows);
+}
 
 /**
  * Replaces ActivitySession rows from wizard scheduleJson (dates + time).
@@ -13,22 +94,24 @@ export async function replaceActivitySessionsFromScheduleJson(
   activityId: string,
   scheduleJson: unknown,
 ): Promise<number> {
-  const j = scheduleJson as ScheduleJsonLike | null | undefined;
-  const dates =
-    j && Array.isArray(j.dates)
-      ? (j.dates as string[]).filter(
-          (d): d is string => typeof d === "string" && /^\d{4}-\d{2}-\d{2}$/.test(d),
-        )
-      : [];
+  const started = isServerSavePerfEnabled() ? performance.now() : 0;
+  const { dates, startTime } = extractScheduleDatesAndStartTime(scheduleJson);
 
-  const startTime =
-    typeof j?.startTime === "string" && /^\d{2}:\d{2}$/.test(j.startTime)
-      ? j.startTime
-      : "10:00";
-
+  const deleteStarted = isServerSavePerfEnabled() ? performance.now() : 0;
   await prisma.activitySession.deleteMany({ where: { activityId } });
+  const deleteMs = isServerSavePerfEnabled() ? Math.round(performance.now() - deleteStarted) : 0;
 
   if (dates.length === 0) {
+    if (isServerSavePerfEnabled()) {
+      console.info("[event-sessions-sync]", {
+        activityId,
+        datesCount: 0,
+        startTime,
+        deleteMs,
+        createMs: 0,
+        totalMs: Math.round(performance.now() - started),
+      });
+    }
     return 0;
   }
 
@@ -39,9 +122,22 @@ export async function replaceActivitySessionsFromScheduleJson(
     startsAtList.push(new Date(y, m - 1, d, hh, mm, 0, 0));
   }
 
+  const createStarted = isServerSavePerfEnabled() ? performance.now() : 0;
   await prisma.activitySession.createMany({
     data: startsAtList.map((startsAt) => ({ activityId, startsAt })),
   });
+  const createMs = isServerSavePerfEnabled() ? Math.round(performance.now() - createStarted) : 0;
+
+  if (isServerSavePerfEnabled()) {
+    console.info("[event-sessions-sync]", {
+      activityId,
+      datesCount: startsAtList.length,
+      startTime,
+      deleteMs,
+      createMs,
+      totalMs: Math.round(performance.now() - started),
+    });
+  }
 
   return startsAtList.length;
 }

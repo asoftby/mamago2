@@ -5,6 +5,7 @@ import { buildOfferDocument } from "@/lib/search/builders/buildOfferDocument";
 import { buildPlaceDocument } from "@/lib/search/builders/buildPlaceDocument";
 import { buildRouteDocument } from "@/lib/search/builders/buildRouteDocument";
 import type { SearchDocUpsertFields } from "@/lib/search/builders/buildActivityDocument";
+import { isServerSavePerfEnabled } from "@/server/utils/requestPerf";
 
 const BATCH = 25;
 
@@ -16,11 +17,20 @@ export class SearchIndexerService {
   constructor(private readonly db: PrismaClient) {}
 
   private async upsertDoc(doc: SearchDocUpsertFields | null, entityLabel: string, entityId: string) {
+    const started = isServerSavePerfEnabled() ? performance.now() : 0;
     if (!doc) {
       try {
         await this.db.searchDocument.deleteMany({
           where: { entityType: entityLabel as SearchEntityType, entityId },
         });
+        if (isServerSavePerfEnabled()) {
+          console.info("[search-index-upsert]", {
+            entityLabel,
+            entityId,
+            action: "delete-stale",
+            durationMs: Math.round(performance.now() - started),
+          });
+        }
       } catch (e) {
         logIndexerError(`remove stale (${entityLabel})`, e);
       }
@@ -39,15 +49,36 @@ export class SearchIndexerService {
         create: { entityType, entityId: eid, ...rest },
         update: rest,
       });
+      if (isServerSavePerfEnabled()) {
+        console.info("[search-index-upsert]", {
+          entityLabel,
+          entityId,
+          action: "upsert",
+          durationMs: Math.round(performance.now() - started),
+        });
+      }
     } catch (e) {
       logIndexerError(`upsert ${entityLabel} ${entityId}`, e);
     }
   }
 
   async upsertActivity(activityId: string): Promise<void> {
+    const started = isServerSavePerfEnabled() ? performance.now() : 0;
     try {
+      const buildStarted = isServerSavePerfEnabled() ? performance.now() : 0;
       const doc = await buildActivityDocument(this.db, activityId);
+      const buildMs = isServerSavePerfEnabled() ? Math.round(performance.now() - buildStarted) : 0;
+      const writeStarted = isServerSavePerfEnabled() ? performance.now() : 0;
       await this.upsertDoc(doc, "activity", activityId);
+      const writeMs = isServerSavePerfEnabled() ? Math.round(performance.now() - writeStarted) : 0;
+      if (isServerSavePerfEnabled()) {
+        console.info("[search-index-activity]", {
+          activityId,
+          buildMs,
+          writeMs,
+          totalMs: Math.round(performance.now() - started),
+        });
+      }
     } catch (e) {
       logIndexerError(`upsertActivity ${activityId}`, e);
     }

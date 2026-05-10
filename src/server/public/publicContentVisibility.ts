@@ -52,6 +52,13 @@ export function getActivityNotExpiredForPublicWhere(
   return {
     OR: [
       { nextOccurrenceAt: { gte: now } },
+      /**
+       * Denormalized `nextOccurrenceAt` can lag behind session rewrites during edits.
+       * Public feeds should still surface an event as soon as it has a future session.
+       */
+      {
+        sessions: { some: { startsAt: { gte: now } } },
+      },
       {
         AND: [
           { nextOccurrenceAt: null },

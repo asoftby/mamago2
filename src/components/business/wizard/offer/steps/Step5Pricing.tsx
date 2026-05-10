@@ -1,17 +1,20 @@
-// Step 5: Pricing
-// Inherits Event Wizard Step5PricingParticipation pattern
+"use client";
 
-import { useState } from "react";
+import { useMemo } from "react";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Trash2 } from "lucide-react";
 import { StableCardSelector } from "@/components/ui/stable-card-selector";
-import type { OfferFormData, PricingOption } from "../types";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  PublicationAccessEditor,
+  type PublicationAccess,
+} from "@/features/publication-access";
 import { formatPrice } from "@/lib/formatters/format-price";
+import { Plus, Trash2 } from "lucide-react";
+import type { OfferFormData, PricingOption } from "../types";
 
 interface Step5PricingProps {
   data: OfferFormData;
@@ -19,11 +22,96 @@ interface Step5PricingProps {
   isEditable: boolean;
 }
 
-export function Step5Pricing({ data, onChange, isEditable }: Step5PricingProps) {
+function getPublicationAccessFromOffer(data: OfferFormData): PublicationAccess {
+  if (data.publicationAccess) return data.publicationAccess;
+
+  if (data.ctaType === "перейти_на_сайт") {
+    return {
+      method: "external",
+      externalUrl: data.ctaLink,
+      instructions: data.ctaInstructions,
+    };
+  }
+
+  if (data.ctaType === "записаться" || data.ctaType === "отправить_заявку") {
+    return {
+      method: "prebooking",
+      phone: data.ctaPhone,
+      externalUrl: data.ctaLink,
+      instructions: data.ctaInstructions,
+    };
+  }
+
+  if (data.ctaType === "купить_билет") {
+    return {
+      method: "external",
+      externalUrl: data.ctaLink,
+      instructions: data.ctaInstructions,
+    };
+  }
+
+  return {
+    method: "details",
+    instructions: data.ctaInstructions,
+  };
+}
+
+function buildOfferAccessPatch(access: PublicationAccess): Partial<OfferFormData> {
+  switch (access.method) {
+    case "external":
+      return {
+        publicationAccess: access,
+        ctaType: "перейти_на_сайт",
+        ctaLink: access.externalUrl ?? "",
+        ctaPhone: access.phone ?? "",
+        ctaInstructions: access.instructions ?? "",
+      };
+    case "contact":
+      return {
+        publicationAccess: access,
+        ctaType: "отправить_заявку",
+        ctaPhone: access.phone ?? "",
+        ctaLink: "",
+        ctaInstructions: access.instructions ?? "",
+      };
+    case "prebooking":
+      return {
+        publicationAccess: access,
+        ctaType:
+          access.externalUrl?.trim() && !access.phone?.trim()
+            ? "отправить_заявку"
+            : "записаться",
+        ctaPhone: access.phone ?? "",
+        ctaLink: access.externalUrl ?? "",
+        ctaInstructions: access.instructions ?? "",
+      };
+    case "details":
+      return {
+        publicationAccess: access,
+        ctaType: "перейти_на_сайт",
+        ctaLink: access.externalUrl ?? "",
+        ctaInstructions: access.instructions ?? "",
+      };
+    default:
+      return {
+        publicationAccess: access,
+      };
+  }
+}
+
+export function Step5Pricing({
+  data,
+  onChange,
+  isEditable,
+}: Step5PricingProps) {
+  const publicationAccess = useMemo(
+    () => getPublicationAccessFromOffer(data),
+    [data],
+  );
+
   const handlePricingModeChange = (pricingMode: "single" | "multiple") => {
-    onChange({ 
+    onChange({
       pricingMode,
-      // Reset pricing data when changing mode
       singlePrice: "",
       singlePriceLabel: "",
       pricingOptions: [],
@@ -42,34 +130,38 @@ export function Step5Pricing({ data, onChange, isEditable }: Step5PricingProps) 
       oldPrice: "",
       description: "",
     };
-    
+
     onChange({
       pricingOptions: [...data.pricingOptions, newOption],
     });
   };
 
-  const handleUpdatePricingOption = (id: string, updates: Partial<PricingOption>) => {
-    const updatedOptions = data.pricingOptions.map(option =>
-      option.id === id ? { ...option, ...updates } : option
+  const handleUpdatePricingOption = (
+    id: string,
+    updates: Partial<PricingOption>,
+  ) => {
+    const updatedOptions = data.pricingOptions.map((option) =>
+      option.id === id ? { ...option, ...updates } : option,
     );
     onChange({ pricingOptions: updatedOptions });
   };
 
   const handleRemovePricingOption = (id: string) => {
-    const filteredOptions = data.pricingOptions.filter(option => option.id !== id);
+    const filteredOptions = data.pricingOptions.filter(
+      (option) => option.id !== id,
+    );
     onChange({ pricingOptions: filteredOptions });
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div>
-        <h2 className="text-xl font-semibold mb-2">Ценообразование</h2>
+        <h2 className="text-xl font-semibold mb-2">Стоимость и участие</h2>
         <p className="text-muted-foreground">
-          Укажите стоимость предложения
+          Настройте цену, способ получения и дополнительные условия в одном шаге
         </p>
       </div>
 
-      {/* Pricing Mode Selection */}
       <div className="space-y-3">
         <Label>Режим ценообразования</Label>
         <StableCardSelector
@@ -92,7 +184,6 @@ export function Step5Pricing({ data, onChange, isEditable }: Step5PricingProps) 
         />
       </div>
 
-      {/* Single Price Mode */}
       {data.pricingMode === "single" && (
         <div className="space-y-4">
           <div className="grid grid-cols-3 gap-4">
@@ -104,7 +195,9 @@ export function Step5Pricing({ data, onChange, isEditable }: Step5PricingProps) 
                 id="singlePrice"
                 placeholder="100"
                 value={data.singlePrice}
-                onChange={(e) => handleSinglePriceChange("singlePrice", e.target.value)}
+                onChange={(e) =>
+                  handleSinglePriceChange("singlePrice", e.target.value)
+                }
                 disabled={!isEditable}
               />
             </div>
@@ -112,7 +205,9 @@ export function Step5Pricing({ data, onChange, isEditable }: Step5PricingProps) 
               <Label htmlFor="singleCurrency">Валюта</Label>
               <Select
                 value={data.singleCurrency}
-                onValueChange={(value) => handleSinglePriceChange("singleCurrency", value)}
+                onValueChange={(value) =>
+                  handleSinglePriceChange("singleCurrency", value)
+                }
                 disabled={!isEditable}
               >
                 <SelectTrigger>
@@ -128,19 +223,22 @@ export function Step5Pricing({ data, onChange, isEditable }: Step5PricingProps) 
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="singlePriceLabel">Подпись к цене (необязательно)</Label>
+            <Label htmlFor="singlePriceLabel">
+              Подпись к цене (необязательно)
+            </Label>
             <Input
               id="singlePriceLabel"
               placeholder="Например: за человека, за группу"
               value={data.singlePriceLabel}
-              onChange={(e) => handleSinglePriceChange("singlePriceLabel", e.target.value)}
+              onChange={(e) =>
+                handleSinglePriceChange("singlePriceLabel", e.target.value)
+              }
               disabled={!isEditable}
             />
           </div>
         </div>
       )}
 
-      {/* Multiple Pricing Mode */}
       {data.pricingMode === "multiple" && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
@@ -188,7 +286,11 @@ export function Step5Pricing({ data, onChange, isEditable }: Step5PricingProps) 
                       <Input
                         placeholder="Например: Пробное занятие"
                         value={option.title}
-                        onChange={(e) => handleUpdatePricingOption(option.id, { title: e.target.value })}
+                        onChange={(e) =>
+                          handleUpdatePricingOption(option.id, {
+                            title: e.target.value,
+                          })
+                        }
                         disabled={!isEditable}
                       />
                     </div>
@@ -199,7 +301,11 @@ export function Step5Pricing({ data, onChange, isEditable }: Step5PricingProps) 
                       <Input
                         placeholder="40"
                         value={option.price}
-                        onChange={(e) => handleUpdatePricingOption(option.id, { price: e.target.value })}
+                        onChange={(e) =>
+                          handleUpdatePricingOption(option.id, {
+                            price: e.target.value,
+                          })
+                        }
                         disabled={!isEditable}
                       />
                     </div>
@@ -211,7 +317,11 @@ export function Step5Pricing({ data, onChange, isEditable }: Step5PricingProps) 
                       <Input
                         placeholder="60"
                         value={option.oldPrice || ""}
-                        onChange={(e) => handleUpdatePricingOption(option.id, { oldPrice: e.target.value })}
+                        onChange={(e) =>
+                          handleUpdatePricingOption(option.id, {
+                            oldPrice: e.target.value,
+                          })
+                        }
                         disabled={!isEditable}
                       />
                     </div>
@@ -222,7 +332,11 @@ export function Step5Pricing({ data, onChange, isEditable }: Step5PricingProps) 
                     <Textarea
                       placeholder="Что включено в этот вариант..."
                       value={option.description}
-                      onChange={(e) => handleUpdatePricingOption(option.id, { description: e.target.value })}
+                      onChange={(e) =>
+                        handleUpdatePricingOption(option.id, {
+                          description: e.target.value,
+                        })
+                      }
                       disabled={!isEditable}
                       rows={2}
                     />
@@ -234,8 +348,7 @@ export function Step5Pricing({ data, onChange, isEditable }: Step5PricingProps) 
         </div>
       )}
 
-      {/* Pricing Preview */}
-      {((data.pricingMode === "single" && data.singlePrice) || 
+      {((data.pricingMode === "single" && data.singlePrice) ||
         (data.pricingMode === "multiple" && data.pricingOptions.length > 0)) && (
         <div className="bg-gray-50 border rounded-lg p-4">
           <h4 className="font-medium mb-3">Превью цен</h4>
@@ -248,51 +361,61 @@ export function Step5Pricing({ data, onChange, isEditable }: Step5PricingProps) 
                 </span>
               </div>
             )}
-            
-            {data.pricingMode === "multiple" && data.pricingOptions.map((option) => {
-              const oldPriceNumber = option.oldPrice !== "" && option.oldPrice != null ? Number(option.oldPrice) : null;
-              const priceNumber = option.price !== "" && option.price != null ? Number(option.price) : null;
-              const isValidOldPrice = oldPriceNumber !== null && !isNaN(oldPriceNumber) && oldPriceNumber > 0;
-              const isValidPrice = priceNumber !== null && !isNaN(priceNumber);
-              
-              return (
-                <div key={option.id} className="flex items-center justify-between">
-                  <div>
-                    <span className="font-medium">{option.title}</span>
-                    {option.description && (
-                      <p className="text-xs text-muted-foreground">{option.description}</p>
-                    )}
+
+            {data.pricingMode === "multiple" &&
+              data.pricingOptions.map((option) => {
+                const oldPriceNumber =
+                  option.oldPrice !== "" && option.oldPrice != null
+                    ? Number(option.oldPrice)
+                    : null;
+                const priceNumber =
+                  option.price !== "" && option.price != null
+                    ? Number(option.price)
+                    : null;
+                const isValidOldPrice =
+                  oldPriceNumber !== null &&
+                  !Number.isNaN(oldPriceNumber) &&
+                  oldPriceNumber > 0;
+                const isValidPrice =
+                  priceNumber !== null && !Number.isNaN(priceNumber);
+
+                return (
+                  <div
+                    key={option.id}
+                    className="flex items-center justify-between"
+                  >
+                    <div>
+                      <div className="font-medium">{option.title || "Без названия"}</div>
+                      {option.description ? (
+                        <div className="text-sm text-muted-foreground">
+                          {option.description}
+                        </div>
+                      ) : null}
+                    </div>
+                    <div className="text-right">
+                      {isValidOldPrice ? (
+                        <div className="text-sm line-through text-muted-foreground">
+                          {formatPrice(oldPriceNumber)}
+                        </div>
+                      ) : null}
+                      <div className="font-medium">
+                        {isValidPrice ? formatPrice(priceNumber) : option.price}
+                      </div>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    {isValidOldPrice && (
-                      <span className="text-xs text-muted-foreground line-through mr-2">
-                        {formatPrice(oldPriceNumber)}
-                      </span>
-                    )}
-                    {isValidPrice && <span className="font-medium">{formatPrice(priceNumber)}</span>}
-                  </div>
-                </div>
-              );
-            })}
+                );
+              })}
           </div>
         </div>
       )}
 
-      {/* Promotional Offer */}
-      <div className="space-y-2">
-        <Label htmlFor="promotionalOffer">Акционное предложение (необязательно)</Label>
-        <Textarea
-          id="promotionalOffer"
-          placeholder="Например: скидка 20% при записи до 15 мая, раннее бронирование, скидка для второго ребёнка"
-          value={data.promotionalOffer || ""}
-          onChange={(e) => onChange({ promotionalOffer: e.target.value })}
-          disabled={!isEditable}
-          rows={2}
-        />
-        <p className="text-xs text-muted-foreground">
-          Опишите специальные предложения, скидки или условия
-        </p>
-      </div>
+      <PublicationAccessEditor
+        entityType="offer"
+        value={publicationAccess}
+        onChange={(value) => onChange(buildOfferAccessPatch(value))}
+        allowedMethods={["details", "prebooking", "external", "contact"]}
+        disabled={!isEditable}
+      />
     </div>
   );
 }

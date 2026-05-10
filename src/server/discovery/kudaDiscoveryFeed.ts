@@ -100,7 +100,7 @@ function mapActivityRowToCard(
     place: { cityId: string | null; city: { slug: string } | null } | null;
     venue: { cityId: string | null } | null;
     eventCategory: { nameRu: string } | null;
-    images: Array<{ id: string; url: string }>;
+    images: Array<{ id: string; url: string; mediaAssetId: string | null }>;
     sessions: Array<{ startsAt: Date }>;
   },
   ownerFirst: boolean,
@@ -142,6 +142,7 @@ function mapActivityRowToCard(
     title: a.title,
     description: a.shortDesc,
     image: cover,
+    coverMediaId: a.coverImageId,
     ageFrom,
     ageTo,
     priceMin,
@@ -212,7 +213,11 @@ export async function getKudaDiscoveryFeed(
     take: Math.min(take * 3, 200),
     orderBy: [{ nextOccurrenceAt: "desc" }, { createdAt: "desc" }],
     include: {
-      images: { orderBy: { sortOrder: "asc" }, take: GALLERY_FOR_COVER },
+      images: {
+        orderBy: { sortOrder: "asc" },
+        take: GALLERY_FOR_COVER,
+        select: { id: true, url: true, mediaAssetId: true },
+      },
       sessions: { orderBy: { startsAt: "asc" }, take: 100 },
       eventCategory: { select: { nameRu: true } },
       place: { select: { cityId: true, city: { select: { slug: true } } } },

@@ -1,13 +1,31 @@
-// Step 4: Camp Schedule (CAMP type only)
-// Defines camp sessions, duration, and schedule details
+// Step 4: Смены и расписание (CAMP)
 
+import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, Trash2 } from "lucide-react";
-import type { OfferFormData } from "../types";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import { CalendarRange, ChevronDown, Plus, Trash2 } from "lucide-react";
+import { cn } from "@/lib/utils";
+import type { CampSessionEntry, CampSessionKind, OfferFormData } from "../types";
+import {
+  CAMP_SESSION_KIND_LABELS,
+  createEmptyCampSession,
+  formatCampShiftDateRangeRu,
+} from "../campOfferModel";
 
 interface Step4CampScheduleProps {
   data: OfferFormData;
@@ -16,245 +34,396 @@ interface Step4CampScheduleProps {
 }
 
 export function Step4CampSchedule({ data, onChange, isEditable }: Step4CampScheduleProps) {
-  const handleAddSession = () => {
-    const newSession = {
-      dateFrom: null,
-      dateTo: null,
-    };
+  const [moreOpen, setMoreOpen] = useState(false);
+
+  const patchSession = (id: string, patch: Partial<CampSessionEntry>) => {
     onChange({
-      campSessions: [...data.campSessions, newSession],
+      campSessions: data.campSessions.map((s) =>
+        s.id === id ? { ...s, ...patch } : s,
+      ),
     });
   };
 
-  const handleUpdateSession = (index: number, field: "dateFrom" | "dateTo", value: string | null) => {
-    const updatedSessions = [...data.campSessions];
-    updatedSessions[index] = {
-      ...updatedSessions[index],
-      [field]: value,
-    };
-    onChange({ campSessions: updatedSessions });
+  const handleAddSession = () => {
+    const next = createEmptyCampSession(data.campSessions.length);
+    onChange({
+      campSessions: [...data.campSessions, next],
+    });
   };
 
-  const handleRemoveSession = (index: number) => {
-    const filteredSessions = data.campSessions.filter((_, i) => i !== index);
-    onChange({ campSessions: filteredSessions });
-  };
-
-  const handleSessionDurationChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    onChange({ campSessionDuration: e.target.value });
-  };
-
-  const handleStayDurationChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    onChange({ campStayDuration: e.target.value });
-  };
-
-  const handlePlacesCountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value ? parseInt(e.target.value, 10) : null;
-    onChange({ campPlacesCount: value });
-  };
-
-  const handleGroupSizeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value ? parseInt(e.target.value, 10) : null;
-    onChange({ campGroupSize: value });
-  };
-
-  const handleDayScheduleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    onChange({ campDaySchedule: e.target.value });
-  };
-
-  const handleCanSelectDaysChange = () => {
-    onChange({ campCanSelectDays: !data.campCanSelectDays });
-  };
-
-  const handleHasExtendedCareChange = () => {
-    onChange({ campHasExtendedCare: !data.campHasExtendedCare });
+  const handleRemoveSession = (id: string) => {
+    onChange({
+      campSessions: data.campSessions.filter((s) => s.id !== id),
+    });
   };
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-xl font-semibold mb-2">Смены и расписание</h2>
-        <p className="text-muted-foreground">
-          Укажите даты, формат пребывания и расписание смены
+    <div className="space-y-8">
+      <div className="space-y-1">
+        <h2 className="text-xl font-semibold tracking-tight text-foreground">
+          Смены лагеря
+        </h2>
+        <p className="text-sm text-muted-foreground leading-relaxed">
+          Добавьте даты смен, время и количество мест
         </p>
       </div>
 
-      {/* Camp Sessions */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <Label className="text-base font-medium">Смены</Label>
-            <p className="text-xs text-muted-foreground mt-1">Укажите даты начала и окончания каждой смены</p>
-          </div>
+      {data.campSessions.length === 0 ? (
+        <div
+          className={cn(
+            "rounded-2xl border border-dashed border-border/80 bg-muted/30 px-6 py-14 text-center",
+            "transition-colors",
+          )}
+        >
+          <CalendarRange className="mx-auto h-10 w-10 text-muted-foreground/70 mb-4" />
+          <p className="text-sm font-medium text-foreground mb-1">
+            Пока нет ни одной смены
+          </p>
+          <p className="text-sm text-muted-foreground max-w-md mx-auto mb-6">
+            Родителям проще доверять программе, когда видны конкретные даты, возраст и
+            вместимость каждой смены.
+          </p>
           <Button
             type="button"
-            variant="outline"
-            size="sm"
+            size="lg"
+            className="w-full sm:w-auto min-w-[220px] rounded-xl"
             onClick={handleAddSession}
             disabled={!isEditable}
           >
-            <Plus className="w-4 h-4 mr-2" />
+            <Plus className="mr-2 h-5 w-5" />
             Добавить смену
           </Button>
         </div>
+      ) : (
+        <>
+          <div className="space-y-4">
+            {data.campSessions.map((session) => {
+              const rangeLabel = formatCampShiftDateRangeRu(session.dateFrom, session.dateTo);
+              return (
+                <Card
+                  key={session.id}
+                  data-session-id={session.id}
+                  className="overflow-hidden rounded-2xl border border-border/70 shadow-sm"
+                >
+                  <CardContent className="p-4 sm:p-5 space-y-5">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="min-w-0 space-y-1">
+                        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                          Смена
+                        </p>
+                        {rangeLabel ? (
+                          <p className="text-base font-semibold text-foreground">{rangeLabel}</p>
+                        ) : (
+                          <p className="text-sm text-muted-foreground">Укажите даты смены</p>
+                        )}
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="shrink-0 self-start text-destructive hover:text-destructive"
+                        onClick={() => handleRemoveSession(session.id)}
+                        disabled={!isEditable}
+                      >
+                        <Trash2 className="mr-1.5 h-4 w-4" />
+                        Удалить
+                      </Button>
+                    </div>
 
-        {data.campSessions.length === 0 && (
-          <div className="text-center py-8 text-muted-foreground border-2 border-dashed rounded-lg">
-            <p>Добавьте хотя бы одну смену</p>
+                    <div className="space-y-2">
+                      <Label htmlFor={`title-${session.id}`}>Название смены</Label>
+                      <Input
+                        id={`title-${session.id}`}
+                        placeholder="Например: English Camp — Июнь"
+                        value={session.title}
+                        onChange={(e) => patchSession(session.id, { title: e.target.value })}
+                        disabled={!isEditable}
+                        className="rounded-xl"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label htmlFor={`df-${session.id}`}>Дата начала</Label>
+                        <Input
+                          id={`df-${session.id}`}
+                          type="date"
+                          value={session.dateFrom ?? ""}
+                          onChange={(e) =>
+                            patchSession(session.id, {
+                              dateFrom: e.target.value || null,
+                            })
+                          }
+                          disabled={!isEditable}
+                          className="rounded-xl"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor={`dt-${session.id}`}>Дата окончания</Label>
+                        <Input
+                          id={`dt-${session.id}`}
+                          type="date"
+                          value={session.dateTo ?? ""}
+                          onChange={(e) =>
+                            patchSession(session.id, {
+                              dateTo: e.target.value || null,
+                            })
+                          }
+                          disabled={!isEditable}
+                          className="rounded-xl"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label htmlFor={`tf-${session.id}`}>Время начала</Label>
+                        <Input
+                          id={`tf-${session.id}`}
+                          type="time"
+                          value={session.timeFrom ?? ""}
+                          onChange={(e) =>
+                            patchSession(session.id, {
+                              timeFrom: e.target.value || null,
+                            })
+                          }
+                          disabled={!isEditable}
+                          className="rounded-xl"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor={`tt-${session.id}`}>Время окончания</Label>
+                        <Input
+                          id={`tt-${session.id}`}
+                          type="time"
+                          value={session.timeTo ?? ""}
+                          onChange={(e) =>
+                            patchSession(session.id, {
+                              timeTo: e.target.value || null,
+                            })
+                          }
+                          disabled={!isEditable}
+                          className="rounded-xl"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Тип</Label>
+                      <Select
+                        value={session.sessionKind}
+                        onValueChange={(v) =>
+                          patchSession(session.id, { sessionKind: v as CampSessionKind })
+                        }
+                        disabled={!isEditable}
+                      >
+                        <SelectTrigger className="w-full rounded-xl">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {(Object.keys(CAMP_SESSION_KIND_LABELS) as CampSessionKind[]).map(
+                            (k) => (
+                              <SelectItem key={k} value={k}>
+                                {CAMP_SESSION_KIND_LABELS[k]}
+                              </SelectItem>
+                            ),
+                          )}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label htmlFor={`agef-${session.id}`}>Возраст, от (лет)</Label>
+                        <Input
+                          id={`agef-${session.id}`}
+                          type="number"
+                          inputMode="numeric"
+                          min={0}
+                          max={25}
+                          placeholder="Например: 7"
+                          value={session.ageFrom ?? ""}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            const n = parseInt(v, 10);
+                            patchSession(session.id, {
+                              ageFrom: v === "" ? null : Number.isFinite(n) ? n : session.ageFrom,
+                            });
+                          }}
+                          disabled={!isEditable}
+                          className="rounded-xl"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor={`aget-${session.id}`}>Возраст, до (лет)</Label>
+                        <Input
+                          id={`aget-${session.id}`}
+                          type="number"
+                          inputMode="numeric"
+                          min={0}
+                          max={25}
+                          placeholder="Например: 12"
+                          value={session.ageTo ?? ""}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            const n = parseInt(v, 10);
+                            patchSession(session.id, {
+                              ageTo: v === "" ? null : Number.isFinite(n) ? n : session.ageTo,
+                            });
+                          }}
+                          disabled={!isEditable}
+                          className="rounded-xl"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label htmlFor={`cap-${session.id}`}>Вместимость (мест)</Label>
+                        <Input
+                          id={`cap-${session.id}`}
+                          type="number"
+                          inputMode="numeric"
+                          min={1}
+                          placeholder="Например: 24"
+                          value={session.capacity ?? ""}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            const n = parseInt(v, 10);
+                            patchSession(session.id, {
+                              capacity: v === "" ? null : Number.isFinite(n) ? n : session.capacity,
+                            });
+                          }}
+                          disabled={!isEditable}
+                          className="rounded-xl"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor={`left-${session.id}`}>Осталось мест (необязательно)</Label>
+                        <Input
+                          id={`left-${session.id}`}
+                          type="number"
+                          inputMode="numeric"
+                          min={0}
+                          placeholder="Например: 6"
+                          value={session.spotsLeft ?? ""}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            const n = parseInt(v, 10);
+                            patchSession(session.id, {
+                              spotsLeft: v === "" ? null : Number.isFinite(n) ? n : session.spotsLeft,
+                            });
+                          }}
+                          disabled={!isEditable}
+                          className="rounded-xl"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor={`price-${session.id}`}>
+                        Цена смены (необязательно)
+                      </Label>
+                      <Input
+                        id={`price-${session.id}`}
+                        placeholder="Если отличается от основной цены предложения"
+                        value={session.priceOverride}
+                        onChange={(e) =>
+                          patchSession(session.id, { priceOverride: e.target.value })
+                        }
+                        disabled={!isEditable}
+                        className="rounded-xl"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor={`desc-${session.id}`}>Краткое описание смены</Label>
+                      <Textarea
+                        id={`desc-${session.id}`}
+                        placeholder="Чем эта смена отличается от других: язык, смена темы, интенсивность…"
+                        value={session.description}
+                        onChange={(e) =>
+                          patchSession(session.id, { description: e.target.value })
+                        }
+                        disabled={!isEditable}
+                        rows={3}
+                        className="rounded-xl min-h-[88px] resize-y"
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
-        )}
 
-        <div className="space-y-3">
-          {data.campSessions.map((session, index) => (
-            <Card key={index} className="border-2">
-              <CardContent className="p-4">
-                <div className="flex items-start justify-between mb-4">
-                  <h4 className="font-medium">Смена {index + 1}</h4>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleRemoveSession(index)}
-                    disabled={!isEditable}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor={`dateFrom-${index}`}>Дата начала</Label>
-                    <Input
-                      id={`dateFrom-${index}`}
-                      type="date"
-                      value={session.dateFrom || ""}
-                      onChange={(e) => handleUpdateSession(index, "dateFrom", e.target.value || null)}
-                      disabled={!isEditable}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor={`dateTo-${index}`}>Дата окончания</Label>
-                    <Input
-                      id={`dateTo-${index}`}
-                      type="date"
-                      value={session.dateTo || ""}
-                      onChange={(e) => handleUpdateSession(index, "dateTo", e.target.value || null)}
-                      disabled={!isEditable}
-                    />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </div>
-
-      {/* Session Duration */}
-      <div className="space-y-2">
-        <Label htmlFor="campSessionDuration">
-          Длительность смены <span className="text-red-500">*</span>
-        </Label>
-        <Input
-          id="campSessionDuration"
-          placeholder="Например: 7 дней, 2 недели, 10 дней"
-          value={data.campSessionDuration}
-          onChange={handleSessionDurationChange}
-          disabled={!isEditable}
-        />
-        <p className="text-xs text-muted-foreground">
-          Укажите продолжительность одной смены
-        </p>
-      </div>
-
-      {/* Stay Duration */}
-      <div className="space-y-2">
-        <Label htmlFor="campStayDuration">
-          Время пребывания <span className="text-red-500">*</span>
-        </Label>
-        <Input
-          id="campStayDuration"
-          placeholder="Например: с 9:00 до 17:00, круглосуточно, с 10:00 до 18:00"
-          value={data.campStayDuration}
-          onChange={handleStayDurationChange}
-          disabled={!isEditable}
-        />
-        <p className="text-xs text-muted-foreground">
-          Укажите часы работы лагеря или формат пребывания
-        </p>
-      </div>
-
-      {/* Capacity */}
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label htmlFor="campPlacesCount">Количество мест</Label>
-          <Input
-            id="campPlacesCount"
-            type="number"
-            placeholder="Например: 30"
-            value={data.campPlacesCount || ""}
-            onChange={handlePlacesCountChange}
+          <Button
+            type="button"
+            variant="outline"
+            size="lg"
+            className="w-full rounded-xl border-dashed"
+            onClick={handleAddSession}
             disabled={!isEditable}
-            min="1"
-          />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="campGroupSize">Размер группы</Label>
-          <Input
-            id="campGroupSize"
-            type="number"
-            placeholder="Например: 10"
-            value={data.campGroupSize || ""}
-            onChange={handleGroupSizeChange}
-            disabled={!isEditable}
-            min="1"
-          />
-        </div>
-      </div>
+          >
+            <Plus className="mr-2 h-5 w-5" />
+            Добавить смену
+          </Button>
+        </>
+      )}
 
-      {/* Day Schedule */}
-      <div className="space-y-2">
-        <Label htmlFor="campDaySchedule">
-          Расписание дня <span className="text-red-500">*</span>
-        </Label>
-        <Textarea
-          id="campDaySchedule"
-          placeholder="Опишите примерное расписание дня: завтрак, занятия, обед, свободное время, ужин..."
-          value={data.campDaySchedule}
-          onChange={handleDayScheduleChange}
-          disabled={!isEditable}
-          rows={4}
-        />
-        <p className="text-xs text-muted-foreground">
-          Расскажите о распорядке дня в лагере
-        </p>
-      </div>
-
-      {/* Options */}
-      <div className="space-y-3 bg-gray-50 border rounded-lg p-4">
-        <h3 className="font-medium">Дополнительные опции</h3>
-        
-        <label className="flex items-center gap-3 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={data.campCanSelectDays}
-            onChange={handleCanSelectDaysChange}
-            disabled={!isEditable}
-            className="w-4 h-4 rounded"
-          />
-          <span className="text-sm">Можно выбрать отдельные дни</span>
-        </label>
-
-        <label className="flex items-center gap-3 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={data.campHasExtendedCare}
-            onChange={handleHasExtendedCareChange}
-            disabled={!isEditable}
-            className="w-4 h-4 rounded"
-          />
-          <span className="text-sm">Есть опция продлённого дня</span>
-        </label>
-      </div>
+      <Collapsible open={moreOpen} onOpenChange={setMoreOpen}>
+        <CollapsibleTrigger asChild>
+          <button
+            type="button"
+            className={cn(
+              "flex w-full items-center justify-between rounded-xl border border-border/60 bg-card px-4 py-3 text-left text-sm font-medium",
+              "hover:bg-muted/40 transition-colors",
+            )}
+          >
+            Дополнительно: расписание дня и опции
+            <ChevronDown
+              className={cn("h-4 w-4 shrink-0 transition-transform", moreOpen && "rotate-180")}
+            />
+          </button>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <div className="pt-4 space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="campDaySchedule">Расписание дня</Label>
+            <Textarea
+              id="campDaySchedule"
+              placeholder="Опционально: общий распорядок, если он одинаковый для всех смен"
+              value={data.campDaySchedule}
+              onChange={(e) => onChange({ campDaySchedule: e.target.value })}
+              disabled={!isEditable}
+              rows={4}
+              className="rounded-xl min-h-[120px]"
+            />
+          </div>
+          <div className="rounded-xl border border-border/50 bg-muted/20 px-4 py-3 space-y-3">
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                className="h-4 w-4 rounded border-input"
+                checked={data.campCanSelectDays}
+                onChange={() => onChange({ campCanSelectDays: !data.campCanSelectDays })}
+                disabled={!isEditable}
+              />
+              <span className="text-sm">Можно выбрать отдельные дни</span>
+            </label>
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                className="h-4 w-4 rounded border-input"
+                checked={data.campHasExtendedCare}
+                onChange={() => onChange({ campHasExtendedCare: !data.campHasExtendedCare })}
+                disabled={!isEditable}
+              />
+              <span className="text-sm">Есть продлённый день</span>
+            </label>
+          </div>
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
     </div>
   );
 }

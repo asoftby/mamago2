@@ -6,6 +6,9 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { REFERENCE_DATA_CACHE_CONTROL } from "@/lib/http/referenceDataCacheHeaders";
+
+const CACHE_HEADERS = { "Cache-Control": REFERENCE_DATA_CACHE_CONTROL };
 
 export async function GET(request: NextRequest) {
   try {
@@ -16,7 +19,7 @@ export async function GET(request: NextRequest) {
     if (!cityId && !citySlug) {
       return NextResponse.json(
         { error: "cityId or citySlug is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -29,7 +32,7 @@ export async function GET(request: NextRequest) {
       });
       
       if (!city) {
-        return NextResponse.json({ districts: [] });
+        return NextResponse.json({ districts: [] }, { headers: CACHE_HEADERS });
       }
       
       resolvedCityId = city.id;
@@ -44,12 +47,12 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    return NextResponse.json({ districts });
+    return NextResponse.json({ districts }, { headers: CACHE_HEADERS });
   } catch (error) {
     console.error("Get districts error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

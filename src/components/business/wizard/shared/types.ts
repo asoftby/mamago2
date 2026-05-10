@@ -37,7 +37,11 @@ export interface WizardStepConfig<TFormData = Record<string, unknown>> {
   // Component to render for this step
   component: React.ComponentType<{
     data: TFormData;
-    onChange: (updates: Partial<TFormData>) => void;
+    onChange: (
+      updates:
+        | Partial<TFormData>
+        | ((prev: TFormData) => Partial<TFormData>),
+    ) => void;
     isEditable: boolean;
     [key: string]: unknown; // Allow additional props
   }>;

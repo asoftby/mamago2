@@ -51,6 +51,7 @@ interface Place {
     revisionRequestedAt: Date | null;
   } | null;
   updatedAt: Date;
+  createdAt: Date;
   linkedEventsCount?: number;
   linkedOffersCount?: number;
 }

@@ -3,6 +3,14 @@
  */
 
 export const AUTH_STATE_CHANGED_EVENT = "auth-state-changed";
+
+/**
+ * Temporary compatibility: fires `notifications-changed`; the only subscriber is
+ * `mountNotificationEventBridge` in `src/features/notifications/store/notification-sync.ts`.
+ * Prefer notification store `refresh()` / `refreshUnreadOnly()` in new code.
+ * TODO: remove once all producers call the store directly.
+ * @deprecated Window event bus — migrate to notification store.
+ */
 export const NOTIFICATIONS_CHANGED_EVENT = "notifications-changed";
 
 export function notifyAuthStateChanged() {
@@ -10,6 +18,7 @@ export function notifyAuthStateChanged() {
   window.dispatchEvent(new CustomEvent(AUTH_STATE_CHANGED_EVENT));
 }
 
+/** @deprecated Prefer notification store actions; kept for legacy callers (email banner, auth flows). */
 export function notifyNotificationsChanged() {
   if (typeof window === "undefined") return;
   window.dispatchEvent(new CustomEvent(NOTIFICATIONS_CHANGED_EVENT));

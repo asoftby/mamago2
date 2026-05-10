@@ -16,14 +16,12 @@ import { canPublishContentDirectly } from "@/lib/auth/businessContentAccess";
 import { useWizardSession } from "@/hooks/useWizardSession";
 
 import type { OfferFormData, OfferWizardMode, OfferWizardStepKey } from "./types";
-import { getDefaultFormData, hasMeaningfulContent, determineIntent, suggestCTAType } from "./defaults";
-import { validateStep, validateForSubmit } from "./validation";
+import { getDefaultFormData, hasMeaningfulContent } from "./defaults";
+import { validateForSubmit } from "./validation";
 import { 
   getStepsForOfferType, 
   getStepNumber, 
-  getTotalStepsForType,
   isStepComplete,
-  getMissingFieldsForStep,
   getNextStepKey,
   getPreviousStepKey,
 } from "./offerWizardSteps.config";
@@ -32,9 +30,11 @@ import {
   buildOfferUpdatePayload,
   mapOfferToFormData,
 } from "./mappers";
-import { createClientSavePerf } from "@/lib/perf/clientSavePerf";
 
 import { Step8Review } from "./steps/Step8Review";
+import { Step4CampSchedule } from "./steps/Step4CampSchedule";
+import { Step5Accommodation } from "./steps/Step5Accommodation";
+import { campImpliesLodging } from "./campOfferModel";
 import type { Role, Offer } from "@prisma/client";
 import {
   defaultEditorNav,
@@ -51,7 +51,6 @@ import { Step3Media } from "./steps/Step3Media";
 import { Step4Conditions } from "./steps/Step4Conditions";
 import { Step5Pricing } from "./steps/Step5Pricing";
 import { Step6Contacts } from "./steps/Step6Contacts";
-import { Step7Publication } from "./steps/Step7Publication";
 
 interface OfferWizardProps {
   mode: OfferWizardMode;
@@ -80,7 +79,6 @@ export function OfferWizard({
   offer,
   userId,
   userRole,
-  business,
   onComplete,
   defaultPlaceId,
   editorSurface,
@@ -167,20 +165,39 @@ export function OfferWizard({
     }
   }, [formData, mode]);
 
+  useEffect(() => {
+    if (formData.offerWizardType !== "CAMP") return;
+    if (!campImpliesLodging(formData.campProgramType)) return;
+    if (formData.accommodationProvided) return;
+    setFormData((prev) => ({ ...prev, accommodationProvided: true }));
+  }, [
+    formData.offerWizardType,
+    formData.campProgramType,
+    formData.accommodationProvided,
+  ]);
+
   // Auto-determine intent and CTA
   useEffect(() => {
     if (formData.offerKind) {
-      const intent = determineIntent(formData);
+      const intent =
+        formData.offerKind === "course"
+          ? formData.durationType === "recurring"
+            ? "занятия"
+            : "куда_пойти"
+          : "день_рождения";
+
       if (intent && intent !== formData.intent) {
         setFormData(prev => ({ ...prev, intent }));
       }
 
-      const suggestedCTA = suggestCTAType(formData);
+      const suggestedCTA =
+        formData.offerKind === "course" ? "записаться" : "отправить_заявку";
+
       if (suggestedCTA && !formData.ctaType) {
         setFormData(prev => ({ ...prev, ctaType: suggestedCTA }));
       }
     }
-  }, [formData.offerKind, formData.durationType]);
+  }, [formData.ctaType, formData.durationType, formData.intent, formData.offerKind]);
 
   const handleChange = useCallback(
     (
@@ -410,15 +427,13 @@ export function OfferWizard({
       case "conditions":
         return <Step4Conditions {...commonProps} />;
       case "campSchedule":
-        return <div className="p-4">Шаг "Смены и расписание" - в разработке</div>;
+        return <Step4CampSchedule {...commonProps} />;
       case "accommodation":
-        return <div className="p-4">Шаг "Размещение" - в разработке</div>;
+        return <Step5Accommodation {...commonProps} />;
       case "price":
         return <Step5Pricing {...commonProps} />;
       case "contacts":
         return <Step6Contacts {...commonProps} />;
-      case "publication":
-        return <Step7Publication {...commonProps} />;
       default:
         return null;
     }

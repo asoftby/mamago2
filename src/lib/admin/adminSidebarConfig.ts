@@ -450,6 +450,12 @@ export const GROUP_SEO: AdminSidebarGroup = {
       matchers: [{ type: "prefix", value: adminPath("/seo/schema") }],
     },
     {
+      id: "seo-llms-txt",
+      label: "llms.txt",
+      href: adminPath("/seo/llms-txt"),
+      matchers: [{ type: "prefix", value: adminPath("/seo/llms-txt") }],
+    },
+    {
       id: "seo-sitemap",
       label: "Sitemap",
       href: adminPath("/seo/sitemap"),

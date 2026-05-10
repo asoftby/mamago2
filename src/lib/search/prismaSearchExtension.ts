@@ -1,5 +1,6 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
 import type { SearchIndexerService } from "@/lib/search/SearchIndexerService";
+import { isServerSavePerfEnabled } from "@/server/utils/requestPerf";
 
 type QueryCb = (args: unknown) => Promise<unknown>;
 
@@ -26,7 +27,17 @@ export function extendPrismaWithSearchIndexing(
           return result;
         },
         async update({ args, query }: { args: Prisma.ActivityUpdateArgs; query: QueryCb }) {
+          const started = isServerSavePerfEnabled() ? performance.now() : 0;
           const result = (await query(args)) as { id: string };
+          if (isServerSavePerfEnabled()) {
+            console.info("[prisma-search-extension]", {
+              model: "activity",
+              op: "update",
+              entityId: result.id,
+              queryMs: Math.round(performance.now() - started),
+              indexDispatch: "fire-and-forget",
+            });
+          }
           fireAndForget(indexer.upsertActivity(result.id));
           return result;
         },

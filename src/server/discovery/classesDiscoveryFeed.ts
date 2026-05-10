@@ -62,7 +62,11 @@ export async function getClassesDiscoveryFeed(
     take: Math.min(take * 3, 60),
     orderBy: [{ nextOccurrenceAt: "asc" }, { createdAt: "desc" }],
     include: {
-      images: { orderBy: { sortOrder: "asc" }, take: 20 },
+      images: {
+        orderBy: { sortOrder: "asc" },
+        take: 20,
+        select: { id: true, url: true, mediaAssetId: true },
+      },
       sessions: { orderBy: { startsAt: "asc" }, take: 50 },
       eventCategory: { select: { nameRu: true } },
       place: { select: { cityId: true, city: { select: { slug: true } } } },
@@ -112,6 +116,7 @@ export async function getClassesDiscoveryFeed(
       title: a.title,
       description: a.shortDesc,
       image: cover,
+      coverMediaId: a.coverImageId,
       ageFrom,
       ageTo,
       priceMin: a.priceFrom ?? undefined,

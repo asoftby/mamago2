@@ -12,7 +12,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
-import { ActivityType, ScheduleMode, ContentStatus, Prisma } from "@prisma/client";
+import { ActivityType, ScheduleMode, Prisma } from "@prisma/client";
 import { canCreateBusinessContent } from "@/lib/auth/businessContentAccess";
 import {
   canManageActivityById,
@@ -165,7 +165,11 @@ export async function PATCH(
     if (body.currency !== undefined) updateData.currency = body.currency;
 
     // Images
-    if (body.coverImageId !== undefined) updateData.coverImageId = body.coverImageId;
+    if (body.coverImageId !== undefined) {
+      updateData.coverImage = body.coverImageId
+        ? { connect: { id: body.coverImageId } }
+        : { disconnect: true };
+    }
 
     // Place
     if (body.placeId !== undefined) {

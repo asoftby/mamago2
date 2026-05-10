@@ -1,9 +1,13 @@
- 
+"use client";
+
 /**
  * API client for fetching discovery filter options from the database
  */
 
+import * as React from "react";
 import type { AgeDef } from "@/server/discovery/ageMapping";
+import { fetchMetroDistrictFilterOptions } from "./geoFilterOptionsClient";
+import { useOptionalHeaderDiscoveryFilters } from "./headerDiscoveryFiltersContext";
 
 export type FilterOption = {
   id: string;
@@ -24,33 +28,22 @@ export type DiscoveryFilterOptions = {
   districts: FilterOption[];
 };
 
-type MetroStation = { id: string; name: string };
-type District = { id: string; name: string };
-
 /**
  * Fetch discovery filter options from the API
- * 
+ *
  * @param citySlug - City slug (e.g., "minsk")
  * @returns Filter options for age, metro, and district
  */
 export async function fetchDiscoveryFilters(
-  citySlug: string = "minsk"
+  citySlug: string = "minsk",
 ): Promise<DiscoveryFilterOptions> {
   try {
-    // Fetch all data in parallel
-    const [filtersResponse, metroResponse, districtsResponse] = await Promise.all([
+    const [filtersResponse, geoPair] = await Promise.all([
       fetch("/api/discovery/filters", {
         method: "GET",
         headers: { "Content-Type": "application/json" },
       }),
-      fetch(`/api/geo/metro-stations?citySlug=${encodeURIComponent(citySlug)}`, {
-        method: "GET",
-        headers: { "Content-Type": "application/json" },
-      }),
-      fetch(`/api/geo/districts?citySlug=${encodeURIComponent(citySlug)}`, {
-        method: "GET",
-        headers: { "Content-Type": "application/json" },
-      }),
+      fetchMetroDistrictFilterOptions(citySlug),
     ]);
 
     const filtersData = filtersResponse.ok
@@ -63,33 +56,10 @@ export async function fetchDiscoveryFilters(
       );
     }
 
-    const metroData = metroResponse.ok
-      ? await metroResponse.json()
-      : { metroStations: [] };
-    if (!metroResponse.ok && process.env.NODE_ENV === "development") {
-      console.warn(
-        "[fetchDiscoveryFilters] metro-stations:",
-        metroResponse.status,
-        citySlug,
-      );
-    }
-
-    const districtsData = districtsResponse.ok
-      ? await districtsResponse.json()
-      : { districts: [] };
-    if (!districtsResponse.ok && process.env.NODE_ENV === "development") {
-      console.warn(
-        "[fetchDiscoveryFilters] districts:",
-        districtsResponse.status,
-        citySlug,
-      );
-    }
-    
-    // Transform API responses to our format
     const filters = filtersData.filters || [];
-    
+
     const agesRaw: FilterOption[] = [];
-    
+
     for (const filter of filters) {
       if (filter.slug === "age" && filter.options) {
         for (const option of filter.options) {
@@ -102,7 +72,6 @@ export async function fetchDiscoveryFilters(
       }
     }
 
-    // Enrich ages with canonical mapping (group/order/min/max)
     const { AGE_DEFS } = await import("@/server/discovery/ageMapping");
     const ageMap = new Map<string, AgeDef>(AGE_DEFS.map((d) => [d.value, d]));
     const ages: AgeOption[] = agesRaw
@@ -127,20 +96,9 @@ export async function fetchDiscoveryFilters(
         return a.label.localeCompare(b.label, "ru");
       });
 
-    // Transform metro stations
-    const metros: FilterOption[] = (metroData.metroStations || []).map((station: MetroStation) => ({
-      id: station.id,
-      value: station.id,
-      label: station.name,
-    }));
+    const metros: FilterOption[] = geoPair.metros;
+    const districts: FilterOption[] = geoPair.districts;
 
-    // Transform districts
-    const districts: FilterOption[] = (districtsData.districts || []).map((district: District) => ({
-      id: district.id,
-      value: district.id,
-      label: district.name,
-    }));
-    
     return {
       ages,
       metros,
@@ -148,8 +106,7 @@ export async function fetchDiscoveryFilters(
     };
   } catch (error) {
     console.error("Error fetching discovery filters:", error);
-    
-    // Return empty arrays on error - graceful degradation
+
     return {
       ages: [],
       metros: [],
@@ -158,16 +115,25 @@ export async function fetchDiscoveryFilters(
   }
 }
 
+const EMPTY_OPTIONS: DiscoveryFilterOptions = {
+  ages: [],
+  metros: [],
+  districts: [],
+};
+
 /**
  * Client-side hook for fetching filter options
  * Use this in client components
  */
 export function useDiscoveryFilterOptions(citySlug: string | null = "minsk") {
-  const [options, setOptions] = React.useState<DiscoveryFilterOptions>({
-    ages: [],
-    metros: [],
-    districts: [],
-  });
+  const headerFilters = useOptionalHeaderDiscoveryFilters();
+
+  const matchesHeaderScope =
+    headerFilters != null &&
+    citySlug != null &&
+    headerFilters.citySlug === citySlug;
+
+  const [options, setOptions] = React.useState<DiscoveryFilterOptions>(EMPTY_OPTIONS);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<Error | null>(null);
 
@@ -176,93 +142,66 @@ export function useDiscoveryFilterOptions(citySlug: string | null = "minsk") {
 
     async function load() {
       try {
-        setLoading(true);
         setError(null);
-        
-        // If no city slug, return empty options
+
         if (!citySlug) {
           if (mounted) {
-            setOptions({
-              ages: [],
-              metros: [],
-              districts: [],
-            });
+            setOptions(EMPTY_OPTIONS);
             setLoading(false);
           }
           return;
         }
-        
-        const slug = encodeURIComponent(citySlug);
-        const [metroResponse, districtsResponse] = await Promise.all([
-          fetch(`/api/geo/metro-stations?citySlug=${slug}`),
-          fetch(`/api/geo/districts?citySlug=${slug}`),
-        ]);
 
-        let metros: FilterOption[] = [];
-        let districts: FilterOption[] = [];
+        if (matchesHeaderScope && headerFilters) {
+          if (headerFilters.loading) {
+            if (mounted) setLoading(true);
+            return;
+          }
 
-        if (metroResponse.ok) {
-          const metroData = await metroResponse.json();
-          metros = (metroData.metroStations || []).map((station: MetroStation) => ({
-            id: station.id,
-            value: station.id,
-            label: station.name,
-          }));
-        } else if (process.env.NODE_ENV === "development") {
-          console.warn(
-            "[useDiscoveryFilterOptions] metro-stations:",
-            metroResponse.status,
-            citySlug,
-          );
+          if (mounted) {
+            setOptions({
+              ages: [],
+              metros: headerFilters.metros,
+              districts: headerFilters.districts,
+            });
+            setLoading(false);
+            setError(headerFilters.error);
+          }
+          return;
         }
 
-        if (districtsResponse.ok) {
-          const districtsData = await districtsResponse.json();
-          districts = (districtsData.districts || []).map((district: District) => ({
-            id: district.id,
-            value: district.id,
-            label: district.name,
-          }));
-        } else if (process.env.NODE_ENV === "development") {
-          console.warn(
-            "[useDiscoveryFilterOptions] districts:",
-            districtsResponse.status,
-            citySlug,
-          );
-        }
-        
-        const data = {
-          ages: [], // Skip ages for now to simplify
-          metros,
-          districts,
-        };
-        
-        if (mounted) {
-          setOptions(data);
-        }
+        setLoading(true);
+
+        const pair = await fetchMetroDistrictFilterOptions(citySlug);
+
+        if (!mounted) return;
+
+        setOptions({
+          ages: [],
+          metros: pair.metros,
+          districts: pair.districts,
+        });
+        setError(null);
+        setLoading(false);
       } catch (err) {
         if (process.env.NODE_ENV === "development") {
           console.warn("useDiscoveryFilterOptions:", err);
         }
         if (mounted) {
           setError(err instanceof Error ? err : new Error("Unknown error"));
-        }
-      } finally {
-        if (mounted) {
           setLoading(false);
         }
       }
     }
 
-    load();
+    void load();
 
     return () => {
       mounted = false;
     };
-  }, [citySlug]);
+  }, [citySlug, matchesHeaderScope, headerFilters]);
 
   return { options, loading, error };
 }
 
-// Add React import for the hook
-import * as React from "react";
+export { fetchMetroDistrictFilterOptions } from "./geoFilterOptionsClient";

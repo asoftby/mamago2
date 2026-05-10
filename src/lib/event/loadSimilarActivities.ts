@@ -30,7 +30,7 @@ type SimilarRow = {
   coverImageId: string | null;
   priceText: string | null;
   priceFrom: number | null;
-  images: Array<{ id: string; url: string }>;
+  images: Array<{ id: string; url: string; mediaAssetId: string | null }>;
   sessions: Array<{ id: string; startsAt: Date }>;
   place: { city: { slug: string } | null } | null;
 };
@@ -43,7 +43,11 @@ const SIMILAR_SELECT = {
   coverImageId: true,
   priceText: true,
   priceFrom: true,
-  images: { select: { id: true, url: true }, orderBy: { sortOrder: "asc" as const }, take: 1 },
+  images: {
+    select: { id: true, url: true, mediaAssetId: true },
+    orderBy: { sortOrder: "asc" as const },
+    take: 1,
+  },
   sessions: { select: { id: true, startsAt: true }, orderBy: { startsAt: "asc" as const }, take: 1 },
   place: { select: { city: { select: { slug: true } } } },
 } satisfies Prisma.ActivitySelect;

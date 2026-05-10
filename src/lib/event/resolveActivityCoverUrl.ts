@@ -25,11 +25,13 @@ function normalizeActivityImageUrl(value: string | null | undefined): string | n
 export function resolveActivityCoverUrl(input: {
   coverImageId: string | null;
   coverImageUrl: string | null;
-  images: Array<{ id: string; url: string }>;
+  images: Array<{ id: string; url: string; mediaAssetId?: string | null }>;
 }): string | null {
   const rawId = input.coverImageId?.trim();
   if (rawId) {
-    const matched = input.images.find((i) => i.id === rawId);
+    const matched = input.images.find(
+      (i) => i.id === rawId || i.mediaAssetId === rawId,
+    );
     if (matched?.url) return normalizeActivityImageUrl(matched.url);
 
     const normalizedRawId = normalizeActivityImageUrl(rawId);

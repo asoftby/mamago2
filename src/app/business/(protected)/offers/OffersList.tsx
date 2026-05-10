@@ -22,6 +22,7 @@ interface Offer {
     title: string;
   };
   updatedAt: Date;
+  createdAt: Date;
   metrics: {
     views: number;
     saves: number;

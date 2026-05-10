@@ -641,6 +641,7 @@ model Activity {
   owner                User                      @relation("ActivityOwner", fields: [ownerUserId], references: [id], onDelete: Cascade)
   organizer            Organizer?                @relation(fields: [organizerId], references: [id], onDelete: SetNull)
   place                Place?                    @relation("PlaceActivities", fields: [placeId], references: [id], onDelete: Restrict)
+  coverImage           MediaAsset?               @relation("ActivityCover", fields: [coverImageId], references: [id])
   filterOptions        ActivityFilterOption[]
   images               ActivityImage[]
   programCategoryLinks ActivityProgramCategory[]
@@ -673,6 +674,7 @@ model Activity {
   @@index([eventCategoryId])
   @@index([organizerId])
   @@index([slug])
+  @@index([coverImageId])
 }
 
 /// Join table: категории «в программе» события (many-to-many Activity ↔ EventCategory).
@@ -701,6 +703,7 @@ model ActivitySlugHistory {
 model ActivityImage {
   id         String   @id @default(cuid())
   activityId String
+  mediaAssetId String?
   url        String
   width      Int?
   height     Int?
@@ -708,8 +711,10 @@ model ActivityImage {
   sortOrder  Int      @default(0)
   createdAt  DateTime @default(now())
   activity   Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  mediaAsset MediaAsset? @relation("ActivityGalleryImageAsset", fields: [mediaAssetId], references: [id], onDelete: SetNull)
 
   @@index([activityId, sortOrder])
+  @@index([mediaAssetId])
 }
 
 model EventVenue {
@@ -1556,6 +1561,53 @@ model Offer {
   bookingPhone   String?
   bookingNote    String?
 
+  // Gallery images (JSON array of URLs)
+  galleryImages            Json?              @default("[]")
+
+  // Camp-specific fields (JSON for MVP, can be normalized later)
+  /// Camp sessions with dates (JSON array: [{dateFrom, dateTo}, ...])
+  campSessions             Json?
+  /// Camp session duration (e.g., "7 дней", "2 недели")
+  campSessionDuration      String?
+  /// Camp stay duration (e.g., "с 9:00 до 17:00", "круглосуточно")
+  campStayDuration         String?
+  /// Number of available places
+  campPlacesCount          Int?
+  /// Group size
+  campGroupSize            Int?
+  /// Daily schedule description
+  campDaySchedule          String?
+  /// Can select individual days
+  campCanSelectDays        Boolean            @default(false)
+  /// Has extended care option
+  campHasExtendedCare      Boolean            @default(false)
+  /// Тип программы лагеря: городской | выездной | смешанный (wizard CAMP)
+  campProgramType          String?
+
+  // Accommodation fields (for CAMP type)
+  /// Is accommodation provided
+  accommodationProvided    Boolean            @default(false)
+  /// Type of accommodation (e.g., "палатки", "коттеджи")
+  accommodationType        String?
+  /// Адрес проживания (отдельно от площадки)
+  accommodationAddress     String?
+  /// Описание комнат / расселения
+  accommodationRooms       String?
+  /// Включённые приёмы питания (JSON string[]: breakfast, lunch, dinner, snacks)
+  campIncludedMeals        Json?
+  /// Безопасность / охрана
+  campSafetyInfo           String?
+  /// Медицинское сопровождение
+  campMedicalInfo          String?
+  /// Accommodation conditions description
+  accommodationConditions  String?
+  /// Meal information
+  mealInfo                 String?
+  /// Transfer information
+  transferInfo             String?
+  /// What to bring
+  whatToBring              String?
+
   boosts          Boost[]
   bookingRequests BookingRequest[]
   openingHours    OpeningHours?      @relation(fields: [openingHoursId], references: [id])
@@ -1906,6 +1958,8 @@ model MediaAsset {
   deletedAt        DateTime?
   uploadedBy       User?            @relation(fields: [uploadedById], references: [id])
   usages           MediaUsage[]
+  activityCovers   Activity[]       @relation("ActivityCover")
+  activityImages   ActivityImage[]  @relation("ActivityGalleryImageAsset")
   articleCovers    Article[]        @relation("ArticleCover")
   articleSeoImages Article[]        @relation("ArticleSeoImage")
 
@@ -2086,6 +2140,18 @@ model RouteStop {
 
   @@index([routeId, order])
   @@index([placeId])
+}
+
+/// SEO llms.txt configuration (per city or global)
+model SeoLlmsTxt {
+  id        String   @id @default(cuid())
+  citySlug  String?  @unique
+  content   String   @db.Text
+  isEnabled Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([citySlug])
 }
 
 /// Глобальные веса ранжирования (одна запись — singleton)

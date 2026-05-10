@@ -30,6 +30,7 @@ interface GroupConfig {
   min?: number;
   max?: number;
   helperText?: string;
+  preferredOptionValues?: string[];
 }
 
 interface StructuredDiscoverySignalPickerProps {
@@ -157,9 +158,31 @@ export function StructuredDiscoverySignalPicker({
         (opt) => opt.active || value.includes(opt.id),
       );
 
+      const preferredOrder = new Map(
+        (config.preferredOptionValues ?? []).map((optionValue, index) => [
+          optionValue,
+          index,
+        ]),
+      );
+
+      const sortedOptions =
+        preferredOrder.size === 0
+          ? visibleOptions
+          : [...visibleOptions].sort((a, b) => {
+              const aOrder = preferredOrder.get(a.value);
+              const bOrder = preferredOrder.get(b.value);
+
+              if (aOrder !== undefined && bOrder !== undefined) {
+                return aOrder - bOrder;
+              }
+              if (aOrder !== undefined) return -1;
+              if (bOrder !== undefined) return 1;
+              return a.order - b.order;
+            });
+
       return {
         ...group,
-        options: visibleOptions,
+        options: sortedOptions,
         config,
       };
     })

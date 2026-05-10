@@ -5,7 +5,7 @@ import { Upload, X, Image as ImageIcon } from "lucide-react";
 import { useImageUpload, type UploadedImage } from "@/hooks/useImageUpload";
 
 interface ImageUploaderProps {
-  onUpload: (image: UploadedImage) => void;
+  onUpload?: (image: UploadedImage) => void;
   onUploadBatch?: (images: UploadedImage[]) => void; // For multiple files at once
   onError?: (error: string) => void;
   accept?: string;
@@ -51,8 +51,7 @@ export function ImageUploader({
     // Use batch callback if available (prevents state race condition)
     if (onUploadBatch && results.length > 0) {
       onUploadBatch(results);
-    } else {
-      // Fallback to individual callbacks
+    } else if (onUpload) {
       results.forEach((image) => {
         onUpload(image);
       });

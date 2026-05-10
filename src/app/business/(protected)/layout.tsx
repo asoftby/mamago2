@@ -7,6 +7,7 @@ import { BusinessShell } from "@/components/business/layout/BusinessShell";
 import { Toaster } from "@/components/ui/toaster";
 import { headers } from "next/headers";
 import { buildSurfaceRedirectDestination } from "@/lib/routing/surface";
+import { BackofficeProviders } from "@/components/providers/BackofficeProviders";
 export default async function ProtectedBusinessLayout({
   children,
 }: {
@@ -83,17 +84,19 @@ export default async function ProtectedBusinessLayout({
     billingSummary?.account.depositBalance?.toNumber() ?? 0;
 
   return (
-    <BusinessShell
-      user={{
-        id: user.id,
-        email: user.email,
-        role: user.role,
-        hasApprovedBusinessProfile: true,
-        businessBalanceBYN,
-      }}
-    >
-      {children}
-      <Toaster />
-    </BusinessShell>
+    <BackofficeProviders>
+      <BusinessShell
+        user={{
+          id: user.id,
+          email: user.email,
+          role: user.role,
+          hasApprovedBusinessProfile: true,
+          businessBalanceBYN,
+        }}
+      >
+        {children}
+        <Toaster />
+      </BusinessShell>
+    </BackofficeProviders>
   );
 }

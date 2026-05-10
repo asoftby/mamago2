@@ -14,15 +14,16 @@ type Props = {
 
 /**
  * Статус / CTA Telegram внутри модалки настроек.
- * После открытия бота запускает polling статуса и вызывает onConnected при успехе.
+ * Связанность приходит из `/api/notifications/settings` — здесь не дергаем
+ * `/api/settings/telegram/status` до нажатия «Подключить» (тогда включается polling).
  */
 export function TelegramStatusRow({ connected, onConnected }: Props) {
   const [isPolling, setIsPolling] = useState(false);
 
   useTelegramConnectionStatus({
-    enabled: true,
+    enabled: isPolling,
     polling: isPolling,
-    onConnected: (status) => {
+    onConnected: () => {
       setIsPolling(false);
       onConnected?.();
     },

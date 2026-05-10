@@ -35,9 +35,9 @@ export type ActivityForEventPageInput = {
   priceDetails: string | null;
   /** Денормализованный URL обложки; может дублировать запись по coverImageId в images */
   coverImageUrl: string | null;
-  /** Primary: соответствует записи в images (ActivityImage.id) */
+  /** Primary media asset id for cover image. */
   coverImageId?: string | null;
-  images: Array<{ id: string; url: string }>;
+  images: Array<{ id: string; url: string; mediaAssetId?: string | null }>;
   sessions: Array<{ id: string; startsAt: Date }>;
   place: {
     id: string;

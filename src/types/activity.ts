@@ -18,6 +18,7 @@ export interface ActivityMock {
   title: string;
   description: string;
   image: string;
+  coverMediaId?: string | null;
   ageFrom: number;
   ageTo: number;
   priceMin?: number;

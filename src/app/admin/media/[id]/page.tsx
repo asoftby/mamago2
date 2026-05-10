@@ -20,6 +20,10 @@ import { getMediaUsageContext } from "@/lib/media/getMediaUsageContext";
 import { resolveEffectiveMetadata, resolveEffectiveMetadataWithSources } from "@/lib/media/generateMediaMetadata";
 import { buildMediaPageTitle } from "@/lib/media/buildMediaPageTitle";
 
+// Force dynamic rendering for admin pages (no caching)
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export default async function AdminMediaDetailPage({
   params,
 }: {

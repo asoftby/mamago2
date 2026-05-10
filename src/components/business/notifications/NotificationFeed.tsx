@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
 import { ru } from "date-fns/locale";
@@ -17,9 +17,7 @@ import { TelegramPromptBanner } from "./TelegramPromptBanner";
 import { EmailVerificationPromptBanner } from "./EmailVerificationPromptBanner";
 import { useEmailVerificationPromptVisibility } from "@/features/email-verification/hooks/useEmailVerificationPromptVisibility";
 import { trackNotificationEvent } from "@/lib/notifications/notificationAnalytics";
-import { NOTIFICATIONS_CHANGED_EVENT } from "@/lib/auth/client";
-
-const PAGE_SIZE = 15;
+import { useNotificationStore } from "@/features/notifications/store";
 
 type Props = {
   open: boolean;
@@ -41,137 +39,32 @@ function isNewRow(n: NotificationApiRow): boolean {
 export function NotificationFeed({
   open,
   stream,
-  onNotificationRead,
   onClose,
   listClassName,
 }: Props) {
-  const [notifications, setNotifications] = useState<NotificationApiRow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [hasMore, setHasMore] = useState(false);
-  const [offset, setOffset] = useState(0);
-  const [showTelegramPrompt, setShowTelegramPrompt] = useState(false);
+  const notifications = useNotificationStore((s) => s.items);
+  const loading = useNotificationStore((s) => s.isLoading);
+  const loadingMore = useNotificationStore((s) => s.loadingMore);
+  const hasMore = useNotificationStore((s) => s.hasMore);
+  const error = useNotificationStore((s) => s.error);
+  const showTelegramPrompt = useNotificationStore((s) => s.showTelegramPrompt);
+  const fetchMoreNotifications = useNotificationStore((s) => s.fetchMoreNotifications);
+  const clearError = useNotificationStore((s) => s.clearError);
+
   const telegramBannerViewedRef = useRef(false);
   const { visible: emailVerificationPromptVisible, dismiss: dismissEmailVerificationPrompt } =
     useEmailVerificationPromptVisibility();
 
-  const fetchPage = useCallback(
-    async (startOffset: number, append: boolean) => {
-      const params = new URLSearchParams({
-        limit: String(PAGE_SIZE),
-        offset: String(startOffset),
-      });
-      // Don't pass stream parameter — fetch ALL accessible notifications
-      const res = await fetch(`/api/notifications?${params.toString()}`, {
-        credentials: "include",
-      });
-      if (!res.ok) {
-        if (res.status === 401) {
-          setNotifications([]);
-          setHasMore(false);
-          setOffset(0);
-          return {
-            notifications: [],
-            hasMore: false,
-          };
-        }
-        const errText = await res.text().catch(() => "");
-        let apiDetails = "";
-        try {
-          const j = JSON.parse(errText) as { details?: string; code?: string };
-          if (typeof j.details === "string") apiDetails = j.details;
-        } catch {
-          /* not JSON */
-        }
-        if (process.env.NODE_ENV === "development") {
-          console.error(
-            "[NotificationFeed] GET /api/notifications",
-            res.status,
-            errText.slice(0, 800),
-            apiDetails ? `\n→ ${apiDetails}` : "",
-          );
-        }
-        const hint =
-          process.env.NODE_ENV === "development" && apiDetails.includes("does not exist")
-            ? " (проверьте миграции: pnpm db:migrate:deploy)"
-            : "";
-        throw new Error(
-          `GET /api/notifications failed (${res.status})${apiDetails ? `: ${apiDetails}${hint}` : errText ? `: ${errText.slice(0, 200)}` : ""}`,
-        );
-      }
-      const data = (await res.json()) as {
-        notifications: NotificationApiRow[];
-        hasMore?: boolean;
-        showTelegramPrompt?: boolean;
-        telegramConnected?: boolean;
-      };
-      const rows = data.notifications || [];
-      if (append) {
-        setNotifications((prev) => [...prev, ...rows]);
-      } else {
-        setNotifications(rows);
-        if (typeof data.showTelegramPrompt === "boolean") {
-          setShowTelegramPrompt(data.showTelegramPrompt);
-        }
-      }
-      setHasMore(Boolean(data.hasMore));
-      setOffset(startOffset + rows.length);
-      return data;
-    },
-    [],
-  );
-
-  const runMarkOpenAndSync = useCallback(async () => {
-    const params = new URLSearchParams();
-    // Don't pass stream parameter — mark ALL accessible notifications as seen
-    const markRes = await fetch(`/api/notifications/mark-open?${params.toString()}`, {
-      method: "POST",
-      credentials: "include",
-    });
-    if (!markRes.ok) return;
-    const markData = (await markRes.json()) as {
-      showTelegramPrompt?: boolean;
-    };
-    if (typeof markData.showTelegramPrompt === "boolean") {
-      setShowTelegramPrompt(markData.showTelegramPrompt);
-    }
-    onNotificationRead?.();
-    setNotifications((prev) =>
-      prev.map((n) => ({
-        ...n,
-        seenAt: n.seenAt ?? new Date().toISOString(),
-        isRead: true,
-      })),
-    );
-  }, [onNotificationRead]);
-
-  const bootstrap = useCallback(async () => {
-    try {
-      setLoading(true);
-      await fetchPage(0, false);
-      // Не блокируем первичный рендер списка: mark-open запускаем в фоне.
-      void runMarkOpenAndSync();
-    } catch (error) {
-      console.error("Failed to fetch notifications:", error);
-      toast.error("Не удалось загрузить уведомления");
-    } finally {
-      setLoading(false);
-    }
-  }, [fetchPage, runMarkOpenAndSync]);
-
   useEffect(() => {
     if (!open) return;
-    void bootstrap();
-  }, [open, bootstrap]);
+    void useNotificationStore.getState().openPanel();
+  }, [open]);
 
   useEffect(() => {
-    const handler = () => {
-      if (!open) return;
-      void bootstrap();
-    };
-    window.addEventListener(NOTIFICATIONS_CHANGED_EVENT, handler);
-    return () => window.removeEventListener(NOTIFICATIONS_CHANGED_EVENT, handler);
-  }, [open, bootstrap]);
+    if (!open || !error) return;
+    toast.error("Не удалось загрузить уведомления");
+    clearError();
+  }, [open, error, clearError]);
 
   useEffect(() => {
     if (showTelegramPrompt && !telegramBannerViewedRef.current) {
@@ -183,15 +76,11 @@ export function NotificationFeed({
   const loadMore = useCallback(async () => {
     if (!hasMore || loadingMore) return;
     try {
-      setLoadingMore(true);
-      await fetchPage(offset, true);
-    } catch (e) {
-      console.error(e);
+      await fetchMoreNotifications();
+    } catch {
       toast.error("Не удалось подгрузить уведомления");
-    } finally {
-      setLoadingMore(false);
     }
-  }, [hasMore, loadingMore, fetchPage, offset]);
+  }, [hasMore, loadingMore, fetchMoreNotifications]);
 
   const handleNotificationClick = useCallback(
     (notification: NotificationApiRow) => {
@@ -223,7 +112,6 @@ export function NotificationFeed({
       case "ANNOUNCEMENT":
         return "📣";
       case "SYSTEM":
-        // Проверяем, если это уведомление о подтверждении email
         if (n.title.includes("почта подтверждена") || n.title.includes("email")) {
           return "✉️";
         }
@@ -235,7 +123,7 @@ export function NotificationFeed({
 
   const getNotificationContextBadge = (n: NotificationApiRow): { label: string; color: string } | null => {
     if (!n.audience) return null;
-    
+
     switch (n.audience) {
       case "BUSINESS":
         return { label: "Бизнес", color: "bg-blue-100 text-blue-700" };
@@ -243,7 +131,7 @@ export function NotificationFeed({
         return { label: "Админ", color: "bg-purple-100 text-purple-700" };
       case "USER":
       default:
-        return null; // Don't show badge for USER (default context)
+        return null;
     }
   };
 

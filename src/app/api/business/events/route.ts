@@ -23,17 +23,29 @@ import { assignActivitySlugIfMissing } from "@/lib/slug/activitySlugService";
 import { replaceActivityGalleryFromMediaIds } from "@/lib/business/syncEventGalleryFromMediaIds";
 import { resolveEventOrganizer } from "@/lib/business/eventOrganizer";
 import { syncActivityOccasions } from "@/lib/business/syncActivityOccasions";
+import {
+  revalidateEventMutationPaths,
+  syncActivityNextOccurrenceAt,
+} from "@/lib/business/eventMutationSideEffects";
 import { prismaBase } from "@/lib/prisma";
 import { DEFAULT_ACTIVITY_FORMAT, normalizeActivityFormat } from "@/domain/activities/activity-format";
 import { validateEventSignals } from "@/lib/event/eventSignalMapping";
+import { createRequestPerf } from "@/server/utils/requestPerf";
+import { syncActivityMediaUsage } from "@/server/services/media/media-usage.service";
+import {
+  findMediaAssetByReference,
+  normalizeMediaDisplayUrl,
+} from "@/lib/media/resolveMediaAssetReference";
 
 /**
  * POST /api/business/events
  * Create new event (draft)
  */
 export async function POST(request: NextRequest) {
+  const perf = createRequestPerf("save-event:route:create");
   try {
     const user = await getCurrentUser();
+    perf.mark("auth");
 
     if (!user || !canCreateBusinessContent(user.role)) {
       return NextResponse.json(
@@ -43,6 +55,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
+    perf.mark("parse");
 
     const title = typeof body.title === "string" && body.title.trim() ? body.title : "Новое событие";
     const description = typeof body.description === "string" ? body.description : "";
@@ -101,6 +114,17 @@ export async function POST(request: NextRequest) {
       // Remove duplicates
       discoverySignalIds = Array.from(new Set(signalIds));
     }
+    perf.mark("validate");
+
+    const coverImageRef =
+      typeof body.coverImageId === "string" ? body.coverImageId : null;
+    const resolvedCoverAsset = await findMediaAssetByReference(coverImageRef);
+    const resolvedCoverImageId = resolvedCoverAsset?.id ?? null;
+    const resolvedCoverImageUrl =
+      resolvedCoverAsset?.publicUrl ??
+      normalizeMediaDisplayUrl(coverImageRef) ??
+      null;
+    perf.mark("resolve-media");
 
     // Process genre slugs
     const genreSlugs: string[] = [];
@@ -178,7 +202,8 @@ export async function POST(request: NextRequest) {
         currency: body.currency || "BYN",
         
         // Images
-        coverImageId: body.coverImageId,
+        coverImageId: resolvedCoverImageId,
+        coverImageUrl: resolvedCoverImageUrl,
         
         // Location
         ...(mergedPlaceId !== undefined ? { placeId: mergedPlaceId } : {}),
@@ -188,13 +213,17 @@ export async function POST(request: NextRequest) {
         organizerId: organizerResolution.organizerId,
       },
     });
+    perf.mark("write");
 
     await replaceActivitySessionsFromScheduleJson(event.id, event.scheduleJson);
+    perf.mark("schedule-sync");
+    await syncActivityNextOccurrenceAt(event.id);
     await replaceActivityGalleryFromMediaIds(
       event.id,
       Array.isArray(body.galleryMediaIds) ? body.galleryMediaIds.filter((id: unknown): id is string => typeof id === "string") : [],
-      typeof body.coverImageId === "string" ? body.coverImageId : null,
+      resolvedCoverImageId,
     );
+    perf.mark("gallery-sync");
     if (body.venue !== undefined) {
       await syncEventVenueAndActivityCity(
         event.id,
@@ -204,6 +233,7 @@ export async function POST(request: NextRequest) {
     } else if (mergedPlaceId !== undefined) {
       await syncEventVenueAndActivityCity(event.id, null, mergedPlaceId);
     }
+    perf.mark("venue-sync");
 
     // Sync occasion links
     const occasionIds = Array.isArray(body.occasionIds)
@@ -212,13 +242,28 @@ export async function POST(request: NextRequest) {
     if (occasionIds.length > 0) {
       await syncActivityOccasions(event.id, occasionIds);
     }
+    perf.mark("occasion-sync");
 
     await assignActivitySlugIfMissing(event.id, title);
+    perf.mark("slug");
 
     const slugRow = await prisma.activity.findUnique({
       where: { id: event.id },
       select: { slug: true },
     });
+
+    const { publicPath } = await revalidateEventMutationPaths(event.id, "business-save");
+    perf.mark("revalidate");
+
+    // Sync media usage (don't block on errors)
+    try {
+      await syncActivityMediaUsage(event.id);
+    } catch (error) {
+      console.error(`Failed to sync media usage for activity ${event.id}:`, error);
+    }
+
+    perf.mark("response");
+    perf.log({ eventId: event.id, status: event.status });
 
     return NextResponse.json({
       success: true,
@@ -227,6 +272,7 @@ export async function POST(request: NextRequest) {
         title: event.title,
         status: event.status,
         slug: slugRow?.slug ?? null,
+        publicPath,
       },
     });
   } catch (error: unknown) {

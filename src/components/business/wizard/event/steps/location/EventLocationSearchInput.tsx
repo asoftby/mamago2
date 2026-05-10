@@ -86,6 +86,8 @@ export const EventLocationSearchInput = forwardRef<HTMLInputElement, EventLocati
     const hostRef = useRef<HTMLDivElement>(null);
     const widgetRef = useRef<(HTMLElement & { value?: string; focus?: () => void }) | null>(null);
     const cleanupRef = useRef<(() => void) | null>(null);
+    const shouldFocusWidgetRef = useRef(false);
+    const [autocompleteRequested, setAutocompleteRequested] = useState(false);
     const [isWidgetReady, setIsWidgetReady] = useState(false);
 
     useImperativeHandle(forwardedRef, () => {
@@ -192,6 +194,10 @@ export const EventLocationSearchInput = forwardRef<HTMLInputElement, EventLocati
 
         host.appendChild(widget);
         setIsWidgetReady(true);
+        if (shouldFocusWidgetRef.current) {
+          shouldFocusWidgetRef.current = false;
+          widget.focus?.();
+        }
 
         cleanupRef.current = () => {
           widget.removeEventListener("gmp-select", handlePlaceSelect);
@@ -211,7 +217,18 @@ export const EventLocationSearchInput = forwardRef<HTMLInputElement, EventLocati
       }
     }, [initialValue]);
 
+    const requestAutocomplete = useCallback(() => {
+      if (disabled || autocompleteRequested) {
+        return;
+      }
+      shouldFocusWidgetRef.current = true;
+      setAutocompleteRequested(true);
+    }, [autocompleteRequested, disabled]);
+
     useEffect(() => {
+      if (!autocompleteRequested) {
+        return;
+      }
       const t = setTimeout(() => {
         void initAutocomplete();
       }, 0);
@@ -219,7 +236,7 @@ export const EventLocationSearchInput = forwardRef<HTMLInputElement, EventLocati
         clearTimeout(t);
         cleanupRef.current?.();
       };
-    }, [initAutocomplete]);
+    }, [autocompleteRequested, initAutocomplete]);
 
     useEffect(() => {
       syncWidgetState();
@@ -253,6 +270,8 @@ export const EventLocationSearchInput = forwardRef<HTMLInputElement, EventLocati
             placeholder={placeholder}
             disabled={disabled}
             autoComplete="off"
+            onFocus={requestAutocomplete}
+            onPointerDown={requestAutocomplete}
             className={cn(
               "placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground border-input h-10 w-full min-w-0 rounded-md border bg-white px-3 py-2 text-base leading-none shadow-xs outline-none md:text-sm dark:bg-input/30",
               "focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]",

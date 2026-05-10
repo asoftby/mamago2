@@ -2,6 +2,9 @@
 // Inherits Event Wizard architecture 1-to-1
 
 import type { OfferFormData } from "./types";
+import { getStepsForOfferType } from "./offerWizardSteps.config";
+import { validatePublicationAccess } from "@/features/publication-access";
+import { showCampLodgingFormFields } from "./campOfferModel";
 
 export interface ValidationResult {
   isValid: boolean;
@@ -50,9 +53,7 @@ export function validateStep(step: number, data: OfferFormData): ValidationResul
     case 6:
       return validateStep6(data);
     case 7:
-      return validateStep7(data);
-    case 8:
-      return validateForSubmit(data);
+      return validateCampScheduleStep(data);
     default:
       return { isValid: true, isComplete: true, errors: [], warnings: [] };
   }
@@ -103,6 +104,12 @@ function validateStep2(data: OfferFormData): ValidationResult {
   const errors: string[] = [];
   const warnings: string[] = [];
 
+  if (data.offerWizardType === "CAMP") {
+    if (!data.campProgramType) {
+      errors.push("Выберите тип программы лагеря");
+    }
+  }
+
   if (!data.title || data.title.trim().length < 3) {
     errors.push("Название должно содержать минимум 3 символа");
   }
@@ -126,14 +133,6 @@ function validateStep2(data: OfferFormData): ValidationResult {
   // Validate Discovery Signals (structured groups)
   const signalIds = data.signalIds ?? [];
   
-  // Helper to count signals in a group by slug prefix
-  const countSignalsInGroup = (slugPrefix: string): number => {
-    // Note: We need to check against actual signal IDs, but we don't have the mapping here
-    // For now, we'll do a basic count check
-    // TODO: Improve this by loading signal definitions or passing them as context
-    return signalIds.length; // Placeholder - will be validated on backend
-  };
-
   // Basic validation: check if signals are selected
   if (signalIds.length === 0) {
     errors.push("Выберите характеристики предложения (активность, формат, участие)");
@@ -145,7 +144,11 @@ function validateStep2(data: OfferFormData): ValidationResult {
     }
   }
 
+  const campProgramOk =
+    data.offerWizardType !== "CAMP" || Boolean(data.campProgramType);
+
   const isComplete = Boolean(
+    campProgramOk &&
     data.title.trim().length >= 3 &&
     data.shortDescription.trim().length >= 10 &&
     data.shortDescription.length <= 120 &&
@@ -237,34 +240,62 @@ function validateStep4(data: OfferFormData): ValidationResult {
 }
 
 /**
- * Step 5: Pricing
+ * Step 5: Pricing and participation
  */
 function validateStep5(data: OfferFormData): ValidationResult {
-  const errors: string[] = [];
+  const pricingErrors: string[] = [];
+  const participationErrors: string[] = [];
   const warnings: string[] = [];
 
   if (!data.pricingMode) {
-    errors.push("Выберите режим ценообразования");
+    pricingErrors.push("Выберите режим ценообразования");
   }
 
   if (data.pricingMode === "single") {
     if (!data.singlePrice || data.singlePrice.trim().length === 0) {
-      errors.push("Укажите цену");
+      pricingErrors.push("Укажите цену");
     }
   }
 
   if (data.pricingMode === "multiple") {
     if (data.pricingOptions.length === 0) {
-      errors.push("Добавьте хотя бы один вариант цены");
+      pricingErrors.push("Добавьте хотя бы один вариант цены");
     } else {
       data.pricingOptions.forEach((option, index) => {
         if (!option.title || option.title.trim().length === 0) {
-          errors.push(`Вариант ${index + 1}: укажите название`);
+          pricingErrors.push(`Вариант ${index + 1}: укажите название`);
         }
         if (!option.price || option.price.trim().length === 0) {
-          errors.push(`Вариант ${index + 1}: укажите цену`);
+          pricingErrors.push(`Вариант ${index + 1}: укажите цену`);
         }
       });
+    }
+  }
+
+  if (data.publicationAccess) {
+    const result = validatePublicationAccess(data.publicationAccess);
+    participationErrors.push(...Object.values(result.errors));
+  } else if (!data.ctaType) {
+    participationErrors.push("Выберите тип действия");
+  } else {
+    if (data.ctaType === "записаться" || data.ctaType === "отправить_заявку") {
+      if (!data.ctaPhone || data.ctaPhone.trim().length === 0) {
+        participationErrors.push("Укажите телефон для связи");
+      } else if (!isValidPhone(data.ctaPhone)) {
+        participationErrors.push("Некорректный номер телефона");
+      }
+    }
+
+    if (data.ctaType === "перейти_на_сайт" || data.ctaType === "купить_билет") {
+      if (!data.ctaLink || data.ctaLink.trim().length === 0) {
+        participationErrors.push("Укажите ссылку");
+      } else if (!isValidUrl(data.ctaLink)) {
+        participationErrors.push("Некорректная ссылка");
+      }
+    }
+
+    if (data.ctaType === "забронировать" && !validateBookingSettings(data.bookingSettings)) {
+      participationErrors.push("Заполните настройки бронирования");
     }
   }
 
@@ -272,13 +303,16 @@ function validateStep5(data: OfferFormData): ValidationResult {
     data.pricingMode &&
     ((data.pricingMode === "single" && data.singlePrice.trim()) ||
      (data.pricingMode === "multiple" && data.pricingOptions.length > 0 &&
-      data.pricingOptions.every(opt => opt.title.trim() && opt.price.trim())))
+      data.pricingOptions.every(opt => opt.title.trim() && opt.price.trim()))) &&
+    (data.publicationAccess
+      ? validatePublicationAccess(data.publicationAccess).valid
+      : Boolean(data.ctaType))
   );
 
   return {
-    isValid: errors.length === 0,
+    isValid: pricingErrors.length === 0 && participationErrors.length === 0,
     isComplete,
-    errors,
+    errors: [...pricingErrors, ...participationErrors],
     warnings,
   };
 }
@@ -319,90 +353,37 @@ function validateStep6(data: OfferFormData): ValidationResult {
 }
 
 /**
- * Step 7: CTA and Publication
+ * Step 4 (camp): Смены и расписание
  */
-function validateStep7(data: OfferFormData): ValidationResult {
+function validateCampScheduleStep(data: OfferFormData): ValidationResult {
   const errors: string[] = [];
   const warnings: string[] = [];
 
-  if (!data.ctaType) {
-    errors.push("Выберите тип действия");
+  if (data.offerWizardType !== "CAMP") {
+    return {
+      isValid: true,
+      isComplete: true,
+      errors,
+      warnings,
+    };
   }
 
-  // Validate based on CTA type
-  if (data.ctaType === "записаться" || data.ctaType === "отправить_заявку") {
-    if (!data.ctaPhone || data.ctaPhone.trim().length === 0) {
-      errors.push("Укажите телефон для связи");
-    } else if (!isValidPhone(data.ctaPhone)) {
-      errors.push("Некорректный номер телефона");
-    }
+  const dated = data.campSessions.filter((session) => session.dateFrom && session.dateTo);
+  if (dated.length === 0) {
+    errors.push("Добавьте хотя бы одну смену с датами");
   }
 
-  if (data.ctaType === "перейти_на_сайт" || data.ctaType === "купить_билет") {
-    if (!data.ctaLink || data.ctaLink.trim().length === 0) {
-      errors.push("Укажите ссылку");
-    } else if (!isValidUrl(data.ctaLink)) {
-      errors.push("Некорректная ссылка");
-    }
-  }
-
-  // Validate booking settings if CTA is "забронировать"
-  if (data.ctaType === "забронировать") {
-    const booking = data.bookingSettings;
-    
-    if (!booking.mode) {
-      errors.push("Выберите способ бронирования");
-    }
-
-    if (booking.mode === "request") {
-      if (!booking.selectionType) {
-        errors.push("Выберите что выбирает клиент");
-      }
-      if (!booking.availableDaysAhead || booking.availableDaysAhead < 1) {
-        errors.push("Укажите на сколько дней вперёд доступна бронь");
-      }
-      if (!booking.capacityPerUnit || booking.capacityPerUnit < 1) {
-        errors.push("Укажите количество заявок на дату/слот");
-      }
-    }
-
-    if (booking.mode === "slot") {
-      if (!booking.availableDaysAhead || booking.availableDaysAhead < 1) {
-        errors.push("Укажите на сколько дней вперёд открыта запись");
-      }
-      if (!booking.slotDurationMinutes || booking.slotDurationMinutes < 15) {
-        errors.push("Выберите длительность слота");
-      }
-      if (!booking.capacityPerUnit || booking.capacityPerUnit < 1) {
-        errors.push("Укажите количество клиентов в слот");
-      }
-      
-      // Check if at least one day is enabled with valid times
-      const hasValidSchedule = booking.weeklyAvailability.some(day => 
-        day.enabled && day.startTime && day.endTime
-      );
-      if (!hasValidSchedule) {
-        errors.push("Добавьте хотя бы один день в расписание");
-      }
-    }
-
-    if (booking.mode === "external") {
-      if (!booking.externalUrl || booking.externalUrl.trim().length === 0) {
-        errors.push("Укажите ссылку для бронирования");
-      } else if (!isValidUrl(booking.externalUrl)) {
-        errors.push("Некорректная ссылка для бронирования");
-      }
+  for (const session of dated) {
+    if (session.dateFrom && session.dateTo && session.dateFrom > session.dateTo) {
+      errors.push("Дата окончания смены не может быть раньше даты начала");
+      break;
     }
   }
 
-  const isComplete = Boolean(
-    data.ctaType &&
-    ((data.ctaType === "записаться" || data.ctaType === "отправить_заявку") ? 
-     (data.ctaPhone && isValidPhone(data.ctaPhone)) : true) &&
-    ((data.ctaType === "перейти_на_сайт" || data.ctaType === "купить_билет") ? 
-     (data.ctaLink && isValidUrl(data.ctaLink)) : true) &&
-    (data.ctaType === "забронировать" ? validateBookingSettings(data.bookingSettings) : true)
+  const dateOrderOk = !dated.some(
+    (s) => s.dateFrom && s.dateTo && s.dateFrom > s.dateTo,
   );
+  const isComplete = dated.length > 0 && dateOrderOk;
 
   return {
     isValid: errors.length === 0,
@@ -410,6 +391,29 @@ function validateStep7(data: OfferFormData): ValidationResult {
     errors,
     warnings,
   };
+}
+
+function validateAccommodationStep(data: OfferFormData): ValidationResult {
+  const errors: string[] = [];
+  const warnings: string[] = [];
+
+  if (data.offerWizardType !== "CAMP") {
+    return { isValid: true, isComplete: true, errors, warnings };
+  }
+
+  if (!showCampLodgingFormFields(data)) {
+    return { isValid: true, isComplete: true, errors, warnings };
+  }
+
+  if (!data.accommodationType) {
+    errors.push("Укажите тип размещения");
+  }
+  if (!data.accommodationAddress?.trim()) {
+    errors.push("Укажите адрес проживания");
+  }
+
+  const isComplete = errors.length === 0;
+  return { isValid: isComplete, isComplete, errors, warnings };
 }
 
 /**
@@ -456,13 +460,46 @@ function validateBookingSettings(booking: OfferFormData["bookingSettings"]): boo
 export function validateForSubmit(data: OfferFormData): ValidationResult {
   const allErrors: string[] = [];
   const allWarnings: string[] = [];
+  const steps = getStepsForOfferType(data.offerWizardType).filter(
+    (step) => step.key !== "review",
+  );
 
-  // Validate all required steps
-  for (let step = 1; step <= 7; step++) {
-    const result = validateStep(step, data);
-    if (!result.isComplete) {
-      allErrors.push(`Шаг ${step}: не заполнены обязательные поля`);
+  for (const step of steps) {
+    let result: ValidationResult;
+
+    switch (step.key) {
+      case "type":
+        result = validateStep1(data);
+        break;
+      case "details":
+        result = validateStep2(data);
+        break;
+      case "photo":
+        result = validateStep3(data);
+        break;
+      case "conditions":
+        result = validateStep4(data);
+        break;
+      case "campSchedule":
+        result = validateCampScheduleStep(data);
+        break;
+      case "accommodation":
+        result = validateAccommodationStep(data);
+        break;
+      case "price":
+        result = validateStep5(data);
+        break;
+      case "contacts":
+        result = validateStep6(data);
+        break;
+      default:
+        result = { isValid: true, isComplete: true, errors: [], warnings: [] };
     }
+
+    if (!result.isComplete) {
+      allErrors.push(`Шаг "${step.title}": не заполнены обязательные поля`);
+    }
+
     allErrors.push(...result.errors);
     allWarnings.push(...result.warnings);
   }

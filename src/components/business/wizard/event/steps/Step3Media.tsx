@@ -657,10 +657,9 @@ export function Step3Media({
       const uploadedImage = await withUploadTimeout(uploadImage(file), "Обложка");
       if (!uploadedImage) throw new Error("Failed to upload image");
 
-      const filename = uploadedImage.url.split("/").pop() || uploadedImage.id;
       setCoverPreview(uploadedImage.url);
       setCoverPreviewUnavailable(false);
-      onChange({ coverImage: filename });
+      onChange({ coverImage: uploadedImage.mediaId ?? uploadedImage.id });
       toast.success("Обложка загружена");
     } catch (error) {
       console.error("Cover upload error:", error);
@@ -701,14 +700,14 @@ export function Step3Media({
         const uploadedImage = await withUploadTimeout(uploadImage(file), file.name);
         if (!uploadedImage) throw new Error("Failed to upload image");
 
-        const filename = uploadedImage.url.split("/").pop() || uploadedImage.id;
+        const mediaId = uploadedImage.mediaId ?? uploadedImage.id;
         setGalleryItems((prev) =>
           prev.map((img) =>
-            img.id === placeholderId ? { id: filename, url: uploadedImage.url, status: "done" as const } : img,
+            img.id === placeholderId ? { id: mediaId, url: uploadedImage.url, status: "done" as const } : img,
           ),
         );
-        onChange({ gallery: [...nextGallery, filename] });
-        nextGallery = [...nextGallery, filename];
+        onChange({ gallery: [...nextGallery, mediaId] });
+        nextGallery = [...nextGallery, mediaId];
       } catch (error) {
         console.error("Gallery upload error:", error);
         setGalleryItems((prev) =>

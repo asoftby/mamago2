@@ -57,7 +57,10 @@ export async function loadPublicActivityForCityPage(
   const activity = await prisma.activity.findFirst({
     where,
     include: {
-      images: { orderBy: { sortOrder: "asc" } },
+      images: {
+        orderBy: { sortOrder: "asc" },
+        select: { id: true, url: true, mediaAssetId: true },
+      },
       sessions: { orderBy: { startsAt: "asc" } },
       // SEO fields are scalar fields on Activity, included automatically.
       place: {
@@ -118,7 +121,11 @@ export async function loadPublicActivityForCityPage(
     coverImageUrl: resolveActivityCoverUrl({
       coverImageId: activity.coverImageId,
       coverImageUrl: activity.coverImageUrl,
-      images: activity.images.map((img) => ({ id: img.id, url: img.url })),
+      images: activity.images.map((img) => ({
+        id: img.id,
+        url: img.url,
+        mediaAssetId: img.mediaAssetId,
+      })),
     }),
     images: activity.images.map((img) => ({ id: img.id, url: img.url })),
     sessions: activity.sessions.map((s) => ({ id: s.id, startsAt: s.startsAt })),

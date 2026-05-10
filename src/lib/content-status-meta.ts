@@ -1,4 +1,4 @@
-import type { ContentStatus } from "@prisma/client";
+import type { ContentStatus, OfferStatus } from "@prisma/client";
 
 export interface ContentStatusMeta {
   label: string;
@@ -72,3 +72,59 @@ export const CONTENT_STATUS_META: Record<ContentStatus, ContentStatusMeta> = {
     actionLabel: "Восстановить",
   },
 };
+
+/** Классы круглого бейджа статуса (как на карточке места в бизнес-кабинете). */
+export function contentStatusPublicationPillClass(
+  status: ContentStatus,
+): string {
+  switch (status) {
+    case "DRAFT":
+      return "border-stone-200 bg-stone-50 text-stone-600";
+    case "PENDING":
+    case "PENDING_UPDATE":
+    case "NEEDS_REVISION":
+      return "border-amber-200 bg-amber-50 text-amber-800";
+    case "PUBLISHED":
+      return "border-emerald-200 bg-emerald-50 text-emerald-700";
+    case "REJECTED":
+      return "border-red-200 bg-red-50 text-red-700";
+    case "DELETED":
+      return "border-stone-200 bg-stone-50 text-stone-500";
+    case "SCHEDULED":
+      return "border-blue-200 bg-blue-50 text-blue-900";
+    case "ARCHIVED":
+      return "border-stone-200 bg-stone-50 text-stone-600";
+    default:
+      return "border-stone-200 bg-stone-50 text-stone-600";
+  }
+}
+
+export function offerStatusPublicationPillClass(status: OfferStatus): string {
+  switch (status) {
+    case "DRAFT":
+      return "border-stone-200 bg-stone-50 text-stone-600";
+    case "PENDING":
+      return "border-amber-200 bg-amber-50 text-amber-800";
+    case "PUBLISHED":
+      return "border-emerald-200 bg-emerald-50 text-emerald-700";
+    case "REJECTED":
+      return "border-red-200 bg-red-50 text-red-700";
+    default:
+      return "border-stone-200 bg-stone-50 text-stone-600";
+  }
+}
+
+export function offerStatusPublicationLabel(status: OfferStatus): string {
+  switch (status) {
+    case "DRAFT":
+      return "Черновик";
+    case "PENDING":
+      return "На модерации";
+    case "PUBLISHED":
+      return "Опубликовано";
+    case "REJECTED":
+      return "Отклонено";
+    default:
+      return status;
+  }
+}

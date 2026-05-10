@@ -33,6 +33,7 @@ import {
   validatePlaceCategoriesDraft,
 } from "@/lib/validation/placeCategoryValidation";
 import { createPublishTimer, runAfterPublishResponse } from "@/server/utils/publishPipeline";
+import { syncPlaceMediaUsage } from "@/server/services/media/media-usage.service";
 
 async function finalizePublishedPlaceSlugIfNeeded(placeId: string, isPublished: boolean) {
   if (!isPublished) return;
@@ -461,6 +462,16 @@ export async function POST(request: NextRequest) {
 
     await finalizePublishedPlaceSlugIfNeeded(place.id, isPublished);
     timer.mark("status");
+
+    // Sync media usage if logo was attached (don't block on errors)
+    if (attachedLogoImageId || isMediaAssetCuid(d.logoImageId)) {
+      try {
+        await syncPlaceMediaUsage(place.id);
+      } catch (error) {
+        console.error(`Failed to sync media usage for place ${place.id}:`, error);
+      }
+    }
+
     timer.mark("response");
     timer.log({ status: place.status, created: 1 });
 

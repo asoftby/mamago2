@@ -118,7 +118,10 @@ export async function GET(
     select: {
       coverImageId: true,
       coverImageUrl: true,
-      images: { orderBy: { sortOrder: "asc" }, select: { url: true } },
+      images: {
+        orderBy: { sortOrder: "asc" },
+        select: { url: true, mediaAssetId: true },
+      },
     },
   });
 
@@ -198,6 +201,27 @@ export async function GET(
       select: { id: true, publicUrl: true, alt: true, title: true, sourceType: true },
     });
     if (m) upsert(m, "cover", true);
+  }
+
+  const galleryMediaIds = [
+    ...new Set(
+      activity.images
+        .map((image) => image.mediaAssetId)
+        .filter((id): id is string => typeof id === "string" && id.length > 0),
+    ),
+  ];
+  if (galleryMediaIds.length > 0) {
+    const fromGalleryIds = await prisma.mediaAsset.findMany({
+      where: {
+        id: { in: galleryMediaIds },
+        kind: MediaAssetKind.IMAGE,
+        status: MediaAssetStatus.ACTIVE,
+      },
+      select: { id: true, publicUrl: true, alt: true, title: true, sourceType: true },
+    });
+    for (const m of fromGalleryIds) {
+      upsert(m, "gallery", true);
+    }
   }
 
   const urls = [...new Set(activity.images.map((i) => i.url).filter(Boolean))];

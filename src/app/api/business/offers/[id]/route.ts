@@ -12,6 +12,12 @@ import { assignOfferSlugIfMissing } from "@/lib/slug/offerSlugService";
 import { formatPriceFrom } from "@/lib/formatters/format-price";
 import { ensurePublishedOfferHasSlug } from "@/lib/slug/publishSlugGuards";
 import { createPublishTimer, runAfterPublishResponse } from "@/server/utils/publishPipeline";
+import {
+  campMealKeySchema,
+  campProgramTypeSchema,
+  campSessionEntrySchema,
+} from "@/lib/business/offerCampApiSchemas";
+import { syncOfferMediaUsage } from "@/server/services/media/media-usage.service";
 
 const updateOfferSchema = z.object({
   title: z.string().min(1).optional(),
@@ -39,6 +45,28 @@ const updateOfferSchema = z.object({
   bookingInstructions: z.string().optional(),
   status: z.enum(["DRAFT", "PENDING", "PUBLISHED"]).optional(),
   discoverySignalIds: z.array(z.string()).optional(),
+  campProgramType: campProgramTypeSchema,
+  // Camp fields
+  campSessions: z.array(campSessionEntrySchema).optional(),
+  campSessionDuration: z.string().optional(),
+  campStayDuration: z.string().optional(),
+  campPlacesCount: z.number().optional(),
+  campGroupSize: z.number().optional(),
+  campDaySchedule: z.string().optional(),
+  campCanSelectDays: z.boolean().optional(),
+  campHasExtendedCare: z.boolean().optional(),
+  // Accommodation fields
+  accommodationProvided: z.boolean().optional(),
+  accommodationType: z.string().optional(),
+  accommodationAddress: z.string().optional(),
+  accommodationRooms: z.string().optional(),
+  campIncludedMeals: z.array(campMealKeySchema).optional(),
+  campSafetyInfo: z.string().optional(),
+  campMedicalInfo: z.string().optional(),
+  accommodationConditions: z.string().optional(),
+  mealInfo: z.string().optional(),
+  transferInfo: z.string().optional(),
+  whatToBring: z.string().optional(),
 });
 
 export async function GET(
@@ -149,12 +177,37 @@ export async function PATCH(
     if (data.videoUrl !== undefined) updateData.videoUrl = data.videoUrl;
     if (data.promotionalOffer !== undefined) updateData.promotionalOffer = data.promotionalOffer;
     if (data.discoverySignalIds !== undefined) updateData.discoverySignalIds = data.discoverySignalIds;
+    if (data.campProgramType !== undefined) updateData.campProgramType = data.campProgramType;
     if (data.status !== undefined) {
       updateData.status = data.status;
       if (data.status === "PUBLISHED") {
         updateData.publishedAt = new Date();
       }
     }
+    
+    // Camp fields
+    if (data.campSessions !== undefined)
+      updateData.campSessions = data.campSessions as unknown as Prisma.InputJsonValue;
+    if (data.campSessionDuration !== undefined) updateData.campSessionDuration = data.campSessionDuration;
+    if (data.campStayDuration !== undefined) updateData.campStayDuration = data.campStayDuration;
+    if (data.campPlacesCount !== undefined) updateData.campPlacesCount = data.campPlacesCount;
+    if (data.campGroupSize !== undefined) updateData.campGroupSize = data.campGroupSize;
+    if (data.campDaySchedule !== undefined) updateData.campDaySchedule = data.campDaySchedule;
+    if (data.campCanSelectDays !== undefined) updateData.campCanSelectDays = data.campCanSelectDays;
+    if (data.campHasExtendedCare !== undefined) updateData.campHasExtendedCare = data.campHasExtendedCare;
+    
+    // Accommodation fields
+    if (data.accommodationProvided !== undefined) updateData.accommodationProvided = data.accommodationProvided;
+    if (data.accommodationType !== undefined) updateData.accommodationType = data.accommodationType;
+    if (data.accommodationAddress !== undefined) updateData.accommodationAddress = data.accommodationAddress;
+    if (data.accommodationRooms !== undefined) updateData.accommodationRooms = data.accommodationRooms;
+    if (data.campIncludedMeals !== undefined) updateData.campIncludedMeals = data.campIncludedMeals;
+    if (data.campSafetyInfo !== undefined) updateData.campSafetyInfo = data.campSafetyInfo;
+    if (data.campMedicalInfo !== undefined) updateData.campMedicalInfo = data.campMedicalInfo;
+    if (data.accommodationConditions !== undefined) updateData.accommodationConditions = data.accommodationConditions;
+    if (data.mealInfo !== undefined) updateData.mealInfo = data.mealInfo;
+    if (data.transferInfo !== undefined) updateData.transferInfo = data.transferInfo;
+    if (data.whatToBring !== undefined) updateData.whatToBring = data.whatToBring;
     
     // Update price fields if they were recalculated
     if (priceFrom !== existingOffer.priceFrom) updateData.priceFrom = priceFrom;
@@ -193,6 +246,17 @@ export async function PATCH(
         assignOfferSlugIfMissing(offer.id, title),
       );
     }
+
+    // Sync media usage if cover or gallery changed (don't block on errors)
+    const mediaChanged = data.coverImage !== undefined || data.gallery !== undefined;
+    if (mediaChanged) {
+      try {
+        await syncOfferMediaUsage(offer.id);
+      } catch (error) {
+        console.error(`Failed to sync media usage for offer ${offer.id}:`, error);
+      }
+    }
+
     timer.mark("response");
     timer.log({ status: offer.status });
 

@@ -57,10 +57,15 @@ export function getDefaultFormData(): OfferFormData {
     // Step 5 (for CAMP): Accommodation
     accommodationProvided: false,
     accommodationType: "",
+    accommodationAddress: "",
+    accommodationRooms: "",
     accommodationConditions: "",
+    campIncludedMeals: [],
     mealInfo: "",
     transferInfo: "",
     whatToBring: "",
+    campSafetyInfo: "",
+    campMedicalInfo: "",
     
     // Step 5/6: Pricing
     pricingMode: "single",
@@ -76,6 +81,7 @@ export function getDefaultFormData(): OfferFormData {
     socialLinks: [],
     
     // Step 7/8: CTA and Publication
+    publicationAccess: null,
     ctaType: null,
     ctaPhone: "",
     ctaLink: "",

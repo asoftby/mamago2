@@ -1,10 +1,43 @@
 // Offer Wizard Types
 // Refactored for multi-type support (SINGLE, REGULAR, CAMP)
 
+import type { PublicationAccess } from "@/features/publication-access";
+
 export type OfferWizardMode = "create" | "edit";
 
 /** Offer types for wizard */
 export type OfferWizardType = "SINGLE" | "REGULAR" | "CAMP";
+
+/** Смена лагеря (шаг «Смены и расписание») */
+export type CampSessionKind = "day" | "full_day" | "residential";
+
+export type CampLodgingTypeKey =
+  | "hotel"
+  | "resort_base"
+  | "camping"
+  | "cottage"
+  | "sanatorium"
+  | "other";
+
+export type CampMealKey = "breakfast" | "lunch" | "dinner" | "snacks";
+
+export interface CampSessionEntry {
+  id: string;
+  /** Для будущей сортировки drag-and-drop */
+  sortOrder: number;
+  title: string;
+  dateFrom: string | null;
+  dateTo: string | null;
+  timeFrom: string | null;
+  timeTo: string | null;
+  sessionKind: CampSessionKind;
+  ageFrom: number | null;
+  ageTo: number | null;
+  capacity: number | null;
+  spotsLeft: number | null;
+  priceOverride: string;
+  description: string;
+}
 
 /** Step keys for wizard */
 export type OfferWizardStepKey =
@@ -16,7 +49,6 @@ export type OfferWizardStepKey =
   | "accommodation"
   | "price"
   | "contacts"
-  | "publication"
   | "review";
 
 /**
@@ -55,11 +87,8 @@ export interface OfferFormData {
   classGroupSize: string;
   classFormat: "trial" | "course" | "subscription" | null;
   
-  // Camp schedule fields (CAMP only)
-  campSessions: Array<{
-    dateFrom: string | null;
-    dateTo: string | null;
-  }>;
+  // Camp schedule fields (CAMP only): JSON в БД (campSessions)
+  campSessions: CampSessionEntry[];
   campSessionDuration: string; // e.g., "7 дней", "2 недели"
   campStayDuration: string; // e.g., "с 9:00 до 17:00", "круглосуточно"
   campPlacesCount: number | null;
@@ -80,12 +109,18 @@ export interface OfferFormData {
   serviceDeliveryArea: string;
   
   // Step 5 (for CAMP): Accommodation
-  accommodationProvided: boolean; // Is accommodation provided
-  accommodationType: string; // e.g., "палатки", "коттеджи", "гостиница"
-  accommodationConditions: string; // Description of living conditions
-  mealInfo: string; // Meal information
-  transferInfo: string; // Transfer information
-  whatToBring: string; // What to bring
+  accommodationProvided: boolean;
+  /** Ключ из CampLodgingTypeKey, в БД — accommodationType */
+  accommodationType: CampLodgingTypeKey | "";
+  accommodationAddress: string;
+  accommodationRooms: string;
+  accommodationConditions: string;
+  campIncludedMeals: CampMealKey[];
+  mealInfo: string; // legacy / свободный текст при необходимости
+  transferInfo: string;
+  whatToBring: string;
+  campSafetyInfo: string;
+  campMedicalInfo: string;
   
   // Step 5/6: Pricing
   pricingMode: "single" | "multiple";
@@ -101,6 +136,7 @@ export interface OfferFormData {
   socialLinks: SocialLink[];
   
   // Step 7/8: CTA and Publication
+  publicationAccess: PublicationAccess | null;
   ctaType: "записаться" | "забронировать" | "купить_билет" | "отправить_заявку" | "перейти_на_сайт" | null;
   ctaPhone: string;
   ctaLink: string;

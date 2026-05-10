@@ -234,9 +234,19 @@ export function PlaceWizard({
   };
 
   // Update form data
-  const handleChange = useCallback((updates: Partial<PlaceFormData>) => {
-    setFormData(prev => ({ ...prev, ...updates }));
-  }, []);
+  const handleChange = useCallback(
+    (
+      updates:
+        | Partial<PlaceFormData>
+        | ((prev: PlaceFormData) => Partial<PlaceFormData>),
+    ) => {
+      setFormData((prev) => {
+        const patch = typeof updates === "function" ? updates(prev) : updates;
+        return { ...prev, ...patch };
+      });
+    },
+    [],
+  );
 
   // Navigation
   const handleNext = () => {

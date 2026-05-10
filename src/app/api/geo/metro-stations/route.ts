@@ -6,6 +6,9 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { REFERENCE_DATA_CACHE_CONTROL } from "@/lib/http/referenceDataCacheHeaders";
+
+const CACHE_HEADERS = { "Cache-Control": REFERENCE_DATA_CACHE_CONTROL };
 
 export async function GET(request: NextRequest) {
   try {
@@ -29,7 +32,7 @@ export async function GET(request: NextRequest) {
       });
       
       if (!city) {
-        return NextResponse.json({ metroStations: [] });
+        return NextResponse.json({ metroStations: [] }, { headers: CACHE_HEADERS });
       }
       
       resolvedCityId = city.id;
@@ -44,12 +47,12 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    return NextResponse.json({ metroStations: stations });
+    return NextResponse.json({ metroStations: stations }, { headers: CACHE_HEADERS });
   } catch (error) {
     console.error("Get metro stations error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

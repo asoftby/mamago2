@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import { ContentStatus } from "@prisma/client";
 import { Button } from "@/components/ui/button";
 import {
@@ -23,9 +22,16 @@ import { calculateUrgency } from "@/lib/improvementRequest/urgency";
 import { CONTENT_STATUS_META } from "@/lib/content-status-meta";
 import { getCanonicalPublicAppUrl } from "@/lib/config/publicAppUrl";
 import { cn } from "@/lib/utils";
-import { isAppMediaUrl } from "@/lib/media/isAppMediaUrl";
 import { resolvePlaceLogoImage } from "@/lib/place/resolvePlaceLogoImage";
 import { PublicationStatisticsDialog } from "@/components/business/shared/PublicationStatisticsDialog";
+import {
+  BusinessPublicationCard,
+  BUSINESS_PUBLICATION_ACTION_BUTTON,
+  BUSINESS_PUBLICATION_ACTION_DANGER_ICON,
+  BUSINESS_PUBLICATION_ACTION_ICON,
+  BUSINESS_PUBLICATION_ACTION_NEUTRAL,
+} from "@/components/business/shared/BusinessPublicationCard";
+import { formatUpdatedAgo } from "@/lib/date/formatUpdatedAgo";
 
 interface PlaceCardData {
   id: string;
@@ -68,6 +74,7 @@ interface PlaceCardData {
     dueAt: Date | null;
   }>;
   updatedAt: Date;
+  createdAt: Date;
 }
 
 interface PlaceCardHorizontalProps {
@@ -216,12 +223,68 @@ export function PlaceCardHorizontal({ place, onDelete, onArchive, onUnarchive }:
     ? `/places/${place.slug.trim()}`
     : `/places/${place.id}`;
   const publicPlaceHref = `${publicBase}${publicPath}`;
-  const actionButtonClass =
-    "inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-2xl px-3.5 text-sm font-medium transition-colors disabled:pointer-events-none disabled:opacity-50";
-  const neutralActionClass =
-    "border border-stone-200 bg-white text-stone-700 hover:border-stone-300 hover:bg-stone-50 hover:text-stone-950";
-  const iconActionClass =
-    "h-10 w-10 shrink-0 rounded-2xl p-0 text-stone-500 hover:bg-stone-100 hover:text-stone-900";
+  const coverImageUrl = coverImage?.url ?? null;
+  const updatedLine = formatUpdatedAgo(place.updatedAt, place.createdAt);
+
+  const statusRow =
+    !place.archivedAt ? (
+      <>
+        <span
+          className={`inline-flex items-center rounded-full border px-3 py-1.5 text-xs font-medium ${
+            place.status === "DRAFT"
+              ? "border-stone-200 bg-stone-50 text-stone-600"
+              : place.status === "PENDING"
+                ? "border-amber-200 bg-amber-50 text-amber-800"
+                : place.status === "PENDING_UPDATE"
+                  ? "border-amber-200 bg-amber-50 text-amber-800"
+                  : place.status === "PUBLISHED"
+                    ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                    : place.status === "NEEDS_REVISION"
+                      ? "border-amber-200 bg-amber-50 text-amber-800"
+                      : place.status === "SCHEDULED"
+                        ? "border-blue-200 bg-blue-50 text-blue-900"
+                        : place.status === "ARCHIVED"
+                          ? "border-stone-200 bg-stone-50 text-stone-600"
+                          : "border-red-200 bg-red-50 text-red-700"
+          }`}
+        >
+          {statusConfig.label}
+        </span>
+        {hasActiveImprovementRequest && mostUrgentUrgency ? (
+          <Badge
+            variant="outline"
+            className={`rounded-full px-3 py-1.5 text-xs ${
+              mostUrgentUrgency.level === "overdue"
+                ? "border-red-300 bg-red-50 text-red-700"
+                : mostUrgentUrgency.urgent
+                  ? "border-orange-300 bg-orange-50 text-orange-700"
+                  : "border-amber-300 bg-amber-50 text-amber-700"
+            } flex items-center gap-1`}
+          >
+            <AlertTriangle className="h-3 w-3" />
+            {mostUrgentUrgency.level === "overdue"
+              ? "Просрочено"
+              : mostUrgentUrgency.urgent
+                ? "Требуются исправления"
+                : "Нужны правки"}
+          </Badge>
+        ) : null}
+      </>
+    ) : undefined;
+
+  const revisionFootnote =
+    daysSinceRevision !== null ? (
+      <p className="text-xs text-amber-700">
+        Отправлено на доработку {daysSinceRevision}{" "}
+        {daysSinceRevision === 1
+          ? "день"
+          : daysSinceRevision < 5
+            ? "дня"
+            : "дней"}{" "}
+        назад
+      </p>
+    ) : undefined;
+
   const placeMetrics = {
     views: 0,
     saves: 0,
@@ -231,173 +294,90 @@ export function PlaceCardHorizontal({ place, onDelete, onArchive, onUnarchive }:
 
   return (
     <>
-      <div className="group flex flex-col gap-4 rounded-[26px] border border-stone-200/90 bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-all hover:border-stone-300 hover:shadow-[0_14px_32px_rgba(15,23,42,0.05)] md:flex-row md:items-center md:p-5">
-        {/* Cover Image */}
-        <Link href={publicPlaceHref} className="flex-shrink-0 self-start md:self-center">
-          <div className="relative size-[86px] shrink-0 overflow-hidden rounded-full bg-stone-100 ring-1 ring-stone-200/70">
-            {coverImage ? (
-              isAppMediaUrl(coverImage.url) ? (
-                <img
-                  src={coverImage.url}
-                  alt={displayTitle}
-                  className="absolute inset-0 h-full w-full object-cover"
-                />
-              ) : (
-                <Image
-                  src={coverImage.url}
-                  alt={displayTitle}
-                  fill
-                  unoptimized={isAppMediaUrl(coverImage.url)}
-                  className="object-cover"
-                  sizes="86px"
-                />
-              )
-            ) : (
-              <div className="flex h-full w-full items-center justify-center text-stone-400">
-                <MapPin className="h-7 w-7" />
-              </div>
-            )}
-          </div>
-        </Link>
-
-        {/* Content */}
-        <div className="flex-1 min-w-0">
-          <Link href={publicPlaceHref}>
-            <h3 className="truncate text-lg font-semibold text-stone-950 transition-colors hover:text-stone-700">
-              {displayTitle}
-            </h3>
-          </Link>
-          
-          <p className="mt-1 truncate text-sm text-stone-600">
-            {displayAddress}
-          </p>
-          
-          {/* Status badge - always show for non-archived places */}
-          {!place.archivedAt && (
-            <div className="mt-2 flex items-center gap-2 flex-wrap">
-              <span className={`inline-flex items-center rounded-full border px-3 py-1.5 text-xs font-medium ${
-                place.status === "DRAFT"
-                  ? "border-stone-200 bg-stone-50 text-stone-600"
-                  : place.status === "PENDING"
-                  ? "border-amber-200 bg-amber-50 text-amber-800"
-                  : place.status === "PENDING_UPDATE"
-                  ? "border-amber-200 bg-amber-50 text-amber-800"
-                  : place.status === "PUBLISHED"
-                  ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                  : place.status === "NEEDS_REVISION"
-                  ? "border-amber-200 bg-amber-50 text-amber-800"
-                  : place.status === "SCHEDULED"
-                  ? "border-blue-200 bg-blue-50 text-blue-900"
-                  : place.status === "ARCHIVED"
-                  ? "border-stone-200 bg-stone-50 text-stone-600"
-                  : "border-red-200 bg-red-50 text-red-700"
-              }`}>
-                {statusConfig.label}
+      <BusinessPublicationCard
+        type="place"
+        imageUrl={coverImageUrl}
+        imageAlt={displayTitle}
+        imageHref={publicPlaceHref}
+        placeholderIcon={MapPin}
+        title={displayTitle}
+        titleHref={publicPlaceHref}
+        subtitle={displayAddress}
+        statusRow={statusRow}
+        updatedLine={updatedLine}
+        footnote={revisionFootnote}
+        actions={
+          <>
+            {place.archivedAt ? (
+              <span className="inline-flex h-10 shrink-0 items-center rounded-2xl bg-stone-100 px-3 text-xs font-medium text-stone-500">
+                Архив
               </span>
-              
-              {/* Improvement Request Indicator */}
-              {hasActiveImprovementRequest && mostUrgentUrgency && (
-                <Badge 
-                  variant="outline" 
-                  className={`rounded-full px-3 py-1.5 text-xs ${
-                    mostUrgentUrgency.level === "overdue" 
-                      ? "bg-red-50 text-red-700 border-red-300" 
-                      : mostUrgentUrgency.urgent
-                      ? "bg-orange-50 text-orange-700 border-orange-300"
-                      : "bg-amber-50 text-amber-700 border-amber-300"
-                  } flex items-center gap-1`}
-                >
-                  <AlertTriangle className="w-3 h-3" />
-                  {mostUrgentUrgency.level === "overdue" 
-                    ? "Просрочено" 
-                    : mostUrgentUrgency.urgent
-                    ? "Требуются исправления"
-                    : "Нужны правки"
-                  }
-                </Badge>
+            ) : null}
+
+            <button
+              type="button"
+              onClick={() => setStatisticsOpen(true)}
+              className={cn(
+                BUSINESS_PUBLICATION_ACTION_BUTTON,
+                BUSINESS_PUBLICATION_ACTION_NEUTRAL,
               )}
-            </div>
-          )}
-          
-          {/* Inactivity warning for NEEDS_REVISION */}
-          {daysSinceRevision !== null && (
-            <p className="mt-1 text-xs text-amber-700">
-              Отправлено на доработку {daysSinceRevision} {daysSinceRevision === 1 ? "день" : daysSinceRevision < 5 ? "дня" : "дней"} назад
-            </p>
-          )}
-        </div>
-
-        {/* Actions */}
-        <div className="flex max-w-full flex-shrink-0 gap-2 overflow-x-auto pb-1 md:justify-end md:overflow-visible">
-          {/* Archived Badge */}
-          {place.archivedAt && (
-            <span className="inline-flex h-10 shrink-0 items-center rounded-2xl bg-stone-100 px-3 text-xs font-medium text-stone-500">
-              Архив
-            </span>
-          )}
-
-          <button
-            type="button"
-            onClick={() => setStatisticsOpen(true)}
-            className={cn(actionButtonClass, neutralActionClass)}
-          >
-            <BarChart3 className="h-4 w-4 shrink-0" />
-            Статистика
-          </button>
-
-          {!place.archivedAt && displayStatus !== "PENDING" && (
-            <Link
-              href={`/business/places/${place.id}/edit`}
-              className={cn(actionButtonClass, neutralActionClass)}
             >
-              <Pencil className="h-4 w-4 shrink-0" />
-              Редактировать
-            </Link>
-          )}
+              <BarChart3 className="h-4 w-4 shrink-0" />
+              Статистика
+            </button>
 
-          {/* Places cannot be promoted - only events and offers */}
+            {!place.archivedAt && displayStatus !== "PENDING" ? (
+              <Link
+                href={`/business/places/${place.id}/edit`}
+                className={cn(
+                  BUSINESS_PUBLICATION_ACTION_BUTTON,
+                  BUSINESS_PUBLICATION_ACTION_NEUTRAL,
+                )}
+              >
+                <Pencil className="h-4 w-4 shrink-0" />
+                Редактировать
+              </Link>
+            ) : null}
 
-          {/* Unarchive Action */}
-          {place.archivedAt && onUnarchive && (
-            <Button
-              variant="ghost"
-              onClick={handleUnarchive}
-              disabled={isArchiving}
-              className={iconActionClass}
-              title="Восстановить"
-              aria-label="Восстановить"
-            >
-              <ArchiveRestore className="h-4 w-4" />
-            </Button>
-          )}
+            {place.archivedAt && onUnarchive ? (
+              <Button
+                variant="ghost"
+                onClick={handleUnarchive}
+                disabled={isArchiving}
+                className={BUSINESS_PUBLICATION_ACTION_ICON}
+                title="Восстановить"
+                aria-label="Восстановить"
+              >
+                <ArchiveRestore className="h-4 w-4" />
+              </Button>
+            ) : null}
 
-          {/* Archive Action (for active places) */}
-          {!place.archivedAt && onArchive && place.status !== "DRAFT" && (
-            <Button
+            {!place.archivedAt && onArchive && place.status !== "DRAFT" ? (
+              <Button
                 variant="ghost"
                 onClick={() => setShowArchiveDialog(true)}
-                className={iconActionClass}
+                className={BUSINESS_PUBLICATION_ACTION_ICON}
                 title="В архив"
                 aria-label="В архив"
               >
-              <Archive className="h-4 w-4" />
-            </Button>
-          )}
+                <Archive className="h-4 w-4" />
+              </Button>
+            ) : null}
 
-          {/* Delete Action (only for DRAFT) */}
-          {place.status === "DRAFT" && onDelete && !place.archivedAt && (
-            <Button
+            {place.status === "DRAFT" && onDelete && !place.archivedAt ? (
+              <Button
                 variant="ghost"
                 onClick={() => setShowDeleteDialog(true)}
-                className="h-10 w-10 shrink-0 rounded-2xl p-0 text-stone-400 hover:bg-red-50 hover:text-red-600"
+                className={BUSINESS_PUBLICATION_ACTION_DANGER_ICON}
                 title="Удалить"
                 aria-label="Удалить"
               >
-              <Trash2 className="h-4 w-4" />
-            </Button>
-          )}
-        </div>
-      </div>
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            ) : null}
+          </>
+        }
+      />
 
       <PublicationStatisticsDialog
         open={statisticsOpen}

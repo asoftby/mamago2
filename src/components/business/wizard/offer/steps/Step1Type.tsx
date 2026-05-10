@@ -13,11 +13,16 @@ interface Step1TypeProps {
 
 export function Step1Type({ data, onChange, isEditable }: Step1TypeProps) {
   const handleTypeChange = (offerWizardType: OfferWizardType) => {
+    const legacy =
+      offerWizardType === "CAMP"
+        ? { offerKind: "course" as const, durationType: "camp" as const }
+        : offerWizardType === "SINGLE"
+          ? { offerKind: "course" as const, durationType: "single" as const }
+          : { offerKind: "course" as const, durationType: "recurring" as const };
+
     onChange({
       offerWizardType,
-      // Reset legacy fields when changing type
-      offerKind: null,
-      durationType: null,
+      ...legacy,
       serviceType: null,
       locationType: null,
     });

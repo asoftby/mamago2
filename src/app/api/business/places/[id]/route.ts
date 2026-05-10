@@ -13,6 +13,7 @@ import { canManagePlaceAsync } from "@/lib/auth/placeAccess";
 import { assignPlaceSlugIfMissing } from "@/lib/slug/placeSlugService";
 import { validatePlaceCategoriesDraft } from "@/lib/validation/placeCategoryValidation";
 import { createRequestPerf } from "@/server/utils/requestPerf";
+import { syncPlaceMediaUsage } from "@/server/services/media/media-usage.service";
 
 export async function GET(
   request: NextRequest,
@@ -305,6 +306,16 @@ export async function PATCH(
       },
     });
     perf.mark("response");
+
+    // Sync media usage if logo changed (don't block on errors)
+    if (body.logoImageId !== undefined) {
+      try {
+        await syncPlaceMediaUsage(id);
+      } catch (error) {
+        console.error(`Failed to sync media usage for place ${id}:`, error);
+      }
+    }
+
     perf.log({ placeId: id, fields: Object.keys(updateData).length });
 
     return NextResponse.json({ place });

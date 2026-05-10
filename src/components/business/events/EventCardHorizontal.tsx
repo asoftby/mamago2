@@ -2,10 +2,16 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import { usePathname, useSearchParams } from "next/navigation";
-import { ContentStatusBadge } from "@/components/business/shared/ContentStatusBadge";
-import { Pencil, Archive, ArchiveRestore, Trash2, Calendar, MapPin, BarChart3, Zap } from "lucide-react";
+import {
+  Pencil,
+  Archive,
+  ArchiveRestore,
+  Trash2,
+  Calendar,
+  BarChart3,
+  Zap,
+} from "lucide-react";
 import { ContentStatus, ActivityType, ScheduleMode } from "@prisma/client";
 import {
   AlertDialog,
@@ -21,6 +27,21 @@ import { cn } from "@/lib/utils";
 import { BusinessChip } from "@/components/business/ui/BusinessChip";
 import { buildPromotionLaunchHref } from "@/lib/promotion/shared";
 import { PublicationStatisticsDialog } from "@/components/business/shared/PublicationStatisticsDialog";
+import { BusinessPublicationCard } from "@/components/business/shared/BusinessPublicationCard";
+import {
+  BUSINESS_PUBLICATION_ACTION_BUTTON,
+  BUSINESS_PUBLICATION_ACTION_DANGER_ICON,
+  BUSINESS_PUBLICATION_ACTION_ICON,
+  BUSINESS_PUBLICATION_ACTION_NEUTRAL,
+  BUSINESS_PUBLICATION_ACTION_PROMOTE,
+} from "@/components/business/shared/BusinessPublicationCard";
+import { formatUpdatedAgo } from "@/lib/date/formatUpdatedAgo";
+import {
+  CONTENT_STATUS_META,
+  contentStatusPublicationPillClass,
+} from "@/lib/content-status-meta";
+import { format } from "date-fns";
+import { ru } from "date-fns/locale";
 
 interface Activity {
   id: string;
@@ -41,6 +62,8 @@ interface Activity {
     url: string;
   }>;
   updatedAt: Date;
+  createdAt: Date;
+  nextOccurrenceAt?: Date | null;
   metrics?: {
     views: number;
     saves: number;
@@ -56,8 +79,14 @@ interface EventCardHorizontalProps {
   onUnarchive?: (id: string) => Promise<void>;
 }
 
-function deleteDialogCopy(status: ContentStatus): { title: string; description: string } {
-  if (status === ContentStatus.PUBLISHED || status === ContentStatus.PENDING_UPDATE) {
+function deleteDialogCopy(status: ContentStatus): {
+  title: string;
+  description: string;
+} {
+  if (
+    status === ContentStatus.PUBLISHED ||
+    status === ContentStatus.PENDING_UPDATE
+  ) {
     return {
       title: "Удалить опубликованное событие?",
       description: "Оно перестанет отображаться пользователям.",
@@ -69,11 +98,27 @@ function deleteDialogCopy(status: ContentStatus): { title: string; description: 
   };
 }
 
-function formatUpdatedAt(date: Date) {
-  return new Intl.DateTimeFormat("ru-RU", {
-    day: "numeric",
-    month: "short",
-  }).format(new Date(date));
+function buildEventSubtitle(activity: Activity): string {
+  const parts: string[] = [];
+  if (activity.place?.title) {
+    parts.push(activity.place.title);
+  }
+  if (activity.nextOccurrenceAt) {
+    parts.push(
+      format(new Date(activity.nextOccurrenceAt), "d MMM yyyy", {
+        locale: ru,
+      }),
+    );
+  }
+  if (activity.priceText) {
+    parts.push(activity.priceText);
+  } else if (activity.priceFrom != null) {
+    parts.push(`от ${activity.priceFrom} BYN`);
+  }
+  if (parts.length === 0 && activity.shortDesc?.trim()) {
+    return activity.shortDesc.trim();
+  }
+  return parts.length > 0 ? parts.join(" · ") : "Место и время уточняются";
 }
 
 export function EventCardHorizontal({
@@ -89,7 +134,7 @@ export function EventCardHorizontal({
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [statisticsOpen, setStatisticsOpen] = useState(false);
 
-  const coverImage = activity.images.find((img) => img.id);
+  const coverImage = activity.images[0];
   const currentSearch = searchParams.toString();
   const returnTo = `${pathname}${currentSearch ? `?${currentSearch}` : ""}`;
 
@@ -134,72 +179,45 @@ export function EventCardHorizontal({
   };
 
   const deleteCopy = deleteDialogCopy(activity.status);
-  const actionButtonClass =
-    "inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-2xl px-3.5 text-sm font-medium transition-colors disabled:pointer-events-none disabled:opacity-50";
-  const neutralActionClass =
-    "border border-stone-200 bg-white text-stone-700 hover:border-stone-300 hover:bg-stone-50 hover:text-stone-950";
-  const promoteActionClass =
-    "bg-[#C6FF72] text-stone-950 shadow-[0_8px_22px_rgba(132,204,22,0.22)] hover:bg-[#B8FF65] hover:shadow-[0_10px_28px_rgba(132,204,22,0.32)]";
-  const ghostIconActionClass =
-    "h-10 w-10 rounded-2xl text-stone-500 hover:bg-stone-100 hover:text-stone-900";
+  const statusMeta = CONTENT_STATUS_META[activity.status];
+  const updatedLine = formatUpdatedAgo(activity.updatedAt, activity.createdAt);
+
+  const statusRow = (
+    <span
+      className={cn(
+        "inline-flex items-center rounded-full border px-3 py-1.5 text-xs font-medium",
+        contentStatusPublicationPillClass(activity.status),
+      )}
+    >
+      {statusMeta.label}
+    </span>
+  );
 
   return (
     <>
-    <div className="rounded-[26px] border border-stone-200/90 bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-all hover:border-stone-300 hover:shadow-[0_14px_32px_rgba(15,23,42,0.05)] md:p-5">
-      <div className="flex gap-4">
-        {coverImage ? (
-          <div className="flex h-24 w-24 flex-shrink-0 overflow-hidden rounded-[22px] bg-stone-100 ring-1 ring-stone-200/70">
-            <Image
-              src={coverImage.url}
-              alt={activity.title}
-              width={96}
-              height={96}
-              className="h-full w-full object-cover"
-            />
-          </div>
-        ) : (
-          <div className="flex h-24 w-24 flex-shrink-0 items-center justify-center rounded-[22px] bg-stone-100 text-stone-400 ring-1 ring-stone-200/70">
-            <Calendar className="w-8 h-8" />
-          </div>
-        )}
-
-        <div className="flex-1 min-w-0">
-          <div className="mb-3 flex items-start justify-between gap-4">
-            <div className="flex-1">
-              <div className="mb-1 flex flex-wrap items-center gap-2">
-                <h3 className="text-lg font-semibold text-stone-950">
-                  {activity.title}
-                </h3>
-                <BusinessChip tone="muted" size="compact">
-                  Event
-                </BusinessChip>
-              </div>
-              <p className="line-clamp-2 text-sm leading-7 text-stone-600">
-                {activity.shortDesc}
-              </p>
-            </div>
-            <ContentStatusBadge status={activity.status} />
-          </div>
-
-          <div className="mb-4 flex flex-wrap items-center gap-3 text-sm text-stone-500">
-            {activity.place && (
-              <div className="flex items-center gap-1">
-                <MapPin className="w-4 h-4" />
-                <span>{activity.place.title}</span>
-              </div>
-            )}
-            {activity.priceText && <span>{activity.priceText}</span>}
-            {activity.priceFrom !== null && !activity.priceText && (
-              <span>от {activity.priceFrom} BYN</span>
-            )}
-            <span>Обновлено {formatUpdatedAt(activity.updatedAt)}</span>
-          </div>
-
-          <div className="flex gap-2 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-visible">
+      <BusinessPublicationCard
+        type="event"
+        imageUrl={coverImage?.url ?? null}
+        imageAlt={activity.title}
+        placeholderIcon={Calendar}
+        title={activity.title}
+        typeChip={
+          <BusinessChip tone="muted" size="compact">
+            Event
+          </BusinessChip>
+        }
+        subtitle={buildEventSubtitle(activity)}
+        statusRow={statusRow}
+        updatedLine={updatedLine}
+        actions={
+          <>
             <button
               type="button"
               onClick={() => setStatisticsOpen(true)}
-              className={cn(actionButtonClass, neutralActionClass)}
+              className={cn(
+                BUSINESS_PUBLICATION_ACTION_BUTTON,
+                BUSINESS_PUBLICATION_ACTION_NEUTRAL,
+              )}
             >
               <BarChart3 className="h-4 w-4 shrink-0" />
               Статистика
@@ -207,7 +225,10 @@ export function EventCardHorizontal({
 
             <Link
               href={`/business/events/${activity.id}/edit?returnTo=${encodeURIComponent(returnTo)}`}
-              className={cn(actionButtonClass, neutralActionClass)}
+              className={cn(
+                BUSINESS_PUBLICATION_ACTION_BUTTON,
+                BUSINESS_PUBLICATION_ACTION_NEUTRAL,
+              )}
             >
               <Pencil className="h-4 w-4 shrink-0" />
               Редактировать
@@ -218,64 +239,69 @@ export function EventCardHorizontal({
                 publicationType: "EVENT",
                 publicationId: activity.id,
               })}
-              className={cn(actionButtonClass, promoteActionClass, "px-4 font-semibold")}
+              className={cn(
+                BUSINESS_PUBLICATION_ACTION_BUTTON,
+                BUSINESS_PUBLICATION_ACTION_PROMOTE,
+              )}
             >
               <Zap className="h-4 w-4 shrink-0 fill-stone-950" />
               Продвигать
             </Link>
 
-            {onArchive && (
+            {onArchive ? (
               <button
                 type="button"
                 onClick={handleArchive}
                 disabled={isArchiving}
-                className={cn(actionButtonClass, ghostIconActionClass)}
+                className={BUSINESS_PUBLICATION_ACTION_ICON}
                 title="В архив"
                 aria-label="В архив"
               >
                 <Archive className="h-4 w-4" />
               </button>
-            )}
+            ) : null}
 
-            {onUnarchive && (
+            {onUnarchive ? (
               <button
                 type="button"
                 onClick={handleUnarchive}
                 disabled={isArchiving}
-                className={cn(actionButtonClass, ghostIconActionClass)}
+                className={BUSINESS_PUBLICATION_ACTION_ICON}
                 title="Восстановить"
                 aria-label="Восстановить"
               >
                 <ArchiveRestore className="h-4 w-4" />
               </button>
-            )}
+            ) : null}
 
-            {canDeleteEvent && (
+            {canDeleteEvent ? (
               <>
                 <button
                   type="button"
                   onClick={() => setDeleteDialogOpen(true)}
                   disabled={isDeleting}
-                  className={cn(
-                    actionButtonClass,
-                    "h-10 w-10 rounded-2xl",
-                    "text-stone-400 hover:bg-red-50 hover:text-red-600",
-                    "disabled:opacity-50 disabled:pointer-events-none"
-                  )}
+                  className={BUSINESS_PUBLICATION_ACTION_DANGER_ICON}
                   title="Удалить событие"
                   aria-label="Удалить событие"
                 >
-                  <Trash2 className="w-4 h-4" />
+                  <Trash2 className="h-4 w-4" />
                 </button>
 
-                <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+                <AlertDialog
+                  open={deleteDialogOpen}
+                  onOpenChange={setDeleteDialogOpen}
+                >
                   <AlertDialogContent>
                     <AlertDialogHeader>
                       <AlertDialogTitle>{deleteCopy.title}</AlertDialogTitle>
-                      <AlertDialogDescription>{deleteCopy.description}</AlertDialogDescription>
+                      <AlertDialogDescription>
+                        {deleteCopy.description}
+                      </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                      <AlertDialogCancel disabled={isDeleting}>Отмена</AlertDialogCancel>
+                      <AlertDialogCancel disabled={isDeleting}>
+                        Отмена
+                      </AlertDialogCancel>
                       <Button
                         type="button"
                         variant="destructive"
@@ -288,18 +314,18 @@ export function EventCardHorizontal({
                   </AlertDialogContent>
                 </AlertDialog>
               </>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-    <PublicationStatisticsDialog
-      open={statisticsOpen}
-      onOpenChange={setStatisticsOpen}
-      title={activity.title}
-      entityLabel="события"
-      metrics={activity.metrics}
-    />
+            ) : null}
+          </>
+        }
+      />
+
+      <PublicationStatisticsDialog
+        open={statisticsOpen}
+        onOpenChange={setStatisticsOpen}
+        title={activity.title}
+        entityLabel="события"
+        metrics={activity.metrics}
+      />
     </>
   );
 }

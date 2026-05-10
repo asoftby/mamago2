@@ -9,6 +9,8 @@
 
 import type { ReviewSection } from "../shared/types";
 import type { OfferWizardType, OfferWizardStepKey, OfferFormData } from "./types";
+import { validatePublicationAccess } from "@/features/publication-access";
+import { showCampLodgingFormFields } from "./campOfferModel";
 
 export interface OfferWizardStepDef {
   key: OfferWizardStepKey;
@@ -38,7 +40,8 @@ export function getStepLabel(stepId: number): string {
 /**
  * Legacy export for backward compatibility
  */
-export function buildReviewSections(data: OfferFormData): ReviewSection[] {
+export function buildReviewSections(_data: OfferFormData): ReviewSection[] {
+  void _data;
   return [];
 }
 
@@ -82,18 +85,13 @@ export function getStepsForOfferType(type: OfferWizardType | null): OfferWizardS
     },
     price: {
       title: "Цена",
-      description: "Ценообразование и акционные предложения",
+      description: "Стоимость, способ участия и условия получения",
       shortLabel: "Цена",
     },
     contacts: {
       title: "Контакты",
       description: "Адрес, телефоны, сайт и социальные сети",
       shortLabel: "Контакты",
-    },
-    publication: {
-      title: "Публикация",
-      description: "Действие и финальные настройки",
-      shortLabel: "Публикация",
     },
     review: {
       title: "Проверка",
@@ -113,7 +111,6 @@ export function getStepsForOfferType(type: OfferWizardType | null): OfferWizardS
       "conditions",
       "price",
       "contacts",
-      "publication",
       "review",
     ];
   } else if (type === "CAMP") {
@@ -126,7 +123,6 @@ export function getStepsForOfferType(type: OfferWizardType | null): OfferWizardS
       "accommodation",
       "price",
       "contacts",
-      "publication",
       "review",
     ];
   }
@@ -220,6 +216,13 @@ export function isStepComplete(
       return !!data.offerWizardType;
 
     case "details":
+      if (data.offerWizardType === "CAMP") {
+        return (
+          data.title.trim().length >= 3 &&
+          data.shortDescription.trim().length >= 10 &&
+          !!data.campProgramType
+        );
+      }
       return (
         data.title.trim().length >= 3 &&
         data.shortDescription.trim().length >= 10
@@ -238,69 +241,79 @@ export function isStepComplete(
     case "campSchedule":
       // For CAMP
       if (data.offerWizardType === "CAMP") {
-        return data.campSessions.some((s) => s.dateFrom && s.dateTo);
+        const dated = data.campSessions.filter((s) => s.dateFrom && s.dateTo);
+        if (dated.length === 0) return false;
+        return !dated.some(
+          (s) => s.dateFrom && s.dateTo && s.dateFrom > s.dateTo,
+        );
       }
       return true;
 
     case "accommodation":
-      // Optional step for CAMP
-      return true;
+      if (data.offerWizardType !== "CAMP") return true;
+      if (!showCampLodgingFormFields(data)) return true;
+      return Boolean(
+        data.accommodationType &&
+        data.accommodationAddress?.trim(),
+      );
 
     case "price":
-      if (!data.pricingMode) return false;
-      if (data.pricingMode === "single") {
-        return !!data.singlePrice.trim();
+      {
+        const hasValidPricing =
+          !!data.pricingMode &&
+          (data.pricingMode === "single"
+            ? !!data.singlePrice.trim()
+            : data.pricingOptions.length > 0 &&
+              data.pricingOptions.every((opt) => opt.title.trim() && opt.price.trim()));
+
+        if (!hasValidPricing) return false;
+
+        if (data.publicationAccess) {
+          return validatePublicationAccess(data.publicationAccess).valid;
+        }
+
+        if (!data.ctaType) return false;
+        if (data.ctaType === "записаться" || data.ctaType === "отправить_заявку") {
+          return !!(data.ctaPhone && data.ctaPhone.trim());
+        }
+        if (data.ctaType === "перейти_на_сайт" || data.ctaType === "купить_билет") {
+          return !!(data.ctaLink && data.ctaLink.trim());
+        }
+        if (data.ctaType === "забронировать") {
+          const booking = data.bookingSettings;
+          if (!booking.mode) return false;
+          if (booking.mode === "request") {
+            return !!(
+              booking.selectionType &&
+              booking.availableDaysAhead &&
+              booking.availableDaysAhead > 0 &&
+              booking.capacityPerUnit &&
+              booking.capacityPerUnit > 0
+            );
+          }
+          if (booking.mode === "slot") {
+            const hasValidSchedule = booking.weeklyAvailability.some(
+              (day) => day.enabled && day.startTime && day.endTime
+            );
+            return !!(
+              booking.availableDaysAhead &&
+              booking.availableDaysAhead > 0 &&
+              booking.slotDurationMinutes &&
+              booking.slotDurationMinutes >= 15 &&
+              booking.capacityPerUnit &&
+              booking.capacityPerUnit > 0 &&
+              hasValidSchedule
+            );
+          }
+          if (booking.mode === "external") {
+            return !!(booking.externalUrl && booking.externalUrl.trim());
+          }
+        }
+        return true;
       }
-      if (data.pricingMode === "multiple") {
-        return (
-          data.pricingOptions.length > 0 &&
-          data.pricingOptions.every((opt) => opt.title.trim() && opt.price.trim())
-        );
-      }
-      return false;
 
     case "contacts":
       // Optional step
-      return true;
-
-    case "publication":
-      if (!data.ctaType) return false;
-      if (data.ctaType === "записаться" || data.ctaType === "отправить_заявку") {
-        return !!(data.ctaPhone && data.ctaPhone.trim());
-      }
-      if (data.ctaType === "перейти_на_сайт" || data.ctaType === "купить_билет") {
-        return !!(data.ctaLink && data.ctaLink.trim());
-      }
-      if (data.ctaType === "забронировать") {
-        const booking = data.bookingSettings;
-        if (!booking.mode) return false;
-        if (booking.mode === "request") {
-          return !!(
-            booking.selectionType &&
-            booking.availableDaysAhead &&
-            booking.availableDaysAhead > 0 &&
-            booking.capacityPerUnit &&
-            booking.capacityPerUnit > 0
-          );
-        }
-        if (booking.mode === "slot") {
-          const hasValidSchedule = booking.weeklyAvailability.some(
-            (day) => day.enabled && day.startTime && day.endTime
-          );
-          return !!(
-            booking.availableDaysAhead &&
-            booking.availableDaysAhead > 0 &&
-            booking.slotDurationMinutes &&
-            booking.slotDurationMinutes >= 15 &&
-            booking.capacityPerUnit &&
-            booking.capacityPerUnit > 0 &&
-            hasValidSchedule
-          );
-        }
-        if (booking.mode === "external") {
-          return !!(booking.externalUrl && booking.externalUrl.trim());
-        }
-      }
       return true;
 
     case "review":
@@ -330,6 +343,9 @@ export function getMissingFieldsForStep(
       if (!data.title || data.title.trim().length < 3) missing.push("Название");
       if (!data.shortDescription || data.shortDescription.trim().length < 10)
         missing.push("Описание");
+      if (data.offerWizardType === "CAMP" && !data.campProgramType) {
+        missing.push("Тип программы лагеря");
+      }
       break;
 
     case "photo":
@@ -345,9 +361,21 @@ export function getMissingFieldsForStep(
 
     case "campSchedule":
       if (data.offerWizardType === "CAMP") {
-        if (!data.campSessions.some((s) => s.dateFrom && s.dateTo)) {
+        const dated = data.campSessions.filter((s) => s.dateFrom && s.dateTo);
+        if (dated.length === 0) {
           missing.push("Смены с датами");
+        } else if (
+          dated.some((s) => s.dateFrom && s.dateTo && s.dateFrom > s.dateTo)
+        ) {
+          missing.push("Корректный интервал дат смены");
         }
+      }
+      break;
+
+    case "accommodation":
+      if (data.offerWizardType === "CAMP" && showCampLodgingFormFields(data)) {
+        if (!data.accommodationType) missing.push("Тип размещения");
+        if (!data.accommodationAddress?.trim()) missing.push("Адрес проживания");
       }
       break;
 
@@ -359,10 +387,10 @@ export function getMissingFieldsForStep(
       } else if (data.pricingMode === "multiple" && data.pricingOptions.length === 0) {
         missing.push("Варианты цен");
       }
-      break;
-
-    case "publication":
-      if (!data.ctaType) {
+      if (data.publicationAccess) {
+        const validation = validatePublicationAccess(data.publicationAccess);
+        missing.push(...Object.values(validation.errors));
+      } else if (!data.ctaType) {
         missing.push("Тип действия");
       } else {
         if (

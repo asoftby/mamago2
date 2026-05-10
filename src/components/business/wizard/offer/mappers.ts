@@ -1,13 +1,56 @@
 import type { OfferKind } from "@prisma/client";
-import type { OfferFormData } from "./types";
+import type { OfferFormData, CampLodgingTypeKey } from "./types";
 import { getDefaultFormData } from "./defaults";
+import type { PublicationAccess } from "@/features/publication-access";
+import {
+  normalizeCampSessionsFromDb,
+  normalizeCampMealsFromDb,
+  sortCampSessions,
+} from "./campOfferModel";
+
+const CAMP_LODGING_KEYS = new Set<CampLodgingTypeKey>([
+  "hotel",
+  "resort_base",
+  "camping",
+  "cottage",
+  "sanatorium",
+  "other",
+]);
+
+function parseCampLodgingTypeFromDb(
+  value: string | null | undefined,
+): CampLodgingTypeKey | "" {
+  if (!value) return "";
+  return CAMP_LODGING_KEYS.has(value as CampLodgingTypeKey)
+    ? (value as CampLodgingTypeKey)
+    : "";
+}
+
+function parseCampProgramTypeFromDb(
+  v: string | null | undefined,
+): OfferFormData["campProgramType"] {
+  if (v === "городской" || v === "выездной" || v === "смешанный") return v;
+  return null;
+}
+
+function inferOfferWizardTypeFromOffer(offer: {
+  campProgramType?: string | null;
+  campSessions?: unknown;
+}): OfferFormData["offerWizardType"] {
+  if (parseCampProgramTypeFromDb(offer.campProgramType)) return "CAMP";
+  const sessions = normalizeCampSessionsFromDb(offer.campSessions);
+  if (sessions.length > 0) return "CAMP";
+  return null;
+}
 
 function formKindToApiKind(
   data: OfferFormData
 ): "VISIT" | "CLASS" | "PARTY" | "EVENT_TICKET" {
+  if (data.offerWizardType === "CAMP") return "CLASS";
+  if (data.durationType === "camp") return "CLASS";
   if (data.offerKind === "birthday") return "PARTY";
   if (data.offerKind === "course") {
-    return data.durationType === "recurring" || data.durationType === "camp" ? "CLASS" : "VISIT";
+    return data.durationType === "recurring" ? "CLASS" : "VISIT";
   }
   if (data.offerKind === "service") return "VISIT";
   return "VISIT";
@@ -33,6 +76,68 @@ function mapCtaToApi(
 function parsePrice(value: string): number | undefined {
   const n = parseFloat(String(value).replace(",", ".").trim());
   return Number.isFinite(n) ? n : undefined;
+}
+
+function deriveOfferApiFieldsFromPublicationAccess(
+  access: PublicationAccess | null,
+  data: OfferFormData,
+): {
+  ctaType: "BOOK" | "RESERVE" | "BUY_TICKET" | "SEND_REQUEST" | "VISIT_WEBSITE";
+  phone?: string;
+  website?: string;
+  bookingInstructions?: string;
+} {
+  if (!access) {
+    return {
+      ctaType: mapCtaToApi(data.ctaType),
+      phone: (data.ctaPhone || data.phone).trim() || undefined,
+      website: (data.ctaLink || data.website).trim() || undefined,
+      bookingInstructions: data.ctaInstructions.trim() || undefined,
+    };
+  }
+
+  switch (access.method) {
+    case "details":
+      return {
+        ctaType: "VISIT_WEBSITE",
+        website: access.externalUrl?.trim() || data.website.trim() || undefined,
+        bookingInstructions: access.instructions?.trim() || undefined,
+      };
+    case "ticket":
+      return {
+        ctaType: "BUY_TICKET",
+        website: access.ticketUrl?.trim() || undefined,
+        bookingInstructions: access.instructions?.trim() || undefined,
+      };
+    case "timeslots":
+      return {
+        ctaType: "RESERVE",
+        bookingInstructions: access.instructions?.trim() || undefined,
+      };
+    case "prebooking":
+      return {
+        ctaType: access.externalUrl?.trim() ? "SEND_REQUEST" : "BOOK",
+        phone: access.phone?.trim() || undefined,
+        website: access.externalUrl?.trim() || undefined,
+        bookingInstructions: access.instructions?.trim() || undefined,
+      };
+    case "external":
+      return {
+        ctaType: "VISIT_WEBSITE",
+        website: access.externalUrl?.trim() || undefined,
+        bookingInstructions: access.instructions?.trim() || undefined,
+      };
+    case "contact":
+      return {
+        ctaType: "SEND_REQUEST",
+        phone: access.phone?.trim() || undefined,
+        bookingInstructions: access.instructions?.trim() || undefined,
+      };
+    default:
+      return {
+        ctaType: "BOOK",
+      };
+  }
 }
 
 function ageGroupsToMonths(ageGroups: string[]): {
@@ -69,6 +174,10 @@ export function buildOfferCreatePayload(
 ) {
   const pricingMode = data.pricingMode === "multiple" ? "MULTIPLE" : "SINGLE";
   const ages = ageGroupsToMonths(data.ageGroups);
+  const accessFields = deriveOfferApiFieldsFromPublicationAccess(
+    data.publicationAccess,
+    data,
+  );
 
   const base = {
     source: "PLACE" as const,
@@ -90,13 +199,42 @@ export function buildOfferCreatePayload(
       oldPrice: o.oldPrice ? parsePrice(o.oldPrice) : undefined,
       description: o.description?.trim() || undefined,
     })),
-    ctaType: mapCtaToApi(data.ctaType),
-    phone: (data.ctaPhone || data.phone).trim() || undefined,
-    website: (data.ctaLink || data.website).trim() || undefined,
-    bookingInstructions: data.ctaInstructions.trim() || undefined,
+    ctaType: accessFields.ctaType,
+    phone: accessFields.phone,
+    website: accessFields.website,
+    bookingInstructions: accessFields.bookingInstructions,
     discoverySignalIds: data.signalIds,
     status: opts?.status ?? "DRAFT",
     gallery: data.gallery ?? [],
+    campProgramType:
+      data.offerWizardType === "CAMP" && data.campProgramType
+        ? data.campProgramType
+        : undefined,
+    // Camp fields
+    campSessions:
+      data.offerWizardType === "CAMP"
+        ? sortCampSessions(data.campSessions).map((s, i) => ({ ...s, sortOrder: i }))
+        : undefined,
+    campSessionDuration: data.campSessionDuration?.trim() || undefined,
+    campStayDuration: data.campStayDuration?.trim() || undefined,
+    campPlacesCount: data.campPlacesCount ?? undefined,
+    campGroupSize: data.campGroupSize ?? undefined,
+    campDaySchedule: data.campDaySchedule?.trim() || undefined,
+    campCanSelectDays: data.campCanSelectDays,
+    campHasExtendedCare: data.campHasExtendedCare,
+    // Accommodation fields
+    accommodationProvided: data.accommodationProvided,
+    accommodationType: data.accommodationType || undefined,
+    accommodationAddress: data.accommodationAddress.trim() || undefined,
+    accommodationRooms: data.accommodationRooms.trim() || undefined,
+    campIncludedMeals:
+      data.campIncludedMeals.length > 0 ? data.campIncludedMeals : undefined,
+    campSafetyInfo: data.campSafetyInfo.trim() || undefined,
+    campMedicalInfo: data.campMedicalInfo.trim() || undefined,
+    accommodationConditions: data.accommodationConditions?.trim() || undefined,
+    mealInfo: data.mealInfo?.trim() || undefined,
+    transferInfo: data.transferInfo?.trim() || undefined,
+    whatToBring: data.whatToBring?.trim() || undefined,
   };
 
   return base;
@@ -109,6 +247,10 @@ export function buildOfferUpdatePayload(
 ) {
   const pricingMode = data.pricingMode === "multiple" ? "MULTIPLE" : "SINGLE";
   const ages = ageGroupsToMonths(data.ageGroups);
+  const accessFields = deriveOfferApiFieldsFromPublicationAccess(
+    data.publicationAccess,
+    data,
+  );
 
   const payload: Record<string, unknown> = {
     title: data.title.trim() || "Новое предложение",
@@ -127,12 +269,41 @@ export function buildOfferUpdatePayload(
       oldPrice: o.oldPrice ? parsePrice(o.oldPrice) : undefined,
       description: o.description?.trim() || undefined,
     })),
-    ctaType: mapCtaToApi(data.ctaType),
-    phone: (data.ctaPhone || data.phone).trim() || undefined,
-    website: (data.ctaLink || data.website).trim() || undefined,
-    bookingInstructions: data.ctaInstructions.trim() || undefined,
+    ctaType: accessFields.ctaType,
+    phone: accessFields.phone,
+    website: accessFields.website,
+    bookingInstructions: accessFields.bookingInstructions,
     discoverySignalIds: data.signalIds,
     gallery: data.gallery ?? [],
+    campProgramType:
+      data.offerWizardType === "CAMP" && data.campProgramType
+        ? data.campProgramType
+        : undefined,
+    // Camp fields
+    campSessions:
+      data.offerWizardType === "CAMP"
+        ? sortCampSessions(data.campSessions).map((s, i) => ({ ...s, sortOrder: i }))
+        : undefined,
+    campSessionDuration: data.campSessionDuration?.trim() || undefined,
+    campStayDuration: data.campStayDuration?.trim() || undefined,
+    campPlacesCount: data.campPlacesCount ?? undefined,
+    campGroupSize: data.campGroupSize ?? undefined,
+    campDaySchedule: data.campDaySchedule?.trim() || undefined,
+    campCanSelectDays: data.campCanSelectDays,
+    campHasExtendedCare: data.campHasExtendedCare,
+    // Accommodation fields
+    accommodationProvided: data.accommodationProvided,
+    accommodationType: data.accommodationType || undefined,
+    accommodationAddress: data.accommodationAddress.trim() || undefined,
+    accommodationRooms: data.accommodationRooms.trim() || undefined,
+    campIncludedMeals:
+      data.campIncludedMeals.length > 0 ? data.campIncludedMeals : undefined,
+    campSafetyInfo: data.campSafetyInfo.trim() || undefined,
+    campMedicalInfo: data.campMedicalInfo.trim() || undefined,
+    accommodationConditions: data.accommodationConditions?.trim() || undefined,
+    mealInfo: data.mealInfo?.trim() || undefined,
+    transferInfo: data.transferInfo?.trim() || undefined,
+    whatToBring: data.whatToBring?.trim() || undefined,
   };
 
   if (opts?.status) {
@@ -148,7 +319,7 @@ export function mapOfferToFormData(offer: {
   title: string;
   description: string | null;
   coverImage: string | null;
-  galleryImages?: string[];
+  galleryImages?: unknown; // JsonValue from Prisma
   videoUrl?: string | null;
   promotionalOffer?: string | null;
   priceFrom: number | null;
@@ -156,17 +327,61 @@ export function mapOfferToFormData(offer: {
   ageMinMonths: number | null;
   ageMaxMonths: number | null;
   discoverySignalIds?: string[];
+  // Camp fields
+  campProgramType?: string | null;
+  campSessions?: unknown;
+  campSessionDuration?: string | null;
+  campStayDuration?: string | null;
+  campPlacesCount?: number | null;
+  campGroupSize?: number | null;
+  campDaySchedule?: string | null;
+  campCanSelectDays?: boolean;
+  campHasExtendedCare?: boolean;
+  // Accommodation fields
+  accommodationProvided?: boolean;
+  accommodationType?: string | null;
+  accommodationAddress?: string | null;
+  accommodationRooms?: string | null;
+  campIncludedMeals?: unknown;
+  campSafetyInfo?: string | null;
+  campMedicalInfo?: string | null;
+  accommodationConditions?: string | null;
+  mealInfo?: string | null;
+  transferInfo?: string | null;
+  whatToBring?: string | null;
 }): OfferFormData {
   const defaults = getDefaultFormData();
+
+  const campSessions = normalizeCampSessionsFromDb(offer.campSessions);
+
+  // Parse gallery images from JSON
+  let gallery: string[] = [];
+  if (offer.galleryImages) {
+    try {
+      if (Array.isArray(offer.galleryImages)) {
+        gallery = offer.galleryImages;
+      } else if (typeof offer.galleryImages === "string") {
+        gallery = JSON.parse(offer.galleryImages);
+      }
+    } catch {
+      gallery = [];
+    }
+  }
+
+  const inferredWizardType = inferOfferWizardTypeFromOffer(offer);
+  const isCamp = inferredWizardType === "CAMP";
+
   return {
     ...defaults,
-    offerKind: offer.kind === "EVENT" ? "course" : "service",
-    durationType: offer.kind === "EVENT" ? "single" : null,
+    offerWizardType: inferredWizardType,
+    offerKind: isCamp ? "course" : offer.kind === "EVENT" ? "course" : "service",
+    durationType: isCamp ? "camp" : offer.kind === "EVENT" ? "single" : null,
+    campProgramType: parseCampProgramTypeFromDb(offer.campProgramType),
     title: offer.title,
     shortDescription: offer.description ?? "",
     description: offer.description ?? "",
     coverImage: offer.coverImage,
-    gallery: offer.galleryImages ?? [],
+    gallery,
     videoUrl: offer.videoUrl ?? null,
     promotionalOffer: offer.promotionalOffer ?? "",
     pricingMode: "single",
@@ -174,5 +389,26 @@ export function mapOfferToFormData(offer: {
     singleCurrency: "BYN",
     singlePriceLabel: offer.priceText ?? "",
     signalIds: offer.discoverySignalIds ?? [],
+    // Camp fields
+    campSessions,
+    campSessionDuration: offer.campSessionDuration ?? "",
+    campStayDuration: offer.campStayDuration ?? "",
+    campPlacesCount: offer.campPlacesCount ?? null,
+    campGroupSize: offer.campGroupSize ?? null,
+    campDaySchedule: offer.campDaySchedule ?? "",
+    campCanSelectDays: offer.campCanSelectDays ?? false,
+    campHasExtendedCare: offer.campHasExtendedCare ?? false,
+    // Accommodation fields
+    accommodationProvided: offer.accommodationProvided ?? false,
+    accommodationType: parseCampLodgingTypeFromDb(offer.accommodationType),
+    accommodationAddress: offer.accommodationAddress ?? "",
+    accommodationRooms: offer.accommodationRooms ?? "",
+    accommodationConditions: offer.accommodationConditions ?? "",
+    campIncludedMeals: normalizeCampMealsFromDb(offer.campIncludedMeals),
+    mealInfo: offer.mealInfo ?? "",
+    transferInfo: offer.transferInfo ?? "",
+    whatToBring: offer.whatToBring ?? "",
+    campSafetyInfo: offer.campSafetyInfo ?? "",
+    campMedicalInfo: offer.campMedicalInfo ?? "",
   };
 }
