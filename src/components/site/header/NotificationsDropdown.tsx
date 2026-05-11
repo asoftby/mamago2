@@ -35,10 +35,15 @@ export function NotificationsDropdown({
   const isUserStream = stream === "user";
 
   const [open, setOpen] = useState(false);
-  const businessUnreadCount = useNotificationStore((s) => s.businessUnreadCount);
+  // Only subscribe to businessUnreadCount when actually in business context.
+  // This prevents the user-facing header from re-rendering on business count changes.
+  const businessUnreadCount = useNotificationStore((s) =>
+    isUserStream ? 0 : s.businessUnreadCount,
+  );
 
   const refreshUnread = useCallback(async () => {
-    await useNotificationStore.getState().refreshBusinessUnreadOnly();
+    // Force-refresh so the explicit user action bypasses throttle.
+    await useNotificationStore.getState().refreshBusinessUnreadOnly({ force: true });
   }, []);
 
   const handleOpenChange = useCallback((next: boolean) => {

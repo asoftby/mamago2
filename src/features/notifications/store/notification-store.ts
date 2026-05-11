@@ -5,13 +5,33 @@ import {
   fetchUnreadCountFromApi,
   postMarkNotificationsOpenApi,
 } from "./notification-actions";
+import { isBusinessSurface } from "./notification-surface";
 
 const PAGE_SIZE = 15;
+
+/** Minimum ms between successive unread-count fetches for the same stream. */
+const THROTTLE_MS = 10_000;
+
+// ─── Dev logging ─────────────────────────────────────────────────────────────
+
+function devLog(msg: string, ...args: unknown[]): void {
+  if (process.env.NODE_ENV === "development") {
+    console.debug(`[notifications] ${msg}`, ...args);
+  }
+}
+
+// ─── In-flight deduplication ─────────────────────────────────────────────────
 
 /** In-flight dedupe: concurrent callers await the same network work. */
 let unifiedUnreadPromise: Promise<void> | null = null;
 let businessUnreadPromise: Promise<void> | null = null;
 let bothUnreadChainPromise: Promise<void> | null = null;
+
+/** Timestamps of last successful fetch per stream (for throttling). */
+let lastUserUnreadFetchAt = 0;
+let lastBusinessUnreadFetchAt = 0;
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function bumpRevision(set: (partial: Partial<NotificationState>) => void) {
   set({ revision: Date.now() });
@@ -37,14 +57,16 @@ const initialSnapshot = (): NotificationState => ({
   revision: 0,
 });
 
+// ─── Store actions type ───────────────────────────────────────────────────────
+
 export type NotificationStoreActions = {
   setAuthenticated: (authenticated: boolean) => void;
   fetchUnreadCount: () => Promise<void>;
   fetchNotifications: (options?: { force?: boolean }) => Promise<void>;
   refresh: () => Promise<void>;
-  refreshUnreadOnly: () => Promise<void>;
-  refreshBusinessUnreadOnly: () => Promise<void>;
-  refreshBothUnreadCounts: () => Promise<void>;
+  refreshUnreadOnly: (options?: { force?: boolean }) => Promise<void>;
+  refreshBusinessUnreadOnly: (options?: { force?: boolean }) => Promise<void>;
+  refreshBothUnreadCounts: (options?: { force?: boolean }) => Promise<void>;
   openPanel: () => Promise<void>;
   closePanel: () => void;
   clearError: () => void;
@@ -55,6 +77,8 @@ export type NotificationStoreActions = {
   reset: () => void;
   fetchMoreNotifications: () => Promise<void>;
 };
+
+// ─── Store ────────────────────────────────────────────────────────────────────
 
 export const useNotificationStore = create<NotificationState & NotificationStoreActions>(
   (set, get) => {
@@ -98,7 +122,12 @@ export const useNotificationStore = create<NotificationState & NotificationStore
           lastMarkOpenAt: Date.now(),
           lastSeenAt: ts,
         }));
-        await get().refreshBothUnreadCounts();
+        // After marking open, only refresh the relevant stream.
+        if (isBusinessSurface()) {
+          await get().refreshBusinessUnreadOnly({ force: true });
+        } else {
+          await get().refreshUnreadOnly({ force: true });
+        }
       } catch (error) {
         console.error("Failed to mark notifications as open:", error);
       } finally {
@@ -113,16 +142,39 @@ export const useNotificationStore = create<NotificationState & NotificationStore
 
       setAuthenticated: (authenticated) => set({ authenticated }),
 
-      reset: () => set(initialSnapshot()),
+      reset: () => {
+        // Also reset throttle timestamps so the next auth cycle fetches fresh.
+        lastUserUnreadFetchAt = 0;
+        lastBusinessUnreadFetchAt = 0;
+        set(initialSnapshot());
+      },
 
       fetchUnreadCount: async () => {
         await get().refreshUnreadOnly();
       },
 
-      refreshUnreadOnly: async () => {
-        if (!get().authenticated) return;
-        if (unifiedUnreadPromise) return unifiedUnreadPromise;
+      refreshUnreadOnly: async (options) => {
+        const force = options?.force === true;
 
+        if (!get().authenticated) {
+          devLog("refreshUnreadOnly: skipped — unauthenticated");
+          return;
+        }
+
+        // Throttle: skip if fetched recently and not forced.
+        const now = Date.now();
+        if (!force && now - lastUserUnreadFetchAt < THROTTLE_MS) {
+          devLog("refreshUnreadOnly: skipped — throttled (%dms ago)", now - lastUserUnreadFetchAt);
+          return;
+        }
+
+        // In-flight dedup: return existing promise if one is running.
+        if (unifiedUnreadPromise) {
+          devLog("refreshUnreadOnly: skipped — in-flight");
+          return unifiedUnreadPromise;
+        }
+
+        devLog("refreshUnreadOnly: fetching user unread-count");
         const p = (async () => {
           set((s) => ({
             inflight: { ...s.inflight, fetchUnread: true },
@@ -130,6 +182,7 @@ export const useNotificationStore = create<NotificationState & NotificationStore
           try {
             const unified = await fetchUnreadCountFromApi();
             if (!get().authenticated) return;
+            lastUserUnreadFetchAt = Date.now();
             set({ unreadCount: unified });
             bumpRevision(set);
           } finally {
@@ -146,10 +199,37 @@ export const useNotificationStore = create<NotificationState & NotificationStore
         return p;
       },
 
-      refreshBusinessUnreadOnly: async () => {
-        if (!get().authenticated) return;
-        if (businessUnreadPromise) return businessUnreadPromise;
+      refreshBusinessUnreadOnly: async (options) => {
+        const force = options?.force === true;
 
+        if (!get().authenticated) {
+          devLog("refreshBusinessUnreadOnly: skipped — unauthenticated");
+          return;
+        }
+
+        // Guard: only fetch business unread on business surface (unless forced).
+        if (!force && !isBusinessSurface()) {
+          devLog("refreshBusinessUnreadOnly: skipped — public surface");
+          return;
+        }
+
+        // Throttle: skip if fetched recently and not forced.
+        const now = Date.now();
+        if (!force && now - lastBusinessUnreadFetchAt < THROTTLE_MS) {
+          devLog(
+            "refreshBusinessUnreadOnly: skipped — throttled (%dms ago)",
+            now - lastBusinessUnreadFetchAt,
+          );
+          return;
+        }
+
+        // In-flight dedup.
+        if (businessUnreadPromise) {
+          devLog("refreshBusinessUnreadOnly: skipped — in-flight");
+          return businessUnreadPromise;
+        }
+
+        devLog("refreshBusinessUnreadOnly: fetching business unread-count");
         const p = (async () => {
           set((s) => ({
             inflight: { ...s.inflight, fetchUnread: true },
@@ -157,6 +237,7 @@ export const useNotificationStore = create<NotificationState & NotificationStore
           try {
             const business = await fetchUnreadCountFromApi("business");
             if (!get().authenticated) return;
+            lastBusinessUnreadFetchAt = Date.now();
             set({ businessUnreadCount: business });
             bumpRevision(set);
           } finally {
@@ -173,13 +254,29 @@ export const useNotificationStore = create<NotificationState & NotificationStore
         return p;
       },
 
-      refreshBothUnreadCounts: async () => {
-        if (!get().authenticated) return;
-        if (bothUnreadChainPromise) return bothUnreadChainPromise;
+      refreshBothUnreadCounts: async (options) => {
+        const force = options?.force === true;
 
+        if (!get().authenticated) {
+          devLog("refreshBothUnreadCounts: skipped — unauthenticated");
+          return;
+        }
+
+        // On public surface, only refresh user unread.
+        if (!force && !isBusinessSurface()) {
+          devLog("refreshBothUnreadCounts: public surface → refreshUnreadOnly only");
+          return get().refreshUnreadOnly(options);
+        }
+
+        if (bothUnreadChainPromise) {
+          devLog("refreshBothUnreadCounts: skipped — in-flight");
+          return bothUnreadChainPromise;
+        }
+
+        devLog("refreshBothUnreadCounts: fetching user + business");
         const p = (async () => {
-          await get().refreshUnreadOnly();
-          await get().refreshBusinessUnreadOnly();
+          await get().refreshUnreadOnly(options);
+          await get().refreshBusinessUnreadOnly(options);
         })();
 
         bothUnreadChainPromise = p;

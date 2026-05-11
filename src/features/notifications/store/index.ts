@@ -20,4 +20,4 @@ export {
   selectNotificationsHasMore,
   selectNotificationRevision,
 } from "./notification-selectors";
-export { mountNotificationEventBridge } from "./notification-sync";
+export { mountNotificationEventBridge, unmountNotificationEventBridge } from "./notification-sync";
