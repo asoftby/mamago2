@@ -17,6 +17,7 @@ import type { SaveToPlanResult } from "@/components/activity/SaveToPlanModal";
 import { useAuthMe } from "@/features/birthday/builder/hooks/useAuthMe";
 import { PublicationStatsPanel } from "@/components/publication-stats";
 import { postAnalyticsEvent } from "@/lib/analytics/client";
+import { extractPlainTextLinesFromHtml } from "@/lib/richtext/utils";
 
 // Новые конверсионные блоки
 import { EventHighlights } from "./EventHighlights";
@@ -264,7 +265,7 @@ export function ConversionEventPageView({ data }: { data: EventPageData }) {
     // TODO: в будущем это будет отдельное поле в данных
     // Пока используем priceDetails или bookingNotes
     if (data.priceDetails) {
-      return data.priceDetails.split('\n').filter(Boolean);
+      return extractPlainTextLinesFromHtml(data.priceDetails);
     }
     return [];
   }, [data.priceDetails]);

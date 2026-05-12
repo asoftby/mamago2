@@ -2,11 +2,16 @@
  * Generates a random UUID-like string.
  */
 export function randomId(): string {
-  const c = globalThis.crypto;
-  if (typeof c?.randomUUID === "function") {
-    return c.randomUUID();
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
   }
-  const values = new Uint32Array(2);
-  c.getRandomValues(values);
-  return `${Date.now().toString(36)}-${Array.from(values).join("-")}`;
+  
+  // Fallback for non-secure contexts or older environments
+  return (
+    Date.now().toString(36) +
+    "-" +
+    Math.random().toString(36).substring(2, 10) +
+    "-" +
+    Math.random().toString(36).substring(2, 10)
+  );
 }

@@ -21,6 +21,7 @@ type DomainActivity = {
   slug?: string | null;
   /** Канонический city slug для публичной страницы события. */
   citySlug?: string | null;
+  href?: string;
   format?: ActivityFormat | null;
   title: string;
   image: string;
@@ -109,6 +110,7 @@ export function ActivityCard(props: AdapterProps) {
           id: props.activity.id,
           slug: props.activity.slug,
           citySlug: props.activity.citySlug,
+          href: props.activity.href,
           format: props.activity.format,
           title: props.activity.title,
           image: props.activity.coverImage ?? props.activity.image ?? null,
@@ -138,6 +140,7 @@ export function ActivityCard(props: AdapterProps) {
           id: props.id,
           slug: undefined,
           citySlug: undefined,
+          href: undefined,
           format: null,
           title: props.title,
           image: props.image,
@@ -159,7 +162,7 @@ export function ActivityCard(props: AdapterProps) {
           onSaveResult: props.onSaveResult,
         };
 
-  const href = publicActivityPath(base.id, base.citySlug ?? city, base.slug);
+  const href = base.href ?? publicActivityPath(base.id, base.citySlug ?? city, base.slug);
 
   const showRating =
     typeof base.rating === "number" &&

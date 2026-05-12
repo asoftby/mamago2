@@ -13,6 +13,10 @@ const FALLBACK_CITIES: PublicCityOption[] = [
   { id: DEFAULT_CITY_SLUG, slug: DEFAULT_CITY_SLUG, name: "Минск" },
 ];
 
+/** Module-level cache to avoid repeated fetch across remounts */
+let cachedCities: PublicCityOption[] | null = null;
+let inFlightCitiesPromise: Promise<PublicCityOption[]> | null = null;
+
 function mergeCityOptions(
   ...lists: Array<PublicCityOption[] | null | undefined>
 ): PublicCityOption[] {
@@ -34,25 +38,51 @@ function mergeCityOptions(
 }
 
 export function usePublicCityOptions() {
-  const [cities, setCities] = useState<PublicCityOption[]>(FALLBACK_CITIES);
-  const [loading, setLoading] = useState(true);
+  const [cities, setCities] = useState<PublicCityOption[]>(cachedCities || FALLBACK_CITIES);
+  const [loading, setLoading] = useState(!cachedCities);
 
   useEffect(() => {
+    if (cachedCities) {
+      setLoading(false);
+      return;
+    }
+
     let cancelled = false;
 
     async function load() {
-      try {
-        const response = await fetch("/api/public/cities", { credentials: "same-origin" });
-        if (!response.ok) return;
-        const data = (await response.json()) as { cities?: PublicCityOption[] };
-        if (cancelled) return;
-        if (Array.isArray(data.cities) && data.cities.length > 0) {
-          setCities((prev) => mergeCityOptions(FALLBACK_CITIES, prev, data.cities));
+      if (inFlightCitiesPromise) {
+        const result = await inFlightCitiesPromise;
+        if (!cancelled) {
+          setCities(result);
+          setLoading(false);
         }
-      } catch {
-        // keep fallback
-      } finally {
-        if (!cancelled) setLoading(false);
+        return;
+      }
+
+      inFlightCitiesPromise = (async () => {
+        try {
+          const response = await fetch("/api/public/cities", {
+            credentials: "same-origin",
+          });
+          if (!response.ok) return FALLBACK_CITIES;
+          const data = (await response.json()) as { cities?: PublicCityOption[] };
+          if (Array.isArray(data.cities) && data.cities.length > 0) {
+            const merged = mergeCityOptions(FALLBACK_CITIES, data.cities);
+            cachedCities = merged;
+            return merged;
+          }
+          return FALLBACK_CITIES;
+        } catch {
+          return FALLBACK_CITIES;
+        } finally {
+          inFlightCitiesPromise = null;
+        }
+      })();
+
+      const result = await inFlightCitiesPromise;
+      if (!cancelled) {
+        setCities(result);
+        setLoading(false);
       }
     }
 

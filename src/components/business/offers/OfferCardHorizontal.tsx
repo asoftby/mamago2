@@ -21,10 +21,14 @@ import {
   BUSINESS_PUBLICATION_ACTION_PROMOTE,
 } from "@/components/business/shared/BusinessPublicationCard";
 import { formatUpdatedAgo } from "@/lib/date/formatUpdatedAgo";
+import { getOfferPublicUrl } from "@/lib/offers/offerPublicUrl";
+import { format as fmtDate } from "date-fns";
 
 interface Offer {
   id: string;
   kind: OfferKind;
+  durationType?: string | null;
+  campProgramType?: string | null;
   title: string;
   description: string | null;
   coverImage: string | null;
@@ -33,9 +37,13 @@ interface Offer {
   status: OfferStatus;
   dateFrom: Date | null;
   dateTo: Date | null;
+  slug: string | null;
   place: {
     id: string;
     title: string;
+    city?: {
+      slug: string;
+    } | null;
   };
   updatedAt: Date;
   createdAt: Date;
@@ -125,8 +133,29 @@ export function OfferCardHorizontal({
 
   const kindLabel = offer.kind === "EVENT" ? "Мероприятие" : "Услуга";
   const updatedLine = formatUpdatedAgo(offer.updatedAt, offer.createdAt);
+  const createdLine = `Создано: ${fmtDate(new Date(offer.createdAt), "d MMMM yyyy", { locale: ru })}`;
   /** Для Next/Image: внешние URL как есть; /api/media через img в карточке */
   const offerImageForCard = offer.coverImage;
+
+  const citySlug = offer.place.city?.slug;
+  const publicOfferHref = (offer.status === "PUBLISHED" && citySlug && offer.slug)
+    ? getOfferPublicUrl(offer, citySlug)
+    : undefined;
+
+  const cardMetrics = {
+    views: offer.metrics.views,
+    saves: offer.metrics.saves,
+    planAdds: offer.metrics.planAdds,
+    ctaClicks: offer.metrics.ctaClicks,
+  };
+
+  const tip = offer.status === "PUBLISHED" && offer.metrics.views < 100
+    ? {
+        text: "Продвигайте предложение, чтобы получить больше заявок и увеличить охват.",
+        ctaLabel: "Узнать больше",
+        ctaHref: buildPromotionLaunchHref({ publicationType: "OFFER", publicationId: offer.id }),
+      }
+    : null;
 
   return (
     <>
@@ -136,6 +165,8 @@ export function OfferCardHorizontal({
         imageAlt={offer.title}
         placeholderIcon={Tag}
         title={offer.title}
+        titleHref={publicOfferHref}
+        imageHref={publicOfferHref}
         typeChip={
           <BusinessChip tone="muted" size="compact">
             {kindLabel}
@@ -144,6 +175,9 @@ export function OfferCardHorizontal({
         subtitle={buildOfferSubtitle(offer)}
         statusRow={<OfferStatusBadge status={offer.status} />}
         updatedLine={updatedLine}
+        createdLine={createdLine}
+        metrics={cardMetrics}
+        tip={tip}
         actions={
           <>
             <button

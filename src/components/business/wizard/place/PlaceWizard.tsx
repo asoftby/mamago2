@@ -666,7 +666,7 @@ export function PlaceWizard({
         title={
           mode === "create"
             ? businessFormCopy.place.createTitle
-            : businessFormCopy.place.editTitle
+            : businessFormCopy.place.editTitle(place?.title)
         }
         subtitle={businessFormCopy.stepSubtitle(
           currentStep,

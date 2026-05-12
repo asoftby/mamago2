@@ -27,6 +27,7 @@ import { EventSessionSelector } from "./EventSessionSelector";
 import { EventStickyActionBar } from "./EventStickyActionBar";
 import { SimilarEventsSection } from "./SimilarEventsSection";
 import { PublicationStatsPanel } from "@/components/publication-stats";
+import { RichContentRenderer } from "@/components/content/RichContentRenderer";
 import { postAnalyticsEvent } from "@/lib/analytics/client";
 
 function venueOneLine(data: EventPageData): string | undefined {
@@ -335,9 +336,10 @@ export function EventPageView({ data }: { data: EventPageData }) {
             {data.priceDetails && (
               <section className="border-t border-border/40 py-8">
                 <h2 className="text-[15px] font-semibold">Детали цены</h2>
-                <p className="mt-3 whitespace-pre-line text-[14px] leading-relaxed text-muted-foreground">
-                  {data.priceDetails}
-                </p>
+                <RichContentRenderer
+                  html={data.priceDetails}
+                  className="mt-3 prose-p:my-2 prose-p:text-[14px] prose-p:leading-relaxed prose-p:text-muted-foreground prose-li:text-[14px] prose-li:text-muted-foreground"
+                />
               </section>
             )}
           </div>

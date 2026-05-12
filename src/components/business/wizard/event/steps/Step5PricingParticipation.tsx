@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+import { WizardRichTextField } from "@/components/business/wizard/shared/WizardRichTextField";
 import {
   PublicationAccessEditor,
   type PublicationAccess,
@@ -201,19 +201,15 @@ export function Step5PricingParticipation({
 
             {data.pricingMode === "from" && (
               <div className="space-y-2">
-                <Label htmlFor="priceDetails">Детали стоимости (опционально)</Label>
-                <Textarea
-                  id="priceDetails"
+                <WizardRichTextField
+                  label="Детали стоимости"
+                  helperText="Если есть разные цены или условия, укажите их здесь."
                   value={data.priceDetails}
-                  onChange={(e) => onChange({ priceDetails: e.target.value })}
+                  onChange={(value) => onChange({ priceDetails: value })}
                   placeholder={"Дети — 30 BYN\nВзрослые — 50 BYN\nСемейный билет — 80 BYN"}
-                  rows={4}
                   disabled={!isEditable}
-                  className="resize-none"
+                  minHeight={140}
                 />
-                <p className="text-[12px] text-gray-600">
-                  Если есть разные цены — укажите их тут
-                </p>
               </div>
             )}
           </div>

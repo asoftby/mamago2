@@ -1,6 +1,7 @@
 import React, { Suspense } from "react";
 import { SiteHeader } from "@/components/site/header";
 import { PublicLayoutBody } from "./PublicLayoutBody";
+import { HeaderDiscoveryFiltersProviderWrapper } from "./HeaderDiscoveryFiltersProviderWrapper";
 import { PublicationIntentProvider } from "@/contexts/PublicationIntentContext";
 import { RefinementFiltersProvider } from "@/contexts/RefinementFiltersContext";
 import { RefinementFiltersModalGlobal } from "@/components/discovery/RefinementFiltersModalGlobal";
@@ -21,20 +22,22 @@ export default function PublicGroupLayout({
       <RefinementFiltersProvider>
         <ReloadProbe />
         <PublicationIntentProvider>
-          <div className="flex min-h-screen flex-col bg-white">
-            <SiteHeader />
+          <HeaderDiscoveryFiltersProviderWrapper>
+            <div className="flex min-h-screen flex-col bg-white">
+              <SiteHeader />
 
-            <PublicLayoutBody>{children}</PublicLayoutBody>
-            <FamilyDerivedAgeSync />
-            <MyPlanProvider />
-            <GateFlowController />
-            <MobileTapDiagnostics />
+              <PublicLayoutBody>{children}</PublicLayoutBody>
+              <FamilyDerivedAgeSync />
+              <MyPlanProvider />
+              <GateFlowController />
+              <MobileTapDiagnostics />
 
-            {/* Global Refinement Modal */}
-            <Suspense fallback={null}>
-              <RefinementFiltersModalGlobal />
-            </Suspense>
-          </div>
+              {/* Global Refinement Modal */}
+              <Suspense fallback={null}>
+                <RefinementFiltersModalGlobal />
+              </Suspense>
+            </div>
+          </HeaderDiscoveryFiltersProviderWrapper>
         </PublicationIntentProvider>
       </RefinementFiltersProvider>
     </PublicProviders>

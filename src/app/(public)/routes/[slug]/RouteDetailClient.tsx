@@ -289,7 +289,18 @@ export function RouteDetailClient({ route }: Props) {
   const [galleryInitialIndex, setGalleryInitialIndex] = useState(0);
   const [stickyBarVisible, setStickyBarVisible] = useState(false);
   const actionBlockRef = useRef<HTMLDivElement>(null);
+  const stickyBarRef = useRef<HTMLDivElement>(null);
   const { isAuthenticated, user } = useAuthMe();
+
+  // Снимаем фокус при скрытии sticky bar
+  useEffect(() => {
+    if (stickyBarVisible) return;
+    const el = stickyBarRef.current;
+    if (!el) return;
+    if (el.contains(document.activeElement) && document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
+  }, [stickyBarVisible]);
 
   // IntersectionObserver: sticky top bar появляется когда action block ушёл из viewport
   useEffect(() => {
@@ -364,7 +375,9 @@ export function RouteDetailClient({ route }: Props) {
     <>
       {/* ── Sticky top action bar (появляется после скролла) ── */}
       <div
-        aria-hidden={!stickyBarVisible}
+        ref={stickyBarRef}
+        // inert блокирует фокус и AT для скрытого бара (замена aria-hidden для интерактивных контейнеров)
+        inert={!stickyBarVisible}
         className={cn(
           "fixed top-0 left-0 right-0 z-40 transition-[opacity,transform] duration-200",
           stickyBarVisible

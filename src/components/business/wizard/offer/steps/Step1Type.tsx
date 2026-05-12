@@ -15,10 +15,10 @@ export function Step1Type({ data, onChange, isEditable }: Step1TypeProps) {
   const handleTypeChange = (offerWizardType: OfferWizardType) => {
     const legacy =
       offerWizardType === "CAMP"
-        ? { offerKind: "course" as const, durationType: "camp" as const }
+        ? { offerKind: "course" as const, durationType: "camp" as const, intent: "занятия" as const }
         : offerWizardType === "SINGLE"
-          ? { offerKind: "course" as const, durationType: "single" as const }
-          : { offerKind: "course" as const, durationType: "recurring" as const };
+          ? { offerKind: "course" as const, durationType: "single" as const, intent: "куда_пойти" as const }
+          : { offerKind: "course" as const, durationType: "recurring" as const, intent: "занятия" as const };
 
     onChange({
       offerWizardType,

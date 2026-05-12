@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { PrimaryButton } from "@/components/ui/PrimaryButton";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -36,10 +37,24 @@ export function EventTopFloatingBar({
   onSecondary,
 }: EventTopFloatingBarProps) {
   const hasSecondary = Boolean(secondaryLabel && onSecondary);
+  const barRef = useRef<HTMLDivElement>(null);
+
+  // Снимаем фокус при скрытии — предотвращает
+  // "Blocked aria-hidden on an element because its descendant retained focus"
+  useEffect(() => {
+    if (visible) return;
+    const el = barRef.current;
+    if (!el) return;
+    if (el.contains(document.activeElement) && document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
+  }, [visible]);
 
   return (
     <div
-      aria-hidden={!visible}
+      ref={barRef}
+      // inert блокирует фокус и AT для скрытого бара (замена aria-hidden для интерактивных контейнеров)
+      inert={!visible}
       className={cn(
         // Только desktop
         "hidden lg:block",

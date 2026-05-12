@@ -15,6 +15,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+import { randomId } from "@/lib/utils/randomId";
 
 type PickerItem = { id: string; publicUrl: string | null; alt: string | null; title: string | null };
 
@@ -357,7 +358,7 @@ export function ArticleEditorGalleryField({
     }
     const added: GalleryRow[] = files.map((file) => ({
       type: "local" as const,
-      clientId: crypto.randomUUID(),
+      clientId: randomId(),
       file,
       previewUrl: URL.createObjectURL(file),
     }));

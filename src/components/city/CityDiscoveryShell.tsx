@@ -9,6 +9,7 @@ import { DISCOVERY_INTENT_CONFIG } from "@/lib/discovery/discoveryIntentConfig";
 import { formatCityTitle } from "@/lib/city/cityDisplayNames";
 import { useDiscoveryFilters } from "@/features/filters/discovery/filters.store";
 import { whenPresetPageTitleSuffix } from "@/features/filters/discovery/whenLabel";
+import { ClassesChipBar } from "./ClassesChipBar";
 import type { PublicRouteCardModel } from "@/components/routes/types";
 import type { ActivityMock } from "@/types/activity";
 import Link from "next/link";
@@ -76,6 +77,8 @@ interface CityDiscoveryShellProps {
   routesData?: PublicRouteCardModel[];
   /** Лента «Куда пойти»: только данные с сервера (БД) */
   discoveryActivities?: ActivityMock[];
+  classChips?: Array<{ id: string; title: string; slug: string }>;
+  activeClassChipSlug?: string;
 }
 
 export function CityDiscoveryShell({
@@ -83,6 +86,8 @@ export function CityDiscoveryShell({
   intent,
   routesData,
   discoveryActivities,
+  classChips,
+  activeClassChipSlug,
 }: CityDiscoveryShellProps) {
   const { applied } = useDiscoveryFilters();
   const intentConfig = DISCOVERY_INTENT_CONFIG[intent];
@@ -150,9 +155,22 @@ export function CityDiscoveryShell({
         <div className="space-y-4">
           <H1 className="px-1">{pageTitle}</H1>
         </div>
+        {intent === "classes" && classChips && activeClassChipSlug ? (
+          <ClassesChipBar chips={classChips} activeChipSlug={activeClassChipSlug} />
+        ) : null}
         <DiscoveryActivitiesGrid
           activities={discoveryActivities ?? []}
           coverRatio={intent === "classes" ? "1/1" : undefined}
+          emptyTitle={
+            intent === "classes"
+              ? "Пока нет занятий по вашему запросу"
+              : undefined
+          }
+          emptyDescription={
+            intent === "classes"
+              ? "В этом городе пока нет подходящих опубликованных предложений — или стоит ослабить фильтры."
+              : undefined
+          }
         />
       </Container>
     </main>

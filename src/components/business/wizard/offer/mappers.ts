@@ -3,6 +3,11 @@ import type { OfferFormData, CampLodgingTypeKey } from "./types";
 import { getDefaultFormData } from "./defaults";
 import type { PublicationAccess } from "@/features/publication-access";
 import {
+  createExcerpt,
+  normalizeRichTextEditorValue,
+  plainTextToRichTextHtml,
+} from "@/lib/richtext/utils";
+import {
   normalizeCampSessionsFromDb,
   normalizeCampMealsFromDb,
   sortCampSessions,
@@ -76,6 +81,11 @@ function mapCtaToApi(
 function parsePrice(value: string): number | undefined {
   const n = parseFloat(String(value).replace(",", ".").trim());
   return Number.isFinite(n) ? n : undefined;
+}
+
+function richTextToLegacyPriceText(html: string): string | undefined {
+  const excerpt = createExcerpt(html, 80);
+  return excerpt || undefined;
 }
 
 function deriveOfferApiFieldsFromPublicationAccess(
@@ -169,9 +179,11 @@ export function isValidVideoUrl(url: string): boolean {
 /** POST /api/business/offers — matches createOfferSchema */
 export function buildOfferCreatePayload(
   data: OfferFormData,
-  placeId: string,
   opts?: { status?: "DRAFT" | "PENDING" | "PUBLISHED" }
 ) {
+  if (!data.placeId) {
+    throw new Error("placeId is required to create offer payload");
+  }
   const pricingMode = data.pricingMode === "multiple" ? "MULTIPLE" : "SINGLE";
   const ages = ageGroupsToMonths(data.ageGroups);
   const accessFields = deriveOfferApiFieldsFromPublicationAccess(
@@ -181,7 +193,7 @@ export function buildOfferCreatePayload(
 
   const base = {
     source: "PLACE" as const,
-    selectedPlace: { id: placeId },
+    selectedPlace: { id: data.placeId },
     kind: formKindToApiKind(data),
     title: data.title.trim() || "Новое предложение",
     shortDescription: data.shortDescription.trim() || "—",
@@ -189,10 +201,12 @@ export function buildOfferCreatePayload(
     ...ages,
     coverImage: data.coverImage ?? undefined,
     videoUrl: data.videoUrl?.trim() || undefined,
-    promotionalOffer: data.promotionalOffer?.trim() || undefined,
+    priceCaption: data.priceCaption?.trim() || undefined,
+    promotionDetails: data.promotionDetails?.trim() || undefined,
+    promotionalOffer: createExcerpt(data.promotionDetails, 120) || undefined,
     pricingMode,
     singlePrice: parsePrice(data.singlePrice),
-    singlePriceLabel: data.singlePriceLabel.trim() || undefined,
+    singlePriceLabel: richTextToLegacyPriceText(data.priceCaption),
     pricingOptions: data.pricingOptions.map((o) => ({
       title: o.title.trim(),
       price: parsePrice(o.price) ?? 0,
@@ -203,7 +217,18 @@ export function buildOfferCreatePayload(
     phone: accessFields.phone,
     website: accessFields.website,
     bookingInstructions: accessFields.bookingInstructions,
+    contactSource: data.contactSource,
+    contactPhone: data.phone.trim() || undefined,
+    contactWebsite: data.website.trim() || undefined,
+    contactSocialLinks: data.socialLinks
+      .filter((link) => link.url.trim().length > 0)
+      .map((link) => ({
+        id: link.id,
+        network: link.network,
+        url: link.url.trim(),
+      })),
     discoverySignalIds: data.signalIds,
+    classChipSlugs: data.classChipSlugs,
     status: opts?.status ?? "DRAFT",
     gallery: data.gallery ?? [],
     campProgramType:
@@ -253,16 +278,19 @@ export function buildOfferUpdatePayload(
   );
 
   const payload: Record<string, unknown> = {
+    selectedPlace: data.placeId ? { id: data.placeId } : undefined,
     title: data.title.trim() || "Новое предложение",
     shortDescription: data.shortDescription.trim() || "—",
     description: data.description?.trim() || "",
     ...ages,
     coverImage: data.coverImage ?? undefined,
     videoUrl: data.videoUrl?.trim() || undefined,
-    promotionalOffer: data.promotionalOffer?.trim() || undefined,
+    priceCaption: data.priceCaption?.trim() || undefined,
+    promotionDetails: data.promotionDetails?.trim() || undefined,
+    promotionalOffer: createExcerpt(data.promotionDetails, 120) || undefined,
     pricingMode,
     singlePrice: parsePrice(data.singlePrice),
-    singlePriceLabel: data.singlePriceLabel.trim() || undefined,
+    singlePriceLabel: richTextToLegacyPriceText(data.priceCaption),
     pricingOptions: data.pricingOptions.map((o) => ({
       title: o.title.trim(),
       price: parsePrice(o.price) ?? 0,
@@ -273,7 +301,18 @@ export function buildOfferUpdatePayload(
     phone: accessFields.phone,
     website: accessFields.website,
     bookingInstructions: accessFields.bookingInstructions,
+    contactSource: data.contactSource,
+    contactPhone: data.phone.trim() || undefined,
+    contactWebsite: data.website.trim() || undefined,
+    contactSocialLinks: data.socialLinks
+      .filter((link) => link.url.trim().length > 0)
+      .map((link) => ({
+        id: link.id,
+        network: link.network,
+        url: link.url.trim(),
+      })),
     discoverySignalIds: data.signalIds,
+    classChipSlugs: data.classChipSlugs,
     gallery: data.gallery ?? [],
     campProgramType:
       data.offerWizardType === "CAMP" && data.campProgramType
@@ -315,18 +354,23 @@ export function buildOfferUpdatePayload(
 
 /** Map Prisma offer row to wizard form (fields stored in DB only). */
 export function mapOfferToFormData(offer: {
+  placeId?: string | null;
+  place?: { title?: string | null } | null;
   kind: OfferKind;
   title: string;
   description: string | null;
   coverImage: string | null;
   galleryImages?: unknown; // JsonValue from Prisma
   videoUrl?: string | null;
+  priceCaption?: string | null;
+  promotionDetails?: string | null;
   promotionalOffer?: string | null;
   priceFrom: number | null;
   priceText: string | null;
   ageMinMonths: number | null;
   ageMaxMonths: number | null;
   discoverySignalIds?: string[];
+  classChipSlugs?: string[];
   // Camp fields
   campProgramType?: string | null;
   campSessions?: unknown;
@@ -349,8 +393,12 @@ export function mapOfferToFormData(offer: {
   mealInfo?: string | null;
   transferInfo?: string | null;
   whatToBring?: string | null;
+  contactSource?: string | null;
+  contactPhone?: string | null;
+  contactWebsite?: string | null;
+  contactSocialLinks?: unknown;
 }): OfferFormData {
-  const defaults = getDefaultFormData();
+  const defaults = getDefaultFormData(offer.placeId ?? null);
 
   const campSessions = normalizeCampSessionsFromDb(offer.campSessions);
 
@@ -370,6 +418,29 @@ export function mapOfferToFormData(offer: {
 
   const inferredWizardType = inferOfferWizardTypeFromOffer(offer);
   const isCamp = inferredWizardType === "CAMP";
+  const socialLinks = Array.isArray(offer.contactSocialLinks)
+    ? offer.contactSocialLinks
+        .filter(
+          (item): item is { id?: string; network?: string; url?: string } =>
+            typeof item === "object" && item !== null,
+        )
+        .map((item, index) => {
+          const network: OfferFormData["socialLinks"][number]["network"] =
+            item.network === "instagram" ||
+            item.network === "telegram" ||
+            item.network === "tiktok" ||
+            item.network === "youtube" ||
+            item.network === "other"
+              ? item.network
+              : "instagram";
+          return {
+            id: typeof item.id === "string" && item.id.trim() ? item.id : `offer-social-${index}`,
+            network,
+            url: typeof item.url === "string" ? item.url : "",
+          };
+        })
+        .filter((item) => item.url.trim().length > 0)
+    : [];
 
   return {
     ...defaults,
@@ -377,38 +448,56 @@ export function mapOfferToFormData(offer: {
     offerKind: isCamp ? "course" : offer.kind === "EVENT" ? "course" : "service",
     durationType: isCamp ? "camp" : offer.kind === "EVENT" ? "single" : null,
     campProgramType: parseCampProgramTypeFromDb(offer.campProgramType),
+    placeId: offer.placeId ?? null,
+    placeTitle: offer.place?.title ?? "",
     title: offer.title,
     shortDescription: offer.description ?? "",
-    description: offer.description ?? "",
+    description: normalizeRichTextEditorValue(offer.description),
     coverImage: offer.coverImage,
     gallery,
     videoUrl: offer.videoUrl ?? null,
-    promotionalOffer: offer.promotionalOffer ?? "",
+    priceCaption: offer.priceCaption
+      ? offer.priceCaption
+      : offer.priceText
+        ? plainTextToRichTextHtml(offer.priceText)
+        : "",
+    promotionDetails: offer.promotionDetails
+      ? offer.promotionDetails
+      : offer.promotionalOffer
+        ? plainTextToRichTextHtml(offer.promotionalOffer)
+        : "",
     pricingMode: "single",
     singlePrice: offer.priceFrom != null ? String(offer.priceFrom) : "",
     singleCurrency: "BYN",
-    singlePriceLabel: offer.priceText ?? "",
+    contactSource: offer.contactSource === "place" ? "place" : "manual",
+    phone: offer.contactPhone ?? "",
+    website: offer.contactWebsite ?? "",
+    socialLinks,
     signalIds: offer.discoverySignalIds ?? [],
+    classChipSlugs: offer.classChipSlugs ?? [],
     // Camp fields
-    campSessions,
+    campSessions: campSessions.map((session) => ({
+      ...session,
+      description: normalizeRichTextEditorValue(session.description),
+    })),
     campSessionDuration: offer.campSessionDuration ?? "",
     campStayDuration: offer.campStayDuration ?? "",
     campPlacesCount: offer.campPlacesCount ?? null,
     campGroupSize: offer.campGroupSize ?? null,
-    campDaySchedule: offer.campDaySchedule ?? "",
+    campDaySchedule: normalizeRichTextEditorValue(offer.campDaySchedule),
     campCanSelectDays: offer.campCanSelectDays ?? false,
     campHasExtendedCare: offer.campHasExtendedCare ?? false,
     // Accommodation fields
     accommodationProvided: offer.accommodationProvided ?? false,
     accommodationType: parseCampLodgingTypeFromDb(offer.accommodationType),
     accommodationAddress: offer.accommodationAddress ?? "",
-    accommodationRooms: offer.accommodationRooms ?? "",
-    accommodationConditions: offer.accommodationConditions ?? "",
+    accommodationRooms: normalizeRichTextEditorValue(offer.accommodationRooms),
+    accommodationConditions: normalizeRichTextEditorValue(offer.accommodationConditions),
     campIncludedMeals: normalizeCampMealsFromDb(offer.campIncludedMeals),
     mealInfo: offer.mealInfo ?? "",
     transferInfo: offer.transferInfo ?? "",
-    whatToBring: offer.whatToBring ?? "",
-    campSafetyInfo: offer.campSafetyInfo ?? "",
-    campMedicalInfo: offer.campMedicalInfo ?? "",
+    whatToBring: normalizeRichTextEditorValue(offer.whatToBring),
+    campSafetyInfo: normalizeRichTextEditorValue(offer.campSafetyInfo),
+    campMedicalInfo: normalizeRichTextEditorValue(offer.campMedicalInfo),
   };
 }

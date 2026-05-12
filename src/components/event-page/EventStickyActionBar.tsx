@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Check } from "lucide-react";
@@ -43,6 +43,18 @@ export function EventStickyActionBar({
 }: EventStickyActionBarProps) {
   const [visible, setVisible] = useState(false);
   const hasSecondary = Boolean(secondaryLabel && onSecondary);
+  const barRef = useRef<HTMLDivElement>(null);
+
+  // Снимаем фокус при скрытии бара — предотвращает
+  // "Blocked aria-hidden on an element because its descendant retained focus"
+  useEffect(() => {
+    if (visible) return;
+    const el = barRef.current;
+    if (!el) return;
+    if (el.contains(document.activeElement) && document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
+  }, [visible]);
 
   useEffect(() => {
     const el = ctaRef?.current;
@@ -87,6 +99,7 @@ export function EventStickyActionBar({
 
   return (
     <div
+      ref={barRef}
       className={cn(
         "fixed inset-x-0 top-0 z-40",
         "transition-transform duration-200 ease-out",
@@ -98,7 +111,8 @@ export function EventStickyActionBar({
       )}
       role="region"
       aria-label="Действия с событием"
-      aria-hidden={!visible}
+      // inert блокирует фокус и AT для скрытого бара (замена aria-hidden для интерактивных контейнеров)
+      inert={!visible}
     >
       {/* Всегда одна строка: левая часть + кнопки справа */}
       <div className="mx-auto flex w-full max-w-[1200px] items-center gap-3 px-4 sm:px-6 lg:px-8">

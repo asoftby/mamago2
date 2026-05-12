@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+import { WizardRichTextField } from "@/components/business/wizard/shared/WizardRichTextField";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -337,17 +337,14 @@ export function Step4CampSchedule({ data, onChange, isEditable }: Step4CampSched
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor={`desc-${session.id}`}>Краткое описание смены</Label>
-                      <Textarea
-                        id={`desc-${session.id}`}
-                        placeholder="Чем эта смена отличается от других: язык, смена темы, интенсивность…"
+                      <WizardRichTextField
+                        label="Краткое описание смены"
+                        helperText="Чем эта смена отличается от других: тема, акценты, интенсивность."
                         value={session.description}
-                        onChange={(e) =>
-                          patchSession(session.id, { description: e.target.value })
-                        }
+                        onChange={(value) => patchSession(session.id, { description: value })}
+                        placeholder="Чем эта смена отличается от других: язык, смена темы, интенсивность…"
                         disabled={!isEditable}
-                        rows={3}
-                        className="rounded-xl min-h-[88px] resize-y"
+                        minHeight={140}
                       />
                     </div>
                   </CardContent>
@@ -388,15 +385,14 @@ export function Step4CampSchedule({ data, onChange, isEditable }: Step4CampSched
         <CollapsibleContent>
           <div className="pt-4 space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="campDaySchedule">Расписание дня</Label>
-            <Textarea
-              id="campDaySchedule"
-              placeholder="Опционально: общий распорядок, если он одинаковый для всех смен"
+            <WizardRichTextField
+              label="Расписание дня"
+              helperText="Опционально: общий распорядок, если он одинаковый для всех смен."
               value={data.campDaySchedule}
-              onChange={(e) => onChange({ campDaySchedule: e.target.value })}
+              onChange={(value) => onChange({ campDaySchedule: value })}
+              placeholder="Опционально: общий распорядок, если он одинаковый для всех смен"
               disabled={!isEditable}
-              rows={4}
-              className="rounded-xl min-h-[120px]"
+              minHeight={140}
             />
           </div>
           <div className="rounded-xl border border-border/50 bg-muted/20 px-4 py-3 space-y-3">

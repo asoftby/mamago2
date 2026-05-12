@@ -5,6 +5,7 @@ import type { OfferFormData } from "./types";
 import { getStepsForOfferType } from "./offerWizardSteps.config";
 import { validatePublicationAccess } from "@/features/publication-access";
 import { showCampLodgingFormFields } from "./campOfferModel";
+import { isOfferContactsComplete, isValidPhone, isValidUrl } from "./contacts";
 
 export interface ValidationResult {
   isValid: boolean;
@@ -323,6 +324,19 @@ function validateStep5(data: OfferFormData): ValidationResult {
 function validateStep6(data: OfferFormData): ValidationResult {
   const errors: string[] = [];
   const warnings: string[] = [];
+  const isComplete = isOfferContactsComplete(data);
+
+  if (data.contactSource === "place") {
+    if (!isComplete) {
+      errors.push("Выберите место для контактов или переключитесь на ручной ввод");
+    }
+    return {
+      isValid: errors.length === 0,
+      isComplete,
+      errors,
+      warnings,
+    };
+  }
 
   if (data.phone && !isValidPhone(data.phone)) {
     errors.push("Некорректный номер телефона");
@@ -340,9 +354,6 @@ function validateStep6(data: OfferFormData): ValidationResult {
       errors.push(`Соцсеть ${index + 1}: некорректная ссылка`);
     }
   });
-
-  // Step 7 is optional, so always complete
-  const isComplete = true;
 
   return {
     isValid: errors.length === 0,
@@ -510,20 +521,4 @@ export function validateForSubmit(data: OfferFormData): ValidationResult {
     errors: allErrors,
     warnings: allWarnings,
   };
-}
-
-// Helper functions
-function isValidUrl(url: string): boolean {
-  try {
-    new URL(url);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-function isValidPhone(phone: string): boolean {
-  // Basic phone validation
-  const phoneRegex = /^[\d\s\+\-\(\)]+$/;
-  return phoneRegex.test(phone) && phone.replace(/\D/g, "").length >= 9;
 }

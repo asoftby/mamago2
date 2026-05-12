@@ -17,7 +17,7 @@ import { useWizardSession } from "@/hooks/useWizardSession";
 
 import type { OfferFormData, OfferWizardMode, OfferWizardStepKey } from "./types";
 import { getDefaultFormData, hasMeaningfulContent } from "./defaults";
-import { validateForSubmit } from "./validation";
+import { validateForSubmit, type ValidationResult } from "./validation";
 import { 
   getStepsForOfferType, 
   getStepNumber, 
@@ -30,6 +30,7 @@ import {
   buildOfferUpdatePayload,
   mapOfferToFormData,
 } from "./mappers";
+import { plainTextToRichTextHtml } from "@/lib/richtext/utils";
 
 import { Step8Review } from "./steps/Step8Review";
 import { Step4CampSchedule } from "./steps/Step4CampSchedule";
@@ -97,7 +98,7 @@ export function OfferWizard({
     if (mode === "edit" && offer) {
       return mapOfferToFormData(offer);
     }
-    return getDefaultFormData();
+    return getDefaultFormData(defaultPlaceId ?? null);
   });
   
   // Get steps based on current offer type
@@ -120,19 +121,36 @@ export function OfferWizard({
     if (mode === "create") {
       try {
         const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          const defaults = getDefaultFormData();
-          setFormData({
-            ...defaults,
-            ...parsed,
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        const defaults = getDefaultFormData(defaultPlaceId ?? null);
+        if (typeof parsed.singlePriceLabel === "string" && !parsed.priceCaption) {
+          parsed.priceCaption = plainTextToRichTextHtml(parsed.singlePriceLabel);
+        }
+        if (typeof parsed.promotionalOffer === "string" && !parsed.promotionDetails) {
+          parsed.promotionDetails = plainTextToRichTextHtml(parsed.promotionalOffer);
+        }
+        if (!parsed.placeId && defaultPlaceId) {
+          parsed.placeId = defaultPlaceId;
+        }
+        setFormData({
+          ...defaults,
+          ...parsed,
           });
         }
       } catch (e) {
         console.error("Failed to restore draft:", e);
       }
     }
-  }, [mode]);
+  }, [mode, defaultPlaceId]);
+
+  useEffect(() => {
+    if (!defaultPlaceId) return;
+    setFormData((prev) => {
+      if (prev.placeId) return prev;
+      return { ...prev, placeId: defaultPlaceId };
+    });
+  }, [defaultPlaceId]);
   
   const [offerId, setOfferId] = useState<string | null>(
     mode === "edit" && offer ? offer.id : null
@@ -243,10 +261,7 @@ export function OfferWizard({
     setIsSaving(true);
     
     try {
-      const placeId =
-        mode === "edit" && offer?.placeId
-          ? offer.placeId
-          : defaultPlaceId ?? undefined;
+      const placeId = formData.placeId ?? undefined;
 
       if (mode === "create" && !placeId) {
         toast.error("Не выбрано место для предложения");
@@ -262,15 +277,16 @@ export function OfferWizard({
         });
         
         if (!response.ok) {
-          const error = await response.json();
-          throw new Error(error.error || "Failed to update draft");
+          const errorData = await response.json();
+          const errorMessage = errorData.message || errorData.error || "Failed to update draft";
+          throw new Error(errorMessage);
         }
       } else {
         if (!placeId) {
           toast.error("Не выбрано место для предложения");
           return;
         }
-        const createPayload = buildOfferCreatePayload(formData, placeId, { status: "DRAFT" });
+        const createPayload = buildOfferCreatePayload(formData, { status: "DRAFT" });
         const response = await fetch("/api/business/offers", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -278,8 +294,9 @@ export function OfferWizard({
         });
         
         if (!response.ok) {
-          const error = await response.json();
-          throw new Error(error.error || "Failed to create draft");
+          const errorData = await response.json();
+          const errorMessage = errorData.message || errorData.error || "Failed to create draft";
+          throw new Error(errorMessage);
         }
         
         const data = await response.json();
@@ -311,18 +328,15 @@ export function OfferWizard({
     if (isSubmitting) return;
     const validation = validateForSubmit(formData);
     
-    if (!validation.isValid) {
-      toast.error("Заполните все обязательные поля");
+    if (!validation.isComplete) {
+      toast.error(validation.errors[0] || "Заполните все обязательные поля");
       return;
     }
     
     setIsSubmitting(true);
     
     try {
-      const placeId =
-        mode === "edit" && offer?.placeId
-          ? offer.placeId
-          : defaultPlaceId ?? undefined;
+      const placeId = formData.placeId ?? undefined;
 
       if (mode === "create" && !placeId) {
         toast.error("Не выбрано место для предложения");
@@ -335,7 +349,7 @@ export function OfferWizard({
           return;
         }
         const finalStatus = canPublishContentDirectly(userRole) ? "PUBLISHED" : "PENDING";
-        const createPayload = buildOfferCreatePayload(formData, placeId, { status: finalStatus });
+        const createPayload = buildOfferCreatePayload(formData, { status: finalStatus });
         const createResponse = await fetch("/api/business/offers", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -343,8 +357,9 @@ export function OfferWizard({
         });
         
         if (!createResponse.ok) {
-          const error = await createResponse.json();
-          throw new Error(error.error || "Failed to create offer");
+          const errorData = await createResponse.json();
+          const errorMessage = errorData.message || errorData.error || "Failed to create offer";
+          throw new Error(errorMessage);
         }
         
         const createData = await createResponse.json();
@@ -376,8 +391,9 @@ export function OfferWizard({
       });
       
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Failed to submit offer");
+        const errorData = await response.json();
+        const errorMessage = errorData.message || errorData.error || "Failed to submit offer";
+        throw new Error(errorMessage);
       }
 
       toast.success("Предложение отправлено на модерацию");
@@ -408,7 +424,14 @@ export function OfferWizard({
   // Render current step
   const renderStep = () => {
     if (currentStepKey === "review") {
-      return <Step8Review data={formData} isSubmitting={isSubmitting} onGoToStep={handleGoToStep} />;
+      return (
+        <Step8Review
+          data={formData}
+          isSubmitting={isSubmitting}
+          onGoToStep={handleGoToStep}
+          validation={submitValidation}
+        />
+      );
     }
     
     const commonProps = {
@@ -444,7 +467,9 @@ export function OfferWizard({
   const canPrev = true;
   const isReviewStep = currentStepKey === "review";
 
-  const submitValidation = isReviewStep ? validateForSubmit(formData) : { isValid: true };
+  const submitValidation: ValidationResult = isReviewStep
+    ? validateForSubmit(formData)
+    : { isValid: true, isComplete: true, errors: [], warnings: [] };
 
   const progressSteps = useMemo(
     () => [
@@ -469,7 +494,7 @@ export function OfferWizard({
         title={
           mode === "create"
             ? businessFormCopy.offer.createTitle
-            : businessFormCopy.offer.editTitle
+            : businessFormCopy.offer.editTitle(offer?.title)
         }
         subtitle={businessFormCopy.stepSubtitle(
           currentStepNum,
@@ -500,7 +525,7 @@ export function OfferWizard({
         continueDisabled={!canNext || isSaving || isSubmitting}
         onSubmit={isReviewStep ? handleSubmit : undefined}
         submitDisabled={
-          isSubmitting || isSaving || !submitValidation.isValid
+          isSubmitting || isSaving || !submitValidation.isComplete
         }
       />
     </FormWizardShell>

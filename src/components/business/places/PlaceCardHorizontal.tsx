@@ -3,6 +3,8 @@
 import { useState } from "react";
 import Link from "next/link";
 import { ContentStatus } from "@prisma/client";
+import { format } from "date-fns";
+import { ru } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
@@ -225,6 +227,7 @@ export function PlaceCardHorizontal({ place, onDelete, onArchive, onUnarchive }:
   const publicPlaceHref = `${publicBase}${publicPath}`;
   const coverImageUrl = coverImage?.url ?? null;
   const updatedLine = formatUpdatedAgo(place.updatedAt, place.createdAt);
+  const createdLine = `Создано: ${format(new Date(place.createdAt), "d MMMM yyyy", { locale: ru })}`;
 
   const statusRow =
     !place.archivedAt ? (
@@ -305,6 +308,8 @@ export function PlaceCardHorizontal({ place, onDelete, onArchive, onUnarchive }:
         subtitle={displayAddress}
         statusRow={statusRow}
         updatedLine={updatedLine}
+        createdLine={createdLine}
+        metrics={null}
         footnote={revisionFootnote}
         actions={
           <>

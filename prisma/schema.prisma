@@ -69,6 +69,7 @@ model User {
   businessInvitesSent               BusinessInvite[]                 @relation("BusinessInviteInviter")
   businessMemberships               BusinessMember[]
   bookingRequests                   BookingRequest[]
+  bookingFeedbacks                  BookingFeedback[]
   reviewedBusinessVerifications     BusinessVerificationLog[]        @relation("ReviewedBy")
   children                          Child[]
   contentEdits                      ContentEditLog[]                 @relation("ContentEditor")
@@ -420,6 +421,26 @@ model DiscoveryTaxonomyEntry {
 
   @@unique([axis, slug])
   @@index([axis, sortOrder])
+}
+
+model DiscoveryClassChip {
+  id               String   @id @default(cuid())
+  title            String
+  slug             String   @unique
+  description      String?
+  icon             String?
+  sortOrder        Int      @default(0)
+  isActive         Boolean  @default(true)
+  isDefault        Boolean  @default(false)
+  isSystem         Boolean  @default(false)
+  entityType       String   @default("OFFER")
+  surfaceKey       String   @default("CLASSES")
+  signalDefinitionId String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([surfaceKey, isActive, sortOrder])
+  @@index([signalDefinitionId])
 }
 
 model Occasion {
@@ -1516,14 +1537,26 @@ model OpeningHoursExceptionInterval {
 model Offer {
   id                       String             @id @default(cuid())
   placeId                  String
+  /// Источник контактных данных предложения: manual | place
+  contactSource            String?            @default("manual")
+  /// Ручной телефон предложения (fallback, если не берём контакты из места)
+  contactPhone             String?
+  /// Ручной сайт предложения
+  contactWebsite           String?
+  /// Ручные соцсети предложения (JSON array)
+  contactSocialLinks       Json?
   kind                     OfferKind
   title                    String
   description              String?
   coverImage               String?
   /// Видео URL (YouTube, YouTube Shorts, Instagram Reels)
   videoUrl                 String?
+  /// Rich-text подпись к цене: что входит, ограничения, условия участия
+  priceCaption             String?
   priceFrom                Float?
   priceText                String?
+  /// Rich-text детали акций, скидок и специальных условий
+  promotionDetails         String?
   /// Акционное предложение (текстовое описание скидки, раннего бронирования и т.д.)
   promotionalOffer         String?
   ageMinMonths             Int?
@@ -1554,6 +1587,8 @@ model Offer {
   seoCanonicalSource       SeoCanonicalSource @default(FALLBACK)
   /// Сигналы DISCOVERY домена (entityType=OFFER), ID SignalDefinition
   discoverySignalIds       String[]           @default([])
+  /// Чипы публичной витрины /[city]/classes
+  classChipSlugs           String[]           @default([])
 
   // Настройки записи
   bookingEnabled Boolean      @default(false)
@@ -2600,6 +2635,12 @@ enum NotificationType {
   ADMIN_MODERATION_ITEM_CREATED
   NEWS
   ANNOUNCEMENT
+  /// Новая заявка на запись (лагерь, событие, место)
+  BOOKING_CREATED
+  /// Заявка не обработана долгое время (NEW > 24ч)
+  BOOKING_STALE
+  /// Подтверждённая заявка без активности (CONFIRMED > 3 дней)
+  BOOKING_NEEDS_ATTENTION
 }
 
 enum NotificationAudience {
@@ -3202,11 +3243,25 @@ model BookingRequest {
   requestedDate     DateTime? // Snapshot для Offer или общий fallback
   requestedTime     String? // Snapshot времени (HH:MM)
 
+  // Смена лагеря (snapshot из Offer.campSessions JSON)
+  /// ID смены из JSON-массива campSessions (строковый ключ, не FK)
+  campShiftId       String?
+  /// Название смены (snapshot)
+  campShiftTitle    String?
+  /// Дата начала смены (snapshot)
+  campShiftDateFrom DateTime?
+  /// Дата окончания смены (snapshot)
+  campShiftDateTo   DateTime?
+
   // Данные клиента
   customerName    String
   customerPhone   String
   customerEmail   String?
   customerComment String?
+
+  // Данные ребёнка (для лагерей и детских занятий)
+  childName String?
+  childAge  Int?
 
   // Количество
   adultsCount   Int @default(1)
@@ -3216,16 +3271,30 @@ model BookingRequest {
   status BookingStatus @default(NEW)
 
   // Timestamps
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  /// Время последнего действия (звонок, смена статуса) — для сортировки stale leads
+  lastActivityAt DateTime @default(now())
+
+  // Derived metrics (filled automatically on status transitions)
+  /// Время первого подтверждения (NEW → CONFIRMED)
+  firstResponseAt     DateTime?
+  /// Время завершения (CONFIRMED → COMPLETED)
+  completedAt         DateTime?
+  /// Время отклонения (NEW|CONFIRMED → REJECTED)
+  rejectedAt          DateTime?
+  /// Время ответа в минутах (diff firstResponseAt − createdAt)
+  responseTimeMinutes Int?
 
   // Relations
-  business Business         @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  user     User?            @relation(fields: [userId], references: [id], onDelete: SetNull)
-  activity Activity?        @relation(fields: [activityId], references: [id], onDelete: SetNull)
-  offer    Offer?           @relation(fields: [offerId], references: [id], onDelete: SetNull)
-  place    Place?           @relation(fields: [placeId], references: [id], onDelete: SetNull)
-  session  ActivitySession? @relation(fields: [selectedSessionId], references: [id], onDelete: SetNull)
+  business   Business          @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  user       User?             @relation(fields: [userId], references: [id], onDelete: SetNull)
+  activity   Activity?         @relation(fields: [activityId], references: [id], onDelete: SetNull)
+  offer      Offer?            @relation(fields: [offerId], references: [id], onDelete: SetNull)
+  place      Place?            @relation(fields: [placeId], references: [id], onDelete: SetNull)
+  session    ActivitySession?  @relation(fields: [selectedSessionId], references: [id], onDelete: SetNull)
+  activities BookingActivity[]
+  feedback   BookingFeedback?
 
   @@index([businessId])
   @@index([userId])
@@ -3233,8 +3302,62 @@ model BookingRequest {
   @@index([offerId])
   @@index([placeId])
   @@index([selectedSessionId])
+  @@index([campShiftId])
   @@index([status])
   @@index([requestedDate])
+  @@index([createdAt])
+  @@index([businessId, createdAt])
+  @@index([businessId, firstResponseAt])
+}
+
+/// Тип события в истории заявки
+enum BookingActivityType {
+  CREATED
+  STATUS_CHANGED
+  PHONE_CLICKED
+  COMMENT_ADDED
+}
+
+/// Актор события: бизнес или система
+enum BookingActivityActorType {
+  BUSINESS
+  SYSTEM
+}
+
+/// История событий по заявке (timeline)
+model BookingActivity {
+  id         String                   @id @default(cuid())
+  bookingId  String
+  type       BookingActivityType
+  actorType  BookingActivityActorType @default(SYSTEM)
+  actorId    String?
+  /// Дополнительные данные события (JSON)
+  payload    Json?
+  createdAt  DateTime                 @default(now())
+
+  booking BookingRequest @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@index([bookingId, createdAt])
+  @@index([bookingId, type])
+}
+
+/// Отзыв клиента после завершённой заявки (1–5 звёзд)
+/// Только для COMPLETED bookings. Один отзыв на заявку.
+model BookingFeedback {
+  id        String   @id @default(cuid())
+  bookingId String   @unique
+  userId    String?
+  /// Оценка 1–5
+  rating    Int
+  /// Необязательный комментарий
+  comment   String?
+  createdAt DateTime @default(now())
+
+  booking BookingRequest @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  user    User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([bookingId])
+  @@index([userId])
   @@index([createdAt])
 }
 

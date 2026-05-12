@@ -3,6 +3,7 @@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { WizardRichTextField } from "@/components/business/wizard/shared/WizardRichTextField";
 import { Card, CardContent } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -167,54 +168,50 @@ export function Step5Accommodation({ data, onChange, isEditable }: Step5Accommod
           </Card>
 
           <div className="space-y-2">
-            <Label htmlFor="accommodationConditions">Условия</Label>
-            <Textarea
-              id="accommodationConditions"
-              placeholder="Режим, правила, уборка, доступ взрослых на территорию…"
+            <WizardRichTextField
+              label="Условия"
+              helperText="Режим, правила, уборка, доступ взрослых на территорию и другие важные детали."
               value={data.accommodationConditions}
-              onChange={(e) => onChange({ accommodationConditions: e.target.value })}
+              onChange={(value) => onChange({ accommodationConditions: value })}
+              placeholder="Режим, правила, уборка, доступ взрослых на территорию…"
               disabled={!isEditable}
-              rows={5}
-              className="rounded-xl min-h-[140px] resize-y"
+              minHeight={140}
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="whatToBring">Что взять с собой</Label>
-            <Textarea
-              id="whatToBring"
-              placeholder="Документы, одежда по погоде, средства гигиены…"
+            <WizardRichTextField
+              label="Что взять с собой"
+              helperText="Документы, одежда, средства гигиены и другие обязательные вещи."
               value={data.whatToBring}
-              onChange={(e) => onChange({ whatToBring: e.target.value })}
+              onChange={(value) => onChange({ whatToBring: value })}
+              placeholder="Документы, одежда по погоде, средства гигиены…"
               disabled={!isEditable}
-              rows={5}
-              className="rounded-xl min-h-[140px] resize-y"
+              minHeight={140}
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="campSafetyInfo">Безопасность</Label>
-            <Textarea
-              id="campSafetyInfo"
-              placeholder="Охрана, пропускной режим, сопровождение на мероприятиях…"
+            <WizardRichTextField
+              label="Безопасность"
+              helperText="Охрана, пропускной режим и сопровождение детей на активностях."
               value={data.campSafetyInfo}
-              onChange={(e) => onChange({ campSafetyInfo: e.target.value })}
+              onChange={(value) => onChange({ campSafetyInfo: value })}
+              placeholder="Охрана, пропускной режим, сопровождение на мероприятиях…"
               disabled={!isEditable}
-              rows={5}
-              className="rounded-xl min-h-[140px] resize-y"
+              minHeight={140}
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="campMedicalInfo">Медицинское сопровождение</Label>
-            <Textarea
-              id="campMedicalInfo"
-              placeholder="Медсестра/врач на смене, первая помощь, хранение лекарств…"
+            <WizardRichTextField
+              label="Медицинское сопровождение"
+              helperText="Первая помощь, врач или медсестра на смене, хранение лекарств."
               value={data.campMedicalInfo}
-              onChange={(e) => onChange({ campMedicalInfo: e.target.value })}
+              onChange={(value) => onChange({ campMedicalInfo: value })}
+              placeholder="Медсестра/врач на смене, первая помощь, хранение лекарств…"
               disabled={!isEditable}
-              rows={5}
-              className="rounded-xl min-h-[140px] resize-y"
+              minHeight={140}
             />
           </div>
         </div>

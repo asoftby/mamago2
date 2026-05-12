@@ -1,9 +1,17 @@
 // Offer Wizard Defaults
 // Refactored for multi-type support (SINGLE, REGULAR, CAMP)
 
-import type { OfferFormData } from "./types";
+import type { OfferFormData, SocialLink } from "./types";
 
-export function getDefaultFormData(): OfferFormData {
+export function createDefaultSocialLink(id?: string): SocialLink {
+  return {
+    id: id ?? `offer-social-${Date.now()}`,
+    network: "instagram",
+    url: "",
+  };
+}
+
+export function getDefaultFormData(defaultPlaceId: string | null = null): OfferFormData {
   return {
     // Step 1: Offer Type
     offerWizardType: null,
@@ -23,6 +31,8 @@ export function getDefaultFormData(): OfferFormData {
     campProgramType: null,
     
     // Step 3: Media
+    placeId: defaultPlaceId,
+    placeTitle: "",
     coverImage: null,
     gallery: [],
     videoUrl: null,
@@ -71,11 +81,12 @@ export function getDefaultFormData(): OfferFormData {
     pricingMode: "single",
     singlePrice: "",
     singleCurrency: "BYN",
-    singlePriceLabel: "",
+    priceCaption: "",
     pricingOptions: [],
-    promotionalOffer: "",
+    promotionDetails: "",
     
     // Step 6/7: Contacts
+    contactSource: "manual",
     phone: "",
     website: "",
     socialLinks: [],
@@ -89,6 +100,7 @@ export function getDefaultFormData(): OfferFormData {
 
     // Signals (DISCOVERY domain, entityType=OFFER)
     signalIds: [],
+    classChipSlugs: [],
     
     // Booking Settings (only for ctaType = "забронировать")
     bookingSettings: {
@@ -142,6 +154,7 @@ export function determineIntent(data: OfferFormData): "куда_пойти" | "�
   if (!data.offerKind) return null;
   
   if (data.offerKind === "course") {
+    if (data.durationType === "camp") return "занятия";
     return data.durationType === "recurring" ? "занятия" : "куда_пойти";
   }
   if (data.offerKind === "birthday") return "день_рождения";

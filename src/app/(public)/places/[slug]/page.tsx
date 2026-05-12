@@ -355,22 +355,20 @@ export default async function PlacePage({ params }: PlacePageProps) {
   });
 
   // Fetch active offers for this place
-  const activeOffers = await prisma.activity.findMany({
+  const activeOffers = await prisma.offer.findMany({
     where: {
       placeId: place.id,
-      type: "OFFER",
       status: "PUBLISHED",
     },
     select: {
       id: true,
       title: true,
       slug: true,
-      shortDesc: true,
+      description: true,
       priceFrom: true,
-      coverImageUrl: true,
-      eventCategory: {
-        select: { nameRu: true },
-      },
+      coverImage: true,
+      kind: true,
+      campProgramType: true,
     },
     orderBy: { createdAt: "desc" },
     take: 10,
@@ -440,10 +438,11 @@ export default async function PlacePage({ params }: PlacePageProps) {
     id: offer.id,
     title: offer.title,
     slug: offer.slug || offer.id,
-    imageUrl: offer.coverImageUrl || undefined,
-    description: offer.shortDesc || undefined,
+    imageUrl: offer.coverImage || undefined,
+    description: offer.description || undefined,
     price: offer.priceFrom || undefined,
-    category: offer.eventCategory?.nameRu,
+    kind: offer.kind,
+    campProgramType: offer.campProgramType,
   }));
 
   // Get district and metro names

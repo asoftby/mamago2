@@ -21,6 +21,7 @@ import {
   type ArticleBlock,
   type DynamicActivityFeedBlock,
 } from "@/lib/publications/domain";
+import { randomId } from "@/lib/utils/randomId";
 
 const BLOCK_OPTIONS: { value: ArticleBlockType; label: string }[] = [
   { value: ArticleBlockType.TITLE, label: "Заголовок" },
@@ -35,7 +36,7 @@ const BLOCK_OPTIONS: { value: ArticleBlockType; label: string }[] = [
 ];
 
 function newBlock(type: ArticleBlockType): ArticleBlock {
-  const id = crypto.randomUUID();
+  const id = randomId();
   switch (type) {
     case ArticleBlockType.TITLE:
       return { id, type, text: "" };

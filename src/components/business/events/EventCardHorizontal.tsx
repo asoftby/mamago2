@@ -181,6 +181,16 @@ export function EventCardHorizontal({
   const deleteCopy = deleteDialogCopy(activity.status);
   const statusMeta = CONTENT_STATUS_META[activity.status];
   const updatedLine = formatUpdatedAgo(activity.updatedAt, activity.createdAt);
+  const createdLine = `Создано: ${format(new Date(activity.createdAt), "d MMMM yyyy", { locale: ru })}`;
+
+  const cardMetrics = activity.metrics
+    ? {
+        views: activity.metrics.views,
+        saves: activity.metrics.saves,
+        planAdds: activity.metrics.planAdds,
+        ctaClicks: activity.metrics.ctaClicks,
+      }
+    : null;
 
   const statusRow = (
     <span
@@ -209,6 +219,8 @@ export function EventCardHorizontal({
         subtitle={buildEventSubtitle(activity)}
         statusRow={statusRow}
         updatedLine={updatedLine}
+        createdLine={createdLine}
+        metrics={cardMetrics}
         actions={
           <>
             <button

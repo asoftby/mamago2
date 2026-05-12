@@ -1,4 +1,4 @@
-"use client";
+import { randomId } from "@/lib/utils/randomId";
 
 const STORAGE_KEY = "anonymousId";
 
@@ -8,7 +8,7 @@ const STORAGE_KEY = "anonymousId";
  */
 export function getOrCreateAnonymousId(): string {
   if (typeof window === "undefined") return "";
-  const create = () => crypto.randomUUID();
+  const create = () => randomId();
 
   try {
     let id = localStorage.getItem(STORAGE_KEY)?.trim();

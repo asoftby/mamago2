@@ -3,16 +3,12 @@
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { EventScheduleCard } from "./EventScheduleCard";
+import { randomId } from "@/lib/utils/randomId";
 import type { EventScheduleItem, EventScheduleListProps } from "./types";
 
 function createNewScheduleItem(): EventScheduleItem {
-  // Use crypto.randomUUID() if available, otherwise fallback to timestamp
-  const randomId = typeof crypto !== 'undefined' && crypto.randomUUID 
-    ? crypto.randomUUID() 
-    : `${Date.now()}-${Math.random()}`;
-    
   return {
-    id: `schedule-${randomId}`,
+    id: `schedule-${randomId()}`,
     isMultiDay: false,
     date: null,
     allDay: false,

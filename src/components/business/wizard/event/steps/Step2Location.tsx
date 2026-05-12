@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
+import { WizardRichTextField } from "@/components/business/wizard/shared/WizardRichTextField";
 import { MapPinIcon, TruckIcon, ClockIcon, Loader2, Search, Sparkles, PlusCircle } from "lucide-react";
 import type { EventFormData } from "../types";
 import type { PendingLocation } from "../types";
@@ -685,18 +685,18 @@ export function Step2Location({ data, onChange, isEditable, eventId }: Step2Loca
       {/* Optional Note for MOBILE/TBD */}
       {(data.venueKind === "MOBILE" || data.venueKind === "TBD") && (
         <div className="space-y-2">
-          <Label htmlFor="location-note">Дополнительная информация (опционально)</Label>
-          <Textarea
-            id="location-note"
+          <WizardRichTextField
+            label="Дополнительная информация"
+            helperText="Короткое пояснение для родителей и участников о формате локации."
             value={data.venueNote}
-            onChange={(e) => onChange({ venueNote: e.target.value })}
+            onChange={(value) => onChange({ venueNote: value })}
             placeholder={
               data.venueKind === "MOBILE" 
                 ? "Например: Выезд в пределах Минска" 
                 : "Например: Локация будет объявлена за неделю до события"
             }
             disabled={!isEditable}
-            rows={3}
+            minHeight={140}
           />
         </div>
       )}

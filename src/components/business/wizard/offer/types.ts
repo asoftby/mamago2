@@ -7,6 +7,7 @@ export type OfferWizardMode = "create" | "edit";
 
 /** Offer types for wizard */
 export type OfferWizardType = "SINGLE" | "REGULAR" | "CAMP";
+export type OfferContactSource = "manual" | "place";
 
 /** Смена лагеря (шаг «Смены и расписание») */
 export type CampSessionKind = "day" | "full_day" | "residential";
@@ -77,6 +78,8 @@ export interface OfferFormData {
   campProgramType: "городской" | "выездной" | "смешанный" | null; // Only for CAMP
   
   // Step 3: Media
+  placeId: string | null;
+  placeTitle: string;
   coverImage: string | null;
   gallery: string[];
   videoUrl: string | null; // New: YouTube, YouTube Shorts, Instagram Reels
@@ -126,11 +129,12 @@ export interface OfferFormData {
   pricingMode: "single" | "multiple";
   singlePrice: string;
   singleCurrency: "BYN" | "USD" | "EUR";
-  singlePriceLabel: string;
+  priceCaption: string;
   pricingOptions: PricingOption[];
-  promotionalOffer: string; // New: promotional offer text (e.g., "скидка 20% при записи до 15 мая")
+  promotionDetails: string;
   
   // Step 6/7: Contacts
+  contactSource: OfferContactSource;
   phone: string;
   website: string;
   socialLinks: SocialLink[];
@@ -144,6 +148,8 @@ export interface OfferFormData {
 
   /** Сигналы DISCOVERY домена (entityType=OFFER), опционально. */
   signalIds: string[];
+  /** Привязка к чипам публичной витрины /[city]/classes. */
+  classChipSlugs: string[];
   
   // Booking Settings (only for ctaType = "забронировать")
   bookingSettings: {

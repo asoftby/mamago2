@@ -7,6 +7,7 @@ import type {
   NotificationType,
 } from "@prisma/client";
 import { getCanonicalPublicAppUrl } from "@/lib/config/publicAppUrl";
+import { getNotificationRegistryEntry } from "@/lib/notifications/notificationRegistry";
 import type { TelegramReplyMarkup } from "./TelegramChannel";
 
 type RenderedTelegramMessage = {
@@ -40,6 +41,31 @@ function renderGenericNotification(notification: Notification): RenderedTelegram
 export function renderNotificationTelegramMessage(
   notification: Notification,
 ): RenderedTelegramMessage {
+  // Пробуем использовать registry template
+  const registryEntry = getNotificationRegistryEntry(notification.type);
+  
+  if (registryEntry?.telegram) {
+    const { telegram } = registryEntry;
+    
+    // Используем inline template из registry, если есть
+    if (telegram.title || telegram.body) {
+      const prefix = audiencePrefix(notification.audience);
+      const title = telegram.title || notification.title;
+      const body = telegram.body || notification.body;
+      
+      // Заменяем {{body}} на реальный body из notification
+      const renderedBody = body.replace(/\{\{body\}\}/g, notification.body);
+      
+      const text = `${prefix} — ${title}\n\n${renderedBody}`;
+      
+      // Добавляем CTA кнопку, если есть
+      const replyMarkup = buildReplyMarkup(notification, registryEntry);
+      
+      return { text, replyMarkup };
+    }
+  }
+  
+  // Специальная обработка для BUSINESS_APPLICATION_CREATED (legacy)
   if (
     notification.type === "BUSINESS_APPLICATION_CREATED" &&
     notification.entityId
@@ -63,7 +89,51 @@ export function renderNotificationTelegramMessage(
     };
   }
 
+  // Fallback на generic template
   return renderGenericNotification(notification);
+}
+
+/**
+ * Построить inline keyboard для уведомления на основе registry
+ */
+function buildReplyMarkup(
+  notification: Notification,
+  registryEntry: ReturnType<typeof getNotificationRegistryEntry>,
+): TelegramReplyMarkup | undefined {
+  if (!registryEntry?.ctaLabel) return undefined;
+  
+  // Получаем href из registry
+  let href: string | null = null;
+  if (registryEntry.resolveHref) {
+    try {
+      href = registryEntry.resolveHref({
+        entityType: notification.entityType ?? undefined,
+        entityId: notification.entityId ?? undefined,
+        ctaAction: notification.ctaAction ?? undefined,
+      });
+    } catch (error) {
+      console.warn("[telegram] Failed to resolve href for", notification.type, error);
+    }
+  }
+  
+  // Если нет href, не показываем кнопку
+  if (!href) return undefined;
+  
+  // Строим абсолютный URL
+  const absoluteUrl = href.startsWith('http') 
+    ? href 
+    : `${getPublicAppBaseUrl()}${href}`;
+  
+  return {
+    inline_keyboard: [
+      [
+        {
+          text: registryEntry.ctaLabel,
+          url: absoluteUrl,
+        },
+      ],
+    ],
+  };
 }
 
 export function renderDevBusinessApplicationMessage(

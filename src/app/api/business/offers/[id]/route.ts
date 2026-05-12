@@ -20,6 +20,9 @@ import {
 import { syncOfferMediaUsage } from "@/server/services/media/media-usage.service";
 
 const updateOfferSchema = z.object({
+  selectedPlace: z.object({
+    id: z.string(),
+  }).optional(),
   title: z.string().min(1).optional(),
   shortDescription: z.string().min(1).optional(),
   ageMinMonths: z.number().optional(),
@@ -30,6 +33,8 @@ const updateOfferSchema = z.object({
   videoUrl: z.string().url().optional(),
   /** Акционное предложение (текстовое описание скидки и т.д.) */
   promotionalOffer: z.string().optional(),
+  priceCaption: z.string().optional(),
+  promotionDetails: z.string().optional(),
   pricingMode: z.enum(["SINGLE", "MULTIPLE"]).optional(),
   singlePrice: z.number().optional(),
   singlePriceLabel: z.string().optional(),
@@ -43,8 +48,19 @@ const updateOfferSchema = z.object({
   phone: z.string().optional(),
   website: z.string().optional(),
   bookingInstructions: z.string().optional(),
+  contactSource: z.enum(["manual", "place"]).optional(),
+  contactPhone: z.string().optional(),
+  contactWebsite: z.string().optional(),
+  contactSocialLinks: z.array(
+    z.object({
+      id: z.string().optional(),
+      network: z.enum(["instagram", "telegram", "tiktok", "youtube", "other"]),
+      url: z.string(),
+    }),
+  ).optional(),
   status: z.enum(["DRAFT", "PENDING", "PUBLISHED"]).optional(),
   discoverySignalIds: z.array(z.string()).optional(),
+  classChipSlugs: z.array(z.string()).optional(),
   campProgramType: campProgramTypeSchema,
   // Camp fields
   campSessions: z.array(campSessionEntrySchema).optional(),
@@ -89,6 +105,8 @@ export async function GET(
           select: {
             id: true,
             title: true,
+            formattedAddr: true,
+            customAddress: true,
             ownerBusinessId: true,
           },
         },
@@ -114,6 +132,7 @@ export async function GET(
   }
 }
 
+// Re-trigger build for schema updates
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -142,6 +161,7 @@ export async function PATCH(
         title: true,
         priceFrom: true,
         priceText: true,
+        placeId: true,
         place: { select: { ownerBusinessId: true } },
       },
     });
@@ -152,6 +172,23 @@ export async function PATCH(
       !canManageOwnedContent(user, existingOffer.place.ownerBusinessId)
     ) {
       return NextResponse.json({ error: "Offer not found" }, { status: 404 });
+    }
+
+    const updateData: Prisma.OfferUpdateInput = {};
+
+    if (data.selectedPlace?.id) {
+      const nextPlace = await prisma.place.findUnique({
+        where: { id: data.selectedPlace.id },
+        select: { id: true, ownerBusinessId: true },
+      });
+
+      if (!nextPlace || !nextPlace.ownerBusinessId || !canManageOwnedContent(user, nextPlace.ownerBusinessId)) {
+        return NextResponse.json({ error: "Place not found" }, { status: 404 });
+      }
+
+      if (data.selectedPlace.id !== existingOffer.placeId) {
+        updateData.place = { connect: { id: data.selectedPlace.id } };
+      }
     }
 
     // Calculate price fields if pricing data is provided
@@ -165,8 +202,6 @@ export async function PATCH(
       priceFrom = Math.min(...data.pricingOptions.map(p => p.price));
       priceText = formatPriceFrom(priceFrom);
     }
-
-    const updateData: Prisma.OfferUpdateInput = {};
     
     if (data.title !== undefined) updateData.title = data.title;
     if (data.shortDescription !== undefined) updateData.description = data.shortDescription;
@@ -175,8 +210,16 @@ export async function PATCH(
     if (data.coverImage !== undefined) updateData.coverImage = data.coverImage;
     if (data.gallery !== undefined) updateData.galleryImages = data.gallery;
     if (data.videoUrl !== undefined) updateData.videoUrl = data.videoUrl;
+    if (data.priceCaption !== undefined) updateData.priceCaption = data.priceCaption;
+    if (data.promotionDetails !== undefined) updateData.promotionDetails = data.promotionDetails;
     if (data.promotionalOffer !== undefined) updateData.promotionalOffer = data.promotionalOffer;
     if (data.discoverySignalIds !== undefined) updateData.discoverySignalIds = data.discoverySignalIds;
+    if (data.classChipSlugs !== undefined) updateData.classChipSlugs = data.classChipSlugs;
+    if (data.contactSource !== undefined) updateData.contactSource = data.contactSource;
+    if (data.contactPhone !== undefined) updateData.contactPhone = data.contactPhone;
+    if (data.contactWebsite !== undefined) updateData.contactWebsite = data.contactWebsite;
+    if (data.contactSocialLinks !== undefined)
+      updateData.contactSocialLinks = data.contactSocialLinks as unknown as Prisma.InputJsonValue;
     if (data.campProgramType !== undefined) updateData.campProgramType = data.campProgramType;
     if (data.status !== undefined) {
       updateData.status = data.status;
@@ -226,6 +269,8 @@ export async function PATCH(
           select: {
             id: true,
             title: true,
+            formattedAddr: true,
+            customAddress: true,
           },
         },
       },
@@ -274,7 +319,10 @@ export async function PATCH(
     }
 
     return NextResponse.json(
-      { error: "Internal server error" },
+      { 
+        error: "Internal server error", 
+        message: error instanceof Error ? error.message : "Something went wrong" 
+      },
       { status: 500 }
     );
   }

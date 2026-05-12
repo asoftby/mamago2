@@ -11,6 +11,7 @@ import type { ReviewSection } from "../shared/types";
 import type { OfferWizardType, OfferWizardStepKey, OfferFormData } from "./types";
 import { validatePublicationAccess } from "@/features/publication-access";
 import { showCampLodgingFormFields } from "./campOfferModel";
+import { isOfferContactsComplete } from "./contacts";
 
 export interface OfferWizardStepDef {
   key: OfferWizardStepKey;
@@ -313,8 +314,7 @@ export function isStepComplete(
       }
 
     case "contacts":
-      // Optional step
-      return true;
+      return isOfferContactsComplete(data);
 
     case "review":
       // Review step is complete when all previous steps are complete
@@ -376,6 +376,12 @@ export function getMissingFieldsForStep(
       if (data.offerWizardType === "CAMP" && showCampLodgingFormFields(data)) {
         if (!data.accommodationType) missing.push("Тип размещения");
         if (!data.accommodationAddress?.trim()) missing.push("Адрес проживания");
+      }
+      break;
+
+    case "contacts":
+      if (data.contactSource === "place") {
+        if (!data.placeId) missing.push("Место для контактов");
       }
       break;
 

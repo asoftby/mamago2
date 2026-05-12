@@ -106,8 +106,9 @@ export async function POST(request: NextRequest) {
       ...(redirectTo ? { redirectTo } : {}),
     });
     
-    // Set session cookie on response
-    setSessionCookie(response, token);
+    // Set session cookie on response with request hostname for proper dev/prod domain handling
+    const requestHost = request.headers.get("x-forwarded-host") ?? request.headers.get("host");
+    setSessionCookie(response, token, requestHost ?? undefined);
 
     return response;
   } catch (error) {

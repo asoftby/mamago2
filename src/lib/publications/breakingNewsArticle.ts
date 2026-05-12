@@ -6,6 +6,7 @@ import {
   type ArticleContentPayload,
   type ArticleBlockMvp,
 } from "@/lib/publications/articleMvp";
+import { randomId } from "@/lib/utils/randomId";
 
 /** Маркер в `Article.subtitle` — отличает Breaking news от обычной статьи. */
 export const BREAKING_NEWS_SUBTITLE = "__breaking_news__";
@@ -38,11 +39,11 @@ export function emptyBreakingNewsContent(): ArticleContentPayload {
 /** Сборка блоков: два text (тело, цены), опционально activityCard и gallery. */
 export function buildBreakingNewsContent(state: BreakingNewsFormState): ArticleContentPayload {
   const blocks: ArticleBlockMvp[] = [];
-  blocks.push({ id: crypto.randomUUID(), type: "text", text: state.bodyHtml });
-  blocks.push({ id: crypto.randomUUID(), type: "text", text: state.pricingHtml });
+  blocks.push({ id: randomId(), type: "text", text: state.bodyHtml });
+  blocks.push({ id: randomId(), type: "text", text: state.pricingHtml });
   if (state.linkedEntityId.trim()) {
     blocks.push({
-      id: crypto.randomUUID(),
+      id: randomId(),
       type: "activityCard",
       entityType: state.linkedEntityType,
       entityId: state.linkedEntityId.trim(),
@@ -50,9 +51,10 @@ export function buildBreakingNewsContent(state: BreakingNewsFormState): ArticleC
   }
   if (state.galleryIds.length > 0) {
     blocks.push({
-      id: crypto.randomUUID(),
+      id: randomId(),
       type: "gallery",
       mediaIds: state.galleryIds,
+      caption: "",
     });
   }
   return { version: 1, blocks };

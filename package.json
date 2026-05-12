@@ -11,8 +11,8 @@
     }
   },
   "scripts": {
-    "dev": "next dev --webpack -H 0.0.0.0",
-    "dev:turbo": "next dev --turbo -H 0.0.0.0",
+    "dev": "ulimit -n 65536 && next dev --webpack -H 0.0.0.0",
+    "dev:turbo": "ulimit -n 65536 && next dev --turbo -H 0.0.0.0",
     "dev:webpack": "next dev",
     "email:preview": "react-email dev --dir ./emails --port 3011",
     "build": "next build",
@@ -71,6 +71,7 @@
     "@react-email/render": "^2.0.5",
     "@tiptap/extension-link": "^3.20.1",
     "@tiptap/extension-placeholder": "^3.20.1",
+    "@tiptap/extension-underline": "^3.20.1",
     "@tiptap/react": "^3.20.1",
     "@tiptap/starter-kit": "^3.20.1",
     "bcryptjs": "^3.0.3",

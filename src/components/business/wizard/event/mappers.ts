@@ -19,6 +19,7 @@ import { detectAgeBuckets } from "@/lib/age/ageMapping";
 import { sortAgeKeys } from "@/lib/config/ages";
 import type { EventOrganizerInput } from "@/lib/business/eventOrganizer";
 import { DEFAULT_ACTIVITY_FORMAT, normalizeActivityFormat } from "@/domain/activities/activity-format";
+import { normalizeRichTextEditorValue } from "@/lib/richtext/utils";
 
 export type ActivityWithRelations = Activity & {
   id: string;
@@ -299,7 +300,7 @@ export function mapEventToFormData(event: ActivityWithRelations): EventFormData 
   }
 
   // Step 2: Description
-  formData.fullDescription = event.description || "";
+  formData.fullDescription = normalizeRichTextEditorValue(event.description);
 
   // Step 3: Media
   formData.coverImage = event.coverImageId || null;
@@ -383,7 +384,10 @@ export function mapEventToFormData(event: ActivityWithRelations): EventFormData 
           ? String(priceFromDb)
           : "";
   }
-  formData.priceDetails = typeof scheduleJson.priceDetails === "string" ? scheduleJson.priceDetails : "";
+  formData.priceDetails =
+    typeof scheduleJson.priceDetails === "string"
+      ? normalizeRichTextEditorValue(scheduleJson.priceDetails)
+      : "";
   formData.ticketLink = typeof scheduleJson.ticketLink === "string" ? scheduleJson.ticketLink : "";
 
   formData.participationMode = normalizeParticipationMode(scheduleJson.participationMode);
@@ -424,7 +428,7 @@ export function mapEventToFormData(event: ActivityWithRelations): EventFormData 
     formData.venueName = event.venue.title ?? "";
     formData.address = event.venue.addressLine ?? "";
     formData.city = event.venue.cityId ?? "";
-    formData.venueNote = event.venue.note ?? "";
+    formData.venueNote = normalizeRichTextEditorValue(event.venue.note);
     
     // Map district and metro fields if available
     formData.districtAutoId = event.venue.districtAutoId || null;

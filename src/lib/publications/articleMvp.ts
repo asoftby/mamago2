@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { randomId } from "@/lib/utils/randomId";
 
 /** Версия формата `Article.contentJson` */
 export const ARTICLE_CONTENT_VERSION = 1 as const;
@@ -84,7 +85,7 @@ export function articleStarterContent(): ArticleContentPayload {
 
 export function newBlock(
   type: ArticleBlockMvp["type"],
-  id: () => string = () => crypto.randomUUID(),
+  id: () => string = () => randomId(),
 ): ArticleBlockMvp {
   const bid = id();
   switch (type) {

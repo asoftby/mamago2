@@ -5,6 +5,11 @@ import { Intent } from "@/lib/intent";
 import { listPublicRoutesByCity } from "@/server/services/route.service";
 import { getCurrentUser } from "@/lib/auth/server";
 import { getKudaDiscoveryFeed } from "@/server/discovery/kudaDiscoveryFeed";
+import { getClassesDiscoveryFeed } from "@/server/discovery/classesDiscoveryFeed";
+import {
+  listDiscoveryClassChips,
+  resolveDiscoveryClassChipSlug,
+} from "@/server/discovery/classChips";
 import { parseActivityFormatQuery } from "@/domain/activities/activity-format";
 import type { PublicRouteCardModel } from "@/components/routes/types";
 
@@ -22,6 +27,8 @@ export async function CityShell({ citySlug, intent, searchParams }: CityShellPro
   if (!city) notFound();
 
   let discoveryActivities = undefined;
+  let classChips = undefined;
+  let activeClassChipSlug = undefined;
   if (intent === "kuda" || intent === "birthday") {
     const formatParam = Array.isArray(searchParams.format)
       ? searchParams.format[0]
@@ -32,6 +39,17 @@ export async function CityShell({ citySlug, intent, searchParams }: CityShellPro
     discoveryActivities = await getKudaDiscoveryFeed(city.id, city.slug, user?.id ?? null, {
       format: parseActivityFormatQuery(typeof formatParam === "string" ? formatParam : null),
       nearby: nearbyParam === "true",
+    });
+  }
+  if (intent === "classes") {
+    const requestedChip = Array.isArray(searchParams.chip)
+      ? searchParams.chip[0]
+      : searchParams.chip;
+    classChips = await listDiscoveryClassChips();
+    activeClassChipSlug = resolveDiscoveryClassChipSlug(requestedChip, classChips);
+    discoveryActivities = await getClassesDiscoveryFeed(city.id, city.slug, {
+      chipSlug: activeClassChipSlug,
+      chipTitleBySlug: new Map(classChips.map((chip) => [chip.slug, chip.title])),
     });
   }
 
@@ -78,6 +96,8 @@ export async function CityShell({ citySlug, intent, searchParams }: CityShellPro
       intent={intent}
       routesData={routesData}
       discoveryActivities={discoveryActivities}
+      classChips={classChips}
+      activeClassChipSlug={activeClassChipSlug}
     />
   );
 }

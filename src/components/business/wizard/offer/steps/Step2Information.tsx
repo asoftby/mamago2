@@ -9,6 +9,7 @@ import { AGE_OPTIONS } from "@/lib/config/ages";
 import { RichDescriptionEditor } from "@/components/editor/RichDescriptionEditor";
 import type { OfferFormData } from "../types";
 import { StructuredDiscoverySignalPicker } from "../../shared/StructuredDiscoverySignalPicker";
+import { OfferClassChipPicker } from "../components/OfferClassChipPicker";
 import { SignalEntityType } from "@prisma/client";
 
 interface Step2InformationProps {
@@ -246,6 +247,20 @@ export function Step2Information({ data, onChange, isEditable }: Step2Informatio
                 : undefined,
             },
           ]}
+        />
+      </div>
+
+      <div className="space-y-3">
+        <div>
+          <h3 className="text-lg font-semibold mb-1">Чипы витрины “Занятия”</h3>
+          <p className="text-sm text-muted-foreground">
+            Помогают показать предложение в конкретных категориях на странице занятий. Без выбора предложение останется только в чипе “Все”.
+          </p>
+        </div>
+        <OfferClassChipPicker
+          value={data.classChipSlugs ?? []}
+          onChange={(classChipSlugs) => onChange({ classChipSlugs })}
+          disabled={!isEditable}
         />
       </div>
     </div>

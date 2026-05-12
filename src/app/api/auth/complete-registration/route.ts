@@ -248,7 +248,8 @@ export async function POST(request: NextRequest) {
       ...(redirectTo ? { redirectTo } : {}),
       ...(emailResult.verificationEmailSendFailed ? { verificationEmailSendFailed: true } : {}),
     });
-    setSessionCookie(response, token);
+    const requestHost = request.headers.get("x-forwarded-host") ?? request.headers.get("host");
+    setSessionCookie(response, token, requestHost ?? undefined);
 
     return response;
   } catch (error) {

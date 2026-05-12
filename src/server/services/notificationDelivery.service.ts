@@ -164,6 +164,10 @@ async function handleTelegram(notificationId: string, enabled: boolean): Promise
   try {
     const connection = await getActiveTelegramConnectionForCurrentEnvironment(notification.userId);
     if (!connection?.isActive) {
+      console.warn(
+        "[delivery:telegram] skipped: TELEGRAM_NOT_CONNECTED",
+        { userId: notification.userId, notificationId, type: notification.type }
+      );
       await prisma.notificationDelivery.update({
         where: { id: deliveryId },
         data: { status: "SKIPPED", errorMessage: "TELEGRAM_NOT_CONNECTED" },
@@ -191,7 +195,10 @@ async function handleTelegram(notificationId: string, enabled: boolean): Promise
         errorMessage: e instanceof Error ? e.message : "TELEGRAM_SEND_FAILED",
       },
     });
-    console.error("[delivery:telegram] Failed to send:", e);
+    console.error(
+      "[delivery:telegram] failed",
+      { userId: notification.userId, notificationId, type: notification.type, error: e instanceof Error ? e.message : String(e) }
+    );
   }
 }
 

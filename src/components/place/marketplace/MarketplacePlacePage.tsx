@@ -74,6 +74,8 @@ interface MarketplacePlacePageProps {
     id: string;
     title: string;
     slug: string;
+    kind: string;
+    campProgramType?: string | null;
     imageUrl?: string;
     description?: string;
     price?: number;

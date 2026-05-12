@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import { RichContentRenderer } from "@/components/content/RichContentRenderer";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -12,7 +13,9 @@ import {
   PublicationAccessEditor,
   type PublicationAccess,
 } from "@/features/publication-access";
+import { WizardRichTextField } from "@/components/business/wizard/shared/WizardRichTextField";
 import { formatPrice } from "@/lib/formatters/format-price";
+import { isRichTextMeaningful } from "@/lib/richtext/utils";
 import { Plus, Trash2 } from "lucide-react";
 import type { OfferFormData, PricingOption } from "../types";
 
@@ -108,12 +111,14 @@ export function Step5Pricing({
     () => getPublicationAccessFromOffer(data),
     [data],
   );
+  const hasPriceCaption = isRichTextMeaningful(data.priceCaption);
+  const hasPromotionDetails = isRichTextMeaningful(data.promotionDetails);
 
   const handlePricingModeChange = (pricingMode: "single" | "multiple") => {
     onChange({
       pricingMode,
       singlePrice: "",
-      singlePriceLabel: "",
+      priceCaption: "",
       pricingOptions: [],
     });
   };
@@ -185,9 +190,9 @@ export function Step5Pricing({
       </div>
 
       {data.pricingMode === "single" && (
-        <div className="space-y-4">
-          <div className="grid grid-cols-3 gap-4">
-            <div className="col-span-2 space-y-2">
+        <div className="space-y-6">
+          <div className="grid gap-4 md:grid-cols-3">
+            <div className="space-y-2 md:col-span-2">
               <Label htmlFor="singlePrice">
                 Цена <span className="text-red-500">*</span>
               </Label>
@@ -222,20 +227,6 @@ export function Step5Pricing({
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="singlePriceLabel">
-              Подпись к цене (необязательно)
-            </Label>
-            <Input
-              id="singlePriceLabel"
-              placeholder="Например: за человека, за группу"
-              value={data.singlePriceLabel}
-              onChange={(e) =>
-                handleSinglePriceChange("singlePriceLabel", e.target.value)
-              }
-              disabled={!isEditable}
-            />
-          </div>
         </div>
       )}
 
@@ -348,17 +339,52 @@ export function Step5Pricing({
         </div>
       )}
 
+      <div className="space-y-6">
+        <WizardRichTextField
+          label="Подпись к цене"
+          helperText="Например: что входит в стоимость, условия участия, важные ограничения"
+          value={data.priceCaption}
+          onChange={(html) => onChange({ priceCaption: html })}
+          placeholder="Что входит в стоимость, питание, материалы, дополнительные расходы…"
+          disabled={!isEditable}
+          minHeight={140}
+        />
+
+        <WizardRichTextField
+          label="Акционные данные"
+          helperText="Например: скидки, акции, бонусы, специальные условия"
+          value={data.promotionDetails}
+          onChange={(html) => onChange({ promotionDetails: html })}
+          placeholder="Скидки, раннее бронирование, акции, бонусы…"
+          disabled={!isEditable}
+          minHeight={140}
+        />
+      </div>
+
       {((data.pricingMode === "single" && data.singlePrice) ||
         (data.pricingMode === "multiple" && data.pricingOptions.length > 0)) && (
         <div className="bg-gray-50 border rounded-lg p-4">
           <h4 className="font-medium mb-3">Превью цен</h4>
           <div className="space-y-2">
             {data.pricingMode === "single" && (
-              <div className="flex items-center justify-between">
-                <span>{data.singlePriceLabel || "Стоимость"}</span>
-                <span className="font-medium">
-                  {data.singlePrice} {data.singleCurrency}
-                </span>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-4">
+                  <span>Стоимость</span>
+                  <span className="font-medium">
+                    {data.singlePrice} {data.singleCurrency}
+                  </span>
+                </div>
+                {hasPriceCaption ? (
+                  <div className="rounded-md border bg-background p-3">
+                    <RichContentRenderer html={data.priceCaption} className="prose-p:my-2 prose-ul:my-2 prose-ol:my-2" />
+                  </div>
+                ) : null}
+                {hasPromotionDetails ? (
+                  <div className="rounded-md border bg-background p-3">
+                    <div className="text-sm font-medium mb-2">Акционные данные</div>
+                    <RichContentRenderer html={data.promotionDetails} className="prose-p:my-2 prose-ul:my-2 prose-ol:my-2" />
+                  </div>
+                ) : null}
               </div>
             )}
 
@@ -405,6 +431,23 @@ export function Step5Pricing({
                   </div>
                 );
               })}
+
+            {data.pricingMode === "multiple" && (hasPriceCaption || hasPromotionDetails) ? (
+              <div className="space-y-3 border-t pt-3">
+                {hasPriceCaption ? (
+                  <div className="rounded-md border bg-background p-3">
+                    <div className="text-sm font-medium mb-2">Подпись к цене</div>
+                    <RichContentRenderer html={data.priceCaption} className="prose-p:my-2 prose-ul:my-2 prose-ol:my-2" />
+                  </div>
+                ) : null}
+                {hasPromotionDetails ? (
+                  <div className="rounded-md border bg-background p-3">
+                    <div className="text-sm font-medium mb-2">Акционные данные</div>
+                    <RichContentRenderer html={data.promotionDetails} className="prose-p:my-2 prose-ul:my-2 prose-ol:my-2" />
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
           </div>
         </div>
       )}

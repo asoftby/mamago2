@@ -3,6 +3,15 @@ import type {
   NotificationChannel,
   NotificationType,
 } from "@prisma/client";
+import {
+  NOTIFICATION_REGISTRY,
+  getNotificationRegistryEntry,
+  getNotificationTypesForSurface,
+  getNotificationDefaultChannels,
+  getNotificationSettingsRows,
+  type NotificationChannels,
+  type NotificationRegistryEntry,
+} from "./notificationRegistry";
 
 export type NotificationSettingsSurface = "USER" | "BUSINESS" | "ADMIN";
 
@@ -15,6 +24,41 @@ export type NotificationSettingsGroupId =
   | "business-verification"
   | "business-applications"
   | "admin-operations";
+
+// ─── Registry Integration ─────────────────────────────────────────────────────
+
+/**
+ * Mapping между registry groupId и существующими NotificationSettingsGroupId
+ * Это позволяет сохранить обратную совместимость с UI
+ */
+const REGISTRY_GROUP_MAPPING: Record<string, NotificationSettingsGroupId> = {
+  // USER surface
+  "system": "user-important",
+  "recommendations": "user-important", 
+  "news": "user-important",
+  
+  // BUSINESS surface  
+  "moderation": "business-places", // PLACE_*, ACTIVITY_*, OFFER_*
+  "business": "business-verification", // BUSINESS_*
+  "bookings": "business-applications", // BOOKING_*
+  
+  // ADMIN surface
+  "admin_moderation": "admin-operations",
+};
+
+/**
+ * Обратный mapping для определения порядка групп
+ */
+const SETTINGS_GROUP_REGISTRY_MAPPING: Record<NotificationSettingsGroupId, string[]> = {
+  "user-important": ["system", "recommendations", "news"],
+  "user-for-you": [],
+  "business-places": ["moderation"],
+  "business-updates": [], // Пока пустая, но может использоваться для PLACE_UPDATE_*
+  "business-content": [], // Пока пустая, но может использоваться для отдельной группы
+  "business-verification": ["business"],
+  "business-applications": ["bookings"],
+  "admin-operations": ["admin_moderation"],
+};
 
 export type ChannelDefaults = {
   inApp: boolean;
@@ -362,6 +406,36 @@ const NOTIFICATION_SETTINGS_TYPE_DEFINITIONS: readonly NotificationSettingsTypeD
     order: 10,
     defaultKind: "BUSINESS_ACTION",
   },
+  {
+    type: "BOOKING_CREATED",
+    label: "Заявка на запись",
+    description: "Новая бронь или запись на услугу",
+    audience: "BUSINESS",
+    surface: "BUSINESS",
+    groupId: "business-applications",
+    order: 20,
+    defaultKind: "BUSINESS_ACTION",
+  },
+  {
+    type: "BOOKING_STALE",
+    label: "Необработанная заявка",
+    description: "Напоминание о заявке, ожидающей решения более 24 часов",
+    audience: "BUSINESS",
+    surface: "BUSINESS",
+    groupId: "business-applications",
+    order: 30,
+    defaultKind: "BUSINESS_ACTION",
+  },
+  {
+    type: "BOOKING_NEEDS_ATTENTION",
+    label: "Внимание к заявке",
+    description: "Требуется действие по подтверждённой брони",
+    audience: "BUSINESS",
+    surface: "BUSINESS",
+    groupId: "business-applications",
+    order: 40,
+    defaultKind: "BUSINESS_ACTION",
+  },
   // ── ADMIN surface — unchanged ─────────────────────────────────────────────
   {
     type: "ADMIN_MODERATION_ITEM_CREATED",
@@ -395,36 +469,93 @@ function toChannelRecord(defaults: ChannelDefaults): Record<NotificationChannel,
   };
 }
 
-export const ALL_NOTIFICATION_SETTINGS_TYPES = NOTIFICATION_SETTINGS_TYPE_DEFINITIONS.map(
-  (definition) => definition.type,
-);
+/**
+ * Конвертирует NotificationChannels из registry в ChannelDefaults
+ */
+function fromRegistryChannels(channels: NotificationChannels): ChannelDefaults {
+  return {
+    inApp: channels.inApp,
+    email: channels.email,
+    telegram: channels.telegram,
+  };
+}
+
+export const ALL_NOTIFICATION_SETTINGS_TYPES = Object.keys(NOTIFICATION_REGISTRY) as NotificationType[];
 
 /**
- * The 4 active USER-surface notification types.
+ * The active USER-surface notification types.
  * Only these types are valid for USER preference writes and settings UI.
  * WELCOME and ANNOUNCEMENT are legacy-only — they are NOT in this set.
  */
 export const ACTIVE_USER_NOTIFICATION_TYPES = new Set<NotificationType>(
-  NOTIFICATION_SETTINGS_TYPE_DEFINITIONS
-    .filter((d) => d.surface === "USER")
-    .map((d) => d.type),
+  Object.values(NOTIFICATION_REGISTRY)
+    .filter((entry) => entry.surface === "USER" && !isLegacyNotificationType(entry.type))
+    .map((entry) => entry.type as NotificationType),
 );
+
+/**
+ * Определяет, является ли тип уведомления legacy (не должен показываться в настройках)
+ */
+function isLegacyNotificationType(type: string): boolean {
+  // WELCOME и ANNOUNCEMENT не должны появляться в обычных настройках пользователя
+  return type === "WELCOME" || type === "ANNOUNCEMENT";
+}
 
 export function getNotificationSettingsTypesForSurface(
   surface: NotificationSettingsSurface,
 ): NotificationType[] {
-  return NOTIFICATION_SETTINGS_TYPE_DEFINITIONS
-    .filter((definition) => definition.surface === surface)
-    .sort((left, right) => left.order - right.order)
-    .map((definition) => definition.type);
+  return Object.values(NOTIFICATION_REGISTRY)
+    .filter((entry) => entry.surface === surface && !isLegacyNotificationType(entry.type))
+    .sort((a, b) => {
+      // Сортируем по groupId, затем по алфавиту
+      const groupCompare = a.groupId.localeCompare(b.groupId);
+      if (groupCompare !== 0) return groupCompare;
+      return a.label.localeCompare(b.label);
+    })
+    .map((entry) => entry.type as NotificationType);
 }
 
 export function getNotificationSettingsTypeDefinitions(
   surface: NotificationSettingsSurface,
 ): NotificationSettingsTypeDefinition[] {
-  return NOTIFICATION_SETTINGS_TYPE_DEFINITIONS
-    .filter((definition) => definition.surface === surface)
-    .sort((left, right) => left.order - right.order);
+  return Object.values(NOTIFICATION_REGISTRY)
+    .filter((entry) => entry.surface === surface && !isLegacyNotificationType(entry.type))
+    .sort((a, b) => {
+      const groupCompare = a.groupId.localeCompare(b.groupId);
+      if (groupCompare !== 0) return groupCompare;
+      return a.label.localeCompare(b.label);
+    })
+    .map((entry, index) => ({
+      type: entry.type as NotificationType,
+      label: entry.label,
+      description: entry.description,
+      audience: entry.audience as NotificationAudience,
+      surface: entry.surface as NotificationSettingsSurface,
+      groupId: REGISTRY_GROUP_MAPPING[entry.groupId] || "user-important",
+      order: (index + 1) * 10,
+      defaultKind: getDefaultKindForEntry(entry),
+    }));
+}
+
+/**
+ * Определяет defaultKind на основе entry из registry
+ */
+function getDefaultKindForEntry(entry: NotificationRegistryEntry): NotificationSettingsDefaultKind {
+  if (entry.surface === "USER") {
+    if (entry.category === "SYSTEM") return "USER_SECURITY";
+    if (entry.category === "PLAN") return "USER_REMINDERS";
+    if (entry.category === "MARKETING") return "USER_RECOMMENDATIONS";
+    return "USER_NEWS";
+  }
+  
+  if (entry.surface === "BUSINESS") {
+    if (entry.importance === "HIGH" || entry.importance === "CRITICAL") {
+      return "BUSINESS_ACTION";
+    }
+    return "BUSINESS_DECISION";
+  }
+  
+  return "ADMIN_QUEUE";
 }
 
 export function getNotificationSettingsGroupDefinitions(
@@ -438,27 +569,40 @@ export function getNotificationSettingsGroupDefinitions(
 export function getNotificationSettingsTypeDefinition(
   notificationType: NotificationType,
 ): NotificationSettingsTypeDefinition | undefined {
-  return NOTIFICATION_SETTINGS_TYPE_DEFINITIONS.find(
-    (definition) => definition.type === notificationType,
-  );
+  const entry = getNotificationRegistryEntry(notificationType);
+  if (!entry) return undefined;
+  
+  return {
+    type: entry.type as NotificationType,
+    label: entry.label,
+    description: entry.description,
+    audience: entry.audience as NotificationAudience,
+    surface: entry.surface as NotificationSettingsSurface,
+    groupId: REGISTRY_GROUP_MAPPING[entry.groupId] || "user-important",
+    order: 10, // Порядок будет определяться в getNotificationSettingsTypeDefinitions
+    defaultKind: getDefaultKindForEntry(entry),
+  };
 }
 
 export function getNotificationSettingsLabel(
   notificationType: NotificationType,
 ): string {
-  return getNotificationSettingsTypeDefinition(notificationType)?.label ?? notificationType;
+  const entry = getNotificationRegistryEntry(notificationType);
+  return entry?.label ?? notificationType;
 }
 
 export function resolveNotificationSettingsSurfaceForType(
   notificationType: NotificationType,
 ): NotificationSettingsSurface {
-  return getNotificationSettingsTypeDefinition(notificationType)?.surface ?? "USER";
+  const entry = getNotificationRegistryEntry(notificationType);
+  return (entry?.surface as NotificationSettingsSurface) ?? "USER";
 }
 
 export function resolveNotificationAudienceForType(
   notificationType: NotificationType,
 ): NotificationAudience {
-  return getNotificationSettingsTypeDefinition(notificationType)?.audience ?? "USER";
+  const entry = getNotificationRegistryEntry(notificationType);
+  return (entry?.audience as NotificationAudience) ?? "USER";
 }
 
 export function isNotificationTypeSupportedOnSurface(
@@ -472,13 +616,13 @@ export function getNotificationSurfaceDefaults(
   surface: NotificationSettingsSurface,
   notificationType: NotificationType,
 ): ChannelDefaults {
-  const definition = getNotificationSettingsTypeDefinition(notificationType);
+  const entry = getNotificationRegistryEntry(notificationType);
 
-  if (!definition || definition.surface !== surface) {
+  if (!entry || entry.surface !== surface) {
     return SILENT_CHANNELS;
   }
 
-  return CHANNEL_DEFAULT_PRESETS[definition.defaultKind];
+  return fromRegistryChannels(entry.defaultChannels);
 }
 
 export function getLegacyNotificationDefaults(
@@ -519,6 +663,7 @@ export function buildEmptyNotificationSettingsSurfaceData(
     return {
       notificationType: definition.type,
       label: definition.label,
+      description: definition.description,
       audience: definition.audience,
       channels: toChannelRecord(defaults),
       defaultChannels: toChannelRecord(defaults),
@@ -533,7 +678,7 @@ export function buildEmptyNotificationSettingsSurfaceData(
       rows: getNotificationSettingsTypeDefinitions(surface)
         .filter((definition) => definition.groupId === group.id)
         .map((definition) => rowsByType.get(definition.type))
-        .filter((row): row is NotificationSettingsRow => Boolean(row)),
+        .filter((row) => row !== undefined) as NotificationSettingsRow[],
     }))
     .filter((group) => group.rows.length > 0);
 

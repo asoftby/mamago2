@@ -1188,12 +1188,21 @@ function EventWizardInner({
   const isEditable = true; // TODO: Add proper logic
 
   const displayTitleRaw = formData.title?.trim() ?? "";
-  const displayTitle =
-    displayTitleRaw.length === 0
-      ? businessFormCopy.event.createTitle
-      : displayTitleRaw.length <= 60
-        ? displayTitleRaw
-        : `${displayTitleRaw.slice(0, 57)}...`;
+  const displayTitle = (() => {
+    if (mode === "edit") {
+      // В режиме редактирования — всегда показываем "Редактирование события: название"
+      return businessFormCopy.event.editTitle(
+        displayTitleRaw.length > 60
+          ? `${displayTitleRaw.slice(0, 57)}...`
+          : displayTitleRaw || undefined
+      );
+    }
+    // В режиме создания — показываем название по мере ввода
+    if (displayTitleRaw.length === 0) return businessFormCopy.event.createTitle;
+    return displayTitleRaw.length <= 60
+      ? displayTitleRaw
+      : `${displayTitleRaw.slice(0, 57)}...`;
+  })();
 
   // Check if form is valid for submission (only on review step)
   const submitValidation = currentStep === TOTAL_STEPS ? validateForSubmit(formData) : { isValid: true };

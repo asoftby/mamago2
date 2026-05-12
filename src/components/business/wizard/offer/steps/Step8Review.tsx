@@ -7,14 +7,16 @@ import { Badge } from "@/components/ui/badge";
 import { AlertCircle, CheckCircle2, Edit } from "lucide-react";
 import { getStepsForOfferType, isStepComplete, getMissingFieldsForStep, getStepNumber } from "../offerWizardSteps.config";
 import type { OfferFormData, OfferWizardStepKey } from "../types";
+import type { ValidationResult } from "../validation";
 
 interface Step8ReviewProps {
   data: OfferFormData;
   isSubmitting: boolean;
   onGoToStep: (step: number) => void;
+  validation: ValidationResult;
 }
 
-export function Step8Review({ data, isSubmitting, onGoToStep }: Step8ReviewProps) {
+export function Step8Review({ data, isSubmitting, onGoToStep, validation }: Step8ReviewProps) {
   const steps = getStepsForOfferType(data.offerWizardType);
   
   // Calculate completion stats (exclude review step itself)
@@ -32,6 +34,7 @@ export function Step8Review({ data, isSubmitting, onGoToStep }: Step8ReviewProps
   });
   
   const hasErrors = allMissingFields.length > 0;
+  const validationErrors = Array.from(new Set(validation.errors));
 
   const handleGoToStep = (stepKey: OfferWizardStepKey) => {
     const stepNum = getStepNumber(data.offerWizardType, stepKey);
@@ -101,6 +104,26 @@ export function Step8Review({ data, isSubmitting, onGoToStep }: Step8ReviewProps
         </Card>
       )}
 
+      {!hasErrors && validationErrors.length > 0 && (
+        <Card className="border-amber-200 bg-amber-50">
+          <CardContent className="p-4">
+            <div className="flex gap-3">
+              <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <h4 className="font-medium text-amber-900 mb-2">Проверьте значения полей:</h4>
+                <ul className="space-y-1">
+                  {validationErrors.map((field, idx) => (
+                    <li key={idx} className="text-sm text-amber-800">
+                      • {field}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Steps Review */}
       <div className="space-y-3">
         <h3 className="font-medium">Проверка по шагам</h3>
@@ -148,6 +171,46 @@ export function Step8Review({ data, isSubmitting, onGoToStep }: Step8ReviewProps
           );
         })}
       </div>
+
+      <Card className="border-border/70">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">Контакты</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2 text-sm">
+          {data.contactSource === "place" && data.placeId ? (
+            <div>
+              <div className="font-medium text-foreground">
+                Контакты взяты из места: {data.placeTitle || "Выбранная площадка"}
+              </div>
+              <div className="text-muted-foreground">
+                Телефон, сайт и социальные сети будут использованы из выбранной площадки.
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-1">
+              <div>
+                <span className="font-medium">Телефон:</span>{" "}
+                <span className="text-muted-foreground">{data.phone || "Не указан"}</span>
+              </div>
+              <div>
+                <span className="font-medium">Сайт:</span>{" "}
+                <span className="text-muted-foreground">{data.website || "Не указан"}</span>
+              </div>
+              <div>
+                <span className="font-medium">Соцсети:</span>{" "}
+                <span className="text-muted-foreground">
+                  {data.socialLinks.filter((link) => link.url.trim()).length > 0
+                    ? data.socialLinks
+                        .filter((link) => link.url.trim())
+                        .map((link) => link.url.trim())
+                        .join(", ")
+                    : "Не указаны"}
+                </span>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Ready to Submit */}
       {completionPercentage === 100 && (

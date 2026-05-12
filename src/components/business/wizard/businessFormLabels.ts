@@ -30,14 +30,17 @@ export const businessFormCopy = {
   savedAt: (d: Date) => `Сохранено ${d.toLocaleTimeString()}`,
   place: {
     createTitle: "Новое место",
-    editTitle: "Редактирование места",
+    editTitle: (name?: string | null) =>
+      name?.trim() ? `Редактирование места: ${name.trim()}` : "Редактирование места",
   },
   event: {
     createTitle: "Новое событие",
-    editTitle: "Редактирование события",
+    editTitle: (name?: string | null) =>
+      name?.trim() ? `Редактирование события: ${name.trim()}` : "Редактирование события",
   },
   offer: {
     createTitle: "Новое предложение",
-    editTitle: "Редактирование предложения",
+    editTitle: (name?: string | null) =>
+      name?.trim() ? `Редактирование предложения: ${name.trim()}` : "Редактирование предложения",
   },
 } as const;

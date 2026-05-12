@@ -4,11 +4,14 @@ import { ArrowRight, Heart, Calendar } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { isAppMediaUrl } from "@/lib/media/isAppMediaUrl";
+import { getOfferPublicPath } from "@/lib/offers/offerPublicUrl";
 
 interface Offer {
   id: string;
   title: string;
   slug: string;
+  kind: string;
+  campProgramType?: string | null;
   imageUrl?: string;
   description?: string;
   price?: number;
@@ -19,9 +22,10 @@ interface Offer {
 interface PlaceOffersSectionProps {
   offers: Offer[];
   placeId: string;
+  citySlug?: string;
 }
 
-export function PlaceOffersSection({ offers, placeId }: PlaceOffersSectionProps) {
+export function PlaceOffersSection({ offers, placeId, citySlug = "minsk" }: PlaceOffersSectionProps) {
   if (offers.length === 0) {
     return null;
   }
@@ -43,17 +47,17 @@ export function PlaceOffersSection({ offers, placeId }: PlaceOffersSectionProps)
 
       <div className="flex gap-4 overflow-x-auto pb-4 no-scrollbar">
         {offers.map((offer) => (
-          <OfferCard key={offer.id} offer={offer} />
+          <OfferCard key={offer.id} offer={offer} citySlug={citySlug} />
         ))}
       </div>
     </section>
   );
 }
 
-function OfferCard({ offer }: { offer: Offer }) {
+function OfferCard({ offer, citySlug }: { offer: Offer; citySlug: string }) {
   return (
     <Link
-      href={`/offers/${offer.slug}`}
+      href={getOfferPublicPath(offer as any, citySlug)}
       className="group relative flex w-[280px] flex-shrink-0 flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white transition hover:shadow-lg"
     >
       {/* Image */}

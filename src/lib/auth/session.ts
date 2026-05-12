@@ -29,9 +29,13 @@ export async function createSession(userId: string): Promise<string> {
 /**
  * Set session cookie on NextResponse (for Route Handlers)
  * CRITICAL: In Route Handlers, cookies must be set on the response object
+ * 
+ * @param res - NextResponse object to set cookie on
+ * @param token - Session token
+ * @param requestHostname - Optional hostname from request headers for dev host detection
  */
-export function setSessionCookie(res: NextResponse, token: string): void {
-  const cookieOptions = getAuthCookieOptions();
+export function setSessionCookie(res: NextResponse, token: string, requestHostname?: string): void {
+  const cookieOptions = getAuthCookieOptions(requestHostname);
   
   res.cookies.set(SESSION_COOKIE_NAME, token, {
     ...cookieOptions,
@@ -41,10 +45,13 @@ export function setSessionCookie(res: NextResponse, token: string): void {
 
 /**
  * Set session cookie in Server Actions
+ * 
+ * @param token - Session token
+ * @param requestHostname - Optional hostname from request headers for dev host detection
  */
-export async function setSessionCookieAction(token: string): Promise<void> {
+export async function setSessionCookieAction(token: string, requestHostname?: string): Promise<void> {
   const cookieStore = await cookies();
-  const cookieOptions = getAuthCookieOptions();
+  const cookieOptions = getAuthCookieOptions(requestHostname);
   
   cookieStore.set(SESSION_COOKIE_NAME, token, {
     ...cookieOptions,
@@ -62,11 +69,29 @@ export async function getSessionToken(): Promise<string | null> {
 }
 
 /**
- * Delete session cookie in Server Actions
+ * Delete session cookie on NextResponse (for Route Handlers)
+ * CRITICAL: In Route Handlers, cookies must be deleted on the response object
+ * 
+ * @param res - NextResponse object to delete cookie on
+ * @param requestHostname - Optional hostname from request headers for dev host detection
  */
-export async function deleteSessionCookieAction(): Promise<void> {
+export function deleteSessionCookie(res: NextResponse, requestHostname?: string): void {
+  const cookieOptions = getAuthCookieOptions(requestHostname);
+  
+  res.cookies.set(SESSION_COOKIE_NAME, "", {
+    ...cookieOptions,
+    maxAge: 0,
+  });
+}
+
+/**
+ * Delete session cookie in Server Actions
+ * 
+ * @param requestHostname - Optional hostname from request headers for dev host detection
+ */
+export async function deleteSessionCookieAction(requestHostname?: string): Promise<void> {
   const cookieStore = await cookies();
-  const cookieOptions = getAuthCookieOptions();
+  const cookieOptions = getAuthCookieOptions(requestHostname);
   
   // Set cookie with maxAge: 0 to delete it
   cookieStore.set(SESSION_COOKIE_NAME, "", {

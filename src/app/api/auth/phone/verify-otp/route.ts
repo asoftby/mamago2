@@ -85,7 +85,8 @@ export async function POST(request: NextRequest) {
 
     const token = await createSession(user.id);
     const response = NextResponse.json({ ok: true });
-    setSessionCookie(response, token);
+    const requestHost = request.headers.get("x-forwarded-host") ?? request.headers.get("host");
+    setSessionCookie(response, token, requestHost ?? undefined);
 
     return response;
   } catch (error) {

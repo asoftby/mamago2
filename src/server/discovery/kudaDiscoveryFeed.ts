@@ -8,6 +8,7 @@ import { resolveActivityCoverUrl } from "@/lib/event/resolveActivityCoverUrl";
 import type { ActivityMock } from "@/types/activity";
 import { getEventEngagementScores } from "@/server/discovery/eventEngagementScores";
 import { getActivityOccasionBoosts } from "@/lib/discovery/occasions";
+import { getBusinessQualityBoostMap, applyBusinessQualityBoost } from "@/server/services/ranking/businessQualityBoost";
 import { normalizePricingMode } from "@/components/business/wizard/event/pricingMode";
 import {
   getWeatherRankingBoost,
@@ -247,15 +248,33 @@ export async function getKudaDiscoveryFeed(
   // Occasion boost is a soft contextual ranking signal, not a visibility rule.
   const occasionBoostMap = await getActivityOccasionBoosts(rows.map((r) => r.id));
 
-  const cards = rows.map((a) =>
-    mapActivityRowToCard(
+  // Business quality boost — soft multiplier based on booking reputation.
+  // Only applied when bookingCount30d >= 5. Max +10% to engagement score.
+  const businessIds = Array.from(
+    new Set(rows.map((r) => r.businessId).filter((id): id is string => id !== null)),
+  );
+  const qualityBoostMap = await getBusinessQualityBoostMap(businessIds);
+  // Map activityId → quality multiplier via businessId
+  const activityQualityBoost = new Map<string, number>(
+    rows.map((r) => [
+      r.id,
+      r.businessId ? (qualityBoostMap.get(r.businessId) ?? 1.0) : 1.0,
+    ]),
+  );
+
+  const cards = rows.map((a) => {
+    const baseEngagement = (scoreMap.get(a.id) ?? 0) + (occasionBoostMap.get(a.id) ?? 0);
+    const qualityMultiplier = activityQualityBoost.get(a.id) ?? 1.0;
+    const finalEngagement = applyBusinessQualityBoost(baseEngagement, qualityMultiplier);
+
+    return mapActivityRowToCard(
       a,
       Boolean(currentUserId && a.ownerUserId === currentUserId),
       primaryCityId,
-      (scoreMap.get(a.id) ?? 0) + (occasionBoostMap.get(a.id) ?? 0),
+      finalEngagement,
       citySlugById,
-    ),
-  );
+    );
+  });
 
   cards.sort((a, b) => {
     const aMine = currentUserId && ownerUserIdById.get(a.id) === currentUserId ? 0 : 1;

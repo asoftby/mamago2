@@ -39,6 +39,8 @@ const createOfferSchema = z.object({
   videoUrl: z.string().url().optional(),
   /** Акционное предложение (текстовое описание скидки и т.д.) */
   promotionalOffer: z.string().optional(),
+  priceCaption: z.string().optional(),
+  promotionDetails: z.string().optional(),
   pricingMode: z.enum(["SINGLE", "MULTIPLE"]),
   singlePrice: z.number().optional(),
   singlePriceLabel: z.string().optional(),
@@ -52,8 +54,19 @@ const createOfferSchema = z.object({
   phone: z.string().optional(),
   website: z.string().optional(),
   bookingInstructions: z.string().optional(),
+  contactSource: z.enum(["manual", "place"]).optional(),
+  contactPhone: z.string().optional(),
+  contactWebsite: z.string().optional(),
+  contactSocialLinks: z.array(
+    z.object({
+      id: z.string().optional(),
+      network: z.enum(["instagram", "telegram", "tiktok", "youtube", "other"]),
+      url: z.string(),
+    }),
+  ).optional(),
   status: z.enum(["DRAFT", "PENDING", "PUBLISHED"]).default("DRAFT"),
   discoverySignalIds: z.array(z.string()).default([]),
+  classChipSlugs: z.array(z.string()).default([]),
   campProgramType: campProgramTypeSchema,
   // Camp fields
   campSessions: z.array(campSessionEntrySchema).optional(),
@@ -78,6 +91,7 @@ const createOfferSchema = z.object({
   whatToBring: z.string().optional(),
 });
 
+// Re-trigger build for schema updates
 export async function POST(request: NextRequest) {
   const timer = createPublishTimer("publish:offer");
   try {
@@ -146,17 +160,24 @@ export async function POST(request: NextRequest) {
         data: {
           placeId: place.id,
           kind: dbKind,
+          contactSource: data.contactSource ?? "manual",
+          contactPhone: data.contactPhone,
+          contactWebsite: data.contactWebsite,
+          contactSocialLinks: data.contactSocialLinks as Prisma.InputJsonValue | undefined,
           title: data.title,
           description: data.shortDescription,
           coverImage: data.coverImage,
           galleryImages: data.gallery ?? [],
           videoUrl: data.videoUrl,
+          priceCaption: data.priceCaption,
+          promotionDetails: data.promotionDetails,
           promotionalOffer: data.promotionalOffer,
           priceFrom,
           priceText,
           ageMinMonths: data.ageMinMonths,
           ageMaxMonths: data.ageMaxMonths,
           discoverySignalIds: data.discoverySignalIds,
+          classChipSlugs: data.classChipSlugs,
           status: data.status,
           campProgramType: data.campProgramType,
           // Camp fields
@@ -235,7 +256,10 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json(
-      { error: "Internal server error" },
+      { 
+        error: "Internal server error", 
+        message: error instanceof Error ? error.message : "Something went wrong" 
+      },
       { status: 500 }
     );
   }

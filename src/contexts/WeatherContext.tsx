@@ -27,35 +27,70 @@ interface WeatherContextValue {
 
 const WeatherContext = createContext<WeatherContextValue | null>(null);
 
+/** Module-level cache for weather data */
+const weatherCache = new Map<string, WeeklyWeatherData>();
+/** In-flight promises to deduplicate concurrent requests */
+const inFlightWeather = new Map<string, Promise<WeeklyWeatherData | null>>();
+
 export function WeatherProvider({ children }: { children: ReactNode }) {
   const { citySlug } = useCity();
 
-  const [weatherData, setWeatherData] = useState<WeeklyWeatherData | null>(null);
+  const [weatherData, setWeatherData] = useState<WeeklyWeatherData | null>(
+    citySlug ? weatherCache.get(citySlug) || null : null,
+  );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const fetchWeather = useCallback(async (slug: string) => {
+    // 1. Check module cache
+    const cached = weatherCache.get(slug);
+    if (cached) {
+      setWeatherData(cached);
+      return;
+    }
+
+    // 2. Check in-flight promise
+    if (inFlightWeather.has(slug)) {
+      setLoading(true);
+      const result = await inFlightWeather.get(slug);
+      if (result) setWeatherData(result);
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     setError(null);
-    // Clear stale data immediately on city change
-    setWeatherData(null);
+
+    const promise = (async () => {
+      try {
+        const url = `/api/weather/weekly?city=${slug}`;
+        if (process.env.NODE_ENV !== "production") {
+          console.info("[WeatherContext] fetching", { url, citySlug: slug });
+        }
+
+        const response = await fetch(url);
+        if (!response.ok) {
+          if (response.status === 404) return null;
+          throw new Error("Failed to fetch weather");
+        }
+
+        const data = (await response.json()) as WeeklyWeatherData;
+        weatherCache.set(slug, data);
+        return data;
+      } catch (err) {
+        console.error("[WeatherContext] Error:", err);
+        throw err;
+      } finally {
+        inFlightWeather.delete(slug);
+      }
+    })();
+
+    inFlightWeather.set(slug, promise);
 
     try {
-      const response = await fetch(`/api/weather/weekly?city=${slug}`);
-
-      if (!response.ok) {
-        // 404 = city has no coordinates — silently hide weather
-        if (response.status === 404) {
-          setWeatherData(null);
-          return;
-        }
-        throw new Error("Failed to fetch weather");
-      }
-
-      const data = (await response.json()) as WeeklyWeatherData;
+      const data = await promise;
       setWeatherData(data);
     } catch (err) {
-      console.error("[WeatherContext] Error:", err);
       setError(err instanceof Error ? err.message : "Unknown error");
     } finally {
       setLoading(false);
@@ -64,9 +99,7 @@ export function WeatherProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!citySlug) {
-      // No city selected — clear weather silently
       setWeatherData(null);
-      setLoading(false);
       return;
     }
     void fetchWeather(citySlug);

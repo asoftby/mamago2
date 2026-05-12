@@ -95,6 +95,8 @@ export function NotificationFeed({
   const getNotificationIcon = (n: NotificationApiRow): string => {
     if (n.type === "WELCOME") return "🎉";
     switch (n.type) {
+      case "BOOKING_CREATED":
+        return "📋";
       case "PLACE_APPROVED":
         return "✅";
       case "PLACE_NEEDS_CHANGES":

@@ -13,6 +13,7 @@ import { DashboardActionStack } from "@/components/business/dashboard/DashboardA
 import { DashboardPeriodSwitcher } from "@/components/business/dashboard/DashboardPeriodSwitcher";
 import { DashboardOnboarding } from "@/components/business/dashboard/DashboardOnboarding";
 import { NewBusinessDashboard } from "@/components/business/dashboard/NewBusinessDashboard";
+import { BusinessReputationBlock } from "@/components/business/dashboard/BusinessReputationBlock";
 import type { DashboardPeriod } from "@/server/services/business/businessWorkspace.service";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -439,6 +440,7 @@ export function DashboardClient({ data, defaultPeriod = "week" }: DashboardClien
               promotionHref={data.hrefs.promotion}
               hasPublications={data.totalPublications > 0}
             />
+            <BusinessReputationBlock />
           </div>
 
           {/* Inbox — full width, above KPI cards, reduced height */}
@@ -487,6 +489,7 @@ export function DashboardClient({ data, defaultPeriod = "week" }: DashboardClien
               promotionHref={data.hrefs.promotion}
               hasPublications={data.totalPublications > 0}
             />
+            <BusinessReputationBlock />
           </div>
         </div>
 

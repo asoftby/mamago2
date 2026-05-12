@@ -19,6 +19,7 @@ type Props = {
  */
 export function TelegramStatusRow({ connected, onConnected }: Props) {
   const [isPolling, setIsPolling] = useState(false);
+  const [isSendingTest, setIsSendingTest] = useState(false);
 
   useTelegramConnectionStatus({
     enabled: isPolling,
@@ -48,6 +49,36 @@ export function TelegramStatusRow({ connected, onConnected }: Props) {
     }
   };
 
+  const handleSendTest = async () => {
+    setIsSendingTest(true);
+    try {
+      const res = await fetch("/api/notifications/telegram/test", {
+        method: "POST",
+        credentials: "include",
+      });
+      const json = (await res.json()) as { ok: boolean; code?: string };
+      
+      if (!res.ok || !json.ok) {
+        if (json.code === "TELEGRAM_NOT_CONNECTED") {
+          toast.error("Telegram не подключён");
+        } else if (json.code === "TELEGRAM_SEND_FAILED") {
+          toast.error("Не удалось отправить сообщение. Проверьте, что вы не заблокировали бота.");
+        } else if (json.code === "TELEGRAM_BOT_NOT_CONFIGURED") {
+          toast.error("Telegram бот не настроен на сервере");
+        } else {
+          toast.error("Не удалось отправить тестовое сообщение");
+        }
+        return;
+      }
+      
+      toast.success("Тестовое сообщение отправлено в Telegram");
+    } catch (error) {
+      toast.error("Не удалось отправить тестовое сообщение");
+    } finally {
+      setIsSendingTest(false);
+    }
+  };
+
   return (
     <div className="flex items-center gap-3 rounded-xl border border-neutral-200 bg-neutral-50/90 px-4 py-3">
       <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white shadow-sm">
@@ -66,11 +97,21 @@ export function TelegramStatusRow({ connected, onConnected }: Props) {
           </p>
         )}
       </div>
-      {!connected ? (
+      {connected ? (
+        <Button 
+          size="sm" 
+          variant="outline" 
+          className="shrink-0" 
+          onClick={() => void handleSendTest()}
+          disabled={isSendingTest}
+        >
+          {isSendingTest ? "Отправка..." : "Отправить тест"}
+        </Button>
+      ) : (
         <Button size="sm" variant="secondary" className="shrink-0" onClick={() => void handleConnect()}>
           Подключить
         </Button>
-      ) : null}
+      )}
     </div>
   );
 }

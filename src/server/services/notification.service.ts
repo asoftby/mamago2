@@ -25,6 +25,25 @@ import {
 } from "@/lib/notifications/welcomeNotification";
 import { resolveNotificationAudience } from "@/lib/notifications/audience";
 import { dispatchDelivery } from "./notificationDelivery.service";
+import { validateNotificationRegistry } from "@/lib/notifications/notificationRegistry";
+
+// ─── Dev Validation ───────────────────────────────────────────────────────────
+
+// Run registry validation in development
+if (process.env.NODE_ENV === "development") {
+  // Get all NotificationType enum values from Prisma
+  const prismaTypes = Object.values(NotificationType);
+  validateNotificationRegistry(prismaTypes);
+}
+
+// ─── Dev Validation ───────────────────────────────────────────────────────────
+
+// Run registry validation in development
+if (process.env.NODE_ENV === "development") {
+  // Get all NotificationType enum values from Prisma
+  const prismaTypes = Object.values(NotificationType);
+  validateNotificationRegistry(prismaTypes);
+}
 
 export type NotificationStreamFilter = "user" | "business";
 
@@ -671,5 +690,72 @@ export async function notifyUserPlanReminder(params: {
     body: params.body,
     entityType: "PLAN_ITEM",
     entityId: params.entityId ?? undefined,
+  });
+}
+
+// ── BOOKING ───────────────────────────────────────────────────────────────────
+
+import {
+  buildBookingNotificationBody,
+  type BookingNotificationBodyInput,
+} from "./booking/booking.formatters";
+import { resolveBookingSourceType } from "./booking/booking.types";
+
+export interface NotifyBookingCreatedParams {
+  /** userId владельца бизнеса (получатель уведомления) */
+  ownerUserId: string;
+  bookingId: string;
+  offerId?: string | null;
+  offerTitle?: string | null;
+  activityId?: string | null;
+  activityTitle?: string | null;
+  placeId?: string | null;
+  placeTitle?: string | null;
+  campShiftId?: string | null;
+  campShiftTitle?: string | null;
+  campShiftDateFrom?: string | null;
+  campShiftDateTo?: string | null;
+  customerName: string;
+  childName?: string | null;
+  childAge?: number | null;
+}
+
+/**
+ * Уведомление бизнесу о новой заявке на запись.
+ * Тело строится через buildBookingNotificationBody — без лагерь-специфичных assumptions.
+ */
+export async function notifyBookingCreated(params: NotifyBookingCreatedParams) {
+  const sourceType = resolveBookingSourceType({
+    campShiftId: params.campShiftId ?? null,
+    offerId: params.offerId ?? null,
+    activityId: params.activityId ?? null,
+    placeId: params.placeId ?? null,
+  });
+
+  const bodyInput: BookingNotificationBodyInput = {
+    sourceType,
+    offerTitle: params.offerTitle ?? null,
+    activityTitle: params.activityTitle ?? null,
+    placeTitle: params.placeTitle ?? null,
+    campShiftTitle: params.campShiftTitle ?? null,
+    campShiftDateFrom: params.campShiftDateFrom ?? null,
+    campShiftDateTo: params.campShiftDateTo ?? null,
+    customerName: params.customerName,
+    childName: params.childName ?? null,
+    childAge: params.childAge ?? null,
+  };
+
+  const body = buildBookingNotificationBody(bodyInput);
+
+  return createNotification({
+    userId: params.ownerUserId,
+    audience: "BUSINESS",
+    type: "BOOKING_CREATED",
+    title: "Новая заявка",
+    body,
+    entityType: "BOOKING",
+    entityId: params.bookingId,
+    ctaLabel: "Открыть заявки",
+    ctaAction: "/business/bookings",
   });
 }

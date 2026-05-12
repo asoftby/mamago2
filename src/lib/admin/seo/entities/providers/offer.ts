@@ -171,8 +171,10 @@ export const offerProvider: SeoEntityProvider = {
         priceFrom: true,
         priceText: true,
         coverImage: true,
+        kind: true,
+        campProgramType: true,
         seoJsonLdOverride: true,
-        place: { select: { title: true, slug: true } },
+        place: { select: { title: true, slug: true, city: { select: { slug: true } } } },
       },
     });
     if (!o) return null;
@@ -180,7 +182,7 @@ export const offerProvider: SeoEntityProvider = {
       return o.seoJsonLdOverride as Record<string, unknown>;
     }
     const publicBase = process.env.NEXT_PUBLIC_APP_URL || "https://mamago.by";
-    return buildOfferJsonLd({ offer: o, place: o.place, publicBase });
+    return buildOfferJsonLd({ offer: o as any, place: o.place as any, publicBase });
   },
 };
 
