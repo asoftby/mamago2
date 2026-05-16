@@ -21,25 +21,16 @@ RUN pnpm build
 FROM node:22-alpine AS runner
 WORKDIR /app
 
-RUN corepack enable && corepack prepare pnpm@10.28.2 --activate
-
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# Копируем standalone-сборку
+# standalone уже включает node_modules (в т.ч. prisma/sharp)
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/public ./public
 
-# Prisma schema + migrations
+# Prisma schema + migrations (нужны для migrate deploy)
 COPY --from=builder /app/prisma ./prisma
-
-# Prisma Client (нативные бинарники)
-COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
-COPY --from=builder /app/node_modules/@prisma/client ./node_modules/@prisma/client
-
-# sharp для оптимизации изображений
-COPY --from=builder /app/node_modules/sharp ./node_modules/sharp
 
 RUN apk add --no-cache curl
 
