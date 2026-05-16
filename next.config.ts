@@ -34,15 +34,18 @@ const nextConfig: NextConfig = {
   // В production оставляем включённым.
   reactCompiler: process.env.NODE_ENV === "production",
 
+  // Standalone output для Docker-сборки
+  output: "standalone",
+
   async redirects() {
     return [
       { source: "/birthday/builder", destination: "/minsk/birthday/make", permanent: true },
     ];
   },
-  
+
   // Exclude sharp from client bundle (server-only image processing)
   serverExternalPackages: ['sharp'],
-  
+
   images: {
     remotePatterns: [
       {
