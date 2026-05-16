@@ -4,12 +4,12 @@ WORKDIR /app
 RUN corepack enable && corepack prepare pnpm@10.28.2 --activate
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+# Копируем prisma до pnpm install — нужен для postinstall (prisma generate)
+COPY prisma ./prisma
+
 RUN pnpm install --frozen-lockfile
 
 COPY . .
-
-# Генерируем Prisma Client
-RUN pnpm exec prisma generate
 
 # Фиктивный DATABASE_URL только для сборки (не для миграций)
 ENV DATABASE_URL="postgresql://placeholder:placeholder@localhost:5432/placeholder"
