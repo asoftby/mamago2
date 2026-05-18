@@ -50,7 +50,7 @@ export async function GET(
   } catch (error: unknown) {
     console.error("[API] Get display info error:", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to get display info" },
+      { error: "Internal server error" },
       { status: 500 }
     );
   }

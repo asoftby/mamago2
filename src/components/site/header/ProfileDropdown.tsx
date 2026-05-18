@@ -19,6 +19,7 @@ export type ProfileDropdownProps = {
   onGoToPersonalAccount: () => void;
   onGoToPersonalIdeas: () => void;
   onGoToPersonalPlan: () => void;
+  onGoToPersonalBookings: () => void;
   onGoToPersonalRoutes: () => void;
   onGoToSettings: () => void;
   onGoToAdminAccount: () => void;
@@ -50,6 +51,7 @@ export function ProfileDropdown({
   onGoToPersonalAccount,
   onGoToPersonalIdeas,
   onGoToPersonalPlan,
+  onGoToPersonalBookings,
   onGoToPersonalRoutes,
   onGoToSettings,
   onGoToAdminAccount,
@@ -84,6 +86,7 @@ export function ProfileDropdown({
         onGoToPersonalAccount={onGoToPersonalAccount}
         onGoToPersonalIdeas={onGoToPersonalIdeas}
         onGoToPersonalPlan={onGoToPersonalPlan}
+        onGoToPersonalBookings={onGoToPersonalBookings}
         onGoToPersonalRoutes={onGoToPersonalRoutes}
         onGoToSettings={onGoToSettings}
         onGoToAdminAccount={onGoToAdminAccount}

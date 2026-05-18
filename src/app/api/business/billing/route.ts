@@ -73,7 +73,7 @@ export async function GET(_request: NextRequest) {
   } catch (error: unknown) {
     console.error("Get business billing error:", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to get billing info" },
+      { error: "Internal server error" },
       { status: 500 }
     );
   }

@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { headers } from "next/headers";
 import "./globals.css";
-import { ntSomic } from "@/lib/fonts";
+import { ntSomic, instrumentSerif } from "@/lib/fonts";
 import { Sonner } from "@/components/ui/sonner";
 import { AccountModeProvider } from "@/contexts/AccountModeContext";
 import { FamilyPersonaProvider } from "@/contexts/FamilyPersonaContext";
@@ -42,7 +42,7 @@ export default async function RootLayout({
   const initialAuthUser = await getCurrentAuthState();
 
   return (
-    <html lang="ru" className={ntSomic.variable}>
+    <html lang="ru" className={`${ntSomic.variable} ${instrumentSerif.variable}`}>
       <body
         className="antialiased min-h-screen text-foreground"
       >

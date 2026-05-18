@@ -11,6 +11,7 @@ import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { buildSurfaceRedirectDestination } from "@/lib/routing/surface";
 import prisma from "@/lib/prisma";
+import { BackofficeProviders } from "@/components/providers/BackofficeProviders";
 
 const EMPTY_MODERATION_COUNTS: ModerationNavCounts = {
   queueTotal: 0,
@@ -80,33 +81,35 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 font-sans antialiased">
-      {/* Global Header */}
-      <AdminHeader
-        userEmail={user.email || undefined}
-        userDisplayName={user.displayName}
-        hasApprovedBusinessProfile={hasApprovedBusinessProfile}
-        moderationCounts={moderationCounts}
-        b2bPendingVerificationCount={b2bPendingVerificationCount}
-      />
+    <BackofficeProviders>
+      <div className="min-h-screen bg-gray-50 font-sans antialiased">
+        {/* Global Header */}
+        <AdminHeader
+          userEmail={user.email || undefined}
+          userDisplayName={user.displayName}
+          hasApprovedBusinessProfile={hasApprovedBusinessProfile}
+          moderationCounts={moderationCounts}
+          b2bPendingVerificationCount={b2bPendingVerificationCount}
+        />
 
-      {/* Two-column layout: Sidebar + Content */}
-      <div className="flex min-h-[calc(100vh-4rem)]">
-        {/* Left Sidebar - Hidden on mobile */}
-        <div className="hidden lg:block bg-white border-r border-gray-200">
-          <AdminSidebar
-            moderationCounts={moderationCounts}
-            b2bPendingVerificationCount={b2bPendingVerificationCount}
-            importPendingReviewCount={importPendingReviewCount}
-            reviewsPendingCount={reviewsPendingCount}
-          />
+        {/* Two-column layout: Sidebar + Content */}
+        <div className="flex min-h-[calc(100vh-4rem)]">
+          {/* Left Sidebar - Hidden on mobile */}
+          <div className="hidden lg:block bg-white border-r border-gray-200">
+            <AdminSidebar
+              moderationCounts={moderationCounts}
+              b2bPendingVerificationCount={b2bPendingVerificationCount}
+              importPendingReviewCount={importPendingReviewCount}
+              reviewsPendingCount={reviewsPendingCount}
+            />
+          </div>
+
+          {/* Right Content Area — min-w-0 чтобы flex не раздувал ширину по таблице; скролл остаётся внутри страниц */}
+          <main className="min-w-0 flex-1 w-full lg:w-auto">
+            <div className="mx-auto w-full min-w-0 max-w-[1400px]">{children}</div>
+          </main>
         </div>
-
-        {/* Right Content Area — min-w-0 чтобы flex не раздувал ширину по таблице; скролл остаётся внутри страниц */}
-        <main className="min-w-0 flex-1 w-full lg:w-auto">
-          <div className="mx-auto w-full min-w-0 max-w-[1400px]">{children}</div>
-        </main>
       </div>
-    </div>
+    </BackofficeProviders>
   );
 }

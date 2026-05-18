@@ -84,7 +84,7 @@ export async function POST(request: NextRequest) {
   } catch (error: unknown) {
     console.error("Debit deposit error:", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to debit deposit" },
+      { error: "Internal server error" },
       { status: 500 }
     );
   }

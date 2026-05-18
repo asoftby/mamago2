@@ -3,9 +3,8 @@
 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent } from "@/components/ui/card";
 import { StableCardSelector } from "@/components/ui/stable-card-selector";
+import { WizardRichTextField } from "@/components/business/wizard/shared/WizardRichTextField";
 import type { OfferFormData } from "../types";
 
 interface Step4ConditionsProps {
@@ -75,16 +74,15 @@ export function Step4Conditions({ data, onChange, isEditable }: Step4ConditionsP
   const renderPartyFields = () => (
     <div className="space-y-4">
       <div className="space-y-2">
-        <Label htmlFor="partyProgram">
-          Программа праздника <span className="text-red-500">*</span>
-        </Label>
-        <Textarea
-          id="partyProgram"
-          placeholder="Опишите программу: игры, развлечения, мастер-классы..."
+        <WizardRichTextField
+          label="Программа праздника"
+          required
+          helperText="Игры, развлечения, мастер-классы и другие ключевые элементы программы."
           value={data.partyProgram}
-          onChange={(e) => onChange({ partyProgram: e.target.value })}
+          onChange={(value) => onChange({ partyProgram: value })}
+          placeholder="Опишите программу: игры, развлечения, мастер-классы..."
           disabled={!isEditable}
-          rows={4}
+          minHeight={140}
         />
       </div>
 
@@ -113,14 +111,14 @@ export function Step4Conditions({ data, onChange, isEditable }: Step4ConditionsP
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="partyIncluded">Что включено</Label>
-        <Textarea
-          id="partyIncluded"
-          placeholder="Например: украшение зала, торт, подарки..."
+        <WizardRichTextField
+          label="Что включено"
+          helperText="Коротко перечислите, что уже входит в пакет."
           value={data.partyIncluded}
-          onChange={(e) => onChange({ partyIncluded: e.target.value })}
+          onChange={(value) => onChange({ partyIncluded: value })}
+          placeholder="Например: украшение зала, торт, подарки..."
           disabled={!isEditable}
-          rows={3}
+          minHeight={140}
         />
       </div>
     </div>
@@ -129,16 +127,15 @@ export function Step4Conditions({ data, onChange, isEditable }: Step4ConditionsP
   const renderServiceFields = () => (
     <div className="space-y-4">
       <div className="space-y-2">
-        <Label htmlFor="serviceDescription">
-          Описание услуги <span className="text-red-500">*</span>
-        </Label>
-        <Textarea
-          id="serviceDescription"
-          placeholder="Опишите что включает услуга, как проходит процесс..."
+        <WizardRichTextField
+          label="Описание услуги"
+          required
+          helperText="Что входит в услугу, как проходит процесс и что важно знать заранее."
           value={data.serviceDescription}
-          onChange={(e) => onChange({ serviceDescription: e.target.value })}
+          onChange={(value) => onChange({ serviceDescription: value })}
+          placeholder="Опишите что включает услуга, как проходит процесс..."
           disabled={!isEditable}
-          rows={4}
+          minHeight={140}
         />
       </div>
 

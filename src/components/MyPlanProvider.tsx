@@ -18,6 +18,8 @@ function MyPlanProviderInner() {
 
   const isOnPlanPage = pathname === "/me/plan" || (pathname?.startsWith("/me/plan/") ?? false);
   const effectivePlanOpen = planOpen && !isOnPlanPage;
+  // На странице /me/plan виджет не нужен — пользователь уже на странице плана
+  const hidePlanEntryEffective = hidePlanEntry || isOnPlanPage;
 
   // Открытие по URL param ?myPlan=open (гость или пользователь)
   useEffect(() => {
@@ -54,7 +56,7 @@ function MyPlanProviderInner() {
 
   return (
     <MyPlanStateProvider>
-      {!hidePlanEntry ? <MyPlanWidget onOpen={handleOpenMyPlan} /> : null}
+      {!hidePlanEntryEffective ? <MyPlanWidget onOpen={handleOpenMyPlan} /> : null}
 
       <MyPlanOverlay open={effectivePlanOpen} onOpenChange={handlePlanOpenChange} />
     </MyPlanStateProvider>

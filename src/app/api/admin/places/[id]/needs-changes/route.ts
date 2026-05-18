@@ -40,7 +40,7 @@ export async function POST(
   } catch (error) {
     console.error("Error requesting changes for place:", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to request changes" },
+      { error: "Failed to request changes" },
       { status: 400 }
     );
   }

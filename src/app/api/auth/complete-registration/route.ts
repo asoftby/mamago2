@@ -13,10 +13,11 @@ import {
   getBusinessInviteAcceptanceState,
 } from "@/server/business/businessInvite.service";
 import { buildSurfaceRedirectDestination } from "@/lib/routing/surface";
+import { passwordSchema } from "@/lib/auth/passwordPolicy";
 
 const bodySchema = z.object({
   email: z.string().email("Некорректный email"),
-  password: z.string().min(8, "Пароль — минимум 8 символов"),
+  password: passwordSchema,
   invitationToken: z.string().min(1).optional(),
 });
 
@@ -248,7 +249,8 @@ export async function POST(request: NextRequest) {
       ...(redirectTo ? { redirectTo } : {}),
       ...(emailResult.verificationEmailSendFailed ? { verificationEmailSendFailed: true } : {}),
     });
-    setSessionCookie(response, token);
+    const requestHost = request.headers.get("x-forwarded-host") ?? request.headers.get("host");
+    setSessionCookie(response, token, requestHost ?? undefined);
 
     return response;
   } catch (error) {

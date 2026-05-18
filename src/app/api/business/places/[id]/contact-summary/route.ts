@@ -20,8 +20,11 @@ export async function GET(
     where: { id },
     select: {
       id: true,
+      title: true,
       createdByUserId: true,
       ownerBusinessId: true,
+      formattedAddr: true,
+      customAddress: true,
       phone: true,
       website: true,
       instagramUrl: true,
@@ -41,6 +44,9 @@ export async function GET(
     }));
 
   return NextResponse.json({
+    id: place.id,
+    title: place.title,
+    address: place.formattedAddr ?? place.customAddress ?? "",
     phone: place.phone ?? "",
     website: place.website ?? "",
     socialLinks,

@@ -21,6 +21,7 @@ import {
   isPlaceDetailPath,
 } from "@/lib/intent";
 import { getSiteHeaderVariant } from "@/lib/site/siteHeaderVariant";
+import { shouldShowDesktopHeaderSearch } from "@/lib/site/shouldShowDesktopHeaderSearch";
 import { useCity } from "@/contexts/CityContext";
 import { usePublicationIntent } from "@/contexts/PublicationIntentContext";
 import { DiscoveryIntentTabs } from "@/components/city/DiscoveryIntentTabs";
@@ -131,6 +132,8 @@ export function SiteHeaderShell() {
 
   /** Вторая строка (сегментированный поиск): на посадочных не показываем. */
   const showExpandedSearchRow = !hb.showAirbnbCompactBar;
+  const shouldRenderDesktopSearchRow =
+    !isLandingHeader && shouldShowDesktopHeaderSearch(pathname ?? "");
 
   const expandedSearchRowInner = (
     <div
@@ -332,7 +335,7 @@ export function SiteHeaderShell() {
           </div>
 
           {/* Вторая строка: сегментированный поиск — не на посадочных */}
-          {!isLandingHeader && (
+          {shouldRenderDesktopSearchRow && (
             <motion.div
               data-header-block1
               data-search-surface

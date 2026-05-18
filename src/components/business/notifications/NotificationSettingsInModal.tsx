@@ -42,26 +42,11 @@ export function NotificationSettingsInModal({ mode }: Props) {
   }, [surface]);
 
   useEffect(() => {
-    let alive = true;
-    void (async () => {
-      try {
-        const response = await fetch(
-          `/api/notifications/settings?surface=${surface.toLowerCase()}`,
-          { credentials: "include" },
-        );
-        const json = (await response.json()) as NotificationSettingsSurfaceData;
-        if (!alive) return;
-        setData(response.ok ? json : buildEmptyNotificationSettingsSurfaceData(surface));
-      } catch {
-        if (alive) {
-          setData(buildEmptyNotificationSettingsSurfaceData(surface));
-        }
-      }
-    })();
-    return () => {
-      alive = false;
-    };
-  }, [surface]);
+    const id = window.setTimeout(() => {
+      void loadData();
+    }, 0);
+    return () => window.clearTimeout(id);
+  }, [loadData]);
 
   if (data === null) {
     return (

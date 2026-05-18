@@ -35,7 +35,15 @@ export async function POST(request: NextRequest) {
         lat?: number;
         lng?: number;
         placeId?: string;
+        googlePlaceId?: string;
         customTitle?: string;
+        formattedAddress?: string;
+        addressComponents?: unknown;
+        rawGooglePayload?: unknown;
+        detectedCountryCode?: string;
+        detectedCountryName?: string;
+        detectedCityName?: string;
+        detectedRegionName?: string;
       }[];
     };
 
@@ -64,7 +72,15 @@ export async function POST(request: NextRequest) {
         lat: s.lat,
         lng: s.lng,
         placeId: s.placeId,
+        googlePlaceId: s.googlePlaceId,
         customTitle: s.customTitle,
+        formattedAddress: s.formattedAddress,
+        addressComponents: s.addressComponents,
+        rawGooglePayload: s.rawGooglePayload,
+        detectedCountryCode: s.detectedCountryCode,
+        detectedCountryName: s.detectedCountryName,
+        detectedCityName: s.detectedCityName,
+        detectedRegionName: s.detectedRegionName,
       })),
     });
 

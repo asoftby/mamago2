@@ -1,9 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { Check } from "lucide-react";
+import { CalendarDays, Check, Heart, Ticket } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { ru } from "date-fns/locale";
 
@@ -14,7 +13,7 @@ export interface EventStickyActionBarProps {
   primaryLabel: string;
   secondaryLabel?: string;
   isPlanned?: boolean;
-  /** ISO дата в плане — для компактного текста на мобильном "✓ 30 апреля" */
+  isSaved?: boolean;
   planDate?: string | null;
   isPrimaryLoading?: boolean;
   isSecondaryLoading?: boolean;
@@ -22,6 +21,7 @@ export interface EventStickyActionBarProps {
   isSecondaryDisabled?: boolean;
   onPrimary: () => void;
   onSecondary?: () => void;
+  onSave?: () => void;
   className?: string;
 }
 
@@ -32,6 +32,7 @@ export function EventStickyActionBar({
   primaryLabel,
   secondaryLabel,
   isPlanned = false,
+  isSaved = false,
   planDate,
   isPrimaryLoading = false,
   isSecondaryLoading = false,
@@ -39,124 +40,170 @@ export function EventStickyActionBar({
   isSecondaryDisabled = false,
   onPrimary,
   onSecondary,
+  onSave,
   className,
 }: EventStickyActionBarProps) {
-  const [visible, setVisible] = useState(false);
+  const [ctaPassed, setCtaPassed] = useState(false);
   const hasSecondary = Boolean(secondaryLabel && onSecondary);
+  const mobilePrimaryAction = hasSecondary && onSecondary ? onSecondary : onPrimary;
+  const mobilePrimaryLabel = hasSecondary && secondaryLabel ? secondaryLabel : primaryLabel;
+  const mobilePrimaryLoading = hasSecondary ? isSecondaryLoading : isPrimaryLoading;
+  const mobilePrimaryDisabled = hasSecondary ? isSecondaryDisabled : isPrimaryDisabled;
 
   useEffect(() => {
     const el = ctaRef?.current;
     const syncFromScroll = () => {
       if (el) {
-        const rect = el.getBoundingClientRect();
-        setVisible(rect.bottom <= 0);
+        setCtaPassed(el.getBoundingClientRect().bottom <= 0);
         return;
       }
-      setVisible(window.scrollY > 280);
+      setCtaPassed(window.scrollY > 280);
     };
-
     syncFromScroll();
-
     if (!("IntersectionObserver" in window) || !el) {
       window.addEventListener("scroll", syncFromScroll, { passive: true });
-      window.addEventListener("resize", syncFromScroll);
-      return () => {
-        window.removeEventListener("scroll", syncFromScroll);
-        window.removeEventListener("resize", syncFromScroll);
-      };
+      return () => window.removeEventListener("scroll", syncFromScroll);
     }
-
     const observer = new IntersectionObserver(
-      ([entry]) => setVisible(!(entry?.isIntersecting ?? true)),
+      ([entry]) => setCtaPassed(!(entry?.isIntersecting ?? true)),
       { threshold: 0 },
     );
     observer.observe(el);
     window.addEventListener("scroll", syncFromScroll, { passive: true });
-    window.addEventListener("resize", syncFromScroll);
     return () => {
       observer.disconnect();
       window.removeEventListener("scroll", syncFromScroll);
-      window.removeEventListener("resize", syncFromScroll);
     };
   }, [ctaRef]);
 
-  // Компактный текст для мобильного: "✓ 30 апреля"
   const compactPlanLabel = planDate
     ? format(parseISO(planDate), "d MMMM", { locale: ru })
     : null;
 
-  return (
+  /* ── Desktop top sticky bar ── */
+  const TopBar = (
     <div
       className={cn(
-        "fixed inset-x-0 top-0 z-40",
+        "fixed inset-x-0 top-0 z-40 hidden lg:block",
         "transition-transform duration-200 ease-out",
-        visible ? "translate-y-0 pointer-events-auto" : "-translate-y-full pointer-events-none",
-        "border-b border-border/60 bg-background/95 backdrop-blur-md supports-[backdrop-filter]:bg-background/85",
-        "shadow-[0_4px_20px_rgba(15,23,42,0.08)]",
-        "pb-3 pt-[max(0.75rem,env(safe-area-inset-top))]",
+        ctaPassed ? "translate-y-0 pointer-events-auto" : "-translate-y-full pointer-events-none",
+        "border-b border-[rgba(20,18,16,0.10)] bg-[rgba(250,247,241,0.95)] backdrop-blur-md",
+        "shadow-[0_4px_20px_rgba(20,18,16,0.08)] py-3",
         className,
       )}
       role="region"
       aria-label="Действия с событием"
-      aria-hidden={!visible}
+      aria-hidden={!ctaPassed}
     >
-      {/* Всегда одна строка: левая часть + кнопки справа */}
-      <div className="mx-auto flex w-full max-w-[1200px] items-center gap-3 px-4 sm:px-6 lg:px-8">
-        {/* Левая часть: дата и цена */}
+      <div className="mx-auto flex w-full max-w-[1320px] items-center gap-4 px-4 sm:px-6 lg:px-7">
         <div className="min-w-0 flex-1">
           {sessionLine && (
-            <p className="truncate text-[12px] text-muted-foreground leading-tight">
-              {sessionLine}
+            <p className="truncate font-mono text-[11px] uppercase tracking-[0.06em] text-[#C24E22]">
+              ● {sessionLine}
             </p>
           )}
-          <p className="text-[15px] font-semibold text-foreground leading-tight">{priceLabel}</p>
+          <p className="font-[family-name:var(--font-display)] text-[28px] leading-none tracking-[-0.02em] text-[#141210]">
+            {priceLabel}
+          </p>
         </div>
-
-        {/* Правая часть: кнопки */}
-        <div className="flex shrink-0 items-center gap-2">
-          <Button
+        <div className="flex shrink-0 items-center gap-2.5">
+          <button
             type="button"
-            variant="outline"
-            className={cn(
-              "h-9 rounded-xl px-4 text-[13px] font-semibold",
-              isPlanned
-                ? "gap-1.5 border-[#EF8759] bg-[#FFF7F3] text-[#EF8759] hover:bg-[#FFF0E8]"
-                : "border-border/80 hover:border-border hover:bg-accent/50",
-            )}
             onClick={onPrimary}
             disabled={isPrimaryDisabled || isPrimaryLoading}
+            className={cn(
+              "inline-flex h-10 items-center gap-2 rounded-full px-5 text-[14px] font-semibold transition-colors",
+              isPlanned
+                ? "border border-[#E86A3A] bg-[#FFE8DC] text-[#C24E22]"
+                : "bg-[#E86A3A] text-white hover:bg-[#C24E22]",
+            )}
           >
             {isPrimaryLoading ? (
-              <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
+              <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
             ) : isPlanned ? (
               <>
-                <Check className="h-3.5 w-3.5 shrink-0" />
-                {/* Мобильный: компактно "30 апреля", десктоп: полный текст */}
+                <Check className="h-3.5 w-3.5" />
                 <span className="sm:hidden">{compactPlanLabel ?? primaryLabel}</span>
                 <span className="hidden sm:inline">{primaryLabel}</span>
               </>
             ) : (
               primaryLabel
             )}
-          </Button>
-
+          </button>
           {hasSecondary && (
-            <Button
+            <button
               type="button"
-              variant="outline"
-              className="h-9 rounded-xl px-4 text-[13px] font-semibold border-border/80 hover:border-border hover:bg-accent/50"
               onClick={onSecondary}
               disabled={isSecondaryDisabled || isSecondaryLoading}
+              className="inline-flex h-10 items-center rounded-full border border-[rgba(20,18,16,0.18)] px-5 text-[14px] font-semibold text-[#141210] transition-colors hover:border-[#141210]"
             >
               {isSecondaryLoading ? (
-                <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
               ) : (
                 secondaryLabel
               )}
-            </Button>
+            </button>
           )}
         </div>
       </div>
     </div>
+  );
+
+  /* ── Mobile bottom bar ── */
+  const BottomBar = (
+    <div
+      className={cn(
+        "fixed inset-x-0 bottom-0 z-40 flex lg:hidden",
+        "items-center gap-2.5 px-3.5 py-2.5",
+        "border-t border-[rgba(20,18,16,0.10)] bg-[rgba(250,247,241,0.95)] backdrop-blur-[14px]",
+        "shadow-[0_-10px_30px_-10px_rgba(20,18,16,0.18)]",
+        "pb-[calc(0.625rem+env(safe-area-inset-bottom))]",
+      )}
+      role="region"
+      aria-label="Действия с событием"
+    >
+      {/* Big orange CTA */}
+      <button
+        type="button"
+        onClick={mobilePrimaryAction}
+        disabled={mobilePrimaryDisabled || mobilePrimaryLoading}
+        className="flex flex-1 h-[52px] items-center justify-center gap-2.5 rounded-full bg-[#E86A3A] text-[15px] font-semibold text-white transition-colors hover:bg-[#C24E22] active:translate-y-px"
+      >
+        {mobilePrimaryLoading ? (
+          <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+        ) : (
+          <>
+            {hasSecondary ? (
+              <Ticket className="h-4 w-4 shrink-0" />
+            ) : (
+              <CalendarDays className="h-4 w-4 shrink-0" />
+            )}
+            {mobilePrimaryLabel}
+          </>
+        )}
+      </button>
+
+      {/* Heart save button */}
+      <button
+        type="button"
+        onClick={onSave}
+        aria-label="Сохранить в план или идеи"
+        className={cn(
+          "flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-full border transition-colors",
+          isSaved
+            ? "border-[#E86A3A] bg-[#FFE8DC] text-[#E86A3A]"
+            : "border-[rgba(20,18,16,0.18)] bg-transparent text-[rgba(20,18,16,0.55)] hover:border-[#141210] hover:text-[#141210]",
+        )}
+      >
+        <Heart className={cn("h-5 w-5", isSaved && "fill-[#E86A3A]")} />
+      </button>
+    </div>
+  );
+
+  return (
+    <>
+      {TopBar}
+      {BottomBar}
+    </>
   );
 }

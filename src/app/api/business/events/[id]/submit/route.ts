@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
-import { ActivityType, ContentStatus } from "@prisma/client";
+import { ActivityType, ContentStatus, Prisma } from "@prisma/client";
 import { fetchActivityEventRowSummary } from "@/lib/activity/fetchActivityEventRowSummary";
 import {
   canCreateBusinessContent,
@@ -10,10 +10,16 @@ import {
 import { canManageActivityById } from "@/lib/auth/activityAccess";
 import { assignActivitySlugIfMissing } from "@/lib/slug/activitySlugService";
 import { ensurePublishedActivityHasSlug } from "@/lib/slug/publishSlugGuards";
-import { resolveCanonicalEventPublicPathById } from "@/lib/business/resolveCanonicalEventPublicPath";
+import { revalidateEventMutationPaths } from "@/lib/business/eventMutationSideEffects";
 import { resolvePendingLocationOnPublish } from "@/lib/business/resolvePendingLocationOnPublish";
 import { assignSlugOnPublish } from "@/lib/slug/placeSlugService";
-import { createPublishTimer, runAfterPublishResponse } from "@/server/utils/publishPipeline";
+import { runAfterPublishResponse } from "@/server/utils/publishPipeline";
+import { createRequestPerf } from "@/server/utils/requestPerf";
+import {
+  activitySessionsMatchScheduleJson,
+  replaceActivitySessionsFromScheduleJson,
+} from "@/lib/business/syncEventActivitySessions";
+import { stableJsonStringify } from "@/lib/json/stableJsonStringify";
 
 /**
  * POST /api/business/events/[id]/submit
@@ -23,10 +29,13 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const timer = createPublishTimer("publish:event");
+  const perf = createRequestPerf("publish:event:submit");
   try {
     const { id } = await params;
+    perf.mark("parse-params");
+
     const user = await getCurrentUser();
+    perf.mark("auth");
 
     if (!user || !canCreateBusinessContent(user.role)) {
       return NextResponse.json(
@@ -49,13 +58,28 @@ export async function POST(
         { status: 404 }
       );
     }
+    perf.mark("access-check");
 
     const existing = await prisma.activity.findFirst({
       where: {
         id,
         type: ActivityType.EVENT,
       },
+      select: {
+        id: true,
+        title: true,
+        shortDesc: true,
+        description: true,
+        coverImageId: true,
+        ageTags: true,
+        scheduleJson: true,
+        businessId: true,
+        status: true,
+        slug: true,
+        nextOccurrenceAt: true,
+      },
     });
+    perf.mark("fetch-existing");
 
     if (!existing) {
       return NextResponse.json(
@@ -63,9 +87,7 @@ export async function POST(
         { status: 404 }
       );
     }
-    timer.mark("db");
 
-    // Validate required fields
     const errors: string[] = [];
 
     if (!existing.title || existing.title.trim().length < 3) {
@@ -88,28 +110,7 @@ export async function POST(
       errors.push("Выберите возраст");
     }
 
-    // Check sessions
-    const now = new Date();
-    const [sessionsCount, nextUpcomingSession] = await Promise.all([
-      prisma.activitySession.count({
-        where: {
-          activityId: id,
-        },
-      }),
-      prisma.activitySession.findFirst({
-        where: {
-          activityId: id,
-          startsAt: { gte: now },
-        },
-        orderBy: { startsAt: "asc" },
-        select: { startsAt: true },
-      }),
-    ]);
-
-    if (sessionsCount === 0) {
-      errors.push("Добавьте хотя бы одну дату проведения");
-    }
-    timer.mark("validate");
+    perf.mark("validate-fields");
 
     if (errors.length > 0) {
       return NextResponse.json(
@@ -118,11 +119,53 @@ export async function POST(
       );
     }
 
-    if (existing.title?.trim()) {
-      await assignActivitySlugIfMissing(id, existing.title.trim());
+    const scheduleJsonForSync =
+      existing.scheduleJson && typeof existing.scheduleJson === "object" && !Array.isArray(existing.scheduleJson)
+        ? (existing.scheduleJson as Record<string, unknown>)
+        : {};
+
+    let sessionSyncRan = false;
+    if (!(await activitySessionsMatchScheduleJson(id, scheduleJsonForSync))) {
+      await replaceActivitySessionsFromScheduleJson(id, scheduleJsonForSync);
+      sessionSyncRan = true;
+      perf.mark("session-sync");
+    } else {
+      perf.mark("session-sync");
     }
 
+    const now = new Date();
+    const sessionsCount = await prisma.activitySession.count({
+      where: { activityId: id },
+    });
+
+    const nextUpcomingSession = await prisma.activitySession.findFirst({
+      where: {
+        activityId: id,
+        startsAt: { gte: now },
+      },
+      orderBy: { startsAt: "asc" },
+      select: { startsAt: true },
+    });
+
+    if (sessionsCount === 0) {
+      return NextResponse.json(
+        {
+          error: "Validation failed",
+          errors: ["Добавьте хотя бы одну дату проведения"],
+        },
+        { status: 400 }
+      );
+    }
+    perf.mark("validate-sessions");
+
     const nextOccurrenceAt = nextUpcomingSession?.startsAt ?? null;
+
+    if (!existing.slug?.trim() && existing.title?.trim()) {
+      await assignActivitySlugIfMissing(id, existing.title.trim());
+      perf.mark("slug-pre-tx");
+    } else {
+      perf.mark("slug-pre-tx");
+    }
 
     const nextStatus = canPublishContentDirectly(user.role)
       ? ContentStatus.PUBLISHED
@@ -130,37 +173,43 @@ export async function POST(
         ? ContentStatus.PENDING_UPDATE
         : ContentStatus.PENDING;
 
-    // Резолвим pendingLocation и при необходимости создаём Place — всё в одной транзакции
-    const scheduleJson =
-      existing.scheduleJson && typeof existing.scheduleJson === "object" && !Array.isArray(existing.scheduleJson)
-        ? (existing.scheduleJson as Record<string, unknown>)
-        : {};
+    const { placeId: resolvedPlaceId, placeCreated } = await prisma.$transaction(async (tx) => {
+      const resolved = await resolvePendingLocationOnPublish(
+        tx,
+        id,
+        scheduleJsonForSync,
+        user.id,
+        existing.businessId ?? null,
+      );
 
-    const { placeId: resolvedPlaceId, placeCreated } =
-      await prisma.$transaction(async (tx) => {
-        const result = await resolvePendingLocationOnPublish(
-          tx,
-          id,
-          scheduleJson,
-          user.id,
-          existing.businessId ?? null,
-        );
+      const nextOccurrenceChanged =
+        (existing.nextOccurrenceAt?.getTime() ?? null) !== (nextOccurrenceAt?.getTime() ?? null);
 
-        await tx.activity.update({
-          where: { id },
-          data: {
-            status: nextStatus,
-            nextOccurrenceAt,
-            scheduleJson: result.updatedScheduleJson as never,
-            ...(result.placeId !== null ? { placeId: result.placeId } : {}),
-          },
-        });
+      const scheduleChanged =
+        stableJsonStringify(existing.scheduleJson) !==
+        stableJsonStringify(resolved.updatedScheduleJson as unknown);
 
-        return result;
+      const updateData: Prisma.ActivityUncheckedUpdateInput = {
+        status: nextStatus,
+        ...(resolved.placeId !== null ? { placeId: resolved.placeId } : {}),
+      };
+
+      if (nextOccurrenceChanged) {
+        updateData.nextOccurrenceAt = nextOccurrenceAt;
+      }
+      if (scheduleChanged) {
+        updateData.scheduleJson = resolved.updatedScheduleJson as Prisma.InputJsonValue;
+      }
+
+      await tx.activity.update({
+        where: { id },
+        data: updateData,
       });
-    timer.mark("status");
 
-    // Назначаем slug новому Place (вне транзакции — идемпотентно)
+      return { placeId: resolved.placeId, placeCreated: resolved.placeCreated };
+    });
+    perf.mark("tx-publish");
+
     if (placeCreated && resolvedPlaceId) {
       runAfterPublishResponse("publish:event", "assign place slug", () =>
         assignSlugOnPublish(resolvedPlaceId),
@@ -176,14 +225,25 @@ export async function POST(
         slug: true,
       },
     });
+    perf.mark("fetch-result");
 
     if (event.status === ContentStatus.PUBLISHED && !event.slug) {
       await ensurePublishedActivityHasSlug(event.id);
+      perf.mark("slug-ensure-published");
+    } else {
+      perf.mark("slug-ensure-published");
     }
 
-    const publicPath = await resolveCanonicalEventPublicPathById(event.id);
-    timer.mark("response");
-    timer.log({ status: event.status, placeCreated: placeCreated ? 1 : 0 });
+    const { publicPath } = await revalidateEventMutationPaths(event.id, "publish");
+    perf.mark("revalidate");
+
+    perf.mark("response-sent");
+    perf.log({
+      eventId: event.id,
+      status: event.status,
+      placeCreated: placeCreated ? 1 : 0,
+      sessionSyncRan: sessionSyncRan ? 1 : 0,
+    });
 
     return NextResponse.json({
       success: true,
@@ -196,9 +256,8 @@ export async function POST(
       },
     });
   } catch (error: unknown) {
-    timer.log({ error: 1 });
+    perf.log({ error: 1 });
     console.error("Submit event error:", error);
-    const message = error instanceof Error ? error.message : "Failed to submit event";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: "Failed to submit event" }, { status: 500 });
   }
 }

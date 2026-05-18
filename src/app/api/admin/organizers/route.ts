@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth/server";
+import { parsePaginationParams } from "@/lib/api/pagination";
 import { Prisma } from "@prisma/client";
 
 export const runtime = "nodejs";
@@ -18,7 +19,7 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     const query = (searchParams.get("query") ?? searchParams.get("q") ?? "").trim();
-    const limit = Math.max(1, Math.min(30, Number(searchParams.get("limit") ?? "10") || 10));
+    const { limit } = parsePaginationParams(searchParams, { defaultLimit: 10, maxLimit: 30 });
 
     const organizers = await prisma.organizer.findMany({
       where: query

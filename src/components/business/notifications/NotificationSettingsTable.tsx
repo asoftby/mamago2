@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
-import { Bell, Loader2, Mail, Send } from "lucide-react";
+import { useCallback, useEffect, useState, useTransition } from "react";
+import { Bell, Check, Copy, ExternalLink, Loader2, Mail, Send } from "lucide-react";
 import { NotificationChannel, type NotificationType } from "@prisma/client";
 import { toast } from "@/lib/toast";
 import { Toggle } from "@/components/ui/Toggle";
@@ -82,26 +82,40 @@ export function NotificationSettingsTable({
   const [pendingKey, setPendingKey] = useState<string | null>(null);
   const [isLinkingTelegram, setIsLinkingTelegram] = useState(false);
   const [isUnlinkingTelegram, setIsUnlinkingTelegram] = useState(false);
+  const [isSendingTelegramTest, setIsSendingTelegramTest] = useState(false);
   const [unlinkDialogOpen, setUnlinkDialogOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
 
+  // State for reconnection fallback: stored command text from /api/settings/telegram/link
+  const [linkCommand, setLinkCommand] = useState<string | null>(null);
+  const [linkBotUsername, setLinkBotUsername] = useState<string | null>(null);
+  const [commandCopied, setCommandCopied] = useState(false);
+
   // Use unified Telegram status hook with controlled polling
   const [isPolling, setIsPolling] = useState(false);
-  const { status: telegramStatus } = useTelegramConnectionStatus({
+  const { status: telegramStatus, timedOut: pollingTimedOut, resetTimeout: resetPollingTimeout } = useTelegramConnectionStatus({
     enabled: true,
     polling: isPolling,
     onConnected: (status) => {
       setIsPolling(false);
+      setLinkCommand(null);
+      setLinkBotUsername(null);
+      setCommandCopied(false);
       setData((prev) =>
         prev
           ? {
               ...prev,
               telegramConnected: true,
+              telegramConfigured: status.configured ?? true,
               telegramUsername: status.username,
+              telegramBotUsername: status.botUsername,
             }
           : prev,
       );
       toast.success("Telegram подключён");
+    },
+    onTimeout: () => {
+      setIsPolling(false);
     },
   });
 
@@ -113,7 +127,9 @@ export function NotificationSettingsTable({
           ? {
               ...prev,
               telegramConnected: telegramStatus.linked,
+              telegramConfigured: telegramStatus.configured ?? false,
               telegramUsername: telegramStatus.username,
+              telegramBotUsername: telegramStatus.botUsername,
             }
           : prev,
       );
@@ -217,8 +233,16 @@ export function NotificationSettingsTable({
   };
 
   const handleConnectTelegram = async () => {
+    if (data && !data.telegramConfigured) {
+      setError("Telegram бот пока не настроен на сервере.");
+      return;
+    }
+
     setError(null);
     setIsLinkingTelegram(true);
+    setLinkCommand(null);
+    setLinkBotUsername(null);
+    setCommandCopied(false);
 
     try {
       const res = await fetch("/api/settings/telegram/link", {
@@ -226,21 +250,92 @@ export function NotificationSettingsTable({
         credentials: "include",
       });
       const json = (await res.json().catch(() => null)) as
-        | { url?: string; error?: string }
+        | { url?: string; command?: string; botUsername?: string; error?: string }
         | null;
 
       if (!res.ok || !json?.url) {
         throw new Error(json?.error || "Не удалось начать подключение Telegram");
       }
 
+      // Store the manual command and bot username for fallback UI
+      if (json.command) {
+        setLinkCommand(json.command);
+      }
+      if (json.botUsername) {
+        setLinkBotUsername(json.botUsername);
+      }
+
       window.open(json.url, "_blank", "noopener,noreferrer");
-      
+
       // Start polling for connection status
       setIsPolling(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Не удалось начать подключение Telegram");
     } finally {
       setIsLinkingTelegram(false);
+    }
+  };
+
+  const handleCopyCommand = useCallback(async () => {
+    if (!linkCommand) return;
+    try {
+      await navigator.clipboard.writeText(linkCommand);
+      setCommandCopied(true);
+      setTimeout(() => setCommandCopied(false), 2000);
+    } catch {
+      // Fallback for older browsers
+      const textArea = document.createElement("textarea");
+      textArea.value = linkCommand;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand("copy");
+      document.body.removeChild(textArea);
+      setCommandCopied(true);
+      setTimeout(() => setCommandCopied(false), 2000);
+    }
+  }, [linkCommand]);
+
+  const handleRetryConnect = () => {
+    setError(null);
+    setLinkCommand(null);
+    setLinkBotUsername(null);
+    setCommandCopied(false);
+    resetPollingTimeout();
+    void handleConnectTelegram();
+  };
+
+  const handleSendTelegramTest = async () => {
+    setError(null);
+    setIsSendingTelegramTest(true);
+
+    try {
+      const res = await fetch("/api/notifications/telegram/test", {
+        method: "POST",
+        credentials: "include",
+      });
+      const json = (await res.json().catch(() => null)) as
+        | { ok?: boolean; code?: string }
+        | null;
+
+      if (!res.ok || !json?.ok) {
+        if (json?.code === "TELEGRAM_NOT_CONNECTED") {
+          throw new Error("Telegram ещё не подключён.");
+        }
+        if (json?.code === "TELEGRAM_BOT_NOT_CONFIGURED") {
+          throw new Error("Telegram бот не настроен на сервере.");
+        }
+        throw new Error("Не удалось отправить тестовое сообщение.");
+      }
+
+      toast.success("Тестовое сообщение отправлено в Telegram");
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Не удалось отправить тестовое сообщение.",
+      );
+    } finally {
+      setIsSendingTelegramTest(false);
     }
   };
 
@@ -321,51 +416,156 @@ export function NotificationSettingsTable({
                 ? `Подключён аккаунт @${data.telegramUsername}. Теперь этот канал доступен для уведомлений.`
                 : "Telegram-канал доступен для уведомлений."}
             </p>
+            {data.telegramBotUsername ? (
+              <p className="mt-1 text-xs text-stone-500">
+                Бот для уведомлений: @{data.telegramBotUsername}
+              </p>
+            ) : null}
           </div>
-          <Button
-            type="button"
-            variant="outline"
-            className="shrink-0 rounded-xl"
-            onClick={() => setUnlinkDialogOpen(true)}
-          >
-            Отключить
-          </Button>
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              className="rounded-xl"
+              onClick={handleSendTelegramTest}
+              disabled={isSendingTelegramTest}
+            >
+              {isSendingTelegramTest ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Отправка…
+                </>
+              ) : (
+                "Отправить тест"
+              )}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className="rounded-xl"
+              onClick={() => setUnlinkDialogOpen(true)}
+            >
+              Отключить
+            </Button>
+          </div>
         </div>
       ) : (
-        <div className="flex items-center gap-3 rounded-[22px] border border-sky-200/80 bg-sky-50/80 px-4 py-3">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white shadow-sm">
-            <Send className="h-4 w-4 text-sky-600" />
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-medium text-stone-950">
-              Подключите Telegram, чтобы получать уведомления
-            </p>
-            <p className="mt-1 text-xs leading-6 text-stone-600">
-              Пока Telegram не подключён, этот канал недоступен и остаётся серым.
-            </p>
-          </div>
-          <Button
-            type="button"
-            variant="outline"
-            className="shrink-0 rounded-xl bg-white"
-            onClick={handleConnectTelegram}
-            disabled={isLinkingTelegram || isPolling}
-          >
-            {isLinkingTelegram || isPolling ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                {isLinkingTelegram ? "Открываем…" : "Ожидаем подключение…"}
-              </>
-            ) : (
-              "Подключить"
+        <div>
+          <div
+            className={cn(
+              "flex items-center gap-3 rounded-[22px] px-4 py-3",
+              pollingTimedOut
+                ? "border border-amber-200/80 bg-amber-50/80"
+                : data.telegramConfigured
+                  ? "border border-sky-200/80 bg-sky-50/80"
+                  : "border border-amber-200/80 bg-amber-50/80",
             )}
-          </Button>
+          >
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white shadow-sm">
+              <Send className="h-4 w-4 text-sky-600" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium text-stone-950">
+                {pollingTimedOut
+                  ? "Подключение не завершилось"
+                  : data.telegramConfigured
+                    ? "Подключите Telegram, чтобы получать уведомления"
+                    : "Telegram канал пока не настроен"}
+              </p>
+              <p className="mt-1 text-xs leading-6 text-stone-600">
+                {pollingTimedOut
+                  ? "Если Telegram уже открыт, отправьте боту команду вручную или нажмите «Подключить заново»."
+                  : data.telegramConfigured
+                    ? "Пока Telegram не подключён, этот канал недоступен и остаётся серым."
+                    : "После настройки серверного бота этот канал станет доступен без дополнительных изменений интерфейса."}
+              </p>
+              {!pollingTimedOut && data.telegramConfigured && data.telegramBotUsername ? (
+                <p className="mt-1 text-xs text-stone-500">
+                  Подключение через бота @{data.telegramBotUsername}
+                </p>
+              ) : null}
+            </div>
+            {pollingTimedOut ? (
+              <Button
+                type="button"
+                variant="outline"
+                className="shrink-0 rounded-xl bg-white"
+                onClick={handleRetryConnect}
+                disabled={isLinkingTelegram}
+              >
+                {isLinkingTelegram ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Открываем…
+                  </>
+                ) : (
+                  "Подключить заново"
+                )}
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                variant="outline"
+                className="shrink-0 rounded-xl bg-white"
+                onClick={handleConnectTelegram}
+                disabled={!data.telegramConfigured || isLinkingTelegram || (isPolling && !pollingTimedOut)}
+              >
+                {isLinkingTelegram || isPolling ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    {isLinkingTelegram ? "Открываем…" : "Ожидаем подключение…"}
+                  </>
+                ) : (
+                  data.telegramConfigured ? "Подключить" : "Бот не настроен"
+                )}
+              </Button>
+            )}
+          </div>
+
+          {/* Fallback command block — shown after polling times out */}
+          {pollingTimedOut && linkCommand ? (
+            <div className="mt-3 flex items-center gap-3 rounded-[18px] border border-stone-200 bg-stone-50/80 px-4 py-3">
+              <ExternalLink className="h-4 w-4 shrink-0 text-stone-500" />
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-medium text-stone-700">
+                  {linkBotUsername
+                    ? `Отправьте боту @${linkBotUsername} команду вручную:`
+                    : "Отправьте боту эту команду вручную:"}
+                </p>
+                <code className="mt-1 inline-block rounded-md bg-white px-2 py-1 text-xs font-mono text-stone-800 border border-stone-200 select-all">
+                  {linkCommand}
+                </code>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                className="shrink-0 rounded-xl bg-white"
+                onClick={handleCopyCommand}
+              >
+                {commandCopied ? (
+                  <>
+                    <Check className="h-4 w-4 text-emerald-600" />
+                    Скопировано
+                  </>
+                ) : (
+                  <>
+                    <Copy className="h-4 w-4" />
+                    Копировать
+                  </>
+                )}
+              </Button>
+            </div>
+          ) : null}
         </div>
       )}
 
       {error ? (
-        <div className="rounded-[18px] border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
-          {error}
+        <div className="rounded-[18px] border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800 flex items-start gap-3">
+          <span className="mt-0.5 shrink-0">⚠️</span>
+          <div className="flex-1">
+            <p className="font-medium">{error}</p>
+            <p className="mt-1 text-xs text-rose-700">Попробуйте обновить страницу или свяжитесь с поддержкой.</p>
+          </div>
         </div>
       ) : null}
 
@@ -403,7 +603,8 @@ export function NotificationSettingsTable({
                       const isDisabled =
                         isPending ||
                         pendingKey === `${row.notificationType}:${channel}` ||
-                        (isTelegram && !data.telegramConnected);
+                        (isTelegram &&
+                          (!data.telegramConfigured || !data.telegramConnected));
 
                       return (
                         <div

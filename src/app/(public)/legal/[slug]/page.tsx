@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { Metadata } from "next";
 import { getPublishedPageBySlug } from "@/lib/pages/service";
 import { PageType } from "@prisma/client";
+import { sanitizeRichContent } from "@/components/content/RichContentRenderer";
 
 type PageProps = {
   params: Promise<{ slug: string }>;
@@ -86,7 +87,9 @@ export default async function LegalPage({ params }: PageProps) {
         <article className="prose prose-lg max-w-none">
           {page.content ? (
             <div
-              dangerouslySetInnerHTML={{ __html: page.content }}
+              dangerouslySetInnerHTML={{
+                __html: sanitizeRichContent(page.content),
+              }}
               className="text-gray-800 leading-relaxed"
             />
           ) : (

@@ -8,8 +8,8 @@ export const maxDuration = 30;
 
 const rewriteRequestSchema = z.object({
   tone: z.enum(["neutral", "friendly", "editorial", "short"]),
-  sourceText: z.string().trim().min(20),
-  title: z.string().trim().optional(),
+  sourceText: z.string().trim().min(20).max(8000),
+  title: z.string().trim().max(200).optional(),
   entityType: z.enum(["event", "place"]).optional(),
 });
 
@@ -109,19 +109,20 @@ function extractRewriteResult(content: string): string | null {
     
     // If result field is missing but we have other fields, log it
     if (parsed && typeof parsed === "object") {
-      console.warn("[AI Rewrite] JSON parsed but no 'result' field", {
-        keys: Object.keys(parsed),
-        preview: JSON.stringify(parsed).slice(0, 200),
-      });
+      if (process.env.NODE_ENV !== "production") {
+        console.warn("[AI Rewrite] JSON parsed but no 'result' field", {
+          keys: Object.keys(parsed),
+        });
+      }
     }
     
     return null;
   } catch {
     // If not valid JSON, maybe AI returned plain text
     // This shouldn't happen with response_format: json_object, but handle it gracefully
-    console.warn("[AI Rewrite] content is not valid JSON, treating as plain text", {
-      contentPreview: content.slice(0, 200),
-    });
+    if (process.env.NODE_ENV !== "production") {
+      console.warn("[AI Rewrite] content is not valid JSON, treating as plain text");
+    }
     
     // Return the content as-is if it looks like rewritten text (not an error message)
     if (content.length > 20 && !content.toLowerCase().includes("error")) {
@@ -159,7 +160,15 @@ export async function POST(request: NextRequest) {
     const parsed = rewriteRequestSchema.safeParse(rawBody);
     if (!parsed.success) {
       return NextResponse.json(
-        { error: "Validation error", details: parsed.error.flatten() },
+        { error: "Invalid input" },
+        { status: 400 },
+      );
+    }
+
+    // Server-side hard guard: reject oversized input before calling OpenRouter
+    if (parsed.data.sourceText.length > 8000) {
+      return NextResponse.json(
+        { error: "Invalid input" },
         { status: 400 },
       );
     }
@@ -197,11 +206,9 @@ export async function POST(request: NextRequest) {
     console.log("[AI Rewrite] request started", {
       provider: "openrouter",
       model,
-      endpoint,
       tone: parsed.data.tone,
       entityType: parsed.data.entityType ?? "event",
       sourceLength: parsed.data.sourceText.length,
-      hasApiKey: !!apiKey,
     });
 
     const controller = new AbortController();
@@ -257,9 +264,7 @@ export async function POST(request: NextRequest) {
       console.error("[AI Rewrite] provider error", {
         provider: "openrouter",
         status: response.status,
-        statusText: response.statusText,
         errorMessage: message,
-        bodyPreview: rawResponseText.slice(0, 200),
       });
       
       return NextResponse.json(
@@ -277,7 +282,6 @@ export async function POST(request: NextRequest) {
       console.error("[AI Rewrite] invalid JSON response", {
         provider: "openrouter",
         status: response.status,
-        bodyPreview: rawResponseText.slice(0, 200),
       });
       
       return NextResponse.json(
@@ -323,22 +327,19 @@ export async function POST(request: NextRequest) {
 
     // Debug logging if content extraction failed
     if (!content) {
-      console.error("[AI Rewrite] failed to extract content", {
-        provider: "openrouter",
-        status: response.status,
-        topLevelKeys: payload ? Object.keys(payload) : [],
-        hasChoices: !!(payload && "choices" in payload),
-        choicesLength: isOpenRouterResponse(payload) && Array.isArray(payload.choices) ? payload.choices.length : 0,
-        firstChoiceKeys: isOpenRouterResponse(payload) && payload.choices?.[0] ? Object.keys(payload.choices[0]) : [],
-        messageKeys: isOpenRouterResponse(payload) && payload.choices?.[0]?.message ? Object.keys(payload.choices[0].message) : [],
-        contentType: isOpenRouterResponse(payload) && payload.choices?.[0]?.message?.content ? typeof payload.choices[0].message.content : undefined,
-        contentPreview: isOpenRouterResponse(payload) && payload.choices?.[0]?.message?.content
-          ? typeof payload.choices[0].message.content === "string"
-            ? payload.choices[0].message.content.slice(0, 300)
-            : JSON.stringify(payload.choices[0].message.content).slice(0, 300)
-          : undefined,
-        rawBodyPreview: rawResponseText.slice(0, 300),
-      });
+      if (process.env.NODE_ENV !== "production") {
+        console.error("[AI Rewrite] failed to extract content", {
+          provider: "openrouter",
+          topLevelKeys: payload ? Object.keys(payload) : [],
+          hasChoices: !!(payload && "choices" in payload),
+          choicesLength:
+            isOpenRouterResponse(payload) && Array.isArray(payload.choices)
+              ? payload.choices.length
+              : 0,
+        });
+      } else {
+        console.error("[AI Rewrite] failed to extract content");
+      }
       
       return NextResponse.json(
         { error: "Не удалось переписать текст. Попробуйте позже.", code: "INVALID_RESULT" },
@@ -349,12 +350,13 @@ export async function POST(request: NextRequest) {
     // Extract the actual rewritten text from JSON response
     const result = extractRewriteResult(content);
     if (!result) {
-      console.error("[AI Rewrite] failed to parse result JSON", {
-        provider: "openrouter",
-        contentLength: content.length,
-        contentPreview: content.slice(0, 300),
-        contentType: typeof content,
-      });
+      if (process.env.NODE_ENV !== "production") {
+        console.error("[AI Rewrite] failed to parse result JSON", {
+          contentLength: content.length,
+        });
+      } else {
+        console.error("[AI Rewrite] failed to parse result JSON");
+      }
       
       return NextResponse.json(
         { error: "Не удалось переписать текст. Попробуйте позже.", code: "INVALID_RESULT" },
@@ -378,8 +380,10 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error("[AI Rewrite] unexpected error", {
       error: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined,
     });
+    if (process.env.NODE_ENV !== "production" && error instanceof Error && error.stack) {
+      console.error(error.stack);
+    }
     
     return NextResponse.json(
       { error: "Не удалось переписать текст. Попробуйте позже.", code: "INTERNAL_ERROR" },

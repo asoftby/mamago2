@@ -1,10 +1,13 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { listAdminCityRows } from "@/server/city/cityAdminData";
+import { requireAdminOrModeratorApiUser } from "@/lib/auth/requireAdminApi";
 
 export const runtime = "nodejs";
 
 export async function GET(request: Request) {
+  const auth = await requireAdminOrModeratorApiUser();
+  if (auth instanceof NextResponse) return auth;
   try {
     const { searchParams } = new URL(request.url);
     if (searchParams.get("details") === "1") {

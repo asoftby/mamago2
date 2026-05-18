@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { requireAdminOrModeratorApiUser } from "@/lib/auth/requireAdminApi";
 
 export const runtime = "nodejs";
 
@@ -7,6 +8,8 @@ export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const auth = await requireAdminOrModeratorApiUser();
+  if (auth instanceof NextResponse) return auth;
   const { id } = await params;
   const filter = await prisma.filterDefinition.findUnique({
     where: { id },
@@ -24,6 +27,8 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const auth = await requireAdminOrModeratorApiUser();
+  if (auth instanceof NextResponse) return auth;
   try {
     const { id } = await params;
     const body = await request.json();
@@ -49,7 +54,9 @@ export async function PATCH(
   }
 }
 
-export async function DELETE(_: Request, { params }: { params: Promise<{ id: string }> }) { 
+export async function DELETE(_: Request, { params }: { params: Promise<{ id: string }> }) {
+  const auth = await requireAdminOrModeratorApiUser();
+  if (auth instanceof NextResponse) return auth;
   const { id } = await params;
   await prisma.filterDefinition.delete({ where: { id } }); 
   return NextResponse.json({ ok: true }); 

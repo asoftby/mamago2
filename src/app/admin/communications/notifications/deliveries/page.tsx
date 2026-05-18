@@ -14,7 +14,10 @@ import { prisma } from "@/lib/prisma";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-const SCENARIO_OPTIONS: NotificationScenario[] = ["PLAN_EVENT_2H_BEFORE"];
+const SCENARIO_OPTIONS: NotificationScenario[] = [
+  "PLAN_EVENT_2H_BEFORE",
+  "PLAN_TOMORROW_DIGEST",
+];
 const CHANNEL_OPTIONS: NotificationChannel[] = ["IN_APP", "EMAIL", "TELEGRAM"];
 const STATUS_OPTIONS: NotificationDeliveryStatus[] = ["PENDING", "SENT", "FAILED", "SKIPPED"];
 

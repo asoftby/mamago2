@@ -1,4 +1,5 @@
 import localFont from "next/font/local";
+import { Instrument_Serif } from "next/font/google";
 
 /**
  * Единый источник правды для шрифта NTSomic.
@@ -35,4 +36,13 @@ export const ntSomic = localFont({
   display: "swap",
   preload: false,
   fallback: ["ui-sans-serif", "system-ui", "sans-serif"],
+});
+
+export const instrumentSerif = Instrument_Serif({
+  weight: ["400"],
+  style: ["normal", "italic"],
+  subsets: ["latin", "latin-ext"],
+  variable: "--font-display",
+  display: "swap",
+  preload: false,
 });

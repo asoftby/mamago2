@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { format } from "date-fns";
 import { ru } from "date-fns/locale";
+import { isAppMediaUrl } from "@/lib/media/isAppMediaUrl";
 
 interface Event {
   id: string;
@@ -66,6 +67,7 @@ function EventCard({ event }: { event: Event }) {
             alt={event.title}
             fill
             sizes="280px"
+            unoptimized={isAppMediaUrl(event.imageUrl)}
             className="object-cover transition duration-300 group-hover:scale-105"
           />
         ) : (

@@ -14,15 +14,17 @@ type Props = {
 
 /**
  * Статус / CTA Telegram внутри модалки настроек.
- * После открытия бота запускает polling статуса и вызывает onConnected при успехе.
+ * Связанность приходит из `/api/notifications/settings` — здесь не дергаем
+ * `/api/settings/telegram/status` до нажатия «Подключить» (тогда включается polling).
  */
 export function TelegramStatusRow({ connected, onConnected }: Props) {
   const [isPolling, setIsPolling] = useState(false);
+  const [isSendingTest, setIsSendingTest] = useState(false);
 
   useTelegramConnectionStatus({
-    enabled: true,
+    enabled: isPolling,
     polling: isPolling,
-    onConnected: (status) => {
+    onConnected: () => {
       setIsPolling(false);
       onConnected?.();
     },
@@ -47,6 +49,36 @@ export function TelegramStatusRow({ connected, onConnected }: Props) {
     }
   };
 
+  const handleSendTest = async () => {
+    setIsSendingTest(true);
+    try {
+      const res = await fetch("/api/notifications/telegram/test", {
+        method: "POST",
+        credentials: "include",
+      });
+      const json = (await res.json()) as { ok: boolean; code?: string };
+      
+      if (!res.ok || !json.ok) {
+        if (json.code === "TELEGRAM_NOT_CONNECTED") {
+          toast.error("Telegram не подключён");
+        } else if (json.code === "TELEGRAM_SEND_FAILED") {
+          toast.error("Не удалось отправить сообщение. Проверьте, что вы не заблокировали бота.");
+        } else if (json.code === "TELEGRAM_BOT_NOT_CONFIGURED") {
+          toast.error("Telegram бот не настроен на сервере");
+        } else {
+          toast.error("Не удалось отправить тестовое сообщение");
+        }
+        return;
+      }
+      
+      toast.success("Тестовое сообщение отправлено в Telegram");
+    } catch (error) {
+      toast.error("Не удалось отправить тестовое сообщение");
+    } finally {
+      setIsSendingTest(false);
+    }
+  };
+
   return (
     <div className="flex items-center gap-3 rounded-xl border border-neutral-200 bg-neutral-50/90 px-4 py-3">
       <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white shadow-sm">
@@ -57,19 +89,36 @@ export function TelegramStatusRow({ connected, onConnected }: Props) {
         {connected ? (
           <p className="mt-0.5 flex items-center gap-1.5 text-xs text-emerald-700">
             <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
-            Подключён — уведомления можно получать в Telegram
+            Подключён — уведомления отправляются в Telegram
           </p>
         ) : (
           <p className="mt-0.5 text-xs text-neutral-500">
-            Подключите бота, чтобы не пропускать важное
+            Подключите бота для получения уведомлений в Telegram
           </p>
         )}
       </div>
-      {!connected ? (
-        <Button size="sm" variant="secondary" className="shrink-0" onClick={() => void handleConnect()}>
+      {connected ? (
+        <Button 
+          size="sm" 
+          variant="outline" 
+          className="shrink-0 text-xs" 
+          onClick={() => void handleSendTest()}
+          disabled={isSendingTest}
+        >
+          {isSendingTest ? (
+            <>
+              <span className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent mr-1.5" />
+              Отправка…
+            </>
+          ) : (
+            "Отправить тест"
+          )}
+        </Button>
+      ) : (
+        <Button size="sm" variant="secondary" className="shrink-0 text-xs" onClick={() => void handleConnect()}>
           Подключить
         </Button>
-      ) : null}
+      )}
     </div>
   );
 }

@@ -131,7 +131,7 @@ export async function PATCH(request: NextRequest) {
   } catch (error: unknown) {
     console.error("PATCH /api/admin/search/ranking error:", error);
     return NextResponse.json(
-      { success: false, error: (error as Error).message || "Internal server error" },
+      { success: false, error: "Internal server error" },
       { status: 500 }
     );
   }

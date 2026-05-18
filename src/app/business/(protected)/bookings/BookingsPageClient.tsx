@@ -1,404 +1,330 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { formatDistanceToNow } from "date-fns";
-import { ru } from "date-fns/locale";
-import { Calendar, Phone, User, Users, ChevronLeft, ChevronRight } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { ChevronLeft, ChevronRight, Calendar, Inbox } from "lucide-react";
+import { BookingStatus } from "@prisma/client";
 import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { DatePicker } from "@/components/ui/date-picker";
-import { BookingStatus, PublicationType } from "@prisma/client";
+import { BookingCard } from "./BookingCard";
+import { BookingAnalyticsStrip } from "./BookingAnalyticsStrip";
+import { BookingFeedbackSummary } from "./BookingFeedbackSummary";
+import { useNotificationStore } from "@/features/notifications/store";
+import type {
+  BusinessBookingItem,
+  BookingStatusCounts,
+  WeekDayCount,
+} from "@/server/services/booking/bookingQuery.service";
 
-type BookingStatusFilter = "all" | BookingStatus;
+// ─── Constants ────────────────────────────────────────────────────────────────
 
-interface BookingRow {
-  id: string;
-  publicationType: PublicationType;
-  status: BookingStatus;
-  customerName: string;
-  customerPhone: string;
-  customerEmail?: string | null;
-  customerComment?: string | null;
-  adultsCount: number;
-  childrenCount: number;
-  requestedDate?: string | null;
-  requestedTime?: string | null;
-  createdAt: string;
-  activity?: {
-    id: string;
-    title: string;
-    slug?: string | null;
-  } | null;
-  offer?: {
-    id: string;
-    title: string;
-    slug?: string | null;
-  } | null;
-  place?: {
-    id: string;
-    title: string;
-    slug?: string | null;
-  } | null;
-  session?: {
-    id: string;
-    startsAt: string;
-  } | null;
-}
+type StatusFilter = "all" | BookingStatus;
 
-interface WeekDayCount {
-  date: string;
-  total: number;
-  newCount: number;
-  confirmedCount: number;
-}
+const WEEKDAY_SHORT = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
 
-interface BookingsResponse {
-  items: BookingRow[];
-  weekCounts?: WeekDayCount[];
-}
-
-const STATUS_LABELS: Record<BookingStatus, string> = {
-  NEW: "Новые",
-  CONFIRMED: "Подтвержденные",
-  REJECTED: "Отклоненные",
-  CANCELLED: "Отмененные",
-  COMPLETED: "Завершенные",
-};
-
-const STATUS_COLORS: Record<BookingStatus, string> = {
-  NEW: "bg-blue-100 text-blue-800",
-  CONFIRMED: "bg-green-100 text-green-800",
-  REJECTED: "bg-red-100 text-red-800",
-  CANCELLED: "bg-stone-100 text-stone-800",
-  COMPLETED: "bg-purple-100 text-purple-800",
-};
-
-const PUBLICATION_TYPE_LABELS: Record<PublicationType, string> = {
-  EVENT: "Событие",
-  OFFER: "Предложение",
-  PLACE: "Место",
-};
-
-const WEEKDAY_LABELS = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
-
-const MONTH_GENITIVE = [
+const MONTH_GEN = [
   "января", "февраля", "марта", "апреля", "мая", "июня",
-  "июля", "августа", "сентября", "октября", "ноября", "декабря"
+  "июля", "августа", "сентября", "октября", "ноября", "декабря",
 ];
 
-function getMonday(date: Date): Date {
-  const d = new Date(date);
-  const day = d.getDay();
-  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-  return new Date(d.setDate(diff));
-}
+const DEFAULT_COUNTS: BookingStatusCounts = {
+  all: 0, new: 0, confirmed: 0, completed: 0, rejected: 0,
+};
 
-function formatDateKey(date: Date): string {
-  return date.toISOString().split("T")[0];
-}
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function isSameDay(date1: Date, date2: Date): boolean {
-  return formatDateKey(date1) === formatDateKey(date2);
-}
-
-function getWeekdayIndex(date: Date): number {
+function getMonday(d: Date): Date {
+  const date = new Date(d);
   const day = date.getDay();
-  return day === 0 ? 6 : day - 1; // Convert Sunday=0 to Sunday=6, Monday=1 to Monday=0
+  date.setDate(date.getDate() - (day === 0 ? 6 : day - 1));
+  date.setHours(0, 0, 0, 0);
+  return date;
 }
+
+function toDateKey(d: Date): string {
+  return d.toISOString().split("T")[0]!;
+}
+
+function isSameDay(a: Date, b: Date): boolean {
+  return toDateKey(a) === toDateKey(b);
+}
+
+function weekRangeLabel(weekStart: Date): string {
+  const end = new Date(weekStart);
+  end.setDate(end.getDate() + 6);
+  const s = weekStart.getDate();
+  const e = end.getDate();
+  const sm = MONTH_GEN[weekStart.getMonth()]!;
+  const em = MONTH_GEN[end.getMonth()]!;
+  return weekStart.getMonth() === end.getMonth()
+    ? `${s}–${e} ${em}`
+    : `${s} ${sm} – ${e} ${em}`;
+}
+
+// ─── Component ────────────────────────────────────────────────────────────────
 
 export function BookingsPageClient() {
-  const [bookings, setBookings] = useState<BookingRow[]>([]);
+  const [items, setItems] = useState<BusinessBookingItem[]>([]);
+  const [counts, setCounts] = useState<BookingStatusCounts>(DEFAULT_COUNTS);
   const [weekCounts, setWeekCounts] = useState<WeekDayCount[]>([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<BookingStatusFilter>("all");
-  const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [tab, setTab] = useState<StatusFilter>("all");
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
-  const [weekStart, setWeekStart] = useState<Date>(getMonday(new Date()));
-  const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
+  const [weekStart, setWeekStart] = useState<Date>(() => getMonday(new Date()));
 
-  const fetchBookings = useCallback(async (status?: BookingStatus, date?: Date, weekStartDate?: Date) => {
-    setLoading(true);
-    try {
-      const params = new URLSearchParams();
-      if (status) {
-        params.set("status", status);
+  // Auto-read: track if we've already marked notifications read this session
+  const autoReadDoneRef = useRef(false);
+  const refreshBusinessUnreadOnly = useNotificationStore(
+    (s) => s.refreshBusinessUnreadOnly,
+  );
+
+  // ── Fetch ──
+  const fetchBookings = useCallback(
+    async (opts: { status?: BookingStatus; date?: Date; weekStart?: Date }) => {
+      setLoading(true);
+      try {
+        const qs = new URLSearchParams();
+        if (opts.status) qs.set("status", opts.status);
+        if (opts.date) qs.set("date", toDateKey(opts.date));
+        if (opts.weekStart) qs.set("weekStart", toDateKey(opts.weekStart));
+
+        const res = await fetch(`/api/business/bookings?${qs}`, {
+          credentials: "include",
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+        const data = (await res.json()) as {
+          items: BusinessBookingItem[];
+          counts: BookingStatusCounts;
+          weekCounts?: WeekDayCount[];
+        };
+        setItems(data.items ?? []);
+        setCounts(data.counts ?? DEFAULT_COUNTS);
+        if (data.weekCounts) setWeekCounts(data.weekCounts);
+      } catch (err) {
+        console.error("[BookingsPageClient] fetch error", err);
+        toast.error("Не удалось загрузить заявки");
+      } finally {
+        setLoading(false);
       }
-      if (date) {
-        params.set("date", formatDateKey(date));
-      }
-      if (weekStartDate) {
-        params.set("weekStart", formatDateKey(weekStartDate));
-      }
-      const res = await fetch(`/api/business/bookings?${params}`, { credentials: "include" });
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({ error: "Unknown error" }));
-        console.error("API error:", res.status, errorData);
-        throw new Error(errorData.error || `HTTP ${res.status}`);
-      }
-      const data = await res.json() as BookingsResponse;
-      setBookings(data.items || []);
-      if (data.weekCounts) {
-        setWeekCounts(data.weekCounts);
-      }
-    } catch (error) {
-      console.error("Fetch bookings error:", error);
-      // Don't show error toast on first load, just log it
-      if (bookings.length > 0) {
-        toast.error("Ошибка загрузки заявок");
-      }
-    } finally {
-      setLoading(false);
-    }
-  }, [bookings.length]);
+    },
+    [],
+  );
+
+  // ── Auto-read: mark BOOKING_CREATED notifications as read on page open ──
+  useEffect(() => {
+    if (autoReadDoneRef.current) return;
+    autoReadDoneRef.current = true;
+
+    // Fire-and-forget: mark booking notifications as seen
+    fetch("/api/notifications/mark-booking-read", {
+      method: "POST",
+      credentials: "include",
+    })
+      .then(() => {
+        // Refresh business unread badge (throttled, won't spam)
+        void refreshBusinessUnreadOnly({ force: true });
+      })
+      .catch(() => {
+        // Non-critical — silently ignore
+      });
+
+    // Fire-and-forget: lazy stale check — sends reminder notifications with dedup
+    fetch("/api/business/bookings/check-stale", {
+      method: "POST",
+      credentials: "include",
+    }).catch(() => {/* silently ignore */});
+  }, [refreshBusinessUnreadOnly]);
 
   useEffect(() => {
-    const status = tab === "all" ? undefined : tab;
-    void fetchBookings(status, selectedDate || undefined, weekStart);
+    void fetchBookings({
+      status: tab === "all" ? undefined : tab,
+      date: selectedDate ?? undefined,
+      weekStart,
+    });
   }, [tab, selectedDate, weekStart, fetchBookings]);
 
-  const updateBookingStatus = async (bookingId: string, newStatus: BookingStatus) => {
-    setUpdatingId(bookingId);
-    try {
-      const res = await fetch(`/api/business/bookings/${bookingId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ status: newStatus }),
-      });
-      if (!res.ok) throw new Error("Failed to update");
-      const updated = await res.json() as BookingRow;
-      setBookings((prev) => prev.map((b) => (b.id === bookingId ? updated : b)));
-      toast.success("Статус обновлен");
-      // Refresh week counts
-      void fetchBookings(tab === "all" ? undefined : tab, selectedDate || undefined, weekStart);
-    } catch (error) {
-      console.error("Update booking error:", error);
-      toast.error("Ошибка обновления статуса");
-    } finally {
-      setUpdatingId(null);
-    }
-  };
+  // ── Status update (optimistic) ──
+  const handleStatusChange = useCallback(
+    async (id: string, status: BookingStatus) => {
+      // Optimistic update
+      setItems((prev) =>
+        prev.map((b) => (b.id === id ? { ...b, status } : b)),
+      );
 
-  const getPublicationTitle = (booking: BookingRow): string => {
-    if (booking.activity) return booking.activity.title;
-    if (booking.offer) return booking.offer.title;
-    if (booking.place) return booking.place.title;
-    return "Без названия";
-  };
+      try {
+        const res = await fetch(`/api/business/bookings/${id}/status`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ status }),
+        });
 
-  const getDateTimeDisplay = (booking: BookingRow): string => {
-    if (booking.session) {
-      const date = new Date(booking.session.startsAt);
-      return date.toLocaleString("ru-RU", {
-        day: "numeric",
-        month: "long",
-        hour: "2-digit",
-        minute: "2-digit",
-      });
-    }
-    if (booking.requestedDate) {
-      const date = new Date(booking.requestedDate);
-      const dateStr = date.toLocaleDateString("ru-RU", {
-        day: "numeric",
-        month: "long",
-      });
-      if (booking.requestedTime) {
-        return `${dateStr}, ${booking.requestedTime}`;
+        if (!res.ok) {
+          const err = (await res.json().catch(() => ({}))) as { error?: string };
+          throw new Error(err.error ?? `HTTP ${res.status}`);
+        }
+
+        const updated = (await res.json()) as BusinessBookingItem;
+        setItems((prev) => prev.map((b) => (b.id === id ? updated : b)));
+        toast.success("Статус обновлён");
+
+        // Refresh counts + week counts after status change
+        void fetchBookings({
+          status: tab === "all" ? undefined : tab,
+          date: selectedDate ?? undefined,
+          weekStart,
+        });
+
+        // Refresh notification badge
+        void refreshBusinessUnreadOnly({ force: true });
+      } catch (err) {
+        // Revert optimistic update
+        void fetchBookings({
+          status: tab === "all" ? undefined : tab,
+          date: selectedDate ?? undefined,
+          weekStart,
+        });
+        toast.error(err instanceof Error ? err.message : "Ошибка обновления");
       }
-      return dateStr;
-    }
-    return "Без выбора времени";
+    },
+    [fetchBookings, tab, selectedDate, weekStart, refreshBusinessUnreadOnly],
+  );
+
+  // ── Week navigation ──
+  const prevWeek = () => {
+    const d = new Date(weekStart);
+    d.setDate(d.getDate() - 7);
+    setWeekStart(d);
+  };
+  const nextWeek = () => {
+    const d = new Date(weekStart);
+    d.setDate(d.getDate() + 7);
+    setWeekStart(d);
   };
 
-  const handlePrevWeek = () => {
-    const newWeekStart = new Date(weekStart);
-    newWeekStart.setDate(newWeekStart.getDate() - 7);
-    setWeekStart(newWeekStart);
-    
-    // Preserve weekday if date is selected
-    if (selectedDate) {
-      const weekdayIndex = getWeekdayIndex(selectedDate);
-      const newSelectedDate = new Date(newWeekStart);
-      newSelectedDate.setDate(newSelectedDate.getDate() + weekdayIndex);
-      setSelectedDate(newSelectedDate);
-    }
-  };
-
-  const handleNextWeek = () => {
-    const newWeekStart = new Date(weekStart);
-    newWeekStart.setDate(newWeekStart.getDate() + 7);
-    setWeekStart(newWeekStart);
-    
-    // Preserve weekday if date is selected
-    if (selectedDate) {
-      const weekdayIndex = getWeekdayIndex(selectedDate);
-      const newSelectedDate = new Date(newWeekStart);
-      newSelectedDate.setDate(newSelectedDate.getDate() + weekdayIndex);
-      setSelectedDate(newSelectedDate);
-    }
-  };
-
-  const handleDayClick = (date: Date) => {
-    if (selectedDate && isSameDay(selectedDate, date)) {
-      setSelectedDate(null);
-    } else {
-      setSelectedDate(date);
-    }
-  };
-
-  const handleDatePickerChange = (date: Date | null) => {
-    if (date) {
-      const newWeekStart = getMonday(date);
-      setWeekStart(newWeekStart);
-      setSelectedDate(date);
-      setIsDatePickerOpen(false);
-    }
-  };
-
-  const getWeekDays = (): Date[] => {
-    const days: Date[] = [];
-    for (let i = 0; i < 7; i++) {
-      const day = new Date(weekStart);
-      day.setDate(day.getDate() + i);
-      days.push(day);
-    }
-    return days;
-  };
-
-  const getWeekRange = (): string => {
-    const weekEnd = new Date(weekStart);
-    weekEnd.setDate(weekEnd.getDate() + 6);
-    const startDay = weekStart.getDate();
-    const endDay = weekEnd.getDate();
-    const startMonth = MONTH_GENITIVE[weekStart.getMonth()];
-    const endMonth = MONTH_GENITIVE[weekEnd.getMonth()];
-    
-    if (weekStart.getMonth() === weekEnd.getMonth()) {
-      return `с ${startDay} по ${endDay} ${endMonth}`;
-    } else {
-      return `с ${startDay} ${startMonth} по ${endDay} ${endMonth}`;
-    }
-  };
-
-  const getDayCount = (date: Date): number => {
-    const dateKey = formatDateKey(date);
-    const count = weekCounts.find((c) => c.date === dateKey);
-    return count?.total || 0;
-  };
+  const weekDays = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(weekStart);
+    d.setDate(d.getDate() + i);
+    return d;
+  });
 
   const today = new Date();
-  const weekDays = getWeekDays();
-  const hasAnyBookings = bookings.length > 0 || weekCounts.some((c) => c.total > 0);
 
-  if (loading) {
-    return <div className="py-12 text-center text-sm text-stone-500">Загрузка…</div>;
-  }
+  // ── Tab definitions with live counts ──
+  const TABS: { value: StatusFilter; label: string; count: number }[] = [
+    { value: "all", label: "Все", count: counts.all },
+    { value: BookingStatus.NEW, label: "Новые", count: counts.new },
+    { value: BookingStatus.CONFIRMED, label: "Подтверждённые", count: counts.confirmed },
+    { value: BookingStatus.COMPLETED, label: "Завершённые", count: counts.completed },
+    { value: BookingStatus.REJECTED, label: "Отклонённые", count: counts.rejected },
+  ];
 
+  // ── Render ──
   return (
     <div className="space-y-4">
-      {/* Tabs */}
-      <div className="flex items-center gap-1 rounded-xl border border-stone-200 bg-white p-1 overflow-x-auto">
-        {(["all", BookingStatus.NEW, BookingStatus.CONFIRMED, BookingStatus.COMPLETED, BookingStatus.REJECTED] as BookingStatusFilter[]).map((t) => (
+      {/* ── Analytics strip ── */}
+      <BookingAnalyticsStrip />
+
+      {/* ── Feedback summary (shown only when feedbackCount > 0) ── */}
+      <BookingFeedbackSummary />
+
+      {/* ── Status tabs with counts ── */}
+      <div className="flex items-center gap-1 overflow-x-auto rounded-xl border border-stone-200 bg-white p-1 scrollbar-hide">
+        {TABS.map((t) => (
           <button
-            key={t}
-            onClick={() => setTab(t)}
+            key={t.value}
+            type="button"
+            onClick={() => setTab(t.value)}
             className={cn(
-              "rounded-lg px-3 py-1.5 text-sm font-medium transition-colors whitespace-nowrap",
-              tab === t
+              "shrink-0 inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[13px] font-medium transition-colors whitespace-nowrap",
+              tab === t.value
                 ? "bg-stone-900 text-white"
                 : "text-stone-600 hover:bg-stone-100",
             )}
           >
-            {t === "all" ? "Все" : STATUS_LABELS[t]}
+            {t.label}
+            {t.count > 0 && (
+              <span
+                className={cn(
+                  "rounded-full px-1.5 py-0.5 text-[10px] font-bold leading-none",
+                  tab === t.value
+                    ? "bg-white/20 text-white"
+                    : t.value === BookingStatus.NEW
+                      ? "bg-blue-100 text-blue-700"
+                      : "bg-stone-100 text-stone-600",
+                )}
+              >
+                {t.count}
+              </span>
+            )}
           </button>
         ))}
       </div>
 
-      {/* Week Calendar */}
-      <div className="rounded-2xl border border-stone-200 bg-white p-5">
-        {/* Week Navigation */}
-        <div className="flex items-center justify-between mb-5">
+      {/* ── Week calendar ── */}
+      <div className="rounded-2xl border border-stone-200 bg-white p-4">
+        {/* Navigation */}
+        <div className="mb-4 flex items-center justify-between">
           <button
-            onClick={handlePrevWeek}
-            className="p-2 rounded-lg hover:bg-stone-100 transition-colors"
+            type="button"
+            onClick={prevWeek}
             aria-label="Предыдущая неделя"
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-stone-500 hover:bg-stone-100 transition-colors"
           >
-            <ChevronLeft className="h-5 w-5 text-stone-600" />
+            <ChevronLeft className="h-4 w-4" />
           </button>
-          
-          <Popover open={isDatePickerOpen} onOpenChange={setIsDatePickerOpen}>
-            <PopoverTrigger asChild>
-              <button
-                className={cn(
-                  "text-sm font-medium text-stone-900 transition-all",
-                  "border-b-2 border-dashed border-[#EF8759]/40",
-                  "hover:border-[#EF8759]/70 cursor-pointer",
-                  "pb-0.5"
-                )}
-              >
-                {getWeekRange()}
-              </button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto min-w-[360px] p-0" align="center">
-              <div className="p-5">
-                <DatePicker
-                  value={selectedDate}
-                  onDateChange={handleDatePickerChange}
-                  disablePast={false}
-                />
-              </div>
-            </PopoverContent>
-          </Popover>
-
+          <span className="text-[13px] font-medium text-stone-700">
+            {weekRangeLabel(weekStart)}
+          </span>
           <button
-            onClick={handleNextWeek}
-            className="p-2 rounded-lg hover:bg-stone-100 transition-colors"
+            type="button"
+            onClick={nextWeek}
             aria-label="Следующая неделя"
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-stone-500 hover:bg-stone-100 transition-colors"
           >
-            <ChevronRight className="h-5 w-5 text-stone-600" />
+            <ChevronRight className="h-4 w-4" />
           </button>
         </div>
 
-        {/* Week Days */}
-        <div className="grid grid-cols-7 gap-3">
-          {weekDays.map((day, index) => {
+        {/* Days */}
+        <div className="grid grid-cols-7 gap-1.5">
+          {weekDays.map((day, idx) => {
             const isToday = isSameDay(day, today);
-            const isSelected = selectedDate && isSameDay(day, selectedDate);
-            const count = getDayCount(day);
-            const dayNum = day.getDate();
+            const isSelected = selectedDate ? isSameDay(day, selectedDate) : false;
+            const count =
+              weekCounts.find((c) => c.date === toDateKey(day))?.total ?? 0;
 
             return (
               <button
-                key={index}
-                onClick={() => handleDayClick(day)}
+                key={idx}
+                type="button"
+                onClick={() =>
+                  setSelectedDate(isSelected ? null : new Date(day))
+                }
                 className={cn(
-                  "flex flex-col items-center justify-center py-5 px-4 rounded-xl transition-all",
-                  "hover:bg-stone-50",
-                  isSelected && "bg-[#EF8759] text-white hover:bg-[#EF8759]",
-                  !isSelected && isToday && "bg-stone-100",
+                  "flex flex-col items-center gap-1 rounded-xl py-3 transition-colors",
+                  isSelected
+                    ? "bg-[#EF8759] text-white"
+                    : isToday
+                      ? "bg-stone-100 text-stone-900"
+                      : "text-stone-600 hover:bg-stone-50",
                 )}
               >
-                <span className={cn(
-                  "text-sm font-medium mb-1.5",
-                  isSelected ? "text-white" : "text-stone-500",
-                )}>
-                  {WEEKDAY_LABELS[index]}
-                </span>
-                <span className={cn(
-                  "text-2xl font-semibold mb-1.5",
-                  isSelected ? "text-white" : "text-stone-900",
-                )}>
-                  {dayNum}
-                </span>
-                {count > 0 && (
-                  <span className={cn(
-                    "text-xs font-semibold px-2 py-0.5 rounded-full",
-                    isSelected ? "bg-white/20 text-white" : "bg-[#EF8759]/15 text-[#C65D2E]",
-                  )}>
-                    •{count}
+                <span className="text-[11px] font-medium">{WEEKDAY_SHORT[idx]}</span>
+                <span className="text-[18px] font-bold leading-none">{day.getDate()}</span>
+                {count > 0 ? (
+                  <span
+                    className={cn(
+                      "rounded-full px-1.5 py-0.5 text-[10px] font-bold",
+                      isSelected
+                        ? "bg-white/25 text-white"
+                        : "bg-[#EF8759]/15 text-[#C65D2E]",
+                    )}
+                  >
+                    {count}
                   </span>
+                ) : (
+                  <span className="h-[18px]" />
                 )}
               </button>
             );
@@ -406,159 +332,62 @@ export function BookingsPageClient() {
         </div>
       </div>
 
-      {/* List */}
-      {bookings.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-stone-300 bg-white py-16 text-center">
-          <Calendar className="mb-3 h-12 w-12 text-stone-300" />
-          {selectedDate ? (
-            <>
-              <p className="text-base font-medium text-stone-900 mb-1">На этот день заявок нет</p>
-              <p className="text-sm text-stone-500 max-w-md">
-                Выберите другой день недели или проверьте вкладку «Все».
-              </p>
-            </>
-          ) : hasAnyBookings ? (
-            <>
-              <p className="text-base font-medium text-stone-900 mb-1">Заявок в этом фильтре нет</p>
-              <p className="text-sm text-stone-500 max-w-md">
-                Попробуйте выбрать другой статус или день недели.
-              </p>
-            </>
-          ) : (
-            <>
-              <p className="text-base font-medium text-stone-900 mb-1">Заявок пока нет</p>
-              <p className="text-sm text-stone-500 max-w-md">
-                Когда клиенты будут записываться на ваши события, места или предложения, заявки появятся здесь.
-              </p>
-            </>
-          )}
-        </div>
+      {/* ── List ── */}
+      {loading ? (
+        <LoadingSkeleton />
+      ) : items.length === 0 ? (
+        <EmptyState hasFilter={tab !== "all" || selectedDate !== null} />
       ) : (
         <div className="space-y-3">
-          {bookings.map((booking) => {
-            const isUpdating = updatingId === booking.id;
-            const canConfirm = booking.status === BookingStatus.NEW;
-            const canReject = booking.status === BookingStatus.NEW;
-            const canComplete = booking.status === BookingStatus.CONFIRMED;
-
-            return (
-              <div
-                key={booking.id}
-                className="rounded-2xl border border-stone-200 bg-white p-5 space-y-4"
-              >
-                {/* Header */}
-                <div className="flex items-start justify-between gap-4">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2 mb-1 flex-wrap">
-                      <span className="text-xs font-medium text-stone-400 uppercase tracking-wide">
-                        {PUBLICATION_TYPE_LABELS[booking.publicationType]}
-                      </span>
-                      <span
-                        className={cn(
-                          "rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
-                          STATUS_COLORS[booking.status],
-                        )}
-                      >
-                        {STATUS_LABELS[booking.status]}
-                      </span>
-                    </div>
-                    <h3 className="text-base font-semibold text-stone-900 mb-1">
-                      {getPublicationTitle(booking)}
-                    </h3>
-                    <div className="flex items-center gap-1.5 text-sm text-stone-600">
-                      <Calendar className="h-4 w-4" />
-                      <span>{getDateTimeDisplay(booking)}</span>
-                    </div>
-                  </div>
-                  <span className="shrink-0 text-xs text-stone-400">
-                    {formatDistanceToNow(new Date(booking.createdAt), { addSuffix: true, locale: ru })}
-                  </span>
-                </div>
-
-                {/* Customer Info */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-3 border-t border-stone-100">
-                  <div className="flex items-center gap-2">
-                    <User className="h-4 w-4 text-stone-400" />
-                    <span className="text-sm text-stone-900 font-medium">{booking.customerName}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Phone className="h-4 w-4 text-stone-400" />
-                    <a
-                      href={`tel:${booking.customerPhone}`}
-                      className="text-sm text-stone-900 hover:text-[#EF8759] transition-colors"
-                    >
-                      {booking.customerPhone}
-                    </a>
-                  </div>
-                  {(booking.adultsCount > 0 || booking.childrenCount > 0) && (
-                    <div className="flex items-center gap-2">
-                      <Users className="h-4 w-4 text-stone-400" />
-                      <span className="text-sm text-stone-600">
-                        {booking.adultsCount > 0 && `${booking.adultsCount} взр.`}
-                        {booking.adultsCount > 0 && booking.childrenCount > 0 && ", "}
-                        {booking.childrenCount > 0 && `${booking.childrenCount} дет.`}
-                      </span>
-                    </div>
-                  )}
-                </div>
-
-                {/* Comment */}
-                {booking.customerComment && (
-                  <div className="pt-3 border-t border-stone-100">
-                    <p className="text-sm text-stone-600 italic">&quot;{booking.customerComment}&quot;</p>
-                  </div>
-                )}
-
-                {/* Actions */}
-                <div className="flex items-center gap-2 pt-3 border-t border-stone-100 flex-wrap">
-                  {canConfirm && (
-                    <Button
-                      size="sm"
-                      onClick={() => void updateBookingStatus(booking.id, BookingStatus.CONFIRMED)}
-                      disabled={isUpdating}
-                      className="rounded-xl bg-green-600 hover:bg-green-700"
-                    >
-                      Подтвердить
-                    </Button>
-                  )}
-                  {canReject && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => void updateBookingStatus(booking.id, BookingStatus.REJECTED)}
-                      disabled={isUpdating}
-                      className="rounded-xl"
-                    >
-                      Отклонить
-                    </Button>
-                  )}
-                  {canComplete && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => void updateBookingStatus(booking.id, BookingStatus.COMPLETED)}
-                      disabled={isUpdating}
-                      className="rounded-xl"
-                    >
-                      Завершить
-                    </Button>
-                  )}
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    asChild
-                    className="rounded-xl gap-2"
-                  >
-                    <a href={`tel:${booking.customerPhone}`}>
-                      <Phone className="h-4 w-4" />
-                      Позвонить
-                    </a>
-                  </Button>
-                </div>
-              </div>
-            );
-          })}
+          {items.map((booking) => (
+            <BookingCard
+              key={booking.id}
+              booking={booking}
+              onStatusChange={handleStatusChange}
+            />
+          ))}
         </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Loading skeleton ─────────────────────────────────────────────────────────
+
+function LoadingSkeleton() {
+  return (
+    <div className="space-y-3">
+      {[1, 2, 3].map((i) => (
+        <div
+          key={i}
+          className="h-40 animate-pulse rounded-2xl border border-stone-100 bg-stone-50"
+        />
+      ))}
+    </div>
+  );
+}
+
+// ─── Empty state ──────────────────────────────────────────────────────────────
+
+function EmptyState({ hasFilter }: { hasFilter: boolean }) {
+  return (
+    <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-stone-200 bg-white py-16 text-center">
+      {hasFilter ? (
+        <>
+          <Inbox className="mb-3 h-10 w-10 text-stone-300" />
+          <p className="text-[15px] font-semibold text-stone-700">Заявок в этом фильтре нет</p>
+          <p className="mt-1 text-[13px] text-stone-400">
+            Попробуйте выбрать другой статус или день
+          </p>
+        </>
+      ) : (
+        <>
+          <Calendar className="mb-3 h-10 w-10 text-stone-300" />
+          <p className="text-[15px] font-semibold text-stone-700">Заявок пока нет</p>
+          <p className="mt-1 max-w-xs text-[13px] text-stone-400">
+            Когда клиенты запишутся на ваши предложения, заявки появятся здесь
+          </p>
+        </>
       )}
     </div>
   );

@@ -2,6 +2,7 @@ import type { ActivityFormat, EventVenueKind } from "@prisma/client";
 import type { Intent } from "@/lib/intent";
 import { DEFAULT_CITY_HUB_PATH } from "@/lib/intent";
 import { extractPlainTextFromHtml } from "@/lib/richtext/utils";
+import { sanitizeRichContent } from "@/components/content/RichContentRenderer";
 import { resolveActivityCoverUrl } from "@/lib/event/resolveActivityCoverUrl";
 import { formatPriceFrom } from "@/lib/formatters/format-price";
 import type { EventPageData } from "./eventPageTypes";
@@ -32,13 +33,16 @@ export type ActivityForEventPageInput = {
   priceFrom: number | null;
   currency: string | null;
   priceDetails: string | null;
+  scheduleJson?: unknown | null;
   /** Денормализованный URL обложки; может дублировать запись по coverImageId в images */
   coverImageUrl: string | null;
-  /** Primary: соответствует записи в images (ActivityImage.id) */
+  /** Primary media asset id for cover image. */
   coverImageId?: string | null;
-  images: Array<{ id: string; url: string }>;
+  images: Array<{ id: string; url: string; mediaAssetId?: string | null }>;
   sessions: Array<{ id: string; startsAt: Date }>;
   place: {
+    id: string;
+    slug: string | null;
     title: string;
     formattedAddr: string | null;
     city: { slug: string } | null;
@@ -47,7 +51,13 @@ export type ActivityForEventPageInput = {
     kind: EventVenueKind;
     title: string | null;
     addressLine: string | null;
-    place: { title: string; formattedAddr: string | null } | null;
+    place: {
+      id: string;
+      slug: string | null;
+      title: string;
+      formattedAddr: string | null;
+      city: { slug: string } | null;
+    } | null;
   } | null;
   eventCategory: { nameRu: string } | null;
 };
@@ -79,6 +89,31 @@ function priceLabel(activity: Pick<ActivityForEventPageInput, "priceText" | "pri
     return formatPriceFrom(activity.priceFrom);
   }
   return "Уточняйте цену";
+}
+
+function isHttpUrl(value: string): boolean {
+  return /^https?:\/\//i.test(value.trim());
+}
+
+function resolvePurchaseUrl(activity: Pick<ActivityForEventPageInput, "scheduleJson">): string | undefined {
+  const raw = activity.scheduleJson;
+  if (!raw || typeof raw !== "object") return undefined;
+  const json = raw as Record<string, unknown>;
+  const participationMode =
+    typeof json.participationMode === "string" ? json.participationMode : undefined;
+  if (participationMode === "external-link") {
+    const ticketLink = typeof json.ticketLink === "string" ? json.ticketLink.trim() : "";
+    return ticketLink && isHttpUrl(ticketLink) ? ticketLink : undefined;
+  }
+  if (participationMode === "prebook") {
+    const prebookMethod =
+      typeof json.prebookMethod === "string" ? json.prebookMethod : undefined;
+    const prebookUrl = typeof json.prebookUrl === "string" ? json.prebookUrl.trim() : "";
+    if (prebookMethod === "link" && prebookUrl && isHttpUrl(prebookUrl)) {
+      return prebookUrl;
+    }
+  }
+  return undefined;
 }
 
 function factChipsFromActivity(activity: ActivityForEventPageInput): EventPageData["factChips"] {
@@ -117,14 +152,37 @@ function importantFactsFromActivity(activity: ActivityForEventPageInput): EventP
   return rows;
 }
 
-function venueFromActivity(activity: ActivityForEventPageInput): EventPageData["venue"] | undefined {
+function eventVenueCitySlug(activity: ActivityForEventPageInput): string {
+  return (
+    activity.place?.city?.slug ??
+    activity.venue?.place?.city?.slug ??
+    DEFAULT_CITY_HUB_PATH.replace(/^\//, "")
+  );
+}
+
+function publicPlaceHref(
+  citySlug: string,
+  place: { id: string; slug: string | null },
+): string {
+  const seg = encodeURIComponent(place.slug ?? place.id);
+  return `/${citySlug}/places/${seg}`;
+}
+
+function venueFromActivity(
+  activity: ActivityForEventPageInput,
+  listingCitySlug: string,
+): EventPageData["venue"] | undefined {
+  const fallbackCity = eventVenueCitySlug(activity);
+
   if (activity.venue) {
     if (activity.format === "ONLINE") return undefined;
     const v = activity.venue;
     if (v.kind === "PLACE" && v.place) {
+      const cityForPlace = v.place.city?.slug ?? listingCitySlug ?? fallbackCity;
       return {
         name: v.place.title,
         address: v.place.formattedAddr ?? undefined,
+        placeHref: publicPlaceHref(cityForPlace, v.place),
       };
     }
     if (v.title || v.addressLine) {
@@ -140,9 +198,11 @@ function venueFromActivity(activity: ActivityForEventPageInput): EventPageData["
   }
   if (activity.place) {
     if (activity.format === "ONLINE") return undefined;
+    const cityForPlace = activity.place.city?.slug ?? listingCitySlug ?? fallbackCity;
     return {
       name: activity.place.title,
       address: activity.place.formattedAddr ?? undefined,
+      placeHref: publicPlaceHref(cityForPlace, activity.place),
     };
   }
   return undefined;
@@ -157,8 +217,8 @@ function aboutFromActivity(activity: ActivityForEventPageInput): EventPageData["
   return {
     summary,
     full: fullPlain.length > 220 ? fullPlain : undefined,
-    // Preserve HTML for rich text rendering
-    descriptionHtml: raw || undefined,
+    // Safe HTML for public/owner preview (allowlist matches TipTap output)
+    descriptionHtml: raw ? sanitizeRichContent(raw) : undefined,
   };
 }
 
@@ -184,6 +244,7 @@ export function buildEventPageDataFromPrismaActivity(
   const citySlug =
     options?.citySlug ??
     activity.place?.city?.slug ??
+    activity.venue?.place?.city?.slug ??
     DEFAULT_CITY_HUB_PATH.replace(/^\//, "");
 
   const poster =
@@ -202,10 +263,15 @@ export function buildEventPageDataFromPrismaActivity(
     ? extractPlainTextFromHtml(activity.description)
     : "";
 
+  const now = new Date();
+  const isPastEvent =
+    sessions.length > 0 && sessions.every((s) => new Date(s.startsAt) < now);
+
   const data: EventPageData = {
     id: activity.id,
     slug: activity.slug ?? null,
     citySlug,
+    isPastEvent,
     discoveryIntent: discoveryIntentForActivity(),
     ageFromBadge: ageFromPlusBadgeFromAgeTags(activity.ageTags),
     categoryLabel: activity.eventCategory?.nameRu,
@@ -218,7 +284,7 @@ export function buildEventPageDataFromPrismaActivity(
       posterAlt: activity.title,
     },
     sessions,
-    venue: venueFromActivity(activity),
+    venue: venueFromActivity(activity, citySlug),
     whyGo: bulletsFromText(plainDesc || activity.shortDesc, 160),
     goodFit: [
       `Если вы ищете событие с указанным возрастом: ${activity.ageTags.join(", ") || "см. описание"}.`,
@@ -239,6 +305,7 @@ export function buildEventPageDataFromPrismaActivity(
       planLabel: "В план",
       buyLabel: activity.format === "ONLINE" ? "Участвовать онлайн" : "Купить билет",
       saveLabel: "В идеи",
+      purchaseUrl: resolvePurchaseUrl(activity),
     },
     ownerEditHref: options?.ownerEditHref,
     previewBannerLabel: options?.previewBannerLabel,

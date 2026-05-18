@@ -244,8 +244,7 @@ export async function POST(
     return NextResponse.json(
       {
         error: "INTERNAL_ERROR",
-        message: error instanceof Error ? error.message : "An unexpected error occurred while syncing reviews.",
-        details: process.env.NODE_ENV === "development" ? String(error) : undefined,
+        message: "An unexpected error occurred while syncing reviews.",
       },
       { status: 500 }
     );

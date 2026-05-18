@@ -55,15 +55,13 @@ export default async function CityHomePage({ citySlug }: CityHomePageProps) {
     }),
     listPublicRoutesByCity(city.id).catch(() => []),
     listCityHomeArticles(city),
-    getClassesDiscoveryFeed([city.id], {
-      take: 8,
-      weather: weatherRanking,
-    }).catch(() => []),
+    getClassesDiscoveryFeed(city.id, city.slug, { take: 8 }).catch(() => []),
     listPublicRoutesByCityIds(nearbyCities.map((c) => c.id)).catch(() => []),
-    getClassesDiscoveryFeed(nearbyCities.map((c) => c.id), {
-      take: 8,
-      weather: weatherRanking,
-    }).catch(() => []),
+    Promise.all(
+      nearbyCities.map((nearbyCity) =>
+        getClassesDiscoveryFeed(nearbyCity.id, nearbyCity.slug, { take: 8 }).catch(() => []),
+      ),
+    ).then((groups) => groups.flat()),
   ]);
 
   const mapRoutePreview = (r: (typeof localRoutes)[number]): PublicRouteCardModel => ({

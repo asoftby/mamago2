@@ -29,7 +29,7 @@ export async function GET(req: NextRequest, context: RouteContext) {
   } catch (error) {
     console.error("[admin/pages/[id] GET]", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to fetch page" },
+      { error: "Internal server error" },
       { status: 500 }
     );
   }
@@ -62,7 +62,7 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
   } catch (error) {
     console.error("[admin/pages/[id] PATCH]", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to update page" },
+      { error: "Failed to update page" },
       { status: 400 }
     );
   }
@@ -85,7 +85,7 @@ export async function DELETE(req: NextRequest, context: RouteContext) {
   } catch (error) {
     console.error("[admin/pages/[id] DELETE]", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to archive page" },
+      { error: "Failed to archive page" },
       { status: 400 }
     );
   }

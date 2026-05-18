@@ -16,6 +16,11 @@ export type AdminCityRow = {
   placesCount: number;
 };
 
+/** Server-side memory cache for admin city rows (revalidated every 5 minutes) */
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+let cachedRows: AdminCityRow[] | null = null;
+let cacheUpdatedAt = 0;
+
 async function countPublicEventsForCity(cityId: string): Promise<number> {
   const pubActivity = getPublicListingActivityWhere();
   const pubActivityParts = (pubActivity.AND ?? []) as object[];
@@ -43,6 +48,12 @@ async function countPublicPlacesForCity(cityId: string): Promise<number> {
 }
 
 export async function listAdminCityRows(): Promise<AdminCityRow[]> {
+  // Return cached data if still fresh
+  const now = Date.now();
+  if (cachedRows && now - cacheUpdatedAt < CACHE_TTL) {
+    return cachedRows;
+  }
+
   const cities = await prisma.city.findMany({
     orderBy: [{ priority: "desc" }, { name: "asc" }],
     select: {
@@ -69,6 +80,10 @@ export async function listAdminCityRows(): Promise<AdminCityRow[]> {
       };
     }),
   );
+
+  // Update cache
+  cachedRows = rows;
+  cacheUpdatedAt = now;
 
   return rows;
 }

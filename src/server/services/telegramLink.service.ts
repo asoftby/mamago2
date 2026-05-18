@@ -51,7 +51,19 @@ function buildTelegramStartUrl(botUsername: string, token: string): string {
   return `${getTelegramBotProfileUrl(botUsername)}?start=link_${token}`;
 }
 
-export async function createTelegramLink(params: { userId: string }) {
+function buildTelegramStartCommand(token: string): string {
+  return `/start link_${token}`;
+}
+
+export type CreateTelegramLinkResult = {
+  url: string;
+  command: string;
+  expiresAt: string;
+  environment: string;
+  botUsername: string;
+};
+
+export async function createTelegramLink(params: { userId: string }): Promise<CreateTelegramLinkResult> {
   const config = requireTelegramConfig();
   const token = randomBytes(24).toString("hex");
   const expiresAt = new Date(Date.now() + TELEGRAM_LINK_TTL_MS);
@@ -90,8 +102,16 @@ export async function createTelegramLink(params: { userId: string }) {
     `;
   }
 
+  if (process.env.NODE_ENV !== "production") {
+    console.log(
+      "[telegram:link] createTelegramLink userId=%s token=%s expiresAt=%s",
+      params.userId, token, expiresAt.toISOString(),
+    );
+  }
+
   return {
     url: buildTelegramStartUrl(config.botUsername, token),
+    command: buildTelegramStartCommand(token),
     expiresAt: expiresAt.toISOString(),
     environment: config.environment,
     botUsername: config.botUsername,
@@ -269,12 +289,43 @@ export async function consumeTelegramLinkToken(params: {
     }
   })();
 
-  if (
-    !linkToken ||
-    linkToken.environment !== config.environment ||
-    linkToken.usedAt ||
-    linkToken.expiresAt <= now
-  ) {
+  if (!linkToken) {
+    if (process.env.NODE_ENV !== "production") {
+      console.log(
+        "[telegram:link] consumeTelegramLinkToken FAIL — token not found (token=%s)",
+        params.token,
+      );
+    }
+    return { ok: false as const, reason: "invalid_or_expired" };
+  }
+
+  if (linkToken.environment !== config.environment) {
+    if (process.env.NODE_ENV !== "production") {
+      console.log(
+        "[telegram:link] consumeTelegramLinkToken FAIL — environment mismatch: expected=%s actual=%s (token=%s, userId=%s)",
+        config.environment, linkToken.environment, params.token, linkToken.userId,
+      );
+    }
+    return { ok: false as const, reason: "invalid_or_expired" };
+  }
+
+  if (linkToken.usedAt) {
+    if (process.env.NODE_ENV !== "production") {
+      console.log(
+        "[telegram:link] consumeTelegramLinkToken FAIL — already used (token=%s, userId=%s, usedAt=%s)",
+        params.token, linkToken.userId, linkToken.usedAt.toISOString(),
+      );
+    }
+    return { ok: false as const, reason: "invalid_or_expired" };
+  }
+
+  if (linkToken.expiresAt <= now) {
+    if (process.env.NODE_ENV !== "production") {
+      console.log(
+        "[telegram:link] consumeTelegramLinkToken FAIL — expired (token=%s, userId=%s, expiresAt=%s)",
+        params.token, linkToken.userId, linkToken.expiresAt.toISOString(),
+      );
+    }
     return { ok: false as const, reason: "invalid_or_expired" };
   }
 

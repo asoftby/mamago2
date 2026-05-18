@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
 import { z } from "zod";
+import { Prisma } from "@prisma/client";
 import {
   canCreateBusinessContent,
   canManageOwnedContent,
@@ -11,6 +12,12 @@ import { assignOfferSlugIfMissing } from "@/lib/slug/offerSlugService";
 import { formatPriceFrom } from "@/lib/formatters/format-price";
 import { ensurePublishedOfferHasSlug } from "@/lib/slug/publishSlugGuards";
 import { createPublishTimer, runAfterPublishResponse } from "@/server/utils/publishPipeline";
+import {
+  campMealKeySchema,
+  campProgramTypeSchema,
+  campSessionEntrySchema,
+} from "@/lib/business/offerCampApiSchemas";
+import { syncOfferMediaUsage } from "@/server/services/media/media-usage.service";
 
 const createOfferSchema = z.object({
   source: z.enum(["PLACE", "EVENT"]),
@@ -26,6 +33,14 @@ const createOfferSchema = z.object({
   ageMinMonths: z.number().optional(),
   ageMaxMonths: z.number().optional(),
   coverImage: z.string().optional(),
+  /** Публичные URL изображений галереи (как возвращает /api/upload). */
+  gallery: z.array(z.string()).optional(),
+  /** Видео URL (YouTube, YouTube Shorts, Instagram Reels) */
+  videoUrl: z.string().url().optional(),
+  /** Акционное предложение (текстовое описание скидки и т.д.) */
+  promotionalOffer: z.string().optional(),
+  priceCaption: z.string().optional(),
+  promotionDetails: z.string().optional(),
   pricingMode: z.enum(["SINGLE", "MULTIPLE"]),
   singlePrice: z.number().optional(),
   singlePriceLabel: z.string().optional(),
@@ -39,10 +54,44 @@ const createOfferSchema = z.object({
   phone: z.string().optional(),
   website: z.string().optional(),
   bookingInstructions: z.string().optional(),
+  contactSource: z.enum(["manual", "place"]).optional(),
+  contactPhone: z.string().optional(),
+  contactWebsite: z.string().optional(),
+  contactSocialLinks: z.array(
+    z.object({
+      id: z.string().optional(),
+      network: z.enum(["instagram", "telegram", "tiktok", "youtube", "other"]),
+      url: z.string(),
+    }),
+  ).optional(),
   status: z.enum(["DRAFT", "PENDING", "PUBLISHED"]).default("DRAFT"),
   discoverySignalIds: z.array(z.string()).default([]),
+  classChipSlugs: z.array(z.string()).default([]),
+  campProgramType: campProgramTypeSchema,
+  // Camp fields
+  campSessions: z.array(campSessionEntrySchema).optional(),
+  campSessionDuration: z.string().optional(),
+  campStayDuration: z.string().optional(),
+  campPlacesCount: z.number().optional(),
+  campGroupSize: z.number().optional(),
+  campDaySchedule: z.string().optional(),
+  campCanSelectDays: z.boolean().optional(),
+  campHasExtendedCare: z.boolean().optional(),
+  // Accommodation fields
+  accommodationProvided: z.boolean().optional(),
+  accommodationType: z.string().optional(),
+  accommodationAddress: z.string().optional(),
+  accommodationRooms: z.string().optional(),
+  campIncludedMeals: z.array(campMealKeySchema).optional(),
+  campSafetyInfo: z.string().optional(),
+  campMedicalInfo: z.string().optional(),
+  accommodationConditions: z.string().optional(),
+  mealInfo: z.string().optional(),
+  transferInfo: z.string().optional(),
+  whatToBring: z.string().optional(),
 });
 
+// Re-trigger build for schema updates
 export async function POST(request: NextRequest) {
   const timer = createPublishTimer("publish:offer");
   try {
@@ -111,15 +160,47 @@ export async function POST(request: NextRequest) {
         data: {
           placeId: place.id,
           kind: dbKind,
+          contactSource: data.contactSource ?? "manual",
+          contactPhone: data.contactPhone,
+          contactWebsite: data.contactWebsite,
+          contactSocialLinks: data.contactSocialLinks as Prisma.InputJsonValue | undefined,
           title: data.title,
           description: data.shortDescription,
           coverImage: data.coverImage,
+          galleryImages: data.gallery ?? [],
+          videoUrl: data.videoUrl,
+          priceCaption: data.priceCaption,
+          promotionDetails: data.promotionDetails,
+          promotionalOffer: data.promotionalOffer,
           priceFrom,
           priceText,
           ageMinMonths: data.ageMinMonths,
           ageMaxMonths: data.ageMaxMonths,
           discoverySignalIds: data.discoverySignalIds,
+          classChipSlugs: data.classChipSlugs,
           status: data.status,
+          campProgramType: data.campProgramType,
+          // Camp fields
+          campSessions: data.campSessions as unknown as Prisma.InputJsonValue,
+          campSessionDuration: data.campSessionDuration,
+          campStayDuration: data.campStayDuration,
+          campPlacesCount: data.campPlacesCount,
+          campGroupSize: data.campGroupSize,
+          campDaySchedule: data.campDaySchedule,
+          campCanSelectDays: data.campCanSelectDays,
+          campHasExtendedCare: data.campHasExtendedCare,
+          // Accommodation fields
+          accommodationProvided: data.accommodationProvided,
+          accommodationType: data.accommodationType,
+          accommodationAddress: data.accommodationAddress,
+          accommodationRooms: data.accommodationRooms,
+          campIncludedMeals: data.campIncludedMeals,
+          campSafetyInfo: data.campSafetyInfo,
+          campMedicalInfo: data.campMedicalInfo,
+          accommodationConditions: data.accommodationConditions,
+          mealInfo: data.mealInfo,
+          transferInfo: data.transferInfo,
+          whatToBring: data.whatToBring,
           ...(data.status === "PUBLISHED" ? { publishedAt: new Date() } : {}),
         },
         select: {
@@ -144,6 +225,16 @@ export async function POST(request: NextRequest) {
           );
         }
       }
+
+      // Sync media usage if cover or gallery provided (don't block on errors)
+      if (data.coverImage || (data.gallery && data.gallery.length > 0)) {
+        try {
+          await syncOfferMediaUsage(offer.id);
+        } catch (error) {
+          console.error(`Failed to sync media usage for offer ${offer.id}:`, error);
+        }
+      }
+
       timer.mark("response");
       timer.log({ status: offer.status });
 
@@ -165,7 +256,9 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json(
-      { error: "Internal server error" },
+      {
+        error: "Internal server error",
+      },
       { status: 500 }
     );
   }

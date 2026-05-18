@@ -25,6 +25,26 @@ import {
 } from "@/lib/notifications/welcomeNotification";
 import { resolveNotificationAudience } from "@/lib/notifications/audience";
 import { dispatchDelivery } from "./notificationDelivery.service";
+import { validateNotificationRegistry } from "@/lib/notifications/notificationRegistry";
+import { checkNotificationDedup } from "./notificationDedup.service";
+
+// ─── Dev Validation ───────────────────────────────────────────────────────────
+
+// Run registry validation in development
+if (process.env.NODE_ENV === "development") {
+  // Get all NotificationType enum values from Prisma
+  const prismaTypes = Object.values(NotificationType);
+  validateNotificationRegistry(prismaTypes);
+}
+
+// ─── Dev Validation ───────────────────────────────────────────────────────────
+
+// Run registry validation in development
+if (process.env.NODE_ENV === "development") {
+  // Get all NotificationType enum values from Prisma
+  const prismaTypes = Object.values(NotificationType);
+  validateNotificationRegistry(prismaTypes);
+}
 
 export type NotificationStreamFilter = "user" | "business";
 
@@ -41,8 +61,10 @@ export function getAccessibleSurfacesForUser(user: {
   
   if (user.business) {
     surfaces.push("BUSINESS");
+  } else if (user.role === "BUSINESS_OWNER") {
+    surfaces.push("BUSINESS");
   }
-  
+
   if (user.role === "ADMIN") {
     surfaces.push("ADMIN");
   }
@@ -174,6 +196,9 @@ export async function notifyEmailVerified(userId: string) {
 // ── PLACE ─────────────────────────────────────────────────────────────────────
 
 export async function notifyPlaceApproved(placeId: string, placeName: string, ownerId: string) {
+  const dedup = await checkNotificationDedup(ownerId, "PLACE_APPROVED", "PLACE", placeId);
+  if (dedup.isDuplicate) return null;
+
   return createNotification({
     userId: ownerId,
     type: "PLACE_APPROVED",
@@ -190,6 +215,9 @@ export async function notifyPlaceNeedsChanges(
   ownerId: string,
   moderatorComment: string,
 ) {
+  const dedup = await checkNotificationDedup(ownerId, "PLACE_NEEDS_CHANGES", "PLACE", placeId);
+  if (dedup.isDuplicate) return null;
+
   return createNotification({
     userId: ownerId,
     type: "PLACE_NEEDS_CHANGES",
@@ -206,6 +234,9 @@ export async function notifyPlaceRejected(
   ownerId: string,
   moderatorComment: string,
 ) {
+  const dedup = await checkNotificationDedup(ownerId, "PLACE_REJECTED", "PLACE", placeId);
+  if (dedup.isDuplicate) return null;
+
   return createNotification({
     userId: ownerId,
     type: "PLACE_REJECTED",
@@ -217,6 +248,9 @@ export async function notifyPlaceRejected(
 }
 
 export async function notifyPlaceUpdateApproved(placeId: string, placeName: string, ownerId: string) {
+  const dedup = await checkNotificationDedup(ownerId, "PLACE_UPDATE_APPROVED", "PLACE", placeId);
+  if (dedup.isDuplicate) return null;
+
   return createNotification({
     userId: ownerId,
     type: "PLACE_UPDATE_APPROVED",
@@ -233,6 +267,9 @@ export async function notifyPlaceUpdateNeedsRevision(
   ownerId: string,
   moderatorComment: string,
 ) {
+  const dedup = await checkNotificationDedup(ownerId, "PLACE_UPDATE_NEEDS_REVISION", "PLACE", placeId);
+  if (dedup.isDuplicate) return null;
+
   return createNotification({
     userId: ownerId,
     type: "PLACE_UPDATE_NEEDS_REVISION",
@@ -249,6 +286,9 @@ export async function notifyPlaceUpdateRejected(
   ownerId: string,
   moderatorComment: string,
 ) {
+  const dedup = await checkNotificationDedup(ownerId, "PLACE_UPDATE_REJECTED", "PLACE", placeId);
+  if (dedup.isDuplicate) return null;
+
   return createNotification({
     userId: ownerId,
     type: "PLACE_UPDATE_REJECTED",
@@ -262,6 +302,9 @@ export async function notifyPlaceUpdateRejected(
 // ── ACTIVITY ──────────────────────────────────────────────────────────────────
 
 export async function notifyActivityApproved(activityId: string, activityName: string, ownerId: string) {
+  const dedup = await checkNotificationDedup(ownerId, "ACTIVITY_APPROVED", "ACTIVITY", activityId);
+  if (dedup.isDuplicate) return null;
+
   return createNotification({
     userId: ownerId,
     type: "ACTIVITY_APPROVED",
@@ -278,6 +321,9 @@ export async function notifyActivityNeedsChanges(
   ownerId: string,
   moderatorComment: string,
 ) {
+  const dedup = await checkNotificationDedup(ownerId, "ACTIVITY_NEEDS_CHANGES", "ACTIVITY", activityId);
+  if (dedup.isDuplicate) return null;
+
   return createNotification({
     userId: ownerId,
     type: "ACTIVITY_NEEDS_CHANGES",
@@ -294,6 +340,9 @@ export async function notifyActivityRejected(
   ownerId: string,
   moderatorComment: string,
 ) {
+  const dedup = await checkNotificationDedup(ownerId, "ACTIVITY_REJECTED", "ACTIVITY", activityId);
+  if (dedup.isDuplicate) return null;
+
   return createNotification({
     userId: ownerId,
     type: "ACTIVITY_REJECTED",
@@ -307,6 +356,9 @@ export async function notifyActivityRejected(
 // ── OFFER ─────────────────────────────────────────────────────────────────────
 
 export async function notifyOfferApproved(offerId: string, offerName: string, ownerId: string) {
+  const dedup = await checkNotificationDedup(ownerId, "OFFER_APPROVED", "OFFER", offerId);
+  if (dedup.isDuplicate) return null;
+
   return createNotification({
     userId: ownerId,
     type: "OFFER_APPROVED",
@@ -323,6 +375,9 @@ export async function notifyOfferNeedsChanges(
   ownerId: string,
   moderatorComment: string,
 ) {
+  const dedup = await checkNotificationDedup(ownerId, "OFFER_NEEDS_CHANGES", "OFFER", offerId);
+  if (dedup.isDuplicate) return null;
+
   return createNotification({
     userId: ownerId,
     type: "OFFER_NEEDS_CHANGES",
@@ -339,6 +394,9 @@ export async function notifyOfferRejected(
   ownerId: string,
   moderatorComment: string,
 ) {
+  const dedup = await checkNotificationDedup(ownerId, "OFFER_REJECTED", "OFFER", offerId);
+  if (dedup.isDuplicate) return null;
+
   return createNotification({
     userId: ownerId,
     type: "OFFER_REJECTED",
@@ -352,6 +410,9 @@ export async function notifyOfferRejected(
 // ── BUSINESS VERIFICATION ─────────────────────────────────────────────────────
 
 export async function notifyBusinessVerified(businessId: string, businessName: string, ownerId: string) {
+  const dedup = await checkNotificationDedup(ownerId, "BUSINESS_VERIFIED", "BUSINESS", businessId);
+  if (dedup.isDuplicate) return null;
+
   return createNotification({
     userId: ownerId,
     type: "BUSINESS_VERIFIED",
@@ -368,6 +429,9 @@ export async function notifyBusinessRejected(
   ownerId: string,
   note: string,
 ) {
+  const dedup = await checkNotificationDedup(ownerId, "BUSINESS_REJECTED", "BUSINESS", businessId);
+  if (dedup.isDuplicate) return null;
+
   return createNotification({
     userId: ownerId,
     type: "BUSINESS_REJECTED",
@@ -384,6 +448,9 @@ export async function notifyBusinessNeedsInfo(
   ownerId: string,
   note: string,
 ) {
+  const dedup = await checkNotificationDedup(ownerId, "BUSINESS_NEEDS_INFO", "BUSINESS", businessId);
+  if (dedup.isDuplicate) return null;
+
   return createNotification({
     userId: ownerId,
     type: "BUSINESS_NEEDS_INFO",
@@ -669,5 +736,213 @@ export async function notifyUserPlanReminder(params: {
     body: params.body,
     entityType: "PLAN_ITEM",
     entityId: params.entityId ?? undefined,
+  });
+}
+
+// ── BOOKING ───────────────────────────────────────────────────────────────────
+
+import {
+  buildBookingNotificationBody,
+  type BookingNotificationBodyInput,
+} from "./booking/booking.formatters";
+import { resolveBookingSourceType } from "./booking/booking.types";
+
+export interface NotifyBookingCreatedParams {
+  /** userId владельца бизнеса (получатель уведомления) */
+  ownerUserId: string;
+  bookingId: string;
+  offerId?: string | null;
+  offerTitle?: string | null;
+  activityId?: string | null;
+  activityTitle?: string | null;
+  placeId?: string | null;
+  placeTitle?: string | null;
+  campShiftId?: string | null;
+  campShiftTitle?: string | null;
+  campShiftDateFrom?: string | null;
+  campShiftDateTo?: string | null;
+  customerName: string;
+  childName?: string | null;
+  childAge?: number | null;
+}
+
+/**
+ * Уведомление бизнесу о новой заявке на запись.
+ * Тело строится через buildBookingNotificationBody — без лагерь-специфичных assumptions.
+ */
+export async function notifyBookingCreated(params: NotifyBookingCreatedParams) {
+  const sourceType = resolveBookingSourceType({
+    campShiftId: params.campShiftId ?? null,
+    offerId: params.offerId ?? null,
+    activityId: params.activityId ?? null,
+    placeId: params.placeId ?? null,
+  });
+
+  const bodyInput: BookingNotificationBodyInput = {
+    sourceType,
+    offerTitle: params.offerTitle ?? null,
+    activityTitle: params.activityTitle ?? null,
+    placeTitle: params.placeTitle ?? null,
+    campShiftTitle: params.campShiftTitle ?? null,
+    campShiftDateFrom: params.campShiftDateFrom ?? null,
+    campShiftDateTo: params.campShiftDateTo ?? null,
+    customerName: params.customerName,
+    childName: params.childName ?? null,
+    childAge: params.childAge ?? null,
+  };
+
+  const body = buildBookingNotificationBody(bodyInput);
+
+  return createNotification({
+    userId: params.ownerUserId,
+    audience: "BUSINESS",
+    type: "BOOKING_CREATED",
+    title: "Новая заявка",
+    body,
+    entityType: "BOOKING",
+    entityId: params.bookingId,
+    ctaLabel: "Открыть заявки",
+    ctaAction: "/business/bookings",
+  });
+}
+
+// ── USER BOOKING LIFECYCLE ────────────────────────────────────────────────────
+
+export interface NotifyUserBookingParams {
+  /** userId владельца заявки (получатель уведомления) */
+  userId: string;
+  bookingId: string;
+  /** Название активности/предложения/места (для тела уведомления) */
+  publicationTitle?: string | null;
+}
+
+/**
+ * Уведомление пользователю: бизнес подтвердил заявку.
+ * Вызывается при переходе NEW → CONFIRMED.
+ * Dedup: one per status change (no time window)
+ */
+export async function notifyUserBookingConfirmed(params: NotifyUserBookingParams) {
+  // Check dedup
+  const dedup = await checkNotificationDedup(
+    params.userId,
+    "BOOKING_CONFIRMED",
+    "BOOKING",
+    params.bookingId,
+  );
+  if (dedup.isDuplicate) {
+    console.warn("[notification] BOOKING_CONFIRMED deduplicated:", params.bookingId);
+    return null;
+  }
+
+  const title = params.publicationTitle ? `«${params.publicationTitle}»` : "Ваша заявка";
+  return createNotification({
+    userId: params.userId,
+    audience: "USER",
+    type: "BOOKING_CONFIRMED",
+    title: "Заявка подтверждена",
+    body: `${title} подтверждена. Ждём вас!`,
+    entityType: "BOOKING",
+    entityId: params.bookingId,
+    ctaLabel: "Мои записи",
+    ctaAction: "/me/bookings",
+  });
+}
+
+/**
+ * Уведомление пользователю: бизнес отклонил заявку.
+ * Вызывается при переходе NEW|CONFIRMED → REJECTED.
+ * Dedup: one per status change (no time window)
+ */
+export async function notifyUserBookingCancelled(params: NotifyUserBookingParams) {
+  // Check dedup
+  const dedup = await checkNotificationDedup(
+    params.userId,
+    "BOOKING_CANCELLED",
+    "BOOKING",
+    params.bookingId,
+  );
+  if (dedup.isDuplicate) {
+    console.warn("[notification] BOOKING_CANCELLED deduplicated:", params.bookingId);
+    return null;
+  }
+
+  const title = params.publicationTitle ? `«${params.publicationTitle}»` : "Ваша заявка";
+  return createNotification({
+    userId: params.userId,
+    audience: "USER",
+    type: "BOOKING_CANCELLED",
+    title: "Заявка отклонена",
+    body: `${title} была отклонена. Вы можете подать новую заявку.`,
+    entityType: "BOOKING",
+    entityId: params.bookingId,
+    ctaLabel: "Мои записи",
+    ctaAction: "/me/bookings",
+  });
+}
+
+/**
+ * Уведомление пользователю: заявка завершена.
+ * Вызывается при переходе CONFIRMED → COMPLETED.
+ * Dedup: one per status change (no time window)
+ */
+export async function notifyUserBookingCompleted(params: NotifyUserBookingParams) {
+  // Check dedup
+  const dedup = await checkNotificationDedup(
+    params.userId,
+    "BOOKING_COMPLETED",
+    "BOOKING",
+    params.bookingId,
+  );
+  if (dedup.isDuplicate) {
+    console.warn("[notification] BOOKING_COMPLETED deduplicated:", params.bookingId);
+    return null;
+  }
+
+  const title = params.publicationTitle ? `«${params.publicationTitle}»` : "Ваша заявка";
+  return createNotification({
+    userId: params.userId,
+    audience: "USER",
+    type: "BOOKING_COMPLETED",
+    title: "Заявка завершена",
+    body: `${title} завершена. Спасибо, что выбрали нас!`,
+    entityType: "BOOKING",
+    entityId: params.bookingId,
+    ctaLabel: "Мои записи",
+    ctaAction: "/me/bookings",
+  });
+}
+
+/**
+ * Уведомление пользователю: запрос отзыва после завершения.
+ * Вызывается после BOOKING_COMPLETED, если feedback flow доступен.
+ * Dedup: one per booking completion (no time window)
+ *
+ * TODO: Когда появится страница /me/bookings/:id с формой отзыва,
+ * обновить ctaAction на `/me/bookings/${params.bookingId}`.
+ */
+export async function notifyUserBookingFeedbackRequest(params: NotifyUserBookingParams) {
+  // Check dedup
+  const dedup = await checkNotificationDedup(
+    params.userId,
+    "BOOKING_FEEDBACK_REQUEST",
+    "BOOKING",
+    params.bookingId,
+  );
+  if (dedup.isDuplicate) {
+    console.warn("[notification] BOOKING_FEEDBACK_REQUEST deduplicated:", params.bookingId);
+    return null;
+  }
+
+  const title = params.publicationTitle ? `«${params.publicationTitle}»` : "посещение";
+  return createNotification({
+    userId: params.userId,
+    audience: "USER",
+    type: "BOOKING_FEEDBACK_REQUEST",
+    title: "Как прошло?",
+    body: `Поделитесь впечатлениями о ${title}. Ваш отзыв поможет другим родителям.`,
+    entityType: "BOOKING",
+    entityId: params.bookingId,
+    ctaLabel: "Оставить отзыв",
+    ctaAction: "/me/bookings",
   });
 }

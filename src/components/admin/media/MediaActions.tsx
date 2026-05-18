@@ -16,7 +16,9 @@ export function MediaActions({ mediaId, status, usageCount }: MediaActionsProps)
   const [isDeleting, setIsDeleting] = useState(false);
   const [isArchiving, setIsArchiving] = useState(false);
   const [isRestoring, setIsRestoring] = useState(false);
+  const [isRecomputing, setIsRecomputing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [recomputeSuccess, setRecomputeSuccess] = useState<string | null>(null);
 
   const handleArchive = async () => {
     if (!confirm("Архивировать этот файл? Он будет скрыт из основного списка, но останется доступным через фильтр.")) {
@@ -63,6 +65,37 @@ export function MediaActions({ mediaId, status, usageCount }: MediaActionsProps)
       setError(err instanceof Error ? err.message : "Ошибка восстановления");
     } finally {
       setIsRestoring(false);
+    }
+  };
+
+  const handleRecomputeUsage = async () => {
+    setIsRecomputing(true);
+    setError(null);
+    setRecomputeSuccess(null);
+
+    try {
+      const response = await fetch(`/api/admin/media/${mediaId}/recalculate-usage`, {
+        method: "POST",
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Ошибка пересчёта");
+      }
+
+      const result = await response.json();
+      
+      setRecomputeSuccess(
+        `Пересчёт завершён. Связано событий: ${result.recompute?.backfill?.linkedActivities ?? 0}, ` +
+        `активных использований: ${result.recompute?.usageCount ?? 0}.`
+      );
+      
+      // Refresh the page to show updated usage count
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Ошибка пересчёта");
+    } finally {
+      setIsRecomputing(false);
     }
   };
 
@@ -116,9 +149,13 @@ export function MediaActions({ mediaId, status, usageCount }: MediaActionsProps)
             {isRestoring ? "Восстановление..." : "Восстановить"}
           </button>
         )}
-        <button className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">
-          <RefreshCw className="w-4 h-4" />
-          Пересчитать usage
+        <button 
+          onClick={handleRecomputeUsage}
+          disabled={isRecomputing}
+          className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+        >
+          <RefreshCw className={`w-4 h-4 ${isRecomputing ? "animate-spin" : ""}`} />
+          {isRecomputing ? "Пересчёт..." : "Пересчитать usage"}
         </button>
         {usageCount === 0 && (
           <button
@@ -135,6 +172,11 @@ export function MediaActions({ mediaId, status, usageCount }: MediaActionsProps)
             <p className="text-xs text-orange-800">
               Удаление заблокировано: файл используется в {usageCount} местах
             </p>
+          </div>
+        )}
+        {recomputeSuccess && (
+          <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+            <p className="text-xs text-green-800">{recomputeSuccess}</p>
           </div>
         )}
         {error && (

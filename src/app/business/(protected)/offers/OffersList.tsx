@@ -9,6 +9,8 @@ interface Offer {
   id: string;
   placeId: string;
   kind: OfferKind;
+  durationType?: string | null;
+  campProgramType?: string | null;
   title: string;
   description: string | null;
   coverImage: string | null;
@@ -17,11 +19,16 @@ interface Offer {
   status: OfferStatus;
   dateFrom: Date | null;
   dateTo: Date | null;
+  slug: string | null;
   place: {
     id: string;
     title: string;
+    city?: {
+      slug: string;
+    } | null;
   };
   updatedAt: Date;
+  createdAt: Date;
   metrics: {
     views: number;
     saves: number;

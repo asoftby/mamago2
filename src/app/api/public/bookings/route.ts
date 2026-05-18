@@ -3,6 +3,7 @@ import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
 import { z } from "zod";
 import { PublicationType, BookingMode, BookingStatus } from "@prisma/client";
+import { checkRateLimit } from "@/lib/security/rateLimit";
 
 const createBookingSchema = z.object({
   publicationType: z.nativeEnum(PublicationType),
@@ -18,8 +19,33 @@ const createBookingSchema = z.object({
   childrenCount: z.number().int().min(0).default(0),
 });
 
+function getClientIp(request: NextRequest): string {
+  const cf = request.headers.get("cf-connecting-ip")?.trim();
+  if (cf) return cf;
+
+  const real = request.headers.get("x-real-ip")?.trim();
+  if (real) return real;
+
+  const xff = request.headers.get("x-forwarded-for");
+  if (xff) {
+    const first = xff
+      .split(",")
+      .map((part) => part.trim())
+      .find(Boolean);
+    if (first) return first;
+  }
+
+  return "unknown";
+}
+
 export async function POST(request: NextRequest) {
   try {
+    const ip = getClientIp(request);
+    const rateLimit = checkRateLimit(`booking_create:${ip}`, 10, 10 * 60 * 1000);
+    if (!rateLimit.allowed) {
+      return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+    }
+
     const user = await getCurrentUser();
     
     const body = await request.json();

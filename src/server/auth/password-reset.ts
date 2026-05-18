@@ -1,9 +1,10 @@
 import { z } from "zod";
-import crypto from "crypto";
 import { prisma } from "@/lib/prisma";
 import { hashPassword } from "@/lib/auth/crypto";
+import { generateRawToken, hashToken } from "@/lib/auth/tokenHash";
 import { emailService } from "@/features/email/server/email-service";
 import { AuthError } from "./register";
+import { passwordSchema } from "@/lib/auth/passwordPolicy";
 
 const requestResetSchema = z.object({
   email: z.string().email("Некорректный email"),
@@ -11,7 +12,7 @@ const requestResetSchema = z.object({
 
 const resetPasswordSchema = z.object({
   token: z.string().min(1, "Токен обязателен"),
-  password: z.string().min(6, "Пароль должен содержать минимум 6 символов"),
+  password: passwordSchema,
 });
 
 /**
@@ -37,12 +38,15 @@ export async function requestPasswordReset(email: string): Promise<void> {
   }
 
   // Generate secure random token
-  const resetToken = crypto.randomUUID();
+  const rawToken = generateRawToken();
+
+  // Hash the token before storing in DB (defense-in-depth)
+  const resetToken = hashToken(rawToken);
 
   // Set expiration (1 hour from now)
   const resetTokenExpires = new Date(Date.now() + 60 * 60 * 1000);
 
-  // Save token to database
+  // Save hashed token to database
   await prisma.user.update({
     where: { id: user.id },
     data: {
@@ -52,9 +56,11 @@ export async function requestPasswordReset(email: string): Promise<void> {
   });
 
   try {
+    // Send raw (unhashed) token to user via email — this is the only time
+    // the plaintext token is available outside the DB
     await emailService.sendPasswordResetEmail({
       to: normalizedEmail,
-      token: resetToken,
+      token: rawToken,
     });
   } catch (e) {
     console.error("[Password Reset] sendPasswordResetEmail failed", {
@@ -76,10 +82,13 @@ export async function resetPassword(
   // Validate input
   const validated = resetPasswordSchema.parse({ token, password: newPassword });
 
-  // Find user by token
+  // Hash the incoming token before looking it up
+  const hashedToken = hashToken(validated.token);
+
+  // Find user by hashed token
   const user = await prisma.user.findFirst({
     where: {
-      resetToken: validated.token,
+      resetToken: hashedToken,
     },
   });
 

@@ -13,6 +13,7 @@ import { canManagePlaceAsync } from "@/lib/auth/placeAccess";
 import { assignPlaceSlugIfMissing } from "@/lib/slug/placeSlugService";
 import { validatePlaceCategoriesDraft } from "@/lib/validation/placeCategoryValidation";
 import { createRequestPerf } from "@/server/utils/requestPerf";
+import { syncPlaceMediaUsage } from "@/server/services/media/media-usage.service";
 
 export async function GET(
   request: NextRequest,
@@ -115,9 +116,9 @@ export async function GET(
     console.error("[place-get] ❌ Error:", error);
     console.error("[place-get] Stack:", error instanceof Error ? error.stack : "No stack");
     return NextResponse.json(
-      { 
+      {
         error: "INTERNAL_SERVER_ERROR",
-        message: error instanceof Error ? error.message : "Failed to get place"
+        message: "Internal server error"
       },
       { status: 500 }
     );
@@ -218,7 +219,21 @@ export async function PATCH(
     if (body.category !== undefined) updateData.category = String(body.category);
     if (body.shortDesc !== undefined) updateData.shortDesc = String(body.shortDesc);
     if (body.description !== undefined) updateData.description = body.description ? String(body.description) : null;
-    if (body.logoImageId !== undefined) updateData.logoImageId = body.logoImageId;
+    if (body.logoImageId !== undefined) {
+      const v = body.logoImageId;
+      if (v === null) {
+        updateData.logoImageId = null;
+      } else if (typeof v === "string" && v.trim()) {
+        const vid = v.trim();
+        const placeImageOk = await prisma.placeImage.findFirst({
+          where: { placeId: id, id: vid },
+          select: { id: true },
+        });
+        if (placeImageOk) {
+          updateData.logoImageId = vid;
+        }
+      }
+    }
     if (body.phone !== undefined) updateData.phone = body.phone ? String(body.phone) : null;
     if (body.website !== undefined) updateData.website = body.website ? String(body.website) : null;
     if (body.instagramHandle !== undefined) updateData.instagramHandle = body.instagramHandle ? String(body.instagramHandle) : null;
@@ -291,6 +306,16 @@ export async function PATCH(
       },
     });
     perf.mark("response");
+
+    // Sync media usage if logo changed (don't block on errors)
+    if (body.logoImageId !== undefined) {
+      try {
+        await syncPlaceMediaUsage(id);
+      } catch (error) {
+        console.error(`Failed to sync media usage for place ${id}:`, error);
+      }
+    }
+
     perf.log({ placeId: id, fields: Object.keys(updateData).length });
 
     return NextResponse.json({ place });
@@ -298,9 +323,9 @@ export async function PATCH(
     console.error("[place-patch] ❌ Error:", error);
     console.error("[place-patch] Stack:", error instanceof Error ? error.stack : "No stack");
     return NextResponse.json(
-      { 
+      {
         error: "INTERNAL_SERVER_ERROR",
-        message: error instanceof Error ? error.message : "Failed to update place"
+        message: "Internal server error"
       },
       { status: 500 }
     );
@@ -381,9 +406,9 @@ export async function DELETE(
     console.error("[place-delete] ❌ Error:", error);
     console.error("[place-delete] Stack:", error instanceof Error ? error.stack : "No stack");
     return NextResponse.json(
-      { 
+      {
         error: "INTERNAL_SERVER_ERROR",
-        message: error instanceof Error ? error.message : "Failed to delete place"
+        message: "Internal server error"
       },
       { status: 500 }
     );

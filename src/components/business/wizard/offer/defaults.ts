@@ -1,36 +1,57 @@
 // Offer Wizard Defaults
-// Inherits Event Wizard architecture 1-to-1
+// Refactored for multi-type support (SINGLE, REGULAR, CAMP)
 
-import type { OfferFormData } from "./types";
+import type { OfferFormData, SocialLink } from "./types";
 
-export function getDefaultFormData(): OfferFormData {
+export function createDefaultSocialLink(id?: string): SocialLink {
+  return {
+    id: id ?? `offer-social-${Date.now()}`,
+    network: "instagram",
+    url: "",
+  };
+}
+
+export function getDefaultFormData(defaultPlaceId: string | null = null): OfferFormData {
   return {
     // Step 1: Offer Type
+    offerWizardType: null,
+    
+    // Legacy fields (for backward compatibility)
     offerKind: null,
     durationType: null,
     serviceType: null,
     locationType: null,
     intent: null,
     
-    // Step 2: Public Information
+    // Step 2: Details / Public Information
     title: "",
     shortDescription: "",
     description: "",
     ageGroups: [],
+    campProgramType: null,
     
     // Step 3: Media
+    placeId: defaultPlaceId,
+    placeTitle: "",
     coverImage: null,
     gallery: [],
+    videoUrl: null,
     
-    // Step 4: Format and Conditions
+    // Step 4: Conditions / Camp Schedule
     // Class fields
     classDuration: "",
     classGroupSize: "",
     classFormat: null,
     
-    // Camp fields
+    // Camp schedule fields
     campSessions: [],
-    campPriceText: "",
+    campSessionDuration: "",
+    campStayDuration: "",
+    campPlacesCount: null,
+    campGroupSize: null,
+    campDaySchedule: "",
+    campCanSelectDays: false,
+    campHasExtendedCare: false,
     
     // Party fields
     partyProgram: "",
@@ -43,19 +64,35 @@ export function getDefaultFormData(): OfferFormData {
     serviceDuration: "",
     serviceDeliveryArea: "",
     
-    // Step 5: Pricing
+    // Step 5 (for CAMP): Accommodation
+    accommodationProvided: false,
+    accommodationType: "",
+    accommodationAddress: "",
+    accommodationRooms: "",
+    accommodationConditions: "",
+    campIncludedMeals: [],
+    mealInfo: "",
+    transferInfo: "",
+    whatToBring: "",
+    campSafetyInfo: "",
+    campMedicalInfo: "",
+    
+    // Step 5/6: Pricing
     pricingMode: "single",
     singlePrice: "",
     singleCurrency: "BYN",
-    singlePriceLabel: "",
+    priceCaption: "",
     pricingOptions: [],
+    promotionDetails: "",
     
-    // Step 6: Contacts
+    // Step 6/7: Contacts
+    contactSource: "manual",
     phone: "",
     website: "",
     socialLinks: [],
     
-    // Step 7: CTA and Publication
+    // Step 7/8: CTA and Publication
+    publicationAccess: null,
     ctaType: null,
     ctaPhone: "",
     ctaLink: "",
@@ -63,6 +100,7 @@ export function getDefaultFormData(): OfferFormData {
 
     // Signals (DISCOVERY domain, entityType=OFFER)
     signalIds: [],
+    classChipSlugs: [],
     
     // Booking Settings (only for ctaType = "забронировать")
     bookingSettings: {
@@ -116,6 +154,7 @@ export function determineIntent(data: OfferFormData): "куда_пойти" | "�
   if (!data.offerKind) return null;
   
   if (data.offerKind === "course") {
+    if (data.durationType === "camp") return "занятия";
     return data.durationType === "recurring" ? "занятия" : "куда_пойти";
   }
   if (data.offerKind === "birthday") return "день_рождения";

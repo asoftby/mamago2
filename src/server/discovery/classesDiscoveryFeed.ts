@@ -1,138 +1,250 @@
-import { ActivityType, ScheduleMode, type Prisma } from "@prisma/client";
+import { ActivityFormat, type Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
-import { getPublicListingActivityWhere } from "@/server/public/publicContentVisibility";
-import { activityInAnyOfCitiesWhere } from "@/server/discovery/activityInCityWhere";
-import { resolveActivityCoverUrl } from "@/lib/event/resolveActivityCoverUrl";
+import { getOfferPublicPath } from "@/lib/offers/offerPublicUrl";
 import type { ActivityMock } from "@/types/activity";
-import {
-  getWeatherRankingBoost,
-  type HomeWeatherScenario,
-} from "@/features/hero-weather/lib/weather-scenario-layer";
-import type { TimeOfDay } from "@/features/hero-weather/model/types";
-import { ageBoundsFromActivityFields } from "@/lib/event/activityAgeBounds";
+import { getPublicPublishedOfferWhere } from "@/server/public/publicContentVisibility";
+import { getBusinessQualityBoostMap, applyBusinessQualityBoost } from "@/server/services/ranking/businessQualityBoost";
 
-function discoveryCardDatesFromActivity(a: {
-  nextOccurrenceAt: Date | null;
-  sessions: { startsAt: Date }[];
-}): { dateStart?: string; dateEnd?: string } {
-  const times: number[] = [];
-  for (const s of a.sessions) times.push(s.startsAt.getTime());
-  if (a.nextOccurrenceAt) times.push(a.nextOccurrenceAt.getTime());
-  if (times.length === 0) return {};
-  const min = Math.min(...times);
-  const max = Math.max(...times);
-  const start = new Date(min);
-  const end = new Date(max);
-  const ds = start.toISOString();
+function ageBoundsFromOffer(offer: {
+  ageMinMonths: number | null;
+  ageMaxMonths: number | null;
+}): { ageFrom: number; ageTo: number } {
   if (
-    start.getFullYear() === end.getFullYear() &&
-    start.getMonth() === end.getMonth() &&
-    start.getDate() === end.getDate()
+    typeof offer.ageMinMonths === "number" &&
+    typeof offer.ageMaxMonths === "number"
   ) {
-    return { dateStart: ds };
+    return {
+      ageFrom: Math.max(0, Math.floor(offer.ageMinMonths / 12)),
+      ageTo: Math.min(99, Math.ceil(offer.ageMaxMonths / 12)),
+    };
   }
-  return { dateStart: ds, dateEnd: end.toISOString() };
+
+  return { ageFrom: 0, ageTo: 18 };
 }
 
-export async function getClassesDiscoveryFeed(
-  cityIds: string[],
-  options?: {
-    take?: number;
-    weather?: {
-      scenario: HomeWeatherScenario;
-      timeOfDay: TimeOfDay;
+function extractOfferDateRange(input: {
+  dateFrom: Date | null;
+  dateTo: Date | null;
+  campSessions: unknown;
+}): {
+  dateStart?: string;
+  dateEnd?: string;
+} {
+  if (input.dateFrom || input.dateTo) {
+    return {
+      dateStart: input.dateFrom?.toISOString(),
+      dateEnd: input.dateTo?.toISOString(),
     };
-  },
+  }
+
+  const campSessions = input.campSessions;
+  if (!Array.isArray(campSessions) || campSessions.length === 0) return {};
+
+  const timestamps = campSessions
+    .flatMap((session) => {
+      if (!session || typeof session !== "object") return [];
+      const record = session as Record<string, unknown>;
+      return [record.dateFrom, record.dateTo];
+    })
+    .filter((value): value is string => typeof value === "string" && value.length > 0)
+    .map((value) => new Date(value).getTime())
+    .filter((value) => Number.isFinite(value));
+
+  if (timestamps.length === 0) return {};
+
+  return {
+    dateStart: new Date(Math.min(...timestamps)).toISOString(),
+    dateEnd: new Date(Math.max(...timestamps)).toISOString(),
+  };
+}
+
+type GetClassesDiscoveryFeedOptions = {
+  take?: number;
+  chipSlug?: string | null;
+  chipTitleBySlug?: Map<string, string>;
+};
+
+export async function getClassesDiscoveryFeed(
+  cityId: string,
+  citySlug: string,
+  options?: GetClassesDiscoveryFeedOptions,
 ): Promise<ActivityMock[]> {
-  if (cityIds.length === 0) return [];
-  const take = options?.take ?? 8;
-  const pub = getPublicListingActivityWhere();
-  const pubParts = (pub.AND ?? []) as Prisma.ActivityWhereInput[];
+  const take = options?.take ?? 80;
+  const chipSlug = options?.chipSlug && options.chipSlug !== "all" ? options.chipSlug : null;
+  const publicWhere = getPublicPublishedOfferWhere();
+  const publicWhereParts = (publicWhere.AND ?? []) as Prisma.OfferWhereInput[];
+  const now = new Date();
 
-  const rows = await prisma.activity.findMany({
-    where: {
-      AND: [
-        {
-          OR: [{ type: ActivityType.COURSE }, { scheduleMode: ScheduleMode.RECURRING }],
-        },
-        activityInAnyOfCitiesWhere(cityIds),
-        ...pubParts,
-      ],
-    },
-    take: Math.min(take * 3, 60),
-    orderBy: [{ nextOccurrenceAt: "asc" }, { createdAt: "desc" }],
-    include: {
-      images: { orderBy: { sortOrder: "asc" }, take: 20 },
-      sessions: { orderBy: { startsAt: "asc" }, take: 50 },
-      eventCategory: { select: { nameRu: true } },
-      place: { select: { cityId: true, city: { select: { slug: true } } } },
-      venue: { select: { cityId: true } },
-    },
-  });
+  // classChipSlugs column may not exist yet (pending migration).
+  // We try the full query first; if it fails with a missing-column error we
+  // fall back to a query without the chip filter so the page still renders.
+  let rows: Awaited<ReturnType<typeof runQuery>> = [];
+  let classChipSlugsAvailable = true;
 
-  const cityIdsFromRows = Array.from(
+  try {
+    rows = await runQuery({ publicWhereParts, cityId, chipSlug, now });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    const isMissingColumn =
+      msg.includes("classChipSlugs") ||
+      msg.includes("does not exist") ||
+      msg.includes("P2022");
+
+    if (isMissingColumn) {
+      console.warn("[classesDiscoveryFeed] classChipSlugs column not found, falling back to unfiltered query");
+      classChipSlugsAvailable = false;
+      try {
+        rows = await runQuery({ publicWhereParts, cityId, chipSlug: null, now, skipChipSlugsSelect: true });
+      } catch {
+        return [];
+      }
+    } else {
+      throw err;
+    }
+  }
+
+  const chipTitleBySlug = options?.chipTitleBySlug ?? new Map<string, string>();
+
+  // Business quality boost — soft multiplier based on booking reputation.
+  // Offer → place.ownerBusinessId → quality boost.
+  const offerBusinessIds = Array.from(
     new Set(
       rows
-        .flatMap((row) => [row.cityId, row.place?.cityId, row.venue?.cityId])
-        .filter((value): value is string => typeof value === "string" && value.length > 0),
+        .map((r) => (r.place as { ownerBusinessId?: string | null }).ownerBusinessId)
+        .filter((id): id is string => typeof id === "string" && id.length > 0),
     ),
   );
-  const cityRows =
-    cityIdsFromRows.length > 0
-      ? await prisma.city.findMany({
-          where: { id: { in: cityIdsFromRows } },
-          select: { id: true, slug: true },
-        })
-      : [];
-  const citySlugById = new Map(cityRows.map((row) => [row.id, row.slug]));
+  const qualityBoostMap = await getBusinessQualityBoostMap(offerBusinessIds);
 
-  const cards = rows.map((a) => {
-    const { ageFrom, ageTo } = ageBoundsFromActivityFields(a);
-    const cover =
-      resolveActivityCoverUrl({
-        coverImageId: a.coverImageId,
-        coverImageUrl: a.coverImageUrl,
-        images: a.images,
-      }) ?? "";
-    const { dateStart, dateEnd } = discoveryCardDatesFromActivity({
-      nextOccurrenceAt: a.nextOccurrenceAt,
-      sessions: a.sessions,
+  const cards = rows.map<ActivityMock>((offer) => {
+    const { ageFrom, ageTo } = ageBoundsFromOffer(offer);
+    const cityForPath = (offer.place as { city?: { slug: string } | null }).city?.slug ?? citySlug;
+    const chipSlugs: string[] = classChipSlugsAvailable
+      ? ((offer as { classChipSlugs?: string[] }).classChipSlugs ?? [])
+      : [];
+    const chipTitles = chipSlugs
+      .map((slug) => chipTitleBySlug.get(slug))
+      .filter((value): value is string => typeof value === "string" && value.length > 0);
+    const { dateStart, dateEnd } = extractOfferDateRange({
+      dateFrom: offer.dateFrom,
+      dateTo: offer.dateTo,
+      campSessions: offer.campSessions,
     });
-    const listingCityId = a.venue?.cityId ?? a.place?.cityId ?? a.cityId ?? null;
-    const citySlug =
-      a.place?.city?.slug ??
-      (listingCityId ? citySlugById.get(listingCityId) ?? null : null);
+    const isBoosted = offer.boosts.length > 0;
+    const baseEngagement = isBoosted ? 1000 : 0;
+
+    // Apply quality boost (capped at +10%, no effect on promoted boosts)
+    const businessId = (offer.place as { ownerBusinessId?: string | null }).ownerBusinessId;
+    const qualityMultiplier = businessId ? (qualityBoostMap.get(businessId) ?? 1.0) : 1.0;
+    // Don't apply quality boost to already-promoted offers (isBoosted = 1000)
+    // to avoid double-boosting. Only apply to organic offers.
+    const finalEngagement = isBoosted
+      ? baseEngagement
+      : applyBusinessQualityBoost(baseEngagement, qualityMultiplier);
 
     return {
-      id: a.id,
-      slug: a.slug,
-      citySlug,
-      type: "CLASS_SCHEDULE" as const,
-      discoveryIntent: "classes" as const,
-      title: a.title,
-      description: a.shortDesc,
-      image: cover,
+      id: offer.id,
+      slug: offer.slug,
+      citySlug: cityForPath,
+      type: "CLASS_SCHEDULE",
+      discoveryIntent: "classes",
+      analyticsEntityType: "OFFER",
+      href: getOfferPublicPath(
+        {
+          kind: offer.kind,
+          campProgramType: offer.campProgramType,
+          slug: offer.slug,
+        },
+        cityForPath,
+      ),
+      title: offer.title,
+      description: offer.description ?? "",
+      image: offer.coverImage ?? "",
       ageFrom,
       ageTo,
-      priceMin: a.priceFrom ?? undefined,
-      priceMax: a.priceTo ?? undefined,
-      currency: "BYN" as const,
+      priceMin: offer.priceFrom ?? undefined,
+      currency: "BYN",
       dateStart,
       dateEnd,
-      tags: [],
-      badge: a.eventCategory?.nameRu ?? "Занятие",
+      format: ActivityFormat.OFFLINE,
+      tags: chipSlugs,
+      badge:
+        chipTitles[0] ??
+        (offer.campProgramType ? "Лагерь" : "Занятие"),
+      engagementScore: finalEngagement,
     };
   });
 
-  cards.sort((a, b) => {
-    const aWeatherBoost = options?.weather ? getWeatherRankingBoost(a, options.weather) : 0;
-    const bWeatherBoost = options?.weather ? getWeatherRankingBoost(b, options.weather) : 0;
-    if (aWeatherBoost !== bWeatherBoost) return bWeatherBoost - aWeatherBoost;
+  cards.sort((left, right) => {
+    const boostDelta = (right.engagementScore ?? 0) - (left.engagementScore ?? 0);
+    if (boostDelta !== 0) return boostDelta;
 
-    const ta = a.dateStart ? new Date(a.dateStart).getTime() : Number.MAX_SAFE_INTEGER;
-    const tb = b.dateStart ? new Date(b.dateStart).getTime() : Number.MAX_SAFE_INTEGER;
-    return ta - tb;
+    const leftDate = left.dateStart ? new Date(left.dateStart).getTime() : 0;
+    const rightDate = right.dateStart ? new Date(right.dateStart).getTime() : 0;
+    if (leftDate !== rightDate) return rightDate - leftDate;
+
+    return right.id.localeCompare(left.id);
   });
 
   return cards.slice(0, take);
+}
+
+// ─── Internal query helper ────────────────────────────────────────────────────
+
+type RunQueryParams = {
+  publicWhereParts: Prisma.OfferWhereInput[];
+  cityId: string;
+  chipSlug: string | null;
+  now: Date;
+  skipChipSlugsSelect?: boolean;
+};
+
+async function runQuery({ publicWhereParts, cityId, chipSlug, now, skipChipSlugsSelect = false }: RunQueryParams) {
+  return prisma.offer.findMany({
+    where: {
+      AND: [
+        ...publicWhereParts,
+        { kind: "SERVICE" },
+        { place: { cityId } },
+        // Only add chip filter when column exists and chip is requested
+        ...(chipSlug && !skipChipSlugsSelect
+          ? [{ classChipSlugs: { has: chipSlug } } as Prisma.OfferWhereInput]
+          : []),
+      ],
+    },
+    take: 120,
+    orderBy: [{ publishedAt: "desc" }, { createdAt: "desc" }],
+    select: {
+      id: true,
+      slug: true,
+      kind: true,
+      campProgramType: true,
+      title: true,
+      description: true,
+      coverImage: true,
+      ageMinMonths: true,
+      ageMaxMonths: true,
+      priceFrom: true,
+      dateFrom: true,
+      dateTo: true,
+      campSessions: true,
+      // classChipSlugs is only selected when the column is known to exist
+      ...(!skipChipSlugsSelect ? { classChipSlugs: true } : {}),
+      place: {
+        select: {
+          ownerBusinessId: true,
+          city: {
+            select: { slug: true },
+          },
+        },
+      },
+      boosts: {
+        where: {
+          startAt: { lte: now },
+          endAt: { gte: now },
+        },
+        select: { id: true },
+      },
+    },
+  });
 }

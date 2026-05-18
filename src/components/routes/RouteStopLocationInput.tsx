@@ -6,7 +6,7 @@
  * Single smart input for route stop location resolution.
  * Resolution order (invisible to user):
  *   1. Search mamaGo Places DB
- *   2. Google Places Autocomplete (fallback)
+ *   2. Google Places Autocomplete (fallback, WORLDWIDE — no country restriction)
  *   3. Manual map pin (user-triggered)
  *
  * States:
@@ -20,12 +20,27 @@ import { PlaceMapModal } from "@/components/business/place/PlaceMapModal";
 import { GoogleMapsService } from "@/services/googleMaps";
 import {
   MapPin, Search, Building2, Navigation,
-  X, Pencil, Loader2, CheckCircle2,
+  X, Pencil, Loader2, CheckCircle2, Globe,
 } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export type RouteStopSource = "PLACE" | "GOOGLE" | "MANUAL_PIN";
+
+/** Address component parsed from Google address_components */
+export type GoogleAddressComponent = {
+  long_name: string;
+  short_name: string;
+  types: string[];
+};
+
+/** Normalised detected location info extracted from Google address_components */
+export type DetectedLocation = {
+  detectedCountryCode?: string;
+  detectedCountryName?: string;
+  detectedCityName?: string;
+  detectedRegionName?: string;
+};
 
 export type RouteStopLocationValue = {
   source: RouteStopSource;
@@ -40,11 +55,17 @@ export type RouteStopLocationValue = {
    */
   customTitle?: string;
   address?: string;
+  /** Full formatted_address from Google (always set for GOOGLE source) */
+  formattedAddress?: string;
   cityId?: string;
   cityName?: string;
   lat?: number;
   lng?: number;
-};
+  /** Google address_components — raw array for server-side city resolution */
+  addressComponents?: GoogleAddressComponent[];
+  /** Raw Google Place payload for future enrichment */
+  rawGooglePayload?: Record<string, unknown>;
+} & DetectedLocation;
 
 type PlaceResult = {
   id: string;
@@ -60,8 +81,14 @@ type GoogleResult = {
   googlePlaceId: string;
   title: string;
   address: string;
+  formattedAddress: string;
   lat: number;
   lng: number;
+  addressComponents: GoogleAddressComponent[];
+  detectedCountryCode?: string;
+  detectedCountryName?: string;
+  detectedCityName?: string;
+  detectedRegionName?: string;
 };
 
 type SearchState =
@@ -71,6 +98,37 @@ type SearchState =
   | { kind: "empty" };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+
+/**
+ * Extract city, region, country from Google address_components.
+ */
+function parseAddressComponents(
+  components: google.maps.GeocoderAddressComponent[],
+): {
+  detectedCityName: string | undefined;
+  detectedRegionName: string | undefined;
+  detectedCountryCode: string | undefined;
+  detectedCountryName: string | undefined;
+} {
+  let cityName: string | undefined;
+  let regionName: string | undefined;
+  let countryCode: string | undefined;
+  let countryName: string | undefined;
+
+  for (const comp of components) {
+    const types = comp.types ?? [];
+    if (types.includes("locality") || types.includes("postal_town")) {
+      cityName = comp.long_name;
+    } else if (types.includes("administrative_area_level_1")) {
+      regionName = comp.long_name;
+    } else if (types.includes("country")) {
+      countryCode = comp.short_name;
+      countryName = comp.long_name;
+    }
+  }
+
+  return { detectedCityName: cityName, detectedRegionName: regionName, detectedCountryCode: countryCode, detectedCountryName: countryName };
+}
 
 function sourceIcon(source: RouteStopSource) {
   if (source === "PLACE") return <Building2 className="w-4 h-4" />;
@@ -101,6 +159,8 @@ export function RouteStopLocationInput({
   const [searchState, setSearchState] = useState<SearchState>({ kind: "idle" });
   const [mapOpen, setMapOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(() => !value);
+  /** Скрытое предупреждение для адресов вне активных городов mamaGo */
+  const [outsideCityWarning, setOutsideCityWarning] = useState<string | null>(null);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
@@ -124,17 +184,18 @@ export function RouteStopLocationInput({
   const onChangeRef = useRef(onChange);
   useEffect(() => { onChangeRef.current = onChange; }, [onChange]);
 
-  // ── Google Autocomplete init ──────────────────────────────────────────────
+  // ── Google Autocomplete init (WORLDWIDE, no country restriction) ──────────
   const initGoogleAutocomplete = useCallback(async () => {
     if (!inputRef.current || !(inputRef.current instanceof HTMLInputElement)) return;
     try {
       const placesLib = await GoogleMapsService.getPlacesLibrary();
       const input = inputRef.current;
       if (!input || !(input instanceof HTMLInputElement)) return;
+
+      // WORLDWIDE: no componentRestrictions, no strictBounds
       const autocomplete = new placesLib.Autocomplete(input, {
         types: ["geocode", "establishment"],
-        fields: ["place_id", "name", "geometry", "formatted_address"],
-        componentRestrictions: { country: "by" },
+        fields: ["place_id", "name", "geometry", "formatted_address", "address_components"],
       });
       autocompleteRef.current = autocomplete;
 
@@ -142,14 +203,39 @@ export function RouteStopLocationInput({
         const place = autocomplete.getPlace();
         if (!place.place_id || !place.geometry?.location) return;
 
+        // Parse address components for city/region/country
+        const rawComponents = place.address_components ?? [];
+        const parsed = parseAddressComponents(rawComponents);
+
+        // Clean up raw components for storage (remove circular refs)
+        const cleanComponents = rawComponents.map((c) => ({
+          long_name: c.long_name,
+          short_name: c.short_name,
+          types: c.types ?? [],
+        }));
+
         const result: RouteStopLocationValue = {
           source: "GOOGLE",
           googlePlaceId: place.place_id,
           title: place.name || place.formatted_address || "",
           address: place.formatted_address || "",
+          formattedAddress: place.formatted_address || "",
           lat: place.geometry.location.lat(),
           lng: place.geometry.location.lng(),
+          addressComponents: cleanComponents,
+          ...parsed,
         };
+
+        // Check if detected city is outside mamaGo active cities
+        const isBelarusCity = parsed.detectedCountryCode?.toUpperCase() === "BY";
+        if (!isBelarusCity && parsed.detectedCityName) {
+          setOutsideCityWarning(
+            `Адрес вне активных городов mamaGo. Точка будет сохранена, но маршрут не попадёт в публичную городскую выдачу, пока город не будет подключён.`,
+          );
+        } else {
+          setOutsideCityWarning(null);
+        }
+
         // Use ref so we always call the latest onChange, never a stale closure
         onChangeRef.current(result);
         setIsEditing(false);
@@ -214,6 +300,7 @@ export function RouteStopLocationInput({
     setIsEditing(false);
     setSearchState({ kind: "idle" });
     setQuery("");
+    setOutsideCityWarning(null);
   };
 
   const handlePlaceSelect = (place: PlaceResult) => {
@@ -243,6 +330,7 @@ export function RouteStopLocationInput({
   const handleEdit = () => {
     setIsEditing(true);
     setQuery(value?.title ?? "");
+    setOutsideCityWarning(null);
     setTimeout(() => inputRef.current?.focus(), 50);
   };
 
@@ -251,6 +339,7 @@ export function RouteStopLocationInput({
     setIsEditing(true);
     setQuery("");
     setSearchState({ kind: "idle" });
+    setOutsideCityWarning(null);
   };
 
   // ── Close dropdown on outside click ──────────────────────────────────────
@@ -283,6 +372,11 @@ export function RouteStopLocationInput({
         ? value.address
         : undefined;
 
+    // Check if this is a non-Belarus address for soft warning
+    const isOutsideMamaGo =
+      value.detectedCountryCode &&
+      value.detectedCountryCode.toUpperCase() !== "BY";
+
     return (
       <>
         <div className="flex items-start gap-3 p-3 rounded-xl bg-neutral-50 border border-neutral-100">
@@ -297,6 +391,12 @@ export function RouteStopLocationInput({
             <div className="flex items-center gap-1.5 mt-1.5">
               <CheckCircle2 className="w-3 h-3 text-emerald-500 shrink-0" />
               <span className="text-xs text-neutral-400">{sourceLabel(value.source)}</span>
+              {value.detectedCountryCode && (
+                <>
+                  <span className="text-neutral-300">·</span>
+                  <span className="text-xs text-neutral-400">{value.detectedCountryCode}</span>
+                </>
+              )}
               {value.cityName && (
                 <>
                   <span className="text-neutral-300">·</span>
@@ -304,6 +404,15 @@ export function RouteStopLocationInput({
                 </>
               )}
             </div>
+            {/* Soft warning for addresses outside active mamaGo cities */}
+            {isOutsideMamaGo && (
+              <div className="mt-2 flex items-start gap-2 px-3 py-2 rounded-lg bg-amber-50 border border-amber-200">
+                <Globe className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
+                <p className="text-xs text-amber-700 leading-relaxed">
+                  Адрес находится вне активных городов mamaGo. Точка будет сохранена, но маршрут не попадёт в публичную городскую выдачу, пока город не будет подключён.
+                </p>
+              </div>
+            )}
           </div>
           <div className="flex items-center gap-1 shrink-0">
             <button
@@ -324,6 +433,12 @@ export function RouteStopLocationInput({
             </button>
           </div>
         </div>
+        {outsideCityWarning && (
+          <div className="mt-2 flex items-start gap-2 px-3 py-2 rounded-lg bg-amber-50 border border-amber-200">
+            <Globe className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
+            <p className="text-xs text-amber-700 leading-relaxed">{outsideCityWarning}</p>
+          </div>
+        )}
       </>
     );
   }

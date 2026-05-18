@@ -73,7 +73,9 @@ export async function getNotificationSettingsSurfaceData(
     return {
       ...empty,
       telegramConnected: telegramStatus.linked,
+      telegramConfigured: telegramStatus.configured,
       telegramUsername: telegramStatus.username ?? undefined,
+      telegramBotUsername: telegramStatus.botUsername ?? undefined,
     };
   }
 
@@ -151,7 +153,9 @@ export async function getNotificationSettingsSurfaceData(
   return {
     surface,
     telegramConnected: telegramStatus.linked,
+    telegramConfigured: telegramStatus.configured,
     telegramUsername: telegramStatus.username ?? undefined,
+    telegramBotUsername: telegramStatus.botUsername ?? undefined,
     rows,
     groups,
   };

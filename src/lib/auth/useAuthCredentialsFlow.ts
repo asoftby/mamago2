@@ -8,6 +8,7 @@ import { notifyAuthStateChanged, notifyNotificationsChanged } from "@/lib/auth/c
 import { navigateToCompatibleHref } from "@/lib/routing/clientNavigation";
 import { toast } from "@/lib/toast";
 import { VERIFICATION_EMAIL_SEND_FAILED_AFTER_REGISTRATION_TOAST } from "@/lib/auth/registrationVerificationToast";
+import { PASSWORD_MIN_LENGTH, validatePasswordPolicy } from "@/lib/auth/passwordPolicy";
 
 export type AuthFlowMode = "login" | "register";
 
@@ -18,7 +19,6 @@ export function isValidEmail(value: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
 }
 
-const MIN_PASSWORD_LEN = 8;
 
 export interface UseAuthCredentialsFlowOptions {
   open: boolean;
@@ -165,8 +165,9 @@ export function useAuthCredentialsFlow({
       setError("Некорректный email");
       return;
     }
-    if (password.length < MIN_PASSWORD_LEN) {
-      setError("Пароль не короче " + MIN_PASSWORD_LEN + " символов");
+    const validation = validatePasswordPolicy(password);
+    if (!validation.valid) {
+      setError(validation.error);
       return;
     }
     setLoading(true);
@@ -219,7 +220,7 @@ export function useAuthCredentialsFlow({
     setError,
     submitLogin,
     submitRegister,
-    minPasswordLen: MIN_PASSWORD_LEN,
+    minPasswordLen: PASSWORD_MIN_LENGTH,
     resetCredentials,
   };
 }

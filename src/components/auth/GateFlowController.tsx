@@ -16,13 +16,12 @@ import { usePendingAction } from "@/contexts/PendingActionContext";
  */
 export function GateFlowController() {
   const { user, isLoading } = useAuthMe();
-  const { pendingAction, executePendingAction, clearPendingAction } =
-    usePendingAction();
+  const { pendingAction, executePendingAction } = usePendingAction();
 
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [phoneModalOpen, setPhoneModalOpen] = useState(false);
   const [modalReason, setModalReason] = useState<
-    "review" | "comment" | "business_request" | "chat"
+    "review" | "comment" | "business_request" | "chat" | "save" | "plan"
   >("review");
   const [entityName, setEntityName] = useState<string | undefined>();
 

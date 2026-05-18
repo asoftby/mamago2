@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import { getAdminMediaList } from "@/server/services/media/media-query.service";
 import { getMediaStats } from "@/server/services/media/media.service";
+import { parsePaginationParams } from "@/lib/api/pagination";
 import { MediaAssetKind, MediaAssetStatus, MediaSourceType } from "@prisma/client";
 
 export async function GET(request: NextRequest) {
@@ -59,8 +60,7 @@ export async function GET(request: NextRequest) {
     if (dateTo) filters.dateTo = new Date(dateTo);
 
     // Parse pagination
-    const page = parseInt(searchParams.get("page") || "1");
-    const limit = parseInt(searchParams.get("limit") || "50");
+    const { page, limit } = parsePaginationParams(searchParams, { defaultLimit: 50 });
 
     // Parse sort
     const sortField = (searchParams.get("sortField") ?? undefined) as "createdAt" | "updatedAt" | "filename" | "sizeBytes" | undefined;
@@ -83,7 +83,7 @@ export async function GET(request: NextRequest) {
   } catch (error: unknown) {
     console.error("Error fetching media list:", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to fetch media" },
+      { error: "Internal server error" },
       { status: 500 }
     );
   }

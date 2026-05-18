@@ -1,14 +1,13 @@
+import "server-only";
+
+import { emailService } from "@/features/email/server/email-service";
+
 /**
- * Email Adapter — delivery abstraction for mamaGo notifications.
+ * Email Adapter — legacy compatibility layer.
  *
- * Currently a stub: logs to console in dev, ready for real provider.
- * To wire a real provider (Resend, nodemailer, SES):
- *   1. Install the package
- *   2. Add env vars (EMAIL_FROM, RESEND_API_KEY / SMTP_HOST etc.)
- *   3. Replace the stub body in sendEmail() below
- *
- * This file is the ONLY place that knows about the email provider.
- * notification.service.ts never imports a provider directly.
+ * Canonical delivery now lives in `emailService` and uses Resend.
+ * This adapter remains only so older notification codepaths can delegate
+ * without a larger refactor.
  */
 
 export interface EmailPayload {
@@ -32,31 +31,11 @@ export interface EmailResult {
  * Never throws — callers rely on the return value.
  */
 export async function sendEmail(payload: EmailPayload): Promise<EmailResult> {
-  const from = process.env.EMAIL_FROM;
+  const result = await emailService.sendRawEmail(payload);
 
-  // No provider configured — skip silently in prod, log in dev
-  if (!from || from === "noreply@example.com") {
-    if (process.env.NODE_ENV !== "production") {
-      console.log("[email:stub] Would send email:", {
-        to: payload.to,
-        subject: payload.subject,
-      });
-    }
-    return { ok: false, error: "EMAIL_NOT_CONFIGURED" };
+  if (result.status === "SENT") {
+    return { ok: true, messageId: result.messageId };
   }
 
-  // TODO: replace stub with real provider
-  // Example with Resend:
-  //   const resend = new Resend(process.env.RESEND_API_KEY);
-  //   const { data, error } = await resend.emails.send({ from, ...payload });
-  //   if (error) return { ok: false, error: error.message };
-  //   return { ok: true, messageId: data?.id };
-  //
-  // Example with nodemailer:
-  //   const transporter = nodemailer.createTransport({ host: process.env.SMTP_HOST, ... });
-  //   const info = await transporter.sendMail({ from, ...payload });
-  //   return { ok: true, messageId: info.messageId };
-
-  console.warn("[email] Provider not implemented. Set EMAIL_FROM and wire a provider.");
-  return { ok: false, error: "EMAIL_PROVIDER_NOT_IMPLEMENTED" };
+  return { ok: false, error: result.reason ?? "EMAIL_SEND_FAILED" };
 }

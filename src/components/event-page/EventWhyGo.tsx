@@ -1,7 +1,5 @@
 "use client";
 
-import { Check } from "lucide-react";
-import { Section } from "@/components/ui/Section";
 import { cn } from "@/lib/utils";
 
 export function EventWhyGo({
@@ -13,20 +11,23 @@ export function EventWhyGo({
 }) {
   if (!items.length) return null;
   return (
-    <Section title="Почему стоит пойти" className={cn("py-8 md:py-10", className)}>
-      <ul className="grid gap-3 sm:grid-cols-2">
+    <div className={cn("flex flex-col", className)}>
+      <h3 className="font-[family-name:var(--font-display)] text-[clamp(28px,4vw,40px)] font-normal leading-[1.05] tracking-[-0.02em] text-[#141210]" style={{ margin: "0 0 24px" }}>
+        Почему <span className="italic text-[#C24E22]">стоит пойти</span>
+      </h3>
+      <ul className="flex flex-col gap-3.5">
         {items.map((text, i) => (
           <li
             key={i}
-            className="flex gap-3 rounded-2xl border border-border/60 bg-card/50 p-4 text-[14px] leading-relaxed text-foreground"
+            className="flex items-baseline gap-3.5 text-[17px] leading-[1.5] text-[#3A332B]"
           >
-            <span className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
-              <Check className="size-3.5" strokeWidth={2.5} />
+            <span className="min-w-[24px] shrink-0 pt-1.5 font-mono text-[12px] text-[#C24E22]">
+              0{i + 1}
             </span>
-            <span>{text}</span>
+            <span dangerouslySetInnerHTML={{ __html: text }} />
           </li>
         ))}
       </ul>
-    </Section>
+    </div>
   );
 }

@@ -1,6 +1,5 @@
 import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/server";
-import { canCreateBusinessContent } from "@/lib/auth/businessContentAccess";
 import prisma from "@/lib/prisma";
 import { EventWizard } from "@/components/business/wizard/event/EventWizard";
 import { ContentEditorChrome } from "@/components/content-editor/ContentEditorChrome";
@@ -17,6 +16,7 @@ import { buildSurfaceRedirectDestination, resolveSurfaceFromHostAndPathname } fr
 import { getCurrentRequestRoutingContext } from "@/lib/routing/requestContext";
 import { ExternalLink } from "lucide-react";
 import { getEventStep1Taxonomies } from "@/server/admin/activities/get-activity-form-data";
+import { resolveCanonicalEventPublicPathById } from "@/lib/business/resolveCanonicalEventPublicPath";
 
 function surfaceFromHostAndPath(host: string | undefined, pathname: string): ContentEditorSurface {
   const resolved = resolveSurfaceFromHostAndPathname(host, pathname);
@@ -150,17 +150,37 @@ export default async function EditorEditEventPage({
     importContext?.sourceUrl ??
     importContext?.source.baseUrl ??
     null;
-  const originalLink = originalUrl ? (
-    <a
-      href={originalUrl}
-      target="_blank"
-      rel="noreferrer noopener"
-      className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
-    >
-      Открыть оригинал
-      <ExternalLink className="h-3.5 w-3.5" aria-hidden />
-    </a>
-  ) : null;
+  const publicPath =
+    event.status === "PUBLISHED"
+      ? await resolveCanonicalEventPublicPathById(event.id)
+      : null;
+  const headerAction =
+    originalUrl || publicPath ? (
+      <div className="flex items-center gap-2">
+        {publicPath ? (
+          <a
+            href={publicPath}
+            target="_blank"
+            rel="noreferrer noopener"
+            className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+          >
+            Открыть на сайте
+            <ExternalLink className="h-3.5 w-3.5" aria-hidden />
+          </a>
+        ) : null}
+        {originalUrl ? (
+          <a
+            href={originalUrl}
+            target="_blank"
+            rel="noreferrer noopener"
+            className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+          >
+            Открыть оригинал
+            <ExternalLink className="h-3.5 w-3.5" aria-hidden />
+          </a>
+        ) : null}
+      </div>
+    ) : null;
 
   const surface = surfaceFromHostAndPath(routing.currentHost, `/editor/event/${id}/edit`);
   const nav = defaultEditorNav(surface, "event");
@@ -187,7 +207,7 @@ export default async function EditorEditEventPage({
       title="Редактирование события"
       backHref={backHref}
       surface={surface}
-      headerAction={originalLink}
+      headerAction={headerAction}
     >
       <EventWizard
         mode="edit"

@@ -1,6 +1,5 @@
 "use client";
 
-import { Section } from "@/components/ui/Section";
 import { cn } from "@/lib/utils";
 
 export function EventGoodFit({
@@ -12,21 +11,23 @@ export function EventGoodFit({
 }) {
   if (!items.length) return null;
   return (
-    <Section
-      title="Кому подойдёт"
-      subtitle="Подойдёт, если вы ищете"
-      className={cn("py-8 md:py-10", className)}
-    >
-      <div className="grid gap-2 sm:grid-cols-2">
+    <div className={cn("flex flex-col", className)}>
+      <h3 className="font-[family-name:var(--font-display)] text-[clamp(28px,4vw,40px)] font-normal leading-[1.05] tracking-[-0.02em] text-[#141210]" style={{ margin: "0 0 24px" }}>
+        Кому <span className="italic text-[#C24E22]">подойдёт</span>
+      </h3>
+      <ul className="flex flex-col gap-3.5">
         {items.map((text, i) => (
-          <div
+          <li
             key={i}
-            className="rounded-2xl border border-border/60 bg-muted/25 px-4 py-3 text-[14px] leading-relaxed text-foreground"
+            className="flex items-baseline gap-3.5 text-[17px] leading-[1.5] text-[#3A332B]"
           >
-            {text}
-          </div>
+            <span className="min-w-[20px] shrink-0 pt-1 text-[18px] leading-none text-[#E86A3A]">
+              ✦
+            </span>
+            <span dangerouslySetInnerHTML={{ __html: text }} />
+          </li>
         ))}
-      </div>
-    </Section>
+      </ul>
+    </div>
   );
 }

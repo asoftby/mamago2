@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { MediaAssetKind, MediaAssetStatus } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { requireAdminOrModerator } from "@/lib/article/requireAdminOrModerator";
+import { parsePaginationParams } from "@/lib/api/pagination";
 
 export const runtime = "nodejs";
 
@@ -14,7 +15,10 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const limit = Math.min(60, Math.max(1, parseInt(req.nextUrl.searchParams.get("limit") || "36", 10)));
+  const { limit } = parsePaginationParams(req.nextUrl.searchParams, {
+    defaultLimit: 36,
+    maxLimit: 60,
+  });
 
   const items = await prisma.mediaAsset.findMany({
     where: {

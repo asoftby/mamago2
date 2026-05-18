@@ -90,8 +90,15 @@ export type PlanItemWithActivity = {
     scheduleJson?: unknown;
   } | null;
 };
-
 export type PlanReminderCandidate = PlanItemWithActivity;
+
+/**
+ * Candidate for tomorrow's plan digest notification.
+ * Reuses PlanItemWithActivity shape which covers all fields needed
+ * for building digest context (activity title, place, venue, city, startsAt).
+ */
+export type PlanTomorrowDigestCandidate = PlanItemWithActivity;
+
 
 /**
  * Add or update an activity in user's plan for a specific date.
@@ -311,4 +318,23 @@ export function getCurrentWeekStart(): string {
   monday.setDate(today.getDate() + diff);
   
   return monday.toISOString().split("T")[0];
+}
+
+/**
+ * List plan items for tomorrow's digest — all users, all activities on a date.
+ * Only returns items with an activityId (route-only items excluded).
+ */
+export async function listPlanItemsForTomorrowDigest(args: {
+  date: string;
+}): Promise<PlanTomorrowDigestCandidate[]> {
+  return (await prisma.planItem.findMany({
+    where: {
+      date: args.date,
+      activityId: { not: null },
+    },
+    include: {
+      activity: { select: planActivitySelect },
+    },
+    orderBy: { startsAt: "asc" },
+  })) as PlanTomorrowDigestCandidate[];
 }

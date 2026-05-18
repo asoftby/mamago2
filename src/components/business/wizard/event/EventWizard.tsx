@@ -9,6 +9,7 @@ import {
   useRef,
 } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import Link from "next/link";
 import { ContentStatus, Activity } from "@prisma/client";
 import { toast } from "@/lib/toast";
 import {
@@ -69,6 +70,7 @@ import type { EventStep1Taxonomies } from "./steps/step1Taxonomies";
 import { useAiEnrichment } from "./useAiEnrichment";
 import { applyAiEnrichmentToDraft } from "@/lib/event/applyAiEnrichment";
 import { createClientSavePerf } from "@/lib/perf/clientSavePerf";
+import { stableJsonStringify } from "@/lib/json/stableJsonStringify";
 
 type AiSuggestedFields = {
   participationFormat: boolean;
@@ -115,11 +117,99 @@ const EVENT_SUBMITTED_OR_LIVE_STATUSES: ReadonlySet<ContentStatus> = new Set([
   ContentStatus.SCHEDULED,
 ]);
 
+/** Публичная витрина: можно открыть карточку на сайте. */
+const EVENT_STATUSES_WITH_LIVE_PUBLIC_PAGE: ReadonlySet<ContentStatus> = new Set([
+  ContentStatus.PUBLISHED,
+  ContentStatus.PENDING_UPDATE,
+  ContentStatus.SCHEDULED,
+]);
+
 function eventFormBaselineJson(mode: EventWizardMode, event?: Activity): string {
   if (mode === "edit" && event) {
     return JSON.stringify(mapEventToFormData(event as unknown as ActivityWithRelations));
   }
   return JSON.stringify(getDefaultFormData());
+}
+
+function cloneEventFormData(data: EventFormData): EventFormData {
+  return JSON.parse(JSON.stringify(data)) as EventFormData;
+}
+
+function buildDraftPersistPayload(
+  current: EventFormData,
+  mode: EventWizardMode,
+  baseline: EventFormData,
+) {
+  const payload = buildEventPayload(current);
+  if (mode !== "edit") {
+    return payload;
+  }
+
+  const baselinePayload = buildEventPayload(baseline);
+  const nextPayload: Record<string, unknown> = { ...payload };
+
+  if (payload.title === baselinePayload.title) {
+    delete nextPayload.title;
+  }
+  if (payload.description === baselinePayload.description) {
+    delete nextPayload.description;
+  }
+  if (payload.format === baselinePayload.format) {
+    delete nextPayload.format;
+  }
+  if (stableJsonStringify(payload.ageTags) === stableJsonStringify(baselinePayload.ageTags)) {
+    delete nextPayload.ageTags;
+  }
+  if (payload.scheduleMode === baselinePayload.scheduleMode) {
+    delete nextPayload.scheduleMode;
+  }
+  if (payload.eventCategoryId === baselinePayload.eventCategoryId) {
+    delete nextPayload.eventCategoryId;
+  }
+  if (
+    stableJsonStringify(payload.programCategoryIds) ===
+    stableJsonStringify(baselinePayload.programCategoryIds)
+  ) {
+    delete nextPayload.programCategoryIds;
+  }
+  if (
+    stableJsonStringify(payload.scheduleJson) === stableJsonStringify(baselinePayload.scheduleJson)
+  ) {
+    delete nextPayload.scheduleJson;
+  }
+  if (
+    stableJsonStringify(payload.organizerInput) ===
+    stableJsonStringify(baselinePayload.organizerInput)
+  ) {
+    delete nextPayload.organizerInput;
+  }
+  if (payload.priceFrom === baselinePayload.priceFrom) {
+    delete nextPayload.priceFrom;
+  }
+  if (payload.priceTo === baselinePayload.priceTo) {
+    delete nextPayload.priceTo;
+  }
+  if (payload.priceText === baselinePayload.priceText) {
+    delete nextPayload.priceText;
+  }
+  if (payload.currency === baselinePayload.currency) {
+    delete nextPayload.currency;
+  }
+
+  if (stableJsonStringify(payload.venue) === stableJsonStringify(baselinePayload.venue)) {
+    delete nextPayload.venue;
+  }
+  if (stableJsonStringify(payload.occasionIds) === stableJsonStringify(baselinePayload.occasionIds)) {
+    delete nextPayload.occasionIds;
+  }
+  if (stableJsonStringify(payload.galleryMediaIds) === stableJsonStringify(baselinePayload.galleryMediaIds)) {
+    delete nextPayload.galleryMediaIds;
+  }
+  if (payload.coverImageId === baselinePayload.coverImageId) {
+    delete nextPayload.coverImageId;
+  }
+
+  return nextPayload;
 }
 
 function debugEditorLog(message: string, payload?: Record<string, unknown>) {
@@ -236,10 +326,20 @@ function EventWizardInner({
     }
   }, [mode]);
 
+  useEffect(() => {
+    setOpenSitePublicPath(null);
+  }, [event?.id]);
+
   const [isSaving, setIsSaving] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
+  const [openSitePublicPath, setOpenSitePublicPath] = useState<string | null>(null);
   const baselineJsonRef = useRef(eventFormBaselineJson(mode, event));
+  const baselineFormDataRef = useRef<EventFormData>(
+    mode === "edit" && event
+      ? mapEventToFormData(event as unknown as ActivityWithRelations)
+      : getDefaultFormData(),
+  );
   const formSnapshot = useMemo(() => JSON.stringify(formData), [formData]);
   const unpublishedFlow =
     mode === "create" ||
@@ -488,12 +588,19 @@ function EventWizardInner({
   }, [shouldInterceptLeave]);
 
   // Update form data
-  const handleChange = useCallback((updates: Partial<EventFormData>) => {
-    patchFormData(updates);
-  }, [patchFormData]);
+  const handleChange = useCallback(
+    (
+      updates:
+        | Partial<EventFormData>
+        | ((prev: EventFormData) => Partial<EventFormData>),
+    ) => {
+      patchFormData(updates);
+    },
+    [patchFormData],
+  );
 
   const persistEventDraftCore = useCallback(async (): Promise<
-    | { ok: true; persistedId: string | null }
+    | { ok: true; persistedId: string | null; publicPath: string | null }
     | { ok: false; reason: "validation" | "api"; message: string }
   > => {
     const draftCheck = validateForDraft(formData);
@@ -505,7 +612,7 @@ function EventWizardInner({
       };
     }
 
-    const payload = buildEventPayload(formData);
+    const payload = buildDraftPersistPayload(formData, mode, baselineFormDataRef.current);
     const tid = eventId ?? (mode === "edit" && event ? event.id : null);
 
     if (tid) {
@@ -527,7 +634,12 @@ function EventWizardInner({
           message: apiErrorMessage(errorBody, "Не удалось сохранить"),
         };
       }
-      return { ok: true, persistedId: tid };
+      const saved = await response.json();
+      return {
+        ok: true,
+        persistedId: tid,
+        publicPath: eventPublicPathFromSubmitBody(saved),
+      };
     }
 
     const perf = createClientSavePerf("save-event:client", {
@@ -548,8 +660,15 @@ function EventWizardInner({
         message: apiErrorMessage(errorBody, "Не удалось создать черновик"),
       };
     }
-    const data = (await response.json()) as { event: { id: string } };
-    return { ok: true, persistedId: data.event.id };
+    const data = (await response.json()) as {
+      success?: boolean;
+      event?: { id: string; publicPath?: string | null };
+    };
+    return {
+      ok: true,
+      persistedId: data.event?.id ?? null,
+      publicPath: eventPublicPathFromSubmitBody(data),
+    };
   }, [event, eventId, formData, mode]);
 
   const finalizePendingNavigateAway = useCallback(() => {
@@ -609,6 +728,7 @@ function EventWizardInner({
         setEventId(result.persistedId);
       }
       baselineJsonRef.current = JSON.stringify(formData);
+      baselineFormDataRef.current = cloneEventFormData(formData);
       setLastSaved(new Date());
       if (mode === "create" && typeof window !== "undefined") {
         localStorage.removeItem(LOCAL_STORAGE_KEY);
@@ -738,18 +858,23 @@ function EventWizardInner({
       }
 
       baselineJsonRef.current = JSON.stringify(formData);
+      baselineFormDataRef.current = cloneEventFormData(formData);
       setLastSaved(new Date());
       toast.success(hadEventId ? "Изменения сохранены" : "Черновик сохранён");
+
+      if (
+        mode === "edit" &&
+        event?.status &&
+        EVENT_STATUSES_WITH_LIVE_PUBLIC_PAGE.has(event.status) &&
+        result.publicPath
+      ) {
+        setOpenSitePublicPath(result.publicPath);
+      }
 
       if (mode === "create" && typeof window !== "undefined") {
         localStorage.removeItem(LOCAL_STORAGE_KEY);
         localStorage.removeItem(CURRENT_STEP_STORAGE_KEY);
         clearPersistedDraft();
-      }
-
-      if (mode === "edit") {
-        debugEditorLog("navigate after edit save draft", { href: afterSubmitDestination });
-        navigateToCompatibleHref(router, afterSubmitDestination);
       }
     } catch (error: unknown) {
       console.error("Save draft error:", error);
@@ -760,7 +885,7 @@ function EventWizardInner({
     }
   };
 
-  /** Опубликованное событие: финальный шаг — сохранить, отправить на проверку, редирект на карточку. */
+  /** Опубликованное событие: финальный шаг — сохранить изменения, остаться в редакторе. */
   const handlePublishedReviewSave = async () => {
     if (isSubmitting) return;
     debugEditorLog("published review save started", { eventId, currentStep });
@@ -819,6 +944,9 @@ function EventWizardInner({
         eventPublicPathFromSubmitBody(submitBody) ??
         publicActivityPath(tid, formData.city, eventSlugFromSubmitBody(submitBody));
 
+      baselineJsonRef.current = JSON.stringify(formData);
+      baselineFormDataRef.current = cloneEventFormData(formData);
+      setPublishedActivityHref(href);
       toast.success(
         canPublishContentDirectly(userRole)
           ? "Изменения опубликованы"
@@ -832,11 +960,15 @@ function EventWizardInner({
         clearPersistedDraft();
       }
 
-      const destination = mode === "edit" ? afterSubmitDestination : href;
+      if (mode === "edit") {
+        if (href) {
+          setOpenSitePublicPath(href);
+        }
+        return;
+      }
 
-      // Navigate immediately after success
-      debugEditorLog("navigate after published review save", { href: destination });
-      navigateToCompatibleHref(router, destination);
+      debugEditorLog("navigate after published review save", { href });
+      navigateToCompatibleHref(router, href);
     } catch (error: unknown) {
       console.error("Published review save error:", error);
       setSubmitStatus("error");
@@ -1025,6 +1157,10 @@ function EventWizardInner({
           : "Событие отправлено на модерацию",
       );
 
+      baselineJsonRef.current = JSON.stringify(formData);
+      baselineFormDataRef.current = cloneEventFormData(formData);
+      setLastSaved(new Date());
+
       // Clean up AFTER marking success
       if (mode === "create" && typeof window !== "undefined") {
         localStorage.removeItem(LOCAL_STORAGE_KEY);
@@ -1037,12 +1173,6 @@ function EventWizardInner({
       } else if (mode === "create") {
         debugEditorLog("navigate after submit", { href: afterSubmitDestination, reason: "create" });
         navigateToCompatibleHref(router, afterSubmitDestination);
-      } else if (returnTo) {
-        debugEditorLog("navigate after submit", { href: returnTo, reason: "returnTo" });
-        navigateToCompatibleHref(router, returnTo);
-      } else if (surface === "admin") {
-        debugEditorLog("navigate after submit", { href: nav.afterSubmitListPath, reason: "admin surface" });
-        navigateToCompatibleHref(router, nav.afterSubmitListPath);
       }
     } catch (error: unknown) {
       console.error("Submit error:", error);
@@ -1058,12 +1188,21 @@ function EventWizardInner({
   const isEditable = true; // TODO: Add proper logic
 
   const displayTitleRaw = formData.title?.trim() ?? "";
-  const displayTitle =
-    displayTitleRaw.length === 0
-      ? businessFormCopy.event.createTitle
-      : displayTitleRaw.length <= 60
-        ? displayTitleRaw
-        : `${displayTitleRaw.slice(0, 57)}...`;
+  const displayTitle = (() => {
+    if (mode === "edit") {
+      // В режиме редактирования — всегда показываем "Редактирование события: название"
+      return businessFormCopy.event.editTitle(
+        displayTitleRaw.length > 60
+          ? `${displayTitleRaw.slice(0, 57)}...`
+          : displayTitleRaw || undefined
+      );
+    }
+    // В режиме создания — показываем название по мере ввода
+    if (displayTitleRaw.length === 0) return businessFormCopy.event.createTitle;
+    return displayTitleRaw.length <= 60
+      ? displayTitleRaw
+      : `${displayTitleRaw.slice(0, 57)}...`;
+  })();
 
   // Check if form is valid for submission (only on review step)
   const submitValidation = currentStep === TOTAL_STEPS ? validateForSubmit(formData) : { isValid: true };
@@ -1220,6 +1359,19 @@ function EventWizardInner({
           submitStatus === "submitting"
         }
       />
+
+      {openSitePublicPath ? (
+        <div className="border-t border-[#EBEBEB] bg-white px-4 py-3 text-center text-sm">
+          <Link
+            href={openSitePublicPath}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-medium text-[#EF8759] underline underline-offset-2 hover:no-underline"
+          >
+            Открыть на сайте
+          </Link>
+        </div>
+      ) : null}
 
       {moderationSuccessEventId && (
         <EventSubmitModerationSuccessDialog

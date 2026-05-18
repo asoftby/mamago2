@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { requireAdminApiUser } from "@/lib/auth/requireAdminApi";
 
 export const runtime = "nodejs";
 
@@ -36,6 +37,8 @@ async function upsertFilter(slug: string, title: string, type: string, ui: strin
 }
 
 export async function POST() {
+  const auth = await requireAdminApiUser();
+  if (auth instanceof NextResponse) return auth;
   // Signals
   await upsertSignal("tempo", "Tempo", [
     { value: "slow", label: "Медленно", order: 1 },

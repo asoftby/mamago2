@@ -70,7 +70,7 @@ function saveDiscoveryFiltersSession(
 ): void {
   if (typeof window === "undefined") return;
   try {
-    sessionStorage.setItem(discoverySessionKey(city, intent), JSON.stringify(filters));
+    localStorage.setItem(discoverySessionKey(city, intent), JSON.stringify(filters));
   } catch {
     /* ignore */
   }
@@ -82,7 +82,7 @@ function loadDiscoveryFiltersSession(
 ): DiscoveryFilters | null {
   if (typeof window === "undefined") return null;
   try {
-    const raw = sessionStorage.getItem(discoverySessionKey(city, intent));
+    const raw = localStorage.getItem(discoverySessionKey(city, intent));
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<DiscoveryFilters>;
     return {
@@ -98,7 +98,7 @@ function loadDiscoveryFiltersSession(
 function clearDiscoveryFiltersSession(city: string, intent: Intent): void {
   if (typeof window === "undefined") return;
   try {
-    sessionStorage.removeItem(discoverySessionKey(city, intent));
+    localStorage.removeItem(discoverySessionKey(city, intent));
   } catch {
     /* ignore */
   }
@@ -133,6 +133,10 @@ function hasDiscoveryFilterParamsInUrl(
     searchParams.get("district") ||
     searchParams.get("nearby") === "true"
   );
+}
+
+function hasAnyUrlParams(searchParams: ReadonlyURLSearchParams): boolean {
+  return Array.from(searchParams.keys()).length > 0;
 }
 
 export type OpenKey = "date" | "age" | "metro" | "district" | null;
@@ -334,6 +338,11 @@ export function useDiscoveryFilters() {
     const intent = getIntentFromPath(pathname);
     if (!intent || !cityForSession) return;
     if (!isDiscoveryListingPath(pathname)) return;
+    // Any query params in the URL take precedence over local storage.
+    // This keeps shared links stable even when they carry non-filter params.
+    if (hasAnyUrlParams(searchParams)) {
+      return;
+    }
     if (hasDiscoveryFilterParamsInUrl(searchParams)) return;
     const stored = loadDiscoveryFiltersSession(cityForSession, intent);
     if (!stored || isDiscoveryFiltersEmpty(stored)) return;

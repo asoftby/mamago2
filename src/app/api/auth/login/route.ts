@@ -6,12 +6,32 @@ import { createSession, setSessionCookie } from "@/lib/auth/session";
 import { normalizeEmail } from "@/lib/auth/email";
 import { acceptBusinessInvite } from "@/server/business/businessInvite.service";
 import { buildSurfaceRedirectDestination } from "@/lib/routing/surface";
+import { checkRateLimit, resetRateLimit } from "@/lib/security/rateLimit";
 
 const loginSchema = z.object({
   email: z.string().email(),
   password: z.string(),
   invitationToken: z.string().min(1).optional(),
 });
+
+/**
+ * Extracts client IP with support for Cloudflare and proxies.
+ */
+function getClientIp(request: NextRequest): string {
+  const cf = request.headers.get("cf-connecting-ip");
+  if (cf) return cf;
+
+  const real = request.headers.get("x-real-ip");
+  if (real) return real;
+
+  const xff = request.headers.get("x-forwarded-for");
+  if (xff) {
+    const first = xff.split(",")[0]?.trim();
+    if (first) return first;
+  }
+
+  return "unknown";
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -22,6 +42,18 @@ export async function POST(request: NextRequest) {
     const email = normalizeEmail(parsed.email);
     const password = parsed.password;
     const invitationToken = parsed.invitationToken?.trim() || null;
+
+    // Rate limit check: 5 attempts per 15 minutes per IP + Email
+    const ip = getClientIp(request);
+    const rateLimitKey = `login:${ip}:${email}`;
+    const rl = checkRateLimit(rateLimitKey, 5, 15 * 60 * 1000);
+
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { error: "Слишком много попыток входа. Попробуйте позже." },
+        { status: 429 }
+      );
+    }
 
     // Find user
     const user = await prisma.user.findFirst({
@@ -94,6 +126,9 @@ export async function POST(request: NextRequest) {
         currentProtocol: protocol,
       });
     }
+
+    // Success: reset rate limit counter for this IP + Email
+    resetRateLimit(`login:${ip}:${email}`);
     
     // Create response with user data
     const response = NextResponse.json({
@@ -106,8 +141,9 @@ export async function POST(request: NextRequest) {
       ...(redirectTo ? { redirectTo } : {}),
     });
     
-    // Set session cookie on response
-    setSessionCookie(response, token);
+    // Set session cookie on response with request hostname for proper dev/prod domain handling
+    const requestHost = request.headers.get("x-forwarded-host") ?? request.headers.get("host");
+    setSessionCookie(response, token, requestHost ?? undefined);
 
     return response;
   } catch (error) {

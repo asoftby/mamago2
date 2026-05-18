@@ -30,6 +30,26 @@ export function extractPlainTextFromHtml(html: string): string {
 }
 
 /**
+ * Extract plain text lines from rich HTML while preserving simple block breaks.
+ * Useful when older UIs still expect line-based plain text.
+ */
+export function extractPlainTextLinesFromHtml(html: string): string[] {
+  if (!html) return [];
+
+  const normalized = html
+    .replace(/<(br|br\/)\s*>/gi, "\n")
+    .replace(/<\/(p|div|li|ul|ol|h2|h3|hr)>/gi, "\n")
+    .replace(/<li[^>]*>/gi, "• ");
+
+  const text = extractPlainTextFromHtml(normalized);
+
+  return text
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+}
+
+/**
  * Check if rich text HTML contains meaningful content
  * Returns false for empty strings, empty tags, or only whitespace
  */
@@ -113,4 +133,12 @@ export function plainTextToRichTextHtml(text: string): string {
       return `<p>${html}</p>`;
     })
     .join("");
+}
+
+export function normalizeRichTextEditorValue(value: string | null | undefined): string {
+  const normalized = (value ?? "").trim();
+  if (!normalized) return "";
+  return /<[a-z][\s\S]*>/i.test(normalized)
+    ? normalized
+    : plainTextToRichTextHtml(normalized);
 }

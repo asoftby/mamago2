@@ -69,6 +69,7 @@ model User {
   businessInvitesSent               BusinessInvite[]                 @relation("BusinessInviteInviter")
   businessMemberships               BusinessMember[]
   bookingRequests                   BookingRequest[]
+  bookingFeedbacks                  BookingFeedback[]
   reviewedBusinessVerifications     BusinessVerificationLog[]        @relation("ReviewedBy")
   children                          Child[]
   contentEdits                      ContentEditLog[]                 @relation("ContentEditor")
@@ -81,6 +82,7 @@ model User {
   moderationLogs                    ModerationLog[]                  @relation("ModerationReviewer")
   notifications                     Notification[]
   notificationDeliveries            NotificationDelivery[]
+  offerIdeas                        OfferIdea[]
   phoneOtps                         PhoneOtp[]
   archivedPlaces                    Place[]                          @relation("PlaceArchiver")
   createdPlaces                     Place[]                          @relation("PlaceCreator")
@@ -422,6 +424,26 @@ model DiscoveryTaxonomyEntry {
   @@index([axis, sortOrder])
 }
 
+model DiscoveryClassChip {
+  id               String   @id @default(cuid())
+  title            String
+  slug             String   @unique
+  description      String?
+  icon             String?
+  sortOrder        Int      @default(0)
+  isActive         Boolean  @default(true)
+  isDefault        Boolean  @default(false)
+  isSystem         Boolean  @default(false)
+  entityType       String   @default("OFFER")
+  surfaceKey       String   @default("CLASSES")
+  signalDefinitionId String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([surfaceKey, isActive, sortOrder])
+  @@index([signalDefinitionId])
+}
+
 model Occasion {
   id          String       @id @default(cuid())
   name        String
@@ -641,6 +663,7 @@ model Activity {
   owner                User                      @relation("ActivityOwner", fields: [ownerUserId], references: [id], onDelete: Cascade)
   organizer            Organizer?                @relation(fields: [organizerId], references: [id], onDelete: SetNull)
   place                Place?                    @relation("PlaceActivities", fields: [placeId], references: [id], onDelete: Restrict)
+  coverImage           MediaAsset?               @relation("ActivityCover", fields: [coverImageId], references: [id])
   filterOptions        ActivityFilterOption[]
   images               ActivityImage[]
   programCategoryLinks ActivityProgramCategory[]
@@ -673,6 +696,7 @@ model Activity {
   @@index([eventCategoryId])
   @@index([organizerId])
   @@index([slug])
+  @@index([coverImageId])
 }
 
 /// Join table: категории «в программе» события (many-to-many Activity ↔ EventCategory).
@@ -701,6 +725,7 @@ model ActivitySlugHistory {
 model ActivityImage {
   id         String   @id @default(cuid())
   activityId String
+  mediaAssetId String?
   url        String
   width      Int?
   height     Int?
@@ -708,8 +733,10 @@ model ActivityImage {
   sortOrder  Int      @default(0)
   createdAt  DateTime @default(now())
   activity   Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  mediaAsset MediaAsset? @relation("ActivityGalleryImageAsset", fields: [mediaAssetId], references: [id], onDelete: SetNull)
 
   @@index([activityId, sortOrder])
+  @@index([mediaAssetId])
 }
 
 model EventVenue {
@@ -1511,12 +1538,28 @@ model OpeningHoursExceptionInterval {
 model Offer {
   id                       String             @id @default(cuid())
   placeId                  String
+  /// Источник контактных данных предложения: manual | place
+  contactSource            String?            @default("manual")
+  /// Ручной телефон предложения (fallback, если не берём контакты из места)
+  contactPhone             String?
+  /// Ручной сайт предложения
+  contactWebsite           String?
+  /// Ручные соцсети предложения (JSON array)
+  contactSocialLinks       Json?
   kind                     OfferKind
   title                    String
   description              String?
   coverImage               String?
+  /// Видео URL (YouTube, YouTube Shorts, Instagram Reels)
+  videoUrl                 String?
+  /// Rich-text подпись к цене: что входит, ограничения, условия участия
+  priceCaption             String?
   priceFrom                Float?
   priceText                String?
+  /// Rich-text детали акций, скидок и специальных условий
+  promotionDetails         String?
+  /// Акционное предложение (текстовое описание скидки, раннего бронирования и т.д.)
+  promotionalOffer         String?
   ageMinMonths             Int?
   ageMaxMonths             Int?
   dateFrom                 DateTime?
@@ -1545,6 +1588,8 @@ model Offer {
   seoCanonicalSource       SeoCanonicalSource @default(FALLBACK)
   /// Сигналы DISCOVERY домена (entityType=OFFER), ID SignalDefinition
   discoverySignalIds       String[]           @default([])
+  /// Чипы публичной витрины /[city]/classes
+  classChipSlugs           String[]           @default([])
 
   // Настройки записи
   bookingEnabled Boolean      @default(false)
@@ -1552,8 +1597,56 @@ model Offer {
   bookingPhone   String?
   bookingNote    String?
 
+  // Gallery images (JSON array of URLs)
+  galleryImages            Json?              @default("[]")
+
+  // Camp-specific fields (JSON for MVP, can be normalized later)
+  /// Camp sessions with dates (JSON array: [{dateFrom, dateTo}, ...])
+  campSessions             Json?
+  /// Camp session duration (e.g., "7 дней", "2 недели")
+  campSessionDuration      String?
+  /// Camp stay duration (e.g., "с 9:00 до 17:00", "круглосуточно")
+  campStayDuration         String?
+  /// Number of available places
+  campPlacesCount          Int?
+  /// Group size
+  campGroupSize            Int?
+  /// Daily schedule description
+  campDaySchedule          String?
+  /// Can select individual days
+  campCanSelectDays        Boolean            @default(false)
+  /// Has extended care option
+  campHasExtendedCare      Boolean            @default(false)
+  /// Тип программы лагеря: городской | выездной | смешанный (wizard CAMP)
+  campProgramType          String?
+
+  // Accommodation fields (for CAMP type)
+  /// Is accommodation provided
+  accommodationProvided    Boolean            @default(false)
+  /// Type of accommodation (e.g., "палатки", "коттеджи")
+  accommodationType        String?
+  /// Адрес проживания (отдельно от площадки)
+  accommodationAddress     String?
+  /// Описание комнат / расселения
+  accommodationRooms       String?
+  /// Включённые приёмы питания (JSON string[]: breakfast, lunch, dinner, snacks)
+  campIncludedMeals        Json?
+  /// Безопасность / охрана
+  campSafetyInfo           String?
+  /// Медицинское сопровождение
+  campMedicalInfo          String?
+  /// Accommodation conditions description
+  accommodationConditions  String?
+  /// Meal information
+  mealInfo                 String?
+  /// Transfer information
+  transferInfo             String?
+  /// What to bring
+  whatToBring              String?
+
   boosts          Boost[]
   bookingRequests BookingRequest[]
+  offerIdeas      OfferIdea[]
   openingHours    OpeningHours?      @relation(fields: [openingHoursId], references: [id])
   place           Place              @relation(fields: [placeId], references: [id], onDelete: Cascade)
   slugHistory     OfferSlugHistory[]
@@ -1565,6 +1658,20 @@ model Offer {
   @@index([ageMinMonths, ageMaxMonths])
   @@index([openingHoursId])
   @@index([slug])
+}
+
+/// Сохранённые предложения в «Идеи» (отдельно от Idea с activityId)
+model OfferIdea {
+  id        String   @id @default(cuid())
+  userId    String
+  offerId   String
+  createdAt DateTime @default(now())
+  offer      Offer   @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  user       User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, offerId])
+  @@index([userId])
+  @@index([offerId])
 }
 
 model OfferSlugHistory {
@@ -1902,6 +2009,8 @@ model MediaAsset {
   deletedAt        DateTime?
   uploadedBy       User?            @relation(fields: [uploadedById], references: [id])
   usages           MediaUsage[]
+  activityCovers   Activity[]       @relation("ActivityCover")
+  activityImages   ActivityImage[]  @relation("ActivityGalleryImageAsset")
   articleCovers    Article[]        @relation("ArticleCover")
   articleSeoImages Article[]        @relation("ArticleSeoImage")
 
@@ -2065,23 +2174,44 @@ enum SearchEntityType {
 }
 
 model RouteStop {
-  id          String   @id @default(cuid())
-  routeId     String
-  order       Int
-  placeId     String?
-  lat         Float?
-  lng         Float?
-  address     String?
-  customTitle String?
-  note        String
-  photoUrl    String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  place       Place?   @relation(fields: [placeId], references: [id])
-  route       Route    @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  id                   String   @id @default(cuid())
+  routeId              String
+  order                Int
+  placeId              String?
+  googlePlaceId        String?
+  lat                  Float?
+  lng                  Float?
+  address              String?
+  customTitle          String?
+  note                 String
+  photoUrl             String?
+  formattedAddress     String?
+  addressComponents    Json?
+  rawGooglePayload     Json?
+  detectedCountryCode  String?
+  detectedCountryName  String?
+  detectedCityName     String?
+  detectedRegionName   String?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  place                Place?   @relation(fields: [placeId], references: [id])
+  route                Route    @relation(fields: [routeId], references: [id], onDelete: Cascade)
 
   @@index([routeId, order])
   @@index([placeId])
+  @@index([googlePlaceId])
+}
+
+/// SEO llms.txt configuration (per city or global)
+model SeoLlmsTxt {
+  id        String   @id @default(cuid())
+  citySlug  String?  @unique
+  content   String   @db.Text
+  isEnabled Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([citySlug])
 }
 
 /// Глобальные веса ранжирования (одна запись — singleton)
@@ -2135,6 +2265,7 @@ model NotificationDelivery {
   errorMessage   String?
   payloadJson    Json?
   sentAt         DateTime?
+  attemptCount   Int                        @default(0)
   createdAt      DateTime                   @default(now())
   updatedAt      DateTime                   @updatedAt
   notification   Notification?              @relation(fields: [notificationId], references: [id], onDelete: Cascade)
@@ -2262,6 +2393,11 @@ enum UserEventType {
   CTA_CLICK
   SEARCH_APPLY
   FILTER_APPLY
+  BOOKING_CREATED
+  BOOKING_CONFIRMED
+  BOOKING_COMPLETED
+  BOOKING_CANCELLED
+  FEEDBACK_LEFT
 }
 
 enum AnalyticsEntityType {
@@ -2525,11 +2661,26 @@ enum NotificationType {
   BUSINESS_NEEDS_INFO
   WELCOME
   REMINDER
+  PLAN_TOMORROW_DIGEST
   RECOMMENDATION
   BUSINESS_APPLICATION_CREATED
   ADMIN_MODERATION_ITEM_CREATED
   NEWS
   ANNOUNCEMENT
+  /// Новая заявка на запись (лагерь, событие, место)
+  BOOKING_CREATED
+  /// Заявка не обработана долгое время (NEW > 24ч)
+  BOOKING_STALE
+  /// Подтверждённая заявка без активности (CONFIRMED > 3 дней)
+  BOOKING_NEEDS_ATTENTION
+  /// Бизнес подтвердил заявку пользователя
+  BOOKING_CONFIRMED
+  /// Бизнес отменил/отклонил заявку пользователя
+  BOOKING_CANCELLED
+  /// Заявка завершена
+  BOOKING_COMPLETED
+  /// Запрос отзыва после завершения заявки
+  BOOKING_FEEDBACK_REQUEST
 }
 
 enum NotificationAudience {
@@ -2759,6 +2910,7 @@ enum NotificationDeliveryStatus {
 
 enum NotificationScenario {
   PLAN_EVENT_2H_BEFORE
+  PLAN_TOMORROW_DIGEST
 }
 
 enum DevTelegramBusinessApplicationStatus {
@@ -3132,11 +3284,25 @@ model BookingRequest {
   requestedDate     DateTime? // Snapshot для Offer или общий fallback
   requestedTime     String? // Snapshot времени (HH:MM)
 
+  // Смена лагеря (snapshot из Offer.campSessions JSON)
+  /// ID смены из JSON-массива campSessions (строковый ключ, не FK)
+  campShiftId       String?
+  /// Название смены (snapshot)
+  campShiftTitle    String?
+  /// Дата начала смены (snapshot)
+  campShiftDateFrom DateTime?
+  /// Дата окончания смены (snapshot)
+  campShiftDateTo   DateTime?
+
   // Данные клиента
   customerName    String
   customerPhone   String
   customerEmail   String?
   customerComment String?
+
+  // Данные ребёнка (для лагерей и детских занятий)
+  childName String?
+  childAge  Int?
 
   // Количество
   adultsCount   Int @default(1)
@@ -3146,16 +3312,30 @@ model BookingRequest {
   status BookingStatus @default(NEW)
 
   // Timestamps
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  /// Время последнего действия (звонок, смена статуса) — для сортировки stale leads
+  lastActivityAt DateTime @default(now())
+
+  // Derived metrics (filled automatically on status transitions)
+  /// Время первого подтверждения (NEW → CONFIRMED)
+  firstResponseAt     DateTime?
+  /// Время завершения (CONFIRMED → COMPLETED)
+  completedAt         DateTime?
+  /// Время отклонения (NEW|CONFIRMED → REJECTED)
+  rejectedAt          DateTime?
+  /// Время ответа в минутах (diff firstResponseAt − createdAt)
+  responseTimeMinutes Int?
 
   // Relations
-  business Business         @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  user     User?            @relation(fields: [userId], references: [id], onDelete: SetNull)
-  activity Activity?        @relation(fields: [activityId], references: [id], onDelete: SetNull)
-  offer    Offer?           @relation(fields: [offerId], references: [id], onDelete: SetNull)
-  place    Place?           @relation(fields: [placeId], references: [id], onDelete: SetNull)
-  session  ActivitySession? @relation(fields: [selectedSessionId], references: [id], onDelete: SetNull)
+  business   Business          @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  user       User?             @relation(fields: [userId], references: [id], onDelete: SetNull)
+  activity   Activity?         @relation(fields: [activityId], references: [id], onDelete: SetNull)
+  offer      Offer?            @relation(fields: [offerId], references: [id], onDelete: SetNull)
+  place      Place?            @relation(fields: [placeId], references: [id], onDelete: SetNull)
+  session    ActivitySession?  @relation(fields: [selectedSessionId], references: [id], onDelete: SetNull)
+  activities BookingActivity[]
+  feedback   BookingFeedback?
 
   @@index([businessId])
   @@index([userId])
@@ -3163,8 +3343,62 @@ model BookingRequest {
   @@index([offerId])
   @@index([placeId])
   @@index([selectedSessionId])
+  @@index([campShiftId])
   @@index([status])
   @@index([requestedDate])
+  @@index([createdAt])
+  @@index([businessId, createdAt])
+  @@index([businessId, firstResponseAt])
+}
+
+/// Тип события в истории заявки
+enum BookingActivityType {
+  CREATED
+  STATUS_CHANGED
+  PHONE_CLICKED
+  COMMENT_ADDED
+}
+
+/// Актор события: бизнес или система
+enum BookingActivityActorType {
+  BUSINESS
+  SYSTEM
+}
+
+/// История событий по заявке (timeline)
+model BookingActivity {
+  id         String                   @id @default(cuid())
+  bookingId  String
+  type       BookingActivityType
+  actorType  BookingActivityActorType @default(SYSTEM)
+  actorId    String?
+  /// Дополнительные данные события (JSON)
+  payload    Json?
+  createdAt  DateTime                 @default(now())
+
+  booking BookingRequest @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@index([bookingId, createdAt])
+  @@index([bookingId, type])
+}
+
+/// Отзыв клиента после завершённой заявки (1–5 звёзд)
+/// Только для COMPLETED bookings. Один отзыв на заявку.
+model BookingFeedback {
+  id        String   @id @default(cuid())
+  bookingId String   @unique
+  userId    String?
+  /// Оценка 1–5
+  rating    Int
+  /// Необязательный комментарий
+  comment   String?
+  createdAt DateTime @default(now())
+
+  booking BookingRequest @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  user    User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([bookingId])
+  @@index([userId])
   @@index([createdAt])
 }
 

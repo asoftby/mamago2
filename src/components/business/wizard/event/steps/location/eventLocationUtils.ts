@@ -9,6 +9,71 @@ type AddressComponent = {
   short_name: string;
 };
 
+type GeoOption = { id: string; name: string };
+
+const CITY_NAME_TO_SLUG: Record<string, string> = {
+  "Минск": "minsk",
+  Minsk: "minsk",
+  минск: "minsk",
+};
+
+const districtsCache = new Map<string, Promise<GeoOption[]>>();
+const metroStationsCache = new Map<string, Promise<GeoOption[]>>();
+
+function normalizeCityLookup(cityIdOrSlug: string): { cacheKey: string; query: string } {
+  const trimmed = cityIdOrSlug.trim();
+  const resolvedInput = CITY_NAME_TO_SLUG[trimmed] ?? trimmed;
+  const isCuid = /^c[a-z0-9]{24}$/i.test(resolvedInput);
+  const isUuid =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+      resolvedInput,
+    );
+  const query = isCuid || isUuid
+    ? `cityId=${encodeURIComponent(resolvedInput)}`
+    : `citySlug=${encodeURIComponent(resolvedInput)}`;
+
+  return {
+    cacheKey: query,
+    query,
+  };
+}
+
+async function fetchGeoOptions(
+  endpoint: string,
+  query: string,
+  field: "districts" | "metroStations",
+): Promise<GeoOption[]> {
+  const response = await fetch(`${endpoint}?${query}`);
+  if (!response.ok) {
+    throw new Error(`Geo request failed: ${response.status} ${response.statusText}`);
+  }
+
+  const data = (await response.json()) as Partial<Record<"districts" | "metroStations", GeoOption[]>>;
+  return Array.isArray(data[field]) ? data[field] ?? [] : [];
+}
+
+function getCachedGeoOptions(
+  cache: Map<string, Promise<GeoOption[]>>,
+  endpoint: string,
+  cityIdOrSlug: string,
+  field: "districts" | "metroStations",
+): Promise<GeoOption[]> {
+  const { cacheKey, query } = normalizeCityLookup(cityIdOrSlug);
+  const existing = cache.get(cacheKey);
+  if (existing) {
+    return existing;
+  }
+
+  const request = fetchGeoOptions(endpoint, query, field).catch((error) => {
+    cache.delete(cacheKey);
+    console.error(`[${field}] Error:`, error);
+    return [];
+  });
+
+  cache.set(cacheKey, request);
+  return request;
+}
+
 /**
  * Extract city information from Google Places address components
  */
@@ -87,104 +152,24 @@ export function extractVenueNameFromPlace(place: {
  * Load districts for a city
  */
 export async function loadDistricts(cityIdOrSlug: string): Promise<Array<{ id: string; name: string }>> {
-  try {
-    // Handle common city names by converting to known slugs
-    const cityNameToSlug: Record<string, string> = {
-      'Минск': 'minsk',
-      'Minsk': 'minsk',
-      'минск': 'minsk',
-    };
-    
-    let resolvedInput = cityIdOrSlug;
-    if (cityNameToSlug[cityIdOrSlug]) {
-      console.log('[loadDistricts] Converting city name to slug:', cityIdOrSlug, '->', cityNameToSlug[cityIdOrSlug]);
-      resolvedInput = cityNameToSlug[cityIdOrSlug];
-    }
-    
-    // Determine if it's a CUID/UUID (cityId) or slug
-    // CUID format: cmmj3p3uh0011ws3mmxhskmsf (25 chars, alphanumeric)
-    // UUID format: 550e8400-e29b-41d4-a716-446655440000 (36 chars with dashes)
-    const isCUID = /^c[a-z0-9]{24}$/i.test(resolvedInput);
-    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(resolvedInput);
-    const isId = isCUID || isUUID;
-    
-    const param = isId ? `cityId=${encodeURIComponent(resolvedInput)}` : `citySlug=${encodeURIComponent(resolvedInput)}`;
-    
-    console.log('[loadDistricts] Using param:', param, 'for input:', cityIdOrSlug, 'resolved to:', resolvedInput);
-    
-    const response = await fetch(`/api/geo/districts?${param}`);
-    if (!response.ok) {
-      console.error('[loadDistricts] API error:', response.status, response.statusText);
-      
-      // Try to get error details
-      try {
-        const errorData = await response.text();
-        console.error('[loadDistricts] Error details:', errorData);
-      } catch (e) {
-        // Ignore error parsing error
-      }
-      
-      return [];
-    }
-    
-    const data = await response.json();
-    return data.districts || [];
-  } catch (err) {
-    console.error('[loadDistricts] Error:', err);
-    return [];
-  }
+  return getCachedGeoOptions(
+    districtsCache,
+    "/api/geo/districts",
+    cityIdOrSlug,
+    "districts",
+  );
 }
 
 /**
  * Load metro stations for a city
  */
 export async function loadMetroStations(cityIdOrSlug: string): Promise<Array<{ id: string; name: string }>> {
-  try {
-    // Handle common city names by converting to known slugs
-    const cityNameToSlug: Record<string, string> = {
-      'Минск': 'minsk',
-      'Minsk': 'minsk',
-      'минск': 'minsk',
-    };
-    
-    let resolvedInput = cityIdOrSlug;
-    if (cityNameToSlug[cityIdOrSlug]) {
-      console.log('[loadMetroStations] Converting city name to slug:', cityIdOrSlug, '->', cityNameToSlug[cityIdOrSlug]);
-      resolvedInput = cityNameToSlug[cityIdOrSlug];
-    }
-    
-    // Determine if it's a CUID/UUID (cityId) or slug
-    // CUID format: cmmj3p3uh0011ws3mmxhskmsf (25 chars, alphanumeric)
-    // UUID format: 550e8400-e29b-41d4-a716-446655440000 (36 chars with dashes)
-    const isCUID = /^c[a-z0-9]{24}$/i.test(resolvedInput);
-    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(resolvedInput);
-    const isId = isCUID || isUUID;
-    
-    const param = isId ? `cityId=${encodeURIComponent(resolvedInput)}` : `citySlug=${encodeURIComponent(resolvedInput)}`;
-    
-    console.log('[loadMetroStations] Using param:', param, 'for input:', cityIdOrSlug, 'resolved to:', resolvedInput);
-    
-    const response = await fetch(`/api/geo/metro-stations?${param}`);
-    if (!response.ok) {
-      console.error('[loadMetroStations] API error:', response.status, response.statusText);
-      
-      // Try to get error details
-      try {
-        const errorData = await response.text();
-        console.error('[loadMetroStations] Error details:', errorData);
-      } catch (e) {
-        // Ignore error parsing error
-      }
-      
-      return [];
-    }
-    
-    const data = await response.json();
-    return data.metroStations || [];
-  } catch (err) {
-    console.error('[loadMetroStations] Error:', err);
-    return [];
-  }
+  return getCachedGeoOptions(
+    metroStationsCache,
+    "/api/geo/metro-stations",
+    cityIdOrSlug,
+    "metroStations",
+  );
 }
 
 /**
@@ -224,7 +209,7 @@ export async function enrichEventLocation(data: {
       try {
         const errorData = await response.text();
         console.error('[enrichEventLocation] Error details:', errorData);
-      } catch (e) {
+      } catch {
         // Ignore error parsing error
       }
       

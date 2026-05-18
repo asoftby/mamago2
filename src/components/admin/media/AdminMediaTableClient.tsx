@@ -263,6 +263,7 @@ export function AdminMediaTableClient({ items }: { items: AdminMediaTableRow[] }
                         kind={media.kind}
                         publicUrl={media.publicUrl}
                         filename={media.filename}
+                        mediaId={media.id}
                         size="sm"
                       />
                     </td>

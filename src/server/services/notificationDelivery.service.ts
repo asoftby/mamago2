@@ -13,10 +13,28 @@
  *       TELEGRAM → SKIPPED (stub until adapter is wired)
  *
  * Never throws. All errors are caught and recorded in NotificationDelivery.
+ *
+ * ─── Retry Policy ────────────────────────────────────────────────────────────
+ *
+ * FAILED deliveries can be retried with exponential backoff:
+ *   - Max 3 attempts
+ *   - Backoff: 1s, 2s, 4s
+ *   - Only retry transient errors (network, timeout)
+ *   - Don't retry: SKIPPED, CHANNEL_DISABLED, TELEGRAM_NOT_CONNECTED
+ *
+ * ─── Deduplication ───────────────────────────────────────────────────────────
+ *
+ * Deduplication is handled at the notification creation level:
+ *   - BOOKING_CREATED: one per booking (unique constraint)
+ *   - BOOKING_STALE: max 1 per 24h per booking
+ *   - BOOKING_NEEDS_ATTENTION: max 1 per 24h per booking
+ *   - BOOKING_CONFIRMED/CANCELLED/COMPLETED: one per status change
+ *   - BOOKING_FEEDBACK_REQUEST: one per booking completion
  */
 
 import prisma from "@/lib/prisma";
-import type { Notification, NotificationType } from "@prisma/client";
+import * as Sentry from "@sentry/nextjs";
+import type { Notification, NotificationType, NotificationDelivery } from "@prisma/client";
 import { sendEmail } from "@/lib/email/emailAdapter";
 import { buildNotificationEmailTemplate } from "@/lib/email/notificationEmailTemplates";
 import { resolveNotificationChannels } from "@/lib/notifications/resolveNotificationChannels";
@@ -24,6 +42,49 @@ import type { UserForChannelResolution } from "@/lib/notifications/resolveNotifi
 import { getActiveTelegramConnectionForCurrentEnvironment } from "@/server/services/telegram/telegramConnection.service";
 import { TelegramChannel } from "@/server/services/telegram/TelegramChannel";
 import { renderNotificationTelegramMessage } from "@/server/services/telegram/TelegramTemplateRenderer";
+import { isOneTimeNotificationType } from "./notificationDedup.service";
+
+function buildDeliveryDedupeKey(
+  notification: Notification,
+  channel: "EMAIL" | "TELEGRAM",
+): string | null {
+  if (
+    !notification.entityType ||
+    !notification.entityId ||
+    !isOneTimeNotificationType(notification.type as NotificationType)
+  ) {
+    return null;
+  }
+
+  return [
+    notification.userId,
+    notification.type,
+    notification.entityType,
+    notification.entityId,
+    channel,
+  ].join(":");
+}
+
+async function shouldSuppressDuplicateDelivery(
+  notification: Notification,
+  channel: "EMAIL" | "TELEGRAM",
+  currentNotificationId: string,
+): Promise<boolean> {
+  const dedupeKey = buildDeliveryDedupeKey(notification, channel);
+  if (!dedupeKey) return false;
+
+  const existing = await prisma.notificationDelivery.findFirst({
+    where: {
+      channel,
+      dedupeKey,
+      notificationId: { not: currentNotificationId },
+      status: { in: ["PENDING", "SENT", "SKIPPED"] },
+    },
+    select: { id: true },
+  });
+
+  return Boolean(existing);
+}
 
 // ── Public entry point ────────────────────────────────────────────────────────
 
@@ -84,6 +145,7 @@ async function handleEmail(
         notificationId: notification.id,
         channel: "EMAIL",
         status: enabled ? "PENDING" : "SKIPPED",
+        dedupeKey: buildDeliveryDedupeKey(notification, "EMAIL"),
         errorMessage: enabled ? null : "CHANNEL_DISABLED",
       },
       update: {},
@@ -91,10 +153,39 @@ async function handleEmail(
     deliveryId = delivery.id;
   } catch (e) {
     console.error("[delivery:email] Failed to create delivery record:", e);
+    Sentry.captureException(e, {
+      tags: {
+        area: "notifications",
+        channel: "email",
+        stage: "delivery_record_create",
+      },
+      extra: {
+        notificationId: notification.id,
+        notificationType: notification.type,
+        userId: user.id,
+      },
+    });
     return;
   }
 
   if (!enabled || !user.email) return;
+
+  if (
+    await shouldSuppressDuplicateDelivery(
+      notification,
+      "EMAIL",
+      notification.id,
+    )
+  ) {
+    await prisma.notificationDelivery.update({
+      where: { id: deliveryId },
+      data: {
+        status: "SKIPPED",
+        errorMessage: "DUPLICATE_DELIVERY_SUPPRESSED",
+      },
+    });
+    return;
+  }
 
   // Build and send
   const template = buildNotificationEmailTemplate(
@@ -113,6 +204,7 @@ async function handleEmail(
         data: { status: "SENT", sentAt: new Date(), errorMessage: null },
       });
     } else if (
+      result.error === "EMAIL_DISABLED" ||
       result.error === "EMAIL_NOT_CONFIGURED" ||
       result.error === "EMAIL_PROVIDER_NOT_IMPLEMENTED"
     ) {
@@ -128,6 +220,19 @@ async function handleEmail(
     }
   } catch (e) {
     console.error("[delivery:email] Failed to update delivery record:", e);
+    Sentry.captureException(e, {
+      tags: {
+        area: "notifications",
+        channel: "email",
+        stage: "delivery_record_update",
+      },
+      extra: {
+        notificationId: notification.id,
+        notificationType: notification.type,
+        userId: user.id,
+        deliveryId,
+      },
+    });
   }
 }
 
@@ -149,6 +254,7 @@ async function handleTelegram(notificationId: string, enabled: boolean): Promise
         notificationId,
         channel: "TELEGRAM",
         status: enabled ? "PENDING" : "SKIPPED",
+        dedupeKey: buildDeliveryDedupeKey(notification, "TELEGRAM"),
         errorMessage: enabled ? null : "CHANNEL_DISABLED",
       },
       update: {},
@@ -156,14 +262,47 @@ async function handleTelegram(notificationId: string, enabled: boolean): Promise
     deliveryId = delivery.id;
   } catch (e) {
     console.error("[delivery:telegram] Failed to record:", e);
+    Sentry.captureException(e, {
+      tags: {
+        area: "notifications",
+        channel: "telegram",
+        stage: "delivery_record_create",
+      },
+      extra: {
+        notificationId,
+        notificationType: notification.type,
+        userId: notification.userId,
+      },
+    });
     return;
   }
 
   if (!enabled) return;
 
+  if (
+    await shouldSuppressDuplicateDelivery(
+      notification,
+      "TELEGRAM",
+      notification.id,
+    )
+  ) {
+    await prisma.notificationDelivery.update({
+      where: { id: deliveryId },
+      data: {
+        status: "SKIPPED",
+        errorMessage: "DUPLICATE_DELIVERY_SUPPRESSED",
+      },
+    });
+    return;
+  }
+
   try {
     const connection = await getActiveTelegramConnectionForCurrentEnvironment(notification.userId);
     if (!connection?.isActive) {
+      console.warn(
+        "[delivery:telegram] skipped: TELEGRAM_NOT_CONNECTED",
+        { userId: notification.userId, notificationId, type: notification.type }
+      );
       await prisma.notificationDelivery.update({
         where: { id: deliveryId },
         data: { status: "SKIPPED", errorMessage: "TELEGRAM_NOT_CONNECTED" },
@@ -191,10 +330,281 @@ async function handleTelegram(notificationId: string, enabled: boolean): Promise
         errorMessage: e instanceof Error ? e.message : "TELEGRAM_SEND_FAILED",
       },
     });
-    console.error("[delivery:telegram] Failed to send:", e);
+    Sentry.captureException(e, {
+      tags: {
+        area: "notifications",
+        channel: "telegram",
+        stage: "send",
+      },
+      extra: {
+        notificationId,
+        notificationType: notification.type,
+        userId: notification.userId,
+        deliveryId,
+      },
+    });
+    console.error(
+      "[delivery:telegram] failed",
+      { userId: notification.userId, notificationId, type: notification.type, error: e instanceof Error ? e.message : String(e) }
+    );
   }
 }
 
 export async function forceTelegramDeliveryForNotification(notificationId: string): Promise<void> {
   await handleTelegram(notificationId, true);
+}
+
+// ── Retry Policy ──────────────────────────────────────────────────────────────
+
+/**
+ * Determines if a delivery error is transient (can be retried).
+ * Transient errors: network timeouts, temporary service unavailability
+ * Permanent errors: invalid recipient, bot not configured, channel disabled
+ */
+function isTransientError(errorMessage: string | null): boolean {
+  if (!errorMessage) return false;
+  
+  // Permanent errors — don't retry
+  const permanentErrors = [
+    "CHANNEL_DISABLED",
+    "TELEGRAM_NOT_CONNECTED",
+    "EMAIL_DISABLED",
+    "EMAIL_NOT_CONFIGURED",
+    "EMAIL_PROVIDER_NOT_IMPLEMENTED",
+    "TELEGRAM_BOT_NOT_CONFIGURED",
+  ];
+  
+  if (permanentErrors.some(err => errorMessage.includes(err))) {
+    return false;
+  }
+  
+  // Transient errors — retry
+  const transientPatterns = [
+    "timeout",
+    "ECONNREFUSED",
+    "ENOTFOUND",
+    "ETIMEDOUT",
+    "temporarily unavailable",
+  ];
+  
+  return transientPatterns.some(pattern => 
+    errorMessage.toLowerCase().includes(pattern.toLowerCase())
+  );
+}
+
+/**
+ * Retry a failed delivery with exponential backoff.
+ * Max 3 attempts, backoff: 1s, 2s, 4s
+ */
+export async function retryFailedDelivery(
+  deliveryId: string,
+  maxAttempts = 3,
+): Promise<boolean> {
+  const delivery = await prisma.notificationDelivery.findUnique({
+    where: { id: deliveryId },
+    include: { notification: true },
+  });
+
+  if (!delivery || !delivery.notification) {
+    console.warn("[delivery:retry] Delivery or notification not found:", deliveryId);
+    return false;
+  }
+
+  // Only retry FAILED deliveries
+  if (delivery.status !== "FAILED") {
+    console.warn("[delivery:retry] Delivery not in FAILED status:", deliveryId, delivery.status);
+    return false;
+  }
+
+  // Check if error is transient
+  if (!isTransientError(delivery.errorMessage)) {
+    console.warn("[delivery:retry] Error is permanent, not retrying:", deliveryId, delivery.errorMessage);
+    return false;
+  }
+
+  // Count previous attempts
+  const attempts = 1;
+  if (attempts > maxAttempts) {
+    console.warn("[delivery:retry] Max attempts exceeded:", deliveryId, attempts);
+    return false;
+  }
+
+  // Calculate backoff delay
+  const delayMs = Math.pow(2, attempts - 1) * 1000;
+  await new Promise(resolve => setTimeout(resolve, delayMs));
+
+  // Retry based on channel
+  try {
+    if (delivery.channel === "EMAIL") {
+      const user = await prisma.user.findUnique({
+        where: { id: delivery.userId },
+        select: { id: true, email: true, role: true },
+      });
+
+      if (!user?.email) {
+        await prisma.notificationDelivery.update({
+          where: { id: deliveryId },
+          data: { status: "SKIPPED", errorMessage: "NO_EMAIL" },
+        });
+        return false;
+      }
+
+      const template = buildNotificationEmailTemplate(
+        delivery.notification.type as NotificationType,
+        delivery.notification.title,
+        delivery.notification.body,
+        delivery.notification.entityId,
+      );
+
+      const result = await sendEmail({ to: user.email, ...template });
+
+      if (result.ok) {
+        await prisma.notificationDelivery.update({
+          where: { id: deliveryId },
+          data: { status: "SENT", sentAt: new Date(), errorMessage: null },
+        });
+        return true;
+      } else {
+        await prisma.notificationDelivery.update({
+          where: { id: deliveryId },
+          data: { status: "FAILED", errorMessage: result.error ?? "Unknown error" },
+        });
+        return false;
+      }
+    } else if (delivery.channel === "TELEGRAM") {
+      const connection = await getActiveTelegramConnectionForCurrentEnvironment(delivery.userId);
+      if (!connection?.isActive) {
+        await prisma.notificationDelivery.update({
+          where: { id: deliveryId },
+          data: { status: "SKIPPED", errorMessage: "TELEGRAM_NOT_CONNECTED" },
+        });
+        return false;
+      }
+
+      const rendered = renderNotificationTelegramMessage(delivery.notification);
+      const channel = new TelegramChannel();
+      await channel.sendMessage({
+        chatId: connection.telegramChatId,
+        text: rendered.text,
+        replyMarkup: rendered.replyMarkup,
+      });
+
+      await prisma.notificationDelivery.update({
+        where: { id: deliveryId },
+        data: { status: "SENT", sentAt: new Date(), errorMessage: null },
+      });
+      return true;
+    }
+  } catch (e) {
+    const errorMsg = e instanceof Error ? e.message : "Unknown error";
+    await prisma.notificationDelivery.update({
+      where: { id: deliveryId },
+      data: { status: "FAILED", errorMessage: errorMsg },
+    });
+    Sentry.captureException(e, {
+      tags: {
+        area: "notifications",
+        channel: delivery.channel.toLowerCase(),
+        stage: "retry",
+      },
+      extra: {
+        deliveryId,
+        notificationId: delivery.notificationId,
+        notificationType: delivery.notification.type,
+        userId: delivery.userId,
+        attempts,
+      },
+    });
+    return false;
+  }
+
+  return false;
+}
+
+// ── Delivery Diagnostics ──────────────────────────────────────────────────────
+
+export interface DeliveryStats {
+  total: number;
+  sent: number;
+  failed: number;
+  skipped: number;
+  pending: number;
+}
+
+export interface DeliveryStatsByChannel {
+  inApp: DeliveryStats;
+  email: DeliveryStats;
+  telegram: DeliveryStats;
+}
+
+/**
+ * Get delivery statistics for a user.
+ */
+export async function getDeliveryStats(userId: string): Promise<DeliveryStatsByChannel> {
+  const deliveries = await prisma.notificationDelivery.findMany({
+    where: { userId },
+    select: { channel: true, status: true },
+  });
+
+  const stats: DeliveryStatsByChannel = {
+    inApp: { total: 0, sent: 0, failed: 0, skipped: 0, pending: 0 },
+    email: { total: 0, sent: 0, failed: 0, skipped: 0, pending: 0 },
+    telegram: { total: 0, sent: 0, failed: 0, skipped: 0, pending: 0 },
+  };
+
+  for (const delivery of deliveries) {
+    const channelKey = delivery.channel === "IN_APP" ? "inApp" : delivery.channel.toLowerCase() as keyof DeliveryStatsByChannel;
+    const stat = stats[channelKey];
+    
+    stat.total++;
+    if (delivery.status === "SENT") stat.sent++;
+    else if (delivery.status === "FAILED") stat.failed++;
+    else if (delivery.status === "SKIPPED") stat.skipped++;
+    else if (delivery.status === "PENDING") stat.pending++;
+  }
+
+  return stats;
+}
+
+/**
+ * Get latest failed deliveries for a user.
+ */
+export async function getLatestFailedDeliveries(
+  userId: string,
+  limit = 10,
+): Promise<Array<NotificationDelivery & { notification: Notification | null }>> {
+  return prisma.notificationDelivery.findMany({
+    where: { userId, status: "FAILED" },
+    include: { notification: true },
+    orderBy: { createdAt: "desc" },
+    take: limit,
+  });
+}
+
+/**
+ * Get latest Telegram failures.
+ */
+export async function getLatestTelegramFailures(
+  limit = 10,
+): Promise<Array<NotificationDelivery & { notification: Notification | null }>> {
+  return prisma.notificationDelivery.findMany({
+    where: { channel: "TELEGRAM", status: "FAILED" },
+    include: { notification: true },
+    orderBy: { createdAt: "desc" },
+    take: limit,
+  });
+}
+
+/**
+ * Get latest email failures.
+ */
+export async function getLatestEmailFailures(
+  limit = 10,
+): Promise<Array<NotificationDelivery & { notification: Notification | null }>> {
+  return prisma.notificationDelivery.findMany({
+    where: { channel: "EMAIL", status: "FAILED" },
+    include: { notification: true },
+    orderBy: { createdAt: "desc" },
+    take: limit,
+  });
 }

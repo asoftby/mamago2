@@ -1,14 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth/server";
+import { parsePaginationParams } from "@/lib/api/pagination";
 import { PlaceReviewStatus, PlaceReviewSource } from "@prisma/client";
 
 /**
  * GET /api/admin/reviews/places
  * Получение всех отзывов о местах (mamaGo + Google)
- * 
+ *
  * Доступ: ADMIN, EDITOR
- * 
+ *
  * Query params:
  * - status: PENDING | PUBLISHED | HIDDEN | all
  * - source: MAMAGO | GOOGLE | all
@@ -31,8 +32,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const statusParam = searchParams.get("status");
     const sourceParam = searchParams.get("source");
     const hasReplyParam = searchParams.get("hasReply");
-    const limit = parseInt(searchParams.get("limit") || "50");
-    const offset = parseInt(searchParams.get("offset") || "0");
+    const { limit, skip: offset } = parsePaginationParams(searchParams, { defaultLimit: 50 });
 
     // Построить where условие
     const where: Record<string, unknown> = {};

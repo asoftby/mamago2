@@ -8,7 +8,6 @@ import { assignArticleSlugIfMissing } from "@/lib/slug/articleSlugService";
 import { assignOfferSlugIfMissing } from "@/lib/slug/offerSlugService";
 import { assignPlaceSlugIfMissing } from "@/lib/slug/placeSlugService";
 import {
-  syncActivityCanonical,
   syncArticleCanonical,
   syncOfferCanonical,
   syncPlaceCanonical,
@@ -29,7 +28,6 @@ export async function ensurePublishedActivityHasSlug(activityId: string): Promis
   });
   if (!a || a.status !== ContentStatus.PUBLISHED) return;
   await assignActivitySlugIfMissing(activityId, a.title.trim() || "event");
-  await syncActivityCanonical(activityId);
   const again = await prisma.activity.findUnique({
     where: { id: activityId },
     select: { slug: true },

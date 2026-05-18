@@ -8,6 +8,7 @@ const globalForPrisma = globalThis as unknown as {
   searchIndexer: SearchIndexerService | undefined;
 };
 
+// Forced reload for Prisma schema changes - v2
 const prismaBase =
   globalForPrisma.prismaBase ??
   new PrismaClient({

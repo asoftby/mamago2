@@ -10,9 +10,11 @@ import { AnalyticsDetailBeacon } from "@/components/analytics/AnalyticsDetailBea
 import { buildOgMeta } from "@/lib/seo/buildOgMeta";
 import { MarketplacePlacePage } from "@/components/place/marketplace";
 import { getCurrentUser } from "@/lib/auth/server";
+import { canEditPlace } from "@/lib/permissions/placeEditPermissions";
 import { resolveInstagramProfileHref } from "@/lib/instagram/extractUsername";
 import { buildPublicWorkingHoursText } from "@/server/services/openingHours/openingHours.publicSummary";
 import type { OpeningHoursWithRelations } from "@/server/services/openingHours/openingHours.types";
+import { resolvePlaceLogoImage } from "@/lib/place/resolvePlaceLogoImage";
 
 interface PlacePageProps {
   params: Promise<{ slug: string }>;
@@ -37,7 +39,8 @@ export async function generateMetadata({ params }: PlacePageProps): Promise<Meta
     status: string;
     archivedAt: Date | null;
     slug: string | null;
-    images: { url: string; kind: string; sortOrder: number }[];
+    logoImageId: string | null;
+    images: { id: string; url: string; kind: string; sortOrder: number }[];
     ownerBusiness: { operationalStatus: string } | null;
   } | null;
   
@@ -58,10 +61,11 @@ export async function generateMetadata({ params }: PlacePageProps): Promise<Meta
         status: true,
         archivedAt: true,
         slug: true,
+        logoImageId: true,
         images: {
-          select: { url: true, kind: true, sortOrder: true },
-          orderBy: { sortOrder: "asc" },
-          take: 3,
+          select: { id: true, url: true, kind: true, sortOrder: true },
+          orderBy: [{ kind: "asc" }, { sortOrder: "asc" }],
+          take: 24,
         },
         ownerBusiness: {
           select: {
@@ -99,10 +103,11 @@ export async function generateMetadata({ params }: PlacePageProps): Promise<Meta
         status: true,
         archivedAt: true,
         slug: true,
+        logoImageId: true,
         images: {
-          select: { url: true, kind: true, sortOrder: true },
-          orderBy: { sortOrder: "asc" },
-          take: 3,
+          select: { id: true, url: true, kind: true, sortOrder: true },
+          orderBy: [{ kind: "asc" }, { sortOrder: "asc" }],
+          take: 24,
         },
         ownerBusiness: {
           select: {
@@ -138,9 +143,11 @@ export async function generateMetadata({ params }: PlacePageProps): Promise<Meta
   });
 
   const publicBase = process.env.NEXT_PUBLIC_APP_URL || "https://mamago.by";
+  const logoForMeta = resolvePlaceLogoImage(place.images, place.logoImageId);
   const coverImage =
     place.seoOgImage?.trim() ||
     place.images.find((i) => i.kind === "GALLERY")?.url ||
+    logoForMeta?.url ||
     place.images[0]?.url;
 
   return buildOgMeta({
@@ -311,9 +318,10 @@ export default async function PlacePage({ params }: PlacePageProps) {
           publicBase,
         });
 
-  const logoImage = place.images.find((img) => img.kind === "LOGO");
+  const logoImage = resolvePlaceLogoImage(place.images, place.logoImageId);
   const galleryImages = place.images
     .filter((img) => img.kind === "GALLERY")
+    .filter((img) => !logoImage || img.id !== logoImage.id)
     .sort((a, b) => a.sortOrder - b.sortOrder)
     .map((img) => ({
       id: img.id,
@@ -347,22 +355,20 @@ export default async function PlacePage({ params }: PlacePageProps) {
   });
 
   // Fetch active offers for this place
-  const activeOffers = await prisma.activity.findMany({
+  const activeOffers = await prisma.offer.findMany({
     where: {
       placeId: place.id,
-      type: "OFFER",
       status: "PUBLISHED",
     },
     select: {
       id: true,
       title: true,
       slug: true,
-      shortDesc: true,
+      description: true,
       priceFrom: true,
-      coverImageUrl: true,
-      eventCategory: {
-        select: { nameRu: true },
-      },
+      coverImage: true,
+      kind: true,
+      campProgramType: true,
     },
     orderBy: { createdAt: "desc" },
     take: 10,
@@ -406,24 +412,15 @@ export default async function PlacePage({ params }: PlacePageProps) {
   const averageRating = reviewStats._avg.rating || undefined;
   const totalReviewCount = reviewStats._count;
 
-  // Check if current user can edit this place
   const currentUser = await getCurrentUser();
-  let canEdit = false;
-
-  if (currentUser) {
-    // ADMIN can edit any place
-    if (currentUser.role === "ADMIN") {
-      canEdit = true;
-    }
-    // Check if user owns the business that owns this place
-    else if (place.ownerBusinessId && place.ownerBusiness) {
-      const isBusinessOwner = place.ownerBusiness.ownerUserId === currentUser.id;
-      const isBusinessMember = place.ownerBusiness.members.some(
-        (member) => member.userId === currentUser.id
-      );
-      canEdit = isBusinessOwner || isBusinessMember;
-    }
-  }
+  const canShowPlaceEditor =
+    currentUser != null &&
+    (await canEditPlace(currentUser, {
+      placeId: place.id,
+      createdByUserId: place.createdByUserId,
+      ownerBusinessId: place.ownerBusinessId,
+      status: place.status,
+    }));
 
   // Format data for premium components
   const formattedEvents = upcomingEvents.map((event) => ({
@@ -441,10 +438,11 @@ export default async function PlacePage({ params }: PlacePageProps) {
     id: offer.id,
     title: offer.title,
     slug: offer.slug || offer.id,
-    imageUrl: offer.coverImageUrl || undefined,
-    description: offer.shortDesc || undefined,
+    imageUrl: offer.coverImage || undefined,
+    description: offer.description || undefined,
     price: offer.priceFrom || undefined,
-    category: offer.eventCategory?.nameRu,
+    kind: offer.kind,
+    campProgramType: offer.campProgramType,
   }));
 
   // Get district and metro names
@@ -556,6 +554,7 @@ export default async function PlacePage({ params }: PlacePageProps) {
         events={formattedEvents}
         offers={formattedOffers}
         reviews={placeReviews}
+        ownerEditPlaceId={canShowPlaceEditor ? place.id : undefined}
       />
     </>
   );

@@ -38,8 +38,8 @@ export async function POST(
   } catch (error) {
     console.error("[admin/assign-owner] Error:", error);
     return NextResponse.json(
-      { 
-        error: error instanceof Error ? error.message : "Failed to assign owner"
+      {
+        error: "Failed to assign owner"
       },
       { status: 400 }
     );

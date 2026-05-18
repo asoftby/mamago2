@@ -6,6 +6,7 @@ import { buildSurfaceRedirectDestination } from "@/lib/routing/surface";
 import { getMyBusiness } from "@/server/business/getMyBusiness";
 import { getBusinessMembership } from "@/server/permissions/business-permissions";
 import type { SettingsBusinessContext, SettingsContext, SettingsScope } from "./types";
+import { getActiveTelegramConnectionForCurrentEnvironment } from "@/server/services/telegram/telegramConnection.service";
 
 type ResolveSettingsContextOptions = {
   requestedScope: SettingsScope;
@@ -45,6 +46,8 @@ export async function resolveSettingsContext(
       businessContext.membershipRole === BusinessMemberRole.OWNER ||
       businessContext.membershipRole === BusinessMemberRole.MANAGER);
 
+  const tg = await getActiveTelegramConnectionForCurrentEnvironment(user.id);
+
   return {
     viewer: {
       id: user.id,
@@ -55,6 +58,8 @@ export async function resolveSettingsContext(
       phoneE164: user.phoneE164 ?? null,
       phoneVerifiedAt: user.phoneVerifiedAt?.toISOString() ?? null,
       emailVerifiedAt: user.emailVerifiedAt?.toISOString() ?? null,
+      telegramLinked: tg?.isActive ?? false,
+      telegramUsername: tg?.telegramUsername ?? null,
     },
     surfaceScope: options.requestedScope,
     requestedScope: options.requestedScope,

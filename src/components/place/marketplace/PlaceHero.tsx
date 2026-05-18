@@ -4,6 +4,8 @@ import { Share2, Heart, MapPin, Image as ImageIcon } from "lucide-react";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
+import { OwnerPlaceEditDropdown } from "./OwnerPlaceEditDropdown";
+import { isAppMediaUrl } from "@/lib/media/isAppMediaUrl";
 
 interface PlaceHeroProps {
   title: string;
@@ -19,6 +21,8 @@ interface PlaceHeroProps {
   }>;
   onShareClick?: () => void;
   onSaveClick?: () => void;
+  /** Когда задан — показываем дропдаун «Редактировать» (владелец / команда / админ). */
+  ownerEditPlaceId?: string;
 }
 
 export function PlaceHero({
@@ -31,6 +35,7 @@ export function PlaceHero({
   images = [],
   onShareClick,
   onSaveClick,
+  ownerEditPlaceId,
 }: PlaceHeroProps) {
   const displayCover = coverImageUrl || images[0]?.url;
   const totalImages = images.length;
@@ -40,33 +45,54 @@ export function PlaceHero({
       {/* Left: Cover Image */}
       <div className="relative aspect-[4/3] overflow-hidden rounded-3xl bg-gray-100">
         {displayCover ? (
-          <Image
-            src={displayCover}
-            alt={title}
-            fill
-            priority
-            sizes="(min-width: 1024px) 60vw, 100vw"
-            className="object-cover"
-          />
+          isAppMediaUrl(displayCover) ? (
+            <img
+              src={displayCover}
+              alt={title}
+              loading="eager"
+              decoding="async"
+              fetchPriority="high"
+              className="absolute inset-0 h-full w-full object-cover"
+            />
+          ) : (
+            <Image
+              src={displayCover}
+              alt={title}
+              fill
+              priority
+              sizes="(min-width: 1024px) 60vw, 100vw"
+              className="object-cover"
+            />
+          )
         ) : (
           <div className="flex h-full items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200">
             <ImageIcon className="h-16 w-16 text-gray-400" />
           </div>
         )}
 
-        {/* Logo Overlay - Bottom Left */}
-        {logoUrl && (
-          <div className="absolute bottom-4 left-4 rounded-2xl border-2 border-white bg-white p-2 shadow-lg">
+        {/* Лого: показываем бейдж всегда, если есть URL (даже если совпадает с обложкой — это намеренный акцент) */}
+        {logoUrl ? (
+          <div className="absolute bottom-4 left-4 z-10 rounded-2xl border-2 border-white bg-white p-2 shadow-lg">
             <div className="relative h-16 w-16 overflow-hidden rounded-xl">
-              <Image
-                src={logoUrl}
-                alt={`${title} logo`}
-                fill
-                className="object-cover"
-              />
+              {isAppMediaUrl(logoUrl) ? (
+                <img
+                  src={logoUrl}
+                  alt={`${title} logo`}
+                  loading="eager"
+                  decoding="async"
+                  className="absolute inset-0 h-full w-full object-cover"
+                />
+              ) : (
+                <Image
+                  src={logoUrl}
+                  alt={`${title} logo`}
+                  fill
+                  className="object-cover"
+                />
+              )}
             </div>
           </div>
-        )}
+        ) : null}
 
         {/* All Photos Button - Bottom Right */}
         {totalImages > 0 && (
@@ -125,6 +151,11 @@ export function PlaceHero({
             Сохранить
           </Button>
         </div>
+        {ownerEditPlaceId ? (
+          <div className="pt-1">
+            <OwnerPlaceEditDropdown placeId={ownerEditPlaceId} className="w-full" />
+          </div>
+        ) : null}
       </div>
     </div>
   );

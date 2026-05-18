@@ -124,7 +124,7 @@ export async function POST(
       return NextResponse.json(
         {
           error: "DATABASE_ERROR",
-          message: error.message || "Database operation failed",
+          message: "Internal server error",
           code: error.code,
         },
         { status: 500 }
@@ -144,9 +144,9 @@ export async function POST(
     
     // Generic error fallback
     return NextResponse.json(
-      { 
+      {
         error: "INTERNAL_SERVER_ERROR",
-        message: error instanceof Error ? error.message : "Failed to save location",
+        message: "Internal server error",
       },
       { status: 500 }
     );

@@ -9,7 +9,7 @@ import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { toast } from "@/lib/toast";
 import {
   CalendarDays, CalendarCheck, CalendarClock,
-  Bookmark, BookmarkCheck, ChevronRight, ChevronLeft,
+  Bookmark, BookmarkCheck, ChevronRight,
   ExternalLink, Pencil, Trash2,
 } from "lucide-react";
 import { DatePicker } from "@/components/ui/date-picker";
@@ -18,6 +18,7 @@ import {
   formatLocalPlanDate,
   getLocalDateKey,
 } from "@/lib/date/localDateKey";
+import { formatRuShortDayMonth } from "@/lib/formatters/date";
 
 export type SaveScenario =
   | { kind: "confirm"; title: string; dateLabel: string; timeLabel: string; dateISO: string; slotId?: string | null }
@@ -27,6 +28,8 @@ export type SaveScenario =
       title: string;
       /** Одна дата сеанса (страница события): «В план» = на эту дату или в идеи, без «сегодня/завтра». */
       eventPlanDateISO?: string;
+      /** Конец диапазона проведения, если активность длительная. */
+      eventPlanDateEndISO?: string;
       /** Набор доступных дат события (YYYY-MM-DD). */
       eventPlanDateOptions?: string[];
     };
@@ -46,6 +49,7 @@ export interface SaveToPlanModalProps {
   inPlan?: boolean;
   planDate?: string | null;
   planStartsAt?: string | null;
+  source?: string;
 }
 
 type ModalView = "quick" | "calendar";
@@ -68,21 +72,32 @@ function toastRemovedIdea() { toast("Убрано из идей", { duration: 25
 
 interface ActionRowProps {
   icon: React.ReactNode; title: string; subtitle: string; onClick: () => void;
-  iconBg?: string; iconColor?: string; rightEl?: React.ReactNode;
+  iconBg?: string; iconColor?: string; rightEl?: React.ReactNode; className?: string; hideChevron?: boolean;
 }
-function ActionRow({ icon, title, subtitle, onClick, iconBg = "bg-neutral-900", iconColor = "text-white", rightEl }: ActionRowProps) {
+function ActionRow({
+  icon,
+  title,
+  subtitle,
+  onClick,
+  iconBg = "bg-neutral-900",
+  iconColor = "text-white",
+  rightEl,
+  className,
+  hideChevron = false,
+}: ActionRowProps) {
   return (
     <button onClick={onClick} className={cn(
       "w-full flex items-center gap-3.5 px-4 py-3.5 rounded-2xl border border-neutral-200 bg-white text-left",
       "hover:border-neutral-300 hover:bg-neutral-50 active:scale-[0.985] transition-all duration-100",
-      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900/20"
+      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900/20",
+      className,
     )}>
       <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center shrink-0", iconBg, iconColor)}>{icon}</div>
       <div className="flex-1 min-w-0">
         <p className="text-sm font-semibold text-neutral-900 leading-tight">{title}</p>
         <p className="text-xs text-neutral-500 mt-0.5 leading-tight">{subtitle}</p>
       </div>
-      {rightEl ?? <ChevronRight className="w-4 h-4 text-neutral-300 shrink-0" />}
+      {hideChevron ? null : rightEl ?? <ChevronRight className="w-4 h-4 text-neutral-300 shrink-0" />}
     </button>
   );
 }
@@ -112,11 +127,9 @@ function StatusCard({ icon, title, subtitle, actions }: StatusCardProps) {
 }
 
 function CalendarView({
-  onBack,
   onSelect,
   allowedDateKeys,
 }: {
-  onBack: () => void;
   onSelect: (iso: string) => void;
   allowedDateKeys?: string[] | null;
 }) {
@@ -157,13 +170,43 @@ function normalizePlanDateISO(value?: string | null): string | null {
   return getLocalDateKey(parsed);
 }
 
+function isLongRunningRange(startISO?: string | null, endISO?: string | null): boolean {
+  const start = normalizePlanDateISO(startISO);
+  const end = normalizePlanDateISO(endISO);
+  if (!start || !end) return false;
+  return end > start;
+}
+
+function formatEventRangeSubtitle(startISO?: string | null, endISO?: string | null): string | null {
+  const start = normalizePlanDateISO(startISO);
+  const end = normalizePlanDateISO(endISO);
+  if (!start || !end) return null;
+  return `Событие проходит с ${formatRuShortDayMonth(start)} по ${formatRuShortDayMonth(end)}.`;
+}
+
+function buildDateRangeKeys(startISO?: string | null, endISO?: string | null): string[] {
+  const start = normalizePlanDateISO(startISO);
+  const end = normalizePlanDateISO(endISO);
+  if (!start || !end || end < start) return [];
+
+  const keys: string[] = [];
+  let cursor = start;
+  while (cursor <= end) {
+    keys.push(cursor);
+    cursor = addDaysLocal(cursor, 1);
+  }
+  return keys;
+}
+
 interface QuickViewProps {
   isIdea: boolean;
   inPlan: boolean;
   planDate: string | null;
-  planStartsAt: string | null;
+  source?: string;
   /** YYYY-MM-DD единственного сеанса — только «на дату проведения», без сегодня/завтра. */
   eventPlanDateISO?: string | null;
+  /** YYYY-MM-DD конца события для длительных активностей. */
+  eventPlanDateEndISO?: string | null;
   /** Доступные даты события (YYYY-MM-DD). Для multi-date сценария. */
   eventPlanDateOptions?: string[];
   onPlan: (iso: string) => void;
@@ -175,8 +218,9 @@ function QuickView({
   isIdea,
   inPlan,
   planDate,
-  planStartsAt: _planStartsAt,
+  source,
   eventPlanDateISO,
+  eventPlanDateEndISO,
   eventPlanDateOptions,
   onPlan,
   onIdea,
@@ -185,6 +229,9 @@ function QuickView({
 }: QuickViewProps) {
   const todayISO = getLocalDateKey();
   const tomorrowISO = addDaysLocal(todayISO, 1);
+  const isIdeasSource = source === "ideas";
+  const isLongRunning = isLongRunningRange(eventPlanDateISO, eventPlanDateEndISO);
+  const eventRangeSubtitle = formatEventRangeSubtitle(eventPlanDateISO, eventPlanDateEndISO);
   const normalizedOptions = React.useMemo(() => {
     const unique = new Set((eventPlanDateOptions ?? []).map((d) => normalizePlanDateISO(d)).filter(Boolean));
     return Array.from(unique).sort() as string[];
@@ -207,6 +254,13 @@ function QuickView({
               { label: "Изменить дату", icon: <Pencil className="w-3 h-3" />, onClick: onSwitchCalendar },
               { label: "Открыть план", icon: <ExternalLink className="w-3 h-3" />, onClick: () => { window.location.href = "/me/plan"; } },
             ]}
+          />
+        ) : isLongRunning ? (
+          <ActionRow
+            icon={<CalendarClock className="w-5 h-5" />}
+            title="Выбрать дату"
+            subtitle={eventRangeSubtitle ?? "Выбрать дату посещения в диапазоне события"}
+            onClick={onSwitchCalendar}
           />
         ) : isSingleEventDate ? (
           <ActionRow
@@ -248,7 +302,18 @@ function QuickView({
       </div>
       <div className="space-y-2">
         <p className="text-[11px] font-semibold text-neutral-400 uppercase tracking-widest px-1">Без даты</p>
-        {isIdea ? (
+        {isIdeasSource && isIdea ? (
+          <ActionRow
+            icon={<Trash2 className="w-5 h-5" />}
+            title="Удалить из идей"
+            subtitle="Активность будет удалена из моих идей"
+            onClick={onRemoveIdea}
+            iconBg="bg-[#FDECEC]"
+            iconColor="text-[#D05A5A]"
+            className="border-[#F3D4D4] bg-[#FFF7F7] hover:border-[#E8C2C2] hover:bg-[#FFF1F1]"
+            hideChevron
+          />
+        ) : isIdea ? (
           <StatusCard
             icon={<BookmarkCheck className="w-4 h-4" />}
             title="Уже в идеях"
@@ -274,6 +339,7 @@ export interface SaveToPlanPickerBodyProps {
   inPlan?: boolean;
   planDate?: string | null;
   planStartsAt?: string | null;
+  source?: string;
 }
 
 export function SaveToPlanPickerBody({
@@ -282,7 +348,7 @@ export function SaveToPlanPickerBody({
   isIdea = false,
   inPlan = false,
   planDate = null,
-  planStartsAt = null,
+  source,
 }: SaveToPlanPickerBodyProps) {
   const [view, setView] = React.useState<ModalView>("quick");
   const [selectedSlotId, setSelectedSlotId] = React.useState<string | null>(
@@ -318,8 +384,16 @@ export function SaveToPlanPickerBody({
   const eventPlanDateISO = normalizePlanDateISO(
     scenario.kind === "quickdate" ? scenario.eventPlanDateISO ?? null : null,
   );
-  const eventPlanDateOptions =
-    scenario.kind === "quickdate" ? scenario.eventPlanDateOptions ?? [] : [];
+  const eventPlanDateEndISO = normalizePlanDateISO(
+    scenario.kind === "quickdate" ? scenario.eventPlanDateEndISO ?? null : null,
+  );
+  const eventPlanDateOptions = React.useMemo(() => {
+    if (scenario.kind !== "quickdate") return [];
+    if ((scenario.eventPlanDateOptions?.length ?? 0) > 0) {
+      return scenario.eventPlanDateOptions ?? [];
+    }
+    return buildDateRangeKeys(scenario.eventPlanDateISO, scenario.eventPlanDateEndISO);
+  }, [scenario]);
   const headerTitle =
     view === "calendar"
       ? "Выберите дату"
@@ -341,12 +415,14 @@ export function SaveToPlanPickerBody({
     <div className="flex flex-col">
       <div className="px-5 pt-5 pb-4 border-b border-neutral-100">
         <p className="text-[18px] font-semibold text-neutral-900 text-center leading-snug">{headerTitle}</p>
-        {headerSubtitle && <p className="text-xs text-neutral-500 text-center mt-1 leading-snug">{headerSubtitle}</p>}
+        {scenario.title && (
+          <p className="text-[13px] font-medium text-neutral-800 text-center mt-1.5 leading-snug line-clamp-2">{scenario.title}</p>
+        )}
+        {headerSubtitle && <p className="text-xs text-neutral-500 text-center mt-0.5 leading-snug">{headerSubtitle}</p>}
       </div>
       {isQuickdate ? (
         view === "calendar" ? (
           <CalendarView
-            onBack={() => setView("quick")}
             onSelect={(iso) => {
               setView("quick");
               handlePlan(iso);
@@ -358,8 +434,9 @@ export function SaveToPlanPickerBody({
             isIdea={isIdea}
             inPlan={inPlan}
             planDate={planDate}
-            planStartsAt={planStartsAt}
+            source={source}
             eventPlanDateISO={eventPlanDateISO}
+            eventPlanDateEndISO={eventPlanDateEndISO}
             eventPlanDateOptions={eventPlanDateOptions}
             onPlan={handlePlan}
             onIdea={handleIdea}
@@ -422,6 +499,7 @@ function ModalContent(props: ModalContentProps) {
       inPlan={inPlan}
       planDate={planDate}
       planStartsAt={planStartsAt}
+      source={props.source}
       onCommit={(result) => {
         if (result.action === "plan") {
           toastPlan(result.dateISO);

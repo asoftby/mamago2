@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { requireAdminOrModeratorApiUser } from "@/lib/auth/requireAdminApi";
 
 // Prisma -> только node runtime
 export const runtime = "nodejs";
@@ -73,6 +74,8 @@ async function fetchOverpass(query: string) {
 }
 
 export async function POST(req: Request) {
+  const auth = await requireAdminOrModeratorApiUser();
+  if (auth instanceof NextResponse) return auth;
   try {
     const { cityId, radiusMeters } = (await req.json()) as { cityId?: string; radiusMeters?: number };
     if (!cityId) {

@@ -120,7 +120,7 @@ export async function POST(req: NextRequest) {
     console.error("[temp-media] Upload temp media error:", error);
     console.error("[temp-media] Error stack:", error instanceof Error ? error.stack : "No stack");
     return NextResponse.json(
-      { error: "Internal server error", details: error instanceof Error ? error.message : String(error) },
+      { error: "Internal server error" },
       { status: 500 }
     );
   }

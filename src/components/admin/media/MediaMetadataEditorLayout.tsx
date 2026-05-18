@@ -42,6 +42,7 @@ interface MediaMetadataEditorLayoutProps {
 
 export function MediaMetadataEditorLayout({
   media,
+  mediaId,
   usageContext,
 }: MediaMetadataEditorLayoutProps) {
   return (
@@ -50,7 +51,7 @@ export function MediaMetadataEditorLayout({
       <div className="min-h-[500px] bg-gray-50 flex items-center justify-center p-8">
         {media.kind === "IMAGE" ? (
           <img
-            src={`/api/media/${media.filename}`}
+            src={`/api/media/${mediaId}`}
             alt={media.filename}
             className="max-w-full max-h-[450px] object-contain rounded-lg"
           />

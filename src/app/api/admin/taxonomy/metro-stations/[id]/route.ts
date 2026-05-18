@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { requireAdminOrModeratorApiUser } from "@/lib/auth/requireAdminApi";
 
 export const runtime = "nodejs";
 
@@ -7,6 +8,8 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const auth = await requireAdminOrModeratorApiUser();
+  if (auth instanceof NextResponse) return auth;
   const { id } = await params;
 
   try {
@@ -43,6 +46,8 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const auth = await requireAdminOrModeratorApiUser();
+  if (auth instanceof NextResponse) return auth;
   const { id } = await params;
 
   try {

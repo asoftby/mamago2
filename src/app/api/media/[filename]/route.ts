@@ -1,27 +1,31 @@
 /**
  * Media Proxy Route
- * 
+ *
  * Serves media files with correct Content-Type headers.
- * Fixes issue where .blob files download instead of displaying.
+ * Access: published linkage or authenticated owner/team/admin.
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { readFile } from "fs/promises";
 import { existsSync } from "fs";
 import { prisma } from "@/lib/prisma";
+import { getCurrentUser } from "@/lib/auth/server";
 import {
   resolveLegacyPublicUploadPath,
   resolveStoredMediaPath,
 } from "@/server/media/media-storage";
+import { canServeMediaResponse } from "@/server/media/mediaPublicAccess";
 
 export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ filename: string }> }
+  _request: NextRequest,
+  { params }: { params: Promise<{ filename: string }> },
 ) {
   try {
     const { filename } = await params;
-    
-    // Find media asset by filename
+    if (!filename?.trim()) {
+      return new NextResponse("Not found", { status: 404 });
+    }
+
     const media = await prisma.mediaAsset.findFirst({
       where: {
         OR: [
@@ -36,7 +40,11 @@ export async function GET(
       return new NextResponse("Not found", { status: 404 });
     }
 
-    // Get file path
+    const user = await getCurrentUser();
+    if (!(await canServeMediaResponse(media, user))) {
+      return new NextResponse("Not found", { status: 404 });
+    }
+
     const filepath =
       resolveStoredMediaPath(media.publicUrl) ??
       resolveStoredMediaPath(media.storageKey) ??
@@ -47,15 +55,14 @@ export async function GET(
       return new NextResponse("File not found", { status: 404 });
     }
 
-    // Read file
     const fileBuffer = await readFile(filepath);
 
-    // Return with correct Content-Type
     return new NextResponse(fileBuffer, {
       headers: {
         "Content-Type": media.mimeType || "application/octet-stream",
         "Content-Length": fileBuffer.length.toString(),
         "Cache-Control": "public, max-age=31536000, immutable",
+        "X-Content-Type-Options": "nosniff",
       },
     });
   } catch (error) {

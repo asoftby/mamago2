@@ -9,6 +9,8 @@ import {
   type ContentEditorSurface,
 } from "@/lib/content-editor/types";
 import { loadPlaceForWizard } from "@/lib/content-editor/loadPlaceForWizard";
+import { parsePlaceEditorStepQuery } from "@/lib/business/placeEditorStepQuery";
+import { TOTAL_STEPS } from "@/components/business/wizard/place/config";
 import { buildSurfaceRedirectDestination, resolveSurfaceFromHostAndPathname } from "@/lib/routing/surface";
 import { getCurrentRequestRoutingContext } from "@/lib/routing/requestContext";
 
@@ -23,7 +25,7 @@ export default async function EditorEditPlacePage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ returnTo?: string }>;
+  searchParams: Promise<{ returnTo?: string; step?: string | string[] }>;
 }) {
   const routing = await getCurrentRequestRoutingContext();
   const user = await getCurrentUser();
@@ -39,7 +41,16 @@ export default async function EditorEditPlacePage({
   }
 
   const { id } = await params;
-  const { returnTo } = await searchParams;
+  const sp = await searchParams;
+  const { returnTo } = sp;
+  const stepRaw = Array.isArray(sp.step) ? sp.step[0] : sp.step;
+  const parsedStep = parsePlaceEditorStepQuery(
+    typeof stepRaw === "string" ? stepRaw : null,
+  );
+  const initialEditStep =
+    parsedStep != null && parsedStep >= 1 && parsedStep <= TOTAL_STEPS
+      ? parsedStep
+      : undefined;
 
   const { place, placeForWizard } = await loadPlaceForWizard(id);
 
@@ -95,6 +106,7 @@ export default async function EditorEditPlacePage({
         editorSurface={surface}
         contentEditorNav={nav}
         returnTo={returnTo}
+        initialEditStep={initialEditStep}
       />
     </ContentEditorChrome>
   );

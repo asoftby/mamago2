@@ -11,6 +11,8 @@ import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
 import { PlaceImageKind, MediaEntityType } from "@prisma/client";
 import { attachMediaToEntity } from "@/lib/media/mediaRegistry";
+import { ensureMediaAssetForStoredFileUrl } from "@/lib/media/ensureMediaAssetForStoredFileUrl";
+import { extractMediaRelativePathFromUrl } from "@/server/media/media-storage";
 import { canCreateBusinessContent } from "@/lib/auth/businessContentAccess";
 import { canManagePlaceAsync } from "@/lib/auth/placeAccess";
 
@@ -103,9 +105,24 @@ export async function POST(
 
     // Register usage in media library
     try {
-      const mediaAsset = await prisma.mediaAsset.findUnique({
-        where: { storageKey: url },
+      let mediaAsset = await prisma.mediaAsset.findFirst({
+        where: { OR: [{ storageKey: url }, { publicUrl: url }] },
       });
+
+      if (
+        !mediaAsset &&
+        typeof url === "string" &&
+        extractMediaRelativePathFromUrl(url)
+      ) {
+        mediaAsset = await ensureMediaAssetForStoredFileUrl({
+          publicUrl: url,
+          uploadedById: user.id,
+          userRole: user.role,
+          width: width ?? null,
+          height: height ?? null,
+          originalName: kind === "LOGO" ? "place-logo.webp" : "place-gallery.webp",
+        });
+      }
 
       if (mediaAsset) {
         await attachMediaToEntity({

@@ -30,7 +30,7 @@ export async function POST(
   } catch (error: unknown) {
     console.error("Error deleting media:", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to delete media" },
+      { error: "Internal server error" },
       { status: 500 }
     );
   }

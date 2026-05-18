@@ -3,13 +3,11 @@ import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
 import { hashPassword, verifyPassword } from "@/lib/auth/crypto";
+import { passwordSchema } from "@/lib/auth/passwordPolicy";
 
 const bodySchema = z.object({
   currentPassword: z.string().min(1, "Введите текущий пароль"),
-  newPassword: z
-    .string()
-    .min(8, "Пароль должен содержать минимум 8 символов")
-    .regex(/\d/u, "Пароль должен содержать хотя бы одну цифру"),
+  newPassword: passwordSchema.regex(/\d/u, "Пароль должен содержать хотя бы одну цифру"),
 });
 
 export async function PATCH(request: NextRequest) {

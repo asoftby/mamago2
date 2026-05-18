@@ -2,13 +2,14 @@ import type { NotificationChannel, NotificationType } from "@prisma/client";
 import type { LucideIcon } from "lucide-react";
 import {
   BellRing,
+  CalendarClock,
   Lock,
   Sparkles,
   Target,
 } from "lucide-react";
 
 export const SYSTEM_NOTIFICATION_GUARD_MESSAGE =
-  "Системные уведомления должны быть включены хотя бы в одном канале";
+  "Уведомления аккаунта должны быть включены хотя бы в одном канале";
 
 export type UserNotificationMatrixDefinition = {
   notificationType: NotificationType;
@@ -19,9 +20,15 @@ export type UserNotificationMatrixDefinition = {
 
 export const USER_NOTIFICATION_MATRIX_DEFINITIONS: readonly UserNotificationMatrixDefinition[] = [
   {
+    notificationType: "PLAN_TOMORROW_DIGEST",
+    title: "Завтра в плане",
+    description: "Ежедневный Telegram-digest о событиях на завтра",
+    icon: CalendarClock,
+  },
+  {
     notificationType: "REMINDER",
-    title: "Напоминания",
-    description: "О запланированных событиях",
+    title: "План",
+    description: "Напоминания о событиях и изменениях в вашем плане",
     icon: BellRing,
   },
   {
@@ -38,8 +45,8 @@ export const USER_NOTIFICATION_MATRIX_DEFINITIONS: readonly UserNotificationMatr
   },
   {
     notificationType: "SYSTEM",
-    title: "Системные",
-    description: "Безопасность и важные изменения",
+    title: "Аккаунт",
+    description: "Email, пароль, Telegram и безопасность аккаунта",
     icon: Lock,
   },
 ] as const;

@@ -20,7 +20,9 @@ import { getCurrentUser } from "@/lib/auth/server";
 import { canCreateBusinessContent } from "@/lib/auth/businessContentAccess";
 import { normalizeInstagramUsername } from "@/lib/instagram/extractUsername";
 import { uploadImageFromUrl } from "@/lib/upload/uploadFromUrl";
+import { ensureMediaAssetForStoredFileUrl } from "@/lib/media/ensureMediaAssetForStoredFileUrl";
 import prisma from "@/lib/prisma";
+import type { User } from "@prisma/client";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -290,7 +292,7 @@ export async function POST(request: NextRequest) {
           devLog("Step1 og:image fallback found:", ogUrl);
 
           // Skip Step 2, go directly to download
-          return await downloadAndSave(ogUrl, username, user.id, wizardSessionId);
+          return await downloadAndSave(ogUrl, username, user, wizardSessionId);
         }
 
         devLog("reason 422: INSTAGRAM_AVATAR_UNAVAILABLE (no user_id, no og:image)");
@@ -347,7 +349,7 @@ export async function POST(request: NextRequest) {
     }
 
     // ── Step 3: Download, process, save ──────────────────────────────────────
-    return await downloadAndSave(picUrl, username, user.id, wizardSessionId);
+    return await downloadAndSave(picUrl, username, user, wizardSessionId);
   } catch (error) {
     console.error("[instagram/avatar] Unhandled error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
@@ -359,7 +361,7 @@ export async function POST(request: NextRequest) {
 async function downloadAndSave(
   picUrl: string,
   username: string,
-  userId: string,
+  user: User,
   wizardSessionId: string
 ): Promise<Response> {
   devLog("Downloading image:", picUrl.slice(0, 80) + "…");
@@ -378,10 +380,26 @@ async function downloadAndSave(
     );
   }
 
+  const registered = await ensureMediaAssetForStoredFileUrl({
+    publicUrl: uploadedImage.url,
+    uploadedById: user.id,
+    userRole: user.role,
+    width: uploadedImage.width,
+    height: uploadedImage.height,
+    originalName: `instagram-@${username}.webp`,
+  });
+  if (!registered) {
+    devLog("reason 422: IMAGE_UPLOAD_FAILED (MediaAsset registry)");
+    return err422(
+      "IMAGE_UPLOAD_FAILED",
+      "Не удалось зарегистрировать изображение в медиатеке. Загрузите логотип вручную."
+    );
+  }
+
   // Save to TempMedia
   const tempMedia = await prisma.tempMedia.create({
     data: {
-      ownerUserId: userId,
+      ownerUserId: user.id,
       wizardSessionId,
       url: uploadedImage.url,
       width: uploadedImage.width,

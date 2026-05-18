@@ -31,8 +31,8 @@ export async function POST(
   } catch (error) {
     console.error("[admin/claims/approve] Error:", error);
     return NextResponse.json(
-      { 
-        error: error instanceof Error ? error.message : "Failed to approve claim"
+      {
+        error: "Failed to approve claim"
       },
       { status: 400 }
     );

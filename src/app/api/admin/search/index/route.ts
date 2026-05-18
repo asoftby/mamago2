@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
+import { parsePaginationParams } from "@/lib/api/pagination";
 import type { SearchIndexEntityType, SearchIndexStatus, SearchIndexRecord } from "@prisma/client";
 
 /**
@@ -22,9 +23,7 @@ export async function GET(request: NextRequest) {
     const entityType = searchParams.get("entityType") as SearchIndexEntityType | null;
     const status = searchParams.get("status") as SearchIndexStatus | null;
     const searchable = searchParams.get("searchable");
-    const page = parseInt(searchParams.get("page") || "1");
-    const limit = parseInt(searchParams.get("limit") || "50");
-    const skip = (page - 1) * limit;
+    const { page, limit, skip } = parsePaginationParams(searchParams, { defaultLimit: 50 });
 
     // Build where clause
     const where: Record<string, unknown> = {};

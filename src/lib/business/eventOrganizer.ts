@@ -248,3 +248,68 @@ export async function resolveEventOrganizer(
     organizerSnapshot: asSnapshot(organizer, mode),
   };
 }
+
+function organizerManualImportMatchesRow(
+  row: Pick<Organizer, "name" | "unp" | "phone" | "website" | "instagram">,
+  input: EventOrganizerInput,
+): boolean {
+  if (input.mode === "existing") return false;
+  const name = cleanText(input.name);
+  if (!name) return false;
+  if (row.name.trim().toLowerCase() !== name.toLowerCase()) return false;
+  const unpIn = normalizeUnp(input.unp);
+  if ((row.unp ?? null) !== unpIn) return false;
+  const phoneIn = normalizePhoneToE164(cleanText(input.phone) ?? "");
+  const phoneRow = row.phone ?? "";
+  if (phoneIn !== phoneRow) return false;
+  const websiteIn = normalizeWebsite(input.website);
+  const websiteRow = row.website ?? null;
+  if ((websiteIn ?? null) !== (websiteRow ?? null)) return false;
+  const instIn = normalizeInstagram(input.instagram);
+  const instRow = row.instagram ?? null;
+  if ((instIn ?? null) !== (instRow ?? null)) return false;
+  return true;
+}
+
+/**
+ * PATCH/event save: reuse DB organizer row when input is unchanged to avoid UNP/EGR network calls.
+ */
+export async function resolveEventOrganizerForPatch(
+  prisma: PrismaClient,
+  args: {
+    existingOrganizerId: string | null;
+    organizerInput: EventOrganizerInput | undefined;
+  },
+): Promise<{ organizerId: string | null; organizerSnapshot: OrganizerSnapshot | null }> {
+  const input = args.organizerInput;
+  if (!input || typeof input !== "object") {
+    return { organizerId: args.existingOrganizerId, organizerSnapshot: null };
+  }
+
+  if (input.mode === "existing" && input.organizerId) {
+    if (input.organizerId === args.existingOrganizerId) {
+      const organizer = await prisma.organizer.findUnique({
+        where: { id: input.organizerId },
+      });
+      return {
+        organizerId: organizer?.id ?? null,
+        organizerSnapshot: asSnapshot(organizer, "existing"),
+      };
+    }
+    return resolveEventOrganizer(prisma, input);
+  }
+
+  if (args.existingOrganizerId) {
+    const organizerRow = await prisma.organizer.findUnique({
+      where: { id: args.existingOrganizerId },
+    });
+    if (organizerRow && organizerManualImportMatchesRow(organizerRow, input)) {
+      return {
+        organizerId: organizerRow.id,
+        organizerSnapshot: asSnapshot(organizerRow, input.mode),
+      };
+    }
+  }
+
+  return resolveEventOrganizer(prisma, input);
+}

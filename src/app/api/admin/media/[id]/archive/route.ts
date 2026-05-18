@@ -31,7 +31,7 @@ export async function POST(
   } catch (error: unknown) {
     console.error("Archive media error:", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to archive media" },
+      { error: "Internal server error" },
       { status: 500 }
     );
   }

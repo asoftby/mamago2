@@ -76,7 +76,9 @@ export function RefinementFiltersModal() {
             isOpen ? "opacity-100" : "opacity-0",
           )}
           onClick={() => setIsOpen(false)}
-          aria-hidden
+          aria-hidden="true"
+          // pointer-events-none когда закрыт — не перехватывает клики
+          style={!isOpen ? { pointerEvents: "none" } : undefined}
         />
 
         <div

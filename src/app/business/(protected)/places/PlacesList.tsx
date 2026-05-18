@@ -19,6 +19,7 @@ interface Place {
   moderatorComment: string | null;
   revisionRequestedAt: Date | null;
   archivedAt: Date | null;
+  logoImageId?: string | null;
   city: {
     name: string;
     hasMetro: boolean;
@@ -50,6 +51,7 @@ interface Place {
     revisionRequestedAt: Date | null;
   } | null;
   updatedAt: Date;
+  createdAt: Date;
   linkedEventsCount?: number;
   linkedOffersCount?: number;
 }

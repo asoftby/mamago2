@@ -6,16 +6,16 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { revalidatePath } from "next/cache";
 import { getCurrentUser } from "@/lib/auth/server";
 import { softDeleteActivityById } from "@/lib/activity/softDeleteActivity";
 import { fetchActivityEventRowSummary } from "@/lib/activity/fetchActivityEventRowSummary";
+import { revalidateEventMutationPaths } from "@/lib/business/eventMutationSideEffects";
 import {
   approveActivity,
   needsRevisionActivity,
   rejectActivity,
 } from "@/server/services/moderation.service";
-import { createPublishTimer, runAfterPublishResponse } from "@/server/utils/publishPipeline";
+import { createPublishTimer } from "@/server/utils/publishPipeline";
 
 export async function POST(
   req: NextRequest,
@@ -60,10 +60,9 @@ export async function POST(
       );
     }
 
-    runAfterPublishResponse("publish:event", "admin moderation revalidate", () => {
-      revalidatePath("/admin/moderation/events");
-      revalidatePath("/admin/content/events");
-    });
+    const revalidateScope =
+      action === "APPROVE" ? "moderation-status-change" : "visibility-change";
+    await revalidateEventMutationPaths(id, revalidateScope);
     timer.mark("response");
     timer.log({ action });
     return NextResponse.json({ success: true, action });
@@ -91,14 +90,11 @@ export async function DELETE(
     }
 
     await softDeleteActivityById(id);
-    revalidatePath("/admin/moderation/events");
-    revalidatePath("/admin/content/events");
-    revalidatePath("/admin");
+    await revalidateEventMutationPaths(id, "visibility-change");
 
     return NextResponse.json({ success: true });
   } catch (error: unknown) {
     console.error("[admin] Delete moderation event error:", error);
-    const message = error instanceof Error ? error.message : "Failed to delete event";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

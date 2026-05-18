@@ -27,9 +27,7 @@ export async function GET() {
     
     return NextResponse.json(status);
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Не удалось загрузить статус Telegram";
     console.error("[telegram:status] ERROR:", error);
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: "Не удалось загрузить статус Telegram" }, { status: 500 });
   }
 }

@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth/server";
+import { parsePaginationParams } from "@/lib/api/pagination";
 
 /**
  * GET /api/admin/reviews/moderation
  * Получение отзывов на модерации (status = PENDING)
- * 
+ *
  * Доступ: ADMIN, EDITOR
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
@@ -20,8 +21,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     }
 
     const { searchParams } = new URL(request.url);
-    const limit = parseInt(searchParams.get("limit") || "50");
-    const offset = parseInt(searchParams.get("offset") || "0");
+    const { limit, skip: offset } = parsePaginationParams(searchParams, { defaultLimit: 50 });
 
     // Получить отзывы на модерации (только mamaGo)
     const reviews = await prisma.placeReview.findMany({

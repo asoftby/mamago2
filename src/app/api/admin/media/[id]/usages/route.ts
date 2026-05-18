@@ -27,7 +27,7 @@ export async function GET(
   } catch (error: unknown) {
     console.error("Error fetching media usages:", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to fetch usages" },
+      { error: "Internal server error" },
       { status: 500 }
     );
   }

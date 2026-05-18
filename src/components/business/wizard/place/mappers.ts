@@ -4,6 +4,7 @@ import { getDefaultFormData } from "./defaults";
 import { mapToUIState } from "@/lib/openingHours";
 import type { OpeningHoursWithRelations } from "@/server/services/openingHours/openingHours.types";
 import { normalizeVisitFormats } from "@/hooks/useVisitFormats";
+import { resolvePlaceLogoImage } from "@/lib/place/resolvePlaceLogoImage";
 
 type PlaceWithRelations = Place & {
   images?: PrismaPlaceImage[];
@@ -72,7 +73,7 @@ export function mapPlaceToFormData(
     
     // Step 4: Photos
     logoImageId: place.logoImageId,
-    logoUrl: place.images?.find(img => img.kind === "LOGO")?.url || null,
+    logoUrl: resolvePlaceLogoImage(place.images ?? [], place.logoImageId)?.url ?? null,
     images: place.images ? place.images.map(mapPrismaImageToFormImage) : [],
     
     // Step 5: Opening Hours

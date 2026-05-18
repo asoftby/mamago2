@@ -10,6 +10,33 @@ export async function POST() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // ── Balance guard: запретить удаление, если пользователь — владелец бизнеса с положительным балансом ──
+    const business = await prisma.business.findFirst({
+      where: { ownerUserId: user.id },
+      select: {
+        id: true,
+        billingAccount: {
+          select: {
+            depositBalance: true,
+            status: true,
+          },
+        },
+      },
+    });
+
+    if (business?.billingAccount) {
+      const balance = Number(business.billingAccount.depositBalance);
+      if (balance > 0) {
+        return NextResponse.json(
+          {
+            error:
+              "Нельзя удалить аккаунт с активным балансом бизнеса. Обратитесь в поддержку.",
+          },
+          { status: 409 },
+        );
+      }
+    }
+
     await prisma.$transaction(async (tx) => {
       await tx.user.update({
         where: { id: user.id },

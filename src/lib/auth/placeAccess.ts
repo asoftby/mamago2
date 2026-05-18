@@ -12,11 +12,15 @@ import {
 
 /**
  * Check if user can manage a place
- * 
+ *
  * Rules:
  * - Admin/Moderator: full access to all places
  * - If place has business owner: user must own that business
  * - If place has no business owner: only creator can manage (or admin/moderator)
+ *
+ * @deprecated Use canManagePlaceAsync for any server-side authorization.
+ *             The sync version bypasses business member checks and must not
+ *             be used for access control decisions on the server.
  */
 export function canManagePlace(
   user: { id: string; role: Role },

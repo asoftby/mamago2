@@ -128,7 +128,7 @@ export async function POST(request: NextRequest) {
   } catch (error: unknown) {
     console.error("Credit deposit error:", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to credit deposit" },
+      { error: "Internal server error" },
       { status: 500 }
     );
   }

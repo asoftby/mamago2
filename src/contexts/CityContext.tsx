@@ -33,54 +33,95 @@ function CityProviderInner({ children }: { children: React.ReactNode }) {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { cities } = usePublicCityOptions();
-  const [storedCity, setStoredCity] = useState<string | null>(() => {
-    try {
-      return localStorage.getItem(STORAGE_KEY);
-    } catch {
-      return null;
-    }
-  });
 
+  // 1. Initial city from URL or default (SSR-safe source of truth)
   const cityFromQuery = searchParams.get("city");
-  const resolvedCity = useMemo(
+  const initialResolved = useMemo(
     () =>
       resolveCityContext({
         pathname,
         cityFromQuery,
-        preferredCitySlug: storedCity,
+        preferredCitySlug: null, // Don't use storage on init to avoid hydration flicker
         allowedCitySlugs: cities.map((city) => city.slug),
       }),
-    [pathname, cityFromQuery, storedCity, cities],
+    [pathname, cityFromQuery, cities],
   );
+
+  const [storedCity, setStoredCity] = useState<string | null>(null);
+  const [isInitialized, setIsInitialized] = useState(false);
+
+  // 2. Hydrate storage city on mount
+  useEffect(() => {
+    let nextStoredCity: string | null = null;
+    try {
+      nextStoredCity = localStorage.getItem(STORAGE_KEY);
+    } catch {
+      /* ignore */
+    }
+
+    queueMicrotask(() => {
+      setStoredCity(nextStoredCity);
+      setIsInitialized(true);
+    });
+  }, []);
+
+  const resolvedCity = useMemo(() => {
+    // If we have a city in URL, it ALWAYS wins over storage
+    if (initialResolved.source === "route") {
+      return initialResolved;
+    }
+
+    // If no city in URL, use storage as fallback (only after hydration)
+    if (isInitialized && storedCity) {
+      return resolveCityContext({
+        pathname,
+        cityFromQuery,
+        preferredCitySlug: storedCity,
+        allowedCitySlugs: cities.map((city) => city.slug),
+      });
+    }
+
+    return initialResolved;
+  }, [initialResolved, isInitialized, storedCity, pathname, cityFromQuery, cities]);
 
   const citySlug = resolvedCity.citySlug ?? DEFAULT_CITY_SLUG;
   const cityName = resolvedCity.cityName ?? citySlug;
 
+  // 3. Sync storage with stable city (but NO router.push/refresh here)
   useEffect(() => {
-    if (resolvedCity.source !== "route" || !resolvedCity.citySlug) return;
+    if (!isInitialized || !resolvedCity.citySlug) return;
     if (resolvedCity.citySlug === storedCity) return;
 
+    // Only update storage if it's a route-based city or a default
     try {
       localStorage.setItem(STORAGE_KEY, resolvedCity.citySlug);
     } catch {
       /* ignore */
     }
-    queueMicrotask(() => setStoredCity(resolvedCity.citySlug));
-  }, [resolvedCity, storedCity]);
+    queueMicrotask(() => {
+      setStoredCity(resolvedCity.citySlug);
+    });
+  }, [resolvedCity.citySlug, storedCity, isInitialized]);
 
   useEffect(() => {
-    if (process.env.NODE_ENV !== "production") {
+    if (process.env.NODE_ENV !== "production" && isInitialized) {
       console.debug("[CityContext] city resolved", {
-        pathname,
-        cityFromQuery,
-        storedCity,
-        resolvedCity,
+        source: resolvedCity.source,
+        citySlug,
+        isCityRoute: resolvedCity.isCityRoute,
+        isInitialized,
       });
     }
-  }, [pathname, cityFromQuery, storedCity, resolvedCity]);
+  }, [citySlug, resolvedCity.source, resolvedCity.isCityRoute, isInitialized]);
 
   const setCity = useCallback(
     (slug: string) => {
+      if (slug === citySlug) return;
+
+      if (process.env.NODE_ENV !== "production") {
+        console.debug("[CityContext] user city change", { from: citySlug, to: slug });
+      }
+
       try {
         localStorage.setItem(STORAGE_KEY, slug);
       } catch {
@@ -89,7 +130,7 @@ function CityProviderInner({ children }: { children: React.ReactNode }) {
       setStoredCity(slug);
       router.push(`/${slug}`);
     },
-    [router],
+    [router, citySlug],
   );
 
   const appendCityQuery = useCallback(

@@ -12,13 +12,29 @@ import { assignOfferSlugIfMissing } from "@/lib/slug/offerSlugService";
 import { formatPriceFrom } from "@/lib/formatters/format-price";
 import { ensurePublishedOfferHasSlug } from "@/lib/slug/publishSlugGuards";
 import { createPublishTimer, runAfterPublishResponse } from "@/server/utils/publishPipeline";
+import {
+  campMealKeySchema,
+  campProgramTypeSchema,
+  campSessionEntrySchema,
+} from "@/lib/business/offerCampApiSchemas";
+import { syncOfferMediaUsage } from "@/server/services/media/media-usage.service";
 
 const updateOfferSchema = z.object({
+  selectedPlace: z.object({
+    id: z.string(),
+  }).optional(),
   title: z.string().min(1).optional(),
   shortDescription: z.string().min(1).optional(),
   ageMinMonths: z.number().optional(),
   ageMaxMonths: z.number().optional(),
   coverImage: z.string().optional(),
+  gallery: z.array(z.string()).optional(),
+  /** Видео URL (YouTube, YouTube Shorts, Instagram Reels) */
+  videoUrl: z.string().url().optional(),
+  /** Акционное предложение (текстовое описание скидки и т.д.) */
+  promotionalOffer: z.string().optional(),
+  priceCaption: z.string().optional(),
+  promotionDetails: z.string().optional(),
   pricingMode: z.enum(["SINGLE", "MULTIPLE"]).optional(),
   singlePrice: z.number().optional(),
   singlePriceLabel: z.string().optional(),
@@ -32,8 +48,41 @@ const updateOfferSchema = z.object({
   phone: z.string().optional(),
   website: z.string().optional(),
   bookingInstructions: z.string().optional(),
+  contactSource: z.enum(["manual", "place"]).optional(),
+  contactPhone: z.string().optional(),
+  contactWebsite: z.string().optional(),
+  contactSocialLinks: z.array(
+    z.object({
+      id: z.string().optional(),
+      network: z.enum(["instagram", "telegram", "tiktok", "youtube", "other"]),
+      url: z.string(),
+    }),
+  ).optional(),
   status: z.enum(["DRAFT", "PENDING", "PUBLISHED"]).optional(),
   discoverySignalIds: z.array(z.string()).optional(),
+  classChipSlugs: z.array(z.string()).optional(),
+  campProgramType: campProgramTypeSchema,
+  // Camp fields
+  campSessions: z.array(campSessionEntrySchema).optional(),
+  campSessionDuration: z.string().optional(),
+  campStayDuration: z.string().optional(),
+  campPlacesCount: z.number().optional(),
+  campGroupSize: z.number().optional(),
+  campDaySchedule: z.string().optional(),
+  campCanSelectDays: z.boolean().optional(),
+  campHasExtendedCare: z.boolean().optional(),
+  // Accommodation fields
+  accommodationProvided: z.boolean().optional(),
+  accommodationType: z.string().optional(),
+  accommodationAddress: z.string().optional(),
+  accommodationRooms: z.string().optional(),
+  campIncludedMeals: z.array(campMealKeySchema).optional(),
+  campSafetyInfo: z.string().optional(),
+  campMedicalInfo: z.string().optional(),
+  accommodationConditions: z.string().optional(),
+  mealInfo: z.string().optional(),
+  transferInfo: z.string().optional(),
+  whatToBring: z.string().optional(),
 });
 
 export async function GET(
@@ -56,6 +105,8 @@ export async function GET(
           select: {
             id: true,
             title: true,
+            formattedAddr: true,
+            customAddress: true,
             ownerBusinessId: true,
           },
         },
@@ -81,6 +132,7 @@ export async function GET(
   }
 }
 
+// Re-trigger build for schema updates
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -109,6 +161,7 @@ export async function PATCH(
         title: true,
         priceFrom: true,
         priceText: true,
+        placeId: true,
         place: { select: { ownerBusinessId: true } },
       },
     });
@@ -119,6 +172,23 @@ export async function PATCH(
       !canManageOwnedContent(user, existingOffer.place.ownerBusinessId)
     ) {
       return NextResponse.json({ error: "Offer not found" }, { status: 404 });
+    }
+
+    const updateData: Prisma.OfferUpdateInput = {};
+
+    if (data.selectedPlace?.id) {
+      const nextPlace = await prisma.place.findUnique({
+        where: { id: data.selectedPlace.id },
+        select: { id: true, ownerBusinessId: true },
+      });
+
+      if (!nextPlace || !nextPlace.ownerBusinessId || !canManageOwnedContent(user, nextPlace.ownerBusinessId)) {
+        return NextResponse.json({ error: "Place not found" }, { status: 404 });
+      }
+
+      if (data.selectedPlace.id !== existingOffer.placeId) {
+        updateData.place = { connect: { id: data.selectedPlace.id } };
+      }
     }
 
     // Calculate price fields if pricing data is provided
@@ -132,21 +202,55 @@ export async function PATCH(
       priceFrom = Math.min(...data.pricingOptions.map(p => p.price));
       priceText = formatPriceFrom(priceFrom);
     }
-
-    const updateData: Prisma.OfferUpdateInput = {};
     
     if (data.title !== undefined) updateData.title = data.title;
     if (data.shortDescription !== undefined) updateData.description = data.shortDescription;
     if (data.ageMinMonths !== undefined) updateData.ageMinMonths = data.ageMinMonths;
     if (data.ageMaxMonths !== undefined) updateData.ageMaxMonths = data.ageMaxMonths;
     if (data.coverImage !== undefined) updateData.coverImage = data.coverImage;
+    if (data.gallery !== undefined) updateData.galleryImages = data.gallery;
+    if (data.videoUrl !== undefined) updateData.videoUrl = data.videoUrl;
+    if (data.priceCaption !== undefined) updateData.priceCaption = data.priceCaption;
+    if (data.promotionDetails !== undefined) updateData.promotionDetails = data.promotionDetails;
+    if (data.promotionalOffer !== undefined) updateData.promotionalOffer = data.promotionalOffer;
     if (data.discoverySignalIds !== undefined) updateData.discoverySignalIds = data.discoverySignalIds;
+    if (data.classChipSlugs !== undefined) updateData.classChipSlugs = data.classChipSlugs;
+    if (data.contactSource !== undefined) updateData.contactSource = data.contactSource;
+    if (data.contactPhone !== undefined) updateData.contactPhone = data.contactPhone;
+    if (data.contactWebsite !== undefined) updateData.contactWebsite = data.contactWebsite;
+    if (data.contactSocialLinks !== undefined)
+      updateData.contactSocialLinks = data.contactSocialLinks as unknown as Prisma.InputJsonValue;
+    if (data.campProgramType !== undefined) updateData.campProgramType = data.campProgramType;
     if (data.status !== undefined) {
       updateData.status = data.status;
       if (data.status === "PUBLISHED") {
         updateData.publishedAt = new Date();
       }
     }
+    
+    // Camp fields
+    if (data.campSessions !== undefined)
+      updateData.campSessions = data.campSessions as unknown as Prisma.InputJsonValue;
+    if (data.campSessionDuration !== undefined) updateData.campSessionDuration = data.campSessionDuration;
+    if (data.campStayDuration !== undefined) updateData.campStayDuration = data.campStayDuration;
+    if (data.campPlacesCount !== undefined) updateData.campPlacesCount = data.campPlacesCount;
+    if (data.campGroupSize !== undefined) updateData.campGroupSize = data.campGroupSize;
+    if (data.campDaySchedule !== undefined) updateData.campDaySchedule = data.campDaySchedule;
+    if (data.campCanSelectDays !== undefined) updateData.campCanSelectDays = data.campCanSelectDays;
+    if (data.campHasExtendedCare !== undefined) updateData.campHasExtendedCare = data.campHasExtendedCare;
+    
+    // Accommodation fields
+    if (data.accommodationProvided !== undefined) updateData.accommodationProvided = data.accommodationProvided;
+    if (data.accommodationType !== undefined) updateData.accommodationType = data.accommodationType;
+    if (data.accommodationAddress !== undefined) updateData.accommodationAddress = data.accommodationAddress;
+    if (data.accommodationRooms !== undefined) updateData.accommodationRooms = data.accommodationRooms;
+    if (data.campIncludedMeals !== undefined) updateData.campIncludedMeals = data.campIncludedMeals;
+    if (data.campSafetyInfo !== undefined) updateData.campSafetyInfo = data.campSafetyInfo;
+    if (data.campMedicalInfo !== undefined) updateData.campMedicalInfo = data.campMedicalInfo;
+    if (data.accommodationConditions !== undefined) updateData.accommodationConditions = data.accommodationConditions;
+    if (data.mealInfo !== undefined) updateData.mealInfo = data.mealInfo;
+    if (data.transferInfo !== undefined) updateData.transferInfo = data.transferInfo;
+    if (data.whatToBring !== undefined) updateData.whatToBring = data.whatToBring;
     
     // Update price fields if they were recalculated
     if (priceFrom !== existingOffer.priceFrom) updateData.priceFrom = priceFrom;
@@ -165,6 +269,8 @@ export async function PATCH(
           select: {
             id: true,
             title: true,
+            formattedAddr: true,
+            customAddress: true,
           },
         },
       },
@@ -185,6 +291,17 @@ export async function PATCH(
         assignOfferSlugIfMissing(offer.id, title),
       );
     }
+
+    // Sync media usage if cover or gallery changed (don't block on errors)
+    const mediaChanged = data.coverImage !== undefined || data.gallery !== undefined;
+    if (mediaChanged) {
+      try {
+        await syncOfferMediaUsage(offer.id);
+      } catch (error) {
+        console.error(`Failed to sync media usage for offer ${offer.id}:`, error);
+      }
+    }
+
     timer.mark("response");
     timer.log({ status: offer.status });
 
@@ -202,7 +319,9 @@ export async function PATCH(
     }
 
     return NextResponse.json(
-      { error: "Internal server error" },
+      {
+        error: "Internal server error",
+      },
       { status: 500 }
     );
   }

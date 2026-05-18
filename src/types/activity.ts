@@ -12,12 +12,15 @@ export interface ActivityMock {
   id: string;
   slug?: string | null;
   citySlug?: string | null;
+  href?: string;
   format?: ActivityFormat | null;
   type: ActivityType;
   discoveryIntent?: Intent;
+  analyticsEntityType?: "EVENT" | "OFFER";
   title: string;
   description: string;
   image: string;
+  coverMediaId?: string | null;
   ageFrom: number;
   ageTo: number;
   priceMin?: number;

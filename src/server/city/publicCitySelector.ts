@@ -22,9 +22,14 @@ function isAdministrativeSlug(slug: string): boolean {
 }
 
 export async function listPublicCitySelectorOptions(): Promise<PublicCitySelectorOption[]> {
+  const totalStart = performance.now();
   const rows = await listAdminCityRows();
+  if (process.env.NODE_ENV === "development") {
+    console.debug(`[publicCitySelector] listAdminCityRows: ${(performance.now() - totalStart).toFixed(0)}ms`);
+  }
 
-  return rows
+  const filterStart = performance.now();
+  const result = rows
     .filter(
       (city) =>
         city.isActive &&
@@ -47,4 +52,9 @@ export async function listPublicCitySelectorOptions(): Promise<PublicCitySelecto
       return a.name.localeCompare(b.name, "ru");
     })
     .map(({ id, slug, name }) => ({ id, slug, name }));
+  if (process.env.NODE_ENV === "development") {
+    console.debug(`[publicCitySelector] filter+sort: ${(performance.now() - filterStart).toFixed(0)}ms`);
+    console.debug(`[publicCitySelector] total: ${(performance.now() - totalStart).toFixed(0)}ms`);
+  }
+  return result;
 }

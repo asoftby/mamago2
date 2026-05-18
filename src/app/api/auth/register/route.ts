@@ -6,10 +6,11 @@ import { sendRegistrationVerificationEmail } from "@/server/auth/email-verificat
 import { hashPassword } from "@/lib/auth/crypto";
 import { createSession, setSessionCookie } from "@/lib/auth/session";
 import { normalizeEmail } from "@/lib/auth/email";
+import { passwordSchema } from "@/lib/auth/passwordPolicy";
 
 const registerSchema = z.object({
   email: z.string().email(),
-  password: z.string().min(8),
+  password: passwordSchema,
 });
 
 export async function POST(request: NextRequest) {
@@ -67,7 +68,8 @@ export async function POST(request: NextRequest) {
       ...(emailResult.verificationEmailSendFailed ? { verificationEmailSendFailed: true } : {}),
     });
 
-    setSessionCookie(response, token);
+    const requestHost = request.headers.get("x-forwarded-host") ?? request.headers.get("host");
+    setSessionCookie(response, token, requestHost ?? undefined);
 
     return response;
   } catch (error) {

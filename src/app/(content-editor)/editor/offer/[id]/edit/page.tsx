@@ -1,6 +1,5 @@
 import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/server";
-import { canCreateBusinessContent } from "@/lib/auth/businessContentAccess";
 import prisma from "@/lib/prisma";
 import { OfferWizard } from "@/components/business/wizard/offer/OfferWizard";
 import { ContentEditorChrome } from "@/components/content-editor/ContentEditorChrome";
@@ -25,7 +24,7 @@ export default async function EditorEditOfferPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ returnTo?: string }>;
+  searchParams: Promise<{ returnTo?: string; step?: string }>;
 }) {
   const routing = await getCurrentRequestRoutingContext();
   const user = await getCurrentUser();
@@ -41,7 +40,11 @@ export default async function EditorEditOfferPage({
   }
 
   const { id } = await params;
-  const { returnTo } = await searchParams;
+  const { returnTo, step: stepParam } = await searchParams;
+  const initialStepNumber =
+    typeof stepParam === "string" && /^\d+$/.test(stepParam.trim())
+      ? parseInt(stepParam.trim(), 10)
+      : undefined;
 
   const { offer, offerForWizard } = await loadOfferForWizard(id);
 
@@ -116,6 +119,7 @@ export default async function EditorEditOfferPage({
         editorSurface={surface}
         contentEditorNav={nav}
         returnTo={returnTo}
+        initialStepNumber={initialStepNumber}
       />
     </ContentEditorChrome>
   );

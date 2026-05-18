@@ -58,9 +58,19 @@ export function useEventEditorDraft(params: {
   }, [params.event?.id, params.mode, params.persistenceKey]);
   const hydratedKeyRef = useRef<string | null>(null);
 
-  const patchDraft = useCallback((updates: Partial<EventFormData>) => {
-    setDraft((prev) => ({ ...prev, ...updates }));
-  }, []);
+  const patchDraft = useCallback(
+    (
+      updates:
+        | Partial<EventFormData>
+        | ((prev: EventFormData) => Partial<EventFormData>),
+    ) => {
+      setDraft((prev) => {
+        const patch = typeof updates === "function" ? updates(prev) : updates;
+        return { ...prev, ...patch };
+      });
+    },
+    [],
+  );
 
   const hydrateFromServer = useCallback((event?: Activity) => {
     setDraft(buildInitialDraft("edit", event));

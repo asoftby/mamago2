@@ -19,6 +19,7 @@ export const runtime = 'nodejs';
 export const maxDuration = 30;
 
 import { getCurrentUser } from "@/lib/auth/server";
+import { validateUploadPreflight } from "@/lib/uploads/validateUploadPreflight";
 import { registerUploadedMedia } from "@/lib/media/mediaRegistry";
 import { MediaSourceType } from "@prisma/client";
 import {
@@ -58,6 +59,12 @@ export async function POST(req: NextRequest) {
       draftEntityId,
       draftEntityType,
     });
+
+    // Preflight validation (before any memory read)
+    const preflightError = validateUploadPreflight(file);
+    if (preflightError) {
+      return preflightError;
+    }
 
     // Convert file to buffer
     const bytes = await file.arrayBuffer();
@@ -167,7 +174,6 @@ export async function POST(req: NextRequest) {
     });
   } catch (error: unknown) {
     console.error("❌ [WIZARD UPLOAD] Error:", error);
-    const message = error instanceof Error ? error.message : "Failed to upload file";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: "Failed to upload file" }, { status: 500 });
   }
 }

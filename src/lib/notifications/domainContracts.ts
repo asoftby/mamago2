@@ -8,6 +8,7 @@ export type NotificationScenario = PrismaNotificationScenario;
 
 export const NOTIFICATION_SCENARIOS = {
   PLAN_EVENT_2H_BEFORE: "PLAN_EVENT_2H_BEFORE",
+  PLAN_TOMORROW_DIGEST: "PLAN_TOMORROW_DIGEST",
 } as const satisfies Record<string, NotificationScenario>;
 
 /**
@@ -33,7 +34,7 @@ export type NotificationChannelPreferenceMatrix = {
   TELEGRAM: boolean;
 };
 
-export type SendNotificationContext = {
+export type PlanEventReminderContext = {
   /**
    * The reminder should be anchored to the user's saved plan row,
    * not to a generic activity schedule.
@@ -45,6 +46,26 @@ export type SendNotificationContext = {
   placeName?: string | null;
   cityName?: string | null;
 };
+
+export type PlanTomorrowDigestItem = {
+  planItemId: string;
+  activityId?: string | null;
+  eventTitle: string;
+  startsAt?: Date | null;
+  placeName?: string | null;
+  cityName?: string | null;
+};
+
+export type PlanTomorrowDigestContext = {
+  digestDate: string;
+  citySlug?: string | null;
+  planItemIds: string[];
+  items: PlanTomorrowDigestItem[];
+};
+
+export type SendNotificationContext =
+  | PlanEventReminderContext
+  | PlanTomorrowDigestContext;
 
 export type SendNotificationInput = {
   scenario: NotificationScenario;

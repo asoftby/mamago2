@@ -6,6 +6,7 @@ import { createSession } from "@/lib/auth/session";
 import { normalizeEmail } from "@/lib/auth/email";
 import type { User } from "@prisma/client";
 import { sendRegistrationVerificationEmail } from "@/server/auth/email-verification";
+import { passwordSchema } from "@/lib/auth/passwordPolicy";
 
 export class AuthError extends Error {
   constructor(
@@ -19,7 +20,7 @@ export class AuthError extends Error {
 
 const registerSchema = z.object({
   email: z.string().email("Некорректный email"),
-  password: z.string().min(6, "Пароль должен содержать минимум 6 символов"),
+  password: passwordSchema,
 });
 
 export type RegisterInput = z.infer<typeof registerSchema>;

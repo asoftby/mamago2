@@ -71,11 +71,31 @@ export default async function PublicationsOffersPage({
                 OR: [{ dateTo: null }, { dateTo: { gte: now } }],
               }),
         },
-        include: {
+        select: {
+          id: true,
+          title: true,
+          kind: true,
+          status: true,
+          description: true,
+          coverImage: true,
+          priceFrom: true,
+          priceText: true,
+          dateFrom: true,
+          dateTo: true,
+          updatedAt: true,
+          createdAt: true,
+          slug: true,
+          campProgramType: true,
+          placeId: true,
           place: {
             select: {
               id: true,
               title: true,
+              city: {
+                select: {
+                  slug: true,
+                },
+              },
             },
           },
         },

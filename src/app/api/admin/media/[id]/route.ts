@@ -37,7 +37,7 @@ export async function PATCH(
   } catch (error: unknown) {
     console.error("Update media error:", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to update media" },
+      { error: "Internal server error" },
       { status: 500 }
     );
   }
@@ -72,7 +72,7 @@ export async function DELETE(
   } catch (error: unknown) {
     console.error("Delete media error:", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to delete media" },
+      { error: "Internal server error" },
       { status: 500 }
     );
   }

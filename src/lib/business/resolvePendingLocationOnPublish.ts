@@ -10,7 +10,8 @@
  * Всё выполняется внутри переданной Prisma-транзакции.
  */
 
-import { Prisma, EventVenueKind, LocationSource, PlaceKind, ContentStatus } from "@prisma/client";import { extractStreetName, normalizePlaceName } from "@/lib/slug/slugUtils";
+import { Prisma, EventVenueKind, LocationSource, PlaceKind, ContentStatus } from "@prisma/client";
+import { extractStreetName, normalizePlaceName } from "@/lib/slug/slugUtils";
 
 export type PendingLocationMode =
   | "EXISTING_PLACE"

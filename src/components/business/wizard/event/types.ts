@@ -7,6 +7,7 @@ import type {
   AgeBucket,
   AgeDetectionConfidence,
 } from "@/lib/age/ageMapping";
+import type { PublicationAccess } from "@/features/publication-access";
 
 export type EventWizardMode = "create" | "edit";
 
@@ -117,6 +118,7 @@ export interface EventFormData {
   pricingMode: "free" | "fixed" | "from";
   price: string;
   priceDetails: string; // Optional details for "from" mode (e.g., different ticket categories)
+  publicationAccess: PublicationAccess | null;
   ticketLink: string;
   /** Как попасть на событие (3 сценария; при загрузке старых данных нормализуется в маппере) */
   participationMode: "external-link" | "time-slots" | "walk-in" | "prebook";

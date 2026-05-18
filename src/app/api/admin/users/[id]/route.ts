@@ -28,7 +28,7 @@ export async function GET(
   } catch (error: unknown) {
     console.error("Error fetching user details:", error);
     
-    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    const errorMessage = error instanceof Error ? error.message : "";
     
     // Handle redirect errors from requireRole
     if (errorMessage.includes("NEXT_REDIRECT")) {
@@ -39,7 +39,7 @@ export async function GET(
     }
     
     return NextResponse.json(
-      { error: errorMessage || "Failed to fetch user details" },
+      { error: "Failed to fetch user details" },
       { status: errorMessage === "User not found" ? 404 : errorMessage === "Insufficient permissions" ? 403 : 500 }
     );
   }

@@ -21,6 +21,8 @@ type DiscoveryActivitiesGridProps = {
   className?: string;
   /** Соотношение обложки `ActivityCard` (по умолчанию 4/5, для «Занятия» — 1/1) */
   coverRatio?: string;
+  emptyTitle?: string;
+  emptyDescription?: string;
 };
 
 function filtersSignature(f: DiscoveryFilters): string {
@@ -50,6 +52,8 @@ export function DiscoveryActivitiesGrid({
   activities,
   className,
   coverRatio,
+  emptyTitle = "Пока нет событий по вашему запросу",
+  emptyDescription = "В этом городе пока нет подходящих опубликованных событий — или стоит ослабить фильтры.",
 }: DiscoveryActivitiesGridProps) {
   const cityCtx = useOptionalCity();
   const citySlug = cityCtx?.citySlug ?? DEFAULT_CITY_SLUG;
@@ -66,27 +70,31 @@ export function DiscoveryActivitiesGrid({
   const renderCard = (activity: (typeof activities)[number]) => (
       <AnalyticsCardViewTracker
         key={activity.id}
-      entityType="EVENT"
-      entityId={activity.id}
-      vertical="CITY"
-      citySlug={citySlug}
-      meta={{ section: "afisha" }}
-    >
+        entityType={activity.analyticsEntityType ?? "EVENT"}
+        entityId={activity.id}
+        vertical="CITY"
+        citySlug={citySlug}
+        meta={{ section: activity.analyticsEntityType === "OFFER" ? "offers" : "afisha" }}
+      >
       <ActivityCard
         className="mb-0 h-full"
         coverRatio={ratio}
         variant="poster-feed"
         activity={activity}
-        saveMeta={{
-          title: activity.title,
-          dateISO: activity.dateStart ?? null,
-                  dateLabel: activity.dateStart
-                    ? formatRuShortDayMonthRange(
-                        activity.dateStart,
-                        activity.dateEnd ?? null,
-                      )
-                    : null,
-        }}
+        saveMeta={
+          activity.analyticsEntityType === "OFFER"
+            ? undefined
+            : {
+                title: activity.title,
+                dateISO: activity.dateStart ?? null,
+                dateLabel: activity.dateStart
+                  ? formatRuShortDayMonthRange(
+                      activity.dateStart,
+                      activity.dateEnd ?? null,
+                    )
+                  : null,
+              }
+        }
       />
     </AnalyticsCardViewTracker>
   );
@@ -98,10 +106,10 @@ export function DiscoveryActivitiesGrid({
       {showEmpty && (
         <div className="rounded-2xl border border-dashed border-neutral-200 bg-neutral-50/90 px-5 py-12 text-center sm:px-8">
           <p className="text-[15px] font-semibold text-neutral-900">
-            Пока нет событий по вашему запросу
+            {emptyTitle}
           </p>
           <p className="mt-2 text-sm leading-relaxed text-neutral-600">
-            В этом городе пока нет подходящих опубликованных событий — или стоит ослабить фильтры.
+            {emptyDescription}
           </p>
           <Button
             type="button"

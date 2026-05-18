@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { format } from "date-fns";
 import { ru } from "date-fns/locale";
-import { ChevronRight, Loader2, MoreHorizontal } from "lucide-react";
+import { BarChart2, ChevronRight, Loader2, MoreHorizontal } from "lucide-react";
 import { toast } from "@/lib/toast";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -43,6 +43,8 @@ import {
   type PublicationListRow,
 } from "@/lib/publications/domain";
 import { PUBLICATION_STATUS_LABEL, PUBLICATION_TYPE_LABEL } from "@/lib/publications/labels";
+import { PublicationStatsDrawer } from "./PublicationStatsDrawer";
+import type { PublicationStatsDrawerProps } from "./PublicationStatsDrawer";
 
 function matchesTab(row: PublicationListRow, tab: PublicationTabFilter): boolean {
   if (tab === PublicationTabFilter.ALL) return true;
@@ -123,6 +125,9 @@ export function PublicationsIndexClient({
     isDraft: boolean;
   } | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  // Drawer статистики
+  const [statsDrawer, setStatsDrawer] = useState<PublicationStatsDrawerProps["publication"] | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -234,6 +239,24 @@ export function PublicationsIndexClient({
     }
   }, [tab]);
 
+  /** Публичный путь публикации для запроса статистики */
+  function publicationPath(row: PublicationListRow): string {
+    if (row.slug) return `/blog/${row.slug}`;
+    return `/publications/${row.id}`;
+  }
+
+  const openStatsDrawer = (row: PublicationListRow) => {
+    setStatsDrawer({
+      id: row.id,
+      title: row.title,
+      type: row.type,
+      status: row.status,
+      slug: row.slug,
+      path: publicationPath(row),
+      updatedAt: row.updatedAt,
+    });
+  };
+
   const confirmDeleteArticle = async () => {
     if (!deleteTarget) return;
     setDeletingId(deleteTarget.id);
@@ -337,6 +360,15 @@ export function PublicationsIndexClient({
           </p>
         </div>
       </div>
+
+      {/* ── Drawer статистики ── */}
+      {statsDrawer && (
+        <PublicationStatsDrawer
+          open={statsDrawer !== null}
+          onOpenChange={(open) => { if (!open) setStatsDrawer(null); }}
+          publication={statsDrawer}
+        />
+      )}
 
       <AlertDialog
         open={deleteTarget !== null}
@@ -706,6 +738,14 @@ export function PublicationsIndexClient({
                                 </Link>
                               </DropdownMenuItem>
                             ) : null}
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              onClick={() => openStatsDrawer(row)}
+                              className="gap-2"
+                            >
+                              <BarChart2 className="h-4 w-4 text-muted-foreground" />
+                              Статистика
+                            </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
                               disabled={

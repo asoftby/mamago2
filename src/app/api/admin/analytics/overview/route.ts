@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
     }
     console.error("GET /api/admin/analytics/overview:", error);
     return NextResponse.json(
-      { error: msg || "Failed to load overview" },
+      { error: "Failed to load overview" },
       { status: 500 },
     );
   }

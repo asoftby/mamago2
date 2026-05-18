@@ -2,9 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import { OfferStatusBadge } from "./OfferStatusBadge";
-import { Pencil, Archive, ArchiveRestore, Trash2, Tag, MapPin, Calendar, BarChart3, Zap } from "lucide-react";
+import { Pencil, Archive, ArchiveRestore, Trash2, Tag, BarChart3, Zap } from "lucide-react";
 import { OfferStatus, OfferKind } from "@prisma/client";
 import { format } from "date-fns";
 import { ru } from "date-fns/locale";
@@ -13,10 +12,23 @@ import { buildPromotionLaunchHref } from "@/lib/promotion/shared";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { PublicationStatisticsDialog } from "@/components/business/shared/PublicationStatisticsDialog";
+import { BusinessPublicationCard } from "@/components/business/shared/BusinessPublicationCard";
+import {
+  BUSINESS_PUBLICATION_ACTION_BUTTON,
+  BUSINESS_PUBLICATION_ACTION_DANGER_ICON,
+  BUSINESS_PUBLICATION_ACTION_ICON,
+  BUSINESS_PUBLICATION_ACTION_NEUTRAL,
+  BUSINESS_PUBLICATION_ACTION_PROMOTE,
+} from "@/components/business/shared/BusinessPublicationCard";
+import { formatUpdatedAgo } from "@/lib/date/formatUpdatedAgo";
+import { getOfferPublicUrl } from "@/lib/offers/offerPublicUrl";
+import { format as fmtDate } from "date-fns";
 
 interface Offer {
   id: string;
   kind: OfferKind;
+  durationType?: string | null;
+  campProgramType?: string | null;
   title: string;
   description: string | null;
   coverImage: string | null;
@@ -25,11 +37,16 @@ interface Offer {
   status: OfferStatus;
   dateFrom: Date | null;
   dateTo: Date | null;
+  slug: string | null;
   place: {
     id: string;
     title: string;
+    city?: {
+      slug: string;
+    } | null;
   };
   updatedAt: Date;
+  createdAt: Date;
   metrics: {
     views: number;
     saves: number;
@@ -43,6 +60,25 @@ interface OfferCardHorizontalProps {
   onDelete: (id: string) => Promise<void>;
   onArchive?: (id: string) => Promise<void>;
   onUnarchive?: (id: string) => Promise<void>;
+}
+
+function buildOfferSubtitle(offer: Offer): string {
+  const parts: string[] = [offer.place.title];
+  if (offer.dateFrom && offer.dateTo) {
+    parts.push(
+      `${format(new Date(offer.dateFrom), "d MMM", { locale: ru })} — ${format(new Date(offer.dateTo), "d MMM", { locale: ru })}`,
+    );
+  } else if (offer.dateFrom) {
+    parts.push(
+      format(new Date(offer.dateFrom), "d MMM yyyy", { locale: ru }),
+    );
+  }
+  if (offer.priceText) {
+    parts.push(offer.priceText);
+  } else if (offer.priceFrom != null) {
+    parts.push(`от ${offer.priceFrom} BYN`);
+  }
+  return parts.join(" · ");
 }
 
 export function OfferCardHorizontal({
@@ -96,89 +132,61 @@ export function OfferCardHorizontal({
   };
 
   const kindLabel = offer.kind === "EVENT" ? "Мероприятие" : "Услуга";
-  const updatedLabel = new Intl.DateTimeFormat("ru-RU", {
-    day: "numeric",
-    month: "short",
-  }).format(new Date(offer.updatedAt));
-  const actionButtonClass =
-    "inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-2xl px-3.5 text-sm font-medium transition-colors disabled:pointer-events-none disabled:opacity-50";
-  const neutralActionClass =
-    "border border-stone-200 bg-white text-stone-700 hover:border-stone-300 hover:bg-stone-50 hover:text-stone-950";
-  const promoteActionClass =
-    "bg-[#C6FF72] text-stone-950 shadow-[0_8px_22px_rgba(132,204,22,0.22)] hover:bg-[#B8FF65] hover:shadow-[0_10px_28px_rgba(132,204,22,0.32)]";
-  const ghostIconActionClass =
-    "h-10 w-10 rounded-2xl text-stone-500 hover:bg-stone-100 hover:text-stone-900";
+  const updatedLine = formatUpdatedAgo(offer.updatedAt, offer.createdAt);
+  const createdLine = `Создано: ${fmtDate(new Date(offer.createdAt), "d MMMM yyyy", { locale: ru })}`;
+  /** Для Next/Image: внешние URL как есть; /api/media через img в карточке */
+  const offerImageForCard = offer.coverImage;
+
+  const citySlug = offer.place.city?.slug;
+  const publicOfferHref = (offer.status === "PUBLISHED" && citySlug && offer.slug)
+    ? getOfferPublicUrl(offer, citySlug)
+    : undefined;
+
+  const cardMetrics = {
+    views: offer.metrics.views,
+    saves: offer.metrics.saves,
+    planAdds: offer.metrics.planAdds,
+    ctaClicks: offer.metrics.ctaClicks,
+  };
+
+  const tip = offer.status === "PUBLISHED" && offer.metrics.views < 100
+    ? {
+        text: "Продвигайте предложение, чтобы получить больше заявок и увеличить охват.",
+        ctaLabel: "Узнать больше",
+        ctaHref: buildPromotionLaunchHref({ publicationType: "OFFER", publicationId: offer.id }),
+      }
+    : null;
 
   return (
     <>
-    <div className="rounded-[26px] border border-stone-200/90 bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-all hover:border-stone-300 hover:shadow-[0_14px_32px_rgba(15,23,42,0.05)] md:p-5">
-      <div className="flex gap-4">
-        {/* Cover Image */}
-        {offer.coverImage ? (
-          <div className="flex h-24 w-24 flex-shrink-0 overflow-hidden rounded-[22px] bg-stone-100 ring-1 ring-stone-200/70">
-            <Image
-              src={offer.coverImage}
-              alt={offer.title}
-              width={96}
-              height={96}
-              className="h-full w-full object-cover"
-            />
-          </div>
-        ) : (
-          <div className="flex h-24 w-24 flex-shrink-0 items-center justify-center rounded-[22px] bg-stone-100 text-stone-400 ring-1 ring-stone-200/70">
-            <Tag className="w-8 h-8" />
-          </div>
-        )}
-
-        {/* Content */}
-        <div className="flex-1 min-w-0">
-          <div className="mb-3 flex items-start justify-between gap-4">
-            <div className="flex-1">
-              <div className="mb-1 flex items-center gap-2">
-                <h3 className="text-lg font-semibold text-stone-950">
-                  {offer.title}
-                </h3>
-                <BusinessChip tone="muted" size="compact">
-                  {kindLabel}
-                </BusinessChip>
-              </div>
-              {offer.description && (
-                <p className="line-clamp-2 text-sm leading-7 text-stone-600">
-                  {offer.description}
-                </p>
-              )}
-            </div>
-            <OfferStatusBadge status={offer.status} />
-          </div>
-
-          <div className="mb-4 flex flex-wrap items-center gap-3 text-sm text-stone-500">
-            <div className="flex items-center gap-1">
-              <MapPin className="w-4 h-4" />
-              <span>{offer.place.title}</span>
-            </div>
-            {offer.dateFrom && offer.dateTo && (
-              <div className="flex items-center gap-1">
-                <Calendar className="w-4 h-4" />
-                <span>
-                  {format(new Date(offer.dateFrom), "d MMM", { locale: ru })} - {format(new Date(offer.dateTo), "d MMM", { locale: ru })}
-                </span>
-              </div>
-            )}
-            {offer.priceText && (
-              <span>{offer.priceText}</span>
-            )}
-            {offer.priceFrom !== null && !offer.priceText && (
-              <span>от {offer.priceFrom} BYN</span>
-            )}
-            <span>Обновлено {updatedLabel}</span>
-          </div>
-
-          {/* Actions */}
-          <div className="flex gap-2 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-visible">
+      <BusinessPublicationCard
+        type="offer"
+        imageUrl={offerImageForCard}
+        imageAlt={offer.title}
+        placeholderIcon={Tag}
+        title={offer.title}
+        titleHref={publicOfferHref}
+        imageHref={publicOfferHref}
+        typeChip={
+          <BusinessChip tone="muted" size="compact">
+            {kindLabel}
+          </BusinessChip>
+        }
+        subtitle={buildOfferSubtitle(offer)}
+        statusRow={<OfferStatusBadge status={offer.status} />}
+        updatedLine={updatedLine}
+        createdLine={createdLine}
+        metrics={cardMetrics}
+        tip={tip}
+        actions={
+          <>
             <button
               type="button"
               onClick={() => setStatisticsOpen(true)}
-              className={cn(actionButtonClass, neutralActionClass)}
+              className={cn(
+                BUSINESS_PUBLICATION_ACTION_BUTTON,
+                BUSINESS_PUBLICATION_ACTION_NEUTRAL,
+              )}
             >
               <BarChart3 className="h-4 w-4 shrink-0" />
               Статистика
@@ -186,7 +194,10 @@ export function OfferCardHorizontal({
 
             <Link
               href={`/business/offers/${offer.id}/edit`}
-              className={cn(actionButtonClass, neutralActionClass)}
+              className={cn(
+                BUSINESS_PUBLICATION_ACTION_BUTTON,
+                BUSINESS_PUBLICATION_ACTION_NEUTRAL,
+              )}
             >
               <Pencil className="h-4 w-4 shrink-0" />
               Редактировать
@@ -197,62 +208,64 @@ export function OfferCardHorizontal({
                 publicationType: "OFFER",
                 publicationId: offer.id,
               })}
-              className={cn(actionButtonClass, promoteActionClass, "px-4 font-semibold")}
+              className={cn(
+                BUSINESS_PUBLICATION_ACTION_BUTTON,
+                BUSINESS_PUBLICATION_ACTION_PROMOTE,
+              )}
             >
               <Zap className="h-4 w-4 shrink-0 fill-stone-950" />
               Продвигать
             </Link>
 
-            {onArchive && (
+            {onArchive ? (
               <button
                 type="button"
                 onClick={handleArchive}
                 disabled={isArchiving}
-                className={cn(actionButtonClass, ghostIconActionClass)}
+                className={BUSINESS_PUBLICATION_ACTION_ICON}
                 title="В архив"
                 aria-label="В архив"
               >
                 <Archive className="h-4 w-4" />
               </button>
-            )}
+            ) : null}
 
-            {onUnarchive && (
+            {onUnarchive ? (
               <button
                 type="button"
                 onClick={handleUnarchive}
                 disabled={isArchiving}
-                className={cn(actionButtonClass, ghostIconActionClass)}
+                className={BUSINESS_PUBLICATION_ACTION_ICON}
                 title="Восстановить"
                 aria-label="Восстановить"
               >
                 <ArchiveRestore className="h-4 w-4" />
               </button>
-            )}
+            ) : null}
 
-            {offer.status === "DRAFT" && (
+            {offer.status === "DRAFT" ? (
               <Button
                 type="button"
                 variant="ghost"
                 onClick={handleDelete}
                 disabled={isDeleting}
-                className="h-10 w-10 shrink-0 rounded-2xl p-0 text-stone-400 hover:bg-red-50 hover:text-red-600"
+                className={BUSINESS_PUBLICATION_ACTION_DANGER_ICON}
                 title="Удалить"
                 aria-label="Удалить"
               >
                 <Trash2 className="h-4 w-4" />
               </Button>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-    <PublicationStatisticsDialog
-      open={statisticsOpen}
-      onOpenChange={setStatisticsOpen}
-      title={offer.title}
-      entityLabel="предложения"
-      metrics={offer.metrics}
-    />
+            ) : null}
+          </>
+        }
+      />
+      <PublicationStatisticsDialog
+        open={statisticsOpen}
+        onOpenChange={setStatisticsOpen}
+        title={offer.title}
+        entityLabel="предложения"
+        metrics={offer.metrics}
+      />
     </>
   );
 }

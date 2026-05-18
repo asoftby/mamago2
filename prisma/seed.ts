@@ -203,6 +203,45 @@ async function upsertFilter(
   }
 }
 
+async function upsertDiscoveryClassChip(input: {
+  title: string;
+  slug: string;
+  description?: string;
+  icon?: string;
+  sortOrder: number;
+  isDefault?: boolean;
+  signalDefinitionId?: string | null;
+}) {
+  return prisma.discoveryClassChip.upsert({
+    where: { slug: input.slug },
+    update: {
+      title: input.title,
+      description: input.description,
+      icon: input.icon,
+      sortOrder: input.sortOrder,
+      isActive: true,
+      isDefault: input.isDefault ?? false,
+      isSystem: true,
+      entityType: "OFFER",
+      surfaceKey: "CLASSES",
+      signalDefinitionId: input.signalDefinitionId ?? null,
+    },
+    create: {
+      title: input.title,
+      slug: input.slug,
+      description: input.description,
+      icon: input.icon,
+      sortOrder: input.sortOrder,
+      isActive: true,
+      isDefault: input.isDefault ?? false,
+      isSystem: true,
+      entityType: "OFFER",
+      surfaceKey: "CLASSES",
+      signalDefinitionId: input.signalDefinitionId ?? null,
+    },
+  });
+}
+
 async function main() {
   console.log("🌱 Seeding SYSTEM DATA...");
 
@@ -296,6 +335,37 @@ async function main() {
     { value: "6-8",  label: "6–8",  order: 3 },
     { value: "9-12", label: "9–12", order: 4 },
   ]);
+
+  console.log("  → Class chips");
+  const classChipSignalBySlug = new Map<string, string | null>();
+  for (const slug of [
+    "discovery-activity-creative",
+    "discovery-activity-educational",
+    "discovery-feature-vacation",
+  ]) {
+    const signal = await prisma.signalDefinition.findUnique({
+      where: { slug },
+      select: { id: true },
+    });
+    classChipSignalBySlug.set(slug, signal?.id ?? null);
+  }
+
+  const classChips = [
+    { title: "Все", slug: "all", sortOrder: 0, isDefault: true },
+    { title: "Кружки", slug: "clubs", sortOrder: 10 },
+    { title: "Секции", slug: "sections", sortOrder: 20 },
+    { title: "Курсы", slug: "courses", sortOrder: 30, signalDefinitionId: classChipSignalBySlug.get("discovery-activity-educational") ?? null },
+    { title: "Лагеря", slug: "camps", sortOrder: 40, signalDefinitionId: classChipSignalBySlug.get("discovery-feature-vacation") ?? null },
+    { title: "Мастер-классы", slug: "workshops", sortOrder: 50 },
+    { title: "Спорт", slug: "sport", sortOrder: 60 },
+    { title: "Творчество", slug: "creativity", sortOrder: 70, signalDefinitionId: classChipSignalBySlug.get("discovery-activity-creative") ?? null },
+    { title: "Музыка", slug: "music", sortOrder: 80 },
+    { title: "Танцы", slug: "dance", sortOrder: 90 },
+  ] as const;
+
+  for (const chip of classChips) {
+    await upsertDiscoveryClassChip(chip);
+  }
 
   // ── Cities (SYSTEM) ───────────────────────────────────────────────────────
   console.log("  → Cities");

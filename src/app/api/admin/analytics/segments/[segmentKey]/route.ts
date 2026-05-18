@@ -47,7 +47,7 @@ export async function GET(
     }
     console.error("GET /api/admin/analytics/segments/[segmentKey]:", error);
     return NextResponse.json(
-      { error: msg || "Failed to load segment" },
+      { error: "Failed to load segment" },
       { status: 500 },
     );
   }

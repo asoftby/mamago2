@@ -36,6 +36,11 @@ export const SEO_CONTROL_NAV: SeoNavItem[] = [
     description: "JSON-LD и разметка",
   },
   {
+    href: `${SEO_ROOT}/llms-txt`,
+    label: "llms.txt",
+    description: "AI Search Readiness и инструкции для LLM",
+  },
+  {
     href: `${SEO_ROOT}/sitemap`,
     label: "Sitemap",
     description: "Sitemap.xml и robots.txt",

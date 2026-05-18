@@ -81,14 +81,6 @@ export async function POST(request: NextRequest) {
     }
 
     console.error("[AI Category Detection API] Error:", error);
-
-    if (error instanceof Error) {
-      return NextResponse.json(
-        { error: error.message || "Internal server error" },
-        { status: 500 },
-      );
-    }
-
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

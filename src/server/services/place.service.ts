@@ -64,6 +64,7 @@ export async function getBusinessPlaces(
       moderatorComment: true,
       revisionRequestedAt: true,
       archivedAt: true,
+      logoImageId: true,
       city: {
         select: {
           name: true,
@@ -104,6 +105,7 @@ export async function getBusinessPlaces(
         },
       },
       updatedAt: true,
+      createdAt: true,
     },
     orderBy: {
       updatedAt: "desc",

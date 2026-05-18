@@ -50,11 +50,8 @@ export async function POST(
   } catch (error) {
     console.error("[admin/business-verification/reject] Error:", error);
 
-    const errorMessage =
-      error instanceof Error ? error.message : "Внутренняя ошибка сервера";
-
     return NextResponse.json(
-      { ok: false, error: errorMessage },
+      { ok: false, error: "Внутренняя ошибка сервера" },
       { status: 400 }
     );
   }

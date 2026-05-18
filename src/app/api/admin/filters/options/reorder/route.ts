@@ -1,10 +1,13 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { normalizeFilterOptionOrder } from "@/server/admin/normalizeFilterOptionOrder";
+import { requireAdminOrModeratorApiUser } from "@/lib/auth/requireAdminApi";
 
 export const runtime = "nodejs";
 
 export async function POST(req: Request) {
+  const auth = await requireAdminOrModeratorApiUser();
+  if (auth instanceof NextResponse) return auth;
   try {
     const { optionId, direction } = await req.json();
 

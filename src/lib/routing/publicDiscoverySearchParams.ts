@@ -14,6 +14,7 @@ const PUBLIC_DISCOVERY_SEARCH_PARAM_KEYS = new Set([
   "to",
   "preset",
   "intent",
+  "chip",
 ]);
 
 export function stripPublicDiscoverySearchParams(search: string): string {

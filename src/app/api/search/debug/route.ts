@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { SearchEntityType } from "@prisma/client";
 import prisma from "@/lib/prisma";
+import { requireAdminOrModeratorApiUser } from "@/lib/auth/requireAdminApi";
 
 const SEARCH_ENTITY_TYPES: SearchEntityType[] = [
   "activity",
@@ -22,6 +23,13 @@ function parseEntityType(raw: string | null): SearchEntityType | undefined | nul
  * TODO: remove or restrict (e.g. admin + auth) before production hardening.
  */
 export async function GET(req: Request) {
+  const auth = await requireAdminOrModeratorApiUser();
+  if (auth instanceof NextResponse) {
+    return process.env.NODE_ENV === "production"
+      ? NextResponse.json({ error: "Not found" }, { status: 404 })
+      : auth;
+  }
+
   const { searchParams } = new URL(req.url);
   const typeRaw = searchParams.get("type");
   const q = searchParams.get("q")?.trim() ?? "";

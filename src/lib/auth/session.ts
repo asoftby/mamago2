@@ -29,9 +29,13 @@ export async function createSession(userId: string): Promise<string> {
 /**
  * Set session cookie on NextResponse (for Route Handlers)
  * CRITICAL: In Route Handlers, cookies must be set on the response object
+ * 
+ * @param res - NextResponse object to set cookie on
+ * @param token - Session token
+ * @param requestHostname - Optional hostname from request headers for dev host detection
  */
-export function setSessionCookie(res: NextResponse, token: string): void {
-  const cookieOptions = getAuthCookieOptions();
+export function setSessionCookie(res: NextResponse, token: string, requestHostname?: string): void {
+  const cookieOptions = getAuthCookieOptions(requestHostname);
   
   res.cookies.set(SESSION_COOKIE_NAME, token, {
     ...cookieOptions,
@@ -41,10 +45,13 @@ export function setSessionCookie(res: NextResponse, token: string): void {
 
 /**
  * Set session cookie in Server Actions
+ * 
+ * @param token - Session token
+ * @param requestHostname - Optional hostname from request headers for dev host detection
  */
-export async function setSessionCookieAction(token: string): Promise<void> {
+export async function setSessionCookieAction(token: string, requestHostname?: string): Promise<void> {
   const cookieStore = await cookies();
-  const cookieOptions = getAuthCookieOptions();
+  const cookieOptions = getAuthCookieOptions(requestHostname);
   
   cookieStore.set(SESSION_COOKIE_NAME, token, {
     ...cookieOptions,
@@ -62,11 +69,29 @@ export async function getSessionToken(): Promise<string | null> {
 }
 
 /**
- * Delete session cookie in Server Actions
+ * Delete session cookie on NextResponse (for Route Handlers)
+ * CRITICAL: In Route Handlers, cookies must be deleted on the response object
+ * 
+ * @param res - NextResponse object to delete cookie on
+ * @param requestHostname - Optional hostname from request headers for dev host detection
  */
-export async function deleteSessionCookieAction(): Promise<void> {
+export function deleteSessionCookie(res: NextResponse, requestHostname?: string): void {
+  const cookieOptions = getAuthCookieOptions(requestHostname);
+  
+  res.cookies.set(SESSION_COOKIE_NAME, "", {
+    ...cookieOptions,
+    maxAge: 0,
+  });
+}
+
+/**
+ * Delete session cookie in Server Actions
+ * 
+ * @param requestHostname - Optional hostname from request headers for dev host detection
+ */
+export async function deleteSessionCookieAction(requestHostname?: string): Promise<void> {
   const cookieStore = await cookies();
-  const cookieOptions = getAuthCookieOptions();
+  const cookieOptions = getAuthCookieOptions(requestHostname);
   
   // Set cookie with maxAge: 0 to delete it
   cookieStore.set(SESSION_COOKIE_NAME, "", {
@@ -81,12 +106,21 @@ export async function deleteSessionCookieAction(): Promise<void> {
 export async function validateSession(
   token: string
 ): Promise<User | null> {
+  const totalStart = performance.now();
+  const hashStart = performance.now();
   const tokenHash = hashToken(token);
+  if (process.env.NODE_ENV === "development") {
+    console.debug(`[auth] validateSession hashToken: ${(performance.now() - hashStart).toFixed(0)}ms`);
+  }
 
+  const findUniqueStart = performance.now();
   const session = await prisma.session.findUnique({
     where: { tokenHash },
     include: { user: true },
   });
+  if (process.env.NODE_ENV === "development") {
+    console.debug(`[auth] validateSession findUnique: ${(performance.now() - findUniqueStart).toFixed(0)}ms`);
+  }
 
   if (!session) {
     return null;
@@ -94,31 +128,47 @@ export async function validateSession(
 
   // Check if session is expired
   if (session.expiresAt < new Date()) {
+    const deleteStart = performance.now();
     await prisma.session.delete({ where: { id: session.id } });
+    if (process.env.NODE_ENV === "development") {
+      console.debug(`[auth] validateSession deleteExpired: ${(performance.now() - deleteStart).toFixed(0)}ms`);
+    }
     return null;
   }
 
   const user = session.user;
 
   if (user.deletedAt) {
+    const deleteStart = performance.now();
     await prisma.session.delete({ where: { id: session.id } });
+    if (process.env.NODE_ENV === "development") {
+      console.debug(`[auth] validateSession deleteDeleted: ${(performance.now() - deleteStart).toFixed(0)}ms`);
+    }
     return null;
   }
 
   // Check user status
   if (user.status === "BANNED") {
-    // Delete session for banned users
+    const deleteStart = performance.now();
     await prisma.session.delete({ where: { id: session.id } });
+    if (process.env.NODE_ENV === "development") {
+      console.debug(`[auth] validateSession deleteBanned: ${(performance.now() - deleteStart).toFixed(0)}ms`);
+    }
     return null;
   }
 
   if (user.status === "SUSPENDED") {
     if (user.suspendedUntil && user.suspendedUntil > new Date()) {
       // Still suspended
+      const deleteStart = performance.now();
       await prisma.session.delete({ where: { id: session.id } });
+      if (process.env.NODE_ENV === "development") {
+        console.debug(`[auth] validateSession deleteSuspended: ${(performance.now() - deleteStart).toFixed(0)}ms`);
+      }
       return null;
     } else {
       // Suspension expired, auto-unban
+      const updateStart = performance.now();
       await prisma.user.update({
         where: { id: user.id },
         data: {
@@ -127,6 +177,9 @@ export async function validateSession(
           suspendedUntil: null,
         },
       });
+      if (process.env.NODE_ENV === "development") {
+        console.debug(`[auth] validateSession autoUnban: ${(performance.now() - updateStart).toFixed(0)}ms`);
+      }
       user.status = "ACTIVE";
       user.statusReason = null;
       user.suspendedUntil = null;

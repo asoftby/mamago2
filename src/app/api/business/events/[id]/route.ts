@@ -2,13 +2,17 @@ import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
-import { ActivityType, Prisma } from "@prisma/client";
+import { ActivityType, ContentStatus, Prisma } from "@prisma/client";
 import { canCreateBusinessContent } from "@/lib/auth/businessContentAccess";
 import {
   canManageActivityById,
   coalesceActivityBusinessIdFromPlace,
 } from "@/lib/auth/activityAccess";
-import { replaceActivitySessionsFromScheduleJson } from "@/lib/business/syncEventActivitySessions";
+import {
+  replaceActivitySessionsFromScheduleJson,
+  eventSessionScheduleFingerprint,
+  eventSessionFingerprintFromStoredSessions,
+} from "@/lib/business/syncEventActivitySessions";
 import { syncEventVenueAndActivityCity } from "@/lib/business/syncEventVenueFromWizard";
 import { computeEventShortDesc } from "@/lib/business/eventShortDesc";
 import { softDeleteActivityById } from "@/lib/activity/softDeleteActivity";
@@ -16,12 +20,32 @@ import { fetchActivityEventRowSummary } from "@/lib/activity/fetchActivityEventR
 import { assignActivitySlugIfMissing } from "@/lib/slug/activitySlugService";
 import { validateEventProgramCategories } from "@/lib/business/validateEventProgramCategories";
 import { assertBusinessEventPrimaryCategory } from "@/lib/business/validatePrimaryEventCategory";
-import { replaceActivityGalleryFromMediaIds } from "@/lib/business/syncEventGalleryFromMediaIds";
-import { resolveEventOrganizer } from "@/lib/business/eventOrganizer";
+import {
+  activityGalleryMatchesIncomingMediaIds,
+  replaceActivityGalleryFromMediaIds,
+} from "@/lib/business/syncEventGalleryFromMediaIds";
+import { resolveCanonicalEventPublicPathById } from "@/lib/business/resolveCanonicalEventPublicPath";
+import {
+  type EventOrganizerInput,
+  resolveEventOrganizerForPatch,
+} from "@/lib/business/eventOrganizer";
 import { syncActivityOccasions } from "@/lib/business/syncActivityOccasions";
+import {
+  getActivityOccurrenceDebugState,
+  revalidateEventMutationPaths,
+  resolveEventRevalidationTargets,
+  resolveEventPatchRevalidateScope,
+  syncActivityNextOccurrenceAt,
+} from "@/lib/business/eventMutationSideEffects";
+import { stableJsonStringify } from "@/lib/json/stableJsonStringify";
 import { prismaBase } from "@/lib/prisma";
 import { DEFAULT_ACTIVITY_FORMAT, normalizeActivityFormat } from "@/domain/activities/activity-format";
 import { createRequestPerf } from "@/server/utils/requestPerf";
+import { syncActivityMediaUsage } from "@/server/services/media/media-usage.service";
+import {
+  findMediaAssetByReference,
+  normalizeMediaDisplayUrl,
+} from "@/lib/media/resolveMediaAssetReference";
 
 /**
  * GET /api/business/events/[id]
@@ -106,8 +130,7 @@ export async function GET(
     });
   } catch (error: unknown) {
     console.error("Get event error:", error);
-    const message = error instanceof Error ? error.message : "Failed to get event";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: "Failed to get event" }, { status: 500 });
   }
 }
 
@@ -120,8 +143,11 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const perf = createRequestPerf("save-event:route:update");
+  const patchStarted = performance.now();
   try {
     const { id } = await params;
+    perf.mark("parse-params");
+
     const user = await getCurrentUser();
     perf.mark("auth");
 
@@ -133,7 +159,7 @@ export async function PATCH(
     }
 
     const body = await request.json();
-    perf.mark("parse");
+    perf.mark("parse-body");
 
     const summary = await fetchActivityEventRowSummary(id);
     if (!summary || summary.status === "DELETED") {
@@ -149,14 +175,58 @@ export async function PATCH(
         { status: 404 }
       );
     }
+    perf.mark("access-check");
 
     const existing = await prisma.activity.findFirst({
       where: {
         id,
         type: ActivityType.EVENT,
       },
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        businessId: true,
+        cityId: true,
+        nextOccurrenceAt: true,
+        scheduleJson: true,
+        eventCategoryId: true,
+        organizerId: true,
+        coverImageId: true,
+        coverImageUrl: true,
+        placeId: true,
+        status: true,
+        slug: true,
+        format: true,
+        ageTags: true,
+        scheduleMode: true,
+        priceFrom: true,
+        priceTo: true,
+        priceText: true,
+        currency: true,
+        venue: {
+          select: {
+            kind: true,
+            placeId: true,
+            title: true,
+            addressLine: true,
+            cityId: true,
+            note: true,
+          },
+        },
+        occasionLinks: {
+          select: { occasionId: true },
+        },
+        programCategoryLinks: {
+          select: { categoryId: true },
+        },
+        sessions: {
+          orderBy: { startsAt: "asc" },
+          select: { startsAt: true },
+        },
+      },
     });
-    perf.mark("read");
+    perf.mark("fetch-existing");
 
     if (!existing) {
       return NextResponse.json(
@@ -171,10 +241,6 @@ export async function PATCH(
       typeof body.description === "string"
         ? body.description
         : existing.description ?? "";
-    const shortDesc = computeEventShortDesc({
-      title: mergedTitle,
-      fullDescriptionHtml: mergedDescription,
-    });
 
     const mergedPlaceId =
       typeof body.placeId === "string"
@@ -214,22 +280,25 @@ export async function PATCH(
         existing.businessId,
       );
     }
+    perf.mark("place-check");
 
     let nextScheduleJson =
       body.scheduleJson !== undefined
         ? ((body.scheduleJson ?? {}) as Record<string, unknown>)
         : ((existing.scheduleJson ?? {}) as Record<string, unknown>);
-    const organizerResolution =
+
+    const organizerInput =
       body.organizerInput && typeof body.organizerInput === "object"
-        ? await resolveEventOrganizer(prismaBase, body.organizerInput)
-        : {
-            organizerId: existing.organizerId ?? null,
-            organizerSnapshot:
-              nextScheduleJson.organizer && typeof nextScheduleJson.organizer === "object"
-                ? (nextScheduleJson.organizer as Record<string, unknown>)
-                : null,
-          };
-    if (body.organizerInput !== undefined) {
+        ? (body.organizerInput as EventOrganizerInput)
+        : undefined;
+
+    const organizerResolution = await resolveEventOrganizerForPatch(prismaBase, {
+      existingOrganizerId: existing.organizerId ?? null,
+      organizerInput,
+    });
+    perf.mark("organizer-resolve");
+
+    if (organizerInput !== undefined) {
       nextScheduleJson = {
         ...nextScheduleJson,
         ...(organizerResolution.organizerSnapshot
@@ -237,6 +306,7 @@ export async function PATCH(
           : {}),
       };
     }
+
     const nextPrimaryRootCategoryId =
       typeof nextScheduleJson.categoryId === "string" ? nextScheduleJson.categoryId : null;
     const nextPrimaryLeafCategoryId =
@@ -247,114 +317,441 @@ export async function PATCH(
       scheduleJson: nextScheduleJson,
     });
 
+    const effectiveProgramCategoryIds =
+      body.programCategoryIds !== undefined
+        ? body.programCategoryIds
+        : existing.programCategoryLinks.map((l) => l.categoryId);
+
     const { programCategoryIds } = await validateEventProgramCategories({
       primaryRootCategoryId: nextPrimaryRootCategoryId,
       primaryLeafCategoryId: nextPrimaryLeafCategoryId,
-      programCategoryIds: body.programCategoryIds,
+      programCategoryIds: effectiveProgramCategoryIds,
     });
+    perf.mark("validate-program");
+
+    const scheduleJsonDirty =
+      stableJsonStringify(existing.scheduleJson) !== stableJsonStringify(nextScheduleJson);
+    const nextScheduleFingerprint = eventSessionScheduleFingerprint(nextScheduleJson);
+    const activitySessionsNeedResync =
+      eventSessionScheduleFingerprint(existing.scheduleJson) !== nextScheduleFingerprint ||
+      eventSessionFingerprintFromStoredSessions(existing.sessions) !== nextScheduleFingerprint;
+    console.info("[event-patch-timing] schedule-compare", {
+      activityId: existing.id,
+      durationMs: Math.round(performance.now() - patchStarted),
+      scheduleJsonDirty,
+      activitySessionsNeedResync,
+    });
+
+    const normalizeOccasionIds = (value: unknown): string[] =>
+      Array.isArray(value)
+        ? value.filter((item): item is string => typeof item === "string")
+        : [];
+    const nextOccasionIds = normalizeOccasionIds(body.occasionIds);
+    const existingOccasionIds = existing.occasionLinks.map((link) => link.occasionId).sort();
+    const occasionIdsChanged =
+      Array.isArray(body.occasionIds) &&
+      stableJsonStringify([...nextOccasionIds].sort()) !== stableJsonStringify(existingOccasionIds);
+
+    const normalizeVenueForCompare = (
+      venue: unknown,
+      fallbackPlaceId: string | null | undefined,
+    ) => {
+      if (!venue || typeof venue !== "object") {
+        return {
+          kind: null,
+          placeId:
+            typeof fallbackPlaceId === "string" && fallbackPlaceId.trim().length > 0
+              ? fallbackPlaceId.trim()
+              : null,
+          title: null,
+          addressLine: null,
+          cityId: null,
+          note: null,
+        };
+      }
+
+      const row = venue as {
+        kind?: unknown;
+        placeId?: unknown;
+        title?: unknown;
+        addressLine?: unknown;
+        cityId?: unknown;
+        note?: unknown;
+      };
+
+      return {
+        kind: typeof row.kind === "string" ? row.kind : null,
+        placeId:
+          typeof row.placeId === "string" && row.placeId.trim().length > 0
+            ? row.placeId.trim()
+            : typeof fallbackPlaceId === "string" && fallbackPlaceId.trim().length > 0
+              ? fallbackPlaceId.trim()
+              : null,
+        title: typeof row.title === "string" ? row.title : null,
+        addressLine: typeof row.addressLine === "string" ? row.addressLine : null,
+        cityId: typeof row.cityId === "string" ? row.cityId : null,
+        note: typeof row.note === "string" ? row.note : null,
+      };
+    };
+    const venueChanged =
+      body.venue !== undefined || body.placeId !== undefined
+        ? stableJsonStringify(
+            normalizeVenueForCompare(body.venue, mergedPlaceId ?? existing.placeId),
+          ) !==
+          stableJsonStringify(
+            normalizeVenueForCompare(existing.venue, existing.placeId),
+          )
+        : false;
     perf.mark("validate");
 
-    // Update event
-    const event = await prisma.activity.update({
-      where: {
-        id,
-      },
-      data: {
-        title: body.title,
-        format:
-          body.format !== undefined
-            ? normalizeActivityFormat(body.format, DEFAULT_ACTIVITY_FORMAT)
-            : undefined,
-        shortDesc,
-        description: body.description,
-        ageTags: body.ageTags,
-        scheduleMode: body.scheduleMode,
-        scheduleJson: nextScheduleJson as Prisma.InputJsonValue,
-        // Event category (leaf: subcategory if selected, otherwise root)
-        eventCategoryId:
-          typeof body.eventCategoryId === "string" ? body.eventCategoryId : undefined,
-        programCategoryLinks: {
-          deleteMany: {},
-          ...(programCategoryIds.length > 0
-            ? {
-                createMany: {
-                  data: programCategoryIds.map((categoryId) => ({ categoryId })),
-                  skipDuplicates: true,
-                },
-              }
-            : {}),
-        },
-        priceFrom: body.priceFrom,
-        priceTo: body.priceTo,
-        priceText: body.priceText,
-        currency: body.currency,
-        coverImageId: body.coverImageId,
-        organizerId: organizerResolution.organizerId,
-        ...(mergedPlaceId !== undefined ? { placeId: mergedPlaceId } : {}),
-        ...(nextBusinessId !== undefined ? { businessId: nextBusinessId } : {}),
-      },
-    });
-    perf.mark("write");
+    const existingProgramSorted = existing.programCategoryLinks
+      .map((l) => l.categoryId)
+      .sort();
+    const nextProgramSorted = [...programCategoryIds].sort();
+    const programCategoriesChanged =
+      stableJsonStringify(existingProgramSorted) !== stableJsonStringify(nextProgramSorted);
 
-    // Auto-assign slug only on first meaningful title fill (idempotent).
-    if (typeof mergedTitle === "string" && mergedTitle.trim()) {
-      await assignActivitySlugIfMissing(event.id, mergedTitle.trim());
+    const updateData: Prisma.ActivityUncheckedUpdateInput = {};
+
+    const coverImageRef =
+      typeof body.coverImageId === "string" ? body.coverImageId : null;
+    const resolvedCoverAsset =
+      body.coverImageId !== undefined ? await findMediaAssetByReference(coverImageRef) : null;
+    const resolvedCoverImageId =
+      body.coverImageId !== undefined
+        ? resolvedCoverAsset?.id ?? null
+        : existing.coverImageId;
+    const resolvedCoverImageUrl =
+      body.coverImageId !== undefined
+        ? resolvedCoverAsset?.publicUrl ??
+          normalizeMediaDisplayUrl(coverImageRef) ??
+          null
+        : existing.coverImageUrl;
+
+    if (typeof body.title === "string" && body.title !== existing.title) {
+      updateData.title = body.title;
+    }
+
+    if (
+      typeof body.description === "string" &&
+      body.description !== (existing.description ?? "")
+    ) {
+      updateData.description = body.description;
+    }
+
+    const shortDescNeedsRefresh =
+      (typeof body.title === "string" && body.title !== existing.title) ||
+      (typeof body.description === "string" &&
+        body.description !== (existing.description ?? ""));
+
+    if (shortDescNeedsRefresh) {
+      updateData.shortDesc = computeEventShortDesc({
+        title: mergedTitle ?? "",
+        fullDescriptionHtml: mergedDescription,
+      });
+    }
+
+    if (body.format !== undefined) {
+      const nf = normalizeActivityFormat(body.format, DEFAULT_ACTIVITY_FORMAT);
+      if (nf !== normalizeActivityFormat(existing.format, DEFAULT_ACTIVITY_FORMAT)) {
+        updateData.format = nf;
+      }
+    }
+
+    if (
+      body.ageTags !== undefined &&
+      stableJsonStringify(body.ageTags) !== stableJsonStringify(existing.ageTags)
+    ) {
+      updateData.ageTags = body.ageTags;
+    }
+
+    if (body.scheduleMode !== undefined && body.scheduleMode !== existing.scheduleMode) {
+      updateData.scheduleMode = body.scheduleMode;
+    }
+
+    if (scheduleJsonDirty) {
+      updateData.scheduleJson = nextScheduleJson as Prisma.InputJsonValue;
+    }
+
+    if (
+      typeof body.eventCategoryId === "string" &&
+      body.eventCategoryId !== existing.eventCategoryId
+    ) {
+      updateData.eventCategoryId = body.eventCategoryId;
+    }
+
+    if (programCategoriesChanged) {
+      updateData.programCategoryLinks = {
+        deleteMany: {},
+        ...(programCategoryIds.length > 0
+          ? {
+              createMany: {
+                data: programCategoryIds.map((categoryId) => ({ categoryId })),
+                skipDuplicates: true,
+              },
+            }
+          : {}),
+      };
+    }
+
+    if (body.priceFrom !== undefined && body.priceFrom !== existing.priceFrom) {
+      updateData.priceFrom = body.priceFrom;
+    }
+    if (body.priceTo !== undefined && body.priceTo !== existing.priceTo) {
+      updateData.priceTo = body.priceTo;
+    }
+    if (body.priceText !== undefined && body.priceText !== (existing.priceText ?? "")) {
+      updateData.priceText = body.priceText;
+    }
+    if (body.currency !== undefined && body.currency !== existing.currency) {
+      updateData.currency = body.currency;
+    }
+
+    if (body.coverImageId !== undefined && resolvedCoverImageId !== existing.coverImageId) {
+      updateData.coverImageId = resolvedCoverImageId;
+    }
+    if (body.coverImageId !== undefined && resolvedCoverImageUrl !== existing.coverImageUrl) {
+      updateData.coverImageUrl = resolvedCoverImageUrl;
+    }
+
+    if (organizerResolution.organizerId !== existing.organizerId) {
+      updateData.organizerId = organizerResolution.organizerId;
+    }
+
+    if (mergedPlaceId !== undefined && mergedPlaceId !== existing.placeId) {
+      updateData.placeId = mergedPlaceId;
+    }
+
+    if (nextBusinessId !== undefined && nextBusinessId !== existing.businessId) {
+      updateData.businessId = nextBusinessId;
+    }
+
+    let saved: {
+      id: string;
+      title: string | null;
+      status: ContentStatus;
+      slug: string | null;
+      coverImageId: string | null;
+    };
+
+    const hasPrismaWrites = Object.keys(updateData).length > 0;
+
+    if (hasPrismaWrites) {
+      const activityUpdateStarted = performance.now();
+      saved = await prisma.activity.update({
+        where: { id },
+        data: updateData,
+        select: {
+          id: true,
+          title: true,
+          status: true,
+          slug: true,
+          coverImageId: true,
+        },
+      });
+      console.info("[event-patch-timing] activity-update", {
+        activityId: id,
+        durationMs: Math.round(performance.now() - activityUpdateStarted),
+        hasPrismaWrites,
+      });
+    } else {
+      saved = {
+        id: existing.id,
+        title: existing.title,
+        status: existing.status,
+        slug: existing.slug,
+        coverImageId: existing.coverImageId,
+      };
+    }
+    perf.mark("prisma-update");
+
+    let slugTouched = false;
+    if (!existing.slug?.trim() && typeof mergedTitle === "string" && mergedTitle.trim()) {
+      await assignActivitySlugIfMissing(saved.id, mergedTitle.trim());
+      slugTouched = true;
     }
     perf.mark("slug");
 
-    const slugRow = await prisma.activity.findUnique({
-      where: { id: event.id },
-      select: { slug: true },
-    });
+    const slugRow = slugTouched
+      ? await prisma.activity.findUnique({
+          where: { id: saved.id },
+          select: { slug: true },
+        })
+      : { slug: saved.slug };
 
-    if (body.scheduleJson !== undefined) {
-      await replaceActivitySessionsFromScheduleJson(event.id, nextScheduleJson);
+    const revalidationTargetsBeforeVenueSync =
+      venueChanged ? await resolveEventRevalidationTargets(saved.id) : null;
+
+    if (activitySessionsNeedResync) {
+      const beforeSyncState = await getActivityOccurrenceDebugState(saved.id);
+      console.info("[event-patch-debug] before sync", {
+        activityId: saved.id,
+        status: saved.status,
+        previousNextOccurrenceAt: existing.nextOccurrenceAt,
+        beforeSyncState,
+      });
+
+      const sessionsSyncStarted = performance.now();
+      await replaceActivitySessionsFromScheduleJson(saved.id, nextScheduleJson);
+      perf.mark("schedule-sync");
+      console.info("[event-patch-timing] activity-sessions-sync", {
+        activityId: saved.id,
+        durationMs: Math.round(performance.now() - sessionsSyncStarted),
+      });
+      const nextOccurrenceSyncStarted = performance.now();
+      const syncedNextOccurrenceAt = await syncActivityNextOccurrenceAt(saved.id);
+      console.info("[event-patch-timing] next-occurrence-sync", {
+        activityId: saved.id,
+        durationMs: Math.round(performance.now() - nextOccurrenceSyncStarted),
+        syncedNextOccurrenceAt,
+      });
+      const afterSyncState = await getActivityOccurrenceDebugState(saved.id);
+      console.info("[event-patch-debug] after sync", {
+        activityId: saved.id,
+        syncedNextOccurrenceAt,
+        afterSyncState,
+      });
+    } else {
+      perf.mark("schedule-sync");
     }
 
+    let galleryTouched = false;
     if (body.galleryMediaIds !== undefined) {
-      await replaceActivityGalleryFromMediaIds(
-        event.id,
-        Array.isArray(body.galleryMediaIds)
-          ? body.galleryMediaIds.filter((mediaId: unknown): mediaId is string => typeof mediaId === "string")
-          : [],
-        typeof body.coverImageId === "string" ? body.coverImageId : event.coverImageId,
+      const incomingGallery = Array.isArray(body.galleryMediaIds)
+        ? body.galleryMediaIds.filter(
+            (mediaId: unknown): mediaId is string => typeof mediaId === "string",
+          )
+        : [];
+      const coverForGallery =
+        body.coverImageId !== undefined ? resolvedCoverImageId : saved.coverImageId;
+      const galleryUnchanged = await activityGalleryMatchesIncomingMediaIds(
+        saved.id,
+        incomingGallery,
+        coverForGallery,
       );
+      if (!galleryUnchanged) {
+        await replaceActivityGalleryFromMediaIds(saved.id, incomingGallery, coverForGallery);
+        galleryTouched = true;
+      }
+      perf.mark("gallery-sync");
+    } else {
+      perf.mark("gallery-sync");
     }
 
-    if (body.venue !== undefined) {
-      await syncEventVenueAndActivityCity(
-        event.id,
-        body.venue,
-        mergedPlaceId,
-      );
-    } else if (body.placeId !== undefined) {
-      await syncEventVenueAndActivityCity(event.id, null, body.placeId);
+    let venueSynced = false;
+    if (venueChanged && body.venue !== undefined) {
+      await syncEventVenueAndActivityCity(saved.id, body.venue, mergedPlaceId);
+      venueSynced = true;
+    } else if (venueChanged && body.placeId !== undefined) {
+      await syncEventVenueAndActivityCity(saved.id, null, body.placeId);
+      venueSynced = true;
+    }
+    perf.mark("venue-sync");
+
+    const revalidationTargetsAfterVenueSync =
+      venueSynced ? await resolveEventRevalidationTargets(saved.id) : null;
+    const cityChanged =
+      venueSynced &&
+      revalidationTargetsBeforeVenueSync?.citySlug !== revalidationTargetsAfterVenueSync?.citySlug;
+
+    let occasionsTouched = false;
+    if (occasionIdsChanged) {
+      await syncActivityOccasions(saved.id, nextOccasionIds);
+      occasionsTouched = true;
+    }
+    perf.mark("occasion-sync");
+
+    const shouldRevalidate =
+      hasPrismaWrites ||
+      slugTouched ||
+      activitySessionsNeedResync ||
+      galleryTouched ||
+      venueSynced ||
+      occasionsTouched;
+
+    const revalidateScope = resolveEventPatchRevalidateScope({
+      currentStatus: summary.status,
+      slugChanged: slugTouched,
+      cityChanged,
+    });
+    let responsePublicPath: string | null = null;
+    if (shouldRevalidate) {
+      const revalidateStarted = performance.now();
+      const rev = await revalidateEventMutationPaths(saved.id, revalidateScope);
+      responsePublicPath = rev.publicPath;
+      console.info("[event-patch-timing] revalidate", {
+        activityId: saved.id,
+        durationMs: Math.round(performance.now() - revalidateStarted),
+        revalidateScope,
+        syncPaths: rev.syncPaths,
+        skippedPaths: rev.skippedPaths,
+        scheduledAsyncPaths: rev.scheduledAsyncPaths,
+        totalRevalidateDurationMs: rev.totalDurationMs,
+      });
+      perf.mark("revalidate");
+    } else {
+      perf.mark("revalidate");
+      if (revalidateScope !== "business-save") {
+        responsePublicPath = await resolveCanonicalEventPublicPathById(saved.id);
+      }
     }
 
-    // Sync occasion links (only when occasionIds is explicitly provided)
-    if (Array.isArray(body.occasionIds)) {
-      const occasionIds = body.occasionIds.filter(
-        (id: unknown): id is string => typeof id === "string",
-      );
-      await syncActivityOccasions(event.id, occasionIds);
-    }
-    perf.mark("sync");
-
-    perf.mark("response");
-    perf.log({ eventId: event.id, status: event.status });
-    return NextResponse.json({
+    const beforeResponseState = await getActivityOccurrenceDebugState(saved.id);
+    const responseSerializationStarted = performance.now();
+    const responsePayload = {
       success: true,
       event: {
-        id: event.id,
-        title: event.title,
-        status: event.status,
+        id: saved.id,
+        title: saved.title,
+        status: saved.status,
         slug: slugRow?.slug ?? null,
+        publicPath: responsePublicPath,
       },
+    };
+    const responseSerializationMs = Math.round(
+      performance.now() - responseSerializationStarted,
+    );
+    console.info("[event-patch-debug] before response", {
+      activityId: saved.id,
+      scheduleJsonDirty,
+      activitySessionsNeedResync,
+      shouldRevalidate,
+      revalidateScope,
+      cityChanged,
+      beforeResponseState,
+      responseSerializationMs,
+      totalPatchMs: Math.round(performance.now() - patchStarted),
     });
+
+    perf.mark("response-sent");
+    perf.log({
+      eventId: saved.id,
+      status: saved.status,
+      revalidateScope,
+      shouldRevalidate,
+      hasPrismaWrites,
+      activitySessionsNeedResync,
+    });
+
+    // Sync media usage if cover or gallery changed (don't block on errors)
+    const mediaChanged = 
+      (body.coverImageId !== undefined &&
+        (resolvedCoverImageId !== existing.coverImageId ||
+          resolvedCoverImageUrl !== existing.coverImageUrl)) ||
+      galleryTouched;
+    
+    if (mediaChanged) {
+      try {
+        await syncActivityMediaUsage(saved.id);
+      } catch (error) {
+        console.error(`Failed to sync media usage for activity ${saved.id}:`, error);
+      }
+    }
+
+    return NextResponse.json(responsePayload);
   } catch (error: unknown) {
     console.error("Update event error:", error);
-    const message = error instanceof Error ? error.message : "Failed to update event";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
 
@@ -392,7 +789,6 @@ export async function DELETE(
     return NextResponse.json({ success: true });
   } catch (error: unknown) {
     console.error("Delete event error:", error);
-    const message = error instanceof Error ? error.message : "Failed to delete event";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

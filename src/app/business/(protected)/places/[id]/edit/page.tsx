@@ -14,10 +14,15 @@ export default async function EditPlacePage({
   const { id } = await params;
   const sp = await searchParams;
   
-  // Add returnTo parameter to redirect back to business places list
-  const returnTo = typeof sp.returnTo === "string" 
-    ? sp.returnTo 
-    : "/business/places";
-  
-  redirect(`/editor/place/${id}/edit?returnTo=${encodeURIComponent(returnTo)}`);
+  const returnTo = typeof sp.returnTo === "string" ? sp.returnTo : "/business/places";
+
+  const qs = new URLSearchParams();
+  qs.set("returnTo", returnTo);
+  const stepRaw = sp.step;
+  const step = Array.isArray(stepRaw) ? stepRaw[0] : stepRaw;
+  if (typeof step === "string" && step.trim()) {
+    qs.set("step", step.trim());
+  }
+
+  redirect(`/editor/place/${id}/edit?${qs.toString()}`);
 }

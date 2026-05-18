@@ -13,6 +13,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import { registerUploadedMedia } from "@/lib/media/mediaRegistry";
 import { MediaSourceType } from "@prisma/client";
+import { validateUploadPreflight } from "@/lib/uploads/validateUploadPreflight";
 import {
   processImage,
   generateProcessedFilename,
@@ -33,6 +34,12 @@ export async function POST(req: NextRequest) {
 
     if (!file) {
       return NextResponse.json({ error: "No file provided" }, { status: 400 });
+    }
+
+    // Preflight validation (before any memory read)
+    const preflightError = validateUploadPreflight(file);
+    if (preflightError) {
+      return preflightError;
     }
 
     // Convert file to buffer
@@ -110,7 +117,6 @@ export async function POST(req: NextRequest) {
     });
   } catch (error: unknown) {
     console.error("Upload error:", error);
-    const message = error instanceof Error ? error.message : "Failed to upload file";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: "Failed to upload file" }, { status: 500 });
   }
 }

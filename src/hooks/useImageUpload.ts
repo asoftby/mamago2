@@ -8,8 +8,12 @@ import { useState, useCallback } from "react";
 import { compressImage, validateImageFile, type CompressedImage } from "@/lib/image/compression";
 
 export interface UploadedImage {
-  id: string; // Temporary ID for UI (will be replaced with DB ID)
+  /** Стабильный id из БД после загрузки; до ответа сервера — временный префикс `temp-`. */
+  id: string;
+  /** Публичный URL для превью (как в ответе `/api/upload`). */
   url: string;
+  /** Id записи MediaAsset из ответа upload, если есть. */
+  mediaId?: string;
   width: number;
   height: number;
   blurhash: string;
@@ -151,9 +155,13 @@ export function useImageUpload(options?: UseImageUploadOptions) {
 
         setProgress(100);
 
+        const serverMediaId =
+          typeof uploadData.mediaId === "string" && uploadData.mediaId ? uploadData.mediaId : undefined;
+
         const uploadedImage: UploadedImage = {
-          id: `temp-${Date.now()}`, // Temporary ID
+          id: serverMediaId ?? `temp-${Date.now()}`,
           url: uploadData.url,
+          mediaId: serverMediaId,
           width: uploadData.width || imageWidth,
           height: uploadData.height || imageHeight,
           blurhash: blurhash,

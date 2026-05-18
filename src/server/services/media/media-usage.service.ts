@@ -7,6 +7,10 @@
 
 import { prisma } from "@/lib/prisma";
 import { MediaEntityType } from "@prisma/client";
+import {
+  findMediaAssetByReference,
+  normalizeMediaDisplayUrl,
+} from "@/lib/media/resolveMediaAssetReference";
 
 function mediaUsageDedupKey(u: {
   entityType: MediaEntityType;
@@ -295,4 +299,614 @@ export async function countMediaUsages(mediaId: string) {
   return prisma.mediaUsage.count({
     where: { mediaId },
   });
+}
+
+type ActivityUsageRecord = {
+  mediaId: string;
+  field: string;
+};
+
+export async function collectMediaUsagesForActivity(activityId: string): Promise<{
+  mediaIds: string[];
+  usageRecords: ActivityUsageRecord[];
+}> {
+  const activity = await prisma.activity.findUnique({
+    where: { id: activityId },
+    include: {
+      images: {
+        orderBy: { sortOrder: "asc" },
+      },
+    },
+  });
+
+  if (!activity) {
+    throw new Error(`Activity ${activityId} not found`);
+  }
+
+  const mediaIds = new Set<string>();
+  const usageRecords: ActivityUsageRecord[] = [];
+
+  const coverAsset =
+    (await findMediaAssetByReference(activity.coverImageId)) ??
+    (await findMediaAssetByReference(activity.coverImageUrl));
+
+  if (coverAsset) {
+    mediaIds.add(coverAsset.id);
+    usageRecords.push({
+      mediaId: coverAsset.id,
+      field: activity.coverImageId === coverAsset.id ? "coverImageId" : "coverImageUrl",
+    });
+  }
+
+  for (const image of activity.images) {
+    if (image.mediaAssetId) {
+      mediaIds.add(image.mediaAssetId);
+      usageRecords.push({
+        mediaId: image.mediaAssetId,
+        field: "galleryMediaAssetId",
+      });
+      continue;
+    }
+
+    const galleryAsset = await findMediaAssetByReference(image.url);
+    if (galleryAsset) {
+      mediaIds.add(galleryAsset.id);
+      usageRecords.push({
+        mediaId: galleryAsset.id,
+        field: "galleryImageUrl",
+      });
+    }
+  }
+
+  return { mediaIds: Array.from(mediaIds), usageRecords };
+}
+
+/**
+ * Sync media usage for an Activity (Event)
+ * Collects all media references and updates MediaUsage records
+ */
+export async function syncActivityMediaUsage(activityId: string) {
+  const { mediaIds, usageRecords } = await collectMediaUsagesForActivity(activityId);
+
+  // Remove old usage records for this activity
+  await prisma.mediaUsage.deleteMany({
+    where: {
+      entityType: MediaEntityType.EVENT,
+      entityId: activityId,
+    },
+  });
+
+  // Create new usage records (deduplicated by field)
+  const seen = new Set<string>();
+  for (const record of usageRecords) {
+    const key = `${record.mediaId}:${record.field}`;
+    if (!seen.has(key)) {
+      await prisma.mediaUsage.create({
+        data: {
+          mediaId: record.mediaId,
+          entityType: MediaEntityType.EVENT,
+          entityId: activityId,
+          field: record.field,
+        },
+      });
+      seen.add(key);
+    }
+  }
+
+  return { mediaIds, usageCount: usageRecords.length };
+}
+
+export async function backfillActivityMediaIdsFromUrls(options?: {
+  activityIds?: string[];
+  targetMediaId?: string;
+}) {
+  const startedAt = Date.now();
+  const scannedWhere =
+    options?.activityIds && options.activityIds.length > 0
+      ? { id: { in: options.activityIds } }
+      : undefined;
+
+  const activities = await prisma.activity.findMany({
+    where: scannedWhere,
+    select: {
+      id: true,
+      coverImageId: true,
+      coverImageUrl: true,
+      images: {
+        select: {
+          id: true,
+          url: true,
+          mediaAssetId: true,
+        },
+      },
+    },
+  });
+
+  const targetMedia =
+    options?.targetMediaId
+      ? await prisma.mediaAsset.findUnique({
+          where: { id: options.targetMediaId },
+          select: {
+            id: true,
+            publicUrl: true,
+            filename: true,
+            originalName: true,
+          },
+        })
+      : null;
+
+  const targetRefs = new Set(
+    [
+      targetMedia?.id,
+      targetMedia?.publicUrl,
+      targetMedia?.filename,
+      targetMedia?.originalName,
+    ].filter((value): value is string => Boolean(value)),
+  );
+
+  let linkedActivities = 0;
+  let notFound = 0;
+  const touchedActivityIds = new Set<string>();
+  const updatedMediaAssets = new Set<string>();
+
+  for (const activity of activities) {
+    let touched = false;
+    let missingForActivity = false;
+
+    const resolvedCoverAsset =
+      (await findMediaAssetByReference(activity.coverImageId)) ??
+      (await findMediaAssetByReference(activity.coverImageUrl));
+
+    const shouldTouchCover =
+      !targetMedia ||
+      (resolvedCoverAsset && resolvedCoverAsset.id === targetMedia.id) ||
+      (activity.coverImageId && targetRefs.has(activity.coverImageId)) ||
+      (activity.coverImageUrl && targetRefs.has(activity.coverImageUrl));
+
+    if (shouldTouchCover) {
+      if (resolvedCoverAsset) {
+        const activityPatch: {
+          coverImageId?: string | null;
+          coverImageUrl?: string | null;
+        } = {};
+
+        if (activity.coverImageId !== resolvedCoverAsset.id) {
+          activityPatch.coverImageId = resolvedCoverAsset.id;
+        }
+        if (resolvedCoverAsset.publicUrl && activity.coverImageUrl !== resolvedCoverAsset.publicUrl) {
+          activityPatch.coverImageUrl = resolvedCoverAsset.publicUrl;
+        }
+
+        if (Object.keys(activityPatch).length > 0) {
+          await prisma.activity.update({
+            where: { id: activity.id },
+            data: activityPatch,
+          });
+          touched = true;
+          updatedMediaAssets.add(resolvedCoverAsset.id);
+        }
+      } else if (activity.coverImageId || activity.coverImageUrl) {
+        missingForActivity = true;
+      }
+    }
+
+    for (const image of activity.images) {
+      const shouldTouchImage =
+        !targetMedia ||
+        image.mediaAssetId === targetMedia.id ||
+        targetRefs.has(image.url);
+      if (!shouldTouchImage || image.mediaAssetId) continue;
+
+      const resolvedImageAsset = await findMediaAssetByReference(image.url);
+      if (!resolvedImageAsset) {
+        if (image.url) missingForActivity = true;
+        continue;
+      }
+
+      await prisma.activityImage.update({
+        where: { id: image.id },
+        data: {
+          mediaAssetId: resolvedImageAsset.id,
+          url: resolvedImageAsset.publicUrl ?? normalizeMediaDisplayUrl(image.url) ?? image.url,
+        },
+      });
+      touched = true;
+      updatedMediaAssets.add(resolvedImageAsset.id);
+    }
+
+    if (touched) {
+      linkedActivities++;
+      touchedActivityIds.add(activity.id);
+    }
+    if (missingForActivity) {
+      notFound++;
+    }
+  }
+
+  for (const activityId of touchedActivityIds) {
+    await syncActivityMediaUsage(activityId);
+  }
+
+  return {
+    scannedActivities: activities.length,
+    linkedActivities,
+    notFound,
+    updatedMediaAssets: updatedMediaAssets.size,
+    durationMs: Date.now() - startedAt,
+    syncedActivities: touchedActivityIds.size,
+  };
+}
+
+export async function recomputeMediaUsageForAsset(mediaId: string) {
+  const backfill = await backfillActivityMediaIdsFromUrls({ targetMediaId: mediaId });
+
+  const media = await prisma.mediaAsset.findUnique({
+    where: { id: mediaId },
+    select: { publicUrl: true, filename: true, originalName: true },
+  });
+
+  const refs = [
+    mediaId,
+    media?.publicUrl ?? null,
+    media?.filename ?? null,
+    media?.originalName ?? null,
+  ].filter((value): value is string => Boolean(value));
+
+  const activities = await prisma.activity.findMany({
+    where: {
+      OR: [
+        { coverImageId: { in: refs } },
+        ...(media?.publicUrl ? [{ coverImageUrl: media.publicUrl }] : []),
+        { images: { some: { mediaAssetId: mediaId } } },
+        ...(media?.publicUrl ? [{ images: { some: { url: media.publicUrl } } }] : []),
+      ],
+    },
+    select: { id: true },
+  });
+
+  const activityIds = [...new Set(activities.map((activity) => activity.id))];
+  for (const activityId of activityIds) {
+    await syncActivityMediaUsage(activityId);
+  }
+
+  return {
+    mediaId,
+    activityIds,
+    backfill,
+    usageCount: await prisma.mediaUsage.count({ where: { mediaId } }),
+  };
+}
+
+/**
+ * Sync media usage for a Place
+ * Collects all media references and updates MediaUsage records
+ */
+export async function syncPlaceMediaUsage(placeId: string) {
+  const place = await prisma.place.findUnique({
+    where: { id: placeId },
+    include: {
+      images: true,
+    },
+  });
+
+  if (!place) {
+    throw new Error(`Place ${placeId} not found`);
+  }
+
+  const mediaIds = new Set<string>();
+  const usageRecords: Array<{ mediaId: string; field: string }> = [];
+
+  // Logo image
+  if (place.logoImageId) {
+    mediaIds.add(place.logoImageId);
+    usageRecords.push({ mediaId: place.logoImageId, field: "logoImageId" });
+  }
+
+  // Gallery images (PlaceImage table with URLs)
+  // TODO: These are stored as URLs in separate table
+  // For now, skip gallery images as they don't have mediaId relations
+
+  // Remove old usage records for this place
+  await prisma.mediaUsage.deleteMany({
+    where: {
+      entityType: MediaEntityType.PLACE,
+      entityId: placeId,
+    },
+  });
+
+  // Create new usage records (deduplicated by field)
+  const seen = new Set<string>();
+  for (const record of usageRecords) {
+    const key = `${record.mediaId}:${record.field}`;
+    if (!seen.has(key)) {
+      await prisma.mediaUsage.create({
+        data: {
+          mediaId: record.mediaId,
+          entityType: MediaEntityType.PLACE,
+          entityId: placeId,
+          field: record.field,
+        },
+      });
+      seen.add(key);
+    }
+  }
+
+  return { mediaIds: Array.from(mediaIds), usageCount: usageRecords.length };
+}
+
+/**
+ * Sync media usage for an Offer
+ * Collects all media references and updates MediaUsage records
+ */
+export async function syncOfferMediaUsage(offerId: string) {
+  const offer = await prisma.offer.findUnique({
+    where: { id: offerId },
+  });
+
+  if (!offer) {
+    throw new Error(`Offer ${offerId} not found`);
+  }
+
+  const mediaIds = new Set<string>();
+  const usageRecords: Array<{ mediaId: string; field: string }> = [];
+
+  // Cover image (stored as URL string)
+  if (offer.coverImage) {
+    const coverAsset = await findMediaAssetByReference(offer.coverImage);
+    if (coverAsset) {
+      mediaIds.add(coverAsset.id);
+      usageRecords.push({ mediaId: coverAsset.id, field: "coverImage" });
+    }
+  }
+
+  // Gallery images (stored as JSON array of URLs)
+  if (offer.galleryImages) {
+    try {
+      const galleryUrls = Array.isArray(offer.galleryImages)
+        ? offer.galleryImages
+        : JSON.parse(offer.galleryImages as string);
+      
+      if (Array.isArray(galleryUrls)) {
+        for (const url of galleryUrls) {
+          if (typeof url === "string") {
+            const galleryAsset = await findMediaAssetByReference(url);
+            if (galleryAsset) {
+              mediaIds.add(galleryAsset.id);
+              usageRecords.push({ mediaId: galleryAsset.id, field: "galleryImages" });
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error(`Error parsing galleryImages for offer ${offerId}:`, error);
+    }
+  }
+
+  // Remove old usage records for this offer
+  await prisma.mediaUsage.deleteMany({
+    where: {
+      entityType: MediaEntityType.OFFER,
+      entityId: offerId,
+    },
+  });
+
+  // Create new usage records (deduplicated by field+mediaId)
+  const seen = new Set<string>();
+  for (const record of usageRecords) {
+    const key = `${record.mediaId}:${record.field}`;
+    if (!seen.has(key)) {
+      await prisma.mediaUsage.create({
+        data: {
+          mediaId: record.mediaId,
+          entityType: MediaEntityType.OFFER,
+          entityId: offerId,
+          field: record.field,
+        },
+      });
+      seen.add(key);
+    }
+  }
+
+  return { mediaIds: Array.from(mediaIds), usageCount: usageRecords.length };
+}
+
+/**
+ * Sync media usage for an Article
+ * Collects all media references and updates MediaUsage records
+ */
+export async function syncArticleMediaUsage(articleId: string) {
+  const article = await prisma.article.findUnique({
+    where: { id: articleId },
+  });
+
+  if (!article) {
+    throw new Error(`Article ${articleId} not found`);
+  }
+
+  const mediaIds = new Set<string>();
+  const usageRecords: Array<{ mediaId: string; field: string }> = [];
+
+  // Cover image (proper relation)
+  if (article.coverImageId) {
+    mediaIds.add(article.coverImageId);
+    usageRecords.push({ mediaId: article.coverImageId, field: "coverImageId" });
+  }
+
+  // SEO image (proper relation)
+  if (article.seoImageId) {
+    mediaIds.add(article.seoImageId);
+    usageRecords.push({ mediaId: article.seoImageId, field: "seoImageId" });
+  }
+
+  // Remove old usage records for this article
+  await prisma.mediaUsage.deleteMany({
+    where: {
+      entityType: MediaEntityType.ARTICLE,
+      entityId: articleId,
+    },
+  });
+
+  // Create new usage records (deduplicated by field)
+  const seen = new Set<string>();
+  for (const record of usageRecords) {
+    const key = `${record.mediaId}:${record.field}`;
+    if (!seen.has(key)) {
+      await prisma.mediaUsage.create({
+        data: {
+          mediaId: record.mediaId,
+          entityType: MediaEntityType.ARTICLE,
+          entityId: articleId,
+          field: record.field,
+        },
+      });
+      seen.add(key);
+    }
+  }
+
+  return { mediaIds: Array.from(mediaIds), usageCount: usageRecords.length };
+}
+
+/**
+ * Recompute usage counts for specific media assets
+ * Updates the denormalized usageCount cache
+ */
+export async function recomputeMediaUsageCounts(mediaIds: string[]) {
+  const results = {
+    total: mediaIds.length,
+    updated: 0,
+    errors: 0,
+  };
+
+  for (const mediaId of mediaIds) {
+    try {
+      await prisma.mediaUsage.count({
+        where: { mediaId },
+      });
+
+      // Note: MediaAsset doesn't have usageCount field in schema
+      // The count is computed from MediaUsage records
+      // This function is kept for future use if usageCount field is added
+      
+      results.updated++;
+    } catch (error) {
+      console.error(`Error recomputing usage count for media ${mediaId}:`, error);
+      results.errors++;
+    }
+  }
+
+  return results;
+}
+
+/**
+ * Recompute all media usage counts
+ * Full recompute for all entities - admin only, safe operation
+ */
+export async function recomputeAllMediaUsageCounts() {
+  const startTime = Date.now();
+
+  const backfill = await backfillActivityMediaIdsFromUrls();
+  
+  // Clear all existing MediaUsage records
+  await prisma.mediaUsage.deleteMany({});
+
+  const stats = {
+    activities: 0,
+    places: 0,
+    offers: 0,
+    articles: 0,
+    errors: 0,
+  };
+
+  // Sync all activities
+  try {
+    const activities = await prisma.activity.findMany({
+      select: { id: true },
+    });
+    
+    for (const activity of activities) {
+      try {
+        await syncActivityMediaUsage(activity.id);
+        stats.activities++;
+      } catch (error) {
+        console.error(`Error syncing activity ${activity.id}:`, error);
+        stats.errors++;
+      }
+    }
+  } catch (error) {
+    console.error("Error fetching activities:", error);
+  }
+
+  // Sync all places
+  try {
+    const places = await prisma.place.findMany({
+      select: { id: true },
+    });
+    
+    for (const place of places) {
+      try {
+        await syncPlaceMediaUsage(place.id);
+        stats.places++;
+      } catch (error) {
+        console.error(`Error syncing place ${place.id}:`, error);
+        stats.errors++;
+      }
+    }
+  } catch (error) {
+    console.error("Error fetching places:", error);
+  }
+
+  // Sync all offers
+  try {
+    const offers = await prisma.offer.findMany({
+      select: { id: true },
+    });
+    
+    for (const offer of offers) {
+      try {
+        await syncOfferMediaUsage(offer.id);
+        stats.offers++;
+      } catch (error) {
+        console.error(`Error syncing offer ${offer.id}:`, error);
+        stats.errors++;
+      }
+    }
+  } catch (error) {
+    console.error("Error fetching offers:", error);
+  }
+
+  // Sync all articles
+  try {
+    const articles = await prisma.article.findMany({
+      select: { id: true },
+    });
+    
+    for (const article of articles) {
+      try {
+        await syncArticleMediaUsage(article.id);
+        stats.articles++;
+      } catch (error) {
+        console.error(`Error syncing article ${article.id}:`, error);
+        stats.errors++;
+      }
+    }
+  } catch (error) {
+    console.error("Error fetching articles:", error);
+  }
+
+  const durationMs = Date.now() - startTime;
+
+  // Get total media assets and zero usage count
+  const totalMediaAssets = await prisma.mediaAsset.count();
+  const mediaWithUsage = await prisma.mediaUsage.groupBy({
+    by: ["mediaId"],
+  });
+  const zeroUsageCount = totalMediaAssets - mediaWithUsage.length;
+
+  return {
+    totalMediaAssets,
+    zeroUsageCount,
+    durationMs,
+    stats,
+    backfill,
+  };
 }

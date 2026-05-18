@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
       const err = error as { code?: string; originalAmount?: number; requestedAmount?: number };
       if (err.code === "REFUND_AMOUNT_EXCEEDS_ORIGINAL") {
         return NextResponse.json(
-          { 
+          {
             error: "Refund amount cannot exceed original transaction amount",
             originalAmount: err.originalAmount,
             requestedAmount: err.requestedAmount,
@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
       }
       
       return NextResponse.json(
-        { error: error.message },
+        { error: "Failed to create refund" },
         { status: 400 }
       );
     }

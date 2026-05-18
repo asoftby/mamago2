@@ -73,7 +73,7 @@ export async function StoriesSection({ cityId, citySlug }: StoriesSectionProps) 
       priceText: true,
       coverImageId: true,
       coverImageUrl: true,
-      images: { select: { id: true, url: true }, orderBy: { sortOrder: "asc" } },
+      images: { select: { id: true, url: true, mediaAssetId: true }, orderBy: { sortOrder: "asc" } },
       nextOccurrenceAt: true,
       sessions: {
         where: { startsAt: { gte: start, lt: end } },

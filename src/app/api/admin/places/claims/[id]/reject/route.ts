@@ -38,8 +38,8 @@ export async function POST(
   } catch (error) {
     console.error("[admin/claims/reject] Error:", error);
     return NextResponse.json(
-      { 
-        error: error instanceof Error ? error.message : "Failed to reject claim"
+      {
+        error: "Failed to reject claim"
       },
       { status: 400 }
     );

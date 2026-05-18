@@ -1,4 +1,5 @@
 import React from "react";
+import { EditorProviders } from "@/components/providers/EditorProviders";
 
 /**
  * Isolated editor shell — no business dashboard sidebar, no site marketing chrome.
@@ -6,6 +7,8 @@ import React from "react";
  */
 export default function ContentEditorGroupLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex min-h-screen flex-col bg-background text-foreground">{children}</div>
+    <EditorProviders>
+      <div className="flex min-h-screen flex-col bg-background text-foreground">{children}</div>
+    </EditorProviders>
   );
 }

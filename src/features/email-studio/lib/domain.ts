@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { randomId } from "@/lib/utils/randomId";
 
 export const EMAIL_TEMPLATE_DOCUMENT_SCHEMA_VERSION = 1 as const;
 
@@ -124,7 +125,7 @@ export type EmailTemplateDocument = z.infer<typeof EmailTemplateDocumentSchema>;
 type BlockIdFactory = () => string;
 
 function defaultBlockIdFactory(): string {
-  return crypto.randomUUID();
+  return randomId();
 }
 
 export function createEmailBlockId(idFactory: BlockIdFactory = defaultBlockIdFactory): string {

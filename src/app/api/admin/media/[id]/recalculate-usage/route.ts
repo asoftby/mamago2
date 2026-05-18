@@ -5,6 +5,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import { recalculateMediaUsageStatus } from "@/server/services/media/media.service";
+import { recomputeMediaUsageForAsset } from "@/server/services/media/media-usage.service";
 
 export async function POST(
   request: NextRequest,
@@ -21,13 +22,18 @@ export async function POST(
     }
 
     const { id } = await params;
+    const recompute = await recomputeMediaUsageForAsset(id);
     const media = await recalculateMediaUsageStatus(id);
 
-    return NextResponse.json(media);
+    return NextResponse.json({
+      success: true,
+      media,
+      recompute,
+    });
   } catch (error: unknown) {
     console.error("Error recalculating media usage:", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to recalculate usage" },
+      { error: "Internal server error" },
       { status: 500 }
     );
   }

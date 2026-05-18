@@ -38,7 +38,7 @@ export function isCityHubPath(pathname: string | null): boolean {
 }
 
 /**
- * Карточка публикации в городе: `/{city}/activity/...`, `/{city}/events/{slug|id}`.
+ * Карточка публикации в городе: `/{city}/activity/...`, `/{city}/events/{slug|id}`, `/{city}/offers/...`.
  * (Витрина `/city/events` без slug — не деталь.)
  * Первый сегмент — любой незарезервированный slug (город из витрины), не только KNOWN_CITY_SLUGS.
  */
@@ -49,7 +49,7 @@ export function isPublicationDetailPath(pathname: string | null): boolean {
   const hub = segments[0];
   if (!hub || isReservedTopLevelSegment(hub)) return false;
   const section = segments[1];
-  return section === "activity" || section === "events";
+  return section === "activity" || section === "events" || section === "offers";
 }
 
 /** Конструктор дня рождения в городе: `/{city}/birthday/make`. */

@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { useHideOnScrollDirection } from "@/hooks/useHideOnScrollDirection";
 import { cn } from "@/lib/utils";
 
@@ -19,6 +20,12 @@ interface MobileBottomBarShellProps {
  * - При скролле вниз плавно уходит вниз (translateY)
  * - При скролле вверх или у верха страницы — возвращается
  * - Не размонтирует children — только transform
+ *
+ * Accessibility:
+ * - При скрытии снимает фокус с любого элемента внутри (blur)
+ * - Использует `inert` вместо `aria-hidden` — это предотвращает
+ *   "Blocked aria-hidden on an element because its descendant retained focus"
+ * - `inert` автоматически блокирует фокус, pointer events и AT
  */
 export function MobileBottomBarShell({
   children,
@@ -27,9 +34,22 @@ export function MobileBottomBarShell({
 }: MobileBottomBarShellProps) {
   const scrollHidden = useHideOnScrollDirection({ threshold: 8, topOffset: 24 });
   const hidden = !disableHide && scrollHidden;
+  const ref = useRef<HTMLDivElement>(null);
+
+  // Снимаем фокус перед скрытием, чтобы не было
+  // "Blocked aria-hidden on an element because its descendant retained focus"
+  useEffect(() => {
+    if (!hidden) return;
+    const el = ref.current;
+    if (!el) return;
+    if (el.contains(document.activeElement) && document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
+  }, [hidden]);
 
   return (
     <div
+      ref={ref}
       className={cn(
         // Только мобилка
         "block lg:hidden",
@@ -45,8 +65,10 @@ export function MobileBottomBarShell({
           : "translate-y-0",
         className,
       )}
-      // Accessibility: скрытый бар недоступен для AT
-      aria-hidden={hidden}
+      // inert блокирует фокус, pointer events и AT для скрытого бара.
+      // Это правильная замена aria-hidden для интерактивных контейнеров:
+      // предотвращает "Blocked aria-hidden on an element because its descendant retained focus"
+      inert={hidden}
     >
       {children}
     </div>

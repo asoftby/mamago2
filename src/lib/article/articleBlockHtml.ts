@@ -1,12 +1,10 @@
 /**
  * Санитизация HTML блоков статьи.
  *
- * НЕ используем isomorphic-dompurify — он тянет jsdom на сервер,
- * а jsdom при инициализации читает .next/browser/default-stylesheet.css
- * которого нет в dev-режиме Next.js 16 + webpack → ENOENT 500.
- *
- * Вместо этого используем sanitize-html (server-safe, без DOM-зависимостей)
- * или встроенную замену на основе allowlist.
+ * Использует легковесный allowlist-санитайзер без зависимостей
+ * (jsdom / DOMPurify), что гарантирует 100 % SSR-безопасность.
+ * Поддерживает фильтрацию тегов/атрибутов по белому списку
+ * и блокировку опасных протоколов (javascript:, data:, vbscript:).
  */
 
 export type ArticleBlockHtmlVariant = "intro" | "text" | "quote";
@@ -49,9 +47,12 @@ export function legacyPlainTextToEditorHtml(text: string): string {
 }
 
 /**
- * Простая allowlist-санитизация без jsdom/DOMPurify.
- * Удаляет все теги кроме разрешённых, фильтрует атрибуты.
- * Достаточно для контента из нашего TipTap-редактора.
+ * Allowlist-санитизация через простой парсинг тегов (без DOMPurify / jsdom).
+ * Удаляет все теги кроме разрешённых, фильтрует атрибуты,
+ * блокирует опасные протоколы (javascript:, data:, vbscript:).
+ *
+ * 100 % SSR-safe — не требует jsdom / DOMPurify.
+ * Сохраняет текстовое содержимое удалённых тегов.
  *
  * Экспортируется для использования в articleEmbedSanitize.ts.
  */
@@ -60,51 +61,108 @@ export function sanitizeHtmlAllowlist(
   allowedTags: string[],
   allowedAttrs: string[],
 ): string {
-  const tagSet = new Set(allowedTags.map((t) => t.toLowerCase()));
-  const attrSet = new Set(allowedAttrs.map((a) => a.toLowerCase()));
+  if (!html) return "";
 
-  // Удаляем script/style/on* полностью включая содержимое
-  let result = html
-    .replace(/<script[\s\S]*?<\/script>/gi, "")
-    .replace(/<style[\s\S]*?<\/style>/gi, "");
+  const allowedTagSet = new Set(allowedTags.map((t) => t.toLowerCase()));
+  const allowedAttrSet = new Set(allowedAttrs.map((a) => a.toLowerCase()));
 
-  // Обрабатываем теги
-  result = result.replace(/<\/?([a-zA-Z][a-zA-Z0-9]*)\b([^>]*)>/g, (match, tagName: string, attrs: string) => {
+  /**
+   * Проверяет, разрешён ли атрибут.
+   * data-* атрибуты всегда разрешены (backward compat с DOMPurify ALLOW_DATA_ATTR).
+   */
+  function isAttrAllowed(name: string): boolean {
+    const lower = name.toLowerCase();
+    return allowedAttrSet.has(lower) || lower.startsWith("data-");
+  }
+
+  /**
+   * Проверяет, что протокол в значении атрибута безопасен.
+   * Блокирует javascript:, data:, vbscript:, file:
+   * Пропускает http(s):, mailto:, tel:, ftp: и схемо-безадресные значения.
+   */
+  function isDangerousProtocol(value: string): boolean {
+    const trimmed = value.trim();
+    // Только если похоже на URI-схему (буквы, цифры, +, -, . и :)
+    if (!/^[a-z][a-z0-9+.-]*:/i.test(trimmed)) return false;
+    return /^(javascript|data|vbscript|file):/i.test(trimmed);
+  }
+
+  // ─── Pre-process: полностью удаляем опасные элементы вместе с содержимым ────
+  // DOMPurify удаляет script, style, template и noscript целиком,
+  // а не только открывающие/закрывающие теги. Повторяем это поведение.
+  const DANGEROUS_TAGS = ["script", "style", "template", "noscript"];
+  let result = html;
+  for (const tag of DANGEROUS_TAGS) {
+    // Удаляем <tag ...>...</tag> целиком
+    result = result.replace(new RegExp(`<${tag}\\b[^>]*>[\\s\\S]*?<\\/${tag}\\s*>`, "gi"), "");
+    // Удаляем самозакрывающиеся варианты <tag ... />
+    result = result.replace(new RegExp(`<${tag}\\b[^>]*\\/>`, "gi"), "");
+  }
+
+  // 1. Блокируем опасные протоколы в href, src, action и formaction
+  result = result.replace(
+    /(\s)(href|src|action|formaction|xlink:href)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/gi,
+    (_, space, attrName, dq, sq, uq) => {
+      const val = (dq ?? sq ?? uq ?? "").trim();
+      if (isDangerousProtocol(val)) {
+        return `${space}${attrName}=""`;
+      }
+      return _;
+    },
+  );
+
+  // 2. Фильтруем теги: удаляем запрещённые, фильтруем атрибуты у разрешённых
+  result = result.replace(/<\/?([a-z][a-z0-9]*)\b([^>]*)>/gi, (full, tagName, rest) => {
     const tag = tagName.toLowerCase();
-    if (!tagSet.has(tag)) {
-      // Запрещённый тег — убираем
+    if (!allowedTagSet.has(tag)) {
+      // Удаляем только тег, но не его содержимое
       return "";
     }
-
-    // Самозакрывающийся или закрывающий тег без атрибутов
-    if (match.startsWith("</")) {
+    // Закрывающий тег — просто нормализуем
+    if (full.startsWith("</")) {
       return `</${tag}>`;
     }
+    // Самозакрывающийся тег (br, hr и т.д. или с />)
+    const isVoid = ["br", "hr", "img", "input", "meta", "link"].includes(tag);
+    const isSelfClose = isVoid || /\s\/>$/.test(full);
 
-    // Фильтруем атрибуты
-    if (attrSet.size === 0) {
-      return `<${tag}>`;
+    // Извлекаем и фильтруем атрибуты
+    const rawAttrs: string[] = [];
+    const attrRe = /([^\s=]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/g;
+    let attrMatch;
+    while ((attrMatch = attrRe.exec(rest)) !== null) {
+      rawAttrs.push(attrMatch[0]);
+    }
+    // Также захватываем булевы атрибуты (без значения)
+    const boolRe = /\s+([a-z][a-z0-9-]*)\b(?=\s|>|$)/gi;
+    while ((attrMatch = boolRe.exec(rest)) !== null) {
+      const bName = attrMatch[1].trim();
+      if (bName && !bName.includes("=")) {
+        rawAttrs.push(bName);
+      }
     }
 
-    const filteredAttrs = attrs.replace(
-      /\s([a-zA-Z][a-zA-Z0-9-]*)(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]*))?/g,
-      (attrMatch, attrName: string) => {
-        const attr = attrName.toLowerCase();
-        if (!attrSet.has(attr)) return "";
-        // Блокируем javascript: в href
-        if (attr === "href") {
-          const valMatch = attrMatch.match(/=\s*["']?([^"'\s>]*)["']?/);
-          if (valMatch) {
-            const val = valMatch[1].trim().toLowerCase().replace(/\s/g, "");
-            if (val.startsWith("javascript:") || val.startsWith("data:")) return "";
-          }
-        }
-        return attrMatch;
-      },
-    );
+    const kept = rawAttrs.filter((a) => {
+      const eqIdx = a.indexOf("=");
+      const name = eqIdx > 0 ? a.slice(0, eqIdx).trim() : a.trim();
+      return isAttrAllowed(name);
+    });
 
-    return `<${tag}${filteredAttrs}>`;
+    const attrStr = kept.length ? ` ${kept.join(" ")}` : "";
+    return isSelfClose ? `<${tag}${attrStr}>` : `<${tag}${attrStr}>`;
   });
+
+  // 3. Гарантируем rel="noopener noreferrer" для target="_blank"
+  result = result.replace(
+    /<a\b([^>]*?)target="_blank"([^>]*)>/gi,
+    (match) => {
+      const withoutRel = match.replace(
+        /\s+rel\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi,
+        "",
+      );
+      return withoutRel.replace(/\s*>$/, ' rel="noopener noreferrer">');
+    },
+  );
 
   return result;
 }

@@ -32,6 +32,7 @@ export default async function MeEventPreviewPage({ params }: PageProps) {
       place: {
         select: {
           id: true,
+          slug: true,
           title: true,
           formattedAddr: true,
           city: { select: { slug: true, name: true } },
@@ -40,7 +41,13 @@ export default async function MeEventPreviewPage({ params }: PageProps) {
       venue: {
         include: {
           place: {
-            select: { title: true, formattedAddr: true },
+            select: {
+              id: true,
+              slug: true,
+              title: true,
+              formattedAddr: true,
+              city: { select: { slug: true } },
+            },
           },
         },
       },

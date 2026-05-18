@@ -2,6 +2,7 @@ import type { SaveToPlanResult } from "@/components/activity/SaveToPlanModal";
 
 export type PersistActivityMeta = {
   activityId: string;
+  offerId?: string;
   title: string;
   coverImageUrl?: string | null;
 };
@@ -32,20 +33,23 @@ export async function persistActivitySave(
   }
 
   if (result.action === "ideas") {
+    const body = meta.offerId
+      ? { offerId: meta.offerId }
+      : { activityId: meta.activityId };
     const res = await fetch("/api/save/idea", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ activityId: meta.activityId }),
+      body: JSON.stringify(body),
     });
     if (!res.ok) throw new Error("idea_save_failed");
     return;
   }
 
   if (result.action === "remove-idea") {
-    const res = await fetch(
-      `/api/save/idea?activityId=${encodeURIComponent(meta.activityId)}`,
-      { method: "DELETE" },
-    );
+    const query = meta.offerId
+      ? `offerId=${encodeURIComponent(meta.offerId)}`
+      : `activityId=${encodeURIComponent(meta.activityId)}`;
+    const res = await fetch(`/api/save/idea?${query}`, { method: "DELETE" });
     if (!res.ok) throw new Error("idea_remove_failed");
   }
 }

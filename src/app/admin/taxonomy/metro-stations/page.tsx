@@ -9,6 +9,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Trash2, Pencil, Plus, Loader2, Download } from "lucide-react";
 import { toast } from "@/lib/toast";
 import { FilterSelect } from "@/components/ui/filter-select";
+import { Badge } from "@/components/ui/badge";
+import { randomId } from "@/lib/utils/randomId";
+
+export const dynamic = "force-dynamic";
 
 type City = {
   id: string;
@@ -94,7 +98,7 @@ export default function MetroStationsPage() {
       lat: "",
       lng: "",
       osmType: "manual",
-      osmId: crypto.randomUUID(), // Generate a unique ID for manual entries
+      osmId: randomId(), // Generate a unique ID for manual entries
     });
     setIsDialogOpen(true);
   };

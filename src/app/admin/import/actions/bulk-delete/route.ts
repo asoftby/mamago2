@@ -1,7 +1,10 @@
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { bulkDeleteImportedRecords } from "../../actions";
+import { requireAdminOrModeratorApiUser } from "@/lib/auth/requireAdminApi";
 
 export async function POST(request: NextRequest) {
+  const auth = await requireAdminOrModeratorApiUser();
+  if (auth instanceof NextResponse) return auth;
   try {
     let importedRecordIds: string[] = [];
     const contentType = request.headers.get("content-type") ?? "";

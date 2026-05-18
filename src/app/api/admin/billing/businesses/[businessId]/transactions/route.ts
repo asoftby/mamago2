@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import { getBillingTransactions } from "@/server/services/billing/billingTransaction.service";
 import { getBillingAccountByBusinessId } from "@/server/services/billing/billingAccount.service";
+import { parsePaginationParams } from "@/lib/api/pagination";
 import { BillingTransactionType, BillingTransactionStatus } from "@prisma/client";
 
 /**
@@ -37,8 +38,7 @@ export async function GET(
     const { searchParams } = new URL(request.url);
     const type = searchParams.get("type") || undefined;
     const status = searchParams.get("status") || undefined;
-    const limit = parseInt(searchParams.get("limit") || "50");
-    const offset = parseInt(searchParams.get("offset") || "0");
+    const { limit, skip: offset } = parsePaginationParams(searchParams, { defaultLimit: 50 });
     const dateFrom = searchParams.get("dateFrom")
       ? new Date(searchParams.get("dateFrom")!)
       : undefined;
@@ -113,7 +113,7 @@ export async function GET(
   } catch (error: unknown) {
     console.error("Get transactions error:", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to get transactions" },
+      { error: "Internal server error" },
       { status: 500 }
     );
   }

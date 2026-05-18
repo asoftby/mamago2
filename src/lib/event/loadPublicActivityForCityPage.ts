@@ -1,7 +1,7 @@
 import { ActivityType, ContentStatus } from "@prisma/client";
 import type { Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
-import { getPublicListingActivityWhere } from "@/server/public/publicContentVisibility";
+import { getPublicActivityDetailWhere } from "@/server/public/publicContentVisibility";
 import { activityInCityWhere } from "@/server/discovery/activityInCityWhere";
 import type { ActivityForEventPageInput } from "@/lib/event/buildEventPageDataFromPrisma";
 import { findActivityBySlug } from "@/lib/slug/activitySlugService";
@@ -42,7 +42,7 @@ export async function loadPublicActivityForCityPage(
   const bySlug = await findActivityBySlug(slugOrId);
   const resolvedId = bySlug?.activityId ?? slugOrId;
 
-  const pub = getPublicListingActivityWhere();
+  const pub = getPublicActivityDetailWhere();
   const pubParts = (pub.AND ?? []) as Prisma.ActivityWhereInput[];
 
   const where: Prisma.ActivityWhereInput = {
@@ -57,11 +57,16 @@ export async function loadPublicActivityForCityPage(
   const activity = await prisma.activity.findFirst({
     where,
     include: {
-      images: { orderBy: { sortOrder: "asc" } },
+      images: {
+        orderBy: { sortOrder: "asc" },
+        select: { id: true, url: true, mediaAssetId: true },
+      },
       sessions: { orderBy: { startsAt: "asc" } },
       // SEO fields are scalar fields on Activity, included automatically.
       place: {
         select: {
+          id: true,
+          slug: true,
           title: true,
           formattedAddr: true,
           city: { select: { slug: true } },
@@ -70,7 +75,13 @@ export async function loadPublicActivityForCityPage(
       venue: {
         include: {
           place: {
-            select: { title: true, formattedAddr: true },
+            select: {
+              id: true,
+              slug: true,
+              title: true,
+              formattedAddr: true,
+              city: { select: { slug: true } },
+            },
           },
         },
       },
@@ -106,16 +117,23 @@ export async function loadPublicActivityForCityPage(
     priceFrom: activity.priceFrom,
     currency: activity.currency,
     priceDetails: activity.priceDetails,
+    scheduleJson: activity.scheduleJson,
     coverImageId: activity.coverImageId,
     coverImageUrl: resolveActivityCoverUrl({
       coverImageId: activity.coverImageId,
       coverImageUrl: activity.coverImageUrl,
-      images: activity.images.map((img) => ({ id: img.id, url: img.url })),
+      images: activity.images.map((img) => ({
+        id: img.id,
+        url: img.url,
+        mediaAssetId: img.mediaAssetId,
+      })),
     }),
     images: activity.images.map((img) => ({ id: img.id, url: img.url })),
     sessions: activity.sessions.map((s) => ({ id: s.id, startsAt: s.startsAt })),
     place: activity.place
       ? {
+          id: activity.place.id,
+          slug: activity.place.slug,
           title: activity.place.title,
           formattedAddr: activity.place.formattedAddr,
           city: activity.place.city,
@@ -128,8 +146,11 @@ export async function loadPublicActivityForCityPage(
           addressLine: activity.venue.addressLine,
           place: activity.venue.place
             ? {
+                id: activity.venue.place.id,
+                slug: activity.venue.place.slug,
                 title: activity.venue.place.title,
                 formattedAddr: activity.venue.place.formattedAddr,
+                city: activity.venue.place.city,
               }
             : null,
         }
