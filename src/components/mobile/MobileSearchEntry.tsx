@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { useDiscoveryFilters } from "@/features/filters/discovery/filters.store";
 import { AGE_GROUPS } from "@/features/filters/age/ageGroups";
 import { useDiscoveryFilterOptions } from "@/features/filters/discovery/filters.api";
+import { useOptionalHeaderDiscoveryFilters } from "@/features/filters/discovery/headerDiscoveryFiltersContext";
 import { DISCOVERY_INTENT_CONFIG } from "@/lib/discovery/discoveryIntentConfig";
 import { Intent } from "@/lib/intent";
 import { IconCompass, IconPalette, IconParty, IconMap } from "@/components/ui/icons";
@@ -54,12 +55,23 @@ export function MobileSearchEntry({
   const { applied } = useDiscoveryFilters();
   const { isAuthenticated } = useAuthMe();
   const family = useFamilyPersona();
-  const { options: apiOptions } = useDiscoveryFilterOptions(citySlug);
+  const headerGeoFilters = useOptionalHeaderDiscoveryFilters();
+  const { options: apiOptions } = useDiscoveryFilterOptions(citySlug, { defer: true });
 
   useEffect(() => {
     const id = window.setTimeout(() => setIsClient(true), 0);
     return () => window.clearTimeout(id);
   }, []);
+
+  useEffect(() => {
+    if (!headerGeoFilters || headerGeoFilters.citySlug !== citySlug) {
+      return;
+    }
+    if (!applied.metro && !applied.district) {
+      return;
+    }
+    void headerGeoFilters.loadGeoFilters();
+  }, [applied.district, applied.metro, citySlug, headerGeoFilters]);
 
   const resolvedIntent: Intent | null =
     currentIntent ?? (cityHubOnly ? null : "kuda");

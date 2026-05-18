@@ -125,7 +125,15 @@ const EMPTY_OPTIONS: DiscoveryFilterOptions = {
  * Client-side hook for fetching filter options
  * Use this in client components
  */
-export function useDiscoveryFilterOptions(citySlug: string | null = "minsk") {
+type UseDiscoveryFilterOptionsConfig = {
+  defer?: boolean;
+};
+
+export function useDiscoveryFilterOptions(
+  citySlug: string | null = "minsk",
+  config: UseDiscoveryFilterOptionsConfig = {},
+) {
+  const { defer = false } = config;
   const headerFilters = useOptionalHeaderDiscoveryFilters();
 
   const matchesHeaderScope =
@@ -153,6 +161,19 @@ export function useDiscoveryFilterOptions(citySlug: string | null = "minsk") {
         }
 
         if (matchesHeaderScope && headerFilters) {
+          if (!headerFilters.hasLoaded && !defer) {
+            await headerFilters.loadGeoFilters();
+          }
+
+          if (!headerFilters.hasLoaded && !headerFilters.loading) {
+            if (mounted) {
+              setOptions(EMPTY_OPTIONS);
+              setLoading(false);
+              setError(headerFilters.error);
+            }
+            return;
+          }
+
           if (headerFilters.loading) {
             if (mounted) setLoading(true);
             return;
@@ -199,7 +220,7 @@ export function useDiscoveryFilterOptions(citySlug: string | null = "minsk") {
     return () => {
       mounted = false;
     };
-  }, [citySlug, matchesHeaderScope, headerFilters]);
+  }, [citySlug, defer, matchesHeaderScope, headerFilters]);
 
   return { options, loading, error };
 }

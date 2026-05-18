@@ -18,6 +18,26 @@ type DistrictRow = { id: string; name: string };
 const metroDistrictCache = new Map<string, MetroDistrictGeoPayload>();
 const metroDistrictInflight = new Map<string, Promise<MetroDistrictGeoPayload>>();
 
+function normalizeCitySlug(citySlug: string | null | undefined): string | null {
+  if (citySlug == null) {
+    return null;
+  }
+
+  const key = citySlug.trim();
+  return key ? key : null;
+}
+
+export function getCachedMetroDistrictFilterOptions(
+  citySlug: string | null | undefined,
+): MetroDistrictGeoPayload | null {
+  const key = normalizeCitySlug(citySlug);
+  if (!key) {
+    return null;
+  }
+
+  return metroDistrictCache.get(key) ?? null;
+}
+
 /**
  * Metro + district lists for discovery filters (public header, sheets, etc.).
  * - Dedupes concurrent callers by citySlug (single shared promise).
@@ -26,11 +46,7 @@ const metroDistrictInflight = new Map<string, Promise<MetroDistrictGeoPayload>>(
 export async function fetchMetroDistrictFilterOptions(
   citySlug: string | null | undefined,
 ): Promise<MetroDistrictGeoPayload> {
-  if (citySlug == null || citySlug === "") {
-    return { metros: [], districts: [] };
-  }
-
-  const key = citySlug.trim();
+  const key = normalizeCitySlug(citySlug);
   if (!key) {
     return { metros: [], districts: [] };
   }

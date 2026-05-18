@@ -9,6 +9,7 @@ import type { DiscoveryFilters } from "@/features/filters/discovery/filters.stor
 import { useDiscoveryFilters } from "@/features/filters/discovery/filters.store";
 import type { FilterOption } from "@/features/filters/discovery/filters.api";
 import { useDiscoveryFilterOptions } from "@/features/filters/discovery/filters.api";
+import { useOptionalHeaderDiscoveryFilters } from "@/features/filters/discovery/headerDiscoveryFiltersContext";
 import { AGE_GROUPS } from "@/features/filters/age/ageGroups";
 import { useChildrenScope } from "@/features/filters/discovery/childrenScope.store";
 import { MAX_ACTIVE_FAMILY_PERSONAS } from "@/lib/family/wholeFamilyPreset";
@@ -91,7 +92,10 @@ function CityHubDesktopSearchControl({
 }: CityHubDesktopSearchControlProps) {
   const locationRef = useRef<HTMLButtonElement>(null);
   const { applied, actions } = useDiscoveryFilters();
-  const { options: apiOptions } = useDiscoveryFilterOptions(citySlug);
+  const headerGeoFilters = useOptionalHeaderDiscoveryFilters();
+  const { options: apiOptions } = useDiscoveryFilterOptions(citySlug, {
+    defer: true,
+  });
   const safeApiOptions = apiOptions || {
     districts: [],
     metros: [],
@@ -130,6 +134,9 @@ function CityHubDesktopSearchControl({
       onPanelClose();
       actions.close();
     } else {
+      if (panel === "where") {
+        void headerGeoFilters?.loadGeoFilters(citySlug);
+      }
       onPanelChange(panel);
     }
   };
@@ -144,6 +151,16 @@ function CityHubDesktopSearchControl({
       actions.close();
     }
   };
+
+  useEffect(() => {
+    if (!headerGeoFilters || headerGeoFilters.citySlug !== citySlug) {
+      return;
+    }
+    if (!applied.metro && !applied.district) {
+      return;
+    }
+    void headerGeoFilters.loadGeoFilters();
+  }, [applied.district, applied.metro, citySlug, headerGeoFilters]);
 
   useEffect(() => {
     if (activePanel === "none" || mode !== "expanded") return;
@@ -182,6 +199,7 @@ function CityHubDesktopSearchControl({
           data-search-container
           onClick={(e) => {
             e.preventDefault();
+            void headerGeoFilters?.loadGeoFilters(citySlug);
             onExpand?.();
           }}
           className={cn(
@@ -389,6 +407,7 @@ function DiscoveryDesktopSearchControl({
   /** Вторичная панель «Фильтры» рендерится после mount, чтобы SSR и первый CSR были идентичны. */
   const [secondaryFiltersMounted, setSecondaryFiltersMounted] = useState(false);
   const [pendingCitySlug, setPendingCitySlug] = useState(citySlug);
+  const headerGeoFilters = useOptionalHeaderDiscoveryFilters();
 
   const containerRef = useRef<HTMLDivElement>(null);
   const locationRef = useRef<HTMLButtonElement>(null);
@@ -396,7 +415,9 @@ function DiscoveryDesktopSearchControl({
   const ageRef = useRef<HTMLButtonElement>(null);
   
   const { applied, actions } = useDiscoveryFilters();
-  const { options: apiOptions } = useDiscoveryFilterOptions(pendingCitySlug);
+  const { options: apiOptions } = useDiscoveryFilterOptions(pendingCitySlug, {
+    defer: true,
+  });
   const { isAuthenticated, isLoading: authLoading } = useAuthMe();
   const family = useFamilyPersona();
   const profileChildren: ProfileChildFilterOption[] =
@@ -489,6 +510,21 @@ function DiscoveryDesktopSearchControl({
   useEffect(() => {
     setPendingCitySlug(citySlug);
   }, [citySlug]);
+
+  useEffect(() => {
+    if (!headerGeoFilters || headerGeoFilters.citySlug !== citySlug) {
+      return;
+    }
+    if (!formDisplayFilters.metro && !formDisplayFilters.district) {
+      return;
+    }
+    void headerGeoFilters.loadGeoFilters();
+  }, [
+    citySlug,
+    formDisplayFilters.district,
+    formDisplayFilters.metro,
+    headerGeoFilters,
+  ]);
 
   useEffect(() => {
     setSecondaryFiltersMounted(true);
@@ -662,6 +698,9 @@ function DiscoveryDesktopSearchControl({
       onPanelClose();
       actions.close(); // Revert draft when closing
     } else {
+      if (panel === "where") {
+        void headerGeoFilters?.loadGeoFilters(pendingCitySlug);
+      }
       onPanelChange(panel);
     }
   };
@@ -767,6 +806,7 @@ function DiscoveryDesktopSearchControl({
           data-search-container
           onClick={(e) => {
             e.preventDefault();
+            void headerGeoFilters?.loadGeoFilters(citySlug);
             onExpand?.();
           }}
           className={cn(

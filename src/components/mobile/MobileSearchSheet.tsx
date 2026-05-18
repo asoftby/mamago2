@@ -24,6 +24,7 @@ import {
   type DiscoveryFilters,
 } from "@/features/filters/discovery/filters.store";
 import { useDiscoveryFilterOptions } from "@/features/filters/discovery/filters.api";
+import { useOptionalHeaderDiscoveryFilters } from "@/features/filters/discovery/headerDiscoveryFiltersContext";
 import { DatePanel, AgePanel } from "@/components/site/header/search-segments";
 import { MobileLocationPanel } from "@/components/mobile/panels/MobileLocationPanel";
 import {
@@ -171,6 +172,7 @@ export function MobileSearchSheet({
 }: MobileSearchSheetProps) {
   const router = useRouter();
   const { applied, actions } = useDiscoveryFilters();
+  const headerGeoFilters = useOptionalHeaderDiscoveryFilters();
 
   const [activeSection, setActiveSection] = useState<AccordionSection | null>(
     null,
@@ -233,7 +235,9 @@ export function MobileSearchSheet({
     [actions, patchSheetDraft],
   );
 
-  const { options: apiOptions } = useDiscoveryFilterOptions(pendingCitySlug);
+  const { options: apiOptions } = useDiscoveryFilterOptions(pendingCitySlug, {
+    defer: true,
+  });
   const safeApiOptions = useMemo(
     () =>
       apiOptions ?? {
@@ -246,6 +250,13 @@ export function MobileSearchSheet({
 
   const { isAuthenticated } = useAuthMe();
   const family = useFamilyPersona();
+
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+    void headerGeoFilters?.loadGeoFilters(pendingCitySlug);
+  }, [headerGeoFilters, isOpen, pendingCitySlug]);
 
   const profileChildren = useMemo(
     () =>

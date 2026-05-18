@@ -2,14 +2,17 @@
 
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
 import {
   fetchMetroDistrictFilterOptions,
+  getCachedMetroDistrictFilterOptions,
   type GeoDiscoveryOption,
 } from "./geoFilterOptionsClient";
 
@@ -19,16 +22,15 @@ export type HeaderDiscoveryFiltersContextValue = {
   districts: GeoDiscoveryOption[];
   loading: boolean;
   error: Error | null;
+  hasLoaded: boolean;
+  loadGeoFilters: (
+    citySlug?: string | null | undefined,
+  ) => Promise<{ metros: GeoDiscoveryOption[]; districts: GeoDiscoveryOption[] }>;
 };
 
 const HeaderDiscoveryFiltersContext = createContext<
   HeaderDiscoveryFiltersContextValue | undefined
 >(undefined);
-
-/** Module-level cache for geo options */
-const geoCache = new Map<string, { metros: GeoDiscoveryOption[]; districts: GeoDiscoveryOption[] }>();
-/** In-flight promises to deduplicate concurrent requests */
-const inFlightGeo = new Map<string, Promise<{ metros: GeoDiscoveryOption[]; districts: GeoDiscoveryOption[] }>>();
 
 /**
  * Single geo fetch + cache entry for the active public header city (`useCity().citySlug`).
@@ -41,88 +43,110 @@ export function HeaderDiscoveryFiltersProvider({
   citySlug: string;
   children: ReactNode;
 }) {
-  const cached = geoCache.get(citySlug);
-  const [metros, setMetros] = useState<GeoDiscoveryOption[]>(cached?.metros ?? []);
-  const [districts, setDistricts] = useState<GeoDiscoveryOption[]>(cached?.districts ?? []);
-  const [loading, setLoading] = useState(!cached);
-  const [error, setError] = useState<Error | null>(null);
-
+  const cached = getCachedMetroDistrictFilterOptions(citySlug);
+  const [state, setState] = useState(() => ({
+    citySlug,
+    metros: cached?.metros ?? [],
+    districts: cached?.districts ?? [],
+    loading: false,
+    error: null as Error | null,
+    hasLoaded: Boolean(cached),
+  }));
+  const activeCitySlugRef = useRef(citySlug);
   useEffect(() => {
-    // 1. Check module cache
-    const existing = geoCache.get(citySlug);
-    if (existing) {
-      setMetros(existing.metros);
-      setDistricts(existing.districts);
-      setLoading(false);
-      return;
-    }
+    activeCitySlugRef.current = citySlug;
+  }, [citySlug]);
 
-    let cancelled = false;
+  const resolvedState = useMemo(
+    () =>
+      state.citySlug === citySlug
+        ? state
+        : {
+            citySlug,
+            metros: cached?.metros ?? [],
+            districts: cached?.districts ?? [],
+            loading: false,
+            error: null as Error | null,
+            hasLoaded: Boolean(cached),
+          },
+    [cached, citySlug, state],
+  );
 
-    const load = async () => {
-      // 2. Check in-flight promise
-      if (inFlightGeo.has(citySlug)) {
-        setLoading(true);
-        try {
-          const pair = await inFlightGeo.get(citySlug)!;
-          if (!cancelled) {
-            setMetros(pair.metros);
-            setDistricts(pair.districts);
-            setLoading(false);
-          }
-        } catch (err) {
-          if (!cancelled) setError(err instanceof Error ? err : new Error("Unknown error"));
+  const loadGeoFilters = useCallback(
+    async (requestedCitySlug?: string | null) => {
+      const targetCitySlug = requestedCitySlug ?? activeCitySlugRef.current;
+      const cachedForTarget = getCachedMetroDistrictFilterOptions(targetCitySlug);
+
+      if (cachedForTarget) {
+        if (targetCitySlug === activeCitySlugRef.current) {
+          setState({
+            citySlug: targetCitySlug,
+            metros: cachedForTarget.metros,
+            districts: cachedForTarget.districts,
+            loading: false,
+            error: null,
+            hasLoaded: true,
+          });
         }
-        return;
+        return cachedForTarget;
       }
 
-      setLoading(true);
-      setError(null);
-
-      const promise = (async () => {
-        try {
-          const pair = await fetchMetroDistrictFilterOptions(citySlug);
-          geoCache.set(citySlug, pair);
-          return pair;
-        } finally {
-          inFlightGeo.delete(citySlug);
-        }
-      })();
-
-      inFlightGeo.set(citySlug, promise);
+      if (targetCitySlug === activeCitySlugRef.current) {
+        setState((prev) => ({
+          citySlug: targetCitySlug,
+          metros:
+            prev.citySlug === targetCitySlug ? prev.metros : [],
+          districts:
+            prev.citySlug === targetCitySlug ? prev.districts : [],
+          loading: true,
+          error: null,
+          hasLoaded: prev.citySlug === targetCitySlug ? prev.hasLoaded : false,
+        }));
+      }
 
       try {
-        const pair = await promise;
-        if (!cancelled) {
-          setMetros(pair.metros);
-          setDistricts(pair.districts);
-          setLoading(false);
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setError(err instanceof Error ? err : new Error("Unknown error"));
-          setMetros([]);
-          setDistricts([]);
-          setLoading(false);
-        }
-      }
-    };
+        const pair = await fetchMetroDistrictFilterOptions(targetCitySlug);
 
-    void load();
-    return () => {
-      cancelled = true;
-    };
-  }, [citySlug]);
+        if (targetCitySlug === activeCitySlugRef.current) {
+          setState({
+            citySlug: targetCitySlug,
+            metros: pair.metros,
+            districts: pair.districts,
+            loading: false,
+            error: null,
+            hasLoaded: true,
+          });
+        }
+
+        return pair;
+      } catch (err) {
+        if (targetCitySlug === activeCitySlugRef.current) {
+          setState({
+            citySlug: targetCitySlug,
+            metros: [],
+            districts: [],
+            loading: false,
+            error: err instanceof Error ? err : new Error("Unknown error"),
+            hasLoaded: false,
+          });
+        }
+        throw err;
+      }
+    },
+    [],
+  );
 
   const value = useMemo(
     (): HeaderDiscoveryFiltersContextValue => ({
       citySlug,
-      metros,
-      districts,
-      loading,
-      error,
+      metros: resolvedState.metros,
+      districts: resolvedState.districts,
+      loading: resolvedState.loading,
+      error: resolvedState.error,
+      hasLoaded: resolvedState.hasLoaded,
+      loadGeoFilters,
     }),
-    [citySlug, metros, districts, loading, error],
+    [citySlug, resolvedState, loadGeoFilters],
   );
 
   return (
