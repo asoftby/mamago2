@@ -103,6 +103,38 @@ export function normalizeStops(stops: RouteStopInput[]): NormalizedStop[] {
     }));
 }
 
+/**
+ * Order-sensitive fingerprint of stops for equality comparison.
+ * Covers only the fields written by normalizeStops — server-side enrichment
+ * fields (googlePlaceId, formattedAddress, addressComponents, etc.) are excluded
+ * so they are preserved rather than dropped when stops are unchanged.
+ */
+function buildRouteStopsFingerprint(
+  stops: Array<{
+    order: number;
+    placeId: string | null;
+    address: string | null | undefined;
+    note: string | null | undefined;
+    photoUrl: string | null;
+    lat: number | null;
+    lng: number | null;
+    customTitle: string | null;
+  }>,
+): string {
+  return JSON.stringify(
+    stops.map((s) => [
+      s.order,
+      s.placeId ?? null,
+      s.address ?? "",
+      s.note ?? "",
+      s.photoUrl ?? null,
+      s.lat ?? null,
+      s.lng ?? null,
+      s.customTitle ?? null,
+    ]),
+  );
+}
+
 export function deriveCoverImageUrl(stops: NormalizedStop[]): string | null {
   return stops.find((s) => s.photoUrl)?.photoUrl ?? null;
 }
@@ -344,28 +376,52 @@ export async function updateRoute(
   return prisma.$transaction(async (tx) => {
     const existing = await tx.route.findUnique({
       where: { id: routeId },
-      select: { id: true, slug: true, authorId: true },
+      select: {
+        id: true,
+        slug: true,
+        authorId: true,
+        stops: {
+          orderBy: { order: "asc" as const },
+          select: {
+            order: true,
+            placeId: true,
+            address: true,
+            note: true,
+            photoUrl: true,
+            lat: true,
+            lng: true,
+            customTitle: true,
+          },
+        },
+      },
     });
 
     if (!existing) throw new Error("ROUTE_NOT_FOUND");
     if (existing.authorId !== userId) throw new Error("ROUTE_FORBIDDEN");
 
-    await tx.routeStop.deleteMany({ where: { routeId } });
+    const stopsChanged =
+      buildRouteStopsFingerprint(normalizedStops) !==
+      buildRouteStopsFingerprint(existing.stops);
+
+    if (stopsChanged) {
+      await tx.routeStop.deleteMany({ where: { routeId } });
+    }
+
+    const routeScalarUpdate = {
+      title: data.title,
+      ageTags: data.ageTags,
+      budgetLevel: data.budgetLevel,
+      visibility: data.visibility,
+      status,
+      cityId,
+      coverImageUrl,
+    };
 
     const updated = await tx.route.update({
       where: { id: routeId },
-      data: {
-        title: data.title,
-        ageTags: data.ageTags,
-        budgetLevel: data.budgetLevel,
-        visibility: data.visibility,
-        status,
-        cityId,
-        coverImageUrl,
-        stops: {
-          create: normalizedStops,
-        },
-      },
+      data: stopsChanged
+        ? { ...routeScalarUpdate, stops: { create: normalizedStops } }
+        : routeScalarUpdate,
       select: { id: true, slug: true },
     });
 
