@@ -18,8 +18,6 @@ import { SaveActivityFlowAdaptive } from "@/components/activity/SaveActivityFlow
 import type { SaveToPlanResult } from "@/components/activity/SaveToPlanModal";
 import { useAuthMe } from "@/features/birthday/builder/hooks/useAuthMe";
 import { requestPlanRefetchForDate } from "@/lib/my-plan/myPlanOpenIntent";
-import { AddToPlanAfterExternalActionPrompt } from "@/features/plan/components/AddToPlanAfterExternalActionPrompt";
-import { useDelayedPlanPromptAfterExternalAction } from "@/features/plan/hooks/useDelayedPlanPromptAfterExternalAction";
 import { EventRichDescription } from "./EventRichDescription";
 import { EventDecisionPanel } from "./EventDecisionPanel";
 import { EventMediaStack } from "./EventMediaStack";
@@ -76,8 +74,9 @@ function EventMetaStrip({ facts }: { facts: EventPageData["importantFacts"] }) {
             <div
               key={f.id}
               className={cn(
-                "flex flex-col gap-1.5 px-5 py-5",
-                i === 0 ? "pl-0" : "border-l border-[rgba(20,18,16,0.10)]",
+                "flex flex-col gap-1.5 py-5",
+                i > 0 && "border-l border-[rgba(20,18,16,0.10)] pl-5",
+                i > 0 ? "pl-5" : "pr-5",
               )}
             >
               <div className="flex items-center justify-between">
@@ -166,19 +165,18 @@ function EventLocationEditorial({ venue }: { venue: NonNullable<EventPageData["v
   return (
     <section className="border-b border-[rgba(20,18,16,0.10)] py-14 md:py-16">
       <div className="mx-auto w-full max-w-[1320px] px-4 sm:px-6 lg:px-7">
-        <div className="grid grid-cols-1 gap-10 md:grid-cols-2 md:gap-12 lg:gap-16">
+        <div className="grid grid-cols-1 gap-8 md:grid-cols-2 md:gap-8">
           {/* Left: text */}
-          <div className="flex flex-col justify-center">
-            <div className="mb-5 flex items-center gap-3.5">
-              <span className="font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-[rgba(20,18,16,0.55)]">
+          <div>
+            <div className="mb-4 flex items-center gap-3.5">
+              <span className="text-[10px] font-medium uppercase tracking-[0.14em] text-[rgba(20,18,16,0.55)]">
                 04 — Где проходит
               </span>
               <span className="h-px flex-1 bg-[rgba(20,18,16,0.10)]" />
             </div>
-
             <h2
-              className="font-[family-name:var(--font-display)] text-[clamp(36px,5vw,60px)] font-normal leading-[1.05] tracking-[-0.02em] text-[#141210]"
-              style={{ margin: "0 0 20px" }}
+              className="font-[family-name:var(--font-display)] text-[clamp(36px,5vw,56px)] font-normal leading-[1] tracking-[-0.02em] text-[#141210]"
+              style={{ margin: "14px 0 18px" }}
             >
               {venue.name},
               <br />
@@ -189,27 +187,35 @@ function EventLocationEditorial({ venue }: { venue: NonNullable<EventPageData["v
               ) : null}
             </h2>
 
-            <div className="mb-6 text-[16px] leading-[1.6] text-[#3A332B]">
+            <div className="mb-6 text-[17px] leading-[1.55] text-[#3A332B]">
               {venue.name}
-              {venue.address && <><br />{venue.address}</>}
-              {venue.district && <><br />{venue.district}</>}
+              {venue.address && (
+                <>
+                  <br />
+                  {venue.address}
+                </>
+              )}
+              {venue.district && (
+                <>
+                  <br />
+                  {venue.district}
+                </>
+              )}
             </div>
 
             {/* Location tags */}
-            {[venue.district, venue.metro, venue.landmark].some(Boolean) && (
-              <div className="mb-8 flex flex-wrap gap-2">
-                {[venue.district, venue.metro, venue.landmark]
-                  .filter(Boolean)
-                  .map((tag, i) => (
-                    <span
-                      key={i}
-                      className="inline-flex h-8 items-center rounded-full border border-[rgba(20,18,16,0.18)] bg-[#FAF7F1] px-3.5 text-[13px] text-[#141210]"
-                    >
-                      ● {tag}
-                    </span>
-                  ))}
-              </div>
-            )}
+            <div className="mb-8 flex flex-wrap gap-2">
+              {[venue.district, venue.metro, venue.landmark]
+                .filter(Boolean)
+                .map((tag, i) => (
+                  <span
+                    key={i}
+                    className="inline-flex h-7 items-center rounded-full border border-[rgba(20,18,16,0.18)] bg-[#FAF7F1] px-3 text-[13px] text-[#141210]"
+                  >
+                    ● {tag}
+                  </span>
+                ))}
+            </div>
 
             {/* Buttons */}
             <div className="flex flex-wrap gap-2.5">
@@ -223,44 +229,35 @@ function EventLocationEditorial({ venue }: { venue: NonNullable<EventPageData["v
                   Маршрут →
                 </a>
               )}
-              {venue.placeHref && (
-                <a
-                  href={venue.placeHref}
-                  className="inline-flex h-12 items-center rounded-full border border-[rgba(20,18,16,0.25)] bg-transparent px-6 text-[15px] font-semibold text-[#141210] transition-colors hover:border-[#141210]"
-                >
-                  Страница места
-                </a>
-              )}
             </div>
           </div>
 
           {/* Right: map card */}
           {venue.mapUrl && (
-            <div
-              className="relative overflow-hidden rounded-[24px] border border-[rgba(20,18,16,0.10)] bg-[#E8E0D4]"
-              style={{ aspectRatio: "4/3" }}
-            >
+            <div className="relative overflow-hidden rounded-[18px] border border-[rgba(20,18,16,0.10)] bg-[#E8E0D4]" style={{ aspectRatio: "4/3" }}>
               <img
                 src={venue.mapUrl}
                 alt={`Карта: ${venue.name}`}
                 className="h-full w-full object-cover"
               />
-              {/* Animated pin */}
+              {/* Pin */}
               <div
-                className="ep-pulse absolute flex h-12 w-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-[#E86A3A] shadow-[0_4px_16px_rgba(232,106,58,0.45)]"
-                style={{ top: "44%", left: "50%" }}
+                className="ep-pulse absolute flex h-11 w-11 items-center justify-center rounded-full bg-[#E86A3A] text-lg text-white"
+                style={{ top: "40%", left: "48%" }}
               >
-                <span className="text-[18px] leading-none">📍</span>
+                📍
               </div>
-              {/* Bottom overlay */}
-              <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between gap-3 rounded-[16px] border border-[rgba(20,18,16,0.08)] bg-[rgba(250,247,241,0.95)] px-4 py-3 backdrop-blur-[10px]">
-                <div className="min-w-0">
-                  <div className="truncate text-[14px] font-semibold leading-snug text-[#141210]">
+              {/* Info overlay */}
+              <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between rounded-[14px] border border-[rgba(20,18,16,0.10)] bg-[rgba(250,247,241,0.94)] px-4 py-3.5 backdrop-blur-[8px]">
+                <div>
+                  <div className="text-[14px] font-semibold leading-snug text-[#141210]">
                     {venue.name}
                   </div>
-                  <div className="mt-0.5 font-mono text-[11px] text-[rgba(20,18,16,0.50)]">
-                    {venue.address ?? venue.district}
-                  </div>
+                  {venue.address && (
+                    <div className="mt-0.5 font-mono text-[11px] text-[rgba(20,18,16,0.55)]">
+                      {venue.address}
+                    </div>
+                  )}
                 </div>
                 {(venue.routeUrl ?? venue.mapUrl) && (
                   <a
@@ -440,19 +437,6 @@ export function EventPageView({ data }: { data: EventPageData }) {
     return { ...base, eventPlanDateISO: availablePlanDates[0]! };
   }, [availablePlanDates, data.title]);
 
-  const {
-    open: externalPlanPromptOpen,
-    triggerPrompt: triggerExternalPlanPrompt,
-    dismissPrompt: dismissExternalPlanPrompt,
-    acceptPrompt: acceptExternalPlanPrompt,
-  } = useDelayedPlanPromptAfterExternalAction({
-    entityType: "EVENT",
-    entityId: data.id,
-    isInPlan: saveStatus.inPlan,
-    delayMs: 10_000,
-    enabled: Boolean(data.cta.purchaseUrl) && !saveModalOpen,
-  });
-
   const loadSaveStatus = useCallback(async () => {
     try {
       const res = await fetch(`/api/save/status?activityId=${data.id}`);
@@ -474,24 +458,6 @@ export function EventPageView({ data }: { data: EventPageData }) {
     if (!saveModalOpen) return;
     void loadSaveStatus();
   }, [saveModalOpen, loadSaveStatus]);
-
-  useEffect(() => {
-    if (!externalPlanPromptOpen) return;
-    void postAnalyticsEvent({
-      eventType: "CARD_VIEW",
-      entityType: "EVENT",
-      entityId: data.id,
-      vertical: "CITY",
-      citySlug: data.citySlug,
-      meta: {
-        source: "detail",
-        section: "afisha",
-        targetAction: "plan_prompt",
-        eventName: "add_to_plan_prompt_shown",
-        placement: "post_external_cta_prompt",
-      },
-    });
-  }, [data.citySlug, data.id, externalPlanPromptOpen]);
 
   const handlePlan = useCallback(() => {
     void postAnalyticsEvent({
@@ -574,10 +540,7 @@ export function EventPageView({ data }: { data: EventPageData }) {
     [data.id, data.media.posterUrl, data.title, formatPlanDateRu, loadSaveStatus],
   );
 
-  const handleBuy = useCallback((options?: { source?: string; sessionId?: string }) => {
-    const placement = options?.source ?? "detail";
-    const sessionId = options?.sessionId ?? selectedSession?.id ?? null;
-
+  const handleBuy = useCallback(() => {
     setIsSecondaryLoading(true);
     void postAnalyticsEvent({
       eventType: "CTA_CLICK",
@@ -585,82 +548,19 @@ export function EventPageView({ data }: { data: EventPageData }) {
       entityId: data.id,
       vertical: "CITY",
       citySlug: data.citySlug,
-      meta: {
-        source: "detail",
-        section: "afisha",
-        targetAction: "buy",
-        eventName: "event_ticket_click",
-        placement,
-        sessionId,
-      },
+      meta: { source: "detail", section: "afisha", targetAction: "buy" },
     });
-
-    const purchaseUrl = data.cta.purchaseUrl?.trim();
-    if (!purchaseUrl) {
-      toast.message(data.cta.buyLabel, {
-        description: "Здесь будет ссылка на покупку или сайт организатора.",
-      });
-      window.setTimeout(() => setIsSecondaryLoading(false), 500);
-      return;
-    }
-
-    const popup = window.open(purchaseUrl, "_blank", "noopener,noreferrer");
-    if (popup) {
-      popup.opener = null;
-    }
-    triggerExternalPlanPrompt();
-    window.setTimeout(() => setIsSecondaryLoading(false), 500);
-  }, [
-    data.citySlug,
-    data.cta.buyLabel,
-    data.cta.purchaseUrl,
-    data.id,
-    selectedSession?.id,
-    triggerExternalPlanPrompt,
-  ]);
+    toast.message(data.cta.buyLabel, {
+      description: "Здесь будет ссылка на покупку или сайт организатора.",
+    });
+    setTimeout(() => setIsSecondaryLoading(false), 500);
+  }, [data.citySlug, data.cta.buyLabel, data.id]);
 
   const handleSave = useCallback(() => {
     const was = isFavorite(data.id);
     toggleFavorite(data.id);
     toast.success(was ? "Убрано из идей" : "Сохранено в идеи");
   }, [data.id]);
-
-  const handleExternalPlanPromptDismiss = useCallback(() => {
-    dismissExternalPlanPrompt();
-    void postAnalyticsEvent({
-      eventType: "CTA_CLICK",
-      entityType: "EVENT",
-      entityId: data.id,
-      vertical: "CITY",
-      citySlug: data.citySlug,
-      meta: {
-        source: "detail",
-        section: "afisha",
-        targetAction: "prompt_dismiss",
-        eventName: "add_to_plan_prompt_dismiss",
-        placement: "post_external_cta_prompt",
-      },
-    });
-  }, [data.citySlug, data.id, dismissExternalPlanPrompt]);
-
-  const handleExternalPlanPromptAccept = useCallback(() => {
-    acceptExternalPlanPrompt();
-    void postAnalyticsEvent({
-      eventType: "CTA_CLICK",
-      entityType: "EVENT",
-      entityId: data.id,
-      vertical: "CITY",
-      citySlug: data.citySlug,
-      meta: {
-        source: "detail",
-        section: "afisha",
-        targetAction: "plan",
-        eventName: "add_to_plan_prompt_accept",
-        placement: "post_external_cta_prompt",
-      },
-    });
-    setSaveModalOpen(true);
-  }, [acceptExternalPlanPrompt, data.citySlug, data.id]);
 
   const handlePlanSimilar = useCallback((id: string) => {
     toggleFavorite(id);
@@ -730,7 +630,7 @@ export function EventPageView({ data }: { data: EventPageData }) {
                 sessionTargetDate={selectedSession?.startsAt}
                 venueShort={venueShort}
                 onPlan={handlePlan}
-                onBuy={() => handleBuy({ source: "hero_cta" })}
+                onBuy={handleBuy}
                 onSave={handleSave}
                 isPlanned={saveStatus.inPlan}
                 planDate={saveStatus.planDate}
@@ -796,10 +696,6 @@ export function EventPageView({ data }: { data: EventPageData }) {
               sessions={sessions}
               selectedId={selectedId}
               onSelect={setSelectedId}
-              onBuySession={(session) =>
-                handleBuy({ source: "session_card", sessionId: session.id })
-              }
-              onPlanSession={() => handlePlan()}
             />
           </div>
         </section>
@@ -822,7 +718,7 @@ export function EventPageView({ data }: { data: EventPageData }) {
         priceLabel={data.priceLabel}
         buyLabel={data.cta.buyLabel}
         planLabel={data.cta.planLabel}
-        onBuy={() => handleBuy({ source: "final_cta" })}
+        onBuy={handleBuy}
         onPlan={handlePlanDayCta}
         sessionTargetDate={selectedSession?.startsAt}
       />
@@ -850,23 +746,10 @@ export function EventPageView({ data }: { data: EventPageData }) {
         planDate={saveStatus.planDate}
         secondaryLabel={data.cta.purchaseUrl ? data.cta.buyLabel : undefined}
         isPlanned={saveStatus.inPlan}
-        isSaved={saveStatus.isIdea}
         isPrimaryLoading={isPrimaryLoading}
         isSecondaryLoading={isSecondaryLoading}
         onPrimary={handlePlan}
-        onSecondary={
-          data.cta.purchaseUrl
-            ? () => handleBuy({ source: "sticky_bar" })
-            : undefined
-        }
-        onSave={handleSave}
-      />
-
-      <AddToPlanAfterExternalActionPrompt
-        open={externalPlanPromptOpen}
-        onAddToPlan={handleExternalPlanPromptAccept}
-        onDismiss={handleExternalPlanPromptDismiss}
-        isIdea={saveStatus.isIdea}
+        onSecondary={data.cta.purchaseUrl ? handleBuy : undefined}
       />
 
       {/* Save flow modal */}
