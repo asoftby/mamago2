@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { REFERENCE_DATA_CACHE_CONTROL } from "@/lib/http/referenceDataCacheHeaders";
+import { resolveCityIdBySlug } from "@/server/geo/resolveCityIdBySlug";
 
 const CACHE_HEADERS = { "Cache-Control": REFERENCE_DATA_CACHE_CONTROL };
 
@@ -26,16 +27,11 @@ export async function GET(request: NextRequest) {
     // Resolve cityId from slug if needed
     let resolvedCityId = cityId;
     if (!resolvedCityId && citySlug) {
-      const city = await prisma.city.findUnique({
-        where: { slug: citySlug },
-        select: { id: true },
-      });
-      
-      if (!city) {
+      resolvedCityId = await resolveCityIdBySlug(citySlug);
+
+      if (!resolvedCityId) {
         return NextResponse.json({ districts: [] }, { headers: CACHE_HEADERS });
       }
-      
-      resolvedCityId = city.id;
     }
 
     const districts = await prisma.district.findMany({
