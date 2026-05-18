@@ -6,6 +6,7 @@ import { appendAntiRepeatEntry, loadAntiRepeatState, saveAntiRepeatState } from 
 import { normalizeWeatherScenario } from "../model/anti-repeat-types";
 import type { HeroGreetingModel } from "../lib/get-hero-context";
 import { HeroGreetingErrorBoundary } from "./HeroGreetingErrorBoundary";
+import { OptionalWeatherProvider } from "@/components/providers/OptionalWeatherProvider";
 
 export type HeroGreetingShellProps = {
   initialModel: HeroGreetingModel;
@@ -56,5 +57,9 @@ export function HeroGreetingShell({ initialModel }: HeroGreetingShellProps) {
     }
   }, []);
 
-  return <HeroGreetingErrorBoundary model={initialModel} />;
+  return (
+    <OptionalWeatherProvider>
+      <HeroGreetingErrorBoundary model={initialModel} />
+    </OptionalWeatherProvider>
+  );
 }

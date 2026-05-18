@@ -55,7 +55,11 @@ export async function GET(req: NextRequest) {
     // Transform to our format
     const weeklyData = transformWeatherData(data, citySlug);
 
-    return NextResponse.json(weeklyData);
+    return NextResponse.json(weeklyData, {
+      headers: {
+        "Cache-Control": "public, max-age=1800, s-maxage=1800, stale-while-revalidate=3600",
+      },
+    });
   } catch (error) {
     console.error("[weather/weekly] Error:", error);
     return NextResponse.json(

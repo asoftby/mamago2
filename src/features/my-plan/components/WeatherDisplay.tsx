@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo } from "react";
 import { differenceInDays } from "date-fns";
+import { OptionalWeatherProvider } from "@/components/providers/OptionalWeatherProvider";
 import { useOptionalWeather } from "@/contexts/WeatherContext";
 import { useOptionalCity } from "@/contexts/CityContext";
 import { getCityDisplayName } from "@/lib/city/cityDisplayNames";
@@ -31,6 +31,22 @@ function mapWeatherCodeToScenario(code: number): string {
 }
 
 export function WeatherDisplay({
+  date,
+  timeOfDay = "evening",
+  className,
+}: WeatherDisplayProps) {
+  return (
+    <OptionalWeatherProvider>
+      <WeatherDisplayContent
+        date={date}
+        timeOfDay={timeOfDay}
+        className={className}
+      />
+    </OptionalWeatherProvider>
+  );
+}
+
+function WeatherDisplayContent({
   date,
   timeOfDay = "evening",
   className,
