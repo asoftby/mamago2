@@ -9,8 +9,6 @@ import { ReloadProbe } from "@/components/dev/ReloadProbe";
 import { PublicProviders } from "@/components/providers/PublicProviders";
 import { FamilyDerivedAgeSync } from "@/components/family/FamilyDerivedAgeSync";
 import { MyPlanProvider } from "@/components/MyPlanProvider";
-import { GateFlowController } from "@/components/auth/GateFlowController";
-import { MobileTapDiagnostics } from "@/components/dev/MobileTapDiagnostics";
 
 export default function PublicGroupLayout({
   children,
@@ -29,8 +27,6 @@ export default function PublicGroupLayout({
               <PublicLayoutBody>{children}</PublicLayoutBody>
               <FamilyDerivedAgeSync />
               <MyPlanProvider />
-              <GateFlowController />
-              <MobileTapDiagnostics />
 
               {/* Global Refinement Modal */}
               <Suspense fallback={null}>

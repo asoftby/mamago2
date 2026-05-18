@@ -1,17 +1,9 @@
 import type { Metadata, Viewport } from "next";
-import { headers } from "next/headers";
 import "./globals.css";
 import { ntSomic, instrumentSerif } from "@/lib/fonts";
 import { Sonner } from "@/components/ui/sonner";
 import { AccountModeProvider } from "@/contexts/AccountModeContext";
-import { FamilyPersonaProvider } from "@/contexts/FamilyPersonaContext";
-import { FamilyDerivedAgeSync } from "@/components/family/FamilyDerivedAgeSync";
-import { MyPlanProvider } from "@/components/MyPlanProvider";
-import { CookieConsentProvider } from "@/components/providers/cookie-consent-provider";
 import { SaveIntentProvider } from "@/lib/save/SaveIntentContext";
-import { resolveSurfaceFromHostAndPathname } from "@/lib/routing/surface";
-import { CityProvider } from "@/contexts/CityContext";
-import { WeatherProvider } from "@/contexts/WeatherContext";
 import { AuthProvider } from "@/lib/auth/AuthProvider";
 import { getCurrentAuthState } from "@/lib/auth/getCurrentAuthState";
 import { PendingActionProvider } from "@/contexts/PendingActionContext";
@@ -35,10 +27,6 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const headerStore = await headers();
-  const host = headerStore.get("x-forwarded-host") ?? headerStore.get("host") ?? undefined;
-  const currentSurface = resolveSurfaceFromHostAndPathname(host, "/");
-  const shouldMountMyPlanProvider = currentSurface === "public";
   const initialAuthUser = await getCurrentAuthState();
 
   return (
@@ -50,19 +38,9 @@ export default async function RootLayout({
           <AuthProvider initialUser={initialAuthUser}>
             <PendingActionProvider>
               <AccountModeProvider>
-                <CityProvider>
-                  <WeatherProvider>
-                    <FamilyPersonaProvider>
-                      <CookieConsentProvider>
-                        <FamilyDerivedAgeSync />
-                        {children}
-                        {shouldMountMyPlanProvider ? <MyPlanProvider /> : null}
-                        <GateFlowController />
-                        <MobileTapDiagnostics />
-                      </CookieConsentProvider>
-                    </FamilyPersonaProvider>
-                  </WeatherProvider>
-                </CityProvider>
+                {children}
+                <GateFlowController />
+                <MobileTapDiagnostics />
               </AccountModeProvider>
             </PendingActionProvider>
           </AuthProvider>
