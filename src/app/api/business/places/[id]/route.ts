@@ -155,11 +155,15 @@ export async function PATCH(
     // Check ownership
     const existing = await prisma.place.findUnique({
       where: { id },
-      select: { 
+      select: {
         createdByUserId: true,
         ownerBusinessId: true,
         status: true,
         primaryCategoryId: true,
+        subcategories: {
+          orderBy: { position: "asc" },
+          select: { categoryId: true },
+        },
       },
     });
     perf.mark("read");
@@ -269,19 +273,27 @@ export async function PATCH(
       select: { id: true },
     });
 
-    // Update subcategories if provided
+    // Update subcategories if provided — skip deleteMany/createMany when unchanged.
+    // Position matters: subcategories are ordered, so comparison is ordered too.
     if (Array.isArray(body.subcategoryIds)) {
-      const subcategoryIds: string[] = body.subcategoryIds.slice(0, 3);
-      await prisma.placeSubcategory.deleteMany({ where: { placeId: id } });
-      if (subcategoryIds.length > 0) {
-        await prisma.placeSubcategory.createMany({
-          data: subcategoryIds.map((categoryId: string, position: number) => ({
-            placeId: id,
-            categoryId,
-            position,
-          })),
-          skipDuplicates: true,
-        });
+      const incomingIds: string[] = body.subcategoryIds.slice(0, 3);
+      const existingIds = existing.subcategories.map((s) => s.categoryId);
+      const subcategoriesUnchanged =
+        incomingIds.length === existingIds.length &&
+        incomingIds.every((categoryId, i) => categoryId === existingIds[i]);
+
+      if (!subcategoriesUnchanged) {
+        await prisma.placeSubcategory.deleteMany({ where: { placeId: id } });
+        if (incomingIds.length > 0) {
+          await prisma.placeSubcategory.createMany({
+            data: incomingIds.map((categoryId: string, position: number) => ({
+              placeId: id,
+              categoryId,
+              position,
+            })),
+            skipDuplicates: true,
+          });
+        }
       }
     }
     perf.mark("write");
