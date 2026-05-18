@@ -681,8 +681,63 @@ export async function PATCH(
       slugChanged: slugTouched,
       cityChanged,
     });
+    // Fields visible in /business/events and /business/publications/events list cards:
+    // title, shortDesc (fallback subtitle from title+description), priceFrom, priceText,
+    // coverImageId/coverImageUrl (denormalized cover; may affect images relation),
+    // nextOccurrenceAt (from session sync), images[0] (from gallery sync),
+    // place.title (from venue sync).
+    const listVisibleFieldChanged =
+      "title" in updateData ||
+      "shortDesc" in updateData ||
+      "priceFrom" in updateData ||
+      "priceText" in updateData ||
+      "coverImageId" in updateData ||
+      "coverImageUrl" in updateData ||
+      activitySessionsNeedResync ||
+      galleryTouched ||
+      venueSynced;
+
+    // Explicit allowlist of Activity table fields known to be editor-only for business
+    // draft PATCH. Any key in updateData NOT in this set is treated as potentially
+    // list-visible → fail-safe revalidation. Add to this set only when a new field is
+    // confirmed not to appear in business event list cards.
+    const EDITOR_ONLY_ACTIVITY_FIELDS = new Set<string>([
+      "description",          // raw HTML; always paired with shortDesc which IS list-visible
+      "format",               // activity format (online/offline/hybrid), not shown in list
+      "ageTags",              // age tag JSON, not shown in list
+      "scheduleMode",         // schedule display mode, not shown in list
+      "scheduleJson",         // schedule metadata; activitySessionsNeedResync captures date/time changes
+      "eventCategoryId",      // event category, not shown in list
+      "programCategoryLinks", // program category relations, not shown in list
+      "priceTo",              // upper price bound, only priceFrom is shown in list
+      "currency",             // currency code, not shown in list
+      "organizerId",          // organizer FK, not shown in list
+      "businessId",           // business FK, not shown in list
+    ]);
+
+    const changedActivityKeys = Object.keys(updateData);
+    // length === 0: no Activity table writes (only side effects: occasions, gallery, sessions).
+    //   List-visible impact already captured above via listVisibleFieldChanged flags.
+    // every(...): all Activity writes are in the explicit editor-only allowlist.
+    // Unknown key → fails every() → allChangedFieldsAreEditorOnly = false → revalidate.
+    const allChangedFieldsAreEditorOnly =
+      changedActivityKeys.length === 0 ||
+      changedActivityKeys.every((key) => EDITOR_ONLY_ACTIVITY_FIELDS.has(key));
+
+    // Skip business list revalidation only when all three conditions hold:
+    //   1. scope is "business-save" (slug/city/status changes move to a stronger scope)
+    //   2. no list-visible Activity field changed
+    //   3. all changed Activity fields are in the explicit editor-only allowlist
+    // Any unknown field that enters updateData triggers revalidation automatically.
+    const canSkipBusinessListRevalidation =
+      revalidateScope === "business-save" &&
+      !listVisibleFieldChanged &&
+      allChangedFieldsAreEditorOnly;
+
+    const shouldRevalidateBusinessLists = !canSkipBusinessListRevalidation;
+
     let responsePublicPath: string | null = null;
-    if (shouldRevalidate) {
+    if (shouldRevalidate && shouldRevalidateBusinessLists) {
       const revalidateStarted = isServerSavePerfEnabled() ? performance.now() : 0;
       const rev = await revalidateEventMutationPaths(saved.id, revalidateScope);
       responsePublicPath = rev.publicPath;
@@ -736,6 +791,9 @@ export async function PATCH(
       status: saved.status,
       revalidateScope,
       shouldRevalidate,
+      listVisibleFieldChanged,
+      allChangedFieldsAreEditorOnly,
+      canSkipBusinessListRevalidation,
       hasPrismaWrites,
       activitySessionsNeedResync,
     });
