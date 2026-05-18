@@ -68,11 +68,8 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error("[admin/promote] Error:", error);
 
-    const errorMessage =
-      error instanceof Error ? error.message : "Внутренняя ошибка сервера";
-
     return NextResponse.json(
-      { success: false, error: errorMessage },
+      { success: false, error: "Внутренняя ошибка сервера" },
       { status: 400 }
     );
   }

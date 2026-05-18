@@ -106,12 +106,21 @@ export async function deleteSessionCookieAction(requestHostname?: string): Promi
 export async function validateSession(
   token: string
 ): Promise<User | null> {
+  const totalStart = performance.now();
+  const hashStart = performance.now();
   const tokenHash = hashToken(token);
+  if (process.env.NODE_ENV === "development") {
+    console.debug(`[auth] validateSession hashToken: ${(performance.now() - hashStart).toFixed(0)}ms`);
+  }
 
+  const findUniqueStart = performance.now();
   const session = await prisma.session.findUnique({
     where: { tokenHash },
     include: { user: true },
   });
+  if (process.env.NODE_ENV === "development") {
+    console.debug(`[auth] validateSession findUnique: ${(performance.now() - findUniqueStart).toFixed(0)}ms`);
+  }
 
   if (!session) {
     return null;
@@ -119,31 +128,47 @@ export async function validateSession(
 
   // Check if session is expired
   if (session.expiresAt < new Date()) {
+    const deleteStart = performance.now();
     await prisma.session.delete({ where: { id: session.id } });
+    if (process.env.NODE_ENV === "development") {
+      console.debug(`[auth] validateSession deleteExpired: ${(performance.now() - deleteStart).toFixed(0)}ms`);
+    }
     return null;
   }
 
   const user = session.user;
 
   if (user.deletedAt) {
+    const deleteStart = performance.now();
     await prisma.session.delete({ where: { id: session.id } });
+    if (process.env.NODE_ENV === "development") {
+      console.debug(`[auth] validateSession deleteDeleted: ${(performance.now() - deleteStart).toFixed(0)}ms`);
+    }
     return null;
   }
 
   // Check user status
   if (user.status === "BANNED") {
-    // Delete session for banned users
+    const deleteStart = performance.now();
     await prisma.session.delete({ where: { id: session.id } });
+    if (process.env.NODE_ENV === "development") {
+      console.debug(`[auth] validateSession deleteBanned: ${(performance.now() - deleteStart).toFixed(0)}ms`);
+    }
     return null;
   }
 
   if (user.status === "SUSPENDED") {
     if (user.suspendedUntil && user.suspendedUntil > new Date()) {
       // Still suspended
+      const deleteStart = performance.now();
       await prisma.session.delete({ where: { id: session.id } });
+      if (process.env.NODE_ENV === "development") {
+        console.debug(`[auth] validateSession deleteSuspended: ${(performance.now() - deleteStart).toFixed(0)}ms`);
+      }
       return null;
     } else {
       // Suspension expired, auto-unban
+      const updateStart = performance.now();
       await prisma.user.update({
         where: { id: user.id },
         data: {
@@ -152,6 +177,9 @@ export async function validateSession(
           suspendedUntil: null,
         },
       });
+      if (process.env.NODE_ENV === "development") {
+        console.debug(`[auth] validateSession autoUnban: ${(performance.now() - updateStart).toFixed(0)}ms`);
+      }
       user.status = "ACTIVE";
       user.statusReason = null;
       user.suspendedUntil = null;

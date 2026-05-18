@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { requireAdminOrModeratorApiUser } from "@/lib/auth/requireAdminApi";
 
 export const runtime = "nodejs";
 
@@ -7,6 +8,8 @@ export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const auth = await requireAdminOrModeratorApiUser();
+  if (auth instanceof NextResponse) return auth;
   try {
     const { id } = await params;
     const body = (await request.json()) as {

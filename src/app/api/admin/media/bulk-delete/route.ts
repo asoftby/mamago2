@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
   } catch (error: unknown) {
     console.error("Bulk delete media error:", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to bulk delete media" },
+      { error: "Internal server error" },
       { status: 500 }
     );
   }

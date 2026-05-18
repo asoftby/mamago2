@@ -95,7 +95,6 @@ export async function DELETE(
     return NextResponse.json({ success: true });
   } catch (error: unknown) {
     console.error("[admin] Delete moderation event error:", error);
-    const message = error instanceof Error ? error.message : "Failed to delete event";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

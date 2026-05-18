@@ -7,6 +7,8 @@ export function resolveNotificationTypeForScenario(
   switch (scenario) {
     case "PLAN_EVENT_2H_BEFORE":
       return "REMINDER";
+    case "PLAN_TOMORROW_DIGEST":
+      return "PLAN_TOMORROW_DIGEST";
     default: {
       const exhaustiveCheck: never = scenario;
       return exhaustiveCheck;

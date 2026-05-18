@@ -120,7 +120,7 @@ export async function POST(
   } catch (error: unknown) {
     console.error("Error performing moderation action:", error);
     
-    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    const errorMessage = error instanceof Error ? error.message : "";
     
     // Handle redirect errors from requireRole
     if (errorMessage.includes("NEXT_REDIRECT")) {
@@ -131,7 +131,7 @@ export async function POST(
     }
     
     return NextResponse.json(
-      { error: errorMessage || "Failed to perform moderation action" },
+      { error: "Failed to perform moderation action" },
       { status: errorMessage === "User not found" ? 404 : errorMessage === "Insufficient permissions" ? 403 : 500 }
     );
   }

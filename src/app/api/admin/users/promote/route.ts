@@ -98,27 +98,30 @@ export async function POST(request: NextRequest) {
 
     const previousRole = targetUser.role;
 
-    // Update role
-    const updatedUser = await prisma.user.update({
-      where: { id: targetUser.id },
-      data: { role: role as Role },
-      select: {
-        id: true,
-        email: true,
-        role: true,
-      },
-    });
-
-    // Log role change
-    console.log("[admin/users/promote] Role change:", {
-      actorUserId: currentUser.id,
-      actorEmail: currentUser.email,
-      targetUserId: targetUser.id,
-      targetEmail: email,
-      previousRole,
-      newRole: role,
-      timestamp: new Date().toISOString(),
-    });
+    // Update role + write audit log in a single transaction
+    const [updatedUser] = await prisma.$transaction([
+      prisma.user.update({
+        where: { id: targetUser.id },
+        data: { role: role as Role },
+        select: {
+          id: true,
+          email: true,
+          role: true,
+        },
+      }),
+      prisma.auditLog.create({
+        data: {
+          actorId: currentUser.id,
+          targetType: "USER",
+          targetId: targetUser.id,
+          action: "USER_ROLE_CHANGED",
+          metadata: {
+            oldRole: previousRole,
+            newRole: role,
+          },
+        },
+      }),
+    ]);
 
     return NextResponse.json({
       success: true,
@@ -131,11 +134,8 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error("[admin/users/promote] Error:", error);
 
-    const errorMessage =
-      error instanceof Error ? error.message : "Внутренняя ошибка сервера";
-
     return NextResponse.json(
-      { success: false, error: errorMessage },
+      { success: false, error: "Внутренняя ошибка сервера" },
       { status: 500 }
     );
   }

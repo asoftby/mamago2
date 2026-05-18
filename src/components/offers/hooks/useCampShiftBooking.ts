@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { ShiftCtaContext } from "@/lib/offer/offerPageTypes";
 
 export type BookingFormValues = {
+  selectedChildId?: string;
   customerName: string;
   customerPhone: string;
   customerEmail: string;
@@ -21,10 +22,6 @@ export interface UseCampShiftBookingReturn {
   reset: () => void;
 }
 
-/**
- * Хук инкапсулирует логику отправки заявки на смену лагеря.
- * Компонент формы остаётся чистым — только UI.
- */
 export function useCampShiftBooking(): UseCampShiftBookingReturn {
   const [phase, setPhase] = useState<BookingPhase>("form");
   const [apiError, setApiError] = useState<string | null>(null);

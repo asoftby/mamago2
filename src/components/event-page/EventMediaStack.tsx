@@ -1,4 +1,6 @@
 "use client";
+
+import { useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
 import type { EventPageMedia } from "@/lib/event/eventPageTypes";
 
@@ -10,64 +12,101 @@ export function EventMediaStack({
   className?: string;
 }) {
   const { posterUrl, posterAlt, reel, trailerYoutubeId, trailerLabel } = media;
-  const mediaWidthClass = "w-full max-w-[280px] sm:max-w-[300px] lg:max-w-[266px]";
+  const posterRef = useRef<HTMLDivElement>(null);
+  const trailerRef = useRef<HTMLDivElement>(null);
+  const reelRef = useRef<HTMLDivElement>(null);
 
-  const isRemoteAbsolute =
-    posterUrl.startsWith("http://") || posterUrl.startsWith("https://");
+  useEffect(() => {
+    const targets = [posterRef.current, trailerRef.current, reelRef.current].filter(
+      Boolean,
+    ) as Element[];
+    const io = new IntersectionObserver(
+      (entries) =>
+        entries.forEach((e) => {
+          if (e.isIntersecting) {
+            (e.target as HTMLElement).style.opacity = "1";
+            (e.target as HTMLElement).style.transform = "none";
+            io.unobserve(e.target);
+          }
+        }),
+      { threshold: 0.1 },
+    );
+    targets.forEach((t) => io.observe(t));
+    return () => io.disconnect();
+  }, []);
+
+  const revealStyle: React.CSSProperties = {
+    opacity: 0,
+    transform: "translateY(14px)",
+    transition: "opacity 0.9s cubic-bezier(0.2,0.7,0.2,1), transform 0.9s cubic-bezier(0.2,0.7,0.2,1)",
+  };
 
   return (
-    <div className={cn("flex w-full flex-col gap-6", className)}>
-      {/* 1) Poster — portrait anchor (narrow column); remote URLs как в MediaCover (вне next/image allowlist) */}
-      <div className={mediaWidthClass}>
-        <div className="w-full overflow-hidden rounded-[18px] bg-muted shadow-[var(--shadow-card)]">
-          {/* eslint-disable-next-line @next/next/no-img-element -- произвольные URL и естественная высота постера */}
-          <img
-            src={posterUrl}
-            alt={posterAlt}
-            className="block h-auto w-full object-contain"
-            loading={isRemoteAbsolute ? "eager" : "lazy"}
-            decoding="async"
-          />
-        </div>
+    <aside
+      className={cn("flex flex-col gap-3.5 lg:sticky lg:top-6", className)}
+    >
+      {/* Poster — 4:5 portrait */}
+      <div
+        ref={posterRef}
+        className="relative overflow-hidden rounded-[18px] bg-[#E8E0D4]"
+        style={{ ...revealStyle, aspectRatio: "4/5" }}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={posterUrl}
+          alt={posterAlt}
+          className="h-full w-full object-cover transition-transform duration-[1200ms] ease-[cubic-bezier(0.2,0.7,0.2,1)] hover:scale-[1.04]"
+          loading="eager"
+          decoding="async"
+        />
+        <span className="absolute left-3.5 top-3.5 inline-flex h-6 items-center rounded-full bg-[rgba(250,247,241,0.94)] px-2.5 text-[11px] font-semibold backdrop-blur-sm">
+          ● фото
+        </span>
       </div>
 
-      {/* 2) Trailer — 16:9 */}
+      {/* Trailer — 16:9 */}
       {trailerYoutubeId && (
-        <div className={cn(mediaWidthClass, "space-y-2")}>
-          <div
-            className="relative w-full overflow-hidden rounded-xl border border-border/60 bg-black shadow-sm"
-            style={{ aspectRatio: "16 / 9" }}
-          >
-            <iframe
-              title={trailerLabel ?? "Трейлер"}
-              src={`https://www.youtube.com/embed/${trailerYoutubeId}`}
-              className="absolute inset-0 h-full w-full"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-              allowFullScreen
-              loading="lazy"
-            />
+        <div
+          ref={trailerRef}
+          className="group relative cursor-pointer overflow-hidden rounded-[14px] bg-black"
+          style={{ ...revealStyle, aspectRatio: "16/9" }}
+        >
+          <img
+            src={posterUrl}
+            alt={trailerLabel ?? "Трейлер"}
+            className="h-full w-full object-cover opacity-50 transition-opacity group-hover:opacity-70"
+          />
+          <div className="absolute inset-0 flex items-center justify-center bg-[rgba(20,18,16,0.18)]">
+            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[#FAF7F1] pl-1 text-[18px] text-[#C24E22] shadow-[0_10px_30px_rgba(0,0,0,0.25)] transition-transform group-hover:scale-110">
+              ▶
+            </div>
           </div>
+          <span className="absolute bottom-2.5 left-3 font-mono text-[10px] uppercase tracking-[0.08em] text-[rgba(250,247,241,0.85)]">
+            {trailerLabel ?? "трейлер"} · 0:42
+          </span>
         </div>
       )}
 
-      {/* 3) Reel — vertical embed, in-page */}
+      {/* Reel — 9:16 vertical */}
       {reel && (
-        <div className={cn(mediaWidthClass, "space-y-2")}>
-          <div
-            className="relative w-full overflow-hidden rounded-xl border border-border/60 bg-black shadow-sm"
-            style={{ aspectRatio: "9 / 16" }}
-          >
-            <iframe
-              title={reel.label}
-              src={reel.iframeSrc}
-              className="absolute inset-0 h-full w-full"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-              allowFullScreen
-              loading="lazy"
-            />
-          </div>
+        <div
+          ref={reelRef}
+          className="relative overflow-hidden rounded-[14px] bg-[#E8E0D4]"
+          style={{ ...revealStyle, aspectRatio: "9/16" }}
+        >
+          <iframe
+            title={reel.label}
+            src={reel.iframeSrc}
+            className="absolute inset-0 h-full w-full"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            allowFullScreen
+            loading="lazy"
+          />
+          <span className="absolute left-3 top-2.5 font-mono text-[10px] uppercase tracking-[0.08em] text-[rgba(250,247,241,0.85)]">
+            ↗ reels
+          </span>
         </div>
       )}
-    </div>
+    </aside>
   );
 }

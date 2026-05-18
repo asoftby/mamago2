@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
+import { parsePaginationParams } from "@/lib/api/pagination";
 
 /**
  * GET /api/admin/search/zero-results
@@ -18,7 +19,7 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url);
-    const limit = parseInt(searchParams.get("limit") || "100");
+    const { limit } = parsePaginationParams(searchParams, { defaultLimit: 100 });
     const minCount = parseInt(searchParams.get("minCount") || "1");
 
     // Aggregate zero-result queries

@@ -26,10 +26,30 @@ function devLog(msg: string, ...args: unknown[]): void {
 let unifiedUnreadPromise: Promise<void> | null = null;
 let businessUnreadPromise: Promise<void> | null = null;
 let bothUnreadChainPromise: Promise<void> | null = null;
+let authContextKey: string | null = null;
+let authEpoch = 0;
 
 /** Timestamps of last successful fetch per stream (for throttling). */
 let lastUserUnreadFetchAt = 0;
 let lastBusinessUnreadFetchAt = 0;
+
+/**
+ * Reset module-level state. Called on logout and auth change.
+ * Prevents stale state when switching between accounts.
+ */
+function resetModuleLevelState(nextAuthContextKey: string | null = null): void {
+  unifiedUnreadPromise = null;
+  businessUnreadPromise = null;
+  bothUnreadChainPromise = null;
+  lastUserUnreadFetchAt = 0;
+  lastBusinessUnreadFetchAt = 0;
+  authContextKey = nextAuthContextKey;
+  authEpoch += 1;
+}
+
+function isStaleAuthEpoch(epoch: number): boolean {
+  return epoch !== authEpoch;
+}
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -60,7 +80,7 @@ const initialSnapshot = (): NotificationState => ({
 // ─── Store actions type ───────────────────────────────────────────────────────
 
 export type NotificationStoreActions = {
-  setAuthenticated: (authenticated: boolean) => void;
+  setAuthenticated: (authenticated: boolean, userId?: string | null) => void;
   fetchUnreadCount: () => Promise<void>;
   fetchNotifications: (options?: { force?: boolean }) => Promise<void>;
   refresh: () => Promise<void>;
@@ -83,6 +103,7 @@ export type NotificationStoreActions = {
 export const useNotificationStore = create<NotificationState & NotificationStoreActions>(
   (set, get) => {
     const maybeMarkOpen = async () => {
+      const requestEpoch = authEpoch;
       const state = get();
       if (!state.authenticated || state.inflight.markOpen) return;
 
@@ -109,6 +130,7 @@ export const useNotificationStore = create<NotificationState & NotificationStore
       }));
       try {
         const markData = await postMarkNotificationsOpenApi();
+        if (isStaleAuthEpoch(requestEpoch)) return;
         if (typeof markData.showTelegramPrompt === "boolean") {
           set({ showTelegramPrompt: markData.showTelegramPrompt });
         }
@@ -131,6 +153,7 @@ export const useNotificationStore = create<NotificationState & NotificationStore
       } catch (error) {
         console.error("Failed to mark notifications as open:", error);
       } finally {
+        if (isStaleAuthEpoch(requestEpoch)) return;
         set((s) => ({
           inflight: { ...s.inflight, markOpen: false },
         }));
@@ -140,12 +163,23 @@ export const useNotificationStore = create<NotificationState & NotificationStore
     return {
       ...initialSnapshot(),
 
-      setAuthenticated: (authenticated) => set({ authenticated }),
+      setAuthenticated: (authenticated, userId) => {
+        const current = get().authenticated;
+        const nextAuthContextKey =
+          authenticated ? userId ?? "__authenticated__" : null;
+        if (
+          current !== authenticated ||
+          authContextKey !== nextAuthContextKey
+        ) {
+          // Reset everything when switching auth state or account to prevent data leaks.
+          resetModuleLevelState(nextAuthContextKey);
+          set({ ...initialSnapshot(), authenticated });
+        }
+      },
 
       reset: () => {
-        // Also reset throttle timestamps so the next auth cycle fetches fresh.
-        lastUserUnreadFetchAt = 0;
-        lastBusinessUnreadFetchAt = 0;
+        // Reset module-level state on explicit reset
+        resetModuleLevelState(null);
         set(initialSnapshot());
       },
 
@@ -175,17 +209,19 @@ export const useNotificationStore = create<NotificationState & NotificationStore
         }
 
         devLog("refreshUnreadOnly: fetching user unread-count");
+        const requestEpoch = authEpoch;
         const p = (async () => {
           set((s) => ({
             inflight: { ...s.inflight, fetchUnread: true },
           }));
           try {
             const unified = await fetchUnreadCountFromApi();
-            if (!get().authenticated) return;
+            if (!get().authenticated || isStaleAuthEpoch(requestEpoch)) return;
             lastUserUnreadFetchAt = Date.now();
             set({ unreadCount: unified });
             bumpRevision(set);
           } finally {
+            if (isStaleAuthEpoch(requestEpoch)) return;
             set((s) => ({
               inflight: { ...s.inflight, fetchUnread: false },
             }));
@@ -230,17 +266,19 @@ export const useNotificationStore = create<NotificationState & NotificationStore
         }
 
         devLog("refreshBusinessUnreadOnly: fetching business unread-count");
+        const requestEpoch = authEpoch;
         const p = (async () => {
           set((s) => ({
             inflight: { ...s.inflight, fetchUnread: true },
           }));
           try {
             const business = await fetchUnreadCountFromApi("business");
-            if (!get().authenticated) return;
+            if (!get().authenticated || isStaleAuthEpoch(requestEpoch)) return;
             lastBusinessUnreadFetchAt = Date.now();
             set({ businessUnreadCount: business });
             bumpRevision(set);
           } finally {
+            if (isStaleAuthEpoch(requestEpoch)) return;
             set((s) => ({
               inflight: { ...s.inflight, fetchUnread: false },
             }));
@@ -297,6 +335,7 @@ export const useNotificationStore = create<NotificationState & NotificationStore
 
       fetchNotifications: async (options) => {
         const force = options?.force === true;
+        const requestEpoch = authEpoch;
         if (!get().authenticated) return;
         if (get().inflight.fetchList) return;
         if (get().isHydrated && !force) return;
@@ -307,6 +346,7 @@ export const useNotificationStore = create<NotificationState & NotificationStore
         }));
         try {
           const page = await fetchNotificationsPageApi(0, PAGE_SIZE);
+          if (!get().authenticated || isStaleAuthEpoch(requestEpoch)) return;
           set({
             items: page.notifications,
             hasMore: page.hasMore,
@@ -325,6 +365,7 @@ export const useNotificationStore = create<NotificationState & NotificationStore
           set({ error: message });
           throw e;
         } finally {
+          if (isStaleAuthEpoch(requestEpoch)) return;
           set((s) => ({
             inflight: { ...s.inflight, fetchList: false },
           }));
@@ -332,6 +373,7 @@ export const useNotificationStore = create<NotificationState & NotificationStore
       },
 
       fetchMoreNotifications: async () => {
+        const requestEpoch = authEpoch;
         if (!get().authenticated) return;
         if (!get().hasMore || get().inflight.fetchList || get().loadingMore) return;
 
@@ -342,6 +384,7 @@ export const useNotificationStore = create<NotificationState & NotificationStore
         try {
           const start = get().offset;
           const page = await fetchNotificationsPageApi(start, PAGE_SIZE);
+          if (!get().authenticated || isStaleAuthEpoch(requestEpoch)) return;
           set((s) => ({
             items: [...s.items, ...page.notifications],
             hasMore: page.hasMore,
@@ -352,6 +395,7 @@ export const useNotificationStore = create<NotificationState & NotificationStore
           console.error(e);
           throw e;
         } finally {
+          if (isStaleAuthEpoch(requestEpoch)) return;
           set({ loadingMore: false });
           set((s) => ({
             inflight: { ...s.inflight, fetchList: false },
@@ -360,6 +404,7 @@ export const useNotificationStore = create<NotificationState & NotificationStore
       },
 
       openPanel: async () => {
+        const requestEpoch = authEpoch;
         if (!get().authenticated) return;
         set({ panelOpen: true });
         if (get().isHydrated) return;
@@ -369,6 +414,7 @@ export const useNotificationStore = create<NotificationState & NotificationStore
           await get().fetchNotifications({ force: true });
           await maybeMarkOpen();
         } finally {
+          if (isStaleAuthEpoch(requestEpoch)) return;
           set({ isLoading: false });
         }
       },

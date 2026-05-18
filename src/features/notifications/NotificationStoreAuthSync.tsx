@@ -21,8 +21,9 @@ import { isBusinessSurface } from "@/features/notifications/store/notification-s
  * - No cascading double-fetch on mode/pathname oscillation.
  */
 export function NotificationStoreAuthSync({ children }: { children: ReactNode }) {
-  const { status } = useAuthMe();
+  const { status, user } = useAuthMe();
   const authed = status === "authenticated";
+  const userId = authed ? user?.id ?? null : null;
   const { mode, hydrated } = useAccountMode();
 
   // Mount the event bridge once; tear it down on unmount.
@@ -36,11 +37,11 @@ export function NotificationStoreAuthSync({ children }: { children: ReactNode })
 
   // Keep the store's `authenticated` flag in sync.
   useEffect(() => {
-    useNotificationStore.getState().setAuthenticated(authed);
+    useNotificationStore.getState().setAuthenticated(authed, userId);
     if (!authed) {
       useNotificationStore.getState().reset();
     }
-  }, [authed]);
+  }, [authed, userId]);
 
   // Initial unread fetch after auth + hydration.
   // Surface-aware: public pages only fetch user unread, business pages only business unread.

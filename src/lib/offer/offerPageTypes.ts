@@ -1,173 +1,66 @@
 /**
- * Offer Page Types
- * Типы данных для публичной страницы предложения
+ * Типы страницы оффера.
+ * Этот файл — единственный источник правды для всех компонентов секции /offers.
  */
 
-import type { Intent } from "@/lib/intent";
-
-export type OfferType = "SINGLE" | "REGULAR" | "CAMP";
-
-export type OfferCtaType = 
-  | "записаться" 
-  | "забронировать" 
-  | "купить_билет" 
-  | "отправить_заявку" 
-  | "перейти_на_сайт";
-
-export interface OfferPageData {
-  id: string;
-  slug: string;
-  citySlug: string;
-  
-  // Basic Info
-  title: string;
-  shortDescription: string;
-  description: string; // Rich HTML
-  offerType: OfferType;
-  
-  // Media
-  media: {
-    posterUrl: string;
-    posterAlt: string;
-    gallery: OfferGalleryImage[];
-    videoUrl?: string | null;
-    videoThumbnail?: string | null;
-    videoDuration?: string | null;
-    videoLabel?: string | null; // "Трейлер", "Как проходят занятия"
-  };
-  
-  // Meta Grid (Quick Facts)
-  metaGrid: OfferMetaItem[];
-  
-  // Pricing
-  pricing: {
-    mode: "single" | "multiple";
-    singlePrice?: string;
-    singleCurrency?: string;
-    priceCaption?: string;
-    priceFrom?: string;
-    options?: OfferPricingOption[];
-    promotionText?: string;
-    promotionSubtitle?: string;
-  };
-  
-  // Schedule / Sessions (for REGULAR and CAMP)
-  schedule?: {
-    type: "classes" | "shifts"; // classes для REGULAR, shifts для CAMP
-    items: OfferScheduleItem[];
-  };
-  
-  // Accommodation (for CAMP only)
-  accommodation?: {
-    provided: boolean;
-    type?: string;
-    address?: string;
-    rooms?: string;
-    conditions?: string;
-    meals?: string[];
-    mealInfo?: string;
-    transferInfo?: string;
-    whatToBring?: string;
-    safetyInfo?: string;
-    medicalInfo?: string;
-  };
-  
-  // Location
-  place?: {
-    id: string;
-    name: string;
-    slug: string;
-    address?: string;
-    district?: string;
-    metro?: string;
-    lat?: number;
-    lng?: number;
-  };
-  
-  // Reviews (только внутренние mamaGo)
-  reviews: OfferReview[];
-  reviewsCount: number;
-  averageRating?: number;
-  
-  // CTA
-  cta: {
-    type: OfferCtaType;
-    primaryLabel: string;
-    secondaryLabel?: string;
-    phone?: string;
-    link?: string;
-    instructions?: string;
-  };
-  
-  // Related Content
-  similar: OfferSimilarItem[];
-  
-  // SEO
-  seo: {
-    title?: string;
-    description?: string;
-    ogTitle?: string;
-    ogDescription?: string;
-    ogImage?: string;
-    canonicalUrl?: string;
-  };
-  
-  // Preview Banner (for draft/moderation)
-  previewBannerLabel?: string;
-  
-  // Stats
-  hidePublicationStats?: boolean;
-  
-  // Discovery Intent (для контекста навигации)
-  discoveryIntent?: Intent;
-}
-
-export interface OfferGalleryImage {
+export interface OfferMediaItem {
   id: string;
   url: string;
+  alt?: string;
+  /** Optional dimensions / blurhash for transformer layer */
   width?: number;
   height?: number;
   blurhash?: string;
-  alt?: string;
 }
+
+/** Alias kept for backward compat with DB mapper / transformer */
+export type OfferGalleryImage = OfferMediaItem;
 
 export interface OfferMetaItem {
   id: string;
-  icon?: string;
   label: string;
   value: string;
+  /** Optional icon name (e.g. lucide icon id) — not used by UI components */
+  icon?: string;
 }
 
 export interface OfferPricingOption {
   id: string;
   title: string;
   price: string;
-  oldPrice?: string;
+  /** Optional legacy fields from old mock/mapper */
   description?: string;
+  oldPrice?: string;
 }
 
 export interface OfferScheduleItem {
   id: string;
-  // For classes (REGULAR)
+  title?: string;
+  ageRange?: string;
+  /** Дата начала — строка, например «1 июля» */
+  dateFrom?: string;
+  /** Дата окончания */
+  dateTo?: string;
+  duration?: string;
+  price?: string;
+  /** Кол-во мест всего */
+  capacity?: number;
+  /** Кол-во оставшихся мест */
+  spotsLeft?: number;
+  /** Показывать ли кнопку CTA */
+  ctaEnabled?: boolean;
+  ctaLabel?: string;
+  /** Для расписания занятий (REGULAR) */
   groupName?: string;
   days?: string;
   time?: string;
-  // For shifts (CAMP)
-  title?: string;
-  dateFrom?: string;
-  dateTo?: string;
-  duration?: string;
-  ageRange?: string;
-  spotsLeft?: number;
-  capacity?: number;
-  // Common
-  price?: string;
+  /** Legacy fields */
+  oldPrice?: string;
+  priceLabel?: string;
+  promoLabel?: string;
   description?: string;
-  ctaLabel?: string;
-  ctaEnabled?: boolean;
 }
 
-/** Контекст конкретной смены, передаётся в CTA-обработчик */
 export interface ShiftCtaContext {
   shiftId: string;
   title?: string;
@@ -181,20 +74,169 @@ export interface OfferReview {
   id: string;
   authorName: string;
   authorAvatar?: string;
-  rating: number;
-  text: string;
   date: string;
+  rating: number;
+  text?: string;
+  /** Legacy helpful count */
   helpful?: number;
 }
 
-export interface OfferSimilarItem {
+export interface OfferPerk {
+  stat: string;
+  label: string;
+  desc?: string;
+}
+
+/** Offer type alias — kept for DB mapper / transformer backward compat */
+export type OfferType = "CAMP" | "REGULAR" | "SINGLE";
+
+/** CTA type alias — kept for offerPageFormat / offerPageData backward compat */
+export type OfferCtaType =
+  | "записаться"
+  | "забронировать"
+  | "купить_билет"
+  | "отправить_заявку"
+  | "перейти_на_сайт";
+
+export interface OfferPageData {
   id: string;
-  title: string;
+  offerType: OfferType;
+  citySlug: string;
   slug: string;
-  coverUrl: string;
-  priceLabel?: string;
-  ageLabel?: string;
-  placeTitle?: string;
-  rating?: number;
+  title: string;
+  shortDescription?: string;
+  /** Long HTML description — not rendered by new UI components, kept for SEO / JSON-LD */
+  description?: string;
+  /** Review count — used by some pages directly */
   reviewsCount?: number;
+
+  place?: {
+    id: string;
+    name: string;
+    slug: string;
+    address?: string;
+    /** Editorial tagline shown under place name, e.g. "в шаге от метро" */
+    tagline?: string;
+    /** Extra amenity/feature chips */
+    tags?: string[];
+    /** Extended fields used by DB mapper */
+    district?: string;
+    metro?: string;
+    lat?: number;
+    lng?: number;
+    logoUrl?: string;
+    rating?: number;
+    ratingsCount?: number;
+    citySlug?: string;
+  };
+
+  media: {
+    posterUrl?: string;
+    posterAlt?: string;
+    videoUrl?: string;
+    /** Video button label, e.g. "Трейлер" */
+    videoLabel?: string;
+    /** Thumbnail for video preview card */
+    videoThumbnail?: string;
+    /** Duration string, e.g. "1:23" */
+    videoDuration?: string;
+    gallery: OfferMediaItem[];
+  };
+
+  metaGrid: OfferMetaItem[];
+
+  pricing: {
+    priceFrom?: string;
+    singlePrice?: string;
+    priceCaption?: string;
+    promotionText?: string;
+    promotionSubtitle?: string;
+    options?: OfferPricingOption[];
+    /** Clean numeric display price, e.g. "890" (shown large in booking card) */
+    priceDisplay?: string;
+    /** Price unit label shown next to large number, e.g. "BYN / смена" */
+    priceUnit?: string;
+    /** Discount list — shown as coloured badges in booking card */
+    discounts?: Array<{ rate: string; label: string }>;
+    /** Legacy fields from old mapper */
+    mode?: string;
+    promoTitle?: string;
+    promoUntil?: string;
+    promotionDetails?: string;
+    oldPrice?: string;
+  };
+
+  averageRating?: number;
+
+  cta: {
+    primaryLabel: string;
+    secondaryLabel?: string;
+    /** Legacy extended fields */
+    type?: OfferCtaType;
+    phone?: string;
+    link?: string;
+    instructions?: string;
+  };
+
+  schedule?: {
+    type: "classes" | "shifts";
+    items: OfferScheduleItem[];
+  };
+
+  reviews?: OfferReview[];
+
+  /** SEO metadata — used by programs page and JSON-LD builder */
+  seo?: {
+    title?: string;
+    description?: string;
+    ogTitle?: string;
+    ogDescription?: string;
+    ogImage?: string;
+    canonicalUrl?: string;
+  };
+
+  /** Camp accommodation block — used by old DB mapper */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  accommodation?: Record<string, any>;
+
+  /** Similar offers — placeholder for future implementation */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  similar?: any[];
+
+  /** Perks / highlights list — used by editorial insight section */
+  perks?: OfferPerk[];
+
+  /**
+   * Bottom promo CTA block — editorial full-width section with countdown,
+   * large serif headline and conversion buttons.
+   */
+  promoCta?: {
+    /** Static timer label, e.g. "ДО КОНЦА АКЦИИ 14 ДНЕЙ · 17 ЧАСОВ" */
+    timerLabel?: string;
+    /** ISO date string — if provided, a live countdown is computed */
+    promoUntil?: string;
+    /** Full headline text, e.g. "Запишите ребёнка на лучшее лето." */
+    headline: string;
+    /** Word inside headline to italicize with accent colour */
+    accentWord?: string;
+    /** Subtitle / supporting copy below the headline */
+    subtitle?: string;
+    /** Primary CTA label, e.g. "Записаться за 650 BYN" */
+    primaryLabel: string;
+    /** Secondary CTA label, e.g. "Получить программу в Telegram" */
+    secondaryLabel?: string;
+    /** Secondary CTA href (Telegram link, etc.) */
+    secondaryHref?: string;
+    /** Trust micro-copy below buttons */
+    trustLine?: string;
+  };
+
+  /** Banner label shown in preview/draft mode */
+  previewBannerLabel?: string;
+
+  /** Hide publication stats in owner view */
+  hidePublicationStats?: boolean;
+
+  /** Discovery intent — used by recommendation engine */
+  discoveryIntent?: string;
 }

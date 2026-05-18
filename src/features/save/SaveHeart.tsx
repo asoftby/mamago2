@@ -12,11 +12,17 @@ import { getLocalDateKey } from "@/lib/date/localDateKey";
 
 type SaveHeartProps = {
   activityId: string;
+  /** When set, all save API calls use offerId instead of activityId. */
+  offerId?: string;
   activityTitle: string;
   coverImageUrl?: string | null;
   /** Если известна единственная дата сеанса, показываем в модалке только её для «В план». */
   eventPlanDateISO?: string | null;
+  /** Если активность длительная, используем конец диапазона для state-aware модалки. */
+  eventPlanDateEndISO?: string | null;
+  source?: string;
   className?: string;
+  iconClassName?: string;
   onSaveChange?: (isSaved: boolean) => void;
 };
 
@@ -38,10 +44,14 @@ function normalizePlanDateISO(value?: string | null): string | undefined {
 
 export function SaveHeart({
   activityId,
+  offerId,
   activityTitle,
   coverImageUrl,
   eventPlanDateISO,
+  eventPlanDateEndISO,
+  source,
   className,
+  iconClassName,
   onSaveChange,
 }: SaveHeartProps) {
   const { isAuthenticated } = useAuthMe();
@@ -61,7 +71,10 @@ export function SaveHeart({
 
   const checkSaveStatus = useCallback(async () => {
     try {
-      const res = await fetch(`/api/save/status?activityId=${activityId}`);
+      const statusQuery = offerId
+        ? `offerId=${offerId}`
+        : `activityId=${activityId}`;
+      const res = await fetch(`/api/save/status?${statusQuery}`);
       if (!res.ok) return;
       const data = await res.json();
       setSaveStatus({
@@ -73,7 +86,7 @@ export function SaveHeart({
     } catch (error) {
       console.error("Failed to check save status:", error);
     }
-  }, [activityId]);
+  }, [activityId, offerId]);
 
   useEffect(() => {
     void checkSaveStatus();
@@ -109,6 +122,7 @@ export function SaveHeart({
       try {
         await persistActivitySave(result, {
           activityId,
+          offerId,
           title: activityTitle,
           coverImageUrl,
         });
@@ -137,7 +151,7 @@ export function SaveHeart({
         setIsLoading(false);
       }
     },
-    [activityId, activityTitle, coverImageUrl, checkSaveStatus, onSaveChange],
+    [activityId, offerId, activityTitle, coverImageUrl, checkSaveStatus, onSaveChange],
   );
 
   const triggerAnimation = () => {
@@ -171,6 +185,7 @@ export function SaveHeart({
             "h-5 w-5 transition-all duration-300",
             isSaved && "fill-current",
             isAnimating && "scale-125",
+            iconClassName,
           )}
         />
       </button>
@@ -183,8 +198,10 @@ export function SaveHeart({
           kind: "quickdate",
           title: activityTitle,
           eventPlanDateISO: normalizedEventPlanDateISO,
+          eventPlanDateEndISO: eventPlanDateEndISO ?? undefined,
           eventPlanDateOptions: eventPlanDateOptions,
         }}
+        source={source}
         onPersist={handlePersist}
         isIdea={saveStatus.isIdea}
         inPlan={saveStatus.inPlan}

@@ -52,13 +52,17 @@ function CityProviderInner({ children }: { children: React.ReactNode }) {
 
   // 2. Hydrate storage city on mount
   useEffect(() => {
+    let nextStoredCity: string | null = null;
     try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      setStoredCity(saved);
+      nextStoredCity = localStorage.getItem(STORAGE_KEY);
     } catch {
       /* ignore */
     }
-    setIsInitialized(true);
+
+    queueMicrotask(() => {
+      setStoredCity(nextStoredCity);
+      setIsInitialized(true);
+    });
   }, []);
 
   const resolvedCity = useMemo(() => {
@@ -94,7 +98,9 @@ function CityProviderInner({ children }: { children: React.ReactNode }) {
     } catch {
       /* ignore */
     }
-    setStoredCity(resolvedCity.citySlug);
+    queueMicrotask(() => {
+      setStoredCity(resolvedCity.citySlug);
+    });
   }, [resolvedCity.citySlug, storedCity, isInitialized]);
 
   useEffect(() => {

@@ -33,6 +33,7 @@ export type ActivityForEventPageInput = {
   priceFrom: number | null;
   currency: string | null;
   priceDetails: string | null;
+  scheduleJson?: unknown | null;
   /** Денормализованный URL обложки; может дублировать запись по coverImageId в images */
   coverImageUrl: string | null;
   /** Primary media asset id for cover image. */
@@ -88,6 +89,31 @@ function priceLabel(activity: Pick<ActivityForEventPageInput, "priceText" | "pri
     return formatPriceFrom(activity.priceFrom);
   }
   return "Уточняйте цену";
+}
+
+function isHttpUrl(value: string): boolean {
+  return /^https?:\/\//i.test(value.trim());
+}
+
+function resolvePurchaseUrl(activity: Pick<ActivityForEventPageInput, "scheduleJson">): string | undefined {
+  const raw = activity.scheduleJson;
+  if (!raw || typeof raw !== "object") return undefined;
+  const json = raw as Record<string, unknown>;
+  const participationMode =
+    typeof json.participationMode === "string" ? json.participationMode : undefined;
+  if (participationMode === "external-link") {
+    const ticketLink = typeof json.ticketLink === "string" ? json.ticketLink.trim() : "";
+    return ticketLink && isHttpUrl(ticketLink) ? ticketLink : undefined;
+  }
+  if (participationMode === "prebook") {
+    const prebookMethod =
+      typeof json.prebookMethod === "string" ? json.prebookMethod : undefined;
+    const prebookUrl = typeof json.prebookUrl === "string" ? json.prebookUrl.trim() : "";
+    if (prebookMethod === "link" && prebookUrl && isHttpUrl(prebookUrl)) {
+      return prebookUrl;
+    }
+  }
+  return undefined;
 }
 
 function factChipsFromActivity(activity: ActivityForEventPageInput): EventPageData["factChips"] {
@@ -237,10 +263,15 @@ export function buildEventPageDataFromPrismaActivity(
     ? extractPlainTextFromHtml(activity.description)
     : "";
 
+  const now = new Date();
+  const isPastEvent =
+    sessions.length > 0 && sessions.every((s) => new Date(s.startsAt) < now);
+
   const data: EventPageData = {
     id: activity.id,
     slug: activity.slug ?? null,
     citySlug,
+    isPastEvent,
     discoveryIntent: discoveryIntentForActivity(),
     ageFromBadge: ageFromPlusBadgeFromAgeTags(activity.ageTags),
     categoryLabel: activity.eventCategory?.nameRu,
@@ -274,6 +305,7 @@ export function buildEventPageDataFromPrismaActivity(
       planLabel: "В план",
       buyLabel: activity.format === "ONLINE" ? "Участвовать онлайн" : "Купить билет",
       saveLabel: "В идеи",
+      purchaseUrl: resolvePurchaseUrl(activity),
     },
     ownerEditHref: options?.ownerEditHref,
     previewBannerLabel: options?.previewBannerLabel,

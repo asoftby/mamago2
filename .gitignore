@@ -34,6 +34,8 @@ prisma/dev.db
 prisma/dev.db-journal
 dev.db
 dev.db-journal
+/dev.db
+/dev.db-journal
 
 # Build artifacts & caches
 .turbo/
@@ -68,3 +70,6 @@ lint-errors*.json
 # local diagnostic logs
 build-errors.txt
 ts-errors.txt
+
+# Local AI assistant files
+.claude/

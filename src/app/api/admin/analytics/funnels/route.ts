@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
     }
     console.error("GET /api/admin/analytics/funnels:", error);
     return NextResponse.json(
-      { error: msg || "Failed to load funnel analytics" },
+      { error: "Failed to load funnel analytics" },
       { status: 500 },
     );
   }

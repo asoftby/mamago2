@@ -25,6 +25,18 @@ export type PendingActionType =
       type: "START_DIRECT_CHAT";
       recipientId: string;
       recipientName?: string;
+    }
+  | {
+      type: "SAVE_IDEA";
+      entityType: "OFFER";
+      entityId: string;
+      entityName?: string;
+    }
+  | {
+      type: "SAVE_PLAN";
+      entityType: "OFFER";
+      entityId: string;
+      entityName?: string;
     };
 
 interface PendingActionContextType {

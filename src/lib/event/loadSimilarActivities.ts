@@ -30,9 +30,12 @@ type SimilarRow = {
   coverImageId: string | null;
   priceText: string | null;
   priceFrom: number | null;
+  ageMinMonths: number | null;
+  ageMaxMonths: number | null;
   images: Array<{ id: string; url: string; mediaAssetId: string | null }>;
   sessions: Array<{ id: string; startsAt: Date }>;
   place: { city: { slug: string } | null } | null;
+  eventCategory: { nameRu: string } | null;
 };
 
 const SIMILAR_SELECT = {
@@ -43,6 +46,8 @@ const SIMILAR_SELECT = {
   coverImageId: true,
   priceText: true,
   priceFrom: true,
+  ageMinMonths: true,
+  ageMaxMonths: true,
   images: {
     select: { id: true, url: true, mediaAssetId: true },
     orderBy: { sortOrder: "asc" as const },
@@ -50,6 +55,7 @@ const SIMILAR_SELECT = {
   },
   sessions: { select: { id: true, startsAt: true }, orderBy: { startsAt: "asc" as const }, take: 1 },
   place: { select: { city: { select: { slug: true } } } },
+  eventCategory: { select: { nameRu: true } },
 } satisfies Prisma.ActivitySelect;
 
 function rowToSimilar(row: SimilarRow, citySlug: string): EventPageSimilar {
@@ -77,12 +83,21 @@ function rowToSimilar(row: SimilarRow, citySlug: string): EventPageSimilar {
 
   const activityCitySlug = row.place?.city?.slug ?? citySlug;
 
+  const ageLabel =
+    row.ageMinMonths != null
+      ? row.ageMaxMonths != null
+        ? `${row.ageMinMonths}–${row.ageMaxMonths}+`
+        : `${row.ageMinMonths}+`
+      : undefined;
+
   return {
     id: row.id,
     title: row.title,
     imageUrl,
     dateLabel,
     priceLabel,
+    categoryLabel: row.eventCategory?.nameRu,
+    ageLabel,
     href: publicActivityPath(row.id, activityCitySlug, row.slug),
   };
 }

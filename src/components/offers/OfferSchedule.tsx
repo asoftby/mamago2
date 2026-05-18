@@ -1,8 +1,8 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { CalendarDays, Clock, Users, Heart, Check } from "lucide-react";
-import { useState } from "react";
+import { CalendarDays, Clock, Flame } from "lucide-react";
+import { useMemo } from "react";
 import { cn } from "@/lib/utils";
 import type { OfferScheduleItem, ShiftCtaContext } from "@/lib/offer/offerPageTypes";
 
@@ -15,17 +15,57 @@ interface OfferScheduleProps {
   onItemCta?: (itemId: string) => void;
 }
 
-export function OfferSchedule({ type, items, onShiftCta, onItemCta }: OfferScheduleProps) {
+export function OfferSchedule({
+  type,
+  items,
+  onShiftCta,
+  onItemCta,
+}: OfferScheduleProps) {
+  /** Помечаем «hot»-смену — первую открытую с минимальным процентом заполнения
+   *  (от 1 до 70% — самые свежие, ещё есть места и есть скидка-стимул). */
+  const hotShiftId = useMemo(() => {
+    if (type !== "shifts") return null;
+    const candidates = items.filter((s) => {
+      if (s.capacity === undefined || s.spotsLeft === undefined) return false;
+      if (s.spotsLeft === 0) return false;
+      const filled = 1 - s.spotsLeft / s.capacity;
+      return filled > 0 && filled < 0.7;
+    });
+    if (candidates.length === 0) return null;
+    // выбираем с минимальной заполненностью
+    return candidates.reduce((best, cur) => {
+      const fb = 1 - (best.spotsLeft! / best.capacity!);
+      const fc = 1 - (cur.spotsLeft! / cur.capacity!);
+      return fc < fb ? cur : best;
+    }).id;
+  }, [type, items]);
+
   return (
-    <section id="schedule" className="space-y-6 scroll-mt-24">
-      <h2 className="text-[22px] font-bold text-gray-900 lg:text-[24px]">
-        {type === "shifts" ? "Смены и стоимость" : "Расписание и стоимость"}
-      </h2>
+    <section id="schedule" className="space-y-7 scroll-mt-24">
+      {/* Editorial section header */}
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-3.5 mb-3">
+            <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-gray-400">
+              {type === "shifts" ? "04 — Смены и стоимость" : "04 — Расписание и стоимость"}
+            </span>
+            <span className="flex-1 h-px bg-gray-100 max-w-[180px]" />
+          </div>
+          <h2 className="font-[family-name:var(--font-display)] text-[36px] lg:text-[44px] font-normal tracking-[-0.02em] leading-[0.95] text-gray-900">
+            Выбери своё{" "}
+            <span className="italic text-[#C2522A]">лето</span>.
+          </h2>
+        </div>
+      </div>
 
       {items.length === 0 ? (
         <EmptySchedule onCta={() => onItemCta?.("empty")} />
       ) : type === "shifts" ? (
-        <ShiftsList items={items} onShiftCta={onShiftCta} />
+        <ShiftsList
+          items={items}
+          onShiftCta={onShiftCta}
+          hotShiftId={hotShiftId}
+        />
       ) : (
         <ClassesTable items={items} onItemCta={onItemCta} />
       )}
@@ -45,7 +85,7 @@ function EmptySchedule({ onCta }: { onCta?: () => void }) {
       <p className="text-[16px] font-semibold text-gray-700">Расписание и стоимость уточняются</p>
       <p className="mt-1 text-[14px] text-gray-400">Оставьте заявку — мы свяжемся с вами</p>
       <Button
-        className="mt-5 h-11 rounded-2xl bg-[#EF8759] px-6 text-[14px] font-bold text-white hover:bg-[#e07848]"
+        className="mt-5 h-11 rounded-full bg-[#EF8759] px-6 text-[14px] font-bold text-white hover:bg-[#e07848]"
         onClick={onCta}
       >
         Оставить заявку
@@ -55,19 +95,26 @@ function EmptySchedule({ onCta }: { onCta?: () => void }) {
 }
 
 /* ─────────────────────────────────────────
-   Shifts List (CAMP) — вертикальный список
+   Shifts (CAMP)
 ───────────────────────────────────────── */
 function ShiftsList({
   items,
   onShiftCta,
+  hotShiftId,
 }: {
   items: OfferScheduleItem[];
   onShiftCta?: (ctx: ShiftCtaContext) => void;
+  hotShiftId: string | null;
 }) {
   return (
-    <div className="space-y-4">
+    <div className="space-y-3.5">
       {items.map((item) => (
-        <ShiftCard key={item.id} item={item} onShiftCta={onShiftCta} />
+        <ShiftCard
+          key={item.id}
+          item={item}
+          onShiftCta={onShiftCta}
+          isHot={item.id === hotShiftId}
+        />
       ))}
     </div>
   );
@@ -76,12 +123,12 @@ function ShiftsList({
 function ShiftCard({
   item,
   onShiftCta,
+  isHot,
 }: {
   item: OfferScheduleItem;
   onShiftCta?: (ctx: ShiftCtaContext) => void;
+  isHot?: boolean;
 }) {
-  const [inPlan, setInPlan] = useState(false);
-
   const ctx: ShiftCtaContext = {
     shiftId: item.id,
     title: item.title,
@@ -96,141 +143,146 @@ function ShiftCard({
       ? `${item.dateFrom} — ${item.dateTo}`
       : item.dateFrom ?? item.dateTo ?? null;
 
+  const isFull = item.spotsLeft === 0;
+
   return (
-    <div className="rounded-3xl border border-gray-100 bg-white shadow-sm transition-shadow hover:shadow-md">
-      {/* ── Desktop layout ── */}
-      <div className="hidden sm:flex items-center gap-6 px-7 py-6">
-        {/* Left: info */}
-        <div className="flex-1 min-w-0 space-y-2">
-          {/* Title + dates */}
-          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-            {item.title && (
-              <h3 className="text-[16px] font-bold text-gray-900">{item.title}</h3>
-            )}
-            {dateLabel && (
-              <span className="flex items-center gap-1 text-[14px] font-medium text-[#EF8759]">
-                <CalendarDays className="h-3.5 w-3.5 shrink-0" />
-                {dateLabel}
-              </span>
-            )}
-          </div>
+    <article
+      className={cn(
+        "relative overflow-hidden rounded-3xl border bg-white shadow-sm transition-shadow hover:shadow-md",
+        isHot
+          ? "border-[#EF8759]/25 bg-gradient-to-b from-[#FFF7F3] to-white"
+          : "border-gray-100",
+      )}
+    >
+      {/* Hot badge */}
+      {isHot && (
+        <span className="absolute right-5 top-4 inline-flex items-center gap-1 font-mono text-[10px] uppercase tracking-[0.14em] font-semibold text-[#C2522A]">
+          <Flame className="h-3 w-3 fill-current" />
+          hot
+        </span>
+      )}
 
-          {/* Meta chips */}
-          <div className="flex flex-wrap gap-2">
-            {item.ageRange && (
-              <MetaChip icon={<Users className="h-3.5 w-3.5" />} label={item.ageRange} />
-            )}
-            {item.duration && (
-              <MetaChip icon={<Clock className="h-3.5 w-3.5" />} label={item.duration} />
-            )}
-            {item.spotsLeft !== undefined && item.capacity !== undefined && (
-              <MetaChip
-                icon={<Users className="h-3.5 w-3.5" />}
-                label={`${item.spotsLeft} из ${item.capacity} мест`}
-                highlight={item.spotsLeft <= 3}
-              />
-            )}
-          </div>
-        </div>
-
-        {/* Right: price + actions */}
-        <div className="flex shrink-0 items-center gap-4">
-          {item.price && (
-            <div className="text-right">
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">Стоимость</p>
-              <p className="text-[20px] font-bold text-gray-900 leading-tight">{item.price}</p>
-            </div>
+      {/* ─── Desktop ─── */}
+      <div className="hidden sm:grid grid-cols-[minmax(220px,1fr)_auto_auto] items-center gap-7 px-7 py-6">
+        {/* Col 1 — info */}
+        <div className="min-w-0">
+          {item.ageRange && (
+            <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-gray-400 mb-1.5">
+              {item.ageRange}
+            </p>
           )}
-
-          {item.ctaEnabled !== false && (
-            <Button
-              onClick={() => onShiftCta?.(ctx)}
-              className="h-11 rounded-2xl bg-[#EF8759] px-5 text-[14px] font-bold text-white hover:bg-[#e07848] transition-all shadow-sm"
-            >
-              {item.ctaLabel ?? "Записаться"}
-            </Button>
-          )}
-
-          <button
-            type="button"
-            aria-label={inPlan ? "Убрать из плана" : "В план"}
-            onClick={() => setInPlan((v) => !v)}
-            className={cn(
-              "flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border transition-all",
-              inPlan
-                ? "border-[#EF8759] bg-[#FFF7F3] text-[#EF8759]"
-                : "border-gray-200 text-gray-400 hover:border-gray-300 hover:text-gray-600",
-            )}
-          >
-            {inPlan ? <Check className="h-4 w-4" /> : <Heart className="h-4 w-4" />}
-          </button>
-        </div>
-      </div>
-
-      {/* ── Mobile layout ── */}
-      <div className="sm:hidden p-5 space-y-4">
-        {/* Title + dates */}
-        <div className="space-y-1">
           {item.title && (
-            <h3 className="text-[15px] font-bold text-gray-900">{item.title}</h3>
+            <h3 className="text-[20px] font-bold tracking-[-0.01em] text-gray-900 truncate">
+              {item.title}
+            </h3>
           )}
           {dateLabel && (
-            <span className="flex items-center gap-1 text-[13px] font-medium text-[#EF8759]">
-              <CalendarDays className="h-3.5 w-3.5 shrink-0" />
-              {dateLabel}
-            </span>
+            <p className="mt-1 font-mono text-[12px] text-gray-500">{dateLabel}</p>
           )}
         </div>
 
-        {/* Meta chips */}
-        {(item.ageRange || item.duration) && (
-          <div className="flex flex-wrap gap-2">
-            {item.ageRange && (
-              <MetaChip icon={<Users className="h-3.5 w-3.5" />} label={item.ageRange} />
-            )}
+        {/* Col 2 — price */}
+        {item.price && (
+          <div className="text-right shrink-0">
+            <p className="font-[family-name:var(--font-display)] text-[40px] leading-[1] tracking-[-0.02em] text-gray-900">
+              {item.price}
+            </p>
+            <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-gray-400 mt-1">
+              за смену
+            </p>
             {item.duration && (
-              <MetaChip icon={<Clock className="h-3.5 w-3.5" />} label={item.duration} />
+              <p className="mt-2 text-[12px] text-gray-500">
+                <Clock className="inline h-3.5 w-3.5 mr-1 -mt-0.5" />
+                {item.duration}
+              </p>
             )}
           </div>
         )}
+
+        {/* Col 3 — actions */}
+        <div className="flex items-center shrink-0">
+          {item.ctaEnabled !== false && !isFull ? (
+            <Button
+              onClick={() => onShiftCta?.(ctx)}
+              className="h-12 rounded-full bg-[#EF8759] px-6 text-[14px] font-bold text-white shadow-sm shadow-[#EF8759]/25 hover:bg-[#e07848] transition-all"
+            >
+              {item.ctaLabel ?? "Записаться"}
+            </Button>
+          ) : (
+            <Button
+              disabled
+              variant="outline"
+              className="h-12 rounded-full border-gray-200 px-6 text-[13px] font-semibold text-gray-400"
+            >
+              В лист ожидания
+            </Button>
+          )}
+
+        </div>
+      </div>
+
+      {/* ─── Mobile ─── */}
+      <div className="sm:hidden p-5 space-y-4">
+        {/* Title + ages */}
+        <div className="space-y-1">
+          {item.ageRange && (
+            <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-gray-400">
+              {item.ageRange}
+            </p>
+          )}
+          {item.title && (
+            <h3 className="text-[17px] font-bold text-gray-900">{item.title}</h3>
+          )}
+          {dateLabel && (
+            <p className="font-mono text-[12px] text-gray-500">{dateLabel}</p>
+          )}
+        </div>
 
         {/* Price */}
         {item.price && (
-          <p className="text-[20px] font-bold text-gray-900">{item.price}</p>
+          <div className="flex items-baseline gap-2">
+            <span className="font-[family-name:var(--font-display)] text-[32px] leading-[1] text-gray-900">
+              {item.price}
+            </span>
+            <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-gray-400">
+              за смену
+            </span>
+          </div>
+        )}
+
+        {item.duration && (
+          <p className="text-[13px] text-gray-500">
+            <Clock className="inline h-3.5 w-3.5 mr-1 -mt-0.5" />
+            {item.duration}
+          </p>
         )}
 
         {/* Actions */}
-        <div className="flex gap-3">
-          {item.ctaEnabled !== false && (
+        <div className="flex">
+          {item.ctaEnabled !== false && !isFull ? (
             <Button
               onClick={() => onShiftCta?.(ctx)}
-              className="h-11 flex-1 rounded-2xl bg-[#EF8759] text-[14px] font-bold text-white hover:bg-[#e07848]"
+              className="h-11 flex-1 rounded-full bg-[#EF8759] text-[14px] font-bold text-white hover:bg-[#e07848]"
             >
               {item.ctaLabel ?? "Записаться"}
             </Button>
+          ) : (
+            <Button
+              disabled
+              variant="outline"
+              className="h-11 flex-1 rounded-full border-gray-200 text-[13px] font-semibold text-gray-400"
+            >
+              В лист ожидания
+            </Button>
           )}
-          <button
-            type="button"
-            aria-label={inPlan ? "Убрать из плана" : "В план"}
-            onClick={() => setInPlan((v) => !v)}
-            className={cn(
-              "flex h-11 items-center justify-center gap-1.5 rounded-2xl border px-4 text-[13px] font-bold transition-all",
-              inPlan
-                ? "border-[#EF8759] bg-[#FFF7F3] text-[#EF8759]"
-                : "border-gray-200 text-gray-500 hover:border-gray-300",
-            )}
-          >
-            {inPlan ? <Check className="h-4 w-4" /> : <Heart className="h-4 w-4" />}
-            {inPlan ? "В плане" : "В план"}
-          </button>
         </div>
       </div>
-    </div>
+    </article>
   );
 }
 
 /* ─────────────────────────────────────────
-   Classes Table (REGULAR)
+   Classes (REGULAR) — без изменений по логике, чуть подправлены радиусы
 ───────────────────────────────────────── */
 function ClassesTable({
   items,
@@ -271,7 +323,7 @@ function ClassesTable({
                   {item.ctaEnabled !== false && (
                     <Button
                       size="sm"
-                      className="h-9 rounded-xl bg-[#EF8759] px-4 text-[13px] font-bold text-white hover:bg-[#e07848]"
+                      className="h-9 rounded-full bg-[#EF8759] px-4 text-[13px] font-bold text-white hover:bg-[#e07848]"
                       onClick={() => onItemCta?.(item.id)}
                     >
                       {item.ctaLabel || "Записаться"}
@@ -312,7 +364,7 @@ function ClassesTable({
               {item.ctaEnabled !== false && (
                 <Button
                   size="sm"
-                  className="h-9 rounded-xl bg-[#EF8759] px-4 text-[13px] font-bold text-white hover:bg-[#e07848]"
+                  className="h-9 rounded-full bg-[#EF8759] px-4 text-[13px] font-bold text-white hover:bg-[#e07848]"
                   onClick={() => onItemCta?.(item.id)}
                 >
                   {item.ctaLabel || "Записаться"}
@@ -323,32 +375,5 @@ function ClassesTable({
         ))}
       </div>
     </div>
-  );
-}
-
-/* ─────────────────────────────────────────
-   Shared: Meta Chip
-───────────────────────────────────────── */
-function MetaChip({
-  icon,
-  label,
-  highlight = false,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  highlight?: boolean;
-}) {
-  return (
-    <span
-      className={cn(
-        "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[12px] font-medium",
-        highlight
-          ? "bg-red-50 text-red-600"
-          : "bg-gray-100 text-gray-600",
-      )}
-    >
-      {icon}
-      {label}
-    </span>
   );
 }

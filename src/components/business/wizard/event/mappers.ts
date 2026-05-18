@@ -20,6 +20,7 @@ import { sortAgeKeys } from "@/lib/config/ages";
 import type { EventOrganizerInput } from "@/lib/business/eventOrganizer";
 import { DEFAULT_ACTIVITY_FORMAT, normalizeActivityFormat } from "@/domain/activities/activity-format";
 import { normalizeRichTextEditorValue } from "@/lib/richtext/utils";
+import { expandScheduleItemDates } from "@/lib/event/expandScheduleItemDates";
 
 export type ActivityWithRelations = Activity & {
   id: string;
@@ -315,10 +316,6 @@ export function mapEventToFormData(event: ActivityWithRelations): EventFormData 
       ? scheduleModeRaw
       : "single";
 
-  formData.dates = Array.isArray(scheduleJson.dates)
-    ? (scheduleJson.dates as string[])
-    : [];
-
   formData.allDay = typeof scheduleJson.allDay === "boolean" ? scheduleJson.allDay : false;
   formData.startTime = typeof scheduleJson.startTime === "string" ? scheduleJson.startTime : "10:00";
   formData.endTime = typeof scheduleJson.endTime === "string" ? scheduleJson.endTime : "18:00";
@@ -341,9 +338,20 @@ export function mapEventToFormData(event: ActivityWithRelations): EventFormData 
   const scheduleItemsRaw = Array.isArray(scheduleJson.scheduleItems)
     ? scheduleJson.scheduleItems
     : null;
-  formData.scheduleItems =
+  const normalizedScheduleItems =
     scheduleItemsRaw && scheduleItemsRaw.length > 0
       ? (scheduleItemsRaw as EventFormData["scheduleItems"])
+      : null;
+
+  formData.dates = normalizedScheduleItems
+    ? expandScheduleItemDates(normalizedScheduleItems)
+    : Array.isArray(scheduleJson.dates)
+      ? (scheduleJson.dates as string[])
+      : [];
+
+  formData.scheduleItems =
+    normalizedScheduleItems
+      ? normalizedScheduleItems
       : formData.dates.length > 0
         ? formData.dates.map((date, index) => ({
             id: `date-${index}`,
@@ -593,9 +601,7 @@ export function buildEventPayload(data: EventFormData): EventPayload {
       ? data.scheduleItems
       : [createDefaultScheduleItem()];
   const firstScheduleItem = normalizedScheduleItems[0] ?? createDefaultScheduleItem();
-  const normalizedDates = normalizedScheduleItems
-    .map((item) => item.date)
-    .filter((date): date is string => Boolean(date));
+  const normalizedDates = expandScheduleItemDates(normalizedScheduleItems);
 
   const categoryIds = data.categoryId ? [data.categoryId] : [];
 

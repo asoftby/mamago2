@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useMemo } from "react";
 import { ActivityCard } from "@/components/activity/ActivityCard";
+import { OfferCard } from "@/components/offers/OfferCard";
 import { RouteCard } from "@/components/routes/RouteCard";
 import { CityHomeSection } from "@/features/city-home/components/CityHomeSection";
 import { HorizontalCardRow } from "@/features/city-home/components/HorizontalCardRow";
@@ -10,6 +11,9 @@ import { useCity } from "@/contexts/CityContext";
 import { useFamilyPersona } from "@/contexts/FamilyPersonaContext";
 import { getCityLocativePhrase } from "@/lib/city/cityDisplayNames";
 import { formatRuShortDayMonth, formatRuShortDayMonthRange } from "@/lib/formatters/date";
+import { formatPriceFrom } from "@/lib/formatters/format-price";
+import { getActivityFormatLabel } from "@/domain/activities/activity-format";
+import { publicActivityPath } from "@/lib/business/eventPublicLink";
 import type { ActivityMock } from "@/types/activity";
 import type { PublicRouteCardModel } from "@/components/routes/types";
 import { cn } from "@/lib/utils";
@@ -22,13 +26,9 @@ import {
 import { applyPersonaRanking } from "@/features/city-home/lib/personaRanking";
 
 const cardShell =
-  "shrink-0 snap-start w-[42vw] min-w-[156px] max-w-[220px] sm:max-w-[240px] " +
-  // Desktop: exactly 4 cards per row width (gap-6 => 3 * 1.5rem = 4.5rem)
+  "shrink-0 snap-start w-[44vw] min-w-[160px] max-w-[230px] sm:max-w-[250px] " +
   "lg:w-[calc((100%-4.5rem)/4)] lg:max-w-none";
-const kudaCardShell =
-  "shrink-0 snap-start w-[42vw] min-w-[156px] max-w-[220px] sm:max-w-[240px] " +
-  // Desktop: exactly 5 cards per row width (gap-6 => 4 * 1.5rem = 6rem)
-  "lg:w-[calc((100%-6rem)/5)] lg:max-w-none";
+const kudaCardShell = cardShell;
 
 function buildKudaSectionTitle(input: {
   citySlug: string;
@@ -64,7 +64,7 @@ function buildKudaSectionTitle(input: {
 }
 
 export function CityHomeKudaSection({ activities }: { activities: ActivityMock[] }) {
-  const { citySlug, appendCityQuery } = useCity();
+  const { appendCityQuery, citySlug } = useCity();
   const { applied } = useDiscoveryFilters();
   const family = useFamilyPersona();
   const baseTitle = buildKudaSectionTitle({
@@ -122,6 +122,7 @@ export function CityHomeKudaSection({ activities }: { activities: ActivityMock[]
               saveMeta={{
                 title: activity.title,
                 dateISO: activity.dateStart ?? null,
+                dateEndISO: activity.dateEnd ?? null,
                 dateLabel: activity.dateStart
                   ? formatRuShortDayMonth(activity.dateStart)
                   : null,
@@ -143,7 +144,7 @@ export function CityHomeClassesSection({
   activities: ActivityMock[];
   mode: "local" | "nearby" | "empty";
 }) {
-  const { citySlug, appendCityQuery } = useCity();
+  const { appendCityQuery, citySlug } = useCity();
   const family = useFamilyPersona();
   const preview = useMemo(
     () =>
@@ -169,21 +170,41 @@ export function CityHomeClassesSection({
       actionIconButton
     >
       <HorizontalCardRow>
-        {preview.map((activity) => (
-          <div key={activity.id} className={cardShell}>
-            <ActivityCard
-              coverRatio="1/1"
-              activity={activity}
-              saveMeta={{
-                title: activity.title,
-                dateISO: activity.dateStart ?? null,
-                dateLabel: activity.dateStart
-                  ? formatRuShortDayMonth(activity.dateStart)
-                  : null,
-              }}
-            />
-          </div>
-        ))}
+        {preview.map((activity) => {
+          const href =
+            activity.href ??
+            publicActivityPath(activity.id, activity.citySlug ?? citySlug, activity.slug);
+          const dateRange = activity.dateStart
+            ? formatRuShortDayMonthRange(activity.dateStart, activity.dateEnd ?? null)
+            : undefined;
+          const ageLabel =
+            activity.ageFrom != null ? `${activity.ageFrom}+` : undefined;
+          const dateLabel = [ageLabel, dateRange].filter(Boolean).join(" · ");
+          const priceLabel =
+            activity.priceMin === 0
+              ? "бесплатно"
+              : activity.priceMin != null
+                ? formatPriceFrom(activity.priceMin)
+                : undefined;
+          return (
+            <div key={activity.id} className={cardShell}>
+              <OfferCard
+                id={activity.id}
+                title={activity.title}
+                href={href}
+                imageUrl={activity.image}
+                categoryLabel={[
+                  activity.badge || null,
+                  activity.format ? getActivityFormatLabel(activity.format) : null,
+                ].filter(Boolean).join(" · ") || undefined}
+                dateLabel={dateLabel || undefined}
+                priceLabel={priceLabel}
+                saveDateISO={activity.dateStart ?? null}
+                saveDateEndISO={activity.dateEnd ?? null}
+              />
+            </div>
+          );
+        })}
       </HorizontalCardRow>
     </CityHomeSection>
   );
@@ -196,7 +217,7 @@ export function CityHomeRoutesSection({
   routes: PublicRouteCardModel[];
   mode: "local" | "nearby" | "empty";
 }) {
-  const { citySlug, appendCityQuery } = useCity();
+  const { appendCityQuery, citySlug } = useCity();
   const preview = routes;
 
   if (mode === "empty" || preview.length === 0) {
@@ -227,7 +248,7 @@ export function CityHomeJournalSection({
 }: {
   articles: CityHomeJournalArticle[];
 }) {
-  const { citySlug, appendCityQuery } = useCity();
+  const { appendCityQuery } = useCity();
 
   if (articles.length === 0) {
     return null;

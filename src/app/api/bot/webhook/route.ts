@@ -13,6 +13,14 @@ export const runtime = "nodejs";
 export async function POST(request: NextRequest) {
   const config = getTelegramConfig();
 
+  // Production guard: webhook secret is mandatory in production
+  if (process.env.NODE_ENV === "production" && !config.webhookSecret) {
+    return NextResponse.json(
+      { error: "Webhook not configured" },
+      { status: 503 },
+    );
+  }
+
   // Validate webhook secret when configured
   if (config.webhookSecret) {
     const incoming = request.headers.get("x-telegram-bot-api-secret-token");

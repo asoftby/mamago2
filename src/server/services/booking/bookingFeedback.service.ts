@@ -21,6 +21,7 @@
 
 import prisma from "@/lib/prisma";
 import { BookingStatus } from "@prisma/client";
+import { trackFeedbackLeft } from "@/server/analytics/trackBookingEvent";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -209,6 +210,27 @@ export async function createBookingFeedback(
       rating: true,
       comment: true,
       createdAt: true,
+      booking: {
+        select: {
+          offerId: true,
+          offer: { select: { id: true } },
+        },
+      },
+    },
+  });
+
+  // Fire-and-forget: analytics tracking
+  void trackFeedbackLeft({
+    userId: input.userId ?? null,
+    bookingId: input.bookingId,
+    entityType: "OFFER",
+    entityId: record.booking?.offerId ?? "",
+    vertical: "CITY",
+    metadata: {
+      rating,
+      hasText: !!comment,
+      source: "feedback_request",
+      surface: "web",
     },
   });
 

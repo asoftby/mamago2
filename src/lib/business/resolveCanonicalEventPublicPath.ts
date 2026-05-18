@@ -3,7 +3,7 @@ import { canonicalPublicActivityPath } from "@/lib/business/eventPublicLink";
 import { findActivityBySlug } from "@/lib/slug/activitySlugService";
 import { ActivityType } from "@prisma/client";
 import type { Prisma } from "@prisma/client";
-import { getPublicListingActivityWhere } from "@/server/public/publicContentVisibility";
+import { getPublicActivityDetailWhere } from "@/server/public/publicContentVisibility";
 
 async function citySlugById(cityId: string | null | undefined): Promise<string | null> {
   const id = typeof cityId === "string" ? cityId.trim() : "";
@@ -63,7 +63,7 @@ export async function resolveCanonicalEventPublicPathBySlugOrId(
 ): Promise<string | null> {
   const bySlug = await findActivityBySlug(slugOrId);
   const resolvedId = bySlug?.activityId ?? slugOrId;
-  const pub = getPublicListingActivityWhere();
+  const pub = getPublicActivityDetailWhere();
   const pubParts = (pub.AND ?? []) as Prisma.ActivityWhereInput[];
 
   const activity = await prisma.activity.findFirst({

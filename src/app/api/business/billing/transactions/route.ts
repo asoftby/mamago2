@@ -95,7 +95,7 @@ export async function GET(request: NextRequest) {
   } catch (error: unknown) {
     console.error("Get business transactions error:", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to get transactions" },
+      { error: "Internal server error" },
       { status: 500 }
     );
   }

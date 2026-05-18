@@ -60,6 +60,8 @@ export type EventPageSimilar = {
   imageUrl: string;
   dateLabel?: string;
   priceLabel?: string;
+  categoryLabel?: string;
+  ageLabel?: string;
   href: string;
 };
 
@@ -68,6 +70,8 @@ export type EventPageData = {
   /** SEO-slug для публичного URL; если нет — в ссылках используется id */
   slug?: string | null;
   citySlug: string;
+  /** true, если все сессии/даты события уже в прошлом */
+  isPastEvent: boolean;
   /** Раздел (Куда пойти / Занятия / …) — для хедера на странице публикации */
   discoveryIntent: Intent;
   /** Бэйдж «5+» из возрастных диапазонов — перед категорией в шапке решения. */

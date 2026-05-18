@@ -33,6 +33,13 @@ export type SaveActivityFlowAdaptiveProps = {
   inPlan?: boolean;
   planDate?: string | null;
   planStartsAt?: string | null;
+  /** Activity ID for pending action persistence across auth */
+  activityId?: string;
+  /** Activity title for pending action (optional, for UX) */
+  activityTitle?: string;
+  /** Cover image URL for pending action (optional, for UX) */
+  coverImageUrl?: string | null;
+  source?: string;
   onPersist: (result: SaveToPlanResult) => Promise<void>;
   nextHref?: string;
 };
@@ -86,6 +93,10 @@ export function SaveActivityFlowAdaptive({
   inPlan = false,
   planDate = null,
   planStartsAt = null,
+  activityId,
+  activityTitle,
+  coverImageUrl,
+  source,
   onPersist,
   nextHref,
 }: SaveActivityFlowAdaptiveProps) {
@@ -131,16 +142,39 @@ export function SaveActivityFlowAdaptive({
 
       // Сохраняем pending action и переходим на auth
       setPending(result);
-      if (typeof window !== "undefined") {
+
+      // Build pending action for automatic execution after auth
+      if (typeof window !== "undefined" && activityId) {
+        const pendingAction =
+          result.action === "ideas"
+            ? {
+                kind: "save_idea" as const,
+                entityType: "activity" as const,
+                entityId: activityId,
+                title: activityTitle,
+                coverImageUrl: coverImageUrl,
+              }
+            : result.action === "plan"
+              ? {
+                  kind: "save_plan" as const,
+                  entityType: "activity" as const,
+                  entityId: activityId,
+                  plannedDate: result.dateISO,
+                  timeSlotId: result.timeSlotId,
+                  title: activityTitle,
+                  coverImageUrl: coverImageUrl,
+                }
+              : null;
+
         savePostAuthContext({
           source: result.action === "ideas" ? "save_idea" : "save_plan",
-          pendingAction: null,
+          pendingAction,
           returnTo: `${window.location.pathname}${window.location.search}`,
         });
       }
       setPhase("auth");
     },
-    [isAuthenticated, onOpenChange, runPersist],
+    [isAuthenticated, onOpenChange, runPersist, activityId, activityTitle, coverImageUrl],
   );
 
   const finishSuccess = React.useCallback(() => {
@@ -236,6 +270,7 @@ export function SaveActivityFlowAdaptive({
           inPlan={inPlan}
           planDate={planDate}
           planStartsAt={planStartsAt}
+          source={source}
           onCommit={handleCommit}
         />
       )}

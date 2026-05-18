@@ -1,11 +1,21 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
-import { CheckCircle2, Loader2, Send } from "lucide-react";
+import { useEffect, useMemo, useState, useTransition } from "react";
+import { CheckCircle2, Loader2, Send, ShieldAlert } from "lucide-react";
 import { toast } from "@/lib/toast";
 import type { NotificationChannel, NotificationType } from "@prisma/client";
 import { Toggle } from "@/components/ui/Toggle";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
 import type {
   NotificationSettingsRow,
@@ -16,6 +26,7 @@ import {
   SYSTEM_NOTIFICATION_GUARD_MESSAGE,
   wouldDisableLastSystemNotificationChannel,
 } from "@/lib/notifications/userNotificationPresentation";
+import { useTelegramConnectionStatus } from "@/hooks/useTelegramConnectionStatus";
 
 interface Props {
   initialData: NotificationSettingsSurfaceData;
@@ -83,15 +94,46 @@ export function NotificationPreferencesClient({
   const [telegramConnected, setTelegramConnected] = useState(
     initialData.telegramConnected,
   );
+  const [telegramConfigured, setTelegramConfigured] = useState(
+    initialData.telegramConfigured,
+  );
   const [telegramUsername, setTelegramUsername] = useState(
     initialData.telegramUsername,
   );
+  const [telegramBotUsername, setTelegramBotUsername] = useState(
+    initialData.telegramBotUsername,
+  );
   const [isLinkingTelegram, setIsLinkingTelegram] = useState(false);
+  const [isPollingTelegram, setIsPollingTelegram] = useState(false);
+  const [isSendingTest, setIsSendingTest] = useState(false);
+  const [isDisconnectingTelegram, setIsDisconnectingTelegram] = useState(false);
+  const [disconnectDialogOpen, setDisconnectDialogOpen] = useState(false);
 
   const rowDefinitions = useMemo(
     () => getUserNotificationMatrixDefinitions(),
     [],
   );
+  const { status: telegramStatus } = useTelegramConnectionStatus({
+    enabled: true,
+    polling: isPollingTelegram,
+    onConnected: (status) => {
+      setIsPollingTelegram(false);
+      setTelegramConnected(true);
+      setTelegramConfigured(status.configured ?? true);
+      setTelegramUsername(status.username);
+      setTelegramBotUsername(status.botUsername);
+      toast.success("Telegram подключён");
+    },
+  });
+
+  useEffect(() => {
+    if (!telegramStatus) return;
+
+    setTelegramConnected(telegramStatus.linked);
+    setTelegramConfigured(telegramStatus.configured ?? false);
+    setTelegramUsername(telegramStatus.username);
+    setTelegramBotUsername(telegramStatus.botUsername);
+  }, [telegramStatus]);
 
   const handleToggleChannel = (
     notificationType: NotificationType,
@@ -162,6 +204,11 @@ export function NotificationPreferencesClient({
   };
 
   const handleTelegramConnect = async () => {
+    if (!telegramConfigured) {
+      toast.error("Telegram бот пока не настроен на сервере");
+      return;
+    }
+
     setIsLinkingTelegram(true);
     try {
       const res = await fetch("/api/settings/telegram/link", {
@@ -173,25 +220,12 @@ export function NotificationPreferencesClient({
         throw new Error(json.error ?? "Не удалось создать ссылку для Telegram");
       }
       window.open(json.url, "_blank", "noopener,noreferrer");
-      toast.success("Откройте бота и нажмите Start");
-      window.setTimeout(async () => {
-        try {
-          const response = await fetch("/api/settings/telegram/status", {
-            credentials: "include",
-            cache: "no-store",
-          });
-          const status = (await response.json()) as {
-            linked?: boolean;
-            username?: string;
-          };
-          if (response.ok && status.linked) {
-            setTelegramConnected(true);
-            setTelegramUsername(status.username);
-          }
-        } catch {
-          // Passive refresh only.
-        }
-      }, 3000);
+      toast.success(
+        telegramBotUsername
+          ? `Откройте @${telegramBotUsername} и нажмите Start`
+          : "Откройте бота и нажмите Start",
+      );
+      setIsPollingTelegram(true);
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Не удалось открыть Telegram",
@@ -201,13 +235,93 @@ export function NotificationPreferencesClient({
     }
   };
 
+  const handleTelegramDisconnect = async () => {
+    setIsDisconnectingTelegram(true);
+    try {
+      const res = await fetch("/api/settings/telegram", {
+        method: "DELETE",
+        credentials: "include",
+      });
+      const json = (await res.json().catch(() => null)) as
+        | { error?: string }
+        | null;
+
+      if (!res.ok) {
+        throw new Error(json?.error ?? "Не удалось отключить Telegram");
+      }
+
+      setTelegramConnected(false);
+      setTelegramUsername(undefined);
+      setDisconnectDialogOpen(false);
+      setIsPollingTelegram(false);
+      setPrefs((prev) => {
+        const next = cloneRowsMap(prev);
+        for (const [notificationType, row] of next.entries()) {
+          next.set(notificationType, {
+            ...row,
+            channels: {
+              ...row.channels,
+              TELEGRAM: false,
+            },
+          });
+        }
+        return next;
+      });
+      toast.success("Telegram отключён");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Не удалось отключить Telegram",
+      );
+    } finally {
+      setIsDisconnectingTelegram(false);
+    }
+  };
+
+  const handleSendTelegramTest = async () => {
+    setIsSendingTest(true);
+    try {
+      const res = await fetch("/api/notifications/telegram/test", {
+        method: "POST",
+        credentials: "include",
+      });
+      const json = (await res.json().catch(() => null)) as
+        | { ok?: boolean; code?: string }
+        | null;
+
+      if (!res.ok || !json?.ok) {
+        if (json?.code === "TELEGRAM_NOT_CONNECTED") {
+          throw new Error("Telegram ещё не подключён");
+        }
+        if (json?.code === "TELEGRAM_BOT_NOT_CONFIGURED") {
+          throw new Error("Telegram бот не настроен на сервере");
+        }
+        if (json?.code === "TELEGRAM_SEND_FAILED") {
+          throw new Error("Не удалось отправить сообщение в Telegram");
+        }
+        throw new Error("Не удалось отправить тестовое уведомление");
+      }
+
+      toast.success("Тестовое сообщение отправлено в Telegram");
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Не удалось отправить тестовое уведомление",
+      );
+    } finally {
+      setIsSendingTest(false);
+    }
+  };
+
   return (
     <div className={cn("flex flex-col", embedded ? "gap-5" : "gap-6")}>
       {!embedded && (
         <section
           className={cn(
             "rounded-[28px] border px-5 py-5 sm:px-6",
-            telegramConnected
+            !telegramConfigured
+              ? "border-amber-200/80 bg-amber-50/70"
+              : telegramConnected
               ? "border-emerald-200/80 bg-emerald-50/70"
               : "border-sky-200/80 bg-sky-50/70",
           )}
@@ -217,10 +331,16 @@ export function NotificationPreferencesClient({
               <div
                 className={cn(
                   "flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white shadow-sm",
-                  telegramConnected ? "text-emerald-600" : "text-sky-600",
+                  !telegramConfigured
+                    ? "text-amber-600"
+                    : telegramConnected
+                      ? "text-emerald-600"
+                      : "text-sky-600",
                 )}
               >
-                {telegramConnected ? (
+                {!telegramConfigured ? (
+                  <ShieldAlert className="h-5 w-5" />
+                ) : telegramConnected ? (
                   <CheckCircle2 className="h-5 w-5" />
                 ) : (
                   <Send className="h-5 w-5" />
@@ -228,36 +348,88 @@ export function NotificationPreferencesClient({
               </div>
               <div className="min-w-0">
                 <p className="text-sm font-semibold text-stone-950 sm:text-base">
-                  {telegramConnected ? "Telegram подключён" : "Подключите Telegram"}
+                  {!telegramConfigured
+                    ? "Telegram канал пока не настроен"
+                    : telegramConnected
+                      ? "Telegram подключён"
+                      : "Подключите Telegram"}
                 </p>
                 <p className="mt-1 text-sm leading-6 text-stone-600">
-                  {telegramConnected
+                  {!telegramConfigured
+                    ? "Фронт уже готов, но серверный бот ещё не сконфигурирован. После настройки канал станет доступен без дополнительных изменений UI."
+                    : telegramConnected
                     ? telegramUsername
                       ? `Уведомления приходят в @${telegramUsername}`
                       : "Уведомления приходят в ваш Telegram"
                     : "Telegram нужен, чтобы получать важные уведомления и напоминания быстрее."}
                 </p>
+                {telegramConfigured && telegramBotUsername ? (
+                  <p className="mt-1 text-xs text-stone-500">
+                    Бот для подключения: @{telegramBotUsername}
+                  </p>
+                ) : null}
+                {telegramConfigured && !telegramConnected ? (
+                  <p className="mt-2 text-xs text-stone-500">
+                    После нажатия «Подключить» откройте бота, нажмите Start и вернитесь сюда. Статус обновится автоматически.
+                  </p>
+                ) : null}
               </div>
             </div>
 
-            {!telegramConnected ? (
+            {!telegramConfigured ? (
+              <Button
+                type="button"
+                variant="outline"
+                className="rounded-2xl bg-white"
+                disabled
+              >
+                Бот не настроен
+              </Button>
+            ) : !telegramConnected ? (
               <Button
                 type="button"
                 variant="outline"
                 className="rounded-2xl bg-white"
                 onClick={handleTelegramConnect}
-                disabled={isLinkingTelegram}
+                disabled={isLinkingTelegram || isPollingTelegram}
               >
-                {isLinkingTelegram ? (
+                {isLinkingTelegram || isPollingTelegram ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    Открываем…
+                    {isLinkingTelegram ? "Открываем…" : "Ожидаем Start…"}
                   </>
                 ) : (
                   "Подключить"
                 )}
               </Button>
-            ) : null}
+            ) : (
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="rounded-2xl bg-white"
+                  onClick={handleSendTelegramTest}
+                  disabled={isSendingTest}
+                >
+                  {isSendingTest ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Отправляем…
+                    </>
+                  ) : (
+                    "Отправить тест"
+                  )}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="rounded-2xl bg-white"
+                  onClick={() => setDisconnectDialogOpen(true)}
+                >
+                  Отключить
+                </Button>
+              </div>
+            )}
           </div>
         </section>
       )}
@@ -326,7 +498,7 @@ export function NotificationPreferencesClient({
                     {CHANNEL_OPTIONS.map((channel) => {
                       const telegramToggleBlocked =
                         channel.key === "TELEGRAM" &&
-                        !telegramConnected &&
+                        (!telegramConfigured || !telegramConnected) &&
                         row.channels.TELEGRAM !== true;
                       const disabled =
                         pending ||
@@ -374,6 +546,38 @@ export function NotificationPreferencesClient({
       <p className="text-sm text-stone-400">
         Изменения сохраняются автоматически
       </p>
+
+      <AlertDialog
+        open={disconnectDialogOpen}
+        onOpenChange={setDisconnectDialogOpen}
+      >
+        <AlertDialogContent className="rounded-2xl border-stone-200">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Отключить Telegram?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Telegram перестанет получать уведомления, а сам канал снова станет
+              недоступен в настройках. Email и уведомления в приложении сохранятся.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="rounded-xl">Отмена</AlertDialogCancel>
+            <AlertDialogAction
+              className="rounded-xl bg-stone-900 hover:bg-stone-800"
+              onClick={handleTelegramDisconnect}
+              disabled={isDisconnectingTelegram}
+            >
+              {isDisconnectingTelegram ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Отключаем…
+                </>
+              ) : (
+                "Отключить"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

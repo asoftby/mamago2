@@ -14,6 +14,14 @@ import { getCurrentUser } from "@/lib/auth/server";
 import { getSessionRowIdFromCookies } from "@/lib/analytics/getSessionRowId";
 import { trackUserEvent } from "@/server/services/analytics/AnalyticsEventService";
 
+const analyticsMetaSchema = z
+  .record(z.string(), z.unknown())
+  .nullable()
+  .refine(
+    (value) => value == null || JSON.stringify(value).length <= 4096,
+    "meta_too_large",
+  );
+
 const bodySchema = z.object({
   eventType: z.nativeEnum(UserEventType),
   entityType: z.nativeEnum(AnalyticsEntityType).optional().nullable(),
@@ -21,7 +29,7 @@ const bodySchema = z.object({
   vertical: z.nativeEnum(AnalyticsVertical).optional().nullable(),
   cityId: z.string().optional().nullable(),
   citySlug: z.string().optional().nullable(),
-  meta: z.any().optional().nullable(),
+  meta: analyticsMetaSchema.optional(),
   sessionId: z.string().optional().nullable(),
 });
 
@@ -30,10 +38,7 @@ export async function POST(request: NextRequest) {
     const raw = await request.json();
     const parsed = bodySchema.safeParse(raw);
     if (!parsed.success) {
-      return NextResponse.json(
-        { error: "invalid_payload", details: parsed.error.flatten() },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: "invalid_payload" }, { status: 400 });
     }
 
     const user = await getCurrentUser();

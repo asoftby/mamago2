@@ -1,15 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prismaBase } from "@/lib/prisma";
 import { listDiscoveryClassChips } from "@/server/discovery/classChips";
+import { requireAdminOrModeratorApiUser } from "@/lib/auth/requireAdminApi";
 
 export const runtime = "nodejs";
 
 export async function GET() {
+  const auth = await requireAdminOrModeratorApiUser();
+  if (auth instanceof NextResponse) return auth;
   const chips = await listDiscoveryClassChips({ includeInactive: true });
   return NextResponse.json(chips);
 }
 
 export async function POST(request: NextRequest) {
+  const auth = await requireAdminOrModeratorApiUser();
+  if (auth instanceof NextResponse) return auth;
   const body = (await request.json()) as Record<string, unknown>;
   const title = String(body.title ?? "").trim();
   const slug = String(body.slug ?? "").trim().toLowerCase();

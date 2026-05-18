@@ -18,6 +18,7 @@ export type NotificationSettingsSurface = "USER" | "BUSINESS" | "ADMIN";
 export type NotificationSettingsGroupId =
   | "user-important"
   | "user-for-you"
+  | "user-bookings"
   | "business-places"
   | "business-updates"
   | "business-content"
@@ -36,6 +37,7 @@ const REGISTRY_GROUP_MAPPING: Record<string, NotificationSettingsGroupId> = {
   "system": "user-important",
   "recommendations": "user-important", 
   "news": "user-important",
+  "user_bookings": "user-bookings",
   
   // BUSINESS surface  
   "moderation": "business-places", // PLACE_*, ACTIVITY_*, OFFER_*
@@ -52,9 +54,10 @@ const REGISTRY_GROUP_MAPPING: Record<string, NotificationSettingsGroupId> = {
 const SETTINGS_GROUP_REGISTRY_MAPPING: Record<NotificationSettingsGroupId, string[]> = {
   "user-important": ["system", "recommendations", "news"],
   "user-for-you": [],
+  "user-bookings": ["user_bookings"],
   "business-places": ["moderation"],
-  "business-updates": [], // Пока пустая, но может использоваться для PLACE_UPDATE_*
-  "business-content": [], // Пока пустая, но может использоваться для отдельной группы
+  "business-updates": [],
+  "business-content": [],
   "business-verification": ["business"],
   "business-applications": ["bookings"],
   "admin-operations": ["admin_moderation"],
@@ -88,7 +91,9 @@ export type NotificationSettingsGroup = {
 export type NotificationSettingsSurfaceData = {
   surface: NotificationSettingsSurface;
   telegramConnected: boolean;
+  telegramConfigured: boolean;
   telegramUsername?: string;
+  telegramBotUsername?: string;
   rows: NotificationSettingsRow[];
   groups: NotificationSettingsGroup[];
 };
@@ -147,6 +152,13 @@ const NOTIFICATION_SETTINGS_GROUP_DEFINITIONS: readonly NotificationSettingsGrou
     title: "Уведомления",
     description: "Выберите, какие уведомления и в какой канал отправлять.",
     order: 10,
+  },
+  {
+    id: "user-bookings",
+    surface: "USER",
+    title: "Мои записи",
+    description: "Статусы ваших записей и заявок",
+    order: 20,
   },
   // BUSINESS surface — unchanged
   {
@@ -207,8 +219,8 @@ const NOTIFICATION_SETTINGS_TYPE_DEFINITIONS: readonly NotificationSettingsTypeD
   // They exist only as compatibility input — see userNotificationEvents.ts.
   {
     type: "SYSTEM",
-    label: "Системные",
-    description: "Безопасность и важные изменения",
+    label: "Аккаунт",
+    description: "Email, пароль, Telegram и безопасность аккаунта",
     audience: "USER",
     surface: "USER",
     groupId: "user-important",
@@ -217,8 +229,8 @@ const NOTIFICATION_SETTINGS_TYPE_DEFINITIONS: readonly NotificationSettingsTypeD
   },
   {
     type: "REMINDER",
-    label: "Напоминания",
-    description: "О запланированных событиях",
+    label: "План",
+    description: "Напоминания о событиях и изменениях в вашем плане",
     audience: "USER",
     surface: "USER",
     groupId: "user-important",
@@ -544,6 +556,7 @@ function getDefaultKindForEntry(entry: NotificationRegistryEntry): NotificationS
   if (entry.surface === "USER") {
     if (entry.category === "SYSTEM") return "USER_SECURITY";
     if (entry.category === "PLAN") return "USER_REMINDERS";
+    if (entry.category === "BOOKING") return "USER_REMINDERS";
     if (entry.category === "MARKETING") return "USER_RECOMMENDATIONS";
     return "USER_NEWS";
   }
@@ -685,6 +698,7 @@ export function buildEmptyNotificationSettingsSurfaceData(
   return {
     surface,
     telegramConnected: false,
+    telegramConfigured: false,
     rows,
     groups,
   };

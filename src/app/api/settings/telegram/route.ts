@@ -14,8 +14,7 @@ export async function DELETE() {
     await unlinkTelegramAccount({ userId: user.id });
     return NextResponse.json({ ok: true });
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Не удалось отключить Telegram";
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error("[telegram:disconnect] ERROR:", error);
+    return NextResponse.json({ error: "Не удалось отключить Telegram" }, { status: 500 });
   }
 }

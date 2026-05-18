@@ -24,6 +24,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import * as Sentry from "@sentry/nextjs";
 import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth/server";
 import {
@@ -107,6 +108,13 @@ export async function POST(request: NextRequest) {
     }
 
     console.error("[POST /api/public/bookings/camp-shift]", err);
+    Sentry.captureException(err, {
+      tags: {
+        area: "booking",
+        flow: "camp_shift",
+        stage: "api_route",
+      },
+    });
     return NextResponse.json(
       { ok: false, error: "Внутренняя ошибка сервера" },
       { status: 500 },

@@ -71,6 +71,8 @@ interface OfferWizardProps {
   editorSurface?: ContentEditorSurface;
   contentEditorNav?: Partial<ContentEditorNav>;
   returnTo?: string;
+  /** 1-based шаг в мастере (из query `?step=`). Только для `mode="edit"`. */
+  initialStepNumber?: number;
 }
 
 const LOCAL_STORAGE_KEY = "offer-wizard-draft";
@@ -85,6 +87,7 @@ export function OfferWizard({
   editorSurface,
   contentEditorNav,
   returnTo,
+  initialStepNumber,
 }: OfferWizardProps) {
   const router = useRouter();
   const surface: ContentEditorSurface = editorSurface ?? "business";
@@ -106,7 +109,15 @@ export function OfferWizard({
   const totalSteps = steps.length;
   
   // Current step key (not number)
-  const [currentStepKey, setCurrentStepKey] = useState<OfferWizardStepKey>("type");
+  const [currentStepKey, setCurrentStepKey] = useState<OfferWizardStepKey>(() => {
+    if (mode !== "edit" || !offer || initialStepNumber == null || initialStepNumber < 1) {
+      return "type";
+    }
+    const fd = mapOfferToFormData(offer);
+    const initialSteps = getStepsForOfferType(fd.offerWizardType);
+    const idx = Math.min(initialStepNumber, initialSteps.length) - 1;
+    return initialSteps[idx]?.key ?? "type";
+  });
   
   // Normalize current step if offer type changes
   useEffect(() => {
@@ -261,6 +272,7 @@ export function OfferWizard({
     setIsSaving(true);
     
     try {
+      const canDirectPublish = canPublishContentDirectly(userRole);
       const placeId = formData.placeId ?? undefined;
 
       if (mode === "create" && !placeId) {
@@ -269,7 +281,10 @@ export function OfferWizard({
       }
 
       if (offerId) {
-        const payload = buildOfferUpdatePayload(formData);
+        const payload = buildOfferUpdatePayload(
+          formData,
+          mode === "edit" && canDirectPublish ? { status: "PUBLISHED" } : undefined,
+        );
         const response = await fetch(`/api/business/offers/${offerId}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
@@ -309,7 +324,13 @@ export function OfferWizard({
         }
       }
       
-      toast.success("Черновик сохранен");
+      toast.success(
+        offerId
+          ? canDirectPublish && mode === "edit"
+            ? "Изменения опубликованы"
+            : "Изменения сохранены"
+          : "Черновик сохранён",
+      );
       setLastSaved(new Date());
       
       if (mode === "create" && typeof window !== "undefined") {
@@ -383,7 +404,10 @@ export function OfferWizard({
         return;
       }
 
-      const updatePayload = buildOfferUpdatePayload(formData, { status: "PENDING" });
+      const canDirectPublish = canPublishContentDirectly(userRole);
+      const updatePayload = buildOfferUpdatePayload(formData, {
+        status: canDirectPublish ? "PUBLISHED" : "PENDING",
+      });
       const response = await fetch(`/api/business/offers/${offerId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -396,7 +420,11 @@ export function OfferWizard({
         throw new Error(errorMessage);
       }
 
-      toast.success("Предложение отправлено на модерацию");
+      toast.success(
+        canDirectPublish
+          ? "Изменения опубликованы"
+          : "Предложение отправлено на модерацию",
+      );
       
       if (mode === "create" && typeof window !== "undefined") {
         localStorage.removeItem(LOCAL_STORAGE_KEY);
@@ -483,7 +511,18 @@ export function OfferWizard({
   );
 
   const phase = formWizardPhaseFromFlags({ isSaving, isSubmitting });
-  const actionLabels = useMemo(() => getBusinessFormActionLabels(userRole), [userRole]);
+  const actionLabels = useMemo(() => {
+    const base = getBusinessFormActionLabels(userRole);
+    if (mode === "edit") {
+      return {
+        ...base,
+        saveDraft: "Сохранить изменения",
+        savingDraft: "Сохранение...",
+      };
+    }
+    return base;
+  }, [userRole, mode]);
+  const showSaveDraftInBar = mode === "edit" || isReviewStep;
 
   const currentStepDef = steps.find(s => s.key === currentStepKey);
   const stepTitle = currentStepDef?.title || "Шаг";
@@ -517,8 +556,8 @@ export function OfferWizard({
         labels={actionLabels}
         showBack={canPrev}
         onBack={handlePrev}
-        showSaveDraft={isReviewStep}
-        onSaveDraft={isReviewStep ? handleSaveDraft : undefined}
+        showSaveDraft={showSaveDraftInBar}
+        onSaveDraft={showSaveDraftInBar ? handleSaveDraft : undefined}
         saveDraftDisabled={isSaving || isSubmitting}
         isReviewStep={isReviewStep}
         onContinue={!isReviewStep ? handleNext : undefined}

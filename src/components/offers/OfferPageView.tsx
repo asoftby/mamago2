@@ -1,259 +1,323 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { useSetPublicationIntent } from "@/contexts/PublicationIntentContext";
-import { toast } from "@/lib/toast";
-import type { OfferPageData, ShiftCtaContext } from "@/lib/offer/offerPageTypes";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { OfferHero } from "./OfferHero";
-import { OfferGallery } from "./OfferGallery";
-import { OfferTrailer } from "./OfferTrailer";
-import { OfferMetaGrid } from "./OfferMetaGrid";
-import { OfferRichDescription } from "./OfferRichDescription";
+import { OfferEditorialInsights } from "./OfferEditorialInsights";
 import { OfferSchedule } from "./OfferSchedule";
-import { OfferAccommodation } from "./OfferAccommodation";
-import { OfferLocation } from "./OfferLocation";
 import { OfferReviews } from "./OfferReviews";
-import { OfferHowToJoin } from "./OfferHowToJoin";
-import { OfferSimilar } from "./OfferSimilar";
-import { OfferStickyBar } from "./OfferStickyBar";
-import { OfferBookingModal } from "./OfferBookingModal";
-import { PublicationStatsPanel } from "@/components/publication-stats";
-import { publicActivityPath } from "@/lib/business/eventPublicLink";
+import { OfferPlace } from "./OfferPlace";
+import { OfferPromoCta } from "./OfferPromoCta";
+import { CampShiftBookingOverlay } from "./CampShiftBookingOverlay";
+import type { OfferPageData, OfferScheduleItem, ShiftCtaContext } from "@/lib/offer/offerPageTypes";
+import {
+  SaveToPlanModal,
+  type SaveScenario,
+  type SaveToPlanResult,
+} from "@/components/activity/SaveToPlanModal";
+import { toast } from "@/lib/toast";
 
-export function OfferPageView({ data }: { data: OfferPageData }) {
-  const setPublicationIntent = useSetPublicationIntent();
+interface OfferPageViewProps {
+  data: OfferPageData;
+  isPrimaryLoading?: boolean;
+  isSecondaryLoading?: boolean;
+  isInPlan?: boolean;
+  isAuthenticated?: boolean;
+  canEditOffer?: boolean;
+  onPrimary?: () => void;
+  onSecondary?: () => void;
+  onSave?: () => void;
+  onShiftCta?: (ctx: ShiftCtaContext) => void;
+}
 
-  // refs
-  const ctaRef = useRef<HTMLDivElement>(null);
-  const scheduleRef = useRef<HTMLDivElement>(null);
+type LocalOfferSaveState = {
+  kind: "plan";
+  dateISO?: string | null;
+  shiftId?: string | null;
+};
 
-  // plan state
-  const [isPrimaryLoading, setIsPrimaryLoading] = useState(false);
-  const [isSecondaryLoading, setIsSecondaryLoading] = useState(false);
-  const [isInPlan, setIsInPlan] = useState(false);
+function parseShiftDateToIso(value?: string | null): string | null {
+  if (!value) return null;
+  const match = value.match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
+  if (!match) return null;
+  return `${match[3]}-${match[2]}-${match[1]}`;
+}
 
-  // Состояние модалки записи
-  const [bookingOpen, setBookingOpen] = useState(false);
-  const [selectedShift, setSelectedShift] = useState<ShiftCtaContext | null>(null);
+function mapItemToShiftContext(item: OfferScheduleItem): ShiftCtaContext {
+  return {
+    shiftId: item.id,
+    title: item.title,
+    dateFrom: item.dateFrom,
+    dateTo: item.dateTo,
+    price: item.price,
+    ageRange: item.ageRange,
+  };
+}
+
+function sortShiftContextsByNearest(shifts: ShiftCtaContext[]): ShiftCtaContext[] {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const toTimestamp = (value?: string | null) => {
+    const iso = parseShiftDateToIso(value);
+    if (!iso) return Number.POSITIVE_INFINITY;
+    return new Date(`${iso}T00:00:00`).getTime();
+  };
+
+  return [...shifts].sort((a, b) => {
+    const aTs = toTimestamp(a.dateFrom);
+    const bTs = toTimestamp(b.dateFrom);
+    const aPast = aTs < today.getTime();
+    const bPast = bTs < today.getTime();
+    if (aPast !== bPast) return aPast ? 1 : -1;
+    return aTs - bTs;
+  });
+}
+
+export function OfferPageView({
+  data,
+  isPrimaryLoading,
+  isSecondaryLoading,
+  canEditOffer = false,
+  onPrimary,
+  onSave,
+  onShiftCta,
+}: OfferPageViewProps) {
+  const storageKey = `mamago:offer-plan:${data.id}`;
+  const [localSave, setLocalSave] = useState<LocalOfferSaveState | null>(() => {
+    if (typeof window === "undefined") return null;
+    try {
+      const raw = window.localStorage.getItem(storageKey);
+      return raw ? (JSON.parse(raw) as LocalOfferSaveState) : null;
+    } catch {
+      return null;
+    }
+  });
+  const [bookingShift, setBookingShift] = useState<ShiftCtaContext | null>(null);
+  const [saveTargetShift, setSaveTargetShift] = useState<ShiftCtaContext | null>(null);
+  const [saveModalOpen, setSaveModalOpen] = useState(false);
+  const [isIdeaSaved, setIsIdeaSaved] = useState(false);
 
   useEffect(() => {
-    setPublicationIntent(data.discoveryIntent ?? null);
-    return () => setPublicationIntent(null);
-  }, [data.discoveryIntent, setPublicationIntent]);
+    if (typeof window === "undefined") return;
+    queueMicrotask(() => {
+      try {
+        const raw = window.localStorage.getItem(storageKey);
+        setLocalSave(raw ? (JSON.parse(raw) as LocalOfferSaveState) : null);
+      } catch {
+        setLocalSave(null);
+      }
+    });
+  }, [storageKey]);
 
-  // ── Derived flags ──
-  const isCamp = data.offerType === "CAMP";
-  const hasShifts = isCamp && (data.schedule?.items.length ?? 0) > 0;
-  const singleShift = hasShifts && data.schedule!.items.length === 1
-    ? data.schedule!.items[0]!
-    : null;
+  const loadIdeaStatus = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/save/status?offerId=${data.id}`, {
+        credentials: "include",
+      });
+      if (!res.ok) return;
+      const json = await res.json();
+      setIsIdeaSaved(Boolean(json.isIdea));
+    } catch {
+      // ignore auth/network errors for guests
+    }
+  }, [data.id]);
 
-  // ── Open booking overlay for a specific shift ──
-  const openBooking = useCallback((shift: ShiftCtaContext) => {
-    setSelectedShift(shift);
-    setBookingOpen(true);
+  useEffect(() => {
+    queueMicrotask(() => {
+      void loadIdeaStatus();
+    });
+  }, [loadIdeaStatus]);
+
+  const persistLocalSave = useCallback((next: LocalOfferSaveState | null) => {
+    setLocalSave(next);
+    if (typeof window === "undefined") return;
+    if (!next) {
+      window.localStorage.removeItem(storageKey);
+      return;
+    }
+    window.localStorage.setItem(storageKey, JSON.stringify(next));
+  }, [storageKey]);
+
+  const shiftDateOptions = useMemo(() => {
+    return (data.schedule?.items ?? [])
+      .map((item) => parseShiftDateToIso(item.dateFrom))
+      .filter((value): value is string => Boolean(value));
+  }, [data.schedule?.items]);
+
+  const shiftOptions = useMemo(() => {
+    if (data.schedule?.type !== "shifts") return [];
+    return sortShiftContextsByNearest(data.schedule.items.map(mapItemToShiftContext));
+  }, [data.schedule]);
+
+  const saveScenario: SaveScenario = useMemo(() => {
+    const target = saveTargetShift;
+    const targetIso = parseShiftDateToIso(target?.dateFrom);
+    return {
+      kind: "quickdate",
+      title: target?.title || data.title,
+      eventPlanDateISO: targetIso ?? undefined,
+      eventPlanDateOptions: targetIso ? [targetIso] : shiftDateOptions,
+    };
+  }, [data.title, saveTargetShift, shiftDateOptions]);
+
+  const openBookingForShift = useCallback((ctx: ShiftCtaContext) => {
+    setBookingShift(ctx);
   }, []);
 
-  // ── Primary CTA (hero button / sticky bar) ──
-  const handlePrimaryAction = useCallback(() => {
-    if (isCamp && hasShifts) {
-      if (singleShift) {
-        // Одна смена — сразу открываем форму
-        openBooking({
-          shiftId: singleShift.id,
-          title: singleShift.title,
-          dateFrom: singleShift.dateFrom,
-          dateTo: singleShift.dateTo,
-          price: singleShift.price,
-          ageRange: singleShift.ageRange,
+  const openSaveForShift = useCallback((ctx?: ShiftCtaContext | null) => {
+    setSaveTargetShift(ctx ?? null);
+    setSaveModalOpen(true);
+  }, []);
+
+  const handlePrimary = useCallback(() => {
+    if (onPrimary) {
+      onPrimary();
+      return;
+    }
+    const nearestShift = shiftOptions[0] ?? null;
+    if (nearestShift) {
+      openBookingForShift(nearestShift);
+      return;
+    }
+    const phone = data.cta.phone?.replace(/[^\d+]/g, "");
+    if (phone && typeof window !== "undefined") {
+      window.location.href = `tel:${phone}`;
+    }
+  }, [data.cta.phone, onPrimary, openBookingForShift, shiftOptions]);
+
+  const handleSave = useCallback(() => {
+    if (onSave) {
+      onSave();
+      return;
+    }
+    openSaveForShift(null);
+  }, [onSave, openSaveForShift]);
+
+  const handleShiftCta = useCallback((ctx: ShiftCtaContext) => {
+    if (onShiftCta) {
+      onShiftCta(ctx);
+      return;
+    }
+    openBookingForShift(ctx);
+  }, [onShiftCta, openBookingForShift]);
+
+  const handleItemCta = useCallback(() => {
+    handlePrimary();
+  }, [handlePrimary]);
+
+  const handleSavePersist = useCallback((result: SaveToPlanResult) => {
+    if (result.action === "cancel") return;
+
+    if (result.action === "remove-idea") {
+      void fetch(`/api/save/idea?offerId=${data.id}`, {
+        method: "DELETE",
+        credentials: "include",
+      })
+        .then(async (res) => {
+          if (!res.ok) throw new Error("offer_idea_remove_failed");
+          setIsIdeaSaved(false);
+          toast("Убрано из идей", { duration: 2500 });
+        })
+        .catch(() => {
+          toast.error("Не получилось убрать предложение из идей");
         });
-      } else {
-        // Несколько смен — скроллим к секции
-        scheduleRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-      }
       return;
     }
 
-    // Обычный offer — заглушка (фаза 3)
-    setIsPrimaryLoading(true);
-    toast.message(data.cta.primaryLabel, {
-      description: data.cta.instructions || "Здесь будет форма записи.",
+    if (result.action === "ideas") {
+      void fetch("/api/save/idea", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ offerId: data.id }),
+      })
+        .then(async (res) => {
+          if (res.status === 401) {
+            toast.error("Нужно войти в аккаунт, чтобы сохранить предложение в идеи");
+            return;
+          }
+          if (!res.ok) throw new Error("offer_idea_save_failed");
+          setIsIdeaSaved(true);
+        })
+        .catch(() => {
+          toast.error("Не получилось сохранить предложение в идеи");
+        });
+      return;
+    }
+
+    persistLocalSave({
+      kind: "plan",
+      dateISO: result.dateISO,
+      shiftId: saveTargetShift?.shiftId ?? null,
     });
-    setTimeout(() => setIsPrimaryLoading(false), 500);
-  }, [isCamp, hasShifts, singleShift, openBooking, data.cta.primaryLabel, data.cta.instructions]);
+  }, [data.id, persistLocalSave, saveTargetShift?.shiftId]);
 
-  // ── Shift CTA (кнопка "Записаться" на карточке смены) ──
-  const handleShiftCta = useCallback((ctx: ShiftCtaContext) => {
-    setSelectedShift(ctx);
-    setBookingOpen(true);
-  }, []);
-
-  // ── Secondary (В план) ──
-  const handleSecondaryAction = useCallback(() => {
-    if (!data.cta.secondaryLabel) return;
-    setIsSecondaryLoading(true);
-    setIsInPlan((prev) => !prev);
-    toast.success(isInPlan ? "Убрано из плана" : "Добавлено в план");
-    setTimeout(() => setIsSecondaryLoading(false), 300);
-  }, [data.cta.secondaryLabel, isInPlan]);
-
-  const handleSave = useCallback(() => {
-    setIsInPlan((prev) => !prev);
-    toast.success(isInPlan ? "Убрано из плана" : "Добавлено в план");
-  }, [isInPlan]);
-
-  // ── Layout flags ──
-  const hasSimilar = data.similar.length > 0;
-  const hasSchedule = data.schedule !== undefined;
-  const hasAccommodation = data.accommodation?.provided;
-  const hasVideo = Boolean(data.media.videoUrl);
-  const hasGallery = data.media.gallery.length > 0;
-  // Для лагерей со сменами "Как записаться" не нужен — процесс очевиден
-  const showHowToJoin = !(isCamp && hasShifts);
-
-  // ── Sticky bar ──
-  const stickyPrimaryLabel = isCamp ? "Записаться" : data.cta.primaryLabel;
-  const stickyPrimaryAction =
-    isCamp && hasShifts && !singleShift
-      ? () => scheduleRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
-      : handlePrimaryAction;
-
-  const priceLabel = data.pricing.priceFrom || data.pricing.singlePrice || "Уточняйте";
+  const isSaved = isIdeaSaved || Boolean(localSave);
+  const isPlanSaved = localSave?.kind === "plan";
+  const planDate = localSave?.kind === "plan" ? localSave.dateISO ?? null : null;
 
   return (
-    <div className="min-h-screen bg-[#FAFAF8] pb-[calc(6rem+env(safe-area-inset-bottom))] lg:pb-24">
-      <div className="mx-auto w-full max-w-[1200px] px-4 pt-4 sm:px-6 sm:pt-6 lg:px-8 lg:pt-8">
+    <main className="ep-surface min-h-screen">
+      <div className="mx-auto max-w-[1280px] space-y-16 px-4 py-8 sm:px-6 lg:space-y-24 lg:px-8 lg:py-12">
+        <OfferHero
+          data={data}
+          canEditOffer={canEditOffer}
+          isPrimaryLoading={isPrimaryLoading}
+          isSecondaryLoading={isSecondaryLoading}
+          isInPlan={isPlanSaved}
+          isSaved={isSaved}
+          onPrimary={handlePrimary}
+          onSave={handleSave}
+        />
 
-        {/* Preview Banner */}
-        {data.previewBannerLabel && (
-          <div
-            role="status"
-            className="mb-6 flex items-center justify-center rounded-2xl border border-amber-400/30 bg-amber-50 px-4 py-3 text-center text-[14px] font-medium text-amber-800"
-          >
-            {data.previewBannerLabel}
-          </div>
-        )}
+        <OfferEditorialInsights data={data} />
 
-        {/* ── 1. Hero ── */}
-        <div ref={ctaRef} className="mb-8 lg:mb-10">
-          <OfferHero
-            data={data}
-            isPrimaryLoading={isPrimaryLoading}
-            isSecondaryLoading={isSecondaryLoading}
-            isInPlan={isInPlan}
-            onPrimary={handlePrimaryAction}
-            onSecondary={handleSecondaryAction}
-            onSave={handleSave}
+        {data.schedule && data.schedule.items.length > 0 && (
+          <OfferSchedule
+            type={data.schedule.type}
+            items={data.schedule.items}
+            onShiftCta={handleShiftCta}
+            onItemCta={handleItemCta}
           />
-        </div>
-
-        {/* ── 2. Facts Bar ── */}
-        {data.metaGrid.length > 0 && (
-          <div className="mb-10 lg:mb-14">
-            <OfferMetaGrid items={data.metaGrid} />
-          </div>
         )}
 
-        {/* ── Main Content ── */}
-        <div className="space-y-14 lg:space-y-20">
-
-          {/* ── 3. About + Video ── */}
-          <div className="grid grid-cols-1 gap-10 lg:grid-cols-[1fr_minmax(0,380px)] lg:gap-14">
-            <OfferRichDescription htmlContent={data.description} />
-            {hasVideo && (
-              <div className="lg:sticky lg:top-24 lg:self-start">
-                <OfferTrailer
-                  videoUrl={data.media.videoUrl!}
-                  thumbnail={data.media.videoThumbnail}
-                  duration={data.media.videoDuration}
-                  label={data.media.videoLabel}
-                />
-              </div>
-            )}
-          </div>
-
-          {/* ── 4. Photo Gallery ── */}
-          {hasGallery && (
-            <OfferGallery images={data.media.gallery} />
-          )}
-
-          {/* ── 5. Schedule / Shifts ── */}
-          {hasSchedule && (
-            <div ref={scheduleRef}>
-              <OfferSchedule
-                type={data.schedule!.type}
-                items={data.schedule!.items}
-                onShiftCta={handleShiftCta}
-                onItemCta={handlePrimaryAction}
-              />
-            </div>
-          )}
-
-          {/* ── 6. Accommodation (CAMP only) ── */}
-          {hasAccommodation && (
-            <OfferAccommodation data={data.accommodation!} />
-          )}
-
-          {/* ── 7. Reviews + How to Join + Location ── */}
-          <div className="grid grid-cols-1 gap-10 lg:grid-cols-[1fr_minmax(0,360px)] lg:gap-14">
-            <div className="space-y-14">
-              <OfferReviews
-                reviews={data.reviews}
-                averageRating={data.averageRating}
-                totalCount={data.reviewsCount}
-              />
-              {showHowToJoin && (
-                <OfferHowToJoin ctaType={data.cta.type} />
-              )}
-            </div>
-
-            {data.place && (
-              <aside className="lg:sticky lg:top-24 lg:self-start">
-                <OfferLocation place={data.place} />
-              </aside>
-            )}
-          </div>
-        </div>
-
-        {/* ── Similar Offers ── */}
-        {hasSimilar && (
-          <div className="mt-16 border-t border-gray-100 pt-14 lg:mt-20 lg:pt-16">
-            <OfferSimilar items={data.similar} />
-          </div>
+        {data.reviews && (
+          <OfferReviews
+            reviews={data.reviews}
+            averageRating={data.averageRating}
+            totalCount={data.reviews.length}
+          />
         )}
+
+        {data.place && <OfferPlace place={data.place} />}
+
+        {data.promoCta && <OfferPromoCta {...data.promoCta} onPrimary={handlePrimary} />}
       </div>
 
-      {/* Publication Stats */}
-      {!data.hidePublicationStats && (
-        <PublicationStatsPanel
-          entityId={data.id}
-          path={publicActivityPath(data.id, data.citySlug, data.slug)}
-        />
-      )}
-
-      {/* ── Sticky Action Bar ── */}
-      <OfferStickyBar
-        ctaRef={ctaRef}
-        title={data.title}
-        priceLabel={priceLabel}
-        primaryLabel={stickyPrimaryLabel}
-        secondaryLabel={data.cta.secondaryLabel}
-        isPrimaryLoading={isPrimaryLoading}
-        isSecondaryLoading={isSecondaryLoading}
-        isInPlan={isInPlan}
-        onPrimary={stickyPrimaryAction}
-        onSecondary={handleSecondaryAction}
-      />
-
-      {/* Модалка записи */}
-      <OfferBookingModal
-        open={bookingOpen}
-        onOpenChange={setBookingOpen}
-        shift={selectedShift}
-        onSubmit={() => {
-          toast.success("Заявка успешно отправлена!");
+      <CampShiftBookingOverlay
+        open={Boolean(bookingShift)}
+        onOpenChange={(open) => {
+          if (!open) setBookingShift(null);
         }}
+        offerId={data.id}
+        offerTitle={data.title}
+        shift={bookingShift}
+        shifts={shiftOptions}
       />
-    </div>
+
+      <SaveToPlanModal
+        open={saveModalOpen}
+        onOpenChange={(open) => {
+          setSaveModalOpen(open);
+          if (!open) setSaveTargetShift(null);
+        }}
+        scenario={saveScenario}
+        onConfirm={handleSavePersist}
+        isIdea={isIdeaSaved}
+        inPlan={isPlanSaved}
+        planDate={planDate}
+        planStartsAt={null}
+      />
+    </main>
   );
 }

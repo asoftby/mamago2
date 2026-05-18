@@ -12,6 +12,7 @@ import {
   SEO_ROBOTS_INDEX_FOLLOW,
   SEO_ROBOTS_NOINDEX_FOLLOW,
 } from "@/lib/admin/seo/entities/robotsConstants";
+import type { OfferJsonLdOffer, OfferJsonLdPlace } from "@/lib/seo/schema/buildOfferJsonLd";
 
 const OFFER_LIST_LIMIT = 300;
 
@@ -182,7 +183,10 @@ export const offerProvider: SeoEntityProvider = {
       return o.seoJsonLdOverride as Record<string, unknown>;
     }
     const publicBase = process.env.NEXT_PUBLIC_APP_URL || "https://mamago.by";
-    return buildOfferJsonLd({ offer: o as any, place: o.place as any, publicBase });
+    return buildOfferJsonLd({
+      offer: o satisfies OfferJsonLdOffer,
+      place: o.place satisfies OfferJsonLdPlace,
+      publicBase,
+    });
   },
 };
-

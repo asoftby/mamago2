@@ -43,10 +43,7 @@ export async function POST() {
   } catch (error) {
     console.error("Error recomputing media usage:", error);
     return NextResponse.json(
-      { 
-        error: "Failed to recompute media usage",
-        details: error instanceof Error ? error.message : "Unknown error"
-      },
+      { error: "Internal server error" },
       { status: 500 }
     );
   }

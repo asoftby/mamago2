@@ -41,6 +41,8 @@ export interface SettingsViewer {
   phoneE164: string | null;
   phoneVerifiedAt: string | null;
   emailVerifiedAt: string | null;
+  telegramLinked: boolean;
+  telegramUsername: string | null;
 }
 
 export interface SettingsViewerPermissions {

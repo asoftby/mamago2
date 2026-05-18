@@ -1,5 +1,6 @@
 import {
   CalendarDays,
+  CalendarCheck,
   Lightbulb,
   Map,
   Settings,
@@ -29,6 +30,7 @@ export function buildPublicSiteAccountModel(input: {
   onGoToPersonalAccount: () => void;
   onGoToPersonalIdeas: () => void;
   onGoToPersonalPlan: () => void;
+  onGoToPersonalBookings: () => void;
   onGoToPersonalRoutes: () => void;
   onGoToSettings: () => void;
   onGoToBusinessDashboard: () => void;
@@ -54,6 +56,7 @@ export function buildPublicSiteAccountModel(input: {
     onGoToPersonalAccount,
     onGoToPersonalIdeas,
     onGoToPersonalPlan,
+    onGoToPersonalBookings,
     onGoToPersonalRoutes,
     onGoToSettings,
     onGoToBusinessBilling,
@@ -105,6 +108,15 @@ export function buildPublicSiteAccountModel(input: {
         icon: CalendarDays,
         onClick: () => {
           onGoToPersonalPlan();
+        },
+      },
+      {
+        key: "bookings",
+        type: "button",
+        label: "Мои записи",
+        icon: CalendarCheck,
+        onClick: () => {
+          onGoToPersonalBookings();
         },
       },
       {
@@ -304,6 +316,7 @@ export function buildBusinessAccountModel(input: {
   onGoToPersonalAccount: () => void;
   onGoToPersonalIdeas: () => void;
   onGoToPersonalPlan: () => void;
+  onGoToPersonalBookings: () => void;
   onGoToPersonalRoutes: () => void;
   onGoToSettings: () => void;
   onGoToBusinessDashboard: () => void;

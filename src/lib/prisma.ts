@@ -10,7 +10,7 @@ const globalForPrisma = globalThis as unknown as {
 
 // Forced reload for Prisma schema changes - v2
 const prismaBase =
-  (process.env.NODE_ENV === "development" ? null : globalForPrisma.prismaBase) ??
+  globalForPrisma.prismaBase ??
   new PrismaClient({
     log: process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
   });

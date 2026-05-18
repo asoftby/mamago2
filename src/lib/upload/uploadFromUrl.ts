@@ -6,6 +6,7 @@
 import "server-only";
 import { processImage, generateProcessedFilename, DEFAULT_IMAGE_CONFIG, type ImageProcessingConfig } from "@/lib/media/imageProcessor";
 import { writeRuntimeUpload } from "@/server/media/media-storage";
+import { assertSafeRemoteUrl } from "@/lib/security/assertSafeRemoteUrl";
 
 export interface UploadFromUrlOptions {
   maxWidthOrHeight?: number;
@@ -26,6 +27,9 @@ export async function uploadImageFromUrl(
   options: UploadFromUrlOptions = {}
 ): Promise<UploadedImageResult> {
   console.log("[uploadFromUrl] Downloading image from:", imageUrl);
+
+  // SSRF protection: validate URL before fetching
+  assertSafeRemoteUrl(imageUrl);
 
   // Download image with timeout
   const controller = new AbortController();

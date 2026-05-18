@@ -1,17 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { requireAdminOrModeratorApiUser } from "@/lib/auth/requireAdminApi";
 
 export const runtime = "nodejs";
 
 export async function GET() {
-  const items = await prisma.filterDefinition.findMany({ 
-    orderBy: [{ order: "asc" }, { slug: "asc" }], 
-    include: { options: { orderBy: [{ order: "asc" }, { value: "asc" }] } }, 
-  }); 
-  return NextResponse.json(items); 
-} 
+  const auth = await requireAdminOrModeratorApiUser();
+  if (auth instanceof NextResponse) return auth;
+  const items = await prisma.filterDefinition.findMany({
+    orderBy: [{ order: "asc" }, { slug: "asc" }],
+    include: { options: { orderBy: [{ order: "asc" }, { value: "asc" }] } },
+  });
+  return NextResponse.json(items);
+}
 
-export async function POST(req: Request) { 
+export async function POST(req: Request) {
+  const auth = await requireAdminOrModeratorApiUser();
+  if (auth instanceof NextResponse) return auth;
   const body = await req.json(); 
   const slug = String(body.slug || "").trim(); 
   const title = String(body.title || "").trim(); 

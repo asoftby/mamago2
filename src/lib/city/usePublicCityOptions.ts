@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { usePathname } from "next/navigation";
 import { DEFAULT_CITY_SLUG } from "@/lib/intent";
 
 export type PublicCityOption = {
@@ -12,6 +13,11 @@ export type PublicCityOption = {
 const FALLBACK_CITIES: PublicCityOption[] = [
   { id: DEFAULT_CITY_SLUG, slug: DEFAULT_CITY_SLUG, name: "Минск" },
 ];
+
+/** Paths where city options are not needed — skip fetch */
+function shouldSkipCityOptions(pathname: string): boolean {
+  return pathname.startsWith("/me/") || pathname.startsWith("/admin/");
+}
 
 /** Module-level cache to avoid repeated fetch across remounts */
 let cachedCities: PublicCityOption[] | null = null;
@@ -38,10 +44,21 @@ function mergeCityOptions(
 }
 
 export function usePublicCityOptions() {
+  const pathname = usePathname();
   const [cities, setCities] = useState<PublicCityOption[]>(cachedCities || FALLBACK_CITIES);
   const [loading, setLoading] = useState(!cachedCities);
 
   useEffect(() => {
+    // Skip fetching cities on /me/* and /admin/* — not needed for these pages
+    if (shouldSkipCityOptions(pathname)) {
+      if (!cachedCities) {
+        // Use fallback (just Minsk) — city data not needed here
+        setCities(FALLBACK_CITIES);
+      }
+      setLoading(false);
+      return;
+    }
+
     if (cachedCities) {
       setLoading(false);
       return;
@@ -90,7 +107,7 @@ export function usePublicCityOptions() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [pathname]);
 
   const slugSet = useMemo(() => new Set(cities.map((city) => city.slug)), [cities]);
 

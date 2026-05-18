@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
     }
     console.error("GET /api/admin/analytics/behavior:", error);
     return NextResponse.json(
-      { error: msg || "Failed to load behavior analytics" },
+      { error: "Failed to load behavior analytics" },
       { status: 500 },
     );
   }

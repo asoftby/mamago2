@@ -19,9 +19,7 @@ export async function POST() {
   } catch (error) {
     console.error("Error backfilling activity media links:", error);
     return NextResponse.json(
-      {
-        error: error instanceof Error ? error.message : "Failed to backfill activity media links",
-      },
+      { error: "Internal server error" },
       { status: 500 },
     );
   }

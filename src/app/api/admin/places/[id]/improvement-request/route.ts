@@ -52,7 +52,7 @@ export async function GET(
   } catch (error: unknown) {
     console.error("[API] List improvement requests error:", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to list improvement requests" },
+      { error: "Internal server error" },
       { status: 500 }
     );
   }
@@ -130,7 +130,7 @@ export async function POST(
     // Handle the specific case where an active request already exists
     if (errorMessage.startsWith("ACTIVE_REQUEST_EXISTS:")) {
       return NextResponse.json(
-        { 
+        {
           error: "ACTIVE_REQUEST_EXISTS",
           message: errorMessage.replace("ACTIVE_REQUEST_EXISTS: ", ""),
         },
@@ -139,7 +139,7 @@ export async function POST(
     }
     
     return NextResponse.json(
-      { error: errorMessage || "Failed to create improvement request" },
+      { error: "Internal server error" },
       { status: 500 }
     );
   }
@@ -186,7 +186,7 @@ export async function PATCH(
   } catch (error: unknown) {
     console.error("[API] Update improvement request error:", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to update improvement request" },
+      { error: "Internal server error" },
       { status: 500 }
     );
   }

@@ -14,7 +14,7 @@ import { MyBirthdaysCard } from "@/features/me/components/MyBirthdaysCard";
 import { UserGreeting } from "@/features/me/components/UserGreeting";
 import { listUserBirthdayParties } from "@/server/services/userBirthdays.service";
 import Link from "next/link";
-import { MapPin, Plus } from "lucide-react";
+import { MapPin, Plus, CalendarCheck } from "lucide-react";
 import { RouteActions } from "@/features/me/components/RouteActions";
 import { BUDGET_LABELS } from "@/components/routes/types";
 import { buildAdultPreferenceDisplayLine } from "@/lib/adultPersonaSignals/buildAdultPreferenceLine";
@@ -140,9 +140,27 @@ export default async function MePage({ searchParams }: PageProps) {
             {children}
           </ChildrenCard>
 
+          {/* My Bookings shortcut */}
+          <Link
+            href="/me/bookings"
+            className="flex items-center justify-between rounded-2xl border border-neutral-100 bg-white px-5 py-4 shadow-sm transition-shadow hover:shadow-md"
+          >
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#fff4ee]">
+                <CalendarCheck className="h-5 w-5 text-[#EF8759]" />
+              </div>
+              <div>
+                <p className="text-[15px] font-semibold text-neutral-900">Мои записи</p>
+                <p className="text-[12px] text-neutral-400">Заявки и бронирования</p>
+              </div>
+            </div>
+            <svg className="h-4 w-4 text-neutral-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+            </svg>
+          </Link>
+
           {/* My Routes */}
-          <div className="bg-white rounded-2xl border border-neutral-100 shadow-sm overflow-hidden">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-neutral-100">
+          <div className="bg-white rounded-2xl border border-neutral-100 shadow-sm overflow-hidden">            <div className="flex items-center justify-between px-5 py-4 border-b border-neutral-100">
               <div className="flex items-center gap-2 min-w-0">
                 <MapPin className="h-5 w-5 text-primary shrink-0" aria-hidden />
                 <h2 className="text-xl md:text-2xl font-semibold tracking-tight leading-tight text-neutral-900 truncate">

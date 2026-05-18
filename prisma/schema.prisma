@@ -82,6 +82,7 @@ model User {
   moderationLogs                    ModerationLog[]                  @relation("ModerationReviewer")
   notifications                     Notification[]
   notificationDeliveries            NotificationDelivery[]
+  offerIdeas                        OfferIdea[]
   phoneOtps                         PhoneOtp[]
   archivedPlaces                    Place[]                          @relation("PlaceArchiver")
   createdPlaces                     Place[]                          @relation("PlaceCreator")
@@ -1645,6 +1646,7 @@ model Offer {
 
   boosts          Boost[]
   bookingRequests BookingRequest[]
+  offerIdeas      OfferIdea[]
   openingHours    OpeningHours?      @relation(fields: [openingHoursId], references: [id])
   place           Place              @relation(fields: [placeId], references: [id], onDelete: Cascade)
   slugHistory     OfferSlugHistory[]
@@ -1656,6 +1658,20 @@ model Offer {
   @@index([ageMinMonths, ageMaxMonths])
   @@index([openingHoursId])
   @@index([slug])
+}
+
+/// Сохранённые предложения в «Идеи» (отдельно от Idea с activityId)
+model OfferIdea {
+  id        String   @id @default(cuid())
+  userId    String
+  offerId   String
+  createdAt DateTime @default(now())
+  offer      Offer   @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  user       User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, offerId])
+  @@index([userId])
+  @@index([offerId])
 }
 
 model OfferSlugHistory {
@@ -2158,23 +2174,32 @@ enum SearchEntityType {
 }
 
 model RouteStop {
-  id          String   @id @default(cuid())
-  routeId     String
-  order       Int
-  placeId     String?
-  lat         Float?
-  lng         Float?
-  address     String?
-  customTitle String?
-  note        String
-  photoUrl    String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  place       Place?   @relation(fields: [placeId], references: [id])
-  route       Route    @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  id                   String   @id @default(cuid())
+  routeId              String
+  order                Int
+  placeId              String?
+  googlePlaceId        String?
+  lat                  Float?
+  lng                  Float?
+  address              String?
+  customTitle          String?
+  note                 String
+  photoUrl             String?
+  formattedAddress     String?
+  addressComponents    Json?
+  rawGooglePayload     Json?
+  detectedCountryCode  String?
+  detectedCountryName  String?
+  detectedCityName     String?
+  detectedRegionName   String?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  place                Place?   @relation(fields: [placeId], references: [id])
+  route                Route    @relation(fields: [routeId], references: [id], onDelete: Cascade)
 
   @@index([routeId, order])
   @@index([placeId])
+  @@index([googlePlaceId])
 }
 
 /// SEO llms.txt configuration (per city or global)
@@ -2240,6 +2265,7 @@ model NotificationDelivery {
   errorMessage   String?
   payloadJson    Json?
   sentAt         DateTime?
+  attemptCount   Int                        @default(0)
   createdAt      DateTime                   @default(now())
   updatedAt      DateTime                   @updatedAt
   notification   Notification?              @relation(fields: [notificationId], references: [id], onDelete: Cascade)
@@ -2367,6 +2393,11 @@ enum UserEventType {
   CTA_CLICK
   SEARCH_APPLY
   FILTER_APPLY
+  BOOKING_CREATED
+  BOOKING_CONFIRMED
+  BOOKING_COMPLETED
+  BOOKING_CANCELLED
+  FEEDBACK_LEFT
 }
 
 enum AnalyticsEntityType {
@@ -2630,6 +2661,7 @@ enum NotificationType {
   BUSINESS_NEEDS_INFO
   WELCOME
   REMINDER
+  PLAN_TOMORROW_DIGEST
   RECOMMENDATION
   BUSINESS_APPLICATION_CREATED
   ADMIN_MODERATION_ITEM_CREATED
@@ -2641,6 +2673,14 @@ enum NotificationType {
   BOOKING_STALE
   /// Подтверждённая заявка без активности (CONFIRMED > 3 дней)
   BOOKING_NEEDS_ATTENTION
+  /// Бизнес подтвердил заявку пользователя
+  BOOKING_CONFIRMED
+  /// Бизнес отменил/отклонил заявку пользователя
+  BOOKING_CANCELLED
+  /// Заявка завершена
+  BOOKING_COMPLETED
+  /// Запрос отзыва после завершения заявки
+  BOOKING_FEEDBACK_REQUEST
 }
 
 enum NotificationAudience {
@@ -2870,6 +2910,7 @@ enum NotificationDeliveryStatus {
 
 enum NotificationScenario {
   PLAN_EVENT_2H_BEFORE
+  PLAN_TOMORROW_DIGEST
 }
 
 enum DevTelegramBusinessApplicationStatus {

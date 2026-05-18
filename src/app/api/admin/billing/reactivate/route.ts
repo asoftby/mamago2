@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
   } catch (error: unknown) {
     console.error("Reactivate account error:", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to reactivate account" },
+      { error: "Internal server error" },
       { status: 500 }
     );
   }

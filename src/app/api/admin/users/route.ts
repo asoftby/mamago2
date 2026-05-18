@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/auth/server";
 import { searchUsers } from "@/server/services/userModeration.service";
+import { parsePaginationParams } from "@/lib/api/pagination";
 import { Role, UserStatus } from "@prisma/client";
 
 export async function GET(req: NextRequest) {
@@ -12,8 +13,7 @@ export async function GET(req: NextRequest) {
     const query = searchParams.get("q") || "";
     const role = searchParams.get("role") as Role | undefined;
     const status = searchParams.get("status") as UserStatus | undefined;
-    const page = parseInt(searchParams.get("page") || "1");
-    const limit = parseInt(searchParams.get("limit") || "20");
+    const { page, limit } = parsePaginationParams(searchParams);
 
     const result = await searchUsers(query, {
       role,
@@ -35,9 +35,7 @@ export async function GET(req: NextRequest) {
     }
     
     return NextResponse.json(
-      {
-        error: error instanceof Error ? error.message : "Failed to fetch users",
-      },
+      { error: "Failed to fetch users" },
       {
         status:
           error instanceof Error && error.message === "Insufficient permissions"

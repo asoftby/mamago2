@@ -49,48 +49,143 @@ function getReplyTo(): string {
   return replyTo;
 }
 
+function getMissingResendEnvKeys(): string[] {
+  const missing: string[] = [];
+  if (!process.env.RESEND_API_KEY?.trim()) missing.push("RESEND_API_KEY");
+  if (!process.env.EMAIL_FROM?.trim()) missing.push("EMAIL_FROM");
+  if (!process.env.EMAIL_REPLY_TO?.trim()) missing.push("EMAIL_REPLY_TO");
+  return missing;
+}
+
 type EmailKind = "verify-email" | "password-reset" | "welcome" | "notification" | "business-invite";
 
-async function sendViaResend(
-  kind: EmailKind,
-  intendedTo: string,
-  subject: string,
-  react: ReactElement,
-): Promise<void> {
-  assertConfiguredForResend();
+type SendViaResendInput =
+  | {
+      kind: EmailKind;
+      intendedTo: string;
+      subject: string;
+      react: ReactElement;
+    }
+  | {
+      kind: EmailKind;
+      intendedTo: string;
+      subject: string;
+      text: string;
+      html?: string;
+    };
 
+async function sendViaResend(input: SendViaResendInput): Promise<{ messageId?: string | null }> {
+  assertConfiguredForResend();
   const debugTo = getDebugRedirectTo();
-  const to = debugTo ?? intendedTo;
+  const to = debugTo ?? input.intendedTo;
   const resend = getResendClient();
   const from = getFrom();
   const replyTo = getReplyTo();
 
   console.info("[email] sending", {
-    kind,
-    intendedTo,
+    kind: input.kind,
+    intendedTo: input.intendedTo,
     actualTo: to,
     debugRedirect: Boolean(debugTo),
-    subject,
+    subject: input.subject,
   });
 
-  const { data, error } = await resend.emails.send({
-    from,
-    to: [to],
-    replyTo: [replyTo],
-    subject,
-    react,
-    tags: [{ name: "type", value: kind }],
-  });
+  const payload =
+    "react" in input
+      ? {
+          from,
+          to: [to],
+          replyTo: [replyTo],
+          subject: input.subject,
+          react: input.react,
+          tags: [{ name: "type", value: input.kind }],
+        }
+      : {
+          from,
+          to: [to],
+          replyTo: [replyTo],
+          subject: input.subject,
+          text: input.text,
+          html: input.html,
+          tags: [{ name: "type", value: input.kind }],
+        };
+
+  const { data, error } = await resend.emails.send(payload);
 
   if (error) {
-    console.error("[email] Resend error", { kind, intendedTo, message: error.message });
+    console.error("[email] Resend error", {
+      kind: input.kind,
+      intendedTo: input.intendedTo,
+      message: error.message,
+    });
     throw new Error(`Resend: ${error.message}`);
   }
 
-  console.info("[email] sent", { kind, intendedTo, messageId: data?.id ?? null });
+  console.info("[email] sent", {
+    kind: input.kind,
+    intendedTo: input.intendedTo,
+    messageId: data?.id ?? null,
+  });
+  return { messageId: data?.id ?? null };
 }
 
 export class EmailService {
+  async sendRawEmail(params: {
+    to: string;
+    subject: string;
+    text: string;
+    html?: string;
+  }): Promise<{ status: "SENT" | "SKIPPED" | "FAILED"; reason?: string; messageId?: string }> {
+    const debugTo = getDebugRedirectTo();
+    const actualTo = debugTo ?? params.to;
+
+    if (!isEmailEnabled()) {
+      console.info("[email] raw email send skipped (EMAIL_ENABLED is not true)", {
+        kind: "notification",
+        intendedTo: params.to,
+        actualTo,
+        debugRedirect: Boolean(debugTo),
+        subject: params.subject,
+      });
+      return { status: "SKIPPED", reason: "EMAIL_DISABLED" };
+    }
+
+    const missingKeys = getMissingResendEnvKeys();
+    if (missingKeys.length > 0) {
+      console.error("[email] Resend email send failed: missing required env", {
+        intendedTo: params.to,
+        actualTo,
+        subject: params.subject,
+        missingKeys,
+        environment: process.env.NODE_ENV,
+      });
+      return { status: "FAILED", reason: "EMAIL_NOT_CONFIGURED" };
+    }
+
+    try {
+      const result = await sendViaResend({
+        kind: "notification",
+        intendedTo: params.to,
+        subject: params.subject,
+        text: params.text,
+        html: params.html,
+      });
+      return { status: "SENT", messageId: result.messageId ?? undefined };
+    } catch (error) {
+      const reason =
+        error instanceof Error && error.message.trim().length > 0
+          ? error.message
+          : "EMAIL_SEND_FAILED";
+      console.error("[email] raw email send failed", {
+        intendedTo: params.to,
+        actualTo,
+        subject: params.subject,
+        reason,
+      });
+      return { status: "FAILED", reason };
+    }
+  }
+
   async sendNotificationEmail(params: {
     to: string;
     subject: string;
@@ -98,7 +193,7 @@ export class EmailService {
     body: string;
     ctaLabel?: string | null;
     ctaUrl?: string | null;
-  }): Promise<{ status: "SENT" | "SKIPPED"; reason?: string }> {
+  }): Promise<{ status: "SENT" | "SKIPPED"; reason?: string; messageId?: string }> {
     const debugTo = getDebugRedirectTo();
     const actualTo = debugTo ?? params.to;
 
@@ -113,19 +208,21 @@ export class EmailService {
       return { status: "SKIPPED", reason: "EMAIL_DISABLED" };
     }
 
-    await sendViaResend(
-      "notification",
-      params.to,
-      params.subject,
-      <TransactionalNotificationTemplate
-        title={params.title}
-        body={params.body}
-        ctaLabel={params.ctaLabel}
-        ctaUrl={params.ctaUrl}
-      />,
-    );
+    const result = await sendViaResend({
+      kind: "notification",
+      intendedTo: params.to,
+      subject: params.subject,
+      react: (
+        <TransactionalNotificationTemplate
+          title={params.title}
+          body={params.body}
+          ctaLabel={params.ctaLabel}
+          ctaUrl={params.ctaUrl}
+        />
+      ),
+    });
 
-    return { status: "SENT" };
+    return { status: "SENT", messageId: result.messageId ?? undefined };
   }
 
   async sendVerifyEmail(params: { to: string; token: string }): Promise<void> {
@@ -146,18 +243,11 @@ export class EmailService {
     });
 
     if (!isEmailEnabled()) {
-      let verifyUrl: string | undefined;
-      try {
-        verifyUrl = buildVerifyEmailUrl(params.token);
-      } catch {
-        verifyUrl = undefined;
-      }
       console.warn("[email] ⚠️ SEND SKIPPED: EMAIL_ENABLED is not 'true'", {
         kind: "verify-email",
         intendedTo: params.to,
         actualTo,
         debugRedirect: Boolean(debugTo),
-        verifyUrl: verifyUrl ?? "(задайте APP_PUBLIC_URL для полной ссылки)",
         subject: EMAIL_SUBJECTS.verifyEmail,
         hint: "Set EMAIL_ENABLED=true in .env to enable email delivery",
       });
@@ -165,18 +255,12 @@ export class EmailService {
     }
 
     const verifyUrl = buildVerifyEmailUrl(params.token);
-    console.info("[email] sending verify email via Resend", {
+    await sendViaResend({
+      kind: "verify-email",
       intendedTo: params.to,
-      actualTo,
-      verifyUrl,
+      subject: EMAIL_SUBJECTS.verifyEmail,
+      react: <VerifyEmailTemplate verifyUrl={verifyUrl} />,
     });
-
-    await sendViaResend(
-      "verify-email",
-      params.to,
-      EMAIL_SUBJECTS.verifyEmail,
-      <VerifyEmailTemplate verifyUrl={verifyUrl} />,
-    );
   }
 
   async sendPasswordResetEmail(params: { to: string; token: string }): Promise<void> {
@@ -184,30 +268,23 @@ export class EmailService {
     const actualTo = debugTo ?? params.to;
 
     if (!isEmailEnabled()) {
-      let resetUrl: string | undefined;
-      try {
-        resetUrl = buildPasswordResetUrl(params.token);
-      } catch {
-        resetUrl = undefined;
-      }
       console.info("[email] send skipped (EMAIL_ENABLED is not true)", {
         kind: "password-reset",
         intendedTo: params.to,
         actualTo,
         debugRedirect: Boolean(debugTo),
-        resetUrl: resetUrl ?? "(задайте APP_PUBLIC_URL для полной ссылки)",
         subject: EMAIL_SUBJECTS.passwordReset,
       });
       return;
     }
 
     const resetUrl = buildPasswordResetUrl(params.token);
-    await sendViaResend(
-      "password-reset",
-      params.to,
-      EMAIL_SUBJECTS.passwordReset,
-      <PasswordResetTemplate resetUrl={resetUrl} />,
-    );
+    await sendViaResend({
+      kind: "password-reset",
+      intendedTo: params.to,
+      subject: EMAIL_SUBJECTS.passwordReset,
+      react: <PasswordResetTemplate resetUrl={resetUrl} />,
+    });
   }
 
   async sendWelcomeEmail(params: {
@@ -234,14 +311,12 @@ export class EmailService {
 
     assertConfiguredForResend();
 
-    await sendViaResend(
-      "welcome",
-      params.to,
-      EMAIL_SUBJECTS.welcome,
-      <MamagoWelcomeTemplate
-        ctaUrl={params.ctaUrl}
-      />,
-    );
+    await sendViaResend({
+      kind: "welcome",
+      intendedTo: params.to,
+      subject: EMAIL_SUBJECTS.welcome,
+      react: <MamagoWelcomeTemplate ctaUrl={params.ctaUrl} />,
+    });
   }
 
   async sendBusinessInvite(params: {
@@ -260,24 +335,25 @@ export class EmailService {
         intendedTo: params.to,
         actualTo,
         debugRedirect: Boolean(debugTo),
-        acceptUrl: params.acceptUrl,
         subject: EMAIL_SUBJECTS.businessInvite,
         hint: "Set EMAIL_ENABLED=true in .env to enable email delivery",
       });
       return;
     }
 
-    await sendViaResend(
-      "business-invite",
-      params.to,
-      EMAIL_SUBJECTS.businessInvite,
-      <BusinessInviteTemplate
-        businessName={params.businessName}
-        inviterName={params.inviterName}
-        acceptUrl={params.acceptUrl}
-        expiresInDays={params.expiresInDays}
-      />,
-    );
+    await sendViaResend({
+      kind: "business-invite",
+      intendedTo: params.to,
+      subject: EMAIL_SUBJECTS.businessInvite,
+      react: (
+        <BusinessInviteTemplate
+          businessName={params.businessName}
+          inviterName={params.inviterName}
+          acceptUrl={params.acceptUrl}
+          expiresInDays={params.expiresInDays}
+        />
+      ),
+    });
   }
 }
 

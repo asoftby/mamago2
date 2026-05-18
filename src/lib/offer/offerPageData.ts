@@ -1,12 +1,156 @@
 import prisma from "@/lib/prisma";
+import type { Prisma } from "@prisma/client";
 import type { OfferPageData, OfferType, OfferCtaType, OfferGalleryImage, OfferScheduleItem } from "./offerPageTypes";
 import { formatAgeRange, formatPrice } from "./offerPageFormat";
-import { getOfferPublicSection } from "../offers/offerPublicUrl";
+import { resolvePlaceLogoImage } from "@/lib/place/resolvePlaceLogoImage";
+import { isMediaAssetCuid } from "@/lib/media/isMediaAssetCuid";
 
 interface GetOfferPageDataParams {
   citySlug: string;
   section: string;
   slug: string;
+}
+
+type CampSessionJson = {
+  id?: string;
+  title?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  priceOverride?: number;
+  description?: string;
+  ageFrom?: number;
+  ageTo?: number;
+  spotsLeft?: number;
+  capacity?: number;
+};
+
+function isCampSessionJson(value: Prisma.JsonValue): value is Prisma.JsonObject {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function asOptionalString(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim().length > 0 ? value : undefined;
+}
+
+function asOptionalNumber(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
+function parseCampSession(value: Prisma.JsonValue, index: number): OfferScheduleItem | null {
+  if (!isCampSessionJson(value)) return null;
+
+  const session = value as CampSessionJson;
+  const dateFrom = asOptionalString(session.dateFrom);
+  const dateTo = asOptionalString(session.dateTo);
+  const ageFrom = asOptionalNumber(session.ageFrom);
+  const ageTo = asOptionalNumber(session.ageTo);
+  const priceOverride = asOptionalNumber(session.priceOverride);
+
+  return {
+    id: asOptionalString(session.id) ?? `camp-session-${index}`,
+    title: asOptionalString(session.title),
+    dateFrom: dateFrom
+      ? new Date(dateFrom).toLocaleDateString("ru-RU")
+      : undefined,
+    dateTo: dateTo ? new Date(dateTo).toLocaleDateString("ru-RU") : undefined,
+    price: priceOverride != null ? `${priceOverride} BYN` : undefined,
+    description: asOptionalString(session.description),
+    ageRange:
+      ageFrom != null || ageTo != null
+        ? `${ageFrom ?? ""}-${ageTo ?? ""}`
+        : undefined,
+    spotsLeft: asOptionalNumber(session.spotsLeft),
+    capacity: asOptionalNumber(session.capacity),
+    ctaEnabled: true,
+  };
+}
+
+function stripHtml(html?: string | null): string {
+  if (!html) return "";
+  return html
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/p>/gi, "\n")
+    .replace(/<\/li>/gi, "\n")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{2,}/g, "\n")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function extractDiscountsFromPromotionDetails(html?: string | null): Array<{ rate: string; label: string }> {
+  if (!html) return [];
+
+  const liMatches = [...html.matchAll(/<li[^>]*>([\s\S]*?)<\/li>/gi)];
+  const rawItems =
+    liMatches.length > 0
+      ? liMatches.map((match) => stripHtml(match[1]))
+      : stripHtml(html)
+          .split("\n")
+          .map((line) => line.trim())
+          .filter(Boolean);
+
+  return rawItems
+    .map((item) => {
+      const rateMatch = item.match(/(-?\d{1,2}%)/);
+      if (!rateMatch) return null;
+      const rate = rateMatch[1];
+      const label = item.replace(rateMatch[0], "").replace(/^[-:•\s]+/, "").trim();
+      if (!label) return null;
+      return { rate, label };
+    })
+    .filter((item): item is { rate: string; label: string } => Boolean(item));
+}
+
+function extractPromoPercent(...values: Array<string | null | undefined>): number | null {
+  for (const value of values) {
+    const plain = stripHtml(value);
+    const match = plain.match(/(\d{1,2})\s*%/);
+    if (match) return Number(match[1]);
+  }
+  return null;
+}
+
+function formatOldPriceFromPercent(priceFrom: number | null | undefined, percent: number | null): string | undefined {
+  if (!priceFrom || !percent || percent <= 0 || percent >= 100) return undefined;
+  const oldPrice = priceFrom / (1 - percent / 100);
+  return formatPrice(Math.round(oldPrice));
+}
+
+function resolvePriceUnit(args: {
+  offerType: OfferType;
+  plainPriceCaption: string;
+}): string | undefined {
+  const cleanedCaption = args.plainPriceCaption
+    .replace(/^за\s+/i, "")
+    .replace(/^\/\s*/i, "")
+    .trim();
+
+  if (cleanedCaption && cleanedCaption.length <= 18) {
+    return `BYN / ${cleanedCaption}`;
+  }
+
+  if (args.offerType === "CAMP") {
+    return "BYN / смена";
+  }
+
+  return "BYN";
+}
+
+function resolvePromotionText(args: {
+  promoTitle?: string | null;
+  promotionalOffer?: string | null;
+  hasDiscounts: boolean;
+}): string | undefined {
+  const promoTitle = args.promoTitle?.trim();
+  if (promoTitle) return promoTitle;
+
+  const promotionalOffer = stripHtml(args.promotionalOffer);
+  if (!promotionalOffer) return undefined;
+  if (args.hasDiscounts) return undefined;
+  if (promotionalOffer.length > 42) return undefined;
+
+  return promotionalOffer;
 }
 
 /**
@@ -29,6 +173,10 @@ export async function getOfferPageData({
           districtAuto: true,
           metroManual: true,
           metroAuto: true,
+          images: {
+            select: { id: true, url: true, kind: true },
+            orderBy: { sortOrder: "asc" },
+          },
         },
       },
     },
@@ -38,6 +186,24 @@ export async function getOfferPageData({
 
   if (!offer || offer.status !== "PUBLISHED") {
     return null;
+  }
+
+  // 2a. Place logo: PlaceImage (resolvePlaceLogoImage) or legacy MediaAsset id
+  let placeLogoUrl: string | undefined;
+  if (offer.place) {
+    const resolved = resolvePlaceLogoImage(offer.place.images, offer.place.logoImageId);
+    placeLogoUrl = resolved?.url?.trim() || undefined;
+    if (
+      !placeLogoUrl &&
+      offer.place.logoImageId &&
+      isMediaAssetCuid(offer.place.logoImageId)
+    ) {
+      const logoAsset = await prisma.mediaAsset.findUnique({
+        where: { id: offer.place.logoImageId },
+        select: { publicUrl: true },
+      });
+      placeLogoUrl = logoAsset?.publicUrl?.trim() || undefined;
+    }
   }
 
   // 2. Fetch reviews from PlaceReview (only MAMAGO source)
@@ -75,21 +241,21 @@ export async function getOfferPageData({
 
   // Map schedule items
   const campSessionsRaw = Array.isArray(offer.campSessions) ? offer.campSessions : [];
-  const scheduleItems: OfferScheduleItem[] = (campSessionsRaw as any[]).map((session: any) => ({
-    id: session.id || Math.random().toString(36).substr(2, 9),
-    title: session.title,
-    dateFrom: session.dateFrom ? new Date(session.dateFrom).toLocaleDateString("ru-RU") : undefined,
-    dateTo: session.dateTo ? new Date(session.dateTo).toLocaleDateString("ru-RU") : undefined,
-    price: session.priceOverride ? `${session.priceOverride} BYN` : undefined,
-    description: session.description,
-    ageRange: session.ageFrom || session.ageTo ? `${session.ageFrom || ""}-${session.ageTo || ""}` : undefined,
-    spotsLeft: session.spotsLeft,
-    capacity: session.capacity,
-    ctaEnabled: true,
-  }));
+  const scheduleItems: OfferScheduleItem[] = campSessionsRaw
+    .map((session, index) => parseCampSession(session, index))
+    .filter((session): session is OfferScheduleItem => session !== null);
 
   // Map pricing
   const pricingMode = offer.priceFrom ? "single" : "multiple";
+  const plainPriceCaption = stripHtml(offer.priceCaption);
+  const parsedDiscounts = extractDiscountsFromPromotionDetails(offer.promotionDetails);
+  const promoPercent = extractPromoPercent(offer.promoTitle, offer.promotionalOffer, offer.promotionDetails);
+  const inferredOldPrice = formatOldPriceFromPercent(offer.priceFrom, promoPercent);
+  const promotionText = resolvePromotionText({
+    promoTitle: offer.promoTitle,
+    promotionalOffer: offer.promotionalOffer,
+    hasDiscounts: parsedDiscounts.length > 0,
+  });
   
   // Map meta grid
   const metaGrid = [
@@ -152,17 +318,27 @@ export async function getOfferPageData({
       posterUrl: offer.coverImage || "",
       posterAlt: offer.title,
       gallery,
-      videoUrl: offer.videoUrl,
+      videoUrl: offer.videoUrl ?? undefined,
       videoLabel: "Трейлер",
     },
     
     metaGrid,
     
     pricing: {
-      mode: pricingMode as any,
+      mode: pricingMode,
       singlePrice: offer.priceFrom ? formatPrice(offer.priceFrom) : undefined,
       priceCaption: offer.priceCaption || undefined,
-      promotionText: offer.promotionalOffer || undefined,
+      priceDisplay: offer.priceFrom ? new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 0 }).format(offer.priceFrom) : undefined,
+      priceUnit: resolvePriceUnit({
+        offerType,
+        plainPriceCaption,
+      }),
+      promotionText,
+      promoTitle: offer.promoTitle || undefined,
+      promoUntil: offer.promoUntil ? offer.promoUntil.toISOString() : undefined,
+      promotionDetails: offer.promotionDetails || undefined,
+      discounts: parsedDiscounts.length > 0 ? parsedDiscounts : undefined,
+      oldPrice: inferredOldPrice,
     },
     
     schedule: offerType !== "SINGLE" ? {
@@ -192,6 +368,9 @@ export async function getOfferPageData({
       metro: offer.place.metroManual?.name || offer.place.metroAuto?.name,
       lat: offer.place.lat || undefined,
       lng: offer.place.lng || undefined,
+      logoUrl: placeLogoUrl,
+      rating: offer.place.googleRating || undefined,
+      ratingsCount: offer.place.googleUserRatingsTotal || undefined,
     } : undefined,
 
     reviews: reviews.map(r => ({

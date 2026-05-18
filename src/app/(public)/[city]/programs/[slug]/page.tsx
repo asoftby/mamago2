@@ -88,17 +88,17 @@ export async function generateMetadata({ params }: ProgramPageProps): Promise<Me
   const publicBase = process.env.NEXT_PUBLIC_APP_URL || "https://mamago.by";
 
   return {
-    title: data.seo.title || data.title,
-    description: data.seo.description || data.shortDescription,
+    title: data.seo?.title || data.title,
+    description: data.seo?.description || data.shortDescription,
     openGraph: {
-      title: data.seo.ogTitle || data.title,
-      description: data.seo.ogDescription || data.shortDescription,
-      images: data.seo.ogImage ? [{ url: data.seo.ogImage }] : undefined,
+      title: data.seo?.ogTitle || data.title,
+      description: data.seo?.ogDescription || data.shortDescription,
+      images: data.seo?.ogImage ? [{ url: data.seo.ogImage }] : undefined,
       type: "website",
       url: `${publicBase}/${city}/programs/${slug}`,
     },
     alternates: {
-      canonical: data.seo.canonicalUrl || `${publicBase}/${city}/programs/${slug}`,
+      canonical: data.seo?.canonicalUrl || `${publicBase}/${city}/programs/${slug}`,
     },
   };
 }

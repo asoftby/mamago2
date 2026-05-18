@@ -116,9 +116,9 @@ export async function GET(
     console.error("[place-get] ❌ Error:", error);
     console.error("[place-get] Stack:", error instanceof Error ? error.stack : "No stack");
     return NextResponse.json(
-      { 
+      {
         error: "INTERNAL_SERVER_ERROR",
-        message: error instanceof Error ? error.message : "Failed to get place"
+        message: "Internal server error"
       },
       { status: 500 }
     );
@@ -323,9 +323,9 @@ export async function PATCH(
     console.error("[place-patch] ❌ Error:", error);
     console.error("[place-patch] Stack:", error instanceof Error ? error.stack : "No stack");
     return NextResponse.json(
-      { 
+      {
         error: "INTERNAL_SERVER_ERROR",
-        message: error instanceof Error ? error.message : "Failed to update place"
+        message: "Internal server error"
       },
       { status: 500 }
     );
@@ -406,9 +406,9 @@ export async function DELETE(
     console.error("[place-delete] ❌ Error:", error);
     console.error("[place-delete] Stack:", error instanceof Error ? error.stack : "No stack");
     return NextResponse.json(
-      { 
+      {
         error: "INTERNAL_SERVER_ERROR",
-        message: error instanceof Error ? error.message : "Failed to delete place"
+        message: "Internal server error"
       },
       { status: 500 }
     );

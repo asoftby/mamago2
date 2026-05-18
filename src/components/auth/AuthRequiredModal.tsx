@@ -6,7 +6,7 @@ import { AuthForm } from "./AuthForm";
 interface AuthRequiredModalProps {
   isOpen: boolean;
   onClose: () => void;
-  reason?: "review" | "comment" | "business_request" | "chat";
+  reason?: "review" | "comment" | "business_request" | "chat" | "save" | "plan";
   entityName?: string;
 }
 
@@ -26,6 +26,10 @@ export function AuthRequiredModal({
         return "Войдите, чтобы отправить заявку";
       case "chat":
         return "Войдите, чтобы начать чат";
+      case "save":
+        return "Войдите, чтобы сохранить";
+      case "plan":
+        return "Войдите, чтобы добавить в план";
       default:
         return "Войдите в аккаунт";
     }

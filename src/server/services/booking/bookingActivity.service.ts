@@ -6,6 +6,7 @@
  */
 
 import prisma from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
 import type { BookingActivityType, BookingActivityActorType } from "@prisma/client";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -16,7 +17,7 @@ export interface BookingActivityRecord {
   type: BookingActivityType;
   actorType: BookingActivityActorType;
   actorId: string | null;
-  payload: Record<string, unknown> | null;
+  payload: Prisma.JsonValue | null;
   createdAt: string;
 }
 
@@ -25,7 +26,7 @@ export interface CreateActivityInput {
   type: BookingActivityType;
   actorType?: BookingActivityActorType;
   actorId?: string | null;
-  payload?: Record<string, unknown> | null;
+  payload?: Prisma.InputJsonValue | null;
 }
 
 // ─── Create ───────────────────────────────────────────────────────────────────
@@ -46,7 +47,7 @@ export async function createBookingActivity(
         type: input.type,
         actorType: input.actorType ?? "SYSTEM",
         actorId: input.actorId ?? null,
-        payload: input.payload ?? undefined,
+        payload: input.payload ?? Prisma.JsonNull,
         createdAt: now,
       },
       select: {
@@ -72,7 +73,7 @@ export async function createBookingActivity(
     type: record.type,
     actorType: record.actorType,
     actorId: record.actorId,
-    payload: record.payload as Record<string, unknown> | null,
+    payload: record.payload,
     createdAt: record.createdAt.toISOString(),
   };
 }
@@ -117,7 +118,7 @@ export async function getBookingActivities(
     type: r.type,
     actorType: r.actorType,
     actorId: r.actorId,
-    payload: r.payload as Record<string, unknown> | null,
+    payload: r.payload,
     createdAt: r.createdAt.toISOString(),
   }));
 }

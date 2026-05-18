@@ -2,9 +2,29 @@ import { NextRequest, NextResponse } from "next/server";
 import { normalizePhoneToE164 } from "@/lib/phone/phoneNormalize";
 import { hashCode, safeEq } from "@/lib/otp/otp";
 import { createSession, setSessionCookie } from "@/lib/auth/session";
+import { checkRateLimit, resetRateLimit } from "@/lib/security/rateLimit";
 import prisma from "@/lib/prisma";
 
 export const runtime = "nodejs";
+
+/**
+ * Extracts client IP with support for Cloudflare and proxies.
+ */
+function getClientIp(request: NextRequest): string {
+  const cf = request.headers.get("cf-connecting-ip");
+  if (cf) return cf;
+
+  const real = request.headers.get("x-real-ip");
+  if (real) return real;
+
+  const xff = request.headers.get("x-forwarded-for");
+  if (xff) {
+    const first = xff.split(",")[0]?.trim();
+    if (first) return first;
+  }
+
+  return "unknown";
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -26,6 +46,17 @@ export async function POST(request: NextRequest) {
     const codeStr = String(code).replace(/\D/g, "");
     if (codeStr.length !== 4) {
       return NextResponse.json({ error: "Код должен быть 4 цифры" }, { status: 400 });
+    }
+
+    // Rate limit check: 5 attempts per 10 minutes per IP + Phone
+    const ip = getClientIp(request);
+    const rateLimitKey = `otp_verify:${ip}:${phoneE164}`;
+    const rl = checkRateLimit(rateLimitKey, 5, 10 * 60 * 1000);
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { error: "Слишком много попыток. Попробуйте позже." },
+        { status: 429 }
+      );
     }
 
     const user = await prisma.user.findFirst({ where: { phoneE164 } });
@@ -83,6 +114,9 @@ export async function POST(request: NextRequest) {
       await tx.phoneOtp.delete({ where: { id: otpRecord.id } });
     });
 
+    // Reset rate limiter on successful verification
+    resetRateLimit(rateLimitKey);
+
     const token = await createSession(user.id);
     const response = NextResponse.json({ ok: true });
     const requestHost = request.headers.get("x-forwarded-host") ?? request.headers.get("host");
@@ -91,7 +125,6 @@ export async function POST(request: NextRequest) {
     return response;
   } catch (error) {
     console.error("[auth/phone/verify-otp]", error);
-    const msg = error instanceof Error ? error.message : "Внутренняя ошибка";
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return NextResponse.json({ error: "Внутренняя ошибка" }, { status: 500 });
   }
 }

@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
     }
     console.error("GET /api/admin/analytics/segments:", error);
     return NextResponse.json(
-      { error: msg || "Failed to load segments" },
+      { error: "Failed to load segments" },
       { status: 500 },
     );
   }

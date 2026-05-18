@@ -1,11 +1,72 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
-import { Section } from "@/components/ui/Section";
-import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { EventPageSimilar } from "@/lib/event/eventPageTypes";
+
+function EventCard({ ev }: { ev: EventPageSimilar }) {
+  const hasImage = ev.imageUrl && !ev.imageUrl.endsWith("/og-default.jpg");
+
+  return (
+    <Link href={ev.href} className="group flex flex-col gap-3 focus:outline-none">
+      {/* Image / placeholder */}
+      <div
+        className="relative overflow-hidden rounded-[18px] bg-[#EDE8DF]"
+        style={{ aspectRatio: "4/5" }}
+      >
+        {hasImage ? (
+          /* eslint-disable-next-line @next/next/no-img-element */
+          <img
+            src={ev.imageUrl}
+            alt=""
+            className="h-full w-full object-cover transition-transform duration-[1000ms] ease-[cubic-bezier(0.2,0.7,0.2,1)] group-hover:scale-[1.04]"
+          />
+        ) : (
+          /* Diagonal-stripe placeholder */
+          <div
+            className="flex h-full w-full items-center justify-center"
+            style={{
+              backgroundImage:
+                "repeating-linear-gradient(-45deg, transparent, transparent 9px, rgba(20,18,16,0.07) 9px, rgba(20,18,16,0.07) 10px)",
+            }}
+          >
+            {ev.categoryLabel && (
+              <span className="font-mono text-[11px] uppercase tracking-[0.18em] text-[rgba(20,18,16,0.30)]">
+                {ev.categoryLabel}
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* Date pill */}
+        {ev.dateLabel && (
+          <span className="absolute left-3 top-3 inline-flex h-7 items-center rounded-full bg-[rgba(250,247,241,0.92)] px-3 text-[12px] font-medium text-[#141210] shadow-[0_1px_4px_rgba(20,18,16,0.12)] backdrop-blur-[6px]">
+            {ev.dateLabel}
+          </span>
+        )}
+      </div>
+
+      {/* Text */}
+      <div className="flex flex-col gap-1 px-0.5">
+        {ev.categoryLabel && (
+          <div className="font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-[rgba(20,18,16,0.55)]">
+            {ev.categoryLabel}
+          </div>
+        )}
+        <div className="line-clamp-2 text-[15px] font-semibold leading-[1.3] tracking-[-0.01em] text-[#141210] transition-colors group-hover:text-[#C24E22]">
+          {ev.title}
+        </div>
+        {(ev.priceLabel || ev.ageLabel) && (
+          <div className="mt-0.5 font-mono text-[12px] text-[rgba(20,18,16,0.55)]">
+            {ev.priceLabel && <span>от {ev.priceLabel}</span>}
+            {ev.priceLabel && ev.ageLabel && <span className="mx-1.5">·</span>}
+            {ev.ageLabel && <span>{ev.ageLabel}</span>}
+          </div>
+        )}
+      </div>
+    </Link>
+  );
+}
 
 export function SimilarEventsSection({
   items,
@@ -19,59 +80,29 @@ export function SimilarEventsSection({
   if (!items.length) return null;
 
   return (
-    <Section
-      title="Похожие события"
-      subtitle="Ещё идеи — после того как разобрались с этим"
-      className={cn("py-8 md:py-12", className)}
-    >
-      <div className="grid w-full gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    <div className={cn("", className)}>
+      {/* Header */}
+      <div className="mb-6 flex items-end justify-between gap-4">
+        <div className="flex flex-1 items-center gap-3.5">
+          <span className="font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-[rgba(20,18,16,0.55)]">
+            05 — Похожие события
+          </span>
+          <span className="h-px flex-1 bg-[rgba(20,18,16,0.10)]" />
+        </div>
+        <a
+          href="#"
+          className="shrink-0 text-[14px] text-[#3A332B] underline underline-offset-4 hover:text-[#141210]"
+        >
+          Все события →
+        </a>
+      </div>
+
+      {/* Grid */}
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-4 md:gap-5">
         {items.map((ev) => (
-          <article
-            key={ev.id}
-            className="flex flex-col overflow-hidden rounded-2xl border border-border/60 bg-card shadow-sm"
-          >
-            <Link href={ev.href} className="relative block aspect-[4/3] bg-muted">
-              {ev.imageUrl.startsWith("http") ? (
-                <Image
-                  src={ev.imageUrl}
-                  alt=""
-                  fill
-                  sizes="(max-width: 640px) 50vw, (max-width: 1200px) 25vw, 280px"
-                  className="object-cover"
-                />
-              ) : (
-                <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
-                  Нет фото
-                </div>
-              )}
-            </Link>
-            <div className="flex flex-1 flex-col gap-2 p-4">
-              <h3 className="line-clamp-2 text-[15px] font-semibold leading-snug">
-                <Link href={ev.href} className="hover:underline">
-                  {ev.title}
-                </Link>
-              </h3>
-              <div className="text-[12px] text-muted-foreground">
-                {[ev.dateLabel, ev.priceLabel].filter(Boolean).join(" · ")}
-              </div>
-              <div className="mt-auto flex flex-wrap gap-2 pt-2">
-                <Button variant="outline" size="sm" className="rounded-xl" asChild>
-                  <Link href={ev.href}>Подробнее</Link>
-                </Button>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="sm"
-                  className="rounded-xl"
-                  onClick={() => onPlan(ev.id)}
-                >
-                  В план
-                </Button>
-              </div>
-            </div>
-          </article>
+          <EventCard key={ev.id} ev={ev} />
         ))}
       </div>
-    </Section>
+    </div>
   );
 }

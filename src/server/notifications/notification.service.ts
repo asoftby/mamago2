@@ -15,6 +15,29 @@ import { sendTelegramNotification, skipTelegramNotification } from "./telegram-d
 import { getActiveTelegramConnectionForCurrentEnvironment } from "@/server/services/telegram/telegramConnection.service";
 import { sendNotificationCore } from "./notification-service-core";
 import { resolveNotificationTypeForScenario } from "./notification-scenario";
+import type {
+  PlanEventReminderContext,
+  PlanTomorrowDigestContext,
+} from "@/lib/notifications/domainContracts";
+
+function resolveNotificationEventId(
+  input: SendNotificationInput,
+): string {
+  switch (input.scenario) {
+    case "PLAN_EVENT_2H_BEFORE": {
+      const context = input.context as PlanEventReminderContext;
+      return context.activityId ?? context.planItemId;
+    }
+    case "PLAN_TOMORROW_DIGEST": {
+      const context = input.context as PlanTomorrowDigestContext;
+      return context.digestDate;
+    }
+    default: {
+      const exhaustiveCheck: never = input.scenario;
+      return exhaustiveCheck;
+    }
+  }
+}
 
 export async function prepareNotification(
   input: SendNotificationInput,
@@ -22,7 +45,7 @@ export async function prepareNotification(
   const dedupeKey = buildNotificationDedupeKey({
     scenario: input.scenario,
     userId: input.userId,
-    eventId: input.context.activityId ?? input.context.planItemId,
+    eventId: resolveNotificationEventId(input),
   });
 
   const alreadySent = await hasSuccessfulNotificationDelivery({

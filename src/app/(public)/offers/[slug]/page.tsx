@@ -115,7 +115,7 @@ export default async function OfferPage({ params }: OfferPageProps) {
   if (!offer) notFound();
   
   const citySlug = offer.place?.city?.slug || "minsk";
-  const canonicalPath = getOfferPublicPath(offer as any, citySlug);
+  const canonicalPath = getOfferPublicPath(offer, citySlug);
   
   permanentRedirect(canonicalPath);
 }

@@ -1,6 +1,7 @@
 import prisma from "@/lib/prisma";
 import { stableJsonStringify } from "@/lib/json/stableJsonStringify";
 import { isServerSavePerfEnabled } from "@/server/utils/requestPerf";
+import { expandScheduleItemDates } from "@/lib/event/expandScheduleItemDates";
 
 type ScheduleJsonLike = {
   dates?: unknown;
@@ -14,27 +15,26 @@ function extractScheduleDatesAndStartTime(scheduleJson: unknown): {
 } {
   const j = scheduleJson as ScheduleJsonLike | null | undefined;
 
-  let dates: string[] =
-    j && Array.isArray(j.dates)
-      ? (j.dates as unknown[]).filter(
-          (d): d is string => typeof d === "string" && /^\d{4}-\d{2}-\d{2}$/.test(d),
-        )
-      : [];
+  let dates: string[] = [];
 
   let startTime =
     typeof j?.startTime === "string" && /^\d{2}:\d{2}$/.test(j.startTime)
       ? j.startTime
       : "10:00";
 
-  if (dates.length === 0 && j && Array.isArray(j.scheduleItems)) {
-    const items = j.scheduleItems as Array<{ date?: unknown; startTime?: unknown }>;
-    dates = items
-      .map((item) => item.date)
-      .filter((d): d is string => typeof d === "string" && /^\d{4}-\d{2}-\d{2}$/.test(d));
+  if (j && Array.isArray(j.scheduleItems) && j.scheduleItems.length > 0) {
+    const items = j.scheduleItems as Array<{ date?: unknown; dateEnd?: unknown; startTime?: unknown }>;
+    dates = expandScheduleItemDates(items);
     const firstSt = items[0]?.startTime;
     if (typeof firstSt === "string" && /^\d{2}:\d{2}$/.test(firstSt)) {
       startTime = firstSt;
     }
+  }
+
+  if (dates.length === 0 && j && Array.isArray(j.dates)) {
+    dates = (j.dates as unknown[]).filter(
+      (d): d is string => typeof d === "string" && /^\d{4}-\d{2}-\d{2}$/.test(d),
+    );
   }
 
   return { dates, startTime };

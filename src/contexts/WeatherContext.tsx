@@ -9,6 +9,7 @@ import {
   useMemo,
   type ReactNode,
 } from "react";
+import { usePathname } from "next/navigation";
 import { useCity } from "./CityContext";
 import type { WeeklyWeatherData, DayWeather } from "@/lib/weather/types";
 
@@ -32,8 +33,14 @@ const weatherCache = new Map<string, WeeklyWeatherData>();
 /** In-flight promises to deduplicate concurrent requests */
 const inFlightWeather = new Map<string, Promise<WeeklyWeatherData | null>>();
 
+/** Paths where weather data is not needed — skip fetch entirely */
+function shouldSkipWeatherFetch(pathname: string): boolean {
+  return pathname.startsWith("/me/") || pathname.startsWith("/admin/");
+}
+
 export function WeatherProvider({ children }: { children: ReactNode }) {
   const { citySlug } = useCity();
+  const pathname = usePathname();
 
   const [weatherData, setWeatherData] = useState<WeeklyWeatherData | null>(
     citySlug ? weatherCache.get(citySlug) || null : null,
@@ -98,12 +105,16 @@ export function WeatherProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
+    // Skip weather fetch on /me/plan and /admin where weather is not needed
+    if (shouldSkipWeatherFetch(pathname)) {
+      return;
+    }
     if (!citySlug) {
       setWeatherData(null);
       return;
     }
     void fetchWeather(citySlug);
-  }, [citySlug, fetchWeather]);
+  }, [citySlug, fetchWeather, pathname]);
 
   const getWeatherForDate = useCallback(
     (date: Date | string): DayWeather | null => {

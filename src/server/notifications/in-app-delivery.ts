@@ -4,6 +4,8 @@ import prisma from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import type {
   NotificationDeliveryOutcome,
+  PlanEventReminderContext,
+  PlanTomorrowDigestContext,
   PreparedNotificationPayload,
 } from "@/lib/notifications/domainContracts";
 import type { NotificationAudience } from "@prisma/client";
@@ -21,9 +23,81 @@ function resolveNotificationAudience(
 ): NotificationAudience {
   switch (scenario) {
     case "PLAN_EVENT_2H_BEFORE":
+    case "PLAN_TOMORROW_DIGEST":
       return "USER";
     default: {
       const exhaustiveCheck: never = scenario;
+      return exhaustiveCheck;
+    }
+  }
+}
+
+function buildInAppPayloadJson(
+  prepared: PreparedNotificationPayload,
+): Prisma.InputJsonValue {
+  switch (prepared.scenario) {
+    case "PLAN_EVENT_2H_BEFORE": {
+      const context = prepared.context as PlanEventReminderContext;
+      return {
+        scenario: prepared.scenario,
+        context: {
+          planItemId: context.planItemId,
+          activityId: context.activityId ?? null,
+          eventTitle: context.eventTitle,
+          startsAt: context.startsAt.toISOString(),
+          placeName: context.placeName ?? null,
+          cityName: context.cityName ?? null,
+        },
+        content: prepared.content,
+      };
+    }
+    case "PLAN_TOMORROW_DIGEST": {
+      const context = prepared.context as PlanTomorrowDigestContext;
+      return {
+        scenario: prepared.scenario,
+        context: {
+          digestDate: context.digestDate,
+          citySlug: context.citySlug ?? null,
+          planItemIds: context.planItemIds,
+          items: context.items.map((item) => ({
+            planItemId: item.planItemId,
+            activityId: item.activityId ?? null,
+            eventTitle: item.eventTitle,
+            startsAt: item.startsAt?.toISOString() ?? null,
+            placeName: item.placeName ?? null,
+            cityName: item.cityName ?? null,
+          })),
+        },
+        content: prepared.content,
+      };
+    }
+    default: {
+      const exhaustiveCheck: never = prepared.scenario;
+      return exhaustiveCheck;
+    }
+  }
+}
+
+function resolveNotificationEntity(
+  prepared: PreparedNotificationPayload,
+): { entityType: string; entityId: string | null } {
+  switch (prepared.scenario) {
+    case "PLAN_EVENT_2H_BEFORE": {
+      const context = prepared.context as PlanEventReminderContext;
+      return {
+        entityType: "PLAN_ITEM",
+        entityId: context.planItemId,
+      };
+    }
+    case "PLAN_TOMORROW_DIGEST": {
+      const context = prepared.context as PlanTomorrowDigestContext;
+      return {
+        entityType: "PLAN_DIGEST",
+        entityId: context.digestDate,
+      };
+    }
+    default: {
+      const exhaustiveCheck: never = prepared.scenario;
       return exhaustiveCheck;
     }
   }
@@ -58,18 +132,8 @@ async function markFailedDelivery(params: {
 export async function sendInAppNotification(
   prepared: PreparedNotificationPayload,
 ): Promise<InAppDeliveryRecord> {
-  const payloadJson: Prisma.InputJsonValue = {
-    scenario: prepared.scenario,
-    context: {
-      planItemId: prepared.context.planItemId,
-      activityId: prepared.context.activityId ?? null,
-      eventTitle: prepared.context.eventTitle,
-      startsAt: prepared.context.startsAt.toISOString(),
-      placeName: prepared.context.placeName ?? null,
-      cityName: prepared.context.cityName ?? null,
-    },
-    content: prepared.content,
-  };
+  const payloadJson = buildInAppPayloadJson(prepared);
+  const entity = resolveNotificationEntity(prepared);
 
   const notification = await prisma.notification.create({
     data: {
@@ -81,8 +145,8 @@ export async function sendInAppNotification(
       body: prepared.content.body,
       ctaLabel: prepared.content.ctaLabel,
       ctaAction: prepared.content.ctaUrl,
-      entityType: "PLAN_ITEM",
-      entityId: prepared.context.planItemId,
+      entityType: entity.entityType,
+      entityId: entity.entityId,
     },
     select: { id: true },
   });
@@ -127,17 +191,28 @@ export async function sendInAppNotification(
 export async function skipInAppNotification(
   prepared: PreparedNotificationPayload,
 ): Promise<NotificationDeliveryOutcome> {
+  const payloadJson =
+    prepared.scenario === "PLAN_EVENT_2H_BEFORE"
+      ? {
+          scenario: prepared.scenario,
+          context: {
+            planItemId: (prepared.context as PlanEventReminderContext).planItemId,
+            activityId: (prepared.context as PlanEventReminderContext).activityId ?? null,
+          },
+        }
+      : {
+          scenario: prepared.scenario,
+          context: {
+            digestDate: (prepared.context as PlanTomorrowDigestContext).digestDate,
+            planItemIds: (prepared.context as PlanTomorrowDigestContext).planItemIds,
+          },
+        };
+
   return recordSkippedNotificationDelivery({
     userId: prepared.userId,
     prepared,
     channel: "IN_APP",
     reason: "USER_DISABLED_CHANNEL",
-    payloadJson: {
-      scenario: prepared.scenario,
-      context: {
-        planItemId: prepared.context.planItemId,
-        activityId: prepared.context.activityId ?? null,
-      },
-    },
+    payloadJson,
   });
 }

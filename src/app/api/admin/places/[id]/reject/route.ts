@@ -40,7 +40,7 @@ export async function POST(
   } catch (error) {
     console.error("Error rejecting place:", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to reject place" },
+      { error: "Failed to reject place" },
       { status: 400 }
     );
   }

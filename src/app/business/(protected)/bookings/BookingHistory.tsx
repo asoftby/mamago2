@@ -17,12 +17,24 @@ const STATUS_LABEL_RU: Record<string, string> = {
   COMPLETED: "Завершена",
 };
 
+function getPayloadString(
+  payload: BookingActivityRecord["payload"],
+  key: string,
+): string | null {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    return null;
+  }
+
+  const value = payload[key];
+  return typeof value === "string" ? value : null;
+}
+
 function getActivityLabel(record: BookingActivityRecord): string {
   switch (record.type) {
     case "CREATED":
       return "Заявка создана";
     case "STATUS_CHANGED": {
-      const to = (record.payload?.to as string) ?? "";
+      const to = getPayloadString(record.payload, "to") ?? "";
       return `Статус изменён: ${STATUS_LABEL_RU[to] ?? to}`;
     }
     case "PHONE_CLICKED":

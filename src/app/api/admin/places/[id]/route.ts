@@ -98,7 +98,7 @@ export async function DELETE(
   } catch (error: unknown) {
     console.error("[API] Delete place error:", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to delete place" },
+      { error: "Internal server error" },
       { status: 500 }
     );
   }

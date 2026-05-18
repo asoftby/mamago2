@@ -84,7 +84,7 @@ export function getActivityNotExpiredForPublicWhere(
   };
 }
 
-/** Публичная лента активностей / событий */
+/** Публичная лента активностей / событий (только будущие/актуальные) */
 export function getPublicListingActivityWhere(
   now: Date = new Date()
 ): Prisma.ActivityWhereInput {
@@ -93,6 +93,20 @@ export function getPublicListingActivityWhere(
       publicListingActivityStatusWhere(),
       activityOwnerBusinessActiveWhere,
       getActivityNotExpiredForPublicWhere(now),
+    ],
+  };
+}
+
+/**
+ * Публичная detail-страница события: без фильтра по дате.
+ * Позволяет открывать прошедшие события по прямой ссылке (SEO).
+ * Проверяет только статус публикации и активность бизнеса.
+ */
+export function getPublicActivityDetailWhere(): Prisma.ActivityWhereInput {
+  return {
+    AND: [
+      publicListingActivityStatusWhere(),
+      activityOwnerBusinessActiveWhere,
     ],
   };
 }

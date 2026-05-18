@@ -89,11 +89,11 @@ export function TelegramStatusRow({ connected, onConnected }: Props) {
         {connected ? (
           <p className="mt-0.5 flex items-center gap-1.5 text-xs text-emerald-700">
             <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
-            Подключён — уведомления можно получать в Telegram
+            Подключён — уведомления отправляются в Telegram
           </p>
         ) : (
           <p className="mt-0.5 text-xs text-neutral-500">
-            Подключите бота, чтобы не пропускать важное
+            Подключите бота для получения уведомлений в Telegram
           </p>
         )}
       </div>
@@ -101,14 +101,21 @@ export function TelegramStatusRow({ connected, onConnected }: Props) {
         <Button 
           size="sm" 
           variant="outline" 
-          className="shrink-0" 
+          className="shrink-0 text-xs" 
           onClick={() => void handleSendTest()}
           disabled={isSendingTest}
         >
-          {isSendingTest ? "Отправка..." : "Отправить тест"}
+          {isSendingTest ? (
+            <>
+              <span className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent mr-1.5" />
+              Отправка…
+            </>
+          ) : (
+            "Отправить тест"
+          )}
         </Button>
       ) : (
-        <Button size="sm" variant="secondary" className="shrink-0" onClick={() => void handleConnect()}>
+        <Button size="sm" variant="secondary" className="shrink-0 text-xs" onClick={() => void handleConnect()}>
           Подключить
         </Button>
       )}

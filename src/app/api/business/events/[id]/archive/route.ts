@@ -39,8 +39,7 @@ export async function POST(
     return NextResponse.json({ success: true, event: { id, status: "ARCHIVED" } });
   } catch (error: unknown) {
     console.error("Archive event error:", error);
-    const message = error instanceof Error ? error.message : "Failed to archive event";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: "Failed to archive event" }, { status: 500 });
   }
 }
 
@@ -71,7 +70,6 @@ export async function DELETE(
     return NextResponse.json({ success: true, event: { id, status: "DRAFT" } });
   } catch (error: unknown) {
     console.error("Unarchive event error:", error);
-    const message = error instanceof Error ? error.message : "Failed to unarchive event";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

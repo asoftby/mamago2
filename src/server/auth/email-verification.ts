@@ -1,5 +1,5 @@
-import crypto from "crypto";
 import { prisma } from "@/lib/prisma";
+import { generateRawToken, hashToken } from "@/lib/auth/tokenHash";
 import { emailService } from "@/features/email/server/email-service";
 
 const VERIFY_TTL_MS = 48 * 60 * 60 * 1000;
@@ -24,7 +24,11 @@ export async function issueEmailVerificationForUser(
     return null;
   }
 
-  const token = crypto.randomUUID();
+  const rawToken = generateRawToken();
+
+  // Hash the token before storing in DB (defense-in-depth)
+  const token = hashToken(rawToken);
+
   const emailVerificationExpires = new Date(Date.now() + VERIFY_TTL_MS);
 
   await prisma.user.update({
@@ -32,7 +36,8 @@ export async function issueEmailVerificationForUser(
     data: { emailVerificationToken: token, emailVerificationExpires },
   });
 
-  return { token };
+  // Return raw (unhashed) token so it can be sent to the user via email
+  return { token: rawToken };
 }
 
 export async function sendRegistrationVerificationEmail(
@@ -131,8 +136,11 @@ export type VerifyEmailResult =
   | { ok: false; reason: "invalid" | "expired" };
 
 export async function verifyEmailByToken(token: string): Promise<VerifyEmailResult> {
+  // Hash the incoming token before looking it up
+  const hashedToken = hashToken(token);
+
   const user = await prisma.user.findFirst({
-    where: { emailVerificationToken: token },
+    where: { emailVerificationToken: hashedToken },
   });
 
   if (!user) {

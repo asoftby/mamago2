@@ -23,6 +23,33 @@ export async function POST() {
 
     const userId = user.id;
 
+    // ── Balance guard: запретить удаление, если пользователь — владелец бизнеса с положительным балансом ──
+    const business = await prisma.business.findFirst({
+      where: { ownerUserId: userId },
+      select: {
+        id: true,
+        billingAccount: {
+          select: {
+            depositBalance: true,
+            status: true,
+          },
+        },
+      },
+    });
+
+    if (business?.billingAccount) {
+      const balance = Number(business.billingAccount.depositBalance);
+      if (balance > 0) {
+        return NextResponse.json(
+          {
+            error:
+              "Нельзя удалить аккаунт с активным балансом бизнеса. Обратитесь в поддержку.",
+          },
+          { status: 409 },
+        );
+      }
+    }
+
     await prisma.$transaction(async (tx) => {
       // 1. Anonymise analytics — keep rows, remove identity
       await tx.userEvent.updateMany({

@@ -108,7 +108,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: true });
   } catch (error) {
     console.error("[auth/phone/send-otp]", error);
-    const msg = error instanceof Error ? error.message : "Ошибка отправки кода";
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return NextResponse.json({ error: "Ошибка отправки кода" }, { status: 500 });
   }
 }

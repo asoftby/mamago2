@@ -34,7 +34,7 @@ function buildCtaUrl(type: NotificationType, entityId?: string | null): string |
   if (type === "WELCOME" || type === "RECOMMENDATION") {
     return `${APP_URL}/me/settings/notifications`;
   }
-  if (type === "REMINDER") return `${APP_URL}/me/plan`;
+  if (type === "REMINDER" || type === "PLAN_TOMORROW_DIGEST") return `${APP_URL}/me/plan`;
   if (type === "SYSTEM") return `${APP_URL}/me/settings/notifications`;
   if (type === "NEWS" || type === "ANNOUNCEMENT") return null;
 

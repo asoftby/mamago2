@@ -121,10 +121,13 @@ function mapActivityRowToCard(
     sessions: a.sessions,
   });
 
+  const isFreeByText = typeof a.priceText === "string" && a.priceText.toLowerCase().includes("бесплатно");
   const priceMin =
     a.priceFrom != null && !Number.isNaN(a.priceFrom)
       ? a.priceFrom
-      : undefined;
+      : isFreeByText
+        ? 0
+        : undefined;
 
   const listingCityId = resolveListingCityIdForKudaBadge(a);
   const geoBadge =

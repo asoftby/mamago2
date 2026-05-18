@@ -76,7 +76,7 @@ export async function GET(request: NextRequest) {
     }
     console.error("GET /api/admin/analytics/content-performance:", error);
     return NextResponse.json(
-      { error: msg || "Failed to load content performance" },
+      { error: "Failed to load content performance" },
       { status: 500 },
     );
   }

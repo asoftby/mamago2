@@ -95,18 +95,37 @@ export const useDiscoveryFiltersStore = create<Store>((set, get) => ({
   },
 }));
 
+/**
+ * Hydration order (IMPORTANT for shared links):
+ * 1. URL params (highest priority) — ensures shared links work correctly
+ * 2. localStorage (fallback) — for returning users
+ * 3. Defaults (base)
+ *
+ * This prevents the bug where localStorage overrides shared link filters.
+ */
 if (safeWindow) {
   try {
-    const stored = safeWindow.localStorage?.getItem(STORAGE_KEY);
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      useDiscoveryFiltersStore.setState({ ...DEFAULTS, ...parsed });
+    // Always check URL params first — shared links must work
+    const sp = new URLSearchParams(safeWindow.location.search);
+    const hasUrlParams = Array.from(sp.keys()).length > 0;
+
+    if (hasUrlParams) {
+      // URL params take priority — hydrate from URL
+      const fromUrl = parseFromURL(sp);
+      useDiscoveryFiltersStore.setState({ ...DEFAULTS, ...fromUrl });
+      // Sync to localStorage for next visit
+      safeWindow.localStorage?.setItem(
+        STORAGE_KEY,
+        JSON.stringify(useDiscoveryFiltersStore.getState())
+      );
     } else {
-      // if URL has params on first load, hydrate from them
-      const sp = new URLSearchParams(safeWindow.location.search);
-      if (Array.from(sp.keys()).length > 0) {
-        useDiscoveryFiltersStore.getState().hydrateFromSearchParams(sp);
+      // No URL params — try localStorage
+      const stored = safeWindow.localStorage?.getItem(STORAGE_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        useDiscoveryFiltersStore.setState({ ...DEFAULTS, ...parsed });
       }
+      // If no localStorage either, defaults are already set
     }
   } catch {
     // ignore

@@ -11,6 +11,7 @@ import {
 import {
   replaceActivitySessionsFromScheduleJson,
   eventSessionScheduleFingerprint,
+  eventSessionFingerprintFromStoredSessions,
 } from "@/lib/business/syncEventActivitySessions";
 import { syncEventVenueAndActivityCity } from "@/lib/business/syncEventVenueFromWizard";
 import { computeEventShortDesc } from "@/lib/business/eventShortDesc";
@@ -129,8 +130,7 @@ export async function GET(
     });
   } catch (error: unknown) {
     console.error("Get event error:", error);
-    const message = error instanceof Error ? error.message : "Failed to get event";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: "Failed to get event" }, { status: 500 });
   }
 }
 
@@ -219,6 +219,10 @@ export async function PATCH(
         },
         programCategoryLinks: {
           select: { categoryId: true },
+        },
+        sessions: {
+          orderBy: { startsAt: "asc" },
+          select: { startsAt: true },
         },
       },
     });
@@ -327,9 +331,10 @@ export async function PATCH(
 
     const scheduleJsonDirty =
       stableJsonStringify(existing.scheduleJson) !== stableJsonStringify(nextScheduleJson);
+    const nextScheduleFingerprint = eventSessionScheduleFingerprint(nextScheduleJson);
     const activitySessionsNeedResync =
-      eventSessionScheduleFingerprint(existing.scheduleJson) !==
-      eventSessionScheduleFingerprint(nextScheduleJson);
+      eventSessionScheduleFingerprint(existing.scheduleJson) !== nextScheduleFingerprint ||
+      eventSessionFingerprintFromStoredSessions(existing.sessions) !== nextScheduleFingerprint;
     console.info("[event-patch-timing] schedule-compare", {
       activityId: existing.id,
       durationMs: Math.round(performance.now() - patchStarted),
@@ -746,8 +751,7 @@ export async function PATCH(
     return NextResponse.json(responsePayload);
   } catch (error: unknown) {
     console.error("Update event error:", error);
-    const message = error instanceof Error ? error.message : "Failed to update event";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
 
@@ -785,7 +789,6 @@ export async function DELETE(
     return NextResponse.json({ success: true });
   } catch (error: unknown) {
     console.error("Delete event error:", error);
-    const message = error instanceof Error ? error.message : "Failed to delete event";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

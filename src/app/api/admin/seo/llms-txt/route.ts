@@ -20,7 +20,7 @@ export async function GET() {
   } catch (error) {
     console.error("[admin/seo/llms-txt GET]", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to load llms.txt settings" },
+      { error: "Internal server error" },
       { status: 500 },
     );
   }
@@ -56,7 +56,7 @@ export async function PUT(req: NextRequest) {
   } catch (error) {
     console.error("[admin/seo/llms-txt PUT]", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to save llms.txt settings" },
+      { error: "Internal server error" },
       { status: 500 },
     );
   }

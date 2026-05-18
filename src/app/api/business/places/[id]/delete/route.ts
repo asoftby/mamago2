@@ -83,7 +83,7 @@ export async function DELETE(
     return NextResponse.json(
       {
         error: "INTERNAL_SERVER_ERROR",
-        message: error instanceof Error ? error.message : "Failed to delete place",
+        message: "Internal server error",
       },
       { status: 500 }
     );

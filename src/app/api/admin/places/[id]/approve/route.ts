@@ -37,7 +37,7 @@ export async function POST(
     timer.log({ error: 1 });
     console.error("Error approving place:", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to approve place" },
+      { error: "Failed to approve place" },
       { status: 400 }
     );
   }

@@ -9,6 +9,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/lib/toast";
 import { displayWelcomeNotificationTitle } from "@/lib/notifications/welcomeNotification";
+import { getNotificationProductDomainBadge } from "@/lib/notifications/productDomains";
 import { getNotificationHref } from "@/lib/notifications/routing";
 import type { NotificationApiRow } from "@/lib/notifications/types";
 import { cn } from "@/lib/utils";
@@ -123,20 +124,6 @@ export function NotificationFeed({
     }
   };
 
-  const getNotificationContextBadge = (n: NotificationApiRow): { label: string; color: string } | null => {
-    if (!n.audience) return null;
-
-    switch (n.audience) {
-      case "BUSINESS":
-        return { label: "Бизнес", color: "bg-blue-100 text-blue-700" };
-      case "ADMIN":
-        return { label: "Админ", color: "bg-purple-100 text-purple-700" };
-      case "USER":
-      default:
-        return null;
-    }
-  };
-
   const showInlineTelegramPrompt =
     showTelegramPrompt && stream !== "business";
 
@@ -150,15 +137,24 @@ export function NotificationFeed({
 
   if (loading) {
     return (
-      <div className="p-6 text-center text-sm text-gray-500">Загрузка…</div>
+      <div className="space-y-3 p-4">
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="animate-pulse rounded-lg bg-gray-100 h-20" />
+        ))}
+      </div>
     );
   }
 
   if (!hasAnyContent) {
     return (
-      <div className="flex flex-col items-center justify-center px-6 py-12 text-center">
-        <Bell className="mb-3 h-10 w-10 text-gray-200" />
-        <p className="text-sm text-gray-500">Пока нет уведомлений</p>
+      <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
+        <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gray-100">
+          <Bell className="h-8 w-8 text-gray-300" />
+        </div>
+        <p className="text-base font-medium text-gray-900">Пока нет уведомлений</p>
+        <p className="mt-1 text-sm text-gray-500">
+          Здесь появятся важные обновления о ваших заявках и публикациях
+        </p>
       </div>
     );
   }
@@ -167,7 +163,7 @@ export function NotificationFeed({
     const link = getNotificationHref(notification);
     const icon = getNotificationIcon(notification);
     const isNew = isNewRow(notification);
-    const contextBadge = getNotificationContextBadge(notification);
+    const contextBadge = getNotificationProductDomainBadge(notification);
 
     return (
       <div
@@ -282,7 +278,7 @@ function FeedRowContent({
                   : notification.title}
               </p>
               {contextBadge && (
-                <span className={cn("text-xs font-medium px-2 py-0.5 rounded", contextBadge.color)}>
+                <span className={cn("text-xs px-2 py-0.5 rounded-full", contextBadge.color)}>
                   {contextBadge.label}
                 </span>
               )}

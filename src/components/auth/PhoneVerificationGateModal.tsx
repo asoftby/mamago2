@@ -11,7 +11,7 @@ import { usePendingAction } from "@/contexts/PendingActionContext";
 interface PhoneVerificationGateModalProps {
   isOpen: boolean;
   onClose: () => void;
-  reason?: "review" | "comment" | "business_request" | "chat";
+  reason?: "review" | "comment" | "business_request" | "chat" | "save" | "plan";
   entityName?: string;
 }
 
@@ -106,12 +106,22 @@ export function PhoneVerificationGateModal({
         return "Подтвердите номер телефона";
       case "chat":
         return "Подтвердите номер телефона";
+      case "save":
+        return "Подтвердите номер телефона";
+      case "plan":
+        return "Подтвердите номер телефона";
       default:
         return "Подтвердите номер телефона";
     }
   };
 
   const getDescription = () => {
+    if (reason === "save") {
+      return "Чтобы сохранять идеи, нужно подтвердить номер телефона. Это помогает защищать mamaGo от спама и злоупотреблений.";
+    }
+    if (reason === "plan") {
+      return "Чтобы добавлять события в план, нужно подтвердить номер телефона. Это помогает защищать mamaGo от спама и злоупотреблений.";
+    }
     const action = reason === "review" ? "оставлять отзывы" : "оставлять комментарии";
     return `Чтобы ${action}, нужно подтвердить номер телефона. Это помогает защищать mamaGo от спама и делает ${
       reason === "review" ? "отзывы" : "комментарии"

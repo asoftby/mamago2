@@ -33,7 +33,7 @@ export async function POST(
   } catch (error: unknown) {
     console.error("Error recalculating media usage:", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to recalculate usage" },
+      { error: "Internal server error" },
       { status: 500 }
     );
   }

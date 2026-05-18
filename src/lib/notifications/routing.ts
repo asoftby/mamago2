@@ -77,7 +77,7 @@ export function getNotificationHref(n: NotificationApiRow): string | null {
   if (n.type === "WELCOME" || n.type === "RECOMMENDATION") {
     return null;
   }
-  if (n.type === "REMINDER") return "/me";
+  if (n.type === "REMINDER" || n.type === "PLAN_TOMORROW_DIGEST") return "/me/plan";
   if (n.type === "SYSTEM") return "/settings";
   
   // Broadcast-уведомления: если есть ctaAction — используем его
@@ -91,6 +91,16 @@ export function getNotificationHref(n: NotificationApiRow): string | null {
   // Booking: ведём в раздел заявок бизнес-кабинета
   if (n.type === "BOOKING_CREATED" || n.type === "BOOKING_STALE" || n.type === "BOOKING_NEEDS_ATTENTION") {
     return n.ctaAction ?? "/business/bookings";
+  }
+  
+  // Booking: ведём на страницу записей пользователя
+  if (
+    n.type === "BOOKING_CONFIRMED" ||
+    n.type === "BOOKING_CANCELLED" ||
+    n.type === "BOOKING_COMPLETED" ||
+    n.type === "BOOKING_FEEDBACK_REQUEST"
+  ) {
+    return "/me/bookings";
   }
   
   // Entity-based routing
@@ -162,6 +172,7 @@ if (process.env.NODE_ENV === "development") {
   // Проверка критичных типов
   const criticalTypes = [
     "REMINDER",
+    "PLAN_TOMORROW_DIGEST",
     "SYSTEM",
     "BOOKING_CREATED",
     "BOOKING_STALE",

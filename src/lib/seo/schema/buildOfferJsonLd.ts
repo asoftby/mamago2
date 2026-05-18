@@ -1,30 +1,33 @@
-import type { Offer, Place } from "@prisma/client";
 import { getOfferPublicSection } from "@/lib/offers/offerPublicUrl";
 
+export type OfferJsonLdOffer = {
+  title: string;
+  description: string | null;
+  slug: string | null;
+  priceFrom: number | null;
+  priceText: string | null;
+  coverImage: string | null;
+  kind: string;
+  durationType?: string | null;
+  campProgramType?: string | null;
+};
+
+export type OfferJsonLdPlace = {
+  title: string;
+  slug: string | null;
+  city?: { slug: string } | null;
+} | null;
+
 export function buildOfferJsonLd(args: {
-  offer: {
-    title: string;
-    description: string | null;
-    slug: string | null;
-    priceFrom: number | null;
-    priceText: string | null;
-    coverImage: string | null;
-    kind: string;
-    durationType?: string | null;
-    campProgramType?: string | null;
-  };
-  place?: {
-    title: string;
-    slug: string | null;
-    city?: any;
-  } | null;
+  offer: OfferJsonLdOffer;
+  place?: OfferJsonLdPlace;
   citySlug?: string;
   publicBase: string;
 }): Record<string, unknown> {
   const { offer, place, citySlug, publicBase } = args;
   
   const effectiveCitySlug = citySlug || place?.city?.slug || "minsk";
-  const section = getOfferPublicSection(offer as any);
+  const section = getOfferPublicSection(offer);
   const url = offer.slug ? `${publicBase}/${effectiveCitySlug}/offers/${section}/${offer.slug}` : undefined;
   const image = offer.coverImage ?? undefined;
 
@@ -54,4 +57,3 @@ export function buildOfferJsonLd(args: {
     seller,
   };
 }
-

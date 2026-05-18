@@ -224,7 +224,7 @@ export async function PUT(
   } catch (error) {
     console.error("[PUT /api/business/places/[id]/opening-hours] Error:", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Internal server error" },
+      { error: "Internal server error" },
       { status: 500 }
     );
   }

@@ -13,10 +13,11 @@ import {
   getBusinessInviteAcceptanceState,
 } from "@/server/business/businessInvite.service";
 import { buildSurfaceRedirectDestination } from "@/lib/routing/surface";
+import { passwordSchema } from "@/lib/auth/passwordPolicy";
 
 const bodySchema = z.object({
   email: z.string().email("Некорректный email"),
-  password: z.string().min(8, "Пароль — минимум 8 символов"),
+  password: passwordSchema,
   invitationToken: z.string().min(1).optional(),
 });
 

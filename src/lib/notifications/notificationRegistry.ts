@@ -112,6 +112,25 @@ export const NOTIFICATION_REGISTRY: Record<string, NotificationRegistryEntry> = 
     category: "PLAN",
   },
 
+  PLAN_TOMORROW_DIGEST: {
+    type: "PLAN_TOMORROW_DIGEST",
+    audience: "USER",
+    surface: "USER",
+    groupId: "user_bookings",
+    label: "Завтра в плане",
+    description: "Ежедневное напоминание о том, что запланировано на завтра",
+    defaultChannels: { inApp: true, email: false, telegram: true },
+    entityType: "PLAN_DIGEST",
+    ctaLabel: "Открыть мой план",
+    resolveHref: () => "/me/plan",
+    telegram: {
+      enabledByDefault: true,
+      template: "plan_tomorrow_digest",
+    },
+    importance: "NORMAL",
+    category: "PLAN",
+  },
+
   RECOMMENDATION: {
     type: "RECOMMENDATION",
     audience: "USER",
@@ -548,6 +567,87 @@ export const NOTIFICATION_REGISTRY: Record<string, NotificationRegistryEntry> = 
       body: "{{body}}", // Используется динамический body из service
     },
     importance: "NORMAL",
+    category: "BOOKING",
+  },
+
+  // ── User Booking Lifecycle ──
+  BOOKING_CONFIRMED: {
+    type: "BOOKING_CONFIRMED",
+    audience: "USER",
+    surface: "USER",
+    groupId: "user_bookings",
+    label: "Заявка подтверждена",
+    description: "Бизнес подтвердил вашу заявку на запись",
+    defaultChannels: { inApp: true, email: false, telegram: true },
+    entityType: "BOOKING",
+    ctaLabel: "Мои записи",
+    resolveHref: () => "/me/bookings",
+    telegram: {
+      enabledByDefault: true,
+      title: "Заявка подтверждена",
+      body: "{{body}}",
+    },
+    importance: "HIGH",
+    category: "BOOKING",
+  },
+
+  BOOKING_CANCELLED: {
+    type: "BOOKING_CANCELLED",
+    audience: "USER",
+    surface: "USER",
+    groupId: "user_bookings",
+    label: "Заявка отклонена",
+    description: "Бизнес отклонил вашу заявку на запись",
+    defaultChannels: { inApp: true, email: false, telegram: true },
+    entityType: "BOOKING",
+    ctaLabel: "Мои записи",
+    resolveHref: () => "/me/bookings",
+    telegram: {
+      enabledByDefault: true,
+      title: "Заявка отклонена",
+      body: "{{body}}",
+    },
+    importance: "HIGH",
+    category: "BOOKING",
+  },
+
+  BOOKING_COMPLETED: {
+    type: "BOOKING_COMPLETED",
+    audience: "USER",
+    surface: "USER",
+    groupId: "user_bookings",
+    label: "Заявка завершена",
+    description: "Ваша заявка на запись завершена",
+    defaultChannels: { inApp: true, email: false, telegram: false },
+    entityType: "BOOKING",
+    ctaLabel: "Мои записи",
+    resolveHref: () => "/me/bookings",
+    telegram: {
+      enabledByDefault: false,
+      title: "Заявка завершена",
+      body: "{{body}}",
+    },
+    importance: "NORMAL",
+    category: "BOOKING",
+  },
+
+  BOOKING_FEEDBACK_REQUEST: {
+    type: "BOOKING_FEEDBACK_REQUEST",
+    audience: "USER",
+    surface: "USER",
+    groupId: "user_bookings",
+    label: "Оставьте отзыв",
+    description: "Поделитесь впечатлениями о посещении",
+    defaultChannels: { inApp: true, email: false, telegram: true },
+    entityType: "BOOKING",
+    ctaLabel: "Оставить отзыв",
+    resolveHref: () => "/me/bookings",
+    telegram: {
+      enabledByDefault: true,
+      title: "Как прошло?",
+      body: "{{body}}",
+    },
+    importance: "LOW",
     category: "BOOKING",
   },
 };

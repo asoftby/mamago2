@@ -32,7 +32,7 @@ export async function DELETE(
       return NextResponse.json({ error: "Place not found" }, { status: 404 });
     }
 
-    if (!place.ownerBusinessId || !canManagePlaceAsync(user, place)) {
+    if (!place.ownerBusinessId || !(await canManagePlaceAsync(user, place))) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 

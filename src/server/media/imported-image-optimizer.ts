@@ -12,6 +12,7 @@ import sharp from "sharp";
 import { prisma } from "@/lib/prisma";
 import { MediaAssetKind, MediaAssetStatus, MediaSourceType } from "@prisma/client";
 import { writeRuntimeUpload } from "@/server/media/media-storage";
+import { assertSafeRemoteUrl } from "@/lib/security/assertSafeRemoteUrl";
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
@@ -70,6 +71,13 @@ export async function optimizeImportedImage(
 ): Promise<OptimizeImageOutcome> {
   if (!originalUrl?.trim()) {
     return { ok: false, error: "Empty URL", originalUrl };
+  }
+
+  // SSRF protection: validate URL before fetching
+  try {
+    assertSafeRemoteUrl(originalUrl);
+  } catch {
+    return { ok: false, error: "Unsafe remote URL", originalUrl };
   }
 
   const filename = buildFilename(importedRecordId, originalUrl);

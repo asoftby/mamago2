@@ -8,6 +8,7 @@ import {
   useMemo,
   useState,
 } from "react";
+import { usePathname } from "next/navigation";
 import type { AccountMenuUser } from "@/lib/account/types";
 import type { FamilyPersona } from "@/lib/family/familyPersonaTypes";
 import {
@@ -100,6 +101,11 @@ type FamilyPersonaContextValue = {
 
 const FamilyPersonaContext = createContext<FamilyPersonaContextValue | null>(null);
 
+/** Paths where family persona is not needed — skip API fetch entirely */
+function shouldSkipFamilyPersona(pathname: string): boolean {
+  return pathname.startsWith("/me/") || pathname.startsWith("/admin/");
+}
+
 async function fetchChildrenRows() {
   const chRes = await fetch("/api/children", {
     credentials: "include",
@@ -116,6 +122,7 @@ async function fetchChildrenRows() {
 }
 
 export function FamilyPersonaProvider({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
   const { user, status, isLoading: authLoading, refetch: refetchAuth } = useAuthMe();
   const [childRows, setChildRows] = useState<
     Array<{ id: string; name: string; birthDate?: string | null }>
@@ -185,13 +192,20 @@ export function FamilyPersonaProvider({ children }: { children: React.ReactNode 
   }, [status, user, applyAuthenticatedState]);
 
   useEffect(() => {
+    // Skip children fetch on /me/* and /admin/* — data not needed for discovery filters
+    if (shouldSkipFamilyPersona(pathname)) {
+      if (process.env.NODE_ENV !== "production") {
+        console.debug("[FamilyPersona] skipped — path excluded", { pathname });
+      }
+      return;
+    }
     if (status !== "authenticated") {
       setChildRows([]);
       setSelectedPersonaIdsState([]);
       return;
     }
     void loadChildren();
-  }, [status, user?.id, loadChildren]);
+  }, [status, user?.id, loadChildren, pathname]);
 
   /** Новые персоны: добавляем только если есть место (до 3), иначе оставляем ручной выбор. */
   useEffect(() => {

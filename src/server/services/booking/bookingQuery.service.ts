@@ -9,6 +9,17 @@ import { buildBookingDisplay } from "./booking.formatters";
 import { resolveBookingSourceType } from "./booking.types";
 import type { BookingDisplay } from "./booking.types";
 import { recordStatusChanged } from "./bookingActivity.service";
+import {
+  notifyUserBookingConfirmed,
+  notifyUserBookingCancelled,
+  notifyUserBookingCompleted,
+  notifyUserBookingFeedbackRequest,
+} from "@/server/services/notification.service";
+import {
+  trackBookingConfirmed,
+  trackBookingCompleted,
+  trackBookingCancelled,
+} from "@/server/analytics/trackBookingEvent";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -377,7 +388,17 @@ export async function updateBookingStatus(
   // 1. Загружаем заявку
   const existing = await prisma.bookingRequest.findUnique({
     where: { id: bookingId },
-    select: { id: true, businessId: true, status: true, createdAt: true, firstResponseAt: true },
+    select: {
+      id: true,
+      businessId: true,
+      status: true,
+      createdAt: true,
+      firstResponseAt: true,
+      userId: true,
+      offer: { select: { id: true, title: true } },
+      activity: { select: { id: true, title: true } },
+      place: { select: { id: true, title: true } },
+    },
   });
 
   if (!existing) {
@@ -429,6 +450,80 @@ export async function updateBookingStatus(
 
   // Fire-and-forget: activity event
   recordStatusChanged(bookingId, existing.status, newStatus);
+
+  // Fire-and-forget: analytics tracking
+  if (newStatus === BookingStatus.CONFIRMED) {
+    void trackBookingConfirmed({
+      userId: existing.userId ?? null,
+      bookingId,
+      entityType: "OFFER",
+      entityId: existing.offer?.id ?? "",
+      vertical: "CITY",
+      metadata: {
+        status: newStatus,
+        responseTimeMinutes: derivedData.responseTimeMinutes,
+        source: "admin",
+        surface: "web",
+      },
+    });
+  } else if (newStatus === BookingStatus.COMPLETED) {
+    void trackBookingCompleted({
+      userId: existing.userId ?? null,
+      bookingId,
+      entityType: "OFFER",
+      entityId: existing.offer?.id ?? "",
+      vertical: "CITY",
+      metadata: {
+        status: newStatus,
+        source: "admin",
+        surface: "web",
+      },
+    });
+  } else if (newStatus === BookingStatus.REJECTED || newStatus === BookingStatus.CANCELLED) {
+    void trackBookingCancelled({
+      userId: existing.userId ?? null,
+      bookingId,
+      entityType: "OFFER",
+      entityId: existing.offer?.id ?? "",
+      vertical: "CITY",
+      metadata: {
+        status: newStatus,
+        source: "admin",
+        surface: "web",
+      },
+    });
+  }
+
+  // Fire-and-forget: user lifecycle notifications (только если заявка от авторизованного пользователя)
+  if (existing.userId) {
+    const publicationTitle =
+      existing.offer?.title ?? existing.activity?.title ?? existing.place?.title ?? null;
+
+    const notifyParams = {
+      userId: existing.userId,
+      bookingId,
+      publicationTitle,
+    };
+
+    if (newStatus === BookingStatus.CONFIRMED) {
+      notifyUserBookingConfirmed(notifyParams).catch((err) =>
+        console.error("[updateBookingStatus] notifyUserBookingConfirmed failed:", err),
+      );
+    } else if (newStatus === BookingStatus.REJECTED) {
+      notifyUserBookingCancelled(notifyParams).catch((err) =>
+        console.error("[updateBookingStatus] notifyUserBookingCancelled failed:", err),
+      );
+    } else if (newStatus === BookingStatus.COMPLETED) {
+      notifyUserBookingCompleted(notifyParams).catch((err) =>
+        console.error("[updateBookingStatus] notifyUserBookingCompleted failed:", err),
+      );
+      // Запрос отзыва — отправляем сразу после завершения
+      // TODO: когда появится /me/bookings/:id, обновить ctaAction в notifyUserBookingFeedbackRequest
+      notifyUserBookingFeedbackRequest(notifyParams).catch((err) =>
+        console.error("[updateBookingStatus] notifyUserBookingFeedbackRequest failed:", err),
+      );
+    }
+  }
 
   return mapBooking(updated);
 }

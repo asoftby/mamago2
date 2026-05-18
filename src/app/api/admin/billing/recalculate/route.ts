@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
   } catch (error: unknown) {
     console.error("Recalculate balance error:", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to recalculate balance" },
+      { error: "Internal server error" },
       { status: 500 }
     );
   }

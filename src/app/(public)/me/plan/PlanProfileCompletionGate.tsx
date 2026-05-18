@@ -9,44 +9,36 @@ import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { savePostAuthContext, clearPostAuthContext } from "@/lib/post-auth";
 import { applyPostAuthCompletionOutcome } from "@/lib/post-auth/resolver";
 import { trackPostAuthEvent } from "@/lib/post-auth/analytics";
-import type { ProfileStatePayload } from "@/lib/post-auth/types";
+import { useAuthMe } from "@/lib/auth/useAuthMe";
 
 /**
  * Safety net: пользователь на /me/plan с сессией, но без usable-профиля — дозаполнение в одном modal.
+ *
+ * Проверка профиля происходит по данным из AuthProvider (SSR), без лишнего API-запроса.
  */
 export function PlanProfileCompletionGate() {
   const router = useRouter();
   const isMobile = !useMediaQuery("(min-width: 640px)");
-  const [open, setOpen] = useState(false);
-  const [checked, setChecked] = useState(false);
+  const [dismissed, setDismissed] = useState(false);
+  const { user, status } = useAuthMe();
+  const open =
+    !dismissed &&
+    status === "authenticated" &&
+    Boolean(user) &&
+    !Boolean(user?.displayName?.trim());
 
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch("/api/me/profile-state", { credentials: "include" });
-        if (!res.ok || cancelled) return;
-        const data = (await res.json()) as ProfileStatePayload;
-        if (cancelled) return;
-        if (!data.isProfileComplete) {
-          savePostAuthContext({
-            source: "my_plan",
-            pendingAction: null,
-            returnTo: "/me/plan",
-          });
-          trackPostAuthEvent("completion_started", { source: "my_plan" });
-          setOpen(true);
-        }
-      } finally {
-        if (!cancelled) setChecked(true);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+    if (!open) return;
 
-  if (!checked || !open) return null;
+    savePostAuthContext({
+      source: "my_plan",
+      pendingAction: null,
+      returnTo: "/me/plan",
+    });
+    trackPostAuthEvent("completion_started", { source: "my_plan" });
+  }, [open]);
+
+  if (!open) return null;
 
   return (
     <Dialog open={open} onOpenChange={() => {}}>
@@ -73,7 +65,7 @@ export function PlanProfileCompletionGate() {
                 skipNavigation: false,
               });
             }
-            setOpen(false);
+            setDismissed(true);
             router.refresh();
           }}
         />

@@ -131,10 +131,9 @@ export async function transformActivityToOfferPageData(
       posterUrl,
       posterAlt: activity.title,
       gallery,
-      videoUrl: null, // TODO: Add video support when field is added to Activity
-      videoThumbnail: null,
-      videoDuration: null,
-      videoLabel: null,
+      videoUrl: undefined, // TODO: Add video support when field is added to Activity
+      videoThumbnail: undefined,
+      videoLabel: undefined,
     },
     metaGrid,
     pricing,

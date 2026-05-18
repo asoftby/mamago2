@@ -61,7 +61,6 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(
       {
         error: "Cleanup failed",
-        details: error instanceof Error ? error.message : String(error),
       },
       { status: 500 },
     );

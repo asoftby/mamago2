@@ -1,4 +1,3 @@
-import Link from "next/link";
 import type { Metadata } from "next";
 import { notFound, permanentRedirect } from "next/navigation";
 import prisma from "@/lib/prisma";
@@ -9,9 +8,14 @@ import { buildOgMeta } from "@/lib/seo/buildOgMeta";
 import { getOfferPublicPath, getOfferPublicSection, parseOfferPublicSection } from "@/lib/offers/offerPublicUrl";
 import { getOfferPageData } from "@/lib/offer/offerPageData";
 import { OfferPageView } from "@/components/offers";
+import { getCurrentUser } from "@/lib/auth/server";
+import { canShowOfferOwnerEditOnPublicPage } from "@/lib/permissions/offerEditPermissions";
+import { mockSummerCamp, mockLesnayaSkazka } from "@/lib/offer/offerPageMock";
+import type { OfferJsonLdOffer, OfferJsonLdPlace } from "@/lib/seo/schema/buildOfferJsonLd";
 
 interface PageProps {
   params: Promise<{ city: string; section: string; slug: string }>;
+  searchParams: Promise<{ mock?: string }>;
 }
 
 function parseRobots(s: string | null | undefined): Metadata["robots"] | undefined {
@@ -71,8 +75,17 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   };
 }
 
-export default async function CanonicalOfferPage({ params }: PageProps) {
+export default async function CanonicalOfferPage({ params, searchParams }: PageProps) {
   const { city, section: sectionSlug, slug } = await params;
+  const { mock } = await searchParams;
+
+  // Mock mode: ?mock=1 or ?mock=lesnaya-skazka
+  if (mock === "lesnaya-skazka") {
+    return <OfferPageView data={mockLesnayaSkazka} canEditOffer={false} />;
+  }
+  if (mock === "1") {
+    return <OfferPageView data={mockSummerCamp} canEditOffer={false} />;
+  }
 
   // 1. Валидация секции
   const parsedSection = parseOfferPublicSection(sectionSlug);
@@ -93,6 +106,11 @@ export default async function CanonicalOfferPage({ params }: PageProps) {
         slug: true,
         kind: true,
         campProgramType: true,
+        title: true,
+        description: true,
+        priceFrom: true,
+        priceText: true,
+        coverImage: true,
         seoJsonLdOverride: true,
         placeId: true,
         place: { 
@@ -100,6 +118,8 @@ export default async function CanonicalOfferPage({ params }: PageProps) {
             id: true, 
             title: true, 
             slug: true,
+            createdByUserId: true,
+            ownerBusinessId: true,
             city: { select: { slug: true } }
           } 
         },
@@ -107,11 +127,17 @@ export default async function CanonicalOfferPage({ params }: PageProps) {
     });
   if (!offer) notFound();
 
-  const canonicalSection = getOfferPublicSection(offer as any);
+  const user = await getCurrentUser();
+  let canEditOffer = false;
+  if (user && offer.place) {
+    canEditOffer = await canShowOfferOwnerEditOnPublicPage(user, offer.place);
+  }
+
+  const canonicalSection = getOfferPublicSection(offer);
   
   // Если секция в URL не совпадает с канонической или если это редирект по слагу
   if (canonicalSection !== sectionSlug || resolved.isRedirect) {
-    const canonicalPath = getOfferPublicPath(offer as any, city);
+    const canonicalPath = getOfferPublicPath(offer, city);
     permanentRedirect(canonicalPath);
   }
 
@@ -122,8 +148,8 @@ export default async function CanonicalOfferPage({ params }: PageProps) {
     offer.seoJsonLdOverride && typeof offer.seoJsonLdOverride === "object"
       ? (offer.seoJsonLdOverride as Record<string, unknown>)
       : buildOfferJsonLd({
-          offer: data as any,
-          place: data.place as any,
+          offer: offer satisfies OfferJsonLdOffer,
+          place: offer.place satisfies OfferJsonLdPlace,
           citySlug: city,
           publicBase,
         });
@@ -155,7 +181,7 @@ export default async function CanonicalOfferPage({ params }: PageProps) {
         "@type": "ListItem",
         "position": 4,
         "name": data.title,
-        "item": `${publicBase}${getOfferPublicPath(offer as any, city)}`
+        "item": `${publicBase}${getOfferPublicPath(offer, city)}`
       }
     ]
   };
@@ -194,7 +220,7 @@ export default async function CanonicalOfferPage({ params }: PageProps) {
           dangerouslySetInnerHTML={{ __html: JSON.stringify(videoJsonLd) }}
         />
       )}
-      <OfferPageView data={data} />
+      <OfferPageView data={data} canEditOffer={canEditOffer} />
     </>
   );
 }

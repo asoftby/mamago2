@@ -8,8 +8,8 @@ export const maxDuration = 30;
 
 const rewriteRequestSchema = z.object({
   tone: z.enum(["neutral", "friendly", "editorial", "short"]),
-  sourceText: z.string().trim().min(20),
-  title: z.string().trim().optional(),
+  sourceText: z.string().trim().min(20).max(8000),
+  title: z.string().trim().max(200).optional(),
   entityType: z.enum(["event", "place"]).optional(),
 });
 
@@ -160,7 +160,15 @@ export async function POST(request: NextRequest) {
     const parsed = rewriteRequestSchema.safeParse(rawBody);
     if (!parsed.success) {
       return NextResponse.json(
-        { error: "Validation error", details: parsed.error.flatten() },
+        { error: "Invalid input" },
+        { status: 400 },
+      );
+    }
+
+    // Server-side hard guard: reject oversized input before calling OpenRouter
+    if (parsed.data.sourceText.length > 8000) {
+      return NextResponse.json(
+        { error: "Invalid input" },
         { status: 400 },
       );
     }

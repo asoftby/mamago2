@@ -1,19 +1,7 @@
-/**
- * Offer Page Components
- * Модульная система компонентов для публичной страницы предложения
- */
-
-export * from "./OfferHero";
-export * from "./OfferGallery";
-export * from "./OfferTrailer";
-export * from "./OfferMetaGrid";
-export * from "./OfferRichDescription";
-export * from "./OfferSchedule";
-export * from "./OfferAccommodation";
-export * from "./OfferLocation";
-export * from "./OfferReviews";
-export * from "./OfferHowToJoin";
-export * from "./OfferSimilar";
-export * from "./OfferStickyBar";
-export * from "./OfferBookingModal";
-export * from "./OfferPageView";
+export { OfferPageView } from "./OfferPageView";
+export { OfferHero } from "./OfferHero";
+export { OfferMetaGrid } from "./OfferMetaGrid";
+export { OfferSchedule } from "./OfferSchedule";
+export { OfferReviews } from "./OfferReviews";
+export { OfferPlace } from "./OfferPlace";
+export { OfferPromoCta } from "./OfferPromoCta";

@@ -13,6 +13,7 @@ import prisma from "@/lib/prisma";
 import { BookingStatus, PublicationType } from "@prisma/client";
 import { notifyBookingCreated } from "@/server/services/notification.service";
 import { recordBookingCreated } from "./bookingActivity.service";
+import { trackBookingCreated } from "@/server/analytics/trackBookingEvent";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -99,6 +100,7 @@ export async function createCampShiftBooking(
       place: {
         select: {
           ownerBusinessId: true,
+          cityId: true,
         },
       },
     },
@@ -172,8 +174,24 @@ export async function createCampShiftBooking(
     select: { id: true, status: true },
   });
 
-  // ── Fire-and-forget: activity + notification ──
+  // ── Fire-and-forget: activity + notification + analytics ──
   recordBookingCreated(booking.id);
+
+  void trackBookingCreated({
+    userId: input.userId ?? null,
+    bookingId: booking.id,
+    entityType: "OFFER",
+    entityId: input.offerId,
+    vertical: "CITY",
+    cityId: offer.place?.cityId ?? null,
+    metadata: {
+      status: booking.status,
+      shiftId: input.campShift.id,
+      shiftTitle: shift.title ?? null,
+      source: "detail",
+      surface: "web",
+    },
+  });
 
   prisma.business
     .findUnique({ where: { id: businessId }, select: { ownerUserId: true } })

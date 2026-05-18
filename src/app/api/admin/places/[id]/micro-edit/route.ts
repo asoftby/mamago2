@@ -23,7 +23,7 @@ export async function GET(
   } catch (error: unknown) {
     console.error("[API] List micro-edits error:", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to list micro-edits" },
+      { error: "Internal server error" },
       { status: 500 }
     );
   }
@@ -75,7 +75,7 @@ export async function POST(
   } catch (error: unknown) {
     console.error("[API] Apply micro-edit error:", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to apply micro-edit" },
+      { error: "Internal server error" },
       { status: 500 }
     );
   }

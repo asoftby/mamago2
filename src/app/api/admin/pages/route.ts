@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
   } catch (error) {
     console.error("[admin/pages GET]", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to fetch pages" },
+      { error: "Internal server error" },
       { status: 500 }
     );
   }
@@ -62,7 +62,7 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     console.error("[admin/pages POST]", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to create page" },
+      { error: "Failed to create page" },
       { status: 400 }
     );
   }
