@@ -6,6 +6,8 @@
  * for the purpose of notification polling — only user unread count is fetched there.
  */
 
+export type NotificationUnreadBootstrapStream = "none" | "user" | "business";
+
 /**
  * Returns true when the current page is the business partner cabinet.
  * Safe to call on the server (returns false).

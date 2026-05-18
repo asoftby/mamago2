@@ -12,6 +12,7 @@ import { headers } from "next/headers";
 import { buildSurfaceRedirectDestination } from "@/lib/routing/surface";
 import prisma from "@/lib/prisma";
 import { BackofficeProviders } from "@/components/providers/BackofficeProviders";
+import { NotificationSurfaceBootstrap } from "@/features/notifications/NotificationSurfaceBootstrap";
 
 const EMPTY_MODERATION_COUNTS: ModerationNavCounts = {
   queueTotal: 0,
@@ -82,6 +83,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   return (
     <BackofficeProviders>
+      <NotificationSurfaceBootstrap surface="admin" />
       <div className="min-h-screen bg-gray-50 font-sans antialiased">
         {/* Global Header */}
         <AdminHeader

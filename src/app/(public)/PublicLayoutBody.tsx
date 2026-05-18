@@ -8,6 +8,7 @@ import { MobileBottomBarShell } from "@/components/layout/MobileBottomBarShell";
 import { shouldHideMobileBottomNav } from "@/lib/intent";
 import { cn } from "@/lib/utils";
 import { useNavigationReloadDebug } from "@/hooks/useNavigationReloadDebug";
+import { NotificationSurfaceBootstrap } from "@/features/notifications/NotificationSurfaceBootstrap";
 
 const MOBILE_MAIN_BOTTOM =
   "pb-[calc(5.75rem+env(safe-area-inset-bottom))] lg:pb-0";
@@ -34,6 +35,8 @@ export function PublicLayoutBody({ children }: { children: React.ReactNode }) {
 
   return (
     <>
+      <NotificationSurfaceBootstrap surface="public" />
+
       <main
         className={cn("flex-1", !hideBottomBar ? MOBILE_MAIN_BOTTOM : "lg:pb-0")}
       >

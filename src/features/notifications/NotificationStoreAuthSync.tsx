@@ -1,30 +1,33 @@
 "use client";
 
 import { useEffect, type ReactNode } from "react";
-import { useAccountMode } from "@/contexts/AccountModeContext";
 import { useAuthMe } from "@/lib/auth/useAuthMe";
 import {
   mountNotificationEventBridge,
+  setNotificationEventBridgeUnreadStream,
   unmountNotificationEventBridge,
   useNotificationStore,
 } from "@/features/notifications/store";
-import { isBusinessSurface } from "@/features/notifications/store/notification-surface";
+import type { NotificationUnreadBootstrapStream } from "@/features/notifications/store/notification-surface";
 
 /**
- * Keeps notification store auth flag and polling/event bridges in sync app-wide
- * (public, business, admin) — does not render UI.
- *
- * Phase 1 fixes applied:
- * - Bridge is properly torn down on unmount (cleanup in useEffect return).
- * - Initial fetch is surface-aware: public pages only fetch user unread.
- * - Auth effect is throttled via the store's built-in THROTTLE_MS guard.
- * - No cascading double-fetch on mode/pathname oscillation.
+ * Keeps notification store auth flag and unread bridges in sync for a surface
+ * that actually renders a visible notifications badge.
  */
-export function NotificationStoreAuthSync({ children }: { children: ReactNode }) {
+export function NotificationStoreAuthSync({
+  children,
+  unreadStream = "none",
+}: {
+  children?: ReactNode;
+  unreadStream?: NotificationUnreadBootstrapStream;
+}) {
   const { status, user } = useAuthMe();
   const authed = status === "authenticated";
   const userId = authed ? user?.id ?? null : null;
-  const { mode, hydrated } = useAccountMode();
+
+  useEffect(() => {
+    setNotificationEventBridgeUnreadStream(unreadStream);
+  }, [unreadStream]);
 
   // Mount the event bridge once; tear it down on unmount.
   // This prevents HMR / StrictMode from leaking multiple intervals.
@@ -43,23 +46,19 @@ export function NotificationStoreAuthSync({ children }: { children: ReactNode })
     }
   }, [authed, userId]);
 
-  // Initial unread fetch after auth + hydration.
-  // Surface-aware: public pages only fetch user unread, business pages only business unread.
-  // The store's throttle guard prevents repeated fetches on mode/pathname oscillation.
+  // Bootstrap only the unread stream that backs the visible badge on this surface.
   useEffect(() => {
-    if (!authed || !hydrated) return;
+    if (!authed || unreadStream === "none") return;
 
-    const onBusiness = mode === "business" || isBusinessSurface();
-
-    if (onBusiness) {
+    if (unreadStream === "business") {
       void useNotificationStore.getState().refreshBusinessUnreadOnly();
-    } else {
+      return;
+    }
+
+    if (unreadStream === "user") {
       void useNotificationStore.getState().refreshUnreadOnly();
     }
-    // Intentionally NOT including `mode` in deps to avoid re-fetching on every
-    // AccountMode oscillation. The bridge handles subsequent refreshes via events.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authed, hydrated]);
+  }, [authed, unreadStream]);
 
   return <>{children}</>;
 }
