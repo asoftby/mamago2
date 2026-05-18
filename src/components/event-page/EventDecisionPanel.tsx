@@ -5,7 +5,6 @@ import { cn } from "@/lib/utils";
 import type { EventPageData } from "@/lib/event/eventPageTypes";
 import { EventBreadcrumbs } from "./EventBreadcrumbs";
 import { OwnerEditDropdown } from "./OwnerEditDropdown";
-import { Heart } from "lucide-react";
 
 type EventDecisionPanelProps = {
   data: Pick<
@@ -256,59 +255,76 @@ export function EventDecisionPanel({
           </div>
         )}
 
-        {/* CTA buttons row */}
-        <div className="flex flex-col gap-2.5 lg:flex-row lg:items-center lg:gap-2">
-          {/* Primary — full width on mobile, flex-1 on desktop */}
-          <button
-            type="button"
-            onClick={onBuy}
-            className="flex h-14 w-full items-center justify-center gap-2 rounded-full bg-[#E86A3A] text-[16px] font-semibold text-white transition-colors hover:bg-[#C24E22] active:translate-y-px lg:flex-1"
-          >
-            {data.cta.buyLabel} <span aria-hidden>→</span>
-          </button>
+        {/* Primary CTA */}
+        <button
+          type="button"
+          onClick={onBuy}
+          className="flex h-14 w-full items-center justify-center gap-2 rounded-full bg-[#E86A3A] text-[16px] font-semibold text-white transition-colors hover:bg-[#C24E22] active:translate-y-px"
+        >
+          {data.cta.buyLabel} <span aria-hidden>→</span>
+        </button>
 
-          {/* Save: full-width plan button on mobile, compact icon on desktop */}
-          <button
-            type="button"
-            onClick={onPlan}
-            aria-label={isPlanned ? "В плане" : "Сохранить в план"}
+        {/* Secondary CTA */}
+        <button
+          type="button"
+          onClick={onPlan}
+          className={cn(
+            "mt-2.5 flex h-12 w-full items-center justify-center gap-2.5 rounded-full border text-[14px] font-semibold transition-colors",
+            isPlanned
+              ? "border-[#E86A3A] bg-[#FFE8DC] text-[#C24E22]"
+              : "border-[rgba(20,18,16,0.18)] bg-transparent text-[#141210] hover:border-[#141210]",
+          )}
+        >
+          <span
             className={cn(
-              "flex h-12 w-full items-center justify-center gap-2.5 rounded-full border text-[14px] font-semibold transition-colors",
-              "lg:h-14 lg:w-14 lg:shrink-0",
+              "inline-flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-[5px] border-[1.5px] text-[11px]",
               isPlanned
-                ? "border-[#E86A3A] bg-[#FFE8DC] text-[#C24E22]"
-                : "border-[rgba(20,18,16,0.18)] bg-transparent text-[#141210] hover:border-[#141210]",
+                ? "border-[#C24E22] bg-[#C24E22] text-white"
+                : "border-[#3A332B] bg-transparent",
             )}
           >
-            {/* Mobile label */}
-            <span className="lg:hidden flex items-center gap-2.5">
-              <span
-                className={cn(
-                  "inline-flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-[5px] border-[1.5px] text-[11px]",
-                  isPlanned
-                    ? "border-[#C24E22] bg-[#C24E22] text-white"
-                    : "border-[#3A332B] bg-transparent",
-                )}
-              >
-                {isPlanned ? "✓" : ""}
-              </span>
-              {planLabel}
-            </span>
-            {/* Desktop icon only */}
-            <Heart
-              className={cn("hidden h-5 w-5 lg:block", isPlanned && "fill-[#C24E22]")}
-            />
-          </button>
+            {isPlanned ? "✓" : ""}
+          </span>
+          {planLabel}
+        </button>
 
-          {/* Owner edit — inline on desktop */}
-          {data.ownerEditHref && (
+        {/* Owner edit */}
+        {data.ownerEditHref && (
+          <div className="mt-2.5">
             <OwnerEditDropdown
               eventId={data.id}
-              className="h-12 w-full rounded-full border border-[rgba(20,18,16,0.18)] text-[13px] font-semibold text-[rgba(20,18,16,0.55)] lg:h-14 lg:w-auto lg:shrink-0 lg:px-5"
+              className="h-10 w-full rounded-full border border-[rgba(20,18,16,0.18)] text-[13px] font-semibold text-[rgba(20,18,16,0.55)]"
             />
-          )}
-        </div>
+          </div>
+        )}
 
+        {/* Save / Share */}
+        <div className="mt-5 flex items-center justify-between border-t border-[rgba(20,18,16,0.10)] pt-4 text-[13px] text-[rgba(20,18,16,0.55)]">
+          <button
+            type="button"
+            onClick={onSave}
+            className="inline-flex items-center gap-1.5 transition-colors hover:text-[#141210]"
+          >
+            <span>♥</span> Сохранить
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              if (typeof navigator !== "undefined" && navigator.share) {
+                void navigator.share({ title: data.title, url: window.location.href });
+              }
+            }}
+            className="inline-flex items-center gap-1.5 transition-colors hover:text-[#141210]"
+          >
+            <span>↗</span> Поделиться
+          </button>
+        </div>
+      </div>
+
+      {/* Trust badge */}
+      <div className="flex items-center gap-3 px-1 text-[12px] text-[rgba(20,18,16,0.55)]">
+        <span className="relative inline-flex h-2 w-2 rounded-full bg-[#1F8A5B] shadow-[0_0_0_4px_rgba(31,138,91,0.18)]" />
+        Подтверждённый партнёр
       </div>
     </div>
   );
