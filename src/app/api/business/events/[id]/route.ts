@@ -40,7 +40,7 @@ import {
 import { stableJsonStringify } from "@/lib/json/stableJsonStringify";
 import { prismaBase } from "@/lib/prisma";
 import { DEFAULT_ACTIVITY_FORMAT, normalizeActivityFormat } from "@/domain/activities/activity-format";
-import { createRequestPerf } from "@/server/utils/requestPerf";
+import { createRequestPerf, isServerSavePerfEnabled } from "@/server/utils/requestPerf";
 import { syncActivityMediaUsage } from "@/server/services/media/media-usage.service";
 import {
   findMediaAssetByReference,
@@ -335,12 +335,14 @@ export async function PATCH(
     const activitySessionsNeedResync =
       eventSessionScheduleFingerprint(existing.scheduleJson) !== nextScheduleFingerprint ||
       eventSessionFingerprintFromStoredSessions(existing.sessions) !== nextScheduleFingerprint;
-    console.info("[event-patch-timing] schedule-compare", {
-      activityId: existing.id,
-      durationMs: Math.round(performance.now() - patchStarted),
-      scheduleJsonDirty,
-      activitySessionsNeedResync,
-    });
+    if (isServerSavePerfEnabled()) {
+      console.info("[event-patch-timing] schedule-compare", {
+        activityId: existing.id,
+        durationMs: Math.round(performance.now() - patchStarted),
+        scheduleJsonDirty,
+        activitySessionsNeedResync,
+      });
+    }
 
     const normalizeOccasionIds = (value: unknown): string[] =>
       Array.isArray(value)
@@ -537,7 +539,7 @@ export async function PATCH(
     const hasPrismaWrites = Object.keys(updateData).length > 0;
 
     if (hasPrismaWrites) {
-      const activityUpdateStarted = performance.now();
+      const activityUpdateStarted = isServerSavePerfEnabled() ? performance.now() : 0;
       saved = await prisma.activity.update({
         where: { id },
         data: updateData,
@@ -549,11 +551,13 @@ export async function PATCH(
           coverImageId: true,
         },
       });
-      console.info("[event-patch-timing] activity-update", {
-        activityId: id,
-        durationMs: Math.round(performance.now() - activityUpdateStarted),
-        hasPrismaWrites,
-      });
+      if (isServerSavePerfEnabled()) {
+        console.info("[event-patch-timing] activity-update", {
+          activityId: id,
+          durationMs: Math.round(performance.now() - activityUpdateStarted),
+          hasPrismaWrites,
+        });
+      }
     } else {
       saved = {
         id: existing.id,
@@ -583,34 +587,37 @@ export async function PATCH(
       venueChanged ? await resolveEventRevalidationTargets(saved.id) : null;
 
     if (activitySessionsNeedResync) {
-      const beforeSyncState = await getActivityOccurrenceDebugState(saved.id);
-      console.info("[event-patch-debug] before sync", {
-        activityId: saved.id,
-        status: saved.status,
-        previousNextOccurrenceAt: existing.nextOccurrenceAt,
-        beforeSyncState,
-      });
+      if (isServerSavePerfEnabled()) {
+        const beforeSyncState = await getActivityOccurrenceDebugState(saved.id);
+        console.info("[event-patch-debug] before sync", {
+          activityId: saved.id,
+          status: saved.status,
+          previousNextOccurrenceAt: existing.nextOccurrenceAt,
+          beforeSyncState,
+        });
+      }
 
-      const sessionsSyncStarted = performance.now();
+      const sessionsSyncStarted = isServerSavePerfEnabled() ? performance.now() : 0;
       await replaceActivitySessionsFromScheduleJson(saved.id, nextScheduleJson);
       perf.mark("schedule-sync");
-      console.info("[event-patch-timing] activity-sessions-sync", {
-        activityId: saved.id,
-        durationMs: Math.round(performance.now() - sessionsSyncStarted),
-      });
-      const nextOccurrenceSyncStarted = performance.now();
       const syncedNextOccurrenceAt = await syncActivityNextOccurrenceAt(saved.id);
-      console.info("[event-patch-timing] next-occurrence-sync", {
-        activityId: saved.id,
-        durationMs: Math.round(performance.now() - nextOccurrenceSyncStarted),
-        syncedNextOccurrenceAt,
-      });
-      const afterSyncState = await getActivityOccurrenceDebugState(saved.id);
-      console.info("[event-patch-debug] after sync", {
-        activityId: saved.id,
-        syncedNextOccurrenceAt,
-        afterSyncState,
-      });
+
+      if (isServerSavePerfEnabled()) {
+        console.info("[event-patch-timing] activity-sessions-sync", {
+          activityId: saved.id,
+          durationMs: Math.round(performance.now() - sessionsSyncStarted),
+        });
+        console.info("[event-patch-timing] next-occurrence-sync", {
+          activityId: saved.id,
+          syncedNextOccurrenceAt,
+        });
+        const afterSyncState = await getActivityOccurrenceDebugState(saved.id);
+        console.info("[event-patch-debug] after sync", {
+          activityId: saved.id,
+          syncedNextOccurrenceAt,
+          afterSyncState,
+        });
+      }
     } else {
       perf.mark("schedule-sync");
     }
@@ -676,18 +683,20 @@ export async function PATCH(
     });
     let responsePublicPath: string | null = null;
     if (shouldRevalidate) {
-      const revalidateStarted = performance.now();
+      const revalidateStarted = isServerSavePerfEnabled() ? performance.now() : 0;
       const rev = await revalidateEventMutationPaths(saved.id, revalidateScope);
       responsePublicPath = rev.publicPath;
-      console.info("[event-patch-timing] revalidate", {
-        activityId: saved.id,
-        durationMs: Math.round(performance.now() - revalidateStarted),
-        revalidateScope,
-        syncPaths: rev.syncPaths,
-        skippedPaths: rev.skippedPaths,
-        scheduledAsyncPaths: rev.scheduledAsyncPaths,
-        totalRevalidateDurationMs: rev.totalDurationMs,
-      });
+      if (isServerSavePerfEnabled()) {
+        console.info("[event-patch-timing] revalidate", {
+          activityId: saved.id,
+          durationMs: Math.round(performance.now() - revalidateStarted),
+          revalidateScope,
+          syncPaths: rev.syncPaths,
+          skippedPaths: rev.skippedPaths,
+          scheduledAsyncPaths: rev.scheduledAsyncPaths,
+          totalRevalidateDurationMs: rev.totalDurationMs,
+        });
+      }
       perf.mark("revalidate");
     } else {
       perf.mark("revalidate");
@@ -696,8 +705,6 @@ export async function PATCH(
       }
     }
 
-    const beforeResponseState = await getActivityOccurrenceDebugState(saved.id);
-    const responseSerializationStarted = performance.now();
     const responsePayload = {
       success: true,
       event: {
@@ -708,20 +715,20 @@ export async function PATCH(
         publicPath: responsePublicPath,
       },
     };
-    const responseSerializationMs = Math.round(
-      performance.now() - responseSerializationStarted,
-    );
-    console.info("[event-patch-debug] before response", {
-      activityId: saved.id,
-      scheduleJsonDirty,
-      activitySessionsNeedResync,
-      shouldRevalidate,
-      revalidateScope,
-      cityChanged,
-      beforeResponseState,
-      responseSerializationMs,
-      totalPatchMs: Math.round(performance.now() - patchStarted),
-    });
+
+    if (isServerSavePerfEnabled()) {
+      const beforeResponseState = await getActivityOccurrenceDebugState(saved.id);
+      console.info("[event-patch-debug] before response", {
+        activityId: saved.id,
+        scheduleJsonDirty,
+        activitySessionsNeedResync,
+        shouldRevalidate,
+        revalidateScope,
+        cityChanged,
+        beforeResponseState,
+        totalPatchMs: Math.round(performance.now() - patchStarted),
+      });
+    }
 
     perf.mark("response-sent");
     perf.log({
