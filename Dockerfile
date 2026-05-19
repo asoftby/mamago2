@@ -7,7 +7,7 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 # Копируем prisma до pnpm install — нужен для postinstall (prisma generate)
 COPY prisma ./prisma
 
-RUN npm_config_ignore_scripts=false pnpm install --frozen-lockfile --dangerously-allow-all-builds
+RUN npm_config_ignore_scripts=false pnpm install --frozen-lockfile
 
 COPY . .
 
