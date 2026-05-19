@@ -48,6 +48,32 @@ export interface PlaceRevisionData {
   placeGroupId?: string | null;
 }
 
+// Structural type used only for fingerprinting — must be compatible with
+// PlaceRevisionImage rows and with TempMedia mapped to revision-image shape.
+interface RevisionImageLike {
+  url: string;
+  kind: string;
+  sortOrder: number;
+}
+
+/**
+ * Canonical fingerprint for a set of revision images.
+ * Sort by (sortOrder, kind, url) so the comparison is order-independent
+ * with respect to insertion order while still respecting user-visible sortOrder.
+ */
+function computeRevisionImageFingerprint(images: RevisionImageLike[]): string {
+  return images
+    .slice()
+    .sort((a, b) => {
+      if (a.sortOrder !== b.sortOrder) return a.sortOrder - b.sortOrder;
+      if (a.kind < b.kind) return -1;
+      if (a.kind > b.kind) return 1;
+      return a.url < b.url ? -1 : a.url > b.url ? 1 : 0;
+    })
+    .map((img) => `${img.sortOrder}|${img.kind}|${img.url}`)
+    .join(",");
+}
+
 /**
  * Get active revision for a Place (DRAFT, PENDING, or NEEDS_REVISION)
  * Returns null if no active revision exists
@@ -314,56 +340,65 @@ export async function savePlaceRevisionDraft(
       console.log(`[PlaceRevision] Found ${tempMedia.length} temp media items`);
 
       if (tempMedia.length > 0) {
-        // Delete existing revision images (we're replacing them)
-        await prisma.placeRevisionImage.deleteMany({
-          where: { revisionId },
-        });
-
-        // Convert temp media to PlaceRevisionImages
-        const revisionImages = await Promise.all(
-          tempMedia.map(async (media: TempMedia) => {
-            const kind = media.kind === "PLACE_LOGO" ? "LOGO" : "GALLERY";
-            
-            return prisma.placeRevisionImage.create({
-              data: {
-                revisionId,
-                kind,
-                url: media.url,
-                width: media.width,
-                height: media.height,
-                blurhash: media.blurhash,
-                sortOrder: media.sortOrder,
-              },
-            });
-          })
+        const incomingFingerprint = computeRevisionImageFingerprint(
+          tempMedia.map((m: TempMedia) => ({
+            url: m.url,
+            kind: m.kind === "PLACE_LOGO" ? "LOGO" : "GALLERY",
+            sortOrder: m.sortOrder,
+          }))
         );
+        const currentFingerprint = computeRevisionImageFingerprint(updatedRevision.images);
 
-        // Update logoImageId if logo was uploaded
-        const logoImage = revisionImages.find((img: PlaceRevisionImage) => img.kind === "LOGO");
-        if (logoImage) {
-          await prisma.placeRevision.update({
-            where: { id: revisionId },
-            data: { logoImageId: logoImage.id },
+        if (incomingFingerprint === currentFingerprint) {
+          // Images unchanged — skip deleteMany/create, only mark temp media attached.
+          console.log("[PlaceRevision] Images unchanged, skipping replacement");
+          await prisma.tempMedia.updateMany({
+            where: { ownerUserId: user.id, wizardSessionId, status: "TEMP" },
+            data: { status: "ATTACHED" },
           });
-          console.log("[PlaceRevision] Set logoImageId:", logoImage.id);
+        } else {
+          // Images changed — replace atomically so a crash cannot leave revision image-less.
+          const revisionImages = await prisma.$transaction(async (tx) => {
+            await tx.placeRevisionImage.deleteMany({ where: { revisionId } });
+
+            const images = await Promise.all(
+              tempMedia.map((media: TempMedia) => {
+                const kind = media.kind === "PLACE_LOGO" ? "LOGO" : "GALLERY";
+                return tx.placeRevisionImage.create({
+                  data: {
+                    revisionId,
+                    kind,
+                    url: media.url,
+                    width: media.width,
+                    height: media.height,
+                    blurhash: media.blurhash,
+                    sortOrder: media.sortOrder,
+                  },
+                });
+              })
+            );
+
+            const logoImage = images.find((img) => img.kind === "LOGO");
+            if (logoImage) {
+              await tx.placeRevision.update({
+                where: { id: revisionId },
+                data: { logoImageId: logoImage.id },
+              });
+              console.log("[PlaceRevision] Set logoImageId:", logoImage.id);
+            }
+
+            await tx.tempMedia.updateMany({
+              where: { ownerUserId: user.id, wizardSessionId, status: "TEMP" },
+              data: { status: "ATTACHED" },
+            });
+
+            return images;
+          });
+
+          console.log(`[PlaceRevision] Attached ${revisionImages.length} images to revision`);
         }
 
-        // Mark temp media as attached
-        await prisma.tempMedia.updateMany({
-          where: {
-            ownerUserId: user.id,
-            wizardSessionId,
-            status: "TEMP",
-          },
-          data: {
-            status: "ATTACHED",
-            // Note: We don't set placeId here since these are attached to revision
-          },
-        });
-
-        console.log(`[PlaceRevision] Attached ${revisionImages.length} images to revision`);
-
-        // Reload revision with new images
+        // Reload revision with updated images
         return prisma.placeRevision.findUnique({
           where: { id: revisionId },
           include: {
@@ -392,7 +427,7 @@ export async function submitPlaceRevisionForModeration(
   user: { id: string; role: Role },
   wizardSessionId?: string
 ) {
-  // Get revision with ownership check
+  // Get revision with ownership check; images loaded here to enable fingerprint guard below.
   const revision = await prisma.placeRevision.findUnique({
     where: { id: revisionId },
     include: {
@@ -402,6 +437,9 @@ export async function submitPlaceRevisionForModeration(
           createdByUserId: true,
           ownerBusinessId: true,
         },
+      },
+      images: {
+        orderBy: { sortOrder: "asc" },
       },
     },
   });
@@ -449,55 +487,61 @@ export async function submitPlaceRevisionForModeration(
     });
 
     if (tempMedia.length > 0) {
-      console.log(`[submitPlaceRevisionForModeration] Found ${tempMedia.length} temp media items to convert`);
+      const incomingFingerprint = computeRevisionImageFingerprint(
+        tempMedia.map((m) => ({
+          url: m.url,
+          kind: m.kind === "PLACE_LOGO" ? "LOGO" : "GALLERY",
+          sortOrder: m.sortOrder,
+        }))
+      );
+      const currentFingerprint = computeRevisionImageFingerprint(revision.images);
 
-      // Delete existing revision images (they will be replaced with temp media)
-      await prisma.placeRevisionImage.deleteMany({
-        where: { revisionId },
-      });
-
-      // Convert temp media to PlaceRevisionImage
-      for (const media of tempMedia) {
-        await prisma.placeRevisionImage.create({
-          data: {
-            revisionId,
-            kind: media.kind === "PLACE_LOGO" ? "LOGO" : "GALLERY",
-            url: media.url,
-            width: media.width,
-            height: media.height,
-            blurhash: media.blurhash,
-            sortOrder: media.sortOrder,
-          },
+      if (incomingFingerprint === currentFingerprint) {
+        // Images unchanged — skip deleteMany/create, only mark temp media attached.
+        console.log("[submitPlaceRevisionForModeration] Images unchanged, skipping replacement");
+        await prisma.tempMedia.updateMany({
+          where: { wizardSessionId, status: "TEMP" },
+          data: { status: "ATTACHED" },
         });
-      }
+      } else {
+        // Images changed — replace atomically to prevent partial-state on crash.
+        console.log(`[submitPlaceRevisionForModeration] Replacing ${tempMedia.length} images`);
+        await prisma.$transaction(async (tx) => {
+          await tx.placeRevisionImage.deleteMany({ where: { revisionId } });
 
-      // Update revision.logoImageId if there's a logo
-      const logoImage = await prisma.placeRevisionImage.findFirst({
-        where: {
-          revisionId,
-          kind: "LOGO",
-        },
-      });
+          const images = await Promise.all(
+            tempMedia.map((media) => {
+              const kind = media.kind === "PLACE_LOGO" ? "LOGO" : "GALLERY";
+              return tx.placeRevisionImage.create({
+                data: {
+                  revisionId,
+                  kind,
+                  url: media.url,
+                  width: media.width,
+                  height: media.height,
+                  blurhash: media.blurhash,
+                  sortOrder: media.sortOrder,
+                },
+              });
+            })
+          );
 
-      if (logoImage) {
-        await prisma.placeRevision.update({
-          where: { id: revisionId },
-          data: { logoImageId: logoImage.id },
+          const logoImage = images.find((img) => img.kind === "LOGO");
+          if (logoImage) {
+            await tx.placeRevision.update({
+              where: { id: revisionId },
+              data: { logoImageId: logoImage.id },
+            });
+          }
+
+          await tx.tempMedia.updateMany({
+            where: { wizardSessionId, status: "TEMP" },
+            data: { status: "ATTACHED" },
+          });
         });
+
+        console.log(`[submitPlaceRevisionForModeration] Replaced ${tempMedia.length} images`);
       }
-
-      // Mark temp media as attached (or delete them)
-      await prisma.tempMedia.updateMany({
-        where: {
-          wizardSessionId,
-          status: "TEMP",
-        },
-        data: {
-          status: "ATTACHED",
-        },
-      });
-
-      console.log(`[submitPlaceRevisionForModeration] Converted ${tempMedia.length} temp media items to PlaceRevisionImage`);
     }
   }
 
