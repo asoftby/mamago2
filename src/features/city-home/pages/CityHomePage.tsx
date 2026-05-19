@@ -93,13 +93,6 @@ export default async function CityHomePage({ citySlug }: CityHomePageProps) {
   const nearbyRoutesPreviewDb = nearbyRoutes.map(mapRoutePreview);
   const localRouteItems = localRoutesPreview.slice(0, 6);
   const nearbyRouteItems = nearbyRoutesPreviewDb.slice(0, 6);
-  console.log("[API] real data used", {
-    endpoint: "city-home-routes",
-    city: city.slug,
-    localCount: localRouteItems.length,
-    nearbyCount: nearbyRouteItems.length,
-  });
-
   const classesMode = localClasses.length > 0 ? "local" : nearbyClasses.length > 0 ? "nearby" : "empty";
   const routesMode = localRouteItems.length > 0 ? "local" : nearbyRouteItems.length > 0 ? "nearby" : "empty";
 
