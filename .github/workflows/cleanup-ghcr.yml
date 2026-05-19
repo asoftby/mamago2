@@ -1,0 +1,35 @@
+name: Cleanup old GHCR images
+
+on:
+  schedule:
+    - cron: '0 4 * * 0' # Каждое воскресенье в 4:00
+  workflow_dispatch:    # Ручной запуск
+
+jobs:
+  cleanup-prod:
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write 
+    steps:
+      - name: Delete old Prod images
+        uses: quartx-analytics/ghcr-cleaner@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          repository_owner: ${{ github.repository_owner }}
+          package-name: 'mamago2'
+          keep-at-most: 3
+          filter-tags: 'prod-*'
+
+  cleanup-dev:
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+    steps:
+      - name: Delete old Dev images
+        uses: quartx-analytics/ghcr-cleaner@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          repository_owner: ${{ github.repository_owner }}
+          package-name: 'mamago2'
+          keep-at-most: 3
+          filter-tags: 'dev-*'
