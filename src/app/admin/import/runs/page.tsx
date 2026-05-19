@@ -2,9 +2,9 @@ import Link from "next/link";
 import { prismaBase } from "@/lib/prisma";
 import { formatDistanceToNow } from "date-fns";
 import { ru } from "date-fns/locale";
+import { Prisma } from "@prisma/client";
 import type {
   ImportEntityType,
-  ImportReviewStatus,
   ImportRunStatus,
 } from "@prisma/client";
 import { RunRowActions } from "./_components/RunRowActions";
@@ -17,11 +17,6 @@ import {
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
-
-type ImportRunRecordStub = {
-  applyResult: unknown;
-  reviewStatus: ImportReviewStatus;
-};
 
 type ImportRunListRow = {
   id: string;
@@ -43,7 +38,6 @@ type ImportRunListRow = {
     isActive: boolean;
     archivedAt: Date | null;
   };
-  records: ImportRunRecordStub[];
 };
 
 type ImportRunsDb = {
@@ -52,6 +46,9 @@ type ImportRunsDb = {
   };
   importSource?: {
     findMany: (args: unknown) => Promise<Array<{ id: string; name: string }>>;
+  };
+  importedRecord?: {
+    groupBy: (args: unknown) => Promise<Array<{ runId: string | null; _count: { _all: number } }>>;
   };
 };
 
@@ -107,7 +104,6 @@ async function getRuns(filters: {
       source: {
         select: { id: true, name: true, slug: true, defaultEntity: true, isActive: true, archivedAt: true },
       },
-      records: { select: { applyResult: true, reviewStatus: true } },
     },
   });
 }
@@ -123,6 +119,42 @@ async function getSources() {
     select: { id: true, name: true },
     orderBy: { name: "asc" },
   });
+}
+
+async function getRunRecordCounts(runIds: string[]): Promise<{
+  pendingByRunId: Map<string, number>;
+  appliedByRunId: Map<string, number>;
+}> {
+  const db = getImportRunsDb();
+  if (!db.importedRecord || runIds.length === 0) {
+    return { pendingByRunId: new Map(), appliedByRunId: new Map() };
+  }
+
+  const [pendingGroups, appliedGroups] = await Promise.all([
+    db.importedRecord.groupBy({
+      by: ["runId"],
+      where: { runId: { in: runIds }, reviewStatus: "PENDING" },
+      _count: { _all: true },
+    }),
+    db.importedRecord.groupBy({
+      by: ["runId"],
+      where: { runId: { in: runIds }, applyResult: { not: Prisma.DbNull } },
+      _count: { _all: true },
+    }),
+  ]);
+
+  const pendingByRunId = new Map(
+    pendingGroups
+      .filter((g): g is typeof g & { runId: string } => g.runId != null)
+      .map((g) => [g.runId, g._count._all]),
+  );
+  const appliedByRunId = new Map(
+    appliedGroups
+      .filter((g): g is typeof g & { runId: string } => g.runId != null)
+      .map((g) => [g.runId, g._count._all]),
+  );
+
+  return { pendingByRunId, appliedByRunId };
 }
 
 export default async function ImportRunsPage({
@@ -141,6 +173,7 @@ export default async function ImportRunsPage({
   const importRuntimeReady = Boolean(getImportRunsDb().importRun && getImportRunsDb().importSource);
 
   const [runs, sources] = await Promise.all([getRuns(filters), getSources()]);
+  const { pendingByRunId, appliedByRunId } = await getRunRecordCounts(runs.map((r) => r.id));
   const hasFilters = sp.status || sp.entity || sp.source || sp.archive;
 
   return (
@@ -231,8 +264,8 @@ export default async function ImportRunsPage({
             </thead>
             <tbody className="divide-y divide-gray-100">
               {runs.map((run) => {
-                const appliedCount = run.records.filter((record) => record.applyResult !== null).length;
-                const pendingReviewCount = run.records.filter((record) => record.reviewStatus === "PENDING").length;
+                const appliedCount = appliedByRunId.get(run.id) ?? 0;
+                const pendingReviewCount = pendingByRunId.get(run.id) ?? 0;
                 const duration =
                   run.startedAt && run.finishedAt
                     ? Math.round((run.finishedAt.getTime() - run.startedAt.getTime()) / 1000)

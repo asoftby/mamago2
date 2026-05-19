@@ -191,27 +191,7 @@ async function getQueueStats() {
     };
   }
 
-  const linkedRecords = (await db.importedRecord.findMany({
-    where: {
-      OR: [
-        { publishedPlaceId: { not: null } },
-        { publishedActivityId: { not: null } },
-      ],
-    },
-    select: {
-      id: true,
-      publishedPlaceId: true,
-      publishedActivityId: true,
-      reviewDecision: true,
-      applyResult: true,
-    },
-  })) as ImportedRecordLinkSnapshot[];
-  const reconciledLinkedRecords = await reconcileImportedRecordLinks(
-    linkedRecords,
-    prismaBase,
-  );
-
-  const [total, pending, inProgress, completed] = await Promise.all([
+  const [total, pending, inProgress, completed, linked] = await Promise.all([
     db.importedRecord.count({ where: {} }),
     db.importedRecord.count({ where: { reviewStatus: "PENDING" } }),
     db.importedRecord.count({
@@ -234,17 +214,17 @@ async function getQueueStats() {
         ],
       },
     }),
+    db.importedRecord.count({
+      where: {
+        OR: [
+          { publishedPlaceId: { not: null } },
+          { publishedActivityId: { not: null } },
+        ],
+      },
+    }),
   ]);
 
-  return {
-    total,
-    pending,
-    inProgress,
-    completed,
-    linked: reconciledLinkedRecords.filter(
-      (record) => record.publishedPlaceId || record.publishedActivityId,
-    ).length,
-  };
+  return { total, pending, inProgress, completed, linked };
 }
 
 async function getSources() {
