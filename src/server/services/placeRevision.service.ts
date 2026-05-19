@@ -74,6 +74,44 @@ function computeRevisionImageFingerprint(images: RevisionImageLike[]): string {
     .join(",");
 }
 
+// Minimal structural type for opening-hours fingerprinting.
+// Compatible with the Prisma-included OpeningHours + rules + intervals shape.
+interface OpeningHoursLike {
+  mode: string;
+  timezone: string;
+  note?: string | null;
+  rules: Array<{
+    dayOfWeek: string;
+    isOpen: boolean;
+    allDay: boolean;
+    intervals: Array<{ startTime: string; endTime: string }>;
+  }>;
+}
+
+/**
+ * Canonical fingerprint for an opening-hours record (rules only, no exceptions).
+ * Exceptions are intentionally excluded: the approval path does not copy them from
+ * revision to place, so they must not affect whether the main schedule is rewritten.
+ *
+ * Only isOpen=true rules are considered — mapToCreatePayload never writes isOpen=false
+ * rules, so the DB never stores them. Filtering here keeps both sides comparable.
+ */
+function computeOpeningHoursFingerprint(oh: OpeningHoursLike | null): string {
+  if (!oh) return "";
+  const rules = oh.rules
+    .filter((r) => r.isOpen)
+    .slice()
+    .sort((a, b) => (a.dayOfWeek < b.dayOfWeek ? -1 : a.dayOfWeek > b.dayOfWeek ? 1 : 0))
+    .map((r) => {
+      const ivs = r.allDay
+        ? "allDay"
+        : r.intervals.map((i) => `${i.startTime}~${i.endTime}`).join("+");
+      return `${r.dayOfWeek}:${ivs}`;
+    })
+    .join("|");
+  return `${oh.mode}!${oh.timezone}!${oh.note ?? ""}!${rules}`;
+}
+
 /**
  * Get active revision for a Place (DRAFT, PENDING, or NEEDS_REVISION)
  * Returns null if no active revision exists
@@ -594,7 +632,8 @@ export async function approvePlaceRevision(
   revisionId: string,
   adminId: string
 ) {
-  // Get revision; place.images loaded here to enable image fingerprint guard below.
+  // Get revision; place.images and place.openingHours loaded here to enable
+  // fingerprint guards for both images (Phase 6F-2) and opening hours (Phase 6F-3).
   const revision = await prisma.placeRevision.findUnique({
     where: { id: revisionId },
     include: {
@@ -602,6 +641,17 @@ export async function approvePlaceRevision(
         include: {
           images: {
             orderBy: { sortOrder: "asc" },
+          },
+          openingHours: {
+            include: {
+              rules: {
+                include: {
+                  intervals: {
+                    orderBy: { sortOrder: "asc" },
+                  },
+                },
+              },
+            },
           },
         },
       },
@@ -648,43 +698,50 @@ export async function approvePlaceRevision(
   // Approval must translate revision.logoImageId → the correct PlaceImage.id.
   await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     // ── Opening hours ───────────────────────────────────────────────────────────
+    // Skip delete+create when revision opening hours are identical to current place
+    // opening hours (fingerprint comparison in memory — no extra DB reads).
+    // Exceptions are intentionally not copied from revision to place (pre-existing
+    // behaviour) and are excluded from the fingerprint for that reason.
     let newOpeningHoursId = revision.place.openingHoursId;
 
     if (revision.openingHours) {
-      // Create a copy of revision opening hours for the main place
-      const { mapToCreatePayload } = await import("@/lib/openingHours");
+      const revisionOhFingerprint = computeOpeningHoursFingerprint(revision.openingHours);
+      const placeOhFingerprint    = computeOpeningHoursFingerprint(revision.place.openingHours ?? null);
 
-      // Map revision opening hours to create payload
-      const openingHoursData = {
-        mode: revision.openingHours.mode,
-        timezone: revision.openingHours.timezone,
-        note: revision.openingHours.note || undefined,
-        rules: revision.openingHours.rules.map((rule: OpeningHoursRule & { intervals: OpeningHoursInterval[] }) => ({
-          dayOfWeek: rule.dayOfWeek,
-          isOpen: rule.isOpen,
-          allDay: rule.allDay,
-          intervals: rule.intervals.map((interval: OpeningHoursInterval) => ({
-            startTime: interval.startTime,
-            endTime: interval.endTime,
+      if (revisionOhFingerprint !== placeOhFingerprint) {
+        // Opening hours changed — replace the place's opening hours record.
+        const { mapToCreatePayload } = await import("@/lib/openingHours");
+
+        const openingHoursData = {
+          mode: revision.openingHours.mode,
+          timezone: revision.openingHours.timezone,
+          note: revision.openingHours.note || undefined,
+          rules: revision.openingHours.rules.map((rule: OpeningHoursRule & { intervals: OpeningHoursInterval[] }) => ({
+            dayOfWeek: rule.dayOfWeek,
+            isOpen: rule.isOpen,
+            allDay: rule.allDay,
+            intervals: rule.intervals.map((interval: OpeningHoursInterval) => ({
+              startTime: interval.startTime,
+              endTime: interval.endTime,
+            })),
           })),
-        })),
-      };
+        };
 
-      const createPayload = mapToCreatePayload(openingHoursData);
+        const createPayload = mapToCreatePayload(openingHoursData);
 
-      // Delete old opening hours if exists
-      if (revision.place.openingHoursId) {
-        await tx.openingHours.delete({
-          where: { id: revision.place.openingHoursId },
+        if (revision.place.openingHoursId) {
+          await tx.openingHours.delete({
+            where: { id: revision.place.openingHoursId },
+          });
+        }
+
+        const newOpeningHours = await tx.openingHours.create({
+          data: createPayload,
         });
+
+        newOpeningHoursId = newOpeningHours.id;
       }
-
-      // Create new opening hours for place
-      const newOpeningHours = await tx.openingHours.create({
-        data: createPayload,
-      });
-
-      newOpeningHoursId = newOpeningHours.id;
+      // else: opening hours unchanged — keep revision.place.openingHoursId as-is.
     }
 
     // ── Images + logoImageId resolution ────────────────────────────────────────
