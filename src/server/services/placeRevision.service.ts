@@ -8,6 +8,7 @@ import {
   notifyPlaceUpdateNeedsRevision,
   notifyPlaceUpdateRejected,
 } from "./notification.service";
+import { mapToCreatePayload } from "@/lib/openingHours";
 
 /**
  * Data structure for revision snapshot fields
@@ -710,8 +711,6 @@ export async function approvePlaceRevision(
 
       if (revisionOhFingerprint !== placeOhFingerprint) {
         // Opening hours changed — replace the place's opening hours record.
-        const { mapToCreatePayload } = await import("@/lib/openingHours");
-
         const openingHoursData = {
           mode: revision.openingHours.mode,
           timezone: revision.openingHours.timezone,
