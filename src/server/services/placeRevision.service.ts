@@ -594,11 +594,17 @@ export async function approvePlaceRevision(
   revisionId: string,
   adminId: string
 ) {
-  // Get revision
+  // Get revision; place.images loaded here to enable image fingerprint guard below.
   const revision = await prisma.placeRevision.findUnique({
     where: { id: revisionId },
     include: {
-      place: true,
+      place: {
+        include: {
+          images: {
+            orderBy: { sortOrder: "asc" },
+          },
+        },
+      },
       images: {
         orderBy: { sortOrder: "asc" },
       },
@@ -631,15 +637,23 @@ export async function approvePlaceRevision(
     throw new Error(`Cannot approve revision from status: ${revision.status}`);
   }
 
-  // Copy revision data to Place in a transaction
+  // Copy revision data to Place in a transaction.
+  // Image handling runs BEFORE place.update so that approvedLogoImageId is resolved
+  // in PlaceImage.id space before being written to place.logoImageId.
+  //
+  // Id-space note:
+  //   Place.logoImageId          must reference a PlaceImage.id
+  //   PlaceRevision.logoImageId  references a PlaceRevisionImage.id (after media upload)
+  //                              or a PlaceImage.id (snapshot copy from place, no upload)
+  // Approval must translate revision.logoImageId → the correct PlaceImage.id.
   await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-    // Handle opening hours if present in revision
+    // ── Opening hours ───────────────────────────────────────────────────────────
     let newOpeningHoursId = revision.place.openingHoursId;
-    
+
     if (revision.openingHours) {
       // Create a copy of revision opening hours for the main place
       const { mapToCreatePayload } = await import("@/lib/openingHours");
-      
+
       // Map revision opening hours to create payload
       const openingHoursData = {
         mode: revision.openingHours.mode,
@@ -657,7 +671,7 @@ export async function approvePlaceRevision(
       };
 
       const createPayload = mapToCreatePayload(openingHoursData);
-      
+
       // Delete old opening hours if exists
       if (revision.place.openingHoursId) {
         await tx.openingHours.delete({
@@ -673,7 +687,75 @@ export async function approvePlaceRevision(
       newOpeningHoursId = newOpeningHours.id;
     }
 
-    // Update Place with revision data
+    // ── Images + logoImageId resolution ────────────────────────────────────────
+    // Fingerprints are computed from pre-loaded in-memory data — no extra DB reads.
+    const placeImageFingerprint    = computeRevisionImageFingerprint(revision.place.images);
+    const revisionImageFingerprint = computeRevisionImageFingerprint(revision.images);
+    const imagesChanged = placeImageFingerprint !== revisionImageFingerprint;
+
+    // Resolve the PlaceImage.id to store in place.logoImageId.
+    // revision.logoImageId may be a PlaceRevisionImage.id (after media upload) or a
+    // PlaceImage.id (snapshot with no subsequent upload). Either way we must end up
+    // with a valid PlaceImage.id — resolved by URL match against the live image set.
+    let approvedLogoImageId: string | null;
+
+    if (!imagesChanged) {
+      // Existing PlaceImage rows are kept unchanged.
+      // Find the logo by matching URL against the current place image set.
+      const revLogoImg = revision.images.find((img) => img.kind === "LOGO");
+      if (revLogoImg) {
+        const placeLogoImg = revision.place.images.find(
+          (img) => img.kind === "LOGO" && img.url === revLogoImg.url
+        );
+        // Fall back to existing place.logoImageId if URL match fails (defensive).
+        approvedLogoImageId = placeLogoImg?.id ?? revision.place.logoImageId;
+      } else {
+        // Revision carries no logo image — clear the logo on the place.
+        approvedLogoImageId = null;
+      }
+    } else {
+      // Images changed — delete old PlaceImages and create new ones.
+      // LOGO is created individually (not via createMany) so its new PlaceImage.id
+      // is available in memory without an extra findFirst round-trip.
+      await tx.placeImage.deleteMany({ where: { placeId: revision.placeId } });
+
+      const logoRevImg     = revision.images.find((img: PlaceRevisionImage) => img.kind === "LOGO");
+      const galleryRevImgs = revision.images.filter((img: PlaceRevisionImage) => img.kind !== "LOGO");
+
+      let newLogoPlaceImg: { id: string } | null = null;
+      if (logoRevImg) {
+        newLogoPlaceImg = await tx.placeImage.create({
+          data: {
+            placeId: revision.placeId,
+            kind: logoRevImg.kind,
+            url: logoRevImg.url,
+            width: logoRevImg.width,
+            height: logoRevImg.height,
+            blurhash: logoRevImg.blurhash,
+            sortOrder: logoRevImg.sortOrder,
+          },
+          select: { id: true },
+        });
+      }
+
+      if (galleryRevImgs.length > 0) {
+        await tx.placeImage.createMany({
+          data: galleryRevImgs.map((img: PlaceRevisionImage) => ({
+            placeId: revision.placeId,
+            kind: img.kind,
+            url: img.url,
+            width: img.width,
+            height: img.height,
+            blurhash: img.blurhash,
+            sortOrder: img.sortOrder,
+          })),
+        });
+      }
+
+      approvedLogoImageId = newLogoPlaceImg?.id ?? null;
+    }
+
+    // ── Place scalar fields ─────────────────────────────────────────────────────
     await tx.place.update({
       where: { id: revision.placeId },
       data: {
@@ -681,7 +763,8 @@ export async function approvePlaceRevision(
         category: revision.category ?? revision.place.category,
         shortDesc: revision.shortDesc ?? revision.place.shortDesc,
         description: revision.description ?? revision.place.description,
-        logoImageId: revision.logoImageId ?? revision.place.logoImageId,
+        // approvedLogoImageId is a PlaceImage.id resolved above — never a PlaceRevisionImage.id.
+        logoImageId: approvedLogoImageId,
         googlePlaceId: revision.googlePlaceId ?? revision.place.googlePlaceId,
         lat: revision.lat ?? revision.place.lat,
         lng: revision.lng ?? revision.place.lng,
@@ -710,28 +793,11 @@ export async function approvePlaceRevision(
         visitFormats: revision.visitFormats,
         activityTypes: revision.activityTypes,
         placeGroupId: revision.placeGroupId ?? revision.place.placeGroupId,
-        openingHoursId: newOpeningHoursId, // Update opening hours
+        openingHoursId: newOpeningHoursId,
       },
     });
 
-    // Delete old Place images and create new ones from revision
-    await tx.placeImage.deleteMany({
-      where: { placeId: revision.placeId },
-    });
-
-    await tx.placeImage.createMany({
-      data: revision.images.map((img: PlaceRevisionImage) => ({
-        placeId: revision.placeId,
-        kind: img.kind,
-        url: img.url,
-        width: img.width,
-        height: img.height,
-        blurhash: img.blurhash,
-        sortOrder: img.sortOrder,
-      })),
-    });
-
-    // Mark revision as APPROVED
+    // ── Revision status + audit log ────────────────────────────────────────────
     await tx.placeRevision.update({
       where: { id: revisionId },
       data: {
@@ -741,7 +807,6 @@ export async function approvePlaceRevision(
       },
     });
 
-    // Log moderation action
     await tx.moderationLog.create({
       data: {
         entityType: "PLACE",
