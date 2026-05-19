@@ -14,7 +14,6 @@ export const dynamic = "force-dynamic";
 
 export default async function RoutesPage() {
   const dbRoutes = await listPublicRoutes().catch(() => []);
-  console.log("[API] real data used", { endpoint: "routes-page", count: dbRoutes.length });
 
   const routes: PublicRouteCardModel[] = dbRoutes.map((r) => ({
     id: r.id,
