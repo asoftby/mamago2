@@ -2,15 +2,22 @@ import { PrismaClient } from "@prisma/client";
 import { SearchIndexerService } from "@/lib/search/SearchIndexerService";
 import { extendPrismaWithSearchIndexing } from "@/lib/search/prismaSearchExtension";
 
+// Increment this version whenever the Prisma schema changes in a way
+// that requires a fresh PrismaClient in the dev hot-reload cycle.
+// Bump: added SectionSystemFilter + DiscoveryFilterPlacement (2026-05-20)
+const PRISMA_CACHE_VERSION = "v4";
+
 const globalForPrisma = globalThis as unknown as {
-  prismaBase: PrismaClient | undefined;
-  prisma: PrismaClient | undefined;
+  [key: string]: unknown;
   searchIndexer: SearchIndexerService | undefined;
 };
 
-// Forced reload for Prisma schema changes - v2
+const baseKey = `prismaBase_${PRISMA_CACHE_VERSION}`;
+const prismaKey = `prisma_${PRISMA_CACHE_VERSION}`;
+
+// Forced reload for Prisma schema changes — bump PRISMA_CACHE_VERSION above.
 const prismaBase =
-  globalForPrisma.prismaBase ??
+  (globalForPrisma[baseKey] as PrismaClient | undefined) ??
   new PrismaClient({
     log: process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
   });
@@ -18,12 +25,13 @@ const prismaBase =
 const searchIndexer = globalForPrisma.searchIndexer ?? new SearchIndexerService(prismaBase);
 
 const prisma =
-  globalForPrisma.prisma ?? extendPrismaWithSearchIndexing(prismaBase, searchIndexer);
+  (globalForPrisma[prismaKey] as PrismaClient | undefined) ??
+  extendPrismaWithSearchIndexing(prismaBase, searchIndexer);
 
 if (process.env.NODE_ENV !== "production") {
-  globalForPrisma.prismaBase = prismaBase;
+  globalForPrisma[baseKey] = prismaBase;
   globalForPrisma.searchIndexer = searchIndexer;
-  globalForPrisma.prisma = prisma;
+  globalForPrisma[prismaKey] = prisma;
 }
 
 export default prisma;
