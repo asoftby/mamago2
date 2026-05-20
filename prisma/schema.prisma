@@ -391,6 +391,7 @@ model FilterDefinition {
   /// True = seeded by system, cannot be deleted, slug is immutable
   isSystem   Boolean        @default(false)
   options    FilterOption[]
+  placements DiscoveryFilterPlacement[]
 }
 
 model FilterOption {
@@ -512,6 +513,7 @@ model EventCategory {
   genres               Genre[]
   placePrimary         Place[]                      @relation("PlacePrimaryCategory")
   placeSubcategories   PlaceSubcategory[]           @relation("PlaceSubcategoryCategory")
+  filterPlacements     DiscoveryFilterPlacement[]
 
   @@unique([publicationType, slug])
   @@index([sortOrder])
@@ -3560,6 +3562,30 @@ model Page {
   @@index([updatedAt])
   @@index([type, status])
   @@index([status, visibility])
+}
+
+/// Привязка FilterDefinition к разделу (intent) или категории (categoryId).
+/// intent-only  → общий фильтр раздела (kuda / classes / birthday / routes).
+/// categoryId-only → фильтр конкретной категории каталога.
+/// intent+categoryId → переопределение фильтра раздела для категории.
+model DiscoveryFilterPlacement {
+  id         String           @id @default(cuid())
+  filterId   String
+  filter     FilterDefinition @relation(fields: [filterId], references: [id], onDelete: Cascade)
+
+  intent     String?          // kuda | classes | birthday | routes
+  categoryId String?
+  category   EventCategory?   @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  isActive   Boolean          @default(true)
+  sortOrder  Int              @default(0)
+
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+
+  @@unique([filterId, intent, categoryId])
+  @@index([intent, isActive, sortOrder])
+  @@index([categoryId, isActive, sortOrder])
 }
 
 enum PageType {
