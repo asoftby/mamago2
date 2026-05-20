@@ -2,19 +2,24 @@
 
 import { useMemo } from "react";
 import { ActivityCard } from "@/components/activity/ActivityCard";
+import { OfferCard } from "@/components/offers/OfferCard";
 import { AnalyticsCardViewTracker } from "@/components/analytics/AnalyticsCardViewTracker";
 import {
   useDiscoveryFilters,
   type DiscoveryFilters,
 } from "@/features/filters/discovery/filters.store";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { useBudgetFilter } from "@/features/filters/discovery/useBudgetFilter";
 import { partitionDiscoveryFeed } from "@/lib/discovery/partitionDiscoveryFeed";
 import { formatRuShortDayMonthRange } from "@/lib/formatters/date";
+import { formatPriceFrom } from "@/lib/formatters/format-price";
 import type { ActivityMock } from "@/types/activity";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useOptionalCity } from "@/contexts/CityContext";
 import { DEFAULT_CITY_SLUG } from "@/lib/city/resolveCityContext";
+import { getActivityFormatLabel } from "@/domain/activities/activity-format";
+import { publicActivityPath } from "@/lib/business/eventPublicLink";
 
 type DiscoveryActivitiesGridProps = {
   activities: ActivityMock[];
@@ -62,40 +67,74 @@ export function DiscoveryActivitiesGrid({
   const debounced = useDebouncedValue(applied, 400);
   const isPending = filtersSignature(applied) !== filtersSignature(debounced);
 
+  const { budget } = useBudgetFilter();
+
   const { primary, secondary, secondaryHeading } = useMemo(
-    () => partitionDiscoveryFeed(debounced, activities),
-    [debounced, activities],
+    () => partitionDiscoveryFeed(debounced, activities, budget),
+    [debounced, activities, budget],
   );
 
   const renderCard = (activity: (typeof activities)[number]) => (
-      <AnalyticsCardViewTracker
-        key={activity.id}
-        entityType={activity.analyticsEntityType ?? "EVENT"}
-        entityId={activity.id}
-        vertical="CITY"
-        citySlug={citySlug}
-        meta={{ section: activity.analyticsEntityType === "OFFER" ? "offers" : "afisha" }}
-      >
-      <ActivityCard
-        className="mb-0 h-full"
-        coverRatio={ratio}
-        variant="poster-feed"
-        activity={activity}
-        saveMeta={
-          activity.analyticsEntityType === "OFFER"
-            ? undefined
-            : {
-                title: activity.title,
-                dateISO: activity.dateStart ?? null,
-                dateLabel: activity.dateStart
-                  ? formatRuShortDayMonthRange(
-                      activity.dateStart,
-                      activity.dateEnd ?? null,
-                    )
-                  : null,
-              }
-        }
-      />
+    <AnalyticsCardViewTracker
+      key={activity.id}
+      entityType={activity.analyticsEntityType ?? "EVENT"}
+      entityId={activity.id}
+      vertical="CITY"
+      citySlug={citySlug}
+      meta={{ section: activity.analyticsEntityType === "OFFER" ? "offers" : "afisha" }}
+    >
+      {activity.analyticsEntityType === "OFFER" ? (
+        <OfferCard
+          id={activity.id}
+          title={activity.title}
+          href={
+            activity.href ??
+            publicActivityPath(activity.id, activity.citySlug ?? citySlug, activity.slug)
+          }
+          imageUrl={activity.image}
+          categoryLabel={[
+            activity.badge || null,
+            activity.format ? getActivityFormatLabel(activity.format) : null,
+          ]
+            .filter(Boolean)
+            .join(" · ") || undefined}
+          dateLabel={[
+            activity.ageFrom != null ? `${activity.ageFrom}+` : null,
+            activity.dateStart
+              ? formatRuShortDayMonthRange(activity.dateStart, activity.dateEnd ?? null)
+              : null,
+          ]
+            .filter(Boolean)
+            .join(" · ") || undefined}
+          priceLabel={
+            activity.priceMin === 0
+              ? "бесплатно"
+              : activity.priceMin != null
+                ? formatPriceFrom(activity.priceMin)
+                : undefined
+          }
+          saveDateISO={activity.dateStart ?? null}
+          saveDateEndISO={activity.dateEnd ?? null}
+          className="h-full"
+        />
+      ) : (
+        <ActivityCard
+          className="mb-0 h-full"
+          coverRatio={ratio}
+          variant="poster-feed"
+          activity={activity}
+          saveMeta={{
+            title: activity.title,
+            dateISO: activity.dateStart ?? null,
+            dateLabel: activity.dateStart
+              ? formatRuShortDayMonthRange(
+                  activity.dateStart,
+                  activity.dateEnd ?? null,
+                )
+              : null,
+          }}
+        />
+      )}
     </AnalyticsCardViewTracker>
   );
 

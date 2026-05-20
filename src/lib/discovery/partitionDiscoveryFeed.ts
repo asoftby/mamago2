@@ -63,12 +63,26 @@ export type DiscoveryFeedPartition = {
 /**
  * Персонально подходящие по возрасту — выше; несовпадения с заметным engagement — второй блок.
  * При отсутствии фильтра по возрасту весь список в primary, сортировка по engagement.
+ *
+ * @param budget — верхняя граница цены (BYN). null = фильтр не активен.
+ *   Элементы без цены (priceMin === undefined) всегда проходят.
+ *   Бесплатные (priceMin === 0) всегда проходят.
  */
 export function partitionDiscoveryFeed(
   filters: DiscoveryFilters,
   activities: ActivityMock[],
+  budget?: number | null,
 ): DiscoveryFeedPartition {
-  const formatFiltered = activities.filter((activity) =>
+  const budgetFiltered =
+    budget && budget > 0
+      ? activities.filter((a) => {
+          const p = a.priceMin;
+          if (p === undefined || p === null) return true; // цена не указана — показываем
+          return p <= budget;
+        })
+      : activities;
+
+  const formatFiltered = budgetFiltered.filter((activity) =>
     activityMatchesFormat(activity, filters.format),
   );
 

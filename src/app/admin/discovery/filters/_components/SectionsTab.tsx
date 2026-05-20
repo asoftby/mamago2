@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -50,6 +50,123 @@ type FilterDef = {
 };
 
 const F: RequestInit = { credentials: "include" };
+
+// ─── System filters block ───────────────────────────────────────────────────
+
+type SystemFilterRow = {
+  id: string | null;
+  sectionKey: string;
+  type: string;
+  enabled: boolean;
+};
+
+const SYSTEM_FILTER_META: Record<string, { label: string; description: string }> = {
+  BUDGET: {
+    label: "Бюджет",
+    description:
+      "Слайдер строится автоматически по максимальной цене опубликованных предложений в разделе.",
+  },
+  FREE_ONLY: {
+    label: "Только бесплатно",
+    description: "Фильтр-переключатель для отображения только бесплатных предложений.",
+  },
+};
+
+function SystemFiltersBlock({ intent }: { intent: Intent }) {
+  const [rows, setRows] = useState<SystemFilterRow[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState<Record<string, boolean>>({});
+  const prevIntent = useRef<Intent | null>(null);
+
+  const fetchSystemFilters = useCallback(async (sectionKey: Intent) => {
+    setLoading(true);
+    try {
+      const res = await fetch(
+        `/api/admin/discovery/system-filters?section=${sectionKey}`,
+        F
+      );
+      if (res.ok) setRows(await res.json());
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (prevIntent.current !== intent) {
+      prevIntent.current = intent;
+      fetchSystemFilters(intent);
+    }
+  }, [intent, fetchSystemFilters]);
+
+  // also fetch on first mount
+  useEffect(() => {
+    fetchSystemFilters(intent);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const toggle = async (type: string, currentEnabled: boolean) => {
+    setSaving((s) => ({ ...s, [type]: true }));
+    try {
+      const res = await fetch("/api/admin/discovery/system-filters", {
+        ...F,
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sectionKey: intent, type, enabled: !currentEnabled }),
+      });
+      if (res.ok) {
+        setRows((prev) =>
+          prev.map((r) => (r.type === type ? { ...r, enabled: !currentEnabled } : r))
+        );
+      } else {
+        toast.error("Не удалось сохранить");
+      }
+    } finally {
+      setSaving((s) => ({ ...s, [type]: false }));
+    }
+  };
+
+  if (loading) return <p className="text-sm text-gray-400 py-2">Загрузка...</p>;
+
+  return (
+    <div className="space-y-2 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+      <p className="text-xs font-semibold text-amber-700 uppercase tracking-wide">
+        Системные фильтры
+      </p>
+      <div className="space-y-3">
+        {rows.map((row) => {
+          const meta = SYSTEM_FILTER_META[row.type];
+          if (!meta) return null;
+          return (
+            <div key={row.type} className="flex items-start gap-4">
+              <button
+                onClick={() => toggle(row.type, row.enabled)}
+                disabled={saving[row.type]}
+                className={cn(
+                  "mt-0.5 relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors",
+                  row.enabled ? "bg-gray-900" : "bg-gray-300",
+                  "focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-1"
+                )}
+                role="switch"
+                aria-checked={row.enabled}
+              >
+                <span
+                  className={cn(
+                    "pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow ring-0 transition-transform",
+                    row.enabled ? "translate-x-4" : "translate-x-0"
+                  )}
+                />
+              </button>
+              <div>
+                <p className="text-sm font-medium text-gray-900">{meta.label}</p>
+                <p className="text-xs text-gray-500 mt-0.5">{meta.description}</p>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 export function SectionsTab() {
   const [intent, setIntent] = useState<Intent>("kuda");
@@ -154,6 +271,9 @@ export function SectionsTab() {
           </button>
         ))}
       </div>
+
+      {/* System filters */}
+      <SystemFiltersBlock intent={intent} />
 
       {/* Table */}
       <div className="space-y-3">

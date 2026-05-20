@@ -3564,6 +3564,21 @@ model Page {
   @@index([status, visibility])
 }
 
+/// Системные фильтры разделов подбора (budget, freeOnly и др.).
+/// Один тип на раздел; создаётся лениво при первом включении в админке.
+model SectionSystemFilter {
+  id         String   @id @default(cuid())
+  sectionKey String   // kuda | classes | birthday | routes
+  type       String   // BUDGET | FREE_ONLY
+  enabled    Boolean  @default(false)
+  sortOrder  Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([sectionKey, type])
+  @@index([sectionKey, enabled])
+}
+
 /// Привязка FilterDefinition к разделу (intent) или категории (categoryId).
 /// intent-only  → общий фильтр раздела (kuda / classes / birthday / routes).
 /// categoryId-only → фильтр конкретной категории каталога.

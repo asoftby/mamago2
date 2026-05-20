@@ -12,6 +12,8 @@ import { whenPresetPageTitleSuffix } from "@/features/filters/discovery/whenLabe
 import { ClassesChipBar } from "./ClassesChipBar";
 import type { PublicRouteCardModel } from "@/components/routes/types";
 import type { ActivityMock } from "@/types/activity";
+import type { BudgetConfig } from "./CityShell";
+import { BudgetSliderFilter } from "@/components/discovery/BudgetSliderFilter";
 import Link from "next/link";
 import { Plus } from "lucide-react";
 
@@ -79,6 +81,8 @@ interface CityDiscoveryShellProps {
   discoveryActivities?: ActivityMock[];
   classChips?: Array<{ id: string; title: string; slug: string }>;
   activeClassChipSlug?: string;
+  /** Конфигурация бюджетного фильтра; null = фильтр выключен в админке. */
+  budgetConfig?: BudgetConfig;
 }
 
 export function CityDiscoveryShell({
@@ -88,6 +92,7 @@ export function CityDiscoveryShell({
   discoveryActivities,
   classChips,
   activeClassChipSlug,
+  budgetConfig,
 }: CityDiscoveryShellProps) {
   const { applied } = useDiscoveryFilters();
   const intentConfig = DISCOVERY_INTENT_CONFIG[intent];
@@ -142,6 +147,10 @@ export function CityDiscoveryShell({
 
           <BirthdayQuickStartBanner city={city} />
 
+          {budgetConfig && (
+            <BudgetSliderFilter max={budgetConfig.max} />
+          )}
+
           <DiscoveryActivitiesGrid activities={discoveryActivities ?? []} coverRatio="1/1" />
         </Container>
       </main>
@@ -158,6 +167,11 @@ export function CityDiscoveryShell({
         {intent === "classes" && classChips && activeClassChipSlug ? (
           <ClassesChipBar chips={classChips} activeChipSlug={activeClassChipSlug} />
         ) : null}
+
+        {budgetConfig && (
+          <BudgetSliderFilter max={budgetConfig.max} />
+        )}
+
         <DiscoveryActivitiesGrid
           activities={discoveryActivities ?? []}
           coverRatio={intent === "classes" ? "1/1" : undefined}

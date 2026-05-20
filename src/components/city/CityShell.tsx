@@ -12,6 +12,9 @@ import {
 } from "@/server/discovery/classChips";
 import { parseActivityFormatQuery } from "@/domain/activities/activity-format";
 import type { PublicRouteCardModel } from "@/components/routes/types";
+import { computeMaxBudget, getBudgetStep } from "@/lib/discovery/budgetUtils";
+
+export type BudgetConfig = { max: number; step: number } | null;
 
 interface CityShellProps {
   citySlug: string;
@@ -20,15 +23,23 @@ interface CityShellProps {
 }
 
 export async function CityShell({ citySlug, intent, searchParams }: CityShellProps) {
-  const [city, user] = await Promise.all([
+  const [city, user, systemFilters] = await Promise.all([
     prisma.city.findUnique({ where: { slug: citySlug } }),
     getCurrentUser(),
+    prisma.sectionSystemFilter.findMany({
+      where: { sectionKey: intent, enabled: true },
+      select: { type: true },
+    }),
   ]);
   if (!city) notFound();
+
+  const budgetEnabled = systemFilters.some((f) => f.type === "BUDGET");
 
   let discoveryActivities = undefined;
   let classChips = undefined;
   let activeClassChipSlug = undefined;
+  let budgetConfig: BudgetConfig = null;
+
   if (intent === "kuda" || intent === "birthday") {
     const formatParam = Array.isArray(searchParams.format)
       ? searchParams.format[0]
@@ -40,6 +51,10 @@ export async function CityShell({ citySlug, intent, searchParams }: CityShellPro
       format: parseActivityFormatQuery(typeof formatParam === "string" ? formatParam : null),
       nearby: nearbyParam === "true",
     });
+    if (budgetEnabled && discoveryActivities) {
+      const max = computeMaxBudget(discoveryActivities);
+      if (max) budgetConfig = { max, step: getBudgetStep(max) };
+    }
   }
   if (intent === "classes") {
     const requestedChip = Array.isArray(searchParams.chip)
@@ -51,6 +66,10 @@ export async function CityShell({ citySlug, intent, searchParams }: CityShellPro
       chipSlug: activeClassChipSlug,
       chipTitleBySlug: new Map(classChips.map((chip) => [chip.slug, chip.title])),
     });
+    if (budgetEnabled && discoveryActivities) {
+      const max = computeMaxBudget(discoveryActivities);
+      if (max) budgetConfig = { max, step: getBudgetStep(max) };
+    }
   }
 
   // For routes intent, load routes data server-side
@@ -98,6 +117,7 @@ export async function CityShell({ citySlug, intent, searchParams }: CityShellPro
       discoveryActivities={discoveryActivities}
       classChips={classChips}
       activeClassChipSlug={activeClassChipSlug}
+      budgetConfig={budgetConfig}
     />
   );
 }
