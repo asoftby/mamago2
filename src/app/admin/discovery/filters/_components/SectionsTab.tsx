@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { toast } from "@/lib/toast";
-import { Trash2 } from "lucide-react";
+import { ChevronUp, ChevronDown, Trash2 } from "lucide-react";
 import {
   DiscoveryTaxonomyTable,
   DiscoveryEmptyState,
@@ -51,121 +51,13 @@ type FilterDef = {
 
 const F: RequestInit = { credentials: "include" };
 
-// ─── System filters block ───────────────────────────────────────────────────
-
-type SystemFilterRow = {
-  id: string | null;
-  sectionKey: string;
-  type: string;
-  enabled: boolean;
-};
-
-const SYSTEM_FILTER_META: Record<string, { label: string; description: string }> = {
-  BUDGET: {
-    label: "Бюджет",
-    description:
-      "Слайдер строится автоматически по максимальной цене опубликованных предложений в разделе.",
-  },
-  FREE_ONLY: {
-    label: "Только бесплатно",
-    description: "Фильтр-переключатель для отображения только бесплатных предложений.",
-  },
-};
-
-function SystemFiltersBlock({ intent }: { intent: Intent }) {
-  const [rows, setRows] = useState<SystemFilterRow[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState<Record<string, boolean>>({});
-  const prevIntent = useRef<Intent | null>(null);
-
-  const fetchSystemFilters = useCallback(async (sectionKey: Intent) => {
-    setLoading(true);
-    try {
-      const res = await fetch(
-        `/api/admin/discovery/system-filters?section=${sectionKey}`,
-        F
-      );
-      if (res.ok) setRows(await res.json());
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (prevIntent.current !== intent) {
-      prevIntent.current = intent;
-      fetchSystemFilters(intent);
-    }
-  }, [intent, fetchSystemFilters]);
-
-  // also fetch on first mount
-  useEffect(() => {
-    fetchSystemFilters(intent);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const toggle = async (type: string, currentEnabled: boolean) => {
-    setSaving((s) => ({ ...s, [type]: true }));
-    try {
-      const res = await fetch("/api/admin/discovery/system-filters", {
-        ...F,
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sectionKey: intent, type, enabled: !currentEnabled }),
-      });
-      if (res.ok) {
-        setRows((prev) =>
-          prev.map((r) => (r.type === type ? { ...r, enabled: !currentEnabled } : r))
-        );
-      } else {
-        toast.error("Не удалось сохранить");
-      }
-    } finally {
-      setSaving((s) => ({ ...s, [type]: false }));
-    }
-  };
-
-  if (loading) return <p className="text-sm text-gray-400 py-2">Загрузка...</p>;
-
-  return (
-    <div className="space-y-2 p-4 bg-amber-50 border border-amber-200 rounded-lg">
-      <p className="text-xs font-semibold text-amber-700 uppercase tracking-wide">
-        Системные фильтры
-      </p>
-      <div className="space-y-3">
-        {rows.map((row) => {
-          const meta = SYSTEM_FILTER_META[row.type];
-          if (!meta) return null;
-          return (
-            <div key={row.type} className="flex items-start gap-4">
-              <button
-                onClick={() => toggle(row.type, row.enabled)}
-                disabled={saving[row.type]}
-                className={cn(
-                  "mt-0.5 relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors",
-                  row.enabled ? "bg-gray-900" : "bg-gray-300",
-                  "focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-1"
-                )}
-                role="switch"
-                aria-checked={row.enabled}
-              >
-                <span
-                  className={cn(
-                    "pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow ring-0 transition-transform",
-                    row.enabled ? "translate-x-4" : "translate-x-0"
-                  )}
-                />
-              </button>
-              <div>
-                <p className="text-sm font-medium text-gray-900">{meta.label}</p>
-                <p className="text-xs text-gray-500 mt-0.5">{meta.description}</p>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
+async function patchPlacement(id: string, data: Record<string, unknown>) {
+  return fetch(`/api/admin/discovery/filter-placements/${id}`, {
+    ...F,
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
 }
 
 export function SectionsTab() {
@@ -173,6 +65,7 @@ export function SectionsTab() {
   const [placements, setPlacements] = useState<Placement[]>([]);
   const [allFilters, setAllFilters] = useState<FilterDef[]>([]);
   const [loading, setLoading] = useState(false);
+  const [reordering, setReordering] = useState(false);
   const [addFilterId, setAddFilterId] = useState("");
   const [adding, setAdding] = useState(false);
 
@@ -204,6 +97,37 @@ export function SectionsTab() {
     (f) => !placements.some((p) => p.filter.id === f.id)
   );
 
+  const sorted = [...placements].sort((a, b) => a.sortOrder - b.sortOrder);
+
+  const move = async (id: string, direction: "up" | "down") => {
+    const idx = sorted.findIndex((p) => p.id === id);
+    const swapIdx = direction === "up" ? idx - 1 : idx + 1;
+    if (swapIdx < 0 || swapIdx >= sorted.length) return;
+
+    const current = sorted[idx];
+    const swap = sorted[swapIdx];
+    setReordering(true);
+    try {
+      await Promise.all([
+        patchPlacement(current.id, { sortOrder: swap.sortOrder }),
+        patchPlacement(swap.id, { sortOrder: current.sortOrder }),
+      ]);
+      // Optimistic local update to avoid a full refetch on every click
+      setPlacements((prev) =>
+        prev.map((p) => {
+          if (p.id === current.id) return { ...p, sortOrder: swap.sortOrder };
+          if (p.id === swap.id) return { ...p, sortOrder: current.sortOrder };
+          return p;
+        })
+      );
+    } catch {
+      toast.error("Не удалось изменить порядок");
+      await fetchPlacements(intent);
+    } finally {
+      setReordering(false);
+    }
+  };
+
   const add = async () => {
     if (!addFilterId) return;
     setAdding(true);
@@ -212,11 +136,7 @@ export function SectionsTab() {
         ...F,
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          filterId: addFilterId,
-          intent,
-          sortOrder: placements.length,
-        }),
+        body: JSON.stringify({ filterId: addFilterId, intent }),
       });
       if (res.ok) {
         setAddFilterId("");
@@ -231,12 +151,7 @@ export function SectionsTab() {
   };
 
   const toggleActive = async (id: string, isActive: boolean) => {
-    await fetch(`/api/admin/discovery/filter-placements/${id}`, {
-      ...F,
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ isActive: !isActive }),
-    });
+    await patchPlacement(id, { isActive: !isActive });
     await fetchPlacements(intent);
   };
 
@@ -272,9 +187,6 @@ export function SectionsTab() {
         ))}
       </div>
 
-      {/* System filters */}
-      <SystemFiltersBlock intent={intent} />
-
       {/* Table */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
@@ -287,7 +199,7 @@ export function SectionsTab() {
 
         {loading ? (
           <p className="text-sm text-gray-400 py-4">Загрузка...</p>
-        ) : placements.length === 0 ? (
+        ) : sorted.length === 0 ? (
           <DiscoveryEmptyState
             title="Нет фильтров"
             description="Добавьте фильтры из справочника ниже."
@@ -296,66 +208,84 @@ export function SectionsTab() {
           <DiscoveryTaxonomyTable>
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
-                <th className={discoveryTh("w-12")}>#</th>
+                <th className={discoveryTh("w-20")}>Порядок</th>
                 <th className={discoveryTh()}>Название</th>
                 <th className={discoveryTh()}>Slug</th>
                 <th className={discoveryTh("w-24")}>Тип</th>
                 <th className={discoveryTh("w-24")}>UI</th>
                 <th className={discoveryTh("w-20")}>Опций</th>
                 <th className={discoveryTh("w-20")}>Активен</th>
-                <th className="w-10 px-2 py-3" />
+                <th className={discoveryTh("w-24")}>Действия</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {[...placements]
-                .sort((a, b) => a.sortOrder - b.sortOrder)
-                .map((p) => (
-                  <tr
-                    key={p.id}
-                    className="bg-white hover:bg-slate-50 transition-colors"
-                  >
-                    <td className={cn(discoveryTd(), "text-gray-400 text-xs tabular-nums")}>
-                      {p.sortOrder}
-                    </td>
-                    <td className={cn(discoveryTd(), "font-medium text-gray-900")}>
-                      {p.filter.title}
-                    </td>
-                    <td className={cn(discoveryTd(), "font-mono text-xs text-gray-600")}>
-                      {p.filter.slug}
-                    </td>
-                    <td className={cn(discoveryTd(), "font-mono text-xs text-gray-600")}>
-                      {p.filter.type}
-                    </td>
-                    <td className={cn(discoveryTd(), "font-mono text-xs text-gray-600")}>
-                      {p.filter.ui}
-                    </td>
-                    <td className={cn(discoveryTd(), "text-gray-500 text-xs")}>
-                      {p.filter.optionsCount}
-                    </td>
-                    <td className={discoveryTd()}>
+              {sorted.map((p, idx) => (
+                <tr
+                  key={p.id}
+                  className="bg-white hover:bg-slate-50 transition-colors"
+                >
+                  <td className={cn(discoveryTd(), "text-center")}>
+                    <div className="flex items-center justify-center gap-0.5">
                       <button
-                        onClick={() => toggleActive(p.id, p.isActive)}
-                        className={cn(
-                          "text-xs px-2 py-0.5 rounded-full font-medium transition-colors",
-                          p.isActive
-                            ? "bg-green-100 text-green-700 hover:bg-green-200"
-                            : "bg-gray-100 text-gray-500 hover:bg-gray-200"
-                        )}
+                        onClick={() => void move(p.id, "up")}
+                        disabled={idx === 0 || reordering}
+                        className="p-1 text-gray-300 hover:text-gray-700 disabled:opacity-30 transition-colors"
+                        aria-label="Переместить вверх"
                       >
-                        {p.isActive ? "Да" : "Нет"}
+                        <ChevronUp className="w-4 h-4" />
                       </button>
-                    </td>
-                    <td className={discoveryTd()}>
+                      <span className="text-xs text-gray-400 tabular-nums w-5 text-center">
+                        {idx + 1}
+                      </span>
                       <button
-                        onClick={() => remove(p.id)}
-                        className="p-1 text-gray-300 hover:text-red-500 transition-colors"
-                        aria-label="Убрать"
+                        onClick={() => void move(p.id, "down")}
+                        disabled={idx === sorted.length - 1 || reordering}
+                        className="p-1 text-gray-300 hover:text-gray-700 disabled:opacity-30 transition-colors"
+                        aria-label="Переместить вниз"
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <ChevronDown className="w-4 h-4" />
                       </button>
-                    </td>
-                  </tr>
-                ))}
+                    </div>
+                  </td>
+                  <td className={cn(discoveryTd(), "font-medium text-gray-900")}>
+                    {p.filter.title}
+                  </td>
+                  <td className={cn(discoveryTd(), "font-mono text-xs text-gray-600")}>
+                    {p.filter.slug}
+                  </td>
+                  <td className={cn(discoveryTd(), "font-mono text-xs text-gray-600")}>
+                    {p.filter.type}
+                  </td>
+                  <td className={cn(discoveryTd(), "font-mono text-xs text-gray-600")}>
+                    {p.filter.ui}
+                  </td>
+                  <td className={cn(discoveryTd(), "text-gray-500 text-xs text-center")}>
+                    {p.filter.optionsCount}
+                  </td>
+                  <td className={discoveryTd()}>
+                    <button
+                      onClick={() => void toggleActive(p.id, p.isActive)}
+                      className={cn(
+                        "text-xs px-2 py-0.5 rounded-full font-medium transition-colors",
+                        p.isActive
+                          ? "bg-green-100 text-green-700 hover:bg-green-200"
+                          : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                      )}
+                    >
+                      {p.isActive ? "Да" : "Нет"}
+                    </button>
+                  </td>
+                  <td className={cn(discoveryTd(), "text-center")}>
+                    <button
+                      onClick={() => void remove(p.id)}
+                      className="p-1 text-gray-300 hover:text-red-500 transition-colors"
+                      aria-label="Убрать"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </DiscoveryTaxonomyTable>
         )}

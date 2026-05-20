@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
 import { SidebarItem } from "@/components/shared/sidebar/SidebarItem";
 import { SidebarPublicSiteEntry } from "@/components/shared/sidebar/SidebarPublicSiteEntry";
@@ -10,7 +11,8 @@ import {
   type AdminSidebarNavItem,
   type AdminSidebarGroup,
 } from "@/lib/admin/adminSidebarConfig";
-import type { ModerationNavCounts } from "@/lib/admin/moderationSidebarConfig";
+import type { ModerationNavCounts, } from "@/lib/admin/moderationSidebarConfig";
+import type { AdminNavMatchRule } from "@/lib/admin/adminSidebarTypes";
 
 interface AdminSidebarProps {
   onNavigate?: () => void;
@@ -19,6 +21,53 @@ interface AdminSidebarProps {
   importPendingReviewCount?: number;
   reviewsPendingCount?: number;
 }
+
+// ─── Active-route helpers ─────────────────────────────────────────────────────
+
+function matchesRule(pathname: string, rule: AdminNavMatchRule): boolean {
+  if (rule.type === "exact") return pathname === rule.value;
+  // Segment-safe prefix: /admin/orders matches /admin/orders/abc but NOT /admin/orders-settings
+  return pathname === rule.value || pathname.startsWith(rule.value + "/");
+}
+
+/** Returns true if the given nav item is "active" for the current pathname. */
+function isNavItemActive(pathname: string, item: AdminSidebarNavItem): boolean {
+  if (item.matchers?.length) {
+    return item.matchers.some((rule) => matchesRule(pathname, rule));
+  }
+  // Fallback: segment-safe prefix match on href
+  return pathname === item.href || pathname.startsWith(item.href + "/");
+}
+
+/** Returns the children of a top-level config entry regardless of its type. */
+function getTopLevelChildren(
+  entry: AdminSidebarNavItem | AdminSidebarGroup,
+): AdminSidebarNavItem[] {
+  // AdminSidebarGroup has no `href`; both types carry `children`
+  const children = (entry as AdminSidebarGroup).children;
+  return Array.isArray(children) ? children : [];
+}
+
+/** True when entry is a group without its own href (AdminSidebarGroup). */
+function isGroupEntry(entry: AdminSidebarNavItem | AdminSidebarGroup): entry is AdminSidebarGroup {
+  return !("href" in entry);
+}
+
+/**
+ * Determine which top-level entry should be open based on the current pathname.
+ * Returns the entry's `id`, or null if no entry has an active child.
+ */
+function findActiveGroupId(pathname: string): string | null {
+  for (const entry of ADMIN_SIDEBAR_CONFIG) {
+    const children = getTopLevelChildren(entry);
+    if (children.some((child) => isNavItemActive(pathname, child))) {
+      return entry.id;
+    }
+  }
+  return null;
+}
+
+// ─── Component ────────────────────────────────────────────────────────────────
 
 export function AdminSidebar({
   onNavigate,
@@ -29,33 +78,52 @@ export function AdminSidebar({
 }: AdminSidebarProps) {
   const pathname = usePathname();
 
-  const getBadgeCount = (key?: string) => {
+  const getBadgeCount = (key?: string): number | undefined => {
     if (!key) return undefined;
     const counts: Record<string, number> = {
       queueTotal: moderationCounts.queueTotal,
-      b2bPendingVerificationCount: b2bPendingVerificationCount,
-      importPendingReviewCount: importPendingReviewCount,
-      reviewsPendingCount: reviewsPendingCount,
+      b2bPendingVerificationCount,
+      importPendingReviewCount,
+      reviewsPendingCount,
     };
     return counts[key];
   };
 
-  const isActive = (href: string) => pathname === href;
-  const isGroupActive = (paths: string[]) => paths.some((path) => pathname.startsWith(path));
+  // ── Accordion state ─────────────────────────────────────────────────────────
+  const derivedGroupId = findActiveGroupId(pathname);
+  const [openSection, setOpenSection] = useState<string | null>(derivedGroupId);
 
-  // Recursively render nav items
+  // Follow navigation: auto-open the section that contains the current page.
+  useEffect(() => {
+    if (derivedGroupId !== null) {
+      setOpenSection(derivedGroupId);
+    }
+  }, [derivedGroupId]);
+
+  function toggleSection(id: string) {
+    setOpenSection((prev) => {
+      // Don't collapse the section that owns the current page — keeps context.
+      if (prev === id && id === derivedGroupId) return id;
+      return prev === id ? null : id;
+    });
+  }
+
+  // ── Render helpers ──────────────────────────────────────────────────────────
+
+  /** Render a single nav item (may recurse for nested children). */
   const renderNavItem = (item: AdminSidebarNavItem, level = 0) => {
-    const isActiveItem = isActive(item.href);
-    const hasActiveChild = item.children?.some((child) => isActive(child.href) || isActive(item.href));
+    const active = isNavItemActive(pathname, item);
+    const childIsActive = item.children?.some((c) => isNavItemActive(pathname, c)) ?? false;
 
-    if (item.children && item.children.length > 0) {
-      // Group with children - render as expandable group
+    if (item.children?.length) {
       return (
         <SidebarGroup
           key={item.id}
           icon={item.icon!}
           label={item.label}
-          defaultOpen={isActiveItem || hasActiveChild}
+          isActive={active || childIsActive}
+          isOpen={openSection === item.id}
+          onToggle={() => toggleSection(item.id)}
         >
           {item.children.map((child) => renderNavItem(child, level + 1))}
         </SidebarGroup>
@@ -68,22 +136,22 @@ export function AdminSidebar({
           key={item.id}
           href={item.href}
           label={item.label}
-          isActive={isActiveItem}
+          isActive={active}
           onClick={onNavigate}
           count={getBadgeCount(item.badgeCountKey)}
         />
       );
     }
 
-    // Single top-level item - render as icon link
+    // Top-level standalone item with its own icon
     const count = getBadgeCount(item.badgeCountKey);
     return (
       <SidebarItem
         key={item.id}
         href={item.href}
-        icon={item.icon!}
+        icon={item.icon}
         label={item.label}
-        isActive={isActiveItem}
+        isActive={active}
         onClick={onNavigate}
         hasAttention={count !== undefined && count > 0}
       />
@@ -92,27 +160,31 @@ export function AdminSidebar({
 
   return (
     <aside className="w-full lg:w-[260px] bg-white">
-      {/* Navigation */}
       <nav className="flex flex-col gap-1.5 p-4">
         <SidebarPublicSiteEntry onNavigate={onNavigate} />
-        {ADMIN_SIDEBAR_CONFIG.map((item) => {
-          if ("children" in item) {
-            // It's a group
-            const groupItem = item as AdminSidebarGroup;
+
+        {ADMIN_SIDEBAR_CONFIG.map((entry) => {
+          if (isGroupEntry(entry)) {
+            // AdminSidebarGroup — collapsible with no own href
+            const groupHasActive = getTopLevelChildren(entry).some((child) =>
+              isNavItemActive(pathname, child)
+            );
             return (
               <SidebarGroup
-                key={groupItem.id}
-                icon={groupItem.icon}
-                label={groupItem.label}
-                defaultOpen={isGroupActive(groupItem.children.map((c) => c.href))}
+                key={entry.id}
+                icon={entry.icon}
+                label={entry.label}
+                isActive={groupHasActive}
+                isOpen={openSection === entry.id}
+                onToggle={() => toggleSection(entry.id)}
               >
-                {groupItem.children.map((child) => renderNavItem(child))}
+                {entry.children.map((child) => renderNavItem(child))}
               </SidebarGroup>
             );
-          } else {
-            // It's a standalone item - use renderNavItem to handle children
-            return renderNavItem(item);
           }
+
+          // AdminSidebarNavItem — standalone or with nested children
+          return renderNavItem(entry as AdminSidebarNavItem);
         })}
       </nav>
     </aside>

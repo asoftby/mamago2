@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import { getBillingAccountByBusinessId, reactivateBillingAccount } from "@/server/services/billing/billingAccount.service";
 import { reactivateAccountSchema } from "@/lib/validation/billing";
+import { logAdminAudit } from "@/server/services/adminAuditLog.service";
 
 export async function POST(request: NextRequest) {
   try {
@@ -43,6 +44,28 @@ export async function POST(request: NextRequest) {
 
     // Reactivate account
     const updatedAccount = await reactivateBillingAccount(account.id);
+
+    await logAdminAudit({
+      actorId: user.id,
+      actorRole: user.role,
+      action: "BILLING_ACCOUNT_REACTIVATED",
+      entityType: "BILLING_ACCOUNT",
+      entityId: account.id,
+      before: {
+        status: account.status,
+        suspendedAt: account.suspendedAt?.toISOString() ?? null,
+        suspendedReason: account.suspendedReason ?? null,
+      },
+      after: {
+        status: updatedAccount.status,
+        suspendedAt: updatedAccount.suspendedAt?.toISOString() ?? null,
+        suspendedReason: updatedAccount.suspendedReason ?? null,
+      },
+      metadata: {
+        businessId,
+        businessName: account.business.name,
+      },
+    });
 
     return NextResponse.json({
       success: true,

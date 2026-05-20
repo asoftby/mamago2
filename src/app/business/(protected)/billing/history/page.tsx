@@ -1,10 +1,9 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   formatDateTime,
   getTransactionTypeLabel,
-  EMPTY_BILLING_STATE,
   type TransactionStatus,
   type TransactionType,
 } from "@/lib/business/billing";
@@ -17,21 +16,106 @@ import { BusinessSurfaceCard } from "@/components/business/ui/BusinessSurfaceCar
 import { BusinessEmptyState } from "@/components/business/ui/BusinessEmptyState";
 import { BusinessChip } from "@/components/business/ui/BusinessChip";
 
+type ApiTransaction = {
+  id: string;
+  occurredAt: string;
+  type: string;
+  status: string;
+  amount: number;
+  currency: string;
+  publicDescription: string;
+  referenceType: string;
+  referenceId: string | null;
+};
+
 export default function BillingTransactionsPage() {
   const [selectedType, setSelectedType] = useState<TransactionType | "all">("all");
   const [selectedStatus, setSelectedStatus] = useState<TransactionStatus | "all">("all");
   const [selectedTransaction, setSelectedTransaction] = useState<string | null>(null);
+  const [transactions, setTransactions] = useState<
+    Array<{
+      id: string;
+      date: string;
+      type: TransactionType;
+      description: string;
+      amount: number;
+      currency: string;
+      status: TransactionStatus;
+      paymentMethod?: string;
+      relatedEntity?: {
+        type: string;
+        id: string;
+        name: string;
+      };
+    }>
+  >([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
-  const transactions = EMPTY_BILLING_STATE.transactions;
-  console.log("[API] real data used", {
-    endpoint: "business-billing-transactions",
-    empty: transactions.length === 0,
-  });
+  useEffect(() => {
+    let isActive = true;
+
+    async function loadTransactions() {
+      setIsLoading(true);
+      setLoadError(null);
+
+      try {
+        const response = await fetch("/api/business/billing/transactions?limit=100", {
+          cache: "no-store",
+        });
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || "Не удалось загрузить историю операций");
+        }
+
+        if (!isActive) return;
+
+        setTransactions(
+          (data.transactions as ApiTransaction[]).map((transaction) => ({
+            id: transaction.id,
+            date: transaction.occurredAt,
+            type: mapApiTransactionType(transaction.type),
+            description: transaction.publicDescription,
+            amount: transaction.amount,
+            currency: transaction.currency,
+            status: mapApiTransactionStatus(transaction.status),
+            paymentMethod: undefined,
+            relatedEntity:
+              transaction.referenceType !== "NONE" && transaction.referenceId
+                ? {
+                    type: transaction.referenceType,
+                    id: transaction.referenceId,
+                    name: transaction.referenceId,
+                  }
+                : undefined,
+          })),
+        );
+      } catch (error) {
+        console.error("Failed to load business billing history:", error);
+        if (isActive) {
+          setLoadError("Не удалось загрузить историю операций");
+        }
+      } finally {
+        if (isActive) {
+          setIsLoading(false);
+        }
+      }
+    }
+
+    void loadTransactions();
+
+    return () => {
+      isActive = false;
+    };
+  }, []);
+
   const filteredTransactions = transactions.filter((transaction) => {
     if (selectedType !== "all" && transaction.type !== selectedType) return false;
     if (selectedStatus !== "all" && transaction.status !== selectedStatus) return false;
     return true;
   });
+  const countLabel = useMemo(() => filteredTransactions.length, [filteredTransactions.length]);
 
   const transactionTypes: Array<{ value: TransactionType | "all"; label: string }> = [
     { value: "all", label: "Все типы" },
@@ -96,19 +180,31 @@ export default function BillingTransactionsPage() {
 
           <div className="ml-auto">
             <BusinessChip tone="muted">
-              Найдено: {filteredTransactions.length}
+              Найдено: {countLabel}
             </BusinessChip>
           </div>
         </div>
       </BusinessSurfaceCard>
 
-      {filteredTransactions.length === 0 ? (
+      {isLoading ? (
+        <BusinessSurfaceCard className="p-6 text-sm text-stone-500">
+          Загружаем историю операций…
+        </BusinessSurfaceCard>
+      ) : loadError ? (
+        <BusinessEmptyState
+          icon={<Filter className="h-7 w-7" />}
+          title="Не удалось загрузить операции"
+          description={loadError}
+        />
+      ) : null}
+
+      {!isLoading && !loadError && filteredTransactions.length === 0 ? (
         <BusinessEmptyState
           icon={<Filter className="h-7 w-7" />}
           title="Операции не найдены"
           description="Попробуйте изменить фильтры или вернуться позже. Когда появятся новые списания, пополнения или продления, они отобразятся здесь."
         />
-      ) : (
+      ) : !isLoading && !loadError ? (
         <BusinessSurfaceCard className="overflow-hidden p-0">
           <div className="overflow-x-auto">
             <table className="w-full">
@@ -234,7 +330,33 @@ export default function BillingTransactionsPage() {
             </table>
           </div>
         </BusinessSurfaceCard>
-      )}
+      ) : null}
     </div>
   );
+}
+
+function mapApiTransactionType(type: string): TransactionType {
+  const mapping: Record<string, TransactionType> = {
+    SUBSCRIPTION_CHARGE: "plan_renewal",
+    SUBSCRIPTION_RENEWAL: "plan_renewal",
+    DEPOSIT_TOPUP: "deposit_topup",
+    LEAD_CHARGE: "lead_charge",
+    PROMOTION_CHARGE: "promotion_charge",
+    REFUND: "refund",
+    MANUAL_ADJUSTMENT: "adjustment",
+    CORRECTION: "adjustment",
+  };
+
+  return mapping[type] || "adjustment";
+}
+
+function mapApiTransactionStatus(status: string): TransactionStatus {
+  const mapping: Record<string, TransactionStatus> = {
+    SUCCEEDED: "completed",
+    PENDING: "pending",
+    FAILED: "failed",
+    CANCELED: "failed",
+  };
+
+  return mapping[status] || "pending";
 }

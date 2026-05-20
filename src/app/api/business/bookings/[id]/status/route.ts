@@ -57,7 +57,13 @@ export async function PATCH(
       );
     }
 
-    const updated = await updateBookingStatus(id, business.id, parsed.data.status);
+    const updated = await updateBookingStatus(id, business.id, parsed.data.status, {
+      actorId: user.id,
+      actorRole: user.role,
+      metadata: {
+        source: "business_status_endpoint",
+      },
+    });
     return NextResponse.json(updated);
   } catch (err) {
     if (err instanceof BookingOwnershipError) {

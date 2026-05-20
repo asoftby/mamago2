@@ -1,8 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
-import { getBillingAccountByBusinessId, creditBusinessDeposit } from "@/server/services/billing/billingAccount.service";
+import {
+  creditBusinessDeposit,
+  creditBusinessDepositInTx,
+  ensureBillingAccountForBusiness,
+  getBillingAccountByBusinessId,
+} from "@/server/services/billing/billingAccount.service";
 import { creditDepositSchema } from "@/lib/validation/billing";
 import prisma from "@/lib/prisma";
+import { BillingReferenceType } from "@prisma/client";
+import { logAdminAudit } from "@/server/services/adminAuditLog.service";
 
 export async function POST(request: NextRequest) {
   try {
@@ -42,52 +49,46 @@ export async function POST(request: NextRequest) {
     const account = await getBillingAccountByBusinessId(businessId);
 
     if (!account) {
-      // Create billing account atomically with first credit
       const result = await prisma.$transaction(async (tx) => {
-        // Create billing account
-        const newAccount = await tx.billingAccount.create({
-          data: {
-            businessId,
-            depositBalance: 0,
-            currency: "BYN",
-            status: "ACTIVE",
-            lowBalanceThreshold: 20,
-            creditLimit: 0,
+        const newAccount = await ensureBillingAccountForBusiness(businessId, tx);
+        const transaction = await creditBusinessDepositInTx(tx, {
+          accountId: newAccount.id,
+          amount,
+          description: `Ручное начисление депозита администратором: ${reason}`,
+          referenceType: BillingReferenceType.MANUAL,
+          metadata: {
+            reason,
+            note,
+            adminId: user.id,
+            adminEmail: user.email,
+            timestamp: new Date().toISOString(),
+            firstTopUp: true,
           },
         });
 
-        // Create credit transaction
-        const transaction = await tx.billingTransaction.create({
-          data: {
-            billingAccountId: newAccount.id,
-            type: "DEPOSIT_TOPUP",
-            status: "SUCCEEDED",
-            amount,
-            currency: "BYN",
-            description: `Ручное начисление депозита администратором: ${reason}`,
-            referenceType: "MANUAL",
-            metadata: {
-              reason,
-              note,
-              adminId: user.id,
-              adminEmail: user.email,
-              timestamp: new Date().toISOString(),
-              firstTopUp: true,
-            },
-          },
-        });
+        return { transaction };
+      });
 
-        // Update balance
-        const updatedAccount = await tx.billingAccount.update({
-          where: { id: newAccount.id },
-          data: {
-            depositBalance: {
-              increment: amount,
-            },
-          },
-        });
-
-        return { transaction, account: updatedAccount };
+      await logAdminAudit({
+        actorId: user.id,
+        actorRole: user.role,
+        action: "BILLING_MANUAL_CREDIT",
+        entityType: "BILLING_TRANSACTION",
+        entityId: result.transaction.id,
+        before: {
+          balance: 0,
+        },
+        after: {
+          balance: amount,
+          transactionAmount: result.transaction.amount.toNumber(),
+        },
+        reason,
+        metadata: {
+          note: note || null,
+          businessId: business.id,
+          businessName: business.name,
+          billingAccountCreated: true,
+        },
       });
 
       return NextResponse.json({
@@ -106,13 +107,35 @@ export async function POST(request: NextRequest) {
       accountId: account.id,
       amount,
       description: `Ручное начисление депозита администратором: ${reason}`,
-      referenceType: "MANUAL",
+      referenceType: BillingReferenceType.MANUAL,
       metadata: {
         reason,
         note,
         adminId: user.id,
         adminEmail: user.email,
         timestamp: new Date().toISOString(),
+      },
+    });
+
+    await logAdminAudit({
+      actorId: user.id,
+      actorRole: user.role,
+      action: "BILLING_MANUAL_CREDIT",
+      entityType: "BILLING_TRANSACTION",
+      entityId: transaction.id,
+      before: {
+        balance: account.depositBalance.toNumber(),
+      },
+      after: {
+        balance: account.depositBalance.toNumber() + amount,
+        transactionAmount: transaction.amount.toNumber(),
+      },
+      reason,
+      metadata: {
+        note: note || null,
+        businessId: business.id,
+        businessName: business.name,
+        billingAccountId: account.id,
       },
     });
 

@@ -64,6 +64,7 @@ model User {
   marketingEmailsEnabled            Boolean                          @default(true)
   activities                        Activity[]                       @relation("ActivityOwner")
   performedAudits                   AuditLog[]                       @relation("AuditActor")
+  performedAdminAuditLogs          AdminAuditLog[]                  @relation("AdminAuditActor")
   auditLogs                         AuditLog[]                       @relation("AuditTarget")
   business                          Business?
   businessInvitesSent               BusinessInvite[]                 @relation("BusinessInviteInviter")
@@ -390,6 +391,8 @@ model FilterDefinition {
   placement  UiPlacement    @default(PRIMARY)
   /// True = seeded by system, cannot be deleted, slug is immutable
   isSystem   Boolean        @default(false)
+  /// Whether the public modal renders the group title above the control
+  showTitle  Boolean        @default(true)
   options    FilterOption[]
   placements DiscoveryFilterPlacement[]
 }
@@ -1416,6 +1419,27 @@ model AuditLog {
   @@index([createdAt])
 }
 
+model AdminAuditLog {
+  id         String   @id @default(cuid())
+  actorId    String?
+  actorRole  String
+  action     String
+  entityType String
+  entityId   String
+  before     Json?
+  after      Json?
+  reason     String?
+  metadata   Json?
+  createdAt  DateTime @default(now())
+  actor      User?    @relation("AdminAuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([actorId])
+  @@index([actorRole])
+  @@index([action])
+  @@index([entityType, entityId])
+  @@index([createdAt])
+}
+
 model EmailTemplate {
   id         String                 @id @default(cuid())
   name       String
@@ -1810,6 +1834,7 @@ model BillingTransaction {
   occurredAt          DateTime                 @default(now())
   referenceType       BillingReferenceType     @default(NONE)
   referenceId         String?
+  idempotencyKey      String?
   parentTransactionId String?
   paymentMethodId     String?
   subscriptionId      String?
@@ -1828,8 +1853,10 @@ model BillingTransaction {
   @@index([type])
   @@index([status])
   @@index([referenceType, referenceId])
+  @@index([idempotencyKey])
   @@index([parentTransactionId])
   @@index([subscriptionId])
+  @@unique([billingAccountId, idempotencyKey])
 }
 
 model BillingDispute {
@@ -2421,6 +2448,8 @@ enum AnalyticsVertical {
 
 enum UiPlacement {
   PRIMARY
+  MODAL
+  ADVANCED
   SECONDARY
   HIDDEN
 }

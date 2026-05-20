@@ -169,6 +169,12 @@ export const GROUP_B2B: AdminSidebarGroup = {
       href: adminPath("/b2b/partners"),
       matchers: [{ type: "prefix", value: adminPath("/b2b/partners") }],
     },
+    {
+      id: "b2b-orders",
+      label: "Заказы",
+      href: adminPath("/orders"),
+      matchers: [{ type: "prefix", value: adminPath("/orders") }],
+    },
   ],
 };
 

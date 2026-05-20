@@ -2,7 +2,6 @@ import {
   AnalyticsEntityType,
   BillingAccountStatus,
   BillingReferenceType,
-  BillingTransactionStatus,
   BillingTransactionType,
   ContentStatus,
   OfferStatus,
@@ -18,6 +17,7 @@ import {
   mapAnalyticsEntityToPromotionPublicationType,
   mapUserEventToPromotionAction,
 } from "@/lib/promotion/shared";
+import { debitBusinessDepositInTx } from "@/server/services/billing/billingAccount.service";
 
 type PromotionTargetLookupParams = {
   businessId: string;
@@ -453,7 +453,7 @@ export async function registerPromotionActionFromUserEvent(params: {
     }
 
     const nextBalance = billingAccount.depositBalance.toNumber() - amount;
-    if (nextBalance < 0 && billingAccount.creditLimit.toNumber() === 0) {
+    if (nextBalance < -billingAccount.creditLimit.toNumber()) {
       await tx.promotion.update({
         where: {
           id: currentPromotion.id,
@@ -470,37 +470,23 @@ export async function registerPromotionActionFromUserEvent(params: {
     const nextSpent = currentPromotion.spent.toNumber() + amount;
     const shouldComplete = nextSpent >= currentPromotion.budget.toNumber();
 
-    await tx.billingTransaction.create({
-      data: {
-        billingAccountId: billingAccount.id,
-        type: BillingTransactionType.PROMOTION_CHARGE,
-        status: BillingTransactionStatus.SUCCEEDED,
-        amount: new Prisma.Decimal(-amount),
-        currency: billingAccount.currency,
-        description:
-          actionType === PromotionActionType.SAVE_TO_PLAN
-            ? `Продвижение: сохранение в план для ${currentPromotion.publicationTitle}`
-            : `Продвижение: лид / обращение для ${currentPromotion.publicationTitle}`,
-        referenceType: BillingReferenceType.PROMOTION,
-        referenceId: currentPromotion.id,
-        metadata: {
-          promotionId: currentPromotion.id,
-          publicationId: currentPromotion.publicationId,
-          publicationType: currentPromotion.publicationType,
-          actionType,
-          userEventId: params.userEventId,
-        },
-      },
-    });
-
-    await tx.billingAccount.update({
-      where: {
-        id: billingAccount.id,
-      },
-      data: {
-        depositBalance: {
-          decrement: amount,
-        },
+    await debitBusinessDepositInTx(tx, {
+      accountId: billingAccount.id,
+      amount,
+      type: BillingTransactionType.PROMOTION_CHARGE,
+      description:
+        actionType === PromotionActionType.SAVE_TO_PLAN
+          ? `Продвижение: сохранение в план для ${currentPromotion.publicationTitle}`
+          : `Продвижение: лид / обращение для ${currentPromotion.publicationTitle}`,
+      referenceType: BillingReferenceType.PROMOTION,
+      referenceId: currentPromotion.id,
+      idempotencyKey: `${currentPromotion.businessId}:${currentPromotion.id}:${params.userEventId}:${actionType}`,
+      metadata: {
+        promotionId: currentPromotion.id,
+        publicationId: currentPromotion.publicationId,
+        publicationType: currentPromotion.publicationType,
+        actionType,
+        userEventId: params.userEventId,
       },
     });
 

@@ -4,7 +4,8 @@
  */
 
 import prisma from "@/lib/prisma";
-import { BookingStatus } from "@prisma/client";
+import { logAdminAudit } from "@/server/services/adminAuditLog.service";
+import { BookingStatus, Prisma } from "@prisma/client";
 import { buildBookingDisplay } from "./booking.formatters";
 import { resolveBookingSourceType } from "./booking.types";
 import type { BookingDisplay } from "./booking.types";
@@ -106,6 +107,10 @@ const BOOKING_SELECT = {
   publicationType: true,
   createdAt: true,
   lastActivityAt: true,
+  firstResponseAt: true,
+  completedAt: true,
+  rejectedAt: true,
+  responseTimeMinutes: true,
 
   offerId: true,
   activityId: true,
@@ -384,6 +389,12 @@ export async function updateBookingStatus(
   bookingId: string,
   businessId: string,
   newStatus: BookingStatus,
+  actor?: {
+    actorId?: string | null;
+    actorRole: string;
+    reason?: string | null;
+    metadata?: Prisma.InputJsonValue;
+  },
 ): Promise<BusinessBookingItem> {
   // 1. Загружаем заявку
   const existing = await prisma.bookingRequest.findUnique({
@@ -446,6 +457,32 @@ export async function updateBookingStatus(
     where: { id: bookingId },
     data: { status: newStatus, ...derivedData },
     select: BOOKING_SELECT,
+  });
+
+  await logAdminAudit({
+    actorId: actor?.actorId ?? null,
+    actorRole: actor?.actorRole ?? "BUSINESS",
+    action: "BOOKING_STATUS_CHANGED",
+    entityType: "BOOKING_REQUEST",
+    entityId: bookingId,
+    before: {
+      status: existing.status,
+      firstResponseAt: existing.firstResponseAt?.toISOString() ?? null,
+    },
+    after: {
+      status: updated.status,
+      firstResponseAt: updated.firstResponseAt?.toISOString() ?? null,
+      completedAt: updated.completedAt?.toISOString() ?? null,
+      rejectedAt: updated.rejectedAt?.toISOString() ?? null,
+      responseTimeMinutes: updated.responseTimeMinutes ?? null,
+    },
+    reason: actor?.reason ?? null,
+    metadata: {
+      businessId,
+      previousStatus: existing.status,
+      nextStatus: updated.status,
+      ...((actor?.metadata as Record<string, unknown> | null) ?? {}),
+    },
   });
 
   // Fire-and-forget: activity event

@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
-import { getBillingAccountByBusinessId, debitBusinessDeposit } from "@/server/services/billing/billingAccount.service";
+import {
+  BillingInsufficientFundsError,
+  debitBusinessDeposit,
+  getBillingAccountByBusinessId,
+} from "@/server/services/billing/billingAccount.service";
+import { BillingReferenceType, BillingTransactionType } from "@prisma/client";
 import { debitDepositSchema } from "@/lib/validation/billing";
+import { logAdminAudit } from "@/server/services/adminAuditLog.service";
 
 export async function POST(request: NextRequest) {
   try {
@@ -41,9 +47,9 @@ export async function POST(request: NextRequest) {
       const transaction = await debitBusinessDeposit({
         accountId: account.id,
         amount,
-        type: "MANUAL_ADJUSTMENT",
+        type: BillingTransactionType.MANUAL_ADJUSTMENT,
         description: `Ручное списание депозита администратором: ${reason}`,
-        referenceType: "MANUAL",
+        referenceType: BillingReferenceType.MANUAL,
         metadata: {
           reason,
           note,
@@ -55,6 +61,28 @@ export async function POST(request: NextRequest) {
         allowNegative,
       });
 
+      await logAdminAudit({
+        actorId: user.id,
+        actorRole: user.role,
+        action: "BILLING_MANUAL_DEBIT",
+        entityType: "BILLING_TRANSACTION",
+        entityId: transaction.id,
+        before: {
+          balance: currentBalance,
+        },
+        after: {
+          balance: currentBalance - amount,
+          transactionAmount: transaction.amount.toNumber(),
+          allowNegative,
+        },
+        reason,
+        metadata: {
+          note: note || null,
+          businessId,
+          billingAccountId: account.id,
+        },
+      });
+
       return NextResponse.json({
         success: true,
         transaction: {
@@ -64,17 +92,15 @@ export async function POST(request: NextRequest) {
         },
       });
     } catch (error: unknown) {
-      // Handle insufficient funds error from service
-      const err = error as { code?: string; currentBalance?: number; creditLimit?: number; availableBalance?: number; requestedAmount?: number; shortfall?: number };
-      if (err.code === "INSUFFICIENT_FUNDS") {
+      if (error instanceof BillingInsufficientFundsError) {
         return NextResponse.json(
           { 
             error: "Insufficient balance",
-            currentBalance: err.currentBalance,
-            creditLimit: err.creditLimit,
-            availableBalance: err.availableBalance,
-            requestedAmount: err.requestedAmount,
-            shortfall: err.shortfall,
+            currentBalance: error.currentBalance,
+            creditLimit: error.creditLimit,
+            availableBalance: error.availableBalance,
+            requestedAmount: error.requestedAmount,
+            shortfall: error.shortfall,
           },
           { status: 400 }
         );

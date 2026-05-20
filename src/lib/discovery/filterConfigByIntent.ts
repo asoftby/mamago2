@@ -1,4 +1,5 @@
 import type { Intent } from "@/lib/intent";
+import type { FilterUi } from "@/lib/discovery/filterDefinitionTypes";
 
 /** Опция в группе secondary-фильтров */
 export type SecondaryFilterOption = {
@@ -12,18 +13,24 @@ export type SecondaryFilterGroup =
       id: string;
       label: string;
       kind: "single";
+      ui?: FilterUi;
+      showTitle?: boolean;
       options: SecondaryFilterOption[];
     }
   | {
       id: string;
       label: string;
-      kind: "multi";
+      kind: "multiple";
+      ui?: FilterUi;
+      showTitle?: boolean;
       options: SecondaryFilterOption[];
     }
   | {
       id: string;
       label: string;
       kind: "boolean";
+      ui?: FilterUi;
+      showTitle?: boolean;
       trueLabel: string;
       falseLabel?: string;
     };
@@ -59,9 +66,17 @@ export const filterConfigByIntent: Record<Intent, SecondaryFilterGroup[]> = {
       trueLabel: "Сейчас открыто",
     },
     {
+      id: "free_only",
+      label: "Только бесплатно",
+      kind: "boolean",
+      ui: "switcher",
+      showTitle: false,
+      trueLabel: "Только бесплатно",
+    },
+    {
       id: "activity_type",
       label: "Как проходит событие",
-      kind: "multi",
+      kind: "multiple",
       options: [
         { id: "calm_relaxed", label: "Спокойно и расслабленно" },
         { id: "educational", label: "Познавательно" },
@@ -124,7 +139,7 @@ export const filterConfigByIntent: Record<Intent, SecondaryFilterGroup[]> = {
     {
       id: "includes",
       label: "Включено",
-      kind: "multi",
+      kind: "multiple",
       options: [
         { id: "food", label: "Еда" },
         { id: "decor", label: "Декор" },

@@ -8,9 +8,15 @@ interface SidebarGroupProps {
   icon: LucideIcon;
   label: string;
   children: React.ReactNode;
+  /** Uncontrolled: initial open state (ignored when isOpen/onToggle are provided) */
   defaultOpen?: boolean;
+  /** Whether any child is currently active (affects parent icon/text colour) */
   isActive?: boolean;
   hasAttention?: boolean;
+  /** Controlled open state. When provided, internal state is bypassed. */
+  isOpen?: boolean;
+  /** Controlled toggle handler. Required when isOpen is provided. */
+  onToggle?: () => void;
 }
 
 export function SidebarGroup({
@@ -20,23 +26,31 @@ export function SidebarGroup({
   defaultOpen = false,
   isActive = false,
   hasAttention = false,
+  isOpen: controlledOpen,
+  onToggle,
 }: SidebarGroupProps) {
-  // Keep the first SSR/CSR render deterministic to avoid hydration mismatch.
-  const [isOpen, setIsOpen] = useState(false);
+  const controlled = controlledOpen !== undefined;
 
+  // Uncontrolled state — used only when no controlled props are given
+  const [internalOpen, setInternalOpen] = useState(false);
   useEffect(() => {
-    setIsOpen(defaultOpen);
-  }, [defaultOpen]);
+    if (!controlled) setInternalOpen(defaultOpen);
+  }, [defaultOpen, controlled]);
+
+  const open = controlled ? controlledOpen : internalOpen;
+  const handleToggle = controlled
+    ? (onToggle ?? (() => {}))
+    : () => setInternalOpen((p) => !p);
 
   return (
     <div>
       <button
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={handleToggle}
         className={cn(
           "relative w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-medium transition-all duration-150",
           isActive
             ? "bg-primary/10 text-stone-950"
-            : isOpen
+            : open
               ? "bg-gray-50 text-gray-900"
               : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
         )}
@@ -61,7 +75,7 @@ export function SidebarGroup({
           className={cn(
             "w-4 h-4 flex-shrink-0 transition-transform duration-200",
             isActive ? "text-primary" : "text-current",
-            isOpen && "rotate-180"
+            open && "rotate-180"
           )}
         />
       </button>
@@ -69,7 +83,7 @@ export function SidebarGroup({
       <div
         className={cn(
           "overflow-hidden transition-all duration-200",
-          isOpen ? "max-h-[500px] opacity-100 mt-1" : "max-h-0 opacity-0"
+          open ? "max-h-[500px] opacity-100 mt-1" : "max-h-0 opacity-0"
         )}
       >
         <div className="flex flex-col gap-1 py-1">

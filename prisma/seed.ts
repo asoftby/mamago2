@@ -13,6 +13,7 @@
 import { PrismaClient, type OccasionType, type SignalDomain, type SignalEntityType } from "@prisma/client";
 import { seedPlaceCategories } from "./seed/place-categories";
 import { seedEventCategories } from "./seed/event-categories";
+import { seedDiscoverySectionFilters } from "./seed/discovery-section-filters";
 
 const prisma = new PrismaClient();
 
@@ -566,6 +567,12 @@ async function main() {
 
   // ── Event Categories ──────────────────────────────────────────────────────
   await seedEventCategories();
+
+  // ── Discovery Section Filters ─────────────────────────────────────────────
+  // FilterDefinition + FilterOption + DiscoveryFilterPlacement per intent.
+  // Makes the admin panel at /admin/discovery/filters the source of truth
+  // for what filters appear in the public secondary-filters modal.
+  await seedDiscoverySectionFilters(prisma);
 
   console.log("✅ System seed complete.");
   console.log("   Demo/content data: run pnpm db:seed:demo");

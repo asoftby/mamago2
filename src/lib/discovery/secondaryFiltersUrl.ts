@@ -96,7 +96,7 @@ export function secondaryLabelsForChips(
       continue;
     }
 
-    if (group.kind === "multi" && Array.isArray(v) && v.length > 0) {
+    if (group.kind === "multiple" && Array.isArray(v) && v.length > 0) {
       out.push(...optionLabelsMulti(group, v));
     }
   }
@@ -106,16 +106,12 @@ export function secondaryLabelsForChips(
 
 /** Количество активных secondary-групп (для бейджа) */
 export function countSecondaryActive(
-  intent: Intent,
+  _intent: Intent,
   values: SecondaryValues,
 ): number {
-  const groups = filterConfigByIntent[intent];
-  let n = 0;
-  for (const group of groups) {
-    const v = values[group.id];
-    if (v === undefined || v === false || v === "") continue;
-    if (group.kind === "multi" && Array.isArray(v) && v.length === 0) continue;
-    n += 1;
-  }
-  return n;
+  return Object.values(values).filter((v) => {
+    if (v === undefined || v === false || v === "") return false;
+    if (Array.isArray(v) && v.length === 0) return false;
+    return true;
+  }).length;
 }

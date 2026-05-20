@@ -2,12 +2,9 @@ import { Suspense } from "react";
 import { getCurrentUser } from "@/lib/auth/server";
 import { redirect } from "next/navigation";
 import { getBillingTransactions } from "@/server/services/billing/billingTransaction.service";
-import { TransactionStatusBadge } from "@/components/admin/billing/TransactionStatusBadge";
-import { TransactionTypeBadge } from "@/components/admin/billing/TransactionTypeBadge";
-import { TransactionAmount } from "@/components/admin/billing/TransactionAmount";
 import { BillingTransactionsFilters } from "@/components/admin/billing/BillingTransactionsFilters";
+import { AdminBillingTransactionsClient } from "@/components/admin/billing/AdminBillingTransactionsClient";
 import { BillingTransactionType, BillingTransactionStatus } from "@prisma/client";
-import Link from "next/link";
 
 interface PageProps {
   searchParams: Promise<{
@@ -34,6 +31,19 @@ export default async function AdminBillingTransactionsPage({ searchParams }: Pag
   };
 
   const { transactions, total } = await getBillingTransactions(filters);
+  const serializedTransactions = transactions.map((tx) => ({
+    id: tx.id,
+    occurredAt: tx.occurredAt.toISOString(),
+    type: tx.type,
+    status: tx.status,
+    description: tx.description,
+    amount: tx.amount.toNumber(),
+    currency: tx.currency,
+    business: {
+      id: tx.billingAccount.business.id,
+      name: tx.billingAccount.business.name,
+    },
+  }));
 
   return (
     <div className="p-6 md:p-4 space-y-6">
@@ -63,74 +73,7 @@ export default async function AdminBillingTransactionsPage({ searchParams }: Pag
       </div>
 
       {/* AdminPageContent - Transactions Table */}
-      <div className="border border-gray-200 rounded-lg overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
-                <th className="text-left py-3 px-4 font-medium text-gray-700">Дата</th>
-                <th className="text-left py-3 px-4 font-medium text-gray-700">Бизнес</th>
-                <th className="text-left py-3 px-4 font-medium text-gray-700">Тип</th>
-                <th className="text-left py-3 px-4 font-medium text-gray-700">Описание</th>
-                <th className="text-right py-3 px-4 font-medium text-gray-700">Сумма</th>
-                <th className="text-center py-3 px-4 font-medium text-gray-700">Статус</th>
-                <th className="text-center py-3 px-4 font-medium text-gray-700">Действия</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {transactions.map((tx) => (
-                <tr key={tx.id} className="hover:bg-gray-50">
-                  <td className="py-3 px-4 text-gray-900">
-                    {new Date(tx.occurredAt).toLocaleDateString("ru-RU", {
-                      day: "2-digit",
-                      month: "2-digit",
-                      year: "numeric",
-                    })}
-                    <br />
-                    <span className="text-xs text-gray-500">
-                      {new Date(tx.occurredAt).toLocaleTimeString("ru-RU", {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </span>
-                  </td>
-                  <td className="py-3 px-4">
-                    <Link
-                      href={`/admin/businesses/${tx.billingAccount.businessId}/billing`}
-                      className="text-blue-600 hover:text-blue-700 font-medium"
-                    >
-                      {tx.billingAccount.business.name}
-                    </Link>
-                  </td>
-                  <td className="py-3 px-4">
-                    <TransactionTypeBadge type={tx.type} />
-                  </td>
-                  <td className="py-3 px-4 text-gray-700 max-w-xs truncate">
-                    {tx.description}
-                  </td>
-                  <td className="py-3 px-4 text-right">
-                    <TransactionAmount amount={tx.amount.toNumber()} currency={tx.currency} />
-                  </td>
-                  <td className="py-3 px-4 text-center">
-                    <TransactionStatusBadge status={tx.status} />
-                  </td>
-                  <td className="py-3 px-4 text-center">
-                    <button className="text-blue-600 hover:text-blue-700">
-                      Подробнее
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {transactions.length === 0 && (
-          <div className="py-12 text-center text-gray-500">
-            Транзакции не найдены
-          </div>
-        )}
-      </div>
+      <AdminBillingTransactionsClient transactions={serializedTransactions} />
     </div>
   );
 }

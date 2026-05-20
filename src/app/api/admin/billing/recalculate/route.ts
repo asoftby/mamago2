@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import { getBillingAccountByBusinessId, recalculateDepositBalance } from "@/server/services/billing/billingAccount.service";
 import { recalculateBalanceSchema } from "@/lib/validation/billing";
+import { logAdminAudit } from "@/server/services/adminAuditLog.service";
 
 export async function POST(request: NextRequest) {
   try {
@@ -38,6 +39,25 @@ export async function POST(request: NextRequest) {
 
     // Recalculate balance from ledger
     const newBalance = await recalculateDepositBalance(account.id);
+
+    await logAdminAudit({
+      actorId: user.id,
+      actorRole: user.role,
+      action: "BILLING_BALANCE_RECALCULATED",
+      entityType: "BILLING_ACCOUNT",
+      entityId: account.id,
+      before: {
+        balance: oldBalance,
+      },
+      after: {
+        balance: newBalance,
+        difference: newBalance - oldBalance,
+      },
+      metadata: {
+        businessId,
+        businessName: account.business.name,
+      },
+    });
 
     return NextResponse.json({
       success: true,

@@ -7,10 +7,16 @@ import { useBackofficeSavedToast } from "@/hooks/useBackofficeSavedToast";
 import { RETURN_TO_PARAM } from "@/lib/backoffice/saveFlow";
 import { Label } from "@/components/ui/typography";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { toast } from "@/lib/toast";
 import { messageFromApiError } from "@/lib/admin/messageFromApiError";
 import { cn } from "@/lib/utils";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   DiscoveryCreateCard,
   DiscoveryTitleSlugCreateRow,
@@ -21,6 +27,14 @@ import {
   discoveryTd,
   discoveryTableRowClass,
 } from "@/components/admin/discovery";
+import {
+  FILTER_TYPE_VALUES,
+  FILTER_TYPE_LABELS,
+  FILTER_UI_LABELS,
+  TYPE_UI_COMPATIBILITY,
+  type FilterType,
+  type FilterUi,
+} from "@/lib/discovery/filterDefinitionTypes";
 
 const EDIT_HREF = (id: string) => `/admin/discovery/filters/${id}`;
 const F: RequestInit = { credentials: "include" };
@@ -47,8 +61,8 @@ export function DirectoryTab() {
   const [loading, setLoading] = useState(true);
 
   const newFilter = useAutoSlug("", "");
-  const [newType, setNewType] = useState("single");
-  const [newUi, setNewUi] = useState("tabs");
+  const [newType, setNewType] = useState<FilterType>("single");
+  const [newUi, setNewUi] = useState<FilterUi>("chips");
 
   const fetchFilters = async () => {
     setLoading(true);
@@ -83,7 +97,7 @@ export function DirectoryTab() {
     if (res.ok) {
       newFilter.hydrate("", "");
       setNewType("single");
-      setNewUi("tabs");
+      setNewUi("chips");
       await fetchFilters();
       toast.success("Фильтр создан");
     } else {
@@ -107,27 +121,46 @@ export function DirectoryTab() {
         <div className="grid gap-4 max-w-2xl md:grid-cols-2">
           <div className="grid gap-2">
             <Label>Тип значения</Label>
-            <Input
+            <Select
               value={newType}
-              onChange={(e) => setNewType(e.target.value)}
-              placeholder="single"
-              className="font-mono text-sm"
-            />
-            <p className="text-xs text-gray-500">
-              single · multi · boolean
-            </p>
+              onValueChange={(val) => {
+                const t = val as FilterType;
+                setNewType(t);
+                const compatible = TYPE_UI_COMPATIBILITY[t];
+                if (compatible && !compatible.includes(newUi)) {
+                  setNewUi(compatible[0]);
+                }
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {FILTER_TYPE_VALUES.map((t) => (
+                  <SelectItem key={t} value={t}>
+                    {FILTER_TYPE_LABELS[t]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <div className="grid gap-2">
             <Label>UI-компонент</Label>
-            <Input
+            <Select
               value={newUi}
-              onChange={(e) => setNewUi(e.target.value)}
-              placeholder="tabs"
-              className="font-mono text-sm"
-            />
-            <p className="text-xs text-gray-500">
-              tabs · multi_tabs · dropdown · checkbox
-            </p>
+              onValueChange={(val) => setNewUi(val as FilterUi)}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {TYPE_UI_COMPATIBILITY[newType].map((u) => (
+                  <SelectItem key={u} value={u}>
+                    {FILTER_UI_LABELS[u]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </div>
         <DiscoveryTitleSlugCreateRow

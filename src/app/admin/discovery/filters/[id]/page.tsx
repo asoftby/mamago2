@@ -25,6 +25,19 @@ import {
   sanitizeReturnTo,
   withSavedToastQuery,
 } from "@/lib/backoffice/saveFlow";
+import {
+  FILTER_TYPE_VALUES,
+  FILTER_TYPE_LABELS,
+  FILTER_UI_LABELS,
+  FILTER_PLACEMENT_VALUES,
+  FILTER_PLACEMENT_LABELS,
+  TYPE_UI_COMPATIBILITY,
+  isCompatibleTypeUi,
+  getCompatibleUis,
+  type FilterType,
+  type FilterUi,
+  type FilterPlacement,
+} from "@/lib/discovery/filterDefinitionTypes";
 
 const adminFetch: RequestInit = { credentials: "include" };
 
@@ -47,8 +60,9 @@ type Filter = {
   ui: string;
   order: number;
   orderIndex: number;
-  placement: "PRIMARY" | "SECONDARY" | "HIDDEN";
+  placement: string;
   isActive: boolean;
+  showTitle: boolean;
   options: Option[];
 };
 
@@ -179,12 +193,19 @@ function FilterEditor({
 }) {
   const router = useRouter();
   const titleSlug = useAutoSlug(filter.title, filter.slug, { mode: "edit" });
-  const [type, setType] = useState(filter.type);
-  const [ui, setUi] = useState(filter.ui);
+  const [type, setType] = useState<FilterType>(
+    (filter.type as FilterType) || "single",
+  );
+  const [ui, setUi] = useState<FilterUi>(
+    (filter.ui as FilterUi) || "chips",
+  );
   const [orderIndex, setOrderIndex] = useState(filter.orderIndex);
   const [isActive, setIsActive] = useState(filter.isActive);
-  const [placement, setPlacement] = useState<"PRIMARY" | "SECONDARY" | "HIDDEN">(
-    filter.placement || "PRIMARY",
+  const [showTitle, setShowTitle] = useState(filter.showTitle ?? true);
+  const [placement, setPlacement] = useState<FilterPlacement>(
+    (FILTER_PLACEMENT_VALUES.includes(filter.placement as FilterPlacement)
+      ? filter.placement
+      : "PRIMARY") as FilterPlacement,
   );
 
   const [newOptLabel, setNewOptLabel] = useState("");
@@ -193,6 +214,13 @@ function FilterEditor({
 
   const saveMainFields = async () => {
     if (savingMain) return;
+    if (!isCompatibleTypeUi(type, ui)) {
+      toast.error(
+        `Несовместимая пара: type="${type}" не поддерживает ui="${ui}". ` +
+          `Для type=${type} допустимы: ${getCompatibleUis(type).join(", ")}`,
+      );
+      return;
+    }
     setSavingMain(true);
     try {
       const res = await fetch(`/api/admin/filters/${filter.id}`, {
@@ -204,6 +232,7 @@ function FilterEditor({
           type,
           ui,
           isActive,
+          showTitle,
           placement,
           orderIndex,
         }),
@@ -299,27 +328,66 @@ function FilterEditor({
           </div>
           <div className="grid gap-2">
             <Label>Тип</Label>
-            <Input value={type} onChange={(e) => setType(e.target.value)} />
-          </div>
-          <div className="grid gap-2">
-            <Label>UI</Label>
-            <Input value={ui} onChange={(e) => setUi(e.target.value)} />
-          </div>
-          <div className="grid gap-2">
-            <Label>Placement</Label>
             <Select
-              value={placement}
-              onValueChange={(val) =>
-                setPlacement(val as "PRIMARY" | "SECONDARY" | "HIDDEN")
-              }
+              value={type}
+              onValueChange={(val) => {
+                const t = val as FilterType;
+                setType(t);
+                // Auto-reset ui to a compatible value when type changes
+                const compatible = TYPE_UI_COMPATIBILITY[t];
+                if (compatible && !compatible.includes(ui)) {
+                  setUi(compatible[0]);
+                }
+              }}
             >
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="PRIMARY">Primary</SelectItem>
-                <SelectItem value="SECONDARY">Secondary</SelectItem>
-                <SelectItem value="HIDDEN">Hidden</SelectItem>
+                {FILTER_TYPE_VALUES.map((t) => (
+                  <SelectItem key={t} value={t}>
+                    {FILTER_TYPE_LABELS[t]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="grid gap-2">
+            <Label>UI</Label>
+            <Select
+              value={ui}
+              onValueChange={(val) => setUi(val as FilterUi)}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {TYPE_UI_COMPATIBILITY[type].map((u) => (
+                  <SelectItem key={u} value={u}>
+                    {FILTER_UI_LABELS[u]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-gray-400">
+              Допустимо для {type}: {TYPE_UI_COMPATIBILITY[type].join(", ")}
+            </p>
+          </div>
+          <div className="grid gap-2">
+            <Label>Placement</Label>
+            <Select
+              value={placement}
+              onValueChange={(val) => setPlacement(val as FilterPlacement)}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {FILTER_PLACEMENT_VALUES.map((p) => (
+                  <SelectItem key={p} value={p}>
+                    {FILTER_PLACEMENT_LABELS[p]}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -331,10 +399,14 @@ function FilterEditor({
               onChange={(e) => setOrderIndex(Number(e.target.value))}
             />
           </div>
-          <div className="flex items-center gap-4 pb-2">
+          <div className="flex items-center gap-4 pb-2 flex-wrap">
             <div className="flex items-center gap-2">
               <Checkbox checked={isActive} onCheckedChange={(c) => setIsActive(!!c)} />
               <Label>Active</Label>
+            </div>
+            <div className="flex items-center gap-2">
+              <Checkbox checked={showTitle} onCheckedChange={(c) => setShowTitle(!!c)} />
+              <Label>Показывать заголовок</Label>
             </div>
             <Button size="sm" onClick={handleSave} disabled={savingMain}>
               <Save className="w-4 h-4 mr-2" />

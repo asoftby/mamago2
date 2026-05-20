@@ -2,8 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
 import { z } from "zod";
-import { PublicationType, BookingMode, BookingStatus } from "@prisma/client";
+import { PublicationType } from "@prisma/client";
 import { checkRateLimit } from "@/lib/security/rateLimit";
+import {
+  createPublicBooking,
+  BookingNotFoundError,
+  BookingValidationError,
+} from "@/server/services/booking/booking.service";
 
 const createBookingSchema = z.object({
   publicationType: z.nativeEnum(PublicationType),
@@ -51,145 +56,23 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const data = createBookingSchema.parse(body);
 
-    // Get publication and verify booking is enabled
-    let publication: {
-      id: string;
-      bookingEnabled: boolean;
-      bookingMode?: BookingMode | null;
-      businessId?: string | null;
-      place?: { ownerBusinessId: string | null } | null;
-      ownerBusinessId?: string | null;
-    } | null = null;
-    let businessId: string | null = null;
-
-    if (data.publicationType === PublicationType.EVENT) {
-      publication = await prisma.activity.findUnique({
-        where: { id: data.publicationId },
-        select: {
-          id: true,
-          bookingEnabled: true,
-          bookingMode: true,
-          businessId: true,
-        },
-      });
-      businessId = publication?.businessId ?? null;
-    } else if (data.publicationType === PublicationType.OFFER) {
-      publication = await prisma.offer.findUnique({
-        where: { id: data.publicationId },
-        select: {
-          id: true,
-          bookingEnabled: true,
-          bookingMode: true,
-          place: {
-            select: {
-              ownerBusinessId: true,
-            },
-          },
-        },
-      });
-      businessId = publication?.place?.ownerBusinessId ?? null;
-    } else if (data.publicationType === PublicationType.PLACE) {
-      publication = await prisma.place.findUnique({
-        where: { id: data.publicationId },
-        select: {
-          id: true,
-          bookingEnabled: true,
-          ownerBusinessId: true,
-        },
-      });
-      businessId = publication?.ownerBusinessId ?? null;
-    }
-
-    if (!publication) {
-      return NextResponse.json({ error: "Publication not found" }, { status: 404 });
-    }
-
-    if (!publication.bookingEnabled) {
-      return NextResponse.json({ error: "Booking not enabled for this publication" }, { status: 400 });
-    }
-
-    if (!businessId) {
-      return NextResponse.json({ error: "Business not found for this publication" }, { status: 400 });
-    }
-
-    // Validate selected session if provided
-    if (data.selectedSessionId) {
-      if (data.publicationType !== PublicationType.EVENT) {
-        return NextResponse.json({ error: "Sessions are only available for events" }, { status: 400 });
-      }
-
-      const session = await prisma.activitySession.findUnique({
-        where: { id: data.selectedSessionId },
-        select: { activityId: true, startsAt: true },
-      });
-
-      if (!session || session.activityId !== data.publicationId) {
-        return NextResponse.json({ error: "Invalid session" }, { status: 400 });
-      }
-    }
-
-    // Validate booking mode requirements
-    if (publication.bookingMode === BookingMode.USE_PUBLICATION_SLOTS && !data.selectedSessionId) {
-      return NextResponse.json({ error: "Session selection required" }, { status: 400 });
-    }
-
-    if (publication.bookingMode === BookingMode.USE_PUBLICATION_DATES && !data.requestedDate) {
-      return NextResponse.json({ error: "Date selection required" }, { status: 400 });
-    }
-
-    // Create booking request
-    const bookingData: {
-      businessId: string;
-      userId: string | undefined;
-      publicationType: PublicationType;
-      customerName: string;
-      customerPhone: string;
-      customerEmail: string | undefined;
-      customerComment: string | undefined;
-      adultsCount: number;
-      childrenCount: number;
-      status: BookingStatus;
-      activityId?: string;
-      offerId?: string;
-      placeId?: string;
-      selectedSessionId?: string;
-      requestedDate?: Date;
-      requestedTime?: string;
-    } = {
-      businessId,
-      userId: user?.id,
+    const result = await createPublicBooking({
       publicationType: data.publicationType,
+      publicationId: data.publicationId,
+      selectedSessionId: data.selectedSessionId ?? null,
+      requestedDate: data.requestedDate ?? null,
+      requestedTime: data.requestedTime ?? null,
       customerName: data.customerName,
       customerPhone: data.customerPhone,
-      customerEmail: data.customerEmail,
-      customerComment: data.customerComment,
+      customerEmail: data.customerEmail ?? null,
+      customerComment: data.customerComment ?? null,
       adultsCount: data.adultsCount,
       childrenCount: data.childrenCount,
-      status: BookingStatus.NEW,
-    };
+      userId: user?.id ?? null,
+    });
 
-    // Set publication reference
-    if (data.publicationType === PublicationType.EVENT) {
-      bookingData.activityId = data.publicationId;
-    } else if (data.publicationType === PublicationType.OFFER) {
-      bookingData.offerId = data.publicationId;
-    } else if (data.publicationType === PublicationType.PLACE) {
-      bookingData.placeId = data.publicationId;
-    }
-
-    // Set date/time/session
-    if (data.selectedSessionId) {
-      bookingData.selectedSessionId = data.selectedSessionId;
-    }
-    if (data.requestedDate) {
-      bookingData.requestedDate = new Date(data.requestedDate);
-    }
-    if (data.requestedTime) {
-      bookingData.requestedTime = data.requestedTime;
-    }
-
-    const booking = await prisma.bookingRequest.create({
-      data: bookingData,
+    const booking = await prisma.bookingRequest.findUnique({
+      where: { id: result.bookingId },
       include: {
         activity: {
           select: {
@@ -221,6 +104,13 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    if (!booking) {
+      return NextResponse.json(
+        { error: "Booking created but could not be loaded" },
+        { status: 500 },
+      );
+    }
+
     return NextResponse.json(booking, { status: 201 });
 
   } catch (error) {
@@ -230,6 +120,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: "Validation error", details: error.issues },
         { status: 400 }
+      );
+    }
+
+    if (error instanceof BookingValidationError) {
+      return NextResponse.json(
+        { error: error.message, field: error.field },
+        { status: 400 },
+      );
+    }
+
+    if (error instanceof BookingNotFoundError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: 404 },
       );
     }
 

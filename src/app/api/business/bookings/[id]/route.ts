@@ -1,22 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import { getMyBusiness } from "@/server/business/getMyBusiness";
-import prisma from "@/lib/prisma";
 import { z } from "zod";
 import { BookingStatus } from "@prisma/client";
+import {
+  updateBookingStatus,
+  BookingOwnershipError,
+  BookingStatusTransitionError,
+} from "@/server/services/booking/bookingQuery.service";
 
 const updateBookingSchema = z.object({
   status: z.enum([
     BookingStatus.CONFIRMED,
     BookingStatus.REJECTED,
-    BookingStatus.CANCELLED,
     BookingStatus.COMPLETED,
   ]),
 });
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const user = await getCurrentUser();
@@ -33,76 +36,39 @@ export async function PATCH(
 
     const body = await request.json();
     const data = updateBookingSchema.parse(body);
+    const { id } = await params;
 
-    // Verify booking belongs to this business
-    const booking = await prisma.bookingRequest.findUnique({
-      where: { id: params.id },
-      select: { businessId: true },
-    });
-
-    if (!booking) {
-      return NextResponse.json({ error: "Booking not found" }, { status: 404 });
-    }
-
-    if (booking.businessId !== business.id) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
-
-    // Update booking status
-    const updatedBooking = await prisma.bookingRequest.update({
-      where: { id: params.id },
-      data: {
-        status: data.status,
-      },
-      include: {
-        activity: {
-          select: {
-            id: true,
-            title: true,
-            slug: true,
-          },
-        },
-        offer: {
-          select: {
-            id: true,
-            title: true,
-            slug: true,
-          },
-        },
-        place: {
-          select: {
-            id: true,
-            title: true,
-            slug: true,
-          },
-        },
-        session: {
-          select: {
-            id: true,
-            startsAt: true,
-          },
-        },
-        user: {
-          select: {
-            id: true,
-            displayName: true,
-            email: true,
-          },
-        },
+    const updatedBooking = await updateBookingStatus(id, business.id, data.status, {
+      actorId: user.id,
+      actorRole: user.role,
+      metadata: {
+        source: "business_legacy_patch_route",
       },
     });
 
     return NextResponse.json(updatedBooking);
 
   } catch (error) {
-    console.error("Update booking error:", error);
-    
+    if (error instanceof BookingOwnershipError) {
+      return NextResponse.json({ error: error.message }, { status: 403 });
+    }
+
+    if (error instanceof BookingStatusTransitionError) {
+      return NextResponse.json({ error: error.message }, { status: 422 });
+    }
+
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { error: "Validation error", details: error.issues },
         { status: 400 }
       );
     }
+
+    if ((error as Error)?.message === "Заявка не найдена") {
+      return NextResponse.json({ error: "Booking not found" }, { status: 404 });
+    }
+
+    console.error("Update booking error:", error);
 
     return NextResponse.json(
       { error: "Internal server error" },

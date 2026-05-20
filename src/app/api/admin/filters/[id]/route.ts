@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { requireAdminOrModeratorApiUser } from "@/lib/auth/requireAdminApi";
+import {
+  isFilterType,
+  isFilterUi,
+  isCompatibleTypeUi,
+  getCompatibleUis,
+} from "@/lib/discovery/filterDefinitionTypes";
 
 export const runtime = "nodejs";
 
@@ -32,19 +38,47 @@ export async function PATCH(
   try {
     const { id } = await params;
     const body = await request.json();
-    const { title, slug, type, ui, order, isActive, placement, orderIndex } = body;
+    const { title, slug, type, ui, order, isActive, placement, orderIndex, showTitle } = body;
+
+    if (type !== undefined && !isFilterType(String(type))) {
+      return NextResponse.json(
+        { error: `Invalid type "${type}". Allowed: single, multiple, boolean, range` },
+        { status: 422 },
+      );
+    }
+    if (ui !== undefined && !isFilterUi(String(ui))) {
+      return NextResponse.json(
+        {
+          error: `Invalid ui "${ui}". Allowed: chips, tabs, toggle, switcher, range, checkboxes, select, multiselect`,
+        },
+        { status: 422 },
+      );
+    }
+    if (type !== undefined && ui !== undefined) {
+      const resolvedType = String(type);
+      const resolvedUi = String(ui);
+      if (isFilterType(resolvedType) && isFilterUi(resolvedUi) && !isCompatibleTypeUi(resolvedType, resolvedUi)) {
+        return NextResponse.json(
+          {
+            error: `Incompatible type+ui: type="${resolvedType}" does not support ui="${resolvedUi}". Allowed: ${getCompatibleUis(resolvedType).join(", ")}`,
+          },
+          { status: 422 },
+        );
+      }
+    }
 
     const filter = await prisma.filterDefinition.update({
       where: { id },
       data: {
-        title,
-        slug,
-        type,
-        ui,
-        order,
-        isActive,
-        placement,
-        orderIndex,
+        ...(title !== undefined && { title }),
+        ...(slug !== undefined && { slug }),
+        ...(type !== undefined && { type }),
+        ...(ui !== undefined && { ui }),
+        ...(order !== undefined && { order }),
+        ...(isActive !== undefined && { isActive }),
+        ...(placement !== undefined && { placement }),
+        ...(orderIndex !== undefined && { orderIndex }),
+        ...(showTitle !== undefined && { showTitle: Boolean(showTitle) }),
       },
     });
 

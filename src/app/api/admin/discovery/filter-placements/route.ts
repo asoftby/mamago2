@@ -58,7 +58,6 @@ export async function POST(req: Request) {
   const filterId = String(body.filterId || "").trim();
   const intent = body.intent ? String(body.intent).trim() : null;
   const categoryId = body.categoryId ? String(body.categoryId).trim() : null;
-  const sortOrder = typeof body.sortOrder === "number" ? body.sortOrder : 0;
 
   if (!filterId) {
     return NextResponse.json({ error: "filterId required" }, { status: 400 });
@@ -69,6 +68,17 @@ export async function POST(req: Request) {
       { status: 400 }
     );
   }
+
+  // Always append at the end of the section's current list
+  const where: Record<string, unknown> = intent
+    ? { intent, categoryId: null }
+    : { categoryId, intent: null };
+  const last = await prisma.discoveryFilterPlacement.findFirst({
+    where,
+    orderBy: { sortOrder: "desc" },
+    select: { sortOrder: true },
+  });
+  const sortOrder = (last?.sortOrder ?? -1) + 1;
 
   const placement = await prisma.discoveryFilterPlacement.create({
     data: { filterId, intent, categoryId, sortOrder, isActive: true },
