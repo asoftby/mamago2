@@ -19,14 +19,12 @@ const STATUS_LABEL: Record<ContentStatus, string> = {
 };
 
 type ArticlePreviewBarProps = {
-  articleId: string;
   status: ContentStatus;
   /** Показать ссылку на /blog/[slug] только для опубликованной статьи со slug */
   publicSlug: string | null;
 };
 
-export function ArticlePreviewBar({ articleId, status, publicSlug }: ArticlePreviewBarProps) {
-  const editHref = `/admin/content/articles/${articleId}/edit`;
+export function ArticlePreviewBar({ status, publicSlug }: ArticlePreviewBarProps) {
   const slug = publicSlug?.trim();
   const blogHref =
     status === "PUBLISHED" && slug ? `/blog/${slug}` : null;
@@ -63,9 +61,6 @@ export function ArticlePreviewBar({ articleId, status, publicSlug }: ArticlePrev
               </Link>
             </Button>
           ) : null}
-          <Button size="sm" className="h-8 bg-amber-800 text-white hover:bg-amber-900" asChild>
-            <Link href={editHref}>Назад к редактированию</Link>
-          </Button>
         </div>
       </div>
     </div>

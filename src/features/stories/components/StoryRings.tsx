@@ -1,5 +1,6 @@
 "use client";
 
+import { Zap } from "lucide-react";
 import { StoryRingItem } from "./StoryRingItem";
 import { StoryModal } from "./StoryModal";
 import { useStoryViewer } from "../hooks/useStoryViewer";
@@ -29,21 +30,27 @@ export function StoryRings({ stories }: StoryRingsProps) {
 
   return (
     <>
-      <div
-        className="flex gap-3 overflow-x-auto no-scrollbar px-1 pb-1"
-        style={{ scrollbarWidth: "none" }}
-      >
-        {stories.map((story, index) => (
-          <StoryRingItem
-            key={story.id}
-            title={story.title}
-            seen={seenIds.has(story.id)}
-            coverImageUrl={resolveStoryRingCoverUrl(story)}
-            imagePriority={index === 0}
-            onClick={() => open(index)}
-          />
-        ))}
-      </div>
+      {stories.map((story, index) => (
+        <StoryRingItem
+          key={story.id}
+          title={story.title}
+          seen={seenIds.has(story.id)}
+          coverImageUrl={resolveStoryRingCoverUrl(story)}
+          itemCount={story.items.length}
+          imagePriority={index === 0}
+          fallbackContent={
+            story.intent === "breaking_news" ? (
+              <div
+                className="flex h-full w-full items-center justify-center rounded-full bg-gradient-to-br from-[#EFF6FF] via-[#DBEAFE] to-[#BFDBFE]"
+                aria-hidden
+              >
+                <Zap className="h-8 w-8 text-[#2563EB] md:h-10 md:w-10" strokeWidth={1.75} />
+              </div>
+            ) : undefined
+          }
+          onClick={() => open(index)}
+        />
+      ))}
 
       {isOpen && activeStory && activeStoryIndex !== null && (
         <StoryModal

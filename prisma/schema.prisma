@@ -2134,6 +2134,7 @@ model Article {
   /// Отображаемое имя автора (если не привязан User)
   authorLabel        String?
   cityContext        String?
+  expiresAt          DateTime?
   scheduledAt        DateTime?
   seoTitle           String?
   seoDescription     String?

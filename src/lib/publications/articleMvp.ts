@@ -4,7 +4,7 @@ import { randomId } from "@/lib/utils/randomId";
 /** Версия формата `Article.contentJson` */
 export const ARTICLE_CONTENT_VERSION = 1 as const;
 
-export const ArticleBlockEntityTypeSchema = z.enum(["EVENT", "PLACE", "OFFER"]);
+export const ArticleBlockEntityTypeSchema = z.enum(["EVENT", "PLACE", "OFFER", "ROUTE", "ARTICLE"]);
 export type ArticleBlockEntityType = z.infer<typeof ArticleBlockEntityTypeSchema>;
 
 const base = z.object({ id: z.string().min(1) });

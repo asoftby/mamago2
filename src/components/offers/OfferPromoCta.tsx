@@ -94,7 +94,7 @@ export function OfferPromoCta({
       )}
 
       {/* Headline */}
-      <h2 className="font-[family-name:var(--font-display)] text-[52px] sm:text-[72px] lg:text-[96px] font-normal tracking-[-0.03em] leading-[0.92] text-gray-900 mx-auto max-w-[900px]">
+      <h2 className="font-sans text-[52px] sm:text-[72px] lg:text-[96px] font-semibold tracking-[-0.03em] leading-[0.92] text-gray-900 mx-auto max-w-[900px]">
         {headlineParts.map((part, i) =>
           part.accent ? (
             <em key={i} className="not-italic italic text-[#EF8759]">

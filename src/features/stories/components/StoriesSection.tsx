@@ -1,4 +1,5 @@
 import { StoryRings } from "./StoryRings";
+import { listBreakingNewsArticles } from "../lib/listBreakingNews";
 import prisma from "@/lib/prisma";
 import { ActivityType, ActivityFormat } from "@prisma/client";
 import type { StoryCollection } from "../types/story";
@@ -6,6 +7,7 @@ import { getPublicListingActivityWhere } from "@/server/public/publicContentVisi
 import { activityInAnyOfCitiesWhere } from "@/server/discovery/activityInCityWhere";
 import { resolveActivityCoverUrl } from "@/lib/event/resolveActivityCoverUrl";
 import { formatPrice, formatPriceFrom } from "@/lib/formatters/format-price";
+import { stripHtml } from "@/lib/search/sanitizeSearchText";
 
 type StoriesSectionProps = {
   cityId: string;
@@ -31,12 +33,30 @@ function mapPriceLabel(input: { priceFrom: number | null; priceTo: number | null
   return formatPriceFrom(input.priceFrom);
 }
 
+function normalizeStoryDescription(...parts: Array<string | null | undefined>): string | undefined {
+  for (const part of parts) {
+    if (!part?.trim()) continue;
+    const plain = stripHtml(part)
+      .replace(/\s*\n+\s*/g, "\n")
+      .replace(/[ \t]+/g, " ")
+      .trim();
+    if (plain) return plain;
+  }
+  return undefined;
+}
+
 export async function StoriesSection({ cityId, citySlug }: StoriesSectionProps) {
   const now = new Date();
   const start = new Date(now);
   start.setHours(0, 0, 0, 0);
   const end = new Date(start);
   end.setDate(end.getDate() + 1);
+
+  // ── Breaking news (параллельно с обычными сторис) ──────────
+  const breakingNewsPromise = listBreakingNewsArticles(citySlug).catch((error) => {
+    console.error("[StoriesSection] Failed to load breaking news", error);
+    return [];
+  });
 
   const pub = getPublicListingActivityWhere(now);
   const pubParts = Array.isArray(pub.AND) ? pub.AND : (pub.AND ? [pub.AND] : []);
@@ -86,7 +106,7 @@ export async function StoriesSection({ cityId, citySlug }: StoriesSectionProps) 
     take: 20, // берём больше, потом сортируем и режем
   });
 
-  if (todayRows.length === 0) return null;
+  const breakingNews = await breakingNewsPromise;
 
   // Определяем время начала для каждого события: сессия сегодня или nextOccurrenceAt
   const withStartTime = todayRows.map((row) => {
@@ -106,7 +126,10 @@ export async function StoriesSection({ cityId, citySlug }: StoriesSectionProps) 
   // Все события сегодня → одна коллекция "Сегодня" с несколькими items (max 5)
   const todayItems = withStartTime.slice(0, 5).map(({ row, effectiveStart }) => ({
     id: row.id,
+    type: "event" as const,
     title: row.title,
+    eyebrow: "сегодня",
+    description: normalizeStoryDescription(row.shortDesc),
     image:
       resolveActivityCoverUrl({
         coverImageId: row.coverImageId,
@@ -120,24 +143,57 @@ export async function StoriesSection({ cityId, citySlug }: StoriesSectionProps) 
     href: `/${citySlug}/events/${row.slug ?? row.id}`,
   }));
 
+  const breakingNewsStory: StoryCollection | null = breakingNews.length > 0
+    ? {
+        id: "breaking-news",
+        intent: "breaking_news",
+        title: "breaking news",
+        items: breakingNews.slice(0, 6).map((item) => ({
+          id: item.id,
+          type: "breaking-news" as const,
+          eyebrow: "BREAKING NEWS",
+          title: item.title,
+          description: normalizeStoryDescription(item.description, item.excerpt),
+          image: item.imageUrl ?? "",
+          href: item.href,
+          datetime: item.publishedAt
+            ? new Date(item.publishedAt).toLocaleDateString("ru-RU", {
+                day: "numeric",
+                month: "long",
+                hour: "2-digit",
+                minute: "2-digit",
+              })
+            : undefined,
+        })),
+        coverImageUrls: breakingNews
+          .map((item) => item.imageUrl)
+          .filter((url): url is string => Boolean(url?.trim()))
+          .slice(0, 4),
+      }
+    : null;
+
   const stories: StoryCollection[] = [
-    {
-      id: "today",
-      intent: "today",
-      title: "Сегодня",
-      emoji: "☀️",
-      items: todayItems,
-      // Передаём до 4 обложек для коллажа в кружке
-      coverImageUrls: todayItems
-        .map((i) => i.image)
-        .filter((u): u is string => Boolean(u?.trim()))
-        .slice(0, 4),
-    },
+    ...(breakingNewsStory ? [breakingNewsStory] : []),
+    ...(todayItems.length > 0
+      ? [{
+          id: "today",
+          intent: "today" as const,
+          title: "сегодня",
+          emoji: "☀️",
+          items: todayItems,
+          coverImageUrls: todayItems
+            .map((i) => i.image)
+            .filter((u): u is string => Boolean(u?.trim()))
+            .slice(0, 4),
+        }]
+      : []),
   ];
 
   return (
     <section aria-label="Stories">
-      <StoryRings stories={stories} />
+      <div className="flex gap-3 overflow-x-auto no-scrollbar px-1 pb-1" style={{ scrollbarWidth: "none" }}>
+        {stories.length > 0 && <StoryRings stories={stories} />}
+      </div>
     </section>
   );
 }

@@ -3,8 +3,9 @@ import Link from "next/link";
 import { ArticleHeader } from "@/components/article/ArticleHeader";
 import { ArticleContent } from "@/components/article/ArticleContent";
 import { ArticleEventCardBlock } from "@/components/article/blocks/ArticleEventCardBlock";
-import { ArticlePlaceCardBlock } from "@/components/article/blocks/ArticlePlaceCardBlock";
 import { ArticleOfferCardBlock } from "@/components/article/blocks/ArticleOfferCardBlock";
+import { ArticleOfferEmbed } from "@/components/article/blocks/ArticleOfferEmbed";
+import { ArticlePlaceCardBlock } from "@/components/article/blocks/ArticlePlaceCardBlock";
 import type { ArticleBlockMvp } from "@/lib/publications/articleMvp";
 import type { ArticleMvpResolvedBlock } from "@/lib/article/articleMvpRenderData";
 import {
@@ -18,6 +19,8 @@ import { ArticleReadingScrollPadding } from "@/components/article/mvp/ArticleRea
 import { articleBlockHtmlForEditor } from "@/lib/article/articleBlockHtml";
 import { cn } from "@/lib/utils";
 import { ArticleInstagramScript } from "@/components/article/mvp/ArticleInstagramScript";
+import { BreakingNewsGalleryPreview } from "@/components/article/mvp/BreakingNewsGalleryPreview";
+import { BREAKING_NEWS_SUBTITLE } from "@/lib/publications/breakingNewsArticle";
 
 /** Лёгкое оглавление: только текст и вложенный список для H3, без карточек и рамок. */
 function ArticleInlineToc({ branches }: { branches: ArticleTocBranch[] }) {
@@ -73,6 +76,8 @@ export function ArticleMvpView({
   draftWatermark?: boolean;
   readingScrollPaddingExtraRem?: number;
 }) {
+  // Detect Breaking News by the subtitle marker.
+  const isBreakingNews = subtitle === BREAKING_NEWS_SUBTITLE;
   const headingEntries = extractHeadingEntriesFromArticleBlocks(blocks as ArticleBlockMvp[]);
   const showToc = shouldShowArticleToc(headingEntries);
   const tocBranches = showToc ? buildArticleTocBranches(headingEntries) : [];
@@ -82,12 +87,26 @@ export function ArticleMvpView({
     (b) => b.type === "embed" && b.embedRequiresInstagramScript,
   );
 
-  const subtitleTrim = subtitle?.trim() || "";
+  // Filter out the Breaking News marker — never show it as visible subtitle text.
+  const subtitleTrim = (isBreakingNews ? "" : subtitle?.trim()) || "";
   const excerptTrim = excerpt?.trim() || "";
   /** Лид в шапке: subtitle, иначе excerpt — без повторения того же текста ниже */
   const headerDek = subtitleTrim || excerptTrim;
   const showExcerptBelowHeader =
     Boolean(excerptTrim) && Boolean(subtitleTrim) && excerptTrim !== subtitleTrim;
+
+  // For Breaking News: extract gallery image URLs to display above the body.
+  // The first gallery block is promoted to a hero preview; it will be skipped in the main loop.
+  const heroGalleryUrls: string[] = isBreakingNews
+    ? (() => {
+        const galleryBlock = blocks.find((b) => b.type === "gallery") as
+          | (Extract<ArticleMvpResolvedBlock, { type: "gallery" }>)
+          | undefined;
+        return galleryBlock
+          ? (galleryBlock.imageUrls.filter((u): u is string => Boolean(u)))
+          : [];
+      })()
+    : [];
 
   return (
     <div
@@ -117,6 +136,11 @@ export function ArticleMvpView({
         </p>
       ) : null}
 
+      {/* Breaking News hero gallery — shown before body text */}
+      {heroGalleryUrls.length > 0 && (
+        <BreakingNewsGalleryPreview urls={heroGalleryUrls} />
+      )}
+
       <ArticleContent>
         {blocks.map((block, i) => {
           const tocAfterIntro =
@@ -125,6 +149,11 @@ export function ArticleMvpView({
             ) : null;
           const tocBeforeFirstBlock =
             showToc && lastIntroIndex < 0 && i === 0 ? <ArticleInlineToc branches={tocBranches} /> : null;
+
+          // For Breaking News, skip the gallery block — it's already rendered above.
+          if (isBreakingNews && block.type === "gallery") {
+            return null;
+          }
 
           const body = (() => {
             if (block.type === "intro") {
@@ -140,7 +169,7 @@ export function ArticleMvpView({
             if (block.type === "text") {
               return (
                 <div
-                  className="leading-[1.75] md:leading-[1.8] text-foreground/95 mb-6 md:mb-7 last:mb-0 [&_p]:mb-4 [&_p:last-child]:mb-0 [&_ul]:my-3 [&_ol]:my-3 [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6 [&_li]:my-0.5 [&_a]:text-primary [&_a]:underline [&_a]:underline-offset-2 [&_a]:decoration-primary/40"
+                  className="font-serif leading-[1.75] md:leading-[1.8] text-foreground/95 mb-6 md:mb-7 last:mb-0 [&_p]:mb-4 [&_p:last-child]:mb-0 [&_ul]:my-3 [&_ol]:my-3 [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6 [&_li]:my-0.5 [&_a]:text-primary [&_a]:underline [&_a]:underline-offset-2 [&_a]:decoration-primary/40"
                   dangerouslySetInnerHTML={{
                     __html: articleBlockHtmlForEditor(block.text, "text"),
                   }}
@@ -168,7 +197,7 @@ export function ArticleMvpView({
               const Tag = block.level === 2 ? "h2" : "h3";
               const cls =
                 block.level === 2
-                  ? "not-prose font-[family-name:var(--font-sans)] text-2xl md:text-[1.75rem] font-bold tracking-tight text-foreground mt-10 md:mt-12 mb-4 scroll-mt-28 md:scroll-mt-32"
+                  ? "not-prose font-serif text-2xl md:text-[1.75rem] font-bold tracking-tight text-foreground mt-10 md:mt-12 mb-4 scroll-mt-28 md:scroll-mt-32"
                   : "not-prose font-serif text-xl md:text-[1.35rem] font-semibold tracking-tight text-foreground mt-8 md:mt-10 mb-3 scroll-mt-28 md:scroll-mt-32";
               return (
                 <Tag id={articleHeadingAnchorId(block.id)} className={cls}>
@@ -276,7 +305,7 @@ export function ArticleMvpView({
               if (!c) {
                 return <p className="text-sm text-muted-foreground my-6">Карточка: сущность не найдена</p>;
               }
-              if (block.entityType === "EVENT") {
+              if (block.entityType === "EVENT" && c.kind === "basic") {
                 return (
                   <ArticleEventCardBlock
                     title={c.title}
@@ -288,10 +317,13 @@ export function ArticleMvpView({
                   />
                 );
               }
-              if (block.entityType === "PLACE") {
+              if (block.entityType === "PLACE" && c.kind === "basic") {
                 return <ArticlePlaceCardBlock title={c.title} href={c.href} location={c.meta} />;
               }
-              return <ArticleOfferCardBlock title={c.title} href={c.href} />;
+              if (c.kind === "offer-embed") {
+                return <ArticleOfferEmbed card={c} />;
+              }
+              return <ArticleOfferCardBlock title={c.title} href={c.href} image={c.imageUrl ?? undefined} />;
             }
             return null;
           })();

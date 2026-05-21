@@ -1,22 +1,19 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { MapPin, Clock, Tag, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { StoryItem } from "../types/story";
 
 interface StoryViewerCardProps {
   item: StoryItem;
-  storyTitle: string;
-  onAddToPlan?: () => void;
-  onDetails?: () => void;
+  onClose?: () => void;
 }
 
 export function StoryViewerCard({
   item,
-  storyTitle,
-  onAddToPlan,
-  onDetails,
+  onClose,
 }: StoryViewerCardProps) {
   return (
     <div className="relative w-full h-full flex flex-col">
@@ -75,6 +72,12 @@ export function StoryViewerCard({
           {item.title}
         </h3>
 
+        {item.subtitle && (
+          <p className="mb-4 text-sm leading-relaxed text-white/80">
+            {item.subtitle}
+          </p>
+        )}
+
         {/* Meta */}
         <div className="flex flex-wrap gap-x-3 gap-y-1.5 mb-5">
           {item.age && (
@@ -102,35 +105,22 @@ export function StoryViewerCard({
           )}
         </div>
 
-        {/* CTAs */}
-        <div className="flex gap-2">
-          <button
+        {item.href ? (
+          <Link
+            href={item.href}
             onClick={(e) => {
               e.stopPropagation();
-              onAddToPlan?.();
+              onClose?.();
             }}
             className={cn(
-              "flex-1 h-11 rounded-2xl text-sm font-semibold transition-all active:scale-[0.97]",
-              "bg-[#EF8759] text-white shadow-lg shadow-[#EF8759]/30",
-              "hover:bg-[#e8784a]",
-            )}
-          >
-            Добавить в план
-          </button>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onDetails?.();
-            }}
-            className={cn(
-              "h-11 px-4 rounded-2xl text-sm font-semibold transition-all active:scale-[0.97]",
+              "inline-flex h-11 items-center justify-center rounded-2xl px-4 text-sm font-semibold transition-all active:scale-[0.97]",
               "bg-white/15 backdrop-blur-sm text-white border border-white/20",
               "hover:bg-white/25",
             )}
           >
             Подробнее
-          </button>
-        </div>
+          </Link>
+        ) : null}
       </div>
     </div>
   );

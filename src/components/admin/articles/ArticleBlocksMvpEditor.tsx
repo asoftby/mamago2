@@ -344,7 +344,7 @@ export function ArticleBlocksMvpEditor({
         <ActivityCardEntityPicker
           entityType={block.entityType}
           entityId={block.entityId}
-          onChangeType={(t) => updateAt(i, { ...block, entityType: t })}
+          onChangeType={(t) => updateAt(i, { ...block, entityType: t, entityId: "" })}
           onChangeId={(id) => updateAt(i, { ...block, entityId: id })}
         />
       )}

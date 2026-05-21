@@ -261,15 +261,13 @@ export function ArticleEditorGalleryField({
       toast.message("Отметьте изображения галочками");
       return;
     }
-    setRows((prev) => {
-      const toAdd = ids.map((id) => ({ type: "remote" as const, mediaId: id }));
-      const merged = [
-        ...prev,
-        ...toAdd.filter((row) => !prev.some((r) => r.type === "remote" && r.mediaId === row.mediaId)),
-      ];
-      emit(merged);
-      return merged;
-    });
+    const toAdd = ids.map((id) => ({ type: "remote" as const, mediaId: id }));
+    const merged = [
+      ...rowsRef.current,
+      ...toAdd.filter((row) => !rowsRef.current.some((r) => r.type === "remote" && r.mediaId === row.mediaId)),
+    ];
+    setRows(merged);
+    emit(merged);
     toast.success(
       ids.length === 1 ? "Добавлено в галерею" : `Добавлено изображений: ${ids.length}`,
     );
@@ -317,24 +315,22 @@ export function ArticleEditorGalleryField({
           }
           const fallback = typeof data.url === "string" ? data.url.trim() : undefined;
 
-          setRows((prev) => {
-            const duplicateRemote = prev.some((r) => r.type === "remote" && r.mediaId === mediaId);
-            const next = prev
-              .map((r) => {
-                if (r.type === "local" && r.clientId === clientId) {
-                  if (duplicateRemote) {
-                    revokeLocal(r);
-                    return null;
-                  }
+          const duplicateRemote = rowsRef.current.some((r) => r.type === "remote" && r.mediaId === mediaId);
+          const next = rowsRef.current
+            .map((r) => {
+              if (r.type === "local" && r.clientId === clientId) {
+                if (duplicateRemote) {
                   revokeLocal(r);
-                  return { type: "remote" as const, mediaId, fallbackUrl: fallback };
+                  return null;
                 }
-                return r;
-              })
-              .filter((r): r is GalleryRow => r != null);
-            emit(next);
-            return next;
-          });
+                revokeLocal(r);
+                return { type: "remote" as const, mediaId, fallbackUrl: fallback };
+              }
+              return r;
+            })
+            .filter((r): r is GalleryRow => r != null);
+          setRows(next);
+          emit(next);
           okCount++;
         }
         if (okCount > 0) {
@@ -372,16 +368,14 @@ export function ArticleEditorGalleryField({
   };
 
   const removeAt = (index: number) => {
-    setRows((prev) => {
-      const row = prev[index];
-      if (!row) return prev;
-      const next = prev.filter((_, i) => i !== index);
-      if (row.type === "local") {
-        revokeLocal(row);
-      }
-      emit(next);
-      return next;
-    });
+    const row = rowsRef.current[index];
+    if (!row) return;
+    const next = rowsRef.current.filter((_, i) => i !== index);
+    if (row.type === "local") {
+      revokeLocal(row);
+    }
+    setRows(next);
+    emit(next);
   };
 
   const hasItems = rows.length > 0;

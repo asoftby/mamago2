@@ -3,6 +3,9 @@ import prisma from "@/lib/prisma";
 import { findArticleBySlug } from "@/lib/slug/articleSlugService";
 import { resolveArticleEmbed } from "@/lib/article/articleEmbedSanitize";
 import { parseArticleContentJson, type ArticleBlockMvp } from "@/lib/publications/articleMvp";
+import type { ShiftCtaContext } from "@/lib/offer/offerPageTypes";
+import { getOfferPageData } from "@/lib/offer/offerPageData";
+import { getOfferPublicPath, getOfferPublicSection } from "@/lib/offers/offerPublicUrl";
 
 /** Без coverImage / seoImageAsset — на старой БД может не быть колонки coverImageId. */
 const articleMvpBaseSelect = {
@@ -16,6 +19,14 @@ const articleMvpBaseSelect = {
   contentJson: true,
   heroImage: true,
   seoOgImage: true,
+  authorLabel: true,
+  authorUser: {
+    select: {
+      id: true,
+      displayName: true,
+      avatarUrl: true,
+    },
+  },
 } as const;
 
 async function fetchArticleCoverImageId(articleId: string): Promise<string | null> {
@@ -41,10 +52,50 @@ async function resolveCoverMedia(coverImageId: string | null): Promise<{
 }
 
 export type ResolvedActivityCard = {
+  kind: "basic";
   href: string;
   title: string;
   meta?: string;
   imageUrl?: string | null;
+};
+
+export type ArticleShiftPreview = {
+  shiftId: string;
+  title?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  price?: string;
+  oldPrice?: string;
+  ageRange?: string;
+  promoLabel?: string;
+  spotsLeft?: number;
+  capacity?: number;
+  duration?: string;
+};
+
+export type ResolvedOfferEmbedCard = {
+  kind: "offer-embed";
+  offerId: string;
+  href: string;
+  title: string;
+  imageUrl?: string | null;
+  typeLabel: string;
+  placeName?: string | null;
+  shortDescription?: string | null;
+  ageLabel?: string | null;
+  formatLabel?: string | null;
+  priceLabel?: string | null;
+  discountBadge?: string | null;
+  ratingValue?: number | null;
+  ratingCount?: number | null;
+  galleryThumbs: string[];
+  galleryExtraCount: number;
+  metaItems: Array<{ id: string; label: string; value: string }>;
+  schedulePreview: ArticleShiftPreview[];
+  ctaLabel: string;
+  ctaMode: "camp-shift" | "phone" | "external" | "details";
+  ctaPhone?: string | null;
+  ctaHref?: string | null;
 };
 
 export type ArticleMvpResolvedBlock =
@@ -54,16 +105,38 @@ export type ArticleMvpResolvedBlock =
   | (ArticleBlockMvp & { type: "heading" })
   | (Extract<ArticleBlockMvp, { type: "image" }> & { imageUrl: string | null })
   | (Extract<ArticleBlockMvp, { type: "gallery" }> & { imageUrls: (string | null)[] })
-  | (Extract<ArticleBlockMvp, { type: "activityCard" }> & { card: ResolvedActivityCard | null })
+  | (Extract<ArticleBlockMvp, { type: "activityCard" }> & { card: ResolvedActivityCard | ResolvedOfferEmbedCard | null })
   | (Extract<ArticleBlockMvp, { type: "embed" }> & {
       sanitizedEmbedHtml: string;
       embedProvider: "youtube" | "instagram" | "unknown";
       embedRequiresInstagramScript: boolean;
     });
 
+function parseRuDateToTimestamp(value?: string | null): number {
+  if (!value) return Number.POSITIVE_INFINITY;
+  const match = value.match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
+  if (!match) return Number.POSITIVE_INFINITY;
+  return new Date(`${match[3]}-${match[2]}-${match[1]}T00:00:00`).getTime();
+}
+
+function sortShiftsNearestFirst(shifts: ArticleShiftPreview[]): ArticleShiftPreview[] {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const todayTs = today.getTime();
+
+  return [...shifts].sort((left, right) => {
+    const leftTs = parseRuDateToTimestamp(left.dateFrom);
+    const rightTs = parseRuDateToTimestamp(right.dateFrom);
+    const leftPast = leftTs < todayTs;
+    const rightPast = rightTs < todayTs;
+    if (leftPast !== rightPast) return leftPast ? 1 : -1;
+    return leftTs - rightTs;
+  });
+}
+
 async function resolveActivityCard(
   b: Extract<ArticleBlockMvp, { type: "activityCard" }>,
-): Promise<ResolvedActivityCard | null> {
+): Promise<ResolvedActivityCard | ResolvedOfferEmbedCard | null> {
   if (!b.entityId.trim()) return null;
   if (b.entityType === "PLACE") {
     const p = await prisma.place.findUnique({
@@ -74,9 +147,9 @@ async function resolveActivityCard(
         city: { select: { slug: true } },
       },
     });
-    if (!p?.slug) return { href: "#", title: p?.title ?? "Место" };
+    if (!p?.slug) return { kind: "basic", href: "#", title: p?.title ?? "Место" };
     const href = `/places/${p.slug}`;
-    return { href, title: p.title };
+    return { kind: "basic", href, title: p.title };
   }
   if (b.entityType === "EVENT") {
     const a = await prisma.activity.findUnique({
@@ -92,14 +165,147 @@ async function resolveActivityCard(
     const citySlug = a.place?.city?.slug;
     const cs = citySlug ?? "minsk";
     const href = `/${cs}/events/${a.slug ?? b.entityId}`;
-    return { href, title: a.title };
+    return { kind: "basic", href, title: a.title };
   }
-  const o = await prisma.offer.findUnique({
+  if (b.entityType === "OFFER") {
+    const o = await prisma.offer.findUnique({
+      where: { id: b.entityId },
+      select: {
+        id: true,
+        title: true,
+        slug: true,
+        kind: true,
+        campProgramType: true,
+        place: {
+          select: {
+            city: { select: { slug: true } },
+          },
+        },
+      },
+    });
+    if (!o) return null;
+    if (!o.slug) {
+      return { kind: "basic", href: "#", title: o.title };
+    }
+
+    const citySlug = o.place?.city?.slug ?? "minsk";
+    const href = getOfferPublicPath(
+      {
+        kind: o.kind,
+        campProgramType: o.campProgramType,
+        slug: o.slug,
+      },
+      citySlug,
+    );
+
+    const offerData = await getOfferPageData({
+      citySlug,
+      section: getOfferPublicSection(o),
+      slug: o.slug,
+    });
+
+    if (!offerData) {
+      return { kind: "basic", href, title: o.title };
+    }
+
+    const ageLabel =
+      offerData.metaGrid.find((item) => item.id === "age")?.value?.trim() || null;
+    const formatLabel =
+      offerData.metaGrid.find((item) => item.id === "format")?.value?.trim() || null;
+    const priceLabel =
+      offerData.pricing.priceFrom?.trim() ||
+      offerData.pricing.singlePrice?.trim() ||
+      (offerData.pricing.priceDisplay && offerData.pricing.priceUnit
+        ? `${offerData.pricing.priceDisplay} ${offerData.pricing.priceUnit}`
+        : null);
+
+    const schedulePreview = sortShiftsNearestFirst(
+      (offerData.schedule?.items ?? []).map((item) => ({
+        shiftId: item.id,
+        title: item.title,
+        dateFrom: item.dateFrom,
+        dateTo: item.dateTo,
+        price: item.price,
+        oldPrice: item.oldPrice,
+        ageRange: item.ageRange,
+        promoLabel: item.promoLabel,
+        spotsLeft: item.spotsLeft,
+        capacity: item.capacity,
+        duration: item.duration,
+      })),
+    );
+
+    const typeLabel =
+      offerData.offerType === "CAMP"
+        ? "Лагерь"
+        : offerData.offerType === "REGULAR"
+          ? "Программа"
+          : "Предложение";
+
+    const firstDiscount = offerData.pricing.discounts?.[0];
+    const discountBadge = firstDiscount
+      ? [firstDiscount.rate, firstDiscount.label].filter(Boolean).join(" • ") || null
+      : null;
+
+    const metaItems = offerData.metaGrid.map((item) => ({
+      id: item.id,
+      label: item.label,
+      value: item.value,
+    }));
+
+    let ctaMode: ResolvedOfferEmbedCard["ctaMode"] = "details";
+    if (schedulePreview.length > 0 && offerData.schedule?.type === "shifts") {
+      ctaMode = "camp-shift";
+    } else if (offerData.cta.phone?.trim()) {
+      ctaMode = "phone";
+    } else if (offerData.cta.link?.trim()) {
+      ctaMode = "external";
+    }
+
+    return {
+      kind: "offer-embed",
+      offerId: offerData.id,
+      href,
+      title: offerData.title,
+      imageUrl: offerData.media.posterUrl || undefined,
+      typeLabel,
+      placeName: offerData.place?.name ?? null,
+      shortDescription: offerData.shortDescription ?? null,
+      ageLabel,
+      formatLabel,
+      priceLabel,
+      discountBadge,
+      ratingValue: offerData.averageRating ?? offerData.place?.rating ?? null,
+      ratingCount: offerData.reviewsCount ?? offerData.place?.ratingsCount ?? null,
+      galleryThumbs: offerData.media.gallery.slice(0, 3).map((image) => image.url),
+      galleryExtraCount: Math.max(offerData.media.gallery.length - 3, 0),
+      metaItems,
+      schedulePreview,
+      ctaLabel: offerData.cta.primaryLabel || "Записаться",
+      ctaMode,
+      ctaPhone: offerData.cta.phone ?? null,
+      ctaHref: offerData.cta.link ?? null,
+    };
+  }
+  if (b.entityType === "ROUTE") {
+    const r = await prisma.route.findUnique({
+      where: { id: b.entityId },
+      select: { title: true, slug: true },
+    });
+    if (!r) return null;
+    return { kind: "basic", href: `/routes/${r.slug}`, title: r.title };
+  }
+  // ARTICLE
+  const article = await prisma.article.findUnique({
     where: { id: b.entityId },
     select: { title: true, slug: true },
   });
-  if (!o?.slug) return o ? { href: `/offers/${o.slug}`, title: o.title } : null;
-  return { href: `/offers/${o.slug}`, title: o.title };
+  if (!article) return null;
+  return {
+    kind: "basic",
+    href: article.slug ? `/blog/${article.slug}` : "#",
+    title: article.title,
+  };
 }
 
 export async function buildArticleMvpResolvedBlocks(
@@ -184,7 +390,42 @@ export async function loadArticleMvpBySlugPublic(slug: string) {
     heroUrl,
     heroAlt: cover?.alt ?? article.title,
     blocks,
+    author: article.authorUser
+      ? { displayName: article.authorUser.displayName, avatarUrl: article.authorUser.avatarUrl }
+      : article.authorLabel
+        ? { displayName: article.authorLabel, avatarUrl: null }
+        : null,
   };
+}
+
+/** Fetch 3 recent breaking news articles (by subtitle marker) excluding `excludeId`. */
+export async function loadRelatedBreakingNews(excludeId: string) {
+  const rows = await prisma.article.findMany({
+    where: {
+      status: "PUBLISHED",
+      subtitle: "__breaking_news__",
+      id: { not: excludeId },
+    },
+    orderBy: { publishedAt: "desc" },
+    take: 3,
+    select: {
+      id: true,
+      title: true,
+      slug: true,
+      excerpt: true,
+      publishedAt: true,
+      heroImage: true,
+      seoOgImage: true,
+    },
+  });
+  return rows.map((r) => ({
+    id: r.id,
+    title: r.title,
+    slug: r.slug,
+    excerpt: r.excerpt,
+    publishedAt: r.publishedAt,
+    heroUrl: r.heroImage ?? r.seoOgImage ?? null,
+  }));
 }
 
 export async function loadArticleMvpById(articleId: string) {
@@ -208,5 +449,6 @@ export async function loadArticleMvpById(articleId: string) {
     heroUrl,
     heroAlt: cover?.alt ?? article.title,
     blocks,
+    authorUserId: article.authorUser?.id ?? null,
   };
 }

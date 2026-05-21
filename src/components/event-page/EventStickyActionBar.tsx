@@ -96,7 +96,7 @@ export function EventStickyActionBar({
               ● {sessionLine}
             </p>
           )}
-          <p className="font-[family-name:var(--font-display)] text-[28px] leading-none tracking-[-0.02em] text-[#141210]">
+          <p className="font-sans text-[28px] font-semibold leading-none tracking-[-0.02em] text-[#141210]">
             {priceLabel}
           </p>
         </div>
@@ -163,7 +163,7 @@ export function EventStickyActionBar({
           </div>
         )}
         <div className="mt-0.5 flex items-baseline gap-1.5">
-          <span className="font-[family-name:var(--font-display)] text-[24px] leading-none tracking-[-0.02em] text-[#141210]">
+          <span className="font-sans text-[24px] font-semibold leading-none tracking-[-0.02em] text-[#141210]">
             {priceLabel}
           </span>
           <span className="font-mono text-[11px] text-[rgba(20,18,16,0.55)]">· билет</span>

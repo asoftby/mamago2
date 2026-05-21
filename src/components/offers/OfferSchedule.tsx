@@ -51,7 +51,7 @@ export function OfferSchedule({
             </span>
             <span className="flex-1 h-px bg-gray-100 max-w-[180px]" />
           </div>
-          <h2 className="font-[family-name:var(--font-display)] text-[36px] lg:text-[44px] font-normal tracking-[-0.02em] leading-[0.95] text-gray-900">
+          <h2 className="font-sans text-[36px] lg:text-[44px] font-semibold tracking-[-0.02em] leading-[0.95] text-gray-900">
             Выбери своё{" "}
             <span className="italic text-[#C2522A]">лето</span>.
           </h2>
@@ -184,7 +184,7 @@ function ShiftCard({
         {/* Col 2 — price */}
         {item.price && (
           <div className="text-right shrink-0">
-            <p className="font-[family-name:var(--font-display)] text-[40px] leading-[1] tracking-[-0.02em] text-gray-900">
+            <p className="font-sans text-[40px] font-semibold leading-[1] tracking-[-0.02em] text-gray-900">
               {item.price}
             </p>
             <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-gray-400 mt-1">
@@ -241,7 +241,7 @@ function ShiftCard({
         {/* Price */}
         {item.price && (
           <div className="flex items-baseline gap-2">
-            <span className="font-[family-name:var(--font-display)] text-[32px] leading-[1] text-gray-900">
+            <span className="font-sans text-[32px] font-semibold leading-[1] text-gray-900">
               {item.price}
             </span>
             <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-gray-400">

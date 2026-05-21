@@ -27,6 +27,7 @@ export type BreakingNewsFormState = {
   seoDescription: string;
   seoCanonicalUrl: string;
   noindex: boolean;
+  authorUserId: string | null;
 };
 
 export function emptyBreakingNewsContent(): ArticleContentPayload {
@@ -72,7 +73,7 @@ export function breakingNewsStateToArticleSaveInput(
     content: buildBreakingNewsContent(state),
     coverImageId: state.coverImageId.trim() || null,
     authorLabel: null,
-    authorUserId: null,
+    authorUserId: state.authorUserId,
     cityContext: null,
     status: state.status,
     publishedAt: opts.publishedAtIso,
@@ -115,6 +116,7 @@ export function parseBreakingNewsFromSnapshot(snapshot: ArticleEditorSnapshot): 
     seoDescription: snapshot.seoDescription ?? "",
     seoCanonicalUrl: snapshot.seoCanonicalUrl ?? "",
     noindex: snapshot.noindex,
+    authorUserId: snapshot.authorUserId,
   };
 }
 

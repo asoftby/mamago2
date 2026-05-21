@@ -9,10 +9,13 @@ import { ArticlePlacesShowcaseBlock } from "@/components/article/blocks/ArticleP
 import prisma from "@/lib/prisma";
 import { findArticleBySlug } from "@/lib/slug/articleSlugService";
 import { buildArticleJsonLd } from "@/lib/seo/schema/buildArticleJsonLd";
+import { buildOgMeta } from "@/lib/seo/buildOgMeta";
 import type { ArticleVm } from "@/lib/blog/articleTypes";
 import { AnalyticsDetailBeacon } from "@/components/analytics/AnalyticsDetailBeacon";
-import { loadArticleMvpBySlugPublic } from "@/lib/article/articleMvpRenderData";
+import { loadArticleMvpBySlugPublic, loadRelatedBreakingNews } from "@/lib/article/articleMvpRenderData";
 import { ArticleMvpView } from "@/components/article/mvp/ArticleMvpView";
+import { BreakingNewsView } from "@/components/article/mvp/BreakingNewsView";
+import { BREAKING_NEWS_SUBTITLE } from "@/lib/publications/breakingNewsArticle";
 import {
   incrementPublishedArticleViews,
   shouldCountPublishedArticleViewRequest,
@@ -65,6 +68,8 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
+  const publicBase = (process.env.NEXT_PUBLIC_APP_URL || "https://mamago.by").replace(/\/$/, "");
+  const defaultCanonical = `${publicBase}/blog/${slug}`;
   const mvp = await loadArticleMvpBySlugPublic(slug);
   if (mvp) {
     const article = await prisma.article.findUnique({
@@ -75,33 +80,28 @@ export async function generateMetadata({
         seoCanonicalUrl: true,
         seoOgTitle: true,
         seoOgDescription: true,
+        seoOgImage: true,
         seoRobots: true,
         noindex: true,
       },
     });
     const title = article?.seoTitle?.trim() || `${mvp.title} — mamaGo`;
     const description = article?.seoDescription?.trim() || mvp.excerpt?.trim() || undefined;
-    const ogTitle =
-      article?.seoOgTitle?.trim() || article?.seoTitle?.trim() || `${mvp.title} — mamaGo`;
-    const ogDescription =
-      article?.seoOgDescription?.trim() ||
-      article?.seoDescription?.trim() ||
-      mvp.excerpt?.trim() ||
-      undefined;
-    const canonical = article?.seoCanonicalUrl?.trim();
+    const canonical = article?.seoCanonicalUrl?.trim() || defaultCanonical;
     const noindex =
       article?.noindex === true ||
       (article?.seoRobots?.toLowerCase().includes("noindex") ?? false);
     return {
+      ...buildOgMeta({
+        title: article?.seoOgTitle?.trim() || title,
+        description: article?.seoOgDescription?.trim() || description,
+        image: article?.seoOgImage?.trim() || mvp.heroUrl,
+        url: canonical,
+        robots: noindex ? { index: false, follow: false } : { index: true, follow: true },
+      }),
       title,
       description,
-      alternates: canonical ? { canonical } : undefined,
-      openGraph: {
-        title: ogTitle,
-        description: ogDescription,
-        images: mvp.heroUrl ? [{ url: mvp.heroUrl }] : undefined,
-      },
-      robots: noindex ? { index: false, follow: false } : undefined,
+      alternates: { canonical },
     };
   }
   const article = await getArticle(slug);
@@ -115,18 +115,21 @@ export async function generateMetadata({
     seo?.heroImage?.trim() || seo?.seoOgImage?.trim() || undefined;
   const noindexFlag =
     seo?.noindex === true || (seo?.seoRobots?.toLowerCase().includes("noindex") ?? false);
+  const title = seo?.seoTitle?.trim() || `${article.title} — mamaGo`;
+  const description = seo?.seoDescription?.trim() || article.subtitle;
+  const canonical = seo?.seoCanonicalUrl?.trim() || defaultCanonical;
+
   return {
-    title: seo?.seoTitle?.trim() || `${article.title} — mamaGo`,
-    description: seo?.seoDescription?.trim() || article.subtitle,
-    alternates: seo?.seoCanonicalUrl?.trim()
-      ? { canonical: seo.seoCanonicalUrl.trim() }
-      : undefined,
-    openGraph: {
-      title: seo?.seoOgTitle?.trim() || seo?.seoTitle?.trim() || `${article.title} — mamaGo`,
-      description: seo?.seoOgDescription?.trim() || seo?.seoDescription?.trim() || article.subtitle,
-      images: ogImageUrl ? [{ url: ogImageUrl }] : undefined,
-    },
-    robots: noindexFlag ? { index: false, follow: false } : undefined,
+    ...buildOgMeta({
+      title: seo?.seoOgTitle?.trim() || title,
+      description: seo?.seoOgDescription?.trim() || description,
+      image: ogImageUrl,
+      url: canonical,
+      robots: noindexFlag ? { index: false, follow: false } : { index: true, follow: true },
+    }),
+    title,
+    description,
+    alternates: { canonical },
   };
 }
 
@@ -194,6 +197,25 @@ export default async function ArticlePage({
     if (await shouldCountPublishedArticleViewRequest()) {
       await incrementPublishedArticleViews(mvp.id);
     }
+
+    // Breaking News articles use the editorial BreakingNewsView.
+    if (mvp.subtitle === BREAKING_NEWS_SUBTITLE) {
+      const related = await loadRelatedBreakingNews(mvp.id);
+      return (
+        <>
+          <AnalyticsDetailBeacon entityType="ARTICLE" entityId={mvp.id} vertical="CITY" />
+          <BreakingNewsView
+            title={mvp.title}
+            excerpt={mvp.excerpt}
+            publishedAt={mvp.publishedAt}
+            blocks={mvp.blocks}
+            author={mvp.author}
+            related={related}
+          />
+        </>
+      );
+    }
+
     return (
       <>
         <AnalyticsDetailBeacon entityType="ARTICLE" entityId={mvp.id} vertical="CITY" />

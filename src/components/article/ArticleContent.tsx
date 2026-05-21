@@ -6,7 +6,7 @@ interface ArticleContentProps {
 }
 
 /**
- * ArticleContent — serif reading wrapper.
+ * ArticleContent — PT Serif reading wrapper.
  * Apply this around long-form article body text.
  * Product blocks (cards, CTAs) placed inside will inherit sans via their own className.
  */
@@ -15,6 +15,7 @@ export function ArticleContent({ children, className }: ArticleContentProps) {
     <div
       className={[
         "article-body",
+        "font-serif",
         className,
       ]
         .filter(Boolean)

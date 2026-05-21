@@ -79,7 +79,7 @@ export function StoryViewer({
       <div className="relative w-full h-full">
         <StoryViewerCard
           item={currentItem}
-          storyTitle={activeStory.title}
+          onClose={onClose}
         />
 
         {/* Tap zones (above the card content) */}
