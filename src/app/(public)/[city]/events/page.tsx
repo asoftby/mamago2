@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { CityShell } from "@/components/city/CityShell";
 import { buildCityEventsListingMetadata } from "@/lib/seo/cityKudaListingMetadata";
+import { applyGlobalRobotsOverride } from "@/lib/seo/globalNoindex";
 
 interface PageProps {
   params: Promise<{ city: string }>;
@@ -13,7 +14,7 @@ export async function generateMetadata({
   params: Promise<{ city: string }>;
 }): Promise<Metadata> {
   const { city: citySlug } = await params;
-  return buildCityEventsListingMetadata(citySlug);
+  return applyGlobalRobotsOverride(await buildCityEventsListingMetadata(citySlug));
 }
 
 /**

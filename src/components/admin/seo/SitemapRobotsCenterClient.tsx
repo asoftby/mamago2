@@ -5,6 +5,7 @@ import { ru } from "date-fns/locale";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   Card,
   CardContent,
@@ -13,6 +14,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { Switch } from "@/components/ui/switch";
 import type {
   RobotsIndexationSettings,
   SitemapRegenerationStatus,
@@ -26,6 +28,7 @@ import {
   Globe2,
   RefreshCw,
   Shield,
+  AlertTriangle,
 } from "lucide-react";
 import { SeoPageHeader } from "@/components/admin/seo/primitives/SeoPageHeader";
 
@@ -270,6 +273,68 @@ export function SitemapRobotsCenterClient({
           .
         </p>
         <Card className="shadow-sm">
+          <CardHeader className="pb-3">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <CardTitle className="text-base">Индексация</CardTitle>
+                <CardDescription>
+                  Глобальное управление доступностью сайта для поисковых систем.
+                </CardDescription>
+              </div>
+              <Badge variant={initialRobots.globalNoindexEnabled ? "destructive" : "secondary"}>
+                {initialRobots.globalNoindexEnabled
+                  ? "Noindex включен"
+                  : "Индексация разрешена"}
+              </Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-gray-900">
+                  Запретить индексацию всего сервиса
+                </p>
+                <p className="text-xs text-gray-500">
+                  На текущем этапе настройка управляется через env. Полноценное управление из
+                  админки будет добавлено после появления глобальной SEO settings модели.
+                </p>
+              </div>
+              <Switch
+                checked={initialRobots.globalNoindexEnabled}
+                disabled
+                aria-label="Global noindex status"
+              />
+            </div>
+
+            {initialRobots.globalNoindexEnabled ? (
+              <Alert variant="destructive">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertTitle>Сайт закрыт от индексации</AlertTitle>
+                <AlertDescription>
+                  Это безопасно для тестов, но перед запуском production нужно выключить
+                  `SITE_NOINDEX_DEFAULT` и `SITE_NOINDEX_FORCE`.
+                </AlertDescription>
+              </Alert>
+            ) : (
+              <Alert>
+                <Shield className="h-4 w-4" />
+                <AlertTitle>Индексация разрешена</AlertTitle>
+                <AlertDescription>
+                  Глобальный запрет индексации не активен. Публичные страницы могут индексироваться
+                  по обычным правилам SEO.
+                </AlertDescription>
+              </Alert>
+            )}
+
+            <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50/60 px-4 py-4">
+              <p className="text-sm font-medium text-slate-900">Источник состояния</p>
+              <p className="mt-1 text-sm leading-relaxed text-slate-600">
+                {initialRobots.globalNoindexReason}
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="shadow-sm">
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Системные настройки</CardTitle>
             <CardDescription>
@@ -303,6 +368,12 @@ export function SitemapRobotsCenterClient({
                   {ROBOTS_STATUS_LABEL[initialRobots.robotsStatus]}
                 </p>
               </div>
+            </div>
+            <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+              <span className="text-muted-foreground">Controls managed by</span>
+              <Badge variant="outline" className="font-mono text-xs">
+                {initialRobots.controlsManagedBy}
+              </Badge>
             </div>
             <div>
               <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">

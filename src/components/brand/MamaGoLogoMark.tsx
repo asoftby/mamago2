@@ -32,10 +32,10 @@ export function MamaGoLogoMark({
         className={imageClassName}
       />
       <span
-        className="font-mono text-[11px] font-normal lowercase leading-none text-[#737373] md:text-xs"
+        className="font-mono text-[9px] font-normal lowercase leading-none text-[#737373] md:text-[10px]"
         aria-hidden
       >
-        beta
+        2.0 beta
       </span>
     </>
   );

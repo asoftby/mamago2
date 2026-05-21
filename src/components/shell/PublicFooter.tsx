@@ -38,6 +38,14 @@ export function PublicFooter() {
               <Link href="#" className="hover:text-primary transition-colors">Поддержка</Link>
               <Link href="#" className="hover:text-primary transition-colors">Контакты</Link>
               <Link href="#" className="hover:text-primary transition-colors">FAQ</Link>
+              <a
+                href="https://t.me/shapovalovalexey"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-primary transition-colors"
+              >
+                Сообщить о проблеме
+              </a>
             </div>
           </div>
 

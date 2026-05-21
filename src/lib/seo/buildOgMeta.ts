@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { applyGlobalRobotsOverride } from "@/lib/seo/globalNoindex";
 
 const FALLBACK_IMAGE = "https://mamago.by/og-default.jpg";
 const SITE_NAME = "mamaGo";
@@ -69,7 +70,7 @@ export function buildOgMeta({
   // Resolve image: provided > fallback
   const resolvedImage = toAbsoluteUrl(image) ?? FALLBACK_IMAGE;
 
-  return {
+  return applyGlobalRobotsOverride({
     title,
     description: resolvedDescription,
     robots: robots ?? { index: true, follow: true },
@@ -93,5 +94,5 @@ export function buildOgMeta({
       description: resolvedDescription,
       images: [resolvedImage],
     },
-  };
+  });
 }

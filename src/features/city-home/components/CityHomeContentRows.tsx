@@ -250,7 +250,9 @@ export function CityHomeJournalSection({
 }) {
   const { appendCityQuery } = useCity();
 
-  if (articles.length === 0) {
+  const visibleArticles = articles.filter((a) => !a.isBreakingNews);
+
+  if (visibleArticles.length === 0) {
     return null;
   }
 
@@ -262,7 +264,7 @@ export function CityHomeJournalSection({
       actionIconButton
     >
       <HorizontalCardRow className="flex-wrap overflow-visible pe-0 snap-none sm:flex-nowrap sm:overflow-x-auto sm:pe-0 sm:snap-x sm:snap-mandatory">
-        {articles.map((a, index) => (
+        {visibleArticles.map((a, index) => (
           <Link
             key={a.slug}
             href={`/blog/${a.slug}`}
@@ -271,9 +273,28 @@ export function CityHomeJournalSection({
               index === 0
                 ? "w-full min-w-0 max-w-none sm:w-[42vw] sm:min-w-[156px] sm:max-w-[240px]"
                 : "w-[calc((100%-0.75rem)/2)] min-w-0 max-w-none sm:w-[42vw] sm:min-w-[156px] sm:max-w-[240px]",
-              "rounded-2xl border border-neutral-200 bg-white p-4 hover:border-neutral-300 hover:bg-neutral-50/80 transition-colors",
+              "rounded-2xl border border-neutral-200 bg-white p-3 hover:border-neutral-300 hover:bg-neutral-50/80 transition-colors",
             )}
           >
+            <div
+              className={cn(
+                "w-full aspect-square rounded-xl mb-3 overflow-hidden bg-gradient-to-br",
+                [
+                  "from-[#F2C8A7] to-[#E89460]",
+                  "from-[#CDE3D6] to-[#9CC1AC]",
+                  "from-[#F6D567] to-[#E8B935]",
+                  "from-[#E6DBC8] to-[#C9BCA0]",
+                ][index % 4],
+              )}
+            >
+              {a.coverImageUrl && (
+                <img
+                  src={a.coverImageUrl}
+                  alt={a.title}
+                  className="w-full h-full object-cover"
+                />
+              )}
+            </div>
             <p className="text-[10px] font-semibold uppercase tracking-wide text-primary">
               {a.category}
             </p>

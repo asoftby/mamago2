@@ -38,6 +38,12 @@ body:has([data-slot="alert-dialog-overlay"][data-state="open"]) {
   scrollbar-width: none;
 }
 
+@utility site-wrap {
+  max-width: var(--site-maxw);
+  margin-inline: auto;
+  width: 100%;
+}
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
@@ -101,6 +107,9 @@ body:has([data-slot="alert-dialog-overlay"][data-state="open"]) {
 }
 
 :root {
+  /* Site-wide layout */
+  --site-maxw: 1200px;
+
   /* Default Shadcn/Tailwind */
   --radius: 0.625rem;
   

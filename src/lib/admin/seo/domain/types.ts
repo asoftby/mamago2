@@ -272,6 +272,9 @@ export interface RobotsIndexationSettings {
   noindexEnvironments: string[];
   robotsStatus: "ok" | "stale" | "missing";
   futureControlsNote: string;
+  globalNoindexEnabled: boolean;
+  globalNoindexReason: string;
+  controlsManagedBy: "env";
 }
 
 // -----------------------------------------------------------------------------
