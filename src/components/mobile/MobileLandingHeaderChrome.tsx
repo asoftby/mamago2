@@ -1,7 +1,6 @@
 "use client";
 
-import Link from "next/link";
-import Image from "next/image";
+import { MamaGoLogoMark } from "@/components/brand/MamaGoLogoMark";
 import { Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DiscoveryIntentTabs } from "@/components/city/DiscoveryIntentTabs";
@@ -25,19 +24,7 @@ export function MobileLandingHeaderChrome({
 }: MobileLandingHeaderChromeProps) {
   return (
     <div className="flex min-h-[52px] min-w-0 items-center gap-2">
-      <Link
-        href={`/${citySlug}`}
-        className="flex shrink-0 items-center rounded-lg p-0.5 transition-opacity hover:opacity-90"
-        aria-label="MamaGo — на главную"
-      >
-        <Image
-          src="/favico_mamago.webp"
-          alt=""
-          width={100}
-          height={100}
-          className="h-8 w-auto"
-        />
-      </Link>
+      <MamaGoLogoMark href={`/${citySlug}`} imageClassName="h-8 w-auto" />
       <div className="min-h-10 min-w-0 flex-1 self-center overflow-hidden">
         <DiscoveryIntentTabs
           city={citySlug}
