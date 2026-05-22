@@ -3,7 +3,6 @@ name: Docker Build & Push (Prisma Studio)
 on:
   push:
     branches:
-      - dev
       - main
     paths:
       - 'Dockerfile.prisma-studio'
