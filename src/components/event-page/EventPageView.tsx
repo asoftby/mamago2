@@ -119,7 +119,7 @@ function EventAboutEditorial({
               <span className="h-px flex-1 bg-[rgba(20,18,16,0.10)]" />
             </div>
             <h2
-              className="font-[family-name:var(--font-display)] text-[clamp(36px,5vw,56px)] font-normal leading-[1] tracking-[-0.02em] text-[#141210]"
+              className="font-sans text-[clamp(36px,5vw,56px)] font-semibold leading-[1] tracking-[-0.02em] text-[#141210]"
             >
               Один час,
               <br />
@@ -175,7 +175,7 @@ function EventLocationEditorial({ venue }: { venue: NonNullable<EventPageData["v
               <span className="h-px flex-1 bg-[rgba(20,18,16,0.10)]" />
             </div>
             <h2
-              className="font-[family-name:var(--font-display)] text-[clamp(36px,5vw,56px)] font-normal leading-[1] tracking-[-0.02em] text-[#141210]"
+              className="font-sans text-[clamp(36px,5vw,56px)] font-semibold leading-[1] tracking-[-0.02em] text-[#141210]"
               style={{ margin: "14px 0 18px" }}
             >
               {venue.name},
@@ -322,7 +322,7 @@ function EventFinalCta({
             </span>
           )}
           <h2
-            className="font-[family-name:var(--font-display)] text-[clamp(52px,8vw,120px)] font-normal leading-[0.95] tracking-[-0.025em] text-[#141210]"
+            className="font-sans text-[clamp(52px,8vw,120px)] font-semibold leading-[0.95] tracking-[-0.025em] text-[#141210]"
           >
             Не пропустите
             <br />
@@ -682,7 +682,7 @@ export function EventPageView({ data }: { data: EventPageData }) {
                   <span className="h-px w-[120px] bg-[rgba(20,18,16,0.10)]" />
                 </div>
                 <h2
-                  className="font-[family-name:var(--font-display)] text-[clamp(36px,5vw,56px)] font-normal leading-[1] tracking-[-0.02em] text-[#141210]"
+                  className="font-sans text-[clamp(36px,5vw,56px)] font-semibold leading-[1] tracking-[-0.02em] text-[#141210]"
                 >
                   Выбери удобное{" "}
                   <span className="italic text-[#C24E22]">время</span>.

@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 
@@ -16,6 +17,8 @@ interface StoryRingItemProps {
   itemCount?: number;
   /** First ring: preload for LCP. */
   imagePriority?: boolean;
+  /** Optional custom fallback content when there is no cover image. */
+  fallbackContent?: ReactNode;
 }
 
 // ─── Collage layouts ──────────────────────────────────────────────────────────
@@ -95,6 +98,7 @@ export function StoryRingItem({
   coverImageUrls,
   itemCount = 1,
   imagePriority = false,
+  fallbackContent,
 }: StoryRingItemProps) {
   const [hydrated, setHydrated] = useState(false);
   useEffect(() => {
@@ -141,10 +145,12 @@ export function StoryRingItem({
             ) : coverImageUrl ? (
               <CoverSingle url={coverImageUrl} priority={imagePriority} seen={isSeen} />
             ) : (
-              <div
-                className="h-full w-full bg-gradient-to-br from-neutral-100 via-neutral-50 to-neutral-200"
-                aria-hidden
-              />
+              fallbackContent ?? (
+                <div
+                  className="h-full w-full bg-gradient-to-br from-neutral-100 via-neutral-50 to-neutral-200"
+                  aria-hidden
+                />
+              )
             )}
           </div>
         </div>

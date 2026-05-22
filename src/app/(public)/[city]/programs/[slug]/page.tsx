@@ -6,6 +6,7 @@ import type { OfferPageData } from "@/lib/offer/offerPageTypes";
 import { resolveActivityVertical } from "@/lib/public/publicVerticalResolver";
 import { AnalyticsDetailBeacon } from "@/components/analytics/AnalyticsDetailBeacon";
 import { transformActivityToOfferPageData } from "@/server/services/offer/offerPageDataTransformer";
+import { applyGlobalRobotsOverride } from "@/lib/seo/globalNoindex";
 
 interface ProgramPageProps {
   params: Promise<{
@@ -80,14 +81,14 @@ export async function generateMetadata({ params }: ProgramPageProps): Promise<Me
   const data = await getProgramData(slug, city);
 
   if (!data) {
-    return {
+    return applyGlobalRobotsOverride({
       title: "Программа не найдена",
-    };
+    });
   }
 
   const publicBase = process.env.NEXT_PUBLIC_APP_URL || "https://mamago.by";
 
-  return {
+  return applyGlobalRobotsOverride({
     title: data.seo?.title || data.title,
     description: data.seo?.description || data.shortDescription,
     openGraph: {
@@ -100,7 +101,7 @@ export async function generateMetadata({ params }: ProgramPageProps): Promise<Me
     alternates: {
       canonical: data.seo?.canonicalUrl || `${publicBase}/${city}/programs/${slug}`,
     },
-  };
+  });
 }
 
 export default async function ProgramPage({ params }: ProgramPageProps) {

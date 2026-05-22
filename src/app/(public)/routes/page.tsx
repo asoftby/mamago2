@@ -3,12 +3,14 @@ import { RouteCard } from "@/components/routes/RouteCard";
 import { listPublicRoutes } from "@/server/services/route.service";
 import Link from "next/link";
 import { Plus } from "lucide-react";
+import type { Metadata } from "next";
 import type { PublicRouteCardModel } from "@/components/routes/types";
+import { applyGlobalRobotsOverride } from "@/lib/seo/globalNoindex";
 
-export const metadata = {
+export const metadata: Metadata = applyGlobalRobotsOverride({
   title: "Маршруты — mamaGo",
   description: "Готовые семейные маршруты по городу. Сохраняйте, делитесь, добавляйте в план.",
-};
+});
 
 export const dynamic = "force-dynamic";
 

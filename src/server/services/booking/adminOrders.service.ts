@@ -409,11 +409,13 @@ export async function getAdminOrders(
 }
 
 export async function getAdminOrderById(id: string) {
-  const rows = await fetchAdminOrdersRows({
-    where: { id },
-    take: 1,
-  });
+  const [rows, financials] = await Promise.all([
+    fetchAdminOrdersRows({ where: { id }, take: 1 }),
+    getOrderFinancials(id),
+  ]);
 
   const booking = rows[0];
-  return booking ? mapAdminOrder(booking) : null;
+  if (!booking) return null;
+
+  return { ...mapAdminOrder(booking), financials };
 }

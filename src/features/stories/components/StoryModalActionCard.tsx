@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { MapPin, Clock, Tag, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { StoryItem } from "../types/story";
@@ -8,22 +9,22 @@ import type { StoryItem } from "../types/story";
 interface StoryModalActionCardProps {
   item: StoryItem;
   storyTitle: string;
-  onAddToPlan: () => void;
-  onDetails: () => void;
+  onClose: () => void;
 }
 
 export function StoryModalActionCard({
   item,
   storyTitle,
-  onAddToPlan,
-  onDetails,
+  onClose,
 }: StoryModalActionCardProps) {
+  const eyebrow = item.eyebrow ?? storyTitle;
+
   return (
     <div className="flex flex-col h-full px-6 py-6 gap-0">
 
       {/* ── Story context label ── */}
-      <p className="text-[11px] font-medium tracking-widest uppercase text-neutral-400 mb-4">
-        {storyTitle}
+      <p className="mb-4 text-[11px] font-medium tracking-[0.18em] text-neutral-400">
+        {eyebrow}
       </p>
 
       {/* ── Business identity ── */}
@@ -87,6 +88,12 @@ export function StoryModalActionCard({
         )}
       </div>
 
+      {item.description ? (
+        <p className="mt-2 mb-5 whitespace-pre-line text-[15px] leading-[1.6] text-neutral-600 line-clamp-4 md:line-clamp-5">
+          {item.description}
+        </p>
+      ) : null}
+
       {/* ── Price ── */}
       {item.price && (
         <p className="text-[17px] font-semibold text-neutral-900 mb-1">
@@ -97,30 +104,19 @@ export function StoryModalActionCard({
       {/* ── Spacer ── */}
       <div className="flex-1 min-h-[16px]" />
 
-      {/* ── CTAs ── */}
-      <div className="space-y-2.5">
-        <button
-          onClick={onAddToPlan}
+      {item.href ? (
+        <Link
+          href={item.href}
+          onClick={onClose}
           className={cn(
-            "w-full h-11 rounded-2xl text-[14px] font-semibold",
-            "bg-[#EF8759] text-white",
-            "shadow-[0_4px_16px_rgba(239,135,89,0.30)]",
-            "hover:bg-[#e8784a] active:scale-[0.98] transition-all",
-          )}
-        >
-          Добавить в план
-        </button>
-        <button
-          onClick={onDetails}
-          className={cn(
-            "w-full h-11 rounded-2xl text-[14px] font-semibold",
-            "bg-neutral-100 text-neutral-600",
-            "hover:bg-neutral-150 active:scale-[0.98] transition-all",
+            "flex h-11 w-full items-center justify-center rounded-2xl text-[14px] font-semibold",
+            "bg-neutral-100 text-neutral-700",
+            "hover:bg-neutral-200 active:scale-[0.98] transition-all",
           )}
         >
           Подробнее
-        </button>
-      </div>
+        </Link>
+      ) : null}
     </div>
   );
 }

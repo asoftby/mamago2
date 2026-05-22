@@ -144,7 +144,7 @@ export function EventDecisionPanel({
 
       {/* Editorial display title */}
       <h1
-        className="font-[family-name:var(--font-display)] text-[clamp(40px,6vw,80px)] font-normal leading-[0.95] tracking-[-0.025em] text-[#141210]"
+        className="font-sans text-[clamp(40px,6vw,80px)] font-semibold leading-[0.95] tracking-[-0.025em] text-[#141210]"
         style={{ margin: 0 }}
       >
         {head}
@@ -200,7 +200,7 @@ export function EventDecisionPanel({
             <div className="mb-1.5 text-[10px] font-medium uppercase tracking-[0.14em] text-[rgba(20,18,16,0.55)]">
               Стоимость
             </div>
-            <div className="font-[family-name:var(--font-display)] text-[48px] leading-[1] tracking-[-0.02em] text-[#141210]">
+            <div className="font-sans text-[48px] font-semibold leading-[1] tracking-[-0.02em] text-[#141210]">
               {data.priceLabel}
             </div>
           </div>

@@ -66,7 +66,7 @@ export function SiteHeaderNew() {
           backfaceVisibility: "hidden"
         }}
       >
-        <div className="mx-auto w-full max-w-[1200px] px-4 h-full">
+        <div className="site-wrap px-4 h-full">
           
           <HeaderChrome
             citySlug={displayCity}

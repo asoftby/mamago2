@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ContentStatus } from "@prisma/client";
 import { formatDistanceToNow } from "date-fns";
@@ -13,7 +12,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import {
   Select,
@@ -27,6 +25,13 @@ import type { ArticleEditorSnapshot } from "@/lib/article/articleAdminTypes";
 import type { ArticleContentPayload } from "@/lib/publications/articleMvp";
 import { ArticleBlocksMvpEditor } from "@/components/admin/articles/ArticleBlocksMvpEditor";
 import { ArticleEditorCoverField } from "@/components/admin/articles/ArticleEditorCoverField";
+import {
+  PublicationPanel,
+  STATUS_LABEL,
+  statusBadgeClass,
+} from "@/components/admin/articles/PublicationPanel";
+import { SeoPanel } from "@/features/admin/seo/components/SeoPanel";
+import { resolveSeoPublicBase } from "@/lib/admin/seo/seoEditorCanonical";
 import { matchCitySlugFromContext } from "@/lib/article/articleEditorBasics";
 import { useHydrated } from "@/hooks/use-hydrated";
 import { useUnsavedChangesNavigationGuard } from "@/hooks/use-unsaved-changes-navigation-guard";
@@ -41,42 +46,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-const STATUS_OPTIONS: ContentStatus[] = [
-  "DRAFT",
-  "PENDING",
-  "PUBLISHED",
-  "REJECTED",
-  "SCHEDULED",
-  "ARCHIVED",
-];
-
-const STATUS_LABEL: Record<string, string> = {
-  DRAFT: "Черновик",
-  PENDING: "На модерации",
-  PUBLISHED: "Опубликовано",
-  REJECTED: "Отклонено",
-  SCHEDULED: "Запланировано",
-  ARCHIVED: "В архиве",
-};
-
-function statusBadgeClass(s: ContentStatus): string {
-  switch (s) {
-    case "PUBLISHED":
-      return "bg-emerald-100 text-emerald-900 border-emerald-200";
-    case "PENDING":
-      return "bg-amber-100 text-amber-900 border-amber-200";
-    case "DRAFT":
-      return "bg-slate-100 text-slate-800 border-slate-200";
-    case "REJECTED":
-      return "bg-red-100 text-red-900 border-red-200";
-    case "SCHEDULED":
-      return "bg-sky-100 text-sky-900 border-sky-200";
-    case "ARCHIVED":
-      return "bg-gray-200 text-gray-800 border-gray-300";
-    default:
-      return "bg-slate-100 text-slate-800 border-slate-200";
-  }
-}
 
 function toLocalDatetimeValue(iso: string | null): string {
   if (!iso) return "";
@@ -98,7 +67,7 @@ function snapshotComparable(args: {
   slug: string;
   excerpt: string;
   coverImageId: string;
-  authorUserId: string;
+  authorUserId: string | null;
   authorLabel: string;
   cityContext: string;
   content: ArticleContentPayload;
@@ -118,7 +87,7 @@ function applySnapshot(setters: {
   setSlug: (v: string) => void;
   setExcerpt: (v: string) => void;
   setCoverImageId: (v: string) => void;
-  setAuthorUserId: (v: string) => void;
+  setAuthorUserId: (v: string | null) => void;
   setAuthorLabel: (v: string) => void;
   setCityContext: (v: string) => void;
   setContent: (v: ArticleContentPayload) => void;
@@ -135,7 +104,7 @@ function applySnapshot(setters: {
   setters.setSlug(snap.slug ?? "");
   setters.setExcerpt(snap.excerpt ?? "");
   setters.setCoverImageId(snap.coverImageId ?? "");
-  setters.setAuthorUserId(snap.authorUserId ?? "");
+  setters.setAuthorUserId(snap.authorUserId ?? null);
   setters.setAuthorLabel(snap.authorLabel ?? "");
   setters.setCityContext(snap.cityContext ?? "");
   setters.setContent(snap.content);
@@ -167,7 +136,7 @@ export function ArticleEditorClient({
     const t = Date.parse(initial.updatedAt);
     return Number.isNaN(t) ? null : t;
   });
-  const [saveHintTick, setSaveHintTick] = useState(0);
+  const [, setSaveHintTick] = useState(0);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
@@ -175,11 +144,11 @@ export function ArticleEditorClient({
   const [slug, setSlug] = useState(initial.slug ?? "");
   const [excerpt, setExcerpt] = useState(initial.excerpt ?? "");
   const [coverImageId, setCoverImageId] = useState(initial.coverImageId ?? "");
-  const [authorUserId, setAuthorUserId] = useState(initial.authorUserId ?? "");
+  const [coverImagePreviewUrl, setCoverImagePreviewUrl] = useState(initial.coverImageUrl ?? "");
+  const [authorUserId, setAuthorUserId] = useState<string | null>(initial.authorUserId ?? null);
   const [authorLabel, setAuthorLabel] = useState(initial.authorLabel ?? "");
   const [cityContext, setCityContext] = useState(initial.cityContext ?? "");
   const [cities, setCities] = useState<{ id: string; name: string; slug: string }[]>([]);
-  const [authors, setAuthors] = useState<{ id: string; label: string; email: string }[]>([]);
   const [content, setContent] = useState<ArticleContentPayload>(initial.content);
   const [status, setStatus] = useState<ContentStatus>(initial.status);
   const [publishedAtLocal, setPublishedAtLocal] = useState(toLocalDatetimeValue(initial.publishedAt));
@@ -200,7 +169,7 @@ export function ArticleEditorClient({
       slug: initial.slug ?? "",
       excerpt: initial.excerpt ?? "",
       coverImageId: initial.coverImageId ?? "",
-      authorUserId: initial.authorUserId ?? "",
+      authorUserId: initial.authorUserId ?? null,
       authorLabel: initial.authorLabel ?? "",
       cityContext: initial.cityContext ?? "",
       content: initial.content,
@@ -272,26 +241,21 @@ export function ArticleEditorClient({
       } | null;
       if (!data || cancelled) return;
       setCities(data.cities ?? []);
-      setAuthors(data.authors ?? []);
     })();
     return () => {
       cancelled = true;
     };
   }, []);
 
-  const publicBase = (process.env.NEXT_PUBLIC_APP_URL || "https://mamago.by").replace(/\/$/, "");
   const slugPreviewPath = slug.trim() ? slug.trim() : "будет-сгенерирован-автоматически";
-  const publicArticleUrl = `${publicBase}/blog/${slug.trim() || "…"}`;
+  const publicArticleUrl = slug.trim()
+    ? `${resolveSeoPublicBase()}/blog/${slug.trim()}`
+    : undefined;
+  const publicUrl = status === "PUBLISHED" && slug.trim() ? publicArticleUrl ?? null : null;
 
   const citySlugForSelect = matchCitySlugFromContext(cityContext, cities);
   const cityContextNotInCatalog =
     !!cityContext.trim() && cities.length > 0 && !citySlugForSelect;
-
-  const authorsForSelect = useMemo(() => {
-    const id = authorUserId.trim();
-    if (!id || authors.some((a) => a.id === id)) return authors;
-    return [{ id, label: "Текущий автор (нет в списке)", email: "" }, ...authors];
-  }, [authors, authorUserId]);
 
   const payload = useMemo(
     () => ({
@@ -302,7 +266,7 @@ export function ArticleEditorClient({
       content,
       coverImageId: coverImageId.trim() || null,
       authorLabel: authorLabel.trim() || null,
-      authorUserId: authorUserId.trim() || null,
+      authorUserId: authorUserId || null,
       cityContext: cityContext.trim() || null,
       status,
       publishedAt: fromLocalDatetimeValue(publishedAtLocal),
@@ -683,7 +647,7 @@ export function ArticleEditorClient({
 
   const actionsBusy = saving || submitting || moderating || deleting;
 
-  const saveStatusLabel = useMemo(() => {
+  const saveStatusLabel = (() => {
     if (dirty) {
       return "Изменения не сохранены";
     }
@@ -691,7 +655,7 @@ export function ArticleEditorClient({
       return `Сохранено ${formatDistanceToNow(lastSavedAt, { addSuffix: true, locale: ru })}`;
     }
     return null;
-  }, [dirty, lastSavedAt, saveHintTick]);
+  })();
 
   return (
     <div className="p-6 md:p-4 space-y-8 max-w-4xl">
@@ -759,53 +723,13 @@ export function ArticleEditorClient({
           <ArticleEditorCoverField
             value={coverImageId}
             initialPreviewUrl={initial.coverImageUrl}
-            onChange={(id) => {
+            onChange={(id, previewUrl) => {
               setCoverImageId(id);
+              setCoverImagePreviewUrl(previewUrl ?? "");
             }}
           />
 
           <div className="grid gap-5 sm:grid-cols-2">
-            <div className="space-y-2 sm:col-span-2">
-              <Label htmlFor="article-author">Автор</Label>
-              {hydrated ? (
-                <Select
-                  value={authorUserId.trim() ? authorUserId : "__none__"}
-                  onValueChange={(v) => setAuthorUserId(v === "__none__" ? "" : v)}
-                >
-                  <SelectTrigger id="article-author" className="w-full">
-                    <SelectValue placeholder="Выберите автора" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none__">Не указан</SelectItem>
-                    {authorsForSelect.map((a) => (
-                      <SelectItem key={a.id} value={a.id}>
-                        {a.email ? `${a.label} (${a.email})` : a.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              ) : (
-                <div
-                  id="article-author"
-                  className="flex h-9 w-full items-center rounded-md border border-input bg-muted/40 px-3 text-sm text-muted-foreground animate-pulse"
-                  aria-hidden
-                >
-                  …
-                </div>
-              )}
-            </div>
-            <div className="space-y-2 sm:col-span-2">
-              <Label htmlFor="article-author-label">Отображаемое имя автора</Label>
-              <Input
-                id="article-author-label"
-                value={authorLabel}
-                onChange={(e) => setAuthorLabel(e.target.value)}
-                placeholder="Необязательно: подпись на сайте вместо имени пользователя"
-              />
-              <p className="text-xs text-muted-foreground">
-                Если пусто, на сайте показывается имя выбранного пользователя.
-              </p>
-            </div>
             <div className="space-y-2 sm:col-span-2">
               <Label htmlFor="article-city">Город</Label>
               {hydrated ? (
@@ -862,178 +786,69 @@ export function ArticleEditorClient({
         </CardContent>
       </Card>
 
-      {/* SEO */}
-      <Card className="border-gray-200 shadow-sm">
-        <CardHeader>
-          <CardTitle className="text-lg">SEO</CardTitle>
-          <CardDescription>
-            Картинка для соцсетей и мессенджеров использует обложку статьи (как в превью).
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label>SEO title</Label>
-            <Input value={seoTitle} onChange={(e) => setSeoTitle(e.target.value)} />
-          </div>
-          <div className="space-y-2">
-            <Label>SEO description</Label>
-            <Textarea rows={3} value={seoDescription} onChange={(e) => setSeoDescription(e.target.value)} />
-          </div>
-          <div className="space-y-2">
-            <Label>Canonical URL</Label>
-            <Input value={seoCanonicalUrl} onChange={(e) => setSeoCanonicalUrl(e.target.value)} />
-          </div>
-          <div className="flex flex-col gap-3 rounded-lg border border-border/60 bg-muted/20 px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="space-y-1 min-w-0">
-              <Label htmlFor="article-noindex" className="text-primary">
-                Скрыть от поисковых систем
-              </Label>
-              <p className="text-xs text-muted-foreground leading-snug">
-                Статья не будет индексироваться Google и не появится в поисковой выдаче.
-              </p>
-            </div>
-            <Switch
-              id="article-noindex"
-              checked={noindex}
-              onCheckedChange={(c) => setNoindex(c === true)}
-              disabled={actionsBusy}
-            />
-          </div>
-        </CardContent>
-      </Card>
+      <SeoPanel
+        entityKey={initial.id}
+        seoTitle={seoTitle}
+        seoDescription={seoDescription}
+        canonicalUrl={seoCanonicalUrl}
+        noindex={noindex}
+        coverImageUrl={coverImagePreviewUrl || initial.coverImageUrl}
+        fallbackTitle={title.trim() ? `${title.trim()} — mamaGo` : ""}
+        fallbackDescription={excerpt}
+        publicUrl={publicArticleUrl}
+        entityType="article"
+        disabled={saving || submitting || moderating || deleting}
+        onSeoTitleChange={setSeoTitle}
+        onSeoDescriptionChange={setSeoDescription}
+        onCanonicalUrlChange={setSeoCanonicalUrl}
+        onNoindexChange={setNoindex}
+      />
 
-      {/* Публикация — в конце формы: статус, даты, сохранение и модерация */}
-      <Card className="border-gray-200 shadow-sm">
-        <CardHeader>
-          <CardTitle className="text-lg">Публикация</CardTitle>
-          <CardDescription>
-            Просмотры: {views}
-            {saveStatusLabel ? (
-              <span className="ml-2">· {saveStatusLabel}</span>
-            ) : null}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label>Статус</Label>
-              {hydrated ? (
-                <Select value={status} onValueChange={(v) => setStatus(v as ContentStatus)}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {STATUS_OPTIONS.map((s) => (
-                      <SelectItem key={s} value={s}>
-                        {STATUS_LABEL[s] ?? s}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              ) : (
-                <div
-                  className="flex h-9 min-w-[10rem] items-center rounded-md border border-input bg-muted/40 px-3 text-sm text-muted-foreground animate-pulse"
-                  aria-hidden
-                >
-                  …
-                </div>
-              )}
-            </div>
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label>Запланировано (scheduledAt)</Label>
-              <Input
-                type="datetime-local"
-                value={scheduledAtLocal}
-                onChange={(e) => setScheduledAtLocal(e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Опубликовано (publishedAt)</Label>
-              <Input
-                type="datetime-local"
-                value={publishedAtLocal}
-                onChange={(e) => setPublishedAtLocal(e.target.value)}
-              />
-            </div>
-          </div>
-          <div className="flex flex-wrap items-center justify-between gap-y-2 gap-x-2 pt-2">
-            <div className="flex flex-wrap items-center gap-2 min-w-0">
-              <Button
-                type="button"
-                variant="default"
-                onClick={() => void submitForModeration()}
-                disabled={actionsBusy}
-              >
-                {submitting ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
-                {isAdminEditor ? "Опубликовать" : "Отправить на модерацию"}
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                className="text-muted-foreground hover:text-foreground"
-                onClick={() => void save()}
-                disabled={actionsBusy}
-              >
-                {saving ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
-                Сохранить черновик
-              </Button>
-              {status === "PENDING" ? (
-                <>
-                  <Button
-                    type="button"
-                    variant="default"
-                    onClick={() => void moderate("publish")}
-                    disabled={actionsBusy}
-                  >
-                    {moderating ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
-                    Одобрить (опубликовать)
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    onClick={() => void moderate("reject")}
-                    disabled={actionsBusy}
-                  >
-                    {moderating ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
-                    Отклонить
-                  </Button>
-                </>
-              ) : null}
-            </div>
-            {hasPersistedId ? (
-              <Button
-                type="button"
-                variant="outline"
-                className="text-muted-foreground hover:text-foreground shrink-0"
-                asChild
-              >
-                <Link href={`/preview/articles/${initial.id}`} target="_blank" rel="noopener noreferrer">
-                  Предпросмотр
-                </Link>
-              </Button>
-            ) : null}
-          </div>
-          {hasPersistedId && (status === "ARCHIVED" || status === "DRAFT") ? (
-            <div className="rounded-lg border border-destructive/25 bg-destructive/5 px-3 py-3 sm:py-4 mt-4">
-              <p className="text-sm text-muted-foreground mb-3">
-                {status === "DRAFT"
-                  ? "Удалить черновик — запись исчезнет из списка публикаций. Пока статья не опубликована, публичных страниц нет."
-                  : "Удаление навсегда убирает статью из базы. Публичная страница вернёт 404. Доступно только для архивных материалов."}
-              </p>
-              <Button
-                type="button"
-                variant="destructive"
-                disabled={actionsBusy}
-                onClick={() => setDeleteDialogOpen(true)}
-              >
-                {status === "DRAFT" ? "Удалить черновик" : "Удалить"}
-              </Button>
-            </div>
-          ) : null}
-        </CardContent>
-      </Card>
+      {/* Публикация */}
+      <PublicationPanel
+        views={views}
+        saveStatusLabel={saveStatusLabel}
+        status={status}
+        onStatusChange={setStatus}
+        scheduledAtLocal={scheduledAtLocal}
+        publishedAtLocal={publishedAtLocal}
+        onScheduledAtChange={setScheduledAtLocal}
+        onPublishedAtChange={setPublishedAtLocal}
+        authorUserId={authorUserId}
+        onAuthorChange={setAuthorUserId}
+        authorLabel={authorLabel}
+        onAuthorLabelChange={setAuthorLabel}
+        isAdminEditor={isAdminEditor}
+        actionsBusy={actionsBusy}
+        submitting={submitting}
+        saving={saving}
+        moderating={moderating}
+        onPublish={() => void submitForModeration()}
+        onSaveDraft={() => void save()}
+        onApprove={() => void moderate("publish")}
+        onReject={() => void moderate("reject")}
+        previewHref={hasPersistedId ? `/preview/articles/${initial.id}` : null}
+        publicUrl={publicUrl}
+      />
+
+      {/* Зона удаления (только для черновиков и архивных) */}
+      {hasPersistedId && (status === "ARCHIVED" || status === "DRAFT") ? (
+        <div className="rounded-lg border border-destructive/25 bg-destructive/5 px-3 py-3 sm:py-4">
+          <p className="text-sm text-muted-foreground mb-3">
+            {status === "DRAFT"
+              ? "Удалить черновик — запись исчезнет из списка публикаций. Пока статья не опубликована, публичных страниц нет."
+              : "Удаление навсегда убирает статью из базы. Публичная страница вернёт 404. Доступно только для архивных материалов."}
+          </p>
+          <Button
+            type="button"
+            variant="destructive"
+            disabled={actionsBusy}
+            onClick={() => setDeleteDialogOpen(true)}
+          >
+            {status === "DRAFT" ? "Удалить черновик" : "Удалить"}
+          </Button>
+        </div>
+      ) : null}
 
       <AlertDialog open={leaveDialogOpen} onOpenChange={onLeaveDialogOpenChange}>
         <AlertDialogContent>

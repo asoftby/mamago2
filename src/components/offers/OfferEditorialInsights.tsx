@@ -107,7 +107,7 @@ export function OfferEditorialInsights({ data }: OfferEditorialInsightsProps) {
       {bodyText && (
         <div className="grid grid-cols-1 gap-10 lg:grid-cols-[420px_minmax(0,1fr)] lg:gap-14">
           <div>
-            <h2 className="max-w-[360px] font-[family-name:var(--font-display)] text-[clamp(44px,6vw,70px)] leading-[0.94] tracking-[-0.035em] text-gray-900">
+            <h2 className="max-w-[360px] font-sans text-[clamp(44px,6vw,70px)] font-semibold leading-[0.94] tracking-[-0.035em] text-gray-900">
               {head}
               <br />
               <span className="italic text-[#EF6D3C]">{accent}</span>
@@ -158,7 +158,7 @@ export function OfferEditorialInsights({ data }: OfferEditorialInsightsProps) {
                     {String(index + 1).padStart(2, "0")}
                   </span>
                 </div>
-                <div className="max-w-[280px] font-[family-name:var(--font-display)] text-[clamp(48px,5vw,76px)] leading-[0.94] tracking-[-0.04em] text-gray-900">
+                <div className="max-w-[280px] font-sans text-[clamp(48px,5vw,76px)] font-semibold leading-[0.94] tracking-[-0.04em] text-gray-900">
                   {perk.stat}
                 </div>
                 {perk.desc && (

@@ -16,6 +16,10 @@ import type {
   SitemapStatusSnapshot,
   UnmatchedUrl,
 } from "../domain/types";
+import {
+  getGlobalNoindexReason,
+  isGlobalNoindexEnabled,
+} from "@/lib/seo/globalNoindex";
 
 export async function getSeoDashboardSummary(): Promise<SeoDashboardSummary> {
   return {
@@ -63,6 +67,14 @@ export async function getSitemapRobotsData(): Promise<{
   sections: SitemapSectionStatus[];
   robots: RobotsIndexationSettings;
 }> {
+  const globalNoindexEnabled = isGlobalNoindexEnabled();
+  const globalNoindexReason = getGlobalNoindexReason();
+  const noindexEnvironments = [
+    process.env.APP_ENV?.trim(),
+    process.env.VERCEL_ENV?.trim(),
+    process.env.NODE_ENV?.trim(),
+  ].filter((value): value is string => Boolean(value));
+
   return {
     status: {
       sitemapUrl: "/sitemap.xml",
@@ -73,10 +85,14 @@ export async function getSitemapRobotsData(): Promise<{
     },
     sections: [],
     robots: {
-      allowIndexing: true,
-      noindexEnvironments: ["development", "preview"],
-      robotsStatus: "missing",
-      futureControlsNote: "Настройки robots будут загружаться из реального сервиса.",
+      allowIndexing: !globalNoindexEnabled,
+      noindexEnvironments,
+      robotsStatus: "ok",
+      futureControlsNote:
+        "На текущем этапе глобальная индексация управляется через env. UI в админке пока только отображает состояние.",
+      globalNoindexEnabled,
+      globalNoindexReason,
+      controlsManagedBy: "env",
     },
   };
 }

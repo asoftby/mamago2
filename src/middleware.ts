@@ -3,16 +3,12 @@ import type { NextRequest } from "next/server";
 import { resolveSubdomainMiddlewareDecision } from "@/lib/routing/subdomainMiddleware";
 import { isDevLocalHost, resolveSurfaceFromHostAndPathname } from "@/lib/routing/surface";
 import { stripPublicDiscoverySearchParams } from "@/lib/routing/publicDiscoverySearchParams";
+import { isGlobalNoindexEnabled } from "@/lib/seo/globalNoindex";
 
 let didLogDevLocalHostDetection = false;
 
-export function middleware(request: NextRequest) {
-  const host = request.headers.get("host") || "";
-  const url = request.nextUrl;
-  const pathname = url.pathname;
-  const hostname = host.split(":")[0]?.toLowerCase() ?? "";
-
-  if (
+function shouldBypassSeoHeader(pathname: string): boolean {
+  return (
     pathname.startsWith("/_next") ||
     pathname.startsWith("/api") ||
     pathname.startsWith("/favicon") ||
@@ -23,7 +19,35 @@ export function middleware(request: NextRequest) {
     pathname.startsWith("/images") ||
     pathname.startsWith("/uploads") ||
     pathname.includes(".")
+  );
+}
+
+function applyGlobalNoindexHeader(
+  response: NextResponse,
+  params: {
+    pathname: string;
+    surface: "public" | "admin" | "business";
+  },
+): NextResponse {
+  if (
+    !isGlobalNoindexEnabled() ||
+    params.surface !== "public" ||
+    shouldBypassSeoHeader(params.pathname)
   ) {
+    return response;
+  }
+
+  response.headers.set("X-Robots-Tag", "noindex, nofollow");
+  return response;
+}
+
+export function middleware(request: NextRequest) {
+  const host = request.headers.get("host") || "";
+  const url = request.nextUrl;
+  const pathname = url.pathname;
+  const hostname = host.split(":")[0]?.toLowerCase() ?? "";
+
+  if (shouldBypassSeoHeader(pathname)) {
     return NextResponse.next();
   }
 
@@ -59,7 +83,10 @@ export function middleware(request: NextRequest) {
   if (decision.kind === "rewrite") {
     url.pathname = decision.pathname;
     url.search = search;
-    return NextResponse.rewrite(url);
+    return applyGlobalNoindexHeader(NextResponse.rewrite(url), {
+      pathname,
+      surface,
+    });
   }
 
   if (surface === "admin" && search !== url.search) {
@@ -67,7 +94,10 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  return NextResponse.next();
+  return applyGlobalNoindexHeader(NextResponse.next(), {
+    pathname,
+    surface,
+  });
 }
 
 export const config = {

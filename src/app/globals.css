@@ -38,6 +38,12 @@ body:has([data-slot="alert-dialog-overlay"][data-state="open"]) {
   scrollbar-width: none;
 }
 
+@utility site-wrap {
+  max-width: var(--site-maxw);
+  margin-inline: auto;
+  width: 100%;
+}
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
@@ -45,9 +51,8 @@ body:has([data-slot="alert-dialog-overlay"][data-state="open"]) {
   --color-foreground: var(--foreground);
   /* --font-sans не переопределяем здесь: next/font/local задаёт --font-sans на <html>.
      Tailwind font-sans использует CSS var(--font-sans) напрямую через body. */
-  --font-mono: ui-monospace, SFMono-Regular, SF Mono, Menlo, Monaco, Consolas,
+  --font-mono: Menlo, ui-monospace, SFMono-Regular, SF Mono, Monaco, Consolas,
     "Liberation Mono", "Courier New", monospace;
-  --font-serif: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
   
   /* Sidebar */
   --color-sidebar-ring: var(--sidebar-ring);
@@ -102,6 +107,9 @@ body:has([data-slot="alert-dialog-overlay"][data-state="open"]) {
 }
 
 :root {
+  /* Site-wide layout */
+  --site-maxw: 1200px;
+
   /* Default Shadcn/Tailwind */
   --radius: 0.625rem;
   
@@ -212,6 +220,12 @@ body:has([data-slot="alert-dialog-overlay"][data-state="open"]) {
   }
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+@layer utilities {
+  .font-serif {
+    font-family: var(--font-serif), ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
   }
 }
 

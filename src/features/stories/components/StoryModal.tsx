@@ -158,8 +158,7 @@ export function StoryModal({
           <StoryModalActionCard
             item={currentItem}
             storyTitle={activeStory.title}
-            onAddToPlan={() => {}}
-            onDetails={() => {}}
+            onClose={onClose}
           />
         </div>
       </div>

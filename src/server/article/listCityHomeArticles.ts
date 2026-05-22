@@ -8,6 +8,9 @@ export type CityHomeJournalArticle = {
   subtitle: string | null;
   category: string;
   readTime: number;
+  isBreakingNews: boolean;
+  publishedAt: Date | null;
+  coverImageUrl: string | null;
 };
 
 function estimateReadTimeMinutes(text: string): number {
@@ -51,7 +54,11 @@ export async function listCityHomeArticles(city: {
       status: "PUBLISHED",
       slug: { not: null },
       publishedAt: { not: null },
-      OR: [{ cityContext: city.slug }, { cityContext: city.name }],
+      OR: [
+        { cityContext: city.slug },
+        { cityContext: city.name },
+        { subtitle: BREAKING_NEWS_SUBTITLE, cityContext: null },
+      ],
     },
     orderBy: [{ publishedAt: "desc" }, { updatedAt: "desc" }],
     take: 6,
@@ -61,6 +68,9 @@ export async function listCityHomeArticles(city: {
       subtitle: true,
       excerpt: true,
       contentJson: true,
+      publishedAt: true,
+      heroImage: true,
+      coverImage: { select: { publicUrl: true } },
     },
   });
 
@@ -69,8 +79,11 @@ export async function listCityHomeArticles(city: {
     .map((row) => ({
       slug: row.slug,
       title: row.title,
-      subtitle: row.subtitle,
+      subtitle: row.subtitle === BREAKING_NEWS_SUBTITLE ? null : row.subtitle,
       category: row.subtitle === BREAKING_NEWS_SUBTITLE ? "Новость" : "Статья",
+      isBreakingNews: row.subtitle === BREAKING_NEWS_SUBTITLE,
       readTime: estimateReadTimeMinutes(extractArticlePlainText(row.contentJson, row.excerpt)),
+      publishedAt: row.publishedAt,
+      coverImageUrl: row.coverImage?.publicUrl ?? row.heroImage ?? null,
     }));
 }

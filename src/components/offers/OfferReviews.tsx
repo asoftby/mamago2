@@ -13,9 +13,8 @@ interface OfferReviewsProps {
 /**
  * Reviews Block — editorial style.
  *
- * Цитата отзыва набирается Instrument Serif (display) большим кеглем —
- * это превращает плотный список карточек в визуально сильную секцию
- * без лишнего шрифтового шума.
+ * Отзыв остаётся крупным и спокойным, но без отдельного display-serif слоя,
+ * чтобы типографика страницы предложения держалась на основном интерфейсном шрифте.
  */
 export function OfferReviews({ reviews, averageRating, totalCount }: OfferReviewsProps) {
   return (
@@ -29,7 +28,7 @@ export function OfferReviews({ reviews, averageRating, totalCount }: OfferReview
             </span>
             <span className="flex-1 h-px bg-gray-100 max-w-[180px]" />
           </div>
-          <h2 className="font-[family-name:var(--font-display)] text-[36px] lg:text-[44px] font-normal tracking-[-0.02em] leading-[0.95] text-gray-900 whitespace-nowrap">
+          <h2 className="font-sans text-[36px] lg:text-[44px] font-semibold tracking-[-0.02em] leading-[0.95] text-gray-900 whitespace-nowrap">
             {averageRating && reviews.length > 0 ? (
               <>
                 <span className="italic">{averageRating.toFixed(1)}</span>
@@ -134,7 +133,7 @@ function ReviewCard({ review }: { review: OfferReview }) {
 
       {/* Quote */}
       {review.text && (
-        <blockquote className="font-[family-name:var(--font-display)] text-[22px] leading-[1.3] tracking-[-0.005em] text-gray-900 line-clamp-5">
+        <blockquote className="font-sans text-[22px] font-medium leading-[1.3] tracking-[-0.005em] text-gray-900 line-clamp-5">
           «{review.text}»
         </blockquote>
       )}

@@ -170,7 +170,7 @@ export function RouteMapHero({
           width:28px;height:28px;border-radius:50%;
           background:#1a1a1a;color:#fff;
           display:flex;align-items:center;justify-content:center;
-          font-size:12px;font-weight:700;font-family:sans-serif;
+          font-size:12px;font-weight:700;font-family:var(--font-sans),ui-sans-serif,system-ui,sans-serif;
           box-shadow:0 2px 6px rgba(0,0,0,0.3);
           border:2px solid #fff;
         `;

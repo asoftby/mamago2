@@ -9,8 +9,6 @@ import { ActivityCardEntityPicker } from "@/components/admin/articles/ActivityCa
 import { ArticleBlockRichEditor } from "@/components/admin/articles/ArticleBlockRichEditor";
 import { ArticleEditorCoverField } from "@/components/admin/articles/ArticleEditorCoverField";
 import { ArticleEditorGalleryField } from "@/components/admin/articles/ArticleEditorGalleryField";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -21,7 +19,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import { PublicationStatus } from "@/lib/publications/domain";
 import type { ArticleEditorSnapshot } from "@/lib/article/articleAdminTypes";
 import { buildEmptyBreakingNewsEditorSnapshot } from "@/lib/article/articleEditorEmptySnapshots";
@@ -33,12 +30,18 @@ import {
   isBreakingNewsSnapshot,
   parseBreakingNewsFromSnapshot,
 } from "@/lib/publications/breakingNewsArticle";
-import { SeoSectionFields } from "@/components/admin/publications/SeoFields";
+import { PublicationPanel } from "@/components/admin/articles/PublicationPanel";
 import { ArticleBlocksEditor, ArticleTocToggle } from "@/components/admin/publications/ArticleBlocksEditor";
-import { useHydrated } from "@/hooks/use-hydrated";
 import { useUnsavedChangesNavigationGuard } from "@/hooks/use-unsaved-changes-navigation-guard";
 import { PlaceLinkedContactsEditor } from "@/components/admin/publications/PlaceLinkedContactsEditor";
 import { createClientSavePerf } from "@/lib/perf/clientSavePerf";
+import { SeoPanel } from "@/features/admin/seo/components/SeoPanel";
+import { resolveSeoPublicBase } from "@/lib/admin/seo/seoEditorCanonical";
+import {
+  buildBreakingNewsCanonicalUrl,
+  generateBreakingNewsSeoDescription,
+  generateBreakingNewsSeoTitle,
+} from "@/lib/publications/breakingNewsSeo";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -50,23 +53,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-const CONTENT_STATUS_OPTIONS: ContentStatus[] = [
-  "DRAFT",
-  "PENDING",
-  "PUBLISHED",
-  "REJECTED",
-  "SCHEDULED",
-  "ARCHIVED",
-];
-
-const CONTENT_STATUS_LABEL: Record<string, string> = {
-  DRAFT: "Черновик",
-  PENDING: "На модерации",
-  PUBLISHED: "Опубликовано",
-  REJECTED: "Отклонено",
-  SCHEDULED: "Запланировано",
-  ARCHIVED: "В архиве",
-};
 
 function newsEditorSnapshotComparable(args: {
   title: string;
@@ -84,6 +70,7 @@ function newsEditorSnapshotComparable(args: {
   seoDescription: string;
   seoCanonicalUrl: string;
   noindex: boolean;
+  authorUserId: string | null;
 }): string {
   return JSON.stringify(args);
 }
@@ -99,7 +86,6 @@ export function NewsPublicationEditor({
   onTitleChange: (value: string) => void;
 }) {
   const router = useRouter();
-  const hydrated = useHydrated();
   const hasPersistedId = Boolean(articleId?.trim());
   const [loadState, setLoadState] = useState<"loading" | "ready" | "error">(() =>
     articleId ? "loading" : "ready",
@@ -126,6 +112,9 @@ export function NewsPublicationEditor({
   const [seoDescription, setSeoDescription] = useState("");
   const [seoCanonicalUrl, setSeoCanonicalUrl] = useState("");
   const [noindex, setNoindex] = useState(false);
+  const [coverImagePreviewUrl, setCoverImagePreviewUrl] = useState("");
+  const [authorUserId, setAuthorUserId] = useState<string | null>(null);
+  const [authorError, setAuthorError] = useState<string | null>(null);
 
   const [savedComparable, setSavedComparable] = useState<string | null>(null);
 
@@ -146,6 +135,7 @@ export function NewsPublicationEditor({
       seoDescription,
       seoCanonicalUrl,
       noindex,
+      authorUserId,
     }),
     [
       title,
@@ -163,6 +153,7 @@ export function NewsPublicationEditor({
       seoDescription,
       seoCanonicalUrl,
       noindex,
+      authorUserId,
     ],
   );
 
@@ -182,6 +173,7 @@ export function NewsPublicationEditor({
       onTitleChange(p.title);
       setSlug(p.slug);
       setCoverImageId(p.coverImageId);
+      setCoverImagePreviewUrl(snap.coverImageUrl ?? "");
       setGalleryIds(p.galleryIds);
       setBodyHtml(p.bodyHtml);
       setPricingHtml(p.pricingHtml);
@@ -194,6 +186,8 @@ export function NewsPublicationEditor({
       setSeoDescription(p.seoDescription);
       setSeoCanonicalUrl(p.seoCanonicalUrl);
       setNoindex(p.noindex);
+      setAuthorUserId(p.authorUserId);
+      setAuthorError(null);
       setViews(snap.views);
       setSavedComparable(newsEditorSnapshotComparable(p));
     },
@@ -242,15 +236,19 @@ export function NewsPublicationEditor({
     (async () => {
       const res = await fetch("/api/auth/me", { credentials: "include" });
       if (!res.ok) return;
-      const u = (await res.json().catch(() => null)) as { role?: string } | null;
+      const u = (await res.json().catch(() => null)) as { id?: string; role?: string } | null;
       if (!cancelled && u?.role) {
         setIsAdminEditor(u.role === "ADMIN");
+      }
+      // Auto-populate author with current user only for brand-new (unsaved) articles.
+      if (!cancelled && u?.id && !articleId) {
+        setAuthorUserId((prev) => prev ?? u.id ?? null);
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [articleId]);
 
   const breakingNewsRequestBody = useCallback(() => {
     const input = breakingNewsStateToArticleSaveInput(formState, {
@@ -358,6 +356,12 @@ export function NewsPublicationEditor({
   const saveDraft = () => void saveArticle();
 
   const submitForModeration = async () => {
+    // Validate author before publishing / submitting for moderation.
+    if (!authorUserId) {
+      setAuthorError("Выберите автора публикации");
+      return;
+    }
+    setAuthorError(null);
     setSubmitting(true);
     setActionsBusy(true);
     try {
@@ -428,6 +432,11 @@ export function NewsPublicationEditor({
   };
 
   const moderate = async (action: "publish" | "reject") => {
+    if (action === "publish" && !authorUserId) {
+      setAuthorError("Выберите автора публикации");
+      return;
+    }
+    setAuthorError(null);
     setModerating(true);
     setActionsBusy(true);
     try {
@@ -483,9 +492,11 @@ export function NewsPublicationEditor({
     }
   };
 
-  const publicBase = (process.env.NEXT_PUBLIC_APP_URL || "https://mamago.by").replace(/\/$/, "");
+  const publicBase = resolveSeoPublicBase();
   const slugPreviewPath = slug.trim() ? slug.trim() : "будет-сгенерирован-автоматически";
-  const publicNewsUrl = `${publicBase}/blog/${slug.trim() || "…"}`;
+  const publicNewsUrl = slug.trim() ? buildBreakingNewsCanonicalUrl(slug, publicBase) : "";
+  const previewHref = articleId?.trim() ? `/preview/articles/${articleId.trim()}` : null;
+  const publicUrl = status === "PUBLISHED" && slug.trim() ? publicNewsUrl : null;
 
   if (loadState === "loading") {
     return (
@@ -533,7 +544,7 @@ export function NewsPublicationEditor({
           />
           <p className="text-xs text-gray-500 break-all">
             <span className="font-medium text-gray-700">Публичный URL: </span>
-            {publicNewsUrl}
+            {publicNewsUrl || `${publicBase}/blog/${slugPreviewPath}`}
             {!slug.trim() ? (
               <span className="block mt-1 text-amber-800">
                 Путь «{slugPreviewPath}» — плейсхолдер; фактический slug появится после сохранения.
@@ -541,7 +552,14 @@ export function NewsPublicationEditor({
             ) : null}
           </p>
         </div>
-        <ArticleEditorCoverField value={coverImageId} onChange={(id) => setCoverImageId(id)} />
+        <ArticleEditorCoverField
+          value={coverImageId}
+          initialPreviewUrl={coverImagePreviewUrl || undefined}
+          onChange={(id, previewUrl) => {
+            setCoverImageId(id);
+            setCoverImagePreviewUrl(previewUrl ?? "");
+          }}
+        />
         <ArticleEditorGalleryField value={galleryIds} onChange={setGalleryIds} />
         <div className="space-y-2">
           <Label>Текст</Label>
@@ -589,152 +607,51 @@ export function NewsPublicationEditor({
         </div>
       </section>
 
-      <Card className="border-gray-200 shadow-sm">
-        <CardHeader>
-          <CardTitle className="text-lg">SEO</CardTitle>
-          <CardDescription>
-            Картинка для соцсетей и мессенджеров использует обложку новости (как в превью).
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label>SEO title</Label>
-            <Input value={seoTitle} onChange={(e) => setSeoTitle(e.target.value)} />
-          </div>
-          <div className="space-y-2">
-            <Label>SEO description</Label>
-            <Textarea rows={3} value={seoDescription} onChange={(e) => setSeoDescription(e.target.value)} />
-          </div>
-          <div className="space-y-2">
-            <Label>Canonical URL</Label>
-            <Input value={seoCanonicalUrl} onChange={(e) => setSeoCanonicalUrl(e.target.value)} />
-          </div>
-          <div className="flex flex-col gap-3 rounded-lg border border-border/60 bg-muted/20 px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="space-y-1 min-w-0">
-              <Label htmlFor="news-noindex" className="text-primary">
-                Скрыть от поисковых систем
-              </Label>
-              <p className="text-xs text-muted-foreground leading-snug">
-                Новость не будет индексироваться Google и не появится в поисковой выдаче.
-              </p>
-            </div>
-            <Switch
-              id="news-noindex"
-              checked={noindex}
-              onCheckedChange={(c) => setNoindex(c === true)}
-              disabled={actionsBusy}
-            />
-          </div>
-        </CardContent>
-      </Card>
+      <SeoPanel
+        entityKey={articleId ?? "new-breaking-news"}
+        seoTitle={seoTitle}
+        seoDescription={seoDescription}
+        canonicalUrl={seoCanonicalUrl}
+        noindex={noindex}
+        coverImageUrl={coverImagePreviewUrl || undefined}
+        fallbackTitle={generateBreakingNewsSeoTitle(title)}
+        fallbackDescription={generateBreakingNewsSeoDescription(bodyHtml, title)}
+        publicUrl={publicNewsUrl || undefined}
+        entityType="breaking-news"
+        disabled={actionsBusy}
+        onSeoTitleChange={setSeoTitle}
+        onSeoDescriptionChange={setSeoDescription}
+        onCanonicalUrlChange={setSeoCanonicalUrl}
+        onNoindexChange={setNoindex}
+      />
 
-      {/* Публикация — как в редакторе статьи: статус, даты, действия */}
-      <Card className="border-gray-200 shadow-sm">
-        <CardHeader>
-          <CardTitle className="text-lg">Публикация</CardTitle>
-          <CardDescription>Статус и даты · просмотры: {views}</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label>Статус</Label>
-              {hydrated ? (
-                <Select value={status} onValueChange={(v) => setStatus(v as ContentStatus)}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {CONTENT_STATUS_OPTIONS.map((s) => (
-                      <SelectItem key={s} value={s}>
-                        {CONTENT_STATUS_LABEL[s] ?? s}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              ) : (
-                <div
-                  className="flex h-9 min-w-[10rem] items-center rounded-md border border-input bg-muted/40 px-3 text-sm text-muted-foreground animate-pulse"
-                  aria-hidden
-                >
-                  …
-                </div>
-              )}
-            </div>
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label>Запланировано (scheduledAt)</Label>
-              <Input
-                type="datetime-local"
-                value={scheduledAtLocal}
-                onChange={(e) => setScheduledAtLocal(e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Опубликовано (publishedAt)</Label>
-              <Input
-                type="datetime-local"
-                value={publishedAtLocal}
-                onChange={(e) => setPublishedAtLocal(e.target.value)}
-              />
-            </div>
-          </div>
-          <div className="flex flex-wrap items-center justify-between gap-y-2 gap-x-2 pt-2">
-            <div className="flex flex-wrap items-center gap-2 min-w-0">
-              <Button
-                type="button"
-                variant="default"
-                onClick={() => void submitForModeration()}
-                disabled={actionsBusy}
-              >
-                {submitting ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
-                {isAdminEditor ? "Опубликовать" : "Отправить на модерацию"}
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                className="text-muted-foreground hover:text-foreground"
-                onClick={() => void saveDraft()}
-                disabled={actionsBusy}
-              >
-                {saving ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
-                Сохранить черновик
-              </Button>
-              {status === "PENDING" ? (
-                <>
-                  <Button
-                    type="button"
-                    variant="default"
-                    onClick={() => void moderate("publish")}
-                    disabled={actionsBusy}
-                  >
-                    {moderating ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
-                    Одобрить (опубликовать)
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    onClick={() => void moderate("reject")}
-                    disabled={actionsBusy}
-                  >
-                    {moderating ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
-                    Отклонить
-                  </Button>
-                </>
-              ) : null}
-            </div>
-            <Button
-              type="button"
-              variant="outline"
-              className="text-muted-foreground hover:text-foreground shrink-0"
-              disabled
-              title="Сохраните черновик — предпросмотр будет доступен после появления записи"
-            >
-              Предпросмотр
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Публикация */}
+      <PublicationPanel
+        views={views}
+        status={status}
+        onStatusChange={setStatus}
+        scheduledAtLocal={scheduledAtLocal}
+        publishedAtLocal={publishedAtLocal}
+        onScheduledAtChange={setScheduledAtLocal}
+        onPublishedAtChange={setPublishedAtLocal}
+        authorUserId={authorUserId}
+        onAuthorChange={(id) => {
+          setAuthorUserId(id);
+          if (id) setAuthorError(null);
+        }}
+        authorError={authorError}
+        isAdminEditor={isAdminEditor}
+        actionsBusy={actionsBusy}
+        submitting={submitting}
+        saving={saving}
+        moderating={moderating}
+        onPublish={() => void submitForModeration()}
+        onSaveDraft={() => void saveDraft()}
+        onApprove={() => void moderate("publish")}
+        onReject={() => void moderate("reject")}
+        previewHref={previewHref}
+        publicUrl={publicUrl}
+      />
 
       <AlertDialog open={leaveDialogOpen} onOpenChange={onLeaveDialogOpenChange}>
         <AlertDialogContent>
@@ -757,6 +674,11 @@ export function NewsPublicationEditor({
 }
 
 export function ArticlePublicationEditor() {
+  const [seoTitle, setSeoTitle] = useState("");
+  const [seoDescription, setSeoDescription] = useState("");
+  const [canonicalUrl, setCanonicalUrl] = useState("");
+  const [noindex, setNoindex] = useState(false);
+
   return (
     <div className="space-y-8 max-w-3xl">
       <section className="space-y-4">
@@ -804,12 +726,30 @@ export function ArticlePublicationEditor() {
           <Input type="datetime-local" />
         </div>
       </section>
-      <SeoSectionFields titleId="article-seo-title" descId="article-seo-desc" />
+      <SeoPanel
+        entityKey="article-publication-editor-demo"
+        seoTitle={seoTitle}
+        seoDescription={seoDescription}
+        canonicalUrl={canonicalUrl}
+        noindex={noindex}
+        fallbackTitle="Заголовок статьи — mamaGo"
+        fallbackDescription="Короткий лид статьи появится здесь."
+        entityType="article"
+        onSeoTitleChange={setSeoTitle}
+        onSeoDescriptionChange={setSeoDescription}
+        onCanonicalUrlChange={setCanonicalUrl}
+        onNoindexChange={setNoindex}
+      />
     </div>
   );
 }
 
 export function CollectionPublicationEditor() {
+  const [seoTitle, setSeoTitle] = useState("");
+  const [seoDescription, setSeoDescription] = useState("");
+  const [canonicalUrl, setCanonicalUrl] = useState("");
+  const [noindex, setNoindex] = useState(false);
+
   return (
     <div className="space-y-8 max-w-3xl">
       <section className="space-y-4">
@@ -871,7 +811,20 @@ export function CollectionPublicationEditor() {
           </div>
         </div>
       </section>
-      <SeoSectionFields titleId="coll-seo-title" descId="coll-seo-desc" />
+      <SeoPanel
+        entityKey="collection-publication-editor-demo"
+        seoTitle={seoTitle}
+        seoDescription={seoDescription}
+        canonicalUrl={canonicalUrl}
+        noindex={noindex}
+        fallbackTitle="Подборка mamaGo"
+        fallbackDescription="Краткое описание подборки появится здесь."
+        entityType="collection"
+        onSeoTitleChange={setSeoTitle}
+        onSeoDescriptionChange={setSeoDescription}
+        onCanonicalUrlChange={setCanonicalUrl}
+        onNoindexChange={setNoindex}
+      />
     </div>
   );
 }

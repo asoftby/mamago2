@@ -3,6 +3,7 @@ import { Metadata } from "next";
 import { getPublishedPageBySlug } from "@/lib/pages/service";
 import { PageType } from "@prisma/client";
 import { sanitizeRichContent } from "@/components/content/RichContentRenderer";
+import { applyGlobalRobotsOverride } from "@/lib/seo/globalNoindex";
 
 type PageProps = {
   params: Promise<{ slug: string }>;
@@ -13,12 +14,12 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const page = await getPublishedPageBySlug(slug);
 
   if (!page || page.type === PageType.LEGAL) {
-    return {
+    return applyGlobalRobotsOverride({
       title: "Страница не найдена",
-    };
+    });
   }
 
-  return {
+  return applyGlobalRobotsOverride({
     title: page.seoTitle || page.title,
     description: page.seoDescription || page.excerpt || undefined,
     openGraph: {
@@ -26,7 +27,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       description: page.seoDescription || page.excerpt || undefined,
       ...(page.ogImageUrl && { images: [page.ogImageUrl] }),
     },
-  };
+  });
 }
 
 export default async function PublicPage({ params }: PageProps) {

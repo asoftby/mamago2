@@ -9,6 +9,7 @@ import { ReloadProbe } from "@/components/dev/ReloadProbe";
 import { PublicProviders } from "@/components/providers/PublicProviders";
 import { FamilyDerivedAgeSync } from "@/components/family/FamilyDerivedAgeSync";
 import { MyPlanProvider } from "@/components/MyPlanProvider";
+import { BetaTip } from "@/components/shared/BetaTip";
 
 export default function PublicGroupLayout({
   children,
@@ -27,6 +28,7 @@ export default function PublicGroupLayout({
               <PublicLayoutBody>{children}</PublicLayoutBody>
               <FamilyDerivedAgeSync />
               <MyPlanProvider />
+              <BetaTip />
 
               {/* Global Refinement Modal */}
               <Suspense fallback={null}>

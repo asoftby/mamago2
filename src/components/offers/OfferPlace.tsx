@@ -49,11 +49,11 @@ export function OfferPlace({ place }: OfferPlaceProps) {
         <div className="flex flex-col gap-5">
           {/* Headline */}
           <div className="leading-[0.95]">
-            <h2 className="font-[family-name:var(--font-display)] text-[40px] lg:text-[52px] font-normal tracking-[-0.02em] text-gray-900">
+            <h2 className="font-sans text-[40px] lg:text-[52px] font-semibold tracking-[-0.02em] text-gray-900">
               {place.name},
             </h2>
             {place.tagline && (
-              <p className="font-[family-name:var(--font-display)] text-[40px] lg:text-[52px] font-normal tracking-[-0.02em] italic text-[#C2522A]">
+              <p className="font-sans text-[40px] lg:text-[52px] font-semibold italic tracking-[-0.02em] text-[#C2522A]">
                 {place.tagline}.
               </p>
             )}

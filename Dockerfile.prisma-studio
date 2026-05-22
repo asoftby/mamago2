@@ -1,0 +1,13 @@
+FROM node:22-alpine
+
+WORKDIR /app
+
+# Копируем только schema — больше ничего не нужно
+COPY prisma ./prisma
+
+# Устанавливаем строго ту же версию prisma, что и в проекте
+RUN npm install --save-dev prisma@6.19.2
+
+EXPOSE 5555
+
+CMD ["npx", "prisma", "studio", "--port", "5555", "--hostname", "0.0.0.0"]

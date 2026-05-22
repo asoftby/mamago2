@@ -1,4 +1,5 @@
 export type StoryIntent =
+  | "breaking_news"
   | "today"
   | "weekend"
   | "free"
@@ -6,10 +7,22 @@ export type StoryIntent =
   | "age_3_5"
   | "new";
 
+export type StoryItemType =
+  | "story"
+  | "breaking-news"
+  | "event"
+  | "place"
+  | "offer"
+  | "route";
+
 export type StoryItem = {
   id: string;
   title: string;
   image: string;
+  type?: StoryItemType;
+  subtitle?: string;
+  eyebrow?: string;
+  description?: string;
   age?: string;
   location?: string;
   datetime?: string;
@@ -17,7 +30,7 @@ export type StoryItem = {
   businessName?: string;
   businessLogo?: string;
   isPromoted?: boolean;
-  href?: string;
+  href?: string | null;
 };
 
 export type StoryCollection = {

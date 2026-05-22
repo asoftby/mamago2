@@ -35,7 +35,7 @@ interface OfferHeroProps {
  * Hero-зона страницы предложения — Editorial style.
  *
  * Визуальная идентичность:
- * - Заголовок в Instrument Serif (display) с italic-акцентом
+ * - Заголовок в основном интерфейсном шрифте с italic-акцентом
  * - Kicker mono-caps вместо «оранжевого» лейбла-плашки
  * - Карточка брони с прерывистой обводкой и крупной serif-ценой
  * - Список скидок вместо одной плашки
@@ -178,7 +178,7 @@ export function OfferHero({
 
           {/* Editorial display title */}
           <h1
-            className="font-[family-name:var(--font-display)] text-[clamp(48px,8vw,96px)] font-normal leading-[0.95] tracking-[-0.025em] text-[#141210]"
+            className="font-sans text-[clamp(48px,8vw,96px)] font-semibold leading-[0.95] tracking-[-0.025em] text-[#141210]"
           >
             {titleParts.head}
             {titleParts.tail && (
@@ -535,7 +535,7 @@ function BookingCard({
         {/* ── Price ── */}
         {priceNumber && (
           <div className="mb-2 flex items-end gap-2">
-            <span className="font-[family-name:var(--font-display)] text-[72px] leading-[0.92] tracking-[-0.04em] text-[#141210]">
+            <span className="font-sans text-[72px] font-semibold leading-[0.92] tracking-[-0.04em] text-[#141210]">
               {priceNumber}
             </span>
             {priceUnit && (

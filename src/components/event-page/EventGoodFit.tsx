@@ -12,7 +12,7 @@ export function EventGoodFit({
   if (!items.length) return null;
   return (
     <div className={cn("flex flex-col", className)}>
-      <h3 className="font-[family-name:var(--font-display)] text-[clamp(28px,4vw,40px)] font-normal leading-[1.05] tracking-[-0.02em] text-[#141210]" style={{ margin: "0 0 24px" }}>
+      <h3 className="font-sans text-[clamp(28px,4vw,40px)] font-semibold leading-[1.05] tracking-[-0.02em] text-[#141210]" style={{ margin: "0 0 24px" }}>
         Кому <span className="italic text-[#C24E22]">подойдёт</span>
       </h3>
       <ul className="flex flex-col gap-3.5">

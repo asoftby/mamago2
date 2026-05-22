@@ -35,9 +35,10 @@ COPY --from=builder /app/prisma ./prisma
 # Prisma CLI нужен для migrate deploy; standalone не трейсит devDependencies
 COPY --from=builder /app/node_modules/.bin/prisma ./node_modules/.bin/prisma
 COPY --from=builder /app/node_modules/prisma ./node_modules/prisma
+COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 
 RUN apk add --no-cache curl
 
 EXPOSE 3000
 
-CMD ["sh", "-c", "./node_modules/.bin/prisma migrate deploy && node server.js"]
+CMD ["node", "server.js"]
