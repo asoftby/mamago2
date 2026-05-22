@@ -30,28 +30,12 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push Prisma Studio image (dev)
-        if: github.ref == 'refs/heads/dev'
+      - name: Build and push Prisma Studio image
         uses: docker/build-push-action@v5
         with:
           context: .
           file: Dockerfile.prisma-studio
           push: true
-          tags: |
-            ghcr.io/${{ github.repository }}-studio:dev-${{ github.run_number }}
-            ghcr.io/${{ github.repository }}-studio:dev
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Build and push Prisma Studio image (prod)
-        if: github.ref == 'refs/heads/main'
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: Dockerfile.prisma-studio
-          push: true
-          tags: |
-            ghcr.io/${{ github.repository }}-studio:prod-${{ github.run_number }}
-            ghcr.io/${{ github.repository }}-studio:latest
+          tags: ghcr.io/${{ github.repository }}-studio:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
