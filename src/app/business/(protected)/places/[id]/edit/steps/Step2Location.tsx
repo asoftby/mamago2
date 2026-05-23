@@ -4,6 +4,7 @@ import type { Place } from "../types";
 import { PlaceLocationPicker } from "@/components/business/place/PlaceLocationPicker";
 import { PlaceGroupSelector } from "@/components/business/place/PlaceGroupSelector";
 import { WizardStepHeader } from "../components/WizardStepHeader";
+import { GoogleReviewsSync } from "@/components/place/GoogleReviewsSync";
 
 interface Step2LocationProps {
   place: Place & { _districtName?: string | null; _metroName?: string | null };
@@ -54,9 +55,23 @@ export function Step2Location({ place, onUpdate, onPrev, onNext, canNext, isEdit
 
       <PlaceLocationPicker 
         placeId={place.id} 
+        placeTitle={place.title}
         initialLocation={initialLocation}
         onUpdate={onUpdate}
         disabled={!isEditable}
+      />
+
+      <GoogleReviewsSync
+        placeId={place.id}
+        placeTitle={place.title}
+        placeAddress={place.formattedAddr || place.customAddress}
+        googlePlaceId={place.googlePlaceId}
+        googleRating={place.googleRating}
+        googleUserRatingsTotal={place.googleUserRatingsTotal}
+        googleReviewsSyncedAt={place.googleReviewsSyncedAt}
+        googleMapsUri={place.googleMapsUri}
+        googleReviewsJson={place.googleReviewsJson}
+        onChange={onUpdate}
       />
 
       {/* Place Group Selector - shown after location is set */}

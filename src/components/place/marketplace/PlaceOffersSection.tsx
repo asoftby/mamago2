@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
+import Image from "next/image";
 import { getOfferPublicPath } from "@/lib/offers/offerPublicUrl";
-import { OfferCard } from "@/components/offers/OfferCard";
+import { isAppMediaUrl } from "@/lib/media/isAppMediaUrl";
 
 interface Offer {
   id: string;
@@ -25,36 +25,201 @@ interface PlaceOffersSectionProps {
   citySlug?: string;
 }
 
-export function PlaceOffersSection({ offers, placeId, citySlug = "minsk" }: PlaceOffersSectionProps) {
+export function PlaceOffersSection({
+  offers,
+  placeId,
+  citySlug = "minsk",
+}: PlaceOffersSectionProps) {
   if (offers.length === 0) return null;
 
   return (
-    <section className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-[20px] font-semibold tracking-[-0.01em] text-[#141210]">
-          Предложения
-        </h2>
-        <Link
-          href={`/places/${placeId}#offers`}
-          className="flex items-center gap-1 text-[14px] text-[rgba(20,18,16,0.55)] transition hover:text-[#141210]"
+    <section
+      style={{
+        padding: "56px 0",
+        borderTop: "1px solid rgba(20,18,16,.10)",
+        background: "#F6F2EA",
+      }}
+    >
+      <div
+        style={{ maxWidth: 1320, margin: "0 auto", padding: "0 28px" }}
+        className="offers-wrap"
+      >
+        {/* Header */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "flex-end",
+            justifyContent: "space-between",
+            marginBottom: 34,
+            gap: 16,
+            flexWrap: "wrap",
+          }}
         >
-          Все <ArrowRight className="h-3.5 w-3.5" />
-        </Link>
+          <div>
+            <div className="kicker-row" style={{ marginBottom: 14 }}>
+              <span className="text-kicker">04 — Предложения</span>
+              <span className="kicker-line" style={{ width: 120 }} />
+            </div>
+            <h2
+              className="font-display"
+              style={{
+                fontSize: 48,
+                margin: 0,
+                letterSpacing: "-.02em",
+                color: "#141210",
+              }}
+            >
+              Чему{" "}
+              <span className="font-display-italic" style={{ color: "#C24E22" }}>
+                научим
+              </span>
+              .
+            </h2>
+          </div>
+          <Link
+            href={`/places/${placeId}#offers`}
+            style={{
+              fontSize: 14,
+              color: "#3A332B",
+              textDecoration: "underline",
+              textUnderlineOffset: 4,
+              whiteSpace: "nowrap",
+            }}
+          >
+            Все предложения →
+          </Link>
+        </div>
+
+        {/* 4-col card grid */}
+        <div
+          className="offers-grid"
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(4, 1fr)",
+            gap: 14,
+          }}
+        >
+          {offers.slice(0, 4).map((offer) => (
+            <OfferCardEditorial
+              key={offer.id}
+              offer={offer}
+              href={getOfferPublicPath(offer, citySlug)}
+            />
+          ))}
+        </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">
-        {offers.map((offer) => (
-          <OfferCard
-            key={offer.id}
-            id={offer.id}
-            title={offer.title}
-            href={getOfferPublicPath(offer, citySlug)}
-            imageUrl={offer.imageUrl}
-            categoryLabel={offer.category ?? offer.kind}
-            priceLabel={offer.price ? `от ${offer.price} BYN` : undefined}
-          />
-        ))}
-      </div>
+      <style>{`
+        @media (max-width: 900px) {
+          .offers-grid { grid-template-columns: repeat(2, 1fr) !important; }
+          .offers-wrap { padding: 0 22px !important; }
+        }
+        @media (max-width: 520px) {
+          .offers-grid { grid-template-columns: 1fr !important; }
+          .offers-wrap { padding: 0 18px !important; }
+        }
+      `}</style>
     </section>
+  );
+}
+
+function OfferCardEditorial({ offer, href }: { offer: Offer; href: string }) {
+  const categoryLabel = offer.category ?? offer.kind;
+
+  return (
+    <Link
+      href={href}
+      style={{ display: "flex", flexDirection: "column", gap: 12, textDecoration: "none" }}
+    >
+      {/* Image */}
+      <div
+        style={{
+          aspectRatio: "4/5",
+          borderRadius: 14,
+          overflow: "hidden",
+          position: "relative",
+          background: "repeating-linear-gradient(135deg, rgba(20,18,16,.05) 0 1px, transparent 1px 12px), linear-gradient(180deg, #E9E2D6, #DDD3C2)",
+        }}
+      >
+        {offer.imageUrl && (
+          isAppMediaUrl(offer.imageUrl) ? (
+            <img
+              src={offer.imageUrl}
+              alt={offer.title}
+              style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
+            />
+          ) : (
+            <Image
+              src={offer.imageUrl}
+              alt={offer.title}
+              fill
+              sizes="(max-width: 520px) 100vw, (max-width: 900px) 50vw, 25vw"
+              className="object-cover"
+            />
+          )
+        )}
+        {/* Price badge */}
+        {offer.price && (
+          <span
+            style={{
+              position: "absolute",
+              top: 10,
+              right: 10,
+              height: 26,
+              padding: "0 10px",
+              borderRadius: 999,
+              background: "#E86A3A",
+              color: "#fff",
+              fontSize: 11,
+              fontWeight: 600,
+              display: "inline-flex",
+              alignItems: "center",
+            }}
+          >
+            от {offer.price} BYN
+          </span>
+        )}
+      </div>
+
+      {/* Meta */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+        {categoryLabel && (
+          <div
+            style={{
+              fontFamily: "var(--font-mono, monospace)",
+              textTransform: "uppercase",
+              fontSize: 10,
+              letterSpacing: ".12em",
+              color: "rgba(20,18,16,.55)",
+            }}
+          >
+            {categoryLabel}
+          </div>
+        )}
+        <div
+          style={{
+            fontSize: 16,
+            fontWeight: 600,
+            letterSpacing: "-.01em",
+            lineHeight: 1.25,
+            color: "#141210",
+          }}
+        >
+          {offer.title}
+        </div>
+        {offer.price && (
+          <div
+            style={{
+              fontFamily: "var(--font-mono, monospace)",
+              fontSize: 12,
+              color: "rgba(20,18,16,.55)",
+              marginTop: 4,
+            }}
+          >
+            от {offer.price} BYN
+          </div>
+        )}
+      </div>
+    </Link>
   );
 }

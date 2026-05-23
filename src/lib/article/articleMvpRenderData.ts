@@ -6,6 +6,9 @@ import { parseArticleContentJson, type ArticleBlockMvp } from "@/lib/publication
 import type { ShiftCtaContext } from "@/lib/offer/offerPageTypes";
 import { getOfferPageData } from "@/lib/offer/offerPageData";
 import { getOfferPublicPath, getOfferPublicSection } from "@/lib/offers/offerPublicUrl";
+import { parsePriceData, type PriceData } from "@/lib/priceItems";
+import { generateSummary, mapToUIState } from "@/lib/openingHours/openingHoursMapper";
+import type { OpeningHoursWithRelations } from "@/server/services/openingHours/openingHours.types";
 
 /** Без coverImage / seoImageAsset — на старой БД может не быть колонки coverImageId. */
 const articleMvpBaseSelect = {
@@ -51,12 +54,26 @@ async function resolveCoverMedia(coverImageId: string | null): Promise<{
   });
 }
 
+export type PlaceCardExtra = {
+  lat: number | null;
+  lng: number | null;
+  address: string | null;
+  cityName: string | null;
+  openingHoursSummary: string | null;
+  ageTags: string[];
+  activityTypes: string[];
+  createdAt: Date;
+  priceData: PriceData;
+  priceUpdatedAt: Date;
+};
+
 export type ResolvedActivityCard = {
   kind: "basic";
   href: string;
   title: string;
   meta?: string;
   imageUrl?: string | null;
+  placeExtra?: PlaceCardExtra;
 };
 
 export type ArticleShiftPreview = {
@@ -144,12 +161,53 @@ async function resolveActivityCard(
       select: {
         title: true,
         slug: true,
-        city: { select: { slug: true } },
+        lat: true,
+        lng: true,
+        formattedAddr: true,
+        customAddress: true,
+        ageTags: true,
+        activityTypes: true,
+        openingHours: {
+          include: {
+            rules: {
+              include: {
+                intervals: true,
+              },
+            },
+            exceptions: {
+              include: {
+                intervals: true,
+              },
+            },
+          },
+        },
+        createdAt: true,
+        updatedAt: true,
+        priceItems: true,
+        city: { select: { slug: true, name: true } },
       },
     });
-    if (!p?.slug) return { kind: "basic", href: "#", title: p?.title ?? "Место" };
-    const href = `/places/${p.slug}`;
-    return { kind: "basic", href, title: p.title };
+    if (!p) return null;
+    const href = p.slug ? `/places/${p.slug}` : "#";
+    const priceData = parsePriceData(p.priceItems);
+    const openingHoursSummary = p.openingHours
+      ? generateSummary(mapToUIState(p.openingHours as OpeningHoursWithRelations))
+          .split("\n")[0]
+          ?.trim() || null
+      : null;
+    const placeExtra: PlaceCardExtra = {
+      lat: p.lat ?? null,
+      lng: p.lng ?? null,
+      address: p.formattedAddr ?? p.customAddress ?? null,
+      cityName: p.city?.name ?? null,
+      openingHoursSummary,
+      ageTags: p.ageTags,
+      activityTypes: p.activityTypes,
+      createdAt: p.createdAt,
+      priceData,
+      priceUpdatedAt: p.updatedAt,
+    };
+    return { kind: "basic", href, title: p.title, placeExtra };
   }
   if (b.entityType === "EVENT") {
     const a = await prisma.activity.findUnique({

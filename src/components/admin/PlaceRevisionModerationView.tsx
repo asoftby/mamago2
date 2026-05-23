@@ -31,6 +31,7 @@ import { getPlacePublicUrl } from "@/lib/placePublicUrl";
 import { PlaceDangerZone } from "./moderation/PlaceDangerZone";
 import { Textarea } from "@/components/ui/textarea";
 import type { OpeningHoursWithRelations } from "@/server/services/openingHours/openingHours.types";
+import { GoogleReviewsStatusBadge } from "@/components/admin/moderation/GoogleReviewsStatusBadge";
 
 interface PlaceRevisionModerationViewProps {
   place: {
@@ -51,6 +52,10 @@ interface PlaceRevisionModerationViewProps {
     metroAutoDistanceM?: number | null;
     formattedAddr?: string | null;
     customAddress?: string | null;
+    googlePlaceId?: string | null;
+    googleRating?: number | null;
+    googleUserRatingsTotal?: number | null;
+    googleReviewsJson?: unknown;
     [key: string]: unknown;
   };
   revision: {
@@ -486,6 +491,14 @@ export function PlaceRevisionModerationView({
                 Местоположение
               </h3>
               <p className="text-sm text-gray-700 mb-3">{displayAddress}</p>
+              <div className="mb-3">
+                <GoogleReviewsStatusBadge
+                  googlePlaceId={place.googlePlaceId}
+                  googleRating={place.googleRating}
+                  googleUserRatingsTotal={place.googleUserRatingsTotal}
+                  googleReviewsJson={place.googleReviewsJson}
+                />
+              </div>
               <div className="flex items-center gap-3 flex-wrap">
                 {districtName && (
                   <span className="inline-flex items-center gap-1 px-3 py-1 text-sm font-medium text-gray-700 bg-gray-100 rounded">

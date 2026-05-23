@@ -11,8 +11,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
-import type { ArticleMvpResolvedBlock } from "@/lib/article/articleMvpRenderData";
-import { articleBlockHtmlForEditor } from "@/lib/article/articleBlockHtml";
+import type { ArticleMvpResolvedBlock, PlaceCardExtra } from "@/lib/article/articleMvpRenderData";
+import { articleBlockHtmlForEditor, articleBlockHtmlForPublic } from "@/lib/article/articleBlockHtml";
+import { SaveHeart } from "@/features/save/SaveHeart";
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 
@@ -59,7 +60,7 @@ function ReadingProgress() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
   return (
-    <div style={{ position: "fixed", top: 0, left: 0, right: 0, height: 3, zIndex: 90 }}>
+    <div style={{ position: "fixed", top: 0, left: 0, right: 0, height: 3, zIndex: 90, pointerEvents: "none" }}>
       <div style={{ height: "100%", width: `${p * 100}%`, background: C.accent, transition: "width .1s linear" }} />
     </div>
   );
@@ -68,12 +69,13 @@ function ReadingProgress() {
 // ─── Marquee ticker ───────────────────────────────────────────────────────────
 
 function Marquee({ items }: { items: string[] }) {
-  const row = [...items, ...items, ...items];
+  const half = Array.from({ length: 15 }, () => items).flat();
+  const row = [...half, ...half];
   return (
     <div style={{ background: C.breaking, color: "#fff", overflow: "hidden" }}>
       <div style={{
-        display: "flex", whiteSpace: "nowrap",
-        animation: "bn-marquee 38s linear infinite",
+        display: "flex", whiteSpace: "nowrap", width: "max-content",
+        animation: "bn-marquee 18s linear infinite",
         padding: "9px 0",
         fontFamily: FONT_MONO, fontSize: 11, letterSpacing: ".08em", textTransform: "uppercase",
       }}>
@@ -88,42 +90,89 @@ function Marquee({ items }: { items: string[] }) {
   );
 }
 
-// ─── Live clock ───────────────────────────────────────────────────────────────
+// ─── Published-at chip ────────────────────────────────────────────────────────
 
-function ClockChip() {
-  const [now, setNow] = useState(() => new Date());
+function useRelativeTime(publishedAt: Date | null) {
+  const [label, setLabel] = useState(() => computeLabel(publishedAt));
+
   useEffect(() => {
-    const id = setInterval(() => setNow(new Date()), 1000);
+    if (!publishedAt) return;
+    const diff = Date.now() - publishedAt.getTime();
+    const interval = diff < 86_400_000 ? 60_000 : 0;
+    if (!interval) return;
+    const id = setInterval(() => setLabel(computeLabel(publishedAt)), interval);
     return () => clearInterval(id);
-  }, []);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return (
-    <span style={{
-      display: "inline-flex", alignItems: "center", gap: 8,
-      fontFamily: FONT_MONO, fontSize: 11, color: C.ink3,
-      padding: "4px 10px", border: `1px solid ${C.line}`, borderRadius: 99,
-    }}>
-      <span style={{ width: 6, height: 6, borderRadius: 99, background: C.breaking, animation: "bn-pulse 1.8s ease-out infinite" }} />
-      Минск · {pad(now.getHours())}:{pad(now.getMinutes())}:{pad(now.getSeconds())}
-    </span>
-  );
+  }, [publishedAt]);
+
+  return label;
 }
 
+function pluralDay(n: number): string {
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  if (mod100 >= 11 && mod100 <= 14) return "дней";
+  if (mod10 === 1) return "день";
+  if (mod10 >= 2 && mod10 <= 4) return "дня";
+  return "дней";
+}
+
+function computeLabel(publishedAt: Date | null): string {
+  if (!publishedAt) return "";
+  const diff = Date.now() - publishedAt.getTime();
+  const minutes = Math.floor(diff / 60_000);
+  const hours = Math.floor(diff / 3_600_000);
+  const days = Math.floor(diff / 86_400_000);
+
+  if (diff < 60_000) return "только что";
+  if (diff < 3_600_000) return `${minutes}м назад`;
+  if (diff < 86_400_000) {
+    const m = minutes % 60;
+    return m > 0 ? `${hours}ч ${m}м назад` : `${hours}ч назад`;
+  }
+  if (days <= 5) return `${days} ${pluralDay(days)} назад`;
+  return new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "long", year: "numeric" })
+    .format(publishedAt)
+    .replace(/ г\.$/, "");
+}
+
+function PublishedAtChip({ publishedAt }: { publishedAt: Date | null }) {
+  const label = useRelativeTime(publishedAt);
+  if (!label) return null;
+  return <span style={capsStyle}>{label}</span>;
+}
+
+
 // ─── Breadcrumbs ──────────────────────────────────────────────────────────────
+
+const BREADCRUMB_HREFS: Record<string, string> = {
+  "Главная": "/",
+  "Журнал": "/blog",
+};
 
 function Breadcrumbs({ items }: { items: string[] }) {
   return (
     <div style={{
-      maxWidth: 1320, margin: "0 auto", padding: "22px 28px 8px",
+      maxWidth: 1200, margin: "0 auto", padding: "28px 28px 16px",
       display: "flex", gap: 8, alignItems: "center",
       color: C.ink3, fontSize: 13, overflowX: "auto", whiteSpace: "nowrap",
     }}>
-      {items.map((t, i) => (
-        <span key={i} style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-          {i > 0 && <span style={{ opacity: .45, fontSize: 11 }}>→</span>}
-          <span style={{ color: i === items.length - 1 ? C.ink : "inherit" }}>{t}</span>
-        </span>
-      ))}
+      {items.map((t, i) => {
+        const isLast = i === items.length - 1;
+        const href = BREADCRUMB_HREFS[t];
+        return (
+          <span key={i} style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+            {i > 0 && <span style={{ opacity: .45, fontSize: 11 }}>→</span>}
+            {!isLast && href ? (
+              <Link href={href} style={{ color: "inherit", textDecoration: "none" }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = C.ink; }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = ""; }}
+              >{t}</Link>
+            ) : (
+              <span style={{ color: isLast ? C.ink : "inherit" }}>{t}</span>
+            )}
+          </span>
+        );
+      })}
     </div>
   );
 }
@@ -131,35 +180,52 @@ function Breadcrumbs({ items }: { items: string[] }) {
 // ─── Hero section ─────────────────────────────────────────────────────────────
 
 function NewsHero({
+  articleId,
   title,
   excerpt,
   publishedAt,
   author,
 }: {
+  articleId: string;
   title: string;
   excerpt: string | null;
   publishedAt: Date | null;
   author: { displayName: string | null; avatarUrl: string | null } | null;
 }) {
-  const [liked, setLiked] = useState(false);
   const [copied, setCopied] = useState(false);
 
+  async function handleShare() {
+    const url = window.location.href;
+    if (navigator.share) {
+      try { await navigator.share({ title, url }); return; } catch {}
+    }
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(url).catch(() => {});
+    } else {
+      try {
+        const el = document.createElement("textarea");
+        el.value = url;
+        el.style.cssText = "position:fixed;opacity:0";
+        document.body.appendChild(el);
+        el.select();
+        document.execCommand("copy");
+        document.body.removeChild(el);
+      } catch {}
+    }
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
   const formattedDate = publishedAt
-    ? new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "long", year: "numeric" }).format(publishedAt)
+    ? new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "long", year: "numeric" }).format(publishedAt).replace(/ г\.$/, "")
     : null;
 
   const authorName = author?.displayName ?? "Редакция mamaGo";
   const authorInitial = authorName.charAt(0).toUpperCase();
 
-  function handleCopy() {
-    navigator.clipboard.writeText(window.location.href).catch(() => {});
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  }
-
   return (
     <section style={{ padding: "4px 0 24px" }}>
-      <div style={{ maxWidth: 1320, margin: "0 auto", padding: "0 28px" }}>
+      <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 28px" }}>
         <div style={{ maxWidth: 720, margin: "0 auto" }}>
           {/* Meta row */}
           <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 18, flexWrap: "wrap" }}>
@@ -171,11 +237,11 @@ function NewsHero({
               fontSize: 11, fontWeight: 500,
             }}>
               <span style={{ width: 6, height: 6, borderRadius: 99, background: "#fff", animation: "bn-blink 1.6s ease-in-out infinite" }} />
-              Breaking
+              Breaking News
             </span>
-            <span style={capsStyle}>Журнал · Новость</span>
             <span style={{ ...capsStyle, color: C.ink2 }}>Минск</span>
-            {formattedDate && <span style={capsStyle}>· {formattedDate}</span>}
+            <span style={capsStyle}>·</span>
+            <PublishedAtChip publishedAt={publishedAt} />
             <span style={capsStyle}>· 5 мин чтения</span>
           </div>
 
@@ -209,55 +275,38 @@ function NewsHero({
               {author?.avatarUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={author.avatarUrl} alt={authorName}
-                  style={{ width: 30, height: 30, borderRadius: 99, objectFit: "cover", flexShrink: 0 }} />
+                  style={{ width: 35, height: 35, borderRadius: 99, objectFit: "cover", flexShrink: 0 }} />
               ) : (
                 <span style={{
-                  width: 30, height: 30, borderRadius: 99,
+                  width: 35, height: 35, borderRadius: 99,
                   background: C.accentSoft, color: C.accentDeep,
                   display: "inline-flex", alignItems: "center", justifyContent: "center",
-                  fontSize: 13, fontWeight: 600, flexShrink: 0,
+                  fontSize: 14, fontWeight: 600, flexShrink: 0,
                 }}>{authorInitial}</span>
               )}
               <div>
                 <div style={{ color: C.ink, fontSize: 14, fontWeight: 600, letterSpacing: "-.01em" }}>{authorName}</div>
-                {formattedDate && (
-                  <div style={{ fontFamily: FONT_MONO, fontSize: 11, marginTop: 1, color: C.ink3 }}>
-                    {formattedDate}
-                  </div>
-                )}
               </div>
             </div>
 
             <span style={{ flex: 1 }} />
-            <ClockChip />
-
-            {/* Like */}
-            <button
-              onClick={() => setLiked((l) => !l)}
-              style={{
-                display: "inline-flex", alignItems: "center", gap: 6,
-                height: 32, padding: "0 12px", borderRadius: 999,
-                border: `1px solid ${liked ? "transparent" : C.line2}`,
-                background: liked ? C.accentSoft : "transparent",
-                color: liked ? C.accentDeep : C.ink2,
-                fontSize: 13, cursor: "pointer", fontFamily: "inherit",
-              }}
-            >
-              <span>{liked ? "♥" : "♡"}</span>
-              {liked ? "В идеях" : "В идеи"}
-            </button>
 
             {/* Share */}
             <button
-              onClick={handleCopy}
+              onClick={handleShare}
+              aria-label="Поделиться"
               style={{
-                display: "inline-flex", alignItems: "center", gap: 6,
-                height: 32, padding: "0 12px", borderRadius: 999,
-                border: `1px solid ${C.line2}`, background: "transparent",
-                color: C.ink2, fontSize: 13, cursor: "pointer", fontFamily: "inherit",
+                display: "inline-flex", alignItems: "center", justifyContent: "center",
+                width: 40, height: 40, borderRadius: 99, cursor: "pointer",
+                border: `1.5px solid ${copied ? "transparent" : C.line2}`,
+                background: copied ? C.accentSoft : "transparent",
+                color: copied ? C.accentDeep : C.ink2,
               }}
             >
-              {copied ? "✓ Скопировано" : "↗ Поделиться"}
+              {copied
+                ? <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                : <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+              }
             </button>
           </div>
         </div>
@@ -328,90 +377,54 @@ function HeroGallery({ urls, title }: { urls: string[]; title: string }) {
 
   if (urls.length === 0) return null;
 
-  const show = urls.slice(0, 4);  // max 4 real photos
-  const extra = Math.max(0, urls.length - 4);
+  const show = urls.slice(0, 3);
+  const extra = Math.max(0, urls.length - 3);
 
   return (
     <>
       <section style={{ padding: "0 0 24px" }}>
-        <div style={{ maxWidth: 1320, margin: "0 auto", padding: "0 28px" }}>
-          {/* Editorial 2-row grid */}
+        <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 28px" }}>
           <div style={{
             display: "grid",
             gap: 10,
-            gridTemplateColumns: show.length >= 3 ? "1.4fr 1fr 1fr" : show.length === 2 ? "1fr 1fr" : "1fr",
-            gridTemplateRows: show.length >= 3 ? "280px 280px" : "320px",
-            ...(show.length >= 3 ? {
-              gridTemplateAreas: show.length >= 4
-                ? '"a b c" "a d e"'
-                : '"a b c"',
-            } : {}),
+            gridTemplateColumns: `repeat(${show.length}, 1fr)`,
+            gridTemplateRows: "380px",
             borderRadius: 18,
             overflow: "hidden",
           }}>
-            {show.map((url, i) => (
-              <div
-                key={i}
-                onClick={() => setLightboxIndex(i)}
-                style={{
-                  gridArea: ["a", "b", "c", "d"][i] as string | undefined,
-                  position: "relative",
-                  overflow: "hidden",
-                  cursor: "pointer",
-                  background: C.bg,
-                  borderRadius: 0,
-                }}
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={url}
-                  alt={`${title} — фото ${i + 1}`}
-                  style={{ display: "block", width: "100%", height: "100%", objectFit: "cover", transition: "transform 1.2s cubic-bezier(.2,.7,.2,1)" }}
-                  onMouseEnter={(e) => { (e.currentTarget as HTMLImageElement).style.transform = "scale(1.04)"; }}
-                  onMouseLeave={(e) => { (e.currentTarget as HTMLImageElement).style.transform = ""; }}
-                />
-                {/* Caption label */}
-                <span style={{ position: "absolute", bottom: 12, left: 14, ...capsStyle, color: "rgba(250,247,241,.75)", fontSize: 10, pointerEvents: "none" }}>
-                  0{i + 1} · фото
-                </span>
-              </div>
-            ))}
-
-            {/* Overflow "+N" card */}
-            {(show.length >= 4 || extra > 0) && (
-              <div
-                onClick={() => setLightboxIndex(0)}
-                style={{
-                  gridArea: "e",
-                  position: "relative",
-                  background: C.ink,
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  cursor: "pointer", overflow: "hidden",
-                }}
-              >
-                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
-                  <span style={{ fontFamily: FONT_DISPLAY, fontSize: 44, lineHeight: 1, color: C.white }}>
-                    +{extra > 0 ? extra : urls.length}
-                  </span>
-                  <span style={{ ...capsStyle, color: "rgba(250,247,241,.55)", fontSize: 10 }}>смотреть все</span>
+            {show.map((url, i) => {
+              const isLast = i === show.length - 1 && extra > 0;
+              return (
+                <div
+                  key={i}
+                  onClick={() => setLightboxIndex(i)}
+                  style={{ position: "relative", overflow: "hidden", cursor: "pointer", background: C.bg }}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={url}
+                    alt={`${title} — фото ${i + 1}`}
+                    style={{ display: "block", width: "100%", height: "100%", objectFit: "cover", transition: "transform 1.2s cubic-bezier(.2,.7,.2,1)" }}
+                    onMouseEnter={(e) => { (e.currentTarget as HTMLImageElement).style.transform = "scale(1.04)"; }}
+                    onMouseLeave={(e) => { (e.currentTarget as HTMLImageElement).style.transform = ""; }}
+                  />
+                  {isLast ? (
+                    <div style={{
+                      position: "absolute", inset: 0,
+                      background: "rgba(20,18,16,.52)",
+                      display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 6,
+                    }}>
+                      <span style={{ fontFamily: FONT_DISPLAY, fontSize: 52, lineHeight: 1, color: "#fff", fontWeight: 400 }}>
+                        +{extra}
+                      </span>
+                      <span style={{ ...capsStyle, color: "rgba(250,247,241,.8)", fontSize: 10 }}>смотреть все</span>
+                    </div>
+                  ) : null}
                 </div>
-                <span style={{ position: "absolute", bottom: 12, left: 14, ...capsStyle, color: "rgba(250,247,241,.5)", fontSize: 10 }}>
-                  05+ · галерея
-                </span>
-              </div>
-            )}
+              );
+            })}
           </div>
 
-          {/* Gallery label */}
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 12, color: C.ink3, fontSize: 12 }}>
-            <span style={capsStyle}>{urls.length} {urls.length === 1 ? "фото" : "фото"} · галерея</span>
-            <button
-              onClick={() => setLightboxIndex(0)}
-              style={{ ...capsStyle, background: "none", border: 0, cursor: "pointer", color: C.ink3 }}
-            >
-              ↗ открыть галерею
-            </button>
-          </div>
         </div>
       </section>
 
@@ -424,45 +437,128 @@ function HeroGallery({ urls, title }: { urls: string[]; title: string }) {
 
 // ─── Article body ─────────────────────────────────────────────────────────────
 
-function ArticleBody({ blocks }: { blocks: ArticleMvpResolvedBlock[] }) {
-  const textBlocks = blocks.filter((b): b is Extract<ArticleMvpResolvedBlock, { type: "text" }> => b.type === "text");
+type ContentBlock = Extract<ArticleMvpResolvedBlock, { type: "text" }> | Extract<ArticleMvpResolvedBlock, { type: "quote" }>;
 
-  if (textBlocks.length === 0) return null;
+function ArticleBody({ blocks }: { blocks: ArticleMvpResolvedBlock[] }) {
+  const contentBlocks = blocks.filter((b): b is ContentBlock => b.type === "text" || b.type === "quote");
+
+  if (contentBlocks.length === 0) return null;
 
   return (
     <section style={{ padding: "28px 0 12px" }}>
-      <div style={{ maxWidth: 1320, margin: "0 auto", padding: "0 28px" }}>
+      <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 28px" }}>
         <div style={{ maxWidth: 720, margin: "0 auto" }}>
-          {textBlocks.map((block, i) => {
-            const isFirst = i === 0;
-            return (
-              <div
-                key={block.id}
-                style={{ marginBottom: i < textBlocks.length - 1 ? 48 : 0 }}
-              >
-                {/* Leading paragraph with drop-cap */}
-                {isFirst ? (
-                  <div
-                    className="bn-lede"
-                    style={{ fontSize: 22, lineHeight: 1.5, color: C.ink, letterSpacing: "-.01em", marginBottom: 24 }}
-                    dangerouslySetInnerHTML={{ __html: articleBlockHtmlForEditor(block.text, "text") }}
-                  />
-                ) : (
-                  <>
-                    {/* Kicker for second block (pricing) */}
-                    <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 18, color: C.ink3 }}>
-                      <span style={capsStyle}>Сколько стоит</span>
-                      <span style={{ flex: 1, height: 1, background: C.line }} />
-                    </div>
+          {contentBlocks.map((block, i) => (
+            <div key={block.id} style={{ marginBottom: i < contentBlocks.length - 1 ? 48 : 0 }}>
+              {block.type === "text" && (
+                <div
+                  className="prose prose-lg max-w-none bn-body"
+                  style={{ color: C.ink, fontFamily: "var(--font-serif), Georgia, serif", fontSize: 20, lineHeight: 1.7 }}
+                  dangerouslySetInnerHTML={{ __html: articleBlockHtmlForPublic(block.text, "text") }}
+                />
+              )}
+              {block.type === "quote" && (
+                <blockquote style={{ display: "flex", gap: 20, margin: 0, padding: 0 }}>
+                  <div style={{ width: 3, flexShrink: 0, alignSelf: "stretch", borderRadius: 99, background: C.accent }} />
+                  <div style={{ minWidth: 0, flex: 1, paddingBlock: 4 }}>
                     <div
-                      style={{ fontSize: 19, lineHeight: 1.65, color: C.ink, letterSpacing: "-.003em" }}
-                      dangerouslySetInnerHTML={{ __html: articleBlockHtmlForEditor(block.text, "text") }}
+                      className="bn-body"
+                      style={{ fontFamily: "var(--font-serif), Georgia, serif", fontSize: 22, lineHeight: 1.6, color: C.ink, fontStyle: "italic" }}
+                      dangerouslySetInnerHTML={{ __html: articleBlockHtmlForEditor(block.text, "quote") }}
                     />
-                  </>
+                    {(block.attribution || block.authorRole) && (
+                      <footer style={{ marginTop: 14, ...capsStyle, fontSize: 11, color: C.ink3 }}>
+                        {block.attribution && <span>— {block.attribution}</span>}
+                        {block.attribution && block.authorRole && <span style={{ margin: "0 8px" }}>·</span>}
+                        {block.authorRole && <span>{block.authorRole}</span>}
+                      </footer>
+                    )}
+                  </div>
+                </blockquote>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ─── Price section ────────────────────────────────────────────────────────────
+
+function PriceSection({ placeExtra }: { placeExtra: PlaceCardExtra }) {
+  const { priceData, priceUpdatedAt } = placeExtra;
+  const items = priceData.items;
+  if (items.length === 0 && !priceData.note?.trim()) return null;
+
+  const dateLabel = new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "long", year: "numeric" })
+    .format(new Date(priceUpdatedAt))
+    .replace(/ г\.$/, "");
+
+  const plural = (n: number) => {
+    const mod10 = n % 10;
+    const mod100 = n % 100;
+    if (mod100 >= 11 && mod100 <= 14) return "позиций";
+    if (mod10 === 1) return "позиция";
+    if (mod10 >= 2 && mod10 <= 4) return "позиции";
+    return "позиций";
+  };
+
+  return (
+    <section style={{ padding: "40px 0 0" }}>
+      <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 28px" }}>
+        <div style={{ maxWidth: 720, margin: "0 auto" }}>
+          {/* Header */}
+          <div style={{
+            display: "flex", alignItems: "center", gap: 14,
+            paddingBottom: 14, borderBottom: `1px solid ${C.line}`,
+          }}>
+            <span style={{ ...capsStyle, color: C.ink }}>Сколько стоит</span>
+            <span style={{ flex: 1, height: 1, background: C.line }} />
+            <span style={capsStyle}>{String(items.length).padStart(2, "0")} {plural(items.length)}</span>
+          </div>
+
+          {/* Rows */}
+          <div>
+            {items.map((item, i) => (
+              <div key={item.id} style={{
+                display: "flex", alignItems: "baseline", gap: 16,
+                padding: "16px 0",
+                borderBottom: `1px solid ${C.line}`,
+              }}>
+                <span style={{ ...capsStyle, width: 20, flexShrink: 0, color: C.ink3 }}>
+                  {String(i + 1).padStart(2, "0")}
+                </span>
+                <span style={{ flex: 1, fontSize: 15, color: C.ink, lineHeight: 1.4 }}>{item.label}</span>
+                <span style={{
+                  fontFamily: FONT_DISPLAY, fontSize: "clamp(28px, 3.5vw, 40px)",
+                  fontWeight: 400, lineHeight: 1, letterSpacing: "-.02em",
+                  color: C.ink, whiteSpace: "nowrap",
+                }}>
+                  {item.price}
+                </span>
+                {item.unit && (
+                  <span style={{ ...capsStyle, color: C.ink3, fontSize: 10, whiteSpace: "nowrap" }}>
+                    {item.unit}
+                  </span>
                 )}
               </div>
-            );
-          })}
+            ))}
+          </div>
+
+          {/* Footer */}
+          <div style={{
+            display: "flex", alignItems: "center", justifyContent: "space-between",
+            padding: "12px 0 0", flexWrap: "wrap", gap: 8,
+          }}>
+            <span style={{ ...capsStyle, color: C.ink3, display: "inline-flex", alignItems: "center", gap: 6 }}>
+              <span style={{ width: 6, height: 6, borderRadius: 99, background: C.ink3 }} />
+              цены актуальны на {dateLabel}
+            </span>
+            {priceData.note?.trim() && (
+              <span style={{ ...capsStyle, color: C.ink3 }}>{priceData.note.trim()}</span>
+            )}
+          </div>
         </div>
       </div>
     </section>
@@ -475,175 +571,229 @@ type ActivityCard = {
   href: string;
   title: string;
   meta?: string;
+  placeExtra?: PlaceCardExtra;
 };
 
-function LinkedEntityCard({ card, entityType }: { card: ActivityCard; entityType: string }) {
-  const [saved, setSaved] = useState(false);
+function EntitySaveHeart({
+  entityType,
+  entityId,
+  title,
+}: {
+  entityType: string;
+  entityId: string;
+  title: string;
+}) {
+  if (entityType === "OFFER") {
+    return (
+      <SaveHeart
+        activityId={entityId}
+        offerId={entityId}
+        activityTitle={title}
+        source="breaking-news-offer"
+        className="h-10 w-10 bg-white shadow-[0_1px_2px_rgba(20,18,16,0.08)]"
+        iconClassName="h-5 w-5"
+      />
+    );
+  }
 
+  if (entityType === "EVENT") {
+    return (
+      <SaveHeart
+        activityId={entityId}
+        activityTitle={title}
+        source="breaking-news-event"
+        className="h-10 w-10 bg-white shadow-[0_1px_2px_rgba(20,18,16,0.08)]"
+        iconClassName="h-5 w-5"
+      />
+    );
+  }
+
+  return null;
+}
+
+function formatPlaceLocationLine(address: string | null | undefined, cityName: string | null | undefined) {
+  const city = cityName?.trim();
+  const parts = (address ?? "")
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .filter((part) => {
+      const lower = part.toLowerCase();
+      return !lower.includes("область") && !lower.includes("район") && lower !== "беларусь";
+    });
+
+  const streetParts = parts.filter((part) => {
+    if (!city) return true;
+    return part.toLowerCase() !== city.toLowerCase();
+  });
+
+  if (city && streetParts.length > 0) {
+    return `г. ${city}, ${streetParts.join(", ")}`;
+  }
+  if (city) {
+    return `г. ${city}`;
+  }
+  return streetParts.join(", ") || null;
+}
+
+function LinkedEntityCard({
+  card,
+  entityType,
+  entityId,
+}: {
+  card: ActivityCard;
+  entityType: string;
+  entityId: string;
+}) {
   const typeLabel = entityType === "EVENT" ? "Событие" : entityType === "OFFER" ? "Предложение" : "Место";
-  const typeIcon = entityType === "EVENT" ? "📅" : entityType === "OFFER" ? "🎁" : "📍";
+  const extra = card.placeExtra;
+
+  const coordsLabel = extra?.lat && extra?.lng
+    ? `${extra.lat.toFixed(3)}° N · ${extra.lng.toFixed(3)}° E`
+    : null;
+
+  const workingHoursLabel = extra?.openingHoursSummary?.trim() || null;
+
+  const allTags = extra ? [...(extra.ageTags ?? []), ...(extra.activityTypes ?? [])] : [];
+
+  const locationLine = formatPlaceLocationLine(extra?.address, extra?.cityName);
 
   return (
-    <section style={{ padding: "36px 0 12px" }}>
-      <div style={{ maxWidth: 1320, margin: "0 auto", padding: "0 28px" }}>
+    <section style={{ padding: "40px 0 12px" }}>
+      <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 28px" }}>
         <div style={{ maxWidth: 720, margin: "0 auto" }}>
           {/* Kicker */}
-          <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 18, color: C.ink3 }}>
-            <span style={capsStyle}>О чём речь</span>
+          <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 18 }}>
+            <span style={{ ...capsStyle, color: C.ink }}>О чём речь</span>
             <span style={{ flex: 1, height: 1, background: C.line }} />
           </div>
 
-          <a
-            href={card.href}
+          <div
+            className="bn-place-card"
             style={{
               display: "grid",
-              gridTemplateColumns: "minmax(0, 280px) 1fr",
+              gridTemplateColumns: "minmax(0, 260px) 1fr",
               gap: 0,
               background: C.paper,
               border: `1px solid ${C.line}`,
               borderRadius: 22,
               overflow: "hidden",
-              textDecoration: "none",
-              color: "inherit",
-              transition: "transform .25s, box-shadow .25s, border-color .2s",
-            }}
-            onMouseEnter={(e) => {
-              const el = e.currentTarget as HTMLAnchorElement;
-              el.style.transform = "translateY(-2px)";
-              el.style.boxShadow = "0 28px 60px -30px rgba(20,18,16,.22)";
-              el.style.borderColor = C.line2;
-            }}
-            onMouseLeave={(e) => {
-              const el = e.currentTarget as HTMLAnchorElement;
-              el.style.transform = "";
-              el.style.boxShadow = "";
-              el.style.borderColor = C.line;
             }}
           >
-            {/* Map/illustration side */}
-            <div style={{ position: "relative", background: "linear-gradient(180deg, #E2EFE5, #C9DFD2)", minHeight: 220 }}>
+            {/* Map panel */}
+            <div style={{ position: "relative", background: "linear-gradient(180deg, #DCF0E4 0%, #BED9CB 100%)", minHeight: 240 }}>
+              {/* Subtle grid lines */}
+              <div style={{
+                position: "absolute", inset: 0,
+                backgroundImage: `
+                  linear-gradient(rgba(20,18,16,.06) 1px, transparent 1px),
+                  linear-gradient(90deg, rgba(20,18,16,.06) 1px, transparent 1px)
+                `,
+                backgroundSize: "32px 32px",
+              }} />
+              {/* Coordinates */}
+              {coordsLabel && (
+                <span style={{
+                  position: "absolute", top: 14, left: 14,
+                  fontFamily: FONT_MONO, fontSize: 10, color: "rgba(20,18,16,.5)",
+                  letterSpacing: ".1em",
+                }}>
+                  {coordsLabel}
+                </span>
+              )}
+              {/* Pin */}
               <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
                 <div style={{
                   width: 52, height: 52, borderRadius: 99,
                   background: C.accent, color: "#fff",
                   display: "flex", alignItems: "center", justifyContent: "center",
-                  fontSize: 22,
-                  boxShadow: `0 0 0 10px rgba(232,106,58,.22), 0 12px 28px rgba(20,18,16,.18)`,
-                  animation: "bn-pulse 2.4s ease-out infinite",
+                  fontSize: 20,
+                  boxShadow: `0 0 0 12px rgba(232,106,58,.18), 0 12px 28px rgba(20,18,16,.18)`,
                 }}>
-                  {typeIcon}
+                  📍
                 </div>
               </div>
-              <span style={{ position: "absolute", top: 14, left: 16, fontFamily: FONT_MONO, fontSize: 10, color: "rgba(20,18,16,.5)", letterSpacing: ".12em", textTransform: "uppercase" }}>
-                mamaGo · {typeLabel}
-              </span>
-              {card.meta && (
-                <span style={{ position: "absolute", bottom: 14, left: 16, fontFamily: FONT_MONO, fontSize: 10, color: "rgba(20,18,16,.5)", letterSpacing: ".12em", textTransform: "uppercase" }}>
-                  {card.meta}
+            </div>
+
+            {/* Info panel */}
+            <div style={{ padding: "22px 24px 20px", display: "flex", flexDirection: "column", gap: 12 }}>
+              {/* Type + heart */}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <span style={capsStyle}>{typeLabel}</span>
+                <EntitySaveHeart entityType={entityType} entityId={entityId} title={card.title} />
+              </div>
+
+              {/* Title */}
+              <a href={card.href} style={{ textDecoration: "none", color: "inherit" }}>
+                <div style={{
+                  fontFamily: FONT_DISPLAY, fontWeight: 400,
+                  fontSize: "clamp(22px, 2.8vw, 32px)", lineHeight: 1.08, letterSpacing: "-.02em",
+                  color: C.ink, textDecoration: "underline", textUnderlineOffset: 5, textDecorationThickness: 1,
+                }}>
+                  {card.title}
+                </div>
+              </a>
+
+              {/* Address */}
+              {locationLine && (
+                <span style={{ fontSize: 13, color: C.ink2, lineHeight: 1.4 }}>{locationLine}</span>
+              )}
+
+              {/* Working hours */}
+              {workingHoursLabel && (
+                <span style={{
+                  display: "inline-flex", alignItems: "center", gap: 6,
+                  fontFamily: FONT_MONO, fontSize: 10, letterSpacing: ".12em", textTransform: "uppercase",
+                  color: C.accentDeep,
+                }}>
+                  <span style={{ width: 6, height: 6, borderRadius: 99, background: C.accentDeep }} />
+                  {workingHoursLabel}
                 </span>
               )}
-            </div>
 
-            {/* Info side */}
-            <div style={{ padding: "24px 26px 22px", display: "flex", flexDirection: "column", gap: 14 }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
-                <span style={capsStyle}>{typeLabel}</span>
-                <button
-                  onClick={(e) => { e.preventDefault(); setSaved((s) => !s); }}
-                  aria-label="Сохранить"
+              {/* Tags */}
+              {allTags.length > 0 && (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                  {allTags.slice(0, 5).map((tag) => (
+                    <span key={tag} style={{
+                      display: "inline-flex", alignItems: "center", height: 28, padding: "0 12px",
+                      borderRadius: 999, border: `1px solid ${C.line2}`, fontSize: 12, color: C.ink2,
+                    }}>
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              {/* CTA buttons */}
+              <div style={{ display: "flex", gap: 8, marginTop: 4, flexWrap: "wrap" }}>
+                <a
+                  href={card.href}
                   style={{
-                    width: 36, height: 36, borderRadius: 99, cursor: "pointer",
-                    border: `1px solid ${saved ? "transparent" : C.line2}`,
-                    background: saved ? C.accentSoft : "transparent",
-                    color: saved ? C.accentDeep : C.ink2,
-                    display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14,
+                    display: "inline-flex", alignItems: "center", gap: 8,
+                    height: 44, padding: "0 18px", borderRadius: 999,
+                    background: C.accent, color: "#fff", fontSize: 14, fontWeight: 600,
+                    textDecoration: "none",
                   }}
                 >
-                  {saved ? "♥" : "♡"}
-                </button>
+                  Смотреть место <span aria-hidden>→</span>
+                </a>
+                {extra?.lat && extra?.lng && (
+                  <a
+                    href={`https://www.google.com/maps/dir/?api=1&destination=${extra.lat},${extra.lng}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      display: "inline-flex", alignItems: "center",
+                      height: 44, padding: "0 18px", borderRadius: 999,
+                      border: `1.5px solid ${C.line2}`, color: C.ink2, fontSize: 14,
+                      textDecoration: "none", background: "transparent",
+                    }}
+                  >
+                    Маршрут
+                  </a>
+                )}
               </div>
-
-              <div style={{
-                fontFamily: FONT_DISPLAY, fontWeight: 400,
-                fontSize: 30, lineHeight: 1.08, letterSpacing: "-.02em",
-                color: C.ink, textDecoration: "underline", textUnderlineOffset: 5, textDecorationThickness: 1,
-              }}>
-                {card.title}
-              </div>
-
-              <div style={{ display: "flex", gap: 10, marginTop: 6 }}>
-                <span style={{
-                  display: "inline-flex", alignItems: "center", gap: 8,
-                  height: 44, padding: "0 18px", borderRadius: 999,
-                  background: C.accent, color: "#fff", fontSize: 14, fontWeight: 600,
-                }}>
-                  Смотреть {typeLabel.toLowerCase()} <span aria-hidden>→</span>
-                </span>
-              </div>
-            </div>
-          </a>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-// ─── Share strip ──────────────────────────────────────────────────────────────
-
-function ShareStrip({ title }: { title: string }) {
-  const [copied, setCopied] = useState(false);
-
-  function handleCopy() {
-    navigator.clipboard.writeText(window.location.href).catch(() => {});
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  }
-
-  const tgUrl = `https://t.me/share/url?url=${encodeURIComponent(typeof window !== "undefined" ? window.location.href : "")}&text=${encodeURIComponent(title)}`;
-
-  return (
-    <section style={{ padding: "28px 0 6px" }}>
-      <div style={{ maxWidth: 1320, margin: "0 auto", padding: "0 28px" }}>
-        <div style={{ maxWidth: 720, margin: "0 auto" }}>
-          <div style={{
-            display: "flex", alignItems: "center", justifyContent: "space-between",
-            padding: "16px 0", borderTop: `1px solid ${C.line}`, borderBottom: `1px solid ${C.line}`,
-            flexWrap: "wrap", gap: 12,
-          }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, color: C.ink3, fontSize: 13 }}>
-              <span style={capsStyle}>Тэги</span>
-              {["дети", "новость", "Минск"].map((tag) => (
-                <span key={tag} style={{
-                  display: "inline-flex", alignItems: "center", height: 26, padding: "0 12px",
-                  borderRadius: 999, border: `1px solid ${C.line2}`, fontSize: 12, color: C.ink2,
-                }}>
-                  {tag}
-                </span>
-              ))}
-            </div>
-            <div style={{ display: "flex", gap: 8 }}>
-              <a
-                href={tgUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{
-                  display: "inline-flex", alignItems: "center", height: 32, padding: "0 12px",
-                  borderRadius: 999, border: `1px solid ${C.line2}`, fontSize: 13, color: C.ink2,
-                  textDecoration: "none",
-                }}
-              >
-                ↗ Telegram
-              </a>
-              <button
-                onClick={handleCopy}
-                style={{
-                  display: "inline-flex", alignItems: "center", height: 32, padding: "0 12px",
-                  borderRadius: 999, border: `1px solid ${C.line2}`, fontSize: 13, color: C.ink2,
-                  cursor: "pointer", background: "transparent", fontFamily: "inherit",
-                }}
-              >
-                {copied ? "✓ Скопировано" : "↗ Копировать"}
-              </button>
             </div>
           </div>
         </div>
@@ -673,7 +823,7 @@ function RelatedSection({ items }: { items: RelatedArticle[] }) {
   if (items.length === 0) return null;
   return (
     <section style={{ padding: "52px 0 28px", borderTop: `1px solid ${C.line}`, marginTop: 44 }}>
-      <div style={{ maxWidth: 1320, margin: "0 auto", padding: "0 28px" }}>
+      <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 28px" }}>
         <div style={{ display: "flex", alignItems: "end", justifyContent: "space-between", marginBottom: 22, gap: 16, flexWrap: "wrap" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 14, flex: 1, minWidth: 220 }}>
             <span style={capsStyle}>Дальше читать</span>
@@ -745,43 +895,18 @@ function RelatedSection({ items }: { items: RelatedArticle[] }) {
   );
 }
 
-// ─── Footer ───────────────────────────────────────────────────────────────────
-
-function FooterBar() {
-  return (
-    <footer style={{ padding: "44px 0 72px", borderTop: `1px solid ${C.line}` }}>
-      <div style={{ maxWidth: 1320, margin: "0 auto", padding: "0 28px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
-        <Link href="/blog" style={{ display: "inline-flex", alignItems: "center", gap: 10, color: C.ink, fontSize: 15, textDecoration: "none" }}>
-          <span style={{ color: C.accentDeep }}>←</span> Все материалы
-        </Link>
-        <div style={{ display: "flex", alignItems: "center", gap: 14, color: C.ink3, fontSize: 12 }}>
-          <span style={{ fontFamily: FONT_MONO, letterSpacing: ".1em", textTransform: "uppercase" }}>mamaGo · Минск</span>
-          <span style={{ width: 4, height: 4, background: C.ink3, borderRadius: 99 }} />
-          <span>журнал · 2026</span>
-        </div>
-      </div>
-    </footer>
-  );
-}
-
 // ─── Keyframes injector ───────────────────────────────────────────────────────
 
 function GlobalStyles() {
   return (
     <style>{`
-      @keyframes bn-marquee { from { transform: translateX(0); } to { transform: translateX(-33.333%); } }
+      .bn-body p { margin-top: 0; margin-bottom: 1.4em; }
+      .bn-body p:last-child { margin-bottom: 0; }
+      @keyframes bn-marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
       @keyframes bn-blink { 0%, 60% { opacity: 1; } 80% { opacity: .25; } 100% { opacity: 1; } }
       @keyframes bn-pulse { 0% { box-shadow: 0 0 0 0 rgba(214,52,43,.55); } 70% { box-shadow: 0 0 0 12px rgba(214,52,43,0); } 100% { box-shadow: 0 0 0 0 rgba(214,52,43,0); } }
 
-      /* Drop-cap on lede first paragraph */
-      .bn-lede p:first-child::first-letter {
-        font-family: ${FONT_DISPLAY};
-        float: left;
-        font-size: 84px;
-        line-height: .82;
-        padding: 6px 12px 0 0;
-        color: ${C.accentDeep};
-      }
+
 
       /* Place card responsive */
       @media (max-width: 640px) {
@@ -800,6 +925,7 @@ function GlobalStyles() {
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export interface BreakingNewsViewProps {
+  articleId: string;
   title: string;
   excerpt: string | null;
   publishedAt: Date | null;
@@ -810,6 +936,7 @@ export interface BreakingNewsViewProps {
 }
 
 export function BreakingNewsView({
+  articleId,
   title,
   excerpt,
   publishedAt,
@@ -826,15 +953,9 @@ export function BreakingNewsView({
   const activityBlock = blocks.find((b): b is Extract<ArticleMvpResolvedBlock, { type: "activityCard" }> => b.type === "activityCard");
 
   // Build marquee items from article context.
-  const marqueeItems = [
-    `Breaking · ${title}`,
-    "mamaGo · Журнал",
-    "Минск · Новости для семей",
-    "Читай · Делись · Сохраняй",
-    "mamaGo · Открытия · Места · События",
-  ];
+  const marqueeItems = ["BREAKING NEWS"];
 
-  const breadcrumbs = ["Главная", "Журнал", title.length > 40 ? title.slice(0, 37) + "…" : title];
+  const breadcrumbs = ["Главная", "Журнал", title];
 
   return (
     <div style={{ background: C.bg, color: C.ink, minHeight: "100vh", position: "relative" }}>
@@ -854,7 +975,7 @@ export function BreakingNewsView({
       <Marquee items={marqueeItems} />
 
       {draftWatermark && (
-        <div style={{ maxWidth: 1320, margin: "0 auto", padding: "12px 28px 0" }}>
+        <div style={{ maxWidth: 1200, margin: "0 auto", padding: "12px 28px 0" }}>
           <div style={{ borderRadius: 10, border: "1px solid #fde68a", background: "#fffbeb", padding: "10px 16px", fontSize: 13, color: "#92400e" }}>
             Черновик / предпросмотр — так видят только редакторы
           </div>
@@ -862,17 +983,23 @@ export function BreakingNewsView({
       )}
 
       <Breadcrumbs items={breadcrumbs} />
-      <NewsHero title={title} excerpt={excerpt} publishedAt={publishedAt} author={author} />
+      <NewsHero articleId={articleId} title={title} excerpt={excerpt} publishedAt={publishedAt} author={author} />
       <HeroGallery urls={galleryUrls} title={title} />
       <ArticleBody blocks={blocks} />
 
-      {activityBlock?.card && (
-        <LinkedEntityCard card={activityBlock.card} entityType={activityBlock.entityType} />
+      {activityBlock?.card && activityBlock.card.kind === "basic" && activityBlock.card.placeExtra && (
+        <PriceSection placeExtra={activityBlock.card.placeExtra} />
       )}
 
-      <ShareStrip title={title} />
+      {activityBlock?.card && (
+        <LinkedEntityCard
+          card={activityBlock.card}
+          entityType={activityBlock.entityType}
+          entityId={activityBlock.entityId}
+        />
+      )}
+
       <RelatedSection items={related} />
-      <FooterBar />
     </div>
   );
 }

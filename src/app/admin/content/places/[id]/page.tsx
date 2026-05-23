@@ -12,7 +12,7 @@ import { getPlacePublicUrl } from "@/lib/placePublicUrl";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, ExternalLink, Mail } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { PlaceFormData } from "@/components/business/wizard/place/types";
 import { ContentStatus, PlaceKind } from "@prisma/client";
 import Link from "next/link";
@@ -227,6 +227,7 @@ export default async function PlaceModerationPage({
         placeKind: place.placeKind as PlaceKind,
         floor: place.floor,
         unit: place.unit,
+        priceItems: { items: [], note: "" },
         createdAt: place.createdAt,
         updatedAt: place.updatedAt,
       };
@@ -270,42 +271,6 @@ export default async function PlaceModerationPage({
                   )}
                 </div>
 
-                <div className="flex gap-2">
-                  {publicUrl ? (
-                    <Button variant="default" asChild>
-                      <a
-                        href={publicUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        <ExternalLink className="w-4 h-4 mr-2" />
-                        Открыть на сайте
-                      </a>
-                    </Button>
-                  ) : (
-                    <Button variant="outline" disabled>
-                      <ExternalLink className="w-4 h-4 mr-2" />
-                      Не опубликовано
-                    </Button>
-                  )}
-
-                  <Button variant="outline" asChild>
-                    <a
-                      href={`mailto:${place.createdBy.email}?subject=Regarding ${place.title}`}
-                    >
-                      <Mail className="w-4 h-4 mr-2" />
-                      Написать владельцу
-                    </a>
-                  </Button>
-
-                  <Button variant="secondary" asChild>
-                    <Link
-                      href={`/editor/place/${place.id}/edit?returnTo=${encodeURIComponent(`/admin/content/places/${place.id}`)}`}
-                    >
-                      Редактор карточки
-                    </Link>
-                  </Button>
-                </div>
               </div>
             </div>
           </div>

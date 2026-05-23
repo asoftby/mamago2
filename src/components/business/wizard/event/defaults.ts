@@ -86,6 +86,7 @@ export function getDefaultFormData(): EventFormData {
     pricingMode: "free",
     price: "",
     priceDetails: "",
+    priceItems: { items: [], note: "" },
     publicationAccess: null,
     ticketLink: "",
     participationMode: "walk-in",

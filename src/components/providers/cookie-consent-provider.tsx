@@ -14,7 +14,7 @@ import { MarketingLoader } from "@/components/analytics/marketing-loader";
 import "vanilla-cookieconsent/dist/cookieconsent.css";
 import "@/styles/cookie-consent-mamago.css";
 
-const TEMP_DISABLE_COOKIE_CONSENT = true;
+const TEMP_DISABLE_COOKIE_CONSENT = false;
 
 export function CookieConsentProvider({
   children,

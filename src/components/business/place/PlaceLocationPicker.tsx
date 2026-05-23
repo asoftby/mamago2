@@ -16,6 +16,7 @@ import { FilterSelect } from "@/components/ui/filter-select";
 
 interface PlaceLocationPickerProps {
   placeId: string;
+  placeTitle?: string;
   initialLocation?: {
     lat: number;
     lng: number;
@@ -42,6 +43,16 @@ type DuplicatePlace = {
   customAddress: string | null;
 };
 
+type GeoOptionsDebugState = {
+  cityId: string;
+  districtsUrl: string;
+  metroUrl: string;
+  districtsStatus: number | null;
+  metroStatus: number | null;
+  districtsCount: number;
+  metroCount: number;
+};
+
 // Single source of truth for location
 type LocationState = {
   lat: number;
@@ -53,6 +64,7 @@ type LocationState = {
 
 export function PlaceLocationPicker({
   placeId,
+  placeTitle,
   initialLocation,
   onUpdate,
   disabled = false,
@@ -110,6 +122,8 @@ export function PlaceLocationPicker({
   // Options for selects
   const [districts, setDistricts] = useState<Array<{ id: string; name: string }>>([]);
   const [metroStations, setMetroStations] = useState<Array<{ id: string; name: string }>>([]);
+  const [geoOptionsDebug, setGeoOptionsDebug] = useState<GeoOptionsDebugState | null>(null);
+  const [geoOptionsWarning, setGeoOptionsWarning] = useState<string | null>(null);
 
   // Duplicate detection
   const [duplicatePlace, setDuplicatePlace] = useState<DuplicatePlace | null>(null);
@@ -128,27 +142,86 @@ export function PlaceLocationPicker({
   const loadGeoOptions = useCallback(async () => {
     if (!cityId) return;
 
+    const districtsUrl = `/api/geo/districts?cityId=${encodeURIComponent(cityId)}`;
+    const metroUrl = `/api/geo/metro-stations?cityId=${encodeURIComponent(cityId)}`;
+
     console.log("[PlaceLocationPicker] Loading geo options for cityId:", cityId);
+    setGeoOptionsWarning(null);
 
     try {
       const [districtsRes, metroRes] = await Promise.all([
-        fetch(`/api/geo/districts?cityId=${cityId}`),
-        fetch(`/api/geo/metro-stations?cityId=${cityId}`),
+        fetch(districtsUrl),
+        fetch(metroUrl),
       ]);
+
+      let nextDistricts: Array<{ id: string; name: string }> = [];
+      let nextMetroStations: Array<{ id: string; name: string }> = [];
 
       if (districtsRes.ok) {
         const data = await districtsRes.json();
-        setDistricts(data.districts || []);
-        console.log("[PlaceLocationPicker] Loaded", data.districts?.length || 0, "districts");
+        nextDistricts = Array.isArray(data.districts) ? data.districts : [];
+        setDistricts(nextDistricts);
+      } else {
+        setDistricts([]);
       }
 
       if (metroRes.ok) {
         const data = await metroRes.json();
-        setMetroStations(data.metroStations || []);
-        console.log("[PlaceLocationPicker] Loaded", data.metroStations?.length || 0, "metro stations");
+        nextMetroStations = Array.isArray(data.metroStations) ? data.metroStations : [];
+        setMetroStations(nextMetroStations);
+      } else {
+        setMetroStations([]);
+      }
+
+      setGeoOptionsDebug({
+        cityId,
+        districtsUrl,
+        metroUrl,
+        districtsStatus: districtsRes.status,
+        metroStatus: metroRes.status,
+        districtsCount: nextDistricts.length,
+        metroCount: nextMetroStations.length,
+      });
+
+      console.log("[PlaceLocationPicker] districts request:", {
+        cityId,
+        url: districtsUrl,
+        status: districtsRes.status,
+        count: nextDistricts.length,
+      });
+      console.log("[PlaceLocationPicker] metro request:", {
+        cityId,
+        url: metroUrl,
+        status: metroRes.status,
+        count: nextMetroStations.length,
+      });
+
+      const warnings: string[] = [];
+      if (nextDistricts.length === 0) {
+        console.warn(`[PlaceLocationPicker] No districts found for cityId: ${cityId}`);
+        warnings.push("Для этого города не загружены районы.");
+      }
+      if (nextMetroStations.length === 0) {
+        console.warn(`[PlaceLocationPicker] No metro stations found for cityId: ${cityId}`);
+        warnings.push("Для этого города не загружены станции метро.");
+      }
+      if (warnings.length > 0) {
+        setGeoOptionsWarning(`${warnings.join(" ")} Можно выбрать вручную после настройки справочника.`);
       }
     } catch (err) {
       console.error("[PlaceLocationPicker] Load geo options error:", err);
+      setDistricts([]);
+      setMetroStations([]);
+      setGeoOptionsWarning("Не удалось загрузить справочники районов и метро. Проверьте geo API и данные города.");
+      setGeoOptionsDebug({
+        cityId,
+        districtsUrl,
+        metroUrl,
+        districtsStatus: null,
+        metroStatus: null,
+        districtsCount: 0,
+        metroCount: 0,
+      });
     }
   }, [cityId]);
 
@@ -188,6 +261,7 @@ export function PlaceLocationPicker({
 
   const handlePlaceSelect = async (data: {
     googlePlaceId: string;
+    placeName: string;
     lat: number;
     lng: number;
     formattedAddr: string;
@@ -212,6 +286,15 @@ export function PlaceLocationPicker({
       googlePlaceId: data.googlePlaceId,
       formattedAddr: data.formattedAddr,
       addressJson: data.addressJson,
+      googleReviewsJson: {
+        meta: {
+          enabled: false,
+          matchStatus: "ADDRESS_ONLY",
+          disabledReason: "pending_verification",
+          googlePlaceName: data.placeName || placeTitle || null,
+          googlePlaceAddress: data.formattedAddr || null,
+        },
+      },
     });
   };
 
@@ -593,6 +676,8 @@ export function PlaceLocationPicker({
                 metroAutoDistanceM: metroAutoDistanceM || null,
                 metroManualId: metroManualId || null,
                 metroManualDistanceM: metroManualDistanceM || null,
+                geoOptionsDebug,
+                geoOptionsWarning,
                 selectsVisible: showSelects,
                 readOnlyVisible: showReadOnlyEnrichment,
               },
@@ -667,6 +752,12 @@ export function PlaceLocationPicker({
       {/* District & Metro Selects (only show if location is set and cityId available) */}
       {showSelects && (
         <div id="geo-selects" className="space-y-4">
+          {geoOptionsWarning && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+              {geoOptionsWarning}
+            </div>
+          )}
+
           {/* District Select */}
           <div>
             <Label htmlFor="district">Район</Label>
@@ -695,8 +786,10 @@ export function PlaceLocationPicker({
                 </div>
               ) : districtAutoId ? (
                 <span>Определено автоматически</span>
+              ) : districts.length === 0 ? (
+                <span>Для этого города не загружены районы. Выбор станет доступен после настройки справочника.</span>
               ) : (
-                <span>Не удалось определить автоматически — выберите вручную</span>
+                <span>Не удалось определить район автоматически — выберите вручную</span>
               )}
             </div>
           </div>
@@ -710,7 +803,7 @@ export function PlaceLocationPicker({
               placeholder="Не выбрано"
               options={metroFilterOptions}
               onChange={handleMetroChange}
-              disabled={disabled}
+              disabled={metroFilterOptions.length === 0 || disabled}
             />
             
             {/* Distance display */}
@@ -736,8 +829,10 @@ export function PlaceLocationPicker({
                 </div>
               ) : metroAutoId ? (
                 <span>Определено автоматически</span>
+              ) : metroFilterOptions.length === 0 ? (
+                <span>Для этого города не загружены станции метро. Выбор станет доступен после настройки справочника.</span>
               ) : (
-                <span>Не удалось определить автоматически — выберите вручную</span>
+                <span>Не удалось определить метро автоматически — выберите вручную</span>
               )}
             </div>
           </div>

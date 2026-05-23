@@ -681,6 +681,8 @@ model Activity {
   /// Сигналы DISCOVERY домена (entityType=EVENT или OFFER), ID SignalDefinition
   discoverySignalIds   String[]                  @default([])
 
+  priceItems             Json?
+
   // Настройки записи
   bookingEnabled         Boolean          @default(false)
   bookingMode            BookingMode?
@@ -984,6 +986,8 @@ model Place {
   googleReviewsJson       Json?
   googleReviewsSyncedAt   DateTime?
   googleMapsUri           String?
+
+  priceItems              Json?
 
   activities      Activity[]          @relation("PlaceActivities")
   bookingRequests BookingRequest[]

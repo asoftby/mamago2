@@ -14,6 +14,10 @@ import prisma from "@/lib/prisma";
 
 const EARTH_RADIUS_KM = 6371;
 
+function isAdministrativeRegionEntity(name: string): boolean {
+  return /область|вобласць|region|oblast|район|rayon|raion/i.test(name);
+}
+
 /**
  * Calculate distance using Haversine formula
  * Returns distance in kilometers
@@ -111,8 +115,13 @@ async function resolveCityByCoordinates(
 
     console.log(`[cityResolver] Checking ${cities.length} cities`);
 
-    // Find nearest city within its radius
-    let nearestCity: { cityId: string; cityName: string; distance: number } | null = null;
+    const matchedCities: Array<{
+      cityId: string;
+      cityName: string;
+      distance: number;
+      radiusKm: number;
+      isAdministrativeRegion: boolean;
+    }> = [];
 
     for (const city of cities) {
       if (city.centerLat === null || city.centerLng === null || city.radiusKm === null) continue;
@@ -123,15 +132,30 @@ async function resolveCityByCoordinates(
 
       // Check if within city radius
       if (distance <= city.radiusKm) {
-        if (!nearestCity || distance < nearestCity.distance) {
-          nearestCity = { cityId: city.id, cityName: city.name, distance };
-        }
+        matchedCities.push({
+          cityId: city.id,
+          cityName: city.name,
+          distance,
+          radiusKm: city.radiusKm,
+          isAdministrativeRegion: isAdministrativeRegionEntity(city.name),
+        });
       }
     }
 
-    if (nearestCity) {
+    if (matchedCities.length > 0) {
+      matchedCities.sort((a, b) => {
+        if (a.isAdministrativeRegion !== b.isAdministrativeRegion) {
+          return a.isAdministrativeRegion ? 1 : -1;
+        }
+        if (a.radiusKm !== b.radiusKm) {
+          return a.radiusKm - b.radiusKm;
+        }
+        return a.distance - b.distance;
+      });
+
+      const nearestCity = matchedCities[0];
       console.log(
-        `[cityResolver] ✅ Matched city by coordinates: ${nearestCity.cityName} (${nearestCity.distance.toFixed(2)}km from center)`
+        `[cityResolver] ✅ Matched city by coordinates: ${nearestCity.cityName} (${nearestCity.distance.toFixed(2)}km from center, radius: ${nearestCity.radiusKm}km, administrativeRegion: ${nearestCity.isAdministrativeRegion})`
       );
       return nearestCity;
     }
@@ -273,6 +297,22 @@ export async function resolveCityId(input: {
         console.log(
           `[cityResolver] ⚠️ Mismatch: coordinates say ${coordResult.cityName}, address says ${addressResult.cityName}. Using coordinates.`
         );
+
+        if (
+          isAdministrativeRegionEntity(coordResult.cityName) &&
+          !isAdministrativeRegionEntity(addressResult.cityName)
+        ) {
+          console.log(
+            `[cityResolver] ✅ Prefer address-based city over broader region: ${addressResult.cityName} instead of ${coordResult.cityName}.`
+          );
+
+          return {
+            cityId: addressResult.cityId,
+            cityName: addressResult.cityName,
+            confidence: "high",
+            shouldUpdate: true,
+          };
+        }
       }
     }
 

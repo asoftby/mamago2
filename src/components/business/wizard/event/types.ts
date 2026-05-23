@@ -8,6 +8,7 @@ import type {
   AgeDetectionConfidence,
 } from "@/lib/age/ageMapping";
 import type { PublicationAccess } from "@/features/publication-access";
+import type { PriceData } from "@/lib/priceItems";
 
 export type EventWizardMode = "create" | "edit";
 
@@ -118,6 +119,7 @@ export interface EventFormData {
   pricingMode: "free" | "fixed" | "from";
   price: string;
   priceDetails: string; // Optional details for "from" mode (e.g., different ticket categories)
+  priceItems: PriceData;
   publicationAccess: PublicationAccess | null;
   ticketLink: string;
   /** Как попасть на событие (3 сценария; при загрузке старых данных нормализуется в маппере) */

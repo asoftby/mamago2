@@ -8,6 +8,9 @@ import {
   type SecondaryFilterGroup,
 } from "@/lib/discovery/filterConfigByIntent";
 import { useSecondaryFiltersFromUrl } from "@/features/filters/discovery/useSecondaryFiltersFromUrl";
+import { BudgetSliderFilter } from "@/components/discovery/BudgetSliderFilter";
+import { useBudgetFilter } from "@/features/filters/discovery/useBudgetFilter";
+import { useOptionalDiscoveryBudgetConfig } from "@/features/filters/discovery/discoveryBudgetContext";
 
 type SecondaryFiltersFormProps = {
   intent: Intent;
@@ -40,8 +43,11 @@ export function SecondaryFiltersForm({
   }, [intent]);
 
   const { values, patch, reset } = useSecondaryFiltersFromUrl(intent);
+  const budgetCtx = useOptionalDiscoveryBudgetConfig();
+  const budgetConfig = budgetCtx?.budgetConfig ?? null;
+  const { clearBudget } = useBudgetFilter();
 
-  if (!groups.length) {
+  if (!groups.length && !budgetConfig) {
     return (
       <p className="text-sm text-muted-foreground">
         Для этого раздела пока нет дополнительных фильтров.
@@ -50,9 +56,15 @@ export function SecondaryFiltersForm({
   }
 
   const gap = compact ? "space-y-5" : "space-y-8";
+  const handleReset = () => {
+    reset();
+    if (budgetConfig) clearBudget();
+  };
 
   return (
     <div className={cn(gap, "pb-1")}>
+      {budgetConfig ? <BudgetSliderFilter max={budgetConfig.max} /> : null}
+
       {groups.map((group) => (
         <FilterGroupRenderer
           key={group.id}
@@ -65,7 +77,7 @@ export function SecondaryFiltersForm({
       <div className="flex items-center justify-between pt-2 border-t border-gray-200">
         <button
           type="button"
-          onClick={reset}
+          onClick={handleReset}
           className="text-sm font-semibold text-gray-600 hover:text-gray-900 transition-colors underline decoration-transparent hover:decoration-current underline-offset-2"
         >
           Сбросить

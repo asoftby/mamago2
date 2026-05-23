@@ -206,7 +206,7 @@ export function PlaceWizard({
   }, [formData, mode, originalData, isSaving, isSubmitting]);
 
   // Auto-save for edit mode
-  const handleAutoSave = async (changes: Partial<PlaceFormData>) => {
+  const handleAutoSave = async (changes: Record<string, unknown>) => {
     if (!place?.id || autosaveInFlightRef.current || isSaving || isSubmitting) return;
 
     try {
@@ -458,6 +458,19 @@ export function PlaceWizard({
           throw new Error(errorMessage);
         }
 
+        // For admin editing a published place, also save opening hours directly
+        if (isAdmin && isPublished && formData.openingHoursData !== null) {
+          const ohResponse = await fetch(`/api/business/places/${place.id}/opening-hours`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ data: formData.openingHoursData }),
+          });
+          if (!ohResponse.ok) {
+            const errorData = await ohResponse.json().catch(() => ({}));
+            throw new Error(errorData.message || errorData.error || "Failed to save opening hours");
+          }
+        }
+
         console.log("[PlaceWizard] Save successful");
         setOriginalData(formData);
         toast.success("Изменения сохранены");
@@ -547,7 +560,40 @@ export function PlaceWizard({
             return;
           }
           if (place.status === "PUBLISHED") {
-          // Create revision for published place
+          const isAdmin = userRole === "ADMIN" || userRole === "MODERATOR";
+
+          if (isAdmin) {
+            // Admin: save directly without revision
+            const changes = extractChanges(formData, originalData);
+
+            if (Object.keys(changes).length > 0) {
+              const response = await fetch(`/api/business/places/${place.id}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(changes),
+              });
+              if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.message || error.error || "Failed to save");
+              }
+            }
+
+            if (formData.openingHoursData !== null) {
+              const ohResponse = await fetch(`/api/business/places/${place.id}/opening-hours`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ data: formData.openingHoursData }),
+              });
+              if (!ohResponse.ok) {
+                const error = await ohResponse.json();
+                throw new Error(error.message || error.error || "Failed to save opening hours");
+              }
+            }
+
+            setOriginalData(formData);
+            toast.success("Изменения сохранены");
+          } else {
+          // Non-admin: create revision for published place
           const changes = extractChanges(formData, originalData);
 
           const response = await fetch(`/api/business/places/${place.id}/revision`, {
@@ -560,11 +606,13 @@ export function PlaceWizard({
           });
 
           if (!response.ok) {
-            throw new Error("Failed to submit revision");
+            const error = await response.json();
+            throw new Error(error.message || error.error || "Failed to submit revision");
           }
 
           setOriginalData(formData);
           toast.success("Изменения отправлены на модерацию");
+          }
         } else {
           // Submit draft place
           const response = await fetch(`/api/business/places/${place.id}/submit`, {
@@ -572,11 +620,58 @@ export function PlaceWizard({
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               openingHoursData: formData.openingHoursData,
+              wizardSessionId: wizardSessionId ?? null,
             }),
           });
 
           if (!response.ok) {
-            throw new Error("Failed to submit");
+            const error = await response.json();
+
+            // Handle structured ValidationError from server (missing required fields)
+            if (error && error.error === "VALIDATION" && Array.isArray(error.missing) && error.missing.length > 0) {
+              const fieldLabels: Record<string, string> = {
+                title: "Название",
+                category: "Категория",
+                shortDesc: "Краткое описание",
+                logoImageId: "Логотип",
+                location: "Местоположение",
+                locationSource: "Источник местоположения",
+                parentPlaceId: "Родительское место",
+                floor: "Этаж",
+                unit: "Помещение",
+              };
+
+              const missingLabels = error.missing.map(
+                (f: string) => fieldLabels[f] || f,
+              );
+              toast.error(`Не заполнены обязательные поля: ${missingLabels.join(", ")}`);
+
+              // Navigate to appropriate step based on first missing field
+              const fieldToStep: Record<string, number> = {
+                title: 1,
+                category: 1,
+                shortDesc: 1,
+                logoImageId: 4,
+                location: 2,
+                locationSource: 2,
+                parentPlaceId: 2,
+                floor: 2,
+                unit: 2,
+              };
+
+              for (const field of error.missing) {
+                const step = fieldToStep[field];
+                if (step !== undefined && step < 6) {
+                  setCurrentStep(step);
+                  break;
+                }
+              }
+
+              setIsSubmitting(false);
+              return;
+            }
+
+            throw new Error(error.message || error.error || "Failed to submit");
           }
 
           setOriginalData(formData);

@@ -116,23 +116,83 @@ function escapeHtml(text: string): string {
     .replace(/'/g, "&#39;");
 }
 
+function normalizeAiListParagraph(paragraph: string): string {
+  const trimmed = paragraph.trim();
+  if (!trimmed) return trimmed;
+
+  if (/:\s*[—\-•*]\s+/.test(trimmed)) {
+    const match = trimmed.match(/^(.*?):\s*[—\-•*]\s+([\s\S]+)$/);
+    if (!match) return trimmed;
+
+    const heading = `${match[1]!.trim()}:`;
+    const items = match[2]!
+      .split(/\s+[—\-•*]\s+/)
+      .map((item) => item.trim())
+      .filter(Boolean);
+
+    if (items.length === 0) return trimmed;
+    return [heading, ...items.map((item) => `— ${item}`)].join("\n");
+  }
+
+  const inlineBulletCount = (trimmed.match(/\s[—\-•*]\s+/g) || []).length;
+  if (inlineBulletCount >= 2 && !trimmed.includes("\n")) {
+    return trimmed.replace(/\s+[—\-•*]\s+/g, "\n— ");
+  }
+
+  return trimmed;
+}
+
+function blockToHtml(block: string): string {
+  const lines = block
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  if (lines.length === 0) return "";
+
+  const firstBulletIndex = lines.findIndex((line) => /^[—\-•*]\s+/.test(line));
+  const allLinesAreBullets = lines.every((line) => /^[—\-•*]\s+/.test(line));
+
+  if (allLinesAreBullets) {
+    const items = lines
+      .map((line) => line.replace(/^[—\-•*]\s+/, "").trim())
+      .filter(Boolean)
+      .map((item) => `<li>${escapeHtml(item)}</li>`)
+      .join("");
+    return `<ul>${items}</ul>`;
+  }
+
+  if (firstBulletIndex > 0) {
+    const lead = lines
+      .slice(0, firstBulletIndex)
+      .map((line) => escapeHtml(line))
+      .join("<br />");
+    const items = lines
+      .slice(firstBulletIndex)
+      .map((line) => line.replace(/^[—\-•*]\s+/, "").trim())
+      .filter(Boolean)
+      .map((item) => `<li>${escapeHtml(item)}</li>`)
+      .join("");
+
+    return `<p>${lead}</p><ul>${items}</ul>`;
+  }
+
+  return `<p>${escapeHtml(lines.join("\n")).replace(/\n/g, "<br />")}</p>`;
+}
+
 export function plainTextToRichTextHtml(text: string): string {
   const normalized = text.replace(/\r\n/g, "\n").trim();
   if (!normalized) return "<p></p>";
 
   const paragraphs = normalized
     .split(/\n{2,}/)
+    .map((paragraph) => normalizeAiListParagraph(paragraph))
     .map((paragraph) => paragraph.trim())
     .filter(Boolean);
 
   if (paragraphs.length === 0) return "<p></p>";
 
-  return paragraphs
-    .map((paragraph) => {
-      const html = escapeHtml(paragraph).replace(/\n/g, "<br />");
-      return `<p>${html}</p>`;
-    })
-    .join("");
+  return paragraphs.map(blockToHtml).filter(Boolean).join("") || "<p></p>";
 }
 
 export function normalizeRichTextEditorValue(value: string | null | undefined): string {

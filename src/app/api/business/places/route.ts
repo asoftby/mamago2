@@ -224,6 +224,11 @@ export async function POST(request: NextRequest) {
         metroAutoDistanceM: d.metroAutoDistanceM || null,
         metroManualId: d.metroManualId || null,
         metroManualDistanceM: d.metroManualDistanceM || null,
+        googleRating: d.googleRating || null,
+        googleUserRatingsTotal: d.googleUserRatingsTotal || null,
+        googleReviewsJson: d.googleReviewsJson || null,
+        googleReviewsSyncedAt: d.googleReviewsSyncedAt || null,
+        googleMapsUri: d.googleMapsUri || null,
 
         // Step 3: не пишем временный/чужой id — выставит аттач temp media или ветка MediaAsset
         logoImageId: d.wizardSessionId ? null : d.logoImageId || null,

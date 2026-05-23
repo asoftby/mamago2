@@ -2,7 +2,6 @@
 
 import { RichContentRenderer } from "@/components/content/RichContentRenderer";
 import { cn } from "@/lib/utils";
-import { Phone, Globe, Instagram, Facebook, Youtube, Send } from "lucide-react";
 import Link from "next/link";
 
 interface PlaceAboutSectionProps {
@@ -36,114 +35,274 @@ export function PlaceAboutSection({
   format,
   categories,
 }: PlaceAboutSectionProps) {
+  const chips = [
+    ...(categories ?? []),
+    ageRange ? `${ageRange}` : null,
+    format ?? null,
+    yearFounded ? `с ${yearFounded}` : null,
+  ].filter(Boolean) as string[];
+
   const socialLinks = [
-    { url: instagramUrl, icon: Instagram, label: "Instagram", color: "#E4405F" },
-    { url: facebookUrl, icon: Facebook, label: "Facebook", color: "#1877F2" },
-    { url: vkUrl, icon: Send, label: "VK", color: "#0077FF" },
-    { url: youtubeUrl, icon: Youtube, label: "YouTube", color: "#FF0000" },
-    { url: telegramUrl, icon: Send, label: "Telegram", color: "#0088CC" },
-    { url: tiktokUrl, icon: Send, label: "TikTok", color: "#000000" },
-  ].filter((link) => link.url);
+    { url: instagramUrl, label: "Instagram", icon: "◎" },
+    { url: facebookUrl, label: "Facebook", icon: "f" },
+    { url: vkUrl, label: "VK", icon: "VK" },
+    { url: youtubeUrl, label: "YouTube", icon: "▶" },
+    { url: telegramUrl, label: "Telegram", icon: "✈" },
+    { url: tiktokUrl, label: "TikTok", icon: "♪" },
+  ].filter((l) => l.url);
+
+  const hasContent =
+    description.trim().length > 0 || chips.length > 0 || socialLinks.length > 0;
+
+  if (!hasContent) return null;
 
   return (
-    <div className="space-y-6">
-      <h2 className="text-2xl font-bold text-gray-900">О месте</h2>
-
-      {/* Description — RichContentRenderer avoids invalid <p><p> nesting and applies paragraph spacing */}
-      {description.trim().length > 0 && (
-        <RichContentRenderer
-          html={description}
-          className={cn(
-            "prose-gray max-w-none",
-            "text-base leading-relaxed text-gray-700",
-            "prose-p:text-base prose-p:leading-relaxed prose-p:text-gray-700 prose-p:my-5 [&>p:last-child]:mb-0",
-            "prose-headings:text-gray-900 prose-strong:text-gray-900",
-            "[&>p:first-child]:mt-0",
-          )}
-        />
-      )}
-
-      {/* Key Characteristics */}
-      <div className="space-y-3 rounded-2xl border border-gray-200 bg-gray-50 p-6">
-        {ageRange && (
-          <InfoRow label="Возраст" value={ageRange} />
-        )}
-        {format && (
-          <InfoRow label="Формат" value={format} />
-        )}
-        {categories && categories.length > 0 && (
-          <InfoRow label="Направления" value={categories.join(", ")} />
-        )}
-        {yearFounded && (
-          <InfoRow label="Год основания" value={yearFounded.toString()} />
-        )}
-        {website && (
-          <div className="flex items-start gap-3 border-t border-gray-200 pt-3">
-            <Globe className="mt-0.5 h-5 w-5 flex-shrink-0 text-gray-500" />
-            <div className="flex-1">
-              <div className="text-sm font-medium text-gray-500">Сайт</div>
-              <Link
-                href={website}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-base text-[#EF8759] hover:underline"
-              >
-                {website.replace(/^https?:\/\//, "")}
-              </Link>
-            </div>
+    <section
+      style={{
+        padding: "80px 0 56px",
+        borderTop: "1px solid rgba(20,18,16,.10)",
+        background: "#F6F2EA",
+      }}
+    >
+      <div
+        style={{
+          maxWidth: 1320,
+          margin: "0 auto",
+          padding: "0 28px",
+          display: "grid",
+          gridTemplateColumns: "320px 1fr",
+          gap: 56,
+        }}
+        className="about-grid"
+      >
+        {/* Left: heading */}
+        <div>
+          <div className="kicker-row" style={{ marginBottom: 18 }}>
+            <span className="text-kicker">01 — О месте</span>
+            <span className="kicker-line" />
           </div>
-        )}
-        {phone && (
-          <div className="flex items-start gap-3 border-t border-gray-200 pt-3">
-            <Phone className="mt-0.5 h-5 w-5 flex-shrink-0 text-gray-500" />
-            <div className="flex-1">
-              <div className="text-sm font-medium text-gray-500">Телефон</div>
-              <Link
-                href={`tel:${phone}`}
-                className="text-base text-[#EF8759] hover:underline"
-              >
-                {phone}
-              </Link>
-            </div>
-          </div>
-        )}
-      </div>
+          <h2
+            className="font-display"
+            style={{
+              fontSize: 48,
+              lineHeight: 1,
+              margin: "0",
+              letterSpacing: "-.02em",
+              color: "#141210",
+            }}
+          >
+            Всё о{" "}
+            <span className="font-display-italic" style={{ color: "#C24E22" }}>
+              месте
+            </span>
+            .
+          </h2>
 
-      {/* Social Media */}
-      {socialLinks.length > 0 && (
-        <div className="space-y-3">
-          <h3 className="text-sm font-semibold text-gray-700">
-            Мы в социальных сетях
-          </h3>
-          <div className="flex flex-wrap gap-3">
-            {socialLinks.map((link) => {
-              const Icon = link.icon;
-              return (
+          {/* Social links */}
+          {socialLinks.length > 0 && (
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 28 }}>
+              {socialLinks.map((link) => (
                 <Link
                   key={link.label}
                   href={link.url!}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 text-gray-700 transition hover:bg-gray-200"
-                  aria-label={link.label}
+                  title={link.label}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    width: 38,
+                    height: 38,
+                    borderRadius: 99,
+                    border: "1px solid rgba(20,18,16,.18)",
+                    background: "#FAF7F1",
+                    color: "#3A332B",
+                    fontSize: 14,
+                    textDecoration: "none",
+                    transition: "background .2s",
+                  }}
                 >
-                  <Icon className="h-5 w-5" />
+                  {link.icon}
                 </Link>
-              );
-            })}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
-      )}
-    </div>
+
+        {/* Right: description + chips */}
+        <div>
+          {description.trim().length > 0 && (
+            <RichContentRenderer
+              html={description}
+              className={cn(
+                "prose-gray max-w-none mb-0",
+                "text-[19px] leading-[1.5] tracking-[-0.005em]",
+                "prose-p:text-[19px] prose-p:leading-[1.5] prose-p:text-[#141210] prose-p:my-5 [&>p:last-child]:mb-0 [&>p:first-child]:mt-0",
+                "prose-headings:text-[#141210] prose-strong:text-[#141210]",
+                "[&>p:first-child]:mt-0",
+              )}
+            />
+          )}
+
+          {/* Key info rows */}
+          {(ageRange || format || yearFounded) && (
+            <div
+              style={{
+                marginTop: 28,
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
+                gap: 0,
+                borderTop: "1px solid rgba(20,18,16,.10)",
+              }}
+            >
+              {ageRange && (
+                <InfoItem n="01" label="Возраст" value={ageRange} />
+              )}
+              {format && (
+                <InfoItem n="02" label="Формат" value={format} />
+              )}
+              {yearFounded && (
+                <InfoItem n="03" label="Основана" value={`${yearFounded}`} />
+              )}
+            </div>
+          )}
+
+          {/* Category chips */}
+          {chips.length > 0 && (
+            <div style={{ display: "flex", gap: 10, marginTop: 28, flexWrap: "wrap" }}>
+              {chips.map((chip, i) => (
+                <span
+                  key={i}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    height: 30,
+                    padding: "0 12px",
+                    borderRadius: 999,
+                    border: "1px solid rgba(20,18,16,.18)",
+                    background: "#FAF7F1",
+                    fontSize: 13,
+                    color: "#3A332B",
+                  }}
+                >
+                  {chip}
+                </span>
+              ))}
+            </div>
+          )}
+
+          {/* Website + phone */}
+          {(website || phone) && (
+            <div
+              style={{
+                marginTop: 28,
+                display: "flex",
+                gap: 12,
+                flexWrap: "wrap",
+              }}
+            >
+              {phone && (
+                <Link
+                  href={`tel:${phone}`}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 8,
+                    height: 46,
+                    padding: "0 20px",
+                    borderRadius: 999,
+                    border: "1px solid rgba(20,18,16,.18)",
+                    background: "#FAF7F1",
+                    fontSize: 14,
+                    fontWeight: 600,
+                    color: "#141210",
+                    textDecoration: "none",
+                  }}
+                >
+                  📞 {phone}
+                </Link>
+              )}
+              {website && (
+                <Link
+                  href={website.startsWith("http") ? website : `https://${website}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 8,
+                    height: 46,
+                    padding: "0 20px",
+                    borderRadius: 999,
+                    border: "1px solid rgba(20,18,16,.18)",
+                    background: "transparent",
+                    fontSize: 14,
+                    fontWeight: 600,
+                    color: "#141210",
+                    textDecoration: "none",
+                  }}
+                >
+                  ↗ {website.replace(/^https?:\/\//, "").replace(/\/$/, "")}
+                </Link>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <style>{`
+        @media (max-width: 900px) {
+          .about-grid {
+            grid-template-columns: 1fr !important;
+            gap: 32px !important;
+          }
+        }
+        @media (max-width: 1100px) {
+          .about-grid {
+            padding: 0 22px !important;
+          }
+        }
+      `}</style>
+    </section>
   );
 }
 
-function InfoRow({ label, value }: { label: string; value: string }) {
+function InfoItem({ n, label, value }: { n: string; label: string; value: string }) {
   return (
-    <div className="flex items-start gap-3">
-      <div className="flex-1">
-        <div className="text-sm font-medium text-gray-500">{label}</div>
-        <div className="text-base text-gray-900">{value}</div>
+    <div
+      style={{
+        padding: "20px 0",
+        borderBottom: "1px solid rgba(20,18,16,.10)",
+        display: "flex",
+        flexDirection: "column",
+        gap: 4,
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <span
+          style={{
+            fontFamily: "var(--font-mono, monospace)",
+            textTransform: "uppercase",
+            fontSize: 11,
+            letterSpacing: ".14em",
+            color: "rgba(20,18,16,.55)",
+          }}
+        >
+          {label}
+        </span>
+        <span
+          style={{
+            fontFamily: "var(--font-mono, monospace)",
+            color: "rgba(20,18,16,.55)",
+            fontSize: 11,
+          }}
+        >
+          {n}
+        </span>
+      </div>
+      <div style={{ fontSize: 18, fontWeight: 500, letterSpacing: "-.01em", color: "#141210" }}>
+        {value}
       </div>
     </div>
   );

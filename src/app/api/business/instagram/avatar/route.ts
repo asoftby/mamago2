@@ -191,6 +191,29 @@ function extractCsrfToken(html: string): string {
   return match?.[1] ?? "missing";
 }
 
+function decodeHtmlAttribute(value: string): string {
+  return value.replace(/&amp;/g, "&").replace(/\\u0026/g, "&").replace(/\\\//g, "/");
+}
+
+function extractAvatarUrlFromHtml(html: string): string | null {
+  const patterns = [
+    /"hd_profile_pic_url_info"\s*:\s*\{\s*"url"\s*:\s*"([^"]+)"/i,
+    /"profile_pic_url_hd"\s*:\s*"([^"]+)"/i,
+    /"profile_pic_url"\s*:\s*"([^"]+)"/i,
+    /<meta\s+property="og:image"\s+content="([^"]+)"/i,
+    /<meta\s+content="([^"]+)"\s+property="og:image"/i,
+  ];
+
+  for (const pattern of patterns) {
+    const match = html.match(pattern);
+    if (match?.[1]) {
+      return decodeHtmlAttribute(match[1]);
+    }
+  }
+
+  return null;
+}
+
 // ─── route handler ────────────────────────────────────────────────────────────
 
 export async function POST(request: NextRequest) {
@@ -236,6 +259,7 @@ export async function POST(request: NextRequest) {
     // ── Step 1: get user_id from profile HTML ─────────────────────────────────
     let userId: string | null;
     let csrfToken = "missing";
+    let htmlAvatarUrl: string | null = null;
 
     try {
       // We need to fetch the HTML to get both user_id and csrf_token
@@ -279,23 +303,18 @@ export async function POST(request: NextRequest) {
       csrfToken = extractCsrfToken(html);
       devLog("Step1 csrf_token:", csrfToken !== "missing" ? "found" : "not found");
 
-      // If user_id not found, try og:image as a direct fallback
+      htmlAvatarUrl = extractAvatarUrlFromHtml(html);
+      devLog("Step1 html avatar:", htmlAvatarUrl ? "found" : "not found");
+
+      // Direct HTML fallback is the most stable option. Prefer it before GraphQL.
+      if (htmlAvatarUrl) {
+        devLog("Step1 using direct HTML avatar fallback");
+        return await downloadAndSave(htmlAvatarUrl, username, user, wizardSessionId);
+      }
+
+      // If user_id not found and HTML fallback didn't work, stop early.
       if (!userId) {
-        devLog("Step1 user_id missing — trying og:image fallback");
-
-        const ogMatch =
-          html.match(/<meta\s+property="og:image"\s+content="([^"]+)"/i) ??
-          html.match(/<meta\s+content="([^"]+)"\s+property="og:image"/i);
-
-        if (ogMatch?.[1]) {
-          const ogUrl = ogMatch[1].replace(/&amp;/g, "&");
-          devLog("Step1 og:image fallback found:", ogUrl);
-
-          // Skip Step 2, go directly to download
-          return await downloadAndSave(ogUrl, username, user, wizardSessionId);
-        }
-
-        devLog("reason 422: INSTAGRAM_AVATAR_UNAVAILABLE (no user_id, no og:image)");
+        devLog("reason 422: INSTAGRAM_AVATAR_UNAVAILABLE (no user_id, no html avatar)");
         return err422(
           "INSTAGRAM_AVATAR_UNAVAILABLE",
           "Не удалось получить аватар из Instagram. Профиль может быть закрытым или Instagram заблокировал запрос."
@@ -341,6 +360,11 @@ export async function POST(request: NextRequest) {
     }
 
     if (!picUrl) {
+      if (htmlAvatarUrl) {
+        devLog("Step2 picUrl missing — retrying direct HTML avatar fallback");
+        return await downloadAndSave(htmlAvatarUrl, username, user, wizardSessionId);
+      }
+
       devLog("reason 422: INSTAGRAM_AVATAR_UNAVAILABLE (no picUrl from GraphQL)");
       return err422(
         "INSTAGRAM_AVATAR_UNAVAILABLE",

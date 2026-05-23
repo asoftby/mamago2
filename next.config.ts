@@ -40,6 +40,7 @@ const nextConfig: NextConfig = {
 
   async redirects() {
     return [
+      { source: "/birthday", destination: "/minsk/birthday/make", permanent: true },
       { source: "/birthday/builder", destination: "/minsk/birthday/make", permanent: true },
     ];
   },

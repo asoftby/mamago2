@@ -1,17 +1,10 @@
 "use client";
 
 import * as React from "react";
-import { cn } from "@/lib/utils";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { toast } from "@/lib/toast";
-import {
-  CalendarDays, CalendarCheck, CalendarClock,
-  Bookmark, BookmarkCheck, ChevronRight,
-  ExternalLink, Pencil, Trash2,
-} from "lucide-react";
 import { DatePicker } from "@/components/ui/date-picker";
 import {
   addDaysLocal,
@@ -20,17 +13,31 @@ import {
 } from "@/lib/date/localDateKey";
 import { formatRuShortDayMonth } from "@/lib/formatters/date";
 
+// ─── Design tokens ────────────────────────────────────────────────────────────
+const C = {
+  bg: "#F6F2EA",
+  paper: "#FAF7F1",
+  ink: "#141210",
+  ink2: "#3A332B",
+  ink3: "rgba(20,18,16,.55)",
+  line: "rgba(20,18,16,.10)",
+  line2: "rgba(20,18,16,.18)",
+  accent: "#E86A3A",
+  accentDeep: "#C24E22",
+  accentSoft: "#FFE8DC",
+  green: "#1F8A5B",
+  greenBg: "rgba(31,138,91,.12)",
+} as const;
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 export type SaveScenario =
   | { kind: "confirm"; title: string; dateLabel: string; timeLabel: string; dateISO: string; slotId?: string | null }
   | { kind: "timeslots"; title: string; dateLabel: string; dateISO: string; slots: { id: string; label: string }[] }
   | {
       kind: "quickdate";
       title: string;
-      /** Одна дата сеанса (страница события): «В план» = на эту дату или в идеи, без «сегодня/завтра». */
       eventPlanDateISO?: string;
-      /** Конец диапазона проведения, если активность длительная. */
       eventPlanDateEndISO?: string;
-      /** Набор доступных дат события (YYYY-MM-DD). */
       eventPlanDateOptions?: string[];
     };
 
@@ -38,6 +45,7 @@ export type SaveToPlanResult =
   | { action: "plan"; dateISO: string; timeSlotId?: string | null }
   | { action: "ideas" }
   | { action: "remove-idea" }
+  | { action: "remove-plan"; planItemId: string }
   | { action: "cancel" };
 
 export interface SaveToPlanModalProps {
@@ -52,7 +60,86 @@ export interface SaveToPlanModalProps {
   source?: string;
 }
 
-type ModalView = "quick" | "calendar";
+export interface SaveToPlanPickerBodyProps {
+  scenario: SaveScenario;
+  onCommit: (result: SaveToPlanResult) => void;
+  isIdea?: boolean;
+  inPlan?: boolean;
+  planDate?: string | null;
+  planStartsAt?: string | null;
+  planItemId?: string | null;
+  source?: string;
+  /** Закрыть контейнер */
+  onClose?: () => void;
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+const RU_MONTHS_SHORT = ["янв","фев","мар","апр","мая","июн","июл","авг","сен","окт","ноя","дек"];
+const RU_MONTHS_FULL  = ["января","февраля","марта","апреля","мая","июня","июля","августа","сентября","октября","ноября","декабря"];
+const RU_MONTHS_NAMED = ["Январь","Февраль","Март","Апрель","Май","Июнь","Июль","Август","Сентябрь","Октябрь","Ноябрь","Декабрь"];
+const RU_DAYS_SHORT   = ["вс","пн","вт","ср","чт","пт","сб"];
+const RU_DAYS_FULL    = ["воскресенье","понедельник","вторник","среда","четверг","пятница","суббота"];
+
+function parseLocalDate(s: string): Date {
+  const [y, m, d] = s.split("-").map(Number);
+  return new Date(y, m - 1, d);
+}
+
+function fmtDateChip(iso: string) {
+  const d = parseLocalDate(iso);
+  return {
+    dow: RU_DAYS_SHORT[d.getDay()],
+    day: String(d.getDate()),
+    month: RU_MONTHS_SHORT[d.getMonth()],
+    monthIdx: d.getMonth(),
+    year: d.getFullYear(),
+  };
+}
+
+function fmtDateLong(iso: string): string {
+  const d = parseLocalDate(iso);
+  const dow = RU_DAYS_FULL[d.getDay()];
+  return `${dow.charAt(0).toUpperCase() + dow.slice(1)}, ${d.getDate()} ${RU_MONTHS_FULL[d.getMonth()]}`;
+}
+
+function fmtDateShort(iso: string): string {
+  const d = parseLocalDate(iso);
+  return `${d.getDate()} ${RU_MONTHS_FULL[d.getMonth()]}`;
+}
+
+function normalizePlanDateISO(value?: string | null): string | null {
+  if (!value) return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return getLocalDateKey(parsed);
+}
+
+function isLongRunningRange(s?: string | null, e?: string | null): boolean {
+  const start = normalizePlanDateISO(s);
+  const end = normalizePlanDateISO(e);
+  return !!(start && end && end > start);
+}
+
+function formatEventRangeSubtitle(s?: string | null, e?: string | null): string | null {
+  const start = normalizePlanDateISO(s);
+  const end = normalizePlanDateISO(e);
+  if (!start || !end) return null;
+  return `${formatRuShortDayMonth(start)} — ${formatRuShortDayMonth(end)}`;
+}
+
+function buildDateRangeKeys(s?: string | null, e?: string | null): string[] {
+  const start = normalizePlanDateISO(s);
+  const end = normalizePlanDateISO(e);
+  if (!start || !end || end < start) return [];
+  const keys: string[] = [];
+  let cursor = start;
+  while (cursor <= end) {
+    keys.push(cursor);
+    cursor = addDaysLocal(cursor, 1);
+  }
+  return keys;
+}
 
 function toastPlan(dateISO: string) {
   toast.success("Добавлено в план", {
@@ -70,478 +157,1225 @@ function toastIdea() {
 }
 function toastRemovedIdea() { toast("Убрано из идей", { duration: 2500 }); }
 
-interface ActionRowProps {
-  icon: React.ReactNode; title: string; subtitle: string; onClick: () => void;
-  iconBg?: string; iconColor?: string; rightEl?: React.ReactNode; className?: string; hideChevron?: boolean;
-}
-function ActionRow({
-  icon,
-  title,
-  subtitle,
-  onClick,
-  iconBg = "bg-neutral-900",
-  iconColor = "text-white",
-  rightEl,
-  className,
-  hideChevron = false,
-}: ActionRowProps) {
+// ─── Icons ────────────────────────────────────────────────────────────────────
+function CalIcon({ size = 18, color = "currentColor" }: { size?: number; color?: string }) {
   return (
-    <button onClick={onClick} className={cn(
-      "w-full flex items-center gap-3.5 px-4 py-3.5 rounded-2xl border border-neutral-200 bg-white text-left",
-      "hover:border-neutral-300 hover:bg-neutral-50 active:scale-[0.985] transition-all duration-100",
-      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900/20",
-      className,
-    )}>
-      <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center shrink-0", iconBg, iconColor)}>{icon}</div>
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold text-neutral-900 leading-tight">{title}</p>
-        <p className="text-xs text-neutral-500 mt-0.5 leading-tight">{subtitle}</p>
-      </div>
-      {hideChevron ? null : rightEl ?? <ChevronRight className="w-4 h-4 text-neutral-300 shrink-0" />}
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3.5" y="5" width="17" height="15" rx="2.5" />
+      <path d="M8 3v4M16 3v4M3.5 10h17" />
+    </svg>
+  );
+}
+
+function BookmarkIcon({ size = 18, color = "currentColor" }: { size?: number; color?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M6 4h12v17l-6-4-6 4z" />
+    </svg>
+  );
+}
+
+function ArrowIcon({ size = 16, color = "currentColor" }: { size?: number; color?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M5 12h14M13 6l6 6-6 6" />
+    </svg>
+  );
+}
+
+function PlusIcon({ size = 13, color = "currentColor" }: { size?: number; color?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round">
+      <path d="M12 5v14M5 12h14" />
+    </svg>
+  );
+}
+
+function TrashIcon({ size = 14, color = "currentColor" }: { size?: number; color?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" />
+    </svg>
+  );
+}
+
+function PencilIcon({ size = 14, color = "currentColor" }: { size?: number; color?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+    </svg>
+  );
+}
+
+function ExternalLinkIcon({ size = 14, color = "currentColor" }: { size?: number; color?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+      <polyline points="15 3 21 3 21 9" />
+      <line x1="10" y1="14" x2="21" y2="3" />
+    </svg>
+  );
+}
+
+// ─── Atoms ────────────────────────────────────────────────────────────────────
+function KickerLine({ label, rightEl }: { label: string; rightEl?: React.ReactNode }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 10 }}>
+      <span style={{
+        fontFamily: "var(--font-mono, ui-monospace)", textTransform: "uppercase",
+        fontSize: 10, letterSpacing: ".14em", color: C.ink3, whiteSpace: "nowrap",
+      }}>{label}</span>
+      <span style={{ flex: 1, height: 1, background: C.line }} />
+      {rightEl}
+    </div>
+  );
+}
+
+function OrDivider({ label = "или" }: { label?: string }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 14, margin: "18px 0 14px" }}>
+      <span style={{ flex: 1, height: 1, background: C.line }} />
+      <span style={{ fontStyle: "italic", fontSize: 16, color: C.ink3 }}>{label}</span>
+      <span style={{ flex: 1, height: 1, background: C.line }} />
+    </div>
+  );
+}
+
+function IcoCircle({ bg, color, border, children }: { bg: string; color: string; border?: string; children: React.ReactNode }) {
+  return (
+    <span style={{
+      width: 42, height: 42, borderRadius: 99, display: "inline-flex",
+      alignItems: "center", justifyContent: "center",
+      background: bg, color, flexShrink: 0, border: border ?? "none",
+    }}>{children}</span>
+  );
+}
+
+function OptRow({ num, iconEl, title, sub, onClick }: {
+  num: string; iconEl: React.ReactNode; title: string; sub: string; onClick: () => void;
+}) {
+  return (
+    <button className="stp-opt" onClick={onClick} style={{
+      display: "flex", alignItems: "center", gap: 14,
+      width: "100%", padding: "14px 16px",
+      background: C.paper, border: `1px solid ${C.line}`,
+      borderRadius: 16, textAlign: "left", cursor: "pointer",
+      fontFamily: "var(--font-sans, ui-sans-serif)", transition: "all .22s ease",
+    }}>
+      <span style={{ minWidth: 22, fontFamily: "var(--font-mono, ui-monospace)", fontSize: 11, color: C.ink3, letterSpacing: ".1em", alignSelf: "center" }}>{num}</span>
+      {iconEl}
+      <span style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 15, fontWeight: 600, letterSpacing: "-.01em", color: C.ink }}>{title}</div>
+        <div style={{ fontSize: 13, color: C.ink3, marginTop: 2 }}>{sub}</div>
+      </span>
+      <span className="stp-arr" style={{ fontSize: 16, color: C.ink3, transition: "all .22s", flexShrink: 0 }}>→</span>
     </button>
   );
 }
 
-interface StatusAction { label: string; icon?: React.ReactNode; onClick: () => void; danger?: boolean; }
-interface StatusCardProps { icon: React.ReactNode; title: string; subtitle: string; actions: StatusAction[]; }
-function StatusCard({ icon, title, subtitle, actions }: StatusCardProps) {
+function IdeasRow({ onClick, ghost }: { onClick: () => void; ghost?: boolean }) {
   return (
-    <div className="rounded-2xl border border-neutral-200 bg-neutral-50 px-4 py-3.5 space-y-3">
-      <div className="flex items-start gap-3">
-        <div className="w-9 h-9 rounded-xl bg-green-100 text-green-600 flex items-center justify-center shrink-0 mt-0.5">{icon}</div>
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-neutral-900 leading-tight">{title}</p>
-          <p className="text-xs text-neutral-500 mt-0.5 leading-snug">{subtitle}</p>
+    <button className="stp-opt" onClick={onClick} style={{
+      display: "flex", alignItems: "center", gap: 14,
+      width: "100%", padding: "14px 16px",
+      background: ghost ? "transparent" : C.paper, border: `1px solid ${C.line}`,
+      borderRadius: 16, textAlign: "left", cursor: "pointer",
+      fontFamily: "var(--font-sans, ui-sans-serif)", transition: "all .22s ease",
+    }}>
+      <IcoCircle bg={C.bg} color={C.ink2} border={`1px solid ${C.line2}`}><BookmarkIcon size={17} /></IcoCircle>
+      <span style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 15, fontWeight: 600, letterSpacing: "-.01em", color: C.ink }}>Сохранить в идеи</div>
+        <div style={{ fontSize: 13, color: C.ink3, marginTop: 2 }}>Вернуться к этому позже — без конкретного дня</div>
+      </span>
+      <span className="stp-arr" style={{ fontSize: 16, color: C.ink3, transition: "all .22s", flexShrink: 0 }}>→</span>
+    </button>
+  );
+}
+
+// ─── Date Slider (Variant B) ──────────────────────────────────────────────────
+interface DateSliderProps {
+  options: string[];  // YYYY-MM-DD sorted upcoming
+  selISO: string | null;
+  onSelect: (iso: string) => void;
+}
+
+function DateSlider({ options, selISO, onSelect }: DateSliderProps) {
+  const sliderRef = React.useRef<HTMLDivElement>(null);
+
+  const scrollBy = (dir: number) => {
+    sliderRef.current?.scrollBy({ left: dir * 240, behavior: "smooth" });
+  };
+
+  // Scroll selected into view
+  React.useEffect(() => {
+    if (!selISO || !sliderRef.current) return;
+    const el = sliderRef.current.querySelector<HTMLElement>(`[data-iso="${selISO}"]`);
+    if (!el) return;
+    const c = sliderRef.current;
+    const er = el.getBoundingClientRect();
+    const cr = c.getBoundingClientRect();
+    if (er.left < cr.left + 40 || er.right > cr.right - 40) {
+      el.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+    }
+  }, [selISO]);
+
+  return (
+    <div style={{ position: "relative", marginBottom: 2 }}>
+      {/* Arrows */}
+      {(["left", "right"] as const).map((side) => (
+        <button
+          key={side}
+          onClick={() => scrollBy(side === "left" ? -1 : 1)}
+          aria-label={side === "left" ? "Назад" : "Вперёд"}
+          style={{
+            position: "absolute", [side]: -2, top: "50%", transform: "translateY(-50%)", zIndex: 2,
+            width: 32, height: 32, borderRadius: 99,
+            background: C.bg, border: `1px solid ${C.line2}`,
+            color: C.ink, cursor: "pointer",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            boxShadow: "0 4px 10px rgba(20,18,16,.06)",
+            padding: 0,
+          }}
+        >
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
+            {side === "left"
+              ? <path d="M9 2L4 7l5 5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+              : <path d="M5 2l5 5-5 5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+            }
+          </svg>
+        </button>
+      ))}
+
+      {/* Fade edges */}
+      <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 36, background: `linear-gradient(90deg, ${C.bg}, transparent)`, pointerEvents: "none", zIndex: 1 }} />
+      <div style={{ position: "absolute", right: 0, top: 0, bottom: 0, width: 36, background: `linear-gradient(270deg, ${C.bg}, transparent)`, pointerEvents: "none", zIndex: 1 }} />
+
+      {/* Track */}
+      <div
+        ref={sliderRef}
+        style={{
+          display: "flex", gap: 8, overflowX: "auto", overflowY: "hidden",
+          padding: "4px 20px", scrollSnapType: "x proximity", scrollbarWidth: "none",
+        }}
+      >
+        <style>{`.stp-slider::-webkit-scrollbar{display:none}`}</style>
+        {options.map((iso) => {
+          const chip = fmtDateChip(iso);
+          const isSel = iso === selISO;
+          return (
+            <button
+              key={iso}
+              data-iso={iso}
+              onClick={() => onSelect(iso)}
+              style={{
+                flexShrink: 0, scrollSnapAlign: "center",
+                width: 76, padding: "10px 8px 10px",
+                display: "flex", flexDirection: "column", alignItems: "center", gap: 4,
+                background: isSel ? C.ink : C.paper,
+                color: isSel ? "#FAF7F1" : C.ink,
+                border: `1px solid ${isSel ? C.ink : C.line}`,
+                borderRadius: 14, cursor: "pointer",
+                transition: "all .15s", position: "relative",
+                fontFamily: "var(--font-sans)",
+              }}
+              onMouseEnter={(e) => { if (!isSel) e.currentTarget.style.borderColor = C.ink; }}
+              onMouseLeave={(e) => { if (!isSel) e.currentTarget.style.borderColor = C.line; }}
+            >
+              <span style={{ fontFamily: "var(--font-mono, ui-monospace)", fontSize: 10, letterSpacing: ".1em", textTransform: "uppercase", color: isSel ? "rgba(250,247,241,.6)" : C.ink3 }}>{chip.dow}</span>
+              <span style={{ fontFamily: "var(--font-display, Georgia), serif", fontSize: 28, lineHeight: 1, letterSpacing: "-.02em" }}>{chip.day}</span>
+              <span style={{ fontFamily: "var(--font-mono, ui-monospace)", fontSize: 9, letterSpacing: ".08em", color: isSel ? "rgba(250,247,241,.55)" : C.ink3 }}>{chip.month}</span>
+              {/* accent dots — visual indicator */}
+              <span style={{ display: "flex", gap: 3, height: 5, alignItems: "center", marginTop: 1 }}>
+                {[0, 1, 2].map((di) => (
+                  <span key={di} style={{ width: 4, height: 4, borderRadius: 99, background: C.accent }} />
+                ))}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─── Dark confirmation bar ────────────────────────────────────────────────────
+function ConfirmBar({ iso, onConfirm }: { iso: string; onConfirm: () => void }) {
+  const chip = fmtDateChip(iso);
+  const DOW_FULL: Record<string, string> = {
+    вс: "Воскресенье", пн: "Понедельник", вт: "Вторник",
+    ср: "Среда", чт: "Четверг", пт: "Пятница", сб: "Суббота",
+  };
+  return (
+    <div style={{
+      marginTop: 14, padding: "14px 16px",
+      background: C.ink, color: "#FAF7F1", borderRadius: 14,
+      display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14,
+    }}>
+      <div>
+        <div style={{ fontFamily: "var(--font-mono, ui-monospace)", textTransform: "uppercase" as const, fontSize: 10, letterSpacing: ".1em", color: "rgba(250,247,241,.55)", marginBottom: 3 }}>● выбрано</div>
+        <div style={{ fontSize: 15, fontWeight: 600, letterSpacing: "-.01em" }}>
+          {DOW_FULL[chip.dow] ?? chip.dow}, {chip.day} {RU_MONTHS_FULL[chip.monthIdx]}
         </div>
       </div>
-      <div className="flex gap-2 flex-wrap">
-        {actions.map((a, i) => (
-          <button key={i} onClick={a.onClick} className={cn(
-            "flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors",
-            a.danger ? "text-red-500 hover:bg-red-50" : "bg-white border border-neutral-200 text-neutral-700 hover:border-neutral-300"
-          )}>{a.icon}{a.label}</button>
+      <button
+        onClick={onConfirm}
+        aria-label="Добавить в план"
+        style={{
+          height: 46, padding: "0 20px", borderRadius: 999,
+          background: C.accent, color: "#fff",
+          display: "flex", alignItems: "center", gap: 8,
+          flexShrink: 0, cursor: "pointer", border: 0,
+          fontSize: 14, fontWeight: 600, letterSpacing: "-.01em",
+          fontFamily: "var(--font-sans, ui-sans-serif)",
+          transition: "transform .18s",
+          whiteSpace: "nowrap",
+        }}
+        onMouseDown={(e) => { (e.currentTarget as HTMLElement).style.transform = "scale(.94)"; }}
+        onMouseUp={(e) => { (e.currentTarget as HTMLElement).style.transform = "none"; }}
+        onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.transform = "none"; }}
+      >
+        Сохранить
+        <ArrowIcon size={14} color="#fff" />
+      </button>
+    </div>
+  );
+}
+
+// ─── All-dates drawer (MoreD style) ──────────────────────────────────────────
+interface AllDatesDrawerProps {
+  options: string[];
+  selISO: string | null;
+  onSelect: (iso: string) => void;
+  onBack: () => void;
+}
+
+function AllDatesDrawer({ options, selISO, onSelect, onBack }: AllDatesDrawerProps) {
+  // Group by month
+  const byMonth = React.useMemo(() => {
+    const map = new Map<string, string[]>();
+    options.forEach((iso) => {
+      const d = parseLocalDate(iso);
+      const key = `${d.getFullYear()}-${d.getMonth()}`;
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(iso);
+    });
+    return Array.from(map.entries()).map(([key, dates]) => {
+      const [y, m] = key.split("-").map(Number);
+      return { label: `${RU_MONTHS_NAMED[m]} ${y !== new Date().getFullYear() ? y : ""}`.trim(), dates };
+    });
+  }, [options]);
+
+  return (
+    <div style={{
+      position: "absolute", inset: 0, zIndex: 5,
+      background: C.bg, borderRadius: "inherit",
+      padding: "24px 24px 18px", display: "flex", flexDirection: "column",
+      animation: "stp-slide-up .35s cubic-bezier(.2,.7,.2,1) both",
+    }}>
+      <style>{`@keyframes stp-slide-up{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}`}</style>
+
+      {/* Header */}
+      <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 20 }}>
+        <button
+          onClick={onBack}
+          aria-label="Назад"
+          style={{
+            width: 36, height: 36, borderRadius: 99,
+            background: "transparent", border: `1px solid ${C.line2}`,
+            color: C.ink2, cursor: "pointer",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: 16, flexShrink: 0, transition: "all .15s",
+          }}
+          onMouseEnter={(e) => { const b = e.currentTarget as HTMLElement; b.style.background = C.ink; b.style.color = "#FAF7F1"; b.style.borderColor = C.ink; }}
+          onMouseLeave={(e) => { const b = e.currentTarget as HTMLElement; b.style.background = "transparent"; b.style.color = C.ink2; b.style.borderColor = C.line2; }}
+        >
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
+            <path d="M9 2L4 7l5 5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </button>
+        <div>
+          <span style={{ fontFamily: "var(--font-mono, ui-monospace)", textTransform: "uppercase" as const, fontSize: 10, letterSpacing: ".14em", color: C.accentDeep }}>● Все даты</span>
+          <h3 style={{ margin: "4px 0 0", fontFamily: "var(--font-display, Georgia), serif", fontSize: 24, letterSpacing: "-.015em", fontWeight: 400 }}>
+            {options.length} <span style={{ fontStyle: "italic", color: C.accentDeep }}>сеансов</span>
+          </h3>
+        </div>
+      </div>
+
+      {/* Scrollable month groups */}
+      <div style={{ flex: 1, overflowY: "auto", marginRight: -8, paddingRight: 8 }}>
+        {byMonth.map(({ label, dates }) => (
+          <div key={label} style={{ marginBottom: 20 }}>
+            <div style={{
+              fontFamily: "var(--font-mono, ui-monospace)", textTransform: "uppercase" as const,
+              fontSize: 10, letterSpacing: ".14em", color: C.ink3, marginBottom: 8,
+            }}>{label} · {dates.length}</div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+              {dates.map((iso) => {
+                const chip = fmtDateChip(iso);
+                const isSel = iso === selISO;
+                return (
+                  <button
+                    key={iso}
+                    onClick={() => onSelect(iso)}
+                    style={{
+                      padding: "10px 12px", borderRadius: 14,
+                      background: isSel ? C.ink : C.paper,
+                      color: isSel ? "#FAF7F1" : C.ink,
+                      border: `1px solid ${isSel ? C.ink : C.line}`,
+                      display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 2,
+                      minWidth: 64, cursor: "pointer", transition: "all .15s",
+                      fontFamily: "var(--font-sans)",
+                    }}
+                    onMouseEnter={(e) => { if (!isSel) e.currentTarget.style.borderColor = C.ink; }}
+                    onMouseLeave={(e) => { if (!isSel) e.currentTarget.style.borderColor = C.line; }}
+                  >
+                    <span style={{ fontFamily: "var(--font-mono, ui-monospace)", fontSize: 10, letterSpacing: ".12em", textTransform: "uppercase" as const, color: isSel ? "rgba(250,247,241,.55)" : C.ink3 }}>{chip.dow}</span>
+                    <span style={{ fontFamily: "var(--font-display, Georgia), serif", fontSize: 24, lineHeight: 1, letterSpacing: "-.02em" }}>{chip.day}</span>
+                    <span style={{ fontSize: 11, color: isSel ? "rgba(250,247,241,.55)" : C.ink3 }}>{chip.month}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         ))}
       </div>
-    </div>
-  );
-}
 
-function CalendarView({
-  onSelect,
-  allowedDateKeys,
-}: {
-  onSelect: (iso: string) => void;
-  allowedDateKeys?: string[] | null;
-}) {
-  const [value, setValue] = React.useState<Date | null>(null);
-  const handleConfirm = () => {
-    if (!value) return;
-    const iso = getLocalDateKey(value);
-    onSelect(iso);
-  };
-  return (
-    <div className="space-y-4 px-4 py-4">
-      <DatePicker
-        value={value}
-        onDateChange={setValue}
-        disablePast
-        allowedDateKeys={allowedDateKeys}
-      />
-      <Button size="lg" className="w-full rounded-2xl font-semibold" disabled={!value} onClick={handleConfirm}>
-        Сохранить в план
-      </Button>
-    </div>
-  );
-}
-
-function formatEventSessionPlanSubtitle(iso: string): string {
-  return new Date(`${iso}T12:00:00`).toLocaleDateString("ru-RU", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-  });
-}
-
-function normalizePlanDateISO(value?: string | null): string | null {
-  if (!value) return null;
-  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return null;
-  return getLocalDateKey(parsed);
-}
-
-function isLongRunningRange(startISO?: string | null, endISO?: string | null): boolean {
-  const start = normalizePlanDateISO(startISO);
-  const end = normalizePlanDateISO(endISO);
-  if (!start || !end) return false;
-  return end > start;
-}
-
-function formatEventRangeSubtitle(startISO?: string | null, endISO?: string | null): string | null {
-  const start = normalizePlanDateISO(startISO);
-  const end = normalizePlanDateISO(endISO);
-  if (!start || !end) return null;
-  return `Событие проходит с ${formatRuShortDayMonth(start)} по ${formatRuShortDayMonth(end)}.`;
-}
-
-function buildDateRangeKeys(startISO?: string | null, endISO?: string | null): string[] {
-  const start = normalizePlanDateISO(startISO);
-  const end = normalizePlanDateISO(endISO);
-  if (!start || !end || end < start) return [];
-
-  const keys: string[] = [];
-  let cursor = start;
-  while (cursor <= end) {
-    keys.push(cursor);
-    cursor = addDaysLocal(cursor, 1);
-  }
-  return keys;
-}
-
-interface QuickViewProps {
-  isIdea: boolean;
-  inPlan: boolean;
-  planDate: string | null;
-  source?: string;
-  /** YYYY-MM-DD единственного сеанса — только «на дату проведения», без сегодня/завтра. */
-  eventPlanDateISO?: string | null;
-  /** YYYY-MM-DD конца события для длительных активностей. */
-  eventPlanDateEndISO?: string | null;
-  /** Доступные даты события (YYYY-MM-DD). Для multi-date сценария. */
-  eventPlanDateOptions?: string[];
-  onPlan: (iso: string) => void;
-  onIdea: () => void;
-  onRemoveIdea: () => void;
-  onSwitchCalendar: () => void;
-}
-function QuickView({
-  isIdea,
-  inPlan,
-  planDate,
-  source,
-  eventPlanDateISO,
-  eventPlanDateEndISO,
-  eventPlanDateOptions,
-  onPlan,
-  onIdea,
-  onRemoveIdea,
-  onSwitchCalendar,
-}: QuickViewProps) {
-  const todayISO = getLocalDateKey();
-  const tomorrowISO = addDaysLocal(todayISO, 1);
-  const isIdeasSource = source === "ideas";
-  const isLongRunning = isLongRunningRange(eventPlanDateISO, eventPlanDateEndISO);
-  const eventRangeSubtitle = formatEventRangeSubtitle(eventPlanDateISO, eventPlanDateEndISO);
-  const normalizedOptions = React.useMemo(() => {
-    const unique = new Set((eventPlanDateOptions ?? []).map((d) => normalizePlanDateISO(d)).filter(Boolean));
-    return Array.from(unique).sort() as string[];
-  }, [eventPlanDateOptions]);
-  const upcomingOptions = normalizedOptions.filter((d) => d >= todayISO);
-  const nearestTwo = upcomingOptions.slice(0, 2);
-  const isSingleEventDate = Boolean(eventPlanDateISO);
-  const hasMultiEventDates = !isSingleEventDate && upcomingOptions.length > 0;
-
-  return (
-    <div className="px-4 py-4 space-y-4">
-      <div className="space-y-2">
-        <p className="text-[11px] font-semibold text-neutral-400 uppercase tracking-widest px-1">В план</p>
-        {inPlan && planDate ? (
-          <StatusCard
-            icon={<CalendarCheck className="w-4 h-4" />}
-            title={`Уже в плане на ${formatLocalPlanDate(planDate, "ru-RU")}`}
-            subtitle="Вы можете изменить дату или открыть план"
-            actions={[
-              { label: "Изменить дату", icon: <Pencil className="w-3 h-3" />, onClick: onSwitchCalendar },
-              { label: "Открыть план", icon: <ExternalLink className="w-3 h-3" />, onClick: () => { window.location.href = "/me/plan"; } },
-            ]}
-          />
-        ) : isLongRunning ? (
-          <ActionRow
-            icon={<CalendarClock className="w-5 h-5" />}
-            title="Выбрать дату"
-            subtitle={eventRangeSubtitle ?? "Выбрать дату посещения в диапазоне события"}
-            onClick={onSwitchCalendar}
-          />
-        ) : isSingleEventDate ? (
-          <ActionRow
-            icon={<CalendarCheck className="w-5 h-5" />}
-            title="На дату проведения"
-            subtitle={`Добавить в план на ${formatEventSessionPlanSubtitle(eventPlanDateISO ?? "")}`}
-            onClick={() => onPlan(eventPlanDateISO ?? "")}
-          />
-        ) : hasMultiEventDates ? (
-          <>
-            {nearestTwo.map((iso, index) => (
-              <ActionRow
-                key={iso}
-                icon={<CalendarCheck className="w-5 h-5" />}
-                title={index === 0 ? "Ближайшая дата" : "Следующая дата"}
-                subtitle={`Добавить в план на ${formatEventSessionPlanSubtitle(iso)}`}
-                onClick={() => onPlan(iso)}
-              />
-            ))}
-            {upcomingOptions.length > 2 ? (
-              <ActionRow
-                icon={<CalendarClock className="w-5 h-5" />}
-                title="Выбрать дату"
-                subtitle="Показать все даты из расписания"
-                onClick={onSwitchCalendar}
-              />
-            ) : null}
-          </>
-        ) : (
-          <>
-            <ActionRow icon={<CalendarCheck className="w-5 h-5" />} title="Сегодня" subtitle={`Добавить в план на ${formatLocalPlanDate(todayISO, "ru-RU")}`} onClick={() => onPlan(todayISO)} />
-            <ActionRow icon={<CalendarDays className="w-5 h-5" />} title="Завтра" subtitle={`Добавить в план на ${formatLocalPlanDate(tomorrowISO, "ru-RU")}`} onClick={() => onPlan(tomorrowISO)} />
-            <ActionRow icon={<CalendarClock className="w-5 h-5" />} title="Выбрать дату" subtitle="Открыть календарь и выбрать день" onClick={onSwitchCalendar} />
-          </>
-        )}
-      </div>
-      <div className="flex items-center gap-3">
-        <div className="flex-1 h-px bg-neutral-100" /><span className="text-[11px] text-neutral-400">или</span><div className="flex-1 h-px bg-neutral-100" />
-      </div>
-      <div className="space-y-2">
-        <p className="text-[11px] font-semibold text-neutral-400 uppercase tracking-widest px-1">Без даты</p>
-        {isIdeasSource && isIdea ? (
-          <ActionRow
-            icon={<Trash2 className="w-5 h-5" />}
-            title="Удалить из идей"
-            subtitle="Активность будет удалена из моих идей"
-            onClick={onRemoveIdea}
-            iconBg="bg-[#FDECEC]"
-            iconColor="text-[#D05A5A]"
-            className="border-[#F3D4D4] bg-[#FFF7F7] hover:border-[#E8C2C2] hover:bg-[#FFF1F1]"
-            hideChevron
-          />
-        ) : isIdea ? (
-          <StatusCard
-            icon={<BookmarkCheck className="w-4 h-4" />}
-            title="Уже в идеях"
-            subtitle="Событие сохранено и доступно в вашем списке"
-            actions={[
-              { label: "Открыть идеи", icon: <ExternalLink className="w-3 h-3" />, onClick: () => { window.location.href = "/me/ideas"; } },
-              { label: "Убрать из идей", icon: <Trash2 className="w-3 h-3" />, onClick: onRemoveIdea, danger: true },
-            ]}
-          />
-        ) : (
-          <ActionRow icon={<Bookmark className="w-5 h-5" />} title="Сохранить в идеи" subtitle="Вернуться к этому позже" onClick={onIdea} iconBg="bg-neutral-100" iconColor="text-neutral-600" />
-        )}
-      </div>
-    </div>
-  );
-}
-
-/** Только выбор (план / идеи / слоты) — без тостов и без закрытия. Для SaveActivityFlow и кастомных сценариев. */
-export interface SaveToPlanPickerBodyProps {
-  scenario: SaveScenario;
-  onCommit: (result: SaveToPlanResult) => void;
-  isIdea?: boolean;
-  inPlan?: boolean;
-  planDate?: string | null;
-  planStartsAt?: string | null;
-  source?: string;
-}
-
-export function SaveToPlanPickerBody({
-  scenario,
-  onCommit,
-  isIdea = false,
-  inPlan = false,
-  planDate = null,
-  source,
-}: SaveToPlanPickerBodyProps) {
-  const [view, setView] = React.useState<ModalView>("quick");
-  const [selectedSlotId, setSelectedSlotId] = React.useState<string | null>(
-    scenario.kind === "timeslots" && scenario.slots.length > 0 ? scenario.slots[0].id : null
-  );
-
-  const handlePlan = (iso: string) => {
-    onCommit({ action: "plan", dateISO: iso, timeSlotId: null });
-  };
-  const handleIdea = () => {
-    onCommit({ action: "ideas" });
-  };
-  const handleRemoveIdea = () => {
-    onCommit({ action: "remove-idea" });
-  };
-  const handleConfirmPlan = () => {
-    if (scenario.kind === "confirm") {
-      onCommit({
-        action: "plan",
-        dateISO: scenario.dateISO,
-        timeSlotId: scenario.slotId ?? null,
-      });
-    } else if (scenario.kind === "timeslots") {
-      onCommit({
-        action: "plan",
-        dateISO: scenario.dateISO,
-        timeSlotId: selectedSlotId,
-      });
-    }
-  };
-
-  const isQuickdate = scenario.kind === "quickdate";
-  const eventPlanDateISO = normalizePlanDateISO(
-    scenario.kind === "quickdate" ? scenario.eventPlanDateISO ?? null : null,
-  );
-  const eventPlanDateEndISO = normalizePlanDateISO(
-    scenario.kind === "quickdate" ? scenario.eventPlanDateEndISO ?? null : null,
-  );
-  const eventPlanDateOptions = React.useMemo(() => {
-    if (scenario.kind !== "quickdate") return [];
-    if ((scenario.eventPlanDateOptions?.length ?? 0) > 0) {
-      return scenario.eventPlanDateOptions ?? [];
-    }
-    return buildDateRangeKeys(scenario.eventPlanDateISO, scenario.eventPlanDateEndISO);
-  }, [scenario]);
-  const headerTitle =
-    view === "calendar"
-      ? "Выберите дату"
-      : isQuickdate
-        ? "Куда сохранить активность?"
-        : scenario.kind === "timeslots"
-          ? "Выберите время"
-          : "Добавить в план?";
-  const headerSubtitle =
-    view === "calendar"
-      ? "Активность будет добавлена в ваш план"
-      : isQuickdate
-        ? eventPlanDateISO
-          ? "На дату проведения или сохраните в идеи"
-          : "Выберите дату для плана или сохраните в идеи"
-        : null;
-
-  return (
-    <div className="flex flex-col">
-      <div className="px-5 pt-5 pb-4 border-b border-neutral-100">
-        <p className="text-[18px] font-semibold text-neutral-900 text-center leading-snug">{headerTitle}</p>
-        {scenario.title && (
-          <p className="text-[13px] font-medium text-neutral-800 text-center mt-1.5 leading-snug line-clamp-2">{scenario.title}</p>
-        )}
-        {headerSubtitle && <p className="text-xs text-neutral-500 text-center mt-0.5 leading-snug">{headerSubtitle}</p>}
-      </div>
-      {isQuickdate ? (
-        view === "calendar" ? (
-          <CalendarView
-            onSelect={(iso) => {
-              setView("quick");
-              handlePlan(iso);
-            }}
-            allowedDateKeys={eventPlanDateOptions}
-          />
-        ) : (
-          <QuickView
-            isIdea={isIdea}
-            inPlan={inPlan}
-            planDate={planDate}
-            source={source}
-            eventPlanDateISO={eventPlanDateISO}
-            eventPlanDateEndISO={eventPlanDateEndISO}
-            eventPlanDateOptions={eventPlanDateOptions}
-            onPlan={handlePlan}
-            onIdea={handleIdea}
-            onRemoveIdea={handleRemoveIdea}
-            onSwitchCalendar={() => setView("calendar")}
-          />
-        )
-      ) : (
-        <>
-          <div className="px-4 py-4">
-            {scenario.kind === "confirm" ? (
-              <div className="rounded-2xl border border-neutral-100 bg-neutral-50 px-4 py-3.5">
-                <p className="text-sm font-semibold text-neutral-900">{scenario.title}</p>
-                <p className="text-xs text-neutral-500 mt-0.5">{scenario.dateLabel} · {scenario.timeLabel}</p>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                <div className="rounded-2xl border border-neutral-100 bg-neutral-50 px-4 py-3">
-                  <p className="text-sm font-semibold text-neutral-900">{scenario.title}</p>
-                  <p className="text-xs text-neutral-500 mt-0.5">{scenario.dateLabel}</p>
-                </div>
-                {scenario.slots.map((slot) => (
-                  <button key={slot.id} onClick={() => setSelectedSlotId(slot.id)} className={cn(
-                    "w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl border-2 transition-all text-left",
-                    selectedSlotId === slot.id ? "border-neutral-900 bg-neutral-900 text-white" : "border-neutral-200 bg-white hover:border-neutral-300 text-neutral-900"
-                  )}>
-                    <div className={cn("w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0", selectedSlotId === slot.id ? "border-white" : "border-neutral-400")}>
-                      {selectedSlotId === slot.id && <div className="w-2 h-2 rounded-full bg-white" />}
-                    </div>
-                    <span className="text-sm font-medium">{slot.label}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-          <div className="px-4 pb-5 pt-3 flex gap-2.5 border-t border-neutral-100">
-            <Button variant="outline" size="lg" className="flex-1 rounded-2xl font-semibold border-neutral-200" onClick={handleIdea}>
-              {isIdea ? "Уже в идеях" : "В идеи"}
-            </Button>
-            <Button size="lg" className="flex-1 rounded-2xl font-semibold" onClick={handleConfirmPlan} disabled={!!inPlan}>
-              {inPlan && planDate ? `На ${formatLocalPlanDate(planDate, "ru-RU")}` : "Добавить в план"}
-            </Button>
-          </div>
-        </>
+      {/* Confirm CTA */}
+      {selISO && (
+        <button
+          onClick={() => onBack()}
+          style={{
+            display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+            width: "100%", marginTop: 12, height: 50,
+            borderRadius: 999, background: C.accent, color: "#fff",
+            fontSize: 14, fontWeight: 600, border: 0, cursor: "pointer",
+            fontFamily: "var(--font-sans)",
+          }}
+        >
+          Выбрать — {fmtDateShort(selISO)} <ArrowIcon size={14} color="#fff" />
+        </button>
       )}
     </div>
   );
 }
 
-interface ModalContentProps extends SaveToPlanModalProps {
-  onClose: () => void;
-}
-function ModalContent(props: ModalContentProps) {
-  const { onConfirm, onClose, scenario, isIdea, inPlan, planDate, planStartsAt } =
-    props;
+// ─── Date Slider View (Variant B) ─────────────────────────────────────────────
+function DateSliderView({
+  options, title, category,
+  onConfirm, onIdea,
+}: {
+  options: string[]; title: string; category?: string;
+  onConfirm: (iso: string) => void; onIdea: () => void;
+}) {
+  const [selISO, setSelISO] = React.useState<string>(options[0] ?? "");
+  const [drawerOpen, setDrawerOpen] = React.useState(false);
+  const FIRST = 5;
+  const visible = options.slice(0, FIRST);
+  const hidden = options.length - FIRST;
+
+  const handleDrawerSelect = (iso: string) => {
+    setSelISO(iso);
+  };
+
+  const handleDrawerBack = () => {
+    setDrawerOpen(false);
+  };
+
   return (
-    <SaveToPlanPickerBody
-      scenario={scenario}
-      isIdea={isIdea}
-      inPlan={inPlan}
-      planDate={planDate}
-      planStartsAt={planStartsAt}
-      source={props.source}
-      onCommit={(result) => {
-        if (result.action === "plan") {
-          toastPlan(result.dateISO);
-        } else if (result.action === "ideas") {
-          toastIdea();
-        } else if (result.action === "remove-idea") {
-          toastRemovedIdea();
-        }
-        onConfirm(result);
-        onClose();
-      }}
-    />
+    <>
+      <div style={{ padding: "24px 24px 20px" }}>
+        {/* Kicker */}
+        <span style={{
+          fontFamily: "var(--font-mono, ui-monospace)", textTransform: "uppercase" as const,
+          fontSize: 10, letterSpacing: ".14em", color: C.accentDeep,
+          display: "inline-block", marginBottom: 12,
+        }}>● сохранить активность</span>
+
+        {/* Heading */}
+        <h2 style={{
+          margin: "0 0 8px",
+          fontFamily: "var(--font-display, Georgia), serif",
+          fontSize: 34, lineHeight: 1.02, letterSpacing: "-.02em", fontWeight: 400,
+        }}>
+          На какой{" "}
+          <span style={{ fontStyle: "italic", color: C.accentDeep }}>день</span>{" "}
+          напомнить?
+        </h2>
+
+        {/* Event context line */}
+        <p style={{
+          marginTop: 8, marginBottom: 18, fontSize: 13, color: C.ink3,
+          display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" as const,
+        }}>
+          {category && (
+            <>
+              <span style={{
+                fontFamily: "var(--font-mono, ui-monospace)", textTransform: "uppercase" as const,
+                fontSize: 11, letterSpacing: ".14em", color: C.accentDeep,
+                display: "inline-flex", alignItems: "center", gap: 6,
+              }}>
+                <span style={{ width: 6, height: 6, borderRadius: 99, background: C.accent }} />
+                {category}
+              </span>
+              <span style={{ color: C.line2 }}>·</span>
+            </>
+          )}
+          <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>{title}</span>
+        </p>
+
+        {/* Month label + session count */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+          <span style={{ fontFamily: "var(--font-display, Georgia), serif", fontSize: 18, letterSpacing: "-.01em", fontWeight: 400 }}>
+            {RU_MONTHS_NAMED[fmtDateChip(options[0]).monthIdx]}{" "}
+            <span style={{ color: C.ink3 }}>{parseLocalDate(options[0]).getFullYear()}</span>
+          </span>
+          <span style={{ fontFamily: "var(--font-mono, ui-monospace)", fontSize: 10, color: C.ink3, letterSpacing: ".1em", textTransform: "uppercase" as const }}>
+            {options.length} дат
+          </span>
+        </div>
+
+        {/* Date slider */}
+        <DateSlider options={visible} selISO={selISO} onSelect={setSelISO} />
+
+        {/* Show all dates button */}
+        {hidden > 0 && (
+          <button
+            onClick={() => setDrawerOpen(true)}
+            style={{
+              width: "100%", padding: "11px 14px", marginTop: 10,
+              background: "transparent", border: `1px dashed ${C.line2}`,
+              borderRadius: 14, display: "flex", alignItems: "center", justifyContent: "space-between",
+              color: C.ink2, fontSize: 13, cursor: "pointer", fontFamily: "var(--font-sans)",
+              transition: "border-color .15s",
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.borderColor = C.ink; }}
+            onMouseLeave={(e) => { e.currentTarget.style.borderColor = C.line2; }}
+          >
+            <span style={{ display: "flex", alignItems: "center", gap: 9 }}>
+              <span style={{ width: 24, height: 24, borderRadius: 99, border: `1px solid ${C.line2}`, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
+                <PlusIcon size={12} />
+              </span>
+              Показать все {options.length} дат
+            </span>
+            <span style={{ fontFamily: "var(--font-mono, ui-monospace)", fontSize: 11, color: C.ink3 }}>
+              до {fmtDateShort(options[options.length - 1])} →
+            </span>
+          </button>
+        )}
+
+        {/* Confirmation bar */}
+        {selISO && <ConfirmBar iso={selISO} onConfirm={() => onConfirm(selISO)} />}
+
+        <OrDivider label="или без даты" />
+        <IdeasRow onClick={onIdea} ghost />
+      </div>
+
+      {/* All-dates drawer */}
+      {drawerOpen && (
+        <AllDatesDrawer
+          options={options}
+          selISO={selISO}
+          onSelect={handleDrawerSelect}
+          onBack={handleDrawerBack}
+        />
+      )}
+    </>
+  );
+}
+
+// ─── Calendar view ────────────────────────────────────────────────────────────
+function CalendarView({ onSelect, allowedDateKeys, onBack }: {
+  onSelect: (iso: string) => void; allowedDateKeys?: string[] | null; onBack?: () => void;
+}) {
+  const [value, setValue] = React.useState<Date | null>(null);
+  return (
+    <div style={{ padding: "24px 24px 20px" }}>
+      {onBack && (
+        <button onClick={onBack} style={{
+          display: "inline-flex", alignItems: "center", gap: 6, marginBottom: 20,
+          fontFamily: "var(--font-mono, ui-monospace)", fontSize: 11, letterSpacing: ".12em",
+          textTransform: "uppercase" as const, color: C.ink3, background: "none", border: 0, cursor: "pointer", padding: 0,
+        }}>‹ Назад</button>
+      )}
+      <h2 style={{ margin: "0 0 6px", fontFamily: "var(--font-display, Georgia), serif", fontSize: 34, lineHeight: 1, letterSpacing: "-.02em", fontWeight: 400 }}>
+        Выберите <span style={{ fontStyle: "italic", color: C.accentDeep }}>дату</span>
+      </h2>
+      <p style={{ marginTop: 8, marginBottom: 22, fontSize: 14, color: C.ink3, lineHeight: 1.5 }}>
+        Добавим в план и напомним вечером накануне.
+      </p>
+      <DatePicker value={value} onDateChange={setValue} disablePast allowedDateKeys={allowedDateKeys} />
+      <button
+        onClick={() => value && onSelect(getLocalDateKey(value))}
+        disabled={!value}
+        style={{
+          display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+          width: "100%", marginTop: 16, height: 52, borderRadius: 999,
+          background: value ? C.accent : C.line, color: value ? "#fff" : C.ink3,
+          fontSize: 15, fontWeight: 600, border: 0,
+          cursor: value ? "pointer" : "not-allowed", transition: "all .2s", fontFamily: "var(--font-sans)",
+        }}
+      >
+        {value ? `В план — ${fmtDateLong(getLocalDateKey(value))}` : "Выберите дату"}
+        {value && <ArrowIcon color="#fff" size={16} />}
+      </button>
+    </div>
+  );
+}
+
+// ─── Already in plan state (Variant E) ───────────────────────────────────────
+function InPlanView({ planDate, planStartsAt, planItemId, onSwitchCalendar, onIdea, onRemovePlan, onClose }: {
+  planDate: string | null; planStartsAt: string | null; planItemId: string | null;
+  onSwitchCalendar: () => void; onIdea: () => void;
+  onRemovePlan: (planItemId: string) => void; onClose: () => void;
+}) {
+  const planDateFmt = planDate ? formatLocalPlanDate(planDate, "ru-RU") : null;
+
+  return (
+    <div style={{ padding: "24px 24px 20px" }}>
+      {/* Green kicker */}
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+        <span style={{
+          width: 22, height: 22, borderRadius: 99, background: C.green, color: "#fff",
+          display: "inline-flex", alignItems: "center", justifyContent: "center",
+          fontSize: 11, fontWeight: 700, boxShadow: `0 0 0 4px ${C.greenBg}`,
+        }}>✓</span>
+        <span style={{ fontFamily: "var(--font-mono, ui-monospace)", textTransform: "uppercase" as const, fontSize: 10, letterSpacing: ".14em", color: C.green }}>уже сохранено</span>
+      </div>
+
+      <h2 style={{ margin: "0 0 8px", fontFamily: "var(--font-display, Georgia), serif", fontSize: 36, lineHeight: 1, letterSpacing: "-.02em", fontWeight: 400 }}>
+        В вашем{" "}
+        <span style={{ fontStyle: "italic", color: C.accentDeep }}>плане</span>.
+      </h2>
+
+      {/* Бейдж — derived от planDate */}
+      {planDateFmt && (
+        <div style={{ display: "flex", gap: 8, marginBottom: 18 }}>
+          <span style={{
+            display: "inline-flex", alignItems: "center", gap: 6,
+            padding: "6px 12px", borderRadius: 99, background: C.ink, color: "#FAF7F1",
+            fontSize: 12, fontWeight: 500,
+          }}>
+            <CalIcon size={13} color="#FAF7F1" /> В плане · {planDateFmt}
+          </span>
+        </div>
+      )}
+
+      {/* Секция «В плане» */}
+      <KickerLine label="в плане" rightEl={
+        <button
+          onClick={onSwitchCalendar}
+          style={{
+            fontFamily: "var(--font-mono, ui-monospace)", textTransform: "uppercase" as const,
+            fontSize: 10, letterSpacing: ".12em", color: C.accentDeep,
+            background: "none", border: 0, cursor: "pointer", padding: 0,
+            display: "inline-flex", alignItems: "center", gap: 4,
+          }}
+        ><PlusIcon size={11} color={C.accentDeep} /> ещё дату</button>
+      } />
+
+      <div style={{ marginBottom: 16 }}>
+        <div style={{
+          display: "flex", alignItems: "center", gap: 12,
+          padding: "14px 14px 14px 16px",
+          background: C.paper, border: `1px solid ${C.line}`, borderRadius: 14,
+        }}>
+          <IcoCircle bg={C.ink} color="#FAF7F1"><CalIcon size={16} color="#FAF7F1" /></IcoCircle>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 15, fontWeight: 600, letterSpacing: "-.005em", color: C.ink, display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" as const }}>
+              {planDateFmt ?? "Дата не указана"}
+              {planStartsAt && (
+                <span style={{ fontFamily: "var(--font-mono, ui-monospace)", fontSize: 12, color: C.ink3, fontWeight: 400 }}>
+                  · {new Date(planStartsAt).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })}
+                </span>
+              )}
+            </div>
+            <div style={{ fontFamily: "var(--font-mono, ui-monospace)", fontSize: 11, color: C.ink3, marginTop: 3, letterSpacing: ".04em" }}>● напомним накануне вечером</div>
+          </div>
+          <button onClick={onSwitchCalendar} title="Изменить дату" style={{
+            width: 32, height: 32, borderRadius: 99, border: `1px solid ${C.line2}`,
+            background: "transparent", color: C.ink2,
+            display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer",
+          }}><PencilIcon size={13} /></button>
+          {/* Удалить из плана → API-запрос → закрыть модалку */}
+          <button onClick={() => planItemId ? onRemovePlan(planItemId) : onClose()} title="Убрать из плана" style={{
+            width: 32, height: 32, borderRadius: 99, border: `1px solid ${C.line2}`,
+            background: "transparent", color: C.ink3,
+            display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer",
+          }}><TrashIcon size={13} /></button>
+        </div>
+      </div>
+
+      {/* Footer */}
+      <div style={{ display: "flex", gap: 10, paddingTop: 14, borderTop: `1px solid ${C.line}` }}>
+        <button onClick={onIdea} style={{
+          flex: 1, height: 46, borderRadius: 999, border: `1px solid ${C.line2}`,
+          background: "transparent", color: C.ink, fontSize: 13, fontWeight: 600,
+          display: "flex", alignItems: "center", justifyContent: "center", gap: 7,
+          cursor: "pointer", fontFamily: "var(--font-sans)",
+        }}>
+          <BookmarkIcon size={14} /> В идеи
+        </button>
+        <button onClick={() => { window.location.href = "/me/plan"; }} style={{
+          flex: 1.2, height: 46, borderRadius: 999, background: C.ink, color: "#FAF7F1",
+          border: 0, fontSize: 13, fontWeight: 600,
+          display: "flex", alignItems: "center", justifyContent: "center", gap: 7,
+          cursor: "pointer", fontFamily: "var(--font-sans)",
+        }}>
+          Перейти в план <ExternalLinkIcon size={13} color="#FAF7F1" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Already in ideas state (VariantEIdeas) ───────────────────────────────────
+function InIdeasView({ onRemoveIdea, onSchedule, dateOptions }: {
+  onRemoveIdea: () => void; onSchedule: (iso: string) => void; dateOptions: string[];
+}) {
+  const [removed, setRemoved] = React.useState(false);
+  const [pickerOpen, setPickerOpen] = React.useState(false);
+  const [selISO, setSelISO] = React.useState<string>(dateOptions[0] ?? "");
+
+  const handleRemove = () => { setRemoved(true); onRemoveIdea(); };
+
+  return (
+    <div style={{ padding: "24px 24px 20px" }}>
+      {/* Green kicker */}
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+        <span style={{
+          width: 22, height: 22, borderRadius: 99, background: C.green, color: "#fff",
+          display: "inline-flex", alignItems: "center", justifyContent: "center",
+          fontSize: 11, fontWeight: 700, boxShadow: `0 0 0 4px ${C.greenBg}`,
+        }}>✓</span>
+        <span style={{ fontFamily: "var(--font-mono, ui-monospace)", textTransform: "uppercase" as const, fontSize: 10, letterSpacing: ".14em", color: C.green }}>уже сохранено</span>
+      </div>
+
+      <h2 style={{ margin: "0 0 8px", fontFamily: "var(--font-display, Georgia), serif", fontSize: 36, lineHeight: 1, letterSpacing: "-.02em", fontWeight: 400 }}>
+        В ваших{" "}
+        <span style={{ fontStyle: "italic", color: C.accentDeep }}>идеях</span>.
+      </h2>
+
+      {/* Status chip */}
+      {!removed && (
+        <div style={{ display: "flex", gap: 8, marginBottom: 18 }}>
+          <span style={{
+            display: "inline-flex", alignItems: "center", gap: 6,
+            padding: "6px 12px", borderRadius: 99, background: C.accentSoft, color: C.accentDeep,
+            fontSize: 12, fontWeight: 500,
+          }}>
+            <BookmarkIcon size={13} /> В идеях
+          </span>
+        </div>
+      )}
+
+      {/* Idea entry */}
+      {!removed ? (
+        <>
+          <KickerLine label="в идеях" />
+          <div style={{ marginBottom: 18 }}>
+            <div style={{
+              display: "flex", alignItems: "center", gap: 12,
+              padding: "14px 14px 14px 16px",
+              background: C.paper, border: `1px solid ${C.line}`, borderRadius: 14,
+            }}>
+              <IcoCircle bg={C.accentSoft} color={C.accentDeep}><BookmarkIcon size={16} /></IcoCircle>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 15, fontWeight: 600, letterSpacing: "-.005em", color: C.ink }}>Без даты</div>
+                <div style={{ fontFamily: "var(--font-mono, ui-monospace)", fontSize: 11, color: C.ink3, marginTop: 3, letterSpacing: ".04em" }}>● без напоминания</div>
+              </div>
+              <button onClick={handleRemove} title="Убрать из идей" style={{
+                width: 32, height: 32, borderRadius: 99, border: `1px solid ${C.line2}`,
+                background: "transparent", color: C.ink3,
+                display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer",
+              }}><TrashIcon size={13} /></button>
+            </div>
+          </div>
+        </>
+      ) : (
+        <div style={{
+          padding: "24px 20px", background: C.paper, border: `1px dashed ${C.line2}`,
+          borderRadius: 14, textAlign: "center", marginBottom: 18,
+        }}>
+          <div style={{ fontFamily: "var(--font-display, Georgia), serif", fontSize: 22, lineHeight: 1.1, color: C.ink, marginBottom: 6 }}>
+            Пока ничего <span style={{ fontStyle: "italic", color: C.accentDeep }}>не сохранено</span>
+          </div>
+          <div style={{ fontSize: 13, color: C.ink3 }}>Добавьте дату в план или сохраните в идеи.</div>
+        </div>
+      )}
+
+      {/* Nudge: convert to plan */}
+      {!removed && (
+        <div style={{
+          padding: "16px 18px", borderRadius: 16,
+          background: "linear-gradient(135deg, #FFE8DC, #FFF1E5)",
+          border: "1px solid rgba(232,106,58,.2)",
+          display: "flex", alignItems: "center", gap: 14, marginBottom: 18,
+        }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontFamily: "var(--font-display, Georgia), serif", fontSize: 18, lineHeight: 1.1, letterSpacing: "-.01em", fontWeight: 400 }}>
+              Готовы <span style={{ fontStyle: "italic", color: C.accentDeep }}>выбрать день</span>?
+            </div>
+            {dateOptions.length > 0 && (
+              <div style={{ fontSize: 12, color: C.ink3, marginTop: 3 }}>
+                {dateOptions.length} дат · ближайшая {fmtDateShort(dateOptions[0])}
+              </div>
+            )}
+          </div>
+          <button
+            onClick={() => setPickerOpen(true)}
+            style={{
+              height: 42, padding: "0 16px", borderRadius: 999,
+              background: C.accent, color: "#fff", border: 0,
+              fontSize: 13, fontWeight: 600, cursor: "pointer", flexShrink: 0,
+              display: "flex", alignItems: "center", gap: 6,
+              fontFamily: "var(--font-sans)",
+            }}
+          >
+            Запланировать <ArrowIcon size={14} color="#fff" />
+          </button>
+        </div>
+      )}
+
+      {/* Footer */}
+      <div style={{ display: "flex", gap: 10, paddingTop: 14, borderTop: `1px solid ${C.line}` }}>
+        <button onClick={() => { window.location.href = "/me/ideas"; }} style={{
+          flex: 1, height: 46, borderRadius: 999, background: C.ink, color: "#FAF7F1",
+          border: 0, fontSize: 13, fontWeight: 600,
+          display: "flex", alignItems: "center", justifyContent: "center", gap: 7,
+          cursor: "pointer", fontFamily: "var(--font-sans)",
+        }}>
+          Все мои идеи <ExternalLinkIcon size={13} color="#FAF7F1" />
+        </button>
+      </div>
+
+      {/* Inline date-picker drawer */}
+      {pickerOpen && (
+        <div style={{
+          position: "absolute", inset: 0, zIndex: 5,
+          background: C.bg, borderRadius: "inherit",
+          padding: "24px 24px 18px", display: "flex", flexDirection: "column",
+          animation: "stp-slide-up .35s cubic-bezier(.2,.7,.2,1) both",
+        }}>
+          <style>{`@keyframes stp-slide-up{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}`}</style>
+          <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 18 }}>
+            <button
+              onClick={() => setPickerOpen(false)}
+              aria-label="Назад"
+              style={{
+                width: 36, height: 36, borderRadius: 99,
+                background: "transparent", border: `1px solid ${C.line2}`,
+                color: C.ink2, cursor: "pointer",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 16, flexShrink: 0, transition: "all .15s",
+              }}
+              onMouseEnter={(e) => { const b = e.currentTarget as HTMLElement; b.style.background = C.ink; b.style.color = "#FAF7F1"; b.style.borderColor = C.ink; }}
+              onMouseLeave={(e) => { const b = e.currentTarget as HTMLElement; b.style.background = "transparent"; b.style.color = C.ink2; b.style.borderColor = C.line2; }}
+            >
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
+                <path d="M9 2L4 7l5 5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </button>
+            <div>
+              <span style={{ fontFamily: "var(--font-mono, ui-monospace)", textTransform: "uppercase" as const, fontSize: 10, letterSpacing: ".14em", color: C.accentDeep }}>● Выбор даты</span>
+              <h3 style={{ margin: "4px 0 0", fontFamily: "var(--font-display, Georgia), serif", fontSize: 24, letterSpacing: "-.015em", fontWeight: 400 }}>
+                {dateOptions.length} <span style={{ fontStyle: "italic", color: C.accentDeep }}>сеансов</span>
+              </h3>
+            </div>
+          </div>
+
+          {/* Date list grouped by month */}
+          {dateOptions.length > 0 ? (
+            <div style={{ flex: 1, overflowY: "auto", marginRight: -8, paddingRight: 8 }}>
+              {/* Simple chip grid */}
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 16 }}>
+                {dateOptions.map((iso) => {
+                  const chip = fmtDateChip(iso);
+                  const isSel = iso === selISO;
+                  return (
+                    <button
+                      key={iso}
+                      onClick={() => setSelISO(iso)}
+                      style={{
+                        padding: "10px 12px", borderRadius: 14,
+                        background: isSel ? C.ink : C.paper,
+                        color: isSel ? "#FAF7F1" : C.ink,
+                        border: `1px solid ${isSel ? C.ink : C.line}`,
+                        display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 2,
+                        minWidth: 64, cursor: "pointer", transition: "all .15s", fontFamily: "var(--font-sans)",
+                      }}
+                    >
+                      <span style={{ fontFamily: "var(--font-mono, ui-monospace)", fontSize: 10, letterSpacing: ".12em", textTransform: "uppercase" as const, color: isSel ? "rgba(250,247,241,.55)" : C.ink3 }}>{chip.dow}</span>
+                      <span style={{ fontFamily: "var(--font-display, Georgia), serif", fontSize: 24, lineHeight: 1, letterSpacing: "-.02em" }}>{chip.day}</span>
+                      <span style={{ fontSize: 11, color: isSel ? "rgba(250,247,241,.55)" : C.ink3 }}>{chip.month}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ) : (
+            <CalendarView
+              onSelect={(iso) => { setSelISO(iso); }}
+              onBack={undefined}
+            />
+          )}
+
+          {selISO && (
+            <button
+              onClick={() => { onSchedule(selISO); setPickerOpen(false); }}
+              style={{
+                display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                width: "100%", height: 50, marginTop: 12,
+                borderRadius: 999, background: C.accent, color: "#fff",
+                fontSize: 14, fontWeight: 600, border: 0, cursor: "pointer",
+                fontFamily: "var(--font-sans)",
+              }}
+            >
+              Добавить в план — {fmtDateShort(selISO)} <ArrowIcon size={14} color="#fff" />
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Editorial quick view (Variant A) ────────────────────────────────────────
+function EditorialView({
+  scenario, isIdea, inPlan, onPlan, onIdea, onSwitchCalendar, dateOptions,
+}: {
+  scenario: SaveScenario; isIdea: boolean; inPlan: boolean;
+  onPlan: (iso: string) => void; onIdea: () => void; onSwitchCalendar: () => void;
+  dateOptions: string[];
+}) {
+  const todayISO = getLocalDateKey();
+  const tomorrowISO = addDaysLocal(todayISO, 1);
+  const eventPlanDateISO = normalizePlanDateISO(scenario.kind === "quickdate" ? scenario.eventPlanDateISO ?? null : null);
+  const eventPlanDateEndISO = normalizePlanDateISO(scenario.kind === "quickdate" ? scenario.eventPlanDateEndISO ?? null : null);
+  const isLongRunning = isLongRunningRange(eventPlanDateISO, eventPlanDateEndISO);
+  const rangeLabel = formatEventRangeSubtitle(eventPlanDateISO, eventPlanDateEndISO);
+  const isSingleDate = Boolean(eventPlanDateISO) && !isLongRunning;
+  const upcomingOptions = dateOptions.filter((d) => d >= todayISO);
+
+  return (
+    <div style={{ padding: "24px 24px 20px" }}>
+      {/* Event chip */}
+      {scenario.title && (
+        <div style={{
+          display: "flex", alignItems: "center", gap: 12,
+          padding: "10px 14px 10px 10px",
+          background: C.paper, border: `1px solid ${C.line}`,
+          borderRadius: 16, marginBottom: 18,
+        }}>
+          <span style={{
+            width: 34, height: 34, borderRadius: 99,
+            background: C.accentSoft, color: C.accentDeep,
+            display: "inline-flex", alignItems: "center", justifyContent: "center",
+            fontSize: 16, flexShrink: 0,
+          }}>✱</span>
+          <span style={{ display: "flex", flexDirection: "column", gap: 3, minWidth: 0 }}>
+            <span style={{ fontFamily: "var(--font-mono, ui-monospace)", textTransform: "uppercase" as const, fontSize: 10, letterSpacing: ".14em", color: C.ink3 }}>
+              активность
+            </span>
+            <span style={{ fontSize: 14, color: C.ink, fontWeight: 600, letterSpacing: "-.01em", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>
+              {scenario.title}
+            </span>
+          </span>
+        </div>
+      )}
+
+      <h2 style={{ margin: "0 0 8px", fontFamily: "var(--font-display, Georgia), serif", fontSize: 38, lineHeight: 1, letterSpacing: "-.02em", fontWeight: 400 }}>
+        Куда сохранить{" "}
+        <span style={{ fontStyle: "italic", color: C.accentDeep }}>активность</span>?
+      </h2>
+      <p style={{ marginTop: 8, marginBottom: 22, fontSize: 14, color: C.ink3, lineHeight: 1.5 }}>
+        Положите в план на дату — напомним вечером накануне.
+        {" "}Или сохраните в идеи, чтобы вернуться позже.
+      </p>
+
+      <KickerLine label="в план" />
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {isSingleDate ? (
+          <>
+            <OptRow num="01" iconEl={<IcoCircle bg={C.ink} color="#FAF7F1"><CalIcon size={17} color="#FAF7F1" /></IcoCircle>}
+              title="На дату проведения" sub={fmtDateLong(eventPlanDateISO ?? "")}
+              onClick={() => onPlan(eventPlanDateISO ?? "")} />
+            <OptRow num="02" iconEl={<IcoCircle bg={C.bg} color={C.ink2} border={`1px solid ${C.line2}`}><CalIcon size={17} /></IcoCircle>}
+              title="Выбрать другую дату" sub="Открыть календарь"
+              onClick={onSwitchCalendar} />
+          </>
+        ) : isLongRunning ? (
+          <OptRow num="01" iconEl={<IcoCircle bg={C.ink} color="#FAF7F1"><CalIcon size={17} color="#FAF7F1" /></IcoCircle>}
+            title="Выбрать дату" sub={rangeLabel ?? "Выбрать дату посещения"}
+            onClick={onSwitchCalendar} />
+        ) : upcomingOptions.length > 0 ? (
+          <>
+            {upcomingOptions.slice(0, 2).map((iso, i) => (
+              <OptRow key={iso} num={`0${i + 1}`}
+                iconEl={<IcoCircle bg={i === 0 ? C.ink : C.bg} color={i === 0 ? "#FAF7F1" : C.ink2} border={i === 0 ? undefined : `1px solid ${C.line2}`}><CalIcon size={17} color={i === 0 ? "#FAF7F1" : undefined} /></IcoCircle>}
+                title={i === 0 ? "Ближайшая дата" : "Следующая дата"} sub={fmtDateLong(iso)}
+                onClick={() => onPlan(iso)} />
+            ))}
+            {upcomingOptions.length > 2 && (
+              <OptRow num={`0${Math.min(upcomingOptions.length, 3)}`}
+                iconEl={<IcoCircle bg={C.bg} color={C.ink2} border={`1px solid ${C.line2}`}><CalIcon size={17} /></IcoCircle>}
+                title="Выбрать дату" sub={`Ещё ${upcomingOptions.length - 2} дат в расписании`}
+                onClick={onSwitchCalendar} />
+            )}
+          </>
+        ) : (
+          <>
+            <OptRow num="01" iconEl={<IcoCircle bg={C.ink} color="#FAF7F1"><CalIcon size={17} color="#FAF7F1" /></IcoCircle>}
+              title="Сегодня" sub={`В план на ${formatLocalPlanDate(todayISO, "ru-RU")}`}
+              onClick={() => onPlan(todayISO)} />
+            <OptRow num="02" iconEl={<IcoCircle bg={C.bg} color={C.ink2} border={`1px solid ${C.line2}`}><CalIcon size={17} /></IcoCircle>}
+              title="Завтра" sub={`В план на ${formatLocalPlanDate(tomorrowISO, "ru-RU")}`}
+              onClick={() => onPlan(tomorrowISO)} />
+            <OptRow num="03" iconEl={<IcoCircle bg={C.bg} color={C.ink2} border={`1px solid ${C.line2}`}><CalIcon size={17} /></IcoCircle>}
+              title="Выбрать дату" sub="Открыть календарь и выбрать день"
+              onClick={onSwitchCalendar} />
+          </>
+        )}
+      </div>
+
+      <OrDivider />
+      <KickerLine label="без даты" />
+      <IdeasRow onClick={onIdea} />
+    </div>
+  );
+}
+
+// ─── Confirm / timeslots scenario ─────────────────────────────────────────────
+function ConfirmView({ scenario, isIdea, inPlan, planDate, onCommit }: {
+  scenario: Extract<SaveScenario, { kind: "confirm" | "timeslots" }>;
+  isIdea: boolean; inPlan: boolean; planDate: string | null;
+  onCommit: (r: SaveToPlanResult) => void;
+}) {
+  const [selectedSlotId, setSelectedSlotId] = React.useState<string | null>(
+    scenario.kind === "timeslots" && scenario.slots.length > 0 ? scenario.slots[0].id : null,
+  );
+  const handlePlan = () => {
+    if (scenario.kind === "confirm") {
+      onCommit({ action: "plan", dateISO: scenario.dateISO, timeSlotId: scenario.slotId ?? null });
+    } else {
+      onCommit({ action: "plan", dateISO: scenario.dateISO, timeSlotId: selectedSlotId });
+    }
+  };
+
+  return (
+    <div style={{ padding: "24px 24px 20px" }}>
+      <h2 style={{ margin: "0 0 20px", fontFamily: "var(--font-display, Georgia), serif", fontSize: 34, lineHeight: 1, letterSpacing: "-.02em", fontWeight: 400 }}>
+        {scenario.kind === "timeslots"
+          ? <>Выберите <span style={{ fontStyle: "italic", color: C.accentDeep }}>время</span></>
+          : <>Добавить в <span style={{ fontStyle: "italic", color: C.accentDeep }}>план</span>?</>}
+      </h2>
+      <div style={{ background: C.paper, border: `1px solid ${C.line}`, borderRadius: 16, padding: "14px 16px", marginBottom: 16 }}>
+        <div style={{ fontSize: 15, fontWeight: 600, letterSpacing: "-.01em", color: C.ink }}>{scenario.title}</div>
+        <div style={{ fontSize: 13, color: C.ink3, marginTop: 3 }}>
+          {scenario.dateLabel}{scenario.kind === "confirm" ? ` · ${scenario.timeLabel}` : ""}
+        </div>
+      </div>
+      {scenario.kind === "timeslots" && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
+          {scenario.slots.map((slot) => {
+            const isSel = selectedSlotId === slot.id;
+            return (
+              <button key={slot.id} onClick={() => setSelectedSlotId(slot.id)} style={{
+                display: "flex", alignItems: "center", gap: 12, padding: "14px 16px",
+                borderRadius: 16, border: `2px solid ${isSel ? C.ink : C.line}`,
+                background: isSel ? C.ink : C.paper, color: isSel ? "#FAF7F1" : C.ink,
+                fontFamily: "var(--font-sans)", fontSize: 14, fontWeight: 500,
+                cursor: "pointer", transition: "all .15s", textAlign: "left",
+              }}>
+                <span style={{ width: 16, height: 16, borderRadius: 99, border: `2px solid ${isSel ? "#FAF7F1" : C.line2}`, display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                  {isSel && <span style={{ width: 8, height: 8, borderRadius: 99, background: "#FAF7F1" }} />}
+                </span>
+                {slot.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
+      <div style={{ display: "flex", gap: 10, paddingTop: 14, borderTop: `1px solid ${C.line}` }}>
+        <button onClick={() => onCommit({ action: "ideas" })} style={{
+          flex: 1, height: 46, borderRadius: 999, border: `1px solid ${C.line2}`,
+          background: "transparent", color: C.ink, fontSize: 13, fontWeight: 600,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          cursor: "pointer", fontFamily: "var(--font-sans)",
+        }}>
+          {isIdea ? "Уже в идеях" : "В идеи"}
+        </button>
+        <button onClick={handlePlan} disabled={!!inPlan} style={{
+          flex: 1.2, height: 46, borderRadius: 999,
+          background: inPlan ? C.line : C.ink, color: inPlan ? C.ink3 : "#FAF7F1",
+          border: 0, fontSize: 13, fontWeight: 600,
+          display: "flex", alignItems: "center", justifyContent: "center", gap: 7,
+          cursor: inPlan ? "not-allowed" : "pointer", fontFamily: "var(--font-sans)",
+        }}>
+          {inPlan && planDate ? `На ${formatLocalPlanDate(planDate, "ru-RU")}` : "Добавить в план"}
+          {!inPlan && <ArrowIcon size={14} color="#FAF7F1" />}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── SaveToPlanPickerBody ─────────────────────────────────────────────────────
+export function SaveToPlanPickerBody({
+  scenario, onCommit, isIdea = false, inPlan = false,
+  planDate = null, planStartsAt = null, planItemId = null,
+  source, onClose,
+}: SaveToPlanPickerBodyProps) {
+  const [view, setView] = React.useState<"main" | "calendar">("main");
+
+  const todayISO = getLocalDateKey();
+  const isQuickdate = scenario.kind === "quickdate";
+
+  const eventPlanDateOptions = React.useMemo(() => {
+    if (scenario.kind !== "quickdate") return [];
+    if ((scenario.eventPlanDateOptions?.length ?? 0) > 0) return scenario.eventPlanDateOptions ?? [];
+    return buildDateRangeKeys(scenario.eventPlanDateISO, scenario.eventPlanDateEndISO);
+  }, [scenario]);
+
+  const normalizedOptions = React.useMemo(() => {
+    const unique = new Set(eventPlanDateOptions.map((d) => normalizePlanDateISO(d)).filter(Boolean));
+    return Array.from(unique).sort() as string[];
+  }, [eventPlanDateOptions]);
+
+  const upcomingOptions = normalizedOptions.filter((d) => d >= todayISO);
+
+  if (!isQuickdate) {
+    return (
+      <ConfirmView
+        scenario={scenario as Extract<SaveScenario, { kind: "confirm" | "timeslots" }>}
+        isIdea={isIdea} inPlan={inPlan} planDate={planDate}
+        onCommit={onCommit}
+      />
+    );
+  }
+
+  if (view === "calendar") {
+    return (
+      <CalendarView
+        onSelect={(iso) => { setView("main"); onCommit({ action: "plan", dateISO: iso, timeSlotId: null }); }}
+        allowedDateKeys={upcomingOptions.length > 0 ? upcomingOptions : null}
+        onBack={() => setView("main")}
+      />
+    );
+  }
+
+  // Already in plan — manage state
+  if (inPlan && planDate) {
+    return (
+      <InPlanView
+        planDate={planDate}
+        planStartsAt={planStartsAt}
+        planItemId={planItemId}
+        onSwitchCalendar={() => setView("calendar")}
+        onIdea={() => onCommit({ action: "ideas" })}
+        onRemovePlan={(id) => onCommit({ action: "remove-plan", planItemId: id })}
+        onClose={() => { onClose?.(); }}
+      />
+    );
+  }
+
+  // Already in ideas — nudge to plan
+  if (isIdea) {
+    return (
+      <InIdeasView
+        onRemoveIdea={() => onCommit({ action: "remove-idea" })}
+        onSchedule={(iso) => onCommit({ action: "plan", dateISO: iso, timeSlotId: null })}
+        dateOptions={upcomingOptions}
+      />
+    );
+  }
+
+  // For quickdate — always use the date slider UI.
+  // If no event dates available, fall back to today + next 6 days.
+  const sliderOptions = upcomingOptions.length > 0
+    ? upcomingOptions
+    : Array.from({ length: 7 }, (_, i) => addDaysLocal(todayISO, i));
+
+  return (
+    <div style={{ position: "relative" }}>
+      <DateSliderView
+        options={sliderOptions}
+        title={scenario.title}
+        onConfirm={(iso) => onCommit({ action: "plan", dateISO: iso, timeSlotId: null })}
+        onIdea={() => onCommit({ action: "ideas" })}
+      />
+    </div>
+  );
+}
+
+// ─── Modal wrappers ───────────────────────────────────────────────────────────
+interface ModalContentProps extends SaveToPlanModalProps { onClose: () => void; }
+
+function ModalContent(props: ModalContentProps) {
+  const { onConfirm, onClose, scenario, isIdea, inPlan, planDate, planStartsAt, source } = props;
+  return (
+    <>
+      <style>{`
+        .stp-opt:hover:not(:disabled) { background: #fff !important; border-color: #141210 !important; transform: translateX(2px); }
+        .stp-opt:hover:not(:disabled) .stp-arr { transform: translateX(4px); color: #C24E22 !important; }
+      `}</style>
+      <div style={{ position: "relative" }}>
+        <SaveToPlanPickerBody
+          scenario={scenario}
+          isIdea={isIdea}
+          inPlan={inPlan}
+          planDate={planDate}
+          planStartsAt={planStartsAt}
+          source={source}
+          onCommit={(result) => {
+            if (result.action === "plan") toastPlan(result.dateISO);
+            else if (result.action === "ideas") toastIdea();
+            else if (result.action === "remove-idea") toastRemovedIdea();
+            onConfirm(result);
+            onClose();
+          }}
+        />
+      </div>
+    </>
   );
 }
 
 export function SaveToPlanModal(props: SaveToPlanModalProps) {
   const { open, onOpenChange } = props;
   const isDesktop = useMediaQuery("(min-width: 640px)");
-  // `mounted` prevents rendering either container during SSR / hydration,
-  // so we never mount Sheet and Dialog simultaneously.
   const [mounted, setMounted] = React.useState(false);
   React.useEffect(() => { setMounted(true); }, []);
-
   if (!mounted) return null;
 
   if (isDesktop) {
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-md p-0 gap-0 overflow-hidden rounded-3xl border-neutral-200">
+        <DialogContent
+          className="sm:max-w-md p-0 gap-0 overflow-hidden rounded-3xl border-neutral-200"
+          style={{ background: C.bg }}
+        >
           <DialogTitle className="sr-only">Сохранить активность</DialogTitle>
           <ModalContent {...props} onClose={() => onOpenChange(false)} />
         </DialogContent>
       </Dialog>
     );
   }
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" showCloseButton={false}
-        className="fixed inset-x-0 bottom-0 w-full max-h-[90vh] rounded-t-3xl bg-white border-t border-neutral-100 shadow-2xl p-0 flex flex-col overflow-hidden gap-0">
-        <div className="flex justify-center pt-3 pb-1 shrink-0"><div className="w-10 h-1 rounded-full bg-neutral-200" /></div>
+      <SheetContent
+        side="bottom"
+        showCloseButton={false}
+        className="fixed inset-x-0 bottom-0 w-full max-h-[90vh] rounded-t-3xl border-t shadow-2xl p-0 flex flex-col overflow-hidden gap-0"
+        style={{ background: C.bg, borderTopColor: C.line }}
+      >
+        <div className="flex justify-center pt-3 pb-1 shrink-0">
+          <div className="w-10 h-1 rounded-full" style={{ background: C.line2 }} />
+        </div>
         <SheetTitle className="sr-only">Сохранить активность</SheetTitle>
-        <div className="flex-1 overflow-y-auto"><ModalContent {...props} onClose={() => onOpenChange(false)} /></div>
+        <div className="flex-1 overflow-y-auto">
+          <ModalContent {...props} onClose={() => onOpenChange(false)} />
+        </div>
         <div className="h-[env(safe-area-inset-bottom)] shrink-0" />
       </SheetContent>
     </Sheet>

@@ -10,6 +10,7 @@ import { PublicProviders } from "@/components/providers/PublicProviders";
 import { FamilyDerivedAgeSync } from "@/components/family/FamilyDerivedAgeSync";
 import { MyPlanProvider } from "@/components/MyPlanProvider";
 import { BetaTip } from "@/components/shared/BetaTip";
+import { DiscoveryBudgetProvider } from "@/features/filters/discovery/discoveryBudgetContext";
 
 export default function PublicGroupLayout({
   children,
@@ -22,19 +23,21 @@ export default function PublicGroupLayout({
         <ReloadProbe />
         <PublicationIntentProvider>
           <HeaderDiscoveryFiltersProviderWrapper>
-            <div className="flex min-h-screen flex-col bg-white">
-              <SiteHeader />
+            <DiscoveryBudgetProvider>
+              <div className="flex min-h-screen flex-col bg-white">
+                <SiteHeader />
 
-              <PublicLayoutBody>{children}</PublicLayoutBody>
-              <FamilyDerivedAgeSync />
-              <MyPlanProvider />
-              <BetaTip />
+                <PublicLayoutBody>{children}</PublicLayoutBody>
+                <FamilyDerivedAgeSync />
+                <MyPlanProvider />
+                <BetaTip />
 
-              {/* Global Refinement Modal */}
-              <Suspense fallback={null}>
-                <RefinementFiltersModalGlobal />
-              </Suspense>
-            </div>
+                {/* Global Refinement Modal */}
+                <Suspense fallback={null}>
+                  <RefinementFiltersModalGlobal />
+                </Suspense>
+              </div>
+            </DiscoveryBudgetProvider>
           </HeaderDiscoveryFiltersProviderWrapper>
         </PublicationIntentProvider>
       </RefinementFiltersProvider>

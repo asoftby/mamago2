@@ -51,5 +51,14 @@ export async function persistActivitySave(
       : `activityId=${encodeURIComponent(meta.activityId)}`;
     const res = await fetch(`/api/save/idea?${query}`, { method: "DELETE" });
     if (!res.ok) throw new Error("idea_remove_failed");
+    return;
+  }
+
+  if (result.action === "remove-plan") {
+    const res = await fetch(
+      `/api/save/plan?planItemId=${encodeURIComponent(result.planItemId)}`,
+      { method: "DELETE" },
+    );
+    if (!res.ok) throw new Error("plan_remove_failed");
   }
 }

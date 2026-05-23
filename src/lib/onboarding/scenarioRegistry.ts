@@ -13,6 +13,7 @@ import {
   type OnboardingContext,
   type PostAuthResult,
 } from "./types";
+import { getBirthdayBuilderHref } from "@/lib/birthday/getBirthdayBuilderHref";
 
 /**
  * Registry of all onboarding scenarios
@@ -133,7 +134,7 @@ const SCENARIO_REGISTRY: Record<OnboardingEntryPoint, OnboardingScenario> = {
     completionStrategy: {
       outcome: OnboardingOutcome.RETURN_TO_BIRTHDAY_RESULT,
       getReturnUrl: (context) => {
-        return context.returnUrl || "/birthday";
+        return context.returnUrl || getBirthdayBuilderHref();
       },
     },
     deferredPrompts: [

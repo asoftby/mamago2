@@ -34,22 +34,24 @@ export function Step2Location({ data, onChange, isEditable = true }: Step2Locati
     <div className="space-y-6">
       <PlaceLocationPicker 
         placeId={data.id || ""} 
+        placeTitle={data.title}
         initialLocation={initialLocation}
         onUpdate={onChange}
         disabled={!isEditable}
       />
       
-      {/* Google Reviews Sync - только для существующих мест */}
-      {data.id && (
-        <GoogleReviewsSync
-          placeId={data.id}
-          googlePlaceId={data.googlePlaceId}
-          googleRating={data.googleRating}
-          googleUserRatingsTotal={data.googleUserRatingsTotal}
-          googleReviewsSyncedAt={data.googleReviewsSyncedAt}
-          googleMapsUri={data.googleMapsUri}
-        />
-      )}
+      <GoogleReviewsSync
+        placeId={data.id || null}
+        placeTitle={data.title}
+        placeAddress={data.formattedAddr || data.customAddress}
+        googlePlaceId={data.googlePlaceId}
+        googleRating={data.googleRating}
+        googleUserRatingsTotal={data.googleUserRatingsTotal}
+        googleReviewsSyncedAt={data.googleReviewsSyncedAt}
+        googleMapsUri={data.googleMapsUri}
+        googleReviewsJson={data.googleReviewsJson}
+        onChange={onChange}
+      />
     </div>
   );
 }

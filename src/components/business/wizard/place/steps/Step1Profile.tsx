@@ -9,6 +9,8 @@ import { AGE_OPTIONS } from "@/lib/config/ages";
 import { useVisitFormats, normalizeVisitFormats } from "@/hooks/useVisitFormats";
 import { RichDescriptionEditor } from "@/components/editor/RichDescriptionEditor";
 import { plainTextToRichTextHtml } from "@/lib/richtext/utils";
+import { AiDescriptionAssistant } from "@/components/ai/AiDescriptionAssistant";
+import { generateSummary } from "@/lib/openingHours/openingHoursMapper";
 import type { PlaceFormData } from "../types";
 
 const MAX_SUBCATEGORIES = 3;
@@ -255,6 +257,29 @@ export function Step1Profile({ data, onChange, isEditable = true }: Step1Profile
       <div>
         <Label htmlFor="description">Описание *</Label>
         <div className="mt-2">
+          <AiDescriptionAssistant
+            entityType="place"
+            title={title}
+            value={description}
+            isEditable={isEditable}
+            onApply={handleDescriptionChange}
+            filledActions={["improve", "shorten", "warm"]}
+            context={{
+              shortDescription: shortDesc,
+              category: primaryRoot?.nameRu || data.category,
+              subcategories: primaryRoot?.children
+                .filter((child) => subcategoryIds.includes(child.id))
+                .map((child) => child.nameRu),
+              ageRange: ageTags,
+              visitFormats,
+              address: data.customAddress || data.formattedAddr,
+              workingHours: data.openingHoursData ? generateSummary(data.openingHoursData) : "",
+              amenities: data.priceItems.items.map((item) => item.label),
+              website: data.website,
+              instagram: data.instagramHandle || data.instagramUrl,
+              phone: data.phone,
+            }}
+          />
           <RichDescriptionEditor
             value={description}
             onChange={handleDescriptionChange}

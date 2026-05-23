@@ -508,6 +508,9 @@ export async function PATCH(
     if (body.currency !== undefined && body.currency !== existing.currency) {
       updateData.currency = body.currency;
     }
+    if (body.priceItems !== undefined) {
+      updateData.priceItems = body.priceItems ?? null;
+    }
 
     if (body.coverImageId !== undefined && resolvedCoverImageId !== existing.coverImageId) {
       updateData.coverImageId = resolvedCoverImageId;

@@ -144,6 +144,7 @@ export function StoryModal({
             paused={paused}
             onNext={onNext}
             onPrev={onPrev}
+            onProgressComplete={onNext}
           />
         </div>
 

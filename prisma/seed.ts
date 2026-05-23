@@ -388,15 +388,73 @@ async function main() {
   });
 
   const minskDistricts = [
-    "Центральный", "Советский", "Первомайский", "Партизанский",
-    "Заводской", "Ленинский", "Октябрьский", "Московский", "Фрунзенский",
+    { name: "Центральный", centerLat: 53.9006, centerLng: 27.5590 },
+    { name: "Советский", centerLat: 53.9200, centerLng: 27.6100 },
+    { name: "Первомайский", centerLat: 53.8900, centerLng: 27.6200 },
+    { name: "Партизанский", centerLat: 53.8700, centerLng: 27.6400 },
+    { name: "Заводской", centerLat: 53.8800, centerLng: 27.4800 },
+    { name: "Ленинский", centerLat: 53.8500, centerLng: 27.5300 },
+    { name: "Октябрьский", centerLat: 53.9100, centerLng: 27.4800 },
+    { name: "Московский", centerLat: 53.9400, centerLng: 27.6700 },
+    { name: "Фрунзенский", centerLat: 53.8500, centerLng: 27.6000 },
   ];
 
-  for (const name of minskDistricts) {
+  for (const district of minskDistricts) {
     await prisma.district.upsert({
-      where: { cityId_name: { cityId: minsk.id, name } },
-      update: {},
-      create: { cityId: minsk.id, name },
+      where: { cityId_name: { cityId: minsk.id, name: district.name } },
+      update: {
+        centerLat: district.centerLat,
+        centerLng: district.centerLng,
+      },
+      create: {
+        cityId: minsk.id,
+        name: district.name,
+        centerLat: district.centerLat,
+        centerLng: district.centerLng,
+      },
+    });
+  }
+
+  const minskMetroStations = [
+    { name: "Институт культуры", lat: 53.8841, lng: 27.5372 },
+    { name: "Площадь Ленина", lat: 53.8938, lng: 27.5483 },
+    { name: "Октябрьская", lat: 53.9002, lng: 27.5618 },
+    { name: "Купаловская", lat: 53.9007, lng: 27.5631 },
+    { name: "Немига", lat: 53.9057, lng: 27.5543 },
+    { name: "Фрунзенская", lat: 53.9098, lng: 27.5396 },
+    { name: "Молодежная", lat: 53.9141, lng: 27.5231 },
+    { name: "Пушкинская", lat: 53.9199, lng: 27.4950 },
+    { name: "Спортивная", lat: 53.9069, lng: 27.4825 },
+    { name: "Кунцевщина", lat: 53.9062, lng: 27.4558 },
+    { name: "Каменная Горка", lat: 53.9067, lng: 27.4376 },
+    { name: "Площадь Победы", lat: 53.9090, lng: 27.5758 },
+    { name: "Площадь Якуба Коласа", lat: 53.9153, lng: 27.5838 },
+    { name: "Академия наук", lat: 53.9214, lng: 27.6008 },
+    { name: "Парк Челюскинцев", lat: 53.9268, lng: 27.6225 },
+    { name: "Московская", lat: 53.9328, lng: 27.6375 },
+    { name: "Восток", lat: 53.9341, lng: 27.6517 },
+    { name: "Пролетарская", lat: 53.8906, lng: 27.5850 },
+    { name: "Тракторный завод", lat: 53.8902, lng: 27.6137 },
+    { name: "Партизанская", lat: 53.8896, lng: 27.6318 },
+    { name: "Автозаводская", lat: 53.8890, lng: 27.6518 },
+    { name: "Могилевская", lat: 53.8619, lng: 27.6745 },
+  ];
+
+  for (const station of minskMetroStations) {
+    await prisma.metroStation.upsert({
+      where: { cityId_name: { cityId: minsk.id, name: station.name } },
+      update: {
+        lat: station.lat,
+        lng: station.lng,
+      },
+      create: {
+        cityId: minsk.id,
+        name: station.name,
+        lat: station.lat,
+        lng: station.lng,
+        osmType: "seed",
+        osmId: `seed-${station.name.toLowerCase().replace(/\s+/g, "-")}`,
+      },
     });
   }
 

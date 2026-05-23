@@ -3,8 +3,9 @@
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
+import { QuoteBlock } from "@/lib/article/quoteBlockExtension";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Bold, Italic, Link2, List, ListOrdered, Redo, Undo } from "lucide-react";
+import { Bold, Italic, Link2, List, ListOrdered, Quote, Redo, Undo } from "lucide-react";
 import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import {
@@ -28,6 +29,8 @@ interface ArticleBlockRichEditorProps {
   placeholder?: string;
   disabled?: boolean;
   minHeightClass?: string;
+  /** Converts the parent block between text ↔ quote. Only shown for "text" and "quote" variants. */
+  onToggleQuote?: () => void;
 }
 
 function buildExtensions(variant: ArticleBlockRichEditorVariant, placeholder: string) {
@@ -88,6 +91,7 @@ function buildExtensions(variant: ArticleBlockRichEditorVariant, placeholder: st
       link: false,
       paragraph: {},
     }),
+    QuoteBlock,
     ArticleBodyLink.configure({
       openOnClick: false,
       autolink: false,
@@ -125,6 +129,7 @@ export function ArticleBlockRichEditor({
   placeholder = "Текст…",
   disabled = false,
   minHeightClass = "min-h-[160px]",
+  onToggleQuote,
 }: ArticleBlockRichEditorProps) {
   const extensions = useMemo(
     () => buildExtensions(variant, placeholder),
@@ -230,6 +235,10 @@ export function ArticleBlockRichEditor({
 
   const showLists = variant === "text";
   const showLink = variant === "text";
+  // Inline QuoteBlock node for text editors (no prop needed — command is built in)
+  const showQuoteBlock = variant === "text";
+  // Legacy whole-block toggle for ArticleBlocksMvpEditor quote blocks
+  const showQuoteToggle = variant === "quote" && Boolean(onToggleQuote);
 
   const proseMirrorMin = minHeightClass.replace(/^min-h-/, "[&_.ProseMirror]:min-h-");
 
@@ -361,6 +370,34 @@ export function ArticleBlockRichEditor({
                 </div>
               </PopoverContent>
             </Popover>
+          </>
+        ) : null}
+
+        {showQuoteBlock ? (
+          <>
+            <div className="w-px h-5 bg-border mx-1" />
+            <ToolbarIcon
+              title={editor.isActive("quoteBlock") ? "Убрать цитату" : "Сделать цитатой"}
+              disabled={disabled}
+              active={editor.isActive("quoteBlock")}
+              onClick={() => editor.chain().focus().toggleQuoteBlock().run()}
+            >
+              <Quote className="w-4 h-4" />
+            </ToolbarIcon>
+          </>
+        ) : null}
+
+        {showQuoteToggle ? (
+          <>
+            <div className="w-px h-5 bg-border mx-1" />
+            <ToolbarIcon
+              title="Убрать цитату"
+              disabled={disabled}
+              active={true}
+              onClick={() => onToggleQuote!()}
+            >
+              <Quote className="w-4 h-4" />
+            </ToolbarIcon>
           </>
         ) : null}
 

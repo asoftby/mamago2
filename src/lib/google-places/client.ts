@@ -46,7 +46,7 @@ export async function getPlaceDetails(
         "X-Goog-Api-Key": GOOGLE_PLACES_API_KEY,
         // Правильный FieldMask для API v1
         "X-Goog-FieldMask":
-          "id,displayName,rating,userRatingCount,reviews,googleMapsUri",
+          "id,displayName,formattedAddress,rating,userRatingCount,reviews,googleMapsUri",
       },
     });
 
@@ -88,6 +88,7 @@ export async function getPlaceDetails(
     return {
       id: data.id,
       displayName: data.displayName || { text: "", languageCode: "en" },
+      formattedAddress: data.formattedAddress,
       rating: data.rating,
       userRatingCount: data.userRatingCount,
       reviews: data.reviews,

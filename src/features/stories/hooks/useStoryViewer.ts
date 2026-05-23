@@ -1,9 +1,7 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect } from "react";
 import type { StoryCollection } from "../types/story";
-
-const AUTOPLAY_DURATION = 5000;
 
 export function useStoryViewer(stories: StoryCollection[]) {
   const [activeStoryIndex, setActiveStoryIndex] = useState<number | null>(null);
@@ -83,21 +81,6 @@ export function useStoryViewer(stories: StoryCollection[]) {
 
   const pause = useCallback(() => setPaused(true), []);
   const resume = useCallback(() => setPaused(false), []);
-
-  // ── autoplay ─────────────────────────────────────────────────────────────
-
-  const nextRef = useRef(next);
-
-  useEffect(() => {
-    nextRef.current = next;
-  }, [next]);
-
-  useEffect(() => {
-    if (!isOpen || paused) return;
-    const id = setTimeout(() => nextRef.current(), AUTOPLAY_DURATION);
-    return () => clearTimeout(id);
-    // progressKey resets the timer on every manual nav or item change
-  }, [isOpen, paused, progressKey, activeItemIndex, activeStoryIndex]);
 
   // ── keyboard ─────────────────────────────────────────────────────────────
 

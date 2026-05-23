@@ -245,6 +245,7 @@ export function OfferPageView({
       return;
     }
 
+    if (result.action !== "plan") return;
     persistLocalSave({
       kind: "plan",
       dateISO: result.dateISO,

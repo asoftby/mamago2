@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { ChevronDown, LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -32,10 +32,7 @@ export function SidebarGroup({
   const controlled = controlledOpen !== undefined;
 
   // Uncontrolled state — used only when no controlled props are given
-  const [internalOpen, setInternalOpen] = useState(false);
-  useEffect(() => {
-    if (!controlled) setInternalOpen(defaultOpen);
-  }, [defaultOpen, controlled]);
+  const [internalOpen, setInternalOpen] = useState(defaultOpen);
 
   const open = controlled ? controlledOpen : internalOpen;
   const handleToggle = controlled

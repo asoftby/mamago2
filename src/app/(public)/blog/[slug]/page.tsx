@@ -205,6 +205,7 @@ export default async function ArticlePage({
         <>
           <AnalyticsDetailBeacon entityType="ARTICLE" entityId={mvp.id} vertical="CITY" />
           <BreakingNewsView
+            articleId={mvp.id}
             title={mvp.title}
             excerpt={mvp.excerpt}
             publishedAt={mvp.publishedAt}

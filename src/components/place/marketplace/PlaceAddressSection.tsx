@@ -1,125 +1,263 @@
 "use client";
 
-import { MapPin, ExternalLink, Navigation } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import Link from "next/link";
 
 interface PlaceAddressSectionProps {
+  title: string;
+  shortDesc?: string;
   address?: string;
   district?: string;
   metro?: string;
+  phone?: string;
   latitude?: number;
   longitude?: number;
-  mapsOpenUrl?: string;
   mapsDirectionsUrl?: string;
-  workingHoursSummary?: string;
 }
 
 export function PlaceAddressSection({
+  title,
+  shortDesc,
   address,
   district,
   metro,
+  phone,
   latitude,
   longitude,
-  mapsOpenUrl,
   mapsDirectionsUrl,
-  workingHoursSummary,
 }: PlaceAddressSectionProps) {
-  // Build Google Maps embed URL
   const mapEmbedUrl =
     latitude && longitude
-      ? `https://www.google.com/maps/embed/v1/place?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ""}&q=${latitude},${longitude}&zoom=15`
+      ? `https://www.google.com/maps/embed/v1/place?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? ""}&q=${latitude},${longitude}&zoom=15`
       : undefined;
 
   return (
-    <div className="space-y-6">
-      <h2 className="text-2xl font-bold text-gray-900">Адрес</h2>
-
-      {/* Google Map */}
-      {mapEmbedUrl ? (
-        <div className="overflow-hidden rounded-2xl border border-gray-200">
-          <iframe
-            src={mapEmbedUrl}
-            width="100%"
-            height="300"
-            style={{ border: 0 }}
-            allowFullScreen
-            loading="lazy"
-            referrerPolicy="no-referrer-when-downgrade"
-            title="Карта местоположения"
-          />
-        </div>
-      ) : (
-        <div className="flex h-[300px] items-center justify-center rounded-2xl border border-gray-200 bg-gray-50">
-          <div className="text-center text-gray-500">
-            <MapPin className="mx-auto mb-2 h-8 w-8" />
-            <p className="text-sm">Карта недоступна</p>
+    <section
+      style={{
+        padding: "56px 0",
+        borderTop: "1px solid rgba(20,18,16,.10)",
+        background: "#F6F2EA",
+      }}
+    >
+      <div
+        className="location-grid"
+        style={{
+          maxWidth: 1320,
+          margin: "0 auto",
+          padding: "0 28px",
+          display: "grid",
+          gridTemplateColumns: "1fr 1fr",
+          gap: 32,
+        }}
+      >
+        {/* Left: place title + shortDesc */}
+        <div>
+          <div className="kicker-row" style={{ marginBottom: 14 }}>
+            <span className="text-kicker">07 — Как добраться</span>
+            <span className="kicker-line" />
           </div>
-        </div>
-      )}
+          {(() => {
+            const words = title.trim().split(/\s+/);
+            const head = words.length > 1 ? words.slice(0, -1).join(" ") : "";
+            const tail = words[words.length - 1] + ".";
+            return (
+              <h2
+                className="font-display"
+                style={{
+                  fontSize: "clamp(36px, 5vw, 72px)",
+                  margin: "0 0 16px",
+                  letterSpacing: "-.025em",
+                  lineHeight: 0.95,
+                  color: "#141210",
+                  fontWeight: 400,
+                }}
+              >
+                {head && <>{head}<br /></>}
+                <span className="font-display-italic" style={{ color: "#C24E22" }}>{tail}</span>
+              </h2>
+            );
+          })()}
 
-      {/* Address Details */}
-      <div className="space-y-3 rounded-2xl border border-gray-200 bg-gray-50 p-6">
-        {address && (
-          <div className="flex items-start gap-3">
-            <MapPin className="mt-0.5 h-5 w-5 flex-shrink-0 text-[#EF8759]" />
-            <div className="flex-1">
-              <div className="text-base font-medium text-gray-900">{address}</div>
+          {shortDesc && (
+            <div style={{ fontSize: 17, lineHeight: 1.55, color: "rgba(20,18,16,.55)", maxWidth: 360, marginBottom: 28 }}>
+              {shortDesc}
             </div>
-          </div>
-        )}
+          )}
 
-        {(district || metro) && (
-          <div className="flex flex-wrap gap-2 text-sm text-gray-600">
-            {district && (
-              <span className="rounded-full bg-white px-3 py-1">
-                {district}
-              </span>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            {mapsDirectionsUrl && (
+              <Link
+                href={mapsDirectionsUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 8,
+                  height: 54,
+                  padding: "0 24px",
+                  borderRadius: 999,
+                  background: "#141210",
+                  color: "#FAF7F1",
+                  fontWeight: 600,
+                  fontSize: 15,
+                  textDecoration: "none",
+                }}
+              >
+                Маршрут <span>→</span>
+              </Link>
             )}
-            {metro && (
-              <span className="rounded-full bg-white px-3 py-1">
-                м. {metro}
-              </span>
+            {phone && (
+              <Link
+                href={`tel:${phone}`}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  height: 54,
+                  padding: "0 24px",
+                  borderRadius: 999,
+                  border: "1px solid rgba(20,18,16,.18)",
+                  background: "transparent",
+                  color: "#141210",
+                  fontWeight: 600,
+                  fontSize: 15,
+                  textDecoration: "none",
+                }}
+              >
+                Позвонить
+              </Link>
             )}
           </div>
-        )}
+        </div>
 
-        {workingHoursSummary && (
-          <div className="border-t border-gray-200 pt-3 text-sm text-gray-600">
-            {workingHoursSummary}
-          </div>
-        )}
+        {/* Right: map */}
+        <div
+          style={{
+            background: "#FAF7F1",
+            border: "1px solid rgba(20,18,16,.10)",
+            borderRadius: 18,
+            overflow: "hidden",
+            aspectRatio: "4/3",
+            position: "relative",
+          }}
+        >
+          {mapEmbedUrl ? (
+            <iframe
+              src={mapEmbedUrl}
+              width="100%"
+              height="100%"
+              style={{ border: 0, display: "block" }}
+              allowFullScreen
+              loading="lazy"
+              referrerPolicy="no-referrer-when-downgrade"
+              title="Карта местоположения"
+            />
+          ) : (
+            <div
+              style={{
+                width: "100%",
+                height: "100%",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                background:
+                  "repeating-linear-gradient(135deg, rgba(20,18,16,.04) 0 1px, transparent 1px 14px), linear-gradient(180deg, #EFE8DA, #E2D8C8)",
+              }}
+            >
+              <div
+                style={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: 99,
+                  background: "#E86A3A",
+                  color: "#fff",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: 22,
+                  boxShadow: "0 0 0 8px rgba(232,106,58,.22), 0 8px 24px rgba(20,18,16,.18)",
+                }}
+              >
+                📍
+              </div>
+            </div>
+          )}
+
+          {/* Floating info card */}
+          {address && (
+            <div
+              style={{
+                position: "absolute",
+                bottom: 16,
+                left: 16,
+                right: 16,
+                padding: "12px 16px",
+                borderRadius: 14,
+                background: "rgba(250,247,241,.94)",
+                backdropFilter: "blur(8px)",
+                WebkitBackdropFilter: "blur(8px)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                border: "1px solid rgba(20,18,16,.10)",
+                gap: 8,
+              }}
+            >
+              <div>
+                <div style={{ fontWeight: 600, fontSize: 14, color: "#141210" }}>{address}</div>
+                {(metro || district) && (
+                  <div
+                    style={{
+                      fontFamily: "var(--font-mono, monospace)",
+                      fontSize: 11,
+                      color: "rgba(20,18,16,.55)",
+                      marginTop: 2,
+                    }}
+                  >
+                    {[metro ? `м. ${metro}` : null, district ? `${district} район` : null].filter(Boolean).join(" · ")}
+                  </div>
+                )}
+              </div>
+              {mapsDirectionsUrl && (
+                <Link
+                  href={mapsDirectionsUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    height: 36,
+                    padding: "0 14px",
+                    borderRadius: 999,
+                    border: "1px solid rgba(20,18,16,.18)",
+                    background: "transparent",
+                    fontSize: 12,
+                    fontWeight: 600,
+                    color: "#141210",
+                    textDecoration: "none",
+                    whiteSpace: "nowrap",
+                    flexShrink: 0,
+                  }}
+                >
+                  ↗ Маршрут
+                </Link>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Action Buttons */}
-      <div className="flex flex-col gap-3 sm:flex-row">
-        {mapsOpenUrl && (
-          <Button
-            asChild
-            variant="outline"
-            size="lg"
-            className="flex-1 gap-2"
-          >
-            <Link href={mapsOpenUrl} target="_blank" rel="noopener noreferrer">
-              <ExternalLink className="h-4 w-4" />
-              Показать на Google Картах
-            </Link>
-          </Button>
-        )}
-        {mapsDirectionsUrl && (
-          <Button
-            asChild
-            variant="outline"
-            size="lg"
-            className="flex-1 gap-2"
-          >
-            <Link href={mapsDirectionsUrl} target="_blank" rel="noopener noreferrer">
-              <Navigation className="h-4 w-4" />
-              Построить маршрут
-            </Link>
-          </Button>
-        )}
-      </div>
-    </div>
+      <style>{`
+        @media (max-width: 900px) {
+          .location-grid {
+            grid-template-columns: 1fr !important;
+            gap: 28px !important;
+            padding: 0 22px !important;
+          }
+        }
+        @media (max-width: 520px) {
+          .location-grid { padding: 0 18px !important; }
+        }
+      `}</style>
+    </section>
   );
 }

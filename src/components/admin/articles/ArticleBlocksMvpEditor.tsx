@@ -264,14 +264,26 @@ export function ArticleBlocksMvpEditor({
             onChange={(html) => updateAt(i, { ...block, text: html })}
             placeholder="Текст цитаты"
             minHeightClass="min-h-[120px]"
-          />
-          <Input
-            placeholder="Автор (опционально)"
-            value={block.attribution ?? ""}
-            onChange={(e) =>
-              updateAt(i, { ...block, attribution: e.target.value || undefined })
+            onToggleQuote={() =>
+              updateAt(i, { id: block.id, type: "text", text: block.text })
             }
           />
+          <div className="flex gap-2">
+            <Input
+              placeholder="Автор (опционально)"
+              value={block.attribution ?? ""}
+              onChange={(e) =>
+                updateAt(i, { ...block, attribution: e.target.value || undefined })
+              }
+            />
+            <Input
+              placeholder="Роль / должность"
+              value={block.authorRole ?? ""}
+              onChange={(e) =>
+                updateAt(i, { ...block, authorRole: e.target.value || undefined })
+              }
+            />
+          </div>
         </>
       )}
       {block.type === "heading" && (

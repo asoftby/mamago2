@@ -3,13 +3,13 @@
  * 
  * Enriches a place with district and metro data based on its coordinates.
  * MVP implementation:
- * - Metro: Haversine distance to nearest station within 4km
+ * - Metro: Haversine distance to nearest station within 1.5km
  * - District: Nearest district centroid (approximation until polygons available)
  */
 
 import prisma from "@/lib/prisma";
 
-const METRO_SEARCH_RADIUS_METERS = 4000; // 4km radius (forgiving for Minsk)
+const METRO_SEARCH_RADIUS_METERS = 1500;
 const EARTH_RADIUS_KM = 6371;
 
 /**
@@ -105,7 +105,7 @@ async function computeNearestMetro(
       return null;
     }
 
-    const maxDistance = city.metroMaxDistanceM || METRO_SEARCH_RADIUS_METERS;
+    const maxDistance = city.metroMaxDistanceM ?? METRO_SEARCH_RADIUS_METERS;
 
     // Get all metro stations for the city
     const stations = await prisma.metroStation.findMany({

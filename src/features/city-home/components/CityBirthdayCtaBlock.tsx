@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowRight, Cake } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { peachPrimaryCtaLinkClassName } from "@/lib/peachPrimaryCtaLink";
+import { getBirthdayBuilderHref } from "@/lib/birthday/getBirthdayBuilderHref";
 
 type CityBirthdayCtaBlockProps = {
   /** Целевой сценарий дня рождения (публичный конструктор) */
@@ -10,7 +11,7 @@ type CityBirthdayCtaBlockProps = {
 };
 
 export function CityBirthdayCtaBlock({
-  href = "/birthday/make",
+  href = getBirthdayBuilderHref(),
   className,
 }: CityBirthdayCtaBlockProps) {
   return (

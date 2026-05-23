@@ -266,6 +266,12 @@ export async function PATCH(
     if (body.metroAutoDistanceM !== undefined) updateData.metroAutoDistanceM = body.metroAutoDistanceM;
     if (body.metroManualId !== undefined) updateData.metroManualId = body.metroManualId;
     if (body.metroManualDistanceM !== undefined) updateData.metroManualDistanceM = body.metroManualDistanceM;
+    if (body.googleRating !== undefined) updateData.googleRating = body.googleRating;
+    if (body.googleUserRatingsTotal !== undefined) updateData.googleUserRatingsTotal = body.googleUserRatingsTotal;
+    if (body.googleReviewsJson !== undefined) updateData.googleReviewsJson = body.googleReviewsJson;
+    if (body.googleReviewsSyncedAt !== undefined) updateData.googleReviewsSyncedAt = body.googleReviewsSyncedAt;
+    if (body.googleMapsUri !== undefined) updateData.googleMapsUri = body.googleMapsUri;
+    if (body.priceItems !== undefined) updateData.priceItems = body.priceItems ?? null;
 
     await prisma.place.update({
       where: { id },
@@ -337,7 +343,8 @@ export async function PATCH(
     return NextResponse.json(
       {
         error: "INTERNAL_SERVER_ERROR",
-        message: "Internal server error"
+        message: error instanceof Error ? error.message : "Internal server error",
+        detail: error instanceof Error ? error.stack?.split("\n").slice(0, 3).join(" | ") : undefined,
       },
       { status: 500 }
     );

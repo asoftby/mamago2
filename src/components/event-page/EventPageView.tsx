@@ -454,8 +454,10 @@ export function EventPageView({ data }: { data: EventPageData }) {
   }, [data.id]);
 
   useEffect(() => { void loadSaveStatus(); }, [loadSaveStatus]);
+  // Статус обновляется только после закрытия модалки, чтобы не вызывать
+  // перерисовку с новым состоянием пока модалка ещё открыта (задвоение).
   useEffect(() => {
-    if (!saveModalOpen) return;
+    if (saveModalOpen) return;
     void loadSaveStatus();
   }, [saveModalOpen, loadSaveStatus]);
 
@@ -504,14 +506,15 @@ export function EventPageView({ data }: { data: EventPageData }) {
           if (!res.ok) throw new Error("idea_remove_failed");
           toast.success("Убрано из идей");
         }
-        await loadSaveStatus();
+        // loadSaveStatus вызывается через useEffect когда saveModalOpen=false —
+        // после закрытия модалки, без перерисовки пока она ещё открыта.
       } catch {
         toast.error("Не получилось выполнить действие", { description: "Попробуйте еще раз" });
       } finally {
         setIsPrimaryLoading(false);
       }
     },
-    [data.id, data.media.posterUrl, data.title, formatPlanDateRu, loadSaveStatus],
+    [data.id, data.media.posterUrl, data.title, formatPlanDateRu],
   );
 
   const addToPlanByDate = useCallback(

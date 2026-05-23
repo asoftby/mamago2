@@ -4,6 +4,7 @@ import type { OfferPageData, OfferType, OfferCtaType, OfferGalleryImage, OfferSc
 import { formatAgeRange, formatPrice } from "./offerPageFormat";
 import { resolvePlaceLogoImage } from "@/lib/place/resolvePlaceLogoImage";
 import { isMediaAssetCuid } from "@/lib/media/isMediaAssetCuid";
+import { isGoogleReviewsEnabled } from "@/lib/place/googleReviewsMeta";
 
 interface GetOfferPageDataParams {
   citySlug: string;
@@ -369,8 +370,12 @@ export async function getOfferPageData({
       lat: offer.place.lat || undefined,
       lng: offer.place.lng || undefined,
       logoUrl: placeLogoUrl,
-      rating: offer.place.googleRating || undefined,
-      ratingsCount: offer.place.googleUserRatingsTotal || undefined,
+      rating: isGoogleReviewsEnabled(offer.place.googlePlaceId, offer.place.googleReviewsJson)
+        ? (offer.place.googleRating || undefined)
+        : undefined,
+      ratingsCount: isGoogleReviewsEnabled(offer.place.googlePlaceId, offer.place.googleReviewsJson)
+        ? (offer.place.googleUserRatingsTotal || undefined)
+        : undefined,
     } : undefined,
 
     reviews: reviews.map(r => ({

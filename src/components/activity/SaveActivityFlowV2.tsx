@@ -133,16 +133,23 @@ export function SaveActivityFlowV2({
 
   const body = (
     <div className="flex flex-col">
+      <style>{`
+        .stp-opt:hover:not(:disabled) { background: #fff !important; border-color: #141210 !important; transform: translateX(2px); }
+        .stp-opt:hover:not(:disabled) .stp-arr { transform: translateX(4px); color: #C24E22 !important; }
+      `}</style>
       {phase === "select" && (
-        <SaveToPlanPickerBody
-          key="pick"
-          scenario={scenario}
-          isIdea={isIdea}
-          inPlan={inPlan}
-          planDate={planDate}
-          planStartsAt={planStartsAt}
-          onCommit={handleCommit}
-        />
+        <div style={{ position: "relative" }}>
+          <SaveToPlanPickerBody
+            key="pick"
+            scenario={scenario}
+            isIdea={isIdea}
+            inPlan={inPlan}
+            planDate={planDate}
+            planStartsAt={planStartsAt}
+            onCommit={handleCommit}
+            onClose={() => onOpenChange(false)}
+          />
+        </div>
       )}
       {phase === "auth" && pending && (
         <div className="max-h-[min(70vh,560px)] overflow-y-auto px-3 pb-4 pt-1 sm:px-5">
@@ -181,12 +188,13 @@ export function SaveActivityFlowV2({
         side="bottom"
         showCloseButton={false}
         className={cn(
-          "fixed inset-x-0 bottom-0 z-50 flex max-h-[90vh] w-full flex-col gap-0 overflow-hidden rounded-t-3xl border-t border-neutral-100 bg-white p-0 shadow-2xl",
+          "fixed inset-x-0 bottom-0 z-50 flex max-h-[90vh] w-full flex-col gap-0 overflow-hidden rounded-t-3xl border-t p-0 shadow-2xl",
           "sm:inset-x-auto sm:left-1/2 sm:max-w-md sm:-translate-x-1/2",
         )}
+        style={{ background: "#F6F2EA", borderTopColor: "rgba(20,18,16,.10)" }}
       >
         <div className="flex shrink-0 justify-center pb-1 pt-3">
-          <div className="h-1 w-10 rounded-full bg-neutral-200" />
+          <div className="h-1 w-10 rounded-full" style={{ background: "rgba(20,18,16,.18)" }} />
         </div>
         <SheetTitle className="sr-only">Сохранить активность</SheetTitle>
         <div className="min-h-0 flex-1 overflow-y-auto">{body}</div>

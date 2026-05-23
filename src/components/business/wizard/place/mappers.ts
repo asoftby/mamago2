@@ -5,6 +5,7 @@ import { mapToUIState } from "@/lib/openingHours";
 import type { OpeningHoursWithRelations } from "@/server/services/openingHours/openingHours.types";
 import { normalizeVisitFormats } from "@/hooks/useVisitFormats";
 import { resolvePlaceLogoImage } from "@/lib/place/resolvePlaceLogoImage";
+import { parsePriceData } from "@/lib/priceItems";
 
 type PlaceWithRelations = Place & {
   images?: PrismaPlaceImage[];
@@ -79,7 +80,10 @@ export function mapPlaceToFormData(
     // Step 5: Opening Hours
     openingHoursId: place.openingHoursId,
     openingHoursData: place.openingHours ? mapToUIState(place.openingHours) : null,
-    
+
+    // Prices
+    priceItems: parsePriceData(place.priceItems),
+
     // Hierarchy
     placeKind: place.placeKind,
     floor: place.floor,
@@ -120,6 +124,11 @@ export function buildPlacePayload(data: PlaceFormData): Partial<Place> & { subca
     metroAutoDistanceM: data.metroAutoDistanceM,
     metroManualId: data.metroManualId,
     metroManualDistanceM: data.metroManualDistanceM,
+    googleRating: data.googleRating,
+    googleUserRatingsTotal: data.googleUserRatingsTotal,
+    googleReviewsJson: data.googleReviewsJson as Prisma.JsonValue,
+    googleReviewsSyncedAt: data.googleReviewsSyncedAt,
+    googleMapsUri: data.googleMapsUri,
     
     // Step 3: Contacts
     phone: data.phone,
@@ -132,7 +141,9 @@ export function buildPlacePayload(data: PlaceFormData): Partial<Place> & { subca
     
     // Step 5: Opening Hours (handled separately via openingHoursData)
     // openingHoursId is set by backend after creating OpeningHours record
-    
+
+    priceItems: data.priceItems as unknown as Prisma.JsonValue,
+
     // Hierarchy
     placeKind: data.placeKind,
     floor: data.floor,
@@ -161,8 +172,8 @@ function mapPrismaImageToFormImage(image: PrismaPlaceImage): PlaceImage {
 export function extractChanges(
   current: PlaceFormData,
   original: PlaceFormData
-): Partial<Place> & { subcategoryIds?: string[] } {
-  const changes: Partial<Place> & { subcategoryIds?: string[] } = {};
+): Record<string, unknown> {
+  const changes: Record<string, unknown> = {};
   const payload = buildPlacePayload(current);
   const originalPayload = buildPlacePayload(original);
   

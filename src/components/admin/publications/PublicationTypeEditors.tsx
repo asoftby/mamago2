@@ -34,6 +34,7 @@ import { PublicationPanel } from "@/components/admin/articles/PublicationPanel";
 import { ArticleBlocksEditor, ArticleTocToggle } from "@/components/admin/publications/ArticleBlocksEditor";
 import { useUnsavedChangesNavigationGuard } from "@/hooks/use-unsaved-changes-navigation-guard";
 import { PlaceLinkedContactsEditor } from "@/components/admin/publications/PlaceLinkedContactsEditor";
+import { PlaceLinkedPricesEditor } from "@/components/admin/publications/PlaceLinkedPricesEditor";
 import { createClientSavePerf } from "@/lib/perf/clientSavePerf";
 import { SeoPanel } from "@/features/admin/seo/components/SeoPanel";
 import { resolveSeoPublicBase } from "@/lib/admin/seo/seoEditorCanonical";
@@ -572,14 +573,18 @@ export function NewsPublicationEditor({
           />
         </div>
         <div className="space-y-2">
-          <Label>Что по ценам?</Label>
-          <ArticleBlockRichEditor
-            variant="text"
-            value={pricingHtml}
-            onChange={setPricingHtml}
-            placeholder="Цены, скидки, условия…"
-            minHeightClass="min-h-[200px]"
-          />
+          <Label>Цены</Label>
+          {linkedEntityType === "PLACE" && linkedEntityId.trim() ? (
+            <PlaceLinkedPricesEditor placeId={linkedEntityId.trim()} />
+          ) : (
+            <ArticleBlockRichEditor
+              variant="text"
+              value={pricingHtml}
+              onChange={setPricingHtml}
+              placeholder="Цены, скидки, условия…"
+              minHeightClass="min-h-[200px]"
+            />
+          )}
         </div>
         <div className="space-y-4">
           <div className="space-y-2">

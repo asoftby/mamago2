@@ -57,6 +57,8 @@ export function PlaceMapPreview({ lat, lng, onOpenMap }: PlaceMapPreviewProps) {
 
         markerRef.current = marker;
       } else {
+        // TODO(google-maps-tech-debt): remove legacy google.maps.Marker fallback
+        // once all environments are provisioned with a valid mapId / AdvancedMarkerElement path.
         const marker = new google.maps.Marker({
           position: { lat, lng },
           map: mapInstanceRef.current,

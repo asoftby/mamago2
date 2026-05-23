@@ -64,6 +64,7 @@ export function SaveHeart({
     inPlan: false,
     planDate: null as string | null,
     planStartsAt: null as string | null,
+    planItemId: null as string | null,
   });
 
   const isSaved = saveStatus.isIdea || saveStatus.inPlan;
@@ -82,6 +83,7 @@ export function SaveHeart({
         inPlan: Boolean(data.inPlan),
         planDate: data.planDate ?? null,
         planStartsAt: data.planStartsAt ?? null,
+        planItemId: data.planItemId ?? null,
       });
     } catch (error) {
       console.error("Failed to check save status:", error);
@@ -92,8 +94,10 @@ export function SaveHeart({
     void checkSaveStatus();
   }, [checkSaveStatus]);
 
+  // Обновляем статус только после закрытия модалки (не во время),
+  // чтобы избежать мигания при перерисовке до закрытия.
   useEffect(() => {
-    if (!flowOpen) return;
+    if (flowOpen) return;
     void checkSaveStatus();
   }, [flowOpen, checkSaveStatus]);
 
@@ -137,9 +141,12 @@ export function SaveHeart({
           });
         } else if (result.action === "remove-idea") {
           toast.success("Убрано из идей");
+        } else if (result.action === "remove-plan") {
+          toast.success("Убрано из плана");
         }
 
-        await checkSaveStatus();
+        // checkSaveStatus вызывается через useEffect когда flowOpen станет false —
+        // после того как модалка уже закрылась, без мигания.
         onSaveChange?.(true);
         triggerAnimation();
       } catch (e) {
@@ -207,6 +214,7 @@ export function SaveHeart({
         inPlan={saveStatus.inPlan}
         planDate={saveStatus.planDate}
         planStartsAt={saveStatus.planStartsAt}
+        planItemId={saveStatus.planItemId}
       />
     </>
   );

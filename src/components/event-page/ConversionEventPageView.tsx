@@ -132,7 +132,7 @@ export function ConversionEventPageView({ data }: { data: EventPageData }) {
   }, [loadSaveStatus]);
 
   useEffect(() => {
-    if (!saveModalOpen) return;
+    if (saveModalOpen) return;
     void loadSaveStatus();
   }, [saveModalOpen, loadSaveStatus]);
 
@@ -187,7 +187,7 @@ export function ConversionEventPageView({ data }: { data: EventPageData }) {
           if (!res.ok) throw new Error("idea_remove_failed");
           toast.success("Убрано из идей");
         }
-        await loadSaveStatus();
+        // loadSaveStatus вызывается через useEffect когда saveModalOpen=false.
       } catch (e) {
         toast.error("Не получилось выполнить действие", {
           description: "Попробуйте еще раз",
@@ -197,7 +197,7 @@ export function ConversionEventPageView({ data }: { data: EventPageData }) {
         setIsPrimaryLoading(false);
       }
     },
-    [data.id, data.media.posterUrl, data.title, formatPlanDateRu, loadSaveStatus],
+    [data.id, data.media.posterUrl, data.title, formatPlanDateRu],
   );
 
   const addToPlanByDate = useCallback(

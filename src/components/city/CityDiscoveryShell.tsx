@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { Container } from "@/components/ui/Container";
 import { RouteCard } from "@/components/routes/RouteCard";
 import { DiscoveryActivitiesGrid } from "@/components/discovery/DiscoveryActivitiesGrid";
@@ -13,9 +14,9 @@ import { ClassesChipBar } from "./ClassesChipBar";
 import type { PublicRouteCardModel } from "@/components/routes/types";
 import type { ActivityMock } from "@/types/activity";
 import type { BudgetConfig } from "./CityShell";
-import { BudgetSliderFilter } from "@/components/discovery/BudgetSliderFilter";
 import Link from "next/link";
 import { Plus } from "lucide-react";
+import { useOptionalDiscoveryBudgetConfig } from "@/features/filters/discovery/discoveryBudgetContext";
 
 function BirthdayQuickStartBanner({ city }: { city: string }) {
   return (
@@ -95,10 +96,18 @@ export function CityDiscoveryShell({
   budgetConfig,
 }: CityDiscoveryShellProps) {
   const { applied } = useDiscoveryFilters();
+  const budgetCtx = useOptionalDiscoveryBudgetConfig();
   const intentConfig = DISCOVERY_INTENT_CONFIG[intent];
   const pageTitle =
     formatCityTitle(intentConfig.titleTemplate, city) +
     whenPresetPageTitleSuffix(applied.whenPreset);
+
+  useEffect(() => {
+    budgetCtx?.setBudgetConfig(budgetConfig ?? null);
+    return () => {
+      budgetCtx?.setBudgetConfig(null);
+    };
+  }, [budgetConfig, budgetCtx]);
 
   // ── Routes intent ──────────────────────────────────────────────────────────
   if (intent === "routes") {
@@ -146,11 +155,6 @@ export function CityDiscoveryShell({
           </div>
 
           <BirthdayQuickStartBanner city={city} />
-
-          {budgetConfig && (
-            <BudgetSliderFilter max={budgetConfig.max} />
-          )}
-
           <DiscoveryActivitiesGrid activities={discoveryActivities ?? []} coverRatio="1/1" />
         </Container>
       </main>
@@ -167,11 +171,6 @@ export function CityDiscoveryShell({
         {intent === "classes" && classChips && activeClassChipSlug ? (
           <ClassesChipBar chips={classChips} activeChipSlug={activeClassChipSlug} />
         ) : null}
-
-        {budgetConfig && (
-          <BudgetSliderFilter max={budgetConfig.max} />
-        )}
-
         <DiscoveryActivitiesGrid
           activities={discoveryActivities ?? []}
           coverRatio={intent === "classes" ? "1/1" : undefined}
