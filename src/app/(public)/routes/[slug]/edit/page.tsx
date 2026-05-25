@@ -69,6 +69,11 @@ export default async function EditRoutePage({ params }: Props) {
       customTitle: stop.customTitle ?? undefined,
       note: stop.note,
       photos,
+      priceType: stop.priceType ?? "UNKNOWN",
+      priceMin: stop.priceMin ?? null,
+      priceMax: stop.priceMax ?? null,
+      priceCurrency: stop.priceCurrency ?? "BYN",
+      priceNote: stop.priceNote ?? "",
     };
   });
 

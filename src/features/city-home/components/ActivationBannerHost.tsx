@@ -101,7 +101,7 @@ function BannerShell({
 
         {/* content */}
         <div className="min-w-0 flex-1 space-y-1.5">
-          <p className="text-[15px] font-semibold leading-snug text-neutral-900">
+          <p className="leading-snug text-neutral-900" style={{ fontFamily: "Georgia, serif", fontWeight: 400, fontSize: 18 }}>
             {title}
           </p>
           <p className="text-sm leading-relaxed text-neutral-500">

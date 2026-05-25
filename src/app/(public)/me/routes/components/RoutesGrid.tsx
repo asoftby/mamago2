@@ -9,6 +9,7 @@ type UserRoute = {
   title: string;
   ageTags: string[];
   budgetLevel: string;
+  budgetLabel: string;
   status: string;
   stopsCount: number;
   coverImageUrl: string | null;
@@ -20,13 +21,6 @@ type RoutesGridProps = {
   routes: UserRoute[];
   deletingRouteId: string | null;
   onDelete: (route: UserRoute) => void;
-};
-
-const BUDGET_LABELS: Record<string, string> = {
-  FREE: "Бесплатно",
-  LOW: "до 50 BYN",
-  MEDIUM: "50–150 BYN",
-  HIGH: "150+ BYN",
 };
 
 function pluralizeStops(n: number): string {
@@ -48,7 +42,7 @@ function RouteGridCard({
 }) {
   const isDraft = route.status === "DRAFT";
   const ageLabel = formatAgeKeysShort(route.ageTags);
-  const budget = BUDGET_LABELS[route.budgetLevel] ?? route.budgetLevel;
+  const budget = route.budgetLabel || route.budgetLevel;
 
   return (
     <div

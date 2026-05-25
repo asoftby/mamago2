@@ -45,6 +45,12 @@ export type ActivityForEventPageInput = {
     slug: string | null;
     title: string;
     formattedAddr: string | null;
+    lat: number | null;
+    lng: number | null;
+    districtManual: { name: string } | null;
+    districtAuto: { name: string } | null;
+    metroManual: { name: string } | null;
+    metroAuto: { name: string } | null;
     city: { slug: string } | null;
   } | null;
   venue: {
@@ -56,6 +62,12 @@ export type ActivityForEventPageInput = {
       slug: string | null;
       title: string;
       formattedAddr: string | null;
+      lat: number | null;
+      lng: number | null;
+      districtManual: { name: string } | null;
+      districtAuto: { name: string } | null;
+      metroManual: { name: string } | null;
+      metroAuto: { name: string } | null;
       city: { slug: string } | null;
     } | null;
   } | null;
@@ -130,25 +142,56 @@ function factChipsFromActivity(activity: ActivityForEventPageInput): EventPageDa
 
 function importantFactsFromActivity(activity: ActivityForEventPageInput): EventPageData["importantFacts"] {
   const rows: EventPageData["importantFacts"] = [];
-  if (activity.ageTags.length > 0) {
+
+  // 01 Дата
+  if (activity.sessions.length > 0) {
+    const uniqueDates = [
+      ...new Set(
+        activity.sessions.map((s) =>
+          new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "long" }).format(s.startsAt),
+        ),
+      ),
+    ];
+    rows.push({
+      id: "date",
+      label: "Дата",
+      value: uniqueDates.join(", "),
+    });
+  }
+
+  // 02 Возраст
+  const ageBadge = ageFromPlusBadgeFromAgeTags(activity.ageTags);
+  if (ageBadge) {
     rows.push({
       id: "age",
       label: "Возраст",
-      value: activity.ageTags.join(", "),
+      value: ageBadge,
     });
   }
-  if (activity.eventCategory?.nameRu) {
+
+  // 03 Время начала
+  if (activity.sessions.length > 0) {
+    const uniqueTimes = [
+      ...new Set(
+        activity.sessions.map((s) =>
+          new Intl.DateTimeFormat("ru-RU", { hour: "2-digit", minute: "2-digit" }).format(s.startsAt),
+        ),
+      ),
+    ];
     rows.push({
-      id: "cat",
-      label: "Категория",
-      value: activity.eventCategory.nameRu,
+      id: "time",
+      label: "Время начала",
+      value: uniqueTimes.join(", "),
     });
   }
+
+  // 04 Формат
   rows.push({
     id: "format",
     label: "Формат",
     value: getActivityFormatDetailLabel(activity.format),
   });
+
   return rows;
 }
 
@@ -182,6 +225,10 @@ function venueFromActivity(
       return {
         name: v.place.title,
         address: v.place.formattedAddr ?? undefined,
+        lat: v.place.lat ?? undefined,
+        lng: v.place.lng ?? undefined,
+        district: (v.place.districtManual ?? v.place.districtAuto)?.name ?? undefined,
+        metro: (v.place.metroManual ?? v.place.metroAuto)?.name ?? undefined,
         placeHref: publicPlaceHref(cityForPlace, v.place),
       };
     }
@@ -202,6 +249,10 @@ function venueFromActivity(
     return {
       name: activity.place.title,
       address: activity.place.formattedAddr ?? undefined,
+      lat: activity.place.lat ?? undefined,
+      lng: activity.place.lng ?? undefined,
+      district: (activity.place.districtManual ?? activity.place.districtAuto)?.name ?? undefined,
+      metro: (activity.place.metroManual ?? activity.place.metroAuto)?.name ?? undefined,
       placeHref: publicPlaceHref(cityForPlace, activity.place),
     };
   }

@@ -48,7 +48,7 @@ export function PlanOnboardingPromoBanner({
         "rounded-2xl border p-4 shadow-sm",
         isChild
           ? "border-[#EF8759]/30 bg-[#EF8759]/5"
-          : "border-neutral-200/90 bg-gradient-to-b from-white to-neutral-50/95",
+          : "border-[rgba(20,18,16,.10)] bg-[#FAF7F1]",
       )}
     >
       <div className="flex items-start gap-3">
@@ -65,7 +65,7 @@ export function PlanOnboardingPromoBanner({
           )}
         </div>
         <div className="min-w-0 flex-1">
-          <h3 className="font-semibold text-neutral-900">{c.title}</h3>
+          <h3 style={{ fontFamily: "Georgia, serif", fontSize: 16, fontWeight: 400, lineHeight: 1.2, color: "#141210" }}>{c.title}</h3>
           <p className="mt-1 text-sm leading-relaxed text-neutral-600">
             {c.description}
           </p>

@@ -73,6 +73,16 @@ export function isRouteDetailPath(pathname: string | null): boolean {
   return segments.length === 2 && segments[0] === "routes" && segments[1] !== "new";
 }
 
+/** Карточка программы: `/{city}/programs/{slug}`. */
+export function isProgramDetailPath(pathname: string | null): boolean {
+  if (!pathname) return false;
+  const segments = pathname.split("/").filter(Boolean);
+  if (segments.length < 3) return false;
+  const hub = segments[0];
+  if (!hub || isReservedTopLevelSegment(hub)) return false;
+  return segments[1] === "programs" && Boolean(segments[2]);
+}
+
 /** Карточка места: `/places/{slug}` или `/{city}/places/{slug}`. */
 export function isPlaceDetailPath(pathname: string | null): boolean {
   if (!pathname) return false;
@@ -99,34 +109,50 @@ export function isNonStickyHeaderPath(pathname: string | null): boolean {
 }
 
 /**
- * Страницы контента публикаций — без фиксированного mobile bottom bar
- * (статья, место, маршрут, короткая ссылка). Страницы событий — исключение: там bottom bar показываем.
+ * Посадочные/детальные страницы без мобильного bottom navigation bar.
+ *
+ * Скрывать:
+ *   - /blog/[slug]
+ *   - /places/[slug]   и  /{city}/places/[slug]
+ *   - /offers/[slug]
+ *   - /routes/[slug]
+ *   - /{city}/programs/[slug]
+ *   - /p/...  (короткие ссылки)
+ *   - /preview/articles/...
+ *   - /me/events/[id]/preview  (превью в кабинете)
+ *
+ * Показывать (явные исключения):
+ *   - /{city}/events/[slug]
+ *   - /{city}/activity/[slug]
+ *   - /{city}/offers/[slug]   (isPublicationDetailPath)
+ *
+ * Чтобы добавить новый маршрут — добавь хелпер `isXxxDetailPath` в этот файл
+ * и включи его ниже.
  */
 export function shouldHideMobileBottomNav(pathname: string | null): boolean {
   if (!pathname) return false;
   const segments = pathname.split("/").filter(Boolean);
   if (segments.length < 2) return false;
 
+  // Статические top-level landing routes
   if (segments[0] === "preview" && segments[1] === "articles") return true;
   if (segments[0] === "blog") return true;
-  if (segments[0] === "places") return true;
-  if (segments[0] === "offers") return true;
   if (segments[0] === "p") return true;
-  // маршруты — bottom nav показываем
-  // if (segments[0] === "routes" && segments[1] !== "new") return true;
 
-  /** Превью события в кабинете — полноэкранная карточка, без нижней навигации и FAB «Мой план». */
+  // Превью события в кабинете
   if (
     segments[0] === "me" &&
     segments[1] === "events" &&
     segments.length >= 4 &&
     segments[3] === "preview"
-  ) {
-    return true;
-  }
+  ) return true;
 
-  // Страницы событий /{city}/events/{slug} — bottom bar показываем
-  if (isPublicationDetailPath(pathname)) return false;
+  // Все детальные/посадочные страницы — скрываем nav, у них своя sticky CTA-полоса
+  if (isPublicationDetailPath(pathname)) return true; // /{city}/events|activity|offers/[slug]
+  if (isPlaceDetailPath(pathname)) return true;        // /places/[s] + /{city}/places/[s]
+  if (isRouteDetailPath(pathname)) return true;        // /routes/[slug]
+  if (isProgramDetailPath(pathname)) return true;      // /{city}/programs/[slug]
+  if (segments[0] === "offers") return true;           // /offers/[slug] (top-level)
 
   return false;
 }

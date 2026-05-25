@@ -5,6 +5,11 @@ import {
   generateRouteSlugFromTitle,
   findRouteBySlug,
 } from "@/lib/slug/routeSlugService";
+import {
+  summarizeRouteBudget,
+  type LegacyBudgetLevel,
+  type RouteStopPriceType,
+} from "@/lib/routes/routeBudget";
 
 const publicRouteStopPlaceWhere = {
   OR: [{ placeId: null }, { place: getPublicPublishedPlaceWhere() }],
@@ -40,6 +45,11 @@ export type RouteWithStops = {
     customTitle: string | null;
     note: string;
     photoUrl: string | null;
+    priceType: RouteStopPriceType;
+    priceMin: number | null;
+    priceMax: number | null;
+    priceCurrency: string;
+    priceNote: string | null;
     place: {
       id: string;
       title: string;
@@ -59,12 +69,17 @@ export type RouteStopInput = {
   lng?: number | null;
   placeId?: string | null;
   customTitle?: string | null;
+  priceType?: RouteStopPriceType | null;
+  priceMin?: number | null;
+  priceMax?: number | null;
+  priceCurrency?: string | null;
+  priceNote?: string | null;
 };
 
 export type RouteWriteInput = {
   title: string;
   ageTags: string[];
-  budgetLevel: BudgetLevel;
+  budgetLevel?: BudgetLevel;
   visibility: RouteVisibility;
   publish?: boolean;
   stops: RouteStopInput[];
@@ -79,6 +94,11 @@ type NormalizedStop = {
   lng: number | null;
   placeId: string | null;
   customTitle: string | null;
+  priceType: RouteStopPriceType;
+  priceMin: number | null;
+  priceMax: number | null;
+  priceCurrency: string;
+  priceNote: string | null;
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -100,6 +120,17 @@ export function normalizeStops(stops: RouteStopInput[]): NormalizedStop[] {
       lng: s.lng ?? null,
       placeId: s.placeId ?? null,
       customTitle: s.customTitle ?? null,
+      priceType: s.priceType ?? "UNKNOWN",
+      priceMin:
+        typeof s.priceMin === "number" && Number.isFinite(s.priceMin)
+          ? s.priceMin
+          : null,
+      priceMax:
+        typeof s.priceMax === "number" && Number.isFinite(s.priceMax)
+          ? s.priceMax
+          : null,
+      priceCurrency: s.priceCurrency?.trim() || "BYN",
+      priceNote: s.priceNote?.trim() || null,
     }));
 }
 
@@ -119,6 +150,11 @@ function buildRouteStopsFingerprint(
     lat: number | null;
     lng: number | null;
     customTitle: string | null;
+    priceType: RouteStopPriceType;
+    priceMin: number | null;
+    priceMax: number | null;
+    priceCurrency: string;
+    priceNote: string | null;
   }>,
 ): string {
   return JSON.stringify(
@@ -131,12 +167,27 @@ function buildRouteStopsFingerprint(
       s.lat ?? null,
       s.lng ?? null,
       s.customTitle ?? null,
+      s.priceType ?? "UNKNOWN",
+      s.priceMin ?? null,
+      s.priceMax ?? null,
+      s.priceCurrency ?? "BYN",
+      s.priceNote ?? null,
     ]),
   );
 }
 
 export function deriveCoverImageUrl(stops: NormalizedStop[]): string | null {
   return stops.find((s) => s.photoUrl)?.photoUrl ?? null;
+}
+
+function deriveLegacyBudgetLevel(
+  normalizedStops: NormalizedStop[],
+  fallbackBudgetLevel?: BudgetLevel | null,
+): LegacyBudgetLevel {
+  return summarizeRouteBudget(
+    normalizedStops,
+    fallbackBudgetLevel ?? null,
+  ).legacyBudgetLevel;
 }
 
 export async function deriveCityIdFromStops(
@@ -321,7 +372,7 @@ export async function createRoute(
   data: {
     title: string;
     ageTags: string[];
-    budgetLevel: BudgetLevel;
+    budgetLevel?: BudgetLevel;
     visibility: RouteVisibility;
     publish?: boolean;
     stops: {
@@ -333,6 +384,11 @@ export async function createRoute(
       lng?: number;
       placeId?: string;
       customTitle?: string;
+      priceType?: RouteStopPriceType | null;
+      priceMin?: number | null;
+      priceMax?: number | null;
+      priceCurrency?: string | null;
+      priceNote?: string | null;
     }[];
   },
 ): Promise<{ id: string; slug: string }> {
@@ -341,6 +397,10 @@ export async function createRoute(
   const coverImageUrl = deriveCoverImageUrl(normalizedStops);
   const cityId = await deriveCityIdFromStops(normalizedStops);
   const status: RouteStatus = data.publish ? "PUBLISHED" : "DRAFT";
+  const budgetLevel = deriveLegacyBudgetLevel(
+    normalizedStops,
+    data.budgetLevel ?? null,
+  );
 
   return prisma.route.create({
     data: {
@@ -348,7 +408,7 @@ export async function createRoute(
       slugUpdatedAt: new Date(),
       title: data.title,
       ageTags: data.ageTags,
-      budgetLevel: data.budgetLevel,
+      budgetLevel,
       coverImageUrl,
       cityId,
       authorId: userId ?? null,
@@ -372,6 +432,10 @@ export async function updateRoute(
   const coverImageUrl = deriveCoverImageUrl(normalizedStops);
   const cityId = await deriveCityIdFromStops(normalizedStops);
   const status: RouteStatus = data.publish ? "PUBLISHED" : "DRAFT";
+  const budgetLevel = deriveLegacyBudgetLevel(
+    normalizedStops,
+    data.budgetLevel ?? null,
+  );
 
   return prisma.$transaction(async (tx) => {
     const existing = await tx.route.findUnique({
@@ -391,6 +455,11 @@ export async function updateRoute(
             lat: true,
             lng: true,
             customTitle: true,
+            priceType: true,
+            priceMin: true,
+            priceMax: true,
+            priceCurrency: true,
+            priceNote: true,
           },
         },
       },
@@ -410,7 +479,7 @@ export async function updateRoute(
     const routeScalarUpdate = {
       title: data.title,
       ageTags: data.ageTags,
-      budgetLevel: data.budgetLevel,
+      budgetLevel,
       visibility: data.visibility,
       status,
       cityId,

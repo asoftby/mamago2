@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { Heart } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { EventPageSession } from "@/lib/event/eventPageTypes";
 
@@ -24,11 +24,20 @@ export function EventSessionSelector({
   sessions,
   selectedId,
   onSelect,
+  onPlan,
+  isPlanned = false,
+  priceLabel,
+  hasPurchaseUrl = true,
   className,
 }: {
   sessions: EventPageSession[];
   selectedId: string | null;
   onSelect: (id: string) => void;
+  /** Открывает модалку сохранения — если передан, сердечко вызывает её */
+  onPlan?: () => void;
+  isPlanned?: boolean;
+  priceLabel?: string;
+  hasPurchaseUrl?: boolean;
   className?: string;
 }) {
   if (sessions.length === 0) {
@@ -51,6 +60,10 @@ export function EventSessionSelector({
             isFirst={isFirst}
             isSelected={isSelected}
             onSelect={onSelect}
+            onPlan={onPlan}
+            isPlanned={isPlanned}
+            priceLabel={priceLabel}
+            hasPurchaseUrl={hasPurchaseUrl}
           />
         );
       })}
@@ -63,17 +76,28 @@ function SessionRow({
   isFirst,
   isSelected,
   onSelect,
+  onPlan,
+  isPlanned = false,
+  priceLabel,
+  hasPurchaseUrl = true,
 }: {
   session: EventPageSession;
   isFirst: boolean;
   isSelected: boolean;
   onSelect: (id: string) => void;
+  onPlan?: () => void;
+  isPlanned?: boolean;
+  priceLabel?: string;
+  hasPurchaseUrl?: boolean;
 }) {
-  const [picked, setPicked] = useState(false);
-
   const dow = getDayLabel(session.startsAt);
   const dateLabel = getDateLabel(session.startsAt);
   const timeLabel = getTimeLabel(session.startsAt);
+
+  const handleHeartClick = () => {
+    onSelect(session.id);
+    onPlan?.();
+  };
 
   return (
     <div
@@ -84,52 +108,51 @@ function SessionRow({
           : "border-[rgba(20,18,16,0.10)] bg-[#FAF7F1]",
       )}
     >
-      {isFirst && (
-        <span className="absolute right-4 top-4 text-[11px] font-medium uppercase tracking-[0.1em] text-[#C24E22]">
-          ● ближайший
-        </span>
-      )}
-
       <div className="flex flex-wrap items-center gap-6">
         {/* Date column */}
         <div className="min-w-[180px]">
-          <div className="text-[10px] font-medium uppercase tracking-[0.14em] text-[rgba(20,18,16,0.55)]">
-            {dow}
+          <div className="flex items-center gap-[5px]">
+            <span className="text-[10px] font-medium uppercase tracking-[0.14em] text-[rgba(20,18,16,0.55)]" style={{ fontFamily: "Menlo, monospace" }}>
+              {dow}
+            </span>
+            {isFirst && (
+              <span className="flex items-center gap-[5px] text-[10px] font-medium uppercase tracking-[0.1em] text-[#C24E22]" style={{ fontFamily: "Menlo, monospace" }}>
+                <span className="inline-block h-[3px] w-[3px] rounded-full bg-[#C24E22]" />
+                ближайший
+              </span>
+            )}
           </div>
           <div className="mt-1 text-[20px] font-semibold leading-tight tracking-[-0.01em] text-[#141210]">
             {dateLabel}
           </div>
-          <div className="mt-1.5 font-mono text-[13px] text-[rgba(20,18,16,0.55)]">
-            {timeLabel}
+          <div className="mt-1.5 text-[13px] text-[rgba(20,18,16,0.55)]" style={{ fontFamily: "Menlo, monospace" }}>
+            {timeLabel}{priceLabel && <> · {priceLabel}</>}
           </div>
         </div>
 
         {/* CTA buttons */}
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex items-center gap-3">
+          {hasPurchaseUrl && (
+            <button
+              type="button"
+              onClick={() => onSelect(session.id)}
+              className="inline-flex h-14 items-center gap-2 rounded-full bg-[#E86A3A] px-6 text-[16px] font-semibold text-white transition-colors hover:bg-[#C24E22] active:translate-y-px"
+            >
+              Купить билет →
+            </button>
+          )}
           <button
             type="button"
-            onClick={() => onSelect(session.id)}
+            onClick={handleHeartClick}
+            aria-label={isPlanned ? "В плане" : "Добавить в план"}
             className={cn(
-              "inline-flex h-12 items-center gap-2 rounded-full px-5 text-[14px] font-semibold transition-colors",
-              isSelected
-                ? "bg-[#141210] text-[#FAF7F1]"
-                : "bg-[#E86A3A] text-white hover:bg-[#C24E22]",
-            )}
-          >
-            {isSelected ? "Выбрано ✓" : "Купить билет →"}
-          </button>
-          <button
-            type="button"
-            onClick={() => { setPicked((p) => !p); onSelect(session.id); }}
-            aria-label="В план"
-            className={cn(
-              "flex h-12 w-12 items-center justify-center rounded-full border text-[16px] transition-colors",
-              picked
+              "flex h-14 w-14 shrink-0 items-center justify-center rounded-full border transition-colors",
+              isPlanned
                 ? "border-[#E86A3A] bg-[#FFE8DC] text-[#C24E22]"
-                : "border-[rgba(20,18,16,0.18)] bg-transparent text-[rgba(20,18,16,0.55)] hover:border-[#141210] hover:text-[#141210]",
+                : "border-[rgba(20,18,16,0.18)] bg-transparent text-[rgba(20,18,16,0.45)] hover:border-[#141210] hover:text-[#141210]",
             )}
           >
-            {picked ? "✓" : "♥"}
+            <Heart size={20} strokeWidth={1.75} className={isPlanned ? "fill-[#C24E22]" : ""} />
           </button>
         </div>
       </div>

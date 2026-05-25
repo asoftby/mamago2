@@ -17,7 +17,7 @@ export const ACTIVITY_FORMAT_OPTIONS: ActivityFormatOption[] = [
     label: "Офлайн",
     description: "Нужно прийти на место",
     icon: MapPin,
-    detailLabel: "Событие проходит на месте",
+    detailLabel: "В помещении",
   },
   {
     value: "ONLINE",
@@ -25,7 +25,7 @@ export const ACTIVITY_FORMAT_OPTIONS: ActivityFormatOption[] = [
     label: "Онлайн",
     description: "Можно участвовать из дома",
     icon: Monitor,
-    detailLabel: "Можно участвовать онлайн",
+    detailLabel: "Онлайн",
   },
   {
     value: "HYBRID",
@@ -33,7 +33,7 @@ export const ACTIVITY_FORMAT_OPTIONS: ActivityFormatOption[] = [
     label: "Гибрид",
     description: "Есть онлайн и офлайн формат",
     icon: RefreshCw,
-    detailLabel: "Можно участвовать онлайн или прийти на место",
+    detailLabel: "Онлайн и офлайн",
   },
 ];
 

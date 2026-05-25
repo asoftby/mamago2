@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import { createRoute } from "@/server/services/route.service";
 import type { BudgetLevel, RouteVisibility } from "@prisma/client";
+import type { RouteStopPriceType } from "@/lib/routes/routeBudget";
 
 export async function POST(request: NextRequest) {
   try {
@@ -17,7 +18,7 @@ export async function POST(request: NextRequest) {
     const {
       title,
       ageTags = [],
-      budgetLevel = "LOW",
+      budgetLevel,
       visibility = "PUBLIC",
       publish = false,
       stops = [],
@@ -40,10 +41,15 @@ export async function POST(request: NextRequest) {
         formattedAddress?: string;
         addressComponents?: unknown;
         rawGooglePayload?: unknown;
-        detectedCountryCode?: string;
-        detectedCountryName?: string;
-        detectedCityName?: string;
-        detectedRegionName?: string;
+      detectedCountryCode?: string;
+      detectedCountryName?: string;
+      detectedCityName?: string;
+      detectedRegionName?: string;
+      priceType?: RouteStopPriceType | null;
+      priceMin?: number | null;
+      priceMax?: number | null;
+      priceCurrency?: string | null;
+      priceNote?: string | null;
       }[];
     };
 
@@ -81,6 +87,11 @@ export async function POST(request: NextRequest) {
         detectedCountryName: s.detectedCountryName,
         detectedCityName: s.detectedCityName,
         detectedRegionName: s.detectedRegionName,
+        priceType: s.priceType,
+        priceMin: s.priceMin,
+        priceMax: s.priceMax,
+        priceCurrency: s.priceCurrency,
+        priceNote: s.priceNote,
       })),
     });
 

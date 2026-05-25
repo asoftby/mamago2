@@ -60,8 +60,8 @@ export function PlanPillNavButton({
         "active:scale-[0.985] active:transition-transform",
         chrome === "dark"
           ? isActive
-            ? "border-[#EF8759]/50 bg-gradient-to-b from-neutral-700/70 to-neutral-800/60 shadow-[inset_0_1px_0_rgba(255,255,255,0.1),0_6px_20px_rgba(0,0,0,0.35)]"
-            : "border-neutral-500/25 bg-neutral-700/45 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]"
+            ? "border-[#EF8759]/50 bg-[rgba(250,247,241,0.50)] shadow-[inset_0_1px_0_rgba(255,255,255,0.18),0_6px_20px_rgba(239,135,89,0.18)]"
+            : "border-[rgba(250,247,241,0.25)] bg-[rgba(250,247,241,0.50)] shadow-[inset_0_1px_0_rgba(255,255,255,0.14)]"
           : isActive
             ? "border-[#EF8759]/40 bg-gradient-to-b from-white to-[#FFF8F5] shadow-[inset_0_1px_0_rgba(255,255,255,1),0_6px_20px_rgba(239,135,89,0.22)]"
             : "border-white/75 bg-white/65 shadow-sm shadow-black/[0.05]",
@@ -73,9 +73,7 @@ export function PlanPillNavButton({
           className={cn(
             "h-[18px] w-[18px] shrink-0 stroke-[1.75]",
             chrome === "dark"
-              ? isActive
-                ? "text-neutral-200"
-                : "text-neutral-400"
+              ? isActive ? "text-neutral-800" : "text-neutral-700"
               : isActive
                 ? "text-neutral-500"
                 : "text-neutral-400",
@@ -85,26 +83,26 @@ export function PlanPillNavButton({
         <div className="flex min-w-0 flex-1 flex-col justify-center gap-0 text-left">
           <span
             className={cn(
-              "font-semibold tracking-tight",
-              guestPlanPromo ? "text-xs leading-snug line-clamp-2" : "text-sm leading-none",
+              "tracking-tight",
+              guestPlanPromo ? "leading-snug line-clamp-2" : "leading-none",
               chrome === "dark"
-                ? isActive
-                  ? "text-neutral-50"
-                  : "text-neutral-200"
-                : isActive
-                  ? "text-gray-900"
-                  : "text-gray-800",
+                ? isActive ? "text-neutral-900" : "text-neutral-800"
+                : isActive ? "text-gray-900" : "text-gray-800",
             )}
+            style={{ fontFamily: "Georgia, serif", fontWeight: 400, fontSize: guestPlanPromo ? 13 : 15 }}
           >
-            {guestPlanPromo ? "Мой план за 10 секунд" : "Мой план"}
+            {guestPlanPromo ? (
+              <>Мой план <em style={{ fontStyle: "italic", color: "#C24E22" }}>за 10 секунд</em></>
+            ) : "Мой план"}
           </span>
           {showEmptyHint && (
             <span
               id={emptyHintId}
               className={cn(
-                "mt-0.5 text-left text-[10px] leading-tight",
-                chrome === "dark" ? "text-neutral-400" : "text-neutral-500",
+                "mt-0.5 text-left text-[10px] leading-tight font-sans",
+                chrome === "dark" ? "text-neutral-700" : "text-neutral-500",
               )}
+              style={{ fontFamily: "var(--font-sans), sans-serif" }}
             >
               {guestPlanPromo
                 ? "Подберём активности под вас"

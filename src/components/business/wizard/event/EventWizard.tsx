@@ -862,6 +862,12 @@ function EventWizardInner({
       setLastSaved(new Date());
       toast.success(hadEventId ? "Изменения сохранены" : "Черновик сохранён");
 
+      // После сохранения опубликованного события — возвращаемся назад
+      if (mode === "edit" && hadEventId && returnTo) {
+        router.push(returnTo);
+        return;
+      }
+
       if (
         mode === "edit" &&
         event?.status &&

@@ -869,7 +869,7 @@ export function PlanMainContent({
           aria-label="Подходит вашим детям"
         >
           <div>
-            <h3 className={compact ? "text-xl font-semibold tracking-tight text-neutral-900" : "text-2xl font-semibold tracking-tight text-neutral-900"}>
+            <h3 style={{ fontFamily: "Georgia, serif", fontSize: compact ? 18 : 22, fontWeight: 400, lineHeight: 1.1, color: "#141210" }}>
               Подходит вашим детям
             </h3>
             <p className="mt-1 text-sm text-neutral-500">Подобрано по возрасту и интересам</p>
@@ -927,14 +927,14 @@ export function PlanMainContent({
 
   if (isDesktop) {
     return (
-      <div className="flex h-full min-h-0 flex-col bg-[#FFFDFC]">
-        <div className="sticky top-0 z-20 flex-shrink-0 bg-[#FFFDFC] px-8 pb-3 pt-6">
+      <div className="flex h-full min-h-0 flex-col bg-white">
+        <div className="sticky top-0 z-20 flex-shrink-0">
           <MyPlanHeader onClose={onRequestClose} />
         </div>
 
         <div
           id="my-plan-recommendations"
-          className="min-h-0 flex-1 space-y-4 overflow-y-auto px-8 pb-6 pt-1"
+          className="min-h-0 flex-1 space-y-4 overflow-y-auto bg-white px-8 pb-6 pt-1"
         >
           {onChangeDate ? (
             <WeekCalendarStrip selectedDate={selectedDate} onChangeDate={onChangeDate} showArrows />
@@ -1023,19 +1023,17 @@ export function PlanMainContent({
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-[#FFFDFC]">
-      <div className="flex-shrink-0 border-b border-neutral-200 bg-white/90 px-4 pb-3 pt-6 backdrop-blur supports-[backdrop-filter]:bg-white/85">
+    <div className="flex h-full min-h-0 flex-col bg-white">
+      <div className="flex-shrink-0">
         <MyPlanHeader onClose={onRequestClose} compact />
       </div>
 
       <div
         id="my-plan-recommendations"
-        className="flex-1 space-y-4 overflow-y-auto bg-[#FFFDFC] px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-3"
+        className="flex-1 space-y-4 overflow-y-auto bg-white px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-3"
       >
         {onChangeDate ? (
-          <div className="-mx-4 pb-1">
-            <WeekCalendarStrip selectedDate={selectedDate} onChangeDate={onChangeDate} compact />
-          </div>
+          <WeekCalendarStrip selectedDate={selectedDate} onChangeDate={onChangeDate} compact />
         ) : null}
 
         <PlanAudienceCompact

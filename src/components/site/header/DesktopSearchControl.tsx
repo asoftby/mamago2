@@ -244,7 +244,7 @@ function CityHubDesktopSearchControl({
             >
               <MapPin className="h-4 w-4 flex-shrink-0 text-gray-400" />
               <div className="flex min-w-0 flex-1 flex-col items-start">
-                <span className="text-xs font-medium text-gray-900">Где?</span>
+                <span className="text-xs text-gray-900" style={{ fontFamily: "Georgia, serif", fontWeight: 400 }}>Где?</span>
                 <span className="w-full truncate text-left text-sm text-gray-600">
                   {getLocationText()}
                 </span>
@@ -855,7 +855,7 @@ function DiscoveryDesktopSearchControl({
             >
               <MapPin className="h-4 w-4 text-gray-400 flex-shrink-0" />
               <div className="flex flex-col items-start min-w-0 flex-1">
-                <span className="text-xs font-medium text-gray-900">Где?</span>
+                <span className="text-xs text-gray-900" style={{ fontFamily: "Georgia, serif", fontWeight: 400 }}>Где?</span>
                 <span className="text-sm text-gray-600 truncate w-full text-left">
                   {getLocationText()}
                 </span>
@@ -897,7 +897,7 @@ function DiscoveryDesktopSearchControl({
             >
               <Calendar className="h-4 w-4 text-gray-400 flex-shrink-0" />
               <div className="flex flex-col items-start min-w-0 flex-1">
-                <span className="text-xs font-medium text-gray-900">Когда?</span>
+                <span className="text-xs text-gray-900" style={{ fontFamily: "Georgia, serif", fontWeight: 400 }}>Когда?</span>
                 <span className="text-sm text-gray-600 truncate w-full text-left">
                   {getDateText()}
                 </span>
@@ -939,7 +939,7 @@ function DiscoveryDesktopSearchControl({
             >
               <Users className="h-4 w-4 text-gray-400 flex-shrink-0" />
               <div className="flex flex-col items-start min-w-0 flex-1">
-                <span className="text-xs font-medium text-gray-900">Для кого?</span>
+                <span className="text-xs text-gray-900" style={{ fontFamily: "Georgia, serif", fontWeight: 400 }}>Для кого?</span>
                 <span className="text-sm text-gray-600 truncate w-full text-left" suppressHydrationWarning>
                   {whoPrimaryLine}
                 </span>

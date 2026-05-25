@@ -1,25 +1,35 @@
-import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/server";
 import { listAllPlanItems } from "@/server/services/plan.service";
 import { prisma } from "@/lib/prisma";
 import { PlanPageClient } from "./PlanPageClient";
+import { PlanGuestFlow } from "./PlanGuestFlow";
 import { getPlanActivityPublicAvailability } from "@/lib/plan/publicVisibility";
 import { getLatestActivePlanReminderNotification } from "@/server/services/notification.service";
 
 export default async function PlanPage() {
   const user = await getCurrentUser();
-  if (!user) redirect("/login");
+  if (!user) return <PlanGuestFlow />;
 
   // Load all plan items
   const planItems = await listAllPlanItems(user.id);
 
-  // Load saved ideas (for recommendations block A)
+  // Load saved ideas for the sidebar
   const ideas = await prisma.idea.findMany({
     where: { userId: user.id },
-    select: { activityId: true },
+    select: { id: true, activityId: true, createdAt: true },
+    orderBy: { createdAt: "desc" },
     take: 10,
   });
   const ideaActivityIds = ideas.map((i) => i.activityId);
+
+  // Fetch activity details for ideas
+  const ideaActivities = ideaActivityIds.length > 0
+    ? await prisma.activity.findMany({
+        where: { id: { in: ideaActivityIds } },
+        select: { id: true, title: true, coverImageUrl: true, type: true, ageLabel: true, slug: true },
+      })
+    : [];
+  const ideaActivityMap = new Map(ideaActivities.map((a) => [a.id, a]));
 
   // Load children for family recommendations
   const children = await prisma.child.findMany({
@@ -59,10 +69,23 @@ export default async function PlanPage() {
       : null,
   }));
 
+  const serializedIdeas = ideas.map((idea) => {
+    const act = ideaActivityMap.get(idea.activityId) ?? null;
+    return {
+      id: idea.id,
+      activityId: idea.activityId,
+      createdAt: idea.createdAt.toISOString(),
+      activity: act
+        ? { id: act.id, title: act.title, coverImageUrl: act.coverImageUrl, type: act.type, ageLabel: act.ageLabel, slug: act.slug }
+        : null,
+    };
+  });
+
   return (
     <PlanPageClient
       initialItems={serializedItems}
       ideaActivityIds={ideaActivityIds}
+      initialIdeas={serializedIdeas}
       childrenAges={childrenAges}
       activeReminder={
         activeReminder

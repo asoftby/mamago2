@@ -404,6 +404,9 @@ export function ConversionEventPageView({ data }: { data: EventPageData }) {
                   sessions={sessions}
                   selectedId={selectedId}
                   onSelect={setSelectedId}
+                  onPlan={handlePlan}
+                  isPlanned={saveStatus.inPlan}
+                  hasPurchaseUrl={Boolean(data.cta.purchaseUrl)}
                 />
               </div>
             )}
@@ -486,19 +489,13 @@ export function ConversionEventPageView({ data }: { data: EventPageData }) {
       <EventStickyActionBar
         sessionLine={sessionLineSticky}
         priceLabel={data.priceLabel}
-        primaryLabel={
-          saveStatus.inPlan
-            ? saveStatus.planDate
-              ? `В плане на ${formatPlanDateRu(saveStatus.planDate)}`
-              : "В плане"
-            : data.cta.planLabel
-        }
-        secondaryLabel={data.cta.buyLabel}
+        primaryLabel={data.cta.buyLabel}
         isPlanned={saveStatus.inPlan}
         isPrimaryLoading={isPrimaryLoading}
-        isSecondaryLoading={isSecondaryLoading}
-        onPrimary={handlePlan}
-        onSecondary={handleBuy}
+        isPlanLoading={isSecondaryLoading}
+        onPrimary={handleBuy}
+        onPlan={handlePlan}
+        hasPurchaseUrl={Boolean(data.cta.purchaseUrl)}
       />
 
       {/* Модалы */}

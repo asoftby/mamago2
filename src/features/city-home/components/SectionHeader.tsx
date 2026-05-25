@@ -59,7 +59,7 @@ export function SectionHeader({
           className,
         )}
       >
-        <h2 className="text-lg font-semibold text-neutral-900 leading-tight tracking-tight">
+        <h2 className="text-neutral-900 leading-tight" style={{ fontFamily: "Georgia, serif", fontWeight: 400, fontSize: 26 }}>
           {title}
         </h2>
         {actionLink}
@@ -75,7 +75,7 @@ export function SectionHeader({
       )}
     >
       <div className="min-w-0 space-y-1">
-        <h2 className="text-lg font-semibold text-neutral-900 leading-tight tracking-tight">
+        <h2 className="text-neutral-900 leading-tight" style={{ fontFamily: "Georgia, serif", fontWeight: 400, fontSize: 26 }}>
           {title}
         </h2>
         {subtitle ? (

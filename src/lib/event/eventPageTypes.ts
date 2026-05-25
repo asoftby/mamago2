@@ -40,6 +40,8 @@ export type EventPageVenue = {
   district?: string;
   metro?: string;
   landmark?: string;
+  lat?: number;
+  lng?: number;
   mapUrl?: string;
   routeUrl?: string;
   /** Публичная страница места (/{city}/places/{slug|id}) */

@@ -15,6 +15,7 @@ import { useCity } from "@/contexts/CityContext";
 import { useFamilyPersona } from "@/contexts/FamilyPersonaContext";
 import { useUserNotificationBadgeCount } from "@/features/notifications/hooks/useUserNotificationBadgeCount";
 import { requestOpenMyPlan } from "@/lib/my-plan/myPlanOpenIntent";
+import { shouldHideMobileBottomNav } from "@/lib/intent";
 import { cn } from "@/lib/utils";
 
 export type MobileBottomNavProps = {
@@ -48,6 +49,9 @@ export function MobileBottomNav({
   const { displayUnreadCount, refreshUnreadCount } = useUserNotificationBadgeCount();
   const [activeSheet, setActiveSheet] = useState<null | "notifications" | "profile">(null);
 
+  // Все хуки вызваны — теперь можно делать ранний выход
+  if (shouldHideMobileBottomNav(pathname)) return null;
+
   const resolvedProfileAvatar =
     profileAvatarUrl ?? family?.menuUser?.avatarUrl ?? undefined;
 
@@ -80,13 +84,21 @@ export function MobileBottomNav({
         )}
       >
         <div
-          className={cn(
-            "flex items-center gap-1.5 rounded-[28px] p-2 pl-2 pr-2",
-            "border border-neutral-600/35",
-            "bg-gradient-to-b from-neutral-800/[0.96] to-neutral-900/[0.98]",
-            "shadow-[inset_0_1px_0_rgba(255,255,255,0.07),0_10px_36px_rgba(0,0,0,0.4)]",
-            "backdrop-blur-xl backdrop-saturate-100",
-          )}
+          className="flex items-center gap-1.5 rounded-[28px] p-2 pl-2 pr-2"
+          style={{
+            background: "rgba(30, 28, 26, 0.55)",
+            backdropFilter: "blur(40px) saturate(1.8)",
+            WebkitBackdropFilter: "blur(40px) saturate(1.8)",
+            border: "1px solid rgba(255,255,255,0.14)",
+            boxShadow: [
+              "inset 0 1px 0 rgba(255,255,255,.16)",
+              "inset 0 -1px 0 rgba(0,0,0,.30)",
+              "inset 1px 0 0 rgba(255,255,255,.08)",
+              "inset -1px 0 0 rgba(255,255,255,.05)",
+              "0 16px 48px rgba(0,0,0,.45)",
+              "0 4px 16px rgba(0,0,0,.30)",
+            ].join(", "),
+          }}
         >
           <NavIconButton
             href={homeHref}
@@ -128,15 +140,15 @@ export function MobileBottomNav({
                     ? "bg-[#EF8759]/22"
                     : displayUnreadCount > 0
                       ? "bg-[#EF8759]/24"
-                      : "bg-neutral-600/45",
+                      : "bg-transparent",
                 )}
               >
                 <Bell
                   className={cn(
                     "h-[22px] w-[22px] transition-colors duration-200",
                     isNotificationsActive || displayUnreadCount > 0
-                      ? "text-[#FFB090]"
-                      : "text-neutral-300",
+                      ? "text-[#C24E22]"
+                      : "text-neutral-700",
                   )}
                   strokeWidth={
                     isNotificationsActive || displayUnreadCount > 0 ? 1.35 : 1.2

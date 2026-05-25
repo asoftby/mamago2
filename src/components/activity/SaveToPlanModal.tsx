@@ -80,6 +80,15 @@ const RU_MONTHS_NAMED = ["Январь","Февраль","Март","Апрел�
 const RU_DAYS_SHORT   = ["вс","пн","вт","ср","чт","пт","сб"];
 const RU_DAYS_FULL    = ["воскресенье","понедельник","вторник","среда","четверг","пятница","суббота"];
 
+function pluralDat(n: number): string {
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  if (mod100 >= 11 && mod100 <= 14) return "дат";
+  if (mod10 === 1) return "дата";
+  if (mod10 >= 2 && mod10 <= 4) return "даты";
+  return "дат";
+}
+
 function parseLocalDate(s: string): Date {
   const [y, m, d] = s.split("-").map(Number);
   return new Date(y, m - 1, d);
@@ -236,7 +245,7 @@ function OrDivider({ label = "или" }: { label?: string }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 14, margin: "18px 0 14px" }}>
       <span style={{ flex: 1, height: 1, background: C.line }} />
-      <span style={{ fontStyle: "italic", fontSize: 16, color: C.ink3 }}>{label}</span>
+      <span style={{ fontFamily: "Georgia, serif", fontStyle: "italic", fontSize: 16, color: C.ink3 }}>{label}</span>
       <span style={{ flex: 1, height: 1, background: C.line }} />
     </div>
   );
@@ -595,8 +604,8 @@ function DateSliderView({
         {/* Heading */}
         <h2 style={{
           margin: "0 0 8px",
-          fontFamily: "var(--font-display, Georgia), serif",
-          fontSize: 34, lineHeight: 1.02, letterSpacing: "-.02em", fontWeight: 400,
+          fontFamily: "Georgia, serif",
+          fontSize: 30, lineHeight: 1.02, letterSpacing: "-.02em", fontWeight: 400,
         }}>
           На какой{" "}
           <span style={{ fontStyle: "italic", color: C.accentDeep }}>день</span>{" "}
@@ -626,12 +635,12 @@ function DateSliderView({
 
         {/* Month label + session count */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-          <span style={{ fontFamily: "var(--font-display, Georgia), serif", fontSize: 18, letterSpacing: "-.01em", fontWeight: 400 }}>
+          <span style={{ fontFamily: "Georgia, serif", fontSize: 18, letterSpacing: "-.01em", fontWeight: 400 }}>
             {RU_MONTHS_NAMED[fmtDateChip(options[0]).monthIdx]}{" "}
-            <span style={{ color: C.ink3 }}>{parseLocalDate(options[0]).getFullYear()}</span>
+            <span style={{ fontFamily: "var(--font-display, Georgia), serif", color: C.ink3 }}>{parseLocalDate(options[0]).getFullYear()}</span>
           </span>
           <span style={{ fontFamily: "var(--font-mono, ui-monospace)", fontSize: 10, color: C.ink3, letterSpacing: ".1em", textTransform: "uppercase" as const }}>
-            {options.length} дат
+            {options.length} {pluralDat(options.length)}
           </span>
         </div>
 

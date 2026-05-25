@@ -18,6 +18,7 @@ import { SaveActivityFlowAdaptive } from "@/components/activity/SaveActivityFlow
 import type { SaveToPlanResult } from "@/components/activity/SaveToPlanModal";
 import { useAuthMe } from "@/features/birthday/builder/hooks/useAuthMe";
 import { requestPlanRefetchForDate } from "@/lib/my-plan/myPlanOpenIntent";
+import { LocationBlock } from "@/components/shared/LocationBlock";
 import { EventRichDescription } from "./EventRichDescription";
 import { EventDecisionPanel } from "./EventDecisionPanel";
 import { EventMediaStack } from "./EventMediaStack";
@@ -67,20 +68,27 @@ function EventMetaStrip({ facts }: { facts: EventPageData["importantFacts"] }) {
   if (!facts.length) return null;
   return (
     <section className="border-y border-[rgba(20,18,16,0.10)]">
-      <div className="mx-auto w-full max-w-[1320px] px-4 sm:px-6 lg:px-7">
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
+      <div className="mx-auto w-full max-w-[1200px] px-4 sm:px-6 lg:px-8">
+        <div
+          className="grid grid-cols-2 md:grid-cols-4"
+        >
 
           {facts.map((f, i) => (
             <div
               key={f.id}
               className={cn(
                 "flex flex-col gap-1.5 py-5",
-                i > 0 && "border-l border-[rgba(20,18,16,0.10)] pl-5",
-                i > 0 ? "pl-5" : "pr-5",
+                // мобиле: левая граница у правых ячеек (i нечётное)
+                i % 2 !== 0 ? "border-l border-[rgba(20,18,16,0.10)] px-4" : "pr-4",
+                // мобиле: нижняя граница у первого ряда
+                i < 2 && "border-b border-[rgba(20,18,16,0.10)] md:border-b-0",
+                // десктоп: левая граница у всех кроме первого, убираем мобильный паттерн
+                i > 0 && "md:border-l md:border-[rgba(20,18,16,0.10)] md:px-5",
+                i === 0 && "md:pr-5",
               )}
             >
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-medium uppercase tracking-[0.14em] text-[rgba(20,18,16,0.55)]">
+                <span className="text-[10px] font-medium uppercase tracking-[0.14em] text-[rgba(20,18,16,0.55)]" style={{ fontFamily: "Menlo, monospace" }}>
                   {f.label}
                 </span>
                 <span className="font-mono text-[11px] text-[rgba(20,18,16,0.55)]">
@@ -108,22 +116,20 @@ function EventAboutEditorial({
 }) {
   return (
     <section className="border-b border-[rgba(20,18,16,0.10)] py-16 md:py-20">
-      <div className="mx-auto w-full max-w-[1320px] px-4 sm:px-6 lg:px-7">
+      <div className="mx-auto w-full max-w-[1200px] px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 gap-10 md:grid-cols-[320px_1fr] md:gap-14">
           {/* Left: heading */}
           <div>
             <div className="mb-4 flex items-center gap-3.5">
-              <span className="text-[10px] font-medium uppercase tracking-[0.14em] text-[rgba(20,18,16,0.55)]">
-                01 — О событии
+              <span className="text-[10px] font-medium uppercase tracking-[0.14em] text-[rgba(20,18,16,0.55)]" style={{ fontFamily: "Menlo, monospace" }}>
+                О событии
               </span>
               <span className="h-px flex-1 bg-[rgba(20,18,16,0.10)]" />
             </div>
             <h2
-              className="font-sans text-[clamp(36px,5vw,56px)] font-semibold leading-[1] tracking-[-0.02em] text-[#141210]"
+              style={{ fontFamily: "Georgia, serif", fontSize: 32, fontWeight: 400, lineHeight: 1.3, letterSpacing: "-0.02em", color: "#141210" }}
             >
-              Один час,
-              <br />
-              <span className="italic text-[#C24E22]">один яркий день.</span>
+              Описание
             </h2>
           </div>
 
@@ -163,118 +169,19 @@ function EventAboutEditorial({
 /* ── Location section ─────────────────────────────────────── */
 function EventLocationEditorial({ venue }: { venue: NonNullable<EventPageData["venue"]> }) {
   return (
-    <section className="border-b border-[rgba(20,18,16,0.10)] py-14 md:py-16">
-      <div className="mx-auto w-full max-w-[1320px] px-4 sm:px-6 lg:px-7">
-        <div className="grid grid-cols-1 gap-8 md:grid-cols-2 md:gap-8">
-          {/* Left: text */}
-          <div>
-            <div className="mb-4 flex items-center gap-3.5">
-              <span className="text-[10px] font-medium uppercase tracking-[0.14em] text-[rgba(20,18,16,0.55)]">
-                04 — Где проходит
-              </span>
-              <span className="h-px flex-1 bg-[rgba(20,18,16,0.10)]" />
-            </div>
-            <h2
-              className="font-sans text-[clamp(36px,5vw,56px)] font-semibold leading-[1] tracking-[-0.02em] text-[#141210]"
-              style={{ margin: "14px 0 18px" }}
-            >
-              {venue.name},
-              <br />
-              {venue.landmark ? (
-                <span className="italic text-[#C24E22]">{venue.landmark}</span>
-              ) : venue.metro ? (
-                <span className="italic text-[#C24E22]">в шаге от метро</span>
-              ) : null}
-            </h2>
-
-            <div className="mb-6 text-[17px] leading-[1.55] text-[#3A332B]">
-              {venue.name}
-              {venue.address && (
-                <>
-                  <br />
-                  {venue.address}
-                </>
-              )}
-              {venue.district && (
-                <>
-                  <br />
-                  {venue.district}
-                </>
-              )}
-            </div>
-
-            {/* Location tags */}
-            <div className="mb-8 flex flex-wrap gap-2">
-              {[venue.district, venue.metro, venue.landmark]
-                .filter(Boolean)
-                .map((tag, i) => (
-                  <span
-                    key={i}
-                    className="inline-flex h-7 items-center rounded-full border border-[rgba(20,18,16,0.18)] bg-[#FAF7F1] px-3 text-[13px] text-[#141210]"
-                  >
-                    ● {tag}
-                  </span>
-                ))}
-            </div>
-
-            {/* Buttons */}
-            <div className="flex flex-wrap gap-2.5">
-              {(venue.routeUrl ?? venue.mapUrl) && (
-                <a
-                  href={venue.routeUrl ?? venue.mapUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex h-12 items-center gap-2 rounded-full bg-[#141210] px-6 text-[15px] font-semibold text-[#FAF7F1] transition-colors hover:bg-black"
-                >
-                  Маршрут →
-                </a>
-              )}
-            </div>
-          </div>
-
-          {/* Right: map card */}
-          {venue.mapUrl && (
-            <div className="relative overflow-hidden rounded-[18px] border border-[rgba(20,18,16,0.10)] bg-[#E8E0D4]" style={{ aspectRatio: "4/3" }}>
-              <img
-                src={venue.mapUrl}
-                alt={`Карта: ${venue.name}`}
-                className="h-full w-full object-cover"
-              />
-              {/* Pin */}
-              <div
-                className="ep-pulse absolute flex h-11 w-11 items-center justify-center rounded-full bg-[#E86A3A] text-lg text-white"
-                style={{ top: "40%", left: "48%" }}
-              >
-                📍
-              </div>
-              {/* Info overlay */}
-              <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between rounded-[14px] border border-[rgba(20,18,16,0.10)] bg-[rgba(250,247,241,0.94)] px-4 py-3.5 backdrop-blur-[8px]">
-                <div>
-                  <div className="text-[14px] font-semibold leading-snug text-[#141210]">
-                    {venue.name}
-                  </div>
-                  {venue.address && (
-                    <div className="mt-0.5 font-mono text-[11px] text-[rgba(20,18,16,0.55)]">
-                      {venue.address}
-                    </div>
-                  )}
-                </div>
-                {(venue.routeUrl ?? venue.mapUrl) && (
-                  <a
-                    href={venue.routeUrl ?? venue.mapUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex h-9 shrink-0 items-center rounded-full border border-[rgba(20,18,16,0.18)] px-3.5 text-[12px] font-semibold text-[#141210] transition-colors hover:border-[#141210]"
-                  >
-                    ↗ Маршрут
-                  </a>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    </section>
+    <LocationBlock
+      name={venue.name}
+      tagline={venue.landmark}
+      address={venue.address}
+      district={venue.district}
+      metro={venue.metro}
+      lat={venue.lat}
+      lng={venue.lng}
+      mapUrl={venue.mapUrl}
+      routeUrl={venue.routeUrl}
+      placeHref={venue.placeHref}
+      className="border-b"
+    />
   );
 }
 
@@ -286,6 +193,7 @@ function EventFinalCta({
   onBuy,
   onPlan,
   sessionTargetDate,
+  hasPurchaseUrl = true,
 }: {
   priceLabel: string;
   buyLabel: string;
@@ -293,6 +201,7 @@ function EventFinalCta({
   onBuy: () => void;
   onPlan: () => void;
   sessionTargetDate?: string;
+  hasPurchaseUrl?: boolean;
 }) {
   const [daysLeft, setDaysLeft] = useState<number | null>(null);
   const [hoursLeft, setHoursLeft] = useState<number | null>(null);
@@ -314,7 +223,7 @@ function EventFinalCta({
 
   return (
     <section className="py-24 md:py-32">
-      <div className="mx-auto w-full max-w-[1320px] px-4 sm:px-6 lg:px-7">
+      <div className="mx-auto w-full max-w-[1200px] px-4 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-[900px] text-center">
           {daysLeft !== null && (
             <span className="mb-4 block text-[10px] font-medium uppercase tracking-[0.14em] text-[rgba(20,18,16,0.55)]">
@@ -333,13 +242,15 @@ function EventFinalCta({
             Купите билет за&nbsp;2&nbsp;минуты или отложите в&nbsp;план — мы&nbsp;напомним вечером накануне.
           </p>
           <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
-            <button
-              type="button"
-              onClick={onBuy}
-              className="inline-flex h-16 items-center gap-2 rounded-full bg-[#E86A3A] px-7 text-[17px] font-semibold text-white transition-colors hover:bg-[#C24E22] active:translate-y-px"
-            >
-              {buyLabel}&nbsp;{priceLabel} <span aria-hidden>→</span>
-            </button>
+            {hasPurchaseUrl && (
+              <button
+                type="button"
+                onClick={onBuy}
+                className="inline-flex h-16 items-center gap-2 rounded-full bg-[#E86A3A] px-7 text-[17px] font-semibold text-white transition-colors hover:bg-[#C24E22] active:translate-y-px"
+              >
+                {buyLabel}&nbsp;{priceLabel} <span aria-hidden>→</span>
+              </button>
+            )}
             <button
               type="button"
               onClick={onPlan}
@@ -578,6 +489,7 @@ export function EventPageView({ data }: { data: EventPageData }) {
     setPlanDateChooserOpen(true);
   }, [availablePlanDates]);
 
+  const hasPurchaseUrl = Boolean(data.cta.purchaseUrl);
   const hasSimilar = data.similar.length > 0;
   const hasWhyGo = data.whyGo.length > 0;
   const hasGoodFit = data.goodFit.length > 0;
@@ -607,19 +519,17 @@ export function EventPageView({ data }: { data: EventPageData }) {
         </div>
       )}
 
-      {/* Marquee ticker */}
-      <EventMarquee items={marqueeItems} />
 
       {/* ── Hero section ─── */}
-      <section className="pt-2 pb-14">
-        <div className="mx-auto w-full max-w-[1320px] px-4 sm:px-6 lg:px-7">
+      <section className="pt-12 pb-14">
+        <div className="mx-auto w-full max-w-[1200px] px-4 sm:px-6 lg:px-8">
           {/* Mobile: media above decision panel */}
           <div className="lg:hidden mb-8">
             <EventMediaStack media={data.media} />
           </div>
 
-          {/* Desktop: two-column side-by-side */}
-          <div className="grid grid-cols-1 gap-12 lg:grid-cols-[320px_1fr] lg:items-start">
+          {/* Desktop: two-column side-by-side (media left, decision panel right) */}
+          <div className="grid grid-cols-1 gap-10 lg:grid-cols-[440px_1fr] lg:gap-14 lg:items-start">
             {/* Left: media stack (desktop only — mobile rendered above) */}
             <div className="hidden lg:block">
               <EventMediaStack media={data.media} />
@@ -654,44 +564,26 @@ export function EventPageView({ data }: { data: EventPageData }) {
         descriptionHtml={data.about.descriptionHtml}
       />
 
-      {/* ── Why go + Good fit ─── */}
-      {(hasWhyGo || hasGoodFit) && (
-        <section className="border-b border-[rgba(20,18,16,0.10)] py-14 md:py-16">
-          <div className="mx-auto w-full max-w-[1320px] px-4 sm:px-6 lg:px-7">
-            <div className="mb-8 flex items-center gap-3.5">
-              <span className="text-[10px] font-medium uppercase tracking-[0.14em] text-[rgba(20,18,16,0.55)]">
-                02 — Что внутри
-              </span>
-              <span className="h-px flex-1 bg-[rgba(20,18,16,0.10)]" />
-            </div>
-            <div className="grid grid-cols-1 gap-12 md:grid-cols-2">
-              {hasWhyGo && <EventWhyGo items={data.whyGo} />}
-              {hasGoodFit && <EventGoodFit items={data.goodFit} />}
-            </div>
-          </div>
-        </section>
-      )}
 
       {/* ── Sessions ─── */}
       {sessions.length > 0 && (
         <section className="border-b border-[rgba(20,18,16,0.10)] py-14 md:py-16">
-          <div className="mx-auto w-full max-w-[1320px] px-4 sm:px-6 lg:px-7">
+          <div className="mx-auto w-full max-w-[1200px] px-4 sm:px-6 lg:px-8">
             <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
               <div>
                 <div className="mb-3 flex items-center gap-3.5">
-                  <span className="text-[10px] font-medium uppercase tracking-[0.14em] text-[rgba(20,18,16,0.55)]">
-                    03 — Расписание и сеансы
+                  <span className="text-[10px] font-medium uppercase tracking-[0.14em] text-[rgba(20,18,16,0.55)]" style={{ fontFamily: "Menlo, monospace" }}>
+                    Расписание и сеансы
                   </span>
                   <span className="h-px w-[120px] bg-[rgba(20,18,16,0.10)]" />
                 </div>
                 <h2
-                  className="font-sans text-[clamp(36px,5vw,56px)] font-semibold leading-[1] tracking-[-0.02em] text-[#141210]"
+                  style={{ fontFamily: "Georgia, serif", fontSize: 32, fontWeight: 400, lineHeight: 1.3, letterSpacing: "-0.02em", color: "#141210" }}
                 >
-                  Выбери удобное{" "}
-                  <span className="italic text-[#C24E22]">время</span>.
+                  Выбери удобное время.
                 </h2>
               </div>
-              <span className="inline-flex h-7 items-center rounded-full border border-[rgba(20,18,16,0.18)] px-3 text-[13px] text-[#141210]">
+              <span className="inline-flex h-7 items-center rounded-full border border-[rgba(20,18,16,0.18)] px-3 text-[13px] text-[#141210]" style={{ fontFamily: "Menlo, monospace" }}>
                 {sessions.length} {sessions.length === 1 ? "сеанс" : "сеансов"}
               </span>
             </div>
@@ -699,6 +591,10 @@ export function EventPageView({ data }: { data: EventPageData }) {
               sessions={sessions}
               selectedId={selectedId}
               onSelect={setSelectedId}
+              onPlan={handlePlan}
+              isPlanned={saveStatus.inPlan}
+              priceLabel={data.priceLabel}
+              hasPurchaseUrl={hasPurchaseUrl}
             />
           </div>
         </section>
@@ -710,21 +606,11 @@ export function EventPageView({ data }: { data: EventPageData }) {
       {/* ── Similar events ─── */}
       {hasSimilar && (
         <section className="border-b border-[rgba(20,18,16,0.10)] py-14 md:py-16">
-          <div className="mx-auto w-full max-w-[1320px] px-4 sm:px-6 lg:px-7">
+          <div className="mx-auto w-full max-w-[1200px] px-4 sm:px-6 lg:px-8">
             <SimilarEventsSection items={data.similar} onPlan={handlePlanSimilar} />
           </div>
         </section>
       )}
-
-      {/* ── Final CTA ─── */}
-      <EventFinalCta
-        priceLabel={data.priceLabel}
-        buyLabel={data.cta.buyLabel}
-        planLabel={data.cta.planLabel}
-        onBuy={handleBuy}
-        onPlan={handlePlanDayCta}
-        sessionTargetDate={selectedSession?.startsAt}
-      />
 
       {/* Publication stats */}
       {!data.hidePublicationStats && (
@@ -739,20 +625,13 @@ export function EventPageView({ data }: { data: EventPageData }) {
         ctaRef={ctaRef}
         sessionLine={sessionLineSticky}
         priceLabel={data.priceLabel}
-        primaryLabel={
-          saveStatus.inPlan
-            ? saveStatus.planDate
-              ? `В плане на ${formatPlanDateRu(saveStatus.planDate)}`
-              : "В плане"
-            : data.cta.planLabel
-        }
-        planDate={saveStatus.planDate}
-        secondaryLabel={data.cta.purchaseUrl ? data.cta.buyLabel : undefined}
+        primaryLabel={data.cta.buyLabel}
         isPlanned={saveStatus.inPlan}
         isPrimaryLoading={isPrimaryLoading}
-        isSecondaryLoading={isSecondaryLoading}
-        onPrimary={handlePlan}
-        onSecondary={data.cta.purchaseUrl ? handleBuy : undefined}
+        isPlanLoading={isSecondaryLoading}
+        onPrimary={handleBuy}
+        onPlan={handlePlan}
+        hasPurchaseUrl={hasPurchaseUrl}
       />
 
       {/* Save flow modal */}

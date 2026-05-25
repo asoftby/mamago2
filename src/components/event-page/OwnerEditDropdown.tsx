@@ -1,5 +1,7 @@
 "use client";
 
+import { useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -28,25 +30,37 @@ export function OwnerEditDropdown({
   className?: string;
 }) {
   const base = editorEventEditHref(eventId);
+  const pathname = usePathname();
+  const returnTo = encodeURIComponent(pathname);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const [contentWidth, setContentWidth] = useState<number | undefined>();
 
   const items = [
     ...EVENT_WIZARD_STEPS.map((s) => ({
-      href: `${base}?step=${encodeURIComponent(String(s.id))}`,
+      href: `${base}?step=${encodeURIComponent(String(s.id))}&returnTo=${returnTo}`,
       label: s.title,
     })),
     {
-      href: `${base}?step=${TOTAL_EVENT_WIZARD_STEPS}`,
+      href: `${base}?step=${TOTAL_EVENT_WIZARD_STEPS}&returnTo=${returnTo}`,
       label: businessFormCopy.reviewStepShortTitle,
     },
   ];
 
   return (
-    <DropdownMenu>
+    <DropdownMenu
+      onOpenChange={(open) => {
+        if (open && triggerRef.current) {
+          setContentWidth(triggerRef.current.getBoundingClientRect().width);
+        }
+      }}
+    >
       <DropdownMenuTrigger asChild>
         <Button
+          ref={triggerRef}
           type="button"
           variant="outline"
           className={cn(
+            "w-full",
             className,
             "border-black bg-black text-white shadow-none hover:bg-neutral-900 hover:text-white [&_svg]:text-white",
           )}
@@ -58,6 +72,8 @@ export function OwnerEditDropdown({
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align="start"
+        sideOffset={6}
+        style={{ width: contentWidth ? `${contentWidth}px` : undefined, minWidth: "unset" }}
         className="max-h-[min(70vh,420px)] overflow-y-auto border-border bg-popover p-2 text-popover-foreground shadow-md"
       >
         {items.map((it) => (

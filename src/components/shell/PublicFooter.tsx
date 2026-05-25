@@ -13,7 +13,7 @@ export function PublicFooter() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-12">
           {/* Column 1 */}
           <div className="flex flex-col gap-4">
-            <h3 className="font-semibold text-foreground">Проект</h3>
+            <h3 className="text-foreground" style={{ fontFamily: "Georgia, serif", fontWeight: 400, fontSize: 18 }}>Проект</h3>
             <div className="flex flex-col gap-2 text-sm text-muted-foreground">
               <Link href="#" className="hover:text-primary transition-colors">О нас</Link>
               <Link href="#" className="hover:text-primary transition-colors">Команда</Link>
@@ -23,7 +23,7 @@ export function PublicFooter() {
 
           {/* Column 2 */}
           <div className="flex flex-col gap-4">
-            <h3 className="font-semibold text-foreground">Партнёрам</h3>
+            <h3 className="text-foreground" style={{ fontFamily: "Georgia, serif", fontWeight: 400, fontSize: 18 }}>Партнёрам</h3>
             <div className="flex flex-col gap-2 text-sm text-muted-foreground">
               <Link href="#" className="hover:text-primary transition-colors">Добавить место</Link>
               <Link href="#" className="hover:text-primary transition-colors">Реклама</Link>
@@ -33,7 +33,7 @@ export function PublicFooter() {
 
           {/* Column 3 */}
           <div className="flex flex-col gap-4">
-            <h3 className="font-semibold text-foreground">Помощь</h3>
+            <h3 className="text-foreground" style={{ fontFamily: "Georgia, serif", fontWeight: 400, fontSize: 18 }}>Помощь</h3>
             <div className="flex flex-col gap-2 text-sm text-muted-foreground">
               <Link href="#" className="hover:text-primary transition-colors">Поддержка</Link>
               <Link href="#" className="hover:text-primary transition-colors">Контакты</Link>
@@ -51,7 +51,7 @@ export function PublicFooter() {
 
           {/* Column 4 */}
           <div className="flex flex-col gap-4">
-            <h3 className="font-semibold text-foreground">Legal</h3>
+            <h3 className="text-foreground" style={{ fontFamily: "Georgia, serif", fontWeight: 400, fontSize: 18 }}>Legal</h3>
             <div className="flex flex-col gap-2 text-sm text-muted-foreground">
               <Link href="#" className="hover:text-primary transition-colors">Политика конфиденциальности</Link>
               <Link href="#" className="hover:text-primary transition-colors">Пользовательское соглашение</Link>

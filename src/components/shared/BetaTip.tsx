@@ -1,15 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { X } from "lucide-react";
 
 const STORAGE_KEY = "beta-tip-dismissed";
 
 export function BetaTip() {
-  const [visible, setVisible] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return !window.localStorage.getItem(STORAGE_KEY);
-  });
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    if (!localStorage.getItem(STORAGE_KEY)) {
+      setVisible(true);
+    }
+  }, []);
 
   function dismiss() {
     localStorage.setItem(STORAGE_KEY, "1");
@@ -55,14 +58,14 @@ export function BetaTip() {
         </div>
       </div>
 
-      {/* Desktop: above MyPlanWidget */}
-      <div className="hidden lg:block fixed z-50 right-4 bottom-[5.5rem] w-[min(100vw-2rem,280px)] animate-in fade-in slide-in-from-bottom-2 pointer-events-none">
+      {/* Desktop: bottom-left, same row & height as MyPlanWidget */}
+      <div className="hidden lg:block fixed z-50 left-4 bottom-4 w-[min(100vw-2rem,280px)] animate-in fade-in slide-in-from-bottom-4 pointer-events-none">
         <div
           className={[
-            "flex items-center gap-2 rounded-[20px] px-4 py-2.5 pointer-events-auto",
+            "flex items-center gap-2 rounded-full px-4 py-3.5 pointer-events-auto",
             "border border-white/60",
             "bg-white/35 backdrop-blur-2xl backdrop-saturate-150",
-            "shadow-[0_2px_16px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,0.7)]",
+            "shadow-[0_16px_30px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,0.7)]",
             "text-neutral-800",
           ].join(" ")}
         >

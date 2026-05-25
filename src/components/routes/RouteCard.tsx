@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { H3, Caption } from "@/components/ui/typography";
 import { Heart } from "lucide-react";
 import { formatAgeKeysShort } from "@/lib/config/ages";
-import { BUDGET_LABELS, type PublicRouteCardModel } from "@/components/routes/types";
+import type { PublicRouteCardModel } from "@/components/routes/types";
 import { AnalyticsCardViewTracker } from "@/components/analytics/AnalyticsCardViewTracker";
 import { useAuthMe } from "@/features/birthday/builder/hooks/useAuthMe";
 import { SaveActivityFlowAdaptive } from "@/components/activity/SaveActivityFlowAdaptive";
@@ -64,7 +64,7 @@ export function RouteCard({ route, className, analyticsCitySlug = "minsk" }: Pro
   const meta = [
     route.stopsCount ? `${route.stopsCount} точки` : null,
     ageLabel,
-    BUDGET_LABELS[route.budgetLevel],
+    route.budgetLabel,
   ]
     .filter(Boolean)
     .join(" • ");

@@ -59,9 +59,6 @@ export function EventMediaStack({
           loading="eager"
           decoding="async"
         />
-        <span className="absolute left-3.5 top-3.5 inline-flex h-6 items-center rounded-full bg-[rgba(250,247,241,0.94)] px-2.5 text-[11px] font-semibold backdrop-blur-sm">
-          ● фото
-        </span>
       </div>
 
       {/* Trailer — 16:9 */}

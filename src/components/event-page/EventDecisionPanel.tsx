@@ -1,10 +1,41 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { Heart, Share2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { EventPageData } from "@/lib/event/eventPageTypes";
 import { EventBreadcrumbs } from "./EventBreadcrumbs";
 import { OwnerEditDropdown } from "./OwnerEditDropdown";
+
+/**
+ * Переформатирует адрес из Google-формата «Улица Дом, Город, Область»
+ * в читаемый: «г. Город, Улица, Дом»
+ */
+function formatAddress(raw: string): string {
+  const parts = raw.split(",").map((s) => s.trim()).filter(Boolean);
+  if (parts.length < 2) return raw;
+
+  // Отбрасываем «Область» / «район» / «Беларусь» и т.п. (последние части)
+  const filtered = parts.filter(
+    (p) => !/область|район|беларусь|belarus/i.test(p),
+  );
+
+  // Первая часть — «Улица Дом», остальные — город и т.д.
+  const [streetHouse, ...rest] = filtered;
+  const city = rest[0];
+
+  if (!city) return raw;
+
+  // Пробуем отделить номер дома от названия улицы (последний «токен» с цифрой)
+  const houseMatch = streetHouse.match(/^(.+?)\s+(\d+\S*)$/);
+  if (houseMatch) {
+    const street = houseMatch[1].trim();
+    const house = houseMatch[2].trim();
+    return `г. ${city}, ${street}, ${house}`;
+  }
+
+  return `г. ${city}, ${streetHouse}`;
+}
 
 type EventDecisionPanelProps = {
   data: Pick<
@@ -46,12 +77,13 @@ function splitTitle(title: string): { head: string; tail: string } {
 
 /** Countdown hook — returns d/h/m/s refreshed every second. */
 function useCountdown(targetIso?: string) {
-  const [now, setNow] = useState(() => Date.now());
+  const [now, setNow] = useState<number | null>(null);
   useEffect(() => {
+    setNow(Date.now());
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
   }, []);
-  if (!targetIso) return null;
+  if (!targetIso || now === null) return null;
   const ms = Math.max(0, new Date(targetIso).getTime() - now);
   return {
     d: Math.floor(ms / 86_400_000),
@@ -130,13 +162,13 @@ export function EventDecisionPanel({
           </span>
         )}
         {data.ageFromBadge && (
-          <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-[rgba(20,18,16,0.55)]">
+          <span className="text-[11px] uppercase tracking-[0.14em] text-[rgba(20,18,16,0.55)]" style={{ fontFamily: "Menlo, monospace" }}>
             {data.ageFromBadge}
           </span>
         )}
         {/* Show first factChip as format */}
         {data.factChips[0] && (
-          <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-[rgba(20,18,16,0.55)]">
+          <span className="text-[11px] uppercase tracking-[0.14em] text-[rgba(20,18,16,0.55)]" style={{ fontFamily: "Menlo, monospace" }}>
             {data.factChips[0].label}
           </span>
         )}
@@ -144,27 +176,10 @@ export function EventDecisionPanel({
 
       {/* Editorial display title */}
       <h1
-        className="font-sans text-[clamp(40px,6vw,80px)] font-semibold leading-[0.95] tracking-[-0.025em] text-[#141210]"
-        style={{ margin: 0 }}
+        style={{ margin: 0, fontFamily: "Georgia, serif", fontSize: 40, fontWeight: 400, lineHeight: 1.1, letterSpacing: "-0.025em", color: "#141210" }}
       >
-        {head}
-        {tail && (
-          <>
-            <br />
-            <span className="italic text-[#C24E22]">{tail}</span>
-          </>
-        )}
+        {data.title}
       </h1>
-
-      {/* Subtitle */}
-      {data.subtitle && (
-        <div
-          ref={subtitleRef}
-          className="ep-reveal max-w-[600px] text-[18px] leading-[1.5] text-[#3A332B]"
-        >
-          {data.subtitle}
-        </div>
-      )}
 
       {/* Decision sticky card */}
       <div
@@ -183,26 +198,53 @@ export function EventDecisionPanel({
         >
           {/* Next session */}
           <div>
-            <div className="mb-1.5 text-[10px] font-medium uppercase tracking-[0.14em] text-[rgba(20,18,16,0.55)]">
+            <div className="mb-1.5 text-[10px] font-medium uppercase tracking-[0.14em] text-[rgba(20,18,16,0.55)]" style={{ fontFamily: "Menlo, monospace" }}>
               Ближайший сеанс
             </div>
-            {sessionLine ? (
-              <div className="text-[18px] font-semibold leading-tight tracking-[-0.01em] text-[#141210]">
-                {sessionLine}
-              </div>
-            ) : (
+            {sessionLine ? (() => {
+              const parts = sessionLine.split(" · ");
+              const datePart = parts[0] ?? sessionLine;
+              const timePart = parts.slice(1).join(" · ");
+              return (
+                <div>
+                  <div className="font-sans text-[20px] font-semibold leading-tight tracking-[-0.02em] text-[#141210]">
+                    {datePart}
+                  </div>
+                  {timePart && (
+                    <div className="mt-1.5 text-[13px] text-[rgba(20,18,16,0.55)]" style={{ fontFamily: "Menlo, monospace" }}>
+                      {timePart}
+                    </div>
+                  )}
+                </div>
+              );
+            })() : (
               <div className="text-[15px] text-[rgba(20,18,16,0.55)]">Расписание уточняется</div>
             )}
           </div>
 
           {/* Price */}
           <div className={cn("text-right", pr?.pricing)}>
-            <div className="mb-1.5 text-[10px] font-medium uppercase tracking-[0.14em] text-[rgba(20,18,16,0.55)]">
+            <div className="mb-1.5 text-[10px] font-medium uppercase tracking-[0.14em] text-[rgba(20,18,16,0.55)]" style={{ fontFamily: "Menlo, monospace" }}>
               Стоимость
             </div>
-            <div className="font-sans text-[48px] font-semibold leading-[1] tracking-[-0.02em] text-[#141210]">
-              {data.priceLabel}
-            </div>
+            {(() => {
+              const priceStr = data.priceLabel ?? "";
+              const spaceIdx = priceStr.lastIndexOf(" ");
+              const numPart = spaceIdx !== -1 ? priceStr.slice(0, spaceIdx) : priceStr;
+              const currencyPart = spaceIdx !== -1 ? priceStr.slice(spaceIdx + 1) : "";
+              return (
+                <div className="flex items-baseline justify-end gap-1">
+                  <span style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 52, fontWeight: 400, lineHeight: 1, letterSpacing: "-0.03em", color: "#141210" }}>
+                    {numPart}
+                  </span>
+                  {currencyPart && (
+                    <span className="text-[13px] text-[rgba(20,18,16,0.55)]" style={{ fontFamily: "Menlo, monospace" }}>
+                      {currencyPart}
+                    </span>
+                  )}
+                </div>
+              );
+            })()}
           </div>
         </div>
 
@@ -218,7 +260,7 @@ export function EventDecisionPanel({
               )}
               {venueAddress && (
                 <div className="mt-0.5 text-[13px] text-[rgba(20,18,16,0.55)]">
-                  {venueAddress}
+                  {formatAddress(venueAddress)}
                 </div>
               )}
               {venueMetro && (
@@ -230,9 +272,10 @@ export function EventDecisionPanel({
           </div>
         )}
 
-        {/* Countdown */}
+        {/* Countdown — renders only after client mount to avoid hydration mismatch */}
         {cd && !cd.done && (
           <div
+            suppressHydrationWarning
             className="mb-5 grid grid-cols-4 gap-1.5 rounded-xl border border-dashed border-[rgba(20,18,16,0.18)] bg-[#F6F2EA] px-3 py-3"
           >
             {(
@@ -243,8 +286,8 @@ export function EventDecisionPanel({
                 [cd.s, "сек"],
               ] as [number, string][]
             ).map(([v, label]) => (
-              <div key={label} className="text-center">
-                <div className="font-mono text-[20px] font-medium leading-none tabular-nums text-[#141210]">
+              <div key={label} className="text-center" suppressHydrationWarning>
+                <div suppressHydrationWarning className="font-mono text-[20px] font-medium leading-none tabular-nums text-[#141210]">
                   {String(v).padStart(2, "0")}
                 </div>
                 <div className="mt-1 text-[9px] font-medium uppercase tracking-[0.14em] text-[rgba(20,18,16,0.55)]">
@@ -255,58 +298,53 @@ export function EventDecisionPanel({
           </div>
         )}
 
-        {/* Primary CTA */}
-        <button
-          type="button"
-          onClick={onBuy}
-          className="flex h-14 w-full items-center justify-center gap-2 rounded-full bg-[#E86A3A] text-[16px] font-semibold text-white transition-colors hover:bg-[#C24E22] active:translate-y-px"
-        >
-          {data.cta.buyLabel} <span aria-hidden>→</span>
-        </button>
-
-        {/* Secondary CTA */}
-        <button
-          type="button"
-          onClick={onPlan}
-          className={cn(
-            "mt-2.5 flex h-12 w-full items-center justify-center gap-2.5 rounded-full border text-[14px] font-semibold transition-colors",
-            isPlanned
-              ? "border-[#E86A3A] bg-[#FFE8DC] text-[#C24E22]"
-              : "border-[rgba(20,18,16,0.18)] bg-transparent text-[#141210] hover:border-[#141210]",
+        {/* CTA row: primary button + heart */}
+        <div className="flex items-center gap-3">
+          {data.cta.purchaseUrl && (
+            <button
+              type="button"
+              onClick={onBuy}
+              className="flex h-14 flex-1 items-center justify-center gap-2 rounded-full bg-[#E86A3A] text-[16px] font-semibold text-white transition-colors hover:bg-[#C24E22] active:translate-y-px"
+            >
+              {data.cta.buyLabel} <span aria-hidden>→</span>
+            </button>
           )}
-        >
-          <span
+
+          <button
+            type="button"
+            onClick={onPlan}
+            aria-label={isPlanned ? planLabel : "Добавить в план"}
             className={cn(
-              "inline-flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-[5px] border-[1.5px] text-[11px]",
+              "flex h-14 shrink-0 items-center justify-center rounded-full border transition-colors",
+              data.cta.purchaseUrl ? "w-14" : "flex-1 gap-2 px-4 text-[16px] font-semibold",
               isPlanned
-                ? "border-[#C24E22] bg-[#C24E22] text-white"
-                : "border-[#3A332B] bg-transparent",
+                ? "border-[#E86A3A] bg-[#FFE8DC] text-[#C24E22]"
+                : "border-[rgba(20,18,16,0.18)] bg-transparent text-[rgba(20,18,16,0.45)] hover:border-[#141210] hover:text-[#141210]",
             )}
           >
-            {isPlanned ? "✓" : ""}
-          </span>
-          {planLabel}
-        </button>
+            <Heart
+              size={20}
+              strokeWidth={1.75}
+              className={isPlanned ? "fill-[#C24E22]" : ""}
+            />
+            {!data.cta.purchaseUrl && (
+              <span>{isPlanned ? planLabel : "Сохранить"}</span>
+            )}
+          </button>
+        </div>
 
         {/* Owner edit */}
         {data.ownerEditHref && (
-          <div className="mt-2.5">
+          <div className="mt-5 border-t border-[rgba(20,18,16,0.10)] pt-5">
             <OwnerEditDropdown
               eventId={data.id}
-              className="h-10 w-full rounded-full border border-[rgba(20,18,16,0.18)] text-[13px] font-semibold text-[rgba(20,18,16,0.55)]"
+              className="h-14 w-full rounded-full border border-[rgba(20,18,16,0.18)] text-[16px] font-semibold text-[rgba(20,18,16,0.55)]"
             />
           </div>
         )}
 
-        {/* Save / Share */}
-        <div className="mt-5 flex items-center justify-between border-t border-[rgba(20,18,16,0.10)] pt-4 text-[13px] text-[rgba(20,18,16,0.55)]">
-          <button
-            type="button"
-            onClick={onSave}
-            className="inline-flex items-center gap-1.5 transition-colors hover:text-[#141210]"
-          >
-            <span>♥</span> Сохранить
-          </button>
+        {/* Share */}
+        <div className="mt-5 flex items-center justify-end border-t border-[rgba(20,18,16,0.10)] pt-5 text-[13px] text-[rgba(20,18,16,0.55)]">
           <button
             type="button"
             onClick={() => {
@@ -316,16 +354,12 @@ export function EventDecisionPanel({
             }}
             className="inline-flex items-center gap-1.5 transition-colors hover:text-[#141210]"
           >
-            <span>↗</span> Поделиться
+            <Share2 size={14} strokeWidth={1.75} /> Поделиться
           </button>
         </div>
       </div>
 
-      {/* Trust badge */}
-      <div className="flex items-center gap-3 px-1 text-[12px] text-[rgba(20,18,16,0.55)]">
-        <span className="relative inline-flex h-2 w-2 rounded-full bg-[#1F8A5B] shadow-[0_0_0_4px_rgba(31,138,91,0.18)]" />
-        Подтверждённый партнёр
-      </div>
+
     </div>
   );
 }

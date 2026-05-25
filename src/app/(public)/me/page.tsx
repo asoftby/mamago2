@@ -16,10 +16,10 @@ import { listUserBirthdayParties } from "@/server/services/userBirthdays.service
 import Link from "next/link";
 import { MapPin, Plus, CalendarCheck } from "lucide-react";
 import { RouteActions } from "@/features/me/components/RouteActions";
-import { BUDGET_LABELS } from "@/components/routes/types";
 import { buildAdultPreferenceDisplayLine } from "@/lib/adultPersonaSignals/buildAdultPreferenceLine";
 import { cn } from "@/lib/utils";
 import { peachPrimaryCtaLinkClassName } from "@/lib/peachPrimaryCtaLink";
+import { summarizeRouteBudget } from "@/lib/routes/routeBudget";
 
 type PageProps = {
   searchParams: Promise<{ date?: string }>;
@@ -226,9 +226,7 @@ export default async function MePage({ searchParams }: PageProps) {
                             {route.stops.length} точки
                           </span>
                           <span>
-                            {BUDGET_LABELS[
-                              route.budgetLevel as keyof typeof BUDGET_LABELS
-                            ] ?? route.budgetLevel}
+                            {summarizeRouteBudget(route.stops).label}
                           </span>
                           <span
                             className={`px-1.5 py-0.5 rounded-full text-[10px] font-medium ${

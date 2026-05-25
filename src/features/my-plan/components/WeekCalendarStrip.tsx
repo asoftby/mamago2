@@ -1,8 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
-import { ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   buildWeekMonthLabel,
@@ -15,13 +13,24 @@ import {
 
 const WEEKDAY_SHORT_RU = ["Вс", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб"] as const;
 
+const ChevronLeft = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M15 18l-6-6 6-6"/>
+  </svg>
+);
+const ChevronRight = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M9 18l6-6-6-6"/>
+  </svg>
+);
+
 type WeekCalendarStripProps = {
   selectedDate: string;
   onChangeDate?: (iso: string) => void;
   className?: string;
   compact?: boolean;
-  /** Показывать стрелки переключения недели. По умолчанию true. */
   showArrows?: boolean;
+  itemsByDate?: Record<string, unknown[]>;
 };
 
 export function WeekCalendarStrip({
@@ -30,182 +39,167 @@ export function WeekCalendarStrip({
   className,
   compact = false,
   showArrows = true,
+  itemsByDate,
 }: WeekCalendarStripProps) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const selectedRef = useRef<HTMLButtonElement>(null);
+
   const [visibleWeekStart, setVisibleWeekStart] = useState(() =>
     getWeekStart(selectedDate),
   );
-  const [direction, setDirection] = useState<1 | -1>(1);
-  const prevSyncedWeekStartRef = useRef<string | null>(null);
-  /** После mount включаем slide-in только при смене недели — без рывка на холодной загрузке. */
-  const [motionEnabled, setMotionEnabled] = useState(false);
-  useEffect(() => {
-    const t = setTimeout(() => {
-      setMotionEnabled(true);
-    }, 0);
-    return () => clearTimeout(t);
-  }, []);
 
   const [prevSelectedDate, setPrevSelectedDate] = useState(selectedDate);
-
   if (selectedDate !== prevSelectedDate) {
     const ws = getWeekStart(selectedDate);
     const prevWs = getWeekStart(prevSelectedDate);
-    if (prevWs !== ws) {
-      setDirection(ws.localeCompare(prevWs) >= 0 ? 1 : -1);
-      setVisibleWeekStart(ws);
-    }
+    if (prevWs !== ws) setVisibleWeekStart(ws);
     setPrevSelectedDate(selectedDate);
   }
 
   useEffect(() => {
-    const ws = getWeekStart(selectedDate);
-    prevSyncedWeekStartRef.current = ws;
+    if (selectedRef.current) {
+      selectedRef.current.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+    }
   }, [selectedDate]);
 
   const weekDays = useMemo(() => getWeekDays(visibleWeekStart), [visibleWeekStart]);
   const monthLabel = useMemo(() => buildWeekMonthLabel(weekDays, selectedDate), [weekDays, selectedDate]);
+  const yearLabel = useMemo(() => new Date(`${visibleWeekStart}T12:00:00`).getFullYear(), [visibleWeekStart]);
   const todayIso = new Date().toISOString().split("T")[0] ?? "";
 
   const shiftWeek = (dir: 1 | -1) => {
     const nextStart = dir === 1 ? getNextWeekStart(visibleWeekStart) : getPrevWeekStart(visibleWeekStart);
-    setDirection(dir);
     setVisibleWeekStart(nextStart);
     if (onChangeDate) onChangeDate(preserveWeekday(selectedDate, nextStart));
   };
 
   return (
     <div
-      className={cn(
-        "relative rounded-3xl border border-neutral-200/80 bg-white p-3 shadow-sm",
-        compact &&
-          "rounded-none border-0 bg-transparent px-0 py-1 shadow-none",
-        className,
-      )}
+      className={cn(className)}
+      style={{
+        padding: "14px 14px 12px",
+        background: "#FAF7F1",
+        border: "1px solid rgba(20,18,16,.10)",
+        borderRadius: 18,
+      }}
     >
-      {showArrows ? (
-        <>
-          <button
-            type="button"
-            onClick={() => shiftWeek(-1)}
-            className="absolute left-0 top-1/2 z-20 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-700"
-            aria-label="Предыдущая неделя"
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </button>
-          <button
-            type="button"
-            onClick={() => shiftWeek(1)}
-            className="absolute right-0 top-1/2 z-20 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-700"
-            aria-label="Следующая неделя"
-          >
-            <ChevronRight className="h-4 w-4" />
-          </button>
-        </>
-      ) : null}
-
-      <div className="relative mb-2 min-h-[14px] text-center">
-        <AnimatePresence mode="wait" initial={false}>
-          <motion.p
-            key={monthLabel}
-            initial={{ opacity: 0, y: 3 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -3 }}
-            transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
-            className="pointer-events-none absolute inset-x-0 top-0 text-[11px] font-medium uppercase leading-none text-neutral-400"
-          >
-            {monthLabel}
-          </motion.p>
-        </AnimatePresence>
-      </div>
-
-      <div
-        className={cn(
-          "relative z-0 isolate overflow-hidden",
-          compact ? "min-h-11 px-8" : "min-h-11 px-8 sm:gap-2",
-        )}
-      >
-        <motion.div
-          key={visibleWeekStart}
-          initial={
-            motionEnabled
-              ? { x: direction > 0 ? 28 : -28, opacity: 0.88 }
-              : false
-          }
-          animate={{ x: 0, opacity: 1 }}
-          transition={{ duration: 0.26, ease: [0.22, 1, 0.36, 1] }}
-          drag="x"
-          dragElastic={0.1}
-          dragConstraints={{ left: 0, right: 0 }}
-          onDragEnd={(_, info) => {
-            const threshold = 44;
-            if (info.offset.x <= -threshold) shiftWeek(1);
-            if (info.offset.x >= threshold) shiftWeek(-1);
+      {/* Strip: arrows + days в одной строке */}
+      <div style={{ display: "grid", gridTemplateColumns: "28px 1fr 28px", gap: 6, alignItems: "center" }}>
+        <button
+          type="button"
+          onClick={() => shiftWeek(-1)}
+          aria-label="Предыдущая неделя"
+          style={{
+            width: 28, height: 28, borderRadius: 99,
+            background: "transparent", border: "1px solid rgba(20,18,16,.18)",
+            color: "#3A332B", cursor: "pointer",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            flexShrink: 0,
           }}
-          className={cn(
-            "absolute top-0 flex items-center justify-between gap-1",
-            compact
-              ? "left-1/2 w-[85%] max-w-full -translate-x-1/2"
-              : "inset-x-0",
-          )}
-        >
-          {weekDays.map((iso) => {
-            const d = new Date(`${iso}T12:00:00`);
-            const selected = iso === selectedDate;
-            const isPast = iso < todayIso;
-            return (
-              <button
-                key={iso}
-                type="button"
-                aria-pressed={selected}
-                aria-label={d.toLocaleDateString("ru-RU", {
-                  weekday: "long",
-                  day: "numeric",
-                  month: "long",
-                })}
-                disabled={isPast && !selected}
-                onClick={() => !isPast && onChangeDate?.(iso)}
-                className={cn(
-                  "relative flex h-11 min-h-11 min-w-0 flex-1 shrink-0 flex-col items-center justify-center gap-0.5 rounded-none text-neutral-700",
-                  "outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-                  isPast && !selected && "cursor-not-allowed opacity-40",
-                )}
-              >
-                {selected ? (
+        ><ChevronLeft /></button>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          {/* Month + year label */}
+          <div style={{ textAlign: "center" }}>
+            <span
+              style={{ fontFamily: "Menlo, monospace", fontSize: 13, fontWeight: 400, lineHeight: 1, letterSpacing: ".08em", color: "#141210" }}
+            >
+              {monthLabel}{" "}
+              <span style={{ fontFamily: "var(--font-display), Georgia, serif", color: "rgba(20,18,16,.45)", fontWeight: 400, letterSpacing: "-.02em" }}>{yearLabel}</span>
+            </span>
+          </div>
+
+          {/* Days row */}
+          <div ref={scrollRef} style={{ display: "flex", gap: 3 }}>
+            {weekDays.map((iso) => {
+              const d = new Date(`${iso}T12:00:00`);
+              const selected = iso === selectedDate;
+              const isToday = iso === todayIso;
+              const isPast = iso < todayIso;
+              const itemCount = itemsByDate?.[iso]?.length ?? 0;
+
+              return (
+                <button
+                  key={iso}
+                  ref={selected ? selectedRef : undefined}
+                  type="button"
+                  disabled={isPast && !selected}
+                  onClick={() => !isPast && onChangeDate?.(iso)}
+                  style={{
+                    flex: "1 1 0",
+                    minWidth: 0,
+                    padding: "7px 4px 6px",
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    gap: 2,
+                    background: selected ? "#141210" : "transparent",
+                    color: selected ? "#FAF7F1" : isPast ? "rgba(20,18,16,.35)" : "#141210",
+                    border: selected ? "1px solid #141210" : "1px solid transparent",
+                    borderRadius: 10,
+                    cursor: isPast && !selected ? "default" : "pointer",
+                    transition: "all .15s",
+                    position: "relative",
+                    opacity: isPast && !selected ? 0.45 : 1,
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!selected && !isPast) (e.currentTarget as HTMLButtonElement).style.background = "rgba(20,18,16,.04)";
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!selected) (e.currentTarget as HTMLButtonElement).style.background = "transparent";
+                  }}
+                >
                   <span
-                    aria-hidden
-                    className={cn(
-                      "pointer-events-none absolute left-1/2 top-1/2 z-0 size-11 aspect-square -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary",
-                    )}
-                  />
-                ) : null}
-                <span
-                  className={cn(
-                    "relative z-10 text-[10px] font-medium uppercase leading-none transition-colors duration-300 ease-out",
-                    selected
-                      ? "text-primary-foreground"
-                      : isPast
-                        ? "text-neutral-400/80"
-                        : "text-neutral-400",
+                    className="font-mono uppercase"
+                    style={{
+                      fontSize: 9,
+                      letterSpacing: ".08em",
+                      color: selected ? "rgba(250,247,241,.55)" : "rgba(20,18,16,.55)",
+                    }}
+                  >
+                    {WEEKDAY_SHORT_RU[d.getDay()]}
+                  </span>
+                  <span
+                    style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 20, lineHeight: 1, letterSpacing: "-.02em" }}
+                  >
+                    {d.getDate()}
+                  </span>
+                  {/* Event dots */}
+                  <span style={{ display: "flex", gap: 2, height: 4, alignItems: "center" }}>
+                    {Array.from({ length: Math.min(itemCount, 3) }).map((_, i) => (
+                      <span
+                        key={i}
+                        style={{ width: 3, height: 3, borderRadius: 99, background: "#E86A3A" }}
+                      />
+                    ))}
+                  </span>
+                  {/* Today dot */}
+                  {isToday && !selected && (
+                    <span style={{
+                      position: "absolute", top: 4, right: 4,
+                      width: 5, height: 5, borderRadius: 99,
+                      background: "#E86A3A",
+                      boxShadow: "0 0 0 2px #FAF7F1",
+                    }} />
                   )}
-                >
-                  {WEEKDAY_SHORT_RU[d.getDay()]}
-                </span>
-                <span
-                  className={cn(
-                    "relative z-10 text-[14px] font-semibold tabular-nums leading-none transition-colors duration-300 ease-out",
-                    selected
-                      ? "text-primary-foreground"
-                      : isPast
-                        ? "text-neutral-500"
-                        : "text-neutral-900",
-                  )}
-                >
-                  {d.getDate()}
-                </span>
-              </button>
-            );
-          })}
-        </motion.div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => shiftWeek(1)}
+          aria-label="Следующая неделя"
+          style={{
+            width: 28, height: 28, borderRadius: 99,
+            background: "transparent", border: "1px solid rgba(20,18,16,.18)",
+            color: "#3A332B", cursor: "pointer",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            flexShrink: 0,
+          }}
+        ><ChevronRight /></button>
       </div>
     </div>
   );

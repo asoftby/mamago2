@@ -18,6 +18,7 @@ function buildRouteModel(idea: IdeaItem): PublicRouteCardModel {
     title: idea.activity.title,
     ageTags: [],
     budgetLevel: "FREE",
+    budgetLabel: "Бесплатно",
     cityName: idea.activity.placeTitle ?? "Минск",
     coverImageUrl: idea.activity.coverImageUrl ?? "",
     authorName: null,

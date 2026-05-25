@@ -2219,6 +2219,11 @@ model RouteStop {
   customTitle          String?
   note                 String
   photoUrl             String?
+  priceType            RouteStopPriceType @default(UNKNOWN)
+  priceMin             Float?
+  priceMax             Float?
+  priceCurrency        String             @default("BYN")
+  priceNote            String?
   formattedAddress     String?
   addressComponents    Json?
   rawGooglePayload     Json?
@@ -2929,6 +2934,15 @@ enum BudgetLevel {
   LOW
   MEDIUM
   HIGH
+}
+
+enum RouteStopPriceType {
+  FREE
+  FIXED
+  RANGE
+  FROM
+  CUSTOM
+  UNKNOWN
 }
 
 enum NotificationChannel {

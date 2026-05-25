@@ -653,14 +653,22 @@ body:has([data-slot="alert-dialog-overlay"][data-state="open"]) {
    Place page — editorial display tokens
    ───────────────────────────────────────────────────────────────────────── */
 
+/* Instrument Serif только для цифр — применяется поверх Georgia */
+@font-face {
+  font-family: "InstrumentSerifNumerals";
+  src: local("Instrument Serif"), var(--font-display);
+  unicode-range: U+0030-0039; /* 0–9 */
+  font-display: swap;
+}
+
 .font-display {
-  font-family: var(--font-display);
+  font-family: "InstrumentSerifNumerals", Georgia, serif;
   font-weight: 400;
   letter-spacing: -0.01em;
 }
 
 .font-display-italic {
-  font-family: var(--font-display);
+  font-family: "InstrumentSerifNumerals", Georgia, serif;
   font-style: italic;
   font-weight: 400;
   letter-spacing: -0.005em;

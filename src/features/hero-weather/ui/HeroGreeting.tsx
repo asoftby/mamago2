@@ -132,8 +132,22 @@ export function HeroGreeting({ model }: HeroGreetingProps) {
     return mapWeatherCodeToScenario(data[weatherTimeOfDay].code);
   }, [weather, citySlug, selectedDates, weatherTimeOfDay, model.weatherScenario]);
 
+  const cityDisplayName = citySlug ? getCityDisplayName(citySlug) : null;
+  const weatherPrefix = cityDisplayName && rangeLabel ? `${rangeLabel} в ${cityDisplayName}` : null;
+
   const fallbackMicrocopy = stripLeadingMicrocopyEmoji(model.microcopy);
   const displaySummary = weatherSummary ?? fallbackMicrocopy ?? model.microcopy;
+
+  // Split italic weather tail into text + numeric parts for mixed font rendering
+  const italicTail = (weatherSummary && weatherPrefix && displaySummary.startsWith(weatherPrefix))
+    ? displaySummary.slice(weatherPrefix.length)
+    : null;
+  const italicParts = italicTail
+    ? (() => {
+        const m = italicTail.match(/^([\s\S]*\S)(\s+[+\-±]?\d[\s\S]*)$/);
+        return m ? { text: m[1], numeric: m[2] } : { text: italicTail, numeric: "" };
+      })()
+    : null;
 
   return (
     <motion.div
@@ -145,19 +159,35 @@ export function HeroGreeting({ model }: HeroGreetingProps) {
       data-hero-weather-scenario={model.weatherScenario}
     >
       {displaySummary ? (
-        <p className="flex items-center gap-3 text-sm font-medium tracking-tight text-neutral-600 sm:text-[15px] [text-wrap:balance]">
+        <p className="flex items-center gap-3 tracking-tight [text-wrap:balance]" style={{ fontSize: 18 }}>
           <HeroMoodIcon
             scenario={weatherSummary ? weatherScenario : model.weatherScenario}
             timeOfDay={iconTimeOfDay}
             maxTemperatureC={model.maxTemperatureC}
             size={56}
           />
-          <span className="min-w-0 whitespace-pre-wrap">{displaySummary}</span>
+          <span className="min-w-0" style={{ fontFamily: "Georgia, serif", fontWeight: 400, color: "#141210" }}>
+            {italicParts ? (
+              <>
+                {weatherPrefix}
+                <em style={{ fontStyle: "italic", color: "#C24E22" }}>
+                  {italicParts.text}
+                </em>
+                {italicParts.numeric && (
+                  <em style={{ fontStyle: "italic", color: "#C24E22", fontFamily: "var(--font-display), Georgia, serif" }}>
+                    {italicParts.numeric}
+                  </em>
+                )}
+              </>
+            ) : (
+              displaySummary
+            )}
+          </span>
         </p>
       ) : null}
 
       <div className="mt-2 flex items-start">
-        <h1 className="min-w-0 flex-1 text-2xl font-semibold leading-tight tracking-tight text-neutral-900 sm:text-3xl [text-wrap:balance]">
+        <h1 className="min-w-0 flex-1 leading-tight [text-wrap:balance]" style={{ fontFamily: "Georgia, serif", fontWeight: 400, fontSize: 40, color: "#141210", letterSpacing: "-.02em" }}>
           <span className="whitespace-pre-wrap">{model.title}</span>
         </h1>
       </div>

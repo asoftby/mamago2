@@ -259,7 +259,7 @@ export function OfferPageView({
 
   return (
     <main className="ep-surface min-h-screen">
-      <div className="mx-auto max-w-[1280px] space-y-16 px-4 py-8 sm:px-6 lg:space-y-24 lg:px-8 lg:py-12">
+      <div className="mx-auto max-w-[1200px] space-y-16 px-4 py-8 sm:px-6 lg:space-y-24 lg:px-8 lg:py-12">
         <OfferHero
           data={data}
           canEditOffer={canEditOffer}

@@ -38,9 +38,9 @@ export function CityBirthdayCtaBlock({
             <Cake className="h-[33px] w-[33px]" aria-hidden />
           </div>
           <div className="min-w-0">
-            <h2 className="max-w-none text-[15px] font-semibold tracking-[-0.04em] text-neutral-900 sm:text-[26px] sm:leading-[1.1]">
-              Организовать День Рождения за{" "}
-              <span className="text-[#ff8a5b]">10 минут</span>
+            <h2 className="max-w-none text-[15px] tracking-[-0.04em] text-neutral-900 sm:text-[26px] sm:leading-[1.1]" style={{ fontFamily: "Georgia, serif", fontWeight: 400 }}>
+              Организовать День Рождения{" "}
+              <em style={{ fontStyle: "italic", color: "#C24E22", fontWeight: 400 }}>за 10 минут</em>
             </h2>
             <p className="mt-3 max-w-2xl text-[14px] leading-[150%] text-neutral-600 sm:text-[14px]">
               Площадка, анимация, торт, декор и другие штуковины — в одном конструкторе легко и просто
