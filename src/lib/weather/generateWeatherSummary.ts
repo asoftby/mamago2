@@ -9,6 +9,7 @@ export interface WeatherSummaryDay {
   tempMax: number;
   tempMin: number;
   condition: "clear" | "partly_cloudy" | "cloudy" | "rain" | "snow";
+  windspeed?: number; // km/h
 }
 
 /**
@@ -89,9 +90,17 @@ export function generateWeatherSummary(
   const maxTemp = Math.max(...days.map((d) => d.tempMax));
   const conditionText = aggregateCondition(days);
   const tempText = tempLabel(maxTemp);
+  const maxWindspeed = Math.max(...days.map((d) => d.windspeed ?? 0));
+
+  // Wind label
+  const windText = maxWindspeed >= 40
+    ? ", сильный ветер"
+    : maxWindspeed >= 25
+      ? ", ветрено"
+      : "";
 
   // Base: "На выходных в Минске прохладно и облачно, до +12°"
-  let summary = `${rangeLabel} в ${city} ${tempText} и ${conditionText}, до ${formatTemp(maxTemp)}`;
+  let summary = `${rangeLabel} в ${city} ${tempText} и ${conditionText}, до ${formatTemp(maxTemp)}${windText}`;
 
   // Add notable drop: if any day is >=5° colder than max
   const DROP_THRESHOLD = 5;
