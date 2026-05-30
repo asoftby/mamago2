@@ -33,18 +33,22 @@ export function MediaIdField({
     }
     let cancelled = false;
     (async () => {
-      const res = await fetch(`/api/admin/articles/media-preview?id=${encodeURIComponent(value.trim())}`);
-      if (!res.ok) {
+      try {
+        const res = await fetch(`/api/admin/articles/media-preview?id=${encodeURIComponent(value.trim())}`);
+        if (!res.ok) {
+          if (!cancelled) setPreview(null);
+          return;
+        }
+        const data = (await res.json()) as {
+          id: string;
+          publicUrl: string | null;
+          alt: string | null;
+          filename: string;
+        };
+        if (!cancelled) setPreview(data);
+      } catch {
         if (!cancelled) setPreview(null);
-        return;
       }
-      const data = (await res.json()) as {
-        id: string;
-        publicUrl: string | null;
-        alt: string | null;
-        filename: string;
-      };
-      if (!cancelled) setPreview(data);
     })();
     return () => {
       cancelled = true;

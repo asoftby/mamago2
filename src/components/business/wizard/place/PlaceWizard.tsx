@@ -370,7 +370,8 @@ export function PlaceWizard({
 
     try {
       const changes = extractChanges(formData, originalData);
-      if (Object.keys(changes).length === 0) {
+      const openingHoursChanged = JSON.stringify(formData.openingHoursData) !== JSON.stringify(originalData.openingHoursData);
+      if (Object.keys(changes).length === 0 && !openingHoursChanged) {
         if (isValidReturnTo(returnTo)) {
           navigateToCompatibleHref(router, returnTo!);
         } else {
@@ -434,32 +435,34 @@ export function PlaceWizard({
         // Для черновиков или ADMIN - прямое сохранение
         console.log("[PlaceWizard] Direct save:", isAdmin ? "(ADMIN)" : "(DRAFT)");
 
-        const response = await fetch(`/api/business/places/${place.id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(changes),
-        });
-
-        console.log("[PlaceWizard] Response status:", response.status, response.statusText);
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error("[PlaceWizard] Error response text:", errorText);
-          const errorData = parseJsonErrorPayload(errorText);
-
-          console.error("[PlaceWizard] Failed to save place:", {
-            status: response.status,
-            statusText: response.statusText,
-            error: errorData,
-            changes,
+        if (Object.keys(changes).length > 0) {
+          const response = await fetch(`/api/business/places/${place.id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(changes),
           });
 
-          const errorMessage = errorData.message || errorData.error || "Failed to save";
-          throw new Error(errorMessage);
+          console.log("[PlaceWizard] Response status:", response.status, response.statusText);
+
+          if (!response.ok) {
+            const errorText = await response.text();
+            console.error("[PlaceWizard] Error response text:", errorText);
+            const errorData = parseJsonErrorPayload(errorText);
+
+            console.error("[PlaceWizard] Failed to save place:", {
+              status: response.status,
+              statusText: response.statusText,
+              error: errorData,
+              changes,
+            });
+
+            const errorMessage = errorData.message || errorData.error || "Failed to save";
+            throw new Error(errorMessage);
+          }
         }
 
-        // For admin editing a published place, also save opening hours directly
-        if (isAdmin && isPublished && formData.openingHoursData !== null) {
+        // Save opening hours if changed
+        if (openingHoursChanged && formData.openingHoursData !== null) {
           const ohResponse = await fetch(`/api/business/places/${place.id}/opening-hours`, {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
