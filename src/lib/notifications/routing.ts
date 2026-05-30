@@ -78,7 +78,7 @@ export function getNotificationHref(n: NotificationApiRow): string | null {
     return null;
   }
   if (n.type === "REMINDER" || n.type === "PLAN_TOMORROW_DIGEST") return "/me/plan";
-  if (n.type === "SYSTEM") return "/settings";
+  if (n.type === "SYSTEM") return "/settings/notifications";
   
   // Broadcast-уведомления: если есть ctaAction — используем его
   if ((n.type === "NEWS" || n.type === "ANNOUNCEMENT") && n.ctaAction) {
@@ -108,6 +108,14 @@ export function getNotificationHref(n: NotificationApiRow): string | null {
   if (n.entityType === "ACTIVITY" && n.entityId) return `/editor/event/${n.entityId}/edit`;
   if (n.entityType === "OFFER" && n.entityId) return `/editor/offer/${n.entityId}/edit`;
   if (n.entityType === "BUSINESS") return "/business/verification";
+  if (n.type === "BUSINESS_APPLICATION_CREATED") {
+    return n.entityId
+      ? `/admin/b2b/requests?status=PENDING&open=${n.entityId}`
+      : "/admin/b2b/requests?status=PENDING";
+  }
+  if (n.type === "ADMIN_MODERATION_ITEM_CREATED") {
+    return n.ctaAction ?? "/admin/moderation/queue";
+  }
 
   const t = n.type;
   if (t.startsWith("PLACE_") || t.startsWith("ACTIVITY_") || t.startsWith("OFFER_")) {

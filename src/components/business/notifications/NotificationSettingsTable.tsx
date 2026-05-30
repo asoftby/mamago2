@@ -83,6 +83,7 @@ export function NotificationSettingsTable({
   const [isLinkingTelegram, setIsLinkingTelegram] = useState(false);
   const [isUnlinkingTelegram, setIsUnlinkingTelegram] = useState(false);
   const [isSendingTelegramTest, setIsSendingTelegramTest] = useState(false);
+  const [isSendingEmailTest, setIsSendingEmailTest] = useState(false);
   const [unlinkDialogOpen, setUnlinkDialogOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
 
@@ -374,6 +375,55 @@ export function NotificationSettingsTable({
     }
   };
 
+  const handleSendEmailTest = async () => {
+    setError(null);
+    setIsSendingEmailTest(true);
+
+    try {
+      const res = await fetch("/api/notifications/email/test", {
+        method: "POST",
+        credentials: "include",
+      });
+      const json = (await res.json().catch(() => null)) as
+        | {
+            ok?: boolean;
+            code?: string;
+            messageId?: string | null;
+            intendedTo?: string;
+            actualTo?: string;
+            redirected?: boolean;
+          }
+        | null;
+
+      if (!res.ok || !json?.ok) {
+        if (json?.code === "EMAIL_MISSING") {
+          throw new Error("Для аккаунта не указана почта.");
+        }
+        if (json?.code === "EMAIL_DISABLED") {
+          throw new Error("Почтовый канал отключён через EMAIL_ENABLED=false.");
+        }
+        if (json?.code === "EMAIL_NOT_CONFIGURED") {
+          throw new Error("Почтовый канал не настроен: не хватает Resend env.");
+        }
+        throw new Error("Не удалось отправить тестовое письмо.");
+      }
+
+      toast.success(
+        json?.messageId
+          ? `Письмо отправлено: ${json.messageId}`
+          : `Письмо отправлено на ${json?.actualTo ?? "указанный адрес"}`,
+      );
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Не удалось отправить тестовое письмо.",
+      );
+    } finally {
+      setIsSendingEmailTest(false);
+    }
+  };
+
   if (!data) {
     return (
       <div className={cn("py-10 text-center text-sm text-stone-500", className)}>
@@ -401,6 +451,25 @@ export function NotificationSettingsTable({
           ) : null}
         </div>
       ) : null}
+
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          className="rounded-xl"
+          onClick={handleSendEmailTest}
+          disabled={isSendingEmailTest}
+        >
+          {isSendingEmailTest ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Отправка письма…
+            </>
+          ) : (
+            "Тест email"
+          )}
+        </Button>
+      </div>
 
       {data.telegramConnected ? (
         <div className="flex items-center gap-3 rounded-[22px] border border-emerald-200/80 bg-emerald-50/80 px-4 py-3">

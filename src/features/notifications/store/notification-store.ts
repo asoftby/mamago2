@@ -61,6 +61,7 @@ const initialSnapshot = (): NotificationState => ({
   authenticated: false,
   unreadCount: 0,
   businessUnreadCount: 0,
+  activeStream: "user",
   items: [],
   isLoading: false,
   loadingMore: false,
@@ -81,6 +82,7 @@ const initialSnapshot = (): NotificationState => ({
 
 export type NotificationStoreActions = {
   setAuthenticated: (authenticated: boolean, userId?: string | null) => void;
+  setActiveStream: (stream: "user" | "business") => void;
   fetchUnreadCount: () => Promise<void>;
   fetchNotifications: (options?: { force?: boolean }) => Promise<void>;
   refresh: () => Promise<void>;
@@ -129,7 +131,7 @@ export const useNotificationStore = create<NotificationState & NotificationStore
         inflight: { ...s.inflight, markOpen: true },
       }));
       try {
-        const markData = await postMarkNotificationsOpenApi();
+        const markData = await postMarkNotificationsOpenApi(state.activeStream);
         if (isStaleAuthEpoch(requestEpoch)) return;
         if (typeof markData.showTelegramPrompt === "boolean") {
           set({ showTelegramPrompt: markData.showTelegramPrompt });
@@ -175,6 +177,19 @@ export const useNotificationStore = create<NotificationState & NotificationStore
           resetModuleLevelState(nextAuthContextKey);
           set({ ...initialSnapshot(), authenticated });
         }
+      },
+
+      setActiveStream: (stream) => {
+        if (get().activeStream === stream) return;
+        set((state) => ({
+          activeStream: stream,
+          items: [],
+          isHydrated: false,
+          hasMore: false,
+          offset: 0,
+          panelOpen: state.panelOpen,
+          error: null,
+        }));
       },
 
       reset: () => {
@@ -345,7 +360,7 @@ export const useNotificationStore = create<NotificationState & NotificationStore
           error: null,
         }));
         try {
-          const page = await fetchNotificationsPageApi(0, PAGE_SIZE);
+          const page = await fetchNotificationsPageApi(0, PAGE_SIZE, get().activeStream);
           if (!get().authenticated || isStaleAuthEpoch(requestEpoch)) return;
           set({
             items: page.notifications,
@@ -383,7 +398,7 @@ export const useNotificationStore = create<NotificationState & NotificationStore
         }));
         try {
           const start = get().offset;
-          const page = await fetchNotificationsPageApi(start, PAGE_SIZE);
+          const page = await fetchNotificationsPageApi(start, PAGE_SIZE, get().activeStream);
           if (!get().authenticated || isStaleAuthEpoch(requestEpoch)) return;
           set((s) => ({
             items: [...s.items, ...page.notifications],

@@ -12,6 +12,7 @@ export type NotificationState = {
   authenticated: boolean;
   unreadCount: number;
   businessUnreadCount: number;
+  activeStream: "user" | "business";
   items: NotificationItem[];
   isLoading: boolean;
   loadingMore: boolean;

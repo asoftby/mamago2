@@ -5,6 +5,7 @@
  */
 
 import type { NotificationType } from "@prisma/client";
+import { resolveNotificationHref } from "@/lib/notifications/notificationRegistry";
 
 interface EmailTemplate {
   subject: string;
@@ -19,8 +20,9 @@ export function buildNotificationEmailTemplate(
   title: string,
   body: string,
   entityId?: string | null,
+  ctaAction?: string | null,
 ): EmailTemplate {
-  const ctaUrl = buildCtaUrl(type, entityId);
+  const ctaUrl = buildCtaUrl(type, entityId, ctaAction);
   const ctaLine = ctaUrl ? `\n\nОткрыть: ${ctaUrl}` : "";
 
   const text = `${title}\n\n${body}${ctaLine}\n\n---\nmamaGo — семейный помощник`;
@@ -29,21 +31,27 @@ export function buildNotificationEmailTemplate(
   return { subject: title, text, html };
 }
 
-function buildCtaUrl(type: NotificationType, entityId?: string | null): string | null {
-  // USER types — link to notification settings or plan
+function buildCtaUrl(
+  type: NotificationType,
+  entityId?: string | null,
+  ctaAction?: string | null,
+): string | null {
+  const href = resolveNotificationHref(type, {
+    entityId: entityId ?? undefined,
+    entityType: undefined,
+    ctaAction: ctaAction ?? undefined,
+  });
+
+  if (href) {
+    return href.startsWith("http") ? href : `${APP_URL}${href}`;
+  }
+
   if (type === "WELCOME" || type === "RECOMMENDATION") {
     return `${APP_URL}/me/settings/notifications`;
   }
   if (type === "REMINDER" || type === "PLAN_TOMORROW_DIGEST") return `${APP_URL}/me/plan`;
-  if (type === "SYSTEM") return `${APP_URL}/me/settings/notifications`;
+  if (type === "SYSTEM") return `${APP_URL}/settings`;
   if (type === "NEWS" || type === "ANNOUNCEMENT") return null;
-
-  if (!entityId) return `${APP_URL}/business/dashboard`;
-
-  if (type.startsWith("PLACE_")) return `${APP_URL}/editor/place/${entityId}/edit`;
-  if (type.startsWith("ACTIVITY_")) return `${APP_URL}/editor/event/${entityId}/edit`;
-  if (type.startsWith("OFFER_")) return `${APP_URL}/editor/offer/${entityId}/edit`;
-  if (type.startsWith("BUSINESS_")) return `${APP_URL}/business/verification`;
 
   return `${APP_URL}/business/dashboard`;
 }

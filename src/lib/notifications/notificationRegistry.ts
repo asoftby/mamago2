@@ -103,7 +103,7 @@ export const NOTIFICATION_REGISTRY: Record<string, NotificationRegistryEntry> = 
     description: "Напоминания о событиях и планах",
     defaultChannels: { inApp: true, email: false, telegram: true },
     ctaLabel: "Мои планы",
-    resolveHref: () => "/me",
+    resolveHref: () => "/me/plan",
     telegram: {
       enabledByDefault: true,
       template: "reminder",
@@ -195,7 +195,7 @@ export const NOTIFICATION_REGISTRY: Record<string, NotificationRegistryEntry> = 
     defaultChannels: { inApp: true, email: true, telegram: true },
     entityType: "PLACE",
     ctaLabel: "Открыть место",
-    resolveHref: (n) => n.ctaAction || `/business/places/${n.entityId}`,
+    resolveHref: (n) => n.ctaAction || (n.entityId ? `/editor/place/${n.entityId}/edit` : "/business/places"),
     telegram: {
       enabledByDefault: true,
       template: "place_approved",
@@ -214,7 +214,7 @@ export const NOTIFICATION_REGISTRY: Record<string, NotificationRegistryEntry> = 
     defaultChannels: { inApp: true, email: true, telegram: true },
     entityType: "PLACE",
     ctaLabel: "Исправить",
-    resolveHref: (n) => n.ctaAction || `/business/places/${n.entityId}/edit`,
+    resolveHref: (n) => n.ctaAction || (n.entityId ? `/editor/place/${n.entityId}/edit` : "/business/places"),
     telegram: {
       enabledByDefault: true,
       template: "place_needs_changes",
@@ -233,7 +233,7 @@ export const NOTIFICATION_REGISTRY: Record<string, NotificationRegistryEntry> = 
     defaultChannels: { inApp: true, email: true, telegram: true },
     entityType: "PLACE",
     ctaLabel: "Подробнее",
-    resolveHref: (n) => n.ctaAction || `/business/places/${n.entityId}`,
+    resolveHref: (n) => n.ctaAction || (n.entityId ? `/editor/place/${n.entityId}/edit` : "/business/places"),
     telegram: {
       enabledByDefault: true,
       template: "place_rejected",
@@ -252,7 +252,7 @@ export const NOTIFICATION_REGISTRY: Record<string, NotificationRegistryEntry> = 
     defaultChannels: { inApp: true, email: false, telegram: true },
     entityType: "PLACE",
     ctaLabel: "Открыть место",
-    resolveHref: (n) => n.ctaAction || `/business/places/${n.entityId}`,
+    resolveHref: (n) => n.ctaAction || (n.entityId ? `/editor/place/${n.entityId}/edit` : "/business/places"),
     telegram: {
       enabledByDefault: true,
       template: "place_update_approved",
@@ -271,7 +271,7 @@ export const NOTIFICATION_REGISTRY: Record<string, NotificationRegistryEntry> = 
     defaultChannels: { inApp: true, email: true, telegram: true },
     entityType: "PLACE",
     ctaLabel: "Исправить",
-    resolveHref: (n) => n.ctaAction || `/business/places/${n.entityId}/edit`,
+    resolveHref: (n) => n.ctaAction || (n.entityId ? `/editor/place/${n.entityId}/edit` : "/business/places"),
     telegram: {
       enabledByDefault: true,
       template: "place_update_needs_revision",
@@ -290,7 +290,7 @@ export const NOTIFICATION_REGISTRY: Record<string, NotificationRegistryEntry> = 
     defaultChannels: { inApp: true, email: true, telegram: true },
     entityType: "PLACE",
     ctaLabel: "Подробнее",
-    resolveHref: (n) => n.ctaAction || `/business/places/${n.entityId}`,
+    resolveHref: (n) => n.ctaAction || (n.entityId ? `/editor/place/${n.entityId}/edit` : "/business/places"),
     telegram: {
       enabledByDefault: true,
       template: "place_update_rejected",
@@ -310,7 +310,7 @@ export const NOTIFICATION_REGISTRY: Record<string, NotificationRegistryEntry> = 
     defaultChannels: { inApp: true, email: true, telegram: true },
     entityType: "ACTIVITY",
     ctaLabel: "Открыть активность",
-    resolveHref: (n) => n.ctaAction || `/business/activities/${n.entityId}`,
+    resolveHref: (n) => n.ctaAction || (n.entityId ? `/editor/event/${n.entityId}/edit` : "/business/events"),
     telegram: {
       enabledByDefault: true,
       template: "activity_approved",
@@ -329,7 +329,7 @@ export const NOTIFICATION_REGISTRY: Record<string, NotificationRegistryEntry> = 
     defaultChannels: { inApp: true, email: true, telegram: true },
     entityType: "ACTIVITY",
     ctaLabel: "Исправить",
-    resolveHref: (n) => n.ctaAction || `/business/activities/${n.entityId}/edit`,
+    resolveHref: (n) => n.ctaAction || (n.entityId ? `/editor/event/${n.entityId}/edit` : "/business/events"),
     telegram: {
       enabledByDefault: true,
       template: "activity_needs_changes",
@@ -348,7 +348,7 @@ export const NOTIFICATION_REGISTRY: Record<string, NotificationRegistryEntry> = 
     defaultChannels: { inApp: true, email: true, telegram: true },
     entityType: "ACTIVITY",
     ctaLabel: "Подробнее",
-    resolveHref: (n) => n.ctaAction || `/business/activities/${n.entityId}`,
+    resolveHref: (n) => n.ctaAction || (n.entityId ? `/editor/event/${n.entityId}/edit` : "/business/events"),
     telegram: {
       enabledByDefault: true,
       template: "activity_rejected",
@@ -368,7 +368,7 @@ export const NOTIFICATION_REGISTRY: Record<string, NotificationRegistryEntry> = 
     defaultChannels: { inApp: true, email: true, telegram: true },
     entityType: "OFFER",
     ctaLabel: "Открыть предложение",
-    resolveHref: (n) => n.ctaAction || `/business/offers/${n.entityId}`,
+    resolveHref: (n) => n.ctaAction || (n.entityId ? `/editor/offer/${n.entityId}/edit` : "/business/offers"),
     telegram: {
       enabledByDefault: true,
       template: "offer_approved",
@@ -387,7 +387,7 @@ export const NOTIFICATION_REGISTRY: Record<string, NotificationRegistryEntry> = 
     defaultChannels: { inApp: true, email: true, telegram: true },
     entityType: "OFFER",
     ctaLabel: "Исправить",
-    resolveHref: (n) => n.ctaAction || `/business/offers/${n.entityId}/edit`,
+    resolveHref: (n) => n.ctaAction || (n.entityId ? `/editor/offer/${n.entityId}/edit` : "/business/offers"),
     telegram: {
       enabledByDefault: true,
       template: "offer_needs_changes",
@@ -406,7 +406,7 @@ export const NOTIFICATION_REGISTRY: Record<string, NotificationRegistryEntry> = 
     defaultChannels: { inApp: true, email: true, telegram: true },
     entityType: "OFFER",
     ctaLabel: "Подробнее",
-    resolveHref: (n) => n.ctaAction || `/business/offers/${n.entityId}`,
+    resolveHref: (n) => n.ctaAction || (n.entityId ? `/editor/offer/${n.entityId}/edit` : "/business/offers"),
     telegram: {
       enabledByDefault: true,
       template: "offer_rejected",
@@ -426,7 +426,7 @@ export const NOTIFICATION_REGISTRY: Record<string, NotificationRegistryEntry> = 
     defaultChannels: { inApp: true, email: true, telegram: true },
     entityType: "BUSINESS",
     ctaLabel: "Открыть кабинет",
-    resolveHref: () => "/business/dashboard",
+    resolveHref: () => "/business/verification",
     telegram: {
       enabledByDefault: true,
       template: "business_verified",
@@ -483,7 +483,7 @@ export const NOTIFICATION_REGISTRY: Record<string, NotificationRegistryEntry> = 
     defaultChannels: { inApp: true, email: false, telegram: true },
     entityType: "BUSINESS",
     ctaLabel: "Проверить",
-    resolveHref: (n) => `/admin/business-applications/${n.entityId}`,
+    resolveHref: (n) => n.entityId ? `/admin/b2b/requests?status=PENDING&open=${n.entityId}` : "/admin/b2b/requests?status=PENDING",
     telegram: {
       enabledByDefault: true,
       template: "business_application_created",

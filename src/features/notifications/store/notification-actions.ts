@@ -25,10 +25,12 @@ export type NotificationsPageResult = {
 export async function fetchNotificationsPageApi(
   offset: number,
   limit: number,
+  stream: "user" | "business",
 ): Promise<NotificationsPageResult> {
   const params = new URLSearchParams({
     limit: String(limit),
     offset: String(offset),
+    stream,
   });
   const res = await fetch(`/api/notifications?${params.toString()}`, {
     credentials: "include",
@@ -59,10 +61,13 @@ export async function fetchNotificationsPageApi(
   };
 }
 
-export async function postMarkNotificationsOpenApi(): Promise<{
+export async function postMarkNotificationsOpenApi(
+  stream: "user" | "business",
+): Promise<{
   showTelegramPrompt?: boolean;
 }> {
-  const res = await fetch("/api/notifications/mark-open", {
+  const params = new URLSearchParams({ stream });
+  const res = await fetch(`/api/notifications/mark-open?${params.toString()}`, {
     method: "POST",
     credentials: "include",
     headers: JSON_HEADERS,
