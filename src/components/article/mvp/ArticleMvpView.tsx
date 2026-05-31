@@ -64,6 +64,7 @@ export function ArticleMvpView({
   excerpt,
   publishedAt,
   blocks,
+  editHref,
   draftWatermark,
   /** Доп. scroll-padding (напр. панель предпросмотра под хедером). */
   readingScrollPaddingExtraRem,
@@ -73,6 +74,7 @@ export function ArticleMvpView({
   excerpt: string | null;
   publishedAt: Date | null;
   blocks: ArticleMvpResolvedBlock[];
+  editHref?: string;
   draftWatermark?: boolean;
   readingScrollPaddingExtraRem?: number;
 }) {
@@ -128,6 +130,7 @@ export function ArticleMvpView({
         category="Журнал"
         readTime={5}
         publishedAt={publishedAt ?? undefined}
+        editHref={editHref}
       />
 
       {showExcerptBelowHeader ? (

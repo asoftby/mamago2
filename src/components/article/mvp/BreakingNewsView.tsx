@@ -185,12 +185,14 @@ function NewsHero({
   excerpt,
   publishedAt,
   author,
+  editHref,
 }: {
   articleId: string;
   title: string;
   excerpt: string | null;
   publishedAt: Date | null;
   author: { displayName: string | null; avatarUrl: string | null } | null;
+  editHref?: string;
 }) {
   const [copied, setCopied] = useState(false);
 
@@ -243,6 +245,22 @@ function NewsHero({
             <span style={capsStyle}>·</span>
             <PublishedAtChip publishedAt={publishedAt} />
             <span style={capsStyle}>· 5 мин чтения</span>
+            {editHref ? (
+              <>
+                <span style={capsStyle}>·</span>
+                <Link
+                  href={editHref}
+                  style={{
+                    ...capsStyle,
+                    color: C.ink,
+                    textDecoration: "underline",
+                    textUnderlineOffset: "4px",
+                  }}
+                >
+                  Редактировать
+                </Link>
+              </>
+            ) : null}
           </div>
 
           {/* H1 */}
@@ -932,6 +950,7 @@ export interface BreakingNewsViewProps {
   blocks: ArticleMvpResolvedBlock[];
   author: { displayName: string | null; avatarUrl: string | null } | null;
   related: RelatedArticle[];
+  editHref?: string;
   draftWatermark?: boolean;
 }
 
@@ -943,6 +962,7 @@ export function BreakingNewsView({
   blocks,
   author,
   related,
+  editHref,
   draftWatermark,
 }: BreakingNewsViewProps) {
   // Extract gallery URLs from the gallery block.
@@ -983,7 +1003,14 @@ export function BreakingNewsView({
       )}
 
       <Breadcrumbs items={breadcrumbs} />
-      <NewsHero articleId={articleId} title={title} excerpt={excerpt} publishedAt={publishedAt} author={author} />
+      <NewsHero
+        articleId={articleId}
+        title={title}
+        excerpt={excerpt}
+        publishedAt={publishedAt}
+        author={author}
+        editHref={editHref}
+      />
       <HeroGallery urls={galleryUrls} title={title} />
       <ArticleBody blocks={blocks} />
 

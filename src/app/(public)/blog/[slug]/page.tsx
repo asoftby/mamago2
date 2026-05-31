@@ -1,4 +1,5 @@
 import { notFound, permanentRedirect } from "next/navigation";
+import { getCurrentUser } from "@/lib/auth/server";
 import { ArticleHeader } from "@/components/article/ArticleHeader";
 import { ArticleContent } from "@/components/article/ArticleContent";
 import { ArticleEventCardBlock } from "@/components/article/blocks/ArticleEventCardBlock";
@@ -192,8 +193,19 @@ export default async function ArticlePage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
+  const user = await getCurrentUser();
+  const canEditPublishedArticle = user?.role === "ADMIN" || user?.role === "MODERATOR";
   const mvp = await loadArticleMvpBySlugPublic(slug);
   if (mvp) {
+    const editHref =
+      canEditPublishedArticle
+        ? (
+            mvp.subtitle === BREAKING_NEWS_SUBTITLE
+              ? `/admin/content/publications/new?type=news&id=${mvp.id}`
+              : `/admin/content/articles/${mvp.id}/edit`
+          )
+        : undefined;
+
     if (await shouldCountPublishedArticleViewRequest()) {
       await incrementPublishedArticleViews(mvp.id);
     }
@@ -212,6 +224,7 @@ export default async function ArticlePage({
             blocks={mvp.blocks}
             author={mvp.author}
             related={related}
+            editHref={editHref}
           />
         </>
       );
@@ -226,6 +239,7 @@ export default async function ArticlePage({
           excerpt={mvp.excerpt}
           publishedAt={mvp.publishedAt}
           blocks={mvp.blocks}
+          editHref={editHref}
         />
       </>
     );
@@ -254,6 +268,8 @@ export default async function ArticlePage({
             publicBase,
           })
         : null;
+  const legacyEditHref =
+    canEditPublishedArticle && seo?.id ? `/admin/content/articles/${seo.id}/edit` : undefined;
 
   return (
     <main className="max-w-3xl mx-auto px-4 sm:px-6 py-12 md:py-16">
@@ -277,6 +293,7 @@ export default async function ArticlePage({
         category={article.category}
         readTime={article.readTime}
         publishedAt={article.publishedAt}
+        editHref={legacyEditHref}
         heroImage={
           article.heroImage
             ? { src: article.heroImage, alt: article.title }
