@@ -19,9 +19,9 @@ export function MyPlanHeader({ onClose, compact = false }: MyPlanHeaderProps) {
       }}
     >
       <h2
-        className="font-display"
         style={{
           margin: 0,
+          fontFamily: "var(--font-sans)",
           fontSize: 24,
           fontWeight: 400,
           lineHeight: 1,
@@ -29,7 +29,7 @@ export function MyPlanHeader({ onClose, compact = false }: MyPlanHeaderProps) {
           color: "#141210",
         }}
       >
-        Мой <em style={{ fontStyle: "italic", color: "#C24E22" }}>план</em>
+        Мой <em style={{ fontFamily: "Georgia, serif", fontStyle: "italic", color: "#C24E22" }}>план</em>
       </h2>
 
       <button

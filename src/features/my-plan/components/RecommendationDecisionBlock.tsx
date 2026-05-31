@@ -92,7 +92,7 @@ export function RecommendationDecisionBlock({
               быстро
             </span>
             <span
-              style={{ fontFamily: "Georgia, serif", fontSize: 16, fontWeight: 400, lineHeight: 1.2, color: "#141210" }}
+              style={{ fontFamily: "var(--font-sans)", fontSize: 16, fontWeight: 400, lineHeight: 1.2, color: "#141210" }}
             >
               {hasGenerated ? "Ещё варианты" : "Реши за меня"}
             </span>
@@ -159,10 +159,10 @@ export function RecommendationDecisionBlock({
               style={{ fontSize: 10, letterSpacing: ".12em", color: "rgba(20,18,16,.55)", display: "inline-flex", alignItems: "center", gap: 5 }}
             >
               <span style={{ width: 5, height: 5, borderRadius: "50%", background: "rgba(20,18,16,.45)", flexShrink: 0 }} />
-              сама
+              самостоятельно
             </span>
             <span
-              style={{ fontFamily: "Georgia, serif", fontSize: 16, fontWeight: 400, lineHeight: 1.2, color: "#141210" }}
+              style={{ fontFamily: "var(--font-sans)", fontSize: 16, fontWeight: 400, lineHeight: 1.2, color: "#141210" }}
             >
               Сама решу
             </span>

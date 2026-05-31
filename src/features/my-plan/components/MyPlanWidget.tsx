@@ -104,20 +104,13 @@ export function MyPlanWidget({ onOpen }: MyPlanWidgetProps) {
           alignItems: "center",
           justifyContent: "space-between",
           gap: 12,
-          padding: "10px 14px 10px 12px",
+          padding: "14px 14px 14px 12px",
           borderRadius: 999,
-          background: "rgba(210, 206, 199, 0.72)",
-          backdropFilter: "blur(32px) saturate(1.4)",
-          WebkitBackdropFilter: "blur(32px) saturate(1.4)",
-          border: "1px solid rgba(255,255,255,0.55)",
-          boxShadow: [
-            "0 8px 32px -8px rgba(20,18,16,.18)",
-            "0 2px 8px -2px rgba(20,18,16,.10)",
-            "inset 0 1px 0 rgba(255,255,255,.70)",
-            "inset 0 -1px 0 rgba(20,18,16,.06)",
-            "inset 1px 0 0 rgba(255,255,255,.45)",
-            "inset -1px 0 0 rgba(255,255,255,.25)",
-          ].join(", "),
+          background: "rgba(255,255,255,0.35)",
+          backdropFilter: "blur(24px) saturate(1.5)",
+          WebkitBackdropFilter: "blur(24px) saturate(1.5)",
+          border: "1px solid rgba(255,255,255,0.60)",
+          boxShadow: "0 16px 30px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.70)",
           cursor: "pointer",
           transition: "all .22s",
           minWidth: 220,
@@ -125,26 +118,12 @@ export function MyPlanWidget({ onOpen }: MyPlanWidgetProps) {
         onMouseEnter={(e) => {
           const b = e.currentTarget as HTMLButtonElement;
           b.style.transform = "translateY(-2px)";
-          b.style.boxShadow = [
-            "0 16px 40px -10px rgba(20,18,16,.24)",
-            "0 4px 12px -4px rgba(20,18,16,.14)",
-            "inset 0 1px 0 rgba(255,255,255,.75)",
-            "inset 0 -1px 0 rgba(20,18,16,.06)",
-            "inset 1px 0 0 rgba(255,255,255,.50)",
-            "inset -1px 0 0 rgba(255,255,255,.30)",
-          ].join(", ");
+          b.style.boxShadow = "0 20px 40px rgba(0,0,0,0.16), inset 0 1px 0 rgba(255,255,255,0.75)";
         }}
         onMouseLeave={(e) => {
           const b = e.currentTarget as HTMLButtonElement;
           b.style.transform = "none";
-          b.style.boxShadow = [
-            "0 8px 32px -8px rgba(20,18,16,.18)",
-            "0 2px 8px -2px rgba(20,18,16,.10)",
-            "inset 0 1px 0 rgba(255,255,255,.70)",
-            "inset 0 -1px 0 rgba(20,18,16,.06)",
-            "inset 1px 0 0 rgba(255,255,255,.45)",
-            "inset -1px 0 0 rgba(255,255,255,.25)",
-          ].join(", ");
+          b.style.boxShadow = "0 16px 30px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.70)";
         }}
       >
         {/* Icon + badge */}
@@ -185,7 +164,7 @@ export function MyPlanWidget({ onOpen }: MyPlanWidgetProps) {
         {/* Text */}
         <div style={{ flex: 1, textAlign: "left", minWidth: 0 }}>
           <div
-            style={{ fontFamily: "Georgia, serif", fontSize: 15, fontWeight: 400, lineHeight: 1, color: "#141210" }}
+            style={{ fontFamily: "var(--font-sans)", fontSize: 15, fontWeight: 400, lineHeight: 1, color: "#141210" }}
           >
             Мой план{widgetState.kind === "unauthenticated" && (
               <em style={{ fontStyle: "italic", color: "#C24E22" }}> за 10 секунд</em>

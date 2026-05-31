@@ -47,7 +47,7 @@ export function PlanAudienceCompact({
   return (
     <div className="space-y-3 rounded-xl border border-neutral-200 bg-[#FAF7F1] p-4">
       <div className="space-y-1">
-        <p style={{ fontFamily: "Georgia, serif", fontSize: 16, fontWeight: 400, lineHeight: 1.1, color: "#141210" }}>Кто идет?</p>
+        <p style={{ fontFamily: "var(--font-sans)", fontSize: 16, fontWeight: 400, lineHeight: 1.1, color: "#141210" }}>Кто идет?</p>
       </div>
 
       <div className="flex flex-wrap items-center gap-2">

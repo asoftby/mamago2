@@ -65,7 +65,7 @@ export function PlanOnboardingPromoBanner({
           )}
         </div>
         <div className="min-w-0 flex-1">
-          <h3 style={{ fontFamily: "Georgia, serif", fontSize: 16, fontWeight: 400, lineHeight: 1.2, color: "#141210" }}>{c.title}</h3>
+          <h3 style={{ fontFamily: "var(--font-sans)", fontSize: 16, fontWeight: 400, lineHeight: 1.2, color: "#141210" }}>{c.title}</h3>
           <p className="mt-1 text-sm leading-relaxed text-neutral-600">
             {c.description}
           </p>

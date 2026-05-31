@@ -245,7 +245,7 @@ function OrDivider({ label = "или" }: { label?: string }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 14, margin: "18px 0 14px" }}>
       <span style={{ flex: 1, height: 1, background: C.line }} />
-      <span style={{ fontFamily: "Georgia, serif", fontStyle: "italic", fontSize: 16, color: C.ink3 }}>{label}</span>
+      <span style={{ fontFamily: "var(--font-sans)", fontStyle: "italic", fontSize: 16, color: C.ink3 }}>{label}</span>
       <span style={{ flex: 1, height: 1, background: C.line }} />
     </div>
   );
@@ -392,7 +392,7 @@ function DateSlider({ options, selISO, onSelect }: DateSliderProps) {
               onMouseLeave={(e) => { if (!isSel) e.currentTarget.style.borderColor = C.line; }}
             >
               <span style={{ fontFamily: "var(--font-mono, ui-monospace)", fontSize: 10, letterSpacing: ".1em", textTransform: "uppercase", color: isSel ? "rgba(250,247,241,.6)" : C.ink3 }}>{chip.dow}</span>
-              <span style={{ fontFamily: "var(--font-display, Georgia), serif", fontSize: 28, lineHeight: 1, letterSpacing: "-.02em" }}>{chip.day}</span>
+              <span style={{ fontFamily: "var(--font-sans)", fontSize: 28, lineHeight: 1, letterSpacing: "-.02em" }}>{chip.day}</span>
               <span style={{ fontFamily: "var(--font-mono, ui-monospace)", fontSize: 9, letterSpacing: ".08em", color: isSel ? "rgba(250,247,241,.55)" : C.ink3 }}>{chip.month}</span>
               {/* accent dots — visual indicator */}
               <span style={{ display: "flex", gap: 3, height: 5, alignItems: "center", marginTop: 1 }}>
@@ -505,7 +505,7 @@ function AllDatesDrawer({ options, selISO, onSelect, onBack }: AllDatesDrawerPro
         </button>
         <div>
           <span style={{ fontFamily: "var(--font-mono, ui-monospace)", textTransform: "uppercase" as const, fontSize: 10, letterSpacing: ".14em", color: C.accentDeep }}>● Все даты</span>
-          <h3 style={{ margin: "4px 0 0", fontFamily: "var(--font-display, Georgia), serif", fontSize: 24, letterSpacing: "-.015em", fontWeight: 400 }}>
+          <h3 style={{ margin: "4px 0 0", fontFamily: "var(--font-sans)", fontSize: 24, letterSpacing: "-.015em", fontWeight: 600 }}>
             {options.length} <span style={{ fontStyle: "italic", color: C.accentDeep }}>сеансов</span>
           </h3>
         </div>
@@ -540,7 +540,7 @@ function AllDatesDrawer({ options, selISO, onSelect, onBack }: AllDatesDrawerPro
                     onMouseLeave={(e) => { if (!isSel) e.currentTarget.style.borderColor = C.line; }}
                   >
                     <span style={{ fontFamily: "var(--font-mono, ui-monospace)", fontSize: 10, letterSpacing: ".12em", textTransform: "uppercase" as const, color: isSel ? "rgba(250,247,241,.55)" : C.ink3 }}>{chip.dow}</span>
-                    <span style={{ fontFamily: "var(--font-display, Georgia), serif", fontSize: 24, lineHeight: 1, letterSpacing: "-.02em" }}>{chip.day}</span>
+                    <span style={{ fontFamily: "var(--font-sans)", fontSize: 24, lineHeight: 1, letterSpacing: "-.02em" }}>{chip.day}</span>
                     <span style={{ fontSize: 11, color: isSel ? "rgba(250,247,241,.55)" : C.ink3 }}>{chip.month}</span>
                   </button>
                 );
@@ -604,7 +604,7 @@ function DateSliderView({
         {/* Heading */}
         <h2 style={{
           margin: "0 0 8px",
-          fontFamily: "Georgia, serif",
+          fontFamily: "var(--font-sans)",
           fontSize: 30, lineHeight: 1.02, letterSpacing: "-.02em", fontWeight: 400,
         }}>
           На какой{" "}
@@ -635,9 +635,9 @@ function DateSliderView({
 
         {/* Month label + session count */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-          <span style={{ fontFamily: "Georgia, serif", fontSize: 18, letterSpacing: "-.01em", fontWeight: 400 }}>
+          <span style={{ fontFamily: "var(--font-sans)", fontSize: 18, letterSpacing: "-.01em", fontWeight: 400 }}>
             {RU_MONTHS_NAMED[fmtDateChip(options[0]).monthIdx]}{" "}
-            <span style={{ fontFamily: "var(--font-display, Georgia), serif", color: C.ink3 }}>{parseLocalDate(options[0]).getFullYear()}</span>
+            <span style={{ fontFamily: "var(--font-sans)", color: C.ink3 }}>{parseLocalDate(options[0]).getFullYear()}</span>
           </span>
           <span style={{ fontFamily: "var(--font-mono, ui-monospace)", fontSize: 10, color: C.ink3, letterSpacing: ".1em", textTransform: "uppercase" as const }}>
             {options.length} {pluralDat(options.length)}
@@ -707,7 +707,7 @@ function CalendarView({ onSelect, allowedDateKeys, onBack }: {
           textTransform: "uppercase" as const, color: C.ink3, background: "none", border: 0, cursor: "pointer", padding: 0,
         }}>‹ Назад</button>
       )}
-      <h2 style={{ margin: "0 0 6px", fontFamily: "var(--font-display, Georgia), serif", fontSize: 34, lineHeight: 1, letterSpacing: "-.02em", fontWeight: 400 }}>
+      <h2 style={{ margin: "0 0 6px", fontFamily: "var(--font-sans)", fontSize: 34, lineHeight: 1, letterSpacing: "-.02em", fontWeight: 600 }}>
         Выберите <span style={{ fontStyle: "italic", color: C.accentDeep }}>дату</span>
       </h2>
       <p style={{ marginTop: 8, marginBottom: 22, fontSize: 14, color: C.ink3, lineHeight: 1.5 }}>
@@ -752,7 +752,7 @@ function InPlanView({ planDate, planStartsAt, planItemId, onSwitchCalendar, onId
         <span style={{ fontFamily: "var(--font-mono, ui-monospace)", textTransform: "uppercase" as const, fontSize: 10, letterSpacing: ".14em", color: C.green }}>уже сохранено</span>
       </div>
 
-      <h2 style={{ margin: "0 0 8px", fontFamily: "var(--font-display, Georgia), serif", fontSize: 36, lineHeight: 1, letterSpacing: "-.02em", fontWeight: 400 }}>
+      <h2 style={{ margin: "0 0 8px", fontFamily: "var(--font-sans)", fontSize: 30, lineHeight: 1, letterSpacing: "-.02em", fontWeight: 600 }}>
         В вашем{" "}
         <span style={{ fontStyle: "italic", color: C.accentDeep }}>плане</span>.
       </h2>
@@ -860,7 +860,7 @@ function InIdeasView({ onRemoveIdea, onSchedule, dateOptions }: {
         <span style={{ fontFamily: "var(--font-mono, ui-monospace)", textTransform: "uppercase" as const, fontSize: 10, letterSpacing: ".14em", color: C.green }}>уже сохранено</span>
       </div>
 
-      <h2 style={{ margin: "0 0 8px", fontFamily: "var(--font-display, Georgia), serif", fontSize: 36, lineHeight: 1, letterSpacing: "-.02em", fontWeight: 400 }}>
+      <h2 style={{ margin: "0 0 8px", fontFamily: "var(--font-sans)", fontSize: 36, lineHeight: 1, letterSpacing: "-.02em", fontWeight: 600 }}>
         В ваших{" "}
         <span style={{ fontStyle: "italic", color: C.accentDeep }}>идеях</span>.
       </h2>
@@ -906,7 +906,7 @@ function InIdeasView({ onRemoveIdea, onSchedule, dateOptions }: {
           padding: "24px 20px", background: C.paper, border: `1px dashed ${C.line2}`,
           borderRadius: 14, textAlign: "center", marginBottom: 18,
         }}>
-          <div style={{ fontFamily: "var(--font-display, Georgia), serif", fontSize: 22, lineHeight: 1.1, color: C.ink, marginBottom: 6 }}>
+          <div style={{ fontFamily: "var(--font-sans)", fontSize: 22, lineHeight: 1.1, color: C.ink, marginBottom: 6 }}>
             Пока ничего <span style={{ fontStyle: "italic", color: C.accentDeep }}>не сохранено</span>
           </div>
           <div style={{ fontSize: 13, color: C.ink3 }}>Добавьте дату в план или сохраните в идеи.</div>
@@ -922,7 +922,7 @@ function InIdeasView({ onRemoveIdea, onSchedule, dateOptions }: {
           display: "flex", alignItems: "center", gap: 14, marginBottom: 18,
         }}>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontFamily: "var(--font-display, Georgia), serif", fontSize: 18, lineHeight: 1.1, letterSpacing: "-.01em", fontWeight: 400 }}>
+            <div style={{ fontFamily: "var(--font-sans)", fontSize: 18, lineHeight: 1.1, letterSpacing: "-.01em", fontWeight: 400 }}>
               Готовы <span style={{ fontStyle: "italic", color: C.accentDeep }}>выбрать день</span>?
             </div>
             {dateOptions.length > 0 && (
@@ -987,7 +987,7 @@ function InIdeasView({ onRemoveIdea, onSchedule, dateOptions }: {
             </button>
             <div>
               <span style={{ fontFamily: "var(--font-mono, ui-monospace)", textTransform: "uppercase" as const, fontSize: 10, letterSpacing: ".14em", color: C.accentDeep }}>● Выбор даты</span>
-              <h3 style={{ margin: "4px 0 0", fontFamily: "var(--font-display, Georgia), serif", fontSize: 24, letterSpacing: "-.015em", fontWeight: 400 }}>
+              <h3 style={{ margin: "4px 0 0", fontFamily: "var(--font-sans)", fontSize: 24, letterSpacing: "-.015em", fontWeight: 600 }}>
                 {dateOptions.length} <span style={{ fontStyle: "italic", color: C.accentDeep }}>сеансов</span>
               </h3>
             </div>
@@ -1015,7 +1015,7 @@ function InIdeasView({ onRemoveIdea, onSchedule, dateOptions }: {
                       }}
                     >
                       <span style={{ fontFamily: "var(--font-mono, ui-monospace)", fontSize: 10, letterSpacing: ".12em", textTransform: "uppercase" as const, color: isSel ? "rgba(250,247,241,.55)" : C.ink3 }}>{chip.dow}</span>
-                      <span style={{ fontFamily: "var(--font-display, Georgia), serif", fontSize: 24, lineHeight: 1, letterSpacing: "-.02em" }}>{chip.day}</span>
+                      <span style={{ fontFamily: "var(--font-sans)", fontSize: 24, lineHeight: 1, letterSpacing: "-.02em" }}>{chip.day}</span>
                       <span style={{ fontSize: 11, color: isSel ? "rgba(250,247,241,.55)" : C.ink3 }}>{chip.month}</span>
                     </button>
                   );
@@ -1093,7 +1093,7 @@ function EditorialView({
         </div>
       )}
 
-      <h2 style={{ margin: "0 0 8px", fontFamily: "var(--font-display, Georgia), serif", fontSize: 38, lineHeight: 1, letterSpacing: "-.02em", fontWeight: 400 }}>
+      <h2 style={{ margin: "0 0 8px", fontFamily: "var(--font-sans)", fontSize: 38, lineHeight: 1, letterSpacing: "-.02em", fontWeight: 600 }}>
         Куда сохранить{" "}
         <span style={{ fontStyle: "italic", color: C.accentDeep }}>активность</span>?
       </h2>
@@ -1173,7 +1173,7 @@ function ConfirmView({ scenario, isIdea, inPlan, planDate, onCommit }: {
 
   return (
     <div style={{ padding: "24px 24px 20px" }}>
-      <h2 style={{ margin: "0 0 20px", fontFamily: "var(--font-display, Georgia), serif", fontSize: 34, lineHeight: 1, letterSpacing: "-.02em", fontWeight: 400 }}>
+      <h2 style={{ margin: "0 0 20px", fontFamily: "var(--font-sans)", fontSize: 34, lineHeight: 1, letterSpacing: "-.02em", fontWeight: 600 }}>
         {scenario.kind === "timeslots"
           ? <>Выберите <span style={{ fontStyle: "italic", color: C.accentDeep }}>время</span></>
           : <>Добавить в <span style={{ fontStyle: "italic", color: C.accentDeep }}>план</span>?</>}
@@ -1236,6 +1236,7 @@ export function SaveToPlanPickerBody({
   source, onClose,
 }: SaveToPlanPickerBodyProps) {
   const [view, setView] = React.useState<"main" | "calendar">("main");
+  const [replanMode, setReplanMode] = React.useState(false);
 
   const todayISO = getLocalDateKey();
   const isQuickdate = scenario.kind === "quickdate";
@@ -1273,14 +1274,14 @@ export function SaveToPlanPickerBody({
     );
   }
 
-  // Already in plan — manage state
-  if (inPlan && planDate) {
+  // Already in plan — manage state (unless user clicked "change date")
+  if (inPlan && planDate && !replanMode) {
     return (
       <InPlanView
         planDate={planDate}
         planStartsAt={planStartsAt}
         planItemId={planItemId}
-        onSwitchCalendar={() => setView("calendar")}
+        onSwitchCalendar={() => setReplanMode(true)}
         onIdea={() => onCommit({ action: "ideas" })}
         onRemovePlan={(id) => onCommit({ action: "remove-plan", planItemId: id })}
         onClose={() => { onClose?.(); }}
@@ -1307,6 +1308,13 @@ export function SaveToPlanPickerBody({
 
   return (
     <div style={{ position: "relative" }}>
+      {replanMode && (
+        <button onClick={() => setReplanMode(false)} style={{
+          display: "inline-flex", alignItems: "center", gap: 6, margin: "24px 24px 0",
+          fontFamily: "var(--font-mono, ui-monospace)", fontSize: 11, letterSpacing: ".12em",
+          textTransform: "uppercase" as const, color: C.ink3, background: "none", border: 0, cursor: "pointer", padding: 0,
+        }}>‹ Назад</button>
+      )}
       <DateSliderView
         options={sliderOptions}
         title={scenario.title}

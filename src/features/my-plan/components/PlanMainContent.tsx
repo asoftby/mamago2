@@ -869,7 +869,7 @@ export function PlanMainContent({
           aria-label="Подходит вашим детям"
         >
           <div>
-            <h3 style={{ fontFamily: "Georgia, serif", fontSize: compact ? 18 : 22, fontWeight: 400, lineHeight: 1.1, color: "#141210" }}>
+            <h3 style={{ fontFamily: "var(--font-sans)", fontSize: compact ? 18 : 22, fontWeight: 600, lineHeight: 1.1, color: "#141210" }}>
               Подходит вашим детям
             </h3>
             <p className="mt-1 text-sm text-neutral-500">Подобрано по возрасту и интересам</p>

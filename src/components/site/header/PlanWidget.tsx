@@ -43,7 +43,7 @@ export function PlanWidget() {
     >
       <CalendarDays className="h-4 w-4 text-white/60 shrink-0" />
       <div className="flex flex-col min-w-0">
-        <span style={{ fontFamily: "Georgia, serif", fontSize: 14, fontWeight: 400, lineHeight: "1.2" }}>Мой план</span>
+        <span style={{ fontFamily: "var(--font-sans)", fontSize: 14, fontWeight: 400, lineHeight: "1.2" }}>Мой план</span>
         <span className="text-[11px] text-white/50 leading-tight truncate max-w-[140px]">
           {subtitle}
         </span>

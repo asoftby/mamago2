@@ -89,7 +89,7 @@ export function PlanPillNavButton({
                 ? isActive ? "text-neutral-900" : "text-neutral-800"
                 : isActive ? "text-gray-900" : "text-gray-800",
             )}
-            style={{ fontFamily: "Georgia, serif", fontWeight: 400, fontSize: guestPlanPromo ? 13 : 15 }}
+            style={{ fontFamily: "var(--font-sans)", fontWeight: 400, fontSize: guestPlanPromo ? 13 : 15 }}
           >
             {guestPlanPromo ? (
               <>Мой план <em style={{ fontStyle: "italic", color: "#C24E22" }}>за 10 секунд</em></>
