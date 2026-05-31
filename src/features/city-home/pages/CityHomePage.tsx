@@ -104,7 +104,7 @@ export default async function CityHomePage({ citySlug }: CityHomePageProps) {
   const routesMode = localRouteItems.length > 0 ? "local" : nearbyRouteItems.length > 0 ? "nearby" : "empty";
 
   return (
-    <div className="min-h-screen bg-white pb-20">
+    <div className="min-h-screen pb-20">
       <Container className="space-y-10 pt-10">
         <HeroGreetingShell initialModel={heroModel} />
 

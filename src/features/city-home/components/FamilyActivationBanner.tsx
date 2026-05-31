@@ -95,7 +95,7 @@ export function FamilyActivationBanner() {
         </button>
 
         <div className="space-y-3 pr-1">
-          <h2 className="text-base leading-snug text-neutral-900 sm:text-lg" style={{ fontFamily: "Georgia, serif", fontWeight: 400 }}>
+          <h2 className="text-base leading-snug text-neutral-900 sm:text-lg" style={{ fontFamily: "var(--font-sans)", fontWeight: 600 }}>
             Подберём идеи для вашей семьи
           </h2>
           <p className="text-sm leading-relaxed text-neutral-600">
