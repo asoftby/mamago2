@@ -36,6 +36,7 @@ export type EventPageFactChip = {
 
 export type EventPageVenue = {
   name: string;
+  logoUrl?: string;
   address?: string;
   district?: string;
   metro?: string;

@@ -58,6 +58,8 @@ function buildMapHtml(lat: number, lng: number): string {
 export interface LocationBlockProps {
   /** Название места — крупный заголовок */
   name: string;
+  /** URL логотипа места */
+  logoUrl?: string;
   /** Курсивная подпись оранжевым цветом (landmark / tagline) */
   tagline?: string;
   /** Адрес строкой */
@@ -86,6 +88,7 @@ export interface LocationBlockProps {
 
 export function LocationBlock({
   name,
+  logoUrl,
   tagline,
   address,
   district,
@@ -138,16 +141,51 @@ export function LocationBlock({
               <span className="h-px flex-1 bg-[rgba(20,18,16,0.10)]" />
             </div>
 
-            {/* Headline */}
-            <div className="mb-5 leading-[1.1]">
-              <h2 style={{ fontFamily: "Georgia, serif", fontSize: 32, fontWeight: 400, letterSpacing: "-0.02em", color: "#141210" }}>
+            {/* Logo + Headline */}
+            <div className="mb-5 flex items-center gap-4 leading-[1.1]">
+              <div
+                style={{
+                  width: 52,
+                  height: 52,
+                  borderRadius: 99,
+                  overflow: "hidden",
+                  flexShrink: 0,
+                  background: "#E86A3A",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                {logoUrl ? (
+                  <img
+                    src={logoUrl}
+                    alt={name}
+                    style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                  />
+                ) : (
+                  <span
+                    style={{
+                      fontFamily: "var(--font-sans)",
+                      fontStyle: "italic",
+                      fontWeight: 400,
+                      fontSize: 20,
+                      color: "#fff",
+                    }}
+                  >
+                    {name.split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase() ?? "").join("")}
+                  </span>
+                )}
+              </div>
+              <div>
+              <h2 style={{ fontFamily: "var(--font-sans)", fontSize: 30, fontWeight: 400, letterSpacing: "-0.02em", color: "#141210" }}>
                 {name}
               </h2>
               {tagline && (
-                <p style={{ fontFamily: "Georgia, serif", fontSize: 32, fontWeight: 400, fontStyle: "italic", letterSpacing: "-0.02em", color: "#C24E22" }}>
+                <p style={{ fontFamily: "var(--font-sans)", fontSize: 32, fontWeight: 400, letterSpacing: "-0.02em", color: "#141210" }}>
                   {tagline}
                 </p>
               )}
+              </div>
             </div>
 
             {/* Address */}

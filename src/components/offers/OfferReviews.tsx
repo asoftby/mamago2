@@ -16,24 +16,33 @@ interface OfferReviewsProps {
  * Отзыв остаётся крупным и спокойным, но без отдельного display-serif слоя,
  * чтобы типографика страницы предложения держалась на основном интерфейсном шрифте.
  */
+function pluralReviews(n: number): string {
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  if (mod100 >= 11 && mod100 <= 14) return "отзывов";
+  if (mod10 === 1) return "отзыв";
+  if (mod10 >= 2 && mod10 <= 4) return "отзыва";
+  return "отзывов";
+}
+
 export function OfferReviews({ reviews, averageRating, totalCount }: OfferReviewsProps) {
   return (
     <section className="space-y-7">
       {/* Editorial header */}
-      <div className="flex flex-wrap items-end justify-between gap-4">
+      <div id="reviews" className="flex flex-wrap items-end justify-between gap-4" style={{ scrollMarginTop: 96 }}>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-3.5 mb-3">
             <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-gray-400">
-              05 — Отзывы
+              Отзывы
             </span>
             <span className="flex-1 h-px bg-gray-100 max-w-[180px]" />
           </div>
-          <h2 className="font-sans text-[36px] lg:text-[44px] font-semibold tracking-[-0.02em] leading-[0.95] text-gray-900 whitespace-nowrap">
+          <h2 className="tracking-[-0.02em] leading-[1] text-gray-900 whitespace-nowrap" style={{ fontFamily: "var(--font-sans)", fontWeight: 400, fontSize: 30 }}>
             {averageRating && reviews.length > 0 ? (
               <>
-                <span className="italic">{averageRating.toFixed(1)}</span>
+                <span style={{ fontFamily: "var(--font-display)", fontStyle: "italic", color: "var(--primary)" }}>{averageRating.toFixed(1)}</span>
                 <span className="text-gray-300"> · </span>
-                <span>{totalCount} отзывов</span>
+                <span><span style={{ fontFamily: "var(--font-sans)" }}>{totalCount}</span> {pluralReviews(totalCount)}</span>
               </>
             ) : (
               <span>Отзывы</span>
@@ -133,7 +142,7 @@ function ReviewCard({ review }: { review: OfferReview }) {
 
       {/* Quote */}
       {review.text && (
-        <blockquote className="font-sans text-[22px] font-medium leading-[1.3] tracking-[-0.005em] text-gray-900 line-clamp-5">
+        <blockquote className="font-sans text-[15px] font-medium leading-[1.5] tracking-[-0.005em] text-gray-900 line-clamp-5">
           «{review.text}»
         </blockquote>
       )}

@@ -136,7 +136,10 @@ export function MarketplacePlacePage({
   if (place.ageRange) metaItems.push(["Возраст", place.ageRange, String(metaItems.length + 1).padStart(2, "0")]);
   if (place.workingHoursSummary) {
     const hoursFirstLine = place.workingHoursSummary.split("\n")[0].trim();
-    if (hoursFirstLine) metaItems.push(["Часы", hoursFirstLine, String(metaItems.length + 1).padStart(2, "0")]);
+    // Extract only "Откроется в X" / "До X" part, not the open/closed status prefix
+    const afterBullet = hoursFirstLine.includes("•") ? hoursFirstLine.split("•").slice(1).join("•").trim() : hoursFirstLine;
+    const hoursDisplay = afterBullet || hoursFirstLine;
+    if (hoursDisplay) metaItems.push(["Часы", hoursDisplay, String(metaItems.length + 1).padStart(2, "0")]);
   }
   if (place.metro) metaItems.push(["Метро", place.metro, String(metaItems.length + 1).padStart(2, "0")]);
   if (place.district && metaItems.length < 5) metaItems.push(["Район", place.district, String(metaItems.length + 1).padStart(2, "0")]);
@@ -144,7 +147,7 @@ export function MarketplacePlacePage({
   const galleryImages = place.images ?? [];
 
   return (
-    <div style={{ background: "#F6F2EA", minHeight: "100vh" }}>
+    <div style={{ background: "#ffffff", minHeight: "100vh" }}>
       {/* Hero */}
       <PlaceHero
         title={place.title}
@@ -170,7 +173,7 @@ export function MarketplacePlacePage({
 
       {/* Meta strip */}
       {metaItems.length > 0 && (
-        <MetaStrip items={metaItems} />
+        <MetaStrip items={metaItems} isOpenNow={place.isOpenNow} />
       )}
 
       {/* About */}
@@ -206,10 +209,10 @@ export function MarketplacePlacePage({
           style={{
             padding: "56px 0",
             borderTop: "1px solid rgba(20,18,16,.10)",
-            background: "#F6F2EA",
+            background: "#ffffff",
           }}
         >
-          <div style={{ maxWidth: 1320, margin: "0 auto", padding: "0 28px" }}>
+          <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 28px" }}>
             <div className="kicker-row" style={{ marginBottom: 24 }}>
               <span className="text-kicker">Цены</span>
               <span className="kicker-line" />
@@ -257,29 +260,25 @@ export function MarketplacePlacePage({
       />
 
       {/* Final CTA */}
-      <FinalCTA place={place} />
-
-      {/* Mobile sticky bar */}
-      <MobileStickyCTA place={place} />
     </div>
   );
 }
 
 /* ─── Meta strip ────────────────────────────────────────────────────────── */
 
-function MetaStrip({ items }: { items: Array<[string, string, string]> }) {
+function MetaStrip({ items, isOpenNow }: { items: Array<[string, string, string]>; isOpenNow?: boolean }) {
   return (
     <section
       style={{
         borderTop: "1px solid rgba(20,18,16,.10)",
         borderBottom: "1px solid rgba(20,18,16,.10)",
-        background: "#F6F2EA",
+        background: "#ffffff",
       }}
     >
       <div
         className="meta-grid"
         style={{
-          maxWidth: 1320,
+          maxWidth: 1200,
           margin: "0 auto",
           padding: "0 28px",
           display: "grid",
@@ -321,7 +320,10 @@ function MetaStrip({ items }: { items: Array<[string, string, string]> }) {
                 {n}
               </span>
             </div>
-            <div style={{ fontSize: 17, fontWeight: 500, letterSpacing: "-.01em", color: "#141210" }}>
+            <div style={{ fontSize: 17, fontWeight: 500, letterSpacing: "-.01em", color: "#141210", display: "flex", alignItems: "center", gap: 6 }}>
+              {label === "Часы" && isOpenNow != null && (
+                <span style={{ fontSize: 14, color: isOpenNow ? "#1F8A5B" : "#C24E22", flexShrink: 0, lineHeight: 1 }}>●</span>
+              )}
               {value}
             </div>
           </div>
@@ -375,13 +377,13 @@ function WorkingHoursSection({ summary }: { summary: string }) {
       style={{
         padding: "56px 0",
         borderTop: "1px solid rgba(20,18,16,.10)",
-        background: "#F6F2EA",
+        background: "#ffffff",
       }}
     >
       <div
         className="hours-grid"
         style={{
-          maxWidth: 1320,
+          maxWidth: 1200,
           margin: "0 auto",
           padding: "0 28px",
           display: "grid",
@@ -392,21 +394,25 @@ function WorkingHoursSection({ summary }: { summary: string }) {
         {/* Left */}
         <div>
           <div className="kicker-row" style={{ marginBottom: 18 }}>
-            <span className="text-kicker">02 — Часы работы</span>
+            <span className="text-kicker">Часы работы</span>
             <span className="kicker-line" />
           </div>
           <h2
-            className="font-display"
-            style={{ fontSize: 40, lineHeight: 1, margin: "0", letterSpacing: "-.02em", color: "#141210" }}
+            style={{ fontSize: 30, lineHeight: 1, margin: "0", letterSpacing: "-.02em", color: "#141210", fontFamily: "var(--font-sans)", fontWeight: 400 }}
           >
             {isOpen ? (
-              <>Открыто <span className="font-display-italic" style={{ color: "#1F8A5B" }}>сейчас</span>.</>
+              <>Открыто <em style={{ fontFamily: "Georgia, serif", fontStyle: "italic", fontWeight: 400, color: "#1F8A5B" }}>сейчас</em></>
             ) : (
-              <>Режим <span className="font-display-italic" style={{ color: "#C24E22" }}>работы</span>.</>
+              <>Режим <em style={{ fontFamily: "Georgia, serif", fontStyle: "italic", fontWeight: 400, color: "#C24E22" }}>работы</em></>
             )}
           </h2>
-          <p style={{ fontSize: 15, color: "rgba(20,18,16,.55)", marginTop: 14, maxWidth: 260, lineHeight: 1.5 }}>
-            {statusLine}
+          <p style={{ fontSize: 15, marginTop: 14, maxWidth: 260, lineHeight: 1.5, color: "rgba(20,18,16,.55)" }}>
+            {!isOpen && statusLine ? (
+              <>
+                <span style={{ color: "#C24E22", display: "block" }}>{statusLine.split("•")[0]?.trim()}</span>
+                {statusLine.includes("•") && <span style={{ display: "block" }}>{statusLine.split("•").slice(1).join("•").trim()}</span>}
+              </>
+            ) : statusLine}
           </p>
         </div>
 
@@ -510,10 +516,10 @@ function GallerySection({
       style={{
         padding: "56px 0",
         borderTop: "1px solid rgba(20,18,16,.10)",
-        background: "#F6F2EA",
+        background: "#ffffff",
       }}
     >
-      <div style={{ maxWidth: 1320, margin: "0 auto", padding: "0 28px" }} className="gallery-wrap">
+      <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 28px" }} className="gallery-wrap">
         {/* Header */}
         <div
           style={{
@@ -524,7 +530,7 @@ function GallerySection({
           }}
         >
           <div className="kicker-row" style={{ flex: 1 }}>
-            <span className="text-kicker">03 — Фотогалерея</span>
+            <span className="text-kicker">Фотогалерея</span>
             <span className="kicker-line" />
           </div>
           {images.length > 7 && (
@@ -603,25 +609,12 @@ function FinalCTA({ place }: { place: MarketplacePlacePageProps["place"] }) {
   if (!hasPhone && !hasWebsite) return null;
 
   return (
-    <section style={{ padding: "96px 0 120px", background: "#F6F2EA" }}>
-      <div style={{ maxWidth: 1320, margin: "0 auto", padding: "0 28px" }}>
+    <section style={{ padding: "96px 0 120px", background: "#ffffff" }}>
+      <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 28px" }}>
         <div
           className="final-cta-inner"
           style={{ textAlign: "center", maxWidth: 900, margin: "0 auto" }}
         >
-          <span
-            style={{
-              display: "block",
-              marginBottom: 18,
-              fontFamily: "var(--font-mono, monospace)",
-              textTransform: "uppercase",
-              fontSize: 11,
-              letterSpacing: ".14em",
-              color: "rgba(20,18,16,.55)",
-            }}
-          >
-            ● {place.workingHoursSummary ?? place.title}
-          </span>
           <h2
             className="font-display final-cta-h2"
             style={{
@@ -713,77 +706,3 @@ function FinalCTA({ place }: { place: MarketplacePlacePageProps["place"] }) {
 }
 
 /* ─── Mobile sticky CTA ─────────────────────────────────────────────────── */
-
-function MobileStickyCTA({ place }: { place: MarketplacePlacePageProps["place"] }) {
-  if (!place.phone && !place.website) return null;
-
-  return (
-    <div
-      style={{
-        position: "fixed",
-        bottom: 0,
-        left: 0,
-        right: 0,
-        zIndex: 60,
-        padding: "10px 14px",
-        display: "flex",
-        alignItems: "center",
-        gap: 12,
-        background: "rgba(250,247,241,.92)",
-        backdropFilter: "blur(14px)",
-        WebkitBackdropFilter: "blur(14px)",
-        borderTop: "1px solid rgba(20,18,16,.10)",
-        boxShadow: "0 -10px 30px -10px rgba(20,18,16,.18)",
-      }}
-      className="mobile-sticky-cta"
-    >
-      <div style={{ flex: 1, minWidth: 0 }}>
-        {place.rating != null && (
-          <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
-            <span
-              className="font-display"
-              style={{ fontSize: 20, lineHeight: 1, color: "#141210" }}
-            >
-              ★ {place.rating.toFixed(1)}
-            </span>
-            {place.reviewCount != null && (
-              <span
-                style={{
-                  fontFamily: "var(--font-mono, monospace)",
-                  fontSize: 11,
-                  color: "rgba(20,18,16,.55)",
-                }}
-              >
-                · {place.reviewCount} отзывов
-              </span>
-            )}
-          </div>
-        )}
-        <div style={{ fontSize: 12, color: "rgba(20,18,16,.55)", marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-          {place.title}
-        </div>
-      </div>
-      {place.phone && (
-        <a
-          href={`tel:${place.phone}`}
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            justifyContent: "center",
-            height: 46,
-            padding: "0 18px",
-            borderRadius: 999,
-            background: "#E86A3A",
-            color: "#fff",
-            fontWeight: 600,
-            fontSize: 14,
-            textDecoration: "none",
-            flexShrink: 0,
-          }}
-        >
-          Позвонить →
-        </a>
-      )}
-    </div>
-  );
-}

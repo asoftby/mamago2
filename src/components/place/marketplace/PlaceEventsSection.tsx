@@ -29,11 +29,11 @@ export function PlaceEventsSection({ events, placeId }: PlaceEventsSectionProps)
       style={{
         padding: "56px 0",
         borderTop: "1px solid rgba(20,18,16,.10)",
-        background: "#F6F2EA",
+        background: "#ffffff",
       }}
     >
       <div
-        style={{ maxWidth: 1320, margin: "0 auto", padding: "0 28px" }}
+        style={{ maxWidth: 1200, margin: "0 auto", padding: "0 28px" }}
         className="events-wrap"
       >
         {/* Header */}
@@ -49,23 +49,23 @@ export function PlaceEventsSection({ events, placeId }: PlaceEventsSectionProps)
         >
           <div>
             <div className="kicker-row" style={{ marginBottom: 14 }}>
-              <span className="text-kicker">05 — Афиша</span>
+              <span className="text-kicker">Афиша</span>
               <span className="kicker-line" style={{ width: 120 }} />
             </div>
             <h2
-              className="font-display"
               style={{
-                fontSize: 48,
+                fontSize: 30,
                 margin: 0,
                 letterSpacing: "-.02em",
                 color: "#141210",
+                fontFamily: "var(--font-sans)",
+                fontWeight: 400,
               }}
             >
               Что{" "}
-              <span className="font-display-italic" style={{ color: "#C24E22" }}>
+              <em style={{ fontFamily: "Georgia, serif", fontStyle: "italic", fontWeight: 400, color: "#C24E22" }}>
                 происходит
-              </span>
-              .
+              </em>
             </h2>
           </div>
           <Link

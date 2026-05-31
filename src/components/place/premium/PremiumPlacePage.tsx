@@ -128,7 +128,7 @@ export function PremiumPlacePage({
         className="pointer-events-none absolute inset-0 opacity-[0.18] [background-image:linear-gradient(rgba(108,99,255,0.14)_1px,transparent_1px),linear-gradient(90deg,rgba(239,135,89,0.11)_1px,transparent_1px)] [background-size:64px_64px]"
       />
 
-      <div className="relative mx-auto max-w-[1440px] px-4 pb-28 pt-4 sm:px-6 lg:pb-32">
+      <div className="relative mx-auto max-w-[1200px] px-4 pb-28 pt-4 sm:px-6 lg:pb-32">
         <PlaceHero
           title={place.title}
           shortDesc={place.shortDesc}

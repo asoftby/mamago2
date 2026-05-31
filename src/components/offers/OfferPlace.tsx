@@ -20,6 +20,7 @@ export function OfferPlace({ place }: OfferPlaceProps) {
   return (
     <LocationBlock
       name={place.name}
+      logoUrl={place.logoUrl ?? undefined}
       tagline={place.tagline ?? undefined}
       address={place.address ?? undefined}
       district={place.district ?? undefined}

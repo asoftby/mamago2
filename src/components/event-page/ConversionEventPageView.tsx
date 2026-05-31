@@ -64,11 +64,13 @@ export function ConversionEventPageView({ data }: { data: EventPageData }) {
     inPlan: boolean;
     planDate: string | null;
     planStartsAt: string | null;
+    planItemId: string | null;
   }>({
     isIdea: false,
     inPlan: false,
     planDate: null,
     planStartsAt: null,
+    planItemId: null,
   });
 
   const selectedSession = useMemo(
@@ -121,6 +123,7 @@ export function ConversionEventPageView({ data }: { data: EventPageData }) {
         inPlan: Boolean(json.inPlan),
         planDate: json.planDate ?? null,
         planStartsAt: json.planStartsAt ?? null,
+        planItemId: json.planItemId ?? null,
       });
     } catch {
       // ignore
@@ -186,6 +189,12 @@ export function ConversionEventPageView({ data }: { data: EventPageData }) {
           });
           if (!res.ok) throw new Error("idea_remove_failed");
           toast.success("Убрано из идей");
+        } else if (result.action === "remove-plan") {
+          const res = await fetch(`/api/save/plan?planItemId=${result.planItemId}`, {
+            method: "DELETE",
+          });
+          if (!res.ok) throw new Error("plan_remove_failed");
+          toast.success("Убрано из плана");
         }
         // loadSaveStatus вызывается через useEffect когда saveModalOpen=false.
       } catch (e) {
@@ -509,6 +518,7 @@ export function ConversionEventPageView({ data }: { data: EventPageData }) {
         inPlan={saveStatus.inPlan}
         planDate={saveStatus.planDate}
         planStartsAt={saveStatus.planStartsAt}
+        planItemId={saveStatus.planItemId}
       />
       <Dialog open={planDateChooserOpen} onOpenChange={setPlanDateChooserOpen}>
         <DialogContent className="sm:max-w-md">

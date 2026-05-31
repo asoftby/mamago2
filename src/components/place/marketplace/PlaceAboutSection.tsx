@@ -61,12 +61,12 @@ export function PlaceAboutSection({
       style={{
         padding: "80px 0 56px",
         borderTop: "1px solid rgba(20,18,16,.10)",
-        background: "#F6F2EA",
+        background: "#ffffff",
       }}
     >
       <div
         style={{
-          maxWidth: 1320,
+          maxWidth: 1200,
           margin: "0 auto",
           padding: "0 28px",
           display: "grid",
@@ -78,24 +78,24 @@ export function PlaceAboutSection({
         {/* Left: heading */}
         <div>
           <div className="kicker-row" style={{ marginBottom: 18 }}>
-            <span className="text-kicker">01 — О месте</span>
+            <span className="text-kicker">О месте</span>
             <span className="kicker-line" />
           </div>
           <h2
-            className="font-display"
             style={{
-              fontSize: 48,
+              fontSize: 30,
               lineHeight: 1,
               margin: "0",
               letterSpacing: "-.02em",
               color: "#141210",
+              fontFamily: "var(--font-sans)",
+              fontWeight: 400,
             }}
           >
-            Всё о{" "}
-            <span className="font-display-italic" style={{ color: "#C24E22" }}>
-              месте
-            </span>
-            .
+            Всё{" "}
+            <em style={{ fontFamily: "Georgia, serif", fontStyle: "italic", fontWeight: 400, color: "#E86A3A" }}>
+              о месте
+            </em>
           </h2>
 
           {/* Social links */}
@@ -133,16 +133,18 @@ export function PlaceAboutSection({
         {/* Right: description + chips */}
         <div>
           {description.trim().length > 0 && (
-            <RichContentRenderer
-              html={description}
-              className={cn(
-                "prose-gray max-w-none mb-0",
-                "text-[19px] leading-[1.5] tracking-[-0.005em]",
-                "prose-p:text-[19px] prose-p:leading-[1.5] prose-p:text-[#141210] prose-p:my-5 [&>p:last-child]:mb-0 [&>p:first-child]:mt-0",
-                "prose-headings:text-[#141210] prose-strong:text-[#141210]",
-                "[&>p:first-child]:mt-0",
-              )}
-            />
+            <div className="place-about-desc">
+              <RichContentRenderer
+                html={description}
+                className={cn(
+                  "prose-gray max-w-none mb-0",
+                  "text-[19px] leading-[1.5] tracking-[-0.005em]",
+                  "prose-p:text-[19px] prose-p:leading-[1.5] prose-p:text-[#141210]",
+                  "prose-headings:text-[#141210] prose-strong:text-[#141210]",
+                )}
+              />
+              <style>{`.place-about-desc p { margin-top: 1.8rem !important; margin-bottom: 1.8rem !important; } .place-about-desc p:first-child { margin-top: 0 !important; } .place-about-desc p:last-child { margin-bottom: 0 !important; }`}</style>
+            </div>
           )}
 
           {/* Key info rows */}
@@ -192,62 +194,6 @@ export function PlaceAboutSection({
             </div>
           )}
 
-          {/* Website + phone */}
-          {(website || phone) && (
-            <div
-              style={{
-                marginTop: 28,
-                display: "flex",
-                gap: 12,
-                flexWrap: "wrap",
-              }}
-            >
-              {phone && (
-                <Link
-                  href={`tel:${phone}`}
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 8,
-                    height: 46,
-                    padding: "0 20px",
-                    borderRadius: 999,
-                    border: "1px solid rgba(20,18,16,.18)",
-                    background: "#FAF7F1",
-                    fontSize: 14,
-                    fontWeight: 600,
-                    color: "#141210",
-                    textDecoration: "none",
-                  }}
-                >
-                  📞 {phone}
-                </Link>
-              )}
-              {website && (
-                <Link
-                  href={website.startsWith("http") ? website : `https://${website}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 8,
-                    height: 46,
-                    padding: "0 20px",
-                    borderRadius: 999,
-                    border: "1px solid rgba(20,18,16,.18)",
-                    background: "transparent",
-                    fontSize: 14,
-                    fontWeight: 600,
-                    color: "#141210",
-                    textDecoration: "none",
-                  }}
-                >
-                  ↗ {website.replace(/^https?:\/\//, "").replace(/\/$/, "")}
-                </Link>
-              )}
-            </div>
-          )}
         </div>
       </div>
 

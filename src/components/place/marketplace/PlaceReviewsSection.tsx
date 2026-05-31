@@ -52,11 +52,11 @@ export function PlaceReviewsSection({
       style={{
         padding: "72px 0 56px",
         borderTop: "1px solid rgba(20,18,16,.10)",
-        background: "#F6F2EA",
+        background: "#ffffff",
       }}
     >
       <div
-        style={{ maxWidth: 1320, margin: "0 auto", padding: "0 28px" }}
+        style={{ maxWidth: 1200, margin: "0 auto", padding: "0 28px" }}
         className="reviews-wrap"
       >
         {/* Header */}
@@ -72,20 +72,21 @@ export function PlaceReviewsSection({
         >
           <div>
             <div className="kicker-row" style={{ marginBottom: 14 }}>
-              <span className="text-kicker">06 — Отзывы</span>
+              <span className="text-kicker">Отзывы</span>
               <span className="kicker-line" style={{ width: 120 }} />
             </div>
             <h2
-              className="font-display"
               style={{
-                fontSize: 48,
+                fontSize: 30,
                 margin: 0,
                 letterSpacing: "-.02em",
                 color: "#141210",
+                fontFamily: "var(--font-sans)",
+                fontWeight: 400,
                 whiteSpace: "nowrap",
               }}
             >
-              <span className="font-display-italic">{displayRating.toFixed(1)}</span>
+              <em style={{ fontFamily: "var(--font-display)", fontStyle: "italic", fontWeight: 400, color: "var(--primary)" }}>{displayRating.toFixed(1)}</em>
               {" · "}{displayCount} отзывов
             </h2>
           </div>
@@ -256,14 +257,13 @@ function ReviewCard({
       {/* Quote text in serif */}
       {review.text && (
         <p
-          className="font-display"
           style={{
             margin: 0,
-            fontSize: isGrid ? 22 : 18,
+            fontFamily: "var(--font-serif)",
+            fontSize: 18,
             lineHeight: 1.3,
             letterSpacing: "-.01em",
             color: "#141210",
-            ...(isGrid ? {} : {}),
           }}
         >
           «{review.text}»

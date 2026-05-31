@@ -127,9 +127,9 @@ function EventAboutEditorial({
               <span className="h-px flex-1 bg-[rgba(20,18,16,0.10)]" />
             </div>
             <h2
-              style={{ fontFamily: "Georgia, serif", fontSize: 32, fontWeight: 400, lineHeight: 1.3, letterSpacing: "-0.02em", color: "#141210" }}
+              style={{ fontSize: 30, fontWeight: 400, lineHeight: 1.3, letterSpacing: "-0.02em", color: "#141210" }}
             >
-              Описание
+              <span style={{ fontFamily: "var(--font-sans)" }}>Описание </span><span style={{ fontFamily: "Georgia, serif", fontStyle: "italic", color: "var(--primary)" }}>события</span>
             </h2>
           </div>
 
@@ -294,11 +294,13 @@ export function EventPageView({ data }: { data: EventPageData }) {
     inPlan: boolean;
     planDate: string | null;
     planStartsAt: string | null;
+    planItemId: string | null;
   }>({
     isIdea: false,
     inPlan: false,
     planDate: null,
     planStartsAt: null,
+    planItemId: null,
   });
 
   const selectedSession = useMemo(
@@ -358,6 +360,7 @@ export function EventPageView({ data }: { data: EventPageData }) {
         inPlan: Boolean(json.inPlan),
         planDate: json.planDate ?? null,
         planStartsAt: json.planStartsAt ?? null,
+        planItemId: json.planItemId ?? null,
       });
     } catch {
       // ignore
@@ -416,6 +419,10 @@ export function EventPageView({ data }: { data: EventPageData }) {
           const res = await fetch(`/api/save/idea?activityId=${data.id}`, { method: "DELETE" });
           if (!res.ok) throw new Error("idea_remove_failed");
           toast.success("Убрано из идей");
+        } else if (result.action === "remove-plan") {
+          const res = await fetch(`/api/save/plan?planItemId=${result.planItemId}`, { method: "DELETE" });
+          if (!res.ok) throw new Error("plan_remove_failed");
+          toast.success("Убрано из плана");
         }
         // loadSaveStatus вызывается через useEffect когда saveModalOpen=false —
         // после закрытия модалки, без перерисовки пока она ещё открыта.
@@ -578,9 +585,9 @@ export function EventPageView({ data }: { data: EventPageData }) {
                   <span className="h-px w-[120px] bg-[rgba(20,18,16,0.10)]" />
                 </div>
                 <h2
-                  style={{ fontFamily: "Georgia, serif", fontSize: 32, fontWeight: 400, lineHeight: 1.3, letterSpacing: "-0.02em", color: "#141210" }}
+                  style={{ fontSize: 30, fontWeight: 400, lineHeight: 1.3, letterSpacing: "-0.02em", color: "#141210" }}
                 >
-                  Выбери удобное время.
+                  <span style={{ fontFamily: "var(--font-sans)" }}>Выбери </span><span style={{ fontFamily: "Georgia, serif", fontStyle: "italic", color: "var(--primary)" }}>удобное время.</span>
                 </h2>
               </div>
               <span className="inline-flex h-7 items-center rounded-full border border-[rgba(20,18,16,0.18)] px-3 text-[13px] text-[#141210]" style={{ fontFamily: "Menlo, monospace" }}>
@@ -645,6 +652,7 @@ export function EventPageView({ data }: { data: EventPageData }) {
         inPlan={saveStatus.inPlan}
         planDate={saveStatus.planDate}
         planStartsAt={saveStatus.planStartsAt}
+        planItemId={saveStatus.planItemId}
       />
 
       {/* Date chooser (multiple sessions) */}

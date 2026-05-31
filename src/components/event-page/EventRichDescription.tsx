@@ -107,7 +107,7 @@ export function EventRichDescription({
         {/* Fade gradient when collapsed */}
         {!isExpanded && shouldShowButton && (
           <div
-            className="pointer-events-none absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-[#F6F2EA] via-[#F6F2EA]/80 to-transparent"
+            className="pointer-events-none absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-white via-white/80 to-transparent"
             aria-hidden="true"
           />
         )}

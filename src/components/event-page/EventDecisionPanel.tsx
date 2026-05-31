@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Heart, Share2 } from "lucide-react";
+import { Heart } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { EventPageData } from "@/lib/event/eventPageTypes";
 import { EventBreadcrumbs } from "./EventBreadcrumbs";
 import { OwnerEditDropdown } from "./OwnerEditDropdown";
+import { PlaceInfoRow } from "@/components/shared/PlaceInfoRow";
+import { SidebarCard, SidebarCardTopSection, SidebarCardShare } from "@/components/shared/SidebarCard";
 
 /**
  * Переформатирует адрес из Google-формата «Улица Дом, Город, Область»
@@ -157,7 +159,7 @@ export function EventDecisionPanel({
         )}
       >
         {data.categoryLabel && (
-          <span className="inline-flex h-7 items-center rounded-full bg-[#FFE8DC] px-3 text-[12px] font-semibold text-[#C24E22]">
+          <span className="inline-flex h-7 items-center rounded-full bg-[#FFE8DC] px-3 text-[12px] font-semibold text-[#E86A3A]">
             ● {data.categoryLabel}
           </span>
         )}
@@ -176,19 +178,13 @@ export function EventDecisionPanel({
 
       {/* Editorial display title */}
       <h1
-        style={{ margin: 0, fontFamily: "Georgia, serif", fontSize: 40, fontWeight: 400, lineHeight: 1.1, letterSpacing: "-0.025em", color: "#141210" }}
+        style={{ margin: 0, fontFamily: "var(--font-sans)", fontSize: 40, fontWeight: 600, lineHeight: 1.1, letterSpacing: "-0.025em", color: "#141210" }}
       >
         {data.title}
       </h1>
 
       {/* Decision sticky card */}
-      <div
-        className={cn(
-          "rounded-[18px] border border-[rgba(20,18,16,0.10)] bg-[#FAF7F1] p-6",
-          "shadow-[0_1px_0_rgba(255,255,255,0.6)_inset,0_30px_60px_-30px_rgba(20,18,16,0.18)]",
-          "lg:sticky lg:top-6",
-        )}
-      >
+      <SidebarCard sticky className="lg:sticky lg:top-6">
         {/* Session + Price row */}
         <div
           className={cn(
@@ -234,7 +230,7 @@ export function EventDecisionPanel({
               const currencyPart = spaceIdx !== -1 ? priceStr.slice(spaceIdx + 1) : "";
               return (
                 <div className="flex items-baseline justify-end gap-1">
-                  <span style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 52, fontWeight: 400, lineHeight: 1, letterSpacing: "-0.03em", color: "#141210" }}>
+                  <span style={{ fontFamily: "var(--font-display)", fontSize: 52, fontWeight: 400, lineHeight: 1, letterSpacing: "-0.03em", color: "#141210" }}>
                     {numPart}
                   </span>
                   {currencyPart && (
@@ -249,26 +245,16 @@ export function EventDecisionPanel({
         </div>
 
         {/* Venue row */}
-        {(venueName || venueAddress) && (
-          <div className={cn("mb-5 flex items-start gap-3 text-[14px]", pr?.venue)}>
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#FFE8DC] text-[15px]">
-              📍
-            </span>
-            <div className="min-w-0">
-              {venueName && (
-                <div className="font-semibold leading-snug text-[#141210]">{venueName}</div>
-              )}
-              {venueAddress && (
-                <div className="mt-0.5 text-[13px] text-[rgba(20,18,16,0.55)]">
-                  {formatAddress(venueAddress)}
-                </div>
-              )}
-              {venueMetro && (
-                <div className="mt-1.5 font-mono text-[11px] uppercase tracking-[0.06em] text-[#C24E22]">
-                  ● {venueMetro}
-                </div>
-              )}
-            </div>
+        {venueName && (
+          <div className={cn("mb-5", pr?.venue)}>
+            <PlaceInfoRow
+              name={venueName}
+              logoUrl={data.venue?.logoUrl}
+              address={venueAddress ? formatAddress(venueAddress) : undefined}
+              district={data.venue?.district}
+              metro={venueMetro}
+              href={data.venue?.placeHref}
+            />
           </div>
         )}
 
@@ -318,14 +304,14 @@ export function EventDecisionPanel({
               "flex h-14 shrink-0 items-center justify-center rounded-full border transition-colors",
               data.cta.purchaseUrl ? "w-14" : "flex-1 gap-2 px-4 text-[16px] font-semibold",
               isPlanned
-                ? "border-[#E86A3A] bg-[#FFE8DC] text-[#C24E22]"
+                ? "border-[#E86A3A] bg-[#FFE8DC] text-[#E86A3A]"
                 : "border-[rgba(20,18,16,0.18)] bg-transparent text-[rgba(20,18,16,0.45)] hover:border-[#141210] hover:text-[#141210]",
             )}
           >
             <Heart
               size={20}
               strokeWidth={1.75}
-              className={isPlanned ? "fill-[#C24E22]" : ""}
+              className={isPlanned ? "fill-[#E86A3A]" : ""}
             />
             {!data.cta.purchaseUrl && (
               <span>{isPlanned ? planLabel : "Сохранить"}</span>
@@ -335,29 +321,21 @@ export function EventDecisionPanel({
 
         {/* Owner edit */}
         {data.ownerEditHref && (
-          <div className="mt-5 border-t border-[rgba(20,18,16,0.10)] pt-5">
+          <SidebarCardTopSection mt={20} pt={20}>
             <OwnerEditDropdown
               eventId={data.id}
               className="h-14 w-full rounded-full border border-[rgba(20,18,16,0.18)] text-[16px] font-semibold text-[rgba(20,18,16,0.55)]"
             />
-          </div>
+          </SidebarCardTopSection>
         )}
 
         {/* Share */}
-        <div className="mt-5 flex items-center justify-end border-t border-[rgba(20,18,16,0.10)] pt-5 text-[13px] text-[rgba(20,18,16,0.55)]">
-          <button
-            type="button"
-            onClick={() => {
-              if (typeof navigator !== "undefined" && navigator.share) {
-                void navigator.share({ title: data.title, url: window.location.href });
-              }
-            }}
-            className="inline-flex items-center gap-1.5 transition-colors hover:text-[#141210]"
-          >
-            <Share2 size={14} strokeWidth={1.75} /> Поделиться
-          </button>
-        </div>
-      </div>
+        <SidebarCardTopSection mt={20} pt={20}>
+          <div className="flex justify-end">
+            <SidebarCardShare title={data.title} />
+          </div>
+        </SidebarCardTopSection>
+      </SidebarCard>
 
 
     </div>

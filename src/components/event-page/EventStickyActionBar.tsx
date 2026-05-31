@@ -83,7 +83,7 @@ export function EventStickyActionBar({
       <div className="mx-auto flex w-full max-w-[1200px] items-center gap-4 px-4 sm:px-6 lg:px-8">
         <div className="min-w-0 flex-1">
           {sessionLine && (
-            <p className="truncate font-mono text-[11px] uppercase tracking-[0.06em] text-[#C24E22]">
+            <p className="truncate font-mono text-[11px] uppercase tracking-[0.06em] text-[#E86A3A]">
               {sessionLine}
             </p>
           )}
@@ -131,14 +131,14 @@ export function EventStickyActionBar({
               className={cn(
                 "flex h-10 w-10 shrink-0 items-center justify-center rounded-full border transition-colors",
                 isPlanned
-                  ? "border-[#E86A3A] bg-[#FFE8DC] text-[#C24E22]"
+                  ? "border-[#E86A3A] bg-[#FFE8DC] text-[#E86A3A]"
                   : "border-[rgba(20,18,16,0.18)] text-[rgba(20,18,16,0.45)] hover:border-[#141210] hover:text-[#141210]",
               )}
             >
               {isPlanLoading ? (
                 <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
               ) : (
-                <Heart size={16} strokeWidth={1.75} className={isPlanned ? "fill-[#C24E22]" : ""} />
+                <Heart size={16} strokeWidth={1.75} className={isPlanned ? "fill-[#E86A3A]" : ""} />
               )}
             </button>
           )}
@@ -162,7 +162,7 @@ export function EventStickyActionBar({
     >
       <div className="flex-1 min-w-0">
         {sessionLine && (
-          <div className="font-mono text-[10px] uppercase tracking-[0.1em] text-[#C24E22]">
+          <div className="font-mono text-[10px] uppercase tracking-[0.1em] text-[#E86A3A]">
             {sessionLine}
           </div>
         )}
@@ -197,7 +197,7 @@ export function EventStickyActionBar({
           {isPrimaryLoading ? (
             <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
           ) : (
-            <>Купить <span aria-hidden>→</span></>
+            <>{primaryLabel} <span aria-hidden>→</span></>
           )}
         </button>
       ) : onPlan ? (
@@ -209,7 +209,7 @@ export function EventStickyActionBar({
           className={cn(
             "flex h-[46px] shrink-0 items-center gap-2 rounded-full border px-5 text-[14px] font-semibold transition-colors",
             isPlanned
-              ? "border-[#E86A3A] bg-[#FFE8DC] text-[#C24E22]"
+              ? "border-[#E86A3A] bg-[#FFE8DC] text-[#E86A3A]"
               : "border-[rgba(20,18,16,0.18)] bg-transparent text-[#141210] hover:border-[#141210]",
           )}
         >
@@ -217,7 +217,7 @@ export function EventStickyActionBar({
             <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
           ) : (
             <>
-              <Heart size={16} strokeWidth={1.75} className={isPlanned ? "fill-[#C24E22]" : ""} />
+              <Heart size={16} strokeWidth={1.75} className={isPlanned ? "fill-[#E86A3A]" : ""} />
               {isPlanned ? "В плане" : "Добавить в план"}
             </>
           )}

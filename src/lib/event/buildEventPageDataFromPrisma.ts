@@ -3,6 +3,7 @@ import type { Intent } from "@/lib/intent";
 import { DEFAULT_CITY_HUB_PATH } from "@/lib/intent";
 import { extractPlainTextFromHtml } from "@/lib/richtext/utils";
 import { sanitizeRichContent } from "@/components/content/RichContentRenderer";
+import { resolvePlaceLogoImage } from "@/lib/place/resolvePlaceLogoImage";
 import { resolveActivityCoverUrl } from "@/lib/event/resolveActivityCoverUrl";
 import { formatPriceFrom } from "@/lib/formatters/format-price";
 import type { EventPageData } from "./eventPageTypes";
@@ -45,6 +46,7 @@ export type ActivityForEventPageInput = {
     slug: string | null;
     title: string;
     formattedAddr: string | null;
+    customAddress: string | null;
     lat: number | null;
     lng: number | null;
     districtManual: { name: string } | null;
@@ -62,8 +64,11 @@ export type ActivityForEventPageInput = {
       slug: string | null;
       title: string;
       formattedAddr: string | null;
+      customAddress: string | null;
       lat: number | null;
       lng: number | null;
+      logoImageId: string | null;
+      images: Array<{ id: string; url: string; kind: string }>;
       districtManual: { name: string } | null;
       districtAuto: { name: string } | null;
       metroManual: { name: string } | null;
@@ -222,9 +227,11 @@ function venueFromActivity(
     const v = activity.venue;
     if (v.kind === "PLACE" && v.place) {
       const cityForPlace = v.place.city?.slug ?? listingCitySlug ?? fallbackCity;
+      const logoResolved = resolvePlaceLogoImage(v.place.images, v.place.logoImageId);
       return {
         name: v.place.title,
-        address: v.place.formattedAddr ?? undefined,
+        logoUrl: logoResolved?.url?.trim() || undefined,
+        address: v.place.customAddress ?? v.place.formattedAddr ?? undefined,
         lat: v.place.lat ?? undefined,
         lng: v.place.lng ?? undefined,
         district: (v.place.districtManual ?? v.place.districtAuto)?.name ?? undefined,
@@ -248,7 +255,7 @@ function venueFromActivity(
     const cityForPlace = activity.place.city?.slug ?? listingCitySlug ?? fallbackCity;
     return {
       name: activity.place.title,
-      address: activity.place.formattedAddr ?? undefined,
+      address: activity.place.customAddress ?? activity.place.formattedAddr ?? undefined,
       lat: activity.place.lat ?? undefined,
       lng: activity.place.lng ?? undefined,
       district: (activity.place.districtManual ?? activity.place.districtAuto)?.name ?? undefined,

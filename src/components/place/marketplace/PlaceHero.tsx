@@ -1,10 +1,20 @@
 "use client";
 
 import { useState } from "react";
+import { Heart, Phone } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { isAppMediaUrl } from "@/lib/media/isAppMediaUrl";
 import { OwnerPlaceEditDropdown } from "./OwnerPlaceEditDropdown";
+import {
+  SidebarCard,
+  SidebarCardSection,
+  SidebarCardTopSection,
+  SidebarCardAddressRow,
+  SidebarCardContactRow,
+  SidebarCardShare,
+  SidebarCardPrimaryLink,
+} from "@/components/shared/SidebarCard";
 
 interface PlaceHeroProps {
   title: string;
@@ -52,8 +62,8 @@ export function PlaceHero({
   const [saved, setSaved] = useState(false);
 
   const words = title.trim().split(/\s+/);
-  const titleHead = words.length > 1 ? words.slice(0, -1).join(" ") : "";
-  const titleTail = words[words.length - 1] + ".";
+  const titleHead = words[0] ?? "";
+  const titleTail = (words.length > 1 ? words.slice(1).join(" ") : "") + ".";
 
   const logoInitials = title
     .split(/\s+/)
@@ -71,13 +81,13 @@ export function PlaceHero({
 
   return (
     <section
-      style={{ paddingTop: 8, paddingBottom: 56, background: "#F6F2EA" }}
+      style={{ paddingTop: 8, paddingBottom: 56, background: "#ffffff" }}
     >
       {/* Breadcrumbs */}
       <div
         className="breadcrumbs"
         style={{
-          maxWidth: 1320,
+          maxWidth: 1200,
           margin: "0 auto",
           padding: "20px 28px 10px",
           display: "flex",
@@ -106,7 +116,7 @@ export function PlaceHero({
       <div
         className="hero-grid"
         style={{
-          maxWidth: 1320,
+          maxWidth: 1200,
           margin: "0 auto",
           padding: "0 28px",
           display: "grid",
@@ -137,7 +147,7 @@ export function PlaceHero({
                   padding: "0 12px",
                   borderRadius: 999,
                   background: "#FFE8DC",
-                  color: "#C24E22",
+                  color: "#E86A3A",
                   fontSize: 13,
                   fontWeight: 500,
                 }}
@@ -163,10 +173,10 @@ export function PlaceHero({
           {/* Title */}
           <h1
             style={{
-              fontFamily: "var(--font-display, Georgia, serif)",
-              fontWeight: 400,
-              fontSize: "clamp(56px, 9vw, 132px)",
-              lineHeight: 0.92,
+              fontFamily: "var(--font-sans)",
+              fontWeight: 600,
+              fontSize: 40,
+              lineHeight: 1.1,
               letterSpacing: "-.025em",
               margin: "0 0 8px",
               color: "#141210",
@@ -178,7 +188,7 @@ export function PlaceHero({
                 <br />
               </>
             )}
-            <span style={{ fontStyle: "italic", color: "#C24E22" }}>{titleTail}</span>
+            <span>{titleTail}</span>
           </h1>
 
           {/* Subtitle */}
@@ -194,338 +204,133 @@ export function PlaceHero({
             {shortDesc}
           </div>
 
-          {/* Rating pill */}
-          {rating != null && reviewCount != null && reviewCount > 0 && (
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 4 }}>
-              <span
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 6,
-                  height: 30,
-                  padding: "0 12px",
-                  borderRadius: 999,
-                  border: "1px solid rgba(20,18,16,.18)",
-                  fontSize: 13,
-                  color: "#3A332B",
-                }}
-              >
-                ★ {rating.toFixed(1)}
-              </span>
-              <span style={{ fontSize: 13, color: "rgba(20,18,16,.55)" }}>
-                {reviewCount} отзывов
-              </span>
-            </div>
-          )}
         </div>
 
         {/* Right: sticky decision card */}
-        <aside style={{ position: "sticky", top: 24 }}>
-          <div
-            style={{
-              background: "#FAF7F1",
-              border: "1px solid rgba(20,18,16,.10)",
-              borderRadius: 18,
-              padding: 24,
-              boxShadow:
-                "0 1px 0 rgba(255,255,255,.6) inset, 0 30px 60px -30px rgba(20,18,16,.18)",
-            }}
-          >
+        <aside>
+          <SidebarCard sticky>
             {/* Logo + status */}
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                marginBottom: 18,
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <div
-                  style={{
-                    width: 44,
-                    height: 44,
-                    borderRadius: 12,
-                    overflow: "hidden",
-                    flexShrink: 0,
-                    background: "#E86A3A",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  {logoUrl ? (
-                    isAppMediaUrl(logoUrl) ? (
-                      <img
-                        src={logoUrl}
-                        alt={title}
-                        style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                      />
+            <SidebarCardSection mb={18} pb={16}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  {/* Logo circle */}
+                  <div style={{ width: 44, height: 44, borderRadius: 99, overflow: "hidden", flexShrink: 0, background: "#E86A3A", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    {logoUrl ? (
+                      isAppMediaUrl(logoUrl) ? (
+                        <img src={logoUrl} alt={title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                      ) : (
+                        <Image src={logoUrl} alt={title} width={44} height={44} className="object-cover" />
+                      )
                     ) : (
-                      <Image
-                        src={logoUrl}
-                        alt={title}
-                        width={44}
-                        height={44}
-                        className="object-cover"
-                      />
-                    )
-                  ) : (
-                    <span
-                      style={{
-                        fontFamily: "var(--font-display, Georgia, serif)",
-                        fontStyle: "italic",
-                        fontWeight: 400,
-                        fontSize: 18,
-                        color: "#fff",
-                      }}
-                    >
-                      {logoInitials}
-                    </span>
-                  )}
-                </div>
-                <div style={{ minWidth: 0, flex: 1 }}>
-                  {/* Open/closed status — or place name fallback */}
-                  <div
-                    style={{
-                      fontFamily: "var(--font-mono, monospace)",
-                      textTransform: "uppercase",
-                      fontSize: 11,
-                      letterSpacing: ".14em",
-                      fontWeight: 500,
-                      color: isOpenNow == null
-                        ? "rgba(20,18,16,.45)"
-                        : isOpenNow
-                          ? "#1F8A5B"
-                          : "rgba(20,18,16,.55)",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {isOpenNow != null
-                      ? `● ${isOpenNow ? "Открыто" : "Закрыто"}`
-                      : workingHoursSummary
-                        ? `● ${workingHoursSummary.split("\n")[0].trim()}`
-                        : title}
+                      <span style={{ fontFamily: "var(--font-display, Georgia, serif)", fontStyle: "italic", fontWeight: 400, fontSize: 18, color: "#fff" }}>
+                        {logoInitials}
+                      </span>
+                    )}
                   </div>
-                  {/* Today's hours or summary first line */}
-                  {(todayHoursText || workingHoursSummary) && (
-                    <div
-                      style={{
-                        fontFamily: "var(--font-mono, monospace)",
-                        fontSize: 12,
-                        color: "rgba(20,18,16,.55)",
-                        marginTop: 2,
-                        letterSpacing: ".02em",
-                      }}
-                    >
-                      {todayHoursText
-                        ? `сегодня ${todayHoursText}`
-                        : workingHoursSummary!.split("\n")[0]}
+                  {/* Status + hours */}
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <div style={{ fontFamily: "var(--font-mono, monospace)", textTransform: "uppercase", fontSize: 11, letterSpacing: ".14em", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: isOpenNow == null ? "rgba(20,18,16,.45)" : isOpenNow ? "#1F8A5B" : "#C24E22" }}>
+                      {isOpenNow != null ? `● ${isOpenNow ? "Открыто" : "Закрыто"}` : workingHoursSummary ? `● ${workingHoursSummary.split("\n")[0].trim()}` : title}
                     </div>
-                  )}
+                    {(todayHoursText || workingHoursSummary) && (
+                      <div style={{ fontFamily: "var(--font-mono, monospace)", fontSize: 12, color: "rgba(20,18,16,.55)", marginTop: 2, letterSpacing: ".02em" }}>
+                        {todayHoursText ? `сегодня ${todayHoursText}` : workingHoursSummary!.split("\n")[0]}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
-              {rating != null ? (
-                <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2, flexShrink: 0 }}>
-                  <span
-                    style={{
-                      fontFamily: "var(--font-mono, monospace)",
-                      textTransform: "uppercase",
-                      fontSize: 13,
-                      letterSpacing: ".08em",
-                      color: "#C24E22",
-                      fontWeight: 600,
-                    }}
-                  >
-                    ★ {rating.toFixed(1)}
-                  </span>
-                  {reviewCount != null && reviewCount > 0 && (
-                    <span style={{ fontSize: 11, color: "rgba(20,18,16,.55)", fontFamily: "var(--font-mono, monospace)" }}>
-                      {reviewCount} отз.
-                    </span>
-                  )}
-                </div>
-              ) : null}
-            </div>
+            </SidebarCardSection>
 
             {/* Address */}
-            {(address || metro) && (
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "flex-start",
-                  gap: 10,
-                  marginBottom: 14,
-                  paddingBottom: 16,
-                  borderBottom: "1px solid rgba(20,18,16,.10)",
-                }}
-              >
-                <span
-                  style={{
-                    width: 32,
-                    height: 32,
-                    flexShrink: 0,
-                    borderRadius: 8,
-                    background: "#FFE8DC",
-                    color: "#C24E22",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontSize: 15,
-                  }}
-                >
-                  📍
-                </span>
-                <div style={{ minWidth: 0, fontSize: 14, color: "#3A332B" }}>
-                  {address && (
-                    <div style={{ fontWeight: 600, color: "#141210", lineHeight: 1.35 }}>
-                      {address}
-                    </div>
-                  )}
-                  {metro && (
-                    <div
-                      style={{
-                        fontFamily: "var(--font-mono, monospace)",
-                        color: "#C24E22",
-                        fontSize: 11,
-                        marginTop: 4,
-                        letterSpacing: ".06em",
-                        textTransform: "uppercase",
-                      }}
-                    >
-                      ● м. {metro}
-                    </div>
-                  )}
-                </div>
-              </div>
+            {(address || metro || district) && (
+              <SidebarCardSection mb={14} pb={16}>
+                <SidebarCardAddressRow address={address} metro={metro} district={district} />
+              </SidebarCardSection>
             )}
 
             {/* Contacts */}
-            {(phone || website || instagramUrl) && (
-              <div
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 10,
-                  marginBottom: 18,
-                  paddingBottom: 18,
-                  borderBottom: "1px solid rgba(20,18,16,.10)",
-                }}
-              >
+            {(website || instagramUrl) && (
+              <SidebarCardSection>
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  {website && websiteDisplay && (
+                    <SidebarCardContactRow
+                      label="Сайт"
+                      href={website.startsWith("http") ? website : `https://${website}`}
+                      value={websiteDisplay}
+                      external
+                    />
+                  )}
+                  {instagramUrl && instagramDisplay && (
+                    <SidebarCardContactRow
+                      label="Instagram"
+                      href={instagramUrl}
+                      value={instagramDisplay}
+                      external
+                    />
+                  )}
+                </div>
+              </SidebarCardSection>
+            )}
+
+            {/* Позвонить + Сохранить */}
+            <SidebarCardTopSection>
+              <div className="flex items-center gap-3">
                 {phone && (
-                  <ContactRow
-                    icon="📞"
-                    label="Телефон"
+                  <Link
                     href={`tel:${phone}`}
-                    value={phone}
-                  />
+                    className="flex h-14 flex-1 items-center justify-center gap-2 rounded-full bg-[#EF8759] text-[15px] font-semibold text-white transition-colors hover:bg-[#E86A3A]"
+                    style={{ textDecoration: "none" }}
+                  >
+                    <Phone className="h-4 w-4 shrink-0" />
+                    Позвонить
+                  </Link>
                 )}
-                {website && websiteDisplay && (
-                  <ContactRow
-                    icon="↗"
-                    label="Сайт"
-                    href={website.startsWith("http") ? website : `https://${website}`}
-                    value={websiteDisplay}
-                    external
-                  />
-                )}
-                {instagramUrl && instagramDisplay && (
-                  <ContactRow
-                    icon="◎"
-                    label="Instagram"
-                    href={instagramUrl}
-                    value={instagramDisplay}
-                    external
-                  />
-                )}
-              </div>
-            )}
-
-            {/* Save / Share */}
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                fontSize: 13,
-                color: "rgba(20,18,16,.55)",
-              }}
-            >
-              <button
-                onClick={() => setSaved((s) => !s)}
-                style={{
-                  background: "none",
-                  border: 0,
-                  padding: 0,
-                  color: "inherit",
-                  display: "inline-flex",
-                  gap: 6,
-                  alignItems: "center",
-                  cursor: "pointer",
-                  fontFamily: "inherit",
-                }}
-              >
-                <span
-                  style={{
-                    color: saved ? "#E86A3A" : "inherit",
-                    transform: saved ? "scale(1.15)" : "none",
-                    transition: "transform .25s",
-                    display: "inline-block",
-                  }}
+                <button
+                  type="button"
+                  aria-label={saved ? "Сохранено" : "Сохранить"}
+                  onClick={() => setSaved((s) => !s)}
+                  className={[
+                    "flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-full border transition-all",
+                    saved
+                      ? "border-[#E86A3A] bg-[#FFE8DC] text-[#C24E22]"
+                      : "border-[rgba(20,18,16,0.18)] bg-transparent text-[rgba(20,18,16,0.45)] hover:border-[#141210] hover:text-[#141210]",
+                  ].join(" ")}
                 >
-                  ♥
-                </span>{" "}
-                Сохранить
-              </button>
-              <button
-                onClick={onShareClick}
-                style={{
-                  background: "none",
-                  border: 0,
-                  padding: 0,
-                  color: "inherit",
-                  display: "inline-flex",
-                  gap: 6,
-                  alignItems: "center",
-                  cursor: "pointer",
-                  fontFamily: "inherit",
-                }}
-              >
-                <span>↗</span> Поделиться
-              </button>
-            </div>
-
-            {phone && (
-              <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid rgba(20,18,16,.10)" }}>
-                <Link
-                  href={`tel:${phone}`}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    width: "100%",
-                    height: 46,
-                    borderRadius: 10,
-                    border: "1px solid rgba(20,18,16,.18)",
-                    background: "transparent",
-                    color: "#141210",
-                    fontWeight: 600,
-                    fontSize: 15,
-                    textDecoration: "none",
-                  }}
-                >
-                  Позвонить
-                </Link>
+                  <Heart className={["h-5 w-5", saved ? "fill-current" : ""].join(" ")} />
+                </button>
               </div>
-            )}
+            </SidebarCardTopSection>
 
+            {/* Owner edit */}
             {ownerEditPlaceId && (
-              <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid rgba(20,18,16,.10)" }}>
-                <OwnerPlaceEditDropdown placeId={ownerEditPlaceId} className="w-full" />
-              </div>
+              <SidebarCardTopSection>
+                <OwnerPlaceEditDropdown placeId={ownerEditPlaceId} className="w-full h-[52px] rounded-full" />
+              </SidebarCardTopSection>
             )}
-          </div>
+
+            {/* Rating + Share */}
+            <SidebarCardTopSection mt={20} pt={20}>
+              <div className="flex items-center justify-between">
+                {rating != null && reviewCount != null && reviewCount > 0 ? (
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-[13px] text-[rgba(20,18,16,0.55)]">
+                      <span className="text-[16px] text-[#E86A3A]">★</span> {rating.toFixed(1)}
+                    </span>
+                    <span className="font-mono text-[13px] text-[rgba(20,18,16,0.55)]">· </span>
+                    <a
+                      href="#reviews"
+                      className="font-mono text-[13px] text-[rgba(20,18,16,0.55)] transition-colors hover:text-[#141210]"
+                      style={{ textDecoration: "underline", textDecorationStyle: "dashed", textDecorationColor: "#E86A3A", textUnderlineOffset: "3px" }}
+                    >
+                      {reviewCount} {reviewCount === 1 ? "отзыв" : reviewCount >= 2 && reviewCount <= 4 ? "отзыва" : "отзывов"}
+                    </a>
+                  </div>
+                ) : <span />}
+                <SidebarCardShare title={title} />
+              </div>
+            </SidebarCardTopSection>
+          </SidebarCard>
         </aside>
       </div>
 
@@ -546,48 +351,3 @@ export function PlaceHero({
   );
 }
 
-function ContactRow({
-  icon,
-  label,
-  href,
-  value,
-  external,
-}: {
-  icon: string;
-  label: string;
-  href: string;
-  value: string;
-  external?: boolean;
-}) {
-  return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        gap: 10,
-        fontSize: 13,
-      }}
-    >
-      <span
-        style={{
-          fontFamily: "var(--font-mono, monospace)",
-          textTransform: "uppercase",
-          fontSize: 11,
-          letterSpacing: ".14em",
-          color: "rgba(20,18,16,.55)",
-        }}
-      >
-        {icon} {label}
-      </span>
-      <Link
-        href={href}
-        target={external ? "_blank" : undefined}
-        rel={external ? "noopener noreferrer" : undefined}
-        style={{ fontWeight: 500, color: "#141210", textDecoration: "none", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
-      >
-        {value}
-      </Link>
-    </div>
-  );
-}

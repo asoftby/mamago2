@@ -1,16 +1,19 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { CalendarDays, Clock, Flame } from "lucide-react";
+import { CalendarDays, Clock } from "lucide-react";
 import { useMemo } from "react";
 import { cn } from "@/lib/utils";
 import type { OfferScheduleItem, ShiftCtaContext } from "@/lib/offer/offerPageTypes";
+import { SessionCard } from "@/components/shared/SessionCard";
 
 interface OfferScheduleProps {
   type: "classes" | "shifts";
   items: OfferScheduleItem[];
   /** Для shifts — передаёт полный контекст смены */
   onShiftCta?: (ctx: ShiftCtaContext) => void;
+  /** Для shifts — сохранить смену в план */
+  onSaveShift?: (ctx: ShiftCtaContext) => void;
   /** Для classes — передаёт id строки */
   onItemCta?: (itemId: string) => void;
 }
@@ -19,10 +22,10 @@ export function OfferSchedule({
   type,
   items,
   onShiftCta,
+  onSaveShift,
   onItemCta,
 }: OfferScheduleProps) {
-  /** Помечаем «hot»-смену — первую открытую с минимальным процентом заполнения
-   *  (от 1 до 70% — самые свежие, ещё есть места и есть скидка-стимул). */
+  /** Помечаем «hot»-смену — первую открытую с минимальным процентом заполнения */
   const hotShiftId = useMemo(() => {
     if (type !== "shifts") return null;
     const candidates = items.filter((s) => {
@@ -32,12 +35,29 @@ export function OfferSchedule({
       return filled > 0 && filled < 0.7;
     });
     if (candidates.length === 0) return null;
-    // выбираем с минимальной заполненностью
     return candidates.reduce((best, cur) => {
       const fb = 1 - (best.spotsLeft! / best.capacity!);
       const fc = 1 - (cur.spotsLeft! / cur.capacity!);
       return fc < fb ? cur : best;
     }).id;
+  }, [type, items]);
+
+  /** Ближайшая предстоящая смена — первая с датой не раньше сегодня */
+  const nearestShiftId = useMemo(() => {
+    if (type !== "shifts") return null;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const parseDate = (s?: string | null) => {
+      if (!s) return null;
+      const m = s.match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
+      if (!m) return null;
+      return new Date(`${m[3]}-${m[2]}-${m[1]}T00:00:00`);
+    };
+    const upcoming = items
+      .map((s) => ({ s, d: parseDate(s.dateFrom) }))
+      .filter(({ d }) => d && d >= today)
+      .sort((a, b) => a.d!.getTime() - b.d!.getTime());
+    return upcoming[0]?.s.id ?? null;
   }, [type, items]);
 
   return (
@@ -47,13 +67,13 @@ export function OfferSchedule({
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-3.5 mb-3">
             <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-gray-400">
-              {type === "shifts" ? "04 — Смены и стоимость" : "04 — Расписание и стоимость"}
+              {type === "shifts" ? "Смены и стоимость" : "Расписание и стоимость"}
             </span>
             <span className="flex-1 h-px bg-gray-100 max-w-[180px]" />
           </div>
-          <h2 className="font-sans text-[36px] lg:text-[44px] font-semibold tracking-[-0.02em] leading-[0.95] text-gray-900">
+          <h2 className="tracking-[-0.02em] leading-[1] text-gray-900" style={{ fontFamily: "var(--font-sans)", fontWeight: 400, fontSize: 30 }}>
             Выбери своё{" "}
-            <span className="italic text-[#C2522A]">лето</span>.
+            <span style={{ fontFamily: "Georgia, serif", fontStyle: "italic", color: "var(--primary)" }}>лето</span>.
           </h2>
         </div>
       </div>
@@ -64,7 +84,9 @@ export function OfferSchedule({
         <ShiftsList
           items={items}
           onShiftCta={onShiftCta}
+          onSaveShift={onSaveShift}
           hotShiftId={hotShiftId}
+          nearestShiftId={nearestShiftId}
         />
       ) : (
         <ClassesTable items={items} onItemCta={onItemCta} />
@@ -100,11 +122,15 @@ function EmptySchedule({ onCta }: { onCta?: () => void }) {
 function ShiftsList({
   items,
   onShiftCta,
+  onSaveShift,
   hotShiftId,
+  nearestShiftId,
 }: {
   items: OfferScheduleItem[];
   onShiftCta?: (ctx: ShiftCtaContext) => void;
+  onSaveShift?: (ctx: ShiftCtaContext) => void;
   hotShiftId: string | null;
+  nearestShiftId: string | null;
 }) {
   return (
     <div className="space-y-3.5">
@@ -113,7 +139,8 @@ function ShiftsList({
           key={item.id}
           item={item}
           onShiftCta={onShiftCta}
-          isHot={item.id === hotShiftId}
+          onSaveShift={onSaveShift}
+          isNearest={item.id === nearestShiftId}
         />
       ))}
     </div>
@@ -123,11 +150,13 @@ function ShiftsList({
 function ShiftCard({
   item,
   onShiftCta,
-  isHot,
+  onSaveShift,
+  isNearest,
 }: {
   item: OfferScheduleItem;
   onShiftCta?: (ctx: ShiftCtaContext) => void;
-  isHot?: boolean;
+  onSaveShift?: (ctx: ShiftCtaContext) => void;
+  isNearest?: boolean;
 }) {
   const ctx: ShiftCtaContext = {
     shiftId: item.id,
@@ -144,140 +173,21 @@ function ShiftCard({
       : item.dateFrom ?? item.dateTo ?? null;
 
   const isFull = item.spotsLeft === 0;
+  const ctaEnabled = item.ctaEnabled !== false && !isFull;
+
+  const subtitle = [dateLabel, item.price].filter(Boolean).join(" · ") || undefined;
 
   return (
-    <article
-      className={cn(
-        "relative overflow-hidden rounded-3xl border bg-white shadow-sm transition-shadow hover:shadow-md",
-        isHot
-          ? "border-[#EF8759]/25 bg-gradient-to-b from-[#FFF7F3] to-white"
-          : "border-gray-100",
-      )}
-    >
-      {/* Hot badge */}
-      {isHot && (
-        <span className="absolute right-5 top-4 inline-flex items-center gap-1 font-mono text-[10px] uppercase tracking-[0.14em] font-semibold text-[#C2522A]">
-          <Flame className="h-3 w-3 fill-current" />
-          hot
-        </span>
-      )}
-
-      {/* ─── Desktop ─── */}
-      <div className="hidden sm:grid grid-cols-[minmax(220px,1fr)_auto_auto] items-center gap-7 px-7 py-6">
-        {/* Col 1 — info */}
-        <div className="min-w-0">
-          {item.ageRange && (
-            <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-gray-400 mb-1.5">
-              {item.ageRange}
-            </p>
-          )}
-          {item.title && (
-            <h3 className="text-[20px] font-bold tracking-[-0.01em] text-gray-900 truncate">
-              {item.title}
-            </h3>
-          )}
-          {dateLabel && (
-            <p className="mt-1 font-mono text-[12px] text-gray-500">{dateLabel}</p>
-          )}
-        </div>
-
-        {/* Col 2 — price */}
-        {item.price && (
-          <div className="text-right shrink-0">
-            <p className="font-sans text-[40px] font-semibold leading-[1] tracking-[-0.02em] text-gray-900">
-              {item.price}
-            </p>
-            <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-gray-400 mt-1">
-              за смену
-            </p>
-            {item.duration && (
-              <p className="mt-2 text-[12px] text-gray-500">
-                <Clock className="inline h-3.5 w-3.5 mr-1 -mt-0.5" />
-                {item.duration}
-              </p>
-            )}
-          </div>
-        )}
-
-        {/* Col 3 — actions */}
-        <div className="flex items-center shrink-0">
-          {item.ctaEnabled !== false && !isFull ? (
-            <Button
-              onClick={() => onShiftCta?.(ctx)}
-              className="h-12 rounded-full bg-[#EF8759] px-6 text-[14px] font-bold text-white shadow-sm shadow-[#EF8759]/25 hover:bg-[#e07848] transition-all"
-            >
-              {item.ctaLabel ?? "Записаться"}
-            </Button>
-          ) : (
-            <Button
-              disabled
-              variant="outline"
-              className="h-12 rounded-full border-gray-200 px-6 text-[13px] font-semibold text-gray-400"
-            >
-              В лист ожидания
-            </Button>
-          )}
-
-        </div>
-      </div>
-
-      {/* ─── Mobile ─── */}
-      <div className="sm:hidden p-5 space-y-4">
-        {/* Title + ages */}
-        <div className="space-y-1">
-          {item.ageRange && (
-            <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-gray-400">
-              {item.ageRange}
-            </p>
-          )}
-          {item.title && (
-            <h3 className="text-[17px] font-bold text-gray-900">{item.title}</h3>
-          )}
-          {dateLabel && (
-            <p className="font-mono text-[12px] text-gray-500">{dateLabel}</p>
-          )}
-        </div>
-
-        {/* Price */}
-        {item.price && (
-          <div className="flex items-baseline gap-2">
-            <span className="font-sans text-[32px] font-semibold leading-[1] text-gray-900">
-              {item.price}
-            </span>
-            <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-gray-400">
-              за смену
-            </span>
-          </div>
-        )}
-
-        {item.duration && (
-          <p className="text-[13px] text-gray-500">
-            <Clock className="inline h-3.5 w-3.5 mr-1 -mt-0.5" />
-            {item.duration}
-          </p>
-        )}
-
-        {/* Actions */}
-        <div className="flex">
-          {item.ctaEnabled !== false && !isFull ? (
-            <Button
-              onClick={() => onShiftCta?.(ctx)}
-              className="h-11 flex-1 rounded-full bg-[#EF8759] text-[14px] font-bold text-white hover:bg-[#e07848]"
-            >
-              {item.ctaLabel ?? "Записаться"}
-            </Button>
-          ) : (
-            <Button
-              disabled
-              variant="outline"
-              className="h-11 flex-1 rounded-full border-gray-200 text-[13px] font-semibold text-gray-400"
-            >
-              В лист ожидания
-            </Button>
-          )}
-        </div>
-      </div>
-    </article>
+    <SessionCard
+      kicker={item.ageRange}
+      isNearest={isNearest}
+      title={item.title ?? dateLabel ?? ""}
+      subtitle={subtitle}
+      primaryLabel={ctaEnabled ? (item.ctaLabel ?? "Записаться") : undefined}
+      primaryDisabled={!ctaEnabled}
+      onPrimary={() => onShiftCta?.(ctx)}
+      onPlan={() => onSaveShift?.(ctx)}
+    />
   );
 }
 

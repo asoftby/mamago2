@@ -37,11 +37,11 @@ export function PlaceOffersSection({
       style={{
         padding: "56px 0",
         borderTop: "1px solid rgba(20,18,16,.10)",
-        background: "#F6F2EA",
+        background: "#ffffff",
       }}
     >
       <div
-        style={{ maxWidth: 1320, margin: "0 auto", padding: "0 28px" }}
+        style={{ maxWidth: 1200, margin: "0 auto", padding: "0 28px" }}
         className="offers-wrap"
       >
         {/* Header */}
@@ -57,23 +57,23 @@ export function PlaceOffersSection({
         >
           <div>
             <div className="kicker-row" style={{ marginBottom: 14 }}>
-              <span className="text-kicker">04 — Предложения</span>
+              <span className="text-kicker">Предложения</span>
               <span className="kicker-line" style={{ width: 120 }} />
             </div>
             <h2
-              className="font-display"
               style={{
-                fontSize: 48,
+                fontSize: 30,
                 margin: 0,
                 letterSpacing: "-.02em",
                 color: "#141210",
+                fontFamily: "var(--font-sans)",
+                fontWeight: 400,
               }}
             >
               Чему{" "}
-              <span className="font-display-italic" style={{ color: "#C24E22" }}>
+              <em style={{ fontFamily: "Georgia, serif", fontStyle: "italic", fontWeight: 400, color: "#C24E22" }}>
                 научим
-              </span>
-              .
+              </em>
             </h2>
           </div>
           <Link
