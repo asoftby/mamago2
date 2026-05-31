@@ -109,7 +109,7 @@ export function AuthForm({
 
           {!isMyPlanEntry ? (
             <div className="space-y-1.5 text-center">
-              <h2 style={{ fontFamily: "Georgia, serif", fontWeight: 400, fontSize: 22, color: "#141210" }}>
+              <h2 style={{ fontFamily: "var(--font-sans)", fontWeight: 600, fontSize: 22, color: "#141210" }}>
                 {displayTitle === "Вход в mamaGo" ? (
                   <>Вход в <em style={{ fontStyle: "italic", color: "#C24E22" }}>mamaGo</em></>
                 ) : (

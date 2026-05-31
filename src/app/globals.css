@@ -116,8 +116,8 @@ body:has([data-slot="alert-dialog-overlay"][data-state="open"]) {
   /* Design System Colors (mamaGo 2.0) */
   /* Using exact hex values where possible, but mapping to Tailwind variables */
   
-  /* bg #F7F7F5 */
-  --background: #F7F7F5;
+  /* bg white */
+  --background: #ffffff;
   /* text #1F1F1F */
   --foreground: #1F1F1F;
   
@@ -598,7 +598,7 @@ body:has([data-slot="alert-dialog-overlay"][data-state="open"]) {
 
 /* ── Event page editorial surface ──────────────────────────── */
 .ep-surface {
-  background: #F6F2EA;
+  background: #ffffff;
   color: #141210;
 }
 
