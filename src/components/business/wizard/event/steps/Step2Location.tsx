@@ -23,6 +23,7 @@ interface UserPlace {
   id: string;
   title: string;
   address: string;
+  displayAddress: string;
   fullAddress: string;
   lat: number | null;
   lng: number | null;
@@ -41,6 +42,33 @@ type ImportLocationHint = {
   addressText: string;
   cityName: string;
 };
+
+function compactPlaceAddress(address?: string | null) {
+  if (!address) return "";
+
+  return address
+    .replace(/,\s*Беларусь\s*$/i, "")
+    .replace(/,\s*Республика Беларусь\s*$/i, "")
+    .trim();
+}
+
+function formatMetroSummary(metroName?: string | null, metroDistanceM?: number | null) {
+  if (!metroName) return null;
+
+  if (metroDistanceM === null || metroDistanceM === undefined) {
+    return `м. ${metroName}`;
+  }
+
+  if (metroDistanceM > 2000) {
+    return `м. ${metroName}`;
+  }
+
+  if (metroDistanceM >= 1000) {
+    return `м. ${metroName} · ${(metroDistanceM / 1000).toFixed(1)} км`;
+  }
+
+  return `м. ${metroName} · ${Math.round(metroDistanceM)} м`;
+}
 
 export function Step2Location({ data, onChange, isEditable, eventId }: Step2LocationProps) {
   const [userPlaces, setUserPlaces] = useState<UserPlace[]>([]);
@@ -585,33 +613,40 @@ export function Step2Location({ data, onChange, isEditable, eventId }: Step2Loca
         
         {!isLoadingPlaces && !placesError && userPlaces.length > 0 && (
           <div className="space-y-2">
-            {userPlaces.map((place) => (
-              <button
-                key={place.id}
-                type="button"
-                onClick={() => handlePlaceSelect(place)}
-                disabled={!isEditable}
-                className={`w-full p-4 rounded-lg border text-left transition-colors ${
-                  data.placeId === place.id && data.venueKind === "PLACE"
-                    ? "bg-primary/5 border-primary"
-                    : "bg-white border-gray-300 hover:border-gray-400"
-                } ${!isEditable ? "opacity-50 cursor-not-allowed" : ""}`}
-              >
-                <div className="font-medium">{place.title}</div>
-                <div className="text-[12px] text-muted-foreground">
-                  {place.cityName} • {place.address}
-                </div>
-                {/* Show district/metro info if available */}
-                {(place.districtName || place.metroName) && (
-                  <div className="text-[12px] text-muted-foreground mt-1">
-                    {place.districtName && `${place.districtName}`}
-                    {place.districtName && place.metroName && " • "}
-                    {place.metroName && `м. ${place.metroName}`}
-                    {place.metroDistanceM && ` (${Math.round(place.metroDistanceM)}м)`}
-                  </div>
-                )}
-              </button>
-            ))}
+            {userPlaces.map((place) => {
+              const addressLine = compactPlaceAddress(
+                place.displayAddress || place.fullAddress || place.address
+              );
+              const metroSummary = formatMetroSummary(place.metroName, place.metroDistanceM);
+
+              return (
+                <button
+                  key={place.id}
+                  type="button"
+                  onClick={() => handlePlaceSelect(place)}
+                  disabled={!isEditable}
+                  className={`w-full p-4 rounded-lg border text-left transition-colors ${
+                    data.placeId === place.id && data.venueKind === "PLACE"
+                      ? "bg-primary/5 border-primary"
+                      : "bg-white border-gray-300 hover:border-gray-400"
+                  } ${!isEditable ? "opacity-50 cursor-not-allowed" : ""}`}
+                >
+                  <div className="font-medium">{place.title}</div>
+                  {addressLine ? (
+                    <div className="text-[12px] text-muted-foreground">
+                      {addressLine}
+                    </div>
+                  ) : null}
+                  {(place.districtName || metroSummary) && (
+                    <div className="mt-1 text-[12px] text-muted-foreground">
+                      {place.districtName && `${place.districtName}`}
+                      {place.districtName && metroSummary && " • "}
+                      {metroSummary}
+                    </div>
+                  )}
+                </button>
+              );
+            })}
           </div>
         )}
       </div>

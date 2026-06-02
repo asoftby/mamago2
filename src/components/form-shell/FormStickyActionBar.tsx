@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, Save, Send } from "lucide-react";
+import { ChevronLeft, ChevronRight, Loader2, Save, Send } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { FormWizardActionLabels, FormWizardUiPhase } from "./types";
 
@@ -24,6 +24,7 @@ export interface FormStickyActionBarProps {
   /** Review step: primary = submit for moderation (or other final action) */
   onSubmit?: () => void;
   submitDisabled?: boolean;
+  busyHint?: string;
   className?: string;
 }
 
@@ -51,6 +52,7 @@ export function FormStickyActionBar({
   continueDisabled,
   onSubmit,
   submitDisabled,
+  busyHint,
   className,
 }: FormStickyActionBarProps) {
   const busy = phaseBlocksActions(phase);
@@ -97,43 +99,59 @@ export function FormStickyActionBar({
           </div>
         )}
 
-        <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3">
-          {showSaveDraft && onSaveDraft && (
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onSaveDraft}
-              disabled={busy || saveDraftDisabled}
-              className="gap-2"
-            >
-              <Save className="h-4 w-4 shrink-0" />
-              {saving ? labels.savingDraft : labels.saveDraft}
-            </Button>
-          )}
+        <div className="flex flex-col items-end gap-2">
+          <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3">
+            {showSaveDraft && onSaveDraft && (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onSaveDraft}
+                disabled={busy || saveDraftDisabled}
+                className="gap-2"
+              >
+                {saving ? (
+                  <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+                ) : (
+                  <Save className="h-4 w-4 shrink-0" />
+                )}
+                {saving ? labels.savingDraft : labels.saveDraft}
+              </Button>
+            )}
 
-          {!isReviewStep && onContinue && (
-            <Button
-              type="button"
-              onClick={onContinue}
-              disabled={busy || continueDisabled}
-              className="gap-2"
-            >
-              {labels.next}
-              <ChevronRight className="h-4 w-4 shrink-0" />
-            </Button>
-          )}
+            {!isReviewStep && onContinue && (
+              <Button
+                type="button"
+                onClick={onContinue}
+                disabled={busy || continueDisabled}
+                className="gap-2"
+              >
+                {labels.next}
+                <ChevronRight className="h-4 w-4 shrink-0" />
+              </Button>
+            )}
 
-          {isReviewStep && onSubmit && (
-            <Button
-              type="button"
-              onClick={onSubmit}
-              disabled={busy || submitDisabled}
-              className="gap-2"
-            >
-              <Send className="h-4 w-4 shrink-0" />
-              {submitting ? labels.submitting : labels.submit}
-            </Button>
-          )}
+            {isReviewStep && onSubmit && (
+              <Button
+                type="button"
+                onClick={onSubmit}
+                disabled={busy || submitDisabled}
+                className="gap-2"
+              >
+                {submitting ? (
+                  <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+                ) : (
+                  <Send className="h-4 w-4 shrink-0" />
+                )}
+                {submitting ? labels.submitting : labels.submit}
+              </Button>
+            )}
+          </div>
+
+          {busy && busyHint ? (
+            <p className="text-[12px] text-muted-foreground">
+              {busyHint}
+            </p>
+          ) : null}
         </div>
       </div>
     </div>

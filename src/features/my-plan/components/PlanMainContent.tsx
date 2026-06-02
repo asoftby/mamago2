@@ -411,6 +411,22 @@ export function PlanMainContent({
     if (!family?.selectedPersonaIds) return [];
     return family.selectedPersonaIds;
   }, [family?.selectedPersonaIds]);
+  const effectiveSelectedChildIds = useMemo(() => {
+    if (selectedPersonaIds.length > 0) {
+      const selectedChildSet = new Set(
+        personas
+          .filter(
+            (persona) =>
+              persona.kind === "child" && selectedPersonaIds.includes(persona.id),
+          )
+          .map((persona) => persona.id),
+      );
+      return childrenList
+        .map((child) => child.id)
+        .filter((childId) => selectedChildSet.has(childId));
+    }
+    return selectedChildIds;
+  }, [childrenList, personas, selectedChildIds, selectedPersonaIds]);
 
   /**
    * Audience mode: derived from FamilyPersonaContext via selectedPersonaIds
@@ -424,43 +440,27 @@ export function PlanMainContent({
   /**
    * Toggle persona selection - syncs with FamilyPersonaContext automatically
    */
-  const handleTogglePersona = (personaId: string) => {
-    const isSelected = selectedPersonaIds.includes(personaId);
-    
-    if (isSelected) {
-      // Deselect persona
-      const newIds = selectedPersonaIds.filter((id) => id !== personaId);
-      
-      // Update via FamilyPersonaContext (single source of truth)
-      if (family?.setSelectedPersonaIds) {
-        family.setSelectedPersonaIds(newIds);
-      }
-      
-      // If no personas left, automatically enters free search mode
-      if (newIds.length === 0) {
-        onChangeSelectedAgeRanges([]);
-      }
-    } else {
-      // Select persona (exits free search mode automatically)
-      const newIds = [...selectedPersonaIds, personaId];
-      
-      // Update via FamilyPersonaContext (single source of truth)
-      if (family?.setSelectedPersonaIds) {
-        family.setSelectedPersonaIds(newIds);
-      }
+  const handleTogglePersona = useCallback((personaId: string) => {
+    const current = family?.selectedPersonaIds ?? [];
+    const isSelected = current.includes(personaId);
+    const next = isSelected
+      ? current.filter((id) => id !== personaId)
+      : [...current, personaId];
+
+    family?.setSelectedPersonaIds(next);
+
+    if (next.length === 0) {
+      onChangeSelectedAgeRanges([]);
     }
-  };
+  }, [family, onChangeSelectedAgeRanges]);
 
   /**
    * Toggle free search mode - clears all persona selections
    */
-  const handleToggleFreeMode = () => {
-    // Switch to free mode: clear all selections via FamilyPersonaContext
-    if (family?.setSelectedPersonaIds) {
-      family.setSelectedPersonaIds([]);
-    }
+  const handleToggleFreeMode = useCallback(() => {
+    family?.setSelectedPersonaIds([]);
     onChangeSelectedAgeRanges([]);
-  };
+  }, [family, onChangeSelectedAgeRanges]);
 
   /**
    * Label for selected audience - includes adult if selected
@@ -502,10 +502,10 @@ export function PlanMainContent({
     qp.set("from", selectedDate);
     qp.set("to", selectedDate);
     qp.set("date", selectedDate);
-    if (selectedChildIds.length === 0 || selectedChildIds.length === childrenList.length) {
+    if (effectiveSelectedChildIds.length === 0 || effectiveSelectedChildIds.length === childrenList.length) {
       qp.set("children", "all");
     } else {
-      qp.set("children", selectedChildIds.join(","));
+      qp.set("children", effectiveSelectedChildIds.join(","));
     }
     qp.set("planChildrenLabel", selectedChildrenLabel);
     qp.set("planMode", "1");
@@ -549,6 +549,15 @@ export function PlanMainContent({
   }, [buildIdeasHref, onRequestClose, router]);
 
   const dayItems = useMemo(() => planItemsByDate?.[selectedDate] ?? [], [planItemsByDate, selectedDate]);
+  const plannedCountByDate = useMemo(() => {
+    const result: Record<string, number> = {};
+
+    for (const [date, items] of Object.entries(planItemsByDate ?? {})) {
+      result[date] = items.length;
+    }
+
+    return result;
+  }, [planItemsByDate]);
 
   const slotFromStartsAt = useCallback(
     (
@@ -590,7 +599,7 @@ export function PlanMainContent({
     ];
     const slots = allSlots.filter((slot) => daySlotCounts[slot] < MAX_PLAN_ITEMS_PER_SLOT);
     const selectedChildren = childrenList
-      .filter((c) => selectedChildIds.includes(c.id))
+      .filter((c) => effectiveSelectedChildIds.includes(c.id))
       .map((c) => ({
         id: c.id,
         birthDate: c.birthDate ?? new Date().toISOString(),
@@ -633,7 +642,7 @@ export function PlanMainContent({
     autoPlanLocalAddedIds,
     childrenList,
     daySlotCounts,
-    selectedChildIds,
+    effectiveSelectedChildIds,
     planItemsByDate,
     selectedDate,
   ]);
@@ -937,7 +946,12 @@ export function PlanMainContent({
           className="min-h-0 flex-1 space-y-4 overflow-y-auto bg-white px-8 pb-6 pt-1"
         >
           {onChangeDate ? (
-            <WeekCalendarStrip selectedDate={selectedDate} onChangeDate={onChangeDate} showArrows />
+            <WeekCalendarStrip
+              selectedDate={selectedDate}
+              onChangeDate={onChangeDate}
+              showArrows
+              plannedCountByDate={plannedCountByDate}
+            />
           ) : null}
 
           <PlanAudienceCompact
@@ -1033,7 +1047,12 @@ export function PlanMainContent({
         className="flex-1 space-y-4 overflow-y-auto bg-white px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-3"
       >
         {onChangeDate ? (
-          <WeekCalendarStrip selectedDate={selectedDate} onChangeDate={onChangeDate} compact />
+          <WeekCalendarStrip
+            selectedDate={selectedDate}
+            onChangeDate={onChangeDate}
+            compact
+            plannedCountByDate={plannedCountByDate}
+          />
         ) : null}
 
         <PlanAudienceCompact

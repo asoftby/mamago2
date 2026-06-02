@@ -9,6 +9,7 @@ export interface EventStickyActionBarProps {
   sessionLine?: string;
   priceLabel: string;
   primaryLabel: string;
+  primaryHref?: string;
   onPrimary: () => void;
   /** Если передан — показывает сердечко-кнопку рядом с primary */
   onPlan?: () => void;
@@ -26,6 +27,7 @@ export function EventStickyActionBar({
   sessionLine,
   priceLabel,
   primaryLabel,
+  primaryHref,
   onPrimary,
   onPlan,
   isPlanned = false,
@@ -108,10 +110,11 @@ export function EventStickyActionBar({
         <div className="flex shrink-0 items-center gap-2.5">
           {/* Buy button — shown only when purchase URL exists */}
           {hasPurchaseUrl && (
-            <button
-              type="button"
+            <a
+              href={primaryHref}
+              target="_blank"
+              rel="noopener noreferrer"
               onClick={onPrimary}
-              disabled={isPrimaryDisabled || isPrimaryLoading}
               className="inline-flex h-10 items-center gap-2 rounded-full bg-[#E86A3A] px-5 text-[14px] font-semibold text-white transition-colors hover:bg-[#C24E22]"
             >
               {isPrimaryLoading ? (
@@ -119,7 +122,7 @@ export function EventStickyActionBar({
               ) : (
                 <>{primaryLabel} <span aria-hidden>→</span></>
               )}
-            </button>
+            </a>
           )}
           {/* Plan / heart button */}
           {onPlan && (
@@ -188,10 +191,11 @@ export function EventStickyActionBar({
         </div>
       </div>
       {hasPurchaseUrl ? (
-        <button
-          type="button"
+        <a
+          href={primaryHref}
+          target="_blank"
+          rel="noopener noreferrer"
           onClick={onPrimary}
-          disabled={isPrimaryDisabled || isPrimaryLoading}
           className="inline-flex h-[46px] shrink-0 items-center gap-2 rounded-full bg-[#E86A3A] px-5 text-[14px] font-semibold text-white transition-colors hover:bg-[#C24E22] active:translate-y-px"
         >
           {isPrimaryLoading ? (
@@ -199,7 +203,7 @@ export function EventStickyActionBar({
           ) : (
             <>{primaryLabel} <span aria-hidden>→</span></>
           )}
-        </button>
+        </a>
       ) : onPlan ? (
         <button
           type="button"

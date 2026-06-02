@@ -39,6 +39,7 @@ export type SaveScenario =
       eventPlanDateISO?: string;
       eventPlanDateEndISO?: string;
       eventPlanDateOptions?: string[];
+      eventPlanSessionCountsByDate?: Record<string, number>;
     };
 
 export type SaveToPlanResult =
@@ -87,6 +88,21 @@ function pluralDat(n: number): string {
   if (mod10 === 1) return "дата";
   if (mod10 >= 2 && mod10 <= 4) return "даты";
   return "дат";
+}
+
+function pluralRu(n: number, forms: [string, string, string]): string {
+  const abs = Math.abs(n);
+  const mod10 = abs % 10;
+  const mod100 = abs % 100;
+  if (mod100 >= 11 && mod100 <= 14) return forms[2];
+  if (mod10 === 1) return forms[0];
+  if (mod10 >= 2 && mod10 <= 4) return forms[1];
+  return forms[2];
+}
+
+function formatSessionDotsLabel(count: number): string {
+  if (count >= 3) return "3 или больше сеансов в этот день";
+  return `${count} ${pluralRu(count, ["сеанс", "сеанса", "сеансов"])} в этот день`;
 }
 
 function parseLocalDate(s: string): Date {
@@ -245,7 +261,7 @@ function OrDivider({ label = "или" }: { label?: string }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 14, margin: "18px 0 14px" }}>
       <span style={{ flex: 1, height: 1, background: C.line }} />
-      <span style={{ fontFamily: "var(--font-sans)", fontStyle: "italic", fontSize: 16, color: C.ink3 }}>{label}</span>
+      <span style={{ fontFamily: "Georgia, 'Times New Roman', serif", fontStyle: "italic", fontSize: 16, color: C.ink3 }}>{label}</span>
       <span style={{ flex: 1, height: 1, background: C.line }} />
     </div>
   );
@@ -307,9 +323,10 @@ interface DateSliderProps {
   options: string[];  // YYYY-MM-DD sorted upcoming
   selISO: string | null;
   onSelect: (iso: string) => void;
+  sessionCountsByDate?: Record<string, number>;
 }
 
-function DateSlider({ options, selISO, onSelect }: DateSliderProps) {
+function DateSlider({ options, selISO, onSelect, sessionCountsByDate }: DateSliderProps) {
   const sliderRef = React.useRef<HTMLDivElement>(null);
 
   const scrollBy = (dir: number) => {
@@ -372,6 +389,9 @@ function DateSlider({ options, selISO, onSelect }: DateSliderProps) {
         {options.map((iso) => {
           const chip = fmtDateChip(iso);
           const isSel = iso === selISO;
+          const sessionsCount = sessionCountsByDate?.[iso] ?? 0;
+          const dotsCount = Math.min(sessionsCount, 3);
+          const dotsLabel = sessionsCount > 0 ? formatSessionDotsLabel(sessionsCount) : null;
           return (
             <button
               key={iso}
@@ -392,14 +412,21 @@ function DateSlider({ options, selISO, onSelect }: DateSliderProps) {
               onMouseLeave={(e) => { if (!isSel) e.currentTarget.style.borderColor = C.line; }}
             >
               <span style={{ fontFamily: "var(--font-mono, ui-monospace)", fontSize: 10, letterSpacing: ".1em", textTransform: "uppercase", color: isSel ? "rgba(250,247,241,.6)" : C.ink3 }}>{chip.dow}</span>
-              <span style={{ fontFamily: "var(--font-sans)", fontSize: 28, lineHeight: 1, letterSpacing: "-.02em" }}>{chip.day}</span>
+              <span style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 28, lineHeight: 1, letterSpacing: "-.02em" }}>{chip.day}</span>
               <span style={{ fontFamily: "var(--font-mono, ui-monospace)", fontSize: 9, letterSpacing: ".08em", color: isSel ? "rgba(250,247,241,.55)" : C.ink3 }}>{chip.month}</span>
-              {/* accent dots — visual indicator */}
-              <span style={{ display: "flex", gap: 3, height: 5, alignItems: "center", marginTop: 1 }}>
-                {[0, 1, 2].map((di) => (
-                  <span key={di} style={{ width: 4, height: 4, borderRadius: 99, background: C.accent }} />
-                ))}
-              </span>
+              {dotsCount > 0 ? (
+                <span
+                  aria-label={dotsLabel ?? undefined}
+                  title={dotsLabel ?? undefined}
+                  style={{ display: "flex", gap: 3, minHeight: 5, alignItems: "center", marginTop: 1 }}
+                >
+                  {Array.from({ length: dotsCount }, (_, di) => (
+                    <span key={di} style={{ width: 4, height: 4, borderRadius: 99, background: C.accent }} />
+                  ))}
+                </span>
+              ) : (
+                <span aria-hidden="true" style={{ minHeight: 5, marginTop: 1 }} />
+              )}
             </button>
           );
         })}
@@ -424,7 +451,9 @@ function ConfirmBar({ iso, onConfirm }: { iso: string; onConfirm: () => void }) 
       <div>
         <div style={{ fontFamily: "var(--font-mono, ui-monospace)", textTransform: "uppercase" as const, fontSize: 10, letterSpacing: ".1em", color: "rgba(250,247,241,.55)", marginBottom: 3 }}>● выбрано</div>
         <div style={{ fontSize: 15, fontWeight: 600, letterSpacing: "-.01em" }}>
-          {DOW_FULL[chip.dow] ?? chip.dow}, {chip.day} {RU_MONTHS_FULL[chip.monthIdx]}
+          {DOW_FULL[chip.dow] ?? chip.dow},{" "}
+          <span style={{ fontFamily: "var(--font-display), Georgia, serif" }}>{chip.day}</span>{" "}
+          {RU_MONTHS_FULL[chip.monthIdx]}
         </div>
       </div>
       <button
@@ -572,10 +601,11 @@ function AllDatesDrawer({ options, selISO, onSelect, onBack }: AllDatesDrawerPro
 // ─── Date Slider View (Variant B) ─────────────────────────────────────────────
 function DateSliderView({
   options, title, category,
-  onConfirm, onIdea,
+  onConfirm, onIdea, sessionCountsByDate,
 }: {
   options: string[]; title: string; category?: string;
   onConfirm: (iso: string) => void; onIdea: () => void;
+  sessionCountsByDate?: Record<string, number>;
 }) {
   const [selISO, setSelISO] = React.useState<string>(options[0] ?? "");
   const [drawerOpen, setDrawerOpen] = React.useState(false);
@@ -608,7 +638,7 @@ function DateSliderView({
           fontSize: 30, lineHeight: 1.02, letterSpacing: "-.02em", fontWeight: 400,
         }}>
           На какой{" "}
-          <span style={{ fontStyle: "italic", color: C.accentDeep }}>день</span>{" "}
+          <span style={{ fontFamily: "Georgia, 'Times New Roman', serif", fontStyle: "italic", color: C.accentDeep }}>день</span>{" "}
           напомнить?
         </h2>
 
@@ -637,7 +667,7 @@ function DateSliderView({
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
           <span style={{ fontFamily: "var(--font-sans)", fontSize: 18, letterSpacing: "-.01em", fontWeight: 400 }}>
             {RU_MONTHS_NAMED[fmtDateChip(options[0]).monthIdx]}{" "}
-            <span style={{ fontFamily: "var(--font-sans)", color: C.ink3 }}>{parseLocalDate(options[0]).getFullYear()}</span>
+            <span style={{ fontFamily: "var(--font-display), Georgia, serif", color: C.ink3 }}>{parseLocalDate(options[0]).getFullYear()}</span>
           </span>
           <span style={{ fontFamily: "var(--font-mono, ui-monospace)", fontSize: 10, color: C.ink3, letterSpacing: ".1em", textTransform: "uppercase" as const }}>
             {options.length} {pluralDat(options.length)}
@@ -645,7 +675,12 @@ function DateSliderView({
         </div>
 
         {/* Date slider */}
-        <DateSlider options={visible} selISO={selISO} onSelect={setSelISO} />
+        <DateSlider
+          options={visible}
+          selISO={selISO}
+          onSelect={setSelISO}
+          sessionCountsByDate={sessionCountsByDate}
+        />
 
         {/* Show all dates button */}
         {hidden > 0 && (
@@ -733,9 +768,9 @@ function CalendarView({ onSelect, allowedDateKeys, onBack }: {
 }
 
 // ─── Already in plan state (Variant E) ───────────────────────────────────────
-function InPlanView({ planDate, planStartsAt, planItemId, onSwitchCalendar, onIdea, onRemovePlan, onClose }: {
+function InPlanView({ planDate, planStartsAt, planItemId, onSwitchCalendar, onRemovePlan, onClose }: {
   planDate: string | null; planStartsAt: string | null; planItemId: string | null;
-  onSwitchCalendar: () => void; onIdea: () => void;
+  onSwitchCalendar: () => void;
   onRemovePlan: (planItemId: string) => void; onClose: () => void;
 }) {
   const planDateFmt = planDate ? formatLocalPlanDate(planDate, "ru-RU") : null;
@@ -754,7 +789,7 @@ function InPlanView({ planDate, planStartsAt, planItemId, onSwitchCalendar, onId
 
       <h2 style={{ margin: "0 0 8px", fontFamily: "var(--font-sans)", fontSize: 30, lineHeight: 1, letterSpacing: "-.02em", fontWeight: 600 }}>
         В вашем{" "}
-        <span style={{ fontStyle: "italic", color: C.accentDeep }}>плане</span>.
+        <span style={{ fontFamily: "Georgia, 'Times New Roman', serif", fontStyle: "italic", fontWeight: 400, color: C.accentDeep }}>плане</span>.
       </h2>
 
       {/* Бейдж — derived от planDate */}
@@ -816,23 +851,37 @@ function InPlanView({ planDate, planStartsAt, planItemId, onSwitchCalendar, onId
       </div>
 
       {/* Footer */}
-      <div style={{ display: "flex", gap: 10, paddingTop: 14, borderTop: `1px solid ${C.line}` }}>
-        <button onClick={onIdea} style={{
-          flex: 1, height: 46, borderRadius: 999, border: `1px solid ${C.line2}`,
-          background: "transparent", color: C.ink, fontSize: 13, fontWeight: 600,
-          display: "flex", alignItems: "center", justifyContent: "center", gap: 7,
-          cursor: "pointer", fontFamily: "var(--font-sans)",
-        }}>
-          <BookmarkIcon size={14} /> В идеи
-        </button>
+      <div style={{ paddingTop: 14, borderTop: `1px solid ${C.line}` }}>
         <button onClick={() => { window.location.href = "/me/plan"; }} style={{
-          flex: 1.2, height: 46, borderRadius: 999, background: C.ink, color: "#FAF7F1",
+          width: "100%", height: 46, borderRadius: 999, background: C.ink, color: "#FAF7F1",
           border: 0, fontSize: 13, fontWeight: 600,
           display: "flex", alignItems: "center", justifyContent: "center", gap: 7,
           cursor: "pointer", fontFamily: "var(--font-sans)",
         }}>
           Перейти в план <ExternalLinkIcon size={13} color="#FAF7F1" />
         </button>
+        <div style={{ display: "flex", justifyContent: "center", marginTop: 16 }}>
+          <button
+            type="button"
+            onClick={() => { window.location.href = "/me/ideas"; }}
+            style={{
+              background: "transparent",
+              border: 0,
+              padding: 0,
+              color: C.accentDeep,
+              fontSize: 15,
+              fontWeight: 600,
+              fontFamily: "var(--font-sans)",
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 8,
+              cursor: "pointer",
+            }}
+          >
+            Мои идеи <span aria-hidden>→</span>
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -1251,6 +1300,10 @@ export function SaveToPlanPickerBody({
     const unique = new Set(eventPlanDateOptions.map((d) => normalizePlanDateISO(d)).filter(Boolean));
     return Array.from(unique).sort() as string[];
   }, [eventPlanDateOptions]);
+  const sessionCountsByDate = React.useMemo(() => {
+    if (scenario.kind !== "quickdate") return {};
+    return scenario.eventPlanSessionCountsByDate ?? {};
+  }, [scenario]);
 
   const upcomingOptions = normalizedOptions.filter((d) => d >= todayISO);
 
@@ -1282,7 +1335,6 @@ export function SaveToPlanPickerBody({
         planStartsAt={planStartsAt}
         planItemId={planItemId}
         onSwitchCalendar={() => setReplanMode(true)}
-        onIdea={() => onCommit({ action: "ideas" })}
         onRemovePlan={(id) => onCommit({ action: "remove-plan", planItemId: id })}
         onClose={() => { onClose?.(); }}
       />
@@ -1318,6 +1370,7 @@ export function SaveToPlanPickerBody({
       <DateSliderView
         options={sliderOptions}
         title={scenario.title}
+        sessionCountsByDate={sessionCountsByDate}
         onConfirm={(iso) => onCommit({ action: "plan", dateISO: iso, timeSlotId: null })}
         onIdea={() => onCommit({ action: "ideas" })}
       />

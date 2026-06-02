@@ -9,6 +9,7 @@ import { getOfferPublicPath } from "@/lib/offers/offerPublicUrl";
 import { listOfferIdeas } from "@/server/services/idea.service";
 import { resolveActivityCoverUrl } from "@/lib/event/resolveActivityCoverUrl";
 import { resolveIdeaPlanState } from "@/lib/plan/ideaPlanStatus";
+import { getEventTemporalState } from "@/lib/events/eventTemporalState";
 import { getLocalDateKey } from "@/lib/date/localDateKey";
 import { publicActivityPath } from "@/lib/business/eventPublicLink";
 import { formatRuShortDayMonthRange } from "@/lib/formatters/date";
@@ -218,6 +219,7 @@ async function getUserIdeas(userId: string): Promise<IdeaItem[]> {
       currency: true,
       priceDetails: true,
       scheduleJson: true,
+      scheduleMode: true,
       status: true,
       nextOccurrenceAt: true,
       sessions: {
@@ -301,6 +303,11 @@ async function getUserIdeas(userId: string): Promise<IdeaItem[]> {
         plannedByActivityId.get(idea.activityId) ?? [],
         todayISO,
       );
+      const temporalState = getEventTemporalState({
+        scheduleMode: activity.scheduleMode,
+        nextOccurrenceAt: activity.nextOccurrenceAt,
+        sessions: activity.sessions,
+      });
 
       return {
         id: idea.id,
@@ -346,6 +353,7 @@ async function getUserIdeas(userId: string): Promise<IdeaItem[]> {
             null,
           categoryLabel: activity.eventCategory?.nameRu ?? null,
           badgeLabel: activity.format ?? null,
+          temporalState,
         },
         planAvailability: getPlanActivityPublicAvailability(activity),
         planStatus: planState.planStatus,

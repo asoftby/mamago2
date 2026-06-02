@@ -30,7 +30,8 @@ export function EventSessionSelector({
   onPlan,
   isPlanned = false,
   priceLabel,
-  hasPurchaseUrl = true,
+  purchaseUrl,
+  buyLabel = "Купить билет",
   className,
 }: {
   sessions: EventPageSession[];
@@ -39,7 +40,8 @@ export function EventSessionSelector({
   onPlan?: () => void;
   isPlanned?: boolean;
   priceLabel?: string;
-  hasPurchaseUrl?: boolean;
+  purchaseUrl?: string;
+  buyLabel?: string;
   className?: string;
 }) {
   if (sessions.length === 0) {
@@ -67,7 +69,8 @@ export function EventSessionSelector({
             isNearest={isFirst}
             title={getDateLabel(s.startsAt)}
             subtitle={subtitle || undefined}
-            primaryLabel={hasPurchaseUrl ? "Купить билет" : undefined}
+            primaryLabel={purchaseUrl ? buyLabel : undefined}
+            primaryHref={purchaseUrl}
             onPrimary={() => onSelect(s.id)}
             onPlan={() => { onSelect(s.id); onPlan?.(); }}
             isPlanned={isPlanned && selectedId === s.id}

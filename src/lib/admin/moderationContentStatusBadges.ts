@@ -23,3 +23,11 @@ export const MODERATION_CONTENT_STATUS_CONFIG: Record<
   SCHEDULED: { label: "Запланировано", variant: "outline", className: "bg-blue-50 text-blue-900 border-blue-200" },
   ARCHIVED: { label: "В архиве", variant: "secondary", className: "text-muted-foreground" },
 };
+
+export const MODERATION_TEMPORAL_BADGE_CONFIG = {
+  past: {
+    label: "Уже прошло",
+    variant: "secondary" as const,
+    className: "bg-gray-100 text-gray-600 border-gray-200",
+  },
+};

@@ -30,6 +30,7 @@ import { EventGoodFit } from "./EventGoodFit";
 import { PublicationStatsPanel } from "@/components/publication-stats";
 import { postAnalyticsEvent } from "@/lib/analytics/client";
 import { cn } from "@/lib/utils";
+import { getLocalDateKey } from "@/lib/date/localDateKey";
 
 /* ── Helpers ──────────────────────────────────────────────── */
 
@@ -38,6 +39,21 @@ function venueOneLine(data: EventPageData): string | undefined {
   if (!v) return undefined;
   const parts = [v.name, v.address].filter(Boolean);
   return parts.join(" · ");
+}
+
+function pluralizeRu(count: number, forms: [string, string, string]): string {
+  const abs = Math.abs(count);
+  const mod100 = abs % 100;
+  const mod10 = abs % 10;
+
+  if (mod100 >= 11 && mod100 <= 14) return forms[2];
+  if (mod10 === 1) return forms[0];
+  if (mod10 >= 2 && mod10 <= 4) return forms[1];
+  return forms[2];
+}
+
+function formatSessionCount(count: number): string {
+  return `${count} ${pluralizeRu(count, ["сеанс", "сеанса", "сеансов"])}`;
 }
 
 /* ── Marquee ticker ───────────────────────────────────────── */
@@ -193,7 +209,7 @@ function EventFinalCta({
   onBuy,
   onPlan,
   sessionTargetDate,
-  hasPurchaseUrl = true,
+  purchaseUrl,
 }: {
   priceLabel: string;
   buyLabel: string;
@@ -201,7 +217,7 @@ function EventFinalCta({
   onBuy: () => void;
   onPlan: () => void;
   sessionTargetDate?: string;
-  hasPurchaseUrl?: boolean;
+  purchaseUrl?: string;
 }) {
   const [daysLeft, setDaysLeft] = useState<number | null>(null);
   const [hoursLeft, setHoursLeft] = useState<number | null>(null);
@@ -242,14 +258,16 @@ function EventFinalCta({
             Купите билет за&nbsp;2&nbsp;минуты или отложите в&nbsp;план — мы&nbsp;напомним вечером накануне.
           </p>
           <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
-            {hasPurchaseUrl && (
-              <button
-                type="button"
+            {purchaseUrl && (
+              <a
+                href={purchaseUrl}
+                target="_blank"
+                rel="noopener noreferrer"
                 onClick={onBuy}
                 className="inline-flex h-16 items-center gap-2 rounded-full bg-[#E86A3A] px-7 text-[17px] font-semibold text-white transition-colors hover:bg-[#C24E22] active:translate-y-px"
               >
                 {buyLabel}&nbsp;{priceLabel} <span aria-hidden>→</span>
-              </button>
+              </a>
             )}
             <button
               type="button"
@@ -324,10 +342,20 @@ export function EventPageView({ data }: { data: EventPageData }) {
     const set = new Set<string>();
     for (const s of sessions) {
       if (!s.startsAt) continue;
-      const iso = new Date(s.startsAt).toISOString().split("T")[0];
+      const iso = getLocalDateKey(new Date(s.startsAt));
       if (iso) set.add(iso);
     }
     return Array.from(set).sort();
+  }, [sessions]);
+
+  const planSessionCountsByDate = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const session of sessions) {
+      if (!session.startsAt) continue;
+      const iso = getLocalDateKey(new Date(session.startsAt));
+      counts[iso] = (counts[iso] ?? 0) + 1;
+    }
+    return counts;
   }, [sessions]);
 
   const formatPlanDateRu = useCallback(
@@ -345,10 +373,11 @@ export function EventPageView({ data }: { data: EventPageData }) {
       kind: "quickdate" as const,
       title: data.title,
       eventPlanDateOptions: availablePlanDates,
+      eventPlanSessionCountsByDate: planSessionCountsByDate,
     };
     if (availablePlanDates.length !== 1) return base;
     return { ...base, eventPlanDateISO: availablePlanDates[0]! };
-  }, [availablePlanDates, data.title]);
+  }, [availablePlanDates, data.title, planSessionCountsByDate]);
 
   const loadSaveStatus = useCallback(async () => {
     try {
@@ -462,7 +491,6 @@ export function EventPageView({ data }: { data: EventPageData }) {
   );
 
   const handleBuy = useCallback(() => {
-    setIsSecondaryLoading(true);
     void postAnalyticsEvent({
       eventType: "CTA_CLICK",
       entityType: "EVENT",
@@ -471,11 +499,7 @@ export function EventPageView({ data }: { data: EventPageData }) {
       citySlug: data.citySlug,
       meta: { source: "detail", section: "afisha", targetAction: "buy" },
     });
-    toast.message(data.cta.buyLabel, {
-      description: "Здесь будет ссылка на покупку или сайт организатора.",
-    });
-    setTimeout(() => setIsSecondaryLoading(false), 500);
-  }, [data.citySlug, data.cta.buyLabel, data.id]);
+  }, [data.citySlug, data.id]);
 
   const handleSave = useCallback(() => {
     const was = isFavorite(data.id);
@@ -591,7 +615,7 @@ export function EventPageView({ data }: { data: EventPageData }) {
                 </h2>
               </div>
               <span className="inline-flex h-7 items-center rounded-full border border-[rgba(20,18,16,0.18)] px-3 text-[13px] text-[#141210]" style={{ fontFamily: "Menlo, monospace" }}>
-                {sessions.length} {sessions.length === 1 ? "сеанс" : "сеансов"}
+                {formatSessionCount(sessions.length)}
               </span>
             </div>
             <EventSessionSelector
@@ -601,7 +625,8 @@ export function EventPageView({ data }: { data: EventPageData }) {
               onPlan={handlePlan}
               isPlanned={saveStatus.inPlan}
               priceLabel={data.priceLabel}
-              hasPurchaseUrl={hasPurchaseUrl}
+              purchaseUrl={data.cta.purchaseUrl}
+              buyLabel={data.cta.buyLabel}
             />
           </div>
         </section>
@@ -633,6 +658,7 @@ export function EventPageView({ data }: { data: EventPageData }) {
         sessionLine={sessionLineSticky}
         priceLabel={data.priceLabel}
         primaryLabel={data.cta.buyLabel}
+        primaryHref={data.cta.purchaseUrl}
         isPlanned={saveStatus.inPlan}
         isPrimaryLoading={isPrimaryLoading}
         isPlanLoading={isSecondaryLoading}

@@ -14,6 +14,7 @@ export interface SessionCardProps {
   subtitle?: string;
   /** Текст кнопки CTA (undefined — кнопка не отображается) */
   primaryLabel?: string;
+  primaryHref?: string;
   /** Если true — вместо CTA показывается «В лист ожидания» */
   primaryDisabled?: boolean;
   onPrimary?: () => void;
@@ -27,6 +28,7 @@ export function SessionCard({
   title,
   subtitle,
   primaryLabel,
+  primaryHref,
   primaryDisabled,
   onPrimary,
   onPlan,
@@ -93,13 +95,15 @@ export function SessionCard({
                 В лист ожидания
               </button>
             ) : (
-              <button
-                type="button"
+              <a
+                href={primaryHref}
+                target="_blank"
+                rel="noopener noreferrer"
                 onClick={onPrimary}
                 className="inline-flex h-14 items-center gap-2 rounded-full bg-[#E86A3A] px-6 text-[15px] font-semibold text-white transition-colors hover:bg-[#C24E22] active:translate-y-px"
               >
                 {primaryLabel} →
-              </button>
+              </a>
             )
           )}
           {onPlan && (

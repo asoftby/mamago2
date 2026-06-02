@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { CalendarDays, MapPin, Baby, CheckCircle2, Clock, XCircle, Star } from "lucide-react";
+import { CalendarDays, MapPin, Baby, CheckCircle2, Clock, XCircle, Star, Phone, MessageCircle, Route, ExternalLink } from "lucide-react";
 import { BookingStatus } from "@prisma/client";
 import { cn } from "@/lib/utils";
 import type { ParentBookingItem } from "@/server/services/booking/parentBookings.service";
@@ -16,7 +16,7 @@ const STATUS_CONFIG: Record<
   { label: string; icon: React.ElementType; className: string }
 > = {
   NEW: {
-    label: "Ожидает подтверждения",
+    label: "Заявка отправлена",
     icon: Clock,
     className: "text-amber-600 bg-amber-50 border-amber-200",
   },
@@ -26,7 +26,7 @@ const STATUS_CONFIG: Record<
     className: "text-emerald-600 bg-emerald-50 border-emerald-200",
   },
   COMPLETED: {
-    label: "Завершена",
+    label: "Посещение завершено",
     icon: CheckCircle2,
     className: "text-neutral-500 bg-neutral-50 border-neutral-200",
   },
@@ -62,14 +62,24 @@ export function ParentBookingCard({ booking }: Props) {
     status === BookingStatus.REJECTED || status === BookingStatus.CANCELLED;
   const isCompleted = status === BookingStatus.COMPLETED;
   const isConfirmed = status === BookingStatus.CONFIRMED;
-
-  const publicationHref = booking.activity?.slug
-    ? `/events/${booking.activity.slug}`
-    : booking.offer?.slug
-      ? `/offers/${booking.offer.slug}`
-      : booking.place?.slug
-        ? `/places/${booking.place.slug}`
-        : null;
+  const isPending = status === BookingStatus.NEW;
+  const publicationHref = booking.publicHref;
+  const phoneHref = booking.organizerPhone
+    ? `tel:${booking.organizerPhone.replace(/[^\d+]/g, "")}`
+    : null;
+  const messageHref = booking.organizerTelegramUrl ?? booking.organizerInstagramUrl;
+  const routeHref = booking.mapUrl
+    ? booking.mapUrl
+    : booking.address
+      ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(booking.address)}`
+      : null;
+  const hasContacts = Boolean(
+    booking.organizerPhone ||
+      booking.organizerTelegramUrl ||
+      booking.organizerInstagramUrl ||
+      booking.organizerWebsite ||
+      booking.address,
+  );
 
   return (
     <article
@@ -160,32 +170,76 @@ export function ParentBookingCard({ booking }: Props) {
       </div>
 
       {/* ── CTA section ── */}
-      {!isCancelled && (
-        <div className="border-t border-neutral-100 px-4 py-3">
-          {/* PENDING */}
-          {status === BookingStatus.NEW && (
-            <p className="text-[13px] text-neutral-400">
+      <div className="border-t border-neutral-100 px-4 py-3">
+        {isPending && (
+          <div className="space-y-3">
+            <p className="text-[13px] text-neutral-500">
               Ожидаем подтверждения от организатора
             </p>
-          )}
-
-          {/* CONFIRMED */}
-          {isConfirmed && (
             <div className="flex flex-wrap items-center gap-2">
-              {publicationHref && (
+              {publicationHref ? (
                 <Link
                   href={publicationHref}
                   className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-neutral-200 bg-white px-4 text-[13px] font-medium text-neutral-700 transition-colors hover:border-neutral-300 hover:bg-neutral-50"
                 >
                   Открыть
                 </Link>
-              )}
-              <AddToPlanButton booking={booking} />
+              ) : null}
             </div>
-          )}
+          </div>
+        )}
 
-          {/* COMPLETED — feedback */}
-          {isCompleted && !hasFeedback && (
+        {isConfirmed && (
+          <div className="space-y-3">
+            <div className="rounded-2xl border border-neutral-100 bg-neutral-50 p-3">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-neutral-400">
+                Контакты для связи
+              </p>
+              <div className="mt-1.5 space-y-1">
+                <p className="text-sm font-medium text-neutral-900">
+                  {booking.organizerName ?? booking.businessName ?? "Организатор"}
+                </p>
+                {booking.organizerPhone ? (
+                  <p className="text-xs text-neutral-500">{booking.organizerPhone}</p>
+                ) : null}
+                {booking.address ? (
+                  <p className="text-xs text-neutral-500">{booking.address}</p>
+                ) : null}
+                {booking.organizerWebsite ? (
+                  <p className="text-xs text-neutral-500">{booking.organizerWebsite}</p>
+                ) : null}
+              </div>
+              <p className="mt-2 text-xs leading-relaxed text-neutral-500">
+                Визит подтверждён организатором. Если планы изменились — свяжитесь с ним заранее.
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {phoneHref ? (
+                  <ActionLink href={phoneHref} icon={Phone} label="Позвонить" />
+                ) : null}
+                {messageHref ? (
+                  <ActionLink href={messageHref} icon={MessageCircle} label="Написать" external />
+                ) : null}
+                {routeHref ? (
+                  <ActionLink href={routeHref} icon={Route} label="Маршрут" external />
+                ) : null}
+                {publicationHref ? (
+                  <ActionLink href={publicationHref} icon={ExternalLink} label="Открыть" />
+                ) : null}
+              </div>
+              {!hasContacts && publicationHref ? (
+                <p className="mt-3 text-xs leading-relaxed text-neutral-500">
+                  Контакты не указаны. Откройте запись, чтобы посмотреть детали.
+                </p>
+              ) : null}
+            </div>
+          </div>
+        )}
+
+        {isCompleted && !hasFeedback && (
+          <div className="space-y-3">
+            <p className="text-[13px] text-neutral-500">
+              Посещение завершено
+            </p>
             <FeedbackWidget
               bookingId={booking.id}
               onSubmitted={(rating) => {
@@ -193,38 +247,92 @@ export function ParentBookingCard({ booking }: Props) {
                 setFeedbackRating(rating);
               }}
             />
-          )}
+            {publicationHref ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <Link
+                  href={publicationHref}
+                  className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-neutral-200 bg-white px-4 text-[13px] font-medium text-neutral-700 transition-colors hover:border-neutral-300 hover:bg-neutral-50"
+                >
+                  Открыть
+                </Link>
+              </div>
+            ) : null}
+          </div>
+        )}
 
-          {/* COMPLETED — already rated */}
-          {isCompleted && hasFeedback && feedbackRating != null && (
+        {isCompleted && hasFeedback && feedbackRating != null && (
+          <div className="space-y-3">
             <div className="flex items-center gap-1.5 text-[13px] text-neutral-400">
               <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
               <span>Вы оценили на {feedbackRating} из 5</span>
             </div>
-          )}
-        </div>
-      )}
+            {publicationHref ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <Link
+                  href={publicationHref}
+                  className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-neutral-200 bg-white px-4 text-[13px] font-medium text-neutral-700 transition-colors hover:border-neutral-300 hover:bg-neutral-50"
+                >
+                  Открыть
+                </Link>
+              </div>
+            ) : null}
+          </div>
+        )}
+
+        {isCancelled && publicationHref ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <Link
+              href={publicationHref}
+              className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-neutral-200 bg-white px-4 text-[13px] font-medium text-neutral-700 transition-colors hover:border-neutral-300 hover:bg-neutral-50"
+            >
+              Открыть
+            </Link>
+          </div>
+        ) : null}
+      </div>
     </article>
   );
 }
 
-// ─── Add to plan button ───────────────────────────────────────────────────────
+function ActionLink({
+  href,
+  icon: Icon,
+  label,
+  external = false,
+}: {
+  href: string;
+  icon: React.ElementType;
+  label: string;
+  external?: boolean;
+}) {
+  const commonClassName =
+    "inline-flex h-9 items-center gap-1.5 rounded-xl border border-neutral-200 bg-white px-4 text-[13px] font-medium text-neutral-700 transition-colors hover:border-neutral-300 hover:bg-neutral-50";
+  const content = (
+    <>
+      <Icon className="h-3.5 w-3.5" />
+      {label}
+    </>
+  );
 
-function AddToPlanButton({ booking }: { booking: ParentBookingItem }) {
-  // Only for activity-based bookings with a date
-  if (!booking.activityId || !booking.requestedDate) return null;
-
-  const dateStr = booking.requestedDate.split("T")[0];
-  if (!dateStr) return null;
-
-  const planHref = `/me/plan?add=${booking.activityId}&date=${dateStr}`;
+  if (external || href.startsWith("tel:")) {
+    return (
+      <a
+        href={href}
+        target={external ? "_blank" : undefined}
+        rel={external ? "noopener noreferrer" : undefined}
+        className={commonClassName}
+      >
+        {content}
+      </a>
+    );
+  }
 
   return (
     <Link
-      href={planHref}
-      className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-[#ffb38a] bg-[linear-gradient(180deg,_#ffb185_0%,_#ff8f61_100%)] px-4 text-[13px] font-semibold text-white shadow-sm transition-all hover:-translate-y-px"
+      href={href}
+      className={commonClassName}
     >
-      В план
+      {content}
     </Link>
   );
 }

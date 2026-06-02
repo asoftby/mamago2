@@ -31,7 +31,19 @@ type WeekCalendarStripProps = {
   compact?: boolean;
   showArrows?: boolean;
   itemsByDate?: Record<string, unknown[]>;
+  plannedCountByDate?: Record<string, number>;
 };
+
+function pluralizePlanEvents(count: number): string {
+  const abs = Math.abs(count);
+  const mod100 = abs % 100;
+  const mod10 = abs % 10;
+
+  if (mod100 >= 11 && mod100 <= 14) return "событий";
+  if (mod10 === 1) return "событие";
+  if (mod10 >= 2 && mod10 <= 4) return "события";
+  return "событий";
+}
 
 export function WeekCalendarStrip({
   selectedDate,
@@ -40,6 +52,7 @@ export function WeekCalendarStrip({
   compact = false,
   showArrows = true,
   itemsByDate,
+  plannedCountByDate,
 }: WeekCalendarStripProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const selectedRef = useRef<HTMLButtonElement>(null);
@@ -116,7 +129,10 @@ export function WeekCalendarStrip({
               const selected = iso === selectedDate;
               const isToday = iso === todayIso;
               const isPast = iso < todayIso;
-              const itemCount = itemsByDate?.[iso]?.length ?? 0;
+              const plannedCount =
+                plannedCountByDate?.[iso] ?? itemsByDate?.[iso]?.length ?? 0;
+              const hasPlannedItems = plannedCount > 0;
+              const plannedLabel = `${plannedCount} ${pluralizePlanEvents(plannedCount)} в плане`;
 
               return (
                 <button
@@ -128,7 +144,8 @@ export function WeekCalendarStrip({
                   style={{
                     flex: "1 1 0",
                     minWidth: 0,
-                    padding: "7px 4px 6px",
+                    minHeight: compact ? 52 : 56,
+                    padding: compact ? "6px 4px 10px" : "7px 4px 11px",
                     display: "flex",
                     flexDirection: "column",
                     alignItems: "center",
@@ -164,15 +181,23 @@ export function WeekCalendarStrip({
                   >
                     {d.getDate()}
                   </span>
-                  {/* Event dots */}
-                  <span style={{ display: "flex", gap: 2, height: 4, alignItems: "center" }}>
-                    {Array.from({ length: Math.min(itemCount, 3) }).map((_, i) => (
-                      <span
-                        key={i}
-                        style={{ width: 3, height: 3, borderRadius: 99, background: "#E86A3A" }}
-                      />
-                    ))}
-                  </span>
+                  {hasPlannedItems ? (
+                    <span
+                      aria-label={plannedLabel}
+                      title={plannedLabel}
+                      className={cn(
+                        "absolute left-1/2 bottom-0.5 z-10 -translate-x-1/2 inline-flex items-center justify-center",
+                        plannedCount === 1
+                          ? "h-1.5 w-1.5 rounded-full"
+                          : "min-w-4 rounded-full px-1 text-[9px] font-semibold leading-4",
+                        selected
+                          ? "bg-white text-[#141210]"
+                          : "bg-[#EF8759] text-white",
+                      )}
+                    >
+                      {plannedCount > 1 ? plannedCount : null}
+                    </span>
+                  ) : null}
                   {/* Today dot */}
                   {isToday && !selected && (
                     <span style={{

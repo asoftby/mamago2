@@ -287,13 +287,15 @@ export function EventDecisionPanel({
         {/* CTA row: primary button + heart */}
         <div className="flex items-center gap-3">
           {data.cta.purchaseUrl && (
-            <button
-              type="button"
+            <a
+              href={data.cta.purchaseUrl}
+              target="_blank"
+              rel="noopener noreferrer"
               onClick={onBuy}
               className="flex h-14 flex-1 items-center justify-center gap-2 rounded-full bg-[#E86A3A] text-[16px] font-semibold text-white transition-colors hover:bg-[#C24E22] active:translate-y-px"
             >
               {data.cta.buyLabel} <span aria-hidden>→</span>
-            </button>
+            </a>
           )}
 
           <button

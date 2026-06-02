@@ -10,6 +10,8 @@ import { AdminEventRowActions } from "@/components/admin/moderation/AdminEventRo
 import { MODERATION_CONTENT_STATUS_CONFIG } from "@/lib/admin/moderationContentStatusBadges";
 import { getModerationFilterCities } from "@/lib/admin/moderationAdminQueries";
 import { activityStatusesExcludingDeleted } from "@/lib/business/eventListWhere";
+import { getEventTemporalState } from "@/lib/events/eventTemporalState";
+import { cn } from "@/lib/utils";
 
 /** Список после DELETE из API должен перечитываться; иначе RSC может отдавать закэшированный снимок. */
 export const dynamic = "force-dynamic";
@@ -27,10 +29,19 @@ function parseContentStatusFilter(
 interface SearchParams {
   status?: string;
   cityId?: string;
+  temporal?: string;
+}
+
+function parseTemporalFilter(
+  raw: string | undefined,
+): "active" | "past" | undefined {
+  if (raw === "active" || raw === "past") return raw;
+  return undefined;
 }
 
 async function getActivities(params: SearchParams) {
   const status = parseContentStatusFilter(params.status);
+  const temporal = parseTemporalFilter(params.temporal);
 
   const where: Prisma.ActivityWhereInput = {
     type: ActivityType.EVENT,
@@ -44,9 +55,14 @@ async function getActivities(params: SearchParams) {
     ];
   }
 
-  return prisma.activity.findMany({
+  const activities = await prisma.activity.findMany({
     where,
     include: {
+      sessions: {
+        orderBy: { startsAt: "desc" },
+        take: 1,
+        select: { startsAt: true },
+      },
       place: {
         select: {
           title: true,
@@ -62,6 +78,24 @@ async function getActivities(params: SearchParams) {
     },
     orderBy: { createdAt: "desc" },
     take: 100,
+  });
+
+  if (!temporal) {
+    return activities;
+  }
+
+  return activities.filter((activity) => {
+    const temporalState = getEventTemporalState({
+      scheduleMode: activity.scheduleMode,
+      nextOccurrenceAt: activity.nextOccurrenceAt,
+      sessions: activity.sessions,
+    });
+
+    if (temporal === "past") {
+      return temporalState === "PAST";
+    }
+
+    return temporalState === "UPCOMING" || temporalState === "ONGOING";
   });
 }
 
@@ -98,6 +132,19 @@ function ActivitiesTable({
             const statusConfig =
               MODERATION_CONTENT_STATUS_CONFIG[activity.status] ||
               MODERATION_CONTENT_STATUS_CONFIG.DRAFT;
+            const temporalState = getEventTemporalState({
+              scheduleMode: activity.scheduleMode,
+              nextOccurrenceAt: activity.nextOccurrenceAt,
+              sessions: activity.sessions,
+            });
+            const temporalLabel =
+              activity.status === ContentStatus.PUBLISHED
+                ? temporalState === "PAST"
+                  ? "Уже прошло"
+                  : temporalState === "UPCOMING" || temporalState === "ONGOING"
+                    ? "Актуально"
+                    : null
+                : null;
             const cityLabel =
               activity.place?.city?.name ||
               (activity.cityId ? cityNameById.get(activity.cityId) : undefined) ||
@@ -110,9 +157,30 @@ function ActivitiesTable({
                   {activity.owner?.business?.name || activity.owner?.email || "—"}
                 </td>
                 <td className="px-4 py-3">
-                  <Badge variant={statusConfig.variant} className={statusConfig.className}>
-                    {statusConfig.label}
-                  </Badge>
+                  <div className="flex flex-col items-start gap-1 text-left">
+                    <Badge variant={statusConfig.variant} className={statusConfig.className}>
+                      {statusConfig.label}
+                    </Badge>
+                    {temporalLabel ? (
+                      <span
+                        className={cn(
+                          "inline-flex items-center gap-1.5 text-[12px] leading-none",
+                          temporalState === "PAST"
+                            ? "text-muted-foreground"
+                            : "text-emerald-600",
+                        )}
+                      >
+                        <span
+                          aria-hidden="true"
+                          className={cn(
+                            "h-1.5 w-1.5 rounded-full",
+                            temporalState === "PAST" ? "bg-gray-400" : "bg-emerald-500",
+                          )}
+                        />
+                        {temporalLabel}
+                      </span>
+                    ) : null}
+                  </div>
                 </td>
                 <td className="px-4 py-3 text-gray-600">
                   {formatDistanceToNow(activity.createdAt, { addSuffix: true, locale: ru })}
@@ -162,6 +230,7 @@ export default async function ModerationEventsPage({
         cities={cities}
         basePath="/admin/content/events"
         statusFilter="content"
+        showTemporalFilter
       />
 
       <Suspense fallback={<div>Загрузка…</div>}>

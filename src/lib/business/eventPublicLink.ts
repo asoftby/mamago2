@@ -1,4 +1,5 @@
 import { DEFAULT_CITY_SLUG } from "@/lib/intent";
+import { getCanonicalPublicAppUrl } from "@/lib/config/publicAppUrl";
 
 function isUsableCitySlug(value: string | undefined | null): value is string {
   const trimmed = (value ?? "").trim();
@@ -77,6 +78,24 @@ export function publicActivityPath(
   return `/${citySlug}/${PUBLIC_EVENT_PATH_SEGMENT}/${seg}`;
 }
 
+export function toAbsolutePublicUrl(pathOrUrl: string | null | undefined): string | null {
+  const value = pathOrUrl?.trim();
+  if (!value) return null;
+  if (/^https?:\/\//i.test(value)) {
+    return value;
+  }
+  const path = value.startsWith("/") ? value : `/${value}`;
+  return `${getCanonicalPublicAppUrl()}${path}`;
+}
+
+export function publicActivityUrl(
+  activityId: string,
+  cityField: string | undefined | null,
+  activitySlug?: string | null,
+): string {
+  return `${getCanonicalPublicAppUrl()}${publicActivityPath(activityId, cityField, activitySlug)}`;
+}
+
 export function canonicalPublicActivityPath(input: {
   activityId: string;
   activitySlug?: string | null;
@@ -93,4 +112,15 @@ export function canonicalPublicActivityPath(input: {
   });
   const seg = activityPublicPathSegment(input.activitySlug ?? null, input.activityId);
   return `/${citySlug}/${PUBLIC_EVENT_PATH_SEGMENT}/${seg}`;
+}
+
+export function canonicalPublicActivityUrl(input: {
+  activityId: string;
+  activitySlug?: string | null;
+  activityCitySlug?: string | null;
+  placeCitySlug?: string | null;
+  venueCitySlug?: string | null;
+  cityField?: string | null;
+}): string {
+  return `${getCanonicalPublicAppUrl()}${canonicalPublicActivityPath(input)}`;
 }

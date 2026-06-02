@@ -244,50 +244,55 @@ export function LocationBlock({
           {/* ── Right: map ── */}
           {hasMap && (
             <div
-              className="relative overflow-hidden rounded-[18px] bg-[#E8E0D4]"
-              style={{ aspectRatio: "4/3", minHeight: 280 }}
+              className="relative rounded-[18px] border border-[rgba(20,18,16,0.10)] bg-[#FAF7F1] p-2"
+              style={{ minHeight: 280 }}
             >
-              {mapDoc ? (
-                <iframe
-                  srcDoc={mapDoc}
-                  className="absolute inset-0 h-full w-full border-0"
-                  title={`Карта: ${name}`}
-                />
-              ) : mapUrl ? (
-                <img
-                  src={mapUrl}
-                  alt={`Карта: ${name}`}
-                  className="h-full w-full object-cover"
-                />
-              ) : null}
+              <div
+                className="relative overflow-hidden rounded-[14px]"
+                style={{ aspectRatio: "4/3", minHeight: 264 }}
+              >
+                {mapDoc ? (
+                  <iframe
+                    srcDoc={mapDoc}
+                    className="absolute inset-0 h-full w-full border-0"
+                    title={`Карта: ${name}`}
+                  />
+                ) : mapUrl ? (
+                  <img
+                    src={mapUrl}
+                    alt={`Карта: ${name}`}
+                    className="h-full w-full object-cover"
+                  />
+                ) : null}
 
-              {/* Bottom overlay */}
-              <div className="absolute bottom-0 left-0 right-0 flex items-center justify-between bg-white/95 px-4 py-3 backdrop-blur-sm">
-                <div className="min-w-0">
-                  <p className="truncate text-[13px] font-semibold text-[#141210]">
-                    &ldquo;{name}&rdquo;
-                  </p>
-                  {hasCoords ? (
-                    <p className="font-mono text-[10px] text-[rgba(20,18,16,0.55)]">
-                      {lat!.toFixed(4)}° N, {lng!.toFixed(4)}° E
+                {/* Bottom overlay */}
+                <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between rounded-[14px] border border-[rgba(20,18,16,0.10)] bg-[rgba(250,247,241,0.96)] px-4 py-3 backdrop-blur-sm">
+                  <div className="min-w-0">
+                    <p className="truncate text-[13px] font-semibold text-[#141210]">
+                      &ldquo;{name}&rdquo;
                     </p>
-                  ) : address ? (
-                    <p className="font-mono text-[10px] text-[rgba(20,18,16,0.55)]">
-                      {address}
-                    </p>
-                  ) : null}
+                    {hasCoords ? (
+                      <p className="font-mono text-[10px] text-[rgba(20,18,16,0.55)]">
+                        {lat!.toFixed(4)}° N, {lng!.toFixed(4)}° E
+                      </p>
+                    ) : address ? (
+                      <p className="font-mono text-[10px] text-[rgba(20,18,16,0.55)]">
+                        {address}
+                      </p>
+                    ) : null}
+                  </div>
+                  {mapsHref && (
+                    <a
+                      href={mapsHref}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="ml-4 flex shrink-0 items-center gap-1.5 text-[13px] font-semibold text-[#141210] transition-colors hover:text-[#E86A3A]"
+                    >
+                      <Navigation className="h-3.5 w-3.5" />
+                      Маршрут
+                    </a>
+                  )}
                 </div>
-                {mapsHref && (
-                  <a
-                    href={mapsHref}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="ml-4 flex shrink-0 items-center gap-1.5 text-[13px] font-semibold text-[#141210] transition-colors hover:text-[#E86A3A]"
-                  >
-                    <Navigation className="h-3.5 w-3.5" />
-                    Маршрут
-                  </a>
-                )}
               </div>
             </div>
           )}

@@ -49,6 +49,8 @@ export function IdeasGrid({
         const activity = idea.activity;
         const isRemoving = removingIdeaId === idea.id;
         const isScheduling = planningIdeaId === idea.id;
+        const isPastEvent =
+          idea.ideaType === "ACTIVITY" && activity.temporalState === "PAST";
         const isFreeByText =
           typeof activity.priceText === "string" &&
           activity.priceText.toLowerCase().includes("бесплатно");
@@ -71,7 +73,11 @@ export function IdeasGrid({
           idea.ideaType === "ROUTE" ? buildRouteModel(idea) : null;
 
         return (
-          <div key={idea.id} className="w-full max-w-[230px] sm:max-w-[250px]">
+          <div
+            key={idea.id}
+            className="w-full max-w-[230px] sm:max-w-[250px]"
+            style={isPastEvent ? { opacity: 0.8 } : undefined}
+          >
             <div className="space-y-3">
               {idea.ideaType === "ACTIVITY" ? (
                 <ActivityCard
@@ -119,8 +125,15 @@ export function IdeasGrid({
               ) : null}
 
               <div className="px-1">
+                {isPastEvent ? (
+                  <div className="mb-2 inline-flex items-center rounded-full bg-[rgba(20,18,16,0.06)] px-2.5 py-1 text-[11px] font-medium text-[rgba(20,18,16,0.68)]">
+                    Уже прошло
+                  </div>
+                ) : null}
                 <IdeaCardActions
                   isPlanned={idea.isPlanned}
+                  isPast={isPastEvent}
+                  publicHref={activity.publicHref ?? null}
                   onSchedule={() => onSchedule(idea.id)}
                   onRemove={() => onRemove(idea)}
                   isScheduling={isScheduling}

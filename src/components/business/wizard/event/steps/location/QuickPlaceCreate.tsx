@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -26,6 +26,15 @@ interface LocationData {
   metroName: string | null;
   metroDistanceM: number | null;
 }
+
+type ResolvedLocation = {
+  googlePlaceId: string | null;
+  lat: number;
+  lng: number;
+  formattedAddr: string;
+  addressJson: unknown[];
+  source: "google" | "map";
+};
 
 interface QuickPlaceCreateProps {
   onPlaceCreated: (location: LocationData) => void;
@@ -53,11 +62,8 @@ export function QuickPlaceCreate({
   placeCreateSource: _placeCreateSource,
 }: QuickPlaceCreateProps) {
   const [name, setName] = useState(initialName);
-  const [address, setAddress] = useState(initialAddress);
-  const [lat, setLat] = useState<number | null>(null);
-  const [lng, setLng] = useState<number | null>(null);
-  const [googlePlaceId, setGooglePlaceId] = useState<string | null>(null);
-  const [addressJson, setAddressJson] = useState<unknown[]>([]);
+  const [addressInputText, setAddressInputText] = useState(initialAddress);
+  const [resolvedLocation, setResolvedLocation] = useState<ResolvedLocation | null>(null);
   
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -77,36 +83,63 @@ export function QuickPlaceCreate({
     }
   }, [initialName]);
 
-  const handleAddressSelect = (placeData: {
+  useEffect(() => {
+    setName(initialName);
+    setAddressInputText(initialAddress);
+    setResolvedLocation(null);
+    setError(null);
+    setIsMapModalOpen(false);
+  }, [initialAddress, initialName]);
+
+  const handleAddressSelect = useCallback((placeData: {
     googlePlaceId: string;
     lat: number;
     lng: number;
     formattedAddr: string;
     addressJson: unknown[];
   }) => {
-    setAddress(placeData.formattedAddr);
-    setLat(placeData.lat);
-    setLng(placeData.lng);
-    setGooglePlaceId(placeData.googlePlaceId);
-    setAddressJson(placeData.addressJson);
+    setAddressInputText(placeData.formattedAddr);
+    setResolvedLocation({
+      googlePlaceId: placeData.googlePlaceId,
+      lat: placeData.lat,
+      lng: placeData.lng,
+      formattedAddr: placeData.formattedAddr,
+      addressJson: placeData.addressJson,
+      source: "google",
+    });
     setError(null);
-  };
+  }, []);
 
-  const handleMapConfirm = (mapData: {
+  const handleAddressInputChange = useCallback((value: string) => {
+    setAddressInputText(value);
+    setError(null);
+    setResolvedLocation((current) => {
+      if (!current) {
+        return null;
+      }
+      return value === current.formattedAddr ? current : null;
+    });
+  }, []);
+
+  const handleMapConfirm = useCallback((mapData: {
     lat: number;
     lng: number;
     formattedAddr?: string;
   }) => {
-    setLat(mapData.lat);
-    setLng(mapData.lng);
-    setAddress(
+    const formattedAddr =
       mapData.formattedAddr?.trim() ||
-        `Координаты: ${mapData.lat.toFixed(6)}, ${mapData.lng.toFixed(6)}`,
-    );
-    setGooglePlaceId(null);
-    setAddressJson([]);
+      `Координаты: ${mapData.lat.toFixed(6)}, ${mapData.lng.toFixed(6)}`;
+    setAddressInputText(formattedAddr);
+    setResolvedLocation({
+      googlePlaceId: null,
+      lat: mapData.lat,
+      lng: mapData.lng,
+      formattedAddr,
+      addressJson: [],
+      source: "map",
+    });
     setError(null);
-  };
+  }, []);
 
   const handleCreate = async () => {
     // Validation
@@ -115,7 +148,11 @@ export function QuickPlaceCreate({
       return;
     }
 
-    if (!lat || !lng) {
+    if (
+      !resolvedLocation ||
+      !Number.isFinite(resolvedLocation.lat) ||
+      !Number.isFinite(resolvedLocation.lng)
+    ) {
       setError("Выберите адрес или точку на карте");
       return;
     }
@@ -127,13 +164,13 @@ export function QuickPlaceCreate({
       if (deferPlaceCreation) {
         onPlaceCreated({
           title: name.trim(),
-          address,
-          fullAddress: address,
+          address: resolvedLocation.formattedAddr,
+          fullAddress: resolvedLocation.formattedAddr,
           cityId: null,
           cityName: null,
           citySlug: null,
-          lat,
-          lng,
+          lat: resolvedLocation.lat,
+          lng: resolvedLocation.lng,
           districtId: null,
           districtName: null,
           metroId: null,
@@ -145,24 +182,25 @@ export function QuickPlaceCreate({
 
       const place = await createQuickPlaceDraft({
         title: name.trim(),
-        formattedAddr: address,
-        lat,
-        lng,
-        googlePlaceId,
-        addressJson,
+        formattedAddr: resolvedLocation.formattedAddr,
+        lat: resolvedLocation.lat,
+        lng: resolvedLocation.lng,
+        googlePlaceId: resolvedLocation.googlePlaceId,
+        addressJson: resolvedLocation.addressJson,
         source: embedded ? "article_editor" : "event_wizard",
       });
 
       onPlaceCreated({
         id: place.id,
         title: name.trim(),
-        address: place.customAddress || place.formattedAddr || address,
-        fullAddress: place.formattedAddr || place.customAddress || address,
+        address: place.customAddress || place.formattedAddr || resolvedLocation.formattedAddr,
+        fullAddress:
+          place.formattedAddr || place.customAddress || resolvedLocation.formattedAddr,
         cityId: place.cityId || null,
         cityName: null,
         citySlug: null,
-        lat: place.lat ?? lat,
-        lng: place.lng ?? lng,
+        lat: place.lat ?? resolvedLocation.lat,
+        lng: place.lng ?? resolvedLocation.lng,
         districtId: place.districtManualId || place.districtAutoId || null,
         districtName: null,
         metroId: place.metroManualId || place.metroAutoId || null,
@@ -179,7 +217,12 @@ export function QuickPlaceCreate({
     }
   };
 
-  const canSave = name.trim().length > 0 && lat !== null && lng !== null;
+  const hasResolvedLocation =
+    resolvedLocation !== null &&
+    Number.isFinite(resolvedLocation.lat) &&
+    Number.isFinite(resolvedLocation.lng);
+  const shouldShowAddressHint = addressInputText.trim().length > 0 && !hasResolvedLocation;
+  const canSave = name.trim().length > 0 && hasResolvedLocation;
 
   return (
     <div
@@ -230,10 +273,16 @@ export function QuickPlaceCreate({
             <EventLocationSearchInput
               ref={addressInputRef}
               onPlaceSelect={handleAddressSelect}
+              onInputValueChange={handleAddressInputChange}
               disabled={isSaving}
-              initialValue={address}
+              initialValue={addressInputText}
               placeholder="Притыцкого 12 или выберите на карте"
             />
+            {shouldShowAddressHint ? (
+              <p className="text-sm text-amber-700">
+                Выберите адрес из списка подсказок или точку на карте
+              </p>
+            ) : null}
             <button
               type="button"
               onClick={() => setIsMapModalOpen(true)}
@@ -246,12 +295,12 @@ export function QuickPlaceCreate({
         </div>
 
         {/* Selected Location Preview */}
-        {lat && lng && (
+        {hasResolvedLocation && resolvedLocation && (
           <div className="flex items-start gap-2 rounded-lg bg-green-50 p-3 text-sm">
             <CheckCircle2 className="mt-0.5 h-4 w-4 flex-shrink-0 text-green-600" />
             <div className="min-w-0 flex-1">
               <div className="font-medium text-green-900">Локация выбрана</div>
-              <div className="mt-0.5 text-green-700">{address}</div>
+              <div className="mt-0.5 text-green-700">{resolvedLocation.formattedAddr}</div>
             </div>
           </div>
         )}
@@ -299,8 +348,8 @@ export function QuickPlaceCreate({
         <EventLocationMapModal
           isOpen={isMapModalOpen}
           onClose={() => setIsMapModalOpen(false)}
-          initialLat={lat}
-          initialLng={lng}
+          initialLat={resolvedLocation?.lat ?? null}
+          initialLng={resolvedLocation?.lng ?? null}
           onConfirm={handleMapConfirm}
           layout={mapLayout === "inline" ? "inline" : "fullscreen"}
         />

@@ -46,7 +46,9 @@ export function EventPublishedSuccessDialog({
         </DialogHeader>
         <DialogFooter className="flex-col gap-2 sm:flex-col">
           <PrimaryButton className="w-full" asChild>
-            <Link href={activityHref}>Посмотреть событие</Link>
+            <a href={activityHref} target="_blank" rel="noopener noreferrer">
+              Посмотреть событие
+            </a>
           </PrimaryButton>
           <Button
             variant="outline"

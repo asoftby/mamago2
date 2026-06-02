@@ -72,11 +72,34 @@ const ArrowIcon = () => (
 );
 
 export function MyPlanWidget({ onOpen }: MyPlanWidgetProps) {
-  const { todayCount, weekItemsCount, nextPlanItem, authLoading, isLoading, isAuthenticated } = useMyPlan();
+  const {
+    todayCount,
+    weekItemsCount,
+    nextPlanItem,
+    authLoading,
+    isLoading,
+    isAuthenticated,
+    planSummaryLoading,
+  } = useMyPlan();
 
   const widgetState = useMemo(
-    () => resolveWidgetState({ authLoading: authLoading || isLoading, isAuthenticated, todayCount, weekItemsCount, nextPlanItem }),
-    [authLoading, isLoading, isAuthenticated, todayCount, weekItemsCount, nextPlanItem],
+    () =>
+      resolveWidgetState({
+        authLoading: authLoading || isLoading || (isAuthenticated && planSummaryLoading),
+        isAuthenticated,
+        todayCount,
+        weekItemsCount,
+        nextPlanItem,
+      }),
+    [
+      authLoading,
+      isLoading,
+      isAuthenticated,
+      nextPlanItem,
+      planSummaryLoading,
+      todayCount,
+      weekItemsCount,
+    ],
   );
 
   const { label, value, badge } = stateToText(widgetState);
