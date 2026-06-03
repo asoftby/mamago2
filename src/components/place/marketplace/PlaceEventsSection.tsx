@@ -1,11 +1,10 @@
 "use client";
 
-import { ArrowRight, Heart, Calendar, Clock } from "lucide-react";
-import Image from "next/image";
 import Link from "next/link";
 import { format } from "date-fns";
 import { ru } from "date-fns/locale";
 import { isAppMediaUrl } from "@/lib/media/isAppMediaUrl";
+import Image from "next/image";
 
 interface Event {
   id: string;
@@ -23,103 +22,210 @@ interface PlaceEventsSectionProps {
 }
 
 export function PlaceEventsSection({ events, placeId }: PlaceEventsSectionProps) {
-  if (events.length === 0) {
-    return null;
-  }
+  if (events.length === 0) return null;
 
   return (
-    <section className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-gray-900">Разовые занятия</h2>
-        <Link
-          href={`/places/${placeId}#events`}
-          className="flex items-center gap-1 text-sm font-medium text-[#EF8759] transition hover:text-[#EF8759]/80"
+    <section
+      style={{
+        padding: "56px 0",
+        borderTop: "1px solid rgba(20,18,16,.10)",
+        background: "#ffffff",
+      }}
+    >
+      <div
+        style={{ maxWidth: 1200, margin: "0 auto", padding: "0 28px" }}
+        className="events-wrap"
+      >
+        {/* Header */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "flex-end",
+            justifyContent: "space-between",
+            marginBottom: 34,
+            gap: 16,
+            flexWrap: "wrap",
+          }}
         >
-          Все занятия
-          <ArrowRight className="h-4 w-4" />
-        </Link>
+          <div>
+            <div className="kicker-row" style={{ marginBottom: 14 }}>
+              <span className="text-kicker">Афиша</span>
+              <span className="kicker-line" style={{ width: 120 }} />
+            </div>
+            <h2
+              style={{
+                fontSize: 30,
+                margin: 0,
+                letterSpacing: "-.02em",
+                color: "#141210",
+                fontFamily: "var(--font-sans)",
+                fontWeight: 400,
+              }}
+            >
+              Что{" "}
+              <em style={{ fontFamily: "Georgia, serif", fontStyle: "italic", fontWeight: 400, color: "#C24E22" }}>
+                происходит
+              </em>
+            </h2>
+          </div>
+          <Link
+            href={`/places/${placeId}#events`}
+            style={{
+              fontSize: 14,
+              color: "#3A332B",
+              textDecoration: "underline",
+              textUnderlineOffset: 4,
+              whiteSpace: "nowrap",
+            }}
+          >
+            Все события →
+          </Link>
+        </div>
+
+        {/* 4-col card grid */}
+        <div
+          className="events-grid"
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(4, 1fr)",
+            gap: 14,
+          }}
+        >
+          {events.slice(0, 4).map((event) => (
+            <EventCard key={event.id} event={event} />
+          ))}
+        </div>
       </div>
 
-      <div className="flex gap-4 overflow-x-auto pb-4 no-scrollbar">
-        {events.map((event) => (
-          <EventCard key={event.id} event={event} />
-        ))}
-      </div>
+      <style>{`
+        @media (max-width: 900px) {
+          .events-grid { grid-template-columns: repeat(2, 1fr) !important; }
+          .events-wrap { padding: 0 22px !important; }
+        }
+        @media (max-width: 520px) {
+          .events-grid { grid-template-columns: 1fr !important; }
+          .events-wrap { padding: 0 18px !important; }
+        }
+      `}</style>
     </section>
   );
 }
 
 function EventCard({ event }: { event: Event }) {
   const eventDate = new Date(event.startDate);
-  const formattedDate = format(eventDate, "d MMMM", { locale: ru });
-  const formattedTime = format(eventDate, "HH:mm");
+  const formattedDate = format(eventDate, "d MMM · EEE", { locale: ru });
 
   return (
     <Link
       href={`/events/${event.slug}`}
-      className="group relative flex w-[280px] flex-shrink-0 flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white transition hover:shadow-lg"
+      style={{ display: "flex", flexDirection: "column", gap: 12, textDecoration: "none" }}
     >
       {/* Image */}
-      <div className="relative aspect-[4/3] overflow-hidden bg-gray-100">
-        {event.imageUrl ? (
-          <Image
-            src={event.imageUrl}
-            alt={event.title}
-            fill
-            sizes="280px"
-            unoptimized={isAppMediaUrl(event.imageUrl)}
-            className="object-cover transition duration-300 group-hover:scale-105"
-          />
-        ) : (
-          <div className="flex h-full items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200">
-            <Calendar className="h-12 w-12 text-gray-400" />
-          </div>
+      <div
+        style={{
+          aspectRatio: "4/5",
+          borderRadius: 14,
+          overflow: "hidden",
+          position: "relative",
+          background: "repeating-linear-gradient(135deg, rgba(20,18,16,.05) 0 1px, transparent 1px 12px), linear-gradient(180deg, #E9E2D6, #DDD3C2)",
+        }}
+      >
+        {event.imageUrl && (
+          isAppMediaUrl(event.imageUrl) ? (
+            <img
+              src={event.imageUrl}
+              alt={event.title}
+              style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", transition: "transform 1.2s cubic-bezier(.2,.7,.2,1)" }}
+            />
+          ) : (
+            <Image
+              src={event.imageUrl}
+              alt={event.title}
+              fill
+              sizes="(max-width: 520px) 100vw, (max-width: 900px) 50vw, 25vw"
+              className="object-cover"
+            />
+          )
         )}
-
-        {/* Price Badge */}
-        {event.price && (
-          <div className="absolute left-3 top-3 rounded-full bg-white px-3 py-1 text-sm font-semibold text-gray-900 shadow-md">
-            от {event.price} BYN
-          </div>
-        )}
-
-        {/* Save Button */}
-        <button
-          onClick={(e) => {
-            e.preventDefault();
-            // TODO: Implement save functionality
+        {/* Date badge */}
+        <span
+          style={{
+            position: "absolute",
+            top: 10,
+            left: 10,
+            height: 26,
+            padding: "0 10px",
+            borderRadius: 999,
+            background: "rgba(250,247,241,.94)",
+            backdropFilter: "blur(6px)",
+            fontSize: 11,
+            fontWeight: 500,
+            color: "#141210",
+            display: "inline-flex",
+            alignItems: "center",
           }}
-          className="absolute right-3 top-3 rounded-full bg-white/90 p-2 backdrop-blur-sm transition hover:bg-white"
-          aria-label="Сохранить"
         >
-          <Heart className="h-4 w-4 text-gray-700" />
-        </button>
+          {formattedDate}
+        </span>
+        {/* Price badge */}
+        {event.price && (
+          <span
+            style={{
+              position: "absolute",
+              top: 10,
+              right: 10,
+              height: 26,
+              padding: "0 10px",
+              borderRadius: 999,
+              background: "#E86A3A",
+              color: "#fff",
+              fontSize: 11,
+              fontWeight: 600,
+              display: "inline-flex",
+              alignItems: "center",
+            }}
+          >
+            от {event.price} BYN
+          </span>
+        )}
       </div>
 
-      {/* Content */}
-      <div className="flex flex-1 flex-col gap-2 p-4">
-        <h3 className="line-clamp-2 text-base font-semibold text-gray-900 group-hover:text-[#EF8759]">
-          {event.title}
-        </h3>
-
-        <div className="mt-auto space-y-1 text-sm text-gray-600">
-          <div className="flex items-center gap-1.5">
-            <Calendar className="h-4 w-4" />
-            <span>{formattedDate}</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <Clock className="h-4 w-4" />
-            <span>{formattedTime}</span>
-          </div>
-        </div>
-
+      {/* Meta */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
         {event.category && (
-          <div className="mt-2">
-            <span className="inline-block rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-700">
-              {event.category}
-            </span>
+          <div
+            style={{
+              fontFamily: "var(--font-mono, monospace)",
+              textTransform: "uppercase",
+              fontSize: 10,
+              letterSpacing: ".12em",
+              color: "rgba(20,18,16,.55)",
+            }}
+          >
+            {event.category}
           </div>
         )}
+        <div
+          style={{
+            fontSize: 16,
+            fontWeight: 600,
+            letterSpacing: "-.01em",
+            lineHeight: 1.25,
+            color: "#141210",
+          }}
+        >
+          {event.title}
+        </div>
+        <div
+          style={{
+            fontFamily: "var(--font-mono, monospace)",
+            fontSize: 12,
+            color: "rgba(20,18,16,.55)",
+            marginTop: 4,
+          }}
+        >
+          {formattedDate}
+        </div>
       </div>
     </Link>
   );

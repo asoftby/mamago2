@@ -6,6 +6,7 @@ import { MapPin, Phone, Globe, Instagram, Clock } from "lucide-react";
 import { sortAgeKeys } from "@/lib/config/ages";
 import { getCategoryLabel } from "@/lib/placeCategoryLabels";
 import { getFormatLabel } from "@/lib/placeChips";
+import { RichContentRenderer } from "@/components/content/RichContentRenderer";
 
 interface PlacePreviewCardProps {
   place: {
@@ -74,7 +75,10 @@ export function PlacePreviewCard({ place }: PlacePreviewCardProps) {
         {place.description && (
           <div>
             <h3 className="font-semibold text-gray-900 mb-2">Описание</h3>
-            <p className="text-gray-700 whitespace-pre-wrap">{place.description}</p>
+            <RichContentRenderer
+              html={place.description}
+              className="prose-gray max-w-none text-base leading-relaxed text-gray-700 prose-p:text-base prose-p:leading-relaxed prose-p:text-gray-700 prose-p:my-5 [&>p:last-child]:mb-0 prose-headings:text-gray-900 prose-strong:text-gray-900 [&>p:first-child]:mt-0"
+            />
           </div>
         )}
 

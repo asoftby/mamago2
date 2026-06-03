@@ -71,6 +71,7 @@
     "@react-email/components": "^1.0.11",
     "@react-email/render": "^2.0.5",
     "@sentry/nextjs": "^10.52.0",
+    "@tiptap/core": "^3.20.1",
     "@tiptap/extension-link": "^3.20.1",
     "@tiptap/extension-placeholder": "^3.20.1",
     "@tiptap/extension-underline": "^3.20.1",

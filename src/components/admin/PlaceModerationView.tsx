@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { MapPin, Navigation, Phone, Globe, Instagram, ArrowLeft, ExternalLink } from "lucide-react";
+import { RichContentRenderer } from "@/components/content/RichContentRenderer";
 import { formatDistance } from "@/lib/formatDistance";
 import { formatDistanceToNow } from "date-fns";
 import { ru } from "date-fns/locale";
@@ -16,6 +17,7 @@ import { getPlacePublicUrl } from "@/lib/placePublicUrl";
 import { PlaceDangerZone } from "@/components/admin/moderation/PlaceDangerZone";
 import { Textarea } from "@/components/ui/textarea";
 import { getFormatLabel } from "@/lib/placeChips";
+import { GoogleReviewsStatusBadge } from "@/components/admin/moderation/GoogleReviewsStatusBadge";
 
 const STATUS_CONFIG = {
   DRAFT: { label: "Черновик", variant: "secondary" as const, className: "" },
@@ -51,6 +53,10 @@ interface PlaceModerationViewProps {
     ageTags: string[];
     visitFormats: string[];
     activityTypes: string[];
+    googlePlaceId?: string | null;
+    googleRating?: number | null;
+    googleUserRatingsTotal?: number | null;
+    googleReviewsJson?: unknown;
     slug?: string | null;
     shortAddress?: string | null;
     owner?: { business: { name: string } | null } | null;
@@ -176,7 +182,10 @@ export function PlaceModerationView({ place }: PlaceModerationViewProps) {
           {place.description && (
             <div>
               <h3 className="text-lg font-semibold text-gray-900 mb-2">Описание</h3>
-              <p className="text-gray-700 whitespace-pre-wrap">{place.description}</p>
+              <RichContentRenderer
+                html={place.description}
+                className="prose-gray max-w-none text-base leading-relaxed text-gray-700 prose-p:text-base prose-p:leading-relaxed prose-p:text-gray-700 prose-p:my-5 [&>p:last-child]:mb-0 prose-headings:text-gray-900 prose-strong:text-gray-900 [&>p:first-child]:mt-0"
+              />
             </div>
           )}
 
@@ -185,6 +194,12 @@ export function PlaceModerationView({ place }: PlaceModerationViewProps) {
             <h3 className="text-lg font-semibold text-gray-900 mb-3">Местоположение</h3>
             <div className="space-y-2">
               <p className="text-gray-700">{displayAddress}</p>
+              <GoogleReviewsStatusBadge
+                googlePlaceId={place.googlePlaceId}
+                googleRating={place.googleRating}
+                googleUserRatingsTotal={place.googleUserRatingsTotal}
+                googleReviewsJson={place.googleReviewsJson}
+              />
 
               {(districtName || shouldShowMetro) && (
                 <div className="flex items-center gap-3 flex-wrap">

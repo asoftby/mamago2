@@ -17,6 +17,7 @@ interface StoryModalVisualProps {
   paused: boolean;
   onNext: () => void;
   onPrev: () => void;
+  onProgressComplete: () => void;
 }
 
 export function StoryModalVisual({
@@ -29,6 +30,7 @@ export function StoryModalVisual({
   paused,
   onNext,
   onPrev,
+  onProgressComplete,
 }: StoryModalVisualProps) {
   const isFirst = !prevItem && activeItemIndex === 0;
   const imgKey = `${currentItem.id}-${currentItem.image}`;
@@ -67,7 +69,8 @@ export function StoryModalVisual({
           alt={currentItem.title}
           fill
           className={cn("object-cover transition-opacity duration-300", imgLoaded ? "opacity-100" : "opacity-0")}
-          sizes="(max-width: 768px) 100vw, 420px"
+          sizes="(max-width: 768px) 100vw, 500px"
+          quality={90}
           priority
           onLoad={() => setImgLoaded(true)}
           onError={() => { setImgLoaded(false); setImgError(true); }}
@@ -87,6 +90,7 @@ export function StoryModalVisual({
           current={activeItemIndex}
           progressKey={progressKey}
           paused={paused}
+          onComplete={onProgressComplete}
         />
       </div>
 

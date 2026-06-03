@@ -39,7 +39,9 @@ export function IdeasClient({ initialIdeas, discoveryHref = "/minsk" }: Props) {
   const counts = useMemo(
     () => ({
       ALL: ideas.length,
-      UNPLANNED: ideas.filter((idea) => !idea.isPlanned).length,
+      UNPLANNED: ideas.filter(
+        (idea) => !idea.isPlanned && idea.activity.temporalState !== "PAST",
+      ).length,
       PLANNED: ideas.filter((idea) => idea.isPlanned).length,
     }),
     [ideas],
@@ -49,7 +51,9 @@ export function IdeasClient({ initialIdeas, discoveryHref = "/minsk" }: Props) {
     () =>
       ideas.filter((idea) => {
         if (filter === "PLANNED") return idea.isPlanned;
-        if (filter === "UNPLANNED") return !idea.isPlanned;
+        if (filter === "UNPLANNED") {
+          return !idea.isPlanned && idea.activity.temporalState !== "PAST";
+        }
         return true;
       }),
     [filter, ideas],

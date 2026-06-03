@@ -1,4 +1,4 @@
-import { formatDescriptionText } from "./formatDescription";
+import { formatDescriptionText, normalizeParagraphs } from "./formatDescription";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -126,6 +126,28 @@ function paragraphCount(text: string): number {
   const result = formatDescriptionText(input);
   const occurrences = result.split("Строка одна.").length - 1;
   console.assert(occurrences === 1, `[14] duplicate lines removed, found ${occurrences} occurrences`);
+}
+
+// 15. Длинный один абзац бьётся на несколько коротких
+{
+  const input =
+    "Это большой анонс события для родителей и детей. Здесь рассказывается, что будет происходить на площадке, " +
+    "какие активности ждут гостей, почему программа подойдёт семьям с детьми разного возраста. " +
+    "Организаторы подготовили мастер-классы, игровую зону, выступления и спокойные пространства для отдыха. " +
+    "Также на площадке будут фотозоны и небольшая ярмарка с товарами местных брендов. " +
+    "Гостям стоит прийти заранее, чтобы спокойно зарегистрироваться и выбрать удобные активности. " +
+    "На месте будут координаторы, которые помогут с навигацией и подскажут расписание.";
+  const paragraphs = normalizeParagraphs(input);
+  console.assert(paragraphs.length >= 2, `[15] long paragraph should split, got ${paragraphs.length}`);
+}
+
+// 16. Стоимость и время сохраняются отдельными блоками
+{
+  const input =
+    "Приходите всей семьёй на городской праздник.\n\nСтоимость:\n— взрослый билет — 20 BYN\n— детский билет — 10 BYN\n\nВремя:\n10:00–23:00";
+  const result = formatDescriptionText(input);
+  console.assert(result.includes("Стоимость:\n— взрослый билет — 20 BYN"), `[16] price block preserved: ${result}`);
+  console.assert(result.includes("Время:\n10:00–23:00"), `[16] time block preserved: ${result}`);
 }
 
 console.log("formatDescriptionText: all assertions passed");

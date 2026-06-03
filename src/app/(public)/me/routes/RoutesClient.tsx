@@ -14,6 +14,7 @@ export type UserRoute = {
   title: string;
   ageTags: string[];
   budgetLevel: string;
+  budgetLabel: string;
   status: string;
   stopsCount: number;
   coverImageUrl: string | null;

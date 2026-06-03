@@ -8,6 +8,7 @@ import { GoogleMapsService } from "@/services/googleMaps";
 interface PlaceSearchInputProps {
   onPlaceSelect: (data: {
     googlePlaceId: string;
+    placeName: string;
     lat: number;
     lng: number;
     formattedAddr: string;
@@ -37,6 +38,8 @@ export function PlaceSearchInput({ onPlaceSelect, disabled, initialValue }: Plac
       const input = inputRef.current;
       if (!input || !(input instanceof HTMLInputElement)) return;
 
+      // TODO(google-maps-tech-debt): migrate from deprecated Autocomplete to PlaceAutocompleteElement
+      // after we finish stabilizing the geo options + enrichment flow in Place Wizard step 2.
       const autocomplete = new placesLib.Autocomplete(input, {
         types: ["geocode", "establishment"],
         fields: ["place_id", "name", "geometry", "formatted_address", "address_components"],
@@ -54,6 +57,7 @@ export function PlaceSearchInput({ onPlaceSelect, disabled, initialValue }: Plac
 
         onPlaceSelect({
           googlePlaceId: place.place_id,
+          placeName: place.name || "",
           lat: place.geometry.location.lat(),
           lng: place.geometry.location.lng(),
           formattedAddr: place.formatted_address || "",
@@ -78,6 +82,7 @@ export function PlaceSearchInput({ onPlaceSelect, disabled, initialValue }: Plac
     <div className="relative">
       <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
       <Input
+        id="place-location-search"
         ref={inputRef}
         placeholder="Адрес или название места"
         className="pl-10"

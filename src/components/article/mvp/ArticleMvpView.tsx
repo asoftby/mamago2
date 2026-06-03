@@ -16,7 +16,7 @@ import {
   type ArticleTocBranch,
 } from "@/lib/article/articleHeadingAnchors";
 import { ArticleReadingScrollPadding } from "@/components/article/mvp/ArticleReadingScrollPadding";
-import { articleBlockHtmlForEditor } from "@/lib/article/articleBlockHtml";
+import { articleBlockHtmlForEditor, articleBlockHtmlForPublic } from "@/lib/article/articleBlockHtml";
 import { cn } from "@/lib/utils";
 import { ArticleInstagramScript } from "@/components/article/mvp/ArticleInstagramScript";
 import { BreakingNewsGalleryPreview } from "@/components/article/mvp/BreakingNewsGalleryPreview";
@@ -64,6 +64,7 @@ export function ArticleMvpView({
   excerpt,
   publishedAt,
   blocks,
+  editHref,
   draftWatermark,
   /** Доп. scroll-padding (напр. панель предпросмотра под хедером). */
   readingScrollPaddingExtraRem,
@@ -73,6 +74,7 @@ export function ArticleMvpView({
   excerpt: string | null;
   publishedAt: Date | null;
   blocks: ArticleMvpResolvedBlock[];
+  editHref?: string;
   draftWatermark?: boolean;
   readingScrollPaddingExtraRem?: number;
 }) {
@@ -128,6 +130,7 @@ export function ArticleMvpView({
         category="Журнал"
         readTime={5}
         publishedAt={publishedAt ?? undefined}
+        editHref={editHref}
       />
 
       {showExcerptBelowHeader ? (
@@ -171,25 +174,30 @@ export function ArticleMvpView({
                 <div
                   className="font-serif leading-[1.75] md:leading-[1.8] text-foreground/95 mb-6 md:mb-7 last:mb-0 [&_p]:mb-4 [&_p:last-child]:mb-0 [&_ul]:my-3 [&_ol]:my-3 [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6 [&_li]:my-0.5 [&_a]:text-primary [&_a]:underline [&_a]:underline-offset-2 [&_a]:decoration-primary/40"
                   dangerouslySetInnerHTML={{
-                    __html: articleBlockHtmlForEditor(block.text, "text"),
+                    __html: articleBlockHtmlForPublic(block.text, "text"),
                   }}
                 />
               );
             }
             if (block.type === "quote") {
               return (
-                <blockquote className="not-prose border-l-[3px] border-primary/40 pl-5 pr-2 py-1 my-8 md:my-10 rounded-r-lg bg-muted/40">
-                  <div
-                    className="text-lg text-foreground/90 leading-relaxed font-serif [&_em]:italic [&_i]:italic [&_p]:mb-2 [&_p:last-child]:mb-0"
-                    dangerouslySetInnerHTML={{
-                      __html: articleBlockHtmlForEditor(block.text, "quote"),
-                    }}
-                  />
-                  {block.attribution ? (
-                    <footer className="mt-3 text-sm text-muted-foreground not-italic font-sans">
-                      — {block.attribution}
-                    </footer>
-                  ) : null}
+                <blockquote className="not-prose flex gap-4 my-8 md:my-10">
+                  <div className="w-[3px] shrink-0 self-stretch rounded-full bg-primary" />
+                  <div className="min-w-0 flex-1 py-1">
+                    <div
+                      className="text-xl leading-relaxed font-serif [&_em]:italic [&_i]:italic [&_p]:mb-3 [&_p:last-child]:mb-0"
+                      dangerouslySetInnerHTML={{
+                        __html: articleBlockHtmlForEditor(block.text, "quote"),
+                      }}
+                    />
+                    {(block.attribution || block.authorRole) ? (
+                      <footer className="mt-4 text-xs uppercase tracking-[0.08em] text-muted-foreground font-sans">
+                        {block.attribution && <span>— {block.attribution}</span>}
+                        {block.attribution && block.authorRole && <span className="mx-1.5">·</span>}
+                        {block.authorRole && <span>{block.authorRole}</span>}
+                      </footer>
+                    ) : null}
+                  </div>
                 </blockquote>
               );
             }

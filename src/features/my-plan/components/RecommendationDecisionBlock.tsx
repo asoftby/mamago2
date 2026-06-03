@@ -1,6 +1,5 @@
 "use client";
 
-import { motion } from "framer-motion";
 import { RefreshCw, Sparkles, BookOpen } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -14,6 +13,12 @@ type RecommendationDecisionBlockProps = {
   compact?: boolean;
 };
 
+const ArrowIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M5 12h14M13 6l6 6-6 6"/>
+  </svg>
+);
+
 export function RecommendationDecisionBlock({
   onDecide,
   onCatalog,
@@ -23,96 +28,176 @@ export function RecommendationDecisionBlock({
   compact = false,
 }: RecommendationDecisionBlockProps) {
   return (
-    <section
-      className={cn(
-        "space-y-3",
-        compact ? "space-y-2.5" : "space-y-3",
-      )}
-      aria-label="Выбор действия"
-    >
-      {/* Two equal-weight action cards */}
-      <div className="grid grid-cols-2 gap-2.5">
-        {/* Card 1 — «Реши за меня» */}
+    <section className={cn("space-y-3", compact && "space-y-2")} aria-label="Выбор действия">
+      {/* Two choice cards */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: compact ? 8 : 12 }}>
+
+        {/* Card 1 — Реши за меня (accent) */}
         <button
           type="button"
           onClick={onDecide}
-          className={cn(
-            "group relative flex flex-col items-start gap-2 overflow-hidden rounded-2xl border border-[#F6B69C] p-4 text-left transition-transform duration-200",
-            "bg-[linear-gradient(135deg,#FF8F64_0%,#FFB48E_42%,#FFE1D2_100%)] shadow-[0_8px_24px_-12px_rgba(239,135,89,0.55)]",
-            "hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF9B73]/60",
-          )}
+          style={{
+            position: "relative",
+            overflow: "hidden",
+            padding: compact ? "18px 16px 16px" : "22px 20px 20px",
+            background: "linear-gradient(160deg, #FFE8DC, #FFF1E5)",
+            border: "1px solid rgba(232,106,58,.28)",
+            borderRadius: 18,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "flex-start",
+            gap: 12,
+            textAlign: "left",
+            cursor: "pointer",
+            transition: "all .22s",
+            minHeight: compact ? 140 : 160,
+          }}
+          onMouseEnter={(e) => {
+            (e.currentTarget as HTMLButtonElement).style.transform = "translateY(-2px)";
+            (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 16px 36px -18px rgba(232,106,58,.4)";
+          }}
+          onMouseLeave={(e) => {
+            (e.currentTarget as HTMLButtonElement).style.transform = "none";
+            (e.currentTarget as HTMLButtonElement).style.boxShadow = "none";
+          }}
         >
-          <motion.div
-            className="absolute inset-0"
-            animate={
-              isGenerating
-                ? {
-                    background: [
-                      "radial-gradient(circle at 12% 18%, rgba(255,255,255,0.40), transparent 42%)",
-                      "radial-gradient(circle at 88% 22%, rgba(255,255,255,0.30), transparent 44%)",
-                      "radial-gradient(circle at 58% 86%, rgba(255,255,255,0.28), transparent 46%)",
-                      "radial-gradient(circle at 12% 18%, rgba(255,255,255,0.40), transparent 42%)",
-                    ],
-                  }
-                : {
-                    background:
-                      "radial-gradient(circle at top left, rgba(255,255,255,0.38), transparent 42%)",
-                  }
-            }
-            transition={
-              isGenerating
-                ? { duration: 1.1, repeat: 1, ease: "easeInOut" }
-                : { duration: 0.2 }
-            }
-          />
-          <span className="relative inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/80 text-[#BE4F2E] shadow-sm">
-            {hasGenerated ? (
-              <RefreshCw className={cn("h-4 w-4", isGenerating && "animate-spin")} />
-            ) : (
-              <Sparkles className="h-4 w-4" />
-            )}
+          {/* Decoration glow */}
+          <span style={{
+            position: "absolute", top: -28, right: -28, width: 110, height: 110, borderRadius: 99,
+            background: "radial-gradient(circle, rgba(232,106,58,.22), transparent 65%)",
+            pointerEvents: "none",
+          }} />
+
+          {/* Icon */}
+          <span style={{
+            width: 40, height: 40, borderRadius: 99,
+            background: "#fff",
+            color: "#C24E22",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            border: "1px solid rgba(232,106,58,.18)",
+            position: "relative", zIndex: 1,
+            flexShrink: 0,
+          }}>
+            {hasGenerated
+              ? <RefreshCw className={cn("h-4 w-4", isGenerating && "animate-spin")} />
+              : <Sparkles className="h-4 w-4" />}
           </span>
-          <span className="relative min-w-0">
-            <span className="block text-sm font-semibold leading-tight text-neutral-950">
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 5, position: "relative", zIndex: 1 }}>
+            <span
+              className="font-mono uppercase"
+              style={{ fontSize: 10, letterSpacing: ".12em", color: "#C24E22", display: "inline-flex", alignItems: "center", gap: 5 }}
+            >
+              <span style={{ width: 5, height: 5, borderRadius: "50%", background: "#C24E22", flexShrink: 0 }} />
+              быстро
+            </span>
+            <span
+              style={{ fontFamily: "var(--font-sans)", fontSize: 16, fontWeight: 400, lineHeight: 1.2, color: "#141210" }}
+            >
               {hasGenerated ? "Ещё варианты" : "Реши за меня"}
             </span>
-            <span className="mt-0.5 block text-xs leading-snug text-neutral-800/75">
+            <span style={{ fontSize: 12, lineHeight: 1.45, color: "#3A332B" }}>
               Подберём идеи за пару секунд
             </span>
+          </div>
+
+          <span style={{
+            marginTop: "auto",
+            display: "inline-flex", alignItems: "center", gap: 6,
+            fontSize: 13, fontWeight: 600,
+            color: "#C24E22",
+            position: "relative", zIndex: 1,
+          }}>
+            Выбрать <ArrowIcon />
           </span>
         </button>
 
-        {/* Card 2 — «Сама решу» */}
+        {/* Card 2 — Сама решу (plain) */}
         <button
           type="button"
           onClick={onCatalog}
-          className={cn(
-            "group flex flex-col items-start gap-2 rounded-2xl border border-neutral-200 bg-white p-4 text-left shadow-sm transition-transform duration-200",
-            "hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-300",
-          )}
+          style={{
+            padding: compact ? "18px 16px 16px" : "22px 20px 20px",
+            background: "#FAF7F1",
+            border: "1px solid rgba(20,18,16,.10)",
+            borderRadius: 18,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "flex-start",
+            gap: 12,
+            textAlign: "left",
+            cursor: "pointer",
+            transition: "all .22s",
+            minHeight: compact ? 140 : 160,
+          }}
+          onMouseEnter={(e) => {
+            (e.currentTarget as HTMLButtonElement).style.transform = "translateY(-2px)";
+            (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 16px 36px -18px rgba(20,18,16,.18)";
+            (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(20,18,16,.28)";
+          }}
+          onMouseLeave={(e) => {
+            (e.currentTarget as HTMLButtonElement).style.transform = "none";
+            (e.currentTarget as HTMLButtonElement).style.boxShadow = "none";
+            (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(20,18,16,.10)";
+          }}
         >
-          <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-neutral-100 text-neutral-600">
+          {/* Icon */}
+          <span style={{
+            width: 40, height: 40, borderRadius: 99,
+            background: "#F6F2EA",
+            color: "#3A332B",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            border: "1px solid rgba(20,18,16,.10)",
+            flexShrink: 0,
+          }}>
             <BookOpen className="h-4 w-4" />
           </span>
-          <span className="min-w-0">
-            <span className="block text-sm font-semibold leading-tight text-neutral-900">
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+            <span
+              className="font-mono uppercase"
+              style={{ fontSize: 10, letterSpacing: ".12em", color: "rgba(20,18,16,.55)", display: "inline-flex", alignItems: "center", gap: 5 }}
+            >
+              <span style={{ width: 5, height: 5, borderRadius: "50%", background: "rgba(20,18,16,.45)", flexShrink: 0 }} />
+              самостоятельно
+            </span>
+            <span
+              style={{ fontFamily: "var(--font-sans)", fontSize: 16, fontWeight: 400, lineHeight: 1.2, color: "#141210" }}
+            >
               Сама решу
             </span>
-            <span className="mt-0.5 block text-xs leading-snug text-neutral-500">
-              Иду в каталог и выбираю
+            <span style={{ fontSize: 12, lineHeight: 1.45, color: "rgba(20,18,16,.55)" }}>
+              Иду в каталог и выбираю под настроение
             </span>
+          </div>
+
+          <span style={{
+            marginTop: "auto",
+            display: "inline-flex", alignItems: "center", gap: 6,
+            fontSize: 13, fontWeight: 600,
+            color: "#141210",
+          }}>
+            Выбрать <ArrowIcon />
           </span>
         </button>
       </div>
 
-      {/* Tertiary link — «Мои идеи» */}
-      <div className="flex justify-center">
+      {/* Footer link */}
+      <div style={{ display: "flex", justifyContent: "center" }}>
         <button
           type="button"
           onClick={onIdeas}
-          className="text-xs font-medium text-neutral-400 transition-colors hover:text-neutral-600"
+          style={{
+            display: "inline-flex", alignItems: "center", gap: 6,
+            fontSize: 13, fontWeight: 600,
+            color: "#C24E22",
+            background: "none", border: "none", cursor: "pointer",
+            transition: "gap .18s",
+          }}
+          onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.gap = "10px"; }}
+          onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.gap = "6px"; }}
         >
-          Мои идеи →
+          Мои идеи <ArrowIcon />
         </button>
       </div>
     </section>

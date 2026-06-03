@@ -1,4 +1,11 @@
-import { getIntentFromPath, isCityHubPath } from "@/lib/intent";
+import {
+  getIntentFromPath,
+  isCityHubPath,
+  isPublicationDetailPath,
+  isPlaceDetailPath,
+  isRouteDetailPath,
+  isProgramDetailPath,
+} from "@/lib/intent";
 
 export type SiteHeaderVariant = "discovery" | "landing";
 
@@ -11,6 +18,12 @@ export type SiteHeaderVariant = "discovery" | "landing";
  */
 export function getSiteHeaderVariant(pathname: string | null): SiteHeaderVariant {
   if (!pathname) return "discovery";
+
+  // Посадочные детальные страницы — всегда landing, даже если intent определился
+  if (isPublicationDetailPath(pathname)) return "landing"; // /{city}/events|activity|offers/[slug]
+  if (isPlaceDetailPath(pathname)) return "landing";        // /places/[s] + /{city}/places/[s]
+  if (isRouteDetailPath(pathname)) return "landing";        // /routes/[slug]
+  if (isProgramDetailPath(pathname)) return "landing";      // /{city}/programs/[slug]
 
   if (getIntentFromPath(pathname) !== null) return "discovery";
   if (isCityHubPath(pathname)) return "discovery";

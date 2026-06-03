@@ -28,7 +28,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { BUDGET_LABELS, type PublicRouteCardModel } from "@/components/routes/types";
+import type { PublicRouteCardModel } from "@/components/routes/types";
 import { ShareSheet } from "@/components/routes/ShareSheet";
 import { SaveActivityFlowAdaptive } from "@/components/activity/SaveActivityFlowAdaptive";
 import type { SaveToPlanResult } from "@/components/activity/SaveToPlanModal";
@@ -597,7 +597,7 @@ export function RouteDetailClient({ route }: Props) {
               <span className="text-neutral-300">|</span>
               <div className="flex items-center gap-1">
                 <Wallet className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                <span className="text-xs font-medium text-neutral-700">{BUDGET_LABELS[route.budgetLevel]}</span>
+                <span className="text-xs font-medium text-neutral-700">{route.budgetLabel}</span>
               </div>
             </div>
           </div>

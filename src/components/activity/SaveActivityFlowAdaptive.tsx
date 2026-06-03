@@ -33,6 +33,7 @@ export type SaveActivityFlowAdaptiveProps = {
   inPlan?: boolean;
   planDate?: string | null;
   planStartsAt?: string | null;
+  planItemId?: string | null;
   /** Activity ID for pending action persistence across auth */
   activityId?: string;
   /** Activity title for pending action (optional, for UX) */
@@ -93,6 +94,7 @@ export function SaveActivityFlowAdaptive({
   inPlan = false,
   planDate = null,
   planStartsAt = null,
+  planItemId = null,
   activityId,
   activityTitle,
   coverImageUrl,
@@ -270,8 +272,10 @@ export function SaveActivityFlowAdaptive({
           inPlan={inPlan}
           planDate={planDate}
           planStartsAt={planStartsAt}
+          planItemId={planItemId}
           source={source}
           onCommit={handleCommit}
+          onClose={() => onOpenChange(false)}
         />
       )}
       {phase === "auth" && pending && (

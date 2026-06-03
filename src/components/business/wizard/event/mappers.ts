@@ -21,6 +21,7 @@ import type { EventOrganizerInput } from "@/lib/business/eventOrganizer";
 import { DEFAULT_ACTIVITY_FORMAT, normalizeActivityFormat } from "@/domain/activities/activity-format";
 import { normalizeRichTextEditorValue } from "@/lib/richtext/utils";
 import { expandScheduleItemDates } from "@/lib/event/expandScheduleItemDates";
+import { parsePriceData } from "@/lib/priceItems";
 
 export type ActivityWithRelations = Activity & {
   id: string;
@@ -396,6 +397,7 @@ export function mapEventToFormData(event: ActivityWithRelations): EventFormData 
     typeof scheduleJson.priceDetails === "string"
       ? normalizeRichTextEditorValue(scheduleJson.priceDetails)
       : "";
+  formData.priceItems = parsePriceData((event as { priceItems?: unknown }).priceItems);
   formData.ticketLink = typeof scheduleJson.ticketLink === "string" ? scheduleJson.ticketLink : "";
 
   formData.participationMode = normalizeParticipationMode(scheduleJson.participationMode);
@@ -567,6 +569,7 @@ type EventPayload = {
   priceTo: number | null;
   priceText: string;
   priceDetails?: string;
+  priceItems?: unknown;
   currency: string;
   coverImageId: string | null;
   galleryMediaIds: string[];
@@ -749,6 +752,7 @@ export function buildEventPayload(data: EventFormData): EventPayload {
           ? data.price.trim()
           : "",
     priceDetails: data.priceDetails,
+    priceItems: data.priceItems,
     currency: "BYN",
 
     coverImageId: data.coverImage,

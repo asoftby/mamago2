@@ -13,8 +13,11 @@ import { getCurrentUser } from "@/lib/auth/server";
 import { canEditPlace } from "@/lib/permissions/placeEditPermissions";
 import { resolveInstagramProfileHref } from "@/lib/instagram/extractUsername";
 import { buildPublicWorkingHoursText } from "@/server/services/openingHours/openingHours.publicSummary";
+import { getOpeningStatus } from "@/server/services/openingHours/openingHours.service";
 import type { OpeningHoursWithRelations } from "@/server/services/openingHours/openingHours.types";
 import { resolvePlaceLogoImage } from "@/lib/place/resolvePlaceLogoImage";
+import { parsePriceData } from "@/lib/priceItems";
+import { isGoogleReviewsEnabled } from "@/lib/place/googleReviewsMeta";
 
 interface PlacePageProps {
   params: Promise<{ slug: string }>;
@@ -302,6 +305,7 @@ export default async function PlacePage({ params }: PlacePageProps) {
 
   // Get formatted location string
   const locationString = getPlaceLocationString(place);
+  const googleReviewsEnabled = isGoogleReviewsEnabled(place.googlePlaceId, place.googleReviewsJson);
 
   const publicBase = process.env.NEXT_PUBLIC_APP_URL || "https://mamago.by";
   const jsonLd =
@@ -379,6 +383,7 @@ export default async function PlacePage({ params }: PlacePageProps) {
     where: {
       placeId: place.id,
       status: "PUBLISHED",
+      ...(googleReviewsEnabled ? {} : { source: { not: "GOOGLE" as const } }),
     },
     select: {
       id: true,
@@ -402,6 +407,7 @@ export default async function PlacePage({ params }: PlacePageProps) {
     where: {
       placeId: place.id,
       status: "PUBLISHED",
+      ...(googleReviewsEnabled ? {} : { source: { not: "GOOGLE" as const } }),
     },
     _avg: {
       rating: true,
@@ -485,6 +491,21 @@ export default async function PlacePage({ params }: PlacePageProps) {
     ? buildPublicWorkingHoursText(openingHoursResolved as OpeningHoursWithRelations, new Date())
     : undefined;
 
+  let isOpenNow: boolean | undefined;
+  let todayHoursText: string | undefined;
+  if (openingHoursResolved) {
+    const openingStatus = getOpeningStatus(
+      openingHoursResolved as OpeningHoursWithRelations,
+      new Date(),
+    );
+    isOpenNow = openingStatus.isOpen;
+    if (openingStatus.todayIntervals && openingStatus.todayIntervals.length > 0) {
+      todayHoursText = openingStatus.todayIntervals
+        .map((i) => `${i.startTime.slice(0, 5)} — ${i.endTime.slice(0, 5)}`)
+        .join(", ");
+    }
+  }
+
   const breadcrumbItems: Array<{ label: string; href?: string }> = [
     { label: "Главная", href: "/" },
     ...(place.city?.slug && place.city.name
@@ -532,9 +553,14 @@ export default async function PlacePage({ params }: PlacePageProps) {
     mapsOpenUrl,
     mapsDirectionsUrl,
     workingHoursSummary,
+    isOpenNow,
+    todayHoursText,
 
     // Media
     images: galleryImages.length > 0 ? galleryImages : undefined,
+
+    priceData: parsePriceData(place.priceItems),
+    updatedAt: place.updatedAt,
   };
 
   return (

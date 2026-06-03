@@ -77,7 +77,7 @@ export function MobileProfileSheet({
         chrome === "dark"
           ? isProfileActive
             ? "bg-[#EF8759]/22"
-            : "bg-neutral-600/45"
+            : "bg-transparent"
           : isProfileActive
             ? "bg-[#EF8759]/12"
             : "bg-neutral-100/95",
@@ -89,8 +89,8 @@ export function MobileProfileSheet({
           compact ? "h-[22px] w-[22px]" : "h-[26px] w-[26px]",
           chrome === "dark"
             ? isProfileActive
-              ? "text-[#FFB090]"
-              : "text-neutral-300"
+              ? "text-[#C24E22]"
+              : "text-neutral-700"
             : isProfileActive
               ? "text-[#EF8759]"
               : "text-neutral-500",

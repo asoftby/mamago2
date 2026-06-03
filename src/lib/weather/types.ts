@@ -9,6 +9,8 @@ export interface TimeOfDayWeather {
   temp: number;
   /** Open-Meteo weather code */
   code: WeatherCode;
+  /** Max wind speed in km/h for this time period */
+  windspeed: number;
 }
 
 export interface DayWeather {
@@ -41,5 +43,6 @@ export interface OpenMeteoHourlyResponse {
     time: string[];
     temperature_2m: number[];
     weathercode: number[];
+    windspeed_10m: number[];
   };
 }

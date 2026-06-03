@@ -1,13 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import Image from "next/image";
 import {
   Play,
-  MapPin,
   Heart,
-  Share2,
   X,
   ChevronLeft,
   ChevronRight,
@@ -15,10 +13,12 @@ import {
   CalendarDays,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { OfferPageData } from "@/lib/offer/offerPageTypes";
+import type { OfferPageData, OfferScheduleItem } from "@/lib/offer/offerPageTypes";
 import { Button } from "@/components/ui/button";
 import { RichContentRenderer } from "@/components/content/RichContentRenderer";
 import { OwnerOfferEditDropdown } from "./OwnerOfferEditDropdown";
+import { PlaceInfoRow } from "@/components/shared/PlaceInfoRow";
+import { SidebarCard, SidebarCardTopSection, SidebarCardShare } from "@/components/shared/SidebarCard";
 
 interface OfferHeroProps {
   data: OfferPageData;
@@ -29,6 +29,7 @@ interface OfferHeroProps {
   isSaved?: boolean;
   onPrimary: () => void;
   onSave: () => void;
+  ctaRef?: React.RefObject<HTMLElement | null>;
 }
 
 /**
@@ -44,11 +45,10 @@ export function OfferHero({
   data,
   canEditOffer,
   isPrimaryLoading,
-  isSecondaryLoading,
-  isInPlan,
   isSaved,
   onPrimary,
   onSave,
+  ctaRef,
 }: OfferHeroProps) {
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxMode, setLightboxMode] = useState<"gallery" | "video">("gallery");
@@ -86,16 +86,6 @@ export function OfferHero({
     }
   }, [data.offerType]);
 
-  /** Разделяем заголовок на две смысловые части для editorial-вёрстки:
-   *  первое слово → serif roman, остальное → serif italic.
-   *  Если заголовок одно слово — всё в roman. */
-  const titleParts = useMemo(() => {
-    const t = data.title?.trim() ?? "";
-    const idx = t.indexOf(" ");
-    if (idx === -1) return { head: t, tail: "" };
-    return { head: t.slice(0, idx), tail: t.slice(idx + 1) };
-  }, [data.title]);
-
   const THUMB_LIMIT = 5;
   const videoSlots = hasVideo ? 1 : 0;
   const imageSlots = THUMB_LIMIT - videoSlots;
@@ -121,105 +111,15 @@ export function OfferHero({
     return url;
   };
 
-  // kept for legacy callers that may still reference it
-  const priceLabel = data.pricing.priceFrom || data.pricing.singlePrice;
-
   return (
     <section className="space-y-6 lg:space-y-10">
-      {/* Breadcrumbs */}
-      <nav
-        aria-label="Breadcrumb"
-        className="flex flex-wrap items-center gap-1.5 text-[13px] text-[rgba(20,18,16,0.45)]"
-      >
-        <Link href="/" className="hover:text-[#3A332B] transition-colors">
-          Главная
-        </Link>
-        <span aria-hidden="true">/</span>
-        <Link
-          href={`/${data.citySlug}/offers`}
-          className="hover:text-[#3A332B] transition-colors"
-        >
-          {badgeLabel}
-        </Link>
-        {data.place && (
-          <>
-            <span aria-hidden="true">/</span>
-            <Link
-              href={`/places/${data.place.slug}`}
-              className="hover:text-[#3A332B] transition-colors truncate max-w-[160px]"
-            >
-              {data.place.name}
-            </Link>
-          </>
-        )}
-        <span aria-hidden="true">/</span>
-        <span className="text-[#3A332B] font-medium truncate max-w-[200px]">
-          {data.title}
-        </span>
-      </nav>
-
-      <div className="grid grid-cols-1 gap-10 lg:grid-cols-[1fr_440px] lg:gap-14 xl:gap-16">
-        {/* ─── LEFT: title + image + thumbs ─── */}
-        <div className="flex flex-col gap-7">
-          {/* Kicker pills */}
-          <div className="flex flex-wrap items-center gap-3">
-            <span className="inline-flex h-7 items-center rounded-full bg-[#FFE8DC] px-3 text-[12px] font-semibold text-[#C24E22]">
-              ● {badgeLabel}
-            </span>
-            {data.metaGrid.slice(0, 1).map((item) => (
-              <span
-                key={item.id}
-                className="font-mono text-[11px] uppercase tracking-[0.14em] text-[rgba(20,18,16,0.45)]"
-              >
-                {item.label} · {item.value}
-              </span>
-            ))}
-          </div>
-
-          {/* Editorial display title */}
-          <h1
-            className="font-sans text-[clamp(48px,8vw,96px)] font-semibold leading-[0.95] tracking-[-0.025em] text-[#141210]"
-          >
-            {titleParts.head}
-            {titleParts.tail && (
-              <>
-                <br />
-                <span className="italic text-[#C24E22]">
-                  {titleParts.tail}
-                </span>
-              </>
-            )}
-          </h1>
-
-          {/* Place + address */}
-          {data.place && (
-            <div className="space-y-0.5">
-              <Link
-                href={`/places/${data.place.slug}`}
-                className="flex items-center gap-1.5 text-[15px] font-semibold text-[#141210] hover:text-[#E86A3A] transition-colors"
-              >
-                <MapPin className="h-4 w-4 shrink-0 text-[#E86A3A]" />
-                {data.place.name}
-              </Link>
-              {data.place.address && (
-                <p className="pl-[22px] text-[13px] text-[rgba(20,18,16,0.55)]">
-                  {data.place.address}
-                </p>
-              )}
-            </div>
-          )}
-
-          {/* Short description */}
-          {data.shortDescription && (
-            <p className="max-w-[560px] text-[17px] leading-[1.55] text-[#3A332B]">
-              {data.shortDescription}
-            </p>
-          )}
-
+      <div className="grid grid-cols-1 gap-10 lg:grid-cols-[440px_1fr] lg:gap-14">
+        {/* ─── LEFT: image + thumbs ─── */}
+        <div className="flex flex-col gap-5">
           {/* Main image */}
           <button
             type="button"
-            className="group relative w-full aspect-[16/10] overflow-hidden rounded-3xl bg-[#EDE8DF] shadow-sm cursor-pointer"
+            className="group relative w-full aspect-[4/3] overflow-hidden rounded-3xl bg-[#EDE8DF] shadow-sm cursor-pointer"
             onClick={() => {
               if (hasGallery) openGallery(0);
               else if (hasVideo) openVideo();
@@ -272,7 +172,6 @@ export function OfferHero({
                   </div>
                 </button>
               )}
-
               {gallery.slice(0, imageSlots).map((img, idx) => {
                 const isLastVisible = idx === imageSlots - 1 && hiddenCount > 0;
                 return (
@@ -301,20 +200,63 @@ export function OfferHero({
           )}
         </div>
 
-        {/* ─── RIGHT: sticky booking card ─── */}
-        <aside className="lg:sticky lg:top-6 lg:self-start">
+        {/* ─── RIGHT: breadcrumbs + kicker + title + booking card ─── */}
+        <div className="flex flex-col gap-5 lg:sticky lg:top-6 lg:self-start">
+          {/* Breadcrumbs */}
+          <nav
+            aria-label="Breadcrumb"
+            className="flex flex-wrap items-center gap-1.5 text-[13px] text-[rgba(20,18,16,0.45)]"
+          >
+            <Link href="/" className="hover:text-[#3A332B] transition-colors">Главная</Link>
+            <span aria-hidden="true">›</span>
+            <Link href={`/${data.citySlug}/offers`} className="hover:text-[#3A332B] transition-colors">
+              {badgeLabel}
+            </Link>
+            {data.place && (
+              <>
+                <span aria-hidden="true">›</span>
+                <Link href={`/places/${data.place.slug}`} className="hover:text-[#3A332B] transition-colors truncate max-w-[160px]">
+                  {data.place.name}
+                </Link>
+              </>
+            )}
+            <span aria-hidden="true">›</span>
+            <span className="text-[#3A332B] font-medium truncate max-w-[200px]">{data.title}</span>
+          </nav>
+
+          {/* Kicker pills */}
+          <div className="flex flex-wrap items-center gap-2.5">
+            <span className="inline-flex h-7 items-center rounded-full bg-[#FFE8DC] px-3 text-[12px] font-semibold text-[#E86A3A]">
+              ● {badgeLabel}
+            </span>
+            {data.metaGrid.slice(0, 1).map((item) => (
+              <span
+                key={item.id}
+                className="font-mono text-[11px] uppercase tracking-[0.14em] text-[rgba(20,18,16,0.45)]"
+              >
+                {item.value}
+              </span>
+            ))}
+          </div>
+
+          {/* Title */}
+          <h1 style={{ margin: 0, fontFamily: "var(--font-sans)", fontSize: 40, fontWeight: 600, lineHeight: 1.1, letterSpacing: "-0.025em", color: "#141210" }}>
+            {data.title}
+          </h1>
+
+          {/* Booking card */}
           <BookingCard
             data={data}
             canEditOffer={canEditOffer}
             badgeLabel={badgeLabel}
             isPrimaryLoading={isPrimaryLoading}
-            isSecondaryLoading={isSecondaryLoading}
-            isInPlan={isInPlan}
             isSaved={isSaved}
             onPrimary={onPrimary}
             onSave={onSave}
+            ctaRef={ctaRef}
           />
-        </aside>
+        </div>
+
       </div>
 
       {/* ─── Lightbox (без изменений) ─── */}
@@ -402,6 +344,79 @@ interface CountdownTime {
   seconds: number;
 }
 
+function parseOfferScheduleDate(value?: string | null): Date | null {
+  if (!value) return null;
+  const match = value.match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
+  if (!match) return null;
+  const parsed = new Date(`${match[3]}-${match[2]}-${match[1]}T00:00:00`);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+const WEEKDAY_GENITIVE: Record<string, string> = {
+  понедельник: "понедельника",
+  вторник: "вторника",
+  среда: "среды",
+  четверг: "четверга",
+  пятница: "пятницы",
+  суббота: "субботы",
+  воскресенье: "воскресенья",
+};
+
+function formatOfferScheduleDate(value?: string | null): string | null {
+  const parsed = parseOfferScheduleDate(value);
+  if (!parsed) return null;
+
+  const formatted = new Intl.DateTimeFormat("ru-RU", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  })
+    .format(parsed)
+    .replace(/\s*г\.$/, "")
+    .replace(".", "");
+
+  // "понедельник, 20 июля 2026" → "Понедельник, 20 июля 2026"
+  return formatted.charAt(0).toUpperCase() + formatted.slice(1);
+}
+
+/** Форматирует дату окончания в родительном падеже для «До …» */
+function formatOfferScheduleDateTo(value?: string | null): string | null {
+  const parsed = parseOfferScheduleDate(value);
+  if (!parsed) return null;
+
+  const formatted = new Intl.DateTimeFormat("ru-RU", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  })
+    .format(parsed)
+    .replace(/\s*г\.$/, "")
+    .replace(".", "");
+
+  const commaIdx = formatted.indexOf(",");
+  if (commaIdx === -1) return formatted;
+  const weekday = formatted.slice(0, commaIdx).toLowerCase();
+  const rest = formatted.slice(commaIdx + 2);
+  return `${WEEKDAY_GENITIVE[weekday] ?? weekday}, ${rest}`;
+}
+
+function pickNearestShift(items: OfferScheduleItem[]): OfferScheduleItem | null {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  return [...items]
+    .sort((a, b) => {
+      const aTs = parseOfferScheduleDate(a.dateFrom)?.getTime() ?? Number.POSITIVE_INFINITY;
+      const bTs = parseOfferScheduleDate(b.dateFrom)?.getTime() ?? Number.POSITIVE_INFINITY;
+      const aPast = aTs < today.getTime();
+      const bPast = bTs < today.getTime();
+      if (aPast !== bPast) return aPast ? 1 : -1;
+      return aTs - bTs;
+    })[0] ?? null;
+}
+
 function computeCountdown(until: string): CountdownTime | null {
   const diff = new Date(until).getTime() - Date.now();
   if (diff <= 0) return null;
@@ -453,6 +468,17 @@ function BookingCountdown({ until }: { until: string }) {
   );
 }
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function pluralReviews(n: number): string {
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  if (mod100 >= 11 && mod100 <= 19) return `${n} отзывов`;
+  if (mod10 === 1) return `${n} отзыв`;
+  if (mod10 >= 2 && mod10 <= 4) return `${n} отзыва`;
+  return `${n} отзывов`;
+}
+
 // ─── Booking Card ─────────────────────────────────────────────────────────────
 
 interface BookingCardProps {
@@ -460,11 +486,10 @@ interface BookingCardProps {
   canEditOffer?: boolean;
   badgeLabel: string;
   isPrimaryLoading?: boolean;
-  isSecondaryLoading?: boolean;
-  isInPlan?: boolean;
   isSaved?: boolean;
   onPrimary: () => void;
   onSave: () => void;
+  ctaRef?: React.RefObject<HTMLElement | null>;
 }
 
 function BookingCard({
@@ -472,13 +497,16 @@ function BookingCard({
   canEditOffer,
   badgeLabel,
   isPrimaryLoading,
-  isSecondaryLoading,
-  isInPlan,
   isSaved,
   onPrimary,
   onSave,
+  ctaRef,
 }: BookingCardProps) {
   const p = data.pricing;
+  const nearestShift = useMemo(() => {
+    if (data.schedule?.type !== "shifts") return null;
+    return pickNearestShift(data.schedule.items);
+  }, [data.schedule]);
   const looksLikeHtml = (value?: string) =>
     typeof value === "string" && /<[a-z][\s\S]*>/i.test(value.trim());
 
@@ -515,53 +543,101 @@ function BookingCard({
   })();
 
   const hasPromoBlock = Boolean(hasDiscounts || promoRichBlock);
+  const nearestShiftDate = formatOfferScheduleDate(nearestShift?.dateFrom);
+  const nearestShiftMeta = nearestShift?.dateTo
+    ? `До ${formatOfferScheduleDateTo(nearestShift.dateTo) ?? nearestShift.dateTo}`
+    : nearestShift?.title || nearestShift?.duration || nearestShift?.ageRange || null;
+
+  const priceLabel = priceUnit || "";
+  const priceLabelParts = priceLabel.split("/").map((part) => part.trim()).filter(Boolean);
+  const currencyPart = priceLabelParts[0] ?? "";
+  const priceSuffixPart = priceLabelParts.slice(1).join(" / ");
 
   return (
     <>
-      <div className="rounded-[24px] border border-[rgba(20,18,16,0.10)] bg-[#FAF7F1] p-6 shadow-[0_1px_0_rgba(255,255,255,0.6)_inset,0_30px_60px_-30px_rgba(20,18,16,0.18)]">
+      <SidebarCard>
 
-        {/* ── Header row: place name + rating ── */}
-        <div className="mb-4 flex items-center justify-between gap-2">
-          <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-[rgba(20,18,16,0.45)] truncate">
-            &ldquo;{data.place?.name ?? badgeLabel}&rdquo;
-          </span>
-          {data.averageRating && (
-            <span className="shrink-0 font-mono text-[11px] text-[#E86A3A]">
-              ● {data.averageRating.toFixed(1)}
-            </span>
-          )}
-        </div>
+        {nearestShift && priceNumber ? (
+          <div className="mb-5 flex flex-wrap items-start justify-between gap-4 border-b border-[rgba(20,18,16,0.10)] pb-5">
+            <div>
+              <div className="mb-1.5 font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-[rgba(20,18,16,0.55)]">
+                Ближайшая смена
+              </div>
+              {nearestShiftDate ? (
+                <div className="text-[20px] font-semibold leading-tight tracking-[-0.02em] text-[#141210]">
+                  {nearestShiftDate}
+                </div>
+              ) : (
+                <div className="text-[15px] text-[rgba(20,18,16,0.55)]">Расписание уточняется</div>
+              )}
+              {nearestShiftMeta && (
+                <div className="mt-1.5 font-mono text-[13px] text-[rgba(20,18,16,0.55)]">
+                  {nearestShiftMeta}
+                </div>
+              )}
+            </div>
 
-        {/* ── Price ── */}
-        {priceNumber && (
+            <div className="text-right">
+              <div className="mb-1.5 font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-[rgba(20,18,16,0.55)]">
+                Стоимость
+              </div>
+              <div className="flex items-end justify-end gap-1.5">
+                <span style={{ fontFamily: "var(--font-display)", fontSize: 52, fontWeight: 400, lineHeight: 1, letterSpacing: "-0.03em", color: "#141210" }}>
+                  {priceNumber}
+                </span>
+                <div className="flex flex-col items-end gap-0.5">
+                  {p.oldPrice && (
+                    <span className="font-mono text-[11px] text-[rgba(20,18,16,0.30)] line-through">
+                      {p.oldPrice}
+                    </span>
+                  )}
+                  {priceLabel && (
+                    <span className="font-mono text-[13px] text-[rgba(20,18,16,0.55)]">
+                      {priceLabel.replace(/ \/ /g, "/")}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : priceNumber && (
           <div className="mb-2 flex items-end gap-2">
             <span className="font-sans text-[72px] font-semibold leading-[0.92] tracking-[-0.04em] text-[#141210]">
               {priceNumber}
             </span>
             {priceUnit && (
               <span className="pb-2 font-mono text-[12px] leading-tight text-[rgba(20,18,16,0.55)]">
-                {priceUnit}
+                {priceUnit.replace(/ \/ /g, "/")}
               </span>
             )}
           </div>
         )}
 
-        {/* ── Old price + promo text ── */}
-        {(p.oldPrice || p.promotionText) && (
+        {/* ── Place info ── */}
+        {data.place && (
+          <div className="mb-5">
+            <PlaceInfoRow
+              name={data.place.name}
+              logoUrl={data.place.logoUrl}
+              address={data.place.address}
+              district={data.place.district}
+              metro={data.place.metro}
+              href={data.place.slug ? `/places/${data.place.slug}` : undefined}
+            />
+          </div>
+        )}
+
+        {/* ── Promo text (old price moved to price block) ── */}
+        {p.promotionText && (
           <div className="mb-5 flex flex-wrap items-center gap-2 text-[13px]">
-            {p.oldPrice && (
-              <span className="font-mono text-[rgba(20,18,16,0.30)] line-through">{p.oldPrice}</span>
-            )}
-            {p.promotionText && (
-              <span className="font-semibold text-[#C24E22]">{p.promotionText}</span>
-            )}
+            <span className="font-semibold text-[#C24E22]">{p.promotionText}</span>
           </div>
         )}
 
         {/* ── Countdown ── */}
         {p.promoUntil && <BookingCountdown until={p.promoUntil} />}
 
-        <div className="mt-6 flex items-center gap-3">
+        <div ref={ctaRef as React.RefObject<HTMLDivElement>} className="mt-6 flex items-center gap-3">
           <Button
             onClick={onPrimary}
             disabled={isPrimaryLoading}
@@ -586,13 +662,13 @@ function BookingCard({
         </div>
 
         {canEditOffer ? (
-          <div className="mt-4 border-t border-[rgba(20,18,16,0.10)] pt-4">
+          <SidebarCardTopSection mt={16} pt={16}>
             <OwnerOfferEditDropdown
               offerId={data.id}
               offerType={data.offerType}
-              className="w-full justify-between rounded-full border-black bg-black px-5"
+              className="h-14 w-full rounded-full border text-[16px] font-semibold"
             />
-          </div>
+          </SidebarCardTopSection>
         ) : null}
 
         {hasDiscounts && (
@@ -610,26 +686,36 @@ function BookingCard({
           </div>
         )}
 
-        <div className="mt-5 flex items-center justify-end text-[13px] text-[rgba(20,18,16,0.55)]">
-          <button
-            type="button"
-            onClick={() => {
-              if (typeof navigator !== "undefined" && navigator.share) {
-                navigator.share({ title: data.title, url: window.location.href });
-              }
-            }}
-            className="inline-flex items-center gap-1.5 transition-colors hover:text-[#141210]"
-          >
-            <Share2 className="h-3.5 w-3.5" />
-            Поделиться
-          </button>
-        </div>
-      </div>
+        <SidebarCardTopSection mt={20} pt={20}>
+          <div className="flex items-center justify-between">
+            {data.averageRating != null ? (
+              <div className="flex items-center gap-2">
+                <span className="font-mono text-[13px] text-[rgba(20,18,16,0.55)]">
+                  <span className="text-[16px] text-[#E86A3A]">★</span> {data.averageRating.toFixed(1)}
+                </span>
+                {data.reviewsCount != null && data.reviewsCount > 0 && (
+                  <>
+                    <span className="font-mono text-[13px] text-[rgba(20,18,16,0.55)]">· </span>
+                    <a
+                      href="#reviews"
+                      className="font-mono text-[13px] text-[rgba(20,18,16,0.55)] transition-colors hover:text-[#141210]"
+                      style={{ textDecoration: "underline", textDecorationStyle: "dashed", textDecorationColor: "#E86A3A", textUnderlineOffset: "3px" }}
+                    >
+                      {pluralReviews(data.reviewsCount)}
+                    </a>
+                  </>
+                )}
+              </div>
+            ) : <span />}
+            <SidebarCardShare title={data.title} />
+          </div>
+        </SidebarCardTopSection>
+      </SidebarCard>
 
       {/* ── Trust badge ── */}
       <div className="mt-4 flex items-center gap-3 px-4 text-[12px] text-[rgba(20,18,16,0.55)]">
         <span className="relative inline-flex h-2 w-2 shrink-0 rounded-full bg-[#2FBF71] shadow-[0_0_0_4px_rgba(47,191,113,0.18)]" />
-        Подтверждённый партнёр mamaGo · оплата возвращается за 24ч
+        Подтверждённый партнёр mamaGo
       </div>
 
       {hasPromoBlock && (

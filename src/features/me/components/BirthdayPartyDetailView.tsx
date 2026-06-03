@@ -5,6 +5,7 @@ import type { UserBirthdayPartyDetail } from "@/features/me/types/userBirthdayPa
 import { getConfirmationProgressUi } from "@/features/me/lib/userBirthdayPartyUi";
 import { BirthdayPartyDayPlan } from "@/features/me/components/BirthdayPartyDayPlan";
 import { cn } from "@/lib/utils";
+import { getBirthdayBuilderHref } from "@/lib/birthday/getBirthdayBuilderHref";
 
 type BirthdayPartyDetailViewProps = {
   party: UserBirthdayPartyDetail;
@@ -20,6 +21,7 @@ export function BirthdayPartyDetailView({
 }: BirthdayPartyDetailViewProps) {
   const isDraft = party.status === "draft";
   const progress = !isDraft ? getConfirmationProgressUi(party) : null;
+  const birthdayBuilderHref = getBirthdayBuilderHref();
 
   return (
     <div className="space-y-6">
@@ -91,15 +93,15 @@ export function BirthdayPartyDetailView({
         <div className="flex flex-col sm:flex-row flex-wrap gap-2">
           {isDraft ? (
             <Button asChild className="h-11 w-full sm:w-auto">
-              <Link href="/birthday">Продолжить настройку</Link>
+              <Link href={birthdayBuilderHref}>Продолжить настройку</Link>
             </Button>
           ) : (
             <>
               <Button variant="outline" className="h-11 w-full sm:w-auto" asChild>
-                <Link href="/birthday">Изменить праздник</Link>
+                <Link href={birthdayBuilderHref}>Изменить праздник</Link>
               </Button>
               <Button variant="outline" className="h-11 w-full sm:w-auto" asChild>
-                <Link href="/birthday">Добавить услугу</Link>
+                <Link href={birthdayBuilderHref}>Добавить услугу</Link>
               </Button>
             </>
           )}

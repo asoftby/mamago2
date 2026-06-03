@@ -2,7 +2,7 @@
  * formatDescriptionText
  *
  * Приводит AI-текст к редакторскому формату:
- *   [сюжет — один абзац]
+ *   [сюжет — несколько коротких абзацев]
  *
  *   [мета-строка 1]
  *
@@ -31,7 +31,11 @@ function removeJunk(text: string): string {
   for (const re of JUNK_PATTERNS) {
     result = result.replace(re, "");
   }
-  return result.replace(/\s{2,}/g, " ").trim();
+  return result
+    .replace(/\r\n/g, "\n")
+    .replace(/[ \t]{2,}/g, " ")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }
 
 // ─── Мета-паттерны ────────────────────────────────────────────────────────────
@@ -89,6 +93,128 @@ interface ExtractResult {
   meta: string[];
 }
 
+const META_BLOCK_PREFIXES = [
+  "стоимость",
+  "цена",
+  "время",
+  "когда",
+  "дата",
+  "адрес",
+  "где",
+  "билеты",
+  "телефон",
+  "регистрация",
+  "условия",
+  "возраст",
+  "длительность",
+  "продолжительность",
+];
+
+function normalizeInlineWhitespace(text: string): string {
+  return text.replace(/[ \t]{2,}/g, " ").trim();
+}
+
+function normalizeLine(line: string): string {
+  const trimmed = normalizeInlineWhitespace(line);
+  if (!trimmed) return "";
+
+  if (/^[\-–•*]\s+/.test(trimmed)) {
+    return trimmed.replace(/^[\-–•*]\s+/, "— ");
+  }
+
+  return trimmed;
+}
+
+function isListLine(line: string): boolean {
+  return /^—\s+/.test(line.trim());
+}
+
+function isMetaBlockHeading(line: string): boolean {
+  const normalized = line.trim().replace(/:$/, "").toLowerCase();
+  return META_BLOCK_PREFIXES.some((prefix) => normalized === prefix);
+}
+
+function splitIntoSentences(text: string): string[] {
+  const matches = text.match(/[^.!?]+(?:[.!?]+|$)/g);
+  return (matches ?? [text])
+    .map((sentence) => normalizeInlineWhitespace(sentence))
+    .filter(Boolean);
+}
+
+function chunkSentences(sentences: string[]): string[] {
+  const chunks: string[] = [];
+  let current: string[] = [];
+
+  for (const sentence of sentences) {
+    current.push(sentence);
+
+    const currentText = current.join(" ");
+    const shouldFlush =
+      current.length >= 4 ||
+      currentText.length >= 420 ||
+      /[!?…]$/.test(sentence);
+
+    if (shouldFlush) {
+      chunks.push(currentText);
+      current = [];
+    }
+  }
+
+  if (current.length > 0) {
+    chunks.push(current.join(" "));
+  }
+
+  return chunks;
+}
+
+function normalizeBlock(block: string): string {
+  const lines = block
+    .replace(/\r\n/g, "\n")
+    .split("\n")
+    .map((line) => normalizeLine(line))
+    .filter(Boolean);
+
+  if (lines.length === 0) return "";
+
+  const dedupedLines = lines.filter((line, index) => line !== lines[index - 1]);
+  if (dedupedLines.length === 0) return "";
+
+  if (dedupedLines.length > 1) {
+    return dedupedLines.join("\n");
+  }
+
+  const onlyLine = dedupedLines[0]!;
+  if (isListLine(onlyLine) || isMetaBlockHeading(onlyLine)) {
+    return onlyLine;
+  }
+
+  if (onlyLine.length < 650) {
+    return onlyLine;
+  }
+
+  const sentences = splitIntoSentences(onlyLine);
+  if (sentences.length <= 4) {
+    return onlyLine;
+  }
+
+  return chunkSentences(sentences).join("\n\n");
+}
+
+export function normalizeParagraphs(text: string): string[] {
+  if (!text.trim()) return [];
+
+  const normalized = text
+    .replace(/\r\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .split(/\n{2,}/)
+    .map((block) => normalizeBlock(block))
+    .flatMap((block) => block.split(/\n{2,}/))
+    .map((block) => block.trim())
+    .filter(Boolean);
+
+  return normalized;
+}
+
 function extractMeta(text: string): ExtractResult {
   let remaining = text;
   const meta: string[] = [];
@@ -105,14 +231,15 @@ function extractMeta(text: string): ExtractResult {
     if (formatted) {
       meta.push(formatted);
       foundKeys.add(pattern.key);
-      remaining = remaining.replace(match[0], "").replace(/\s{2,}/g, " ").trim();
+      remaining = remaining
+        .replace(match[0], "")
+        .replace(/[ \t]{2,}/g, " ")
+        .replace(/\n{3,}/g, "\n\n")
+        .trim();
     }
   }
 
-  const plot = remaining
-    .replace(/\n+/g, " ")
-    .replace(/\s{2,}/g, " ")
-    .trim();
+  const plot = normalizeParagraphs(remaining).join("\n\n");
 
   return { plot, meta };
 }

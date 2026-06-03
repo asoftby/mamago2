@@ -57,9 +57,13 @@ export function NotificationFeed({
     useEmailVerificationPromptVisibility();
 
   useEffect(() => {
+    useNotificationStore.getState().setActiveStream(stream ?? "user");
+  }, [stream]);
+
+  useEffect(() => {
     if (!open) return;
     void useNotificationStore.getState().openPanel();
-  }, [open]);
+  }, [open, stream]);
 
   useEffect(() => {
     if (!open || !error) return;

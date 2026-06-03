@@ -11,6 +11,7 @@ import { ArrowLeft, PartyPopper } from "lucide-react";
 import type { UserBirthdayParty } from "@/features/me/types/userBirthdayParty";
 import { sortPartiesForProfile } from "@/features/me/lib/userBirthdayPartyUi";
 import { BirthdayPartyCard } from "@/features/me/components/BirthdayPartyCard";
+import { getBirthdayBuilderHref } from "@/lib/birthday/getBirthdayBuilderHref";
 
 function isArchived(p: UserBirthdayParty) {
   return p.status === "completed" || p.status === "archived";
@@ -55,7 +56,7 @@ export default async function MeBirthdaysPage() {
               Пока нет праздников — создайте сценарий в конструкторе.
             </BodyMuted>
             <Link
-              href="/birthday"
+              href={getBirthdayBuilderHref()}
               className={cn(peachPrimaryCtaLinkClassName(), "mt-3")}
             >
               <PartyPopper className="h-4 w-4 transition-transform duration-200 group-hover:scale-110 sm:h-[18px] sm:w-[18px]" aria-hidden />

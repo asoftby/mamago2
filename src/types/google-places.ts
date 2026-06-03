@@ -29,6 +29,7 @@ export interface GooglePlaceDetails {
     text: string;
     languageCode: string;
   };
+  formattedAddress?: string;
   rating?: number;
   userRatingCount?: number;
   reviews?: GooglePlaceReview[];
@@ -42,6 +43,7 @@ export interface GooglePlaceDetailsResponse {
     text: string;
     languageCode: string;
   };
+  formattedAddress?: string;
   rating?: number;
   userRatingCount?: number;
   reviews?: GooglePlaceReview[];

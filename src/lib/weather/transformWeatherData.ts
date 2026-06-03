@@ -13,7 +13,7 @@ export function transformWeatherData(
   const byDate: Record<string, DayWeather> = {};
 
   // Group by date
-  const hourlyByDate: Record<string, Array<{ hour: number; temp: number; code: number }>> = {};
+  const hourlyByDate: Record<string, Array<{ hour: number; temp: number; code: number; windspeed: number }>> = {};
 
   for (let i = 0; i < hourly.time.length; i++) {
     const dateTime = new Date(hourly.time[i]);
@@ -21,12 +21,13 @@ export function transformWeatherData(
     const hour = dateTime.getHours();
     const temp = Math.round(hourly.temperature_2m[i]);
     const code = hourly.weathercode[i];
+    const windspeed = Math.round(hourly.windspeed_10m?.[i] ?? 0);
 
     if (!hourlyByDate[dateStr]) {
       hourlyByDate[dateStr] = [];
     }
 
-    hourlyByDate[dateStr].push({ hour, temp, code });
+    hourlyByDate[dateStr].push({ hour, temp, code, windspeed });
   }
 
   // Transform each day
@@ -67,10 +68,10 @@ export function transformWeatherData(
  * Uses max temperature and most frequent weather code
  */
 function aggregateTimeOfDay(
-  hours: Array<{ hour: number; temp: number; code: number }>
+  hours: Array<{ hour: number; temp: number; code: number; windspeed: number }>
 ): TimeOfDayWeather {
   if (hours.length === 0) {
-    return { temp: 0, code: 0 };
+    return { temp: 0, code: 0, windspeed: 0 };
   }
 
   // Max temperature
@@ -86,5 +87,8 @@ function aggregateTimeOfDay(
     Object.entries(codeCounts).sort((a, b) => b[1] - a[1])[0][0]
   );
 
-  return { temp, code };
+  // Max wind speed
+  const windspeed = Math.max(...hours.map((h) => h.windspeed));
+
+  return { temp, code, windspeed };
 }

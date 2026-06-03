@@ -3,7 +3,7 @@
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useHeaderBehavior } from "@/hooks/useHeaderBehavior";
-import { getIntentFromPath, getCityFromPath } from "@/lib/intent";
+import { getIntentFromPath, getCityFromPath, isNonStickyHeaderPath, isProgramDetailPath } from "@/lib/intent";
 
 // New architecture components
 import { HeaderChrome } from "./HeaderChrome";
@@ -43,7 +43,9 @@ export function SiteHeaderNew() {
   const currentCity = getCityFromPath(pathname);
   const displayCity = currentCity || "minsk";
   
-  const shouldShowFilters = !!(currentIntent && currentCity);
+  // Фильтры только на discovery-страницах разделов, не на посадочных
+  const isDetailPage = isNonStickyHeaderPath(pathname) || isProgramDetailPath(pathname);
+  const shouldShowFilters = !!(currentIntent && currentCity) && !isDetailPage;
   /** Вкладки discovery на всех страницах города, включая хаб `/minsk` */
   const shouldShowIntentTabs = !!currentCity;
   

@@ -8,6 +8,7 @@ import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
 import { updateRoute, normalizeStops } from "@/server/services/route.service";
 import type { BudgetLevel, RouteVisibility } from "@prisma/client";
+import type { RouteStopPriceType } from "@/lib/routes/routeBudget";
 
 // ─── Shared helper ─────────────────────────────────────────────────────────────
 
@@ -43,7 +44,7 @@ export async function PATCH(
     const {
       title,
       ageTags = [],
-      budgetLevel = "LOW",
+      budgetLevel,
       visibility = "PRIVATE",
       publish = false,
       stops = [],
@@ -62,6 +63,11 @@ export async function PATCH(
         lng?: number | null;
         placeId?: string | null;
         customTitle?: string | null;
+        priceType?: RouteStopPriceType | null;
+        priceMin?: number | null;
+        priceMax?: number | null;
+        priceCurrency?: string | null;
+        priceNote?: string | null;
       }[];
     };
 

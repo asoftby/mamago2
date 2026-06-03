@@ -85,6 +85,14 @@ export default async function AdminCommunicationsOverviewPage() {
               <CardDescription>
                 Следующий этап: сценарии уведомлений и правила доставки поверх email-канала.
               </CardDescription>
+              <div className="pt-2">
+                <Button asChild variant="outline" className="rounded-2xl">
+                  <Link href={adminPath("/communications/notifications")}>
+                    Открыть уведомления
+                    <ArrowRight className="h-4 w-4" />
+                  </Link>
+                </Button>
+              </div>
             </CardHeader>
           </Card>
 
@@ -97,6 +105,14 @@ export default async function AdminCommunicationsOverviewPage() {
               <CardDescription>
                 Будущий канал для важных событий и быстрых напоминаний.
               </CardDescription>
+              <div className="pt-2">
+                <Button asChild variant="outline" className="rounded-2xl">
+                  <Link href={adminPath("/communications/telegram")}>
+                    Открыть Telegram
+                    <ArrowRight className="h-4 w-4" />
+                  </Link>
+                </Button>
+              </div>
             </CardHeader>
           </Card>
 

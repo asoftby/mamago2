@@ -1,5 +1,6 @@
 "use client";
 
+import React from "react";
 import Link from "next/link";
 import {
   useCallback,
@@ -453,6 +454,17 @@ export function GuestMyPlanPanel({
     setPhase("generated");
   }, [committedBySlot, phase]);
 
+  /** Auto-fetch when restored to generated phase with no cards (e.g. stale draft) */
+  useEffect(() => {
+    if (!restoreDoneRef.current) return;
+    if (phase !== "generated") return;
+    if (scenarioSlots.length > 0) return;
+    if (loadingScenario) return;
+    if (!guestCanGenerateMore) return;
+    void fetchScenario();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, guestCanGenerateMore]);
+
   const nextAuthHref = appendMyPlanOpenToHref(pathname || "/");
   const loginHref = `/login?next=${encodeURIComponent(nextAuthHref)}`;
   const registerHref = `/register?next=${encodeURIComponent(nextAuthHref)}`;
@@ -545,306 +557,506 @@ export function GuestMyPlanPanel({
 
   const renderAuthGate = () =>
     authGateVisible ? (
-      <section className="rounded-2xl border border-neutral-200 bg-neutral-50/80 p-4 shadow-sm">
-        <div className="flex flex-col gap-2">
-          <p className="text-base font-semibold text-neutral-900">
-            Сохранить в «Мой план»?
-          </p>
-          <p className="text-sm leading-relaxed text-neutral-600">
-            Сохраним ваш день, участников и предпочтения — чтобы не потерять
-          </p>
-          <div className="mt-2 flex flex-wrap gap-2">
-            <Button asChild className="rounded-full" variant="default">
-              <Link href={loginHref}>Войти</Link>
-            </Button>
-            <Button asChild variant="outline" className="rounded-full">
-              <Link href={registerHref}>Регистрация</Link>
-            </Button>
-          </div>
+      <div
+        style={{
+          position: "relative", overflow: "hidden",
+          padding: "22px 20px 20px",
+          background: "linear-gradient(135deg, #FFE8DC, #FFF1E5)",
+          border: "1px solid rgba(232,106,58,.25)",
+          borderRadius: 20,
+          display: "flex", flexDirection: "column", gap: 12,
+        }}
+      >
+        <span style={{
+          position: "absolute", top: -40, right: -30, width: 140, height: 140, borderRadius: 99,
+          background: "radial-gradient(circle, rgba(232,106,58,.2), transparent 65%)",
+          pointerEvents: "none",
+        }}/>
+        <h4
+          className="font-display"
+          style={{
+            margin: 0, fontSize: 22, fontWeight: 400, lineHeight: 1.05, letterSpacing: "-.02em",
+            color: "#141210", position: "relative", zIndex: 1,
+          }}
+        >
+          Сохраним ваш план<br/>и&nbsp;<em style={{ fontStyle: "italic", color: "#C24E22" }}>подберём ещё</em>
+        </h4>
+        <p style={{ margin: 0, fontSize: 13, lineHeight: 1.5, color: "#3A332B", position: "relative", zIndex: 1 }}>
+          Войдите, чтобы сохранить план и продолжить подбирать варианты.
+        </p>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, position: "relative", zIndex: 1 }}>
+          <Link
+            href={loginHref}
+            style={{
+              height: 42, padding: "0 20px", borderRadius: 99,
+              background: "linear-gradient(180deg, #FBA77B, #E86A3A)",
+              color: "#fff", fontSize: 13, fontWeight: 600, textDecoration: "none",
+              display: "inline-flex", alignItems: "center", gap: 6,
+              boxShadow: "0 8px 20px -6px rgba(232,106,58,.45)",
+            }}
+          >
+            Войти →
+          </Link>
+          <Link
+            href={registerHref}
+            style={{
+              height: 42, padding: "0 16px", borderRadius: 99,
+              background: "transparent", color: "#141210",
+              border: "1px solid rgba(20,18,16,.18)",
+              fontSize: 13, fontWeight: 500, textDecoration: "none",
+              display: "inline-flex", alignItems: "center",
+            }}
+          >
+            Регистрация
+          </Link>
         </div>
-      </section>
+      </div>
     ) : null;
 
-  const renderScenarioBlocks = (opts: { showRegenerateCta: boolean }) => {
-    return (
-    <div className="space-y-4">
+  const renderScenarioBlocks = (opts: { showRegenerateCta: boolean }) => (
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       {(["morning", "afternoon", "evening"] as const).map((slotKey) => {
         const row = scenarioSlots.find((s) => s.slot === slotKey);
         if (!row) return null;
-        const item = activityToPlanItem(
-          resolvedTargetDate,
-          row.slot,
-          row.activity,
-        );
+        const item = activityToPlanItem(resolvedTargetDate, row.slot, row.activity);
         return (
-          <section key={`${slotKey}-${row.activity.id}`} className="space-y-2">
-            <p className="text-xs font-semibold uppercase tracking-wider text-neutral-400">
+          <div key={`${slotKey}-${row.activity.id}`} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <span
+              className="font-mono uppercase"
+              style={{ fontSize: 10, letterSpacing: ".14em", color: "rgba(20,18,16,.55)" }}
+            >
               {SLOT_LABEL[slotKey]}
-            </p>
+            </span>
             <RecommendationCard
               item={item}
-              onAddToPlan={() =>
-                void handleAddScenarioToPlan(row.slot, row.activity)
-              }
+              onAddToPlan={() => void handleAddScenarioToPlan(row.slot, row.activity)}
             />
-          </section>
+          </div>
         );
       })}
 
       {opts.showRegenerateCta ? (
-        <div className="space-y-1.5">
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {guestQuotaBlocked || guestRemainingGenerations === 0 ? (
-            <div className="rounded-2xl border border-neutral-200 bg-neutral-50/80 p-4 shadow-sm">
-              <p className="text-center text-sm font-medium text-neutral-900">
-                Сохраним ваш план и подберём ещё
+            <div
+              style={{
+                position: "relative", overflow: "hidden",
+                padding: "20px 18px",
+                background: "linear-gradient(135deg, #FFE8DC, #FFF1E5)",
+                border: "1px solid rgba(232,106,58,.25)",
+                borderRadius: 18,
+                display: "flex", flexDirection: "column", gap: 10,
+              }}
+            >
+              <p
+                className="font-display"
+                style={{ margin: 0, fontSize: 20, fontWeight: 400, lineHeight: 1.05, letterSpacing: "-.02em", color: "#141210" }}
+              >
+                Сохраним ваш план<br/>и&nbsp;<em style={{ fontStyle: "italic", color: "#C24E22" }}>подберём ещё</em>
               </p>
-              <div className="mt-3 flex flex-wrap justify-center gap-2">
-                <Button asChild className="rounded-full" variant="default">
-                  <Link href={loginHref}>Войти</Link>
-                </Button>
-                <Button asChild variant="outline" className="rounded-full">
-                  <Link href={registerHref}>Регистрация</Link>
-                </Button>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                <Link
+                  href={loginHref}
+                  style={{
+                    height: 40, padding: "0 18px", borderRadius: 99,
+                    background: "linear-gradient(180deg, #FBA77B, #E86A3A)",
+                    color: "#fff", fontSize: 13, fontWeight: 600, textDecoration: "none",
+                    display: "inline-flex", alignItems: "center",
+                    boxShadow: "0 8px 20px -6px rgba(232,106,58,.45)",
+                  }}
+                >Войти →</Link>
+                <Link
+                  href={registerHref}
+                  style={{
+                    height: 40, padding: "0 16px", borderRadius: 99,
+                    border: "1px solid rgba(20,18,16,.18)",
+                    background: "transparent", color: "#141210",
+                    fontSize: 13, fontWeight: 500, textDecoration: "none",
+                    display: "inline-flex", alignItems: "center",
+                  }}
+                >Регистрация</Link>
               </div>
             </div>
           ) : (
             <>
               <button
                 type="button"
-                className={cn(
-                  "inline-flex h-10 w-full items-center justify-center gap-2 rounded-full border border-[#EF8759] bg-white px-5 text-sm font-semibold text-[#EF8759] transition-all hover:bg-[#FFF8F5] active:scale-[0.97]",
-                  "disabled:pointer-events-none disabled:opacity-50",
-                )}
                 onClick={handleRegenerate}
                 disabled={loadingScenario || !guestCanGenerateMore}
+                style={{
+                  width: "100%", height: 46, borderRadius: 99,
+                  border: "1px solid rgba(232,106,58,.45)",
+                  background: "transparent", color: "#C24E22",
+                  fontSize: 14, fontWeight: 500, cursor: "pointer",
+                  display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8,
+                  transition: "border-color .15s",
+                  fontFamily: "inherit",
+                  opacity: (loadingScenario || !guestCanGenerateMore) ? 0.5 : 1,
+                }}
               >
-                <Sparkles className="h-4 w-4 shrink-0" aria-hidden />
-                Ещё варианты
+                <Sparkles size={14}/> Ещё варианты
               </button>
-              {guestRemainingGenerations != null &&
-              guestRemainingGenerations > 0 ? (
-                <p className="text-center text-xs text-neutral-600">
-                  {formatRemainingGenerationsRu(guestRemainingGenerations)}
-                </p>
-              ) : null}
+              <p
+                className="font-mono uppercase text-center"
+                style={{ margin: 0, fontSize: 10, letterSpacing: ".1em", color: "rgba(20,18,16,.55)" }}
+              >
+                {guestRemainingGenerations === 0
+                  ? "● Генерации закончились · войдите, чтобы продолжить"
+                  : `● ${formatRemainingGenerationsRu(guestRemainingGenerations ?? 3)} · затем войдите, чтобы продолжить`
+                }
+              </p>
             </>
           )}
         </div>
       ) : null}
     </div>
+  );
+
+  const renderGenerated = () => {
+    const isLoadingEmpty = loadingScenario && scenarioSlots.length === 0;
+    const isEmptyNotLoading = !loadingScenario && scenarioSlots.length === 0;
+    // Quota-blocked gate is already rendered inside renderScenarioBlocks — don't duplicate it
+    const quotaBlocked = guestQuotaBlocked || guestRemainingGenerations === 0;
+
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+        <div>
+          <h3
+            className="font-display"
+            style={{ margin: 0, fontSize: 26, fontWeight: 400, lineHeight: 1.05, letterSpacing: "-.02em", color: "#141210" }}
+          >
+            {whenChoice === "today"
+              ? <>Вот что мы подобрали на&nbsp;<em style={{ fontStyle: "italic", color: "#C24E22" }}>сегодня</em></>
+              : whenChoice === "tomorrow"
+                ? <>Вот что мы подобрали на&nbsp;<em style={{ fontStyle: "italic", color: "#C24E22" }}>завтра</em></>
+                : <>Вот что мы подобрали на&nbsp;<em style={{ fontStyle: "italic", color: "#C24E22" }}>выходные</em></>
+            }
+          </h3>
+          <p
+            className="font-mono uppercase"
+            style={{ marginTop: 6, fontSize: 11, letterSpacing: ".08em", color: "rgba(20,18,16,.55)" }}
+          >
+            {generatedPlanDateLine}
+          </p>
+        </div>
+
+        {isLoadingEmpty ? (
+          /* Skeleton while fetching */
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            {(["morning", "afternoon", "evening"] as const).map((sk) => (
+              <div key={sk} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <div style={{ height: 10, width: 48, borderRadius: 4, background: "rgba(20,18,16,.08)", animation: "pulse 1.5s ease-in-out infinite" }}/>
+                <div style={{ height: 140, borderRadius: 20, background: "rgba(20,18,16,.05)", animation: "pulse 1.5s ease-in-out infinite" }}/>
+              </div>
+            ))}
+          </div>
+        ) : isEmptyNotLoading && quotaBlocked ? (
+          /* Quota exhausted & no cards */
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <AuthGateCard />
+            <p
+              className="font-mono uppercase text-center"
+              style={{ margin: 0, fontSize: 10, letterSpacing: ".1em", color: "rgba(20,18,16,.55)" }}
+            >
+              ● Генерации закончились · войдите, чтобы продолжить
+            </p>
+          </div>
+        ) : isEmptyNotLoading && !quotaBlocked ? (
+          /* Restored to generated phase with empty slots — offer to retry */
+          <div style={{ paddingTop: 4 }}>
+            <GuestPrimaryBtn onClick={() => void fetchScenario()} fullWidth>
+              Подобрать варианты <ArrowRight size={14}/>
+            </GuestPrimaryBtn>
+          </div>
+        ) : (
+          /* Normal: cards available */
+          renderScenarioBlocks({ showRegenerateCta: true })
+        )}
+
+        {/* Engagement auth gate — only when not already showing quota-blocked gate */}
+        {authGateVisible && !quotaBlocked ? renderAuthGate() : null}
+      </div>
     );
   };
 
-  const renderGenerated = () => (
-    <div className="space-y-4">
-      <div>
-        <h3 className="text-xl font-semibold tracking-tight text-neutral-900">
-          {generatedPlanHeading}
-        </h3>
-        <p className="mt-1 text-sm text-neutral-500">{generatedPlanDateLine}</p>
-        {loadingScenario && scenarioSlots.length === 0 ? (
-          <p className="mt-2 text-sm text-neutral-500">Подбираем варианты…</p>
-        ) : null}
-      </div>
-
-      {loadingScenario && scenarioSlots.length === 0 ? (
-        <div className="space-y-4 py-1">
-          {(["morning", "afternoon", "evening"] as const).map((slotKey) => (
-            <div key={slotKey} className="space-y-2">
-              <div className="h-3 w-14 animate-pulse rounded bg-neutral-200" />
-              <div className="h-[148px] animate-pulse rounded-[24px] bg-neutral-100 sm:h-[156px]" />
-            </div>
-          ))}
-        </div>
-      ) : (
-        renderScenarioBlocks({ showRegenerateCta: true })
-      )}
-      {renderAuthGate()}
-    </div>
-  );
-
   const renderEngaged = () => {
     const slotsOrder: GuestSlot[] = ["morning", "afternoon", "evening"];
-    const committedCount = slotsOrder.filter(
-      (sk) => committedBySlot[sk]?.activity,
-    ).length;
-    const planStatusHeadline =
-      committedCount >= 2
-        ? "🎯 Ваш план готов!"
-        : "🎯 Ваш план почти готов!";
+    const committedCount = slotsOrder.filter((sk) => committedBySlot[sk]?.activity).length;
     return (
-      <div className="space-y-5">
-        <div>
-          <h3 className="text-xl font-semibold tracking-tight text-neutral-900">
-            {planStatusHeadline}
-          </h3>
-        </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+        <h3
+          className="font-display"
+          style={{ margin: 0, fontSize: 26, fontWeight: 400, lineHeight: 1.05, letterSpacing: "-.02em", color: "#141210" }}
+        >
+          {committedCount >= 2
+            ? <>Ваш план <em style={{ fontStyle: "italic", color: "#C24E22" }}>готов!</em></>
+            : <>Ваш план <em style={{ fontStyle: "italic", color: "#C24E22" }}>почти готов</em></>
+          }
+        </h3>
 
-        {guestQuotaBlocked || guestRemainingGenerations === 0 ? (
-          <div className="rounded-2xl border border-neutral-200 bg-neutral-50/80 p-4 text-center shadow-sm">
-            <p className="text-sm font-medium text-neutral-900">
-              Сохраним ваш план и подберём ещё
-            </p>
-            <div className="mt-3 flex flex-wrap justify-center gap-2">
-              <Button asChild className="rounded-full" variant="default">
-                <Link href={loginHref}>Войти</Link>
-              </Button>
-              <Button asChild variant="outline" className="rounded-full">
-                <Link href={registerHref}>Регистрация</Link>
-              </Button>
-            </div>
-          </div>
-        ) : null}
+        {guestQuotaBlocked || guestRemainingGenerations === 0 ? <AuthGateCard /> : null}
 
         {slotsOrder.map((sk) => {
           const item = committedBySlot[sk];
           if (!item?.activity) return null;
           return (
-            <section key={`committed-${sk}`} className="space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-wider text-neutral-400">
+            <div key={`committed-${sk}`} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <span
+                className="font-mono uppercase"
+                style={{ fontSize: 10, letterSpacing: ".14em", color: "rgba(20,18,16,.55)" }}
+              >
                 {SLOT_LABEL[sk]}
-              </p>
+              </span>
               <RecommendationCard
                 item={item}
                 isInPlan
                 onRemoveFromPlan={() => handleRemoveCommitted(sk)}
               />
-            </section>
+            </div>
           );
         })}
 
         {scenarioSlots.length > 0 ? (
-          <div className="space-y-3 border-t border-neutral-100 pt-4">
-            <p className="text-sm font-semibold text-neutral-800">
+          <div style={{ borderTop: "1px solid rgba(20,18,16,.10)", paddingTop: 16, display: "flex", flexDirection: "column", gap: 12 }}>
+            <span
+              className="font-mono uppercase"
+              style={{ fontSize: 11, letterSpacing: ".12em", color: "rgba(20,18,16,.55)" }}
+            >
               Ещё идеи на этот день
-            </p>
+            </span>
             {renderScenarioBlocks({ showRegenerateCta: false })}
           </div>
         ) : null}
 
-        {renderAuthGate()}
+        {/* Engagement gate: only when not already showing quota-blocked gate */}
+        {authGateVisible && !(guestQuotaBlocked || guestRemainingGenerations === 0) ? renderAuthGate() : null}
       </div>
     );
   };
 
+  /* ── Chip helper ── */
+  const GuestChipGroup = ({
+    label,
+    items,
+  }: {
+    label: string;
+    items: Array<{ id: string; label: React.ReactNode; active?: boolean; onClick?: () => void }>;
+  }) => (
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
+      <span
+        className="font-mono uppercase"
+        style={{ fontSize: 11, letterSpacing: ".14em", color: "rgba(20,18,16,.55)" }}
+      >
+        {label}
+      </span>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, justifyContent: "center" }}>
+        {items.map((chip) => (
+          <button
+            key={chip.id}
+            type="button"
+            onClick={chip.onClick}
+            style={{
+              height: 40, padding: "0 20px", borderRadius: 99,
+              background: chip.active === true ? "#FFE8DC" : "#FAF7F1",
+              border: chip.active === true ? "1px solid transparent" : "1px solid rgba(20,18,16,.10)",
+              color: chip.active === true ? "#C24E22" : "#141210",
+              fontSize: 14, fontWeight: chip.active === true ? 600 : 500,
+              cursor: "pointer", transition: "all .15s",
+              fontFamily: "inherit",
+              display: "inline-flex", alignItems: "center",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {chip.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+
+  /* ── Primary CTA ── */
+  const GuestPrimaryBtn = ({
+    children,
+    onClick,
+    disabled,
+    fullWidth,
+  }: {
+    children: React.ReactNode;
+    onClick?: () => void;
+    disabled?: boolean;
+    fullWidth?: boolean;
+  }) => (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      style={{
+        width: fullWidth ? "100%" : undefined,
+        height: 54, padding: "0 28px", borderRadius: 99,
+        background: disabled
+          ? "rgba(232,106,58,.4)"
+          : "linear-gradient(180deg, #FBA77B, #E86A3A)",
+        color: "#fff",
+        fontSize: 15, fontWeight: 600, letterSpacing: "-.005em",
+        display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 10,
+        cursor: disabled ? "not-allowed" : "pointer", border: 0,
+        boxShadow: disabled ? "none" : "0 14px 32px -10px rgba(232,106,58,.5)",
+        transition: "filter .2s, box-shadow .2s",
+        fontFamily: "inherit",
+      }}
+    >
+      {children}
+    </button>
+  );
+
+  /* ── Auth gate card (reusable) ── */
+  const AuthGateCard = () => (
+    <div
+      style={{
+        position: "relative", overflow: "hidden",
+        padding: "22px 20px 20px",
+        background: "linear-gradient(135deg, #FFE8DC, #FFF1E5)",
+        border: "1px solid rgba(232,106,58,.25)",
+        borderRadius: 20,
+        display: "flex", flexDirection: "column", gap: 12,
+      }}
+    >
+      <span style={{
+        position: "absolute", top: -40, right: -30, width: 140, height: 140, borderRadius: 99,
+        background: "radial-gradient(circle, rgba(232,106,58,.2), transparent 65%)",
+        pointerEvents: "none",
+      }}/>
+      <h4
+        className="font-display"
+        style={{
+          margin: 0, fontSize: 24, fontWeight: 400, lineHeight: 1.05, letterSpacing: "-.02em",
+          color: "#141210", position: "relative", zIndex: 1,
+        }}
+      >
+        Сохраним ваш план<br/>и&nbsp;<em style={{ fontStyle: "italic", color: "#C24E22" }}>подберём ещё</em>
+      </h4>
+      <p style={{ margin: 0, fontSize: 13, lineHeight: 1.5, color: "#3A332B", position: "relative", zIndex: 1 }}>
+        Войдите, чтобы сохранить план, получать напоминания и продолжить подбирать варианты.
+      </p>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, position: "relative", zIndex: 1 }}>
+        <Link
+          href={loginHref}
+          style={{
+            height: 46, padding: "0 22px", borderRadius: 99,
+            background: "linear-gradient(180deg, #FBA77B, #E86A3A)",
+            color: "#fff", fontSize: 14, fontWeight: 600, textDecoration: "none",
+            display: "inline-flex", alignItems: "center", gap: 8,
+            boxShadow: "0 10px 24px -8px rgba(232,106,58,.45)",
+          }}
+        >
+          Войти →
+        </Link>
+        <Link
+          href={registerHref}
+          style={{
+            height: 46, padding: "0 18px", borderRadius: 99,
+            background: "transparent", color: "#141210",
+            border: "1px solid rgba(20,18,16,.18)",
+            fontSize: 14, fontWeight: 500, textDecoration: "none",
+            display: "inline-flex", alignItems: "center",
+          }}
+        >
+          Регистрация
+        </Link>
+      </div>
+    </div>
+  );
+
   const body = (() => {
     switch (phase) {
+      /* ── Step 1: Hook ── */
       case "empty":
         return (
-          <div className="flex flex-col items-center gap-4 py-6 text-center">
-            <div>
-              <h3 className="text-xl font-semibold tracking-tight text-neutral-900">
-                Соберём план на сегодня за 10 секунд
-              </h3>
-              <p className="mt-2 text-sm leading-relaxed text-neutral-600">
-                Подберём активности под вас и вашего ребенка
-              </p>
-            </div>
-            <button
-              type="button"
-              className={peachPrimaryCtaLinkClassName(
-                "touch-manipulation self-center sm:min-w-[240px]",
-              )}
-              onClick={() => setPhase("onboarding")}
+          <div
+            className="flex flex-col items-center text-center"
+            style={{ gap: 20, padding: "8px 4px 16px" }}
+          >
+            <h3
+              style={{
+                margin: 0,
+                fontFamily: '"InstrumentSerifNumerals", Georgia, serif',
+                fontSize: 36,
+                fontWeight: 400, lineHeight: 1.05, letterSpacing: "-.01em",
+                color: "#141210", maxWidth: 360,
+              }}
             >
-              Реши за меня
-              <ArrowRight
-                className="h-4 w-4 shrink-0 transition-transform duration-200 group-hover:translate-x-1 sm:h-[18px] sm:w-[18px]"
-                aria-hidden
-              />
-            </button>
+              Соберём план<br/>
+              на&nbsp;<em style={{ fontStyle: "italic", color: "#C24E22" }}>сегодня</em>
+              {" "}за&nbsp;<span style={{ fontFamily: "var(--font-display)" }}>10</span>&nbsp;секунд
+            </h3>
+
+            <p style={{ margin: 0, fontSize: 14, lineHeight: 1.55, color: "rgba(20,18,16,.55)", maxWidth: 320 }}>
+              Подберём активности под&nbsp;вас и&nbsp;вашего ребёнка — без анкет и&nbsp;регистрации.
+            </p>
+
+            <GuestPrimaryBtn onClick={() => setPhase("onboarding")} fullWidth>
+              <Sparkles size={14}/> Реши за меня <ArrowRight size={14}/>
+            </GuestPrimaryBtn>
+
+            {/* Trust line */}
+            <div
+              className="font-mono uppercase flex items-center gap-3"
+              style={{ fontSize: 10, letterSpacing: ".1em", color: "rgba(20,18,16,.55)" }}
+            >
+              <span className="inline-flex items-center gap-1.5">
+                <span style={{ width: 5, height: 5, borderRadius: 99, background: "#E86A3A", display: "inline-block" }}/>
+                без регистрации
+              </span>
+              <span style={{ width: 3, height: 3, borderRadius: 99, background: "rgba(20,18,16,.4)", display: "inline-block" }}/>
+              <span>3 подбора бесплатно</span>
+            </div>
+
+            <Link
+              href={loginHref}
+              style={{ fontSize: 13, color: "rgba(20,18,16,.55)", textDecoration: "underline", textUnderlineOffset: 3 }}
+            >
+              Я сама подберу →
+            </Link>
           </div>
         );
+
+      /* ── Step 2: Filters / Onboarding ── */
       case "onboarding":
         return (
-          <div className="space-y-5 text-center">
-            <div className="space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">
-                Кто идёт
-              </p>
-              <ChipsRow
-                layout="masonry"
-                justifyWrap="center"
-                aria-label="Кто идёт"
-                items={whoChips}
-              />
-              {!freeSearch && !goAdult ? (
-                <div className="space-y-2 pt-1">
-                  <p className="text-xs text-muted-foreground">Возраст</p>
-                  <ChipsRow
-                    layout="masonry"
-                    justifyWrap="center"
-                    aria-label="Возраст ребёнка"
-                    items={kidAgeChips}
-                  />
-                </div>
-              ) : null}
-            </div>
+          <div className="flex flex-col" style={{ gap: 22 }}>
+            <GuestChipGroup label="Кто идёт" items={whoChips}/>
 
-            <div className="space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">
-                Когда
-              </p>
-              <ChipsRow
-                layout="masonry"
-                justifyWrap="center"
-                aria-label="Когда"
-                items={whenChips}
-              />
-            </div>
+            {!freeSearch && !goAdult ? (
+              <GuestChipGroup label="Возраст" items={kidAgeChips}/>
+            ) : null}
 
-            <div className="space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">
-                Формат
-              </p>
-              <ChipsRow
-                layout="masonry"
-                justifyWrap="center"
-                aria-label="Формат"
-                items={formatChips}
-              />
-            </div>
+            <GuestChipGroup label="Когда" items={whenChips}/>
+            <GuestChipGroup label="Формат" items={formatChips}/>
 
-            <div className="flex justify-center pt-1">
+            <div style={{ paddingTop: 4, display: "flex", flexDirection: "column", gap: 10 }}>
               {guestQuotaBlocked || guestRemainingGenerations === 0 ? (
-                <div className="max-w-md rounded-2xl border border-neutral-200 bg-neutral-50/80 p-4 text-center shadow-sm">
-                  <p className="text-sm font-medium text-neutral-900">
-                    Сохраним ваш план и подберём ещё
+                <>
+                  <AuthGateCard/>
+                  <p
+                    className="font-mono uppercase text-center"
+                    style={{ margin: 0, fontSize: 10, letterSpacing: ".1em", color: "rgba(20,18,16,.55)" }}
+                  >
+                    ● Генерации закончились · войдите, чтобы продолжить
                   </p>
-                  <div className="mt-3 flex flex-wrap justify-center gap-2">
-                    <Button asChild className="rounded-full" variant="default">
-                      <Link href={loginHref}>Войти</Link>
-                    </Button>
-                    <Button asChild variant="outline" className="rounded-full">
-                      <Link href={registerHref}>Регистрация</Link>
-                    </Button>
-                  </div>
-                </div>
+                </>
               ) : (
-                <button
-                  type="button"
+                <GuestPrimaryBtn
+                  onClick={() => void fetchScenario({ showGeneratedShellFirst: true })}
                   disabled={loadingScenario || !guestCanGenerateMore}
-                  className={peachPrimaryCtaLinkClassName(
-                    cn(
-                      "touch-manipulation self-center sm:min-w-[240px]",
-                      (loadingScenario || !guestCanGenerateMore) &&
-                        "pointer-events-none opacity-50",
-                    ),
-                  )}
-                  onClick={() =>
-                    void fetchScenario({ showGeneratedShellFirst: true })
-                  }
+                  fullWidth
                 >
-                  Найди варианты
-                  <ArrowRight
-                    className="h-4 w-4 shrink-0 transition-transform duration-200 group-hover:translate-x-1 sm:h-[18px] sm:w-[18px]"
-                    aria-hidden
-                  />
-                </button>
+                  {loadingScenario ? "Подбираем…" : <>Найди варианты <ArrowRight size={14}/></>}
+                </GuestPrimaryBtn>
               )}
             </div>
           </div>
         );
+
       case "generated":
         return renderGenerated();
       case "engaged":
@@ -854,29 +1066,89 @@ export function GuestMyPlanPanel({
     }
   })();
 
+  /* ── Step dots ── */
+  const stepIdx = phase === "empty" ? 0 : phase === "onboarding" ? 1 : 2;
+  const StepDots = () => (
+    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+      {[0, 1, 2].map((i) => (
+        <span
+          key={i}
+          style={{
+            width: i === stepIdx ? 20 : 6,
+            height: 6,
+            borderRadius: 99,
+            background: i === stepIdx ? "#E86A3A" : i < stepIdx ? "#141210" : "rgba(20,18,16,.18)",
+            transition: "all .25s",
+            display: "inline-block",
+            flexShrink: 0,
+          }}
+        />
+      ))}
+    </div>
+  );
+
+  /* ── Footer nav ── */
+  const footerBack = phase === "generated" || phase === "engaged"
+    ? { label: "← Изменить", action: () => setPhase("onboarding") }
+    : phase === "onboarding"
+      ? { label: "← Назад", action: () => setPhase("empty") }
+      : null;
+
   return (
-    <div className="flex h-full min-h-0 flex-col bg-[#FFFDFC]">
+    <div className="flex h-full min-h-0 flex-col" style={{ background: "#F6F2EA" }}>
+      {/* Header */}
       <div
-        className={cn(
-          "flex-shrink-0 bg-[#FFFDFC]",
-          isDesktop
-            ? "sticky top-0 z-20 px-8 pb-3 pt-6"
-            : "border-b border-neutral-200 bg-white/90 px-4 pb-3 pt-6 backdrop-blur supports-[backdrop-filter]:bg-white/85",
-        )}
+        className="flex-shrink-0"
+        style={isDesktop ? { position: "sticky", top: 0, zIndex: 20 } : {}}
       >
         <MyPlanHeader onClose={onRequestClose} compact={!isDesktop} />
       </div>
 
+      {/* Scrollable body */}
       <div
-        className={cn(
-          "flex-1 overflow-y-auto bg-[#FFFDFC]",
-          isDesktop
-            ? "space-y-4 px-8 pb-6 pt-2"
-            : "space-y-4 px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-4",
-        )}
+        className="flex-1 overflow-y-auto"
+        style={{
+          background: "#F6F2EA",
+          padding: isDesktop
+            ? "24px 32px 16px"
+            : "20px 20px 16px",
+        }}
       >
         {body}
       </div>
+
+      {/* Footer nav: back + step dots */}
+      {phase !== "empty" && (
+        <div
+          className="flex-shrink-0"
+          style={{
+            borderTop: "1px solid rgba(20,18,16,.10)",
+            background: "#F6F2EA",
+            padding: "12px 20px calc(12px + env(safe-area-inset-bottom))",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+          }}
+        >
+          {footerBack ? (
+            <button
+              type="button"
+              onClick={footerBack.action}
+              style={{
+                fontSize: 13, color: "rgba(20,18,16,.55)",
+                background: "transparent", border: 0, cursor: "pointer",
+                fontFamily: "inherit", padding: 0,
+              }}
+            >
+              {footerBack.label}
+            </button>
+          ) : (
+            <span/>
+          )}
+          <StepDots/>
+          <span style={{ visibility: "hidden", fontSize: 13 }}>x</span>
+        </div>
+      )}
     </div>
   );
 }

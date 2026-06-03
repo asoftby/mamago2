@@ -7,7 +7,7 @@ import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { cn } from "@/lib/utils";
 import { Link2, Send, Share2, Check } from "lucide-react";
 import { toast } from "@/lib/toast";
-import { BUDGET_LABELS, type PublicRouteCardModel } from "@/components/routes/types";
+import type { PublicRouteCardModel } from "@/components/routes/types";
 
 type Props = {
   open: boolean;
@@ -43,7 +43,7 @@ function ShareContent({
     route.cityName,
     ageLabel,
     `${route.stopsCount} точки`,
-    BUDGET_LABELS[route.budgetLevel],
+    route.budgetLabel,
   ]
     .filter(Boolean)
     .join(" · ");

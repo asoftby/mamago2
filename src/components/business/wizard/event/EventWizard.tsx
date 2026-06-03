@@ -52,7 +52,10 @@ import { useEventEditorDraft } from "./useEventEditorDraft";
 import { Step9Review } from "./steps/Step9Review";
 import { EventSubmitModerationSuccessDialog } from "./EventSubmitModerationSuccessDialog";
 import { EventPublishedSuccessDialog } from "./EventPublishedSuccessDialog";
-import { publicActivityPath } from "@/lib/business/eventPublicLink";
+import {
+  publicActivityPath,
+  toAbsolutePublicUrl,
+} from "@/lib/business/eventPublicLink";
 import type { Role } from "@prisma/client";
 import {
   defaultEditorNav,
@@ -862,13 +865,19 @@ function EventWizardInner({
       setLastSaved(new Date());
       toast.success(hadEventId ? "Изменения сохранены" : "Черновик сохранён");
 
+      // После сохранения опубликованного события — возвращаемся назад
+      if (mode === "edit" && hadEventId && returnTo) {
+        router.push(returnTo);
+        return;
+      }
+
       if (
         mode === "edit" &&
         event?.status &&
         EVENT_STATUSES_WITH_LIVE_PUBLIC_PAGE.has(event.status) &&
         result.publicPath
       ) {
-        setOpenSitePublicPath(result.publicPath);
+        setOpenSitePublicPath(toAbsolutePublicUrl(result.publicPath));
       }
 
       if (mode === "create" && typeof window !== "undefined") {
@@ -940,9 +949,10 @@ function EventWizardInner({
       setSubmitStatus("success");
       setLastSaved(new Date());
 
-      const href =
+      const href = toAbsolutePublicUrl(
         eventPublicPathFromSubmitBody(submitBody) ??
-        publicActivityPath(tid, formData.city, eventSlugFromSubmitBody(submitBody));
+          publicActivityPath(tid, formData.city, eventSlugFromSubmitBody(submitBody)),
+      );
 
       baselineJsonRef.current = JSON.stringify(formData);
       baselineFormDataRef.current = cloneEventFormData(formData);
@@ -968,7 +978,7 @@ function EventWizardInner({
       }
 
       debugEditorLog("navigate after published review save", { href });
-      navigateToCompatibleHref(router, href);
+      navigateToCompatibleHref(router, href ?? afterSubmitDestination);
     } catch (error: unknown) {
       console.error("Published review save error:", error);
       setSubmitStatus("error");
@@ -1061,8 +1071,10 @@ function EventWizardInner({
             clearPersistedDraft();
           }
           setPublishedActivityHref(
-            eventPublicPathFromSubmitBody(submitBody) ??
-              publicActivityPath(newId, formData.city, eventSlugFromSubmitBody(submitBody)),
+            toAbsolutePublicUrl(
+              eventPublicPathFromSubmitBody(submitBody) ??
+                publicActivityPath(newId, formData.city, eventSlugFromSubmitBody(submitBody)),
+            ),
           );
           setPublishedSuccessModalOpen(true);
           return;
@@ -1144,8 +1156,10 @@ function EventWizardInner({
           clearPersistedDraft();
         }
         setPublishedActivityHref(
-          eventPublicPathFromSubmitBody(submitBody) ??
-            publicActivityPath(targetId, formData.city, eventSlugFromSubmitBody(submitBody)),
+          toAbsolutePublicUrl(
+            eventPublicPathFromSubmitBody(submitBody) ??
+              publicActivityPath(targetId, formData.city, eventSlugFromSubmitBody(submitBody)),
+          ),
         );
         setPublishedSuccessModalOpen(true);
         return;
@@ -1310,6 +1324,14 @@ function EventWizardInner({
   const showSaveDraftInBar = (mode === "edit" || isReviewStep) && !isPublishedEditReview;
 
   const phase = formWizardPhaseFromFlags({ isSaving, isSubmitting });
+  const busyHint =
+    isSubmitting
+      ? isPublishedEditReview
+        ? "Сохраняем изменения… Это может занять несколько секунд."
+        : "Публикуем событие… Это может занять несколько секунд."
+      : isSaving
+        ? "Сохраняем черновик… Это может занять несколько секунд."
+        : undefined;
 
   return (
     <FormWizardShell>
@@ -1351,6 +1373,7 @@ function EventWizardInner({
               : handleSubmit
             : undefined
         }
+        busyHint={busyHint}
         submitDisabled={
           isSubmitting ||
           isSaving ||

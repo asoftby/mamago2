@@ -10,6 +10,7 @@ import {
   type PublicationAccessTimeSlot,
 } from "@/features/publication-access";
 import type { EventFormData } from "../types";
+import { PriceListEditor } from "@/components/shared/PriceListEditor";
 
 interface Step5PricingParticipationProps {
   data: EventFormData;
@@ -214,6 +215,20 @@ export function Step5PricingParticipation({
             )}
           </div>
         )}
+      </div>
+
+      <div className="space-y-3">
+        <div>
+          <h3 className="text-base font-semibold text-gray-900">Детализация цен</h3>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Добавьте отдельные строки с ценами для разных категорий участников.
+          </p>
+        </div>
+        <PriceListEditor
+          value={data.priceItems}
+          onChange={(priceItems) => onChange({ priceItems })}
+          disabled={!isEditable}
+        />
       </div>
 
       <PublicationAccessEditor

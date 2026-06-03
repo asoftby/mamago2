@@ -1,13 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { OfferHero } from "./OfferHero";
 import { OfferEditorialInsights } from "./OfferEditorialInsights";
 import { OfferSchedule } from "./OfferSchedule";
 import { OfferReviews } from "./OfferReviews";
+import { OfferAccordion } from "./OfferAccordion";
 import { OfferPlace } from "./OfferPlace";
 import { OfferPromoCta } from "./OfferPromoCta";
 import { CampShiftBookingOverlay } from "./CampShiftBookingOverlay";
+import { EventStickyActionBar } from "@/components/event-page/EventStickyActionBar";
 import type { OfferPageData, OfferScheduleItem, ShiftCtaContext } from "@/lib/offer/offerPageTypes";
 import {
   SaveToPlanModal,
@@ -82,6 +84,7 @@ export function OfferPageView({
   onSave,
   onShiftCta,
 }: OfferPageViewProps) {
+  const ctaRef = useRef<HTMLElement | null>(null);
   const storageKey = `mamago:offer-plan:${data.id}`;
   const [localSave, setLocalSave] = useState<LocalOfferSaveState | null>(() => {
     if (typeof window === "undefined") return null;
@@ -148,6 +151,24 @@ export function OfferPageView({
     if (data.schedule?.type !== "shifts") return [];
     return sortShiftContextsByNearest(data.schedule.items.map(mapItemToShiftContext));
   }, [data.schedule]);
+
+  const stickyPriceLabel = useMemo(() => {
+    const p = data.pricing;
+    const raw = (p.priceDisplay || p.singlePrice || p.priceFrom || "").replace(/^от\s+/i, "");
+    if (!raw) return "";
+    const parts = raw.split(" ");
+    const num = parts[0] ?? "";
+    const unit = p.priceUnit || parts.slice(1).join(" ");
+    return unit ? `${num} ${unit}` : num;
+  }, [data.pricing]);
+
+  const stickySessionLine = useMemo(() => {
+    const nearest = shiftOptions[0];
+    if (!nearest?.dateFrom) return undefined;
+    return nearest.dateTo
+      ? `${nearest.dateFrom} — ${nearest.dateTo}`
+      : nearest.dateFrom;
+  }, [shiftOptions]);
 
   const saveScenario: SaveScenario = useMemo(() => {
     const target = saveTargetShift;
@@ -245,6 +266,7 @@ export function OfferPageView({
       return;
     }
 
+    if (result.action !== "plan") return;
     persistLocalSave({
       kind: "plan",
       dateISO: result.dateISO,
@@ -258,7 +280,7 @@ export function OfferPageView({
 
   return (
     <main className="ep-surface min-h-screen">
-      <div className="mx-auto max-w-[1280px] space-y-16 px-4 py-8 sm:px-6 lg:space-y-24 lg:px-8 lg:py-12">
+      <div className="mx-auto max-w-[1200px] space-y-16 px-4 py-8 sm:px-6 lg:space-y-24 lg:px-8 lg:py-12">
         <OfferHero
           data={data}
           canEditOffer={canEditOffer}
@@ -268,15 +290,19 @@ export function OfferPageView({
           isSaved={isSaved}
           onPrimary={handlePrimary}
           onSave={handleSave}
+          ctaRef={ctaRef}
         />
 
         <OfferEditorialInsights data={data} />
+
+        <OfferAccordion data={data} />
 
         {data.schedule && data.schedule.items.length > 0 && (
           <OfferSchedule
             type={data.schedule.type}
             items={data.schedule.items}
             onShiftCta={handleShiftCta}
+            onSaveShift={openSaveForShift}
             onItemCta={handleItemCta}
           />
         )}
@@ -293,6 +319,17 @@ export function OfferPageView({
 
         {data.promoCta && <OfferPromoCta {...data.promoCta} onPrimary={handlePrimary} />}
       </div>
+
+      <EventStickyActionBar
+        ctaRef={ctaRef}
+        sessionLine={stickySessionLine}
+        priceLabel={stickyPriceLabel}
+        primaryLabel={data.cta.primaryLabel}
+        onPrimary={handlePrimary}
+        isPrimaryLoading={isPrimaryLoading}
+        onPlan={handleSave}
+        isPlanned={isSaved}
+      />
 
       <CampShiftBookingOverlay
         open={Boolean(bookingShift)}

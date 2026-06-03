@@ -3,6 +3,7 @@ import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
 import { Container } from "@/components/ui/Container";
 import { RoutesClient } from "./RoutesClient";
+import { summarizeRouteBudget } from "@/lib/routes/routeBudget";
 
 export const metadata = { title: "Мои маршруты — mamaGo" };
 
@@ -12,6 +13,7 @@ type UserRoute = {
   title: string;
   ageTags: string[];
   budgetLevel: string;
+  budgetLabel: string;
   status: string;
   stopsCount: number;
   coverImageUrl: string | null;
@@ -25,27 +27,40 @@ async function getUserRoutes(userId: string): Promise<UserRoute[]> {
     orderBy: { updatedAt: "desc" },
     include: {
       stops: {
-        select: { id: true, photoUrl: true },
+        select: {
+          id: true,
+          photoUrl: true,
+          priceType: true,
+          priceMin: true,
+          priceMax: true,
+          priceCurrency: true,
+          priceNote: true,
+        },
         orderBy: { order: "asc" },
       },
     },
   });
 
-  return routes.map((route) => ({
-    id: route.id,
-    slug: route.slug,
-    title: route.title,
-    ageTags: route.ageTags,
-    budgetLevel: route.budgetLevel,
-    status: route.status,
-    stopsCount: route.stops.length,
-    coverImageUrl:
-      route.coverImageUrl ||
-      route.stops.find((s) => s.photoUrl)?.photoUrl ||
-      null,
-    createdAt: route.createdAt.toISOString(),
-    updatedAt: route.updatedAt.toISOString(),
-  }));
+  return routes.map((route) => {
+    const budgetSummary = summarizeRouteBudget(route.stops);
+
+    return {
+      id: route.id,
+      slug: route.slug,
+      title: route.title,
+      ageTags: route.ageTags,
+      budgetLevel: route.budgetLevel,
+      budgetLabel: budgetSummary.label,
+      status: route.status,
+      stopsCount: route.stops.length,
+      coverImageUrl:
+        route.coverImageUrl ||
+        route.stops.find((s) => s.photoUrl)?.photoUrl ||
+        null,
+      createdAt: route.createdAt.toISOString(),
+      updatedAt: route.updatedAt.toISOString(),
+    };
+  });
 }
 
 export default async function RoutesPage() {

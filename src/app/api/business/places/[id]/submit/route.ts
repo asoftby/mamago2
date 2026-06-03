@@ -16,6 +16,8 @@ import { canManagePlaceAsync } from "@/lib/auth/placeAccess";
 import { isMediaAssetCuid } from "@/lib/media/isMediaAssetCuid";
 import { createPublishTimer } from "@/server/utils/publishPipeline";
 import { attachMediaToEntity } from "@/lib/media/mediaRegistry";
+import { ensureMediaAssetForStoredFileUrl } from "@/lib/media/ensureMediaAssetForStoredFileUrl";
+import { extractMediaRelativePathFromUrl } from "@/server/media/media-storage";
 
 interface ValidationError {
   error: "VALIDATION";
@@ -89,6 +91,50 @@ export async function POST(
     }
     timer.mark("db");
 
+    // Convert TempMedia → PlaceImage if wizardSessionId provided (edit mode with pending uploads)
+    const body = await request.json().catch(() => ({})) as Record<string, unknown>;
+    const wizardSessionId = typeof body.wizardSessionId === "string" ? body.wizardSessionId : null;
+    if (wizardSessionId) {
+      try {
+        const tempMediaItems = await prisma.tempMedia.findMany({
+          where: { ownerUserId: user.id, wizardSessionId, status: "TEMP" },
+          orderBy: [{ kind: "asc" }, { sortOrder: "asc" }],
+        });
+        if (tempMediaItems.length > 0) {
+          const createdImages = await Promise.all(
+            tempMediaItems.map(async (media) => {
+              const kind = media.kind === "PLACE_LOGO" ? "LOGO" : "GALLERY";
+              const placeImage = await prisma.placeImage.create({
+                data: { placeId: id, kind, url: media.url, width: media.width, height: media.height, blurhash: media.blurhash, sortOrder: media.sortOrder },
+              });
+              try {
+                let mediaAsset = await prisma.mediaAsset.findFirst({ where: { OR: [{ storageKey: media.url }, { publicUrl: media.url }] } });
+                if (!mediaAsset && typeof media.url === "string" && extractMediaRelativePathFromUrl(media.url)) {
+                  mediaAsset = await ensureMediaAssetForStoredFileUrl({ publicUrl: media.url, uploadedById: user.id, userRole: user.role, width: media.width, height: media.height, originalName: kind === "LOGO" ? "place-logo.webp" : "place-gallery.webp" });
+                }
+                if (mediaAsset) {
+                  await attachMediaToEntity({ mediaId: mediaAsset.id, entityType: MediaEntityType.PLACE, entityId: id, field: kind === "LOGO" ? "logo" : "gallery" });
+                }
+              } catch { /* non-fatal */ }
+              return placeImage;
+            })
+          );
+          const logoPlaceImage = createdImages.find((img) => img.kind === "LOGO");
+          if (logoPlaceImage) {
+            await prisma.place.update({ where: { id }, data: { logoImageId: logoPlaceImage.id } });
+          }
+          await prisma.tempMedia.updateMany({ where: { ownerUserId: user.id, wizardSessionId, status: "TEMP" }, data: { status: "ATTACHED", placeId: id } });
+        }
+      } catch (e) {
+        console.error("[submit] Failed to attach temp media:", e);
+      }
+      // Refresh place data after TempMedia conversion
+      const refreshed = await prisma.place.findUnique({ where: { id }, select: { logoImageId: true, images: { select: { id: true, kind: true } } } });
+      if (refreshed) {
+        (place as { logoImageId: string | null }).logoImageId = refreshed.logoImageId;
+        (place as { images: { id: string; kind: string }[] }).images = refreshed.images;
+      }
+    }
     // Strict validation
     const missing: string[] = [];
     const fields: Record<string, string> = {};
@@ -126,7 +172,7 @@ export async function POST(
             },
           })
         : null;
-    if (!place.logoImageId || (!logoImage && !logoFromMediaLibrary)) {
+    if (!logoImage && !logoFromMediaLibrary) {
       missing.push("logoImageId");
       fields.logoImageId = "Logo image is required";
     }
@@ -177,6 +223,13 @@ export async function POST(
       return NextResponse.json(response, { status: 400 });
     }
     timer.mark("validate");
+
+    if (logoImage && !place.logoImageId) {
+      await prisma.place.update({
+        where: { id: place.id },
+        data: { logoImageId: logoImage.id },
+      });
+    }
 
     if (!logoImage && logoFromMediaLibrary?.publicUrl?.trim()) {
       const image = await prisma.placeImage.create({

@@ -4,6 +4,7 @@ import type { OfferPageData, OfferType, OfferCtaType, OfferGalleryImage, OfferSc
 import { formatAgeRange, formatPrice } from "./offerPageFormat";
 import { resolvePlaceLogoImage } from "@/lib/place/resolvePlaceLogoImage";
 import { isMediaAssetCuid } from "@/lib/media/isMediaAssetCuid";
+import { isGoogleReviewsEnabled } from "@/lib/place/googleReviewsMeta";
 
 interface GetOfferPageDataParams {
   citySlug: string;
@@ -53,7 +54,7 @@ function parseCampSession(value: Prisma.JsonValue, index: number): OfferSchedule
       ? new Date(dateFrom).toLocaleDateString("ru-RU")
       : undefined,
     dateTo: dateTo ? new Date(dateTo).toLocaleDateString("ru-RU") : undefined,
-    price: priceOverride != null ? `${priceOverride} BYN` : undefined,
+    price: priceOverride != null ? `${priceOverride.toFixed(2)} BYN` : undefined,
     description: asOptionalString(session.description),
     ageRange:
       ageFrom != null || ageTo != null
@@ -241,9 +242,13 @@ export async function getOfferPageData({
 
   // Map schedule items
   const campSessionsRaw = Array.isArray(offer.campSessions) ? offer.campSessions : [];
+  const fallbackShiftPrice = offer.priceFrom
+    ? `${offer.priceFrom.toFixed(2).replace(".", ".")} BYN`
+    : undefined;
   const scheduleItems: OfferScheduleItem[] = campSessionsRaw
     .map((session, index) => parseCampSession(session, index))
-    .filter((session): session is OfferScheduleItem => session !== null);
+    .filter((session): session is OfferScheduleItem => session !== null)
+    .map((item) => ({ ...item, price: item.price ?? fallbackShiftPrice }));
 
   // Map pricing
   const pricingMode = offer.priceFrom ? "single" : "multiple";
@@ -363,14 +368,18 @@ export async function getOfferPageData({
       id: offer.place.id,
       name: offer.place.title,
       slug: offer.place.slug || "",
-      address: offer.place.formattedAddr || offer.place.customAddress || "",
+      address: offer.place.customAddress || offer.place.formattedAddr || "",
       district: offer.place.districtManual?.name || offer.place.districtAuto?.name,
       metro: offer.place.metroManual?.name || offer.place.metroAuto?.name,
       lat: offer.place.lat || undefined,
       lng: offer.place.lng || undefined,
       logoUrl: placeLogoUrl,
-      rating: offer.place.googleRating || undefined,
-      ratingsCount: offer.place.googleUserRatingsTotal || undefined,
+      rating: isGoogleReviewsEnabled(offer.place.googlePlaceId, offer.place.googleReviewsJson)
+        ? (offer.place.googleRating || undefined)
+        : undefined,
+      ratingsCount: isGoogleReviewsEnabled(offer.place.googlePlaceId, offer.place.googleReviewsJson)
+        ? (offer.place.googleUserRatingsTotal || undefined)
+        : undefined,
     } : undefined,
 
     reviews: reviews.map(r => ({

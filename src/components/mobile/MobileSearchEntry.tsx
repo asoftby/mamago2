@@ -223,8 +223,8 @@ export function MobileSearchEntry({
 
   const locationText = getLocationText();
 
-  const dateText = getDateText();
-  const ageText = whoOrAgeText;
+  const dateText = isClient ? getDateText() : null;
+  const ageText = isClient ? whoOrAgeText : null;
 
   const parts = cityHubOnly
     ? [locationText]
@@ -235,7 +235,7 @@ export function MobileSearchEntry({
   const summaryText =
     parts.length > 0 ? parts.join(" • ") : cityHubOnly ? locationText : "Начать поиск";
 
-  const hasAdditionalFilters = cityHubOnly
+  const hasAdditionalFilters = isClient && (cityHubOnly
     ? !!(applied.district || applied.metro || applied.nearby)
     : !!(
         applied.district ||
@@ -244,7 +244,7 @@ export function MobileSearchEntry({
         applied.dateFrom ||
         applied.whenPreset ||
         applied.age.length > 0
-      );
+      ));
 
   /** Только город в фильтрах (локация по умолчанию), без даты/возраста/метро/района/поблизости */
   const onlyCitySelected = !(

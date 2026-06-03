@@ -92,7 +92,9 @@ export function validateStep3(data: PlaceFormData): StepValidation {
 export function validateStep4(data: PlaceFormData): StepValidation {
   const errors: string[] = [];
   
-  const hasLogo = !!data.logoImageId;
+  const hasLogo =
+    !!data.logoImageId ||
+    data.images.some((img) => img.kind === "LOGO" && !!img.url?.trim());
   const hasGalleryImages = data.images.length > 0;
   
   if (!hasLogo && !hasGalleryImages) {

@@ -13,6 +13,7 @@ import {
 import { parseActivityFormatQuery } from "@/domain/activities/activity-format";
 import type { PublicRouteCardModel } from "@/components/routes/types";
 import { computeMaxBudget, getBudgetStep } from "@/lib/discovery/budgetUtils";
+import { summarizeRouteBudget } from "@/lib/routes/routeBudget";
 
 export type BudgetConfig = { max: number; step: number } | null;
 
@@ -76,30 +77,36 @@ export async function CityShell({ citySlug, intent, searchParams }: CityShellPro
   let routesData = undefined;
   if (intent === "routes") {
     const dbRoutes = await listPublicRoutesByCity(city.id).catch(() => []);
-    const realRoutes: PublicRouteCardModel[] = dbRoutes.map((r) => ({
-      id: r.id,
-      slug: r.slug,
-      title: r.title,
-      ageTags: r.ageTags,
-      budgetLevel: r.budgetLevel,
-      cityName: r.city?.name ?? city.name,
-      coverImageUrl:
-        r.coverImageUrl ??
-        r.stops.find((s) => s.photoUrl)?.photoUrl ??
-        "https://images.unsplash.com/photo-1513884923967-4b182ef1671f?q=80&w=1200",
-      authorName: r.author?.email?.split("@")[0] ?? null,
-      isEditorial: r.authorId === null,
-      stopsCount: r.stops.length,
-      stops: r.stops.map((s) => ({
-        id: s.id,
-        order: s.order,
-        address: s.place?.title ?? s.customTitle ?? s.address ?? "",
-        note: s.note,
-        photoUrl: s.photoUrl ?? "",
-        lat: s.lat ?? undefined,
-        lng: s.lng ?? undefined,
-      })),
-    }));
+    const realRoutes: PublicRouteCardModel[] = dbRoutes.map((r) => {
+      const budgetSummary = summarizeRouteBudget(r.stops);
+
+      return {
+        id: r.id,
+        slug: r.slug,
+        title: r.title,
+        ageTags: r.ageTags,
+        budgetLevel: r.budgetLevel,
+        budgetLabel: budgetSummary.label,
+        budgetNote: budgetSummary.note,
+        cityName: r.city?.name ?? city.name,
+        coverImageUrl:
+          r.coverImageUrl ??
+          r.stops.find((s) => s.photoUrl)?.photoUrl ??
+          "https://images.unsplash.com/photo-1513884923967-4b182ef1671f?q=80&w=1200",
+        authorName: r.author?.email?.split("@")[0] ?? null,
+        isEditorial: r.authorId === null,
+        stopsCount: r.stops.length,
+        stops: r.stops.map((s) => ({
+          id: s.id,
+          order: s.order,
+          address: s.place?.title ?? s.customTitle ?? s.address ?? "",
+          note: s.note,
+          photoUrl: s.photoUrl ?? "",
+          lat: s.lat ?? undefined,
+          lng: s.lng ?? undefined,
+        })),
+      };
+    });
 
     console.log("[API] real data used", {
       endpoint: "city-shell-routes",

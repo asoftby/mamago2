@@ -45,7 +45,10 @@ export function getDefaultFormData(): PlaceFormData {
     // Step 5: Opening Hours
     openingHoursId: null,
     openingHoursData: null,
-    
+
+    // Prices
+    priceItems: { items: [], note: "" },
+
     // Hierarchy
     placeKind: PlaceKind.STANDALONE,
     floor: null,

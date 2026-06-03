@@ -14,6 +14,8 @@ import {
 import { SecondaryFiltersForm } from "@/components/discovery/SecondaryFiltersForm";
 import type { Intent } from "@/lib/intent";
 import { useSecondaryFiltersFromUrl } from "@/features/filters/discovery/useSecondaryFiltersFromUrl";
+import { useBudgetFilter } from "@/features/filters/discovery/useBudgetFilter";
+import { useOptionalDiscoveryBudgetConfig } from "@/features/filters/discovery/discoveryBudgetContext";
 
 interface RefinementFiltersButtonCompactProps {
   className?: string;
@@ -26,7 +28,16 @@ export function RefinementFiltersButtonCompact({
 }: RefinementFiltersButtonCompactProps) {
   const [open, setOpen] = useState(false);
   const safeIntent = (intent ?? null) as Intent | null;
-  const { activeCount } = useSecondaryFiltersFromUrl(safeIntent);
+  const { activeCount: secondaryActiveCount } =
+    useSecondaryFiltersFromUrl(safeIntent);
+  const budgetCtx = useOptionalDiscoveryBudgetConfig();
+  const budgetConfig = budgetCtx?.budgetConfig ?? null;
+  const { budget } = useBudgetFilter();
+  const budgetActive =
+    Boolean(budgetConfig) &&
+    budget !== null &&
+    budget < (budgetConfig?.max ?? Number.POSITIVE_INFINITY);
+  const activeCount = secondaryActiveCount + (budgetActive ? 1 : 0);
 
   if (!safeIntent) return null;
 

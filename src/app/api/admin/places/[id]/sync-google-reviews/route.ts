@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth/server";
 import { getPlaceDetails } from "@/lib/google-places/client";
+import { classifyGoogleReviewsMatch, mergeGoogleReviewsMeta, readGoogleReviewsPayload } from "@/lib/place/googleReviewsMeta";
+import { Prisma } from "@prisma/client";
 
 interface RouteContext {
   params: Promise<{ id: string }>;
@@ -44,7 +46,10 @@ export async function POST(
       select: {
         id: true,
         title: true,
+        formattedAddr: true,
+        customAddress: true,
         googlePlaceId: true,
+        googleReviewsJson: true,
         ownerBusinessId: true,
         createdByUserId: true,
       },
@@ -203,6 +208,18 @@ export async function POST(
     }
 
     // Обновить агрегированные данные в Place
+    const currentPayload = readGoogleReviewsPayload(place.googleReviewsJson);
+    const classified = classifyGoogleReviewsMatch({
+      placeTitle: place.title,
+      placeAddress: place.formattedAddr || place.customAddress,
+      googlePlaceId: place.googlePlaceId,
+      googlePlaceName: placeDetails.displayName?.text,
+      googlePlaceAddress: placeDetails.formattedAddress,
+    });
+    const nextMeta = currentPayload?.meta?.enabled
+      ? { ...classified, enabled: true, matchStatus: "CONFIRMED" as const, disabledReason: null }
+      : classified;
+
     const updatedPlace = await prisma.place.update({
       where: { id: placeId },
       data: {
@@ -210,12 +227,17 @@ export async function POST(
         googleUserRatingsTotal: placeDetails.userRatingCount || null,
         googleReviewsSyncedAt: new Date(),
         googleMapsUri: placeDetails.googleMapsUri || null,
+        googleReviewsJson: mergeGoogleReviewsMeta(
+          place.googleReviewsJson,
+          nextMeta,
+        ) as Prisma.InputJsonValue,
       },
       select: {
         id: true,
         googleRating: true,
         googleUserRatingsTotal: true,
         googleReviewsSyncedAt: true,
+        googleReviewsJson: true,
       },
     });
 

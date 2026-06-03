@@ -5,6 +5,7 @@ import { X } from "lucide-react";
 import { formatAgeKeys } from "@/lib/config/ages";
 import { Textarea } from "@/components/ui/textarea";
 import { getFormatLabel } from "@/lib/placeChips";
+import { GoogleReviewsStatusBadge } from "@/components/admin/moderation/GoogleReviewsStatusBadge";
 
 type PlaceDetail = {
   id: string;
@@ -20,6 +21,10 @@ type PlaceDetail = {
   formattedAddr: string | null;
   locationSource: string;
   customAddress: string | null;
+  googlePlaceId?: string | null;
+  googleRating?: number | null;
+  googleUserRatingsTotal?: number | null;
+  googleReviewsJson?: unknown;
   phone: string | null;
   website: string | null;
   instagramHandle: string | null;
@@ -48,7 +53,7 @@ type PlaceDetail = {
     url: string;
     sortOrder: number;
   }>;
-  moderationLogs: Array<{
+  moderationLogs?: Array<{
     id: string;
     action: string;
     message: string | null;
@@ -328,6 +333,18 @@ export function PlaceModerationSidePanel({
                       {place.formattedAddr || place.customAddress || "—"}
                     </dd>
                   </div>
+                  <div className="col-span-2">
+                    <dt className="text-sm font-medium text-gray-500">Статус Google Reviews</dt>
+                    <dd className="mt-2">
+                      <GoogleReviewsStatusBadge
+                        googlePlaceId={place.googlePlaceId}
+                        googleRating={place.googleRating}
+                        googleUserRatingsTotal={place.googleUserRatingsTotal}
+                        googleReviewsJson={place.googleReviewsJson}
+                        compact
+                      />
+                    </dd>
+                  </div>
                   {place.phone && (
                     <div>
                       <dt className="text-sm font-medium text-gray-500">
@@ -431,13 +448,13 @@ export function PlaceModerationSidePanel({
               </div>
 
               {/* Moderation Logs */}
-              {place.moderationLogs.length > 0 && (
+              {(place.moderationLogs?.length ?? 0) > 0 && (
                 <div className="bg-gray-50 rounded-lg p-4">
                   <h4 className="text-lg font-semibold mb-3">
                     История модерации
                   </h4>
                   <div className="space-y-3">
-                    {place.moderationLogs.map((log) => (
+                    {place.moderationLogs?.map((log) => (
                       <div
                         key={log.id}
                         className="border-l-4 border-gray-300 pl-3"

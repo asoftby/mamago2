@@ -1,7 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import React, { useEffect, useMemo, useRef } from "react";
 import { cn } from "@/lib/utils";
 import {
   getNextWeekStart,
@@ -13,7 +12,8 @@ import {
 } from "@/features/my-plan/lib/weekCalendar";
 import type { SerializedPlanItem } from "./PlanPageClient";
 
-const DAYS_RU = ["Вс", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб"];
+const DAYS_RU_SHORT: Record<number, string> = { 1:"Пн", 2:"Вт", 3:"Ср", 4:"Чт", 5:"Пт", 6:"Сб", 0:"Вс" };
+const MONTHS_RU = ["янв","фев","мар","апр","май","июн","июл","авг","сен","окт","ноя","дек"];
 
 type Props = {
   selectedDate: string;
@@ -23,120 +23,198 @@ type Props = {
 
 export function WeekCalendar({ selectedDate, onSelect, itemsByDate }: Props) {
   const todayISO = isoFromDate(new Date());
-  const [weekStart, setWeekStart] = useState(() => getWeekStart(selectedDate));
+  const [weekStart, setWeekStart] = React.useState(() => getWeekStart(selectedDate));
+  const scrollRef = useRef<HTMLDivElement>(null);
   const selectedRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     setWeekStart(getWeekStart(selectedDate));
   }, [selectedDate]);
 
-  // Auto-scroll selected day into view on mount and on selection change
   useEffect(() => {
     if (selectedRef.current) {
-      selectedRef.current.scrollIntoView({
-        behavior: "smooth",
-        block: "nearest",
-        inline: "center",
-      });
+      selectedRef.current.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
     }
   }, [selectedDate]);
 
   const weekDates = useMemo(() => getWeekDays(weekStart), [weekStart]);
 
   const shiftWeek = (dir: 1 | -1) => {
-    const next =
-      dir === 1 ? getNextWeekStart(weekStart) : getPrevWeekStart(weekStart);
+    const next = dir === 1 ? getNextWeekStart(weekStart) : getPrevWeekStart(weekStart);
     setWeekStart(next);
     onSelect(preserveWeekday(selectedDate, next));
   };
 
-  return (
-    <div className="relative bg-white rounded-2xl border border-neutral-100 py-2.5">
-      <button
-        type="button"
-        onClick={() => shiftWeek(-1)}
-        className="absolute left-1 top-1/2 z-10 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-700"
-        aria-label="Предыдущая неделя"
-      >
-        <ChevronLeft className="h-4 w-4" />
-      </button>
-      <button
-        type="button"
-        onClick={() => shiftWeek(1)}
-        className="absolute right-1 top-1/2 z-10 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-700"
-        aria-label="Следующая неделя"
-      >
-        <ChevronRight className="h-4 w-4" />
-      </button>
+  // Determine current month label from the first date in the strip
+  const firstDate = new Date(weekDates[0] + "T12:00:00");
+  const lastDate = new Date(weekDates[weekDates.length - 1] + "T12:00:00");
+  const monthLabel = firstDate.getMonth() === lastDate.getMonth()
+    ? `${MONTHS_RU[firstDate.getMonth()].charAt(0).toUpperCase() + MONTHS_RU[firstDate.getMonth()].slice(1)} ${firstDate.getFullYear()}`
+    : `${MONTHS_RU[firstDate.getMonth()].charAt(0).toUpperCase() + MONTHS_RU[firstDate.getMonth()].slice(1)} – ${MONTHS_RU[lastDate.getMonth()]} ${lastDate.getFullYear()}`;
 
-      {/* Horizontal scrollable container */}
-      <div className="overflow-x-auto scrollbar-hide px-10">
-        <div className="flex gap-1 min-w-max">
+  return (
+    <div>
+      {/* Month header row */}
+      <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 14 }}>
+        <span
+          className="font-mono uppercase"
+          style={{ fontSize: 11, letterSpacing: ".14em", color: "rgba(20,18,16,.55)", whiteSpace: "nowrap" }}
+        >
+          {monthLabel}
+        </span>
+        <div style={{ flex: 1, height: 1, background: "rgba(20,18,16,.10)" }} />
+        <button
+          type="button"
+          onClick={() => shiftWeek(-1)}
+          className="font-mono uppercase"
+          style={{ fontSize: 11, letterSpacing: ".1em", color: "#3A332B", cursor: "pointer", whiteSpace: "nowrap" }}
+        >
+          ← пред
+        </button>
+        <button
+          type="button"
+          onClick={() => shiftWeek(1)}
+          className="font-mono uppercase"
+          style={{ fontSize: 11, letterSpacing: ".1em", color: "#3A332B", cursor: "pointer", whiteSpace: "nowrap" }}
+        >
+          след →
+        </button>
+      </div>
+
+      {/* Strip */}
+      <div style={{ display: "grid", gridTemplateColumns: "38px 1fr 38px", gap: 10, alignItems: "center" }}>
+        <button
+          type="button"
+          onClick={() => shiftWeek(-1)}
+          aria-label="Предыдущая неделя"
+          style={{
+            width: 38, height: 38, borderRadius: 99,
+            background: "#FAF7F1", border: "1px solid rgba(20,18,16,.10)",
+            color: "#141210", cursor: "pointer", fontSize: 14,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            flexShrink: 0,
+          }}
+        >
+          ‹
+        </button>
+
+        <div
+          ref={scrollRef}
+          style={{
+            display: "flex", gap: 8,
+            scrollbarWidth: "none",
+            padding: "2px 2px",
+          }}
+        >
           {weekDates.map((dateStr) => {
             const date = new Date(dateStr + "T12:00:00");
-            const dayName = DAYS_RU[date.getDay()];
+            const dow = DAYS_RU_SHORT[date.getDay()];
             const dayNum = date.getDate();
             const isToday = dateStr === todayISO;
             const isSelected = dateStr === selectedDate;
-            const hasItems = (itemsByDate[dateStr]?.length ?? 0) > 0;
+            const itemsCount = itemsByDate[dateStr]?.length ?? 0;
             const isPast = dateStr < todayISO;
-            const isWeekend = date.getDay() === 0 || date.getDay() === 6;
 
             return (
               <button
                 key={dateStr}
                 ref={isSelected ? selectedRef : undefined}
                 type="button"
-                disabled={isPast}
+                disabled={isPast && !isSelected}
                 onClick={() => onSelect(dateStr)}
-                className={cn(
-                  "relative flex flex-col items-center justify-center w-11 h-16 rounded-xl transition-all shrink-0",
-                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#EF8759]/50",
-                  isPast && !isSelected && "opacity-40 cursor-default",
-                  isSelected
-                    ? "bg-[#EF8759] text-white shadow-sm"
-                    : isToday
-                      ? "bg-[#FEF3EE] text-[#D56F47]"
-                      : "hover:bg-neutral-50 text-neutral-700",
-                )}
+                style={{
+                  flex: "1 1 0",
+                  minWidth: 0,
+                  padding: "14px 6px 12px",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  gap: 4,
+                  width: "auto",
+                  background: isSelected ? "#141210" : "#FAF7F1",
+                  color: isSelected ? "#FAF7F1" : isPast ? "rgba(20,18,16,.38)" : "#141210",
+                  border: `1px solid ${isSelected ? "#141210" : "rgba(20,18,16,.10)"}`,
+                  borderRadius: 14,
+                  cursor: isPast && !isSelected ? "default" : "pointer",
+                  transition: "all .15s",
+                  position: "relative",
+                  opacity: isPast && !isSelected ? 0.5 : 1,
+                }}
+                onMouseEnter={(e) => {
+                  if (!isSelected && !isPast) {
+                    (e.currentTarget as HTMLButtonElement).style.borderColor = "#141210";
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isSelected) {
+                    (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(20,18,16,.10)";
+                  }
+                }}
               >
                 <span
-                  className={cn(
-                    "text-[10px] font-semibold mb-0.5 leading-none tracking-wide",
-                    isSelected
-                      ? "text-white/80"
-                      : isToday
-                        ? "text-[#D56F47]"
-                        : isWeekend
-                          ? "text-neutral-400"
-                          : "text-neutral-500",
-                  )}
+                  className="font-mono uppercase"
+                  style={{
+                    fontSize: 10,
+                    letterSpacing: ".1em",
+                    color: isSelected ? "rgba(250,247,241,.55)" : "rgba(20,18,16,.55)",
+                  }}
                 >
-                  {dayName}
+                  {dow}
                 </span>
                 <span
-                  className={cn(
-                    "text-sm font-bold leading-none",
-                    isSelected && "text-white",
-                  )}
+                  className="font-display"
+                  style={{ fontSize: 28, lineHeight: 1, letterSpacing: "-.02em" }}
                 >
                   {dayNum}
                 </span>
-                {hasItems && (
-                  <div
-                    className={cn(
-                      "absolute bottom-1.5 w-1 h-1 rounded-full",
-                      isSelected ? "bg-white/70" : "bg-[#EF8759]",
-                    )}
-                  />
-                )}
+                {/* Dots for events */}
+                <span style={{ display: "flex", gap: 3, height: 5, alignItems: "center", marginTop: 1 }}>
+                  {Array.from({ length: Math.min(itemsCount, 4) }).map((_, di) => (
+                    <span
+                      key={di}
+                      style={{
+                        width: 4,
+                        height: 4,
+                        borderRadius: 99,
+                        background: "#E86A3A",
+                      }}
+                    />
+                  ))}
+                </span>
+                {/* Today indicator */}
                 {isToday && !isSelected && (
-                  <div className="pointer-events-none absolute inset-0 rounded-xl ring-1 ring-[#EF8759]/40" />
+                  <span
+                    style={{
+                      position: "absolute",
+                      top: 6,
+                      right: 6,
+                      width: 7,
+                      height: 7,
+                      borderRadius: 99,
+                      background: "#E86A3A",
+                      boxShadow: "0 0 0 2px #FAF7F1",
+                    }}
+                  />
                 )}
               </button>
             );
           })}
         </div>
+
+        <button
+          type="button"
+          onClick={() => shiftWeek(1)}
+          aria-label="Следующая неделя"
+          style={{
+            width: 38, height: 38, borderRadius: 99,
+            background: "#FAF7F1", border: "1px solid rgba(20,18,16,.10)",
+            color: "#141210", cursor: "pointer", fontSize: 14,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            flexShrink: 0,
+          }}
+        >
+          ›
+        </button>
       </div>
     </div>
   );

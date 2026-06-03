@@ -1,10 +1,9 @@
-// Step 3: Media
-// Inherits Event Wizard Step3Media pattern
+"use client";
 
-import { X } from "lucide-react";
-import { ImageUploader } from "@/components/image/ImageUploader";
-import { Label } from "@/components/ui/label";
+import { useCallback } from "react";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { MediaUploadField, type MediaUploadItem } from "@/components/media/MediaUploadField";
 import type { OfferFormData } from "../types";
 import { isValidVideoUrl } from "../mappers";
 
@@ -19,109 +18,156 @@ interface Step3MediaProps {
   wizardSessionId?: string;
 }
 
-export function Step3Media({ data, onChange, isEditable }: Step3MediaProps) {
-  const removeCover = () => {
-    if (!isEditable) return;
-    onChange({ coverImage: null });
-  };
+type BusinessPickerItem = {
+  id: string;
+  publicUrl: string | null;
+  alt: string | null;
+  title: string | null;
+};
 
-  const removeGalleryUrl = (url: string) => {
-    if (!isEditable) return;
-    onChange((prev) => ({
-      gallery: prev.gallery.filter((u) => u !== url),
+async function uploadFilesToPublicMedia(files: File[]): Promise<MediaUploadItem[]> {
+  const uploaded: MediaUploadItem[] = [];
+
+  for (const file of files) {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const response = await fetch("/api/upload", {
+      method: "POST",
+      body: formData,
+      credentials: "include",
+    });
+
+    const payload = (await response.json().catch(() => ({}))) as {
+      error?: string;
+      url?: string;
+      mediaId?: string | null;
+    };
+
+    if (!response.ok) {
+      throw new Error(
+        typeof payload.error === "string" ? payload.error : `Ошибка загрузки файла «${file.name}»`,
+      );
+    }
+
+    const url = typeof payload.url === "string" ? payload.url.trim() : "";
+    if (!url) {
+      throw new Error(`Файл «${file.name}» загружен без публичного URL`);
+    }
+
+    uploaded.push({
+      id: url,
+      url,
+      title: file.name,
+      alt: null,
+    });
+  }
+
+  return uploaded;
+}
+
+async function loadBusinessMediaLibrary(): Promise<MediaUploadItem[]> {
+  const response = await fetch("/api/business/media-picker?limit=48", {
+    credentials: "include",
+  });
+
+  if (!response.ok) {
+    throw new Error("Не удалось загрузить медиатеку");
+  }
+
+  const data = (await response.json()) as { items?: BusinessPickerItem[] };
+
+  return (data.items ?? [])
+    .filter((item): item is BusinessPickerItem & { publicUrl: string } => Boolean(item.publicUrl))
+    .map((item) => ({
+      id: item.publicUrl,
+      url: item.publicUrl,
+      alt: item.alt,
+      title: item.title,
     }));
+}
+
+export function Step3Media({ data, onChange, isEditable }: Step3MediaProps) {
+  const handleCoverChange = useCallback(
+    (value: MediaUploadItem | MediaUploadItem[] | null) => {
+      const nextCover = value && !Array.isArray(value) ? value.url : null;
+      onChange({ coverImage: nextCover });
+    },
+    [onChange],
+  );
+
+  const handleGalleryChange = useCallback(
+    (value: MediaUploadItem | MediaUploadItem[] | null) => {
+      const nextGallery = Array.isArray(value) ? value.map((item) => item.url) : [];
+      onChange({ gallery: nextGallery });
+    },
+    [onChange],
+  );
+
+  const handleVideoUrlChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    onChange({ videoUrl: event.target.value });
   };
 
-  const handleVideoUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    onChange({ videoUrl: e.target.value });
-  };
+  const videoUrlError =
+    data.videoUrl && !isValidVideoUrl(data.videoUrl) ? "Некорректная ссылка на видео" : null;
 
-  const videoUrlError = data.videoUrl && !isValidVideoUrl(data.videoUrl) ? "Некорректная ссылка на видео" : null;
+  const coverValue = data.coverImage
+    ? {
+        id: data.coverImage,
+        url: data.coverImage,
+        alt: null,
+        title: "Главное изображение",
+      }
+    : null;
+
+  const galleryValue = data.gallery.map((url) => ({
+    id: url,
+    url,
+    alt: null,
+    title: "Изображение галереи",
+  }));
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-xl font-semibold mb-2">Медиа</h2>
+    <div className="space-y-8">
+      <div className="space-y-2">
+        <h2 className="text-xl font-semibold">Медиа</h2>
         <p className="text-muted-foreground">
           Добавьте изображения для привлечения внимания к предложению
         </p>
       </div>
 
-      {/* Cover Image */}
-      <div className="space-y-2">
-        <Label>
-          Главное изображение <span className="text-red-500">*</span>
-        </Label>
-        {data.coverImage ? (
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
-            <div className="relative aspect-square overflow-hidden rounded-lg bg-gray-100 group">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={data.coverImage} alt="" className="h-full w-full object-cover" />
-              {isEditable ? (
-                <button
-                  type="button"
-                  onClick={removeCover}
-                  className="absolute right-2 top-2 rounded-full bg-red-600 p-1.5 text-white opacity-0 transition-opacity hover:bg-red-700 group-hover:opacity-100"
-                  aria-label="Удалить главное изображение"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              ) : null}
-            </div>
-          </div>
-        ) : null}
-        <ImageUploader
-          onUpload={(image) => onChange({ coverImage: image.url })}
-          disabled={!isEditable}
-          maxSizeMB={5}
-          className="w-full"
-          multiple={false}
-        />
-        <p className="text-xs text-muted-foreground">
-          Основное изображение, которое будет показано в каталоге
-        </p>
-      </div>
+      <MediaUploadField
+        label="Главное изображение"
+        description="Основное фото, которое будет показано в карточке предложения."
+        required
+        mode="single"
+        value={coverValue}
+        onChange={handleCoverChange}
+        maxSizeMb={5}
+        disabled={!isEditable}
+        allowMediaLibrary
+        allowUpload
+        onUploadFiles={uploadFilesToPublicMedia}
+        loadMediaLibraryItems={loadBusinessMediaLibrary}
+        mediaLibraryDescription="Выберите одно изображение из вашей медиатеки или загрузите новый файл."
+      />
 
-      {/* Gallery */}
-      <div className="space-y-2">
-        <Label>Галерея (необязательно)</Label>
-        {data.gallery.length > 0 ? (
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
-            {data.gallery.map((url) => (
-              <div key={url} className="relative aspect-square overflow-hidden rounded-lg bg-gray-100 group">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={url} alt="" className="h-full w-full object-cover" />
-                {isEditable ? (
-                  <button
-                    type="button"
-                    onClick={() => removeGalleryUrl(url)}
-                    className="absolute right-2 top-2 rounded-full bg-red-600 p-1.5 text-white opacity-0 transition-opacity hover:bg-red-700 group-hover:opacity-100"
-                    aria-label="Удалить из галереи"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                ) : null}
-              </div>
-            ))}
-          </div>
-        ) : null}
-        <ImageUploader
-          onUploadBatch={(images) =>
-            onChange((prev) => ({
-              gallery: [...prev.gallery, ...images.map((i) => i.url)],
-            }))
-          }
-          disabled={!isEditable}
-          maxSizeMB={3}
-          className="w-full"
-          multiple
-        />
-        <p className="text-xs text-muted-foreground">
-          Дополнительные фотографии для детального показа предложения
-        </p>
-      </div>
+      <MediaUploadField
+        label="Галерея"
+        description="Дополнительные фотографии для детального показа предложения."
+        mode="multiple"
+        value={galleryValue}
+        onChange={handleGalleryChange}
+        maxFiles={12}
+        maxSizeMb={3}
+        disabled={!isEditable}
+        allowMediaLibrary
+        allowUpload
+        onUploadFiles={uploadFilesToPublicMedia}
+        loadMediaLibraryItems={loadBusinessMediaLibrary}
+        mediaLibraryDescription="Выберите несколько изображений из медиатеки или загрузите новые файлы."
+      />
 
-      {/* Video URL */}
       <div className="space-y-2">
         <Label htmlFor="videoUrl">Видео (необязательно)</Label>
         <Input
@@ -132,18 +178,15 @@ export function Step3Media({ data, onChange, isEditable }: Step3MediaProps) {
           disabled={!isEditable}
           className={videoUrlError ? "border-red-500" : ""}
         />
-        {videoUrlError && (
-          <p className="text-xs text-red-500">{videoUrlError}</p>
-        )}
+        {videoUrlError ? <p className="text-xs text-red-500">{videoUrlError}</p> : null}
         <p className="text-xs text-muted-foreground">
           Поддерживаются ссылки на YouTube, YouTube Shorts и Instagram Reels
         </p>
       </div>
 
-      {/* Tips */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-        <h4 className="font-medium text-blue-900 mb-2">Советы по фотографиям</h4>
-        <ul className="text-sm text-blue-700 space-y-1">
+      <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
+        <h4 className="mb-2 font-medium text-blue-900">Советы по фотографиям</h4>
+        <ul className="space-y-1 text-sm text-blue-700">
           <li>• Используйте качественные и яркие изображения</li>
           <li>• Покажите процесс или результат предложения</li>
           <li>• Избегайте размытых или темных фотографий</li>

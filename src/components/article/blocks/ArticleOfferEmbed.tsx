@@ -95,11 +95,24 @@ export function ArticleOfferEmbed({ card }: { card: ResolvedOfferEmbedCard }) {
     window.location.href = card.href;
   };
 
+  // Mock daily schedule
+  const MOCK_DAY_SCHEDULE = [
+    { time: "08:00", label: "Подъём и утренняя зарядка" },
+    { time: "09:00", label: "Завтрак" },
+    { time: "10:00", label: "Занятия по программе смены" },
+    { time: "13:00", label: "Обед" },
+    { time: "14:00", label: "Тихий час" },
+    { time: "16:00", label: "Творческие мастер-классы" },
+    { time: "18:00", label: "Ужин" },
+    { time: "20:00", label: "Вечерняя программа и игры" },
+    { time: "22:00", label: "Отбой" },
+  ];
+
   // Accordion items — only show if at least one has content
   const accordionItems = [
-    { label: "Описание",        content: card.shortDescription || null },
-    { label: "Расписание дня",  content: null },
-    { label: "Проживание",      content: null },
+    { label: "Описание",        content: card.shortDescription || null, schedule: null },
+    { label: "Расписание дня",  content: null, schedule: MOCK_DAY_SCHEDULE },
+    { label: "Проживание",      content: null, schedule: null },
   ];
 
   return (
@@ -116,43 +129,19 @@ export function ArticleOfferEmbed({ card }: { card: ResolvedOfferEmbedCard }) {
       }}>
 
         {/* ── HERO IMAGE ────────────────────────────────────────────── */}
-        <div style={{ position: "relative", aspectRatio: "16/7", background: T.paper3 }}>
-
-          {/* Image */}
-          {card.imageUrl && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={card.imageUrl}
-              alt={card.title}
-              style={{
-                position: "absolute", inset: 0,
-                width: "100%", height: "100%",
-                objectFit: "cover",
-              }}
-            />
-          )}
-
-          {/* Placeholder when no image */}
-          {!card.imageUrl && (
-            <div style={{
-              position: "absolute", inset: 0,
-              display: "flex", alignItems: "center", justifyContent: "center",
-            }}>
-              <svg width={48} height={48} viewBox="0 0 24 24" fill="none"
-                   stroke="currentColor" strokeWidth="1.7"
-                   strokeLinecap="round" strokeLinejoin="round"
-                   style={{ color: T.ink3, opacity: 0.25 }}>
-                <rect x="3" y="4" width="18" height="16" rx="2" />
-                <circle cx="9" cy="10" r="2" />
-                <path d="M21 16l-5-5-9 9" />
-              </svg>
-            </div>
-          )}
-
-          {/* Gradient overlay */}
+        <div style={{
+          position: "relative",
+          width: "100%",
+          paddingBottom: "56.25%", /* 16:9 */
+          backgroundImage: card.imageUrl ? `url(${card.imageUrl})` : "none",
+          backgroundSize: "cover",
+          backgroundPosition: "center top",
+          backgroundColor: T.paper3,
+        }}>
+          {/* Gradient */}
           <div style={{
             position: "absolute", inset: 0,
-            background: "linear-gradient(to top, rgba(20,18,16,.88) 0%, rgba(20,18,16,.4) 52%, transparent 75%)",
+            background: "linear-gradient(to top, rgba(20,18,16,.78) 0%, rgba(20,18,16,.3) 38%, transparent 58%)",
           }} />
 
           {/* Pills row — top-left */}
@@ -160,7 +149,6 @@ export function ArticleOfferEmbed({ card }: { card: ResolvedOfferEmbedCard }) {
             position: "absolute", top: 16, left: 16,
             display: "flex", alignItems: "center", gap: 8,
           }}>
-            {/* Type pill */}
             <span style={{
               display: "inline-flex", alignItems: "center",
               height: 26, padding: "0 12px",
@@ -174,8 +162,6 @@ export function ArticleOfferEmbed({ card }: { card: ResolvedOfferEmbedCard }) {
             }}>
               {card.typeLabel}
             </span>
-
-            {/* Discount pill — RED */}
             {card.discountBadge && (
               <span style={{
                 display: "inline-flex", alignItems: "center", gap: 4,
@@ -228,10 +214,7 @@ export function ArticleOfferEmbed({ card }: { card: ResolvedOfferEmbedCard }) {
           )}
 
           {/* Title block — bottom-left */}
-          <div style={{
-            position: "absolute", bottom: 18, left: 24,
-            maxWidth: "75%",
-          }}>
+          <div style={{ position: "absolute", bottom: 18, left: 24, maxWidth: "75%" }}>
             {card.placeName && (
               <p style={{
                 margin: "0 0 6px",
@@ -260,7 +243,7 @@ export function ArticleOfferEmbed({ card }: { card: ResolvedOfferEmbedCard }) {
               </h3>
             </Link>
           </div>
-        </div>
+        </div>{/* /hero */}
 
         {/* ── CONTENT BODY ──────────────────────────────────────────── */}
         <div style={{ padding: "22px 24px" }}>
@@ -330,15 +313,15 @@ export function ArticleOfferEmbed({ card }: { card: ResolvedOfferEmbedCard }) {
                         </span>
                       </div>
                       <div style={{
-                        fontFamily: T.serif,
+                        fontFamily: "var(--font-sans)",
                         fontWeight: 400,
-                        fontSize: "clamp(28px, 4vw, 52px)",
-                        letterSpacing: "-1.82px",
-                        lineHeight: 0.94,
+                        fontSize: 22,
+                        letterSpacing: "-0.3px",
+                        lineHeight: 1.2,
                         color: T.ink,
                         marginBottom: 14,
                       }}>
-                        {item.value}
+                        {item.value.charAt(0).toUpperCase() + item.value.slice(1)}
                       </div>
                     </div>
                   );
@@ -378,16 +361,6 @@ export function ArticleOfferEmbed({ card }: { card: ResolvedOfferEmbedCard }) {
                       gap: 14,
                     }}>
                       <span style={{
-                        fontFamily: T.mono,
-                        fontSize: 10, fontWeight: 400,
-                        letterSpacing: "1.4px", textTransform: "uppercase",
-                        color: T.ink3,
-                        minWidth: 24,
-                        flexShrink: 0,
-                      }}>
-                        {String(i + 1).padStart(2, "0")}
-                      </span>
-                      <span style={{
                         fontFamily: T.serif,
                         fontSize: 22, fontWeight: 400,
                         letterSpacing: "-0.33px",
@@ -421,6 +394,76 @@ export function ArticleOfferEmbed({ card }: { card: ResolvedOfferEmbedCard }) {
                         }}>
                           {item.content}
                         </p>
+                      ) : item.schedule ? (
+                        /* Day schedule — vertical timeline */
+                        <div style={{ paddingTop: 8, paddingBottom: 4 }}>
+                          {item.schedule.map((row, ri) => {
+                            const isLast = ri === item.schedule!.length - 1;
+                            return (
+                              <div key={ri} style={{ display: "flex", gap: 0, position: "relative" }}>
+                                {/* Time column */}
+                                <div style={{
+                                  minWidth: 44,
+                                  flexShrink: 0,
+                                  paddingTop: 2,
+                                  fontFamily: T.mono,
+                                  fontSize: 10, fontWeight: 500,
+                                  letterSpacing: ".06em",
+                                  color: T.ink3,
+                                  textAlign: "right",
+                                  paddingRight: 14,
+                                }}>
+                                  {row.time}
+                                </div>
+
+                                {/* Line + dot column */}
+                                <div style={{
+                                  display: "flex",
+                                  flexDirection: "column",
+                                  alignItems: "center",
+                                  flexShrink: 0,
+                                  width: 16,
+                                }}>
+                                  {/* Dot */}
+                                  <div style={{
+                                    width: 7, height: 7,
+                                    borderRadius: "50%",
+                                    background: T.accent,
+                                    flexShrink: 0,
+                                    marginTop: 4,
+                                    boxShadow: `0 0 0 2px rgba(232,106,58,.18)`,
+                                  }} />
+                                  {/* Vertical line */}
+                                  {!isLast && (
+                                    <div style={{
+                                      width: 1.5,
+                                      flex: 1,
+                                      minHeight: 24,
+                                      background: `linear-gradient(to bottom, rgba(232,106,58,.3), rgba(232,106,58,.08))`,
+                                      marginTop: 3,
+                                    }} />
+                                  )}
+                                </div>
+
+                                {/* Label column */}
+                                <div style={{
+                                  paddingLeft: 12,
+                                  paddingBottom: isLast ? 0 : 18,
+                                  paddingTop: 1,
+                                }}>
+                                  <span style={{
+                                    fontFamily: T.sans,
+                                    fontSize: 14,
+                                    lineHeight: 1.4,
+                                    color: T.ink2,
+                                  }}>
+                                    {row.label}
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
                       ) : (
                         <Link href={card.href} style={{
                           fontFamily: T.mono,

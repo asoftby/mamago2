@@ -18,6 +18,7 @@ import { useAuthMe } from "@/features/birthday/builder/hooks/useAuthMe";
 import { PublicationStatsPanel } from "@/components/publication-stats";
 import { postAnalyticsEvent } from "@/lib/analytics/client";
 import { extractPlainTextLinesFromHtml } from "@/lib/richtext/utils";
+import { getLocalDateKey } from "@/lib/date/localDateKey";
 
 // Новые конверсионные блоки
 import { EventHighlights } from "./EventHighlights";
@@ -64,11 +65,13 @@ export function ConversionEventPageView({ data }: { data: EventPageData }) {
     inPlan: boolean;
     planDate: string | null;
     planStartsAt: string | null;
+    planItemId: string | null;
   }>({
     isIdea: false,
     inPlan: false,
     planDate: null,
     planStartsAt: null,
+    planItemId: null,
   });
 
   const selectedSession = useMemo(
@@ -87,10 +90,20 @@ export function ConversionEventPageView({ data }: { data: EventPageData }) {
     const set = new Set<string>();
     for (const s of sessions) {
       if (!s.startsAt) continue;
-      const iso = new Date(s.startsAt).toISOString().split("T")[0];
+      const iso = getLocalDateKey(new Date(s.startsAt));
       if (iso) set.add(iso);
     }
     return Array.from(set).sort();
+  }, [sessions]);
+
+  const planSessionCountsByDate = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const session of sessions) {
+      if (!session.startsAt) continue;
+      const iso = getLocalDateKey(new Date(session.startsAt));
+      counts[iso] = (counts[iso] ?? 0) + 1;
+    }
+    return counts;
   }, [sessions]);
 
   const formatPlanDateRu = useCallback((iso: string) => {
@@ -106,10 +119,11 @@ export function ConversionEventPageView({ data }: { data: EventPageData }) {
       kind: "quickdate" as const,
       title: data.title,
       eventPlanDateOptions: availablePlanDates,
+      eventPlanSessionCountsByDate: planSessionCountsByDate,
     };
     if (availablePlanDates.length !== 1) return base;
     return { ...base, eventPlanDateISO: availablePlanDates[0]! };
-  }, [availablePlanDates, data.title]);
+  }, [availablePlanDates, data.title, planSessionCountsByDate]);
 
   const loadSaveStatus = useCallback(async () => {
     try {
@@ -121,6 +135,7 @@ export function ConversionEventPageView({ data }: { data: EventPageData }) {
         inPlan: Boolean(json.inPlan),
         planDate: json.planDate ?? null,
         planStartsAt: json.planStartsAt ?? null,
+        planItemId: json.planItemId ?? null,
       });
     } catch {
       // ignore
@@ -132,7 +147,7 @@ export function ConversionEventPageView({ data }: { data: EventPageData }) {
   }, [loadSaveStatus]);
 
   useEffect(() => {
-    if (!saveModalOpen) return;
+    if (saveModalOpen) return;
     void loadSaveStatus();
   }, [saveModalOpen, loadSaveStatus]);
 
@@ -186,8 +201,14 @@ export function ConversionEventPageView({ data }: { data: EventPageData }) {
           });
           if (!res.ok) throw new Error("idea_remove_failed");
           toast.success("Убрано из идей");
+        } else if (result.action === "remove-plan") {
+          const res = await fetch(`/api/save/plan?planItemId=${result.planItemId}`, {
+            method: "DELETE",
+          });
+          if (!res.ok) throw new Error("plan_remove_failed");
+          toast.success("Убрано из плана");
         }
-        await loadSaveStatus();
+        // loadSaveStatus вызывается через useEffect когда saveModalOpen=false.
       } catch (e) {
         toast.error("Не получилось выполнить действие", {
           description: "Попробуйте еще раз",
@@ -197,7 +218,7 @@ export function ConversionEventPageView({ data }: { data: EventPageData }) {
         setIsPrimaryLoading(false);
       }
     },
-    [data.id, data.media.posterUrl, data.title, formatPlanDateRu, loadSaveStatus],
+    [data.id, data.media.posterUrl, data.title, formatPlanDateRu],
   );
 
   const addToPlanByDate = useCallback(
@@ -228,7 +249,6 @@ export function ConversionEventPageView({ data }: { data: EventPageData }) {
   );
 
   const handleBuy = useCallback(() => {
-    setIsSecondaryLoading(true);
     void postAnalyticsEvent({
       eventType: "CTA_CLICK",
       entityType: "EVENT",
@@ -237,14 +257,7 @@ export function ConversionEventPageView({ data }: { data: EventPageData }) {
       citySlug: data.citySlug,
       meta: { source: "detail", section: "afisha", targetAction: "buy" },
     });
-
-    // TODO: переход на внешний URL или внутренний booking flow
-    toast.message(data.cta.buyLabel, {
-      description: "Здесь будет ссылка на покупку или сайт организатора.",
-    });
-
-    setTimeout(() => setIsSecondaryLoading(false), 500);
-  }, [data.citySlug, data.cta.buyLabel, data.id]);
+  }, [data.citySlug, data.id]);
 
   // Подготовка данных для блоков
   const programSteps = useMemo(() => {
@@ -404,6 +417,10 @@ export function ConversionEventPageView({ data }: { data: EventPageData }) {
                   sessions={sessions}
                   selectedId={selectedId}
                   onSelect={setSelectedId}
+                  onPlan={handlePlan}
+                  isPlanned={saveStatus.inPlan}
+                  purchaseUrl={data.cta.purchaseUrl}
+                  buyLabel={data.cta.buyLabel}
                 />
               </div>
             )}
@@ -486,19 +503,14 @@ export function ConversionEventPageView({ data }: { data: EventPageData }) {
       <EventStickyActionBar
         sessionLine={sessionLineSticky}
         priceLabel={data.priceLabel}
-        primaryLabel={
-          saveStatus.inPlan
-            ? saveStatus.planDate
-              ? `В плане на ${formatPlanDateRu(saveStatus.planDate)}`
-              : "В плане"
-            : data.cta.planLabel
-        }
-        secondaryLabel={data.cta.buyLabel}
+        primaryLabel={data.cta.buyLabel}
+        primaryHref={data.cta.purchaseUrl}
         isPlanned={saveStatus.inPlan}
         isPrimaryLoading={isPrimaryLoading}
-        isSecondaryLoading={isSecondaryLoading}
-        onPrimary={handlePlan}
-        onSecondary={handleBuy}
+        isPlanLoading={isSecondaryLoading}
+        onPrimary={handleBuy}
+        onPlan={handlePlan}
+        hasPurchaseUrl={Boolean(data.cta.purchaseUrl)}
       />
 
       {/* Модалы */}
@@ -512,6 +524,7 @@ export function ConversionEventPageView({ data }: { data: EventPageData }) {
         inPlan={saveStatus.inPlan}
         planDate={saveStatus.planDate}
         planStartsAt={saveStatus.planStartsAt}
+        planItemId={saveStatus.planItemId}
       />
       <Dialog open={planDateChooserOpen} onOpenChange={setPlanDateChooserOpen}>
         <DialogContent className="sm:max-w-md">

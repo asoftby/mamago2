@@ -681,6 +681,8 @@ model Activity {
   /// Сигналы DISCOVERY домена (entityType=EVENT или OFFER), ID SignalDefinition
   discoverySignalIds   String[]                  @default([])
 
+  priceItems             Json?
+
   // Настройки записи
   bookingEnabled         Boolean          @default(false)
   bookingMode            BookingMode?
@@ -984,6 +986,8 @@ model Place {
   googleReviewsJson       Json?
   googleReviewsSyncedAt   DateTime?
   googleMapsUri           String?
+
+  priceItems              Json?
 
   activities      Activity[]          @relation("PlaceActivities")
   bookingRequests BookingRequest[]
@@ -2215,6 +2219,11 @@ model RouteStop {
   customTitle          String?
   note                 String
   photoUrl             String?
+  priceType            RouteStopPriceType @default(UNKNOWN)
+  priceMin             Float?
+  priceMax             Float?
+  priceCurrency        String             @default("BYN")
+  priceNote            String?
   formattedAddress     String?
   addressComponents    Json?
   rawGooglePayload     Json?
@@ -2327,6 +2336,37 @@ model UserNotificationPreference {
   @@unique([userId, notificationType])
   @@index([userId, audience])
   @@index([userId])
+}
+
+model NotificationPolicy {
+  id                           String                    @id @default(cuid())
+  key                          String                    @unique
+  surface                      NotificationPolicySurface
+  notificationType            NotificationType?
+  scenario                     NotificationScenario?
+  enabled                      Boolean                   @default(true)
+  allowedInApp                 Boolean                   @default(true)
+  allowedEmail                 Boolean                   @default(true)
+  allowedTelegram              Boolean                   @default(true)
+  defaultInApp                 Boolean                   @default(true)
+  defaultEmail                 Boolean                   @default(false)
+  defaultTelegram              Boolean                   @default(false)
+  minCooldownMinutes           Int?
+  maxPerDay                    Int?
+  quietHoursEnabled            Boolean                   @default(false)
+  quietHoursStart              String?
+  quietHoursEnd                String?
+  digestTime                   String?
+  defaultReminderOffsetMinutes Int?
+  availableReminderOffsets     Int[]                     @default([])
+  isSystemLocked               Boolean                   @default(false)
+  description                  String?
+  createdAt                    DateTime                  @default(now())
+  updatedAt                    DateTime                  @updatedAt
+
+  @@index([surface])
+  @@index([notificationType])
+  @@index([scenario])
 }
 
 model DevTelegramBusinessApplication {
@@ -2721,6 +2761,13 @@ enum NotificationAudience {
   ADMIN
 }
 
+enum NotificationPolicySurface {
+  USER
+  BUSINESS
+  ADMIN
+  SYSTEM
+}
+
 enum TelegramEnvironment {
   DEV
   PROD
@@ -2925,6 +2972,15 @@ enum BudgetLevel {
   LOW
   MEDIUM
   HIGH
+}
+
+enum RouteStopPriceType {
+  FREE
+  FIXED
+  RANGE
+  FROM
+  CUSTOM
+  UNKNOWN
 }
 
 enum NotificationChannel {

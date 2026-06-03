@@ -11,7 +11,7 @@ export type ArticleBlockHtmlVariant = "intro" | "text" | "quote";
 
 const TAGS: Record<ArticleBlockHtmlVariant, string[]> = {
   intro: ["p", "br", "strong", "b", "em", "i"],
-  text: ["p", "br", "strong", "b", "em", "i", "ul", "ol", "li", "a"],
+  text: ["p", "br", "strong", "b", "em", "i", "ul", "ol", "li", "a", "div"],
   quote: ["p", "br", "em", "i"],
 };
 
@@ -181,4 +181,48 @@ export function articleBlockHtmlForEditor(
 ): string {
   const prepared = legacyPlainTextToEditorHtml(raw);
   return sanitizeArticleBlockHtml(prepared, variant);
+}
+
+function decodeHtmlAttribute(value: string): string {
+  return value
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&amp;/g, "&");
+}
+
+function extractHtmlAttribute(attrs: string, name: string): string {
+  const match = attrs.match(new RegExp(`${name}="([^"]*)"`, "i"));
+  return match?.[1] ? decodeHtmlAttribute(match[1]) : "";
+}
+
+function renderInlineQuoteBlocks(html: string): string {
+  return html.replace(
+    /<div\b([^>]*)data-type="quote-block"([^>]*)>([\s\S]*?)<\/div>/gi,
+    (_full, beforeAttrs, afterAttrs, innerHtml) => {
+      const attrs = `${beforeAttrs ?? ""} ${afterAttrs ?? ""}`;
+      const author = extractHtmlAttribute(attrs, "data-author").trim();
+      const authorRole = extractHtmlAttribute(attrs, "data-author-role").trim();
+      const footer =
+        author || authorRole
+          ? `<footer style="margin-top:14px;font-size:11px;line-height:1.4;letter-spacing:.08em;text-transform:uppercase;opacity:.68;font-family:var(--font-sans),system-ui,sans-serif;">${
+              author ? `<span>&mdash; ${escapeHtml(author)}</span>` : ""
+            }${
+              author && authorRole ? `<span style="margin:0 8px;">&middot;</span>` : ""
+            }${authorRole ? `<span>${escapeHtml(authorRole)}</span>` : ""}</footer>`
+          : "";
+
+      return `<blockquote style="display:flex;gap:20px;margin:32px 0;padding:0;"><div style="width:3px;flex-shrink:0;align-self:stretch;border-radius:999px;background:var(--primary);"></div><div style="min-width:0;flex:1;padding-block:4px;"><div style="font-style:italic;">${innerHtml}</div>${footer}</div></blockquote>`;
+    },
+  );
+}
+
+export function articleBlockHtmlForPublic(
+  raw: string,
+  variant: ArticleBlockHtmlVariant,
+): string {
+  const sanitized = articleBlockHtmlForEditor(raw, variant);
+  if (variant !== "text") return sanitized;
+  return renderInlineQuoteBlocks(sanitized);
 }

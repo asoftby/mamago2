@@ -57,6 +57,20 @@ function getMissingResendEnvKeys(): string[] {
   return missing;
 }
 
+function getEmailDeliveryConfigurationStatus(): {
+  enabled: boolean;
+  configured: boolean;
+  missingKeys: string[];
+} {
+  const enabled = isEmailEnabled();
+  const missingKeys = getMissingResendEnvKeys();
+  return {
+    enabled,
+    configured: enabled && missingKeys.length === 0,
+    missingKeys,
+  };
+}
+
 type EmailKind = "verify-email" | "password-reset" | "welcome" | "notification" | "business-invite";
 
 type SendViaResendInput =
@@ -130,6 +144,10 @@ async function sendViaResend(input: SendViaResendInput): Promise<{ messageId?: s
 }
 
 export class EmailService {
+  getHealth() {
+    return getEmailDeliveryConfigurationStatus();
+  }
+
   async sendRawEmail(params: {
     to: string;
     subject: string;
@@ -152,14 +170,14 @@ export class EmailService {
 
     const missingKeys = getMissingResendEnvKeys();
     if (missingKeys.length > 0) {
-      console.error("[email] Resend email send failed: missing required env", {
+      console.warn("[email] raw email send skipped: missing required env", {
         intendedTo: params.to,
         actualTo,
         subject: params.subject,
         missingKeys,
         environment: process.env.NODE_ENV,
       });
-      return { status: "FAILED", reason: "EMAIL_NOT_CONFIGURED" };
+      return { status: "SKIPPED", reason: "EMAIL_NOT_CONFIGURED" };
     }
 
     try {
@@ -193,7 +211,7 @@ export class EmailService {
     body: string;
     ctaLabel?: string | null;
     ctaUrl?: string | null;
-  }): Promise<{ status: "SENT" | "SKIPPED"; reason?: string; messageId?: string }> {
+  }): Promise<{ status: "SENT" | "SKIPPED" | "FAILED"; reason?: string; messageId?: string }> {
     const debugTo = getDebugRedirectTo();
     const actualTo = debugTo ?? params.to;
 
@@ -208,21 +226,47 @@ export class EmailService {
       return { status: "SKIPPED", reason: "EMAIL_DISABLED" };
     }
 
-    const result = await sendViaResend({
-      kind: "notification",
-      intendedTo: params.to,
-      subject: params.subject,
-      react: (
-        <TransactionalNotificationTemplate
-          title={params.title}
-          body={params.body}
-          ctaLabel={params.ctaLabel}
-          ctaUrl={params.ctaUrl}
-        />
-      ),
-    });
+    const missingKeys = getMissingResendEnvKeys();
+    if (missingKeys.length > 0) {
+      console.warn("[email] notification send skipped: missing required env", {
+        intendedTo: params.to,
+        actualTo,
+        subject: params.subject,
+        missingKeys,
+        environment: process.env.NODE_ENV,
+      });
+      return { status: "SKIPPED", reason: "EMAIL_NOT_CONFIGURED" };
+    }
 
-    return { status: "SENT", messageId: result.messageId ?? undefined };
+    try {
+      const result = await sendViaResend({
+        kind: "notification",
+        intendedTo: params.to,
+        subject: params.subject,
+        react: (
+          <TransactionalNotificationTemplate
+            title={params.title}
+            body={params.body}
+            ctaLabel={params.ctaLabel}
+            ctaUrl={params.ctaUrl}
+          />
+        ),
+      });
+
+      return { status: "SENT", messageId: result.messageId ?? undefined };
+    } catch (error) {
+      const reason =
+        error instanceof Error && error.message.trim().length > 0
+          ? error.message
+          : "EMAIL_SEND_FAILED";
+      console.error("[email] notification send failed", {
+        intendedTo: params.to,
+        actualTo,
+        subject: params.subject,
+        reason,
+      });
+      return { status: "FAILED", reason };
+    }
   }
 
   async sendVerifyEmail(params: { to: string; token: string }): Promise<void> {

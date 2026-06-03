@@ -3,6 +3,7 @@
 import { Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { FilterSelect, type FilterSelectOption } from "@/components/ui/filter-select";
+import { cn } from "@/lib/utils";
 
 export type ModerationStatusFilterKind = "content" | "offer";
 
@@ -12,6 +13,7 @@ export interface ModerationListFiltersProps {
   basePath: string;
   /** `content` — как у мест (ContentStatus); `offer` — OfferStatus */
   statusFilter: ModerationStatusFilterKind;
+  showTemporalFilter?: boolean;
 }
 
 const STATUS_CONTENT: FilterSelectOption[] = [
@@ -30,6 +32,11 @@ const STATUS_OFFER: FilterSelectOption[] = [
   { value: "REJECTED", label: "Отклонено" },
 ];
 
+const TEMPORAL_OPTIONS: FilterSelectOption[] = [
+  { value: "active", label: "Актуально" },
+  { value: "past", label: "Уже прошло" },
+];
+
 /**
  * Фильтры статуса и города — те же опции и стиль, что на списках контента (например `/admin/content/places`).
  */
@@ -37,6 +44,7 @@ function ModerationListFiltersInner({
   cities,
   basePath,
   statusFilter,
+  showTemporalFilter = false,
 }: ModerationListFiltersProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -52,10 +60,11 @@ function ModerationListFiltersInner({
   };
 
   const statusOptions = statusFilter === "content" ? STATUS_CONTENT : STATUS_OFFER;
+  const columnsClass = showTemporalFilter ? "md:grid-cols-3" : "md:grid-cols-2";
 
   return (
-    <div className="flex flex-col md:flex-row gap-3">
-      <div className="flex-1">
+    <div className={cn("grid grid-cols-1 gap-3", columnsClass)}>
+      <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">
           Статус
         </label>
@@ -67,7 +76,7 @@ function ModerationListFiltersInner({
         />
       </div>
 
-      <div className="flex-1">
+      <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">
           Город
         </label>
@@ -78,17 +87,36 @@ function ModerationListFiltersInner({
           onChange={(v) => handleFilterChange("cityId", v)}
         />
       </div>
+
+      {showTemporalFilter ? (
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Актуальность
+          </label>
+          <FilterSelect
+            value={searchParams.get("temporal") || ""}
+            placeholder="Все события"
+            options={TEMPORAL_OPTIONS}
+            onChange={(v) => handleFilterChange("temporal", v)}
+          />
+        </div>
+      ) : null}
     </div>
   );
 }
 
 export function ModerationListFilters(props: ModerationListFiltersProps) {
+  const columnsClass = props.showTemporalFilter ? "md:grid-cols-3" : "md:grid-cols-2";
+
   return (
     <Suspense
       fallback={
-        <div className="flex flex-col md:flex-row gap-3">
-          <div className="h-10 flex-1 rounded-[12px] bg-muted/40 animate-pulse" />
-          <div className="h-10 flex-1 rounded-[12px] bg-muted/40 animate-pulse" />
+        <div className={cn("grid grid-cols-1 gap-3", columnsClass)}>
+          <div className="h-10 rounded-[12px] bg-muted/40 animate-pulse" />
+          <div className="h-10 rounded-[12px] bg-muted/40 animate-pulse" />
+          {props.showTemporalFilter ? (
+            <div className="h-10 rounded-[12px] bg-muted/40 animate-pulse" />
+          ) : null}
         </div>
       }
     >

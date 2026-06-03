@@ -115,20 +115,23 @@ export async function PUT(
       return NextResponse.json({ error: "Place not found" }, { status: 404 });
     }
 
-    // Check ownership
-    if (!place.ownerBusinessId || !canManageOwnedContent(user, place.ownerBusinessId)) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
+    const isAdminOrModerator = user.role === "ADMIN" || user.role === "MODERATOR";
 
-    // For published places, opening hours should be saved to revision instead
-    if (place.status === "PUBLISHED") {
-      return NextResponse.json(
-        { 
-          error: "Cannot edit opening hours for published place directly. Use revision API instead.",
-          code: "USE_REVISION_API"
-        },
-        { status: 400 }
-      );
+    // Admins/moderators can edit any place directly; others need ownership
+    if (!isAdminOrModerator) {
+      if (!place.ownerBusinessId || !canManageOwnedContent(user, place.ownerBusinessId)) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+      // For published places, non-admins must use the revision flow
+      if (place.status === "PUBLISHED") {
+        return NextResponse.json(
+          {
+            error: "Cannot edit opening hours for published place directly. Use revision API instead.",
+            code: "USE_REVISION_API",
+          },
+          { status: 400 }
+        );
+      }
     }
 
     // If data is null, delete existing opening hours

@@ -82,7 +82,8 @@ export async function GET(request: NextRequest) {
     const transformedPlaces = places.map(place => ({
       id: place.id,
       title: place.title,
-      address: place.shortAddress || place.formattedAddr || "",
+      address: place.formattedAddr || place.shortAddress || "",
+      displayAddress: place.formattedAddr || place.shortAddress || "",
       fullAddress: place.formattedAddr || "",
       lat: place.lat,
       lng: place.lng,
@@ -95,7 +96,7 @@ export async function GET(request: NextRequest) {
       // Metro data (prefer manual over auto)
       metroId: place.metroManualId || place.metroAutoId,
       metroName: place.metroManual?.name || place.metroAuto?.name,
-      metroDistanceM: place.metroManualDistanceM || place.metroAutoDistanceM,
+      metroDistanceM: place.metroManualDistanceM ?? place.metroAutoDistanceM,
     }));
 
     return NextResponse.json({ places: transformedPlaces });

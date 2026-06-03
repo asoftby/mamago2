@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { addDays, differenceInCalendarDays, format } from "date-fns";
 import { ru } from "date-fns/locale";
@@ -113,6 +113,7 @@ export function HeroGreeting({ model }: HeroGreetingProps) {
           tempMax: slot.temp,
           tempMin: data.morning.temp,
           condition: codeToCondition(slot.code),
+          windspeed: slot.windspeed,
         };
       })
       .filter((d): d is NonNullable<typeof d> => d !== null);
@@ -132,8 +133,60 @@ export function HeroGreeting({ model }: HeroGreetingProps) {
     return mapWeatherCodeToScenario(data[weatherTimeOfDay].code);
   }, [weather, citySlug, selectedDates, weatherTimeOfDay, model.weatherScenario]);
 
+  // When client weather scenario differs from SSR scenario, fetch fresh title/subtitle
+  const [clientCopy, setClientCopy] = useState<{ title: string; subtitle: string } | null>(null);
+  const fetchedScenarioRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    // Only re-fetch when we have real weather data and the scenario actually differs
+    if (!weather || weather.loading) return;
+    if (!selectedDates[0]) return;
+    const data = weather.getWeatherForDate(selectedDates[0]);
+    if (!data) return;
+
+    const clientScenario = mapWeatherCodeToScenario(data[weatherTimeOfDay].code);
+    const serverScenario = model.weatherScenario;
+
+    // No mismatch — keep server copy
+    if (clientScenario === serverScenario) return;
+    // Already fetched for this scenario
+    if (fetchedScenarioRef.current === clientScenario) return;
+    fetchedScenarioRef.current = clientScenario;
+
+    const params = new URLSearchParams({
+      scenario: clientScenario,
+      mode: model.personaMode,
+      timeOfDay: clientTimeOfDay,
+    });
+
+    fetch(`/api/hero-greeting?${params}`)
+      .then((r) => r.ok ? r.json() : null)
+      .then((json) => {
+        if (json?.title) setClientCopy({ title: json.title, subtitle: json.subtitle ?? "" });
+      })
+      .catch(() => {/* silently keep server copy */});
+  }, [weather, selectedDates, weatherTimeOfDay, model.weatherScenario, model.personaMode, clientTimeOfDay]);
+
+  const cityDisplayName = citySlug ? getCityDisplayName(citySlug) : null;
+  const weatherPrefix = cityDisplayName && rangeLabel ? `${rangeLabel} в ${cityDisplayName}` : null;
+
   const fallbackMicrocopy = stripLeadingMicrocopyEmoji(model.microcopy);
   const displaySummary = weatherSummary ?? fallbackMicrocopy ?? model.microcopy;
+
+  // Split italic weather tail into text + numeric parts for mixed font rendering
+  const italicTail = (weatherSummary && weatherPrefix && displaySummary.startsWith(weatherPrefix))
+    ? displaySummary.slice(weatherPrefix.length)
+    : null;
+  const italicParts = italicTail
+    ? (() => {
+        // Split into: text before number, numeric token (+13°), trailing text (ветрено)
+        const m = italicTail.match(/^([\s\S]*?)(\s+[+\-±]?\d+[°%]?)([,.\s][\s\S]*)?$/);
+        if (m && m[2]) {
+          return { text: m[1], numeric: m[2], numericSuffix: m[3] ?? "" };
+        }
+        return { text: italicTail, numeric: "", numericSuffix: "" };
+      })()
+    : null;
 
   return (
     <motion.div
@@ -145,26 +198,47 @@ export function HeroGreeting({ model }: HeroGreetingProps) {
       data-hero-weather-scenario={model.weatherScenario}
     >
       {displaySummary ? (
-        <p className="flex items-center gap-3 text-sm font-medium tracking-tight text-neutral-600 sm:text-[15px] [text-wrap:balance]">
+        <p className="flex items-center gap-3 tracking-tight [text-wrap:balance]" style={{ fontSize: 18 }}>
           <HeroMoodIcon
             scenario={weatherSummary ? weatherScenario : model.weatherScenario}
             timeOfDay={iconTimeOfDay}
             maxTemperatureC={model.maxTemperatureC}
             size={56}
           />
-          <span className="min-w-0 whitespace-pre-wrap">{displaySummary}</span>
+          <span className="min-w-0" style={{ fontFamily: "Georgia, serif", fontWeight: 400, color: "#141210" }}>
+            {italicParts ? (
+              <>
+                {weatherPrefix}
+                <em style={{ fontStyle: "italic", color: "#C24E22" }}>
+                  {italicParts.text}
+                </em>
+                {italicParts.numeric && (
+                  <em style={{ fontStyle: "italic", color: "#C24E22", fontFamily: "var(--font-display, 'Instrument Serif', Georgia, serif)" }}>
+                    {italicParts.numeric}
+                  </em>
+                )}
+                {italicParts.numericSuffix && (
+                  <em style={{ fontStyle: "italic", color: "#C24E22", fontFamily: "Georgia, serif" }}>
+                    {italicParts.numericSuffix}
+                  </em>
+                )}
+              </>
+            ) : (
+              displaySummary
+            )}
+          </span>
         </p>
       ) : null}
 
       <div className="mt-2 flex items-start">
-        <h1 className="min-w-0 flex-1 text-2xl font-semibold leading-tight tracking-tight text-neutral-900 sm:text-3xl [text-wrap:balance]">
-          <span className="whitespace-pre-wrap">{model.title}</span>
+        <h1 className="min-w-0 flex-1 leading-tight [text-wrap:balance]" style={{ fontFamily: "var(--font-sans)", fontWeight: 600, fontSize: 40, color: "#141210", letterSpacing: "-.02em" }}>
+          <span className="whitespace-pre-wrap">{clientCopy?.title ?? model.title}</span>
         </h1>
       </div>
 
-      {model.subtitle ? (
+      {(clientCopy?.subtitle ?? model.subtitle) ? (
         <p className="mt-2 max-w-xl text-sm leading-relaxed text-neutral-600 sm:text-[15px] [text-wrap:balance]">
-          <span className="whitespace-pre-wrap">{model.subtitle}</span>
+          <span className="whitespace-pre-wrap">{clientCopy?.subtitle ?? model.subtitle}</span>
         </p>
       ) : null}
     </motion.div>

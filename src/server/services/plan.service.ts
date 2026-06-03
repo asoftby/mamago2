@@ -255,6 +255,24 @@ export async function listUpcomingPlanItems(
 }
 
 /**
+ * List plan items in a specific inclusive date range.
+ * Used by lightweight summary endpoints/widgets.
+ */
+export async function listPlanItemsInRange(
+  userId: string,
+  from: string,
+  to: string,
+): Promise<PlanItemWithActivity[]> {
+  return (await prisma.planItem.findMany({
+    where: { userId, date: { gte: from, lte: to } },
+    include: {
+      activity: { select: planActivitySelect },
+    },
+    orderBy: [{ date: "asc" }, { startsAt: "asc" }],
+  })) as PlanItemWithActivity[];
+}
+
+/**
  * List all plan items for a user on a specific date
  */
 export async function listPlanItemsByDate(

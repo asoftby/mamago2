@@ -20,6 +20,7 @@ interface EventLocationSearchInputProps {
     formattedAddr: string;
     addressJson: unknown[];
   }) => void;
+  onInputValueChange?: (value: string) => void;
   disabled?: boolean;
   initialValue?: string;
   placeholder?: string;
@@ -29,6 +30,8 @@ type PlaceAutocompleteElementCtor = new () => HTMLElement & {
   value?: string;
   focus?: () => void;
 };
+
+const EVENT_LOCATION_AUTOCOMPLETE_WIDGET_CLASS = "mg-event-location-autocomplete-widget";
 
 type PlaceAutocompleteSelectionEvent = Event & {
   placePrediction?: {
@@ -76,6 +79,7 @@ export const EventLocationSearchInput = forwardRef<HTMLInputElement, EventLocati
   function EventLocationSearchInput(
     {
       onPlaceSelect,
+      onInputValueChange,
       disabled,
       initialValue,
       placeholder = "Адрес или название места",
@@ -86,7 +90,13 @@ export const EventLocationSearchInput = forwardRef<HTMLInputElement, EventLocati
     const hostRef = useRef<HTMLDivElement>(null);
     const widgetRef = useRef<(HTMLElement & { value?: string; focus?: () => void }) | null>(null);
     const cleanupRef = useRef<(() => void) | null>(null);
+    const onPlaceSelectRef = useRef(onPlaceSelect);
+    const onInputValueChangeRef = useRef(onInputValueChange);
+    const disabledRef = useRef(disabled);
+    const placeholderRef = useRef(placeholder);
+    const inputValueRef = useRef(initialValue ?? "");
     const shouldFocusWidgetRef = useRef(false);
+    const [inputValue, setInputValue] = useState(initialValue ?? "");
     const [autocompleteRequested, setAutocompleteRequested] = useState(false);
     const [isWidgetReady, setIsWidgetReady] = useState(false);
 
@@ -95,47 +105,69 @@ export const EventLocationSearchInput = forwardRef<HTMLInputElement, EventLocati
       return focusTarget as HTMLInputElement;
     });
 
-    const syncWidgetState = useCallback(() => {
-      const widget = widgetRef.current;
-      if (!widget) {
-        return;
-      }
+    useEffect(() => {
+      onPlaceSelectRef.current = onPlaceSelect;
+    }, [onPlaceSelect]);
 
-      widget.setAttribute("placeholder", placeholder);
-      widget.setAttribute("aria-label", placeholder);
-      widget.setAttribute("included-region-codes", "by");
-      widget.setAttribute("requested-language", "ru");
-      widget.setAttribute("requested-region", "by");
-      widget.setAttribute("unit-system", "metric");
+    useEffect(() => {
+      onInputValueChangeRef.current = onInputValueChange;
+    }, [onInputValueChange]);
 
-      if (disabled) {
-        widget.setAttribute("disabled", "");
-      } else {
-        widget.removeAttribute("disabled");
-      }
+    useEffect(() => {
+      disabledRef.current = disabled;
+    }, [disabled]);
 
-      if (typeof initialValue === "string") {
-        widget.value = initialValue;
-        widget.setAttribute("value", initialValue);
+    useEffect(() => {
+      placeholderRef.current = placeholder;
+    }, [placeholder]);
+
+    useEffect(() => {
+      inputValueRef.current = inputValue;
+    }, [inputValue]);
+
+    const applyWidgetAttributes = useCallback(
+      (widget: HTMLElement & { value?: string; focus?: () => void }) => {
+        const nextPlaceholder = placeholderRef.current;
+        widget.setAttribute("placeholder", nextPlaceholder);
+        widget.setAttribute("aria-label", nextPlaceholder);
+        widget.setAttribute("included-region-codes", "by");
+        widget.setAttribute("requested-language", "ru");
+        widget.setAttribute("requested-region", "by");
+        widget.setAttribute("unit-system", "metric");
+
+        if (disabledRef.current) {
+          widget.setAttribute("disabled", "");
+        } else {
+          widget.removeAttribute("disabled");
+        }
+      },
+      [],
+    );
+
+    const syncWidgetValue = useCallback((widget: HTMLElement & { value?: string }, value: string) => {
+      if (widget.value !== value) {
+        widget.value = value;
       }
-    }, [disabled, initialValue, placeholder]);
+      if (widget.getAttribute("value") !== value) {
+        widget.setAttribute("value", value);
+      }
+    }, []);
+
+    const updateInputValue = useCallback((value: string) => {
+      setInputValue(value);
+      onInputValueChangeRef.current?.(value);
+    }, []);
 
     const initAutocomplete = useCallback(async () => {
-      cleanupRef.current?.();
-      cleanupRef.current = null;
-      widgetRef.current = null;
-      
-      // Use setTimeout to avoid synchronous setState in effect
-      setTimeout(() => {
-        setIsWidgetReady(false);
-      }, 0);
+      if (widgetRef.current) {
+        return;
+      }
+      console.debug("[EventLocationSearchInput] init");
 
       const host = hostRef.current;
       if (!host) {
         return;
       }
-
-      host.innerHTML = "";
 
       try {
         const placesLib = (await GoogleMapsService.getPlacesLibrary()) as google.maps.PlacesLibrary & {
@@ -149,12 +181,23 @@ export const EventLocationSearchInput = forwardRef<HTMLInputElement, EventLocati
 
         const widget = new PlaceAutocompleteElement();
         widgetRef.current = widget;
-        syncWidgetState();
+        applyWidgetAttributes(widget);
+        syncWidgetValue(widget, inputValueRef.current);
 
+        widget.classList.add(EVENT_LOCATION_AUTOCOMPLETE_WIDGET_CLASS);
         widget.style.display = "block";
         widget.style.width = "100%";
+        widget.style.colorScheme = "light";
+        widget.style.backgroundColor = "#FFFFFF";
+        widget.style.color = "#1F1F1F";
+
+        const handleInput = (event: Event) => {
+          const target = event.target as HTMLInputElement | null;
+          updateInputValue(target?.value ?? widget.value ?? "");
+        };
 
         const handlePlaceSelect = async (event: Event) => {
+          console.debug(`[EventLocationSearchInput] ${event.type}`);
           const selectEvent = event as PlaceAutocompleteSelectionEvent;
           const prediction =
             selectEvent.placePrediction ??
@@ -180,18 +223,23 @@ export const EventLocationSearchInput = forwardRef<HTMLInputElement, EventLocati
             return;
           }
 
-          onPlaceSelect({
+          const nextFormattedAddress = place.formattedAddress ?? "";
+          updateInputValue(nextFormattedAddress);
+          onPlaceSelectRef.current({
             googlePlaceId: place.id,
             lat,
             lng,
-            formattedAddr: place.formattedAddress ?? "",
+            formattedAddr: nextFormattedAddress,
             addressJson: Array.isArray(place.addressComponents) ? place.addressComponents : [],
           });
         };
 
+        widget.addEventListener("input", handleInput);
+        widget.addEventListener("change", handleInput);
         widget.addEventListener("gmp-select", handlePlaceSelect);
         widget.addEventListener("gmp-placeselect", handlePlaceSelect);
 
+        host.innerHTML = "";
         host.appendChild(widget);
         setIsWidgetReady(true);
         if (shouldFocusWidgetRef.current) {
@@ -200,22 +248,44 @@ export const EventLocationSearchInput = forwardRef<HTMLInputElement, EventLocati
         }
 
         cleanupRef.current = () => {
+          console.debug("[EventLocationSearchInput] cleanup");
+          widget.removeEventListener("input", handleInput);
+          widget.removeEventListener("change", handleInput);
           widget.removeEventListener("gmp-select", handlePlaceSelect);
           widget.removeEventListener("gmp-placeselect", handlePlaceSelect);
           if (host.contains(widget)) {
             host.removeChild(widget);
           }
+          widgetRef.current = null;
+          cleanupRef.current = null;
+          setIsWidgetReady(false);
         };
       } catch (err) {
         console.error("[EventLocationSearchInput] Init error:", err);
       }
-    }, [onPlaceSelect, syncWidgetState]);
+    }, [applyWidgetAttributes, syncWidgetValue, updateInputValue]);
 
     useEffect(() => {
-      if (fallbackInputRef.current && typeof initialValue === "string") {
-        fallbackInputRef.current.value = initialValue;
-      }
+      setInputValue(initialValue ?? "");
     }, [initialValue]);
+
+    useEffect(() => {
+      const widget = widgetRef.current;
+      if (!widget) {
+        return;
+      }
+
+      applyWidgetAttributes(widget);
+    }, [applyWidgetAttributes, disabled, placeholder]);
+
+    useEffect(() => {
+      const widget = widgetRef.current;
+      if (!widget) {
+        return;
+      }
+
+      syncWidgetValue(widget, inputValue);
+    }, [inputValue, syncWidgetValue]);
 
     const requestAutocomplete = useCallback(() => {
       if (disabled || autocompleteRequested) {
@@ -229,21 +299,54 @@ export const EventLocationSearchInput = forwardRef<HTMLInputElement, EventLocati
       if (!autocompleteRequested) {
         return;
       }
-      const t = setTimeout(() => {
-        void initAutocomplete();
-      }, 0);
+
+      void initAutocomplete();
+
       return () => {
-        clearTimeout(t);
         cleanupRef.current?.();
       };
     }, [autocompleteRequested, initAutocomplete]);
 
-    useEffect(() => {
-      syncWidgetState();
-    }, [syncWidgetState]);
-
     return (
       <div className="relative">
+        <style>{`
+          .${EVENT_LOCATION_AUTOCOMPLETE_WIDGET_CLASS} {
+            color-scheme: light;
+            background-color: #ffffff;
+            color: #1f1f1f;
+          }
+
+          .${EVENT_LOCATION_AUTOCOMPLETE_WIDGET_CLASS}::part(input-field) {
+            background-color: #ffffff;
+            color: #1f1f1f;
+          }
+
+          .${EVENT_LOCATION_AUTOCOMPLETE_WIDGET_CLASS}::part(predictions) {
+            background-color: #ffffff;
+            border: 1px solid #eceae6;
+            border-radius: 12px;
+            box-shadow: 0 16px 40px rgba(31, 31, 31, 0.12);
+          }
+
+          .${EVENT_LOCATION_AUTOCOMPLETE_WIDGET_CLASS}::part(prediction-item) {
+            background-color: #ffffff;
+            color: #1f1f1f;
+          }
+
+          .${EVENT_LOCATION_AUTOCOMPLETE_WIDGET_CLASS}::part(prediction-item-match) {
+            color: #1f1f1f;
+          }
+
+          .${EVENT_LOCATION_AUTOCOMPLETE_WIDGET_CLASS}::part(prediction-item-selected) {
+            background-color: #f7f4ef;
+            color: #1f1f1f;
+          }
+
+          .${EVENT_LOCATION_AUTOCOMPLETE_WIDGET_CLASS}::part(prediction-item-icon) {
+            color: #6b6b6b;
+          }
+        `}</style>
+
         <MapPin className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-gray-400" />
 
         <div
@@ -256,10 +359,7 @@ export const EventLocationSearchInput = forwardRef<HTMLInputElement, EventLocati
         >
           <div
             ref={hostRef}
-            className={cn(
-              "min-h-[24px] w-full",
-              "[&_gmp-place-autocomplete]:block [&_gmp-place-autocomplete]:w-full",
-            )}
+            className="min-h-[24px] w-full"
           />
         </div>
 
@@ -270,6 +370,8 @@ export const EventLocationSearchInput = forwardRef<HTMLInputElement, EventLocati
             placeholder={placeholder}
             disabled={disabled}
             autoComplete="off"
+            value={inputValue}
+            onChange={(event) => updateInputValue(event.target.value)}
             onFocus={requestAutocomplete}
             onPointerDown={requestAutocomplete}
             className={cn(

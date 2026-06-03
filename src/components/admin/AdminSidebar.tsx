@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { usePathname } from "next/navigation";
 import { SidebarItem } from "@/components/shared/sidebar/SidebarItem";
 import { SidebarPublicSiteEntry } from "@/components/shared/sidebar/SidebarPublicSiteEntry";
@@ -92,13 +92,6 @@ export function AdminSidebar({
   // ── Accordion state ─────────────────────────────────────────────────────────
   const derivedGroupId = findActiveGroupId(pathname);
   const [openSection, setOpenSection] = useState<string | null>(derivedGroupId);
-
-  // Follow navigation: auto-open the section that contains the current page.
-  useEffect(() => {
-    if (derivedGroupId !== null) {
-      setOpenSection(derivedGroupId);
-    }
-  }, [derivedGroupId]);
 
   function toggleSection(id: string) {
     setOpenSection((prev) => {

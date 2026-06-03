@@ -6,6 +6,7 @@ import { H2, BodyMuted } from "@/components/ui/typography";
 import { PartyPopper } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { peachPrimaryCtaLinkClassName } from "@/lib/peachPrimaryCtaLink";
+import { getBirthdayBuilderHref } from "@/lib/birthday/getBirthdayBuilderHref";
 import type { UserBirthdayParty } from "@/features/me/types/userBirthdayParty";
 import { takePreviewParties } from "@/features/me/lib/userBirthdayPartyUi";
 import { BirthdayPartyCard } from "./BirthdayPartyCard";
@@ -48,7 +49,7 @@ export function MyBirthdaysCard({ parties }: MyBirthdaysCardProps) {
             Здесь появятся черновики и отправленные заявки на дни рождения.
           </BodyMuted>
           <Link
-            href="/birthday"
+            href={getBirthdayBuilderHref()}
             className={cn(peachPrimaryCtaLinkClassName(), "mt-3")}
           >
             <PartyPopper className="h-4 w-4 transition-transform duration-200 group-hover:scale-110 sm:h-[18px] sm:w-[18px]" aria-hidden />

@@ -231,6 +231,24 @@ export interface OfferPageData {
     trustLine?: string;
   };
 
+  /**
+   * Day schedule — list of time-based activities for camp/regular offers.
+   * Used by the accordion "Расписание дня" section.
+   */
+  daySchedule?: Array<{
+    time?: string;
+    title: string;
+    sub?: string;
+    /** Highlights the row in accent colour */
+    accent?: boolean;
+  }>;
+
+  /**
+   * About paragraphs — plain text or HTML fragments shown in "Описание" accordion.
+   * Falls back to data.description if not set.
+   */
+  about?: string[];
+
   /** Banner label shown in preview/draft mode */
   previewBannerLabel?: string;
 

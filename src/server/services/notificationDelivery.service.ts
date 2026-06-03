@@ -193,6 +193,7 @@ async function handleEmail(
     notification.title,
     notification.body,
     notification.entityId,
+    notification.ctaAction,
   );
 
   const result = await sendEmail({ to: user.email, ...template });
@@ -454,6 +455,7 @@ export async function retryFailedDelivery(
         delivery.notification.title,
         delivery.notification.body,
         delivery.notification.entityId,
+        delivery.notification.ctaAction,
       );
 
       const result = await sendEmail({ to: user.email, ...template });
@@ -516,6 +518,72 @@ export async function retryFailedDelivery(
       },
     });
     return false;
+  }
+
+  return false;
+}
+
+export async function resendNotificationDelivery(
+  deliveryId: string,
+): Promise<boolean> {
+  const delivery = await prisma.notificationDelivery.findUnique({
+    where: { id: deliveryId },
+    include: { notification: true },
+  });
+
+  if (!delivery?.notification) {
+    return false;
+  }
+
+  try {
+    if (delivery.channel === "EMAIL") {
+      const user = await prisma.user.findUnique({
+        where: { id: delivery.userId },
+        select: { email: true },
+      });
+
+      if (!user?.email) {
+        await prisma.notificationDelivery.update({
+          where: { id: deliveryId },
+          data: { status: "SKIPPED", errorMessage: "EMAIL_MISSING" },
+        });
+        return false;
+      }
+
+      const template = buildNotificationEmailTemplate(
+        delivery.notification.type as NotificationType,
+        delivery.notification.title,
+        delivery.notification.body,
+        delivery.notification.entityId,
+        delivery.notification.ctaAction,
+      );
+
+      const result = await sendEmail({ to: user.email, ...template });
+      await prisma.notificationDelivery.update({
+        where: { id: deliveryId },
+        data: result.ok
+          ? { status: "SENT", sentAt: new Date(), errorMessage: null }
+          : { status: "FAILED", errorMessage: result.error ?? "EMAIL_SEND_FAILED" },
+      });
+      return result.ok;
+    }
+
+    if (delivery.channel === "TELEGRAM") {
+      await handleTelegram(delivery.notificationId!, true);
+      const refreshed = await prisma.notificationDelivery.findUnique({
+        where: { id: deliveryId },
+        select: { status: true },
+      });
+      return refreshed?.status === "SENT";
+    }
+  } catch (error) {
+    await prisma.notificationDelivery.update({
+      where: { id: deliveryId },
+      data: {
+        status: "FAILED",
+        errorMessage: error instanceof Error ? error.message : "DELIVERY_RESEND_FAILED",
+      },
+    });
   }
 
   return false;

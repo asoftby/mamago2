@@ -21,12 +21,17 @@ import {
   Globe,
   Lock,
   Link2,
+  Wallet,
 } from "lucide-react";
 import { toast } from "@/lib/toast";
+import {
+  summarizeRouteBudget,
+  type LegacyBudgetLevel,
+  type RouteStopPriceType,
+} from "@/lib/routes/routeBudget";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type BudgetLevel = "FREE" | "LOW" | "MEDIUM" | "HIGH";
 type Visibility = "PRIVATE" | "UNLISTED" | "PUBLIC";
 
 export type RouteEditorMode = "create" | "edit";
@@ -37,12 +42,17 @@ export type EditableRouteStop = {
   customTitle?: string;
   note: string;
   photos?: UploadedImage[];
+  priceType: RouteStopPriceType;
+  priceMin?: number | null;
+  priceMax?: number | null;
+  priceCurrency: string;
+  priceNote: string;
 };
 
 export type WizardState = {
   title: string;
   ageTags: string[];
-  budgetLevel: BudgetLevel;
+  budgetLevel: LegacyBudgetLevel | null;
   stops: EditableRouteStop[];
   visibility: Visibility;
 };
@@ -56,11 +66,15 @@ export type RouteEditorProps = {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const BUDGET_OPTIONS: { value: BudgetLevel; label: string; sub: string }[] = [
-  { value: "FREE", label: "Бесплатно", sub: "Без затрат" },
-  { value: "LOW", label: "до 50 BYN", sub: "Бюджетно" },
-  { value: "MEDIUM", label: "50–150 BYN", sub: "Средний бюджет" },
-  { value: "HIGH", label: "150+ BYN", sub: "Премиум" },
+const PRICE_TYPE_OPTIONS: {
+  value: Exclude<RouteStopPriceType, "UNKNOWN">;
+  label: string;
+}[] = [
+  { value: "FREE", label: "Бесплатно" },
+  { value: "FIXED", label: "Цена" },
+  { value: "RANGE", label: "Диапазон" },
+  { value: "FROM", label: "От" },
+  { value: "CUSTOM", label: "Другое" },
 ];
 
 const VISIBILITY_OPTIONS: {
@@ -97,16 +111,40 @@ export function makeEmptyStop(): EditableRouteStop {
     location: null,
     note: "",
     photos: [],
+    priceType: "UNKNOWN",
+    priceMin: null,
+    priceMax: null,
+    priceCurrency: "BYN",
+    priceNote: "",
   };
 }
 
 const BASE_STATE: WizardState = {
   title: "",
   ageTags: [],
-  budgetLevel: "LOW",
+  budgetLevel: null,
   stops: [makeEmptyStop(), makeEmptyStop()],
   visibility: "PUBLIC",
 };
+
+function normalizeEditableStop(stop: EditableRouteStop): EditableRouteStop {
+  return {
+    ...stop,
+    photos: stop.photos ?? [],
+    priceType: stop.priceType ?? "UNKNOWN",
+    priceMin: stop.priceMin ?? null,
+    priceMax: stop.priceMax ?? null,
+    priceCurrency: stop.priceCurrency || "BYN",
+    priceNote: stop.priceNote ?? "",
+  };
+}
+
+function parsePriceInput(value: string): number | null {
+  if (!value.trim()) return null;
+  const normalized = value.replace(",", ".");
+  const next = Number(normalized);
+  return Number.isFinite(next) && next >= 0 ? next : null;
+}
 
 // ─── Step indicator ───────────────────────────────────────────────────────────
 
@@ -208,36 +246,11 @@ function Step1({
         </div>
       </div>
 
-      <div>
-        <label className="text-xs font-semibold text-neutral-500 uppercase tracking-widest block mb-2">
-          Бюджет маршрута
-        </label>
-        <div className="grid grid-cols-2 gap-2">
-          {BUDGET_OPTIONS.map((opt) => (
-            <button
-              key={opt.value}
-              onClick={() => onChange({ budgetLevel: opt.value })}
-              className={cn(
-                "flex flex-col items-start px-4 py-3 rounded-2xl border text-left transition-all",
-                state.budgetLevel === opt.value
-                  ? "bg-neutral-900 text-white border-neutral-900"
-                  : "bg-white text-neutral-700 border-neutral-200 hover:border-neutral-400",
-              )}
-            >
-              <span className="text-sm font-semibold">{opt.label}</span>
-              <span
-                className={cn(
-                  "text-xs mt-0.5",
-                  state.budgetLevel === opt.value
-                    ? "text-white/70"
-                    : "text-neutral-400",
-                )}
-              >
-                {opt.sub}
-              </span>
-            </button>
-          ))}
-        </div>
+      <div className="rounded-2xl border border-dashed border-neutral-200 bg-white px-4 py-3">
+        <p className="text-sm text-neutral-500">
+          Бюджет маршрута соберём автоматически по стоимости каждой точки на
+          следующем шаге.
+        </p>
       </div>
 
       <div className="pt-2">
@@ -255,6 +268,149 @@ function Step1({
 }
 
 // ─── Stop Editor ──────────────────────────────────────────────────────────────
+
+function StopPriceEditor({
+  stop,
+  onChange,
+}: {
+  stop: EditableRouteStop;
+  onChange: (patch: Partial<EditableRouteStop>) => void;
+}) {
+  const selectType = (value: Exclude<RouteStopPriceType, "UNKNOWN">) => {
+    const nextType = stop.priceType === value ? "UNKNOWN" : value;
+    onChange({
+      priceType: nextType,
+      priceCurrency: stop.priceCurrency || "BYN",
+      ...(nextType === "FREE"
+        ? { priceMin: null, priceMax: null }
+        : nextType === "FIXED"
+          ? { priceMax: null }
+          : nextType === "FROM"
+            ? { priceMax: null }
+            : nextType === "CUSTOM" || nextType === "UNKNOWN"
+              ? { priceMin: null, priceMax: null }
+              : {}),
+    });
+  };
+
+  const currentType = stop.priceType ?? "UNKNOWN";
+
+  return (
+    <div className="rounded-2xl border border-neutral-200 bg-neutral-50/70 p-3 space-y-3">
+      <div className="flex items-center gap-2">
+        <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-white text-neutral-600">
+          <Wallet className="h-4 w-4" />
+        </div>
+        <div>
+          <p className="text-sm font-semibold text-neutral-900">Стоимость</p>
+          <p className="text-xs text-neutral-400">
+            Можно оставить пусто и вернуться позже
+          </p>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        {PRICE_TYPE_OPTIONS.map((option) => {
+          const active = currentType === option.value;
+          return (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => selectType(option.value)}
+              className={cn(
+                "rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
+                active
+                  ? "border-neutral-900 bg-neutral-900 text-white"
+                  : "border-neutral-200 bg-white text-neutral-600 hover:border-neutral-400",
+              )}
+            >
+              {option.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {currentType === "FIXED" && (
+        <input
+          type="number"
+          min="0"
+          step="0.01"
+          inputMode="decimal"
+          value={stop.priceMin ?? ""}
+          onChange={(e) => onChange({ priceMin: parsePriceInput(e.target.value) })}
+          placeholder="Сумма"
+          className="w-full h-10 px-3 rounded-xl border border-neutral-200 bg-white text-sm text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-neutral-900/20 focus:border-neutral-400 transition-all"
+        />
+      )}
+
+      {currentType === "RANGE" && (
+        <div className="grid grid-cols-2 gap-2">
+          <input
+            type="number"
+            min="0"
+            step="0.01"
+            inputMode="decimal"
+            value={stop.priceMin ?? ""}
+            onChange={(e) => onChange({ priceMin: parsePriceInput(e.target.value) })}
+            placeholder="От"
+            className="w-full h-10 px-3 rounded-xl border border-neutral-200 bg-white text-sm text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-neutral-900/20 focus:border-neutral-400 transition-all"
+          />
+          <input
+            type="number"
+            min="0"
+            step="0.01"
+            inputMode="decimal"
+            value={stop.priceMax ?? ""}
+            onChange={(e) => onChange({ priceMax: parsePriceInput(e.target.value) })}
+            placeholder="До"
+            className="w-full h-10 px-3 rounded-xl border border-neutral-200 bg-white text-sm text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-neutral-900/20 focus:border-neutral-400 transition-all"
+          />
+        </div>
+      )}
+
+      {currentType === "FROM" && (
+        <input
+          type="number"
+          min="0"
+          step="0.01"
+          inputMode="decimal"
+          value={stop.priceMin ?? ""}
+          onChange={(e) => onChange({ priceMin: parsePriceInput(e.target.value) })}
+          placeholder="От"
+          className="w-full h-10 px-3 rounded-xl border border-neutral-200 bg-white text-sm text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-neutral-900/20 focus:border-neutral-400 transition-all"
+        />
+      )}
+
+      {currentType === "CUSTOM" && (
+        <input
+          type="text"
+          value={stop.priceNote}
+          onChange={(e) => onChange({ priceNote: e.target.value })}
+          placeholder="Например: за семью, зависит от меню, по запросу"
+          maxLength={120}
+          className="w-full h-10 px-3 rounded-xl border border-neutral-200 bg-white text-sm text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-neutral-900/20 focus:border-neutral-400 transition-all"
+        />
+      )}
+
+      {currentType !== "CUSTOM" && currentType !== "FREE" && currentType !== "UNKNOWN" && (
+        <div className="text-[11px] text-neutral-400 px-1">
+          Валюта: {stop.priceCurrency || "BYN"}
+        </div>
+      )}
+
+      {currentType !== "CUSTOM" && (
+        <input
+          type="text"
+          value={stop.priceNote}
+          onChange={(e) => onChange({ priceNote: e.target.value })}
+          placeholder="Комментарий к цене"
+          maxLength={120}
+          className="w-full h-10 px-3 rounded-xl border border-neutral-200 bg-white text-sm text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-neutral-900/20 focus:border-neutral-400 transition-all"
+        />
+      )}
+    </div>
+  );
+}
 
 function StopEditor({
   stop,
@@ -364,6 +520,8 @@ function StopEditor({
                   </p>
                 )}
               </div>
+
+              <StopPriceEditor stop={stop} onChange={onChange} />
 
               <ImageGalleryUploader
                 images={stop.photos || []}
@@ -509,6 +667,7 @@ function Step3({
 }) {
   const coverPhoto = state.stops.find((s) => s.photos && s.photos.length > 0)
     ?.photos?.[0];
+  const budgetSummary = summarizeRouteBudget(state.stops, state.budgetLevel);
 
   return (
     <div className="space-y-6">
@@ -537,8 +696,11 @@ function Step3({
           </p>
           <p className="text-sm text-neutral-500 mt-1">
             {state.stops.length} {state.stops.length === 1 ? "точка" : "точки"}{" "}
-            · {BUDGET_OPTIONS.find((b) => b.value === state.budgetLevel)?.label}
+            · {budgetSummary.label}
           </p>
+          {budgetSummary.note && (
+            <p className="text-xs text-neutral-400 mt-1">{budgetSummary.note}</p>
+          )}
           {state.ageTags.length > 0 && (
             <div className="flex flex-wrap gap-1.5 mt-2">
               {state.ageTags.map((tag) => (
@@ -649,12 +811,13 @@ export function RouteEditor({
   const [state, setState] = useState<WizardState>(() => ({
     ...BASE_STATE,
     ...initialState,
-    stops:
+    stops: (
       initialState?.stops && initialState.stops.length >= 2
         ? initialState.stops
         : initialState?.stops?.length === 1
           ? [...initialState.stops, makeEmptyStop()]
-          : BASE_STATE.stops,
+          : BASE_STATE.stops
+    ).map(normalizeEditableStop),
   }));
   const [saving, setSaving] = useState(false);
   const [stopsCanPublish, setStopsCanPublish] = useState(false);
@@ -701,6 +864,11 @@ export function RouteEditor({
             s.location?.source !== "PLACE"
               ? (s.customTitle ?? undefined)
               : undefined,
+          priceType: s.priceType,
+          priceMin: s.priceMin ?? null,
+          priceMax: s.priceMax ?? null,
+          priceCurrency: s.priceCurrency || "BYN",
+          priceNote: s.priceNote.trim() || null,
         })),
       };
 

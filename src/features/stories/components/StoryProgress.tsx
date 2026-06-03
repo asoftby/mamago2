@@ -9,6 +9,8 @@ interface StoryProgressProps {
   progressKey: number;
   paused: boolean;
   durationMs?: number;
+  /** Called when the active segment's fill animation completes */
+  onComplete?: () => void;
 }
 
 export function StoryProgress({
@@ -17,6 +19,7 @@ export function StoryProgress({
   progressKey,
   paused,
   durationMs = 5000,
+  onComplete,
 }: StoryProgressProps) {
   return (
     <div className="flex gap-[3px] w-full px-3 pt-3">
@@ -41,6 +44,7 @@ export function StoryProgress({
               style={{
                 animation: `storyFill ${durationMs}ms linear forwards`,
               }}
+              onAnimationEnd={onComplete}
             />
           )}
           {/* Future segments stay empty (bg-white/30 from parent) */}

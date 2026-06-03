@@ -56,9 +56,6 @@ export function EventRichDescription({
 
   return (
     <section className={cn("border-t border-border/40 py-10", className)}>
-      <h2 className="mb-6 font-headline text-2xl font-bold text-foreground">
-        О событии
-      </h2>
 
       <div className="relative">
         {/* Rich text content */}
@@ -110,7 +107,7 @@ export function EventRichDescription({
         {/* Fade gradient when collapsed */}
         {!isExpanded && shouldShowButton && (
           <div
-            className="pointer-events-none absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-background via-background/80 to-transparent"
+            className="pointer-events-none absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-white via-white/80 to-transparent"
             aria-hidden="true"
           />
         )}

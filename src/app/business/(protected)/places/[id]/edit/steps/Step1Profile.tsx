@@ -10,6 +10,7 @@ import { AGE_OPTIONS } from "@/lib/config/ages";
 import { useVisitFormats, normalizeVisitFormats } from "@/hooks/useVisitFormats";
 import { RichDescriptionEditor } from "@/components/editor/RichDescriptionEditor";
 import { plainTextToRichTextHtml } from "@/lib/richtext/utils";
+import { AiDescriptionAssistant } from "@/components/ai/AiDescriptionAssistant";
 
 interface Step1ProfileProps {
   place: Place;
@@ -137,6 +138,21 @@ export function Step1Profile({ place, onUpdate, onNext, canNext, isEditable = tr
       <div>
         <Label htmlFor="description">Описание *</Label>
         <div className="mt-2">
+          <AiDescriptionAssistant
+            entityType="place"
+            title={title}
+            value={description}
+            isEditable={isEditable}
+            onApply={handleDescriptionChange}
+            filledActions={["improve", "shorten", "warm"]}
+            context={{
+              shortDescription: shortDesc,
+              category,
+              ageRange: ageTags,
+              visitFormats,
+              amenities: activityTypes,
+            }}
+          />
           <RichDescriptionEditor
             value={description}
             onChange={handleDescriptionChange}

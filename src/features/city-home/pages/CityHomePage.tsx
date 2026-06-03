@@ -20,6 +20,7 @@ import { listCityHomeArticles } from "@/server/article/listCityHomeArticles";
 import { listNearbyCities } from "@/server/city/listNearbyCities";
 import { getClassesDiscoveryFeed } from "@/server/discovery/classesDiscoveryFeed";
 import type { PublicRouteCardModel } from "@/components/routes/types";
+import { summarizeRouteBudget } from "@/lib/routes/routeBudget";
 
 interface CityHomePageProps {
   citySlug: string;
@@ -64,30 +65,36 @@ export default async function CityHomePage({ citySlug }: CityHomePageProps) {
     ).then((groups) => groups.flat()),
   ]);
 
-  const mapRoutePreview = (r: (typeof localRoutes)[number]): PublicRouteCardModel => ({
-    id: r.id,
-    slug: r.slug,
-    title: r.title,
-    ageTags: r.ageTags,
-    budgetLevel: r.budgetLevel,
-    cityName: r.city?.name ?? city.name,
-    coverImageUrl:
-      r.coverImageUrl ??
-      r.stops.find((s) => s.photoUrl)?.photoUrl ??
-      "https://images.unsplash.com/photo-1513884923967-4b182ef1671f?q=80&w=1200",
-    authorName: r.author?.email?.split("@")[0] ?? null,
-    isEditorial: r.authorId === null,
-    stopsCount: r.stops.length,
-    stops: r.stops.map((s) => ({
-      id: s.id,
-      order: s.order,
-      address: s.place?.title ?? s.customTitle ?? s.address ?? "",
-      note: s.note,
-      photoUrl: s.photoUrl ?? "",
-      lat: s.lat ?? undefined,
-      lng: s.lng ?? undefined,
-    })),
-  });
+  const mapRoutePreview = (r: (typeof localRoutes)[number]): PublicRouteCardModel => {
+    const budgetSummary = summarizeRouteBudget(r.stops);
+
+    return {
+      id: r.id,
+      slug: r.slug,
+      title: r.title,
+      ageTags: r.ageTags,
+      budgetLevel: r.budgetLevel,
+      budgetLabel: budgetSummary.label,
+      budgetNote: budgetSummary.note,
+      cityName: r.city?.name ?? city.name,
+      coverImageUrl:
+        r.coverImageUrl ??
+        r.stops.find((s) => s.photoUrl)?.photoUrl ??
+        "https://images.unsplash.com/photo-1513884923967-4b182ef1671f?q=80&w=1200",
+      authorName: r.author?.email?.split("@")[0] ?? null,
+      isEditorial: r.authorId === null,
+      stopsCount: r.stops.length,
+      stops: r.stops.map((s) => ({
+        id: s.id,
+        order: s.order,
+        address: s.place?.title ?? s.customTitle ?? s.address ?? "",
+        note: s.note,
+        photoUrl: s.photoUrl ?? "",
+        lat: s.lat ?? undefined,
+        lng: s.lng ?? undefined,
+      })),
+    };
+  };
 
   const localRoutesPreview = localRoutes.map(mapRoutePreview);
   const nearbyRoutesPreviewDb = nearbyRoutes.map(mapRoutePreview);
@@ -97,7 +104,7 @@ export default async function CityHomePage({ citySlug }: CityHomePageProps) {
   const routesMode = localRouteItems.length > 0 ? "local" : nearbyRouteItems.length > 0 ? "nearby" : "empty";
 
   return (
-    <div className="min-h-screen bg-white pb-20">
+    <div className="min-h-screen pb-20">
       <Container className="space-y-10 pt-10">
         <HeroGreetingShell initialModel={heroModel} />
 

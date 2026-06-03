@@ -34,7 +34,7 @@ export async function GET(req: NextRequest) {
     const url = new URL("https://api.open-meteo.com/v1/forecast");
     url.searchParams.set("latitude", coordinates.lat.toString());
     url.searchParams.set("longitude", coordinates.lon.toString());
-    url.searchParams.set("hourly", "temperature_2m,weathercode");
+    url.searchParams.set("hourly", "temperature_2m,weathercode,windspeed_10m");
     url.searchParams.set("timezone", "auto");
     url.searchParams.set("start_date", startDateStr);
     url.searchParams.set("end_date", endDateStr);

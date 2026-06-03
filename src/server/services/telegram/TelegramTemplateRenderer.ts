@@ -38,31 +38,44 @@ function renderGenericNotification(notification: Notification): RenderedTelegram
   };
 }
 
+function renderRegistryNotification(notification: Notification): RenderedTelegramMessage | null {
+  const registryEntry = getNotificationRegistryEntry(notification.type);
+  if (!registryEntry?.telegram) return null;
+
+  const icon =
+    notification.type.startsWith("BOOKING_")
+      ? "📌"
+      : notification.type.startsWith("PLACE_")
+        ? "📍"
+        : notification.type.startsWith("ACTIVITY_")
+          ? "🎟️"
+          : notification.type.startsWith("OFFER_")
+            ? "🎁"
+            : notification.type.startsWith("BUSINESS_")
+              ? "🏢"
+              : notification.type.startsWith("ADMIN_")
+                ? "🛠"
+                : notification.type === "REMINDER" || notification.type === "PLAN_TOMORROW_DIGEST"
+                  ? "⏰"
+                  : "🔔";
+
+  const title = registryEntry.telegram.title || notification.title;
+  const bodyTemplate = registryEntry.telegram.body || notification.body;
+  const body = bodyTemplate.replace(/\{\{body\}\}/g, notification.body);
+  const replyMarkup = buildReplyMarkup(notification, registryEntry);
+
+  return {
+    text: `${icon} ${title}\n\n${body}`,
+    replyMarkup,
+  };
+}
+
 export function renderNotificationTelegramMessage(
   notification: Notification,
 ): RenderedTelegramMessage {
-  // Пробуем использовать registry template
-  const registryEntry = getNotificationRegistryEntry(notification.type);
-  
-  if (registryEntry?.telegram) {
-    const { telegram } = registryEntry;
-    
-    // Используем inline template из registry, если есть
-    if (telegram.title || telegram.body) {
-      const prefix = audiencePrefix(notification.audience);
-      const title = telegram.title || notification.title;
-      const body = telegram.body || notification.body;
-      
-      // Заменяем {{body}} на реальный body из notification
-      const renderedBody = body.replace(/\{\{body\}\}/g, notification.body);
-      
-      const text = `${prefix} — ${title}\n\n${renderedBody}`;
-      
-      // Добавляем CTA кнопку, если есть
-      const replyMarkup = buildReplyMarkup(notification, registryEntry);
-      
-      return { text, replyMarkup };
-    }
+  const registryRendered = renderRegistryNotification(notification);
+  if (registryRendered) {
+    return registryRendered;
   }
   
   // Специальная обработка для BUSINESS_APPLICATION_CREATED (legacy)

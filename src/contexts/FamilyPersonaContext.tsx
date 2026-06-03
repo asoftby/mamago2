@@ -6,6 +6,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import { usePathname } from "next/navigation";
@@ -91,7 +92,7 @@ type FamilyPersonaContextValue = {
   primaryAdultPersonaId: string | null;
   /** Выбранный контекст «Для кого» (вкл. id взрослого и детей) */
   selectedPersonaIds: string[];
-  setSelectedPersonaIds: (next: string[]) => void;
+  setSelectedPersonaIds: (next: string[] | ((prev: string[]) => string[])) => void;
   /** Данные primary adult для меню профиля — без отдельного fetch */
   menuUser: AccountMenuUser | null;
   /** Дети для фильтра (совместимо с прежним profileChildren) */
@@ -103,7 +104,7 @@ const FamilyPersonaContext = createContext<FamilyPersonaContextValue | null>(nul
 
 /** Paths where family persona is not needed — skip API fetch entirely */
 function shouldSkipFamilyPersona(pathname: string): boolean {
-  return pathname.startsWith("/me/") || pathname.startsWith("/admin/");
+  return pathname.startsWith("/admin/");
 }
 
 async function fetchChildrenRows() {
@@ -129,6 +130,7 @@ export function FamilyPersonaProvider({ children }: { children: React.ReactNode 
   >([]);
   const [childrenLoading, setChildrenLoading] = useState(false);
   const [selectedPersonaIds, setSelectedPersonaIdsState] = useState<string[]>([]);
+  const hasUserTouchedSelectionRef = useRef(false);
   const me = status === "authenticated" ? (user as MeApiUser) : null;
   const loading = authLoading || (status === "authenticated" && childrenLoading);
 
@@ -167,15 +169,24 @@ export function FamilyPersonaProvider({ children }: { children: React.ReactNode 
       const allowed = new Set(allIds);
       const stored = readStoredIds(allIds);
       const next = normalizeStoredSelection(stored, allowed, built, authUser.id);
-      setSelectedPersonaIdsState(next);
-      try {
-        localStorage.setItem(STORAGE_SELECTED, JSON.stringify(next));
-      } catch {
-        /* ignore */
+      setSelectedPersonaIdsState((prev) => {
+        if (hasUserTouchedSelectionRef.current) {
+          return prev.filter((id) => allowed.has(id));
+        }
+        return next;
+      });
+      if (!hasUserTouchedSelectionRef.current) {
+        try {
+          localStorage.setItem(STORAGE_SELECTED, JSON.stringify(next));
+        } catch {
+          /* ignore */
+        }
       }
     } catch {
       setChildRows([]);
-      setSelectedPersonaIdsState([]);
+      if (!hasUserTouchedSelectionRef.current) {
+        setSelectedPersonaIdsState([]);
+      }
     } finally {
       setChildrenLoading(false);
     }
@@ -210,6 +221,7 @@ export function FamilyPersonaProvider({ children }: { children: React.ReactNode 
   /** Новые персоны: добавляем только если есть место (до 3), иначе оставляем ручной выбор. */
   useEffect(() => {
     if (loading || allowedIds.size === 0) return;
+    if (hasUserTouchedSelectionRef.current) return;
     setSelectedPersonaIdsState((prev) => {
       const prevFiltered = prev.filter((id) => allowedIds.has(id));
       /** Явный свободный режим (ничего не выбрано) — не подмешиваем новых персон */
@@ -244,21 +256,24 @@ export function FamilyPersonaProvider({ children }: { children: React.ReactNode 
   }, [loadChildren]);
 
   const setSelectedPersonaIds = useCallback(
-    (next: string[]) => {
-      const filtered = next.filter((id) => allowedIds.has(id));
-      if (filtered.length > MAX_ACTIVE_FAMILY_PERSONAS) {
+    (next: string[] | ((prev: string[]) => string[])) => {
+      hasUserTouchedSelectionRef.current = true;
+      const resolvedNext =
+        typeof next === "function" ? next(selectedPersonaIds) : next;
+      const sanitized = resolvedNext.filter((id) => allowedIds.has(id));
+      if (sanitized.length > MAX_ACTIVE_FAMILY_PERSONAS) {
         toast(FAMILY_SELECTION_LIMIT_MESSAGE, { duration: 4200 });
         return;
       }
       // Взрослого можно снять; пустой выбор = свободный режим (все события без фильтра «для кого»).
-      setSelectedPersonaIdsState(filtered);
+      setSelectedPersonaIdsState(sanitized);
       try {
-        localStorage.setItem(STORAGE_SELECTED, JSON.stringify(filtered));
+        localStorage.setItem(STORAGE_SELECTED, JSON.stringify(sanitized));
       } catch {
         /* ignore */
       }
     },
-    [allowedIds],
+    [allowedIds, selectedPersonaIds],
   );
 
   /** После регистрации из «Мой план» — выбрать взрослого + только что созданного ребёнка для подборки. */

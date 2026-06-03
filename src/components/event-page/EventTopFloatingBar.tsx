@@ -80,9 +80,23 @@ export function EventTopFloatingBar({
               {sessionLine}
             </p>
           )}
-          <p className="text-[15px] font-semibold text-foreground leading-tight">
-            {priceLabel}
-          </p>
+          {(() => {
+            const spaceIdx = (priceLabel ?? "").lastIndexOf(" ");
+            const numPart = spaceIdx !== -1 ? priceLabel.slice(0, spaceIdx) : priceLabel;
+            const currencyPart = spaceIdx !== -1 ? priceLabel.slice(spaceIdx + 1) : "";
+            return (
+              <div className="flex items-baseline gap-1">
+                <span style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 36, fontWeight: 400, lineHeight: 1, letterSpacing: "-0.03em", color: "#141210" }}>
+                  {numPart}
+                </span>
+                {currencyPart && (
+                  <span className="text-[11px] text-[rgba(20,18,16,0.55)]" style={{ fontFamily: "Menlo, monospace" }}>
+                    {currencyPart}
+                  </span>
+                )}
+              </div>
+            );
+          })()}
         </div>
 
         {/* Правая часть: кнопки */}

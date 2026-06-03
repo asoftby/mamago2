@@ -22,6 +22,7 @@ export const ArticleBlockMvpSchema = z.discriminatedUnion("type", [
     type: z.literal("quote"),
     text: z.string(),
     attribution: z.string().optional(),
+    authorRole: z.string().optional(),
   }),
   base.extend({
     type: z.literal("heading"),

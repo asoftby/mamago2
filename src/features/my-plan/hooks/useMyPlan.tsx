@@ -20,6 +20,12 @@ import { MY_PLAN_REFETCH_DATE_EVENT } from "@/lib/my-plan/myPlanOpenIntent";
 function todayISO(): string {
   return new Date().toISOString().split("T")[0];
 }
+
+function addDaysIso(dateISO: string, days: number): string {
+  const date = new Date(`${dateISO}T00:00:00.000Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().split("T")[0]!;
+}
 import { useAuthMe } from "@/features/birthday/builder/hooks/useAuthMe";
 import type { PlanItemWithActivity } from "../types/event";
 import { normalizePlanItemsFromApi } from "../lib/normalizePlanItemFromApi";
@@ -75,6 +81,13 @@ export interface MyPlanIdea {
   activity: NonNullable<PlanItemWithActivity["activity"]>;
 }
 
+interface PlanSummary {
+  todayCount: number;
+  weekItemsCount: number;
+  nextPlanItem: { date: string; item: { title: string | null } } | null;
+  countsByDate: Record<string, number>;
+}
+
 const MyPlanStateContext = createContext<ReturnType<typeof useMyPlanStore> | null>(null);
 
 export function MyPlanStateProvider({ children }: { children: ReactNode }) {
@@ -112,6 +125,8 @@ function useMyPlanStore() {
   const [planItemsByDateMap, setPlanItemsByDateMap] = useState<
     Record<string, PlanItemWithActivity[]>
   >({});
+  const [planSummary, setPlanSummary] = useState<PlanSummary | null>(null);
+  const [planSummaryLoading, setPlanSummaryLoading] = useState(false);
   /** Актуальный снимок для проверки дублей в async-колбэках без устаревшего замыкания. */
   const planItemsByDateMapRef = useRef(planItemsByDateMap);
   planItemsByDateMapRef.current = planItemsByDateMap;
@@ -323,6 +338,53 @@ function useMyPlanStore() {
     [family?.selectedPersonaIds],
   );
 
+  const today = todayISO();
+  const summaryTo = useMemo(() => addDaysIso(today, 14), [today]);
+
+  const refetchPlanSummary = useCallback(async (): Promise<PlanSummary | null> => {
+    if (!isAuthenticated || authLoading) {
+      setPlanSummary(null);
+      return null;
+    }
+
+    setPlanSummaryLoading(true);
+    try {
+      const res = await fetch(
+        `/api/save/plan/summary?from=${encodeURIComponent(today)}&to=${encodeURIComponent(summaryTo)}`,
+        { credentials: "include" },
+      );
+      if (!res.ok) {
+        setPlanSummary(null);
+        return null;
+      }
+      const data = (await res.json()) as PlanSummary;
+      const normalized: PlanSummary = {
+        todayCount: Number.isFinite(data?.todayCount) ? data.todayCount : 0,
+        weekItemsCount: Number.isFinite(data?.weekItemsCount) ? data.weekItemsCount : 0,
+        nextPlanItem:
+          data?.nextPlanItem && typeof data.nextPlanItem.date === "string"
+            ? {
+                date: data.nextPlanItem.date,
+                item: {
+                  title: data.nextPlanItem.item?.title ?? null,
+                },
+              }
+            : null,
+        countsByDate:
+          data?.countsByDate && typeof data.countsByDate === "object"
+            ? data.countsByDate
+            : {},
+      };
+      setPlanSummary(normalized);
+      return normalized;
+    } catch {
+      setPlanSummary(null);
+      return null;
+    } finally {
+      setPlanSummaryLoading(false);
+    }
+  }, [authLoading, isAuthenticated, summaryTo, today]);
+
   const planDayFetchGen = useRef(0);
 
   const refetchPlanForDate = useCallback(
@@ -354,95 +416,26 @@ function useMyPlanStore() {
     [isAuthenticated, authLoading],
   );
 
-  const today = todayISO();
-
-  // Загружаем план на сегодня при mount — чтобы compact widget сразу показывал актуальные данные
+  // Загружаем план на сегодня для содержимого модалки и отдельно summary для compact widget.
   useEffect(() => {
     if (!isAuthenticated || authLoading) return;
     void refetchPlanForDate(today);
-  }, [isAuthenticated, authLoading, refetchPlanForDate, today]);
+    void refetchPlanSummary();
+  }, [isAuthenticated, authLoading, refetchPlanForDate, refetchPlanSummary, today]);
 
   /**
-   * Reverse sync: Monitor Header age filter changes and update My Plan mode
-   * 
-   * Rules:
-   * - If Header age is cleared → My Plan enters FREE_SEARCH (clear personas)
-   * - If Header age is selected → My Plan enters AGE_FILTER_SEARCH (don't create children)
-   * - Never delete profile children, just change selection mode
+   * Для блока «Кто идет?» source of truth — FamilyPersonaContext.selectedPersonaIds.
+   * Не откатываем выбор персон из age-фильтра обратно, иначе первый клик по «Я»/ребёнку
+   * может сразу же очищаться конкурирующим эффектом, пока возраст ещё не успел
+   * досинхронизироваться через FamilyDerivedAgeSync.
    */
   useEffect(() => {
     if (!isAuthenticated || !family || family.loading) return;
+    if ((family.selectedPersonaIds?.length ?? 0) > 0) return;
 
     const headerAge = locationApplied.age ?? [];
-    const currentPersonaIds = family.selectedPersonaIds ?? [];
-    const personas = family.personas ?? [];
-
-    // Helper: Calculate age from birth date
-    const getAgeYears = (birthDate: string | null | undefined): number | null => {
-      if (!birthDate) return null;
-      const birth = new Date(birthDate);
-      if (Number.isNaN(birth.getTime())) return null;
-
-      const now = new Date();
-      let age = now.getFullYear() - birth.getFullYear();
-      const monthDiff = now.getMonth() - birth.getMonth();
-
-      if (monthDiff < 0 || (monthDiff === 0 && now.getDate() < birth.getDate())) {
-        age--;
-      }
-
-      return age >= 0 ? age : null;
-    };
-
-    // Helper: Find age group for a given age
-    const findAgeGroupByYears = (ageYears: number): string | null => {
-      for (const group of AGE_GROUPS) {
-        if (group.max === null) {
-          if (ageYears >= group.min) return group.value;
-        } else if (ageYears >= group.min && ageYears <= group.max) {
-          return group.value;
-        }
-      }
-      return null;
-    };
-
-    // Build expected audience from current personas
-    const currentAudience = new Set<string>();
-    for (const personaId of currentPersonaIds) {
-      const persona = personas.find((p) => p.id === personaId);
-      if (!persona) continue;
-
-      if (persona.kind === "adult") {
-        currentAudience.add("18+");
-      } else if (persona.kind === "child") {
-        const ageYears = getAgeYears(persona.birthDate);
-        if (ageYears !== null) {
-          const groupId = findAgeGroupByYears(ageYears);
-          if (groupId) {
-            currentAudience.add(groupId);
-          }
-        }
-      }
-    }
-
-    // If header age is empty, enter free search mode
     if (headerAge.length === 0) {
-      // Only clear if we're not already in free search
-      if (currentPersonaIds.length > 0) {
-        family.setSelectedPersonaIds([]);
-      }
       return;
-    }
-
-    // If header age is selected, check if current personas match
-    const headerAgeSet = new Set(headerAge);
-    const audienceMatches =
-      currentAudience.size === headerAgeSet.size &&
-      Array.from(currentAudience).every((a) => headerAgeSet.has(a));
-
-    // If mismatch, enter age_filter_search mode (clear personas but keep profile data)
-    if (!audienceMatches && currentPersonaIds.length > 0) {
-      family.setSelectedPersonaIds([]);
     }
   }, [isAuthenticated, locationApplied.age, family]);
 
@@ -451,10 +444,11 @@ function useMyPlanStore() {
     const handler = (e: Event) => {
       const date = (e as CustomEvent<{ date: string }>).detail?.date;
       if (date) void refetchPlanForDate(date);
+      void refetchPlanSummary();
     };
     window.addEventListener(MY_PLAN_REFETCH_DATE_EVENT, handler);
     return () => window.removeEventListener(MY_PLAN_REFETCH_DATE_EVENT, handler);
-  }, [refetchPlanForDate]);
+  }, [refetchPlanForDate, refetchPlanSummary]);
 
   const postActivityToPlan = useCallback(
     async (input: {
@@ -606,12 +600,13 @@ function useMyPlanStore() {
         if (!res.ok) return false;
         removePlanItemLocal(planItemId);
         void refetchPlanForDate(selectedPlanDate);
+        void refetchPlanSummary();
         return true;
       } catch {
         return false;
       }
     },
-    [removePlanItemLocal, refetchPlanForDate, selectedPlanDate],
+    [removePlanItemLocal, refetchPlanForDate, refetchPlanSummary, selectedPlanDate],
   );
 
   const removeIdea = useCallback(async (activityId: string): Promise<boolean> => {
@@ -658,6 +653,43 @@ function useMyPlanStore() {
   };
 
   const weekDates = getWeekDates();
+
+  const effectiveCountsByDate = useMemo(() => {
+    const merged = { ...(planSummary?.countsByDate ?? {}) };
+    for (const [date, items] of Object.entries(planItemsByDateMap)) {
+      merged[date] = items.length;
+    }
+    return merged;
+  }, [planItemsByDateMap, planSummary?.countsByDate]);
+
+  const effectiveTodayCount = useMemo(() => {
+    if (!isAuthenticated) return 0;
+    return effectiveCountsByDate[today] ?? 0;
+  }, [effectiveCountsByDate, isAuthenticated, today]);
+
+  const effectiveWeekItemsCount = useMemo(() => {
+    if (!isAuthenticated) return 0;
+    return weekDates.reduce((sum, date) => sum + (effectiveCountsByDate[date] ?? 0), 0);
+  }, [effectiveCountsByDate, isAuthenticated, weekDates]);
+
+  const effectiveNextPlanItem = useMemo(() => {
+    if (!isAuthenticated) return null;
+
+    const futureDates = Object.keys(effectiveCountsByDate)
+      .filter((date) => date > today && (effectiveCountsByDate[date] ?? 0) > 0)
+      .sort();
+    const nextDate = futureDates[0];
+    if (!nextDate) return null;
+
+    const loadedItems = planItemsByDateMap[nextDate];
+    if (loadedItems && loadedItems.length > 0) {
+      return { date: nextDate, item: loadedItems[0] };
+    }
+    if (planSummary?.nextPlanItem?.date === nextDate) {
+      return planSummary.nextPlanItem;
+    }
+    return { date: nextDate, item: { title: null } };
+  }, [effectiveCountsByDate, isAuthenticated, planItemsByDateMap, planSummary?.nextPlanItem, today]);
 
   const planItemsByDate = planItems.reduce<Record<string, PlanItemWithActivity[]>>((acc, item) => {
     if (!acc[item.date]) acc[item.date] = [];
@@ -742,22 +774,11 @@ function useMyPlanStore() {
     weekDates,
     searchQuery,
     setSearchQuery,
-    todayCount: isAuthenticated ? (planItemsByDateMap[today] ?? []).length : 0,
+    todayCount: effectiveTodayCount,
     /** Суммарное кол-во элементов на ближайшие 7 дней (включая сегодня) */
-    weekItemsCount: isAuthenticated
-      ? weekDates.reduce((sum, d) => sum + (planItemsByDateMap[d]?.length ?? 0), 0)
-      : 0,
+    weekItemsCount: effectiveWeekItemsCount,
     /** Ближайший элемент плана после сегодня (для compact widget) */
-    nextPlanItem: isAuthenticated
-      ? (() => {
-          for (const d of weekDates) {
-            if (d <= today) continue; // пропускаем сегодня и прошлое
-            const items = planItemsByDateMap[d];
-            if (items && items.length > 0) return { date: d, item: items[0] };
-          }
-          return null;
-        })()
-      : null,
+    nextPlanItem: effectiveNextPlanItem,
     planSlots,
     cycleSlotAlternative,
     cycleSlotAlternativePrev,
@@ -801,6 +822,7 @@ function useMyPlanStore() {
           ),
         );
         void refetchPlanForDate(selectedPlanDate);
+        void refetchPlanSummary();
         return { ok: true };
       } catch {
         return { ok: false };
@@ -839,12 +861,14 @@ function useMyPlanStore() {
         };
         addPlanItem(planItem);
         void refetchPlanForDate(selectedPlanDate);
+        void refetchPlanSummary();
         return { ok: true };
       } catch {
         return { ok: false };
       }
     },
     refetchPlanForDate,
+    refetchPlanSummary,
     todayIso: today,
     selectedPlanDate,
     setSelectedPlanDate,
@@ -935,6 +959,7 @@ function useMyPlanStore() {
 
         // Фоновый рефетч для синхронизации с сервером (без блокировки UI)
         void refetchPlanForDate(input.dateISO);
+        void refetchPlanSummary();
         return { ok: true };
       } catch {
         // Откатываем при ошибке сети
@@ -950,5 +975,8 @@ function useMyPlanStore() {
         return { ok: false };
       }
     },
+    planSummary,
+    planSummaryLoading,
+    planCountsByDate: effectiveCountsByDate,
   };
 }

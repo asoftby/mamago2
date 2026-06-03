@@ -41,11 +41,9 @@ export function FormWizardHeader({
               <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>
             )}
           </div>
-          {trailing != null && (
-            <div className="shrink-0 text-right text-xs text-muted-foreground sm:pt-1">
-              {trailing}
-            </div>
-          )}
+          <div className={cn("shrink-0 text-right text-xs text-muted-foreground sm:pt-1", trailing == null && "invisible")} aria-hidden={trailing == null}>
+            {trailing ?? " "}
+          </div>
         </div>
         {children}
       </div>

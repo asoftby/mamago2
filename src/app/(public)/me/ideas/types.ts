@@ -39,6 +39,7 @@ export type IdeaItem = {
     badgeLabel?: string | null;
     kind?: string | null;
     campProgramType?: string | null;
+    temporalState?: "UPCOMING" | "ONGOING" | "PAST" | "UNKNOWN";
   };
   planAvailability?: PlanActivityPublicAvailability;
   planStatus: IdeaPlanStatus;

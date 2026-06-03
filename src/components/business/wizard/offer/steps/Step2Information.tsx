@@ -7,10 +7,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { ChipsRow, type ChipItem } from "@/components/ui/chips-row";
 import { AGE_OPTIONS } from "@/lib/config/ages";
 import { RichDescriptionEditor } from "@/components/editor/RichDescriptionEditor";
+import { AiDescriptionAssistant } from "@/components/ai/AiDescriptionAssistant";
 import type { OfferFormData } from "../types";
 import { StructuredDiscoverySignalPicker } from "../../shared/StructuredDiscoverySignalPicker";
 import { OfferClassChipPicker } from "../components/OfferClassChipPicker";
 import { SignalEntityType } from "@prisma/client";
+import { getProgramTypeLabel } from "@/lib/public/publicVerticalResolver";
 
 interface Step2InformationProps {
   data: OfferFormData;
@@ -103,6 +105,40 @@ export function Step2Information({ data, onChange, isEditable }: Step2Informatio
         <Label>
           Подробное описание <span className="text-red-500">*</span>
         </Label>
+        <AiDescriptionAssistant
+          entityType="offer"
+          title={data.title}
+          value={data.description || ""}
+          isEditable={isEditable}
+          onApply={handleFullDescriptionChange}
+          filledActions={["improve", "shorten", "sell"]}
+          context={{
+            shortDescription: data.shortDescription,
+            offerType: data.offerWizardType ? getProgramTypeLabel(data.offerWizardType) : "",
+            campProgramType: data.campProgramType,
+            ageRange: data.ageGroups,
+            place: data.placeTitle,
+            price:
+              data.pricingMode === "single"
+                ? `${data.singlePrice} ${data.singleCurrency}`.trim()
+                : data.pricingOptions.map((option) => `${option.title}: ${option.price}`).join("; "),
+            discount: data.promotionDetails,
+            validityDates: data.campSessions
+              .map((session) => [session.dateFrom, session.dateTo].filter(Boolean).join(" — "))
+              .filter(Boolean),
+            conditions: [
+              data.classDuration,
+              data.classGroupSize,
+              data.partyDuration,
+              data.partyChildrenCount,
+              data.partyIncluded,
+              data.serviceDuration,
+              data.serviceDeliveryArea,
+              data.ctaInstructions,
+            ],
+            schedule: [data.campSessionDuration, data.campStayDuration, data.campDaySchedule],
+          }}
+        />
         <RichDescriptionEditor
           value={data.description || ""}
           onChange={handleFullDescriptionChange}

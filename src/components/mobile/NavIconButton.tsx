@@ -48,8 +48,8 @@ export function getNavIconButtonClassName({
     "active:scale-[0.96] active:transition-transform",
     chrome === "dark"
       ? isActive
-        ? "border-[#EF8759]/45 bg-neutral-700/55 shadow-[inset_0_1px_0_rgba(255,255,255,0.12),0_4px_16px_rgba(239,135,89,0.22)]"
-        : "border-neutral-500/25 bg-neutral-700/40 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]"
+        ? "border-[#EF8759]/50 bg-[rgba(250,247,241,0.50)] shadow-[inset_0_1px_0_rgba(255,255,255,0.18),0_4px_16px_rgba(239,135,89,0.20)]"
+        : "border-[rgba(250,247,241,0.25)] bg-[rgba(250,247,241,0.50)] shadow-[inset_0_1px_0_rgba(255,255,255,0.14)]"
       : isActive
         ? "border-[#EF8759]/35 bg-white/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_4px_14px_rgba(239,135,89,0.18)]"
         : "border-white/70 bg-white/55 shadow-sm shadow-black/[0.04]",

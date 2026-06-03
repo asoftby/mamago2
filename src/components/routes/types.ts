@@ -1,3 +1,5 @@
+import { LEGACY_BUDGET_LABELS } from "@/lib/routes/routeBudget";
+
 export type PublicRouteStop = {
   id: string;
   order: number;
@@ -16,6 +18,8 @@ export type PublicRouteCardModel = {
   title: string;
   ageTags: string[];
   budgetLevel: "FREE" | "LOW" | "MEDIUM" | "HIGH";
+  budgetLabel: string;
+  budgetNote?: string | null;
   cityName: string;
   coverImageUrl: string;
   authorName: string | null;
@@ -27,9 +31,5 @@ export type PublicRouteCardModel = {
   updatedAt?: string;
 };
 
-export const BUDGET_LABELS: Record<PublicRouteCardModel["budgetLevel"], string> = {
-  FREE: "Бесплатно",
-  LOW: "до 50 BYN",
-  MEDIUM: "50-150 BYN",
-  HIGH: "150+ BYN",
-};
+export const BUDGET_LABELS: Record<PublicRouteCardModel["budgetLevel"], string> =
+  LEGACY_BUDGET_LABELS;

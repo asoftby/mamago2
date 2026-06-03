@@ -12,7 +12,7 @@ import { resolveCityId } from "@/services/place/cityResolver.service";
 import prisma from "@/lib/prisma";
 
 const EARTH_RADIUS_KM = 6371;
-const METRO_SEARCH_RADIUS_METERS = 1000; // Maximum distance to consider metro station relevant
+const METRO_SEARCH_RADIUS_METERS = 1500; // Fallback default when city.metroMaxDistanceM is unset
 
 /**
  * Calculate distance using Haversine formula

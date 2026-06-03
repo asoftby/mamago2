@@ -7,20 +7,44 @@
 import assert from "node:assert/strict";
 import { z } from "zod";
 
-// ─── Schema under test (mirrors the route's rewriteRequestSchema) ────────────
+const contextValueSchema = z.union([
+  z.string(),
+  z.number(),
+  z.boolean(),
+  z.null(),
+  z.array(z.union([z.string(), z.number(), z.boolean(), z.null()])),
+]);
 
-const rewriteRequestSchema = z.object({
-  tone: z.enum(["neutral", "friendly", "editorial", "short"]),
-  sourceText: z.string().trim().min(20).max(8000),
-  title: z.string().trim().max(200).optional(),
-  entityType: z.enum(["event", "place"]).optional(),
-});
+const rewriteRequestSchema = z
+  .object({
+    action: z.enum(["generate", "improve", "shorten", "warm", "sell"]),
+    sourceText: z.string().trim().max(8000).optional().default(""),
+    title: z.string().trim().max(200).optional(),
+    entityType: z.enum(["event", "place", "offer"]),
+    context: z.record(z.string(), contextValueSchema).optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.action !== "generate" && data.sourceText.trim().length < 20) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["sourceText"],
+        message: "sourceText must be at least 20 characters",
+      });
+    }
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+    if (data.action === "generate" && !data.title?.trim() && !data.context) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["context"],
+        message: "title or context is required for generate",
+      });
+    }
+  });
 
 function makeValidInput(overrides: Record<string, unknown> = {}) {
   return {
-    tone: "neutral",
+    action: "improve",
+    entityType: "event",
     sourceText: "A".repeat(100),
     ...overrides,
   };
@@ -29,8 +53,6 @@ function makeValidInput(overrides: Record<string, unknown> = {}) {
 function makeStringOfLength(n: number): string {
   return "A".repeat(n);
 }
-
-// ─── Tests ───────────────────────────────────────────────────────────────────
 
 let passed = 0;
 let failed = 0;
@@ -49,108 +71,79 @@ function test(name: string, fn: () => void) {
 
 console.log("\n🧪 AI Rewrite input validation tests\n");
 
-// ─── sourceText length limits ────────────────────────────────────────────────
-
-test("sourceText with 20 chars passes", () => {
+test("improve with 20 chars passes", () => {
   const result = rewriteRequestSchema.safeParse(
     makeValidInput({ sourceText: makeStringOfLength(20) }),
   );
   assert.equal(result.success, true);
 });
 
-test("sourceText with 19 chars fails (below min)", () => {
+test("improve with 19 chars fails", () => {
   const result = rewriteRequestSchema.safeParse(
     makeValidInput({ sourceText: makeStringOfLength(19) }),
   );
   assert.equal(result.success, false);
 });
 
-test("sourceText with 7999 chars passes (below max)", () => {
+test("generate allows empty sourceText when title exists", () => {
   const result = rewriteRequestSchema.safeParse(
-    makeValidInput({ sourceText: makeStringOfLength(7999) }),
+    makeValidInput({
+      action: "generate",
+      sourceText: "",
+      title: "Место для семейного отдыха",
+      entityType: "place",
+    }),
   );
   assert.equal(result.success, true);
 });
 
-test("sourceText with 8000 chars passes (exactly max)", () => {
+test("generate fails without title and context", () => {
+  const result = rewriteRequestSchema.safeParse(
+    makeValidInput({
+      action: "generate",
+      sourceText: "",
+      title: "",
+      context: undefined,
+      entityType: "offer",
+    }),
+  );
+  assert.equal(result.success, false);
+});
+
+test("sourceText with 8000 chars passes", () => {
   const result = rewriteRequestSchema.safeParse(
     makeValidInput({ sourceText: makeStringOfLength(8000) }),
   );
   assert.equal(result.success, true);
 });
 
-test("sourceText with 8001 chars fails (exceeds max)", () => {
+test("sourceText with 8001 chars fails", () => {
   const result = rewriteRequestSchema.safeParse(
     makeValidInput({ sourceText: makeStringOfLength(8001) }),
   );
   assert.equal(result.success, false);
 });
 
-// ─── title length limits ─────────────────────────────────────────────────────
-
-test("title with 200 chars passes (exactly max)", () => {
+test("title with 200 chars passes", () => {
   const result = rewriteRequestSchema.safeParse(
     makeValidInput({ title: makeStringOfLength(200) }),
   );
   assert.equal(result.success, true);
 });
 
-test("title with 201 chars fails (exceeds max)", () => {
+test("title with 201 chars fails", () => {
   const result = rewriteRequestSchema.safeParse(
     makeValidInput({ title: makeStringOfLength(201) }),
   );
   assert.equal(result.success, false);
 });
 
-test("title is optional — missing title passes", () => {
-  const result = rewriteRequestSchema.safeParse(makeValidInput());
-  assert.equal(result.success, true);
-});
-
-test("title with empty string passes (trimmed to empty, optional)", () => {
+test("offer entityType passes", () => {
   const result = rewriteRequestSchema.safeParse(
-    makeValidInput({ title: "" }),
+    makeValidInput({ entityType: "offer", action: "sell" }),
   );
   assert.equal(result.success, true);
 });
-
-// ─── Validation error does NOT expose Zod internals ──────────────────────────
-
-test("validation error returns generic message, not Zod details", () => {
-  const result = rewriteRequestSchema.safeParse(
-    makeValidInput({ sourceText: makeStringOfLength(8001) }),
-  );
-  assert.equal(result.success, false);
-
-  // Simulate what the route does: return { error: "Invalid input" }
-  const responseBody = { error: "Invalid input" };
-  assert.equal(responseBody.error, "Invalid input");
-  // Ensure no Zod internals are leaked
-  assert.equal("details" in responseBody, false);
-});
-
-// ─── Server-side hard guard logic ────────────────────────────────────────────
-
-test("hard guard: sourceText > 8000 should block provider call", () => {
-  // This simulates the guard check before OpenRouter call
-  const sourceText = makeStringOfLength(8001);
-  const shouldCallProvider = sourceText.length <= 8000;
-  assert.equal(shouldCallProvider, false);
-});
-
-test("hard guard: sourceText <= 8000 should allow provider call", () => {
-  const sourceText = makeStringOfLength(8000);
-  const shouldCallProvider = sourceText.length <= 8000;
-  assert.equal(shouldCallProvider, true);
-});
-
-test("hard guard: sourceText = 7999 should allow provider call", () => {
-  const sourceText = makeStringOfLength(7999);
-  const shouldCallProvider = sourceText.length <= 8000;
-  assert.equal(shouldCallProvider, true);
-});
-
-// ─── Summary ─────────────────────────────────────────────────────────────────
 
 console.log(`\n${"─".repeat(40)}`);
 console.log(`Results: ${passed} passed, ${failed} failed`);

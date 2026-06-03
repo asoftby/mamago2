@@ -1,10 +1,8 @@
 "use client";
 
-import { ArrowRight, Star } from "lucide-react";
-import Image from "next/image";
+import { useState } from "react";
 import { format } from "date-fns";
 import { ru } from "date-fns/locale";
-import { useState } from "react";
 import { cn } from "@/lib/utils";
 import {
   Dialog,
@@ -31,35 +29,100 @@ interface Review {
 interface PlaceReviewsSectionProps {
   reviews: Review[];
   placeId: string;
+  rating?: number;
+  reviewCount?: number;
 }
 
-export function PlaceReviewsSection({ reviews, placeId }: PlaceReviewsSectionProps) {
+export function PlaceReviewsSection({
+  reviews,
+  placeId,
+  rating,
+  reviewCount,
+}: PlaceReviewsSectionProps) {
   const [allOpen, setAllOpen] = useState(false);
 
-  if (reviews.length === 0) {
-    return null;
-  }
+  if (reviews.length === 0) return null;
+
+  const displayRating = rating ?? (reviews.reduce((s, r) => s + r.rating, 0) / reviews.length);
+  const displayCount = reviewCount ?? reviews.length;
 
   return (
-    <section id="reviews" className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-gray-900">Отзывы</h2>
-        <button
-          type="button"
-          className="flex items-center gap-1 text-sm font-medium text-[#EF8759] transition hover:text-[#EF8759]/80"
-          onClick={() => setAllOpen(true)}
-          aria-expanded={allOpen}
-          aria-controls={`reviews-dialog-${placeId}`}
+    <section
+      id="reviews"
+      style={{
+        padding: "72px 0 56px",
+        borderTop: "1px solid rgba(20,18,16,.10)",
+        background: "#ffffff",
+      }}
+    >
+      <div
+        style={{ maxWidth: 1200, margin: "0 auto", padding: "0 28px" }}
+        className="reviews-wrap"
+      >
+        {/* Header */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "flex-end",
+            justifyContent: "space-between",
+            marginBottom: 34,
+            gap: 16,
+            flexWrap: "wrap",
+          }}
         >
-          Все отзывы
-          <ArrowRight className="h-4 w-4" aria-hidden />
-        </button>
-      </div>
+          <div>
+            <div className="kicker-row" style={{ marginBottom: 14 }}>
+              <span className="text-kicker">Отзывы</span>
+              <span className="kicker-line" style={{ width: 120 }} />
+            </div>
+            <h2
+              style={{
+                fontSize: 30,
+                margin: 0,
+                letterSpacing: "-.02em",
+                color: "#141210",
+                fontFamily: "var(--font-sans)",
+                fontWeight: 400,
+                whiteSpace: "nowrap",
+              }}
+            >
+              <em style={{ fontFamily: "var(--font-display)", fontStyle: "italic", fontWeight: 400, color: "var(--primary)" }}>{displayRating.toFixed(1)}</em>
+              {" · "}{displayCount} отзывов
+            </h2>
+          </div>
+          <button
+            type="button"
+            onClick={() => setAllOpen(true)}
+            style={{
+              background: "none",
+              border: "none",
+              padding: 0,
+              fontSize: 14,
+              color: "#3A332B",
+              textDecoration: "underline",
+              textUnderlineOffset: 4,
+              cursor: "pointer",
+              whiteSpace: "nowrap",
+              fontFamily: "inherit",
+            }}
+          >
+            Читать все →
+          </button>
+        </div>
 
-      <div className="flex gap-4 overflow-x-auto pb-4 no-scrollbar">
-        {reviews.slice(0, 6).map((review) => (
-          <ReviewCard key={review.id} review={review} layout="carousel" />
-        ))}
+        {/* 3-col grid */}
+        <div
+          className="reviews-grid"
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(3, 1fr)",
+            gap: 14,
+          }}
+        >
+          {reviews.slice(0, 3).map((review, i) => (
+            <ReviewCard key={review.id} review={review} layout="grid" delay={i * 70} />
+          ))}
+        </div>
       </div>
 
       <Dialog open={allOpen} onOpenChange={setAllOpen}>
@@ -87,6 +150,16 @@ export function PlaceReviewsSection({ reviews, placeId }: PlaceReviewsSectionPro
           </div>
         </DialogContent>
       </Dialog>
+
+      <style>{`
+        @media (max-width: 900px) {
+          .reviews-grid { grid-template-columns: 1fr !important; }
+          .reviews-wrap { padding: 0 22px !important; }
+        }
+        @media (max-width: 520px) {
+          .reviews-wrap { padding: 0 18px !important; }
+        }
+      `}</style>
     </section>
   );
 }
@@ -94,11 +167,13 @@ export function PlaceReviewsSection({ reviews, placeId }: PlaceReviewsSectionPro
 function ReviewCard({
   review,
   layout,
+  delay = 0,
 }: {
   review: Review;
-  layout: "carousel" | "list";
+  layout: "grid" | "list";
+  delay?: number;
 }) {
-  const isCarousel = layout === "carousel";
+  const isGrid = layout === "grid";
 
   const initials = review.authorName
     .split(" ")
@@ -117,75 +192,107 @@ function ReviewCard({
 
   return (
     <div
-      className={cn(
-        "flex flex-col gap-4 rounded-2xl border border-gray-200 bg-white p-5",
-        isCarousel ? "w-[320px] flex-shrink-0" : "w-full",
-      )}
+      style={{
+        background: "#FAF7F1",
+        border: "1px solid rgba(20,18,16,.10)",
+        borderRadius: 18,
+        padding: 24,
+        display: "flex",
+        flexDirection: "column",
+        gap: 14,
+        minHeight: isGrid ? 240 : "auto",
+      }}
     >
-      <div className="flex items-start gap-3">
-        <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#EF8759]/10">
-          {review.authorAvatarUrl ? (
-            <Image
-              src={review.authorAvatarUrl}
-              alt={review.authorName}
-              width={48}
-              height={48}
-              className="h-full w-full object-cover"
-            />
-          ) : (
-            <span className="text-sm font-semibold text-[#EF8759]">{initials}</span>
-          )}
-        </div>
-
-        <div className="min-w-0 flex-1">
-          <div className="font-semibold text-gray-900">{review.authorName}</div>
-          <div className="flex flex-wrap items-center gap-2 text-sm text-gray-600">
-            <span>{formattedDate}</span>
-            {review.source === "GOOGLE" && (
-              <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs">Google</span>
-            )}
-            {review.source === "MAMAGO" && (
-              <span className="rounded-full bg-[#EF8759]/10 px-2 py-0.5 text-xs text-[#EF8759]">
-                mamaGo
-              </span>
-            )}
+      {/* Author row */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0, flex: 1 }}>
+          <div
+            style={{
+              width: 36,
+              height: 36,
+              flexShrink: 0,
+              borderRadius: 99,
+              background: "#FFE8DC",
+              color: "#C24E22",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontWeight: 600,
+              fontSize: 13,
+            }}
+          >
+            {initials}
+          </div>
+          <div style={{ minWidth: 0 }}>
+            <div
+              style={{
+                fontWeight: 600,
+                fontSize: 14,
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                color: "#141210",
+              }}
+            >
+              {review.authorName}
+            </div>
+            <div
+              style={{
+                fontFamily: "var(--font-mono, monospace)",
+                fontSize: 11,
+                color: "rgba(20,18,16,.55)",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {formattedDate}
+              {review.source === "GOOGLE" && " · Google"}
+            </div>
           </div>
         </div>
+        <div style={{ color: "#E86A3A", letterSpacing: ".05em", fontSize: 13, flexShrink: 0 }}>
+          {"★".repeat(Math.min(review.rating, 5))}
+        </div>
       </div>
 
-      <div className="flex items-center gap-1">
-        {[1, 2, 3, 4, 5].map((star) => (
-          <Star
-            key={star}
-            className={cn(
-              "h-4 w-4",
-              star <= review.rating
-                ? "fill-yellow-400 text-yellow-400"
-                : "fill-gray-200 text-gray-200",
-            )}
-          />
-        ))}
-      </div>
-
+      {/* Quote text in serif */}
       {review.text && (
         <p
-          className={cn(
-            "text-sm leading-relaxed text-gray-700",
-            isCarousel && "line-clamp-4",
-          )}
+          style={{
+            margin: 0,
+            fontFamily: "var(--font-serif)",
+            fontSize: 18,
+            lineHeight: 1.3,
+            letterSpacing: "-.01em",
+            color: "#141210",
+          }}
         >
-          {review.text}
+          «{review.text}»
         </p>
       )}
 
+      {/* Owner reply - only in list mode */}
       {review.ownerReplyText?.trim() && layout === "list" && (
-        <div className="rounded-xl border border-gray-100 bg-gray-50 p-4 text-sm leading-relaxed text-gray-700">
-          <div className="mb-2 font-semibold text-gray-900">Ответ владельца</div>
+        <div
+          style={{
+            borderRadius: 10,
+            border: "1px solid rgba(20,18,16,.10)",
+            background: "rgba(20,18,16,.03)",
+            padding: "12px 14px",
+            fontSize: 13,
+            lineHeight: 1.5,
+            color: "#3A332B",
+          }}
+        >
+          <div style={{ fontWeight: 600, marginBottom: 4, color: "#141210" }}>Ответ владельца</div>
           {review.ownerReplyAuthorName && (
-            <div className="mb-1 text-xs font-medium text-gray-500">{review.ownerReplyAuthorName}</div>
+            <div style={{ fontSize: 11, color: "rgba(20,18,16,.55)", marginBottom: 4 }}>
+              {review.ownerReplyAuthorName}
+            </div>
           )}
-          <p className="whitespace-pre-wrap">{review.ownerReplyText.trim()}</p>
-          {replyAt && <div className="mt-2 text-xs text-gray-500">{replyAt}</div>}
+          <p style={{ margin: 0, whiteSpace: "pre-wrap" }}>{review.ownerReplyText.trim()}</p>
+          {replyAt && (
+            <div style={{ marginTop: 8, fontSize: 11, color: "rgba(20,18,16,.55)" }}>{replyAt}</div>
+          )}
         </div>
       )}
     </div>

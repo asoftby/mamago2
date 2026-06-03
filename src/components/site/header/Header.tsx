@@ -183,7 +183,7 @@ export function SiteHeaderShell() {
         className={cn(
           // На страницах событий и деталях маршрута хедер не sticky — не перекрывает контент при скролле
           isNonStickyHeaderPath(pathname) ? "relative z-50 m-0 w-full" : "sticky top-0 z-50 m-0 w-full",
-          "bg-gradient-to-b from-white to-[#F7F7F7]",
+          "bg-[#F6F2EA]",
           "border-b border-[#EBEBEB]",
           "transition-shadow duration-300 ease-out",
           hb.isScrolled ? "shadow-md" : "shadow-sm",

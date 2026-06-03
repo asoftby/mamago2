@@ -1,4 +1,5 @@
 import Image from "next/image";
+import Link from "next/link";
 
 interface ArticleHeaderProps {
   title: string;
@@ -6,6 +7,7 @@ interface ArticleHeaderProps {
   category?: string;
   readTime?: number; // minutes
   publishedAt?: string | Date;
+  editHref?: string;
   heroImage?: {
     src: string;
     alt: string;
@@ -19,6 +21,7 @@ export function ArticleHeader({
   category,
   readTime,
   publishedAt,
+  editHref,
   heroImage,
 }: ArticleHeaderProps) {
   const formattedDate = (() => {
@@ -50,6 +53,17 @@ export function ArticleHeader({
             <>
               <span className="text-border">·</span>
               <span>{readTime} мин чтения</span>
+            </>
+          )}
+          {editHref && (
+            <>
+              <span className="text-border">·</span>
+              <Link
+                href={editHref}
+                className="font-medium text-foreground underline underline-offset-4 decoration-foreground/45 transition-colors hover:text-primary hover:decoration-primary"
+              >
+                Редактировать
+              </Link>
             </>
           )}
         </div>

@@ -1,5 +1,4 @@
 import { notFound, permanentRedirect } from "next/navigation";
-import { BUDGET_LABELS } from "@/components/routes/types";
 import { type RouteWithStops } from "@/server/services/route.service";
 import { RouteDetailClient } from "./RouteDetailClient";
 import prisma from "@/lib/prisma";
@@ -7,6 +6,7 @@ import { findRouteBySlug } from "@/lib/slug/routeSlugService";
 import { buildRouteJsonLd } from "@/lib/seo/schema/buildRouteJsonLd";
 import { AnalyticsDetailBeacon } from "@/components/analytics/AnalyticsDetailBeacon";
 import { buildOgMeta } from "@/lib/seo/buildOgMeta";
+import { summarizeRouteBudget } from "@/lib/routes/routeBudget";
 
 type Props = {
   params: Promise<{ slug: string }>;
@@ -43,17 +43,25 @@ export async function generateMetadata({ params }: Props) {
         budgetLevel: true,
         _count: { select: { stops: true } },
         stops: {
-          select: { photoUrl: true },
+          select: {
+            photoUrl: true,
+            priceType: true,
+            priceMin: true,
+            priceMax: true,
+            priceCurrency: true,
+            priceNote: true,
+          },
           orderBy: { order: "asc" },
           take: 5,
         },
       },
     });
     if (db) {
+      const budgetSummary = summarizeRouteBudget(db.stops);
       const title = db.seoTitle?.trim() || `${db.title} — маршрут | mamaGo`;
       const description =
         db.seoDescription?.trim() ||
-        `${db._count.stops} точки · ${BUDGET_LABELS[db.budgetLevel as keyof typeof BUDGET_LABELS] ?? ""}`;
+        `${db._count.stops} точки · ${budgetSummary.label}`;
       const image =
         db.coverImageUrl ??
         db.stops.find((s) => s.photoUrl)?.photoUrl;
@@ -106,6 +114,7 @@ export default async function RouteDetailPage({ params }: Props) {
       },
     });
     if (db) {
+      const budgetSummary = summarizeRouteBudget(db.stops);
       if (resolved.isRedirect) {
         permanentRedirect(`/routes/${db.slug}`);
       }
@@ -116,6 +125,8 @@ export default async function RouteDetailPage({ params }: Props) {
         title: db.title,
         ageTags: db.ageTags,
         budgetLevel: db.budgetLevel,
+        budgetLabel: budgetSummary.label,
+        budgetNote: budgetSummary.note,
         cityName: db.city?.name ?? "Минск",
         coverImageUrl:
           db.coverImageUrl ??

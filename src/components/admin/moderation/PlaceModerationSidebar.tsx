@@ -3,7 +3,8 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ExternalLink, Mail, Building2, MapPin, Hash } from "lucide-react";
+import { ExternalLink, Mail, Building2, MapPin, Hash, Pencil } from "lucide-react";
+import Link from "next/link";
 import { getPlaceCompletion } from "@/components/business/wizard/place/completion";
 import type { PlaceFormData } from "@/components/business/wizard/place/types";
 
@@ -196,6 +197,19 @@ export function PlaceModerationSidebar({
               <Mail className="w-4 h-4 mr-2" />
               Написать владельцу
             </a>
+          </Button>
+
+          <Button
+            variant="secondary"
+            className="w-full justify-start"
+            asChild
+          >
+            <Link
+              href={`/editor/place/${place.id}/edit?returnTo=${encodeURIComponent(`/admin/content/places/${place.id}`)}`}
+            >
+              <Pencil className="w-4 h-4 mr-2" />
+              Редактировать
+            </Link>
           </Button>
 
           {onCreateRequest && place.status === "PUBLISHED" && (

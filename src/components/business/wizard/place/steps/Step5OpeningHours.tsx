@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { OpeningHoursEditor } from "@/components/openingHours";
 import type { OpeningHoursData } from "@/components/openingHours";
 import { createDefaultUIState, generateSummary } from "@/lib/openingHours";
 import type { PlaceFormData } from "../types";
+import { PriceListEditor } from "@/components/shared/PriceListEditor";
 
 interface Step5OpeningHoursProps {
   data: PlaceFormData;
@@ -61,6 +62,21 @@ export function Step5OpeningHours({
           </pre>
         </div>
       )}
+
+      {/* Prices */}
+      <div className="space-y-3">
+        <div>
+          <h3 className="text-base font-semibold">Цены</h3>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Укажите стоимость посещения — это отобразится на странице места.
+          </p>
+        </div>
+        <PriceListEditor
+          value={data.priceItems}
+          onChange={(priceItems) => onChange({ priceItems })}
+          disabled={!isEditable}
+        />
+      </div>
     </div>
   );
 }
