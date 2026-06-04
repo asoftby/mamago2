@@ -8,6 +8,7 @@ import { EventBreadcrumbs } from "./EventBreadcrumbs";
 import { OwnerEditDropdown } from "./OwnerEditDropdown";
 import { PlaceInfoRow } from "@/components/shared/PlaceInfoRow";
 import { SidebarCard, SidebarCardTopSection, SidebarCardShare } from "@/components/shared/SidebarCard";
+import { EventSimpleBookingModal } from "./EventSimpleBookingModal";
 
 /**
  * Переформатирует адрес из Google-формата «Улица Дом, Город, Область»
@@ -112,6 +113,7 @@ export function EventDecisionPanel({
   const revealRef = useRef<HTMLDivElement>(null);
   const subtitleRef = useRef<HTMLDivElement>(null);
   const cd = useCountdown(sessionTargetDate);
+  const [bookingOpen, setBookingOpen] = useState(false);
 
   /* Reveal animations */
   useEffect(() => {
@@ -298,13 +300,23 @@ export function EventDecisionPanel({
             </a>
           )}
 
+          {data.cta.simpleBooking && (
+            <button
+              type="button"
+              onClick={() => setBookingOpen(true)}
+              className="flex h-14 flex-1 items-center justify-center gap-2 rounded-full bg-[#E86A3A] text-[16px] font-semibold text-white transition-colors hover:bg-[#C24E22] active:translate-y-px"
+            >
+              Записаться
+            </button>
+          )}
+
           <button
             type="button"
             onClick={onPlan}
             aria-label={isPlanned ? planLabel : "Добавить в план"}
             className={cn(
               "flex h-14 shrink-0 items-center justify-center rounded-full border transition-colors",
-              data.cta.purchaseUrl ? "w-14" : "flex-1 gap-2 px-4 text-[16px] font-semibold",
+              (data.cta.purchaseUrl || data.cta.simpleBooking) ? "w-14" : "flex-1 gap-2 px-4 text-[16px] font-semibold",
               isPlanned
                 ? "border-[#E86A3A] bg-[#FFE8DC] text-[#E86A3A]"
                 : "border-[rgba(20,18,16,0.18)] bg-transparent text-[rgba(20,18,16,0.45)] hover:border-[#141210] hover:text-[#141210]",
@@ -315,11 +327,22 @@ export function EventDecisionPanel({
               strokeWidth={1.75}
               className={isPlanned ? "fill-[#E86A3A]" : ""}
             />
-            {!data.cta.purchaseUrl && (
+            {!(data.cta.purchaseUrl || data.cta.simpleBooking) && (
               <span>{isPlanned ? planLabel : "Сохранить"}</span>
             )}
           </button>
         </div>
+
+        {data.cta.simpleBooking && (
+          <EventSimpleBookingModal
+            open={bookingOpen}
+            onOpenChange={setBookingOpen}
+            eventTitle={data.title}
+            eventCategory={data.categoryLabel}
+            priceLabel={data.priceLabel}
+            booking={data.cta.simpleBooking}
+          />
+        )}
 
         {/* Owner edit */}
         {data.ownerEditHref && (

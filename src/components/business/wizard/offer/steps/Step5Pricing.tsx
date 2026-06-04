@@ -88,6 +88,14 @@ function buildOfferAccessPatch(access: PublicationAccess): Partial<OfferFormData
         ctaLink: access.externalUrl ?? "",
         ctaInstructions: access.instructions ?? "",
       };
+    case "timeslots":
+      return {
+        publicationAccess: access,
+        ctaType: "забронировать",
+        ctaPhone: "",
+        ctaLink: "",
+        ctaInstructions: access.instructions ?? "",
+      };
     case "details":
       return {
         publicationAccess: access,
@@ -456,7 +464,7 @@ export function Step5Pricing({
         entityType="offer"
         value={publicationAccess}
         onChange={(value) => onChange(buildOfferAccessPatch(value))}
-        allowedMethods={["details", "prebooking", "external", "contact"]}
+        allowedMethods={["details", "timeslots", "prebooking", "external", "contact"]}
         disabled={!isEditable}
       />
     </div>

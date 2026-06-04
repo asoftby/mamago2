@@ -1,5 +1,6 @@
 "use client";
 
+import { BYN_SYMBOL } from "@/lib/formatters/format-price";
 import Link from "next/link";
 import { Building2, Check, LogOut, Shield, UserRound } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -315,7 +316,7 @@ export function AccountDropdownContent({
           <div className="rounded-xl border border-gray-200 bg-gray-50/60 p-3">
             <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Баланс</p>
             <p className="mt-1 text-lg font-semibold text-gray-900">
-              {businessBalanceBYN.toFixed(2)} BYN
+              {businessBalanceBYN.toFixed(2)} {BYN_SYMBOL}
             </p>
             {businessBalanceBYN <= 0 ? (
               <p className="mt-1 text-xs text-gray-500">

@@ -121,13 +121,26 @@ function mapActivityRowToCard(
     sessions: a.sessions,
   });
 
-  const isFreeByText = typeof a.priceText === "string" && a.priceText.toLowerCase().includes("бесплатно");
+  const sj = a.scheduleJson as Record<string, unknown> | null | undefined;
+  const pricingMode = normalizePricingMode(sj?.pricingMode, {
+    priceText: a.priceText,
+    priceFrom: a.priceFrom,
+    priceTo: a.priceTo,
+  });
+  const priceMinFromText = (() => {
+    if (!a.priceText) return undefined;
+    const m = a.priceText.replace(",", ".").match(/\d+(?:\.\d+)?/);
+    const n = m ? parseFloat(m[0]) : NaN;
+    return Number.isFinite(n) && n > 0 ? n : undefined;
+  })();
   const priceMin =
     a.priceFrom != null && !Number.isNaN(a.priceFrom)
       ? a.priceFrom
-      : isFreeByText
+      : pricingMode === "free"
         ? 0
-        : undefined;
+        : (pricingMode === "from" || pricingMode === "fixed")
+          ? priceMinFromText
+          : undefined;
 
   const listingCityId = resolveListingCityIdForKudaBadge(a);
   const geoBadge =

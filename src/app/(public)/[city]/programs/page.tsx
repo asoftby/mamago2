@@ -1,8 +1,9 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import Image from "next/image";
 import prisma from "@/lib/prisma";
 import { resolveActivityVertical } from "@/lib/public/publicVerticalResolver";
+import { OfferCard } from "@/components/offers/OfferCard";
+import { formatPriceFrom } from "@/lib/formatters/format-price";
 
 interface ProgramsPageProps {
   params: Promise<{
@@ -117,53 +118,27 @@ export default async function ProgramsPage({ params }: ProgramsPageProps) {
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {programActivities.map((program) => (
-              <a
-                key={program.id}
-                href={`/${city}/programs/${program.slug || program.id}`}
-                className="group block overflow-hidden rounded-2xl border border-border/60 bg-card transition-all hover:border-[#EF8759]/50 hover:shadow-lg"
-              >
-                {/* Cover Image */}
-                {program.coverImageUrl && (
-                  <div className="relative aspect-[4/3] overflow-hidden bg-muted">
-                    <Image
-                      src={program.coverImageUrl}
-                      alt={program.title}
-                      fill
-                      className="object-cover transition-transform duration-300 group-hover:scale-105"
-                      sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                    />
-                  </div>
-                )}
-
-                {/* Content */}
-                <div className="p-5">
-                  <h3 className="mb-2 line-clamp-2 text-lg font-semibold text-foreground">
-                    {program.title}
-                  </h3>
-
-                  {program.shortDesc && (
-                    <p className="mb-3 line-clamp-2 text-sm text-muted-foreground">
-                      {program.shortDesc}
-                    </p>
-                  )}
-
-                  {/* Meta */}
-                  <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-                    {program.ageLabel && <span>{program.ageLabel}</span>}
-                    {program.place?.title && <span>• {program.place.title}</span>}
-                  </div>
-
-                  {/* Price */}
-                  {program.priceFrom && (
-                    <div className="mt-3 text-lg font-semibold text-[#EF8759]">
-                      от {program.priceFrom} BYN
-                    </div>
-                  )}
-                </div>
-              </a>
-            ))}
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+            {programActivities.map((program) => {
+              const href = `/${city}/programs/${program.slug || program.id}`;
+              const metaLabel = [program.ageLabel, program.place?.title]
+                .filter(Boolean)
+                .join(" · ") || undefined;
+              const priceLabel = program.priceFrom != null
+                ? formatPriceFrom(program.priceFrom)
+                : undefined;
+              return (
+                <OfferCard
+                  key={program.id}
+                  id={program.id}
+                  title={program.title}
+                  href={href}
+                  imageUrl={program.coverImageUrl}
+                  dateLabel={metaLabel}
+                  priceLabel={priceLabel}
+                />
+              );
+            })}
           </div>
         )}
       </div>

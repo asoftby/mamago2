@@ -1,5 +1,6 @@
 "use client";
 
+import { BYN_SYMBOL } from "@/lib/formatters/format-price";
 import { useMemo, useState } from "react";
 import type { BirthdayBuilderWithGate } from "../hooks/useBirthdayBuilderWithGate";
 import { getBudgetEstimate } from "../../lib/getBudgetEstimate";
@@ -282,7 +283,7 @@ export function BirthdayBuilderStickyBar({ builder }: BirthdayBuilderStickyBarPr
       : "—";
     const budgetText =
       budgetGroup && budgetGroup !== "unknown"
-        ? formatBudgetRange(budgetGroup) + " BYN"
+        ? formatBudgetRange(budgetGroup) + ` ${BYN_SYMBOL}`
         : "—";
     let placeText = "—";
     if (placeType === "VENUE" && selectedBase) placeText = selectedBase.title;
@@ -403,7 +404,7 @@ export function BirthdayBuilderStickyBar({ builder }: BirthdayBuilderStickyBarPr
               <span className="text-muted-foreground">{compactSummaryParts.budgetShort}</span>
               <span className="text-muted-foreground/50">·</span>
               <span className="font-medium text-foreground">
-                {compactSummaryParts.totalRounded} BYN
+                {compactSummaryParts.totalRounded} {BYN_SYMBOL}
               </span>
               {compactSummaryParts.status && (
                 <>
@@ -458,7 +459,7 @@ export function BirthdayBuilderStickyBar({ builder }: BirthdayBuilderStickyBarPr
             <span className="text-muted-foreground">{compactSummaryParts.budgetShort}</span>
             <span className="text-muted-foreground/50"> · </span>
             <span className="font-medium text-foreground">
-              {compactSummaryParts.totalRounded} BYN
+              {compactSummaryParts.totalRounded} {BYN_SYMBOL}
             </span>
             {compactSummaryParts.status && (
               <>
@@ -521,7 +522,7 @@ export function BirthdayBuilderStickyBar({ builder }: BirthdayBuilderStickyBarPr
       <div className="border-t border-border/80 pt-2">
         <div className="flex justify-between items-baseline gap-2 text-sm">
           <span className="text-muted-foreground">Сумма выбранного</span>
-          <span className="font-semibold tabular-nums">{Math.round(totalPrice)} BYN</span>
+          <span className="font-semibold tabular-nums">{Math.round(totalPrice)} {BYN_SYMBOL}</span>
         </div>
         {barBudgetStatus && (
           <p

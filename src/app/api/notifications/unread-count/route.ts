@@ -7,8 +7,9 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
+import { prismaToHttpResponse } from "@/lib/admin/prismaHttpErrors";
 import type { NotificationStreamFilter } from "@/server/services/notification.service";
-import { getUnreadCount, getAccessibleSurfacesForUser } from "@/server/services/notification.service";
+import { getUnreadCount, getAccessibleSurfacesForUser } from "@/server/notifications/notification.service";
 import { resolveNotificationAudienceUser } from "@/server/notifications/resolveNotificationAudienceUser";
 import { getTelegramLinkStatus } from "@/server/services/telegramLink.service";
 
@@ -82,6 +83,16 @@ export async function GET(request: NextRequest) {
       unreadCount,
     });
   } catch (error) {
+    const schemaErrorResponse = prismaToHttpResponse(error);
+    if (schemaErrorResponse && process.env.NODE_ENV === "development") {
+      console.warn("[unread-count] schema drift detected, returning fallback unreadCount=0");
+      return NextResponse.json({ unreadCount: 0, degraded: true });
+    }
+
+    if (schemaErrorResponse) {
+      return schemaErrorResponse;
+    }
+
     console.error("Get unread count error:", error);
     return NextResponse.json(
       { error: "Internal server error" },

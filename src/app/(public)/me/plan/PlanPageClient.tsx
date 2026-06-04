@@ -242,7 +242,7 @@ export function PlanPageClient({ initialItems, ideaActivityIds, initialIdeas = [
   const hasIdeas = initialIdeas.length > 0;
 
   return (
-    <div style={{ minHeight: "100vh", background: "#F6F2EA" }}>
+    <div style={{ minHeight: "100vh", background: "#FFFFFF" }}>
       <PlanProfileCompletionGate />
 
       {/* Breadcrumbs */}

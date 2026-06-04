@@ -5,7 +5,7 @@
 
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
-import { markAllNotificationsAsRead } from "@/server/services/notification.service";
+import { markAllNotificationsAsRead } from "@/server/notifications/notification.service";
 
 export async function POST() {
   try {

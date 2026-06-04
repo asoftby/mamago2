@@ -88,6 +88,37 @@ export function BroadcastsListClient({ initialItems, total }: Props) {
     }
   };
 
+  const handleUnschedule = async (id: string) => {
+    try {
+      const res = await fetch(`/api/admin/broadcasts/${id}/unschedule`, { method: "POST" });
+      const data = await res.json() as { broadcast?: BroadcastRow; error?: string };
+      if (!res.ok || !data.broadcast) {
+        toast.error(data.error ?? "Ошибка");
+        return;
+      }
+      setItems((prev) =>
+        prev.map((item) => (item.id === id ? { ...item, ...data.broadcast } : item)),
+      );
+      toast.success("Сообщение возвращено в черновик");
+    } catch {
+      toast.error("Ошибка сети");
+    }
+  };
+
+  const handleCreateCorrection = async (id: string) => {
+    try {
+      const res = await fetch(`/api/admin/broadcasts/${id}/create-correction`, { method: "POST" });
+      const data = await res.json() as { broadcast?: BroadcastRow; error?: string };
+      if (!res.ok || !data.broadcast) {
+        toast.error(data.error ?? "Ошибка");
+        return;
+      }
+      window.location.href = `/admin/broadcasts/${data.broadcast.id}/edit`;
+    } catch {
+      toast.error("Ошибка сети");
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -123,6 +154,11 @@ export function BroadcastsListClient({ initialItems, total }: Props) {
                     {item.summary && (
                       <p className="text-xs text-gray-500 mt-0.5 line-clamp-1">{item.summary}</p>
                     )}
+                    {item.publishedEditCount > 0 ? (
+                      <p className="mt-1 text-[11px] text-gray-500">
+                        Исправлено {item.publishedEditCount} раз
+                      </p>
+                    ) : null}
                   </td>
                   <td className="py-3 px-4 text-gray-700">
                     {TYPE_LABELS[item.type] ?? item.type}
@@ -139,25 +175,59 @@ export function BroadcastsListClient({ initialItems, total }: Props) {
                     {PRIORITY_LABELS[item.priority] ?? item.priority}
                   </td>
                   <td className="py-3 px-4 text-gray-500 text-xs">
-                    {item.publishedAt
+                    {item.status === "SCHEDULED" && item.scheduledAt
+                      ? `Публикация ${new Date(item.scheduledAt).toLocaleString("ru-RU")}`
+                      : item.publishedAt
                       ? formatDistanceToNow(new Date(item.publishedAt), { addSuffix: true, locale: ru })
                       : formatDistanceToNow(new Date(item.createdAt), { addSuffix: true, locale: ru })}
                   </td>
                   <td className="py-3 px-4">
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <Link
                         href={`/admin/broadcasts/${item.id}/edit`}
                         className="text-blue-600 hover:text-blue-700 text-xs"
                       >
-                        Изменить
+                        {item.status === "PUBLISHED" || item.status === "ARCHIVED" ? "Просмотр" : "Изменить"}
                       </Link>
-                      {item.status === "DRAFT" || item.status === "SCHEDULED" ? (
+                      {item.status === "DRAFT" ? (
                         <button
                           onClick={() => void handlePublish(item.id)}
                           className="text-green-600 hover:text-green-700 text-xs"
                         >
                           Опубликовать
                         </button>
+                      ) : null}
+                      {item.status === "SCHEDULED" ? (
+                        <>
+                          <button
+                            onClick={() => void handlePublish(item.id)}
+                            className="text-green-600 hover:text-green-700 text-xs"
+                          >
+                            Опубликовать сейчас
+                          </button>
+                          <button
+                            onClick={() => void handleUnschedule(item.id)}
+                            className="text-gray-500 hover:text-gray-700 text-xs"
+                          >
+                            В черновик
+                          </button>
+                        </>
+                      ) : null}
+                      {item.status === "PUBLISHED" ? (
+                        <>
+                          <Link
+                            href={`/admin/broadcasts/${item.id}/edit`}
+                            className="text-amber-700 hover:text-amber-800 text-xs"
+                          >
+                            Исправить
+                          </Link>
+                          <button
+                            onClick={() => void handleCreateCorrection(item.id)}
+                            className="text-gray-600 hover:text-gray-800 text-xs"
+                          >
+                            Создать исправление
+                          </button>
+                        </>
                       ) : null}
                       {item.status !== "ARCHIVED" ? (
                         <button

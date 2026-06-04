@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { ActivityCard } from "@/components/activity/ActivityCard";
+import { EventCard, activityMockToEventCard } from "@/components/events";
 import { OfferCard } from "@/components/offers/OfferCard";
 import { AnalyticsCardViewTracker } from "@/components/analytics/AnalyticsCardViewTracker";
 import {
@@ -20,6 +20,8 @@ import { useOptionalCity } from "@/contexts/CityContext";
 import { DEFAULT_CITY_SLUG } from "@/lib/city/resolveCityContext";
 import { getActivityFormatLabel } from "@/domain/activities/activity-format";
 import { publicActivityPath } from "@/lib/business/eventPublicLink";
+// NOTE: formatRuShortDayMonthRange, formatPriceFrom, getActivityFormatLabel, publicActivityPath
+// are still used by the OfferCard branch below — do not remove.
 
 type DiscoveryActivitiesGridProps = {
   activities: ActivityMock[];
@@ -118,21 +120,10 @@ export function DiscoveryActivitiesGrid({
           className="h-full"
         />
       ) : (
-        <ActivityCard
-          className="mb-0 h-full"
+        <EventCard
+          {...activityMockToEventCard(activity, citySlug)}
           coverRatio={ratio}
-          variant="poster-feed"
-          activity={activity}
-          saveMeta={{
-            title: activity.title,
-            dateISO: activity.dateStart ?? null,
-            dateLabel: activity.dateStart
-              ? formatRuShortDayMonthRange(
-                  activity.dateStart,
-                  activity.dateEnd ?? null,
-                )
-              : null,
-          }}
+          className="h-full"
         />
       )}
     </AnalyticsCardViewTracker>

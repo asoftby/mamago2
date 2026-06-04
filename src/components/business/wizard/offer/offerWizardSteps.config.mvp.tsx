@@ -1,6 +1,7 @@
 // Offer Wizard Steps Configuration (MVP)
 // Simplified 5-step wizard
 
+import { BYN_SYMBOL } from "@/lib/formatters/format-price";
 import { WizardStepConfig, SummaryItem } from "../shared/types";
 import type { OfferFormDataMVP } from "./types.mvp";
 
@@ -225,7 +226,7 @@ export const OFFER_WIZARD_STEPS_MVP: WizardStepConfig<OfferFormDataMVP>[] = [
         {
           label: "Цена",
           value: data.priceFrom
-            ? `от ${data.priceFrom} BYN${data.priceText ? ` (${data.priceText})` : ""}`
+            ? `от ${data.priceFrom} ${BYN_SYMBOL}${data.priceText ? ` (${data.priceText})` : ""}`
             : <span className="text-red-500">Не указана</span>,
           isMissing: !data.priceFrom,
         },

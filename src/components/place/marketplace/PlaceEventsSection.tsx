@@ -1,5 +1,6 @@
 "use client";
 
+import { BYN_SYMBOL } from "@/lib/formatters/format-price";
 import Link from "next/link";
 import { format } from "date-fns";
 import { ru } from "date-fns/locale";
@@ -185,7 +186,7 @@ function EventCard({ event }: { event: Event }) {
               alignItems: "center",
             }}
           >
-            от {event.price} BYN
+            от {event.price} {BYN_SYMBOL}
           </span>
         )}
       </div>

@@ -1,113 +1,120 @@
 "use client";
 
-import { Clock, Trash2, Users } from "lucide-react";
+import { Trash2, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import type { ScheduleSlot } from "../../schedule/types";
 
+type SlotErrors = {
+  startTime?: string;
+  endTime?: string;
+  capacity?: string;
+};
+
 export type ScheduleSlotRowProps = {
   slot: ScheduleSlot;
+  errors?: SlotErrors;
+  canRemove?: boolean;
   onChange: (patch: Partial<ScheduleSlot>) => void;
+  onBlurField?: (field: keyof SlotErrors) => void;
   onRemove: () => void;
   disabled?: boolean;
 };
 
 export function ScheduleSlotRow({
   slot,
+  errors,
+  canRemove = true,
   onChange,
+  onBlurField,
   onRemove,
   disabled,
 }: ScheduleSlotRowProps) {
-  const timeLabel =
-    slot.startTime && slot.endTime
-      ? `${slot.startTime} → ${slot.endTime}`
-      : slot.startTime || "—";
-
   return (
-    <div
-      className={cn(
-        "rounded-2xl border border-stone-100 bg-stone-50/90 px-4 py-3 shadow-sm",
-        "transition-shadow hover:shadow",
-      )}
-    >
-      <div className="mb-3 flex items-center justify-between gap-2 sm:hidden">
-        <span className="flex items-center gap-1.5 text-sm font-medium text-stone-800">
-          <Clock className="h-4 w-4 text-primary" aria-hidden />
-          {timeLabel}
-        </span>
-        <span className="flex items-center gap-1 text-xs text-muted-foreground">
-          <Users className="h-3.5 w-3.5" aria-hidden />
-          {slot.capacity}
-        </span>
-      </div>
-
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_1fr_100px_auto] sm:items-end">
+    <div className="rounded-2xl border border-border bg-background px-3 py-3">
+      <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_110px_auto] md:items-start">
         <div className="space-y-1.5">
-          <Label className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+          <Label className="text-[12px] font-medium text-muted-foreground">
             Начало
           </Label>
           <Input
             type="time"
             value={slot.startTime}
             onChange={(e) => onChange({ startTime: e.target.value })}
+            onBlur={() => onBlurField?.("startTime")}
             disabled={disabled}
-            className="rounded-xl border-stone-200 bg-white"
+            aria-invalid={errors?.startTime ? "true" : "false"}
+            className="h-10 rounded-xl border-border bg-background text-[12px] focus-visible:border-primary focus-visible:ring-primary/20"
           />
+          {errors?.startTime ? (
+            <p className="text-[11px] leading-4 text-primary">{errors.startTime}</p>
+          ) : null}
         </div>
+
+        <div className="hidden pt-8 text-[12px] text-muted-foreground md:block">—</div>
+
         <div className="space-y-1.5">
-          <Label className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-            Конец
+          <Label className="text-[12px] font-medium text-muted-foreground">
+            Окончание
           </Label>
           <Input
             type="time"
             value={slot.endTime}
             onChange={(e) => onChange({ endTime: e.target.value })}
+            onBlur={() => onBlurField?.("endTime")}
             disabled={disabled}
-            className="rounded-xl border-stone-200 bg-white"
+            aria-invalid={errors?.endTime ? "true" : "false"}
+            className="h-10 rounded-xl border-border bg-background text-[12px] focus-visible:border-primary focus-visible:ring-primary/20"
           />
+          {errors?.endTime ? (
+            <p className="text-[11px] leading-4 text-primary">{errors.endTime}</p>
+          ) : null}
         </div>
+
         <div className="space-y-1.5">
-          <Label className="flex items-center gap-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-            <Users className="h-3 w-3" aria-hidden />
-            Мест
+          <Label className="flex items-center gap-1 text-[12px] font-medium text-muted-foreground">
+            <Users className="h-3.5 w-3.5 text-primary" aria-hidden />
+            Вместимость
           </Label>
           <Input
             type="number"
             min={1}
-            value={slot.capacity}
-            onChange={(e) =>
+            value={slot.capacity ?? ""}
+            onChange={(e) => {
+              const raw = e.target.value;
               onChange({
-                capacity: Math.max(1, Number(e.target.value) || 1),
-              })
-            }
+                capacity: raw === "" ? null : Math.max(1, Number(raw) || 1),
+              });
+            }}
+            onBlur={() => onBlurField?.("capacity")}
             disabled={disabled}
-            className="rounded-xl border-stone-200 bg-white"
+            aria-invalid={errors?.capacity ? "true" : "false"}
+            className="h-10 rounded-xl border-border bg-background text-[12px] focus-visible:border-primary focus-visible:ring-primary/20"
           />
+          {errors?.capacity ? (
+            <p className="text-[11px] leading-4 text-primary">{errors.capacity}</p>
+          ) : null}
         </div>
-        <div className="flex justify-end sm:pb-0.5">
+
+        <div className="flex justify-end pt-6">
           <Button
             type="button"
             variant="ghost"
-            size="icon"
-            className="shrink-0 text-muted-foreground hover:text-destructive"
+            size="icon-sm"
+            className={cn(
+              "rounded-xl text-muted-foreground hover:bg-primary/5 hover:text-primary",
+              !canRemove && "opacity-50",
+            )}
             onClick={onRemove}
-            disabled={disabled}
+            disabled={disabled || !canRemove}
             aria-label="Удалить слот"
           >
             <Trash2 className="h-4 w-4" />
           </Button>
         </div>
       </div>
-
-      <p className="mt-2 hidden text-xs text-stone-600 sm:block">
-        <Clock className="mr-1 inline h-3.5 w-3.5 text-primary" aria-hidden />
-        {timeLabel}
-        <span className="mx-2 text-stone-300">·</span>
-        <Users className="mr-0.5 inline h-3.5 w-3.5 text-muted-foreground" aria-hidden />
-        {slot.capacity} мест
-      </p>
     </div>
   );
 }

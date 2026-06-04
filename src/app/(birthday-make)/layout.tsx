@@ -8,7 +8,7 @@ export default function BirthdayMakeLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="min-h-screen bg-gradient-to-b from-orange-50/30 to-white flex flex-col">
+    <div style={{ minHeight: "100vh", background: "#fff" }}>
       {children}
     </div>
   );

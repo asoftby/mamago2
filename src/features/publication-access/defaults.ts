@@ -9,7 +9,7 @@ export const DEFAULT_ACCESS_METHODS_BY_ENTITY: Record<
   PublicationAccessMethod[]
 > = {
   event: ["details", "ticket", "timeslots", "prebooking"],
-  offer: ["details", "prebooking", "external", "contact"],
+  offer: ["details", "timeslots", "prebooking", "external", "contact"],
   place: ["details", "external", "contact", "prebooking"],
   route: ["details", "ticket", "external", "contact"],
 };
@@ -20,4 +20,3 @@ export function getDefaultPublicationAccess(
   const method = DEFAULT_ACCESS_METHODS_BY_ENTITY[entityType][0] ?? "details";
   return { method, timeSlots: [] };
 }
-

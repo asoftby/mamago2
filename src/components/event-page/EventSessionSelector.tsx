@@ -28,6 +28,7 @@ export function EventSessionSelector({
   selectedId,
   onSelect,
   onPlan,
+  onBook,
   isPlanned = false,
   priceLabel,
   purchaseUrl,
@@ -38,6 +39,8 @@ export function EventSessionSelector({
   selectedId: string | null;
   onSelect: (id: string) => void;
   onPlan?: () => void;
+  /** Открыть модалку записи для конкретного сеанса */
+  onBook?: (sessionId: string) => void;
   isPlanned?: boolean;
   priceLabel?: string;
   purchaseUrl?: string;
@@ -62,6 +65,7 @@ export function EventSessionSelector({
       {sessions.map((s, idx) => {
         const isFirst = idx === 0;
         const subtitle = [getTimeLabel(s.startsAt), priceLabel].filter(Boolean).join(" · ");
+        const hasAction = !!purchaseUrl || !!onBook;
         return (
           <SessionCard
             key={s.id}
@@ -69,9 +73,9 @@ export function EventSessionSelector({
             isNearest={isFirst}
             title={getDateLabel(s.startsAt)}
             subtitle={subtitle || undefined}
-            primaryLabel={purchaseUrl ? buyLabel : undefined}
+            primaryLabel={hasAction ? (purchaseUrl ? buyLabel : "Записаться") : undefined}
             primaryHref={purchaseUrl}
-            onPrimary={() => onSelect(s.id)}
+            onPrimary={() => { onSelect(s.id); if (onBook) onBook(s.id); }}
             onPlan={() => { onSelect(s.id); onPlan?.(); }}
             isPlanned={isPlanned && selectedId === s.id}
           />

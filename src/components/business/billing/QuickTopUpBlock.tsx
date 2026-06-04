@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { FileText } from "lucide-react";
-import { formatPrice } from "@/lib/formatters/format-price";
+import { BYN_SYMBOL, formatPrice } from "@/lib/formatters/format-price";
 import { QUICK_TOPUP_AMOUNTS } from "@/services/billing/mock";
 
 interface QuickTopUpBlockProps {
@@ -80,7 +80,7 @@ export function QuickTopUpBlock({ onGenerateInvoice, disabled = false }: QuickTo
             "
           />
           <span className="absolute right-4 top-1/2 -translate-y-1/2 text-stone-500 font-medium">
-            BYN
+            {BYN_SYMBOL}
           </span>
         </div>
       </div>

@@ -67,6 +67,10 @@ export type BirthdayOffer = {
   isFeatured?: boolean;
   /** For VENUE/PACKAGE offers: what's included */
   venueIncludes?: string[];
+  /** TODO: wire real booking duration options from admin/business venue fields */
+  availableBookingDurationsHours?: number[];
+  minBookingHours?: number;
+  maxBookingHours?: number;
   /** Compatibility constraints */
   compatibility?: OfferCompatibility;
 };

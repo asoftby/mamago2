@@ -7,6 +7,7 @@ import { BuilderProgress } from "../BuilderProgress";
 import { cn } from "@/lib/utils";
 import {
   firstThemeForSoftPreselect,
+  getRecommendedPartyThemeByChildInterests,
   partitionThemesByInterestMatch,
   type ThemeOption,
 } from "../../lib/themeInterestMatch";
@@ -71,9 +72,13 @@ function ThemeChipButton({
 
 export function StepTheme({ builder }: { builder: BuilderHook }) {
   const { state, setBasics } = builder;
-  const { theme } = state.quiz;
+  const { theme, themeSelectionSource } = state.quiz;
   const partyForChild = state.quiz.partyForChild;
   const interestSlugs = partyForChild?.interestSlugs ?? [];
+  const recommendedTheme = useMemo(
+    () => getRecommendedPartyThemeByChildInterests(interestSlugs),
+    [interestSlugs],
+  );
 
   const { matched, rest, hasMatches } = useMemo(
     () => partitionThemesByInterestMatch(THEME_OPTIONS, interestSlugs),
@@ -89,25 +94,27 @@ export function StepTheme({ builder }: { builder: BuilderHook }) {
   const lastAutoThemeScope = useRef<string | null>(null);
 
   useEffect(() => {
-    if (theme !== null) return;
+    if (themeSelectionSource === "manual") return;
     if (!partyForChild?.interestSlugs?.length || !hasMatches) return;
     if (lastAutoThemeScope.current === preselectScope) return;
-    const pick = firstThemeForSoftPreselect(matched);
+    const pick = recommendedTheme?.themeId ?? firstThemeForSoftPreselect(matched);
     if (pick) {
       lastAutoThemeScope.current = preselectScope;
-      setBasics({ theme: pick });
+      setBasics({ theme: pick, themeSelectionSource: "auto" });
     }
   }, [
     theme,
+    themeSelectionSource,
     partyForChild?.interestSlugs,
     hasMatches,
     matched,
+    recommendedTheme,
     preselectScope,
     setBasics,
   ]);
 
   const handleThemeClick = (t: BirthdayTheme) => {
-    setBasics({ theme: t });
+    setBasics({ theme: t, themeSelectionSource: "manual" });
   };
 
   return (

@@ -1,6 +1,18 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
+@font-face {
+  font-family: "nbrb";
+  src:
+    url("/fonts/nbrb/nbrb.woff2") format("woff2"),
+    url("/fonts/nbrb/nbrb.woff") format("woff"),
+    url("/fonts/nbrb/nbrb.ttf") format("truetype");
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+E901;
+}
+
 /* Смена высоты fixed-хедера не должна двигать scroll (иначе рывок, особенно iOS Safari). */
 html {
   overflow-anchor: none;
@@ -51,7 +63,7 @@ body:has([data-slot="alert-dialog-overlay"][data-state="open"]) {
   --color-foreground: var(--foreground);
   /* --font-sans не переопределяем здесь: next/font/local задаёт --font-sans на <html>.
      Tailwind font-sans использует CSS var(--font-sans) напрямую через body. */
-  --font-mono: Menlo, ui-monospace, SFMono-Regular, SF Mono, Monaco, Consolas,
+  --font-mono: nbrb, Menlo, ui-monospace, SFMono-Regular, SF Mono, Monaco, Consolas,
     "Liberation Mono", "Courier New", monospace;
   
   /* Sidebar */

@@ -12,6 +12,7 @@ import {
   getActivityFormatLabel,
 } from "@/domain/activities/activity-format";
 import { ageFromPlusBadgeFromAgeTags } from "@/lib/event/activityAgeBounds";
+import { getActivityDateDisplay } from "@/lib/event/getActivityDateDisplay";
 
 const FALLBACK_POSTER = "/og-default.jpg";
 
@@ -133,6 +134,41 @@ function resolvePurchaseUrl(activity: Pick<ActivityForEventPageInput, "scheduleJ
   return undefined;
 }
 
+function resolveSimpleBooking(
+  activityId: string,
+  activity: Pick<ActivityForEventPageInput, "scheduleJson">,
+): import("@/lib/event/eventPageTypes").EventSimpleBookingData | undefined {
+  const raw = activity.scheduleJson;
+  if (!raw || typeof raw !== "object") return undefined;
+  const json = raw as Record<string, unknown>;
+  const mode = json.participationMode;
+
+  if (mode === "simple-booking") {
+    return {
+      activityId,
+      date: typeof json.simpleBookingDate === "string" ? json.simpleBookingDate : undefined,
+      time: typeof json.simpleBookingTime === "string" ? json.simpleBookingTime : undefined,
+    };
+  }
+
+  if (mode === "time-slots") {
+    const ts = json.timeSlots as { dates?: Array<{ id: string; isoDate: string; slots: Array<{ id: string; startTime: string; endTime?: string; capacity?: number }> }> } | undefined;
+    const slots = (ts?.dates ?? []).flatMap((d) =>
+      (d.slots ?? []).map((s) => ({
+        id: s.id,
+        isoDate: d.isoDate,
+        startTime: s.startTime,
+        endTime: s.endTime,
+        capacity: s.capacity,
+      })),
+    );
+    if (slots.length === 0) return undefined;
+    return { activityId, slots };
+  }
+
+  return undefined;
+}
+
 function factChipsFromActivity(activity: ActivityForEventPageInput): EventPageData["factChips"] {
   const chips: EventPageData["factChips"] = [];
   /** Офлайн — базовый сценарий, отдельный бэйдж не показываем. */
@@ -149,18 +185,12 @@ function importantFactsFromActivity(activity: ActivityForEventPageInput): EventP
   const rows: EventPageData["importantFacts"] = [];
 
   // 01 Дата
-  if (activity.sessions.length > 0) {
-    const uniqueDates = [
-      ...new Set(
-        activity.sessions.map((s) =>
-          new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "long" }).format(s.startsAt),
-        ),
-      ),
-    ];
+  const activityDateDisplay = getActivityDateDisplay(activity);
+  if (activityDateDisplay) {
     rows.push({
       id: "date",
       label: "Дата",
-      value: uniqueDates.join(", "),
+      value: activityDateDisplay,
     });
   }
 
@@ -364,6 +394,7 @@ export function buildEventPageDataFromPrismaActivity(
       buyLabel: activity.format === "ONLINE" ? "Участвовать онлайн" : "Купить билет",
       saveLabel: "В идеи",
       purchaseUrl: resolvePurchaseUrl(activity),
+      simpleBooking: resolveSimpleBooking(activity.id, activity),
     },
     ownerEditHref: options?.ownerEditHref,
     previewBannerLabel: options?.previewBannerLabel,

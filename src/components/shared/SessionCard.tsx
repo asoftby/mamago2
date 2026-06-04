@@ -94,7 +94,7 @@ export function SessionCard({
               >
                 В лист ожидания
               </button>
-            ) : (
+            ) : primaryHref ? (
               <a
                 href={primaryHref}
                 target="_blank"
@@ -104,6 +104,14 @@ export function SessionCard({
               >
                 {primaryLabel} →
               </a>
+            ) : (
+              <button
+                type="button"
+                onClick={onPrimary}
+                className="inline-flex h-14 items-center gap-2 rounded-full bg-[#E86A3A] px-6 text-[15px] font-semibold text-white transition-colors hover:bg-[#C24E22] active:translate-y-px"
+              >
+                {primaryLabel}
+              </button>
             )
           )}
           {onPlan && (

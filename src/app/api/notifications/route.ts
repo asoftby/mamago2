@@ -1,30 +1,30 @@
 /**
  * GET /api/notifications
- * Единая лента: сортировка «новые» (seenAt IS NULL) сверху, затем просмотренные; пагинация limit/offset.
+ * Единая лента уведомлений.
  *
  * Query:
  * - stream: "user" | "business"
+ * - tab: "inbox" | "unread" | "archived"
  * - limit (default 15, max 100)
  * - offset (default 0)
- * - unreadOnly=true — только для обратной совместимости (фильтр seenAt IS NULL)
- * - readOnly=true — устарело
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
+import { prismaToHttpResponse } from "@/lib/admin/prismaHttpErrors";
 import { getCurrentUser } from "@/lib/auth/server";
 import { shouldShowTelegramPrompt } from "@/lib/user/shouldShowTelegramPrompt";
 import type { NotificationStreamFilter } from "@/server/services/notification.service";
 import { getTelegramLinkStatus } from "@/server/services/telegramLink.service";
 import {
+  countUserArchived,
   countUnifiedNotifications,
   getAccessibleSurfacesForUser,
-  getReadNotifications,
-  getUnifiedNotificationFeed,
   getUnreadCount,
-  getUnreadNotifications,
+  getUserArchived,
+  getUserInbox,
   getWelcomeIsRead,
-} from "@/server/services/notification.service";
+} from "@/server/notifications/notification.service";
 import { resolveNotificationAudienceUser } from "@/server/notifications/resolveNotificationAudienceUser";
 
 function parseStream(
@@ -44,8 +44,11 @@ export async function GET(req: NextRequest) {
     const telegramStatus = await getTelegramLinkStatus({ userId: user.id });
 
     const { searchParams } = new URL(req.url);
-    const unreadOnly = searchParams.get("unreadOnly") === "true";
-    const readOnly = searchParams.get("readOnly") === "true";
+    const tab = searchParams.get("tab") === "archived"
+      ? "archived"
+      : searchParams.get("tab") === "unread"
+        ? "unread"
+        : "inbox";
     const limitRaw = parseInt(searchParams.get("limit") || "15", 10);
     const offset = Math.max(0, parseInt(searchParams.get("offset") || "0", 10));
     const stream = parseStream(searchParams.get("stream"));
@@ -60,38 +63,30 @@ export async function GET(req: NextRequest) {
       accessibleSurfaces,
     };
 
-    if (readOnly && unreadOnly) {
-      return NextResponse.json(
-        { error: "Use either unreadOnly or readOnly, not both" },
-        { status: 400 },
-      );
-    }
-
     let notifications;
-    if (unreadOnly) {
-      const cap = Math.min(limit, 200);
-      notifications = await getUnreadNotifications(user.id, stream, queryOpts, cap);
-    } else if (readOnly) {
-      notifications = await getReadNotifications(
-        user.id,
-        Math.min(limit, 200),
-        offset,
-        stream,
-        queryOpts,
-      );
-    } else {
-      notifications = await getUnifiedNotificationFeed(
-        user.id,
+    if (tab === "archived") {
+      notifications = await getUserArchived(user.id, {
         limit,
         offset,
         stream,
-        queryOpts,
-      );
+        options: queryOpts,
+      });
+    } else {
+      notifications = await getUserInbox(user.id, {
+        limit,
+        offset,
+        unreadOnly: tab === "unread",
+        stream,
+        options: queryOpts,
+      });
     }
 
     const unreadCount = await getUnreadCount(user.id, stream, queryOpts);
     const welcomeIsRead = await getWelcomeIsRead(user.id);
-    const total = await countUnifiedNotifications(user.id, stream, queryOpts);
+    const total =
+      tab === "archived"
+        ? await countUserArchived(user.id, { stream, options: queryOpts })
+        : await countUnifiedNotifications(user.id, stream, queryOpts);
     const hasMore = offset + notifications.length < total;
 
     return NextResponse.json({
@@ -107,6 +102,25 @@ export async function GET(req: NextRequest) {
       }),
     });
   } catch (error) {
+    const schemaErrorResponse = prismaToHttpResponse(error);
+    if (schemaErrorResponse && process.env.NODE_ENV === "development") {
+      console.warn("[notifications] schema drift detected, returning empty feed fallback");
+      return NextResponse.json({
+        notifications: [],
+        unreadCount: 0,
+        total: 0,
+        hasMore: false,
+        telegramConnected: false,
+        welcomeIsRead: true,
+        showTelegramPrompt: false,
+        degraded: true,
+      });
+    }
+
+    if (schemaErrorResponse) {
+      return schemaErrorResponse;
+    }
+
     console.error("Get notifications error:", error);
     const isDev = process.env.NODE_ENV === "development";
     const payload: {

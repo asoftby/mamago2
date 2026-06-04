@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { X, Search, Wallet } from "lucide-react";
-import { formatPrice } from "@/lib/formatters/format-price";
+import { BYN_SYMBOL, formatPrice } from "@/lib/formatters/format-price";
 
 interface Business {
   id: string;
@@ -231,7 +231,7 @@ export function FirstTopUpModal({ onClose, onSuccess }: Props) {
                   placeholder="100.00"
                 />
                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">
-                  BYN
+                  {BYN_SYMBOL}
                 </span>
               </div>
             </div>

@@ -80,7 +80,7 @@ function buildInAppPayloadJson(
 
 function resolveNotificationEntity(
   prepared: PreparedNotificationPayload,
-): { entityType: string; entityId: string | null } {
+): { entityType: "PLAN_ITEM" | "PLAN_DIGEST"; entityId: string | null } {
   switch (prepared.scenario) {
     case "PLAN_EVENT_2H_BEFORE": {
       const context = prepared.context as PlanEventReminderContext;

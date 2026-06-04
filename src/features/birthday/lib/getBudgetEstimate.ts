@@ -1,3 +1,4 @@
+import { BYN_SYMBOL } from "@/lib/formatters/format-price";
 import type { BirthdayBudgetGroup, BirthdayOffer } from "../types/birthday";
 
 export function getBudgetEstimate(
@@ -13,5 +14,5 @@ export function getBudgetEstimate(
 }
 
 export function formatBudget(amount: number): string {
-  return `от ${amount} BYN`;
+  return `от ${amount} ${BYN_SYMBOL}`;
 }

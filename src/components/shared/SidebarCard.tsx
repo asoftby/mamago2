@@ -1,8 +1,9 @@
 "use client";
 
-import { type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Share2 } from "lucide-react";
 import Link from "next/link";
+import { ShareModal } from "@/components/shared/ShareModal";
 
 /* ─── Container ─────────────────────────────────────────────────────────── */
 
@@ -190,32 +191,40 @@ export function SidebarCardContactRow({
 
 /* ─── Share button ───────────────────────────────────────────────────────── */
 
-/** Кнопка «Поделиться» через navigator.share. */
+/** Кнопка «Поделиться» — открывает ShareModal. */
 export function SidebarCardShare({ title }: { title: string }) {
+  const [open, setOpen] = useState(false);
+  const url =
+    typeof window !== "undefined" ? window.location.href : "";
+
   return (
-    <button
-      type="button"
-      onClick={() => {
-        if (typeof navigator !== "undefined" && navigator.share) {
-          void navigator.share({ title, url: window.location.href });
-        }
-      }}
-      style={{
-        background: "none",
-        border: 0,
-        padding: 0,
-        color: "rgba(20,18,16,.55)",
-        display: "inline-flex",
-        gap: 6,
-        alignItems: "center",
-        cursor: "pointer",
-        fontFamily: "Menlo, monospace",
-        fontSize: 13,
-        letterSpacing: ".02em",
-      }}
-    >
-      <Share2 size={14} /> поделиться
-    </button>
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        style={{
+          background: "none",
+          border: 0,
+          padding: 0,
+          color: "rgba(20,18,16,.55)",
+          display: "inline-flex",
+          gap: 6,
+          alignItems: "center",
+          cursor: "pointer",
+          fontFamily: "Menlo, monospace",
+          fontSize: 13,
+          letterSpacing: ".02em",
+        }}
+      >
+        <Share2 size={14} /> поделиться
+      </button>
+      <ShareModal
+        open={open}
+        onOpenChange={setOpen}
+        url={url}
+        title={title}
+      />
+    </>
   );
 }
 

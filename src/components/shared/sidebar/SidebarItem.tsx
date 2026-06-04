@@ -10,6 +10,7 @@ interface SidebarItemProps {
   label: string;
   isActive: boolean;
   variant?: "primary" | "secondary";
+  sidebarVariant?: "admin" | "business";
   onClick?: () => void;
   hasAttention?: boolean;
 }
@@ -20,6 +21,7 @@ export function SidebarItem({
   label,
   isActive,
   variant = "primary",
+  sidebarVariant = "admin",
   onClick,
   hasAttention = false,
 }: SidebarItemProps) {
@@ -31,6 +33,15 @@ export function SidebarItem({
   };
 
   if (variant === "secondary") {
+    const secondaryStateClass =
+      sidebarVariant === "business"
+        ? isActive
+          ? "bg-[#F5FBFE] text-slate-900"
+          : "text-slate-500 hover:bg-[#F5FBFE] hover:text-slate-900"
+        : isActive
+          ? "bg-slate-50 text-slate-900"
+          : "text-slate-500 hover:bg-slate-50 hover:text-slate-900";
+
     return (
       <Link
         href={href}
@@ -38,9 +49,7 @@ export function SidebarItem({
         className={cn(
           "flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-150",
           "ml-3",
-          isActive
-            ? "bg-primary/10 text-primary"
-            : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+          secondaryStateClass
         )}
       >
         <div className="relative flex flex-col items-center">
@@ -54,15 +63,31 @@ export function SidebarItem({
     );
   }
 
+  const primaryStateClass =
+    sidebarVariant === "business"
+      ? isActive
+        ? "bg-[#EAF7FC] text-slate-950"
+        : "text-slate-600 hover:bg-sky-50 hover:text-slate-950"
+      : isActive
+        ? "bg-slate-100 text-slate-950"
+        : "text-slate-600 hover:bg-slate-50 hover:text-slate-950";
+
+  const primaryIconClass =
+    sidebarVariant === "business"
+      ? isActive
+        ? "text-sky-700"
+        : "text-current"
+      : isActive
+        ? "text-slate-700"
+        : "text-current";
+
   return (
     <Link
       href={href}
       onClick={handleClick}
       className={cn(
         "flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-medium transition-all duration-150",
-        isActive
-          ? "bg-primary/10 text-stone-950"
-          : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+        primaryStateClass
       )}
     >
       <div className="relative flex flex-col items-center">
@@ -72,7 +97,7 @@ export function SidebarItem({
         <Icon
           className={cn(
             "w-5 h-5 flex-shrink-0",
-            isActive ? "text-primary" : "text-current"
+            primaryIconClass
           )}
         />
       </div>

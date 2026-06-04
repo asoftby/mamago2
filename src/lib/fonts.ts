@@ -35,7 +35,7 @@ export const ntSomic = localFont({
   variable: "--font-sans",
   display: "swap",
   preload: false,
-  fallback: ["ui-sans-serif", "system-ui", "sans-serif"],
+  fallback: ["nbrb", "ui-sans-serif", "system-ui", "sans-serif"],
 });
 
 export const ptSerif = PT_Serif({

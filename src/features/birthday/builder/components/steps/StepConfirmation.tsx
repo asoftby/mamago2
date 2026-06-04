@@ -23,6 +23,7 @@ import {
   buildOrganizerRequestPreviews,
   formatTotalDurationApprox,
 } from "../../lib/buildPartyScenario";
+import { calculateBookingInterval } from "../../lib/scheduleUtils";
 import { OrganizerRequestReviewCards } from "../OrganizerRequestReviewCards";
 
 type BuilderHook = BirthdayBuilderWithGate;
@@ -153,6 +154,29 @@ export function StepConfirmation({ builder }: { builder: BuilderHook }) {
     [partyPlanning.timeStart],
   );
 
+  const venueBookingInterval = useMemo(() => {
+    const selectedDurationHours =
+      partyPlanning.selectedVenueBookingDurationHours ?? 3;
+    const persistedVenueSchedule = selectedBase
+      ? partyPlanning.itemSchedules?.[selectedBase.id]
+      : null;
+
+    if (persistedVenueSchedule?.startAt && persistedVenueSchedule?.endAt) {
+      return {
+        startsAt: persistedVenueSchedule.startAt,
+        endsAt: persistedVenueSchedule.endAt,
+        label: `${persistedVenueSchedule.startAt} — ${persistedVenueSchedule.endAt}`,
+      };
+    }
+
+    return calculateBookingInterval(timeStartEffective, selectedDurationHours);
+  }, [
+    partyPlanning.itemSchedules,
+    partyPlanning.selectedVenueBookingDurationHours,
+    selectedBase,
+    timeStartEffective,
+  ]);
+
   const celebrationTimeline = useMemo(
     () =>
       validOffers.length > 0
@@ -231,6 +255,8 @@ export function StepConfirmation({ builder }: { builder: BuilderHook }) {
       timeStart: ts,
       timeEnd: timeline?.endHHmm ?? null,
       dateIso: partyPlanning.dateIso,
+      selectedVenueBookingDurationHours:
+        partyPlanning.selectedVenueBookingDurationHours ?? 3,
     });
 
     const payload = {
@@ -251,6 +277,17 @@ export function StepConfirmation({ builder }: { builder: BuilderHook }) {
         dateIso: partyPlanning.dateIso,
         timeStart: ts,
         timeEnd: timeline?.endHHmm ?? null,
+        selectedVenueBookingDurationHours:
+          partyPlanning.selectedVenueBookingDurationHours ?? 3,
+        venueBookingInterval: selectedBase
+          ? {
+              offerId: selectedBase.id,
+              title: selectedBase.title,
+              startsAt: venueBookingInterval.startsAt,
+              endsAt: venueBookingInterval.endsAt,
+              label: venueBookingInterval.label,
+            }
+          : null,
       },
       organizers: targets.filter((t) => selectedTargetKeys.has(t.key)),
       child: partyForChild,
@@ -270,8 +307,11 @@ export function StepConfirmation({ builder }: { builder: BuilderHook }) {
     targets,
     selectedTargetKeys,
     partyForChild,
+    partyPlanning.selectedVenueBookingDurationHours,
     theme,
     placeType,
+    selectedBase,
+    venueBookingInterval,
   ]);
 
   const { run: runVerifiedSubmit, VerificationGate } = useRequireVerifiedEmail({

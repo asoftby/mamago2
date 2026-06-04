@@ -207,6 +207,11 @@ export function ActivityCard(props: AdapterProps) {
                 />
               </div>
             )}
+            {base.priceText && (
+              <span className="absolute bottom-3 right-3 inline-flex h-7 items-center rounded-full px-3 font-mono text-[11px] font-medium backdrop-blur-[4px] bg-[rgba(20,18,16,0.72)] text-white">
+                {base.priceText}
+              </span>
+            )}
           </div>
 
           <div className="space-y-1 px-1.5 pb-1 pt-2.5">
@@ -228,7 +233,7 @@ export function ActivityCard(props: AdapterProps) {
   }
 
   const categoryLabel =
-    base.format ? getActivityFormatLabel(base.format) : undefined;
+    base.format === "ONLINE" ? getActivityFormatLabel(base.format) : undefined;
 
   return (
     <div className={cn("group relative select-none", base.className)}>
@@ -270,9 +275,9 @@ export function ActivityCard(props: AdapterProps) {
 
         {/* Text */}
         <div className="mt-3 flex flex-col gap-1 px-0.5">
-          {categoryLabel && (
+          {(base.badges[0] || categoryLabel) && (
             <div className="font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-[rgba(20,18,16,0.55)]">
-              {categoryLabel}
+              {[base.badges[0], categoryLabel].filter(Boolean).join(" · ")}
             </div>
           )}
           <div className="line-clamp-2 text-[15px] font-semibold leading-[1.3] tracking-[-0.01em] text-[#141210] transition-colors duration-150 group-hover:text-[#C24E22]">

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { SidebarItem } from "@/components/shared/sidebar/SidebarItem";
 import { SidebarPublicSiteEntry } from "@/components/shared/sidebar/SidebarPublicSiteEntry";
@@ -13,6 +13,7 @@ import {
 } from "@/lib/admin/adminSidebarConfig";
 import type { ModerationNavCounts, } from "@/lib/admin/moderationSidebarConfig";
 import type { AdminNavMatchRule } from "@/lib/admin/adminSidebarTypes";
+import { ADMIN_PATH_PREFIX } from "@/lib/routing/surface";
 
 interface AdminSidebarProps {
   onNavigate?: () => void;
@@ -24,10 +25,24 @@ interface AdminSidebarProps {
 
 // ─── Active-route helpers ─────────────────────────────────────────────────────
 
+function normalizeAdminNavPath(path: string | null | undefined): string {
+  if (!path) return "/";
+  if (path === ADMIN_PATH_PREFIX) return "/";
+  if (path.startsWith(`${ADMIN_PATH_PREFIX}/`)) {
+    return path.slice(ADMIN_PATH_PREFIX.length) || "/";
+  }
+  return path;
+}
+
 function matchesRule(pathname: string, rule: AdminNavMatchRule): boolean {
-  if (rule.type === "exact") return pathname === rule.value;
+  const normalizedPathname = normalizeAdminNavPath(pathname);
+  const normalizedRuleValue = normalizeAdminNavPath(rule.value);
+  if (rule.type === "exact") return normalizedPathname === normalizedRuleValue;
   // Segment-safe prefix: /admin/orders matches /admin/orders/abc but NOT /admin/orders-settings
-  return pathname === rule.value || pathname.startsWith(rule.value + "/");
+  return (
+    normalizedPathname === normalizedRuleValue ||
+    normalizedPathname.startsWith(`${normalizedRuleValue}/`)
+  );
 }
 
 /** Returns true if the given nav item is "active" for the current pathname. */
@@ -36,7 +51,12 @@ function isNavItemActive(pathname: string, item: AdminSidebarNavItem): boolean {
     return item.matchers.some((rule) => matchesRule(pathname, rule));
   }
   // Fallback: segment-safe prefix match on href
-  return pathname === item.href || pathname.startsWith(item.href + "/");
+  const normalizedPathname = normalizeAdminNavPath(pathname);
+  const normalizedHref = normalizeAdminNavPath(item.href);
+  return (
+    normalizedPathname === normalizedHref ||
+    normalizedPathname.startsWith(`${normalizedHref}/`)
+  );
 }
 
 /** Returns the children of a top-level config entry regardless of its type. */
@@ -93,6 +113,13 @@ export function AdminSidebar({
   const derivedGroupId = findActiveGroupId(pathname);
   const [openSection, setOpenSection] = useState<string | null>(derivedGroupId);
 
+  useEffect(() => {
+    setOpenSection((prev) => {
+      if (!derivedGroupId) return prev;
+      return derivedGroupId;
+    });
+  }, [derivedGroupId]);
+
   function toggleSection(id: string) {
     setOpenSection((prev) => {
       // Don't collapse the section that owns the current page — keeps context.
@@ -114,6 +141,7 @@ export function AdminSidebar({
           key={item.id}
           icon={item.icon!}
           label={item.label}
+          sidebarVariant="admin"
           isActive={active || childIsActive}
           isOpen={openSection === item.id}
           onToggle={() => toggleSection(item.id)}
@@ -130,6 +158,7 @@ export function AdminSidebar({
           href={item.href}
           label={item.label}
           isActive={active}
+          sidebarVariant="admin"
           onClick={onNavigate}
           count={getBadgeCount(item.badgeCountKey)}
         />
@@ -145,6 +174,7 @@ export function AdminSidebar({
         icon={item.icon}
         label={item.label}
         isActive={active}
+        sidebarVariant="admin"
         onClick={onNavigate}
         hasAttention={count !== undefined && count > 0}
       />
@@ -167,6 +197,7 @@ export function AdminSidebar({
                 key={entry.id}
                 icon={entry.icon}
                 label={entry.label}
+                sidebarVariant="admin"
                 isActive={groupHasActive}
                 isOpen={openSection === entry.id}
                 onToggle={() => toggleSection(entry.id)}

@@ -9,7 +9,7 @@ import { TransactionAmount } from "@/components/admin/billing/TransactionAmount"
 import { AdminBillingActions } from "@/components/admin/billing/AdminBillingActions";
 import { AlertTriangle, CreditCard, Wallet, TrendingDown } from "lucide-react";
 import Link from "next/link";
-import { formatPrice } from "@/lib/formatters/format-price";
+import { BYN_SYMBOL, formatPrice } from "@/lib/formatters/format-price";
 
 export default async function AdminBusinessBillingPage({
   params,
@@ -91,7 +91,7 @@ export default async function AdminBusinessBillingPage({
           </p>
           {currentSubscription && (
             <p className="text-sm text-gray-500 mt-1">
-              {currentSubscription.plan.price.toNumber()} BYN / мес
+              {currentSubscription.plan.price.toNumber()} {BYN_SYMBOL} / мес
             </p>
           )}
         </div>

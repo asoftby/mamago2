@@ -106,6 +106,7 @@ model User {
   notificationPreferences           UserNotificationPreference[]
   unsubscribeTokens                 UnsubscribeToken[]               @relation("UnsubscribeTokens")
   createdBroadcasts                 AdminBroadcast[]                 @relation("AdminBroadcastCreator")
+  editedBroadcastRevisions          AdminBroadcastRevision[]         @relation("AdminBroadcastRevisionEditor")
   devTelegramBusinessApplications   DevTelegramBusinessApplication[]
   searchQueryLogs                   SearchQueryLog[]
   createdPages                      Page[]                           @relation("PageCreatedBy")
@@ -1250,15 +1251,23 @@ model Notification {
   scenario   NotificationScenario?
   title      String
   body       String
-  entityType String?
+  entityType NotificationEntityType?
   entityId   String?
   isRead     Boolean                @default(false)
   readAt     DateTime?
+  archivedAt DateTime?
   /// Первый просмотр в центре уведомлений; null = «новое» для badge и сортировки
   seenAt     DateTime?
   createdAt  DateTime               @default(now())
+  updatedAt  DateTime               @updatedAt
+  expiresAt  DateTime?
   ctaLabel   String?
   ctaAction  String?
+  actionMode NotificationActionMode @default(NONE)
+  actionUrl  String?
+  modalTitle String?
+  modalBody  String?
+  metadata   Json?
   /// Закреплённые уведомления (welcome и т.п.) — показываются выше в списке
   isPinned   Boolean                @default(false)
   user       User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -1268,6 +1277,7 @@ model Notification {
   @@index([userId, scenario, createdAt])
   @@index([userId, isPinned, createdAt])
   @@index([userId, isRead, createdAt])
+  @@index([userId, archivedAt, createdAt])
   @@index([userId, seenAt])
   @@index([entityType, entityId])
 }
@@ -1275,30 +1285,48 @@ model Notification {
 /// Broadcast-сообщения от администратора (новости, объявления, системные).
 /// При публикации fan-out'ятся в Notification для целевой аудитории.
 model AdminBroadcast {
-  id             String            @id @default(cuid())
-  title          String            @db.VarChar(200)
-  summary        String?           @db.VarChar(500)
-  body           String
-  type           BroadcastType
-  priority       BroadcastPriority @default(NORMAL)
-  audienceType   AudienceType      @default(BUSINESS)
-  status         BroadcastStatus   @default(DRAFT)
-  coverImageUrl  String?
-  ctaLabel       String?           @db.VarChar(100)
-  ctaUrl         String?           @db.VarChar(2000)
-  showInInbox    Boolean           @default(true)
-  sendEmail      Boolean           @default(false)
-  pinToDashboard Boolean           @default(false)
-  publishedAt    DateTime?
-  scheduledAt    DateTime?
-  createdById    String
-  createdAt      DateTime          @default(now())
-  updatedAt      DateTime          @updatedAt
-  createdBy      User              @relation("AdminBroadcastCreator", fields: [createdById], references: [id])
+  id                       String                   @id @default(cuid())
+  title                    String                   @db.VarChar(200)
+  summary                  String?                  @db.VarChar(500)
+  body                     String
+  type                     BroadcastType
+  priority                 BroadcastPriority        @default(NORMAL)
+  audienceType             AudienceType             @default(BUSINESS)
+  status                   BroadcastStatus          @default(DRAFT)
+  coverImageUrl            String?
+  ctaLabel                 String?                  @db.VarChar(100)
+  ctaUrl                   String?                  @db.VarChar(2000)
+  showInInbox              Boolean                  @default(true)
+  sendEmail                Boolean                  @default(false)
+  pinToDashboard           Boolean                  @default(false)
+  publishedAt              DateTime?
+  scheduledAt              DateTime?
+  lastEditedAfterPublishAt DateTime?
+  publishedEditCount       Int                      @default(0)
+  createdById              String
+  createdAt                DateTime                 @default(now())
+  updatedAt                DateTime                 @updatedAt
+  createdBy                User                     @relation("AdminBroadcastCreator", fields: [createdById], references: [id])
+  revisions                AdminBroadcastRevision[]
 
   @@index([status, publishedAt])
   @@index([audienceType, status])
   @@index([createdById])
+}
+
+model AdminBroadcastRevision {
+  id          String         @id @default(cuid())
+  broadcastId String
+  editedById  String
+  reason      String?
+  oldSnapshot Json
+  newSnapshot Json
+  createdAt   DateTime       @default(now())
+  broadcast   AdminBroadcast @relation(fields: [broadcastId], references: [id], onDelete: Cascade)
+  editedBy    User           @relation("AdminBroadcastRevisionEditor", fields: [editedById], references: [id], onDelete: Cascade)
+
+  @@index([broadcastId, createdAt])
+  @@index([editedById])
 }
 
 enum BroadcastType {
@@ -2715,6 +2743,20 @@ enum TempMediaStatus {
 }
 
 enum NotificationType {
+  SYSTEM_INFO
+  FEATURE_UPDATE
+  BUSINESS_NEWS
+  MODERATION_RESULT
+  BUSINESS_ACTION_REQUIRED
+  BOOKING_REQUEST
+  LEAD_CREATED
+  PLAN_REMINDER
+  UPCOMING_EVENT
+  COMMENT_REPLY
+  SECURITY_ALERT
+  PAYMENT_INFO
+  CONTENT_PUBLISHED
+  CONTENT_REJECTED
   PLACE_APPROVED
   PLACE_NEEDS_CHANGES
   PLACE_REJECTED
@@ -2759,6 +2801,33 @@ enum NotificationAudience {
   USER
   BUSINESS
   ADMIN
+}
+
+enum NotificationActionMode {
+  NONE
+  MODAL
+  PAGE
+  EXTERNAL_URL
+}
+
+enum NotificationEntityType {
+  ACTIVITY
+  PLACE
+  OFFER
+  EVENT
+  ROUTE
+  PLAN_DAY
+  PLAN_ITEM
+  PLAN_DIGEST
+  BOOKING
+  LEAD
+  BUSINESS
+  BUSINESS_PROFILE
+  ARTICLE
+  USER
+  SYSTEM
+  BROADCAST
+  MODERATION_ITEM
 }
 
 enum NotificationPolicySurface {

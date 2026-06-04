@@ -1,4 +1,5 @@
 import { AnalyticsEntityType, BillingTransactionType, type UserEventType } from "@prisma/client";
+import { NotificationAudience } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { getBusinessBillingSummary } from "@/server/services/billing/billingBusiness.service";
 import { getPromotionOverviewData } from "@/server/services/promotion/promotion.service";
@@ -258,12 +259,14 @@ export async function getBusinessWorkspaceData(params: {
     (tx) => tx.type === BillingTransactionType.LEAD_CHARGE,
   ).length;
 
-  // Inbox preview: latest 3 broadcast notifications for this user
-  // Filter by entityType = "BROADCAST" to avoid dependency on new enum values
+  // Inbox preview: latest 3 broadcast-style notifications for this user.
+  // Avoid filtering by entityType here because some local databases still
+  // store Notification.entityType without the generated Postgres enum type.
   const inboxPreview = await prisma.notification.findMany({
     where: {
       userId: params.userId,
-      entityType: "BROADCAST",
+      audience: NotificationAudience.BUSINESS,
+      type: { in: ["NEWS", "ANNOUNCEMENT"] },
     },
     orderBy: { createdAt: "desc" },
     take: 3,

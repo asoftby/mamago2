@@ -52,6 +52,7 @@ export function BusinessSidebar({ onNavigate, variant = "sidebar" }: BusinessSid
                     ? businessPathname === item.href || businessPathname === "/business/"
                     : matchesPath(patterns)
                 }
+                sidebarVariant="business"
                 onClick={onNavigate}
               />
             );
@@ -66,6 +67,7 @@ export function BusinessSidebar({ onNavigate, variant = "sidebar" }: BusinessSid
               key={item.label}
               icon={item.icon}
               label={item.label}
+              sidebarVariant="business"
               defaultOpen={defaultOpen}
               isActive={isGroupActive}
             >
@@ -78,6 +80,7 @@ export function BusinessSidebar({ onNavigate, variant = "sidebar" }: BusinessSid
                     businessPathname === child.href ||
                     businessPathname.startsWith(`${child.href}/`)
                   }
+                  sidebarVariant="business"
                   onClick={onNavigate}
                 />
               ))}

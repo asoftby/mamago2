@@ -20,11 +20,20 @@ export type NotificationApiRow = {
   body: string;
   ctaLabel: string | null;
   ctaAction: string | null;
+  actionMode: "NONE" | "MODAL" | "PAGE" | "EXTERNAL_URL";
+  actionUrl: string | null;
+  modalTitle: string | null;
+  modalBody: string | null;
   isPinned: boolean;
   entityType: string | null;
   entityId: string | null;
   isRead: boolean;
-  /** null = новое (badge); после открытия центра выставляется на сервере */
+  readAt: string | null;
+  archivedAt: string | null;
+  expiresAt: string | null;
+  updatedAt: string;
+  metadata?: Record<string, unknown> | null;
+  /** null = еще ни разу не открывалось в центре уведомлений */
   seenAt: string | null;
   createdAt: string;
   userId?: string;

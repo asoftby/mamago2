@@ -13,8 +13,13 @@
  */
 
 import prisma from "@/lib/prisma";
-import { Prisma, type Notification as NotificationModel } from "@prisma/client";
-import { NotificationType } from "@prisma/client";
+import {
+  Prisma,
+  type Notification as NotificationModel,
+  type NotificationActionMode,
+  type NotificationEntityType,
+  NotificationType,
+} from "@prisma/client";
 import {
   NOTIFICATION_TYPES_BUSINESS,
   NOTIFICATION_TYPES_USER,
@@ -27,6 +32,11 @@ import { resolveNotificationAudience } from "@/lib/notifications/audience";
 import { dispatchDelivery } from "./notificationDelivery.service";
 import { validateNotificationRegistry } from "@/lib/notifications/notificationRegistry";
 import { checkNotificationDedup } from "./notificationDedup.service";
+import {
+  resolveNotificationAction,
+  resolveNotificationActionDefaults,
+  resolveNotificationPageUrl,
+} from "@/server/notifications/notification-action-resolver";
 
 // ─── Dev Validation ───────────────────────────────────────────────────────────
 
@@ -119,8 +129,14 @@ interface CreateNotificationParams {
   ctaLabel?: string | null;
   ctaAction?: string | null;
   isPinned?: boolean;
-  entityType?: string;
+  entityType?: NotificationEntityType;
   entityId?: string;
+  actionMode?: NotificationActionMode;
+  actionUrl?: string | null;
+  modalTitle?: string | null;
+  modalBody?: string | null;
+  metadata?: Prisma.InputJsonValue | null;
+  expiresAt?: Date | null;
 }
 
 /**
@@ -128,6 +144,21 @@ interface CreateNotificationParams {
  * Never throws on delivery failure — delivery errors are recorded in NotificationDelivery.
  */
 export async function createNotification(params: CreateNotificationParams) {
+  const resolvedAction = resolveNotificationActionDefaults({
+    type: params.type,
+    title: params.title,
+    body: params.body,
+    actionMode: params.actionMode ?? null,
+    actionUrl: params.actionUrl ?? params.ctaAction ?? resolveNotificationPageUrl({
+      type: params.type,
+      entityType: params.entityType,
+      entityId: params.entityId,
+      actionUrl: params.actionUrl ?? params.ctaAction ?? null,
+    }),
+    modalTitle: params.modalTitle ?? null,
+    modalBody: params.modalBody ?? null,
+  });
+
   const notification = await prisma.notification.create({
     data: {
       userId: params.userId,
@@ -136,7 +167,13 @@ export async function createNotification(params: CreateNotificationParams) {
       title: params.title,
       body: params.body,
       ctaLabel: params.ctaLabel ?? null,
-      ctaAction: params.ctaAction ?? null,
+      ctaAction: params.ctaAction ?? resolvedAction.actionUrl,
+      actionMode: resolvedAction.actionMode,
+      actionUrl: resolvedAction.actionUrl,
+      modalTitle: resolvedAction.modalTitle,
+      modalBody: resolvedAction.modalBody,
+      metadata: params.metadata ?? undefined,
+      expiresAt: params.expiresAt ?? null,
       isPinned: params.isPinned ?? false,
       entityType: params.entityType ?? null,
       entityId: params.entityId ?? null,
@@ -475,6 +512,22 @@ const notificationListOrderBy = [
   { createdAt: "desc" as const },
 ];
 
+function buildNotificationBaseWhere(
+  userId: string,
+  stream?: NotificationStreamFilter,
+  options?: UserNotificationsQueryOptions,
+): Prisma.NotificationWhereInput {
+  let where: Prisma.NotificationWhereInput;
+
+  if (options?.accessibleSurfaces && options.accessibleSurfaces.length > 0) {
+    where = mergeAccessibleSurfacesFilter({ userId }, options.accessibleSurfaces);
+  } else {
+    where = mergeStreamFilter({ userId }, stream);
+  }
+
+  return mergeHideWelcomeWhenTelegramConnected(where, options?.telegramConnected);
+}
+
 /**
  * Единая лента: сначала непросмотренные (seenAt IS NULL), затем просмотренные;
  * внутри группы — закрепы выше, далее createdAt desc.
@@ -487,21 +540,15 @@ export async function getUnifiedNotificationFeed(
   stream?: NotificationStreamFilter,
   options?: UserNotificationsQueryOptions,
 ): Promise<NotificationModel[]> {
-  // If accessible surfaces are provided, use them; otherwise fall back to stream-based filtering
-  let where: Prisma.NotificationWhereInput;
-  
-  if (options?.accessibleSurfaces && options.accessibleSurfaces.length > 0) {
-    where = mergeAccessibleSurfacesFilter({ userId }, options.accessibleSurfaces);
-  } else {
-    where = mergeStreamFilter({ userId }, stream);
-  }
-  
-  where = mergeHideWelcomeWhenTelegramConnected(where, options?.telegramConnected);
-  
+  const where = {
+    ...buildNotificationBaseWhere(userId, stream, options),
+    archivedAt: null,
+  } satisfies Prisma.NotificationWhereInput;
+
   return prisma.notification.findMany({
     where,
     orderBy: [
-      { seenAt: { sort: "asc", nulls: "first" } },
+      { readAt: { sort: "asc", nulls: "first" } },
       { isPinned: "desc" },
       { createdAt: "desc" },
     ],
@@ -515,40 +562,31 @@ export async function countUnifiedNotifications(
   stream?: NotificationStreamFilter,
   options?: UserNotificationsQueryOptions,
 ): Promise<number> {
-  let where: Prisma.NotificationWhereInput;
-  
-  if (options?.accessibleSurfaces && options.accessibleSurfaces.length > 0) {
-    where = mergeAccessibleSurfacesFilter({ userId }, options.accessibleSurfaces);
-  } else {
-    where = mergeStreamFilter({ userId }, stream);
-  }
-  
-  where = mergeHideWelcomeWhenTelegramConnected(where, options?.telegramConnected);
-  
+  const where = {
+    ...buildNotificationBaseWhere(userId, stream, options),
+    archivedAt: null,
+  } satisfies Prisma.NotificationWhereInput;
+
   return prisma.notification.count({ where });
 }
 
-/** Пометить все «новые» (seenAt IS NULL) как просмотренные — при открытии центра уведомлений. */
+/** Legacy helper: opening the panel may mark items as seen, but never as read. */
 export async function markUnseenNotificationsAsSeen(
   userId: string,
   stream?: NotificationStreamFilter,
   options?: UserNotificationsQueryOptions,
 ) {
   const now = new Date();
-  
-  let where: Prisma.NotificationWhereInput;
-  
-  if (options?.accessibleSurfaces && options.accessibleSurfaces.length > 0) {
-    where = mergeAccessibleSurfacesFilter({ userId, seenAt: null }, options.accessibleSurfaces);
-  } else {
-    where = mergeStreamFilter({ userId, seenAt: null }, stream);
-  }
-  
-  where = mergeHideWelcomeWhenTelegramConnected(where, options?.telegramConnected);
-  
+
+  const where = {
+    ...buildNotificationBaseWhere(userId, stream, options),
+    archivedAt: null,
+    seenAt: null,
+  } satisfies Prisma.NotificationWhereInput;
+
   return prisma.notification.updateMany({
     where,
-    data: { seenAt: now, isRead: true, readAt: now },
+    data: { seenAt: now },
   });
 }
 
@@ -558,16 +596,12 @@ export async function getUnreadNotifications(
   options?: UserNotificationsQueryOptions,
   take?: number,
 ) {
-  let where: Prisma.NotificationWhereInput;
-  
-  if (options?.accessibleSurfaces && options.accessibleSurfaces.length > 0) {
-    where = mergeAccessibleSurfacesFilter({ userId, seenAt: null }, options.accessibleSurfaces);
-  } else {
-    where = mergeStreamFilter({ userId, seenAt: null }, stream);
-  }
-  
-  where = mergeHideWelcomeWhenTelegramConnected(where, options?.telegramConnected);
-  
+  const where = {
+    ...buildNotificationBaseWhere(userId, stream, options),
+    archivedAt: null,
+    readAt: null,
+  } satisfies Prisma.NotificationWhereInput;
+
   return prisma.notification.findMany({
     where,
     orderBy: notificationListOrderBy,
@@ -582,16 +616,12 @@ export async function getReadNotifications(
   stream?: NotificationStreamFilter,
   options?: UserNotificationsQueryOptions,
 ) {
-  let where: Prisma.NotificationWhereInput;
-  
-  if (options?.accessibleSurfaces && options.accessibleSurfaces.length > 0) {
-    where = mergeAccessibleSurfacesFilter({ userId, seenAt: { not: null } }, options.accessibleSurfaces);
-  } else {
-    where = mergeStreamFilter({ userId, seenAt: { not: null } }, stream);
-  }
-  
-  where = mergeHideWelcomeWhenTelegramConnected(where, options?.telegramConnected);
-  
+  const where = {
+    ...buildNotificationBaseWhere(userId, stream, options),
+    archivedAt: null,
+    readAt: { not: null },
+  } satisfies Prisma.NotificationWhereInput;
+
   return prisma.notification.findMany({
     where,
     orderBy: notificationListOrderBy,
@@ -613,8 +643,14 @@ export async function getUserNotifications(
 
 export async function markNotificationAsRead(notificationId: string, userId: string) {
   const now = new Date();
-  return prisma.notification.update({
+  const existing = await prisma.notification.findFirst({
     where: { id: notificationId, userId },
+    select: { id: true },
+  });
+  if (!existing) throw new Error("Notification not found");
+
+  return prisma.notification.update({
+    where: { id: existing.id },
     data: { isRead: true, readAt: now, seenAt: now },
   });
 }
@@ -622,7 +658,7 @@ export async function markNotificationAsRead(notificationId: string, userId: str
 export async function markAllNotificationsAsRead(userId: string) {
   const now = new Date();
   return prisma.notification.updateMany({
-    where: { userId, seenAt: null },
+    where: { userId, archivedAt: null, readAt: null },
     data: { isRead: true, readAt: now, seenAt: now },
   });
 }
@@ -632,17 +668,142 @@ export async function getUnreadCount(
   stream?: NotificationStreamFilter,
   options?: UserNotificationsQueryOptions,
 ): Promise<number> {
-  let where: Prisma.NotificationWhereInput;
-  
-  if (options?.accessibleSurfaces && options.accessibleSurfaces.length > 0) {
-    where = mergeAccessibleSurfacesFilter({ userId, seenAt: null }, options.accessibleSurfaces);
-  } else {
-    where = mergeStreamFilter({ userId, seenAt: null }, stream);
-  }
-  
-  where = mergeHideWelcomeWhenTelegramConnected(where, options?.telegramConnected);
-  
+  const where = {
+    ...buildNotificationBaseWhere(userId, stream, options),
+    archivedAt: null,
+    readAt: null,
+  } satisfies Prisma.NotificationWhereInput;
+
   return prisma.notification.count({ where });
+}
+
+export async function getUserInbox(
+  userId: string,
+  filters: {
+    limit?: number;
+    offset?: number;
+    unreadOnly?: boolean;
+    stream?: NotificationStreamFilter;
+    options?: UserNotificationsQueryOptions;
+  } = {},
+) {
+  const where = {
+    ...buildNotificationBaseWhere(userId, filters.stream, filters.options),
+    archivedAt: null,
+    ...(filters.unreadOnly ? { readAt: null } : {}),
+  } satisfies Prisma.NotificationWhereInput;
+
+  return prisma.notification.findMany({
+    where,
+    orderBy: [{ readAt: { sort: "asc", nulls: "first" } }, ...notificationListOrderBy],
+    take: filters.limit ?? 50,
+    skip: filters.offset ?? 0,
+  });
+}
+
+export async function getUserArchived(
+  userId: string,
+  filters: {
+    limit?: number;
+    offset?: number;
+    stream?: NotificationStreamFilter;
+    options?: UserNotificationsQueryOptions;
+  } = {},
+) {
+  const where = {
+    ...buildNotificationBaseWhere(userId, filters.stream, filters.options),
+    archivedAt: { not: null },
+  } satisfies Prisma.NotificationWhereInput;
+
+  return prisma.notification.findMany({
+    where,
+    orderBy: [{ archivedAt: "desc" }, ...notificationListOrderBy],
+    take: filters.limit ?? 50,
+    skip: filters.offset ?? 0,
+  });
+}
+
+export async function countUserArchived(
+  userId: string,
+  filters: {
+    stream?: NotificationStreamFilter;
+    options?: UserNotificationsQueryOptions;
+  } = {},
+) {
+  const where = {
+    ...buildNotificationBaseWhere(userId, filters.stream, filters.options),
+    archivedAt: { not: null },
+  } satisfies Prisma.NotificationWhereInput;
+
+  return prisma.notification.count({ where });
+}
+
+export async function archiveNotification(userId: string, notificationId: string) {
+  const existing = await prisma.notification.findFirst({
+    where: { id: notificationId, userId },
+    select: { id: true },
+  });
+  if (!existing) throw new Error("Notification not found");
+
+  return prisma.notification.update({
+    where: { id: existing.id },
+    data: { archivedAt: new Date() },
+  });
+}
+
+export async function archiveAllRead(userId: string) {
+  return prisma.notification.updateMany({
+    where: {
+      userId,
+      archivedAt: null,
+      readAt: { not: null },
+    },
+    data: { archivedAt: new Date() },
+  });
+}
+
+export async function restoreNotification(userId: string, notificationId: string) {
+  const existing = await prisma.notification.findFirst({
+    where: { id: notificationId, userId },
+    select: { id: true },
+  });
+  if (!existing) throw new Error("Notification not found");
+
+  return prisma.notification.update({
+    where: { id: existing.id },
+    data: { archivedAt: null },
+  });
+}
+
+export async function resolveNotificationActionById(
+  userId: string,
+  notificationId: string,
+) {
+  const notification = await prisma.notification.findFirst({
+    where: { id: notificationId, userId },
+  });
+
+  if (!notification) {
+    throw new Error("Notification not found");
+  }
+
+  const action = resolveNotificationAction(notification);
+
+  if (notification.readAt == null) {
+    await prisma.notification.update({
+      where: { id: notification.id },
+      data: {
+        isRead: true,
+        readAt: new Date(),
+        seenAt: notification.seenAt ?? new Date(),
+      },
+    });
+  }
+
+  return {
+    notificationId: notification.id,
+    ...action,
+  };
 }
 
 export async function getLatestActivePlanReminderNotification(
@@ -682,7 +843,7 @@ export async function markWelcomeNotificationsRead(userId: string) {
     where: {
       userId,
       type: "WELCOME",
-      OR: [{ seenAt: null }, { isRead: false }],
+      OR: [{ readAt: null }, { isRead: false }],
     },
     data: { isRead: true, readAt: now, seenAt: now },
   });
@@ -692,17 +853,17 @@ export async function markWelcomeNotificationsRead(userId: string) {
 export async function getWelcomeIsRead(userId: string): Promise<boolean> {
   const welcome = await prisma.notification.findFirst({
     where: { userId, type: "WELCOME" },
-    select: { seenAt: true, isRead: true },
+    select: { readAt: true, isRead: true },
   });
   if (!welcome) return true;
-  return welcome.seenAt != null || welcome.isRead;
+  return welcome.readAt != null || welcome.isRead;
 }
 
 export async function deleteOldNotifications(daysOld = 90) {
   const cutoffDate = new Date();
   cutoffDate.setDate(cutoffDate.getDate() - daysOld);
   return prisma.notification.deleteMany({
-    where: { seenAt: { not: null, lt: cutoffDate } },
+    where: { archivedAt: { not: null, lt: cutoffDate } },
   });
 }
 
@@ -801,8 +962,8 @@ export async function notifyBookingCreated(params: NotifyBookingCreatedParams) {
     body,
     entityType: "BOOKING",
     entityId: params.bookingId,
-    ctaLabel: "Открыть заявки",
-    ctaAction: "/business/bookings",
+    ctaLabel: "Открыть заявку",
+    ctaAction: `/business/bookings?id=${params.bookingId}`,
   });
 }
 

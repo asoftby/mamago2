@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
-import { formatPrice } from "@/lib/formatters/format-price";
+import { BYN_SYMBOL, formatPrice } from "@/lib/formatters/format-price";
 import { BusinessSurfaceCard } from "@/components/business/ui/BusinessSurfaceCard";
 import { PromotionPublicationType } from "@prisma/client";
 import { PROMOTION_MIN_BUDGET, PROMOTION_MAX_BUDGET } from "@/lib/promotion/shared";
@@ -258,7 +258,7 @@ export function PromotionLaunchPanel({
                       Рекомендуем
                     </span>
                   )}
-                  <span className="text-base font-semibold">{p.amount} BYN</span>
+                  <span className="text-base font-semibold">{p.amount} {BYN_SYMBOL}</span>
                   <span
                     className={cn(
                       "text-[11px] leading-tight",

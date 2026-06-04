@@ -8,6 +8,7 @@ interface SidebarGroupProps {
   icon: LucideIcon;
   label: string;
   children: React.ReactNode;
+  sidebarVariant?: "admin" | "business";
   /** Uncontrolled: initial open state (ignored when isOpen/onToggle are provided) */
   defaultOpen?: boolean;
   /** Whether any child is currently active (affects parent icon/text colour) */
@@ -23,6 +24,7 @@ export function SidebarGroup({
   icon: Icon,
   label,
   children,
+  sidebarVariant = "admin",
   defaultOpen = false,
   isActive = false,
   hasAttention = false,
@@ -39,17 +41,44 @@ export function SidebarGroup({
     ? (onToggle ?? (() => {}))
     : () => setInternalOpen((p) => !p);
 
+  const groupStateClass =
+    sidebarVariant === "business"
+      ? isActive
+        ? "bg-[#EAF7FC] text-slate-950"
+        : open
+          ? "bg-[#EAF7FC] text-slate-950"
+          : "text-slate-600 hover:bg-sky-50 hover:text-slate-950"
+      : isActive
+        ? "bg-slate-100 text-slate-950"
+        : open
+          ? "bg-slate-100 text-slate-950"
+          : "text-slate-600 hover:bg-slate-50 hover:text-slate-950";
+
+  const groupIconClass =
+    sidebarVariant === "business"
+      ? isActive || open
+        ? "text-sky-700"
+        : "text-current"
+      : isActive || open
+        ? "text-slate-700"
+        : "text-current";
+
+  const groupChevronClass =
+    sidebarVariant === "business"
+      ? isActive || open
+        ? "text-slate-600"
+        : "text-current"
+      : isActive || open
+        ? "text-slate-600"
+        : "text-current";
+
   return (
     <div>
       <button
         onClick={handleToggle}
         className={cn(
           "relative w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-medium transition-all duration-150",
-          isActive
-            ? "bg-primary/10 text-stone-950"
-            : open
-              ? "bg-gray-50 text-gray-900"
-              : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+          groupStateClass
         )}
       >
         <div className="relative flex flex-col items-center flex-shrink-0">
@@ -63,7 +92,7 @@ export function SidebarGroup({
           <Icon
             className={cn(
               "w-5 h-5 flex-shrink-0",
-              isActive ? "text-primary" : "text-current"
+              groupIconClass
             )}
           />
         </div>
@@ -71,7 +100,7 @@ export function SidebarGroup({
         <ChevronDown
           className={cn(
             "w-4 h-4 flex-shrink-0 transition-transform duration-200",
-            isActive ? "text-primary" : "text-current",
+            groupChevronClass,
             open && "rotate-180"
           )}
         />

@@ -1,40 +1,26 @@
 import type { BirthdayTheme } from "../../types/birthday";
 
 /**
- * Связь интересов ребёнка (slug из SYSTEM_INTERESTS) с тематиками праздника.
- * Один интерес может подсветить несколько тем; несколько интересов — одну тему.
+ * Веса связи между интересами ребёнка (slug из SYSTEM_INTERESTS)
+ * и конкретной тематикой праздника.
  */
-export const INTEREST_SLUG_TO_THEMES: Partial<Record<string, BirthdayTheme[]>> =
-  {
-    sport: ["sport", "superhero"],
-    "active-games": ["sport", "superhero"],
-    science: ["science"],
-    technology: ["science"],
-    construction: ["science", "dinosaur"],
-    art: ["art"],
-    creativity: ["art", "unicorn", "princess"],
-    dance: ["dinosaur", "unicorn", "princess"],
-    /** Музыка / вечеринка — без «кричащего» акцента, несколько тем на выбор */
-    music: ["unicorn", "art", "princess", "pirate"],
-    animals: ["dinosaur", "unicorn"],
-    nature: ["dinosaur"],
-    books: ["any", "pirate", "science"],
-    "quiet-activities": ["art", "unicorn"],
-  };
-
-/** Все тематики, которые считаются «подходящими» по списку интересов */
-export function themesMatchingInterests(
-  interestSlugs: string[],
-): Set<BirthdayTheme> {
-  const out = new Set<BirthdayTheme>();
-  for (const slug of interestSlugs) {
-    const themes = INTEREST_SLUG_TO_THEMES[slug];
-    if (themes) {
-      for (const t of themes) out.add(t);
-    }
-  }
-  return out;
-}
+export const INTEREST_TO_PARTY_THEME_SCORE_MAP: Partial<
+  Record<string, Partial<Record<BirthdayTheme, number>>>
+> = {
+  sport: { sport: 5, superhero: 3 },
+  "active-games": { sport: 5, superhero: 4 },
+  science: { science: 5 },
+  technology: { science: 5 },
+  construction: { science: 3, dinosaur: 2 },
+  art: { art: 5 },
+  creativity: { art: 5, unicorn: 2, princess: 2 },
+  dance: { art: 3, princess: 2, unicorn: 2 },
+  music: { art: 3, unicorn: 2, princess: 1 },
+  animals: { dinosaur: 3, unicorn: 1 },
+  nature: { dinosaur: 3 },
+  books: { pirate: 2, science: 1 },
+  "quiet-activities": { art: 3, unicorn: 2 },
+};
 
 export type ThemeOption = {
   value: BirthdayTheme;
@@ -42,10 +28,64 @@ export type ThemeOption = {
   label: string;
 };
 
-/**
- * Делит опции тем на «совпали с интересами» и «остальные», порядок внутри групп
- * сохраняется как в исходном массиве `options`.
- */
+export function getThemeScoresByChildInterests(
+  interestSlugs: string[],
+): Partial<Record<BirthdayTheme, number>> {
+  return interestSlugs.reduce<Partial<Record<BirthdayTheme, number>>>(
+    (acc, slug) => {
+      const themeScores = INTEREST_TO_PARTY_THEME_SCORE_MAP[slug];
+      if (!themeScores) return acc;
+
+      for (const [themeId, score] of Object.entries(themeScores)) {
+        const typedThemeId = themeId as BirthdayTheme;
+        acc[typedThemeId] = (acc[typedThemeId] ?? 0) + score;
+      }
+
+      return acc;
+    },
+    {},
+  );
+}
+
+export function themesMatchingInterests(
+  interestSlugs: string[],
+): Set<BirthdayTheme> {
+  const scores = getThemeScoresByChildInterests(interestSlugs);
+  return new Set(
+    Object.entries(scores)
+      .filter(([, score]) => typeof score === "number" && score > 0)
+      .map(([themeId]) => themeId as BirthdayTheme),
+  );
+}
+
+export function getRecommendedPartyThemeByChildInterests(
+  interestSlugs: string[],
+): {
+  themeId: BirthdayTheme;
+  reason: "interests" | "fallback";
+  score: number;
+} | null {
+  if (!interestSlugs.length) return null;
+
+  const scores = getThemeScoresByChildInterests(interestSlugs);
+  let bestTheme: BirthdayTheme | null = null;
+  let bestScore = 0;
+
+  for (const [themeId, score] of Object.entries(scores)) {
+    if (typeof score !== "number" || score <= bestScore) continue;
+    bestTheme = themeId as BirthdayTheme;
+    bestScore = score;
+  }
+
+  if (!bestTheme || bestScore <= 0) return null;
+
+  return {
+    themeId: bestTheme,
+    reason: "interests",
+    score: bestScore,
+  };
+}
+
 export function partitionThemesByInterestMatch(
   options: ThemeOption[],
   interestSlugs: string[],
@@ -53,18 +93,18 @@ export function partitionThemesByInterestMatch(
   if (!interestSlugs.length) {
     return { matched: [], rest: options, hasMatches: false };
   }
-  const m = themesMatchingInterests(interestSlugs);
-  const matched = options.filter((o) => m.has(o.value));
-  const rest = options.filter((o) => !m.has(o.value));
+
+  const matchedThemes = themesMatchingInterests(interestSlugs);
+  const matched = options.filter((option) => matchedThemes.has(option.value));
+  const rest = options.filter((option) => !matchedThemes.has(option.value));
   return { matched, rest, hasMatches: matched.length > 0 };
 }
 
-/** Первая тема для мягкого преселекта: предпочитаем не «Любая», если есть другая */
 export function firstThemeForSoftPreselect(
   matched: ThemeOption[],
 ): BirthdayTheme | null {
-  const nonAny = matched.find((o) => o.value !== "any");
+  const nonAny = matched.find((option) => option.value !== "any");
   if (nonAny) return nonAny.value;
-  const anyOpt = matched.find((o) => o.value === "any");
-  return anyOpt?.value ?? null;
+  const anyOption = matched.find((option) => option.value === "any");
+  return anyOption?.value ?? null;
 }

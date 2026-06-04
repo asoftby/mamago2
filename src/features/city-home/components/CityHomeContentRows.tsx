@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo } from "react";
-import { ActivityCard } from "@/components/activity/ActivityCard";
+import { EventCard, activityMockToEventCard } from "@/components/events";
 import { OfferCard } from "@/components/offers/OfferCard";
 import { RouteCard } from "@/components/routes/RouteCard";
 import { CityHomeSection } from "@/features/city-home/components/CityHomeSection";
@@ -117,17 +117,7 @@ export function CityHomeKudaSection({ activities }: { activities: ActivityMock[]
       <HorizontalCardRow>
         {preview.map((activity) => (
           <div key={activity.id} className={kudaCardShell}>
-            <ActivityCard
-              activity={activity}
-              saveMeta={{
-                title: activity.title,
-                dateISO: activity.dateStart ?? null,
-                dateEndISO: activity.dateEnd ?? null,
-                dateLabel: activity.dateStart
-                  ? formatRuShortDayMonth(activity.dateStart)
-                  : null,
-              }}
-            />
+            <EventCard {...activityMockToEventCard(activity, citySlug)} />
           </div>
         ))}
       </HorizontalCardRow>

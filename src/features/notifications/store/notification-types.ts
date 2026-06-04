@@ -13,6 +13,7 @@ export type NotificationState = {
   unreadCount: number;
   businessUnreadCount: number;
   activeStream: "user" | "business";
+  activeTab: "inbox" | "unread" | "archived";
   items: NotificationItem[];
   isLoading: boolean;
   loadingMore: boolean;

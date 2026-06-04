@@ -1,5 +1,6 @@
 "use client";
 
+import { BYN_SYMBOL } from "@/lib/formatters/format-price";
 import Link from "next/link";
 import Image from "next/image";
 import { getOfferPublicPath } from "@/lib/offers/offerPublicUrl";
@@ -176,7 +177,7 @@ function OfferCardEditorial({ offer, href }: { offer: Offer; href: string }) {
               alignItems: "center",
             }}
           >
-            от {offer.price} BYN
+            от {offer.price} {BYN_SYMBOL}
           </span>
         )}
       </div>
@@ -216,7 +217,7 @@ function OfferCardEditorial({ offer, href }: { offer: Offer; href: string }) {
               marginTop: 4,
             }}
           >
-            от {offer.price} BYN
+            от {offer.price} {BYN_SYMBOL}
           </div>
         )}
       </div>

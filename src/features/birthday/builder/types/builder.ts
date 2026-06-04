@@ -5,22 +5,29 @@ import type {
   BirthdayBudgetGroup,
   BirthdayTheme,
 } from "../../types/birthday";
+import type { ScenarioItemSchedule } from "../lib/scheduleUtils";
 
 // ─── Builder-specific types ──────────────────────────────────────────────────
 
 export type PlaceType = "HOME" | "VENUE" | "OUTDOOR" | "PACKAGE";
 
 export type BuilderStep =
-  | "intro"         // child + age
-  | "theme"         // party theme (after child; optional)
-  | "budget"        // budget only
-  | "place"         // place type + venue selection
-  | "extras"        // guests (optional)
-  | "entertainment" // animators / shows (optional)
-  | "food"          // cakes / food (optional)
-  | "decor"         // decor / addons (optional)
-  | "summary"       // assembled party
-  | "confirm";      // confirm which businesses to send requests to
+  | "when"          // date range picker
+  | "who"           // child + age + guests + theme
+  | "format"        // place format + budget
+  | "pick"          // pick vendors (venue + animator + food + decor)
+  | "done"          // summary + time + submit
+  // legacy steps kept for compatibility with draft storage
+  | "intro"
+  | "theme"
+  | "budget"
+  | "place"
+  | "extras"
+  | "entertainment"
+  | "food"
+  | "decor"
+  | "summary"
+  | "confirm";
 
 export type ConflictReason =
   | "VENUE_MISMATCH"
@@ -53,6 +60,7 @@ export type PartyForChild = {
 
 /** Откуда взяты возраст и интересы для сценария (после логина — синхронизация с профилем) */
 export type ScenarioFieldSource = "manual" | "child";
+export type ThemeSelectionSource = "auto" | "manual" | null;
 
 export type BuilderQuizInputs = {
   /** Для кого праздник — выбор из профиля или быстрое добавление */
@@ -70,7 +78,11 @@ export type BuilderQuizInputs = {
   budgetGroup: BirthdayBudgetGroup | null;
   guestsGroup: BirthdayGuestsGroup | null;
   theme: BirthdayTheme | null;
+  themeSelectionSource: ThemeSelectionSource;
   placeType: PlaceType | null;
+  /** Step 1: selected date range (YYYY-M-D keys) */
+  dateRangeFrom: string | null;
+  dateRangeTo: string | null;
 };
 
 export type BuilderSelection = {
@@ -93,9 +105,13 @@ export type BuilderUI = {
 export type PartyPlanning = {
   /** YYYY-MM-DD */
   dateIso: string | null;
-  /** HH:mm */
+  /** HH:mm — глобальное время начала (пресет для автозаполнения) */
   timeStart: string | null;
   timeEnd: string | null;
+  /** Длительность брони площадки в часах; дефолтно 3 */
+  selectedVenueBookingDurationHours: number;
+  /** Индивидуальное расписание каждой позиции сценария */
+  itemSchedules: Record<string, ScenarioItemSchedule>;
 };
 
 export type BirthdayBuilderState = {

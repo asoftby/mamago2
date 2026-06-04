@@ -44,6 +44,28 @@ export const listBroadcastsSchema = z.object({
   offset: z.coerce.number().int().min(0).default(0),
 });
 
+export const publishedEditBroadcastSchema = z.object({
+  title: z.string().min(1, "Заголовок обязателен").max(200, "Максимум 200 символов"),
+  summary: z.string().max(500, "Максимум 500 символов").optional().nullable(),
+  body: z.string().min(1, "Текст сообщения обязателен"),
+  ctaLabel: z.string().max(100).optional().nullable(),
+  ctaUrl: z.string().url("Некорректный URL").max(2000).optional().nullable(),
+  pinToDashboard: z.boolean().default(false),
+  reason: z.string().max(500, "Максимум 500 символов").optional().nullable(),
+}).refine(
+  (data) => {
+    if (data.ctaLabel && !data.ctaUrl) return false;
+    return true;
+  },
+  { message: "Если задан текст кнопки, укажите и ссылку", path: ["ctaUrl"] },
+);
+
+export const scheduleBroadcastSchema = z.object({
+  scheduledAt: z.string().datetime(),
+});
+
 export type CreateBroadcastInput = z.infer<typeof createBroadcastSchema>;
 export type UpdateBroadcastInput = z.infer<typeof updateBroadcastSchema>;
 export type ListBroadcastsFilters = z.infer<typeof listBroadcastsSchema>;
+export type PublishedEditBroadcastInput = z.infer<typeof publishedEditBroadcastSchema>;
+export type ScheduleBroadcastInput = z.infer<typeof scheduleBroadcastSchema>;

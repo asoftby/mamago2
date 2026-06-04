@@ -7,7 +7,6 @@ import prisma from "@/lib/prisma";
 import { logAdminAudit } from "@/server/services/adminAuditLog.service";
 import { BookingStatus, Prisma } from "@prisma/client";
 import { buildBookingDisplay } from "./booking.formatters";
-import { resolveBookingSourceType } from "./booking.types";
 import type { BookingDisplay } from "./booking.types";
 import { recordStatusChanged } from "./bookingActivity.service";
 import {
@@ -37,8 +36,21 @@ export interface BusinessBookingItem {
   offerId: string | null;
   activityId: string | null;
   placeId: string | null;
-  offer: { id: string; title: string; slug: string | null } | null;
-  activity: { id: string; title: string; slug: string | null } | null;
+  offer: {
+    id: string;
+    title: string;
+    slug: string | null;
+    priceFrom: number | null;
+    priceText: string | null;
+  } | null;
+  activity: {
+    id: string;
+    title: string;
+    slug: string | null;
+    priceFrom: number | null;
+    priceText: string | null;
+    currency: string | null;
+  } | null;
   place: { id: string; title: string; slug: string | null } | null;
 
   // Camp shift snapshot
@@ -115,8 +127,10 @@ const BOOKING_SELECT = {
   offerId: true,
   activityId: true,
   placeId: true,
-  offer: { select: { id: true, title: true, slug: true } },
-  activity: { select: { id: true, title: true, slug: true } },
+  offer: { select: { id: true, title: true, slug: true, priceFrom: true, priceText: true } },
+  activity: {
+    select: { id: true, title: true, slug: true, priceFrom: true, priceText: true, currency: true },
+  },
   place: { select: { id: true, title: true, slug: true } },
 
   campShiftId: true,
@@ -171,8 +185,21 @@ function mapBooking(raw: {
   offerId: string | null;
   activityId: string | null;
   placeId: string | null;
-  offer: { id: string; title: string; slug: string | null } | null;
-  activity: { id: string; title: string; slug: string | null } | null;
+  offer: {
+    id: string;
+    title: string;
+    slug: string | null;
+    priceFrom: number | null;
+    priceText: string | null;
+  } | null;
+  activity: {
+    id: string;
+    title: string;
+    slug: string | null;
+    priceFrom: number | null;
+    priceText: string | null;
+    currency: string | null;
+  } | null;
   place: { id: string; title: string; slug: string | null } | null;
   campShiftId: string | null;
   campShiftTitle: string | null;

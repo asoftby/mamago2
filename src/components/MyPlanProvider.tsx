@@ -9,17 +9,28 @@ import { appendMyPlanOpenToHref, MY_PLAN_OPEN_EVENT } from "@/lib/my-plan/myPlan
 import { isMyPlanShellExcludedPath, shouldHideMyPlanWidget } from "@/lib/intent";
 import { PlanOverlayProvider, usePlanOverlay } from "@/lib/my-plan/usePlanOverlay";
 
-function MyPlanProviderInner() {
-  const pathname = usePathname();
+function isMyPlanFullPageRoute(pathname: string | null): boolean {
+  if (!pathname) return true;
+  const segments = pathname.split("/").filter(Boolean);
+  if (segments.length >= 2 && segments[0] === "me" && (segments[1] === "plan" || segments[1] === "day")) {
+    return true;
+  }
+  if (
+    segments.length >= 3 &&
+    segments[1] === "me" &&
+    (segments[2] === "plan" || segments[2] === "day")
+  ) {
+    return true;
+  }
+  return false;
+}
+
+function MyPlanOverlayHost({ pathname }: { pathname: string }) {
   const hidePlanEntry = shouldHideMyPlanWidget(pathname);
   const router = useRouter();
   const { isLoading: authLoading } = useAuthMe();
   const { isOpen: planOpen, open: openPlan, close: closePlan } = usePlanOverlay();
-
-  const isOnPlanPage = pathname === "/me/plan" || (pathname?.startsWith("/me/plan/") ?? false);
-  const effectivePlanOpen = planOpen && !isOnPlanPage;
-  // На странице /me/plan виджет не нужен — пользователь уже на странице плана
-  const hidePlanEntryEffective = hidePlanEntry || isOnPlanPage;
+  const hidePlanEntryEffective = hidePlanEntry;
 
   // Открытие по URL param ?myPlan=open (гость или пользователь)
   useEffect(() => {
@@ -55,11 +66,10 @@ function MyPlanProviderInner() {
   );
 
   return (
-    <MyPlanStateProvider>
+    <>
       {!hidePlanEntryEffective ? <MyPlanWidget onOpen={handleOpenMyPlan} /> : null}
-
-      <MyPlanOverlay open={effectivePlanOpen} onOpenChange={handlePlanOpenChange} />
-    </MyPlanStateProvider>
+      <MyPlanOverlay open={planOpen} onOpenChange={handlePlanOpenChange} />
+    </>
   );
 }
 
@@ -68,9 +78,13 @@ export function MyPlanProvider() {
   if (isMyPlanShellExcludedPath(pathname)) {
     return null;
   }
+  const isFullPageRoute = isMyPlanFullPageRoute(pathname);
+
   return (
     <PlanOverlayProvider>
-      <MyPlanProviderInner />
+      <MyPlanStateProvider>
+        {!isFullPageRoute && pathname ? <MyPlanOverlayHost pathname={pathname} /> : null}
+      </MyPlanStateProvider>
     </PlanOverlayProvider>
   );
 }

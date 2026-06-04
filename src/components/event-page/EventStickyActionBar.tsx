@@ -11,6 +11,8 @@ export interface EventStickyActionBarProps {
   primaryLabel: string;
   primaryHref?: string;
   onPrimary: () => void;
+  /** Открыть модалку записи (режим simple-booking / time-slots) */
+  onBook?: () => void;
   /** Если передан — показывает сердечко-кнопку рядом с primary */
   onPlan?: () => void;
   isPlanned?: boolean;
@@ -29,6 +31,7 @@ export function EventStickyActionBar({
   primaryLabel,
   primaryHref,
   onPrimary,
+  onBook,
   onPlan,
   isPlanned = false,
   isPrimaryLoading = false,
@@ -108,21 +111,31 @@ export function EventStickyActionBar({
           })()}
         </div>
         <div className="flex shrink-0 items-center gap-2.5">
-          {/* Buy button — shown only when purchase URL exists */}
-          {hasPurchaseUrl && (
-            <a
-              href={primaryHref}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={onPrimary}
-              className="inline-flex h-10 items-center gap-2 rounded-full bg-[#E86A3A] px-5 text-[14px] font-semibold text-white transition-colors hover:bg-[#C24E22]"
-            >
-              {isPrimaryLoading ? (
-                <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-              ) : (
-                <>{primaryLabel} <span aria-hidden>→</span></>
-              )}
-            </a>
+          {/* Buy / Book button */}
+          {(hasPurchaseUrl || onBook) && (
+            hasPurchaseUrl ? (
+              <a
+                href={primaryHref}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={onPrimary}
+                className="inline-flex h-10 items-center gap-2 rounded-full bg-[#E86A3A] px-5 text-[14px] font-semibold text-white transition-colors hover:bg-[#C24E22]"
+              >
+                {isPrimaryLoading ? (
+                  <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                ) : (
+                  <>{primaryLabel} <span aria-hidden>→</span></>
+                )}
+              </a>
+            ) : (
+              <button
+                type="button"
+                onClick={onBook}
+                className="inline-flex h-10 items-center gap-2 rounded-full bg-[#E86A3A] px-5 text-[14px] font-semibold text-white transition-colors hover:bg-[#C24E22]"
+              >
+                Записаться
+              </button>
+            )
           )}
           {/* Plan / heart button */}
           {onPlan && (
@@ -204,6 +217,14 @@ export function EventStickyActionBar({
             <>{primaryLabel} <span aria-hidden>→</span></>
           )}
         </a>
+      ) : onBook ? (
+        <button
+          type="button"
+          onClick={onBook}
+          className="inline-flex h-[46px] shrink-0 items-center gap-2 rounded-full bg-[#E86A3A] px-5 text-[14px] font-semibold text-white transition-colors hover:bg-[#C24E22] active:translate-y-px"
+        >
+          Записаться
+        </button>
       ) : onPlan ? (
         <button
           type="button"

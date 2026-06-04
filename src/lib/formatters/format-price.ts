@@ -4,12 +4,15 @@
  * RULE: All prices must be displayed only through this formatter.
  * Direct string interpolation of currency is forbidden.
  *
- * Format: `{amount} BYN`
- * - Integer amounts: `100 BYN`
- * - Fractional amounts: `49.90 BYN`
+ * Format: `{amount} Br` (rendered via NBRB font as the official BYN symbol at U+E901)
+ * - Integer amounts: `100 Br`
+ * - Fractional amounts: `49.90 Br`
  */
 
-const CURRENCY = "BYN";
+/** Official BYN currency symbol from the NBRB font (U+E901). */
+export const BYN_SYMBOL = "";
+
+const CURRENCY = BYN_SYMBOL;
 
 /**
  * Formats a numeric price value to the standard display format.

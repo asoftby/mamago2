@@ -5,7 +5,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
-import { markNotificationAsRead } from "@/server/services/notification.service";
+import { markNotificationAsRead } from "@/server/notifications/notification.service";
 
 export async function POST(
   req: NextRequest,

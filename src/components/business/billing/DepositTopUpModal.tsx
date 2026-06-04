@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { cn } from "@/lib/utils";
-import { formatPrice } from "@/lib/formatters/format-price";
+import { BYN_SYMBOL, formatPrice } from "@/lib/formatters/format-price";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -16,9 +16,9 @@ interface DepositTopUpModalProps {
 // ── Presets ───────────────────────────────────────────────────────────────────
 
 const PRESETS = [
-  { amount: 20,  label: "20 BYN" },
-  { amount: 50,  label: "50 BYN", recommended: true },
-  { amount: 100, label: "100 BYN" },
+  { amount: 20, label: `20 ${BYN_SYMBOL}` },
+  { amount: 50, label: `50 ${BYN_SYMBOL}`, recommended: true },
+  { amount: 100, label: `100 ${BYN_SYMBOL}` },
 ];
 
 // ── Modal ─────────────────────────────────────────────────────────────────────
@@ -37,7 +37,7 @@ export function DepositTopUpModal({ balance, onClose }: DepositTopUpModalProps) 
   }
 
   const recommendedLabel = PRESETS.find((p) => p.amount === selected && !isCustom)?.recommended
-    ? `${selected} BYN — рекомендуем для старта`
+    ? `${selected} ${BYN_SYMBOL} — рекомендуем для старта`
     : null;
 
   return (
@@ -108,7 +108,7 @@ export function DepositTopUpModal({ balance, onClose }: DepositTopUpModalProps) 
                 isCustom ? "border-stone-300 bg-white shadow-sm" : "border-stone-200 bg-stone-50",
               )}
             >
-              <span className="text-sm text-stone-400">BYN</span>
+              <span className="text-sm text-stone-400">{BYN_SYMBOL}</span>
               <input
                 type="number"
                 min={1}

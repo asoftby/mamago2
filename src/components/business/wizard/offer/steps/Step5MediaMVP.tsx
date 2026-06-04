@@ -3,6 +3,7 @@
 
 "use client";
 
+import { BYN_SYMBOL } from "@/lib/formatters/format-price";
 import { useState, useEffect } from "react";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -404,7 +405,7 @@ export function Step5MediaMVP({
               )}
               {data.priceFrom && (
                 <p className="text-lg font-bold text-primary">
-                  от {data.priceFrom} BYN
+                  от {data.priceFrom} {BYN_SYMBOL}
                   {data.priceText && (
                     <span className="text-sm font-normal text-muted-foreground ml-1">
                       {data.priceText}

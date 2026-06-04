@@ -23,6 +23,13 @@ import { normalizeRichTextEditorValue } from "@/lib/richtext/utils";
 import { expandScheduleItemDates } from "@/lib/event/expandScheduleItemDates";
 import { parsePriceData } from "@/lib/priceItems";
 
+/** Extracts the first numeric value from a price string (e.g. "от 48.00 руб." → 48). */
+function parseNumericPrice(s: string): number | undefined {
+  const match = s.replace(",", ".").match(/\d+(?:\.\d+)?/);
+  const n = match ? parseFloat(match[0]) : NaN;
+  return Number.isFinite(n) && n > 0 ? n : undefined;
+}
+
 export type ActivityWithRelations = Activity & {
   id: string;
   title: string | null;
@@ -385,12 +392,12 @@ export function mapEventToFormData(event: ActivityWithRelations): EventFormData 
     formData.price = "";
   } else {
     formData.price =
-      priceTextRaw &&
-      !/^бесплатно$/i.test(priceTextRaw.trim()) &&
-      !/^free$/i.test(priceTextRaw.trim())
-        ? priceTextRaw
-        : priceFromDb != null && !Number.isNaN(priceFromDb)
-          ? String(priceFromDb)
+      priceFromDb != null && !Number.isNaN(priceFromDb)
+        ? String(priceFromDb)
+        : priceTextRaw &&
+          !/^бесплатно$/i.test(priceTextRaw.trim()) &&
+          !/^free$/i.test(priceTextRaw.trim())
+          ? priceTextRaw
           : "";
   }
   formData.priceDetails =
@@ -739,11 +746,11 @@ export function buildEventPayload(data: EventFormData): EventPayload {
 
     priceFrom:
       (data.pricingMode === "fixed" || data.pricingMode === "from") && data.price?.trim()
-        ? parseFloat(data.price) || null
+        ? parseNumericPrice(data.price) ?? null
         : null,
     priceTo:
       data.pricingMode === "fixed" && data.price?.trim()
-        ? parseFloat(data.price) || null
+        ? parseNumericPrice(data.price) ?? null
         : null,
     priceText:
       data.pricingMode === "free"

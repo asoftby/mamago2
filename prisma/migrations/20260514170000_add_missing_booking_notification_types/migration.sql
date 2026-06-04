@@ -1,0 +1,5 @@
+-- Add missing booking notification types to NotificationType enum
+ALTER TYPE "NotificationType" ADD VALUE IF NOT EXISTS 'BOOKING_CONFIRMED';
+ALTER TYPE "NotificationType" ADD VALUE IF NOT EXISTS 'BOOKING_CANCELLED';
+ALTER TYPE "NotificationType" ADD VALUE IF NOT EXISTS 'BOOKING_COMPLETED';
+ALTER TYPE "NotificationType" ADD VALUE IF NOT EXISTS 'BOOKING_FEEDBACK_REQUEST';

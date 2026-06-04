@@ -24,7 +24,7 @@ export function flatSlotsToGroupedDays(slots: PublicationAccessTimeSlot[]): Sche
       id: flat.id || newSlotId(),
       startTime: flat.startTime ?? "",
       endTime: flat.endTime ?? flat.startTime ?? "",
-      capacity: flat.capacity ?? 1,
+      capacity: flat.capacity ?? null,
     };
 
     const existing = byDate.get(dateKey);
@@ -89,6 +89,6 @@ export function createEmptyScheduleSlot(): ScheduleSlot {
     id: newSlotId(),
     startTime: "",
     endTime: "",
-    capacity: 6,
+    capacity: null,
   };
 }

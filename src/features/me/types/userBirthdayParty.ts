@@ -62,6 +62,35 @@ export type OrganizerConfirmationStatus =
   /** Ответили сообщением, без финального подтверждения */
   | "messaged";
 
+export type PerformerStatus = "CONFIRMED" | "PENDING" | "DECLINED";
+
+export type AlternativePerformer = {
+  id: string;
+  category: string;
+  title: string;
+  rating?: number;
+  price: number;
+};
+
+export type ScenarioTimelineItem = {
+  id: string;
+  time: string;
+  type: "performer" | "internal";
+  title: string;
+  subtitle?: string;
+  description?: string;
+  price?: number;
+  status?: PerformerStatus;
+  contactLabel?: string;
+  contact?: {
+    name: string;
+    phone: string;
+    telegram?: string;
+    messageHref?: string;
+  };
+  alternatives?: AlternativePerformer[];
+};
+
 /** Контакт исполнителя: всегда показываем в модалке (tel:, чат, ссылки) */
 export type OrganizerContactItem = {
   label: string;
@@ -101,4 +130,8 @@ export type UserBirthdayPartyDetail = UserBirthdayParty & {
   services: UserBirthdayPartyServiceLine[];
   organizers: UserBirthdayPartyOrganizer[];
   formatLabel: string;
+  childAgeLabel?: string | null;
+  guestsLabel?: string | null;
+  totalPrice?: number | null;
+  timelineItems?: ScenarioTimelineItem[];
 };

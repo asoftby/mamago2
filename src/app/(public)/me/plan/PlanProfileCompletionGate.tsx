@@ -20,12 +20,67 @@ export function PlanProfileCompletionGate() {
   const router = useRouter();
   const isMobile = !useMediaQuery("(min-width: 640px)");
   const [dismissed, setDismissed] = useState(false);
-  const { user, status } = useAuthMe();
-  const open =
-    !dismissed &&
-    status === "authenticated" &&
-    Boolean(user) &&
-    !Boolean(user?.displayName?.trim());
+  const [gateResolved, setGateResolved] = useState(false);
+  const [shouldOpen, setShouldOpen] = useState(false);
+  const { user, status, isLoading } = useAuthMe();
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (dismissed) {
+      setShouldOpen(false);
+      setGateResolved(true);
+      return;
+    }
+
+    if (isLoading) {
+      setShouldOpen(false);
+      setGateResolved(false);
+      return;
+    }
+
+    if (status !== "authenticated" || !user) {
+      setShouldOpen(false);
+      setGateResolved(true);
+      return;
+    }
+
+    if (user.displayName?.trim()) {
+      setShouldOpen(false);
+      setGateResolved(true);
+      return;
+    }
+
+    setGateResolved(false);
+    (async () => {
+      try {
+        const res = await fetch("/api/me/profile-state", { credentials: "include" });
+        if (!res.ok) {
+          if (!cancelled) {
+            setShouldOpen(false);
+          }
+          return;
+        }
+        const data = (await res.json()) as { isProfileComplete?: boolean };
+        if (cancelled) return;
+        setShouldOpen(!Boolean(data.isProfileComplete));
+      } catch {
+        if (!cancelled) {
+          setShouldOpen(false);
+        }
+      } finally {
+        if (!cancelled) {
+          setGateResolved(true);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [dismissed, isLoading, status, user]);
+
+  const open = gateResolved && shouldOpen;
 
   useEffect(() => {
     if (!open) return;

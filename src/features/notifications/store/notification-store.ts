@@ -3,7 +3,8 @@ import type { NotificationState, NotificationItem } from "./notification-types";
 import {
   fetchNotificationsPageApi,
   fetchUnreadCountFromApi,
-  postMarkNotificationsOpenApi,
+  postArchiveReadNotificationsApi,
+  postReadAllNotificationsApi,
 } from "./notification-actions";
 import { isBusinessSurface } from "./notification-surface";
 
@@ -62,6 +63,7 @@ const initialSnapshot = (): NotificationState => ({
   unreadCount: 0,
   businessUnreadCount: 0,
   activeStream: "user",
+  activeTab: "inbox",
   items: [],
   isLoading: false,
   loadingMore: false,
@@ -83,6 +85,7 @@ const initialSnapshot = (): NotificationState => ({
 export type NotificationStoreActions = {
   setAuthenticated: (authenticated: boolean, userId?: string | null) => void;
   setActiveStream: (stream: "user" | "business") => void;
+  setActiveTab: (tab: "inbox" | "unread" | "archived") => void;
   fetchUnreadCount: () => Promise<void>;
   fetchNotifications: (options?: { force?: boolean }) => Promise<void>;
   refresh: () => Promise<void>;
@@ -93,6 +96,7 @@ export type NotificationStoreActions = {
   closePanel: () => void;
   clearError: () => void;
   markAllRead: () => Promise<void>;
+  archiveAllRead: () => Promise<void>;
   markAsRead: (id: string) => void;
   appendNotification: (notification: NotificationItem) => void;
   removeNotification: (id: string) => void;
@@ -104,64 +108,6 @@ export type NotificationStoreActions = {
 
 export const useNotificationStore = create<NotificationState & NotificationStoreActions>(
   (set, get) => {
-    const maybeMarkOpen = async () => {
-      const requestEpoch = authEpoch;
-      const state = get();
-      if (!state.authenticated || state.inflight.markOpen) return;
-
-      const hasUnreadItems = state.items.some((n) => !n.seenAt);
-      const hasUnreadCount =
-        state.unreadCount > 0 || state.businessUnreadCount > 0;
-      const now = Date.now();
-      const last = state.lastMarkOpenAt;
-
-      if (
-        !hasUnreadItems &&
-        last !== null &&
-        now - last < 5 * 60 * 1000
-      ) {
-        return;
-      }
-
-      if (!hasUnreadItems && !hasUnreadCount) {
-        return;
-      }
-
-      set((s) => ({
-        inflight: { ...s.inflight, markOpen: true },
-      }));
-      try {
-        const markData = await postMarkNotificationsOpenApi(state.activeStream);
-        if (isStaleAuthEpoch(requestEpoch)) return;
-        if (typeof markData.showTelegramPrompt === "boolean") {
-          set({ showTelegramPrompt: markData.showTelegramPrompt });
-        }
-        const ts = new Date().toISOString();
-        set((s) => ({
-          items: s.items.map((n) => ({
-            ...n,
-            seenAt: n.seenAt ?? ts,
-            isRead: true,
-          })),
-          lastMarkOpenAt: Date.now(),
-          lastSeenAt: ts,
-        }));
-        // After marking open, only refresh the relevant stream.
-        if (isBusinessSurface()) {
-          await get().refreshBusinessUnreadOnly({ force: true });
-        } else {
-          await get().refreshUnreadOnly({ force: true });
-        }
-      } catch (error) {
-        console.error("Failed to mark notifications as open:", error);
-      } finally {
-        if (isStaleAuthEpoch(requestEpoch)) return;
-        set((s) => ({
-          inflight: { ...s.inflight, markOpen: false },
-        }));
-      }
-    };
-
     return {
       ...initialSnapshot(),
 
@@ -183,6 +129,7 @@ export const useNotificationStore = create<NotificationState & NotificationStore
         if (get().activeStream === stream) return;
         set((state) => ({
           activeStream: stream,
+          activeTab: "inbox",
           items: [],
           isHydrated: false,
           hasMore: false,
@@ -190,6 +137,18 @@ export const useNotificationStore = create<NotificationState & NotificationStore
           panelOpen: state.panelOpen,
           error: null,
         }));
+      },
+
+      setActiveTab: (tab) => {
+        if (get().activeTab === tab) return;
+        set({
+          activeTab: tab,
+          items: [],
+          isHydrated: false,
+          hasMore: false,
+          offset: 0,
+          error: null,
+        });
       },
 
       reset: () => {
@@ -360,7 +319,7 @@ export const useNotificationStore = create<NotificationState & NotificationStore
           error: null,
         }));
         try {
-          const page = await fetchNotificationsPageApi(0, PAGE_SIZE, get().activeStream);
+          const page = await fetchNotificationsPageApi(0, PAGE_SIZE, get().activeStream, get().activeTab);
           if (!get().authenticated || isStaleAuthEpoch(requestEpoch)) return;
           set({
             items: page.notifications,
@@ -398,7 +357,7 @@ export const useNotificationStore = create<NotificationState & NotificationStore
         }));
         try {
           const start = get().offset;
-          const page = await fetchNotificationsPageApi(start, PAGE_SIZE, get().activeStream);
+          const page = await fetchNotificationsPageApi(start, PAGE_SIZE, get().activeStream, get().activeTab);
           if (!get().authenticated || isStaleAuthEpoch(requestEpoch)) return;
           set((s) => ({
             items: [...s.items, ...page.notifications],
@@ -427,7 +386,6 @@ export const useNotificationStore = create<NotificationState & NotificationStore
         set({ isLoading: true, error: null });
         try {
           await get().fetchNotifications({ force: true });
-          await maybeMarkOpen();
         } finally {
           if (isStaleAuthEpoch(requestEpoch)) return;
           set({ isLoading: false });
@@ -439,14 +397,24 @@ export const useNotificationStore = create<NotificationState & NotificationStore
       clearError: () => set({ error: null }),
 
       markAllRead: async () => {
-        await maybeMarkOpen();
+        await postReadAllNotificationsApi();
+        await get().refreshUnreadOnly({ force: true });
+        await get().refreshBusinessUnreadOnly({ force: true });
+        await get().fetchNotifications({ force: true });
+      },
+
+      archiveAllRead: async () => {
+        await postArchiveReadNotificationsApi();
+        await get().refreshUnreadOnly({ force: true });
+        await get().refreshBusinessUnreadOnly({ force: true });
+        await get().fetchNotifications({ force: true });
       },
 
       markAsRead: (id) => {
         const ts = new Date().toISOString();
         set((s) => ({
           items: s.items.map((n) =>
-            n.id === id ? { ...n, seenAt: n.seenAt ?? ts, isRead: true } : n,
+            n.id === id ? { ...n, seenAt: n.seenAt ?? ts, isRead: true, readAt: n.readAt ?? ts } : n,
           ),
         }));
       },

@@ -15,6 +15,7 @@ import type {
   PartyPlanning,
   PlaceType,
 } from "../types/builder";
+import type { ScenarioItemSchedule } from "../lib/scheduleUtils";
 import { ageYearsFromBirthDate, formatYearsRu } from "../lib/partyChildUtils";
 import { BUILDER_STEP_ORDER } from "../lib/stepOrder";
 import { birthdayOffers } from "../../data/birthdayOffers";
@@ -25,6 +26,20 @@ function mergeQuizDefaults(quiz: BirthdayBuilderState["quiz"]): BirthdayBuilderS
     ...quiz,
     ageSource: quiz.ageSource ?? "manual",
     interestsSource: quiz.interestsSource ?? "manual",
+    themeSelectionSource: quiz.themeSelectionSource ?? null,
+  };
+}
+
+function mergePartyPlanningDefaults(
+  partyPlanning: BirthdayBuilderState["partyPlanning"],
+): BirthdayBuilderState["partyPlanning"] {
+  return {
+    dateIso: partyPlanning?.dateIso ?? null,
+    timeStart: partyPlanning?.timeStart ?? null,
+    timeEnd: partyPlanning?.timeEnd ?? null,
+    selectedVenueBookingDurationHours:
+      partyPlanning?.selectedVenueBookingDurationHours ?? 3,
+    itemSchedules: partyPlanning?.itemSchedules ?? {},
   };
 }
 
@@ -32,6 +47,7 @@ function mergeLoadedState(raw: BirthdayBuilderState): BirthdayBuilderState {
   return {
     ...raw,
     quiz: mergeQuizDefaults(raw.quiz),
+    partyPlanning: mergePartyPlanningDefaults(raw.partyPlanning),
   };
 }
 
@@ -46,7 +62,10 @@ const initialState: BirthdayBuilderState = {
     budgetGroup: null,
     guestsGroup: null,
     theme: null,
+    themeSelectionSource: null,
     placeType: null,
+    dateRangeFrom: null,
+    dateRangeTo: null,
   },
   selection: {
     selectedBaseId: null,
@@ -56,12 +75,14 @@ const initialState: BirthdayBuilderState = {
     conflicts: [],
   },
   ui: {
-    currentStep: "intro",
+    currentStep: "when",
   },
   partyPlanning: {
     dateIso: null,
     timeStart: null,
     timeEnd: null,
+    selectedVenueBookingDurationHours: 3,
+    itemSchedules: {},
   },
 };
 
@@ -147,9 +168,12 @@ export function useBirthdayBuilder(init?: { ageGroup?: BirthdayAgeGroup | null }
       ageGroup?: BirthdayAgeGroup | null;
       selectedAgeSignalId?: string | null;
       selectedAgeLabel?: string | null;
-      budgetGroup?: BirthdayBudgetGroup;
-      guestsGroup?: BirthdayGuestsGroup;
-      theme?: BirthdayTheme;
+      budgetGroup?: BirthdayBudgetGroup | null;
+      guestsGroup?: BirthdayGuestsGroup | null;
+      theme?: BirthdayTheme | null;
+      themeSelectionSource?: "auto" | "manual" | null;
+      dateRangeFrom?: string | null;
+      dateRangeTo?: string | null;
     }) => {
       setState((s) => {
         const newQuiz = { ...s.quiz };
@@ -187,8 +211,21 @@ export function useBirthdayBuilder(init?: { ageGroup?: BirthdayAgeGroup | null }
         }
         if (params.theme !== undefined) {
           newQuiz.theme = s.quiz.theme === params.theme ? null : params.theme;
+          if (params.themeSelectionSource !== undefined) {
+            newQuiz.themeSelectionSource = newQuiz.theme ? params.themeSelectionSource : null;
+          } else {
+            newQuiz.themeSelectionSource = newQuiz.theme ? "manual" : null;
+          }
+        } else if (params.themeSelectionSource !== undefined) {
+          newQuiz.themeSelectionSource = params.themeSelectionSource;
         }
-        
+        if (params.dateRangeFrom !== undefined) {
+          newQuiz.dateRangeFrom = params.dateRangeFrom;
+        }
+        if (params.dateRangeTo !== undefined) {
+          newQuiz.dateRangeTo = params.dateRangeTo;
+        }
+
         return {
           ...s,
           quiz: newQuiz,
@@ -208,6 +245,10 @@ export function useBirthdayBuilder(init?: { ageGroup?: BirthdayAgeGroup | null }
           partyForChild,
           ageSource: linked ? "child" : "manual",
           interestsSource: linked ? "child" : "manual",
+          themeSelectionSource:
+            linked || s.quiz.themeSelectionSource === "manual"
+              ? s.quiz.themeSelectionSource
+              : null,
         },
       };
     });
@@ -250,6 +291,10 @@ export function useBirthdayBuilder(init?: { ageGroup?: BirthdayAgeGroup | null }
           selectedAgeLabel,
           ageSource: "child",
           interestsSource: "child",
+          themeSelectionSource:
+            s.quiz.themeSelectionSource === "manual"
+              ? "manual"
+              : s.quiz.themeSelectionSource,
         },
         validation: { conflicts },
       };
@@ -466,6 +511,26 @@ export function useBirthdayBuilder(init?: { ageGroup?: BirthdayAgeGroup | null }
     }));
   }, []);
 
+  const setItemSchedule = useCallback((itemId: string, schedule: ScenarioItemSchedule) => {
+    setState((s) => ({
+      ...s,
+      partyPlanning: {
+        ...s.partyPlanning,
+        itemSchedules: { ...s.partyPlanning.itemSchedules, [itemId]: schedule },
+      },
+    }));
+  }, []);
+
+  const setItemSchedules = useCallback((schedules: Record<string, ScenarioItemSchedule>) => {
+    setState((s) => ({
+      ...s,
+      partyPlanning: {
+        ...s.partyPlanning,
+        itemSchedules: schedules,
+      },
+    }));
+  }, []);
+
   // ─── Return ────────────────────────────────────────────────────────────────
 
   return {
@@ -496,6 +561,8 @@ export function useBirthdayBuilder(init?: { ageGroup?: BirthdayAgeGroup | null }
     goToStep,
     nextStep,
     prevStep,
+    setItemSchedule,
+    setItemSchedules,
     resetBuilder,
     replaceState,
     setPartyPlanning,

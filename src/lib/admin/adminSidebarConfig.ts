@@ -50,6 +50,12 @@ export const NAV_COMMUNICATIONS: AdminSidebarNavItem = {
       matchers: [{ type: "exact", value: adminPath("/communications") }],
     },
     {
+      id: "communications-broadcasts",
+      label: "Сообщения",
+      href: adminPath("/broadcasts"),
+      matchers: [{ type: "prefix", value: adminPath("/broadcasts") }],
+    },
+    {
       id: "communications-email-studio",
       label: "Email Studio",
       href: adminPath("/communications/email-studio"),

@@ -224,6 +224,8 @@ export function NotificationSettingsTable({
         if (!res.ok) {
           throw new Error("save_failed");
         }
+
+        toast.success("Настройки сохранены");
       } catch {
         setError("Не удалось сохранить изменение. Попробуйте ещё раз.");
         setData(rollback);

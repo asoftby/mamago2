@@ -26,11 +26,13 @@ export async function fetchNotificationsPageApi(
   offset: number,
   limit: number,
   stream: "user" | "business",
+  tab: "inbox" | "unread" | "archived",
 ): Promise<NotificationsPageResult> {
   const params = new URLSearchParams({
     limit: String(limit),
     offset: String(offset),
     stream,
+    tab,
   });
   const res = await fetch(`/api/notifications?${params.toString()}`, {
     credentials: "include",
@@ -75,4 +77,20 @@ export async function postMarkNotificationsOpenApi(
   if (!res.ok) return {};
   const data = (await res.json()) as { showTelegramPrompt?: boolean };
   return data ?? {};
+}
+
+export async function postReadAllNotificationsApi(): Promise<void> {
+  await fetch("/api/notifications/read-all", {
+    method: "POST",
+    credentials: "include",
+    headers: JSON_HEADERS,
+  });
+}
+
+export async function postArchiveReadNotificationsApi(): Promise<void> {
+  await fetch("/api/notifications/archive-read", {
+    method: "POST",
+    credentials: "include",
+    headers: JSON_HEADERS,
+  });
 }

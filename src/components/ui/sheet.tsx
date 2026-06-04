@@ -53,6 +53,7 @@ function SheetContent({
   side = "right",
   showCloseButton = true,
   dismissible = true,
+  overlayClassName,
   onPointerDownOutside,
   onInteractOutside,
   onEscapeKeyDown,
@@ -61,10 +62,11 @@ function SheetContent({
   side?: "top" | "right" | "bottom" | "left"
   showCloseButton?: boolean
   dismissible?: boolean
+  overlayClassName?: string
 }) {
   return (
     <SheetPortal>
-      <SheetOverlay />
+      <SheetOverlay className={overlayClassName} />
       <SheetPrimitive.Content
         data-slot="sheet-content"
         aria-describedby={props["aria-describedby"]}

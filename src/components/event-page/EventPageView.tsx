@@ -24,6 +24,7 @@ import { EventDecisionPanel } from "./EventDecisionPanel";
 import { EventMediaStack } from "./EventMediaStack";
 import { EventSessionSelector } from "./EventSessionSelector";
 import { EventStickyActionBar } from "./EventStickyActionBar";
+import { EventSimpleBookingModal } from "./EventSimpleBookingModal";
 import { SimilarEventsSection } from "./SimilarEventsSection";
 import { EventWhyGo } from "./EventWhyGo";
 import { EventGoodFit } from "./EventGoodFit";
@@ -521,6 +522,9 @@ export function EventPageView({ data }: { data: EventPageData }) {
   }, [availablePlanDates]);
 
   const hasPurchaseUrl = Boolean(data.cta.purchaseUrl);
+  const hasSimpleBooking = Boolean(data.cta.simpleBooking);
+  const [bookingModalOpen, setBookingModalOpen] = useState(false);
+  const handleBook = useCallback(() => setBookingModalOpen(true), []);
   const hasSimilar = data.similar.length > 0;
   const hasWhyGo = data.whyGo.length > 0;
   const hasGoodFit = data.goodFit.length > 0;
@@ -623,6 +627,7 @@ export function EventPageView({ data }: { data: EventPageData }) {
               selectedId={selectedId}
               onSelect={setSelectedId}
               onPlan={handlePlan}
+              onBook={hasSimpleBooking ? handleBook : undefined}
               isPlanned={saveStatus.inPlan}
               priceLabel={data.priceLabel}
               purchaseUrl={data.cta.purchaseUrl}
@@ -663,9 +668,21 @@ export function EventPageView({ data }: { data: EventPageData }) {
         isPrimaryLoading={isPrimaryLoading}
         isPlanLoading={isSecondaryLoading}
         onPrimary={handleBuy}
+        onBook={hasSimpleBooking ? handleBook : undefined}
         onPlan={handlePlan}
         hasPurchaseUrl={hasPurchaseUrl}
       />
+
+      {data.cta.simpleBooking && (
+        <EventSimpleBookingModal
+          open={bookingModalOpen}
+          onOpenChange={setBookingModalOpen}
+          eventTitle={data.title}
+          eventCategory={data.categoryLabel}
+          priceLabel={data.priceLabel}
+          booking={data.cta.simpleBooking}
+        />
+      )}
 
       {/* Save flow modal */}
       <SaveActivityFlowAdaptive

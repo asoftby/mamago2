@@ -41,7 +41,7 @@ export async function createDevBusinessApplicationAndNotify(params: {
     type: "BUSINESS_APPLICATION_CREATED",
     title: "Новая заявка",
     body: buildApplicationBody(application),
-    entityType: "DEV_BUSINESS_APPLICATION",
+    entityType: "BUSINESS_PROFILE",
     entityId: application.id,
   });
 

@@ -6,7 +6,7 @@ export type ScheduleSlot = {
   id: string;
   startTime: string;
   endTime: string;
-  capacity: number;
+  capacity: number | null;
 };
 
 export type ScheduleDay = {

@@ -48,7 +48,7 @@
  */
 
 import prisma from "@/lib/prisma";
-import { NotificationType } from "@prisma/client";
+import { NotificationType, type NotificationEntityType } from "@prisma/client";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -66,6 +66,20 @@ export interface DedupCheckResult {
  * - number = time window in hours for reminder notifications
  */
 const DEDUP_WINDOWS: Record<NotificationType, number | null> = {
+  SYSTEM_INFO: null,
+  FEATURE_UPDATE: null,
+  BUSINESS_NEWS: null,
+  MODERATION_RESULT: null,
+  BUSINESS_ACTION_REQUIRED: null,
+  BOOKING_REQUEST: null,
+  LEAD_CREATED: null,
+  PLAN_REMINDER: null,
+  UPCOMING_EVENT: null,
+  COMMENT_REPLY: null,
+  SECURITY_ALERT: null,
+  PAYMENT_INFO: null,
+  CONTENT_PUBLISHED: null,
+  CONTENT_REJECTED: null,
   // One-time booking events (exact dedup)
   BOOKING_CREATED: null,
   BOOKING_CONFIRMED: null,
@@ -132,7 +146,7 @@ function hoursAgo(hours: number): Date {
 export async function checkNotificationDedup(
   userId: string,
   type: NotificationType,
-  entityType?: string | null,
+  entityType?: NotificationEntityType | null,
   entityId?: string | null,
 ): Promise<DedupCheckResult> {
   const dedupWindow = DEDUP_WINDOWS[type];

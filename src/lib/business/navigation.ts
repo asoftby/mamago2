@@ -1,6 +1,7 @@
 import type { LucideIcon } from "lucide-react";
 import {
   BarChart3,
+  Bell,
   CalendarDays,
   CircleHelp,
   ClipboardList,
@@ -44,6 +45,7 @@ export const BUSINESS_PUBLICATIONS_PLACES_HREF = businessRoute("/publications/pl
 export const BUSINESS_PUBLICATIONS_OFFERS_HREF = businessRoute("/publications/offers");
 export const BUSINESS_EVENTS_HREF = businessRoute("/events");
 export const BUSINESS_BOOKINGS_HREF = businessRoute("/bookings");
+export const BUSINESS_NOTIFICATIONS_HREF = businessRoute("/notifications");
 export const BUSINESS_REVIEWS_HREF = businessRoute("/reviews");
 export const BUSINESS_TEAM_HREF = businessRoute("/team");
 export const BUSINESS_PROMOTION_OVERVIEW_HREF = businessRoute("/promotion");
@@ -103,6 +105,13 @@ export const businessNavigation: BusinessNavItem[] = [
   },
   {
     type: "item",
+    label: "Уведомления",
+    href: BUSINESS_NOTIFICATIONS_HREF,
+    icon: Bell,
+    match: [businessRoute("/notifications")],
+  },
+  {
+    type: "item",
     label: "Отзывы",
     href: BUSINESS_REVIEWS_HREF,
     icon: MessageSquareText,
@@ -156,6 +165,7 @@ export const businessQuickActions = {
   events: BUSINESS_EVENTS_HREF,
   bookings: BUSINESS_BOOKINGS_HREF,
   reviews: BUSINESS_REVIEWS_HREF,
+  notifications: BUSINESS_NOTIFICATIONS_HREF,
   promotion: BUSINESS_PROMOTION_OVERVIEW_HREF,
   team: BUSINESS_TEAM_HREF,
   billing: BUSINESS_BILLING_HREF,

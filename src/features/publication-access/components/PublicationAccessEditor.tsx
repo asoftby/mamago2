@@ -148,6 +148,7 @@ export function PublicationAccessEditor({
 
               {config.supportsTimeSlots ? (
                 <TimeSlotEditor
+                  entityType={entityType}
                   value={value.timeSlots ?? []}
                   onChange={(timeSlots) => update({ timeSlots })}
                   disabled={disabled}
@@ -178,4 +179,3 @@ export function PublicationAccessEditor({
     </div>
   );
 }
-

@@ -1,5 +1,6 @@
 "use client";
 
+import { BYN_SYMBOL } from "@/lib/formatters/format-price";
 import { useState } from "react";
 import Link from "next/link";
 import { OfferStatusBadge } from "./OfferStatusBadge";
@@ -76,7 +77,7 @@ function buildOfferSubtitle(offer: Offer): string {
   if (offer.priceText) {
     parts.push(offer.priceText);
   } else if (offer.priceFrom != null) {
-    parts.push(`от ${offer.priceFrom} BYN`);
+    parts.push(`от ${offer.priceFrom} ${BYN_SYMBOL}`);
   }
   return parts.join(" · ");
 }

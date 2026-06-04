@@ -49,12 +49,31 @@ export type EventPageVenue = {
   placeHref?: string;
 };
 
+export type EventBookingSlot = {
+  id: string;
+  isoDate: string;
+  startTime: string;
+  endTime?: string;
+  capacity?: number;
+};
+
+export type EventSimpleBookingData = {
+  activityId: string;
+  /** Для режима simple-booking — одна дата/время */
+  date?: string;
+  time?: string;
+  /** Для режима time-slots — список доступных слотов */
+  slots?: EventBookingSlot[];
+};
+
 export type EventPageCtaConfig = {
   planLabel: string;
   buyLabel: string;
   saveLabel: string;
   /** URL для покупки/записи. Если не задан — кнопку "Купить билет" не показываем. */
   purchaseUrl?: string;
+  /** Данные для записи через встроенную форму (режим simple-booking). */
+  simpleBooking?: EventSimpleBookingData;
 };
 
 export type EventPageSimilar = {
