@@ -3,6 +3,11 @@ import { redirect } from "next/navigation";
 import prisma from "@/lib/prisma";
 import { getBillingAccountByBusinessId } from "@/server/services/billing/billingAccount.service";
 import { BalancePage } from "./BalancePage";
+import { getBusinessResolvedBillingActionPrices } from "@/server/services/billing/billingActionRateResolver.service";
+import {
+  BILLING_ACTION_SHORT_TITLES,
+  formatBillingActionPrice,
+} from "@/lib/billing/actionPricing";
 
 // Force dynamic rendering
 export const dynamic = "force-dynamic";
@@ -69,6 +74,11 @@ export default async function BillingBalancePage() {
   const chargesCount = monthTransactions.length;
   const averageCharge = chargesCount > 0 ? monthSpent / chargesCount : 0;
   const lastCharge = monthTransactions[0] || null;
+  const leadsCount = monthTransactions.filter((tx) => tx.type === "LEAD_CHARGE").length;
+
+  const resolvedPrices = await getBusinessResolvedBillingActionPrices({
+    businessId: business.id,
+  });
 
   // Get last top-up
   const lastTopUp = account
@@ -96,12 +106,22 @@ export default async function BillingBalancePage() {
     lastTopUpDate: lastTopUp?.occurredAt || null,
     lastTopUpAmount: lastTopUp ? Math.abs(lastTopUp.amount.toNumber()) : null,
     monthlySpend: monthSpent,
+    status: (
+      account?.status === "SUSPENDED"
+        ? "SUSPENDED"
+        : (account?.depositBalance.toNumber() || 0) <= 0
+          ? "ZERO_BALANCE"
+          : (account?.depositBalance.toNumber() || 0) < (account?.lowBalanceThreshold.toNumber() || 20)
+            ? "LOW_BALANCE"
+            : "ACTIVE"
+    ) as "ACTIVE" | "LOW_BALANCE" | "ZERO_BALANCE" | "SUSPENDED",
   };
 
   const statsData = {
     monthSpent,
     chargesCount,
     averageCharge,
+    leadsCount,
     lastChargeDate: lastCharge?.occurredAt || null,
     lastChargeAmount: lastCharge ? Math.abs(lastCharge.amount.toNumber()) : null,
   };
@@ -116,11 +136,21 @@ export default async function BillingBalancePage() {
     occurredAt: tx.occurredAt,
   }));
 
+  const actionPrices = resolvedPrices
+    .filter((item) => item.rule && item.rule.isActive)
+    .map((item) => ({
+      actionType: item.actionType,
+      title: BILLING_ACTION_SHORT_TITLES[item.actionType],
+      displayPrice: item.rule ? formatBillingActionPrice(item.rule) : "Бесплатно",
+      isIndividual: item.source === "BUSINESS",
+    }));
+
   return (
     <BalancePage
       balance={balanceData}
       stats={statsData}
       transactions={transactionsData}
+      actionPrices={actionPrices}
       hasBillingProfile={hasBillingProfile}
     />
   );

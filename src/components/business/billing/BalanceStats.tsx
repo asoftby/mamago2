@@ -32,6 +32,7 @@ interface BalanceStatsProps {
   monthSpent: number;
   chargesCount: number;
   averageCharge: number;
+  leadsCount: number;
   lastChargeDate: Date | null;
   lastChargeAmount: number | null;
 }
@@ -40,6 +41,7 @@ export function BalanceStats({
   monthSpent,
   chargesCount,
   averageCharge,
+  leadsCount,
   lastChargeDate,
   lastChargeAmount,
 }: BalanceStatsProps) {
@@ -55,15 +57,15 @@ export function BalanceStats({
         />
         <StatCard
           icon={Receipt}
-          label="Списаний"
-          value={chargesCount.toString()}
-          subtitle="Операций"
+          label="Заявок"
+          value={leadsCount.toString()}
+          subtitle="За текущий месяц"
         />
         <StatCard
           icon={DollarSign}
-          label="Средний чек"
+          label="Средняя стоимость заявки"
           value={formatPrice(averageCharge)}
-          subtitle="За списание"
+          subtitle={`${chargesCount} списаний за месяц`}
         />
         <StatCard
           icon={Calendar}

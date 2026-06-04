@@ -1,6 +1,17 @@
 import prisma from "@/lib/prisma";
 import { BillingTransactionType, BillingTransactionStatus, Prisma } from "@prisma/client";
 
+type BillingTransactionFilters = {
+  businessId?: string;
+  accountId?: string;
+  type?: BillingTransactionType;
+  status?: BillingTransactionStatus;
+  dateFrom?: Date;
+  dateTo?: Date;
+  limit?: number;
+  offset?: number;
+};
+
 export class RefundAmountExceedsAvailableError extends Error {
   code = "REFUND_AMOUNT_EXCEEDS_AVAILABLE" as const;
   originalAmount: number;
@@ -50,6 +61,86 @@ function buildRefundSummary(params: {
     availableAmount,
     refundCount: params.refunds.length,
     canRefund: availableAmount > 0,
+  };
+}
+
+function buildBillingTransactionWhere(filters?: BillingTransactionFilters) {
+  const where: Prisma.BillingTransactionWhereInput = {};
+
+  if (filters?.accountId) {
+    where.billingAccountId = filters.accountId;
+  }
+
+  if (filters?.businessId) {
+    where.billingAccount = {
+      businessId: filters.businessId,
+    };
+  }
+
+  if (filters?.type) {
+    where.type = filters.type;
+  }
+
+  if (filters?.status) {
+    where.status = filters.status;
+  }
+
+  if (filters?.dateFrom || filters?.dateTo) {
+    where.occurredAt = {};
+    if (filters.dateFrom) where.occurredAt.gte = filters.dateFrom;
+    if (filters.dateTo) where.occurredAt.lte = filters.dateTo;
+  }
+
+  return where;
+}
+
+export async function getBillingTransactionsSummary(filters?: BillingTransactionFilters) {
+  const where = buildBillingTransactionWhere(filters);
+  const [rows, transactionsCount] = await Promise.all([
+    prisma.billingTransaction.findMany({
+      where,
+      select: {
+        type: true,
+        status: true,
+        amount: true,
+      },
+    }),
+    prisma.billingTransaction.count({ where }),
+  ]);
+
+  const summary = rows.reduce(
+    (summary, row) => {
+      const amount = row.amount.toNumber();
+
+      if (row.status === BillingTransactionStatus.SUCCEEDED) {
+        summary.netChange += amount;
+
+        if (row.type === BillingTransactionType.DEPOSIT_TOPUP) {
+          summary.totalTopups += Math.abs(amount);
+        } else if (row.type === BillingTransactionType.REFUND) {
+          summary.totalRefunds += Math.abs(amount);
+        } else if (amount < 0) {
+          summary.totalCharges += Math.abs(amount);
+        }
+      }
+
+      return summary;
+    },
+    {
+      totalTopups: 0,
+      totalCharges: 0,
+      totalRefunds: 0,
+      netChange: 0,
+      transactionsCount,
+    },
+  );
+
+  return {
+    totalTopups: Number(summary.totalTopups.toFixed(2)),
+    totalCharges: Number(summary.totalCharges.toFixed(2)),
+    totalRefunds: Number(summary.totalRefunds.toFixed(2)),
+    netChange: Number(summary.netChange.toFixed(2)),
+    transactionsCount: summary.transactionsCount,
   };
 }
 
@@ -137,41 +228,8 @@ export async function getBillingTransactionById(id: string) {
   };
 }
 
-export async function getBillingTransactions(filters?: {
-  businessId?: string;
-  accountId?: string;
-  type?: BillingTransactionType;
-  status?: BillingTransactionStatus;
-  dateFrom?: Date;
-  dateTo?: Date;
-  limit?: number;
-  offset?: number;
-}) {
-  const where: Prisma.BillingTransactionWhereInput = {};
-
-  if (filters?.accountId) {
-    where.billingAccountId = filters.accountId;
-  }
-
-  if (filters?.businessId) {
-    where.billingAccount = {
-      businessId: filters.businessId,
-    };
-  }
-
-  if (filters?.type) {
-    where.type = filters.type;
-  }
-
-  if (filters?.status) {
-    where.status = filters.status;
-  }
-
-  if (filters?.dateFrom || filters?.dateTo) {
-    where.occurredAt = {};
-    if (filters.dateFrom) where.occurredAt.gte = filters.dateFrom;
-    if (filters.dateTo) where.occurredAt.lte = filters.dateTo;
-  }
+export async function getBillingTransactions(filters?: BillingTransactionFilters) {
+  const where = buildBillingTransactionWhere(filters);
 
   const [transactions, total] = await Promise.all([
     prisma.billingTransaction.findMany({
@@ -191,6 +249,20 @@ export async function getBillingTransactions(filters?: {
         subscription: {
           include: {
             plan: true,
+          },
+        },
+        childTransactions: {
+          where: {
+            type: BillingTransactionType.REFUND,
+            status: BillingTransactionStatus.SUCCEEDED,
+          },
+          select: {
+            id: true,
+            amount: true,
+            occurredAt: true,
+            parentTransactionId: true,
+            status: true,
+            type: true,
           },
         },
       },
