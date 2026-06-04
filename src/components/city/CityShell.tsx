@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { CityDiscoveryShell } from "./CityDiscoveryShell";
 import { Intent } from "@/lib/intent";
@@ -23,14 +24,32 @@ interface CityShellProps {
   searchParams: Record<string, string | string[] | undefined>;
 }
 
+function isSectionSystemFilterTableMissing(error: unknown): boolean {
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === "P2021" &&
+    String(error.meta?.table ?? "").includes("SectionSystemFilter")
+  );
+}
+
 export async function CityShell({ citySlug, intent, searchParams }: CityShellProps) {
   const [city, user, systemFilters] = await Promise.all([
     prisma.city.findUnique({ where: { slug: citySlug } }),
     getCurrentUser(),
-    prisma.sectionSystemFilter.findMany({
-      where: { sectionKey: intent, enabled: true },
-      select: { type: true },
-    }),
+    prisma.sectionSystemFilter
+      .findMany({
+        where: { sectionKey: intent, enabled: true },
+        select: { type: true },
+      })
+      .catch((error) => {
+        if (isSectionSystemFilterTableMissing(error)) {
+          console.warn(
+            "[CityShell] SectionSystemFilter table not found, returning empty system filters",
+          );
+          return [];
+        }
+        throw error;
+      }),
   ]);
   if (!city) notFound();
 

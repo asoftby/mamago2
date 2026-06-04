@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { requireAdminOrModeratorApiUser } from "@/lib/auth/requireAdminApi";
 
@@ -9,6 +10,14 @@ const VALID_TYPES = ["BUDGET", "FREE_ONLY"] as const;
 
 type ValidSection = (typeof VALID_SECTIONS)[number];
 type ValidType = (typeof VALID_TYPES)[number];
+
+function isSectionSystemFilterTableMissing(error: unknown): boolean {
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === "P2021" &&
+    String(error.meta?.table ?? "").includes("SectionSystemFilter")
+  );
+}
 
 // GET ?section=classes  → list system filters for section
 export async function GET(req: Request) {
@@ -22,10 +31,20 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "section required" }, { status: 400 });
   }
 
-  const rows = await prisma.sectionSystemFilter.findMany({
-    where: { sectionKey: section },
-    orderBy: { sortOrder: "asc" },
-  });
+  const rows = await prisma.sectionSystemFilter
+    .findMany({
+      where: { sectionKey: section },
+      orderBy: { sortOrder: "asc" },
+    })
+    .catch((error) => {
+      if (isSectionSystemFilterTableMissing(error)) {
+        console.warn(
+          "[admin/discovery/system-filters] SectionSystemFilter table not found, returning defaults",
+        );
+        return [];
+      }
+      throw error;
+    });
 
   // Return merged with defaults so UI always gets all types
   const result = VALID_TYPES.map((type) => {
