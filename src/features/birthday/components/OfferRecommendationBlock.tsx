@@ -8,7 +8,7 @@ type Props = PersonalRecommendation & {
 /**
  * Единый блок «умной подсказки» под названием карточки (площадка, доп. услуга, список в шагах).
  */
-/** Мягкий вспомогательный текст в PT Serif больше не используем вне journal-контекста. */
+/** Мягкий вспомогательный текст держим в serif-акценте только там, где это оправдано. */
 export function OfferRecommendationBlock({ first, second, className }: Props) {
   return (
     <div
