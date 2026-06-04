@@ -6,7 +6,7 @@ interface ArticleContentProps {
 }
 
 /**
- * ArticleContent — PT Serif reading wrapper.
+ * ArticleContent — reading wrapper with serif article typography.
  * Apply this around long-form article body text.
  * Product blocks (cards, CTAs) placed inside will inherit sans via their own className.
  */

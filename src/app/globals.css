@@ -121,6 +121,8 @@ body:has([data-slot="alert-dialog-overlay"][data-state="open"]) {
 :root {
   /* Site-wide layout */
   --site-maxw: 1200px;
+  --font-serif: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
+  --font-display: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
 
   /* Default Shadcn/Tailwind */
   --radius: 0.625rem;
