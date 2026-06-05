@@ -47,7 +47,7 @@ export default function IdentityTypographyPage() {
 
           <BodyMuted>ТРЦ Palazzo</BodyMuted> 
 
-          <Body>от 25 BYN</Body> 
+          <Body>от 25 Б</Body> 
         </div> 
       </section> 
 

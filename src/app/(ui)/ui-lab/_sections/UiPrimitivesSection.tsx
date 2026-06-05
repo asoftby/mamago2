@@ -27,6 +27,7 @@ import { ChipsRow } from "@/components/ui/chips-row";
 import { MediaCover } from "@/components/ui/media-cover";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AGE_GROUPS } from "@/features/filters/age/ageGroups";
+import { formatPriceFrom } from "@/lib/formatters/format-price";
 
 function ChipsRowLabDemo() {
   const [masonrySelected, setMasonrySelected] = React.useState<string[]>([]);
@@ -254,7 +255,7 @@ export function UiPrimitivesSection() {
               badge="Популярное"
               age="0+"
               dateLabel="10:00–22:00"
-              priceLabel="от 30 BYN"
+              priceLabel={formatPriceFrom(30)}
               rating={4.8}
             />
             <ActivityCard 

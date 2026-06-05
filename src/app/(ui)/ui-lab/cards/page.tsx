@@ -9,6 +9,7 @@ import {
   ActivityActionsPlan,
   type ActivityCardItem,
 } from "@/features/activities";
+import { formatPriceFrom } from "@/lib/formatters/format-price";
 
 const baseEvent: ActivityCardItem = {
   id: "event-1",
@@ -21,7 +22,7 @@ const baseEvent: ActivityCardItem = {
   dateLabel: "18 мая · 14:00",
   placeTitle: "Планетарий",
   addressLabel: "Минск, Фрунзе, 2",
-  priceLabel: "от 25 BYN",
+  priceLabel: formatPriceFrom(25),
   ageLabel: "5+",
   categoryLabel: "Наука",
   isSaved: false,
@@ -41,7 +42,7 @@ const baseOffer: ActivityCardItem = {
   dateLabel: "Июнь–август",
   placeTitle: "Kids Hub",
   addressLabel: "Минск, Победителей, 101",
-  priceLabel: "от 650 BYN",
+  priceLabel: formatPriceFrom(650),
   ageLabel: "7+",
   categoryLabel: "Лагерь",
   isSaved: false,
