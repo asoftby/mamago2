@@ -2,6 +2,7 @@ import prisma from "@/lib/prisma";
 import type { Prisma } from "@prisma/client";
 import type { OfferPageData, OfferType, OfferCtaType, OfferGalleryImage, OfferScheduleItem } from "./offerPageTypes";
 import { formatAgeRange, formatPrice } from "./offerPageFormat";
+import { BELARUS_CURRENCY_SYMBOL, normalizeUiCurrencyText } from "@/lib/formatters/format-price";
 import { resolvePlaceLogoImage } from "@/lib/place/resolvePlaceLogoImage";
 import { isMediaAssetCuid } from "@/lib/media/isMediaAssetCuid";
 import { isGoogleReviewsEnabled } from "@/lib/place/googleReviewsMeta";
@@ -54,7 +55,7 @@ function parseCampSession(value: Prisma.JsonValue, index: number): OfferSchedule
       ? new Date(dateFrom).toLocaleDateString("ru-RU")
       : undefined,
     dateTo: dateTo ? new Date(dateTo).toLocaleDateString("ru-RU") : undefined,
-    price: priceOverride != null ? `${priceOverride.toFixed(2)} BYN` : undefined,
+    price: priceOverride != null ? formatPrice(priceOverride) : undefined,
     description: asOptionalString(session.description),
     ageRange:
       ageFrom != null || ageTo != null
@@ -128,14 +129,14 @@ function resolvePriceUnit(args: {
     .trim();
 
   if (cleanedCaption && cleanedCaption.length <= 18) {
-    return `BYN / ${cleanedCaption}`;
+    return `${BELARUS_CURRENCY_SYMBOL} / ${cleanedCaption}`;
   }
 
   if (args.offerType === "CAMP") {
-    return "BYN / смена";
+    return `${BELARUS_CURRENCY_SYMBOL} / смена`;
   }
 
-  return "BYN";
+  return BELARUS_CURRENCY_SYMBOL;
 }
 
 function resolvePromotionText(args: {
@@ -243,7 +244,7 @@ export async function getOfferPageData({
   // Map schedule items
   const campSessionsRaw = Array.isArray(offer.campSessions) ? offer.campSessions : [];
   const fallbackShiftPrice = offer.priceFrom
-    ? `${offer.priceFrom.toFixed(2).replace(".", ".")} BYN`
+    ? formatPrice(offer.priceFrom)
     : undefined;
   const scheduleItems: OfferScheduleItem[] = campSessionsRaw
     .map((session, index) => parseCampSession(session, index))
@@ -332,7 +333,7 @@ export async function getOfferPageData({
     pricing: {
       mode: pricingMode,
       singlePrice: offer.priceFrom ? formatPrice(offer.priceFrom) : undefined,
-      priceCaption: offer.priceCaption || undefined,
+      priceCaption: normalizeUiCurrencyText(offer.priceCaption || undefined) || undefined,
       priceDisplay: offer.priceFrom ? new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 0 }).format(offer.priceFrom) : undefined,
       priceUnit: resolvePriceUnit({
         offerType,

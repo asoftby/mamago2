@@ -96,7 +96,7 @@ export function RecentTransactions({ transactions }: RecentTransactionsProps) {
                   `}
                 >
                   {transaction.amount > 0 ? "+" : ""}
-                  {formatPrice(Math.abs(transaction.amount))}
+                  {formatPrice(Math.abs(transaction.amount), { hideZero: true })}
                 </p>
               </div>
             </div>

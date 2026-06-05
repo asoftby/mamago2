@@ -1,6 +1,7 @@
 "use client";
 
 import { MediaCover } from "@/components/ui/media-cover";
+import { formatPriceFrom, normalizeUiCurrencyText } from "@/lib/formatters/format-price";
 import type { PlanItemWithActivity } from "../types/event";
 import { formatActivityAddressLine } from "../lib/formatActivityAddress";
 
@@ -17,10 +18,10 @@ function formatTime(date: Date | string | null | undefined): string {
 
 function formatPrice(activity: NonNullable<PlanItemWithActivity["activity"]>): string | null {
   const text = activity.priceText?.trim();
-  if (text) return text;
+  if (text) return normalizeUiCurrencyText(text);
   if (activity.priceFrom === 0) return "Бесплатно";
   if (activity.priceFrom != null && !Number.isNaN(activity.priceFrom)) {
-    return `от ${activity.priceFrom} ${(activity.currency || "BYN").trim()}`;
+    return formatPriceFrom(activity.priceFrom, { hideZero: true });
   }
   return null;
 }

@@ -2,7 +2,28 @@
 
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
+import { BYN_SYMBOL, normalizeUiCurrencyText } from "@/lib/formatters/format-price";
 import { Heart } from "lucide-react";
+
+function renderPriceSuffix(text: string) {
+  if (!text) return null;
+  const parts = text.split(BYN_SYMBOL);
+
+  return parts.flatMap((part, index) => {
+    const chunk = part ? [<span key={`text-${index}`}>{part}</span>] : [];
+    if (index === parts.length - 1) return chunk;
+    return [
+      ...chunk,
+      <span
+        key={`byn-${index}`}
+        aria-label="Белорусский рубль"
+        style={{ fontFamily: "nbrb, Menlo, monospace" }}
+      >
+        {BYN_SYMBOL}
+      </span>,
+    ];
+  });
+}
 
 export interface EventStickyActionBarProps {
   ctaRef?: React.RefObject<HTMLElement | null>;
@@ -93,9 +114,10 @@ export function EventStickyActionBar({
             </p>
           )}
           {(() => {
-            const spaceIdx = (priceLabel ?? "").lastIndexOf(" ");
-            const numPart = spaceIdx !== -1 ? priceLabel.slice(0, spaceIdx) : priceLabel;
-            const currencyPart = spaceIdx !== -1 ? priceLabel.slice(spaceIdx + 1) : "";
+            const normalizedPriceLabel = normalizeUiCurrencyText(priceLabel ?? "");
+            const spaceIdx = normalizedPriceLabel.lastIndexOf(" ");
+            const numPart = spaceIdx !== -1 ? normalizedPriceLabel.slice(0, spaceIdx) : normalizedPriceLabel;
+            const currencyPart = spaceIdx !== -1 ? normalizedPriceLabel.slice(spaceIdx + 1) : "";
             return (
               <div className="flex items-baseline gap-1">
                 <span style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 36, fontWeight: 400, lineHeight: 1, letterSpacing: "-0.03em", color: "#141210" }}>
@@ -103,7 +125,7 @@ export function EventStickyActionBar({
                 </span>
                 {currencyPart && (
                   <span className="text-[11px] text-[rgba(20,18,16,0.55)]" style={{ fontFamily: "Menlo, monospace" }}>
-                    {currencyPart}
+                    {renderPriceSuffix(currencyPart)}
                   </span>
                 )}
               </div>
@@ -184,9 +206,10 @@ export function EventStickyActionBar({
         )}
         <div className="mt-0.5 flex items-baseline gap-1">
           {(() => {
-            const spaceIdx = (priceLabel ?? "").lastIndexOf(" ");
-            const numPart = spaceIdx !== -1 ? priceLabel.slice(0, spaceIdx) : priceLabel;
-            const currencyPart = spaceIdx !== -1 ? priceLabel.slice(spaceIdx + 1) : "";
+            const normalizedPriceLabel = normalizeUiCurrencyText(priceLabel ?? "");
+            const spaceIdx = normalizedPriceLabel.lastIndexOf(" ");
+            const numPart = spaceIdx !== -1 ? normalizedPriceLabel.slice(0, spaceIdx) : normalizedPriceLabel;
+            const currencyPart = spaceIdx !== -1 ? normalizedPriceLabel.slice(spaceIdx + 1) : "";
             return (
               <>
                 <span style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 32, fontWeight: 400, lineHeight: 1, letterSpacing: "-0.03em", color: "#141210" }}>
@@ -194,7 +217,7 @@ export function EventStickyActionBar({
                 </span>
                 {currencyPart && (
                   <span className="text-[11px] text-[rgba(20,18,16,0.55)]" style={{ fontFamily: "Menlo, monospace" }}>
-                    {currencyPart}
+                    {renderPriceSuffix(currencyPart)}
                   </span>
                 )}
               </>

@@ -29,6 +29,7 @@ import {
   type LegacyBudgetLevel,
   type RouteStopPriceType,
 } from "@/lib/routes/routeBudget";
+import { BYN_SYMBOL } from "@/lib/formatters/format-price";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -394,7 +395,7 @@ function StopPriceEditor({
 
       {currentType !== "CUSTOM" && currentType !== "FREE" && currentType !== "UNKNOWN" && (
         <div className="text-[11px] text-neutral-400 px-1">
-          Валюта: {stop.priceCurrency || "BYN"}
+          Валюта: {stop.priceCurrency === "BYN" ? BYN_SYMBOL : stop.priceCurrency}
         </div>
       )}
 

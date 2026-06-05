@@ -142,7 +142,7 @@ export function HistoryModal({ account, onClose }: Props) {
                         }`}
                       >
                         {tx.amount >= 0 ? "+" : ""}
-                        {formatPrice(tx.amount)}
+                        {formatPrice(tx.amount, { hideZero: true })}
                       </p>
                       <p className="text-xs text-gray-500">
                         {format(new Date(tx.occurredAt), "dd MMM yyyy, HH:mm", {

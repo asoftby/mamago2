@@ -54,7 +54,7 @@ export function QuickTopUpBlock({ onGenerateInvoice, disabled = false }: QuickTo
               ${disabled ? "opacity-50 cursor-not-allowed" : ""}
             `}
           >
-            {formatPrice(amount)}
+            {formatPrice(amount, { hideZero: true })}
           </button>
         ))}
       </div>

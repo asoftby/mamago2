@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Heart } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { BYN_SYMBOL, normalizeUiCurrencyText } from "@/lib/formatters/format-price";
 import type { EventPageData } from "@/lib/event/eventPageTypes";
 import { EventBreadcrumbs } from "./EventBreadcrumbs";
 import { OwnerEditDropdown } from "./OwnerEditDropdown";
@@ -76,6 +77,26 @@ function splitTitle(title: string): { head: string; tail: string } {
   const idx = t.indexOf(" ");
   if (idx === -1) return { head: t, tail: "" };
   return { head: t.slice(0, idx), tail: t.slice(idx + 1) };
+}
+
+function renderPriceSuffix(text: string) {
+  if (!text) return null;
+  const parts = text.split(BYN_SYMBOL);
+
+  return parts.flatMap((part, index) => {
+    const chunk = part ? [<span key={`text-${index}`}>{part}</span>] : [];
+    if (index === parts.length - 1) return chunk;
+    return [
+      ...chunk,
+      <span
+        key={`byn-${index}`}
+        aria-label="Белорусский рубль"
+        style={{ fontFamily: "nbrb, Menlo, monospace" }}
+      >
+        {BYN_SYMBOL}
+      </span>,
+    ];
+  });
 }
 
 /** Countdown hook — returns d/h/m/s refreshed every second. */
@@ -226,7 +247,7 @@ export function EventDecisionPanel({
               Стоимость
             </div>
             {(() => {
-              const priceStr = data.priceLabel ?? "";
+              const priceStr = normalizeUiCurrencyText(data.priceLabel ?? "");
               const spaceIdx = priceStr.lastIndexOf(" ");
               const numPart = spaceIdx !== -1 ? priceStr.slice(0, spaceIdx) : priceStr;
               const currencyPart = spaceIdx !== -1 ? priceStr.slice(spaceIdx + 1) : "";
@@ -237,7 +258,7 @@ export function EventDecisionPanel({
                   </span>
                   {currencyPart && (
                     <span className="text-[13px] text-[rgba(20,18,16,0.55)]" style={{ fontFamily: "Menlo, monospace" }}>
-                      {currencyPart}
+                      {renderPriceSuffix(currencyPart)}
                     </span>
                   )}
                 </div>

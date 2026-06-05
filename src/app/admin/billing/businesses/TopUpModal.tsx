@@ -93,7 +93,7 @@ export function TopUpModal({ account, onClose, onSuccess }: Props) {
             </label>
             <input
               type="text"
-              value={formatPrice(account.depositBalance)}
+              value={formatPrice(account.depositBalance, { hideZero: true })}
               readOnly
               className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-700"
             />

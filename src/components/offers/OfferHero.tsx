@@ -13,6 +13,8 @@ import {
   CalendarDays,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { normalizeUiCurrencyText } from "@/lib/formatters/format-price";
+import { isAppMediaUrl } from "@/lib/media/isAppMediaUrl";
 import type { OfferPageData, OfferScheduleItem } from "@/lib/offer/offerPageTypes";
 import { Button } from "@/components/ui/button";
 import { RichContentRenderer } from "@/components/content/RichContentRenderer";
@@ -133,6 +135,8 @@ export function OfferHero({
                 className="object-cover transition-transform duration-[1200ms] ease-[cubic-bezier(0.2,0.7,0.2,1)] group-hover:scale-[1.04]"
                 priority
                 sizes="(max-width: 1024px) 100vw, 760px"
+                unoptimized={isAppMediaUrl(data.media.posterUrl)}
+                onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
               />
             ) : (
               <div className="absolute inset-0 flex items-center justify-center bg-[#EDE8DF]">
@@ -165,6 +169,8 @@ export function OfferHero({
                       fill
                       className="object-cover"
                       sizes="120px"
+                      unoptimized={isAppMediaUrl(data.media.posterUrl)}
+                      onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
                     />
                   )}
                   <div className="absolute inset-0 flex items-center justify-center bg-black/45">
@@ -187,6 +193,8 @@ export function OfferHero({
                       fill
                       className="object-cover"
                       sizes="120px"
+                      unoptimized={isAppMediaUrl(img.url)}
+                      onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
                     />
                     {isLastVisible && (
                       <div className="absolute inset-0 flex items-center justify-center bg-black/55 text-[15px] font-bold text-white">
@@ -310,6 +318,8 @@ export function OfferHero({
                   className="object-contain"
                   sizes="100vw"
                   priority
+                  unoptimized={isAppMediaUrl(gallery[galleryIndex]?.url)}
+                  onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
                 />
               </div>
               {gallery.length > 1 && (
@@ -519,14 +529,14 @@ function BookingCard({
 
   const inlinePriceCaption =
     typeof p.priceCaption === "string" && p.priceCaption.trim() && !looksLikeHtml(p.priceCaption)
-      ? p.priceCaption.trim()
+      ? normalizeUiCurrencyText(p.priceCaption.trim())
       : "";
 
   const priceUnit = (() => {
-    if (p.priceUnit) return p.priceUnit;
+    if (p.priceUnit) return normalizeUiCurrencyText(p.priceUnit);
     const raw = (p.singlePrice || p.priceFrom || "").replace(/^от\s+/i, "");
     const parts = raw.split(" ");
-    const currency = parts.slice(1).join(" ");
+    const currency = normalizeUiCurrencyText(parts.slice(1).join(" "));
     return [currency, inlinePriceCaption].filter(Boolean).join(" / ");
   })();
 
@@ -588,12 +598,12 @@ function BookingCard({
                 <div className="flex flex-col items-end gap-0.5">
                   {p.oldPrice && (
                     <span className="font-mono text-[11px] text-[rgba(20,18,16,0.30)] line-through">
-                      {p.oldPrice}
+                      {normalizeUiCurrencyText(p.oldPrice)}
                     </span>
                   )}
                   {priceLabel && (
                     <span className="font-mono text-[13px] text-[rgba(20,18,16,0.55)]">
-                      {priceLabel.replace(/ \/ /g, "/")}
+                      {normalizeUiCurrencyText(priceLabel).replace(/ \/ /g, "/")}
                     </span>
                   )}
                 </div>
@@ -607,7 +617,7 @@ function BookingCard({
             </span>
             {priceUnit && (
               <span className="pb-2 font-mono text-[12px] leading-tight text-[rgba(20,18,16,0.55)]">
-                {priceUnit.replace(/ \/ /g, "/")}
+                {normalizeUiCurrencyText(priceUnit).replace(/ \/ /g, "/")}
               </span>
             )}
           </div>

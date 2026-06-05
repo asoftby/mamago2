@@ -80,7 +80,7 @@ export function HeroBalanceCard({
                   ${isLowBalance ? "text-orange-900" : "text-green-900"}
                 `}
               >
-                {formatPrice(balance)}
+                {formatPrice(balance, { hideZero: true })}
               </p>
               <p className="mt-1 text-sm font-medium text-stone-600">{statusLabel}</p>
             </div>
@@ -93,14 +93,14 @@ export function HeroBalanceCard({
                 <span className="text-stone-500">Последнее пополнение:</span>{" "}
                 <span className="font-medium">
                   {format(lastTopUpDate, "d MMMM yyyy", { locale: ru })}
-                  {lastTopUpAmount && ` • ${formatPrice(lastTopUpAmount)}`}
+                  {lastTopUpAmount && ` • ${formatPrice(lastTopUpAmount, { hideZero: true })}`}
                 </span>
               </div>
             )}
             {monthlySpend !== undefined && monthlySpend > 0 && (
               <div>
                 <span className="text-stone-500">Расход за месяц:</span>{" "}
-                <span className="font-medium">{formatPrice(monthlySpend)}</span>
+                <span className="font-medium">{formatPrice(monthlySpend, { hideZero: true })}</span>
               </div>
             )}
           </div>

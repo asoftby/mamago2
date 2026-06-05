@@ -88,12 +88,12 @@ export default async function AdminBillingPage() {
         <BillingKpiCard
           icon={DollarSign}
           label="Revenue Today"
-          value={formatPrice(overview?.revenueToday || 0)}
+          value={formatPrice(overview?.revenueToday || 0, { hideZero: true })}
         />
         <BillingKpiCard
           icon={TrendingUp}
           label="Revenue This Month"
-          value={formatPrice(overview?.revenueThisMonth || 0)}
+          value={formatPrice(overview?.revenueThisMonth || 0, { hideZero: true })}
         />
         <BillingKpiCard
           icon={CheckCircle}
@@ -150,7 +150,7 @@ export default async function AdminBillingPage() {
                   <td className={`py-3 px-4 text-right font-medium ${
                     tx.amount.toNumber() > 0 ? "text-green-600" : "text-gray-900"
                   }`}>
-                    {tx.amount.toNumber() > 0 ? "+" : ""}{formatPrice(Math.abs(tx.amount.toNumber()))}
+                    {tx.amount.toNumber() > 0 ? "+" : ""}{formatPrice(Math.abs(tx.amount.toNumber()), { hideZero: true })}
                   </td>
                   <td className="py-3 px-4 text-center">
                     <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
@@ -183,7 +183,7 @@ export default async function AdminBillingPage() {
               >
                 <span className="text-sm font-medium text-gray-900">{account.business.name}</span>
                 <span className="text-sm text-orange-600 font-medium">
-                  {formatPrice(account.depositBalance.toNumber())}
+                  {formatPrice(account.depositBalance.toNumber(), { hideZero: true })}
                 </span>
               </Link>
             ))}

@@ -5,7 +5,7 @@ import { extractPlainTextFromHtml } from "@/lib/richtext/utils";
 import { sanitizeRichContent } from "@/components/content/RichContentRenderer";
 import { resolvePlaceLogoImage } from "@/lib/place/resolvePlaceLogoImage";
 import { resolveActivityCoverUrl } from "@/lib/event/resolveActivityCoverUrl";
-import { formatPriceFrom } from "@/lib/formatters/format-price";
+import { BYN_SYMBOL, formatPriceFrom } from "@/lib/formatters/format-price";
 import type { EventPageData } from "./eventPageTypes";
 import {
   getActivityFormatDetailLabel,
@@ -84,19 +84,29 @@ function discoveryIntentForActivity(): Intent {
   return "kuda";
 }
 
-/** Если в `priceText` только число/фраза без валюты — дописываем BYN (как в карточке и визарде). */
+function normalizePriceCurrencyText(text: string): string {
+  return text
+    .replace(/\bBYN\b/gi, BYN_SYMBOL)
+    .replace(/\bBr\b/gi, BYN_SYMBOL)
+    .replace(/руб\.?/gi, BYN_SYMBOL)
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
+/** Если в `priceText` только число/фраза без валюты — дописываем единый символ валюты. */
 function priceTextWithCurrencyIfNeeded(text: string): string {
-  if (/\bbyn\b/i.test(text)) return text;
+  if (/\bbyn\b/i.test(text) || /\bbr\b/i.test(text) || /руб\.?/i.test(text) || text.includes(BYN_SYMBOL)) {
+    return normalizePriceCurrencyText(text);
+  }
   const lower = text.toLowerCase();
   if (
     lower.includes("бесплатно") ||
     lower.includes("уточняйте") ||
-    lower.includes("руб") ||
     /€|\$|£|₽/.test(text)
   ) {
     return text;
   }
-  return `${text} BYN`;
+  return `${text} ${BYN_SYMBOL}`;
 }
 
 function priceLabel(activity: Pick<ActivityForEventPageInput, "priceText" | "priceFrom" | "currency">): string {

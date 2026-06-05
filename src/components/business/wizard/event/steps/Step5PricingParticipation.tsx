@@ -11,6 +11,7 @@ import {
 } from "@/features/publication-access";
 import type { EventFormData } from "../types";
 import { PriceListEditor } from "@/components/shared/PriceListEditor";
+import { BYN_SYMBOL } from "@/lib/formatters/format-price";
 
 interface Step5PricingParticipationProps {
   data: EventFormData;
@@ -188,7 +189,7 @@ export function Step5PricingParticipation({
           <div className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="price">
-                {data.pricingMode === "fixed" ? "Цена (BYN)" : "Цена от (BYN)"}
+                {data.pricingMode === "fixed" ? `Цена (${BYN_SYMBOL})` : `Цена от (${BYN_SYMBOL})`}
               </Label>
               <Input
                 id="price"
@@ -207,7 +208,7 @@ export function Step5PricingParticipation({
                   helperText="Если есть разные цены или условия, укажите их здесь."
                   value={data.priceDetails}
                   onChange={(value) => onChange({ priceDetails: value })}
-                  placeholder={"Дети — 30 BYN\nВзрослые — 50 BYN\nСемейный билет — 80 BYN"}
+                  placeholder={`Дети — 30 ${BYN_SYMBOL}\nВзрослые — 50 ${BYN_SYMBOL}\nСемейный билет — 80 ${BYN_SYMBOL}`}
                   disabled={!isEditable}
                   minHeight={140}
                 />

@@ -134,7 +134,7 @@ export function DepositTopUpModal({ balance, onClose }: DepositTopUpModalProps) 
             className="w-full cursor-not-allowed rounded-2xl bg-stone-100 py-3 text-sm font-semibold text-stone-400"
           >
             {effectiveAmount > 0
-              ? `Пополнение на ${formatPrice(effectiveAmount)} скоро будет доступно`
+              ? `Пополнение на ${formatPrice(effectiveAmount, { hideZero: true })} скоро будет доступно`
               : "Онлайн-пополнение скоро будет доступно"}
           </button>
           <p className="text-center text-xs text-stone-400">

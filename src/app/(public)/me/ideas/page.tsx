@@ -13,6 +13,7 @@ import { getEventTemporalState } from "@/lib/events/eventTemporalState";
 import { getLocalDateKey } from "@/lib/date/localDateKey";
 import { publicActivityPath } from "@/lib/business/eventPublicLink";
 import { formatRuShortDayMonthRange } from "@/lib/formatters/date";
+import { formatPriceFrom, normalizeUiCurrencyText } from "@/lib/formatters/format-price";
 import { normalizePricingMode } from "@/components/business/wizard/event/pricingMode";
 
 export const metadata = { title: "Мои идеи — mamaGo" };
@@ -97,12 +98,10 @@ function getOfferPriceLabel(offer: {
 }): string | null {
   if (offer.priceFrom == null) {
     const direct = offer.priceText?.trim();
-    return direct || null;
+    return direct ? normalizeUiCurrencyText(direct) : null;
   }
   if (offer.priceFrom === 0) return "бесплатно";
-
-  const currency = offer.currency?.trim() || "BYN";
-  return `от ${offer.priceFrom} ${currency}`;
+  return formatPriceFrom(offer.priceFrom);
 }
 
 function getOfferDateMetaLabel(offer: {

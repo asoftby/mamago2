@@ -6,6 +6,7 @@
 import { useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { BYN_SYMBOL } from "@/lib/formatters/format-price";
 import {
   Select,
   SelectContent,
@@ -89,7 +90,7 @@ export function Step4PriceAndCTAMVP({
       <div className="p-6 bg-white border border-gray-200 rounded-lg space-y-4">
         <div className="space-y-2">
           <Label htmlFor="priceFrom" className="flex items-center gap-1">
-            Цена от (BYN)
+            {`Цена от (${BYN_SYMBOL})`}
             <span className="text-red-500">*</span>
           </Label>
           <Input
