@@ -13,5 +13,24 @@ services:
     volumes:
       - mamago2_pg:/var/lib/postgresql/data
 
+  app:
+    build: .
+    container_name: mamago2-app
+    restart: unless-stopped
+    depends_on:
+      - db
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://mamago:mamago@db:5432/mamago2
+    volumes:
+      # Persist uploaded media files across container restarts.
+      # Without this volume, storage/uploads is lost on every redeploy.
+      - mamago2_storage:/app/storage
+
 volumes:
   mamago2_pg:
+  mamago2_storage:
