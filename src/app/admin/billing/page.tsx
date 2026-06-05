@@ -215,8 +215,8 @@ export default async function AdminBillingPage() {
           <p className="text-xs text-gray-600">View complete transaction history</p>
         </Link>
         <Link href="/admin/billing/plans" className="border rounded-lg p-4 hover:bg-gray-50 transition-colors">
-          <h3 className="text-sm font-semibold text-gray-900 mb-1">Plans</h3>
-          <p className="text-xs text-gray-600">Manage subscription plans</p>
+          <h3 className="text-sm font-semibold text-gray-900 mb-1">Тарификация</h3>
+          <p className="text-xs text-gray-600">Правила списаний за полезные действия бизнеса</p>
         </Link>
         <Link href="/admin/billing/businesses" className="border rounded-lg p-4 hover:bg-gray-50 transition-colors">
           <h3 className="text-sm font-semibold text-gray-900 mb-1">Business Balances</h3>

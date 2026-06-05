@@ -7,7 +7,7 @@ import { ru } from "date-fns/locale";
 
 interface HeroBalanceCardProps {
   balance: number;
-  currency: string;
+  status: "ACTIVE" | "LOW_BALANCE" | "ZERO_BALANCE" | "SUSPENDED";
   isLowBalance: boolean;
   lastTopUpDate?: Date;
   lastTopUpAmount?: number;
@@ -19,7 +19,7 @@ interface HeroBalanceCardProps {
 
 export function HeroBalanceCard({
   balance,
-  currency,
+  status,
   isLowBalance,
   lastTopUpDate,
   lastTopUpAmount,
@@ -28,6 +28,15 @@ export function HeroBalanceCard({
   onTopUp,
   onDownloadInvoice,
 }: HeroBalanceCardProps) {
+  const statusLabel =
+    status === "SUSPENDED"
+      ? "Приостановлено"
+      : status === "ZERO_BALANCE"
+        ? "Нулевой баланс"
+        : status === "LOW_BALANCE"
+          ? "Низкий баланс"
+          : "Активен";
+
   return (
     <div
       className={`
@@ -63,9 +72,9 @@ export function HeroBalanceCard({
                 className={`w-8 h-8 ${isLowBalance ? "text-orange-700" : "text-green-700"}`}
               />
             </div>
-            <div>
-              <p className="text-sm font-medium text-stone-600 mb-1">Текущий баланс</p>
-              <p
+          <div>
+            <p className="text-sm font-medium text-stone-600 mb-1">Текущий баланс</p>
+            <p
                 className={`
                   text-5xl font-bold tracking-tight
                   ${isLowBalance ? "text-orange-900" : "text-green-900"}
@@ -73,6 +82,7 @@ export function HeroBalanceCard({
               >
                 {formatPrice(balance)}
               </p>
+              <p className="mt-1 text-sm font-medium text-stone-600">{statusLabel}</p>
             </div>
           </div>
 

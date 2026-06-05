@@ -824,6 +824,7 @@ model Business {
   servicePlacements       BusinessServicePlacement[]
   verificationLogs        BusinessVerificationLog[]
   commercialNotifications CommercialNotification[]
+  billingActionRates      BillingActionRate[]          @relation("BusinessActionRates")
   places                  Place[]                    @relation("BusinessPlaces")
   organizers              Organizer[]
   promotions              Promotion[]
@@ -1909,6 +1910,32 @@ model BillingDispute {
   @@index([status])
 }
 
+model BillingActionRate {
+  id            String                   @id @default(cuid())
+  actionType    BillingActionType
+  scopeType     BillingRateScopeType
+  scopeId       String?
+  pricingType   BillingActionPricingType
+  fixedAmount   Decimal?                 @db.Decimal(10, 2)
+  percentRate   Decimal?                 @db.Decimal(5, 2)
+  minimumAmount Decimal?                 @db.Decimal(10, 2)
+  maximumAmount Decimal?                 @db.Decimal(10, 2)
+  currency      String                   @default("BYN")
+  isActive      Boolean                  @default(true)
+  startsAt      DateTime?
+  endsAt        DateTime?
+  reason        String?
+  createdById   String?
+  createdAt     DateTime                 @default(now())
+  updatedAt     DateTime                 @updatedAt
+  business      Business?                @relation("BusinessActionRates", fields: [scopeId], references: [id], onDelete: Cascade)
+
+  @@index([actionType])
+  @@index([scopeType, scopeId])
+  @@index([isActive])
+  @@index([startsAt, endsAt])
+}
+
 model Promotion {
   id               String                   @id @default(cuid())
   businessId       String
@@ -2862,6 +2889,25 @@ enum BillingAccountStatus {
   ACTIVE
   SUSPENDED
   CLOSED
+}
+
+enum BillingActionType {
+  LEAD_CREATED
+  BOOKING_CONFIRMED
+  CONTACT_OPENED
+  VISIT_CONFIRMED
+}
+
+enum BillingRateScopeType {
+  GLOBAL
+  BUSINESS
+}
+
+enum BillingActionPricingType {
+  FREE
+  FIXED
+  PERCENT
+  PERCENT_WITH_MINIMUM
 }
 
 enum PlanInterval {

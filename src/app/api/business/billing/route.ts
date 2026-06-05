@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import { getBillingAccountByBusinessId } from "@/server/services/billing/billingAccount.service";
 import prisma from "@/lib/prisma";
+import { getBusinessResolvedBillingActionPrices } from "@/server/services/billing/billingActionRateResolver.service";
+import {
+  BILLING_ACTION_SHORT_TITLES,
+  formatBillingActionPrice,
+} from "@/lib/billing/actionPricing";
 
 /**
  * GET /api/business/billing
@@ -42,21 +47,49 @@ export async function GET(_request: NextRequest) {
       );
     }
 
-    // Get active subscription if exists
     const activeSubscription = account.subscriptions?.[0] || null;
+    const resolvedPrices = await getBusinessResolvedBillingActionPrices({
+      businessId: business.id,
+    });
 
-    // Format response (public fields only, no admin metadata)
+    const balanceAmount = account.depositBalance.toNumber();
+    const balanceStatus =
+      account.status === "SUSPENDED"
+        ? "SUSPENDED"
+        : balanceAmount <= 0
+          ? "ZERO_BALANCE"
+          : balanceAmount < account.lowBalanceThreshold.toNumber()
+            ? "LOW_BALANCE"
+            : "ACTIVE";
+
+    const actionPrices = resolvedPrices
+      .filter((item) => item.rule && item.rule.isActive)
+      .map((item) => ({
+        actionType: item.actionType,
+        title: BILLING_ACTION_SHORT_TITLES[item.actionType],
+        description: "Вы платите только за полезные действия клиентов.",
+        displayPrice: item.rule ? formatBillingActionPrice(item.rule) : "Бесплатно",
+        isIndividual: item.source === "BUSINESS",
+        pricingType: item.rule?.pricingType ?? "FREE",
+      }));
+
     return NextResponse.json({
       success: true,
+      balance: {
+        amount: balanceAmount,
+        currency: account.currency,
+        status: balanceStatus,
+      },
+      actionPrices,
       billing: {
         businessId: business.id,
         businessName: business.name,
         status: account.status,
-        depositBalance: account.depositBalance.toNumber(),
+        depositBalance: balanceAmount,
         currency: account.currency,
         lowBalanceThreshold: account.lowBalanceThreshold.toNumber(),
         creditLimit: account.creditLimit.toNumber(),
-        availableBalance: account.depositBalance.toNumber() + account.creditLimit.toNumber(),
+        availableBalance: balanceAmount + account.creditLimit.toNumber(),
         currentPlan: activeSubscription
           ? {
               name: activeSubscription.plan?.name || null,
