@@ -5,157 +5,136 @@ import { cn } from "@/lib/utils";
 
 export interface RouteRatingBlockProps {
   routeId: string;
-  likesCount?: number;
-  neutralCount?: number;
-  dislikesCount?: number;
   onRate?: (type: "like" | "neutral" | "dislike") => void;
 }
 
 type RatingType = "like" | "neutral" | "dislike";
 
-export function RouteRatingBlock({
-  routeId,
-  likesCount = 0,
-  neutralCount = 0,
-  dislikesCount = 0,
-  onRate,
-}: RouteRatingBlockProps) {
+export function RouteRatingBlock({ routeId, onRate }: RouteRatingBlockProps) {
   const [selectedRating, setSelectedRating] = useState<RatingType | null>(null);
-  const [counts, setCounts] = useState({
-    like: likesCount,
-    neutral: neutralCount,
-    dislike: dislikesCount,
-  });
+  const [counts, setCounts] = useState({ like: 0, neutral: 0, dislike: 0 });
   const [hasVoted, setHasVoted] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  // Load initial counts from server
   useEffect(() => {
-    const loadCounts = async () => {
+    const load = async () => {
       try {
         const res = await fetch(`/api/routes/ratings/${routeId}`, {
           credentials: "include",
         });
         if (res.ok) {
           const data = await res.json();
-          setCounts({
-            like: data.like || 0,
-            neutral: data.neutral || 0,
-            dislike: data.dislike || 0,
-          });
+          setCounts({ like: data.like || 0, neutral: data.neutral || 0, dislike: data.dislike || 0 });
+          if (data.myVote) {
+            setSelectedRating(data.myVote as RatingType);
+            setHasVoted(true);
+          }
         }
-      } catch (error) {
-        console.error("Failed to load route ratings:", error);
+      } catch {
+        // keep defaults
+      } finally {
+        setLoading(false);
       }
     };
-
-    loadCounts();
-  }, [routeId]);
-
-  // Check if user has already voted on this route
-  useEffect(() => {
-    const votedRoutes = JSON.parse(localStorage.getItem("votedRoutes") || "{}");
-    if (votedRoutes[routeId]) {
-      setSelectedRating(votedRoutes[routeId]);
-      setHasVoted(true);
-    }
+    load();
   }, [routeId]);
 
   const handleRate = async (type: RatingType) => {
-    if (hasVoted) return; // Prevent duplicate votes
+    if (hasVoted || loading) return;
+
+    // Optimistic update
+    setSelectedRating(type);
+    setHasVoted(true);
+    setCounts((prev) => ({ ...prev, [type]: prev[type] + 1 }));
 
     try {
-      // Save vote to backend
       const res = await fetch("/api/routes/rate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({
-          routeId,
-          ratingType: type,
-        }),
+        body: JSON.stringify({ routeId, ratingType: type }),
       });
 
       if (res.status === 409) {
-        // Already voted
-        setHasVoted(true);
+        // Already voted on server — revert optimistic and reload
+        setCounts((prev) => ({ ...prev, [type]: prev[type] - 1 }));
+        const fresh = await fetch(`/api/routes/ratings/${routeId}`, { credentials: "include" });
+        if (fresh.ok) {
+          const data = await fresh.json();
+          setCounts({ like: data.like || 0, neutral: data.neutral || 0, dislike: data.dislike || 0 });
+          if (data.myVote) setSelectedRating(data.myVote as RatingType);
+        }
         return;
       }
 
       if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.error || "Failed to save rating");
+        // Revert on error
+        setSelectedRating(null);
+        setHasVoted(false);
+        setCounts((prev) => ({ ...prev, [type]: prev[type] - 1 }));
+        return;
       }
 
       const data = await res.json();
-
-      // Update local state with counts from server
       if (data.counts) {
-        setCounts({
-          like: data.counts.like,
-          neutral: data.counts.neutral,
-          dislike: data.counts.dislike,
-        });
+        setCounts({ like: data.counts.like, neutral: data.counts.neutral, dislike: data.counts.dislike });
       }
 
-      // Update local state
-      setSelectedRating(type);
-      setHasVoted(true);
-
-      // Save to localStorage to prevent duplicate votes
-      const votedRoutes = JSON.parse(localStorage.getItem("votedRoutes") || "{}");
-      votedRoutes[routeId] = type;
-      localStorage.setItem("votedRoutes", JSON.stringify(votedRoutes));
-
       onRate?.(type);
-    } catch (error) {
-      console.error("Failed to save rating:", error);
+    } catch {
+      // Revert on network error
+      setSelectedRating(null);
+      setHasVoted(false);
+      setCounts((prev) => ({ ...prev, [type]: prev[type] - 1 }));
     }
   };
 
   const ratings = [
-    { type: "like" as const, emoji: "😍", count: counts.like, label: "Нравится" },
-    { type: "neutral" as const, emoji: "🙂", count: counts.neutral, label: "Нормально" },
-    { type: "dislike" as const, emoji: "😫", count: counts.dislike, label: "Не нравится" },
+    { type: "like" as const, emoji: "😍" },
+    { type: "neutral" as const, emoji: "🙂" },
+    { type: "dislike" as const, emoji: "😫" },
   ];
 
   return (
-    <div className="flex flex-col items-center gap-4">
-      {/* Title */}
-      <p className="text-sm font-medium text-neutral-700">
-        Зацени маршрут
-      </p>
+    <div className="flex flex-col items-center gap-6 py-[30px]">
+      <div className="flex w-full items-center gap-4">
+        <div className="h-px flex-1 bg-neutral-200" />
+        <p
+          className="text-[11px] font-medium tracking-[0.18em] text-neutral-400 uppercase"
+          style={{ fontFamily: "Menlo, monospace" }}
+        >
+          Зацени маршрут
+        </p>
+        <div className="h-px flex-1 bg-neutral-200" />
+      </div>
 
-      {/* Rating buttons - no background, just emojis and counts */}
-      <div className="flex justify-center items-end gap-8">
-        {ratings.map(({ type, emoji, count }) => {
-          try {
-            return (
-              <button
-                key={type}
-                onClick={() => handleRate(type)}
-                disabled={hasVoted && selectedRating !== type}
-                className={cn(
-                  "flex flex-col items-center gap-2 transition-all duration-200",
-                  "hover:scale-110 active:scale-95",
-                  hasVoted && selectedRating !== type && "opacity-50 cursor-not-allowed",
-                  selectedRating === type && "ring-2 ring-offset-2 ring-neutral-300 rounded-xl p-2",
-                )}
-                aria-label={`Rate as ${type}`}
+      <div className="flex justify-center items-center gap-4">
+        {ratings.map(({ type, emoji }) => {
+          const isSelected = selectedRating === type;
+          const isDimmed = hasVoted && !isSelected;
+          return (
+            <button
+              key={type}
+              onClick={() => handleRate(type)}
+              disabled={hasVoted || loading}
+              className={cn(
+                "flex flex-col items-center justify-center gap-2.5 w-[100px] h-[100px] rounded-2xl bg-white transition-all duration-200",
+                "shadow-[0_2px_8px_rgba(0,0,0,0.06)] border border-neutral-100",
+                !hasVoted && !loading && "hover:scale-105 hover:shadow-[0_4px_14px_rgba(0,0,0,0.1)] active:scale-95 cursor-pointer",
+                isDimmed && "opacity-40",
+                isSelected && "ring-2 ring-neutral-300",
+              )}
+              aria-label={`Rate as ${type}`}
+            >
+              <span className="text-[36px] leading-none select-none">{emoji}</span>
+              <span
+                className="text-sm text-neutral-500 font-medium"
+                style={{ fontFamily: "Menlo, monospace" }}
               >
-                {/* Emoji - 10% larger (31px instead of 28px) */}
-                <span className="text-[31px] leading-none select-none">
-                  {emoji}
-                </span>
-                {/* Vote count */}
-                <span className="text-xs text-neutral-500 font-medium">
-                  {count}
-                </span>
-              </button>
-            );
-          } catch (e) {
-            console.error("Error rendering rating button:", e);
-            return null;
-          }
+                {counts[type]}
+              </span>
+            </button>
+          );
         })}
       </div>
     </div>

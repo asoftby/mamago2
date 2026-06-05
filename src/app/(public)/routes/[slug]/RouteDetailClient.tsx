@@ -258,7 +258,7 @@ function StopCard({
                 {stop.title ?? stop.address}
               </p>
               {stop.title && stop.address && (
-                <p className="flex items-center gap-1 text-sm text-neutral-400 mt-0.5">
+                <p className="flex items-center gap-1 text-sm text-neutral-400 mt-0.5" style={{ fontFamily: "Menlo, monospace" }}>
                   <MapPin className="w-3 h-3 shrink-0" />
                   {stop.address}
                 </p>
@@ -396,9 +396,9 @@ export function RouteDetailClient({ route }: Props) {
                   <div className="flex items-center gap-2 mt-0.5">
                     {travelMode === "walk" ? (
                       <>
-                        <span className="text-xs text-neutral-500">🔥 {routeStats.calories} ккал</span>
+                        <span className="text-xs text-neutral-500" style={{ fontFamily: "Menlo, monospace" }}>🔥 {routeStats.calories} ккал</span>
                         <span className="text-xs text-neutral-300">·</span>
-                        <span className="text-xs text-neutral-500">👣 {routeStats.steps.toLocaleString("ru-RU")} шагов</span>
+                        <span className="text-xs text-neutral-500" style={{ fontFamily: "Menlo, monospace" }}>👣 {routeStats.steps.toLocaleString("ru-RU")} шагов</span>
                       </>
                     ) : (
                       <span className="text-xs text-neutral-500">🚗 {routeStats.distance.toFixed(1)} км</span>
@@ -511,7 +511,7 @@ export function RouteDetailClient({ route }: Props) {
                 )}
               >
                 <Footprints className="w-3.5 h-3.5" />
-                Пешком
+                <span style={{ fontFamily: "Menlo, monospace" }} className="uppercase">Пешком</span>
               </button>
               <button
                 type="button"
@@ -524,7 +524,7 @@ export function RouteDetailClient({ route }: Props) {
                 )}
               >
                 <Car className="w-3.5 h-3.5" />
-                На авто
+                <span style={{ fontFamily: "Menlo, monospace" }} className="uppercase">На авто</span>
               </button>
             </div>
 
@@ -549,9 +549,9 @@ export function RouteDetailClient({ route }: Props) {
                     <div className="flex items-center gap-3 mt-1.5">
                       {travelMode === "walk" ? (
                         <>
-                          <span className="text-xs text-neutral-600 font-medium">🔥 {routeStats.calories} ккал</span>
+                          <span className="text-xs text-neutral-600 font-medium" style={{ fontFamily: "Menlo, monospace" }}>🔥 {routeStats.calories} ккал</span>
                           <span className="text-xs text-neutral-400">·</span>
-                          <span className="text-xs text-neutral-600 font-medium">👣 {routeStats.steps.toLocaleString("ru-RU")} шагов</span>
+                          <span className="text-xs text-neutral-600 font-medium" style={{ fontFamily: "Menlo, monospace" }}>👣 {routeStats.steps.toLocaleString("ru-RU")} шагов</span>
                         </>
                       ) : (
                         <span className="text-xs text-neutral-600 font-medium">🚗 {routeStats.distance.toFixed(1)} км</span>
@@ -580,24 +580,24 @@ export function RouteDetailClient({ route }: Props) {
                 <>
                   <div className="flex items-center gap-1">
                     <Users className="w-3.5 h-3.5 text-violet-500 shrink-0" />
-                    <span className="text-xs font-medium text-neutral-700">{ageLabel}</span>
+                    <span className="text-xs font-medium text-neutral-700" style={{ fontFamily: "Menlo, monospace" }}>{ageLabel}</span>
                   </div>
                   <span className="text-neutral-300">|</span>
                 </>
               )}
               <div className="flex items-center gap-1">
                 <MapPin className="w-3.5 h-3.5 text-[#EF8759] shrink-0" />
-                <span className="text-xs font-medium text-neutral-700">{route.stopsCount} точки</span>
+                <span className="text-xs font-medium text-neutral-700" style={{ fontFamily: "Menlo, monospace" }}>{route.stopsCount} точки</span>
               </div>
               <span className="text-neutral-300">|</span>
               <div className="flex items-center gap-1">
                 <Clock className="w-3.5 h-3.5 text-sky-500 shrink-0" />
-                <span className="text-xs font-medium text-neutral-700">{duration}</span>
+                <span className="text-xs font-medium text-neutral-700" style={{ fontFamily: "Menlo, monospace" }}>{duration}</span>
               </div>
               <span className="text-neutral-300">|</span>
               <div className="flex items-center gap-1">
                 <Wallet className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                <span className="text-xs font-medium text-neutral-700">{route.budgetLabel}</span>
+                <span className="text-xs font-medium text-neutral-700" style={{ fontFamily: "Menlo, monospace" }}>{route.budgetLabel}</span>
               </div>
             </div>
           </div>
@@ -644,7 +644,7 @@ export function RouteDetailClient({ route }: Props) {
                 {route.isEditorial ? "mamaGo" : (route.authorName ?? "Автор")}
               </p>
               {(route.updatedAt || route.createdAt) && (
-                <p className="text-xs text-neutral-400 mt-0.5">
+                <p className="text-xs text-neutral-400 mt-0.5" style={{ fontFamily: "Menlo, monospace" }}>
                   {route.updatedAt ? "Обновлено" : "Создано"}{" "}
                   {format(parseISO(route.updatedAt || route.createdAt!), "d MMMM yyyy", { locale: ru })}
                 </p>
@@ -670,15 +670,7 @@ export function RouteDetailClient({ route }: Props) {
 
           {/* Rating block */}
           <div className="mt-6">
-            <RouteRatingBlock
-              routeId={route.id}
-              likesCount={25}
-              neutralCount={15}
-              dislikesCount={4}
-              onRate={(type) => {
-                console.debug("Route rated:", type);
-              }}
-            />
+            <RouteRatingBlock routeId={route.id} />
           </div>
         </Container>
       </div>
