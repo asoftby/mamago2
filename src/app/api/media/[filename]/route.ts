@@ -37,12 +37,19 @@ export async function GET(
     });
 
     if (!media) {
-      return new NextResponse("Not found", { status: 404 });
+      console.warn(`[media-api] media record not found: lookup="${filename}"`);
+      return new NextResponse(
+        JSON.stringify({ error: "media not found", lookup: filename }),
+        { status: 404, headers: { "Content-Type": "application/json" } },
+      );
     }
 
     const user = await getCurrentUser();
     if (!(await canServeMediaResponse(media, user))) {
-      return new NextResponse("Not found", { status: 404 });
+      return new NextResponse(
+        JSON.stringify({ error: "access denied" }),
+        { status: 404, headers: { "Content-Type": "application/json" } },
+      );
     }
 
     const filepath =
@@ -52,7 +59,13 @@ export async function GET(
       resolveLegacyPublicUploadPath(media.storageKey);
 
     if (!filepath || !existsSync(filepath)) {
-      return new NextResponse("File not found", { status: 404 });
+      console.warn(
+        `[media-api] file missing on disk: mediaId="${media.id}" publicUrl="${media.publicUrl}" storageKey="${media.storageKey}" resolvedPath="${filepath}"`,
+      );
+      return new NextResponse(
+        JSON.stringify({ error: "file missing on disk", mediaId: media.id }),
+        { status: 404, headers: { "Content-Type": "application/json" } },
+      );
     }
 
     const fileBuffer = await readFile(filepath);
