@@ -73,6 +73,18 @@ function getBillingActionRateDelegate() {
   }).billingActionRate;
 }
 
+function isMissingBillingActionRateTableError(error: unknown): boolean {
+  if (!(error instanceof Prisma.PrismaClientKnownRequestError)) {
+    return false;
+  }
+
+  return (
+    error.code === "P2021" &&
+    typeof error.message === "string" &&
+    error.message.includes("BillingActionRate")
+  );
+}
+
 function buildFallbackGlobalRate(actionType: BillingActionType): BillingActionRate {
   const defaults = DEFAULT_BILLING_ACTION_RULES[actionType];
   const now = new Date();
@@ -122,39 +134,47 @@ export async function ensureDefaultBillingActionRates(createdById?: string | nul
     return BILLING_ACTION_TYPES.map((actionType) => buildFallbackGlobalRate(actionType));
   }
 
-  await Promise.all(
-    (Object.keys(DEFAULT_BILLING_ACTION_RULES) as BillingActionType[]).map(async (actionType) => {
-      const existing = await delegate.findFirst({
-        where: {
-          actionType,
-          scopeType: "GLOBAL",
-          scopeId: null,
-        },
-      });
+  try {
+    await Promise.all(
+      (Object.keys(DEFAULT_BILLING_ACTION_RULES) as BillingActionType[]).map(async (actionType) => {
+        const existing = await delegate.findFirst({
+          where: {
+            actionType,
+            scopeType: "GLOBAL",
+            scopeId: null,
+          },
+        });
 
-      if (existing) {
-        return existing;
-      }
+        if (existing) {
+          return existing;
+        }
 
-      const defaults = DEFAULT_BILLING_ACTION_RULES[actionType];
-      return delegate.create({
-        data: {
-          actionType,
-          scopeType: "GLOBAL",
-          scopeId: null,
-          pricingType: defaults.pricingType,
-          fixedAmount: defaults.fixedAmount,
-          percentRate: defaults.percentRate,
-          minimumAmount: defaults.minimumAmount,
-          maximumAmount: defaults.maximumAmount,
-          currency: "BYN",
-          isActive: defaults.isActive,
-          reason: defaults.reason,
-          createdById: createdById ?? null,
-        },
-      });
-    }),
-  );
+        const defaults = DEFAULT_BILLING_ACTION_RULES[actionType];
+        return delegate.create({
+          data: {
+            actionType,
+            scopeType: "GLOBAL",
+            scopeId: null,
+            pricingType: defaults.pricingType,
+            fixedAmount: defaults.fixedAmount,
+            percentRate: defaults.percentRate,
+            minimumAmount: defaults.minimumAmount,
+            maximumAmount: defaults.maximumAmount,
+            currency: "BYN",
+            isActive: defaults.isActive,
+            reason: defaults.reason,
+            createdById: createdById ?? null,
+          },
+        });
+      }),
+    );
+  } catch (error) {
+    if (isMissingBillingActionRateTableError(error)) {
+      return BILLING_ACTION_TYPES.map((actionType) => buildFallbackGlobalRate(actionType));
+    }
+
+    throw error;
+  }
 }
 
 export async function listBillingActionRates(params?: {
@@ -179,10 +199,22 @@ export async function listBillingActionRates(params?: {
   if (params?.actionType) where.actionType = params.actionType;
   if (!params?.includeInactive) where.isActive = true;
 
-  return delegate.findMany({
-    where,
-    orderBy: [{ actionType: "asc" }, { startsAt: "desc" }, { updatedAt: "desc" }],
-  });
+  try {
+    return await delegate.findMany({
+      where,
+      orderBy: [{ actionType: "asc" }, { startsAt: "desc" }, { updatedAt: "desc" }],
+    });
+  } catch (error) {
+    if (isMissingBillingActionRateTableError(error)) {
+      const fallbackRates =
+        params?.scopeType === "BUSINESS"
+          ? []
+          : BILLING_ACTION_TYPES.map((actionType) => buildFallbackGlobalRate(actionType));
+      return params?.includeInactive ? fallbackRates : fallbackRates.filter((rate) => rate.isActive);
+    }
+
+    throw error;
+  }
 }
 
 export async function upsertGlobalBillingActionRate(params: {
@@ -294,24 +326,38 @@ export async function resolveBillingActionRate(params: {
       : ({ rule: null, source: null } as const);
   }
 
-  const [businessRules, globalRules] = await Promise.all([
-    delegate.findMany({
-      where: {
-        actionType: params.actionType,
-        scopeType: "BUSINESS",
-        scopeId: params.businessId,
-      },
-      orderBy: [{ startsAt: "desc" }, { updatedAt: "desc" }],
-    }),
-    delegate.findMany({
-      where: {
-        actionType: params.actionType,
-        scopeType: "GLOBAL",
-        scopeId: null,
-      },
-      orderBy: [{ startsAt: "desc" }, { updatedAt: "desc" }],
-    }),
-  ]);
+  let businessRules: BillingActionRate[];
+  let globalRules: BillingActionRate[];
+
+  try {
+    [businessRules, globalRules] = await Promise.all([
+      delegate.findMany({
+        where: {
+          actionType: params.actionType,
+          scopeType: "BUSINESS",
+          scopeId: params.businessId,
+        },
+        orderBy: [{ startsAt: "desc" }, { updatedAt: "desc" }],
+      }),
+      delegate.findMany({
+        where: {
+          actionType: params.actionType,
+          scopeType: "GLOBAL",
+          scopeId: null,
+        },
+        orderBy: [{ startsAt: "desc" }, { updatedAt: "desc" }],
+      }),
+    ]);
+  } catch (error) {
+    if (isMissingBillingActionRateTableError(error)) {
+      const fallbackRule = buildFallbackGlobalRate(params.actionType);
+      return fallbackRule.isActive
+        ? ({ rule: fallbackRule, source: "GLOBAL" } as const)
+        : ({ rule: null, source: null } as const);
+    }
+
+    throw error;
+  }
 
   const businessRule = businessRules.filter((rule) => isRuleActiveAt(rule, occurredAt)).sort(ruleSort)[0] ?? null;
   if (businessRule) {

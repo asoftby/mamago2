@@ -6,6 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Trash2, Plus, Bold, Italic, List } from "lucide-react";
 import type { PriceData, PriceItem } from "@/lib/priceItems";
+import { BELARUS_CURRENCY_SYMBOL } from "@/lib/formatters/format-price";
 
 interface PriceListEditorProps {
   value: PriceData;
@@ -61,7 +62,7 @@ export function PriceListEditor({ value, onChange, disabled }: PriceListEditorPr
 
   function add() {
     const id = Math.random().toString(36).slice(2, 8);
-    onChange({ ...value, items: [...items, { id, label: "", price: "", unit: "BYN" }] });
+    onChange({ ...value, items: [...items, { id, label: "", price: "", unit: BELARUS_CURRENCY_SYMBOL }] });
   }
 
   function remove(id: string) {
@@ -116,7 +117,7 @@ export function PriceListEditor({ value, onChange, disabled }: PriceListEditorPr
             />
             <Input
               className="w-20"
-              placeholder="BYN"
+              placeholder={BELARUS_CURRENCY_SYMBOL}
               value={item.unit}
               onChange={(e) => updateItem(item.id, "unit", e.target.value)}
               disabled={disabled}

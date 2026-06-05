@@ -74,7 +74,7 @@ import { formatPrice } from "@/lib/formatters/format-price";
 
 // Format currency — kept for local use, delegates to shared formatter
 function formatCurrency(amount: number): string {
-  return formatPrice(amount);
+  return formatPrice(amount, { hideZero: true });
 }
 
 export default function AdminDashboardPage() {

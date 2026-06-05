@@ -1,12 +1,11 @@
-import { formatPriceFrom } from "@/lib/formatters/format-price";
+import { formatPriceFrom, normalizeUiCurrencyText } from "@/lib/formatters/format-price";
 
 /** Shared meta lines for SearchDocument (mirrors public search card hints). */
 
 export function formatPrice(from: number | null | undefined, currency: string | null | undefined): string {
   if (from == null || Number.isNaN(from)) return "";
   void currency; // currency param kept for API compat; always uses BYN
-  const c = "BYN";
-  return `от ${Math.round(from)} ${c}`;
+  return formatPriceFrom(Math.round(from), { hideZero: true });
 }
 
 export function activityMetaLine(args: {
@@ -63,7 +62,7 @@ export function offerMetaLine(args: {
 }): string {
   const placeLine = [args.placeCity, args.placeTitle].filter(Boolean).join(" · ");
   const price =
-    args.priceText?.trim() ||
+    normalizeUiCurrencyText(args.priceText?.trim()) ||
     (args.priceFrom != null ? formatPrice(args.priceFrom, "BYN") : "");
   return [price, placeLine].filter(Boolean).join(" · ") || "Предложение";
 }

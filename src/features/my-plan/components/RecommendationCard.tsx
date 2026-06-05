@@ -8,8 +8,8 @@ import { Check, Plus, RefreshCw, Sparkles, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { publicActivityPath } from "@/lib/business/eventPublicLink";
 import { resolveActivityParticipationCta } from "@/lib/plan/resolveActivityParticipationCta";
+import { formatPriceFrom, normalizeUiCurrencyText } from "@/lib/formatters/format-price";
 import type { PlanItemWithActivity } from "../types/event";
-import { formatActivityAddressLine } from "../lib/formatActivityAddress";
 import { useOptionalCity } from "@/contexts/CityContext";
 import { DEFAULT_CITY_SLUG } from "@/lib/city/resolveCityContext";
 
@@ -33,7 +33,6 @@ export function RecommendationCard({
   onAddToPlan,
   onRemoveFromPlan,
   onShowMore,
-  onShowPrevious,
   alternativesCount,
   variantPosition,
   variantTotal,
@@ -87,16 +86,10 @@ export function RecommendationCard({
     const a = item.activity;
     if (!a) return null;
     const text = a.priceText?.trim();
-    if (text) return text;
+    if (text) return normalizeUiCurrencyText(text);
     if (a.priceFrom === 0) return "Бесплатно";
     if (a.priceFrom != null && !Number.isNaN(a.priceFrom)) {
-      const cur = (a.currency || "BYN").trim();
-      // Форматируем число с запятой: 8 → "8,00"
-      const formatted = a.priceFrom.toLocaleString("ru-RU", {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      });
-      return `от ${formatted} ${cur}`.trim();
+      return formatPriceFrom(a.priceFrom);
     }
     return null;
   })();

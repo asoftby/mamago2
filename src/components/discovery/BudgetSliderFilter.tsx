@@ -1,6 +1,6 @@
 "use client";
 
-import { BYN_SYMBOL } from "@/lib/formatters/format-price";
+import { formatPriceUpTo } from "@/lib/formatters/format-price";
 import { cn } from "@/lib/utils";
 import { getBudgetStep } from "@/lib/discovery/budgetUtils";
 import { useBudgetFilter } from "@/features/filters/discovery/useBudgetFilter";
@@ -63,7 +63,7 @@ export function BudgetSliderFilter({ max, className }: BudgetSliderFilterProps) 
             isActive ? "text-gray-900" : "text-gray-400",
           )}
         >
-          {isActive ? `до ${budget} ${BYN_SYMBOL}` : `до ${max} ${BYN_SYMBOL}`}
+          {isActive ? formatPriceUpTo(budget, { hideZero: true }) : formatPriceUpTo(max, { hideZero: true })}
         </span>
       </div>
     </div>

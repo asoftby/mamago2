@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { BirthdayOffer, BirthdayBudgetGroup } from "../../types/birthday";
-import { BYN_SYMBOL } from "@/lib/formatters/format-price";
+import { BYN_SYMBOL, formatPrice } from "@/lib/formatters/format-price";
 import { getBudgetRange, formatBudgetRange } from "../lib/budgetRanges";
 import { cn } from "@/lib/utils";
 
@@ -36,7 +36,7 @@ function getStatusLabel(status: BudgetStatus, total: number, budgetMax: number):
     case "almost":
       return "Почти достигли бюджета";
     case "exceeded":
-      return `Превышен на +${total - budgetMax} ${BYN_SYMBOL}`;
+      return `Превышен на +${formatPrice(total - budgetMax, { hideZero: true })}`;
     default:
       return "";
   }
@@ -93,7 +93,7 @@ export function BudgetBar({
   if (!budgetGroup || budgetGroup === "unknown") {
     return (
       <div className={cn("text-xs", className)}>
-        <span className="font-semibold text-foreground">{totalPrice} {BYN_SYMBOL}</span>
+        <span className="font-semibold text-foreground">{formatPrice(totalPrice, { hideZero: true })}</span>
       </div>
     );
   }
@@ -115,7 +115,7 @@ export function BudgetBar({
       >
         <div className="flex items-center gap-1.5 flex-wrap">
           <span className="font-semibold text-foreground text-xs whitespace-nowrap">
-            {totalPrice} {BYN_SYMBOL} из {rangeLabel}
+            {formatPrice(totalPrice, { hideZero: true })} из {rangeLabel}
           </span>
           <span className={cn("text-[11px] font-medium", statusStyles[status])}>
             {statusLabel}
@@ -132,7 +132,7 @@ export function BudgetBar({
             {breakdown.map((b) => (
               <div key={b.title} className="flex justify-between gap-2">
                 <span className="truncate">{b.label}: {b.title}</span>
-                <span className="shrink-0">{b.price} {BYN_SYMBOL}</span>
+                <span className="shrink-0">{formatPrice(b.price, { hideZero: true })}</span>
               </div>
             ))}
           </div>
@@ -153,7 +153,7 @@ export function BudgetBar({
     >
       <div className="flex items-center justify-between gap-2">
         <span className="text-sm font-semibold text-foreground">
-          {totalPrice} {BYN_SYMBOL} из {rangeLabel}
+          {formatPrice(totalPrice, { hideZero: true })} из {rangeLabel}
         </span>
         <span className={cn("text-sm font-medium", statusStyles[status])}>
           {statusLabel}
@@ -174,7 +174,7 @@ export function BudgetBar({
             {breakdown.map((b) => (
               <div key={b.title} className="flex justify-between gap-2 text-muted-foreground">
                 <span className="truncate">{b.label}: {b.title}</span>
-                <span className="shrink-0 font-medium text-foreground">{b.price} {BYN_SYMBOL}</span>
+                <span className="shrink-0 font-medium text-foreground">{formatPrice(b.price, { hideZero: true })}</span>
               </div>
             ))}
           </div>

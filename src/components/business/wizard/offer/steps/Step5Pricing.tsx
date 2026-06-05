@@ -14,7 +14,7 @@ import {
   type PublicationAccess,
 } from "@/features/publication-access";
 import { WizardRichTextField } from "@/components/business/wizard/shared/WizardRichTextField";
-import { formatPrice } from "@/lib/formatters/format-price";
+import { BYN_SYMBOL, formatPrice } from "@/lib/formatters/format-price";
 import { isRichTextMeaningful } from "@/lib/richtext/utils";
 import { Plus, Trash2 } from "lucide-react";
 import type { OfferFormData, PricingOption } from "../types";
@@ -227,7 +227,7 @@ export function Step5Pricing({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="BYN">BYN</SelectItem>
+                  <SelectItem value="BYN">{BYN_SYMBOL}</SelectItem>
                   <SelectItem value="USD">USD</SelectItem>
                   <SelectItem value="EUR">EUR</SelectItem>
                 </SelectContent>

@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import { PrimaryButton } from "@/components/ui/PrimaryButton";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { normalizeUiCurrencyText } from "@/lib/formatters/format-price";
 import { Check } from "lucide-react";
 
 interface EventTopFloatingBarProps {
@@ -81,9 +82,10 @@ export function EventTopFloatingBar({
             </p>
           )}
           {(() => {
-            const spaceIdx = (priceLabel ?? "").lastIndexOf(" ");
-            const numPart = spaceIdx !== -1 ? priceLabel.slice(0, spaceIdx) : priceLabel;
-            const currencyPart = spaceIdx !== -1 ? priceLabel.slice(spaceIdx + 1) : "";
+            const normalizedPriceLabel = normalizeUiCurrencyText(priceLabel ?? "");
+            const spaceIdx = normalizedPriceLabel.lastIndexOf(" ");
+            const numPart = spaceIdx !== -1 ? normalizedPriceLabel.slice(0, spaceIdx) : normalizedPriceLabel;
+            const currencyPart = spaceIdx !== -1 ? normalizedPriceLabel.slice(spaceIdx + 1) : "";
             return (
               <div className="flex items-baseline gap-1">
                 <span style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 36, fontWeight: 400, lineHeight: 1, letterSpacing: "-0.03em", color: "#141210" }}>

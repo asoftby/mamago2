@@ -6,6 +6,8 @@ import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useRef } from "react";
+import { formatPriceFrom } from "@/lib/formatters/format-price";
+import { isAppMediaUrl } from "@/lib/media/isAppMediaUrl";
 
 interface Event {
   id: string;
@@ -104,6 +106,8 @@ export function PlaceEventsCarousel({
                     alt={event.title}
                     fill
                     className="object-cover group-hover:scale-105 transition-transform duration-300"
+                    unoptimized={isAppMediaUrl(event.imageUrl)}
+                    onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
                   />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-50 to-purple-50">
@@ -141,7 +145,7 @@ export function PlaceEventsCarousel({
                     <span className="text-lg font-bold text-gray-900">
                       {event.price === 0
                         ? "Бесплатно"
-                        : `от ${event.price} ₽`}
+                        : formatPriceFrom(event.price, { hideZero: true })}
                     </span>
                   </div>
                 )}

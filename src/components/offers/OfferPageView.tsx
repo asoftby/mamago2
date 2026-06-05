@@ -16,6 +16,7 @@ import {
   type SaveScenario,
   type SaveToPlanResult,
 } from "@/components/activity/SaveToPlanModal";
+import { normalizeUiCurrencyText } from "@/lib/formatters/format-price";
 import { toast } from "@/lib/toast";
 
 interface OfferPageViewProps {
@@ -158,7 +159,7 @@ export function OfferPageView({
     if (!raw) return "";
     const parts = raw.split(" ");
     const num = parts[0] ?? "";
-    const unit = p.priceUnit || parts.slice(1).join(" ");
+    const unit = normalizeUiCurrencyText(p.priceUnit || parts.slice(1).join(" "));
     return unit ? `${num} ${unit}` : num;
   }, [data.pricing]);
 

@@ -7,6 +7,7 @@ import { FilterSelect } from "@/components/ui/filter-select";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { getTodayStart } from "@/lib/date/getTodayStart";
+import { BYN_SYMBOL } from "@/lib/formatters/format-price";
 
 export type ActivityFormData = {
   name: string;
@@ -203,7 +204,7 @@ export function ActivityForm({
             id="currency"
             value={formData.currency ?? "BYN"}
             options={[
-              { value: "BYN", label: "BYN" },
+              { value: "BYN", label: BYN_SYMBOL },
               { value: "USD", label: "USD" },
               { value: "EUR", label: "EUR" },
               { value: "RUB", label: "RUB" },

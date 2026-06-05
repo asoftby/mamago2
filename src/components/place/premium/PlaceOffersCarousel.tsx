@@ -6,6 +6,8 @@ import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useRef } from "react";
+import { formatPrice, formatPriceFrom } from "@/lib/formatters/format-price";
+import { isAppMediaUrl } from "@/lib/media/isAppMediaUrl";
 
 interface Offer {
   id: string;
@@ -95,6 +97,8 @@ export function PlaceOffersCarousel({
                     alt={offer.title}
                     fill
                     className="object-cover group-hover:scale-105 transition-transform duration-300"
+                    unoptimized={isAppMediaUrl(offer.imageUrl)}
+                    onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
                   />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-orange-50 to-pink-50">
@@ -148,17 +152,17 @@ export function PlaceOffersCarousel({
                     {offer.discount && offer.discount > 0 ? (
                       <div className="flex items-baseline gap-2">
                         <span className="text-lg font-bold text-gray-900">
-                          {Math.round(offer.price * (1 - offer.discount / 100))} ₽
+                          {formatPrice(Math.round(offer.price * (1 - offer.discount / 100)), { hideZero: true })}
                         </span>
                         <span className="text-sm text-gray-500 line-through">
-                          {offer.price} ₽
+                          {formatPrice(offer.price, { hideZero: true })}
                         </span>
                       </div>
                     ) : (
                       <span className="text-lg font-bold text-gray-900">
                         {offer.price === 0
                           ? "Бесплатно"
-                          : `от ${offer.price} ₽`}
+                          : formatPriceFrom(offer.price, { hideZero: true })}
                       </span>
                     )}
                   </div>

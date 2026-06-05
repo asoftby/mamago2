@@ -6,6 +6,7 @@ import { QuickTopUpBlock } from "@/components/business/billing/QuickTopUpBlock";
 import { BalanceStats } from "@/components/business/billing/BalanceStats";
 import { RecentTransactions } from "@/components/business/billing/RecentTransactions";
 import { FirstTopUpModal } from "@/components/business/billing/FirstTopUpModal";
+import { formatPrice } from "@/lib/formatters/format-price";
 import { toast } from "sonner";
 
 interface BalancePageProps {
@@ -70,7 +71,7 @@ export function BalancePage({
     } else {
       // TODO: Generate invoice when backend is ready
       toast.success(
-        `Счет на сумму ${amount} BYN будет сформирован после подключения invoice API`,
+        `Счет на сумму ${formatPrice(amount, { hideZero: true })} будет сформирован после подключения invoice API`,
         {
           description: "Мы работаем над этой функцией",
         }

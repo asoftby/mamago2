@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Image from "next/image";
 import { X, ChevronLeft, ChevronRight } from "lucide-react";
+import { isAppMediaUrl } from "@/lib/media/isAppMediaUrl";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 
@@ -55,6 +56,8 @@ export function PlaceGallery({ images }: PlaceGalleryProps) {
               className="object-cover transition-transform group-hover:scale-105"
               sizes="(max-width: 640px) 100vw, 50vw"
               priority
+              unoptimized={isAppMediaUrl(displayImages[0].url)}
+              onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
             />
             <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
           </div>
@@ -72,6 +75,8 @@ export function PlaceGallery({ images }: PlaceGalleryProps) {
                 fill
                 className="object-cover transition-transform group-hover:scale-105"
                 sizes="(max-width: 640px) 50vw, 25vw"
+                unoptimized={isAppMediaUrl(image.url)}
+                onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
               />
               <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
               
@@ -134,6 +139,8 @@ export function PlaceGallery({ images }: PlaceGalleryProps) {
                 fill
                 className="object-contain"
                 sizes="95vw"
+                unoptimized={isAppMediaUrl(images[currentIndex].url)}
+                onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
               />
             </div>
 

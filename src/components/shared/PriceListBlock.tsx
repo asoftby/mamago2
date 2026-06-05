@@ -1,4 +1,5 @@
 import type { PriceItem } from "@/lib/priceItems";
+import { normalizeUiCurrencyText } from "@/lib/formatters/format-price";
 
 interface PriceListBlockProps {
   items: PriceItem[];
@@ -77,10 +78,10 @@ export function PriceListBlock({ items, note, updatedAt }: PriceListBlockProps) 
             <span className="text-xs text-muted-foreground w-4 shrink-0">{index + 1}.</span>
             <span className="flex-1 text-sm text-foreground">{item.label}</span>
             <span className="font-serif text-base font-medium text-foreground tabular-nums">
-              {item.price}
+              {normalizeUiCurrencyText(item.price)}
             </span>
             {item.unit && (
-              <span className="text-xs text-muted-foreground">{item.unit}</span>
+              <span className="text-xs text-muted-foreground">{normalizeUiCurrencyText(item.unit)}</span>
             )}
           </div>
         ))}

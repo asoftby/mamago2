@@ -1,54 +1,107 @@
 /**
- * Shared price formatter for the entire mamaGo platform.
+ * Shared UI price formatter for the entire mamaGo platform.
  *
- * RULE: All prices must be displayed only through this formatter.
- * Direct string interpolation of currency is forbidden.
- *
- * Format: `{amount} Br` (rendered via NBRB font as the official BYN symbol at U+E901)
- * - Integer amounts: `100 Br`
- * - Fractional amounts: `49.90 Br`
+ * RULE: user-facing prices must be displayed only through this formatter layer.
+ * Technical currency codes like `BYN` may still exist in DB/API/schema contexts.
  */
 
-/** Official BYN currency symbol from the NBRB font (U+E901). */
-export const BYN_SYMBOL = "";
+// The custom NBRB font exposes the Belarusian ruble sign at U+E901.
+export const BELARUS_CURRENCY_SYMBOL = "\uE901";
+export const BYN_SYMBOL = BELARUS_CURRENCY_SYMBOL;
 
-const CURRENCY = BYN_SYMBOL;
+type FormatPriceOptions = {
+  freeLabel?: string;
+  fromPrefix?: boolean;
+  currencySymbol?: string;
+  hideZero?: boolean;
+};
 
-/**
- * Formats a numeric price value to the standard display format.
- *
- * @example
- * formatPrice(100)    // "100 BYN"
- * formatPrice(49.9)   // "49.90 BYN"
- * formatPrice(0)      // "0 BYN"
- */
-export function formatPrice(amount: number): string {
-  const isInteger = Number.isInteger(amount);
-  const formatted = isInteger ? String(amount) : amount.toFixed(2);
-  return `${formatted} ${CURRENCY}`;
+const UI_CURRENCY_RE = /\bBYN\b|\bBr\b|руб\.?|р\.|₽/gi;
+
+function formatNumber(value: number): string {
+  const hasDecimals = Math.round(value * 100) % 100 !== 0;
+  return new Intl.NumberFormat("ru-RU", {
+    minimumFractionDigits: hasDecimals ? 2 : 0,
+    maximumFractionDigits: hasDecimals ? 2 : 0,
+  }).format(value);
 }
 
-/**
- * Formats a price with "от" prefix (used for "from X BYN" display).
- *
- * @example
- * formatPriceFrom(100)  // "от 100 BYN"
- * formatPriceFrom(49.9) // "от 49.90 BYN"
- */
-export function formatPriceFrom(amount: number): string {
-  return `от ${formatPrice(amount)}`;
+function parseNumberish(value: string): number | null {
+  const normalized = value.trim().replace(/\s+/g, "").replace(",", ".");
+  if (!/^-?\d+(\.\d+)?$/.test(normalized)) return null;
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
-/**
- * Formats a signed transaction amount (positive = income, negative = expense).
- * Includes sign prefix and absolute value.
- *
- * @example
- * formatTransactionAmount(100)   // "+100 BYN"
- * formatTransactionAmount(-49.9) // "−49.90 BYN"
- */
+export function normalizeUiCurrencyText(
+  value: string | null | undefined,
+  currencySymbol: string = BELARUS_CURRENCY_SYMBOL,
+): string {
+  if (!value) return "";
+  return value
+    .replace(UI_CURRENCY_RE, currencySymbol)
+    .replace(/\s{2,}/g, " ")
+    .replace(new RegExp(`${currencySymbol}\\s*${currencySymbol}`, "g"), currencySymbol)
+    .trim();
+}
+
+export function formatPrice(
+  value: number | string | null | undefined,
+  options: FormatPriceOptions = {},
+): string {
+  if (value == null) return "";
+
+  const currencySymbol = options.currencySymbol ?? BELARUS_CURRENCY_SYMBOL;
+  const freeLabel = options.freeLabel ?? "Бесплатно";
+
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) return "";
+    const parsed = parseNumberish(trimmed);
+    if (parsed == null) return normalizeUiCurrencyText(trimmed, currencySymbol);
+    return formatPrice(parsed, options);
+  }
+
+  if (!Number.isFinite(value)) return "";
+  if (value === 0 && !options.hideZero) return freeLabel;
+
+  const formatted = `${formatNumber(value)} ${currencySymbol}`;
+  return options.fromPrefix ? `от ${formatted}` : formatted;
+}
+
+export function formatPriceFrom(
+  value: number | string | null | undefined,
+  options: Omit<FormatPriceOptions, "fromPrefix"> = {},
+): string {
+  return formatPrice(value, { ...options, fromPrefix: true });
+}
+
+export function formatPriceUpTo(
+  value: number | string | null | undefined,
+  options: Omit<FormatPriceOptions, "fromPrefix"> = {},
+): string {
+  const base = formatPrice(value, { ...options, hideZero: true });
+  return base ? `до ${base}` : "";
+}
+
+export function formatPriceRange(
+  from: number | string | null | undefined,
+  to: number | string | null | undefined,
+  options: Omit<FormatPriceOptions, "fromPrefix"> = {},
+): string {
+  const currencySymbol = options.currencySymbol ?? BELARUS_CURRENCY_SYMBOL;
+  const fromNum = typeof from === "string" ? parseNumberish(from) : from;
+  const toNum = typeof to === "string" ? parseNumberish(to) : to;
+
+  if (fromNum == null && toNum == null) return "";
+  if (fromNum == null) return formatPriceUpTo(toNum, options);
+  if (toNum == null) return formatPriceFrom(fromNum, options);
+  if (fromNum === toNum) return formatPrice(fromNum, { ...options, hideZero: true });
+  return `${formatNumber(fromNum)}–${formatNumber(toNum)} ${currencySymbol}`;
+}
+
 export function formatTransactionAmount(amount: number): string {
   const abs = Math.abs(amount);
   const sign = amount > 0 ? "+" : "−";
-  return `${sign}${formatPrice(abs)}`;
+  return `${sign}${formatPrice(abs, { hideZero: true })}`;
 }

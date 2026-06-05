@@ -14,17 +14,49 @@ type Props = {
 
 export const dynamic = "force-dynamic";
 
+/** Strip region/country suffixes from a Google-formatted address, keeping city + street + house */
+function reorderAddress(raw: string, cityName?: string | null): string {
+  const parts = raw.split(",").map((p) => p.trim()).filter(Boolean);
+  if (parts.length <= 1) return raw;
+
+  // Remove known noise: anything that looks like "область", "район", country
+  const filtered = parts.filter(
+    (p) => !/область|район|Беларусь|Belarus|Белоруссия/i.test(p),
+  );
+
+  // Find city index
+  const city = cityName ?? null;
+  const cityIdx = city ? filtered.findIndex((p) => p.toLowerCase() === city.toLowerCase()) : -1;
+
+  if (cityIdx > 0) {
+    // Move city to front, keep the rest (street, house) after it, drop duplicates
+    const rest = filtered.filter((_, i) => i !== cityIdx);
+    return [filtered[cityIdx], ...rest].join(", ");
+  }
+
+  // No city reorder needed — just return filtered (region stripped)
+  return filtered.join(", ");
+}
+
 /** Build a human-readable address line: "Город, улица, дом" */
 function buildStopAddress(
   place: RouteWithStops["stops"][0]["place"],
   fallback: string | null,
+  detectedCityName?: string | null,
 ): string {
-  if (!place) return fallback ?? "";
+  if (!place) {
+    if (!fallback) return "";
+    return reorderAddress(fallback, detectedCityName);
+  }
   const parts: string[] = [];
   if (place.city?.name) parts.push(place.city.name);
   if (place.shortAddress) parts.push(place.shortAddress);
-  else if (place.formattedAddr) parts.push(place.formattedAddr);
-  return parts.join(", ") || fallback || "";
+  else if (place.formattedAddr) {
+    // formattedAddr may contain the city again — strip it
+    const stripped = reorderAddress(place.formattedAddr, place.city?.name);
+    parts.push(stripped.replace(new RegExp(`^${place.city?.name},?\\s*`, "i"), "").trim());
+  }
+  return parts.join(", ") || reorderAddress(fallback ?? "", detectedCityName);
 }
 
 export async function generateMetadata({ params }: Props) {
@@ -99,7 +131,21 @@ export default async function RouteDetailPage({ params }: Props) {
         author: { select: { id: true, email: true, avatarUrl: true } },
         stops: {
           orderBy: { order: "asc" },
-          include: {
+          select: {
+            id: true,
+            order: true,
+            lat: true,
+            lng: true,
+            address: true,
+            customTitle: true,
+            note: true,
+            photoUrl: true,
+            detectedCityName: true,
+            priceType: true,
+            priceMin: true,
+            priceMax: true,
+            priceCurrency: true,
+            priceNote: true,
             place: {
               select: {
                 id: true,
@@ -142,7 +188,7 @@ export default async function RouteDetailPage({ params }: Props) {
           id: s.id,
           order: s.order,
           title: s.place?.title ?? s.customTitle ?? undefined,
-          address: buildStopAddress(s.place, s.address),
+          address: buildStopAddress(s.place, s.address, s.detectedCityName),
           note: s.note,
           photoUrl: s.photoUrl ?? "",
           lat: s.lat ?? undefined,

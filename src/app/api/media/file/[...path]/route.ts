@@ -51,8 +51,12 @@ export async function GET(
     };
 
     if (!absolutePath || !fileExists) {
+      console.warn(`[media-file] file not on disk: path="${relativePath}"`);
       await devLogDeny({ media: null, denyReason: "FILE_NOT_ON_DISK" });
-      return new NextResponse("Not found", { status: 404 });
+      return new NextResponse(
+        JSON.stringify({ error: "file not found", path: relativePath }),
+        { status: 404, headers: { "Content-Type": "application/json" } },
+      );
     }
 
     let media = await findMediaAssetByStorageRelativePath(pathSegments);
@@ -61,8 +65,12 @@ export async function GET(
     }
 
     if (!media) {
+      console.warn(`[media-file] no media asset record for path: "${relativePath}"`);
       await devLogDeny({ media: null, denyReason: "MEDIA_ASSET_NOT_FOUND" });
-      return new NextResponse("Not found", { status: 404 });
+      return new NextResponse(
+        JSON.stringify({ error: "media asset not found", path: relativePath }),
+        { status: 404, headers: { "Content-Type": "application/json" } },
+      );
     }
 
     const authorizedPath =
@@ -72,8 +80,14 @@ export async function GET(
       resolveLegacyPublicUploadPath(media.storageKey);
 
     if (!authorizedPath || authorizedPath !== absolutePath) {
+      console.warn(
+        `[media-file] storage path mismatch: mediaId="${media.id}" requested="${absolutePath}" authorized="${authorizedPath}"`,
+      );
       await devLogDeny({ media, denyReason: "STORAGE_PATH_MISMATCH" });
-      return new NextResponse("Not found", { status: 404 });
+      return new NextResponse(
+        JSON.stringify({ error: "storage path mismatch", mediaId: media.id }),
+        { status: 404, headers: { "Content-Type": "application/json" } },
+      );
     }
 
     const user = await getCurrentUser();
@@ -83,7 +97,10 @@ export async function GET(
         denyReason: "CAN_SERVE_MEDIA_DENIED",
         user,
       });
-      return new NextResponse("Not found", { status: 404 });
+      return new NextResponse(
+        JSON.stringify({ error: "access denied" }),
+        { status: 404, headers: { "Content-Type": "application/json" } },
+      );
     }
 
     const [fileBuffer, fileStat] = await Promise.all([

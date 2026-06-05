@@ -3,6 +3,11 @@
  * Утилиты для форматирования данных страницы предложения
  */
 
+import {
+  formatPrice as formatBelarusPrice,
+  formatPriceFrom as formatBelarusPriceFrom,
+  formatPriceRange as formatBelarusPriceRange,
+} from "@/lib/formatters/format-price";
 import type { OfferType, OfferCtaType } from "./offerPageTypes";
 
 /**
@@ -61,27 +66,24 @@ function pluralizeYears(count: number): string {
  * Форматирует цену
  */
 export function formatPrice(price: number, currency: string = "BYN"): string {
-  const formatted = new Intl.NumberFormat("ru-RU", {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-  }).format(price);
-  
-  return `${formatted} ${currency}`;
+  void currency;
+  return formatBelarusPrice(price, { hideZero: true });
 }
 
 /**
  * Форматирует диапазон цен
  */
 export function formatPriceRange(from: number, to: number, currency: string = "BYN"): string {
-  if (from === to) return formatPrice(from, currency);
-  return `${formatPrice(from, currency)} - ${formatPrice(to, currency)}`;
+  void currency;
+  return formatBelarusPriceRange(from, to);
 }
 
 /**
  * Форматирует "от X"
  */
 export function formatPriceFrom(price: number, currency: string = "BYN"): string {
-  return `от ${formatPrice(price, currency)}`;
+  void currency;
+  return formatBelarusPriceFrom(price);
 }
 
 /**

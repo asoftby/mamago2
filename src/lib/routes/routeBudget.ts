@@ -1,4 +1,4 @@
-import { formatPrice, formatPriceFrom } from "@/lib/formatters/format-price";
+import { formatPrice, formatPriceFrom, formatPriceRange, formatPriceUpTo } from "@/lib/formatters/format-price";
 
 export type LegacyBudgetLevel = "FREE" | "LOW" | "MEDIUM" | "HIGH";
 
@@ -20,9 +20,9 @@ export type RouteBudgetStopLike = {
 
 export const LEGACY_BUDGET_LABELS: Record<LegacyBudgetLevel, string> = {
   FREE: "Бесплатно",
-  LOW: "до 50 BYN",
-  MEDIUM: "50–150 BYN",
-  HIGH: "150+ BYN",
+  LOW: formatPriceUpTo(50),
+  MEDIUM: formatPriceRange(50, 150),
+  HIGH: `${formatPrice(150, { hideZero: true })}+`,
 };
 
 type RouteBudgetSummary = {
@@ -39,11 +39,6 @@ function normalizeAmount(value: number | null | undefined): number | null {
     return null;
   }
   return Math.round(value * 100) / 100;
-}
-
-function formatPriceRange(min: number, max: number): string {
-  if (min === max) return formatPrice(min);
-  return `${formatPrice(min)} – ${formatPrice(max)}`;
 }
 
 export function summarizeRouteBudget(

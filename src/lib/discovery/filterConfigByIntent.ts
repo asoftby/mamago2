@@ -1,5 +1,6 @@
 import type { Intent } from "@/lib/intent";
 import type { FilterUi } from "@/lib/discovery/filterDefinitionTypes";
+import { BYN_SYMBOL } from "@/lib/formatters/format-price";
 
 /** Опция в группе secondary-фильтров */
 export type SecondaryFilterOption = {
@@ -131,9 +132,9 @@ export const filterConfigByIntent: Record<Intent, SecondaryFilterGroup[]> = {
       label: "Бюджет",
       kind: "single",
       options: [
-        { id: "low", label: "До 300 BYN" },
-        { id: "mid", label: "300–700 BYN" },
-        { id: "high", label: "700+ BYN" },
+        { id: "low", label: `До 300 ${BYN_SYMBOL}` },
+        { id: "mid", label: `300–700 ${BYN_SYMBOL}` },
+        { id: "high", label: `700+ ${BYN_SYMBOL}` },
       ],
     },
     {

@@ -9,6 +9,7 @@ import {
   PROMOTION_MAX_BUDGET,
   PROMOTION_MIN_BUDGET,
 } from "@/lib/promotion/shared";
+import { BYN_SYMBOL } from "@/lib/formatters/format-price";
 import {
   createPromotion,
   pausePromotion,
@@ -26,8 +27,8 @@ const createPromotionSchema = z.object({
   publicationType: z.nativeEnum(PromotionPublicationType),
   budget: z.coerce
     .number()
-    .min(PROMOTION_MIN_BUDGET, `Минимальный бюджет — ${PROMOTION_MIN_BUDGET} BYN.`)
-    .max(PROMOTION_MAX_BUDGET, `Максимальный бюджет для MVP — ${PROMOTION_MAX_BUDGET} BYN.`),
+    .min(PROMOTION_MIN_BUDGET, `Минимальный бюджет — ${PROMOTION_MIN_BUDGET} ${BYN_SYMBOL}.`)
+    .max(PROMOTION_MAX_BUDGET, `Максимальный бюджет для MVP — ${PROMOTION_MAX_BUDGET} ${BYN_SYMBOL}.`),
 });
 
 const promotionIdSchema = z.object({

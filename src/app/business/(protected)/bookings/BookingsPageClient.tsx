@@ -28,6 +28,7 @@ import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import { useNotificationStore } from "@/features/notifications/store";
 import { formatPriceBr } from "@/lib/formatters/formatPriceBr";
+import { normalizeUiCurrencyText } from "@/lib/formatters/format-price";
 import type {
   BusinessBookingItem,
   BookingStatusCounts,
@@ -297,8 +298,8 @@ function formatPriceLabel(booking: BusinessBookingItem): string | null {
   if (booking.activity?.priceFrom != null) {
     return formatPriceBr(booking.activity.priceFrom, { from: true });
   }
-  if (booking.offer?.priceText) return booking.offer.priceText.replace(/BYN|руб\.?/gi, "Br");
-  if (booking.activity?.priceText) return booking.activity.priceText.replace(/BYN|руб\.?/gi, "Br");
+  if (booking.offer?.priceText) return normalizeUiCurrencyText(booking.offer.priceText);
+  if (booking.activity?.priceText) return normalizeUiCurrencyText(booking.activity.priceText);
   return null;
 }
 

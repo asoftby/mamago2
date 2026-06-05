@@ -54,7 +54,7 @@ export function DebitModal({ account, onClose, onSuccess }: Props) {
       if (!response.ok) {
         if (data.error === "Insufficient balance") {
           throw new Error(
-            `Недостаточно средств. Доступно: ${formatPrice(data.availableBalance || 0)}, не хватает: ${formatPrice(data.shortfall || 0)}`
+            `Недостаточно средств. Доступно: ${formatPrice(data.availableBalance || 0, { hideZero: true })}, не хватает: ${formatPrice(data.shortfall || 0, { hideZero: true })}`
           );
         }
         throw new Error(data.error || "Failed to debit account");
@@ -105,12 +105,12 @@ export function DebitModal({ account, onClose, onSuccess }: Props) {
             </label>
             <input
               type="text"
-              value={formatPrice(account.depositBalance)}
+              value={formatPrice(account.depositBalance, { hideZero: true })}
               readOnly
               className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-700"
             />
             <p className="text-xs text-gray-500 mt-1">
-              Доступно с кредитом: {formatPrice(availableBalance)}
+              Доступно с кредитом: {formatPrice(availableBalance, { hideZero: true })}
             </p>
           </div>
 
@@ -132,7 +132,7 @@ export function DebitModal({ account, onClose, onSuccess }: Props) {
             {isInsufficient && (
               <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
                 <AlertTriangle className="w-3 h-3" />
-                Недостаточно средств (не хватает {formatPrice(requestedAmount - availableBalance)})
+                Недостаточно средств (не хватает {formatPrice(requestedAmount - availableBalance, { hideZero: true })})
               </p>
             )}
           </div>

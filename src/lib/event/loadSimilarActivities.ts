@@ -16,11 +16,20 @@ import { ActivityType, ContentStatus } from "@prisma/client";
 import type { Prisma } from "@prisma/client";
 import { publicActivityPath } from "@/lib/business/eventPublicLink";
 import { formatRuShortDayMonth } from "@/lib/formatters/date";
-import { formatPriceFrom } from "@/lib/formatters/format-price";
+import { BYN_SYMBOL, formatPriceFrom } from "@/lib/formatters/format-price";
 import { resolveActivityCoverUrl } from "@/lib/event/resolveActivityCoverUrl";
 import type { EventPageSimilar } from "@/lib/event/eventPageTypes";
 
 const FALLBACK_IMAGE = "/og-default.jpg";
+
+function normalizePriceLabel(text: string): string {
+  return text
+    .replace(/\bBYN\b/gi, BYN_SYMBOL)
+    .replace(/\bBr\b/gi, BYN_SYMBOL)
+    .replace(/руб\.?/gi, BYN_SYMBOL)
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
 
 type SimilarRow = {
   id: string;
@@ -74,7 +83,7 @@ function rowToSimilar(row: SimilarRow, citySlug: string): EventPageSimilar {
   let priceLabel: string | undefined;
   const t = row.priceText?.trim();
   if (t) {
-    priceLabel = t;
+    priceLabel = normalizePriceLabel(t);
   } else if (row.priceFrom === 0) {
     priceLabel = "Бесплатно";
   } else if (row.priceFrom != null) {

@@ -1,3 +1,5 @@
+import { formatPrice } from "@/lib/formatters/format-price";
+
 export type PlanStatus = "active" | "expiring" | "inactive";
 export type TransactionType =
   | "plan_renewal"
@@ -118,8 +120,7 @@ export function getTransactionStatusLabel(status: TransactionStatus): string {
 
 export function formatCurrency(amount: number, currency: string = "BYN"): string {
   void currency;
-  const isInteger = Number.isInteger(amount);
-  return `${isInteger ? String(amount) : amount.toFixed(2)} BYN`;
+  return formatPrice(amount, { hideZero: true });
 }
 
 export function formatDate(dateString: string): string {
