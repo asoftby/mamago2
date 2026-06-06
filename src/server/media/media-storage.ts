@@ -2,7 +2,16 @@ import { existsSync } from "fs";
 import { mkdir, writeFile } from "fs/promises";
 import { basename, extname, join, posix, resolve, sep } from "path";
 
-export const MEDIA_STORAGE_ROOT = join(process.cwd(), "storage");
+function resolveMediaStorageRoot(): string {
+  const configuredRoot = process.env.MEDIA_STORAGE_ROOT?.trim();
+  if (configuredRoot) {
+    return resolve(configuredRoot);
+  }
+
+  return join(process.cwd(), "storage");
+}
+
+export const MEDIA_STORAGE_ROOT = resolveMediaStorageRoot();
 export const MEDIA_UPLOADS_DIR = join(MEDIA_STORAGE_ROOT, "uploads");
 export const MEDIA_FILE_ROUTE_PREFIX = "/api/media/file";
 export const LEGACY_PUBLIC_UPLOADS_DIR = join(process.cwd(), "public", "uploads");
