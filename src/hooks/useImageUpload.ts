@@ -6,6 +6,8 @@
 
 import { useState, useCallback } from "react";
 import { compressImage, validateImageFile, type CompressedImage } from "@/lib/image/compression";
+import { normalizeUploadMimeType, resolveUploadMimeType } from "@/lib/uploads/uploadConfig";
+import { uploadMediaFile } from "@/lib/uploads/uploadClient";
 
 export interface UploadedImage {
   /** Стабильный id из БД после загрузки; до ответа сервера — временный префикс `temp-`. */
@@ -57,10 +59,12 @@ export function useImageUpload(options?: UseImageUploadOptions) {
         // Skip client-side compression for HEIC/HEIF (not supported by browser-image-compression)
         // Server will handle these formats with sharp
         // Check both MIME type and file extension (macOS sometimes sends wrong MIME type)
-        const fileExtension = file.name.split('.').pop()?.toLowerCase();
-        const isHEIC = 
-          file.type === "image/heic" || 
-          file.type === "image/heif" ||
+        const fileExtension = file.name.split(".").pop()?.toLowerCase();
+        const resolvedMimeType = resolveUploadMimeType(file);
+        const normalizedMimeType = normalizeUploadMimeType(resolvedMimeType);
+        const isHEIC =
+          normalizedMimeType === "image/heic" ||
+          normalizedMimeType === "image/heif" ||
           fileExtension === "heic" ||
           fileExtension === "heif";
         
@@ -99,71 +103,17 @@ export function useImageUpload(options?: UseImageUploadOptions) {
 
         setProgress(50);
 
-        // Upload to server
-        const formData = new FormData();
-        formData.append("file", fileToUpload);
-
-        const response = await fetch("/api/upload", {
-          method: "POST",
-          body: formData,
-        });
-
-        const responseStatus = response.status;
-        const responseStatusText = response.statusText;
-        const responseOk = response.ok;
-        const responseHeaders = Object.fromEntries(response.headers.entries());
-        
-        console.log("📡 [CLIENT] Server response:", {
-          status: responseStatus,
-          statusText: responseStatusText,
-          ok: responseOk,
-          headers: responseHeaders,
-        });
-
-        if (!responseOk) {
-          const contentType = response.headers.get("content-type");
-          let errorMessage = `Upload failed: HTTP ${responseStatus} ${responseStatusText}`;
-          
-          try {
-            // Read response body once
-            const responseText = await response.text();
-            console.log("📄 [CLIENT] Raw response body:", responseText);
-            
-            if (contentType?.includes("application/json") && responseText) {
-              try {
-                const errorData = JSON.parse(responseText);
-                console.log("✅ [CLIENT] Parsed JSON error:", errorData);
-                errorMessage = errorData.error || errorData.message || errorMessage;
-              } catch (jsonError) {
-                console.error("❌ [CLIENT] JSON parse failed, using raw text");
-                errorMessage = responseText || errorMessage;
-              }
-            } else {
-              errorMessage = responseText || errorMessage;
-            }
-          } catch (readError) {
-            console.error("❌ [CLIENT] Failed to read response:", readError);
-          }
-          
-          console.error("❌ [CLIENT] Upload failed with message:", errorMessage);
-          
-          throw new Error(errorMessage);
-        }
-
-        const uploadData = await response.json();
+        const uploadData = await uploadMediaFile(fileToUpload);
         console.log("✅ [CLIENT] Upload successful:", uploadData);
 
         setProgress(100);
 
-        const serverMediaId =
-          typeof uploadData.mediaId === "string" && uploadData.mediaId ? uploadData.mediaId : undefined;
-
         const uploadedImage: UploadedImage = {
-          id: serverMediaId ?? `temp-${Date.now()}`,
+          id: uploadData.id || `temp-${Date.now()}`,
           url: uploadData.url,
-          mediaId: serverMediaId,
-          width: uploadData.width || imageWidth,
-          height: uploadData.height || imageHeight,
+          mediaId: uploadData.id,
+          width: uploadData.width ?? imageWidth,
+          height: uploadData.height ?? imageHeight,
           blurhash: blurhash,
           preview: preview || uploadData.url,
         };

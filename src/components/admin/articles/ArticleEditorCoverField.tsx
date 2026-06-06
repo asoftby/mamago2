@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { MediaUploadField, type MediaUploadItem } from "@/components/media/MediaUploadField";
+import { uploadMediaFile } from "@/lib/uploads/uploadClient";
 
 type PickerItem = {
   id: string;
@@ -68,27 +69,10 @@ export function ArticleEditorCoverField({
     const uploaded: MediaUploadItem[] = [];
 
     for (const file of files) {
-      const fd = new FormData();
-      fd.append("file", file);
-      const res = await fetch("/api/upload", { method: "POST", body: fd });
-      const data = (await res.json().catch(() => ({}))) as {
-        error?: string;
-        url?: string;
-        mediaId?: string | null;
-      };
-
-      if (!res.ok) {
-        throw new Error(typeof data.error === "string" ? data.error : "Ошибка загрузки");
-      }
-
-      const mediaId = data.mediaId?.trim();
-      if (!mediaId) {
-        throw new Error("Файл загружен, но не получен ID медиа. Откройте медиатеку и выберите файл.");
-      }
-
+      const media = await uploadMediaFile(file);
       uploaded.push({
-        id: mediaId,
-        url: data.url ?? "",
+        id: media.id,
+        url: media.url,
         title: file.name,
         alt: null,
       });
