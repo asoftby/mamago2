@@ -26,9 +26,10 @@ services:
     environment:
       NODE_ENV: production
       DATABASE_URL: postgresql://mamago:mamago@db:5432/mamago2
+      MEDIA_STORAGE_ROOT: /app/storage
     volumes:
-      # Persist uploaded media files across container restarts.
-      # Without this volume, storage/uploads is lost on every redeploy.
+      # Persist uploaded media files across container restarts/redeploys.
+      # MEDIA_STORAGE_ROOT must point to this mounted directory.
       - mamago2_storage:/app/storage
 
 volumes:
