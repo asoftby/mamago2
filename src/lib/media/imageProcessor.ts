@@ -7,6 +7,12 @@
  */
 
 import sharp from "sharp";
+import {
+  ALLOWED_UPLOAD_MIME_TYPES,
+  ALLOWED_UPLOAD_MIME_TYPE_SET,
+  MAX_UPLOAD_SIZE_MB,
+  normalizeUploadMimeType,
+} from "@/lib/uploads/uploadConfig";
 
 export interface ImageProcessingConfig {
   maxUploadSizeMB: number;
@@ -22,7 +28,7 @@ export interface ImageProcessingConfig {
 }
 
 export const DEFAULT_IMAGE_CONFIG: ImageProcessingConfig = {
-  maxUploadSizeMB: 10,
+  maxUploadSizeMB: MAX_UPLOAD_SIZE_MB,
   maxMasterWidth: 1600,
   outputFormat: "webp",
   outputQuality: 80,
@@ -63,19 +69,12 @@ export function validateImageFile(
   mimeType: string,
   config: ImageProcessingConfig = DEFAULT_IMAGE_CONFIG
 ): { valid: boolean; error?: string } {
-  // Check mime type
-  const allowedTypes = [
-    "image/jpeg",
-    "image/png",
-    "image/webp",
-    "image/heic",
-    "image/heif",
-  ];
+  const normalizedMimeType = normalizeUploadMimeType(mimeType);
 
-  if (!allowedTypes.includes(mimeType)) {
+  if (!normalizedMimeType || !ALLOWED_UPLOAD_MIME_TYPE_SET.has(normalizedMimeType)) {
     return {
       valid: false,
-      error: `Unsupported image format: ${mimeType}. Allowed: JPEG, PNG, WebP, HEIC, HEIF`,
+      error: `Unsupported image format: ${mimeType}. Allowed: ${ALLOWED_UPLOAD_MIME_TYPES.join(", ")}`,
     };
   }
 
@@ -234,7 +233,8 @@ export async function processImage(
       });
       
       // Handle HEIC/HEIF specific errors
-      if (originalMimeType === "image/heic" || originalMimeType === "image/heif") {
+      const normalizedMimeTypeForError = normalizeUploadMimeType(originalMimeType);
+      if (normalizedMimeTypeForError === "image/heic" || normalizedMimeTypeForError === "image/heif") {
         if (sharpMsg.includes("unsupported") || 
             sharpMsg.includes("HEIC") ||
             sharpMsg.includes("HEIF")) {

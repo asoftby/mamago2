@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { Upload, X, Loader2 } from "lucide-react";
 import { useImageUpload, type UploadedImage } from "@/hooks/useImageUpload";
 import { toast } from "@/lib/toast";
+import { UPLOAD_IMAGE_ACCEPT } from "@/lib/uploads/uploadConfig";
 
 interface PlaceLogoUploadProps {
   placeId: string;
@@ -119,7 +120,7 @@ export function PlaceLogoUpload({
   const handleClick = () => {
     const input = document.createElement("input");
     input.type = "file";
-    input.accept = "image/png,image/jpeg,image/webp";
+    input.accept = UPLOAD_IMAGE_ACCEPT;
     input.onchange = (e) => {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (file) {

@@ -3,6 +3,7 @@
 import { forwardRef, useImperativeHandle, useRef, type ReactNode } from "react";
 import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
+import { UPLOAD_IMAGE_ACCEPT } from "@/lib/uploads/uploadConfig";
 
 type MediaDropzoneRenderApi = {
   openFilePicker: () => void;
@@ -66,7 +67,7 @@ export const MediaDropzone = forwardRef<MediaDropzoneHandle, MediaDropzoneProps>
       <input
         ref={inputRef}
         type="file"
-        accept="image/png,image/jpeg,image/webp"
+        accept={UPLOAD_IMAGE_ACCEPT}
         multiple={selectionMode === "gallery"}
         className="sr-only"
         onChange={(e) => {

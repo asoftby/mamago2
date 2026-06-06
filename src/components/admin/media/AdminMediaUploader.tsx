@@ -5,6 +5,7 @@ import { Upload, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useImageUpload, type UploadedImage } from "@/hooks/useImageUpload";
 import { useRouter } from "next/navigation";
+import { UPLOAD_IMAGE_ACCEPT, UPLOAD_IMAGE_FORMATS_LABEL } from "@/lib/uploads/uploadConfig";
 
 interface AdminMediaUploaderProps {
   onUploadComplete?: () => void;
@@ -72,7 +73,7 @@ export function AdminMediaUploader({ onUploadComplete }: AdminMediaUploaderProps
         <Input
           type="file"
           multiple
-          accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif"
+          accept={UPLOAD_IMAGE_ACCEPT}
           onChange={(e) => handleFileSelect(e.target.files)}
           disabled={uploading}
           className="absolute inset-0 h-full min-h-0 w-full cursor-pointer rounded-lg border-0 p-0 opacity-0 shadow-none ring-0 focus-visible:ring-0"
@@ -95,7 +96,7 @@ export function AdminMediaUploader({ onUploadComplete }: AdminMediaUploaderProps
                 Нажмите или перетащите изображения
               </p>
               <p className="text-xs text-gray-500 mt-1">
-                JPEG, PNG, WebP, HEIC, HEIF до 10MB
+                {UPLOAD_IMAGE_FORMATS_LABEL} до 10MB
               </p>
               <p className="text-xs text-gray-500">
                 Поддерживается множественная загрузка

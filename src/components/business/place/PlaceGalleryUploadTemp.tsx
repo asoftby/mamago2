@@ -26,6 +26,7 @@ import {
   useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { UPLOAD_IMAGE_ACCEPT } from "@/lib/uploads/uploadConfig";
 
 export interface GalleryItem {
   id: string;
@@ -461,7 +462,7 @@ export function PlaceGalleryUploadTemp({
     if (disabled) return;
     const input = document.createElement("input");
     input.type = "file";
-    input.accept = "image/png,image/jpeg,image/webp";
+    input.accept = UPLOAD_IMAGE_ACCEPT;
     input.multiple = true;
     input.onchange = (e) => {
       const files = (e.target as HTMLInputElement).files;

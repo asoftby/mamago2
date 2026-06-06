@@ -138,21 +138,26 @@ export async function writeRuntimeUpload(
   filename: string,
   data: Uint8Array | Buffer,
 ): Promise<{ filename: string; absolutePath: string; publicUrl: string }> {
-  await ensureMediaUploadsDir();
+  try {
+    await ensureMediaUploadsDir();
 
-  const safeFilename = normalizeMediaFilename(filename);
-  const absolutePath = resolveMediaStorageAbsolutePath(safeFilename);
-  if (!absolutePath) {
-    throw new Error("Invalid runtime upload filename");
+    const safeFilename = normalizeMediaFilename(filename);
+    const absolutePath = resolveMediaStorageAbsolutePath(safeFilename);
+    if (!absolutePath) {
+      throw new Error("Invalid runtime upload filename");
+    }
+
+    await writeFile(absolutePath, data);
+
+    return {
+      filename: safeFilename,
+      absolutePath,
+      publicUrl: buildMediaFilePublicUrl(safeFilename),
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`STORAGE_WRITE_FAILED: ${message}`);
   }
-
-  await writeFile(absolutePath, data);
-
-  return {
-    filename: safeFilename,
-    absolutePath,
-    publicUrl: buildMediaFilePublicUrl(safeFilename),
-  };
 }
 
 export function mimeTypeFromFilename(filename: string): string {

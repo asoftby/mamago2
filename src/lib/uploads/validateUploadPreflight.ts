@@ -9,18 +9,12 @@
  */
 
 import { NextResponse } from "next/server";
-
-/** Maximum allowed file size: 15 MB */
-export const MAX_UPLOAD_SIZE_BYTES = 15 * 1024 * 1024;
-
-/** Allowed MIME types for upload */
-export const ALLOWED_MIME_TYPES = new Set([
-  "image/jpeg",
-  "image/png",
-  "image/webp",
-  "image/gif",
-  "image/avif",
-]);
+import {
+  MAX_UPLOAD_SIZE_BYTES,
+  MAX_UPLOAD_SIZE_MB,
+  resolveUploadMimeType,
+} from "./uploadConfig";
+import { jsonUploadError } from "./uploadErrors";
 
 /**
  * Validate file before any memory read or processing.
@@ -29,19 +23,21 @@ export const ALLOWED_MIME_TYPES = new Set([
  * @returns NextResponse with error details if validation fails, or null if valid
  */
 export function validateUploadPreflight(file: File): NextResponse | null {
-  // 1. Check file size
   if (file.size > MAX_UPLOAD_SIZE_BYTES) {
-    return NextResponse.json(
-      { error: "File too large" },
-      { status: 413 },
+    return jsonUploadError(
+      "FILE_TOO_LARGE",
+      `File is too large: ${(file.size / 1024 / 1024).toFixed(2)}MB. Max: ${MAX_UPLOAD_SIZE_MB}MB`,
+      413,
     );
   }
 
-  // 2. Check MIME type
-  if (!ALLOWED_MIME_TYPES.has(file.type)) {
-    return NextResponse.json(
-      { error: "Invalid file type" },
-      { status: 415 },
+  const resolvedMimeType = resolveUploadMimeType(file);
+  if (!resolvedMimeType) {
+    const reportedType = file.type || "unknown";
+    return jsonUploadError(
+      "INVALID_FILE_TYPE",
+      `Unsupported file type: ${reportedType}. Allowed: JPEG, JPG, PNG, WebP, GIF, AVIF, HEIC, HEIF`,
+      415,
     );
   }
 

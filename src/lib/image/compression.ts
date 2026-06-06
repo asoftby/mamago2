@@ -5,6 +5,12 @@
 
 import imageCompression from "browser-image-compression";
 import { encode } from "blurhash";
+import {
+  ALLOWED_UPLOAD_MIME_TYPES,
+  MAX_UPLOAD_SIZE_MB,
+  normalizeUploadMimeType,
+  resolveUploadMimeType,
+} from "@/lib/uploads/uploadConfig";
 
 export interface CompressedImage {
   file: File;
@@ -235,18 +241,27 @@ export function validateImageFile(
     allowedTypes?: string[];
   }
 ): { valid: boolean; error?: string } {
-  const { maxSizeMB = 10, allowedTypes = ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"] } =
-    options || {};
+  const { maxSizeMB = MAX_UPLOAD_SIZE_MB, allowedTypes = [...ALLOWED_UPLOAD_MIME_TYPES] } = options || {};
+  const resolvedMimeType = resolveUploadMimeType(file);
 
-  // Check file type
-  if (!allowedTypes.includes(file.type)) {
+  if (!resolvedMimeType) {
     return {
       valid: false,
       error: `Invalid file type. Allowed: ${allowedTypes.join(", ")}`,
     };
   }
 
-  // Check file size
+  const normalizedAllowedTypes = allowedTypes
+    .map((type) => normalizeUploadMimeType(type))
+    .filter((type): type is string => Boolean(type));
+
+  if (!normalizedAllowedTypes.includes(resolvedMimeType)) {
+    return {
+      valid: false,
+      error: `Invalid file type. Allowed: ${allowedTypes.join(", ")}`,
+    };
+  }
+
   const sizeMB = file.size / 1024 / 1024;
   if (sizeMB > maxSizeMB) {
     return {
