@@ -1,6 +1,6 @@
 import "server-only";
 
-import type { User } from "@prisma/client";
+import type { CurrentUser } from "@/lib/auth/safeUser";
 import { getPartnerCabinetBusiness } from "@/server/permissions/business-permissions";
 
 export type NotificationAudienceUser = {
@@ -13,7 +13,7 @@ export type NotificationAudienceUser = {
  * Resolves business cabinet context for notification audience filtering.
  */
 export async function resolveNotificationAudienceUser(
-  user: User,
+  user: CurrentUser,
 ): Promise<NotificationAudienceUser> {
   const cabinet = await getPartnerCabinetBusiness(user.id);
   return {

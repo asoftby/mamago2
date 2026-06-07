@@ -2,7 +2,8 @@ import "server-only";
 
 import { existsSync } from "fs";
 import { posix } from "path";
-import type { MediaAsset, User } from "@prisma/client";
+import type { MediaAsset } from "@prisma/client";
+import type { AuthActor } from "@/lib/auth/safeUser";
 import {
   BusinessVerificationStatus,
   ContentStatus,
@@ -152,7 +153,7 @@ export async function buildMediaFileAccessDenyPayload(input: {
   storageAbsolutePath: string | null;
   fileExists: boolean;
   media: MediaAsset | null;
-  user: User | null;
+  user: AuthActor | null;
   denyReason: string;
 }): Promise<MediaAccessDenyPayload> {
   const {
@@ -634,7 +635,7 @@ function isMediaAssetSanityBlocked(media: MediaAsset): boolean {
  * Проверка точных URL и fingerprint пути, без «любого endsWith» в обход связи.
  */
 export async function canUserAccessPlaceLinkedMedia(
-  user: User,
+  user: AuthActor,
   media: MediaAsset,
 ): Promise<boolean> {
   if (user.role === "ADMIN" || user.role === "MODERATOR") {
@@ -711,7 +712,7 @@ export async function canUserAccessPlaceLinkedMedia(
 
 async function canAuthenticatedUserViewMedia(
   media: MediaAsset,
-  user: User,
+  user: AuthActor,
 ): Promise<boolean> {
   if (user.role === "ADMIN" || user.role === "MODERATOR") {
     return true;
@@ -749,7 +750,7 @@ export async function canLoadMediaAnonymously(media: MediaAsset): Promise<boolea
  */
 export async function canServeMediaResponse(
   media: MediaAsset,
-  user: User | null,
+  user: AuthActor | null,
 ): Promise<boolean> {
   if (await canLoadMediaAnonymously(media)) {
     return true;

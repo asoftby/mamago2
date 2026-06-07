@@ -12,10 +12,9 @@
  */
 
 import { NextResponse } from "next/server";
-import { getCurrentUser } from "./server";
-import type { User } from "@prisma/client";
+import { getCurrentUser, type CurrentUser } from "./server";
 
-type AuthResult = User | NextResponse;
+type AuthResult = CurrentUser | NextResponse;
 
 /**
  * Require ADMIN role for API route handlers.

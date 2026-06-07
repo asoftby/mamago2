@@ -9,7 +9,8 @@ import {
   resolveStoredMediaPath,
 } from "@/server/media/media-storage";
 import { logMediaAccessDeny } from "@/server/media/mediaAccessDenyLog";
-import type { MediaAsset, User } from "@prisma/client";
+import type { MediaAsset } from "@prisma/client";
+import type { AuthActor } from "@/lib/auth/safeUser";
 import {
   buildMediaFileAccessDenyPayload,
   canServeMediaResponse,
@@ -32,7 +33,7 @@ export async function GET(
     const devLogDeny = async (args: {
       media: MediaAsset | null;
       denyReason: string;
-      user?: User | null;
+      user?: AuthActor | null;
     }) => {
       if (process.env.NODE_ENV !== "development") {
         return;

@@ -1,4 +1,5 @@
-import type { User } from "@prisma/client";
+import type { Role } from "@prisma/client";
+import type { CurrentUser } from "@/lib/auth/safeUser";
 import type { PublicationStatsPayload, PublicationStatsViewerLabel } from "./types";
 import {
   type PublicationStatsPeriod,
@@ -7,7 +8,7 @@ import {
 } from "./period";
 import { getVisibleSectionsForRole } from "./visibility";
 
-function roleToViewerLabel(role: User["role"]): PublicationStatsViewerLabel {
+function roleToViewerLabel(role: Role): PublicationStatsViewerLabel {
   switch (role) {
     case "ADMIN":
       return "admin";
@@ -20,7 +21,7 @@ function roleToViewerLabel(role: User["role"]): PublicationStatsViewerLabel {
   }
 }
 
-function roleLabelRu(role: User["role"]): string {
+function roleLabelRu(role: Role): string {
   switch (role) {
     case "ADMIN":
       return "Администратор";
@@ -36,7 +37,7 @@ function roleLabelRu(role: User["role"]): string {
 export function buildEmptyPublicationStats(
   entityId: string,
   path: string,
-  viewer: User,
+  viewer: CurrentUser,
   period: PublicationStatsPeriod,
 ): PublicationStatsPayload & { empty: true } {
   const now = new Date().toISOString();

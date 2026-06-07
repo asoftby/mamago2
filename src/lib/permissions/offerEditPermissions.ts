@@ -1,9 +1,9 @@
-import type { User } from "@prisma/client";
+import type { CurrentUser } from "@/lib/auth/safeUser";
 import prisma from "@/lib/prisma";
 import { canManagePlaceAsync } from "@/lib/auth/placeAccess";
 
 export async function canEditOfferForUser(
-  user: User,
+  user: CurrentUser,
   offer: { place: { createdByUserId: string; ownerBusinessId: string | null } }
 ): Promise<boolean> {
   return await canManagePlaceAsync(user, offer.place);
@@ -14,7 +14,7 @@ export async function canEditOfferForUser(
  * или владелец публикации (владелец бизнеса места либо автор черновика места без бизнеса).
  */
 export async function canShowOfferOwnerEditOnPublicPage(
-  user: User,
+  user: CurrentUser,
   place: { createdByUserId: string; ownerBusinessId: string | null },
 ): Promise<boolean> {
   if (user.role === "ADMIN" || user.role === "MODERATOR") {
