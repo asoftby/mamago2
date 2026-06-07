@@ -1,4 +1,4 @@
-import type { User } from "@prisma/client";
+import type { CurrentUser } from "@/lib/auth/safeUser";
 import { ActivityType } from "@prisma/client";
 import { canManageActivityById } from "@/lib/auth/activityAccess";
 
@@ -6,7 +6,7 @@ import { canManageActivityById } from "@/lib/auth/activityAccess";
  * Event editor gate: EVENT type + business-first access (see activityAccess).
  */
 export async function canEditEventActivity(
-  user: User,
+  user: CurrentUser,
   activity: { id: string; type: ActivityType },
 ): Promise<boolean> {
   if (activity.type !== ActivityType.EVENT) {

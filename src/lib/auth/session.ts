@@ -3,7 +3,9 @@ import type { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { generateToken, hashToken } from "./crypto";
 import { SESSION_COOKIE_NAME, getAuthCookieOptions } from "./cookie";
-import type { User } from "@prisma/client";
+import { SESSION_USER_SELECT, type SessionUserRecord } from "./safeUser";
+
+export type SessionUser = SessionUserRecord;
 
 const SESSION_DURATION = 30 * 24 * 60 * 60 * 1000; // 30 days
 
@@ -105,7 +107,7 @@ export async function deleteSessionCookieAction(requestHostname?: string): Promi
  */
 export async function validateSession(
   token: string
-): Promise<User | null> {
+): Promise<SessionUser | null> {
   const totalStart = performance.now();
   const hashStart = performance.now();
   const tokenHash = hashToken(token);
@@ -116,7 +118,11 @@ export async function validateSession(
   const findUniqueStart = performance.now();
   const session = await prisma.session.findUnique({
     where: { tokenHash },
-    include: { user: true },
+    include: {
+      user: {
+        select: SESSION_USER_SELECT,
+      },
+    },
   });
   if (process.env.NODE_ENV === "development") {
     console.debug(`[auth] validateSession findUnique: ${(performance.now() - findUniqueStart).toFixed(0)}ms`);
@@ -181,7 +187,6 @@ export async function validateSession(
         console.debug(`[auth] validateSession autoUnban: ${(performance.now() - updateStart).toFixed(0)}ms`);
       }
       user.status = "ACTIVE";
-      user.statusReason = null;
       user.suspendedUntil = null;
     }
   }

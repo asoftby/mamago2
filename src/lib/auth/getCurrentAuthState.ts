@@ -20,9 +20,19 @@ export async function getCurrentAuthState(): Promise<AuthenticatedAppUser | null
     : false;
 
   return {
-    ...user,
-    emailVerifiedAt: user.emailVerifiedAt?.toISOString() ?? null,
+    id: user.id,
+    email: user.email,
+    role: user.role,
+    displayName: user.displayName,
+    avatarUrl: user.avatarUrl,
     phoneVerifiedAt: user.phoneVerifiedAt?.toISOString() ?? null,
+    emailVerifiedAt: user.emailVerifiedAt?.toISOString() ?? null,
+    familyRole: user.familyRole,
+    ageBandLabel: user.ageBandLabel,
+    preferenceSummary: user.preferenceSummary,
+    leisureFormatSummary: user.leisureFormatSummary,
+    preferenceSignalIds: user.preferenceSignalIds,
+    leisureFormatSignalId: user.leisureFormatSignalId,
     hasApprovedBusinessProfile,
   };
 }

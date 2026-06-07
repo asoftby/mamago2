@@ -1,6 +1,15 @@
+import "server-only";
+
 import { existsSync } from "fs";
 import { mkdir, writeFile } from "fs/promises";
 import { basename, extname, join, posix, resolve, sep } from "path";
+import {
+  MEDIA_FILE_ROUTE_PREFIX,
+  buildMediaFilePublicUrl,
+  extractMediaRelativePathFromUrl,
+} from "@/lib/media/mediaUrlBuilder";
+
+export { MEDIA_FILE_ROUTE_PREFIX, buildMediaFilePublicUrl, extractMediaRelativePathFromUrl };
 
 function resolveMediaStorageRoot(): string {
   const configuredRoot = process.env.MEDIA_STORAGE_ROOT?.trim();
@@ -13,7 +22,6 @@ function resolveMediaStorageRoot(): string {
 
 export const MEDIA_STORAGE_ROOT = resolveMediaStorageRoot();
 export const MEDIA_UPLOADS_DIR = join(MEDIA_STORAGE_ROOT, "uploads");
-export const MEDIA_FILE_ROUTE_PREFIX = "/api/media/file";
 export const LEGACY_PUBLIC_UPLOADS_DIR = join(process.cwd(), "public", "uploads");
 
 // Runtime uploads must not be written to public in dev/prod app runtime.
@@ -37,18 +45,6 @@ export async function ensureMediaUploadsDir(): Promise<void> {
   }
 }
 
-export function buildMediaFilePublicUrl(relativePath: string): string {
-  const normalized = posix
-    .normalize(relativePath.replace(/\\/g, "/"))
-    .replace(/^\/+/, "");
-  const encodedPath = normalized
-    .split("/")
-    .filter(Boolean)
-    .map((segment) => encodeURIComponent(segment))
-    .join("/");
-  return `${MEDIA_FILE_ROUTE_PREFIX}/${encodedPath}`;
-}
-
 export function resolveMediaStorageAbsolutePath(relativePath: string): string | null {
   const normalized = posix
     .normalize(relativePath.replace(/\\/g, "/"))
@@ -64,43 +60,6 @@ export function resolveMediaStorageAbsolutePath(relativePath: string): string | 
   }
 
   return absolute;
-}
-
-/**
- * Достаёт относительный путь файла в storage/uploads из URL вида
- * `/api/media/file/<segments>` или абсолютного `https://host/api/media/file/<segments>`.
- * Раньше обрабатывались только относительные строки — из‑за этого при сохранении
- * полного URL в publicUrl/storageKey маршрут file/* давал 404 (authorizedPath === null).
- */
-export function extractMediaRelativePathFromUrl(url: string | null | undefined): string | null {
-  if (!url) return null;
-  const trimmed = url.trim();
-  if (!trimmed) return null;
-
-  const marker = `${MEDIA_FILE_ROUTE_PREFIX}/`;
-  const idx = trimmed.indexOf(marker);
-  if (idx === -1) {
-    return null;
-  }
-
-  let encoded = trimmed.slice(idx + marker.length);
-  if (!encoded) return null;
-  encoded = encoded.split(/[?#]/)[0] ?? "";
-  if (!encoded) return null;
-
-  const decoded = encoded
-    .split("/")
-    .map((segment) => {
-      try {
-        return decodeURIComponent(segment);
-      } catch {
-        return "";
-      }
-    })
-    .filter(Boolean)
-    .join("/");
-
-  return decoded || null;
 }
 
 export function resolveStoredMediaPath(url: string | null | undefined): string | null {

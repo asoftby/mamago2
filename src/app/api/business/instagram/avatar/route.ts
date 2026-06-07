@@ -22,7 +22,7 @@ import { normalizeInstagramUsername } from "@/lib/instagram/extractUsername";
 import { uploadImageFromUrl } from "@/lib/upload/uploadFromUrl";
 import { ensureMediaAssetForStoredFileUrl } from "@/lib/media/ensureMediaAssetForStoredFileUrl";
 import prisma from "@/lib/prisma";
-import type { User } from "@prisma/client";
+import type { CurrentUser } from "@/lib/auth/safeUser";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -385,7 +385,7 @@ export async function POST(request: NextRequest) {
 async function downloadAndSave(
   picUrl: string,
   username: string,
-  user: User,
+  user: CurrentUser,
   wizardSessionId: string
 ): Promise<Response> {
   devLog("Downloading image:", picUrl.slice(0, 80) + "…");
