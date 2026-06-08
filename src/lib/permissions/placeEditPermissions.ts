@@ -4,7 +4,7 @@
  * Business-based ownership model
  */
 
-import type { User } from "@prisma/client";
+import type { CurrentUser } from "@/lib/auth/safeUser";
 import { canManagePlaceAsync } from "@/lib/auth/placeAccess";
 
 export interface PlaceEditContext {
@@ -18,7 +18,7 @@ export interface PlaceEditContext {
  * Check if user can edit a place (async)
  * Rules: business owner OR creator (if no business owner) OR ADMIN OR MODERATOR
  */
-export async function canEditPlace(user: User | null, place: PlaceEditContext): Promise<boolean> {
+export async function canEditPlace(user: CurrentUser | null, place: PlaceEditContext): Promise<boolean> {
   if (!user) return false;
   
   return await canManagePlaceAsync(user, place);
@@ -28,14 +28,14 @@ export async function canEditPlace(user: User | null, place: PlaceEditContext): 
  * Check if user can view edit button on public page (async)
  * Same rules as canEditPlace but used for UI visibility
  */
-export async function canShowEditButton(user: User | null, place: PlaceEditContext): Promise<boolean> {
+export async function canShowEditButton(user: CurrentUser | null, place: PlaceEditContext): Promise<boolean> {
   return await canEditPlace(user, place);
 }
 
 /**
  * Get edit permission error message
  */
-export function getEditPermissionError(user: User | null, place: PlaceEditContext): string {
+export function getEditPermissionError(user: CurrentUser | null, place: PlaceEditContext): string {
   if (!user) {
     return "Необходимо войти в систему для редактирования места";
   }

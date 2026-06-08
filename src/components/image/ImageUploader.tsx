@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { Upload, X, Image as ImageIcon } from "lucide-react";
 import { useImageUpload, type UploadedImage } from "@/hooks/useImageUpload";
+import { MAX_UPLOAD_SIZE_MB, UPLOAD_IMAGE_ACCEPT, UPLOAD_IMAGE_FORMATS_LABEL } from "@/lib/uploads/uploadConfig";
 
 interface ImageUploaderProps {
   onUpload?: (image: UploadedImage) => void;
@@ -22,8 +23,8 @@ export function ImageUploader({
   onUpload,
   onUploadBatch,
   onError,
-  accept = "image/jpeg,image/png,image/webp,image/avif",
-  maxSizeMB = 1,
+  accept = UPLOAD_IMAGE_ACCEPT,
+  maxSizeMB = Math.min(1, MAX_UPLOAD_SIZE_MB),
   maxWidthOrHeight = 2048,
   quality = 0.8,
   disabled = false,
@@ -130,7 +131,7 @@ export function ImageUploader({
                   Нажмите или перетащите изображение
                 </p>
                 <p className="text-xs text-gray-500 mt-1">
-                  JPEG, PNG, WebP, AVIF до {maxSizeMB}MB
+                  {UPLOAD_IMAGE_FORMATS_LABEL} до {maxSizeMB}MB
                 </p>
               </div>
             </div>

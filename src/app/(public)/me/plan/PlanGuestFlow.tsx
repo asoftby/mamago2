@@ -100,6 +100,54 @@ type FilterState = {
   format: "calm" | "active" | "any";
 };
 
+function FilterGroup<K extends keyof FilterState>({
+  label,
+  field,
+  filters,
+  onChange,
+  options,
+}: {
+  label: string;
+  field: K;
+  filters: FilterState;
+  onChange: (f: FilterState) => void;
+  options: Array<{ key: FilterState[K]; label: string }>;
+}) {
+  return (
+    <div className="flex flex-col items-center" style={{ gap: 12 }}>
+      <span
+        className="font-mono uppercase"
+        style={{ fontSize: 11, letterSpacing: ".14em", color: "rgba(20,18,16,.55)" }}
+      >
+        {label}
+      </span>
+      <div className="flex flex-wrap justify-center" style={{ gap: 8 }}>
+        {options.map((o) => {
+          const isOn = filters[field] === o.key;
+          return (
+            <button
+              key={String(o.key)}
+              onClick={() => onChange({ ...filters, [field]: o.key })}
+              style={{
+                height: 42, padding: "0 22px", borderRadius: 99,
+                background: isOn ? "#FFE8DC" : "#FAF7F1",
+                border: isOn ? "1px solid transparent" : "1px solid rgba(20,18,16,.10)",
+                color: isOn ? "#C24E22" : "#141210",
+                fontSize: 15, fontWeight: isOn ? 600 : 500,
+                cursor: "pointer", transition: "all .15s",
+                fontFamily: "inherit",
+                display: "inline-flex", alignItems: "center",
+              }}
+            >
+              {o.label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 /* ══════════════════════════════════════════════════════
    STEP 1 — Hook
 ══════════════════════════════════════════════════════ */
@@ -218,50 +266,6 @@ function Step2({
   filters: FilterState;
   onChange: (f: FilterState) => void;
 }) {
-  function Group<K extends keyof FilterState>({
-    label,
-    field,
-    options,
-  }: {
-    label: string;
-    field: K;
-    options: Array<{ key: FilterState[K]; label: string }>;
-  }) {
-    return (
-      <div className="flex flex-col items-center" style={{ gap: 12 }}>
-        <span
-          className="font-mono uppercase"
-          style={{ fontSize: 11, letterSpacing: ".14em", color: "rgba(20,18,16,.55)" }}
-        >
-          {label}
-        </span>
-        <div className="flex flex-wrap justify-center" style={{ gap: 8 }}>
-          {options.map((o) => {
-            const isOn = filters[field] === o.key;
-            return (
-              <button
-                key={String(o.key)}
-                onClick={() => onChange({ ...filters, [field]: o.key })}
-                style={{
-                  height: 42, padding: "0 22px", borderRadius: 99,
-                  background: isOn ? "#FFE8DC" : "#FAF7F1",
-                  border: isOn ? "1px solid transparent" : "1px solid rgba(20,18,16,.10)",
-                  color: isOn ? "#C24E22" : "#141210",
-                  fontSize: 15, fontWeight: isOn ? 600 : 500,
-                  cursor: "pointer", transition: "all .15s",
-                  fontFamily: "inherit",
-                  display: "inline-flex", alignItems: "center",
-                }}
-              >
-                {o.label}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div
       style={{
@@ -277,17 +281,17 @@ function Step2({
     >
       <ModalHeader/>
       <div className="flex flex-col" style={{ padding: "28px 28px 24px", gap: 24 }}>
-        <Group label="Кто идёт" field="who" options={[
+        <FilterGroup label="Кто идёт" field="who" filters={filters} onChange={onChange} options={[
           { key: "me", label: "Я" },
           { key: "kids", label: "Дети" },
           { key: "free", label: "Свободный поиск" },
         ]}/>
-        <Group label="Когда" field="when" options={[
+        <FilterGroup label="Когда" field="when" filters={filters} onChange={onChange} options={[
           { key: "today", label: "Сегодня" },
           { key: "tomorrow", label: "Завтра" },
           { key: "weekend", label: "Выходные" },
         ]}/>
-        <Group label="Формат" field="format" options={[
+        <FilterGroup label="Формат" field="format" filters={filters} onChange={onChange} options={[
           { key: "calm", label: "Спокойно" },
           { key: "active", label: "Активно" },
           { key: "any", label: "Не важно" },

@@ -7,7 +7,7 @@
  * 3) If no business scope is resolvable, fall back to legacy ownerUserId (transitional).
  */
 
-import type { User } from "@prisma/client";
+import type { AuthActor } from "@/lib/auth/safeUser";
 import { BusinessMemberRole } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { canManageOwnedContent } from "@/lib/auth/businessContentAccess";
@@ -72,7 +72,7 @@ export async function getBusinessIdsUserCanAccess(userId: string): Promise<strin
 }
 
 export async function canManageActivityContent(
-  user: Pick<User, "id" | "role">,
+  user: AuthActor,
   params: {
     ownerUserId: string;
     canonicalBusinessId: string | null;
@@ -97,7 +97,7 @@ export async function canManageActivityContent(
 }
 
 export async function canManageActivityById(
-  user: Pick<User, "id" | "role">,
+  user: AuthActor,
   activityId: string,
 ): Promise<boolean> {
   const activity = await prisma.activity.findUnique({

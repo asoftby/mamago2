@@ -165,7 +165,9 @@ export async function getOfferPageData({
   slug,
 }: GetOfferPageDataParams): Promise<OfferPageData | null> {
   // 1. Fetch offer with all related data
-  const offer = await prisma.offer.findUnique({
+  // Note: Offer unique constraint is @@unique([cityId, slug]), so findUnique({ where: { slug } })
+  // is invalid. Use findFirst to look up by slug across cityId values (including null).
+  const offer = await prisma.offer.findFirst({
     where: { slug },
     include: {
       place: {

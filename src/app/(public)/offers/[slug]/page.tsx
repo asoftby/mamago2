@@ -1,3 +1,4 @@
+import { getCanonicalPublicAppUrl } from "@/lib/config/publicAppUrl";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { notFound, permanentRedirect } from "next/navigation";
@@ -69,7 +70,7 @@ export async function generateMetadata({ params }: OfferPageProps): Promise<Meta
 
   if (!offer) return { title: "Offer Not Found" };
 
-  const publicBase = process.env.NEXT_PUBLIC_APP_URL || "https://mamago.by";
+  const publicBase = getCanonicalPublicAppUrl();
   const title = offer.seoTitle?.trim() || offer.title;
   const description = offer.seoDescription?.trim() || offer.description || "";
   const canonical =

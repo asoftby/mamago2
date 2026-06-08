@@ -1,3 +1,4 @@
+import { getCanonicalPublicAppUrl } from "@/lib/config/publicAppUrl";
 import type { Metadata } from "next";
 import { notFound, permanentRedirect } from "next/navigation";
 import prisma from "@/lib/prisma";
@@ -56,7 +57,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
   if (!offer) return { title: "Offer Not Found" };
 
-  const publicBase = process.env.NEXT_PUBLIC_APP_URL || "https://mamago.by";
+  const publicBase = getCanonicalPublicAppUrl();
   const title = offer.seoTitle?.trim() || offer.title;
   const description = offer.seoDescription?.trim() || offer.description || "";
   
@@ -141,7 +142,7 @@ export default async function CanonicalOfferPage({ params, searchParams }: PageP
     permanentRedirect(canonicalPath);
   }
 
-  const publicBase = process.env.NEXT_PUBLIC_APP_URL || "https://mamago.by";
+  const publicBase = getCanonicalPublicAppUrl();
   
   // 1. Offer JSON-LD
   const offerJsonLd =

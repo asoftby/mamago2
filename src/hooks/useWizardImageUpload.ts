@@ -11,6 +11,8 @@
 
 import { useState, useCallback } from "react";
 import { compressImage, validateImageFile } from "@/lib/image/compression";
+import { normalizeUploadMimeType, resolveUploadMimeType } from "@/lib/uploads/uploadConfig";
+import { uploadMediaFile } from "@/lib/uploads/uploadClient";
 import type { UploadedImage } from "./useImageUpload";
 
 export interface UseWizardImageUploadOptions {
@@ -48,10 +50,12 @@ export function useWizardImageUpload(options: UseWizardImageUploadOptions) {
         setProgress(20);
 
         // Check for HEIC/HEIF
-        const fileExtension = file.name.split('.').pop()?.toLowerCase();
-        const isHEIC = 
-          file.type === "image/heic" || 
-          file.type === "image/heif" ||
+        const fileExtension = file.name.split(".").pop()?.toLowerCase();
+        const resolvedMimeType = resolveUploadMimeType(file);
+        const normalizedMimeType = normalizeUploadMimeType(resolvedMimeType);
+        const isHEIC =
+          normalizedMimeType === "image/heic" ||
+          normalizedMimeType === "image/heif" ||
           fileExtension === "heic" ||
           fileExtension === "heif";
         
@@ -89,60 +93,27 @@ export function useWizardImageUpload(options: UseWizardImageUploadOptions) {
 
         setProgress(50);
 
-        // Upload to wizard endpoint
-        const formData = new FormData();
-        formData.append("file", fileToUpload);
-        formData.append("wizardSessionId", options.wizardSessionId);
-        if (options.draftEntityId) {
-          formData.append("draftEntityId", options.draftEntityId);
-        }
-        if (options.draftEntityType) {
-          formData.append("draftEntityType", options.draftEntityType);
-        }
-
-        const response = await fetch("/api/upload/wizard", {
-          method: "POST",
-          body: formData,
+        const uploadData = await uploadMediaFile(fileToUpload, {
+          endpoint: "/api/upload/wizard",
+          wizardSessionId: options.wizardSessionId,
+          draftEntityId: options.draftEntityId,
+          draftEntityType: options.draftEntityType,
         });
 
         console.log("📡 [WIZARD UPLOAD] Server response:", {
-          status: response.status,
-          ok: response.ok,
+          mediaId: uploadData.id,
+          url: uploadData.url,
         });
-
-        if (!response.ok) {
-          const contentType = response.headers.get("content-type");
-          let errorMessage = `Upload failed: HTTP ${response.status}`;
-          
-          try {
-            const responseText = await response.text();
-            if (contentType?.includes("application/json") && responseText) {
-              const errorData = JSON.parse(responseText);
-              errorMessage = errorData.error || errorData.message || errorMessage;
-            } else {
-              errorMessage = responseText || errorMessage;
-            }
-          } catch (readError) {
-            console.error("❌ [WIZARD UPLOAD] Failed to read response:", readError);
-          }
-          
-          throw new Error(errorMessage);
-        }
-
-        const uploadData = await response.json();
-        console.log("✅ [WIZARD UPLOAD] Upload successful:", {
-          mediaId: uploadData.mediaId,
-          status: uploadData.status,
-          wizardSessionId: uploadData.wizardSessionId,
-        });
+        console.log("✅ [WIZARD UPLOAD] Upload successful:", uploadData);
 
         setProgress(100);
 
         const uploadedImage: UploadedImage = {
-          id: uploadData.mediaId || `temp-${Date.now()}`,
+          id: uploadData.id || `temp-${Date.now()}`,
           url: uploadData.url,
-          width: uploadData.width || imageWidth,
-          height: uploadData.height || imageHeight,
+          mediaId: uploadData.id,
+          width: uploadData.width ?? imageWidth,
+          height: uploadData.height ?? imageHeight,
           blurhash: blurhash,
           preview: preview || uploadData.url,
         };

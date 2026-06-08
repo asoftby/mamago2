@@ -22,6 +22,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+import { UPLOAD_IMAGE_ACCEPT, UPLOAD_IMAGE_FORMATS_LABEL } from "@/lib/uploads/uploadConfig";
 
 export type MediaUploadMode = "single" | "multiple";
 
@@ -109,7 +110,7 @@ export function MediaUploadField({
   onChange,
   maxFiles,
   maxSizeMb,
-  accept = "image/jpeg,image/png,image/webp,image/avif",
+  accept = UPLOAD_IMAGE_ACCEPT,
   disabled = false,
   entityType,
   context,
@@ -367,7 +368,7 @@ export function MediaUploadField({
             <div className="space-y-1.5">
               <p className="text-sm font-medium text-foreground">{emptyHint}</p>
               <p className="text-xs text-muted-foreground">
-                Поддерживаются JPEG, PNG, WebP и AVIF. До {effectiveMaxSizeMb} MB
+                Поддерживаются {UPLOAD_IMAGE_FORMATS_LABEL}. До {effectiveMaxSizeMb} MB
                 {mode === "multiple" ? `, максимум ${effectiveMaxFiles} файлов` : ""}.
               </p>
             </div>

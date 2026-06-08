@@ -34,27 +34,27 @@ export interface PlaceForSlug {
 /**
  * Check if slug is available (not used by any place or in history)
  */
-async function isSlugAvailable(slug: string, excludePlaceId?: string): Promise<boolean> {
+async function isSlugAvailable(slug: string, excludePlaceId?: string, cityId?: string | null): Promise<boolean> {
   // Check current places
-  const existingPlace = await prisma.place.findUnique({
-    where: { slug },
+  const existingPlace = await prisma.place.findFirst({
+    where: { slug, ...(cityId ? { cityId } : {}) },
     select: { id: true },
   });
-  
+
   if (existingPlace && existingPlace.id !== excludePlaceId) {
     return false;
   }
-  
+
   // Check slug history
-  const historyEntry = await prisma.placeSlugHistory.findUnique({
-    where: { slug },
+  const historyEntry = await prisma.placeSlugHistory.findFirst({
+    where: { slug, ...(cityId ? { cityId } : {}) },
     select: { placeId: true },
   });
-  
+
   if (historyEntry && historyEntry.placeId !== excludePlaceId) {
     return false;
   }
-  
+
   return true;
 }
 
@@ -62,23 +62,23 @@ async function isSlugAvailable(slug: string, excludePlaceId?: string): Promise<b
  * Ensure slug is unique by adding numeric suffix if needed
  * Only used as last resort fallback
  */
-async function ensureUniqueSlug(
+async function ensureUniquePlaceSlug(
   candidateSlug: string,
-  excludePlaceId?: string
+  excludePlaceId?: string,
+  cityId?: string | null,
 ): Promise<string> {
   let slug = candidateSlug;
   let suffix = 2;
-  
-  while (!(await isSlugAvailable(slug, excludePlaceId))) {
+
+  while (!(await isSlugAvailable(slug, excludePlaceId, cityId))) {
     slug = addNumericSuffix(candidateSlug, suffix);
     suffix++;
-    
-    // Safety limit
+
     if (suffix > 100) {
       throw new Error(`Could not generate unique slug for: ${candidateSlug}`);
     }
   }
-  
+
   return slug;
 }
 
@@ -145,7 +145,7 @@ export async function generatePlaceSlug(place: PlaceForSlug): Promise<string> {
   }
   
   // Ensure uniqueness (adds numeric suffix if needed)
-  const finalSlug = await ensureUniqueSlug(candidateSlug, place.id);
+  const finalSlug = await ensureUniquePlaceSlug(candidateSlug, place.id, place.cityId);
   
   if (finalSlug !== candidateSlug) {
     console.log(`[Slug] Added numeric suffix: ${finalSlug}`);
@@ -168,7 +168,7 @@ export async function updatePlaceSlug(
     // Get current place
     const place = await tx.place.findUnique({
       where: { id: placeId },
-      select: { slug: true },
+      select: { slug: true, cityId: true },
     });
     
     if (!place) {
@@ -180,13 +180,13 @@ export async function updatePlaceSlug(
       console.log(`[Slug] No change needed for place ${placeId}`);
       return;
     }
-    
+
     // Save old slug to history (if it exists)
     if (place.slug) {
-      await createPlaceSlugHistoryIgnoreDuplicate(tx, placeId, place.slug);
+      await createPlaceSlugHistoryIgnoreDuplicate(tx, placeId, place.slug, place.cityId);
       console.log(`[Slug] Saved old slug to history: ${place.slug}`);
     } else {
-      await createPlaceSlugHistoryIgnoreDuplicate(tx, placeId, placeId);
+      await createPlaceSlugHistoryIgnoreDuplicate(tx, placeId, placeId, place.cityId);
     }
     
     // Update place with new slug
@@ -237,7 +237,7 @@ export async function assignSlugOnPublish(placeId: string): Promise<string> {
   const newSlug = await generatePlaceSlug(place);
   
   await prisma.$transaction(async (tx) => {
-    await createPlaceSlugHistoryIgnoreDuplicate(tx, placeId, placeId);
+    await createPlaceSlugHistoryIgnoreDuplicate(tx, placeId, placeId, place.cityId);
     await tx.place.update({
       where: { id: placeId },
       data: {
@@ -260,7 +260,7 @@ export async function assignSlugOnPublish(placeId: string): Promise<string> {
 export async function assignPlaceSlugIfMissing(placeId: string, title: string): Promise<string> {
   const place = await prisma.place.findUnique({
     where: { id: placeId },
-    select: { id: true, slug: true },
+    select: { id: true, slug: true, cityId: true },
   });
   if (!place) throw new Error(`Place not found: ${placeId}`);
   if (place.slug) return place.slug;
@@ -268,14 +268,14 @@ export async function assignPlaceSlugIfMissing(placeId: string, title: string): 
   const base = slugifyRu(title || "place");
   let slug = base;
   let i = 2;
-  while (!(await isSlugAvailable(slug, placeId))) {
+  while (!(await isSlugAvailable(slug, placeId, place.cityId))) {
     slug = `${base}-${i}`;
     i++;
     if (i > 200) throw new Error(`Could not generate unique place slug for: ${base}`);
   }
 
   await prisma.$transaction(async (tx) => {
-    await createPlaceSlugHistoryIgnoreDuplicate(tx, placeId, placeId);
+    await createPlaceSlugHistoryIgnoreDuplicate(tx, placeId, placeId, place.cityId);
     await tx.place.update({
       where: { id: placeId },
       data: { slug, slugUpdatedAt: new Date() },
@@ -295,20 +295,20 @@ export async function findPlaceBySlug(slug: string): Promise<{
   isRedirect: boolean;
 } | null> {
   // First, try to find by current slug
-  const place = await prisma.place.findUnique({
+  const place = await prisma.place.findFirst({
     where: { slug },
     select: { id: true },
   });
-  
+
   if (place) {
     return {
       placeId: place.id,
       isRedirect: false,
     };
   }
-  
+
   // Not found in current slugs, check history
-  const historyEntry = await prisma.placeSlugHistory.findUnique({
+  const historyEntry = await prisma.placeSlugHistory.findFirst({
     where: { slug },
     select: { placeId: true },
   });

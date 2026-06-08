@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { requireAdminOrModerator } from "@/lib/article/requireAdminOrModerator";
+import { buildMediaFilePublicUrl, extractMediaRelativePathFromUrl } from "@/server/media/media-storage";
 
 export async function GET(req: NextRequest) {
   const user = await requireAdminOrModerator();
@@ -18,6 +19,7 @@ export async function GET(req: NextRequest) {
     select: {
       id: true,
       publicUrl: true,
+      storageKey: true,
       alt: true,
       filename: true,
       mimeType: true,
@@ -28,5 +30,20 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  return NextResponse.json(asset);
+  const fallbackPublicUrl =
+    asset.publicUrl?.trim() ||
+    (asset.storageKey?.trim()
+      ? asset.storageKey.trim().startsWith("/api/media/file/")
+        ? asset.storageKey.trim()
+        : (() => {
+            const relativePath = extractMediaRelativePathFromUrl(asset.storageKey);
+            return relativePath ? buildMediaFilePublicUrl(relativePath) : null;
+          })()
+      : null) ||
+    (asset.filename?.trim() ? buildMediaFilePublicUrl(asset.filename.trim()) : null);
+
+  return NextResponse.json({
+    ...asset,
+    publicUrl: fallbackPublicUrl,
+  });
 }

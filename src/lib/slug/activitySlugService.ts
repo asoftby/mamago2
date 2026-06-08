@@ -14,15 +14,15 @@ import { ensureUniqueSlug } from "@/lib/slug/ensureUniqueSlug";
 import { createActivitySlugHistoryIgnoreDuplicate } from "@/lib/slug/slugHistoryDedupe";
 import { syncActivityCanonical } from "@/lib/seo/syncEntityCanonical";
 
-async function isSlugAvailable(slug: string, excludeActivityId?: string) {
-  const existing = await prisma.activity.findUnique({
-    where: { slug },
+async function isSlugAvailable(slug: string, cityId: string | null | undefined, excludeActivityId?: string) {
+  const existing = await prisma.activity.findFirst({
+    where: { slug, ...(cityId ? { cityId } : {}) },
     select: { id: true },
   });
   if (existing && existing.id !== excludeActivityId) return false;
 
-  const history = await prisma.activitySlugHistory.findUnique({
-    where: { slug },
+  const history = await prisma.activitySlugHistory.findFirst({
+    where: { slug, ...(cityId ? { cityId } : {}) },
     select: { activityId: true },
   });
   if (history && history.activityId !== excludeActivityId) return false;
@@ -32,12 +32,13 @@ async function isSlugAvailable(slug: string, excludeActivityId?: string) {
 
 export async function generateActivitySlugFromTitle(
   title: string,
+  cityId: string | null | undefined,
   excludeActivityId?: string,
 ) {
   const base = slugifyRu((title || "event").trim(), "event");
   return ensureUniqueSlug({
     base,
-    isAvailable: (slug) => isSlugAvailable(slug, excludeActivityId),
+    isAvailable: (slug) => isSlugAvailable(slug, cityId, excludeActivityId),
   });
 }
 
@@ -48,14 +49,14 @@ export async function generateActivitySlugFromTitle(
 export async function assignActivitySlugIfMissing(activityId: string, title: string) {
   const activity = await prisma.activity.findUnique({
     where: { id: activityId },
-    select: { id: true, slug: true },
+    select: { id: true, slug: true, cityId: true },
   });
   if (!activity) throw new Error(`Activity not found: ${activityId}`);
   if (activity.slug) return activity.slug;
 
-  const slug = await generateActivitySlugFromTitle(title, activityId);
+  const slug = await generateActivitySlugFromTitle(title, activity.cityId, activityId);
   await prisma.$transaction(async (tx) => {
-    await createActivitySlugHistoryIgnoreDuplicate(tx, activityId, activityId);
+    await createActivitySlugHistoryIgnoreDuplicate(tx, activityId, activityId, activity.cityId);
     await tx.activity.update({
       where: { id: activityId },
       data: {
@@ -78,28 +79,28 @@ export async function updateActivitySlug(activityId: string, newSlugRaw: string)
   await prisma.$transaction(async (tx) => {
     const activity = await tx.activity.findUnique({
       where: { id: activityId },
-      select: { slug: true },
+      select: { slug: true, cityId: true },
     });
     if (!activity) throw new Error(`Activity not found: ${activityId}`);
 
     if (activity.slug === newSlug) return;
 
     if (!activity.slug) {
-      await createActivitySlugHistoryIgnoreDuplicate(tx, activityId, activityId);
+      await createActivitySlugHistoryIgnoreDuplicate(tx, activityId, activityId, activity.cityId);
     }
 
     // ensure uniqueness across current + history
     const base = newSlug;
     let candidate = base;
     let i = 2;
-     
+
     while (true) {
-      const conflict = await tx.activity.findUnique({
-        where: { slug: candidate },
+      const conflict = await tx.activity.findFirst({
+        where: { slug: candidate, ...(activity.cityId ? { cityId: activity.cityId } : {}) },
         select: { id: true },
       });
-      const hist = await tx.activitySlugHistory.findUnique({
-        where: { slug: candidate },
+      const hist = await tx.activitySlugHistory.findFirst({
+        where: { slug: candidate, ...(activity.cityId ? { cityId: activity.cityId } : {}) },
         select: { activityId: true },
       });
       const ok =
@@ -114,7 +115,7 @@ export async function updateActivitySlug(activityId: string, newSlugRaw: string)
     finalSlug = candidate;
 
     if (activity.slug) {
-      await createActivitySlugHistoryIgnoreDuplicate(tx, activityId, activity.slug);
+      await createActivitySlugHistoryIgnoreDuplicate(tx, activityId, activity.slug, activity.cityId);
     }
 
     await tx.activity.update({
@@ -134,13 +135,13 @@ export async function findActivityBySlug(slug: string): Promise<{
   activityId: string;
   isRedirect: boolean;
 } | null> {
-  const current = await prisma.activity.findUnique({
+  const current = await prisma.activity.findFirst({
     where: { slug },
     select: { id: true },
   });
   if (current) return { activityId: current.id, isRedirect: false };
 
-  const hist = await prisma.activitySlugHistory.findUnique({
+  const hist = await prisma.activitySlugHistory.findFirst({
     where: { slug },
     select: { activityId: true },
   });
@@ -148,4 +149,3 @@ export async function findActivityBySlug(slug: string): Promise<{
 
   return null;
 }
-

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { MediaUploadField, type MediaUploadItem } from "@/components/media/MediaUploadField";
+import { uploadMediaFile } from "@/lib/uploads/uploadClient";
 
 type PickerItem = {
   id: string;
@@ -19,14 +20,13 @@ export function ArticleEditorGalleryField({
   onChange: (ids: string[]) => void;
   showHeading?: boolean;
 }) {
-  const [previewById, setPreviewById] = useState<Record<string, string>>({});
+  const [loadedPreviewById, setLoadedPreviewById] = useState<Record<string, string>>({});
+  const ids = useMemo(() => value.filter((id) => id.trim()), [value]);
 
   useEffect(() => {
     let cancelled = false;
-    const ids = value.filter((id) => id.trim());
 
     if (ids.length === 0) {
-      setPreviewById({});
       return;
     }
 
@@ -48,7 +48,7 @@ export function ArticleEditorGalleryField({
 
       if (cancelled) return;
 
-      setPreviewById(
+      setLoadedPreviewById(
         entries.reduce<Record<string, string>>((acc, [id, url]) => {
           if (url) acc[id] = url;
           return acc;
@@ -59,7 +59,12 @@ export function ArticleEditorGalleryField({
     return () => {
       cancelled = true;
     };
-  }, [value]);
+  }, [ids]);
+
+  const previewById = useMemo(
+    () => (ids.length === 0 ? {} : loadedPreviewById),
+    [ids.length, loadedPreviewById],
+  );
 
   const galleryValue = useMemo(
     () =>
@@ -76,31 +81,10 @@ export function ArticleEditorGalleryField({
     const uploaded: MediaUploadItem[] = [];
 
     for (const file of files) {
-      const fd = new FormData();
-      fd.append("file", file);
-      const res = await fetch("/api/upload", {
-        method: "POST",
-        body: fd,
-        credentials: "include",
-      });
-      const data = (await res.json().catch(() => ({}))) as {
-        error?: string;
-        url?: string;
-        mediaId?: string | null;
-      };
-
-      if (!res.ok) {
-        throw new Error(typeof data.error === "string" ? data.error : `Ошибка загрузки: ${file.name}`);
-      }
-
-      const mediaId = data.mediaId?.trim();
-      if (!mediaId) {
-        throw new Error(`«${file.name}»: нет ID медиа.`);
-      }
-
+      const media = await uploadMediaFile(file);
       uploaded.push({
-        id: mediaId,
-        url: data.url ?? "",
+        id: media.id,
+        url: media.url,
         title: file.name,
         alt: null,
       });
@@ -134,7 +118,7 @@ export function ArticleEditorGalleryField({
       value={galleryValue}
       onChange={(next) => {
         const items = Array.isArray(next) ? next : [];
-        setPreviewById(
+        setLoadedPreviewById(
           items.reduce<Record<string, string>>((acc, item) => {
             acc[item.id] = item.url;
             return acc;

@@ -8,6 +8,7 @@ import { useState, useEffect } from "react";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { uploadMediaFile } from "@/lib/uploads/uploadClient";
 import type { OfferFormDataMVP } from "../types.mvp";
 
 interface Step5MediaMVPProps {
@@ -86,24 +87,14 @@ export function Step5MediaMVP({
     
     setUploadingCover(true);
     try {
-      const formData = new FormData();
-      formData.append("file", file);
-      if (wizardSessionId) {
-        formData.append("wizardSessionId", wizardSessionId);
-      }
-      
-      const response = await fetch("/api/upload", {
-        method: "POST",
-        body: formData,
+      const media = await uploadMediaFile(file, {
+        wizardSessionId,
       });
-      
-      if (!response.ok) throw new Error("Upload failed");
-      
-      const { url } = await response.json();
-      onChange({ coverImage: url });
+
+      onChange({ coverImage: media.url });
     } catch (error) {
       console.error("Cover upload failed:", error);
-      alert("Ошибка загрузки изображения");
+      alert(error instanceof Error ? error.message : "Ошибка загрузки изображения");
     } finally {
       setUploadingCover(false);
     }
@@ -116,21 +107,11 @@ export function Step5MediaMVP({
     setUploadingGallery(true);
     try {
       const uploadPromises = files.map(async (file) => {
-        const formData = new FormData();
-        formData.append("file", file);
-        if (wizardSessionId) {
-          formData.append("wizardSessionId", wizardSessionId);
-        }
-        
-        const response = await fetch("/api/upload", {
-          method: "POST",
-          body: formData,
+        const media = await uploadMediaFile(file, {
+          wizardSessionId,
         });
-        
-        if (!response.ok) throw new Error("Upload failed");
-        
-        const { url } = await response.json();
-        return url;
+
+        return media.url;
       });
       
       const urls = await Promise.all(uploadPromises);

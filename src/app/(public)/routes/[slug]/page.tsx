@@ -1,3 +1,4 @@
+import { getCanonicalPublicAppUrl } from "@/lib/config/publicAppUrl";
 import { notFound, permanentRedirect } from "next/navigation";
 import { type RouteWithStops } from "@/server/services/route.service";
 import { RouteDetailClient } from "./RouteDetailClient";
@@ -61,7 +62,7 @@ function buildStopAddress(
 
 export async function generateMetadata({ params }: Props) {
   const { slug } = await params;
-  const publicBase = process.env.NEXT_PUBLIC_APP_URL || "https://mamago.by";
+  const publicBase = getCanonicalPublicAppUrl();
   const resolved = await findRouteBySlug(slug);
   if (resolved) {
     const db = await prisma.route.findUnique({
@@ -196,7 +197,7 @@ export default async function RouteDetailPage({ params }: Props) {
         })),
       };
 
-      const publicBase = process.env.NEXT_PUBLIC_APP_URL || "https://mamago.by";
+      const publicBase = getCanonicalPublicAppUrl();
       const jsonLd =
         db.seoJsonLdOverride && typeof db.seoJsonLdOverride === "object"
           ? (db.seoJsonLdOverride as Record<string, unknown>)

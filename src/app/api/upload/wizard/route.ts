@@ -19,6 +19,12 @@ export const runtime = 'nodejs';
 export const maxDuration = 30;
 
 import { getCurrentUser } from "@/lib/auth/server";
+import {
+  detectUploadMimeTypeFromBuffer,
+  resolveUploadMimeType,
+} from "@/lib/uploads/uploadConfig";
+import { jsonUploadError } from "@/lib/uploads/uploadErrors";
+import type { UploadSuccessResponse } from "@/lib/uploads/uploadTypes";
 import { validateUploadPreflight } from "@/lib/uploads/validateUploadPreflight";
 import { registerUploadedMedia } from "@/lib/media/mediaRegistry";
 import { MediaSourceType } from "@prisma/client";
@@ -27,63 +33,69 @@ import {
   generateProcessedFilename,
   DEFAULT_IMAGE_CONFIG,
 } from "@/lib/media/imageProcessor";
-import { writeRuntimeUpload } from "@/server/media/media-storage";
+import {
+  MEDIA_STORAGE_ROOT,
+  MEDIA_UPLOADS_DIR,
+  writeRuntimeUpload,
+} from "@/server/media/media-storage";
 
 export async function POST(req: NextRequest) {
   try {
     const user = await getCurrentUser();
 
     if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return jsonUploadError("UNAUTHORIZED", "Authentication is required to upload media", 401);
     }
 
     const formData = await req.formData();
-    const file = formData.get("file") as File;
+    const file = formData.get("file");
     const wizardSessionId = formData.get("wizardSessionId") as string | null;
     const draftEntityId = formData.get("draftEntityId") as string | null;
     const draftEntityType = formData.get("draftEntityType") as string | null;
 
-    if (!file) {
-      return NextResponse.json({ error: "No file provided" }, { status: 400 });
+    if (!(file instanceof File)) {
+      return jsonUploadError("FILE_REQUIRED", "Upload request must include a file field", 400);
     }
 
     if (!wizardSessionId) {
-      return NextResponse.json({ error: "wizardSessionId is required for wizard uploads" }, { status: 400 });
+      return jsonUploadError(
+        "WIZARD_SESSION_REQUIRED",
+        "wizardSessionId is required for wizard uploads",
+        400,
+      );
     }
 
-    console.log("📥 [WIZARD UPLOAD] Incoming file:", {
+    console.log("[WIZARD UPLOAD] Incoming file", {
+      userId: user.id,
+      role: user.role,
       name: file.name,
       type: file.type,
       size: file.size,
       wizardSessionId,
       draftEntityId,
       draftEntityType,
+      targetStorageRoot: MEDIA_STORAGE_ROOT,
+      targetUploadDir: MEDIA_UPLOADS_DIR,
     });
 
-    // Preflight validation (before any memory read)
     const preflightError = validateUploadPreflight(file);
     if (preflightError) {
       return preflightError;
     }
 
-    // Convert file to buffer
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
-    
-    // Detect actual format
-    const magicBytes = buffer.slice(4, 8).toString('ascii');
-    const isLikelyHEIC = magicBytes === 'ftyp' || 
-                         buffer.slice(8, 12).toString('ascii') === 'heic' ||
-                         buffer.slice(8, 12).toString('ascii') === 'mif1';
-    
-    let actualMimeType = file.type;
-    if (isLikelyHEIC && !file.type.includes('heic') && !file.type.includes('heif')) {
-      console.log("⚠️  [WIZARD UPLOAD] Detected HEIC by magic bytes, overriding MIME type");
-      actualMimeType = 'image/heic';
-    }
 
-    // Process image through strict pipeline
-    console.log("🔄 [WIZARD UPLOAD] Starting image processing");
+    const actualMimeType =
+      detectUploadMimeTypeFromBuffer(buffer) ??
+      resolveUploadMimeType(file) ??
+      file.type;
+
+    console.log("[WIZARD UPLOAD] Starting image processing", {
+      userId: user.id,
+      wizardSessionId,
+      mimeType: actualMimeType,
+    });
     let processedImageSet;
     try {
       processedImageSet = await processImage(
@@ -91,34 +103,59 @@ export async function POST(req: NextRequest) {
         actualMimeType,
         DEFAULT_IMAGE_CONFIG
       );
-      console.log("✅ [WIZARD UPLOAD] Image processed successfully");
+      console.log("[WIZARD UPLOAD] Image processed successfully", {
+        userId: user.id,
+        wizardSessionId,
+        originalFormat: processedImageSet.originalMimeType,
+      });
     } catch (processingError: unknown) {
       const message = processingError instanceof Error ? processingError.message : "Image processing failed";
-      console.error("❌ [WIZARD UPLOAD] Processing failed:", message);
-      return NextResponse.json({ error: message }, { status: 400 });
+      console.error("[WIZARD UPLOAD] Processing failed", {
+        userId: user.id,
+        wizardSessionId,
+        error: message,
+      });
+      return jsonUploadError("IMAGE_PROCESSING_FAILED", message, 400);
     }
 
-    // Save master image (WebP)
-    const masterSaved = await writeRuntimeUpload(
-      generateProcessedFilename(file.name),
-      processedImageSet.master.buffer,
-    );
-    const masterFilename = masterSaved.filename;
-    const masterUrl = masterSaved.publicUrl;
-
-    // Save responsive sizes
+    let masterFilename = "";
+    let masterUrl = "";
     const responsiveSizes: Record<string, string> = {};
-    for (const [sizeName, sizeData] of Object.entries(processedImageSet.sizes)) {
-      if (sizeData) {
+    try {
+      const masterSaved = await writeRuntimeUpload(
+        generateProcessedFilename(file.name),
+        processedImageSet.master.buffer,
+      );
+      masterFilename = masterSaved.filename;
+      masterUrl = masterSaved.publicUrl;
+
+      console.log("[WIZARD UPLOAD] Master file saved", {
+        userId: user.id,
+        wizardSessionId,
+        savedPath: masterSaved.absolutePath,
+        publicUrl: masterSaved.publicUrl,
+      });
+
+      for (const [sizeName, sizeData] of Object.entries(processedImageSet.sizes)) {
+        if (!sizeData) continue;
         const sizeSaved = await writeRuntimeUpload(
           generateProcessedFilename(file.name, sizeName),
           sizeData.buffer,
         );
         responsiveSizes[sizeName] = sizeSaved.publicUrl;
       }
+    } catch (storageError) {
+      const message = storageError instanceof Error ? storageError.message : "Failed to write uploaded file";
+      console.error("[WIZARD UPLOAD] Storage write failed", {
+        userId: user.id,
+        wizardSessionId,
+        error: message,
+        targetStorageRoot: MEDIA_STORAGE_ROOT,
+        targetUploadDir: MEDIA_UPLOADS_DIR,
+      });
+      return jsonUploadError("STORAGE_WRITE_FAILED", message, 500);
     }
 
-    // Register in media library with TEMP status
     let mediaId: string | null = null;
     try {
       let sourceType: MediaSourceType = MediaSourceType.USER_UPLOAD;
@@ -146,20 +183,44 @@ export async function POST(req: NextRequest) {
         draftEntityType: draftEntityType || undefined,
       });
       mediaId = asset.id;
-      
-      console.log("✅ [WIZARD UPLOAD] Registered as TEMP MediaAsset:", {
+
+      console.log("[WIZARD UPLOAD] Registered as TEMP MediaAsset", {
         mediaId,
         wizardSessionId,
         draftEntityId,
         draftEntityType,
       });
     } catch (mediaError) {
-      console.error("❌ [WIZARD UPLOAD] Failed to register media:", mediaError);
-      return NextResponse.json({ error: "Failed to register media" }, { status: 500 });
+      const message = mediaError instanceof Error ? mediaError.message : "Failed to register media in database";
+      console.error("[WIZARD UPLOAD] Database write failed", {
+        userId: user.id,
+        wizardSessionId,
+        error: message,
+        fileName: masterFilename,
+        publicUrl: masterUrl,
+      });
+      return jsonUploadError("DATABASE_WRITE_FAILED", message, 500);
     }
 
-    return NextResponse.json({
+    const media: UploadSuccessResponse["media"] = {
+      id: mediaId ?? masterFilename,
       url: masterUrl,
+      mimeType: "image/webp",
+      fileName: masterFilename,
+      width: processedImageSet.master.width,
+      height: processedImageSet.master.height,
+      size: processedImageSet.master.size,
+      status: "TEMP",
+    };
+
+    return NextResponse.json({
+      media,
+      id: media.id,
+      mediaId,
+      url: media.url,
+      publicUrl: media.url,
+      mimeType: media.mimeType,
+      fileName: media.fileName,
       filename: masterFilename,
       size: processedImageSet.master.size,
       width: processedImageSet.master.width,
@@ -168,12 +229,12 @@ export async function POST(req: NextRequest) {
       originalFormat: processedImageSet.originalMimeType,
       responsiveSizes,
       processed: true,
-      mediaId,
       status: "TEMP",
       wizardSessionId,
     });
   } catch (error: unknown) {
-    console.error("❌ [WIZARD UPLOAD] Error:", error);
-    return NextResponse.json({ error: "Failed to upload file" }, { status: 500 });
+    const message = error instanceof Error ? error.message : "Failed to upload file";
+    console.error("[WIZARD UPLOAD] Unexpected error", { error: message });
+    return jsonUploadError("UPLOAD_FAILED", message, 500);
   }
 }

@@ -1,16 +1,18 @@
 import type { Metadata } from "next";
 import prisma from "@/lib/prisma";
+import { getBaseUrl } from "@/lib/routing/cityPaths";
 
+/** Canonical base URL for the public site (BY). */
 export function publicSiteBase(): string {
-  return process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ?? "https://mamago.by";
+  return getBaseUrl("BY");
 }
 
-/** Канонический URL листинга «Куда пойти» / афиши событий в городе. */
+/** Canonical path for the city events listing. */
 export function cityEventsListingPath(citySlug: string): string {
   return `/${citySlug}/events`;
 }
 
-/** Metadata для `/{city}/events` — основная индексируемая витрина intent «kuda». */
+/** Metadata for `/{city}/events` — primary indexable intent «kuda». */
 export async function buildCityEventsListingMetadata(
   citySlug: string,
 ): Promise<Metadata> {
@@ -28,17 +30,21 @@ export async function buildCityEventsListingMetadata(
   };
 }
 
-/** Корень города дублирует контент kuda — canonical на листинг `/events`. */
-export async function buildCityHomeCanonicalToEvents(
-  citySlug: string,
-): Promise<Metadata> {
+/**
+ * Self-canonical metadata for the city hub `/{city}`.
+ * The hub is its own rankable page — NOT a redirect/alias to /events.
+ */
+export async function buildCityHubMetadata(citySlug: string): Promise<Metadata> {
   const city = await prisma.city.findUnique({
     where: { slug: citySlug },
-    select: { id: true },
+    select: { name: true },
   });
   if (!city) return {};
   const base = publicSiteBase();
+  const canonical = `${base}/${citySlug}`;
   return {
-    alternates: { canonical: `${base}${cityEventsListingPath(citySlug)}` },
+    title: `${city.name} — семейный гид | mamaGo`,
+    description: `Афиша событий, занятия, маршруты и журнал mamaGo — городской хаб для семей с детьми в ${city.name}.`,
+    alternates: { canonical },
   };
 }

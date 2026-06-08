@@ -1,3 +1,4 @@
+import { getCanonicalPublicAppUrl } from "@/lib/config/publicAppUrl";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { permanentRedirect } from "next/navigation";
@@ -70,7 +71,7 @@ export async function generateMetadata({ params, searchParams }: EventPublicPage
 
   if (!fromDb) return {};
 
-  const publicBase = process.env.NEXT_PUBLIC_APP_URL || "https://mamago.by";
+  const publicBase = getCanonicalPublicAppUrl();
   const canonical =
     fromDb.seoCanonicalUrl?.trim() || (fromDb.slug ? `${publicBase}/${city}/events/${fromDb.slug}` : null);
 
@@ -96,7 +97,7 @@ export default async function CityEventPublicPage({ params, searchParams }: Even
       permanentRedirect(`/${city}/events/${fromDb._redirectToSlug}${searchParamsToSuffix(sp)}`);
     }
 
-    const publicBase = process.env.NEXT_PUBLIC_APP_URL || "https://mamago.by";
+    const publicBase = getCanonicalPublicAppUrl();
     const jsonLd =
       fromDb.seoJsonLdOverride && typeof fromDb.seoJsonLdOverride === "object"
         ? (fromDb.seoJsonLdOverride as Record<string, unknown>)

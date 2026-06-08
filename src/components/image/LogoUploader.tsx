@@ -3,6 +3,7 @@
 import { useState, useRef } from "react";
 import { Upload, Camera } from "lucide-react";
 import { useImageUpload, type UploadedImage } from "@/hooks/useImageUpload";
+import { UPLOAD_IMAGE_ACCEPT } from "@/lib/uploads/uploadConfig";
 
 interface LogoUploaderProps {
   currentLogo?: string | null;
@@ -72,7 +73,7 @@ export function LogoUploader({
       <input
         ref={fileInputRef}
         type="file"
-        accept="image/jpeg,image/png,image/webp,image/avif"
+        accept={UPLOAD_IMAGE_ACCEPT}
         onChange={(e) => handleFileSelect(e.target.files)}
         className="hidden"
         disabled={disabled || uploading}

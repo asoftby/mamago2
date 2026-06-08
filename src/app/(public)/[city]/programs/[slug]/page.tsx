@@ -1,3 +1,4 @@
+import { getCanonicalPublicAppUrl } from "@/lib/config/publicAppUrl";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import prisma from "@/lib/prisma";
@@ -16,8 +17,8 @@ interface ProgramPageProps {
 }
 
 async function getProgramData(slug: string, citySlug: string): Promise<OfferPageData | null> {
-  // Find activity by slug
-  const activity = await prisma.activity.findUnique({
+  // Find activity by slug (city-scoped via findFirst since slug is no longer globally @unique)
+  const activity = await prisma.activity.findFirst({
     where: { slug },
     include: {
       place: {
@@ -86,7 +87,7 @@ export async function generateMetadata({ params }: ProgramPageProps): Promise<Me
     });
   }
 
-  const publicBase = process.env.NEXT_PUBLIC_APP_URL || "https://mamago.by";
+  const publicBase = getCanonicalPublicAppUrl();
 
   return applyGlobalRobotsOverride({
     title: data.seo?.title || data.title,

@@ -93,7 +93,7 @@ export async function generateUniquePlaceSlug(
 
   // Check if slug exists and increment counter until we find unique one
   while (true) {
-    const existing = await prisma.place.findUnique({
+    const existing = await prisma.place.findFirst({
       where: { slug },
       select: { id: true },
     });
