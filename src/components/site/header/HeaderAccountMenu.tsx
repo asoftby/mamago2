@@ -16,6 +16,7 @@ import { useHydrated } from "@/hooks/use-hydrated";
 import { notifyAuthStateChanged } from "@/lib/auth/client";
 import { resolveHasBusinessProfile } from "@/lib/account/isBusinessAccountRole";
 import { useProfileDropdownHandlers } from "@/lib/account/useProfileDropdownHandlers";
+import { useCurrentPath } from "@/hooks/useCurrentPath";
 
 export function HeaderAccountMenu() {
   const narrow = useNarrowViewport();
@@ -31,6 +32,7 @@ export function HeaderAccountMenu() {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [guestAuthOpen, setGuestAuthOpen] = useState(false);
   const headerHydrated = useHydrated();
+  const currentPath = useCurrentPath();
 
   useEffect(() => {
     if (process.env.NODE_ENV !== "production") {
@@ -88,7 +90,7 @@ export function HeaderAccountMenu() {
         <DefaultAuthModal
           open={guestAuthOpen}
           onOpenChange={setGuestAuthOpen}
-          nextHref="/me"
+          nextHref={currentPath}
           authEntryPoint="profile"
           dialogTitle="Вход в mamaGo"
           title="Вход в mamaGo"

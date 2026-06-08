@@ -9,7 +9,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import { prismaToHttpResponse } from "@/lib/admin/prismaHttpErrors";
 import type { NotificationStreamFilter } from "@/server/services/notification.service";
-import { getUnreadCount, getAccessibleSurfacesForUser } from "@/server/notifications/notification.service";
+import { getUnreadCount, getAccessibleSurfacesForUser, reconcileResolvedActionRequiredNotifications } from "@/server/notifications/notification.service";
 import { resolveNotificationAudienceUser } from "@/server/notifications/resolveNotificationAudienceUser";
 import { getTelegramLinkStatus } from "@/server/services/telegramLink.service";
 
@@ -71,6 +71,7 @@ export async function GET(request: NextRequest) {
     };
 
     const dbStart = performance.now();
+    await reconcileResolvedActionRequiredNotifications(user.id);
     const unreadCount = await getUnreadCount(user.id, stream, queryOpts);
     if (process.env.NODE_ENV === "development") {
       console.debug(`[unread-count] db: ${(performance.now() - dbStart).toFixed(0)}ms`);

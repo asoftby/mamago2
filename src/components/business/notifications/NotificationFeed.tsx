@@ -12,6 +12,8 @@ import { trackNotificationEvent } from "@/lib/notifications/notificationAnalytic
 import { handleNotificationClick } from "@/features/notifications/notification-click";
 import { useNotificationStore } from "@/features/notifications/store";
 import { NotificationListItem } from "./NotificationListItem";
+import { useOnboardingNotificationCta } from "@/features/notifications/hooks/useOnboardingNotificationCta";
+import { canArchiveNotificationRow } from "@/lib/notifications/notificationLifecycle";
 
 type Props = {
   open: boolean;
@@ -124,12 +126,44 @@ export function NotificationFeed({
     [markAsReadLocally, onClose, router],
   );
 
+  const refreshListAndCounts = useCallback(async () => {
+    await refreshList();
+    await useNotificationStore.getState().refreshUnreadOnly({ force: true });
+    if (stream === "business") {
+      await useNotificationStore.getState().refreshBusinessUnreadOnly({ force: true });
+    }
+    await onNotificationRead?.();
+  }, [onNotificationRead, refreshList, stream]);
+
+  const { handleCtaClick: handleOnboardingCta, getCtaProps } =
+    useOnboardingNotificationCta({
+      onRefresh: refreshListAndCounts,
+    });
+
+  const handleCtaClick = useCallback(
+    async (notification: NotificationApiRow) => {
+      const handled = await handleOnboardingCta(notification);
+      if (handled) {
+        return;
+      }
+
+      if (!notification.actionUrl) return;
+      onClose?.();
+      router.push(notification.actionUrl);
+    },
+    [handleOnboardingCta, onClose, router],
+  );
+
   const handleArchive = useCallback(
     async (notificationId: string) => {
       const response = await fetch(`/api/notifications/${notificationId}/archive`, {
         method: "POST",
         credentials: "include",
       });
+      if (response.status === 409) {
+        toast.message("Нельзя архивировать уведомление, пока действие не выполнено");
+        return;
+      }
       if (!response.ok) {
         throw new Error("archive_failed");
       }
@@ -200,12 +234,18 @@ export function NotificationFeed({
     <>
       <div className={cn("flex min-h-0 flex-1 flex-col overflow-hidden bg-white", listClassName)}>
         <div className="divide-y divide-gray-100 bg-white">
-          {notifications.map((notification) => (
-            <NotificationListItem
-              key={notification.id}
-              notification={notification}
-              onClick={handleRowClick}
-              trailingAction={
+          {notifications.map((notification) => {
+            const ctaProps = getCtaProps(notification);
+            return (
+              <NotificationListItem
+                key={notification.id}
+                notification={notification}
+                onClick={handleRowClick}
+                onCtaClick={handleCtaClick}
+                ctaLabel={ctaProps.label}
+                ctaLoading={ctaProps.loading}
+                ctaDisabled={ctaProps.disabled}
+                trailingAction={
                 activeTab === "archived" ? (
                   <Button
                     type="button"
@@ -216,7 +256,7 @@ export function NotificationFeed({
                   >
                     <RotateCcw className="h-4 w-4" />
                   </Button>
-                ) : notification.readAt ? (
+                ) : notification.readAt && canArchiveNotificationRow(notification) ? (
                   <Button
                     type="button"
                     variant="ghost"
@@ -229,7 +269,8 @@ export function NotificationFeed({
                 ) : null
               }
             />
-          ))}
+            );
+          })}
         </div>
         {hasMore ? (
           <div className="shrink-0 border-t border-gray-100 p-3">

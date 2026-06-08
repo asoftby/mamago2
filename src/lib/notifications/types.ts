@@ -39,6 +39,12 @@ export type NotificationApiRow = {
   userId?: string;
   /** Контекст уведомления: USER, BUSINESS, ADMIN */
   audience?: string | null;
+  /** Action-required onboarding (VERIFY_EMAIL, CONNECT_TELEGRAM, …) */
+  actionRequired?: boolean;
+  /** Действие выполнено (email подтверждён, Telegram подключён, …) */
+  actionResolved?: boolean;
+  /** Можно ли архивировать (false для unresolved action-required) */
+  canArchive?: boolean;
 };
 
 /**

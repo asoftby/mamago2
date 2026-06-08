@@ -19,11 +19,13 @@ import { getTelegramLinkStatus } from "@/server/services/telegramLink.service";
 import {
   countUserArchived,
   countUnifiedNotifications,
+  enrichNotificationsWithLifecycle,
   getAccessibleSurfacesForUser,
   getUnreadCount,
   getUserArchived,
   getUserInbox,
   getWelcomeIsRead,
+  reconcileResolvedActionRequiredNotifications,
 } from "@/server/notifications/notification.service";
 import { resolveNotificationAudienceUser } from "@/server/notifications/resolveNotificationAudienceUser";
 
@@ -63,6 +65,8 @@ export async function GET(req: NextRequest) {
       accessibleSurfaces,
     };
 
+    const resolutionState = await reconcileResolvedActionRequiredNotifications(user.id);
+
     let notifications;
     if (tab === "archived") {
       notifications = await getUserArchived(user.id, {
@@ -89,8 +93,13 @@ export async function GET(req: NextRequest) {
         : await countUnifiedNotifications(user.id, stream, queryOpts);
     const hasMore = offset + notifications.length < total;
 
-    return NextResponse.json({
+    const enrichedNotifications = enrichNotificationsWithLifecycle(
       notifications,
+      resolutionState,
+    );
+
+    return NextResponse.json({
+      notifications: enrichedNotifications,
       unreadCount,
       total,
       hasMore,

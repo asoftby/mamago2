@@ -14,6 +14,13 @@
 
 import prisma from "@/lib/prisma";
 import {
+  canArchiveNotification,
+  enrichNotificationsWithLifecycle,
+  getUserActionResolutionState,
+  NotificationArchiveBlockedError,
+} from "@/server/notifications/notification-lifecycle";
+import { getTelegramLinkStatus } from "@/server/services/telegramLink.service";
+import {
   Prisma,
   type Notification as NotificationModel,
   type NotificationActionMode,
@@ -139,7 +146,7 @@ interface CreateNotificationParams {
   expiresAt?: Date | null;
 }
 
-type OnboardingNotificationKind = "VERIFY_EMAIL" | "VERIFY_PHONE";
+type OnboardingNotificationKind = "VERIFY_EMAIL" | "VERIFY_PHONE" | "CONNECT_TELEGRAM";
 
 const ONBOARDING_NOTIFICATION_CONFIG: Record<
   OnboardingNotificationKind,
@@ -157,7 +164,7 @@ const ONBOARDING_NOTIFICATION_CONFIG: Record<
     title: "Подтвердите email",
     body: "Подтвердите почту, чтобы сохранить доступ к аккаунту и получать важные уведомления.",
     ctaLabel: "Подтвердить",
-    actionUrl: "/settings/security",
+    actionUrl: "/me/settings/account",
     metadata: { kind: "VERIFY_EMAIL" },
   },
   VERIFY_PHONE: {
@@ -167,6 +174,14 @@ const ONBOARDING_NOTIFICATION_CONFIG: Record<
     ctaLabel: "Подтвердить",
     actionUrl: "/settings/security",
     metadata: { kind: "VERIFY_PHONE" },
+  },
+  CONNECT_TELEGRAM: {
+    entityId: "CONNECT_TELEGRAM",
+    title: "Подключите Telegram",
+    body: "Получайте уведомления о заявках, планах и событиях прямо в Telegram.",
+    ctaLabel: "Подключить",
+    actionUrl: "/me/settings/notifications",
+    metadata: { kind: "CONNECT_TELEGRAM" },
   },
 };
 
@@ -297,24 +312,29 @@ async function ensureOnboardingNotification(
 }
 
 export async function ensureUserOnboardingNotifications(userId: string) {
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: {
-      id: true,
-      emailVerifiedAt: true,
-      phoneVerifiedAt: true,
-    },
-  });
+  const [user, telegramStatus] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        emailVerifiedAt: true,
+        phoneVerifiedAt: true,
+      },
+    }),
+    getTelegramLinkStatus({ userId }),
+  ]);
 
   if (!user) return null;
 
   const results = await Promise.all([
     user.emailVerifiedAt == null
       ? ensureOnboardingNotification(user.id, "VERIFY_EMAIL")
-      : null,
-    user.phoneVerifiedAt == null
-      ? ensureOnboardingNotification(user.id, "VERIFY_PHONE")
-      : null,
+      : completeOnboardingNotification(user.id, "VERIFY_EMAIL"),
+    // телефон запрашивается контекстно, не в онбординге
+    // ensureOnboardingNotification(user.id, "VERIFY_PHONE"),
+    telegramStatus.linked
+      ? completeOnboardingNotification(user.id, "CONNECT_TELEGRAM")
+      : ensureOnboardingNotification(user.id, "CONNECT_TELEGRAM"),
   ]);
 
   return results;
@@ -343,6 +363,25 @@ export async function completeOnboardingNotification(
       archivedAt: now,
     },
   });
+}
+
+/** Синхронизирует action-required onboarding-уведомления с фактическим состоянием аккаунта. */
+export async function reconcileResolvedActionRequiredNotifications(userId: string) {
+  const state = await getUserActionResolutionState(userId);
+
+  await Promise.all([
+    state.emailVerified
+      ? completeOnboardingNotification(userId, "VERIFY_EMAIL")
+      : Promise.resolve(),
+    state.telegramLinked
+      ? completeOnboardingNotification(userId, "CONNECT_TELEGRAM")
+      : Promise.resolve(),
+    state.phoneVerified
+      ? completeOnboardingNotification(userId, "VERIFY_PHONE")
+      : Promise.resolve(),
+  ]);
+
+  return state;
 }
 
 // ── PLACE ─────────────────────────────────────────────────────────────────────
@@ -854,11 +893,17 @@ export async function countUserArchived(
 }
 
 export async function archiveNotification(userId: string, notificationId: string) {
+  await reconcileResolvedActionRequiredNotifications(userId);
+
   const existing = await prisma.notification.findFirst({
     where: { id: notificationId, userId },
-    select: { id: true },
   });
   if (!existing) throw new Error("Notification not found");
+
+  const state = await getUserActionResolutionState(userId);
+  if (!canArchiveNotification(existing, state)) {
+    throw new NotificationArchiveBlockedError();
+  }
 
   return prisma.notification.update({
     where: { id: existing.id },
@@ -867,14 +912,37 @@ export async function archiveNotification(userId: string, notificationId: string
 }
 
 export async function archiveAllRead(userId: string) {
-  return prisma.notification.updateMany({
+  await reconcileResolvedActionRequiredNotifications(userId);
+
+  const state = await getUserActionResolutionState(userId);
+  const candidates = await prisma.notification.findMany({
     where: {
       userId,
       archivedAt: null,
       readAt: { not: null },
     },
+    select: {
+      id: true,
+      type: true,
+      entityId: true,
+      metadata: true,
+    },
+  });
+
+  const archivableIds = candidates
+    .filter((notification) => canArchiveNotification(notification, state))
+    .map((notification) => notification.id);
+
+  if (archivableIds.length === 0) {
+    return { count: 0 };
+  }
+
+  const result = await prisma.notification.updateMany({
+    where: { id: { in: archivableIds } },
     data: { archivedAt: new Date() },
   });
+
+  return { count: result.count };
 }
 
 export async function restoreNotification(userId: string, notificationId: string) {

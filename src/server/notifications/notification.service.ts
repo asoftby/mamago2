@@ -20,6 +20,11 @@ import type {
   PlanTomorrowDigestContext,
 } from "@/lib/notifications/domainContracts";
 export {
+  enrichNotificationsWithLifecycle,
+  getUserActionResolutionState,
+  NotificationArchiveBlockedError,
+} from "@/server/notifications/notification-lifecycle";
+export {
   archiveAllRead,
   archiveNotification,
   countUserArchived,
@@ -65,6 +70,7 @@ export {
   notifyUserPlanReminder,
   notifyWelcomeNewUser,
   resolveNotificationActionById,
+  reconcileResolvedActionRequiredNotifications,
   restoreNotification,
 } from "@/server/services/notification.service";
 

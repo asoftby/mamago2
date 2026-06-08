@@ -7,6 +7,7 @@ import { displayWelcomeNotificationTitle } from "@/lib/notifications/welcomeNoti
 import { getNotificationProductDomainBadge } from "@/lib/notifications/productDomains";
 import type { NotificationApiRow } from "@/lib/notifications/types";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 import { NotificationMessageBody } from "./NotificationMessageBody";
 import {
   getNotificationIcon,
@@ -16,6 +17,10 @@ import {
 type NotificationListItemProps = {
   notification: NotificationApiRow;
   onClick: (notification: NotificationApiRow) => void | Promise<void>;
+  onCtaClick?: (notification: NotificationApiRow) => void | Promise<void>;
+  ctaLabel?: string | null;
+  ctaLoading?: boolean;
+  ctaDisabled?: boolean;
   trailingAction?: ReactNode;
   compact?: boolean;
 };
@@ -27,6 +32,10 @@ function isUnreadRow(notification: NotificationApiRow): boolean {
 export function NotificationListItem({
   notification,
   onClick,
+  onCtaClick,
+  ctaLabel,
+  ctaLoading = false,
+  ctaDisabled = false,
   trailingAction,
   compact = false,
 }: NotificationListItemProps) {
@@ -34,6 +43,9 @@ export function NotificationListItem({
   const icon = getNotificationIcon(notification.type);
   const typeLabel = getNotificationTypeLabel(notification.type);
   const contextBadge = getNotificationProductDomainBadge(notification);
+
+  const resolvedCtaLabel = ctaLabel ?? notification.ctaLabel;
+  const showCta = Boolean(resolvedCtaLabel && onCtaClick);
 
   return (
     <div
@@ -98,6 +110,19 @@ export function NotificationListItem({
         </button>
         {trailingAction}
       </div>
+      {showCta ? (
+        <div className={cn("mt-2", compact ? "pl-8" : "pl-9")}>
+          <Button
+            type="button"
+            variant="outline"
+            size="xs"
+            disabled={ctaDisabled || ctaLoading}
+            onClick={() => void onCtaClick?.(notification)}
+          >
+            {resolvedCtaLabel}
+          </Button>
+        </div>
+      ) : null}
     </div>
   );
 }

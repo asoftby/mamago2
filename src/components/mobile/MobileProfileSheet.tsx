@@ -12,6 +12,7 @@ import { notifyAuthStateChanged } from "@/lib/auth/client";
 import { cn } from "@/lib/utils";
 import { resolveHasBusinessProfile } from "@/lib/account/isBusinessAccountRole";
 import { useProfileDropdownHandlers } from "@/lib/account/useProfileDropdownHandlers";
+import { useCurrentPath } from "@/hooks/useCurrentPath";
 import {
   getNavIconButtonClassName,
   type NavIconChrome,
@@ -46,6 +47,7 @@ export function MobileProfileSheet({
 
   const [guestAuthOpen, setGuestAuthOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
+  const currentPath = useCurrentPath();
 
   const handlers = useProfileDropdownHandlers({
     user,
@@ -156,7 +158,7 @@ export function MobileProfileSheet({
         <DefaultAuthModal
           open={guestAuthOpen}
           onOpenChange={setGuestAuthOpen}
-          nextHref="/me"
+          nextHref={currentPath}
           authEntryPoint="profile"
           dialogTitle="Вход в mamaGo"
           title="Вход в mamaGo"

@@ -5,7 +5,7 @@
 
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
-import { markAllNotificationsAsRead } from "@/server/notifications/notification.service";
+import { markAllNotificationsAsRead, reconcileResolvedActionRequiredNotifications } from "@/server/notifications/notification.service";
 
 export async function POST() {
   try {
@@ -14,6 +14,7 @@ export async function POST() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    await reconcileResolvedActionRequiredNotifications(user.id);
     await markAllNotificationsAsRead(user.id);
 
     return NextResponse.json({ success: true });

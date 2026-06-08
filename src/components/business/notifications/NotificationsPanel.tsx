@@ -19,6 +19,7 @@ import type { NotificationApiRow } from "@/lib/notifications/types";
 import { useRouter } from "next/navigation";
 import { NotificationModal } from "./NotificationModal";
 import { NotificationListItem } from "./NotificationListItem";
+import { useOnboardingNotificationCta } from "@/features/notifications/hooks/useOnboardingNotificationCta";
 
 export type NotificationsPanelProps = {
   /** Вызывается при закрытии popover/sheet (кнопка X и т.д.) */
@@ -118,6 +119,30 @@ export function NotificationsPanel({
     [refreshCounts],
   );
 
+  const refreshPanel = useCallback(async () => {
+    await refreshCounts();
+    await refreshRecent();
+  }, [refreshCounts, refreshRecent]);
+
+  const { handleCtaClick: handleOnboardingCta, getCtaProps } =
+    useOnboardingNotificationCta({
+      onRefresh: refreshPanel,
+    });
+
+  const handleCtaClick = useCallback(
+    async (notification: NotificationApiRow) => {
+      const handled = await handleOnboardingCta(notification);
+      if (handled) {
+        return;
+      }
+
+      if (!notification.actionUrl) return;
+      onClose();
+      router.push(notification.actionUrl);
+    },
+    [handleOnboardingCta, onClose, router],
+  );
+
   const handleRowClick = useCallback(
     async (notification: NotificationApiRow) => {
       try {
@@ -198,14 +223,21 @@ export function NotificationsPanel({
         ) : (
           <ScrollArea className="h-full max-h-[min(56vh,520px)]">
             <div className="divide-y divide-gray-100 bg-white">
-              {items.map((notification) => (
-                <NotificationListItem
-                  key={notification.id}
-                  notification={notification}
-                  compact
-                  onClick={handleRowClick}
-                />
-              ))}
+              {items.map((notification) => {
+                const ctaProps = getCtaProps(notification);
+                return (
+                  <NotificationListItem
+                    key={notification.id}
+                    notification={notification}
+                    compact
+                    onClick={handleRowClick}
+                    onCtaClick={handleCtaClick}
+                    ctaLabel={ctaProps.label}
+                    ctaLoading={ctaProps.loading}
+                    ctaDisabled={ctaProps.disabled}
+                  />
+                );
+              })}
             </div>
           </ScrollArea>
         )}
