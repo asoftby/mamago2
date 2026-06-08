@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { appendBirthdayBuilderAuthParam } from "@/lib/auth/appendBirthdayBuilderAuthParam";
+import { buildAuthUrl } from "@/lib/auth/redirectTo";
 import { clearPendingBirthdayBuilderAction } from "../lib/pendingBirthdayBuilderAction";
 
 type BirthdayBuilderAuthModalProps = {
@@ -24,7 +25,7 @@ export function BirthdayBuilderAuthModal({ open, onOpenChange }: BirthdayBuilder
 
   const rawNext = `${pathname}${searchParams.toString() ? `?${searchParams.toString()}` : ""}`;
   const nextWithMarker = appendBirthdayBuilderAuthParam(rawNext);
-  const loginHref = `/login?next=${encodeURIComponent(nextWithMarker)}`;
+  const loginHref = buildAuthUrl({ redirectTo: nextWithMarker });
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

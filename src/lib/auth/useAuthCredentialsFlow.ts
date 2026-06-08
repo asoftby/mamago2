@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { appendBirthdayBuilderAuthParam } from "@/lib/auth/appendBirthdayBuilderAuthParam";
 import { getPostAuthRedirect } from "@/lib/auth/postAuthRedirect";
+import { getSafeRedirectPath } from "@/lib/auth/redirectTo";
 import { notifyAuthStateChanged, notifyNotificationsChanged } from "@/lib/auth/client";
 import { navigateToCompatibleHref } from "@/lib/routing/clientNavigation";
 import { toast } from "@/lib/toast";
@@ -86,7 +87,9 @@ export function useAuthCredentialsFlow({
 
   const finishAuthSession = useCallback(
     async (rawRedirect: string) => {
-      const target = appendBirthdayBuilderAuthParam(rawRedirect);
+      const target = appendBirthdayBuilderAuthParam(
+        getSafeRedirectPath(rawRedirect, nextHref ?? getPostAuthRedirect()),
+      );
       if (embedded && beforeFinishAuthSession) {
         await beforeFinishAuthSession();
       }
@@ -149,7 +152,7 @@ export function useAuthCredentialsFlow({
       const raw =
         typeof data.redirectTo === "string" && data.redirectTo.length > 0
           ? data.redirectTo
-          : nextHref ?? getPostAuthRedirect();
+          : getSafeRedirectPath(nextHref, getPostAuthRedirect());
       await finishAuthSession(raw);
     } catch {
       setError("Ошибка сети");
@@ -189,7 +192,7 @@ export function useAuthCredentialsFlow({
       const raw =
         typeof data.redirectTo === "string" && data.redirectTo.length > 0
           ? data.redirectTo
-          : nextHref ?? getPostAuthRedirect();
+          : getSafeRedirectPath(nextHref, getPostAuthRedirect());
       await finishAuthSession(raw);
     } catch {
       setError("Ошибка сети");

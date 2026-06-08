@@ -4,7 +4,7 @@ import {
   deleteSession,
   deleteSessionCookie,
 } from "@/lib/auth/session";
-import { isSafeNextPath } from "@/lib/auth/isSafeNextPath";
+import { readRedirectParam, getSafeRedirectPath } from "@/lib/auth/redirectTo";
 import { buildSurfaceRedirectDestination } from "@/lib/routing/surface";
 import {
   normalizeTargetPathForSurface,
@@ -16,16 +16,17 @@ export async function POST(request: NextRequest) {
   const protocol =
     request.headers.get("x-forwarded-proto") ??
     request.nextUrl.protocol.replace(/:$/u, "");
-  const nextParam = request.nextUrl.searchParams.get("next");
-
+  const redirectParam =
+    readRedirectParam(request.nextUrl.searchParams) ??
+    request.nextUrl.searchParams.get("next") ??
+    undefined;
+  const safeRedirect = getSafeRedirectPath(redirectParam, "/");
   const targetPath =
-    typeof nextParam === "string" && isSafeNextPath(nextParam)
-      ? normalizeTargetPathForSurface(surfaceFromPathname(nextParam), nextParam)
+    safeRedirect !== "/"
+      ? normalizeTargetPathForSurface(surfaceFromPathname(safeRedirect), safeRedirect)
       : "/";
   const targetSurface =
-    typeof nextParam === "string" && isSafeNextPath(nextParam)
-      ? surfaceFromPathname(nextParam)
-      : "public";
+    safeRedirect !== "/" ? surfaceFromPathname(safeRedirect) : "public";
 
   const redirectDestination = buildSurfaceRedirectDestination({
     targetSurface,

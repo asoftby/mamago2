@@ -4,6 +4,10 @@ import { resolveSubdomainMiddlewareDecision } from "@/lib/routing/subdomainMiddl
 import { isDevLocalHost, resolveSurfaceFromHostAndPathname } from "@/lib/routing/surface";
 import { stripPublicDiscoverySearchParams } from "@/lib/routing/publicDiscoverySearchParams";
 import { isGlobalNoindexEnabled } from "@/lib/seo/globalNoindex";
+import {
+  REQUEST_PATHNAME_HEADER,
+  REQUEST_SEARCH_HEADER,
+} from "@/lib/auth/requireAuthRedirect";
 
 let didLogDevLocalHostDetection = false;
 
@@ -20,6 +24,25 @@ function shouldBypassSeoHeader(pathname: string): boolean {
     pathname.startsWith("/uploads") ||
     pathname.includes(".")
   );
+}
+
+function withRequestPathHeaders(request: NextRequest): Headers {
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set(REQUEST_PATHNAME_HEADER, request.nextUrl.pathname);
+  requestHeaders.set(REQUEST_SEARCH_HEADER, request.nextUrl.search);
+  return requestHeaders;
+}
+
+function nextWithRequestPath(request: NextRequest): NextResponse {
+  return NextResponse.next({
+    request: { headers: withRequestPathHeaders(request) },
+  });
+}
+
+function rewriteWithRequestPath(request: NextRequest, url: URL): NextResponse {
+  return NextResponse.rewrite(url, {
+    request: { headers: withRequestPathHeaders(request) },
+  });
 }
 
 function applyGlobalNoindexHeader(
@@ -48,7 +71,7 @@ export function middleware(request: NextRequest) {
   const hostname = host.split(":")[0]?.toLowerCase() ?? "";
 
   if (shouldBypassSeoHeader(pathname)) {
-    return NextResponse.next();
+    return nextWithRequestPath(request);
   }
 
   if (
@@ -83,9 +106,9 @@ export function middleware(request: NextRequest) {
   if (decision.kind === "rewrite") {
     url.pathname = decision.pathname;
     url.search = search;
-    return applyGlobalNoindexHeader(NextResponse.rewrite(url), {
-      pathname,
-      surface,
+    return applyGlobalNoindexHeader(rewriteWithRequestPath(request, url), {
+        pathname,
+        surface,
     });
   }
 
@@ -94,7 +117,7 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  return applyGlobalNoindexHeader(NextResponse.next(), {
+  return applyGlobalNoindexHeader(nextWithRequestPath(request), {
     pathname,
     surface,
   });

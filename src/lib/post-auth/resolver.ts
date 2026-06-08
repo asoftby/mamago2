@@ -4,6 +4,7 @@ import {
   navigateToCompatibleHref,
   navigateToSurface,
 } from "@/lib/routing/clientNavigation";
+import { getSafeRedirectPath } from "@/lib/auth/redirectTo";
 
 type RouterLike = { push: (href: string) => void; replace: (href: string) => void };
 
@@ -27,10 +28,15 @@ export function applyPostAuthCompletionOutcome(
     case "profile":
       if (!skipNavigation) {
         toast.success("Профиль заполнен");
-        navigateToSurface(router, {
-          targetSurface: "public",
-          targetPath: "/me",
-        });
+        const target = getSafeRedirectPath(returnTo, "");
+        if (target) {
+          navigateToCompatibleHref(router, target, { replace: true });
+        } else {
+          navigateToSurface(router, {
+            targetSurface: "public",
+            targetPath: "/me",
+          });
+        }
       }
       return;
     case "save_idea":

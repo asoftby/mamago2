@@ -1,17 +1,20 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/server";
+import { readRedirectParam } from "@/lib/auth/redirectTo";
+import { buildAuthenticatedAuthRedirectDestination } from "@/lib/auth/requireAuthRedirect";
 
 export default async function RegisterPage({
   searchParams,
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  const params = await searchParams;
   const user = await getCurrentUser();
   if (user) {
-    redirect("/me");
+    const redirectParam = readRedirectParam(params ?? {});
+    redirect(await buildAuthenticatedAuthRedirectDestination(redirectParam));
   }
 
-  const params = await searchParams;
   const qs = new URLSearchParams();
   qs.set("mode", "register");
 

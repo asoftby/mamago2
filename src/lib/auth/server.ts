@@ -1,7 +1,6 @@
-import { redirect } from "next/navigation";
 import { getSessionToken, validateSession } from "./session";
 import type { Role } from "@prisma/client";
-import { buildSurfaceRedirectDestination } from "@/lib/routing/surface";
+import { redirectToLogin } from "@/lib/auth/requireAuthRedirect";
 import { type CurrentUser, toCurrentUser } from "./safeUser";
 
 export type { CurrentUser };
@@ -29,12 +28,8 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
 export async function requireUser(): Promise<CurrentUser> {
   const user = await getCurrentUser();
   if (!user) {
-    redirect(
-      buildSurfaceRedirectDestination({
-        targetSurface: "public",
-        targetPath: "/login",
-      }),
-    );
+    await redirectToLogin();
+    throw new Error("Authentication required");
   }
   return user;
 }
