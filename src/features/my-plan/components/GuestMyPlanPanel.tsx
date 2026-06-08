@@ -27,6 +27,7 @@ import {
   type GuestPlanSlot,
 } from "@/lib/my-plan/guestMyPlanDraftStorage";
 import { appendMyPlanOpenToHref } from "@/lib/my-plan/myPlanOpenIntent";
+import { buildAuthUrl } from "@/lib/auth/redirectTo";
 import { getOrCreateAnonymousId } from "@/lib/anonymous/clientAnonymousId";
 import { RecommendationCard } from "./RecommendationCard";
 import { MyPlanHeader } from "./MyPlanHeader";
@@ -466,8 +467,8 @@ export function GuestMyPlanPanel({
   }, [phase, guestCanGenerateMore]);
 
   const nextAuthHref = appendMyPlanOpenToHref(pathname || "/");
-  const loginHref = `/login?next=${encodeURIComponent(nextAuthHref)}`;
-  const registerHref = `/register?next=${encodeURIComponent(nextAuthHref)}`;
+  const loginHref = buildAuthUrl({ redirectTo: nextAuthHref });
+  const registerHref = buildAuthUrl({ mode: "register", redirectTo: nextAuthHref });
 
   const whoChips = useMemo(
     (): ChipItem[] => [

@@ -2,6 +2,8 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
+import { useCurrentPath } from "@/hooks/useCurrentPath";
+import { buildAuthUrl } from "@/lib/auth/redirectTo";
 
 /* ── Icons ── */
 const SparkIcon = () => (
@@ -151,7 +153,7 @@ function FilterGroup<K extends keyof FilterState>({
 /* ══════════════════════════════════════════════════════
    STEP 1 — Hook
 ══════════════════════════════════════════════════════ */
-function Step1({ onNext }: { onNext: () => void }) {
+function Step1({ onNext, loginHref }: { onNext: () => void; loginHref: string }) {
   return (
     <div
       className="guest-modal"
@@ -235,7 +237,7 @@ function Step1({ onNext }: { onNext: () => void }) {
         </div>
 
         <Link
-          href="/login"
+          href={loginHref}
           style={{ marginTop: 4, fontSize: 13, color: "rgba(20,18,16,.55)", textDecoration: "underline", textUnderlineOffset: 3 }}
         >
           Я сама подберу →
@@ -524,7 +526,15 @@ function Step3({
 /* ══════════════════════════════════════════════════════
    STEP 4 — Auth gate
 ══════════════════════════════════════════════════════ */
-function Step4({ onBack }: { onBack: () => void }) {
+function Step4({
+  onBack,
+  loginHref,
+  registerHref,
+}: {
+  onBack: () => void;
+  loginHref: string;
+  registerHref: string;
+}) {
   const d = new Date();
   const DAYS = ["Воскресенье","Понедельник","Вторник","Среда","Четверг","Пятница","Суббота"];
   const MONTHS = ["января","февраля","марта","апреля","мая","июня","июля","августа","сентября","октября","ноября","декабря"];
@@ -602,7 +612,7 @@ function Step4({ onBack }: { onBack: () => void }) {
 
           <div className="flex flex-wrap gap-2" style={{ marginTop: 8, position: "relative", zIndex: 1 }}>
             <Link
-              href="/login"
+              href={loginHref}
               className="inline-flex items-center gap-2.5"
               style={{
                 height: 50, padding: "0 26px", borderRadius: 99,
@@ -614,7 +624,7 @@ function Step4({ onBack }: { onBack: () => void }) {
               Войти <ArrowIcon/>
             </Link>
             <Link
-              href="/register"
+              href={registerHref}
               className="inline-flex items-center"
               style={{
                 height: 50, padding: "0 20px", borderRadius: 99,
@@ -686,6 +696,9 @@ function Step4({ onBack }: { onBack: () => void }) {
 ══════════════════════════════════════════════════════ */
 export function PlanGuestFlow() {
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
+  const currentPath = useCurrentPath();
+  const loginHref = buildAuthUrl({ redirectTo: currentPath });
+  const registerHref = buildAuthUrl({ mode: "register", redirectTo: currentPath });
   const [attemptsLeft, setAttemptsLeft] = useState(2);
   const [filters, setFilters] = useState<FilterState>({
     who: "me",
@@ -730,7 +743,7 @@ export function PlanGuestFlow() {
 
         {/* Modal */}
         <div style={{ position: "relative", zIndex: 1, width: "100%", display: "flex", justifyContent: "center" }}>
-          {step === 1 && <Step1 onNext={() => setStep(2)}/>}
+          {step === 1 && <Step1 onNext={() => setStep(2)} loginHref={loginHref} />}
           {step === 2 && (
             <Step2
               filters={filters}
@@ -746,7 +759,13 @@ export function PlanGuestFlow() {
               onRefresh={handleRefresh}
             />
           )}
-          {step === 4 && <Step4 onBack={() => setStep(3)}/>}
+          {step === 4 && (
+            <Step4
+              onBack={() => setStep(3)}
+              loginHref={loginHref}
+              registerHref={registerHref}
+            />
+          )}
         </div>
       </div>
 

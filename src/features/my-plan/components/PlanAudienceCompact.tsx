@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import { Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { PlanPersonalizationCard } from "./PlanPersonalizationCard";
 
 interface PlanAudienceCompactProps {
   /** Выбранные персоны */
@@ -13,6 +14,9 @@ interface PlanAudienceCompactProps {
     displayName: string;
     kind: "adult" | "child";
     isProfileComplete?: boolean;
+    birthDate?: string | null;
+    preferenceSignalIds?: string[];
+    leisureFormatSignalId?: string | null;
   }>;
   /** Режим аудитории: "specific" (выбраны персоны) или "free" (для всех) */
   audienceMode: "specific" | "free";
@@ -27,70 +31,6 @@ interface PlanAudienceCompactProps {
 }
 
 type AudienceExplanationMode = "free" | "adult" | "child" | "family";
-
-const audienceModeMeta: Record<
-  AudienceExplanationMode,
-  { title: string; description: string }
-> = {
-  free: {
-    title: "Свободный поиск",
-    description:
-      "Ищите без ограничений — покажем все интересные варианты, а вы выберете то, что подходит именно сейчас.",
-  },
-  adult: {
-    title: "Подбор для вас",
-    description:
-      "Учитываем ваши интересы и предпочтения. В приоритете — события, которые могут быть интересны именно вам.",
-  },
-  child: {
-    title: "Подбор для ребёнка",
-    description:
-      "Сначала показываем события, которые лучше всего подходят ребёнку — по возрасту, интересам и формату.",
-  },
-  family: {
-    title: "Семейный подбор",
-    description:
-      "В приоритете — интересы ребёнка, но мы также учитываем ваши предпочтения, чтобы подобрать комфортный вариант для всей семьи.",
-  },
-};
-
-function PlanAudienceModeHint({
-  mode,
-  compact = false,
-}: {
-  mode: AudienceExplanationMode;
-  compact?: boolean;
-}) {
-  const meta = audienceModeMeta[mode];
-
-  return (
-    <div className="relative z-0 pointer-events-none rounded-[16px] border border-[rgba(20,18,16,0.08)] bg-[rgba(255,255,255,0.55)] px-3.5 py-3">
-      <div className="space-y-1.5">
-        <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-[rgba(20,18,16,0.45)]">
-          Режим подбора
-        </p>
-        <p
-          className={cn(
-            "text-[#141210]",
-            compact ? "text-[15px] leading-[1.15]" : "text-[16px] leading-[1.15]",
-          )}
-          style={{ fontFamily: "var(--font-sans)", fontWeight: 500 }}
-        >
-          {meta.title}
-        </p>
-        <p
-          className={cn(
-            "text-[rgba(20,18,16,0.58)]",
-            compact ? "text-[12px] leading-[1.45]" : "text-[13px] leading-[1.45]",
-          )}
-          style={{ fontFamily: "var(--font-sans)" }}
-        >
-          {meta.description}
-        </p>
-      </div>
-    </div>
-  );
-}
 
 export function PlanAudienceCompact({
   selectedPersonaIds,
@@ -186,8 +126,11 @@ export function PlanAudienceCompact({
         </button>
       </div>
 
-      <PlanAudienceModeHint
+      <PlanPersonalizationCard
+        key={`${audienceExplanationMode}-${selectedPersonaIds.join(",")}`}
         mode={audienceExplanationMode}
+        personas={personas}
+        selectedPersonaIds={selectedPersonaIds}
         compact={compact}
       />
     </div>
