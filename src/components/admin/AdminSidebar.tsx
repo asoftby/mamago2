@@ -14,6 +14,7 @@ import {
 import type { ModerationNavCounts, } from "@/lib/admin/moderationSidebarConfig";
 import type { AdminNavMatchRule } from "@/lib/admin/adminSidebarTypes";
 import { ADMIN_PATH_PREFIX } from "@/lib/routing/surface";
+import type { BuildInfo } from "@/lib/system/buildInfo";
 
 interface AdminSidebarProps {
   onNavigate?: () => void;
@@ -21,6 +22,7 @@ interface AdminSidebarProps {
   b2bPendingVerificationCount?: number;
   importPendingReviewCount?: number;
   reviewsPendingCount?: number;
+  buildInfo?: BuildInfo;
 }
 
 // ─── Active-route helpers ─────────────────────────────────────────────────────
@@ -95,6 +97,7 @@ export function AdminSidebar({
   b2bPendingVerificationCount = 0,
   importPendingReviewCount = 0,
   reviewsPendingCount = 0,
+  buildInfo,
 }: AdminSidebarProps) {
   const pathname = usePathname();
 
@@ -189,8 +192,8 @@ export function AdminSidebar({
   };
 
   return (
-    <aside className="w-full lg:w-[260px] bg-white">
-      <nav className="flex flex-col gap-1.5 p-4">
+    <aside className="w-full lg:w-[260px] bg-white flex flex-col">
+      <nav className="flex flex-col gap-1.5 p-4 flex-1">
         <SidebarPublicSiteEntry onNavigate={onNavigate} />
 
         {ADMIN_SIDEBAR_CONFIG.map((entry) => {
@@ -218,6 +221,16 @@ export function AdminSidebar({
           return renderNavItem(entry as AdminSidebarNavItem);
         })}
       </nav>
+      {buildInfo && (
+        <div className="px-4 pb-4 pt-2 text-center">
+          <span className="font-mono text-[10px] text-gray-400">
+            {(() => {
+              const ver = buildInfo.currentReleaseVersion ?? buildInfo.appVersion;
+              return buildInfo.commitShortSha ? `v${ver} · ${buildInfo.commitShortSha}` : `v${ver}`;
+            })()}
+          </span>
+        </div>
+      )}
     </aside>
   );
 }

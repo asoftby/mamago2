@@ -18,7 +18,6 @@ import { accountProfileTriggerLetter } from "@/lib/account/userInitials";
 import { useHydrated } from "@/hooks/use-hydrated";
 import { navigateToSurface } from "@/lib/routing/clientNavigation";
 import { useRouter } from "next/navigation";
-import { BuildModeBadge } from "@/components/backoffice/BuildModeBadge";
 import type { BuildInfo } from "@/lib/system/buildInfo";
 
 interface AdminHeaderProps {
@@ -105,12 +104,6 @@ export function AdminHeader({
               <span className="hidden sm:inline">mamaGo Admin</span>
               <span className="sm:hidden">Admin</span>
             </span>
-            <div className="shrink-0 sm:hidden">
-              <BuildModeBadge buildInfo={buildInfo} />
-            </div>
-            <div className="hidden shrink-0 sm:block">
-              <BuildModeBadge buildInfo={buildInfo} compact />
-            </div>
           </div>
 
           <div className="flex shrink-0 items-center gap-1.5 md:gap-2">
@@ -176,6 +169,7 @@ export function AdminHeader({
           moderationCounts={moderationCounts}
           b2bPendingVerificationCount={b2bPendingVerificationCount}
           onNavigate={() => setMobileMenuOpen(false)}
+          buildInfo={buildInfo}
         />
       </BottomSheet>
     </>

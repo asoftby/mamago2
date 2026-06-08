@@ -6,9 +6,11 @@ import { getBusinessBillingSummary } from "@/server/services/billing/billingBusi
 import { BusinessShell } from "@/components/business/layout/BusinessShell";
 import { Toaster } from "@/components/ui/toaster";
 import { headers } from "next/headers";
+import { buildRequireAuthLoginDestination } from "@/lib/auth/requireAuthRedirect";
 import { buildSurfaceRedirectDestination } from "@/lib/routing/surface";
 import { BackofficeProviders } from "@/components/providers/BackofficeProviders";
 import { getBuildInfo } from "@/lib/system/buildInfo";
+import { getCurrentAppVersion } from "@/lib/system/getCurrentAppVersion";
 export default async function ProtectedBusinessLayout({
   children,
 }: {
@@ -20,14 +22,7 @@ export default async function ProtectedBusinessLayout({
   // 1. Check authentication
   const user = await getCurrentUser();
   if (!user) {
-    redirect(
-      buildSurfaceRedirectDestination({
-        targetSurface: "public",
-        targetPath: "/login",
-        currentHost: host,
-        currentProtocol: protocol,
-      }),
-    );
+    redirect(await buildRequireAuthLoginDestination());
   }
 
   // 2. Partner cabinet: active BusinessMember (OWNER/MANAGER), else owned row; see getPartnerCabinetBusiness.
@@ -80,10 +75,13 @@ export default async function ProtectedBusinessLayout({
     );
   }
 
-  const billingSummary = await getBusinessBillingSummary(business.id);
+  const [billingSummary, currentReleaseVersion] = await Promise.all([
+    getBusinessBillingSummary(business.id),
+    getCurrentAppVersion(),
+  ]);
   const businessBalanceBYN =
     billingSummary?.account.depositBalance?.toNumber() ?? 0;
-  const buildInfo = getBuildInfo();
+  const buildInfo = { ...getBuildInfo(), currentReleaseVersion };
 
   return (
     <BackofficeProviders>

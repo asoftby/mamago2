@@ -1,11 +1,10 @@
 export type ReleaseStatusValue = "DRAFT" | "PUBLISHED";
 
 export type ReleaseNoteTypeValue =
-  | "FEATURE"
-  | "FIX"
-  | "IMPROVEMENT"
-  | "BREAKING"
-  | "INTERNAL";
+  | "feature"
+  | "fix"
+  | "improvement"
+  | "security";
 
 export type ReleaseNoteListItem = {
   id: string;
@@ -37,13 +36,11 @@ export type ReleaseNoteInput = {
 export type CreateReleaseInput = {
   version: string;
   title: string;
-  description?: string | null;
   notes: ReleaseNoteInput[];
 };
 
 export type UpdateReleaseInput = {
   version?: string;
   title?: string;
-  description?: string | null;
   notes?: ReleaseNoteInput[];
 };

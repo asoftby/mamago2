@@ -9,11 +9,13 @@ import { getReviewsPendingCount } from "@/lib/admin/getReviewsPendingCount";
 import type { ModerationNavCounts } from "@/lib/admin/moderationSidebarConfig";
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
+import { buildRequireAuthLoginDestination } from "@/lib/auth/requireAuthRedirect";
 import { buildSurfaceRedirectDestination } from "@/lib/routing/surface";
 import prisma from "@/lib/prisma";
 import { BackofficeProviders } from "@/components/providers/BackofficeProviders";
 import { NotificationSurfaceBootstrap } from "@/features/notifications/NotificationSurfaceBootstrap";
 import { getBuildInfo } from "@/lib/system/buildInfo";
+import { getCurrentAppVersion } from "@/lib/system/getCurrentAppVersion";
 
 const EMPTY_MODERATION_COUNTS: ModerationNavCounts = {
   queueTotal: 0,
@@ -31,11 +33,8 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   // Require authentication for admin
   if (!user) {
     redirect(
-      buildSurfaceRedirectDestination({
-        targetSurface: "public",
-        targetPath: "/login?from=admin",
-        currentHost: host,
-        currentProtocol: protocol,
+      await buildRequireAuthLoginDestination({
+        extra: { from: "admin" },
       }),
     );
   }
@@ -71,14 +70,18 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   let b2bPendingVerificationCount = 0;
   let importPendingReviewCount = 0;
   let reviewsPendingCount = 0;
-  const buildInfo = getBuildInfo();
+  let buildInfo = getBuildInfo();
   try {
-    [moderationCounts, b2bPendingVerificationCount, importPendingReviewCount, reviewsPendingCount] = await Promise.all([
+    const [counts0, counts1, counts2, counts3, currentReleaseVersion] = await Promise.all([
       getModerationNavCounts(),
       getB2bPendingVerificationCount(),
       getImportPendingReviewCount(),
       getReviewsPendingCount(),
+      getCurrentAppVersion(),
     ]);
+    [moderationCounts, b2bPendingVerificationCount, importPendingReviewCount, reviewsPendingCount] =
+      [counts0, counts1, counts2, counts3];
+    buildInfo = { ...buildInfo, currentReleaseVersion };
   } catch (e) {
     console.error("admin layout: counts failed:", e);
   }
@@ -106,6 +109,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
               b2bPendingVerificationCount={b2bPendingVerificationCount}
               importPendingReviewCount={importPendingReviewCount}
               reviewsPendingCount={reviewsPendingCount}
+              buildInfo={buildInfo}
             />
           </div>
 

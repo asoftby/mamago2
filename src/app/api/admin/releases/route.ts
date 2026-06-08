@@ -22,10 +22,10 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  const auth = await requireReleaseAdmin();
-  if (auth.response) return auth.response;
-
   try {
+    const auth = await requireReleaseAdmin();
+    if (auth.response) return auth.response;
+
     const body = await request.json();
     const input = createReleaseInputSchema.parse(body);
     const release = await createRelease(input);

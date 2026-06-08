@@ -3471,11 +3471,10 @@ enum ReleaseStatus {
 }
 
 enum ReleaseNoteType {
-  FEATURE
-  FIX
-  IMPROVEMENT
-  BREAKING
-  INTERNAL
+  feature
+  fix
+  improvement
+  security
 }
 
 /// Тип публикации для записи/заказа
