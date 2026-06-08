@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import type { PublicRouteCardModel } from "@/components/routes/types";
 import { ShareSheet } from "@/components/routes/ShareSheet";
+import { MobileSmartBackButton } from "@/components/shared/MobileSmartBackButton";
 import { SaveActivityFlowAdaptive } from "@/components/activity/SaveActivityFlowAdaptive";
 import type { SaveToPlanResult } from "@/components/activity/SaveToPlanModal";
 import { toast } from "@/lib/toast";
@@ -442,9 +443,10 @@ export function RouteDetailClient({ route }: Props) {
         <div className="bg-[#F8F8F7] border-b border-neutral-100">
           <Container className="max-w-2xl">
             <div className="flex items-center justify-between h-12 pt-[20px]">
+              <MobileSmartBackButton fallbackUrl="/minsk" className="shrink-0" />
               <Link
                 href="/routes"
-                className="flex items-center gap-1.5 text-sm font-medium text-neutral-600 hover:text-neutral-900 transition-colors"
+                className="hidden items-center gap-1.5 text-sm font-medium text-neutral-600 transition-colors hover:text-neutral-900 md:inline-flex"
               >
                 <ArrowLeft className="w-4 h-4" />
                 Маршруты

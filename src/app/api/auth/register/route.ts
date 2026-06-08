@@ -7,6 +7,7 @@ import { hashPassword } from "@/lib/auth/crypto";
 import { createSession, setSessionCookie } from "@/lib/auth/session";
 import { normalizeEmail } from "@/lib/auth/email";
 import { passwordSchema } from "@/lib/auth/passwordPolicy";
+import { ensureUserOnboardingNotifications } from "@/server/services/notification.service";
 
 const registerSchema = z.object({
   email: z.string().email(),
@@ -52,6 +53,15 @@ export async function POST(request: NextRequest) {
       userId: user.id,
       email: user.email,
     });
+
+    try {
+      await ensureUserOnboardingNotifications(user.id);
+    } catch (notificationError) {
+      console.error("[auth] failed to create onboarding notifications", {
+        userId: user.id,
+        error: notificationError,
+      });
+    }
 
     const emailResult = await sendRegistrationVerificationEmail(user.id, user.email);
 

@@ -375,22 +375,6 @@ export function SitemapRobotsCenterClient({
                 {initialRobots.controlsManagedBy}
               </Badge>
             </div>
-            <div>
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Noindex environments
-              </p>
-              <div className="mt-2 flex flex-wrap gap-2">
-                {initialRobots.noindexEnvironments.length > 0 ? (
-                  initialRobots.noindexEnvironments.map((env) => (
-                    <Badge key={env} variant="outline" className="font-mono text-xs">
-                      {env}
-                    </Badge>
-                  ))
-                ) : (
-                  <span className="text-sm text-muted-foreground">—</span>
-                )}
-              </div>
-            </div>
             <div
               className={cn(
                 "rounded-lg border border-dashed border-slate-300 bg-slate-50/60 px-4 py-4",
@@ -398,10 +382,10 @@ export function SitemapRobotsCenterClient({
               )}
             >
               <p className="text-sm font-medium text-slate-900 dark:text-slate-100">
-                Future controls
+                Environment used for noindex decision
               </p>
               <p className="mt-1 text-sm leading-relaxed text-slate-600 dark:text-slate-400">
-                {initialRobots.futureControlsNote}
+                {initialRobots.globalNoindexReason}
               </p>
             </div>
           </CardContent>

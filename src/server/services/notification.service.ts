@@ -139,6 +139,37 @@ interface CreateNotificationParams {
   expiresAt?: Date | null;
 }
 
+type OnboardingNotificationKind = "VERIFY_EMAIL" | "VERIFY_PHONE";
+
+const ONBOARDING_NOTIFICATION_CONFIG: Record<
+  OnboardingNotificationKind,
+  {
+    entityId: string;
+    title: string;
+    body: string;
+    ctaLabel: string;
+    actionUrl: string;
+    metadata: { kind: OnboardingNotificationKind };
+  }
+> = {
+  VERIFY_EMAIL: {
+    entityId: "VERIFY_EMAIL",
+    title: "Подтвердите email",
+    body: "Подтвердите почту, чтобы сохранить доступ к аккаунту и получать важные уведомления.",
+    ctaLabel: "Подтвердить",
+    actionUrl: "/settings/security",
+    metadata: { kind: "VERIFY_EMAIL" },
+  },
+  VERIFY_PHONE: {
+    entityId: "VERIFY_PHONE",
+    title: "Подтвердите телефон",
+    body: "Подтвердите номер телефона, чтобы использовать важные действия и защищённые функции mamaGo.",
+    ctaLabel: "Подтвердить",
+    actionUrl: "/settings/security",
+    metadata: { kind: "VERIFY_PHONE" },
+  },
+};
+
 /**
  * Core: create in-app notification record + dispatch delivery channels.
  * Never throws on delivery failure — delivery errors are recorded in NotificationDelivery.
@@ -227,6 +258,90 @@ export async function notifyEmailVerified(userId: string) {
     title: "Ваша почта подтверждена",
     body: "Теперь вы можете получать важные уведомления и восстанавливать доступ к аккаунту.",
     isPinned: false,
+  });
+}
+
+async function ensureOnboardingNotification(
+  userId: string,
+  kind: OnboardingNotificationKind,
+) {
+  const config = ONBOARDING_NOTIFICATION_CONFIG[kind];
+  const existing = await prisma.notification.findFirst({
+    where: {
+      userId,
+      audience: "USER",
+      type: "SYSTEM",
+      entityType: null,
+      entityId: config.entityId,
+      archivedAt: null,
+    },
+    select: { id: true },
+  });
+
+  if (existing) return existing;
+
+  return createNotification({
+    userId,
+    audience: "USER",
+    type: "SYSTEM",
+    title: config.title,
+    body: config.body,
+    ctaLabel: config.ctaLabel,
+    ctaAction: config.actionUrl,
+    actionMode: "PAGE",
+    actionUrl: config.actionUrl,
+    isPinned: true,
+    entityId: config.entityId,
+    metadata: config.metadata,
+  });
+}
+
+export async function ensureUserOnboardingNotifications(userId: string) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      id: true,
+      emailVerifiedAt: true,
+      phoneVerifiedAt: true,
+    },
+  });
+
+  if (!user) return null;
+
+  const results = await Promise.all([
+    user.emailVerifiedAt == null
+      ? ensureOnboardingNotification(user.id, "VERIFY_EMAIL")
+      : null,
+    user.phoneVerifiedAt == null
+      ? ensureOnboardingNotification(user.id, "VERIFY_PHONE")
+      : null,
+  ]);
+
+  return results;
+}
+
+export async function completeOnboardingNotification(
+  userId: string,
+  kind: OnboardingNotificationKind,
+) {
+  const config = ONBOARDING_NOTIFICATION_CONFIG[kind];
+  const now = new Date();
+
+  return prisma.notification.updateMany({
+    where: {
+      userId,
+      audience: "USER",
+      type: "SYSTEM",
+      entityType: null,
+      entityId: config.entityId,
+      archivedAt: null,
+    },
+    data: {
+      isRead: true,
+      readAt: now,
+      seenAt: now,
+      archivedAt: now,
+    },
   });
 }
 

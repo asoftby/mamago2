@@ -556,6 +556,7 @@ export default async function PlacePage({ params }: PlacePageProps) {
     workingHoursSummary,
     isOpenNow,
     todayHoursText,
+    fallbackUrl: `/${place.city?.slug || "minsk"}`,
 
     // Media
     images: galleryImages.length > 0 ? galleryImages : undefined,

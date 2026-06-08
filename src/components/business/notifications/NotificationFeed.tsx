@@ -7,10 +7,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "@/lib/toast";
 import type { NotificationApiRow } from "@/lib/notifications/types";
 import { cn } from "@/lib/utils";
-import { TelegramPromptBanner } from "./TelegramPromptBanner";
-import { EmailVerificationPromptBanner } from "./EmailVerificationPromptBanner";
 import { NotificationModal } from "./NotificationModal";
-import { useEmailVerificationPromptVisibility } from "@/features/email-verification/hooks/useEmailVerificationPromptVisibility";
 import { trackNotificationEvent } from "@/lib/notifications/notificationAnalytics";
 import { handleNotificationClick } from "@/features/notifications/notification-click";
 import { useNotificationStore } from "@/features/notifications/store";
@@ -47,8 +44,6 @@ export function NotificationFeed({
   const [modalBody, setModalBody] = useState<string | null>(null);
 
   const telegramBannerViewedRef = useRef(false);
-  const { visible: emailVerificationPromptVisible, dismiss: dismissEmailVerificationPrompt } =
-    useEmailVerificationPromptVisibility();
 
   useEffect(() => {
     useNotificationStore.getState().setActiveStream(stream ?? "user");
@@ -161,14 +156,7 @@ export function NotificationFeed({
     [refreshList],
   );
 
-  const showInlineTelegramPrompt =
-    showTelegramPrompt && stream !== "business" && activeTab !== "archived";
-  const showInlineEmailVerificationPrompt =
-    emailVerificationPromptVisible && stream !== "business" && activeTab !== "archived";
-  const hasAnyContent =
-    notifications.length > 0 ||
-    showInlineTelegramPrompt ||
-    showInlineEmailVerificationPrompt;
+  const hasAnyContent = notifications.length > 0;
 
   if (loading) {
     return (
@@ -212,16 +200,6 @@ export function NotificationFeed({
     <>
       <div className={cn("flex min-h-0 flex-1 flex-col overflow-hidden bg-white", listClassName)}>
         <div className="divide-y divide-gray-100 bg-white">
-          {showInlineEmailVerificationPrompt ? (
-            <div className="border-b border-gray-100 bg-white p-4">
-              <EmailVerificationPromptBanner onDismiss={dismissEmailVerificationPrompt} />
-            </div>
-          ) : null}
-          {showInlineTelegramPrompt ? (
-            <div className="border-b border-gray-100 bg-white p-4">
-              <TelegramPromptBanner />
-            </div>
-          ) : null}
           {notifications.map((notification) => (
             <NotificationListItem
               key={notification.id}

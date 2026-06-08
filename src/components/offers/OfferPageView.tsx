@@ -10,6 +10,7 @@ import { OfferPlace } from "./OfferPlace";
 import { OfferPromoCta } from "./OfferPromoCta";
 import { CampShiftBookingOverlay } from "./CampShiftBookingOverlay";
 import { EventStickyActionBar } from "@/components/event-page/EventStickyActionBar";
+import { MobileSmartBackButton } from "@/components/shared/MobileSmartBackButton";
 import type { OfferPageData, OfferScheduleItem, ShiftCtaContext } from "@/lib/offer/offerPageTypes";
 import {
   SaveToPlanModal,
@@ -282,6 +283,10 @@ export function OfferPageView({
   return (
     <main className="ep-surface min-h-screen">
       <div className="mx-auto max-w-[1200px] space-y-16 px-4 py-8 sm:px-6 lg:space-y-24 lg:px-8 lg:py-12">
+        <div className="mb-4 md:mb-0">
+          <MobileSmartBackButton fallbackUrl={`/${data.citySlug || "minsk"}`} />
+        </div>
+
         <OfferHero
           data={data}
           canEditOffer={canEditOffer}

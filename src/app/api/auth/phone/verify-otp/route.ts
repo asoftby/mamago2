@@ -4,6 +4,7 @@ import { hashCode, safeEq } from "@/lib/otp/otp";
 import { createSession, setSessionCookie } from "@/lib/auth/session";
 import { checkRateLimit, resetRateLimit } from "@/lib/security/rateLimit";
 import prisma from "@/lib/prisma";
+import { completeOnboardingNotification } from "@/server/services/notification.service";
 
 export const runtime = "nodejs";
 
@@ -121,6 +122,12 @@ export async function POST(request: NextRequest) {
     const response = NextResponse.json({ ok: true });
     const requestHost = request.headers.get("x-forwarded-host") ?? request.headers.get("host");
     setSessionCookie(response, token, requestHost ?? undefined);
+
+    try {
+      await completeOnboardingNotification(user.id, "VERIFY_PHONE");
+    } catch (notificationError) {
+      console.error("[auth/phone/verify-otp] completeOnboardingNotification", notificationError);
+    }
 
     return response;
   } catch (error) {

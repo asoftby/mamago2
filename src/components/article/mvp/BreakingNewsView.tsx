@@ -11,6 +11,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
+import { MobileSmartBackButton } from "@/components/shared/MobileSmartBackButton";
 import type { ArticleMvpResolvedBlock, PlaceCardExtra } from "@/lib/article/articleMvpRenderData";
 import { articleBlockHtmlForEditor, articleBlockHtmlForPublic } from "@/lib/article/articleBlockHtml";
 import { SaveHeart } from "@/features/save/SaveHeart";
@@ -1001,6 +1002,10 @@ export function BreakingNewsView({
           </div>
         </div>
       )}
+
+      <div className="mx-auto w-full max-w-[1200px] px-4 pt-4 sm:px-6 lg:px-8">
+        <MobileSmartBackButton fallbackUrl="/minsk" />
+      </div>
 
       <Breadcrumbs items={breadcrumbs} />
       <NewsHero
