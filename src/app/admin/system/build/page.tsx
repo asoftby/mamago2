@@ -6,8 +6,10 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
+import { ReleaseHistoryPanel } from "@/components/admin/system/ReleaseHistoryPanel";
 import { BuildModeBadge } from "@/components/backoffice/BuildModeBadge";
 import { getBuildInfo } from "@/lib/system/buildInfo";
+import { listReleases } from "@/server/services/release.service";
 
 function ValueRow({
   label,
@@ -28,8 +30,9 @@ function ValueRow({
   );
 }
 
-export default function AdminSystemBuildPage() {
+export default async function AdminSystemBuildPage() {
   const buildInfo = getBuildInfo();
+  const releases = await listReleases();
 
   return (
     <div className="space-y-6 px-4 py-6 sm:px-6 lg:px-8">
@@ -63,6 +66,8 @@ export default function AdminSystemBuildPage() {
           <ValueRow label="Public URL" value={buildInfo.publicUrl} />
         </CardContent>
       </Card>
+
+      <ReleaseHistoryPanel initialReleases={releases} />
     </div>
   );
 }
