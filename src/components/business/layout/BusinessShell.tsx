@@ -2,17 +2,19 @@ import type { AccountMenuUser } from "@/lib/account/types";
 import { NotificationSurfaceBootstrap } from "@/features/notifications/NotificationSurfaceBootstrap";
 import { BusinessHeader } from "./BusinessHeader";
 import { BusinessSidebar } from "./BusinessSidebar";
+import type { BuildInfo } from "@/lib/system/buildInfo";
 
 interface BusinessShellProps {
   children: React.ReactNode;
   user: AccountMenuUser;
+  buildInfo: BuildInfo;
 }
 
-export function BusinessShell({ children, user }: BusinessShellProps) {
+export function BusinessShell({ children, user, buildInfo }: BusinessShellProps) {
   return (
     <div className="min-h-screen bg-[linear-gradient(180deg,#f9f7f3_0%,#f5f5f4_100%)]">
       <NotificationSurfaceBootstrap surface="business" />
-      <BusinessHeader user={user} />
+      <BusinessHeader user={user} buildInfo={buildInfo} />
 
       {/* Two-column layout: Sidebar + Content */}
       <div className="flex min-h-[calc(100vh-4rem)]">

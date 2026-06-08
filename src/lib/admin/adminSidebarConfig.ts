@@ -16,6 +16,7 @@ import {
   Megaphone,
   Download,
   Search,
+  Server,
 } from "lucide-react";
 
 /**
@@ -476,6 +477,20 @@ export const GROUP_SEO: AdminSidebarGroup = {
   ],
 };
 
+export const GROUP_SYSTEM: AdminSidebarGroup = {
+  id: "system",
+  label: "Система",
+  icon: Server,
+  children: [
+    {
+      id: "system-build",
+      label: "Сборка",
+      href: adminPath("/system/build"),
+      matchers: [{ type: "prefix", value: adminPath("/system/build") }],
+    },
+  ],
+};
+
 // === FULL SIDEBAR CONFIGURATION ===
 
 /**
@@ -497,6 +512,7 @@ export const ADMIN_SIDEBAR_CONFIG: readonly (AdminSidebarNavItem | AdminSidebarG
   NAV_ANALYTICS,
   GROUP_GEOGRAPHY,
   GROUP_SEO,
+  GROUP_SYSTEM,
   NAV_IMPORT, // Import is now a standalone top-level section
 ];
 

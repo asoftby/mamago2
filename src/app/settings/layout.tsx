@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { BusinessShell } from "@/components/business/layout/BusinessShell";
 import { requireSettingsContext } from "@/lib/settings/resolveSettingsContext";
 import { getBusinessBillingSummary } from "@/server/services/billing/billingBusiness.service";
+import { getBuildInfo } from "@/lib/system/buildInfo";
 
 export default async function UnifiedSettingsLayout({
   children,
@@ -22,9 +23,11 @@ export default async function UnifiedSettingsLayout({
   const billingSummary = businessId
     ? await getBusinessBillingSummary(businessId)
     : null;
+  const buildInfo = getBuildInfo();
 
   return (
     <BusinessShell
+      buildInfo={buildInfo}
       user={{
         id: context.viewer.id,
         email: context.viewer.email,

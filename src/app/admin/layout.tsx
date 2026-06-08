@@ -13,6 +13,7 @@ import { buildSurfaceRedirectDestination } from "@/lib/routing/surface";
 import prisma from "@/lib/prisma";
 import { BackofficeProviders } from "@/components/providers/BackofficeProviders";
 import { NotificationSurfaceBootstrap } from "@/features/notifications/NotificationSurfaceBootstrap";
+import { getBuildInfo } from "@/lib/system/buildInfo";
 
 const EMPTY_MODERATION_COUNTS: ModerationNavCounts = {
   queueTotal: 0,
@@ -70,6 +71,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   let b2bPendingVerificationCount = 0;
   let importPendingReviewCount = 0;
   let reviewsPendingCount = 0;
+  const buildInfo = getBuildInfo();
   try {
     [moderationCounts, b2bPendingVerificationCount, importPendingReviewCount, reviewsPendingCount] = await Promise.all([
       getModerationNavCounts(),
@@ -92,6 +94,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           hasApprovedBusinessProfile={hasApprovedBusinessProfile}
           moderationCounts={moderationCounts}
           b2bPendingVerificationCount={b2bPendingVerificationCount}
+          buildInfo={buildInfo}
         />
 
         {/* Two-column layout: Sidebar + Content */}

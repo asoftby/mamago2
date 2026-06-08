@@ -8,6 +8,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { headers } from "next/headers";
 import { buildSurfaceRedirectDestination } from "@/lib/routing/surface";
 import { BackofficeProviders } from "@/components/providers/BackofficeProviders";
+import { getBuildInfo } from "@/lib/system/buildInfo";
 export default async function ProtectedBusinessLayout({
   children,
 }: {
@@ -82,10 +83,12 @@ export default async function ProtectedBusinessLayout({
   const billingSummary = await getBusinessBillingSummary(business.id);
   const businessBalanceBYN =
     billingSummary?.account.depositBalance?.toNumber() ?? 0;
+  const buildInfo = getBuildInfo();
 
   return (
     <BackofficeProviders>
       <BusinessShell
+        buildInfo={buildInfo}
         user={{
           id: user.id,
           email: user.email,
