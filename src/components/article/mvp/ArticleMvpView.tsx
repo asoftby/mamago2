@@ -20,6 +20,7 @@ import { articleBlockHtmlForEditor, articleBlockHtmlForPublic } from "@/lib/arti
 import { cn } from "@/lib/utils";
 import { ArticleInstagramScript } from "@/components/article/mvp/ArticleInstagramScript";
 import { BreakingNewsGalleryPreview } from "@/components/article/mvp/BreakingNewsGalleryPreview";
+import { MobileSmartBackButton } from "@/components/shared/MobileSmartBackButton";
 import { BREAKING_NEWS_SUBTITLE } from "@/lib/publications/breakingNewsArticle";
 
 /** Лёгкое оглавление: только текст и вложенный список для H3, без карточек и рамок. */
@@ -119,6 +120,9 @@ export function ArticleMvpView({
         <ArticleInstagramScript />
       ) : null}
       <ArticleReadingScrollPadding extraTopRem={readingScrollPaddingExtraRem ?? 0} />
+      <div className="mb-4 md:mb-0">
+        <MobileSmartBackButton fallbackUrl="/minsk" />
+      </div>
       {draftWatermark ? (
         <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-900">
           Черновик / предпросмотр — так видят только редакторы

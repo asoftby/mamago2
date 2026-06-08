@@ -7,6 +7,7 @@ import { PlaceAboutSection } from "./PlaceAboutSection";
 import { PlaceAddressSection } from "./PlaceAddressSection";
 import { PlaceReviewsSection } from "./PlaceReviewsSection";
 import { PriceListBlock } from "@/components/shared/PriceListBlock";
+import { MobileSmartBackButton } from "@/components/shared/MobileSmartBackButton";
 import type { PriceData } from "@/lib/priceItems";
 import Link from "next/link";
 import Image from "next/image";
@@ -66,6 +67,7 @@ interface MarketplacePlacePageProps {
 
     priceData?: PriceData;
     updatedAt?: Date | string | null;
+    fallbackUrl?: string;
   };
 
   events?: Array<{
@@ -148,6 +150,10 @@ export function MarketplacePlacePage({
 
   return (
     <div style={{ background: "#ffffff", minHeight: "100vh" }}>
+      <div className="mx-auto w-full max-w-[1200px] px-4 pt-4 sm:px-6 lg:px-8">
+        <MobileSmartBackButton fallbackUrl={place.fallbackUrl || "/minsk"} />
+      </div>
+
       {/* Hero */}
       <PlaceHero
         title={place.title}

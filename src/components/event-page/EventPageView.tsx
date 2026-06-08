@@ -29,6 +29,7 @@ import { SimilarEventsSection } from "./SimilarEventsSection";
 import { EventWhyGo } from "./EventWhyGo";
 import { EventGoodFit } from "./EventGoodFit";
 import { PublicationStatsPanel } from "@/components/publication-stats";
+import { MobileSmartBackButton } from "@/components/shared/MobileSmartBackButton";
 import { postAnalyticsEvent } from "@/lib/analytics/client";
 import { cn } from "@/lib/utils";
 import { getLocalDateKey } from "@/lib/date/localDateKey";
@@ -558,6 +559,10 @@ export function EventPageView({ data }: { data: EventPageData }) {
       {/* ── Hero section ─── */}
       <section className="pt-12 pb-14">
         <div className="mx-auto w-full max-w-[1200px] px-4 sm:px-6 lg:px-8">
+          <div className="mb-4 md:mb-0">
+            <MobileSmartBackButton fallbackUrl={`/${data.citySlug || "minsk"}`} />
+          </div>
+
           {/* Mobile: media above decision panel */}
           <div className="lg:hidden mb-8">
             <EventMediaStack media={data.media} />
