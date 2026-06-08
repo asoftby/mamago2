@@ -1,31 +1,50 @@
 import { prisma } from "@/lib/prisma";
+import { SignalUsageType } from "@prisma/client";
 
 const MAX_PREFERENCES = 3;
 
-async function preferenceChildIdSet(): Promise<Set<string> | null> {
-  const root = await prisma.signalDefinition.findFirst({
-    where: { slug: "preferences", parentId: null, isActive: true },
+async function childIdsForPreferenceRoots(): Promise<Set<string> | null> {
+  const roots = await prisma.signalDefinition.findMany({
+    where: {
+      parentId: null,
+      isActive: true,
+      OR: [
+        { slug: "preferences" },
+        { slug: "plan-adult-preference" },
+        { usageType: SignalUsageType.PLAN_ADULT_PREFERENCE },
+      ],
+    },
     select: { id: true },
   });
-  if (!root) return null;
+  if (roots.length === 0) return null;
+
   const children = await prisma.signalDefinition.findMany({
-    where: { parentId: root.id, isActive: true },
+    where: { parentId: { in: roots.map((root) => root.id) }, isActive: true },
     select: { id: true },
   });
-  return new Set(children.map((c) => c.id));
+  return new Set(children.map((child) => child.id));
 }
 
-async function formatChildIdSet(): Promise<Set<string> | null> {
-  const root = await prisma.signalDefinition.findFirst({
-    where: { slug: "leisure-format", parentId: null, isActive: true },
+async function childIdsForFormatRoots(): Promise<Set<string> | null> {
+  const roots = await prisma.signalDefinition.findMany({
+    where: {
+      parentId: null,
+      isActive: true,
+      OR: [
+        { slug: "leisure-format" },
+        { slug: "plan-leisure-format" },
+        { usageType: SignalUsageType.PLAN_LEISURE_FORMAT },
+      ],
+    },
     select: { id: true },
   });
-  if (!root) return null;
+  if (roots.length === 0) return null;
+
   const children = await prisma.signalDefinition.findMany({
-    where: { parentId: root.id, isActive: true },
+    where: { parentId: { in: roots.map((root) => root.id) }, isActive: true },
     select: { id: true },
   });
-  return new Set(children.map((c) => c.id));
+  return new Set(children.map((child) => child.id));
 }
 
 export async function validatePreferenceSignalIds(
@@ -34,7 +53,7 @@ export async function validatePreferenceSignalIds(
   if (ids.length > MAX_PREFERENCES) {
     return { ok: false, error: `Не больше ${MAX_PREFERENCES} предпочтений` };
   }
-  const allowed = await preferenceChildIdSet();
+  const allowed = await childIdsForPreferenceRoots();
   if (!allowed) {
     return { ok: false, error: "Справочник предпочтений не настроен" };
   }
@@ -51,7 +70,7 @@ export async function validateLeisureFormatSignalId(
   id: string | null,
 ): Promise<{ ok: true; id: string | null } | { ok: false; error: string }> {
   if (id === null) return { ok: true, id: null };
-  const allowed = await formatChildIdSet();
+  const allowed = await childIdsForFormatRoots();
   if (!allowed) {
     return { ok: false, error: "Справочник формата досуга не настроен" };
   }

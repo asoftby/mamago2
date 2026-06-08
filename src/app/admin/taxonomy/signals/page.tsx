@@ -6,7 +6,8 @@ import { toast } from "@/lib/toast";
 import { useAutoSlug } from "@/hooks/useAutoSlug";
 import { orderSignalDefinitionsForDisplay } from "@/lib/taxonomy/signalHierarchy";
 import { messageFromApiError } from "@/lib/admin/messageFromApiError";
-import { SignalDomain, SignalEntityType, SignalStatus } from "@prisma/client";
+import { SignalDomain, SignalEntityType, SignalStatus, SignalUsageType } from "@prisma/client";
+import { SIGNAL_USAGE_TYPE_LABELS } from "@/lib/signals/signalUsageType";
 import {
   DiscoveryTaxonomyPageShell,
   DiscoveryTaxonomyPageHeader,
@@ -40,6 +41,7 @@ type SignalRow = {
   status: SignalStatus;
   replacedById: string | null;
   replacedBy: { id: string; title: string; slug: string } | null;
+  usageType: SignalUsageType | null;
   _count: { children: number; options: number };
 };
 
@@ -52,13 +54,15 @@ export default function SignalsPage() {
   const [createParentId, setCreateParentId] = useState<string | null>(null);
   const newSignal = useAutoSlug("", "");
 
-  const fetchSignals = async (domain?: SignalDomain) => {
+  const fetchSignals = async (tab: string) => {
     setLoading(true);
     try {
       const params = new URLSearchParams();
       params.set("includeDeprecated", "true"); // Show all signals in admin
-      if (domain) {
-        params.set("domain", domain);
+      if (tab === "plan") {
+        params.set("planOnboarding", "true");
+      } else if (tab !== "all") {
+        params.set("domain", tab);
       }
       
       const res = await fetch(`/api/admin/signals?${params.toString()}`, adminFetch);
@@ -75,8 +79,7 @@ export default function SignalsPage() {
   };
 
   useEffect(() => {
-    const domain = activeTab === "all" ? undefined : activeTab as SignalDomain;
-    fetchSignals(domain);
+    fetchSignals(activeTab);
   }, [activeTab]);
 
   const roots = useMemo(
@@ -111,8 +114,7 @@ export default function SignalsPage() {
     });
     if (res.ok) {
       newSignal.hydrate("", "");
-      const domain = activeTab === "all" ? undefined : activeTab as SignalDomain;
-      fetchSignals(domain);
+      fetchSignals(activeTab);
       toast.success("Сигнал создан");
     } else {
       const err = await res.json().catch(() => ({}));
@@ -161,6 +163,11 @@ export default function SignalsPage() {
     );
   };
 
+  const formatUsageType = (usageType: SignalUsageType | null) => {
+    if (!usageType) return "—";
+    return SIGNAL_USAGE_TYPE_LABELS[usageType] ?? usageType;
+  };
+
   return (
     <DiscoveryTaxonomyPageShell>
       <DiscoveryTaxonomyPageHeader
@@ -170,11 +177,12 @@ export default function SignalsPage() {
 
       <div className="space-y-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="all">All Signals</TabsTrigger>
             <TabsTrigger value={SignalDomain.PROFILE}>Profile</TabsTrigger>
             <TabsTrigger value={SignalDomain.DISCOVERY}>Discovery</TabsTrigger>
             <TabsTrigger value={SignalDomain.RECOMMENDATION}>Recommendation</TabsTrigger>
+            <TabsTrigger value="plan">Plan onboarding</TabsTrigger>
           </TabsList>
 
           <TabsContent value={activeTab} className="space-y-6">
@@ -210,6 +218,7 @@ export default function SignalsPage() {
                     <th className={discoveryTh()}>Название</th>
                     <th className={discoveryTh()}>Slug</th>
                     <th className={discoveryTh()}>Domain</th>
+                    <th className={discoveryTh()}>Usage</th>
                     <th className={discoveryTh()}>Entity Types</th>
                     <th className={discoveryTh()}>Status</th>
                     <th className={discoveryTh()}>Родитель</th>
@@ -261,6 +270,9 @@ export default function SignalsPage() {
                         </td>
                         <td className={discoveryTd("text-gray-600")}>
                           {formatDomain(s.domain)}
+                        </td>
+                        <td className={discoveryTd("text-gray-600")}>
+                          <span className="text-xs">{formatUsageType(s.usageType)}</span>
                         </td>
                         <td className={discoveryTd("text-gray-600")}>
                           <span className="text-xs">{formatEntityTypes(s.entityTypes)}</span>

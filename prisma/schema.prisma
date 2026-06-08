@@ -351,6 +351,8 @@ model SignalDefinition {
   status       SignalStatus       @default(ACTIVE)
   /// ID сигнала, который заменяет текущий (для устаревших сигналов)
   replacedById String?
+  /// Назначение сигнала в продукте (mini-onboarding плана, …)
+  usageType    SignalUsageType?
   parent       SignalDefinition?  @relation("SignalDefinitionHierarchy", fields: [parentId], references: [id], onDelete: Restrict)
   children     SignalDefinition[] @relation("SignalDefinitionHierarchy")
   /// Сигнал, который заменяет текущий
@@ -363,6 +365,7 @@ model SignalDefinition {
   @@index([parentId, order])
   @@index([domain])
   @@index([status])
+  @@index([usageType])
 }
 
 model SignalOption {
@@ -2480,6 +2483,11 @@ enum SignalEntityType {
 enum SignalStatus {
   ACTIVE
   DEPRECATED
+}
+
+enum SignalUsageType {
+  PLAN_ADULT_PREFERENCE
+  PLAN_LEISURE_FORMAT
 }
 
 enum Role {

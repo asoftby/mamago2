@@ -161,6 +161,42 @@ async function upsertSignalGroupChild(
   });
 }
 
+async function upsertPlanOnboardingRoot(
+  slug: string,
+  title: string,
+  usageType: "PLAN_ADULT_PREFERENCE" | "PLAN_LEISURE_FORMAT",
+  order: number,
+) {
+  return prisma.signalDefinition.upsert({
+    where: { slug },
+    update: {
+      title,
+      titleEn: title,
+      order,
+      isActive: true,
+      isSystem: true,
+      parentId: null,
+      status: "ACTIVE",
+      domain: "PROFILE",
+      entityTypes: ["USER"],
+      usageType,
+    },
+    create: {
+      slug,
+      title,
+      titleEn: title,
+      order,
+      isActive: true,
+      isSystem: true,
+      parentId: null,
+      status: "ACTIVE",
+      domain: "PROFILE",
+      entityTypes: ["USER"],
+      usageType,
+    },
+  });
+}
+
 const APPROVED_OCCASIONS: Array<{
   slug: string;
   name: string;
@@ -282,7 +318,51 @@ async function main() {
   await upsertSignalWithDomain("preferences", "Предпочтения", "PROFILE", ["USER"], 3);
   await upsertSignalWithDomain("preferences-aesthetics", "Эстетика", "PROFILE", ["USER"], 1, [], "preferences");
   await upsertSignalWithDomain("preferences-coffee", "Кофе", "PROFILE", ["USER"], 2, [], "preferences");
-  await upsertSignalWithDomain("preferences-family", "Семейно", "PROFILE", ["USER"], 3, [], "preferences");
+  await upsertSignalWithDomain("preferences-walks", "Прогулки", "PROFILE", ["USER"], 3, [], "preferences");
+  await upsertSignalWithDomain("preferences-scenic", "Красивые места", "PROFILE", ["USER"], 4, [], "preferences");
+  await upsertSignalWithDomain("preferences-calm", "Спокойно", "PROFILE", ["USER"], 5, [], "preferences");
+  await upsertSignalWithDomain("preferences-family", "Семейно", "PROFILE", ["USER"], 6, [], "preferences");
+
+  // Mini-onboarding «Мой план» — data-driven chips по usageType
+  const planPrefRoot = await upsertPlanOnboardingRoot(
+    "plan-adult-preference",
+    "Plan: предпочтения взрослого",
+    "PLAN_ADULT_PREFERENCE",
+    4,
+  );
+  const planPrefItems: Array<[string, string, number]> = [
+    ["plan-pref-coffee", "Кофе", 1],
+    ["plan-pref-walks", "Прогулки", 2],
+    ["plan-pref-scenic", "Красивые места", 3],
+    ["plan-pref-calm", "Спокойно", 4],
+    ["plan-pref-active", "Активно", 5],
+    ["plan-pref-culture", "Культура", 6],
+    ["plan-pref-creative", "Творчество", 7],
+    ["plan-pref-food", "Еда", 8],
+    ["plan-pref-nature", "Природа", 9],
+    ["plan-pref-family", "Семейно", 10],
+    ["plan-pref-budget", "Недорого", 11],
+    ["plan-pref-new-place", "Новое место", 12],
+  ];
+  for (const [slug, title, order] of planPrefItems) {
+    await upsertSignalGroupChild(planPrefRoot.id, slug, title, order);
+  }
+
+  const planFormatRoot = await upsertPlanOnboardingRoot(
+    "plan-leisure-format",
+    "Plan: формат досуга",
+    "PLAN_LEISURE_FORMAT",
+    5,
+  );
+  const planFormatItems: Array<[string, string, number]> = [
+    ["plan-format-outdoor", "На улице", 1],
+    ["plan-format-indoor", "В помещении", 2],
+    ["plan-format-mixed", "Смешанный", 3],
+    ["plan-format-home", "Дома", 4],
+  ];
+  for (const [slug, title, order] of planFormatItems) {
+    await upsertSignalGroupChild(planFormatRoot.id, slug, title, order);
+  }
 
   // ═══ DISCOVERY DOMAIN ═══
   // Format группа
@@ -317,7 +397,7 @@ async function main() {
   // ═══ LEGACY SIGNALS (для обратной совместимости) ═══
   // Старые сигналы остаются для совместимости, но помечены как DEPRECATED в миграции
   const leisureRoot = await upsertSignalGroupRoot("leisure-format", "Формат досуга", 11);
-  await upsertSignalGroupChild(leisureRoot.id, "leisure-format-home", "Дома", 1);
+  await upsertSignalGroupChild(leisureRoot.id, "leisure-format-home", "В помещении", 1);
   await upsertSignalGroupChild(leisureRoot.id, "leisure-format-outdoor", "На улице", 2);
   await upsertSignalGroupChild(leisureRoot.id, "leisure-format-mixed", "Смешанный", 3);
 
