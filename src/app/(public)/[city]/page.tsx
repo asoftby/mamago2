@@ -7,6 +7,14 @@ import prisma from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
+export async function generateStaticParams() {
+  const cities = await prisma.city.findMany({
+    where: { isActive: true },
+    select: { slug: true },
+  });
+  return cities.map((c) => ({ city: c.slug }));
+}
+
 interface PageProps {
   params: Promise<{ city: string }>;
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
