@@ -8,6 +8,7 @@ import {
   verifyBusinessContactVerificationCode,
 } from "@/lib/phone-verification/businessContactVerification";
 import { isBusinessContactOtpEscalationError } from "@/lib/phone-verification/businessContactOtpErrors";
+import { completeOnboardingNotification } from "@/server/services/notification.service";
 
 export const runtime = "nodejs";
 
@@ -58,6 +59,12 @@ export async function POST(request: NextRequest) {
       phone: phoneE164,
       code: parsed.data.code,
     });
+
+    try {
+      await completeOnboardingNotification(user.id, "VERIFY_PHONE");
+    } catch (notificationError) {
+      console.error("[settings/phone/verify] completeOnboardingNotification", notificationError);
+    }
 
     return NextResponse.json({
       ok: true,

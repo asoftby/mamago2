@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getPublicAppUrl } from "@/features/email/lib/email-links";
 import { getCurrentUser } from "@/lib/auth/server";
 import { verifyEmailByToken } from "@/server/auth/email-verification";
-import { notifyWelcomeNewUser, notifyEmailVerified } from "@/server/services/notification.service";
+import { completeOnboardingNotification } from "@/server/services/notification.service";
 
 function resolveRedirectBase(request: NextRequest): string {
   try {
@@ -44,15 +44,9 @@ export async function GET(
   }
 
   try {
-    await notifyWelcomeNewUser(result.userId);
+    await completeOnboardingNotification(result.userId, "VERIFY_EMAIL");
   } catch (e) {
-    console.error("[auth/verify-email] notifyWelcomeNewUser", e);
-  }
-
-  try {
-    await notifyEmailVerified(result.userId);
-  } catch (e) {
-    console.error("[auth/verify-email] notifyEmailVerified", e);
+    console.error("[auth/verify-email] completeOnboardingNotification", e);
   }
 
   const url = buildDest(request, afterAuthPath);

@@ -14,6 +14,7 @@ import {
 } from "@/server/business/businessInvite.service";
 import { buildSurfaceRedirectDestination } from "@/lib/routing/surface";
 import { passwordSchema } from "@/lib/auth/passwordPolicy";
+import { ensureUserOnboardingNotifications } from "@/server/services/notification.service";
 
 const bodySchema = z.object({
   email: z.string().email("Некорректный email"),
@@ -121,6 +122,15 @@ export async function POST(request: NextRequest) {
         },
       });
 
+      try {
+        await ensureUserOnboardingNotifications(user.id);
+      } catch (notificationError) {
+        console.error("[auth] failed to create onboarding notifications", {
+          userId: user.id,
+          error: notificationError,
+        });
+      }
+
       const emailResult = await sendPostRegistrationEmails({
         userId: user.id,
         email: normalizedEmail,
@@ -195,6 +205,15 @@ export async function POST(request: NextRequest) {
         passwordHash,
       },
     });
+
+    try {
+      await ensureUserOnboardingNotifications(newUser.id);
+    } catch (notificationError) {
+      console.error("[auth] failed to create onboarding notifications", {
+        userId: newUser.id,
+        error: notificationError,
+      });
+    }
 
     const emailResult = await sendPostRegistrationEmails({
       userId: newUser.id,
