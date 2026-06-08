@@ -1,3 +1,4 @@
+import { getCanonicalPublicAppUrl } from "@/lib/config/publicAppUrl";
 import { notFound, permanentRedirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/server";
 import { ArticleHeader } from "@/components/article/ArticleHeader";
@@ -69,7 +70,7 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const publicBase = (process.env.NEXT_PUBLIC_APP_URL || "https://mamago.by").replace(/\/$/, "");
+  const publicBase = getCanonicalPublicAppUrl();
   const defaultCanonical = `${publicBase}/blog/${slug}`;
   const mvp = await loadArticleMvpBySlugPublic(slug);
   if (mvp) {
@@ -252,7 +253,7 @@ export default async function ArticlePage({
   }
 
   const seo = "_seo" in article ? article._seo : undefined;
-  const publicBase = process.env.NEXT_PUBLIC_APP_URL || "https://mamago.by";
+  const publicBase = getCanonicalPublicAppUrl();
   const jsonLd =
     seo?.seoJsonLdOverride && typeof seo.seoJsonLdOverride === "object"
       ? (seo.seoJsonLdOverride as Record<string, unknown>)

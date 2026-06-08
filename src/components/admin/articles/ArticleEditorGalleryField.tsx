@@ -20,14 +20,13 @@ export function ArticleEditorGalleryField({
   onChange: (ids: string[]) => void;
   showHeading?: boolean;
 }) {
-  const [previewById, setPreviewById] = useState<Record<string, string>>({});
+  const [loadedPreviewById, setLoadedPreviewById] = useState<Record<string, string>>({});
+  const ids = useMemo(() => value.filter((id) => id.trim()), [value]);
 
   useEffect(() => {
     let cancelled = false;
-    const ids = value.filter((id) => id.trim());
 
     if (ids.length === 0) {
-      setPreviewById({});
       return;
     }
 
@@ -49,7 +48,7 @@ export function ArticleEditorGalleryField({
 
       if (cancelled) return;
 
-      setPreviewById(
+      setLoadedPreviewById(
         entries.reduce<Record<string, string>>((acc, [id, url]) => {
           if (url) acc[id] = url;
           return acc;
@@ -60,7 +59,12 @@ export function ArticleEditorGalleryField({
     return () => {
       cancelled = true;
     };
-  }, [value]);
+  }, [ids]);
+
+  const previewById = useMemo(
+    () => (ids.length === 0 ? {} : loadedPreviewById),
+    [ids.length, loadedPreviewById],
+  );
 
   const galleryValue = useMemo(
     () =>
@@ -114,7 +118,7 @@ export function ArticleEditorGalleryField({
       value={galleryValue}
       onChange={(next) => {
         const items = Array.isArray(next) ? next : [];
-        setPreviewById(
+        setLoadedPreviewById(
           items.reduce<Record<string, string>>((acc, item) => {
             acc[item.id] = item.url;
             return acc;

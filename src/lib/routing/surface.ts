@@ -226,6 +226,11 @@ export function buildSurfaceRedirectDestination(params: {
 }
 
 /** Витрина по умолчанию при переходе из admin/business на публичный сайт (город). */
+/**
+ * Default entry path from admin/business → public site.
+ * Points to the Minsk city hub (standard city path, not a special case).
+ * When adding a city selector or geo-detection, update this to "/" instead.
+ */
 export const PUBLIC_SITE_DEFAULT_ENTRY_PATH = "/minsk";
 
 /**

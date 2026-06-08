@@ -9,9 +9,10 @@ export async function createActivitySlugHistoryIgnoreDuplicate(
   tx: Prisma.TransactionClient,
   activityId: string,
   slug: string,
+  cityId?: string | null,
 ): Promise<void> {
   try {
-    await tx.activitySlugHistory.create({ data: { activityId, slug } });
+    await tx.activitySlugHistory.create({ data: { activityId, slug, cityId } });
   } catch (e) {
     if (!isUniqueViolation(e)) throw e;
   }
@@ -21,9 +22,10 @@ export async function createPlaceSlugHistoryIgnoreDuplicate(
   tx: Prisma.TransactionClient,
   placeId: string,
   slug: string,
+  cityId?: string | null,
 ): Promise<void> {
   try {
-    await tx.placeSlugHistory.create({ data: { placeId, slug } });
+    await tx.placeSlugHistory.create({ data: { placeId, slug, cityId } });
   } catch (e) {
     if (!isUniqueViolation(e)) throw e;
   }
@@ -33,9 +35,10 @@ export async function createOfferSlugHistoryIgnoreDuplicate(
   tx: Prisma.TransactionClient,
   offerId: string,
   slug: string,
+  cityId?: string | null,
 ): Promise<void> {
   try {
-    await tx.offerSlugHistory.create({ data: { offerId, slug } });
+    await tx.offerSlugHistory.create({ data: { offerId, slug, cityId } });
   } catch (e) {
     if (!isUniqueViolation(e)) throw e;
   }

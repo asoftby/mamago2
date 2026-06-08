@@ -28,34 +28,35 @@ export function ArticleEditorCoverField({
   successUploadMessage?: string;
   successPickMessage?: string;
 }) {
-  const [previewUrl, setPreviewUrl] = useState<string | null>(initialPreviewUrl ?? null);
+  const mediaId = value.trim();
+  const [resolvedPreviewUrl, setResolvedPreviewUrl] = useState<string | null>(initialPreviewUrl ?? null);
 
   useEffect(() => {
-    if (!value.trim()) {
-      setPreviewUrl(null);
+    if (!mediaId) {
       return;
     }
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch(`/api/admin/articles/media-preview?id=${encodeURIComponent(value.trim())}`);
+        const res = await fetch(`/api/admin/articles/media-preview?id=${encodeURIComponent(mediaId)}`);
         if (!res.ok) {
-          if (!cancelled) setPreviewUrl(initialPreviewUrl ?? null);
+          if (!cancelled) setResolvedPreviewUrl(initialPreviewUrl ?? null);
           return;
         }
         const data = (await res.json()) as { publicUrl: string | null };
-        if (!cancelled) setPreviewUrl(data.publicUrl ?? initialPreviewUrl ?? null);
+        if (!cancelled) setResolvedPreviewUrl(data.publicUrl ?? initialPreviewUrl ?? null);
       } catch {
-        if (!cancelled) setPreviewUrl(initialPreviewUrl ?? null);
+        if (!cancelled) setResolvedPreviewUrl(initialPreviewUrl ?? null);
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [value, initialPreviewUrl]);
+  }, [initialPreviewUrl, mediaId]);
+
+  const previewUrl = mediaId ? resolvedPreviewUrl ?? initialPreviewUrl ?? null : null;
 
   const currentValue = useMemo<MediaUploadItem | null>(() => {
-    const mediaId = value.trim();
     if (!mediaId) return null;
     return {
       id: mediaId,
@@ -63,7 +64,7 @@ export function ArticleEditorCoverField({
       alt: null,
       title: "Обложка статьи",
     };
-  }, [value, previewUrl]);
+  }, [mediaId, previewUrl]);
 
   const uploadFiles = async (files: File[]): Promise<MediaUploadItem[]> => {
     const uploaded: MediaUploadItem[] = [];
@@ -104,7 +105,7 @@ export function ArticleEditorCoverField({
       value={currentValue}
       onChange={(next) => {
         const item = next && !Array.isArray(next) ? next : null;
-        setPreviewUrl(item?.url ?? null);
+        setResolvedPreviewUrl(item?.url ?? null);
         onChange(item?.id ?? "", item?.url ?? null);
       }}
       maxSizeMb={5}

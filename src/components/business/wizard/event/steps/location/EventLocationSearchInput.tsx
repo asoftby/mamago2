@@ -266,7 +266,10 @@ export const EventLocationSearchInput = forwardRef<HTMLInputElement, EventLocati
     }, [applyWidgetAttributes, syncWidgetValue, updateInputValue]);
 
     useEffect(() => {
-      setInputValue(initialValue ?? "");
+      const syncId = window.setTimeout(() => {
+        setInputValue(initialValue ?? "");
+      }, 0);
+      return () => window.clearTimeout(syncId);
     }, [initialValue]);
 
     useEffect(() => {
@@ -300,9 +303,12 @@ export const EventLocationSearchInput = forwardRef<HTMLInputElement, EventLocati
         return;
       }
 
-      void initAutocomplete();
+      const initId = window.setTimeout(() => {
+        void initAutocomplete();
+      }, 0);
 
       return () => {
+        window.clearTimeout(initId);
         cleanupRef.current?.();
       };
     }, [autocompleteRequested, initAutocomplete]);

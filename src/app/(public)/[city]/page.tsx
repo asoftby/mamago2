@@ -1,7 +1,11 @@
+import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import CityHomePage from "@/features/city-home/pages/CityHomePage";
-import { buildCityHomeCanonicalToEvents } from "@/lib/seo/cityKudaListingMetadata";
+import { buildCityHubMetadata } from "@/lib/seo/cityKudaListingMetadata";
 import { applyGlobalRobotsOverride } from "@/lib/seo/globalNoindex";
+import prisma from "@/lib/prisma";
+
+export const dynamic = "force-dynamic";
 
 interface PageProps {
   params: Promise<{ city: string }>;
@@ -14,12 +18,19 @@ export async function generateMetadata({
   params: Promise<{ city: string }>;
 }): Promise<Metadata> {
   const { city: citySlug } = await params;
-  return applyGlobalRobotsOverride(await buildCityHomeCanonicalToEvents(citySlug));
+  return applyGlobalRobotsOverride(await buildCityHubMetadata(citySlug));
 }
 
 export default async function CityPage({ params, searchParams }: PageProps) {
   const { city: citySlug } = await params;
   await searchParams;
 
-  return <CityHomePage citySlug={citySlug} />;
+  const city = await prisma.city.findFirst({
+    where: { slug: citySlug.toLowerCase(), isActive: true },
+    select: { slug: true },
+  });
+
+  if (!city) notFound();
+
+  return <CityHomePage citySlug={city.slug} />;
 }

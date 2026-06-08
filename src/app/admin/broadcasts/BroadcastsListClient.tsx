@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { formatDistanceToNow } from "date-fns";
 import { ru } from "date-fns/locale";
 import { toast } from "@/lib/toast";
@@ -50,6 +51,7 @@ interface Props {
 }
 
 export function BroadcastsListClient({ initialItems, total }: Props) {
+  const router = useRouter();
   const [items, setItems] = useState(initialItems);
 
   const handlePublish = async (id: string) => {
@@ -113,7 +115,7 @@ export function BroadcastsListClient({ initialItems, total }: Props) {
         toast.error(data.error ?? "Ошибка");
         return;
       }
-      window.location.href = `/admin/broadcasts/${data.broadcast.id}/edit`;
+      router.push(`/admin/broadcasts/${data.broadcast.id}/edit`);
     } catch {
       toast.error("Ошибка сети");
     }

@@ -29,7 +29,7 @@ async function main() {
     where: { slug: "demo-place" },
     update: {},
     create: {
-      ownerUserId: admin.id,
+      createdByUserId: admin.id,
       status: "PUBLISHED",
       slug: "demo-place",
       slugUpdatedAt: new Date(),

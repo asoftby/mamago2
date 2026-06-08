@@ -9,9 +9,12 @@ export function BetaTip() {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
-    if (!localStorage.getItem(STORAGE_KEY)) {
-      setVisible(true);
-    }
+    const showId = window.setTimeout(() => {
+      if (!localStorage.getItem(STORAGE_KEY)) {
+        setVisible(true);
+      }
+    }, 0);
+    return () => window.clearTimeout(showId);
   }, []);
 
   function dismiss() {

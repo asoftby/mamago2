@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { usePathname } from "next/navigation";
 import { SidebarItem } from "@/components/shared/sidebar/SidebarItem";
 import { SidebarPublicSiteEntry } from "@/components/shared/sidebar/SidebarPublicSiteEntry";
@@ -111,20 +111,27 @@ export function AdminSidebar({
 
   // ── Accordion state ─────────────────────────────────────────────────────────
   const derivedGroupId = findActiveGroupId(pathname);
-  const [openSection, setOpenSection] = useState<string | null>(derivedGroupId);
-
-  useEffect(() => {
-    setOpenSection((prev) => {
-      if (!derivedGroupId) return prev;
-      return derivedGroupId;
-    });
-  }, [derivedGroupId]);
+  const [sidebarState, setSidebarState] = useState<{
+    pathname: string;
+    openSection: string | null;
+  }>({
+    pathname,
+    openSection: derivedGroupId,
+  });
+  const openSection =
+    sidebarState.pathname === pathname ? sidebarState.openSection : derivedGroupId;
 
   function toggleSection(id: string) {
-    setOpenSection((prev) => {
-      // Don't collapse the section that owns the current page — keeps context.
-      if (prev === id && id === derivedGroupId) return id;
-      return prev === id ? null : id;
+    setSidebarState((prev) => {
+      const currentOpenSection =
+        prev.pathname === pathname ? prev.openSection : derivedGroupId;
+      if (currentOpenSection === id && id === derivedGroupId) {
+        return { pathname, openSection: id };
+      }
+      return {
+        pathname,
+        openSection: currentOpenSection === id ? null : id,
+      };
     });
   }
 

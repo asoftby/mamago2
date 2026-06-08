@@ -1,9 +1,7 @@
 import type { MetadataRoute } from "next";
 import prisma from "@/lib/prisma";
-import {
-  getGlobalNoindexPublicBaseUrl,
-  isGlobalNoindexEnabled,
-} from "@/lib/seo/globalNoindex";
+import { isGlobalNoindexEnabled } from "@/lib/seo/globalNoindex";
+import { getBaseUrl, buildCityPublicPath } from "@/lib/routing/cityPaths";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +10,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     return [];
   }
 
-  const baseUrl = getGlobalNoindexPublicBaseUrl();
+  const baseUrl = getBaseUrl("BY");
   const now = new Date();
 
   const entries: MetadataRoute.Sitemap = [
@@ -26,6 +24,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   try {
     const cities = await prisma.city.findMany({
+      where: { isActive: true },
       select: { slug: true, updatedAt: true },
       orderBy: { name: "asc" },
       take: 50,
@@ -33,13 +32,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
     for (const city of cities) {
       entries.push({
-        url: `${baseUrl}/${city.slug}`,
+        url: `${baseUrl}${buildCityPublicPath({ citySlug: city.slug, type: "hub" })}`,
         lastModified: city.updatedAt,
         changeFrequency: "daily",
         priority: 0.9,
       });
       entries.push({
-        url: `${baseUrl}/${city.slug}/events`,
+        url: `${baseUrl}${buildCityPublicPath({ citySlug: city.slug, type: "events" })}`,
         lastModified: city.updatedAt,
         changeFrequency: "daily",
         priority: 0.8,

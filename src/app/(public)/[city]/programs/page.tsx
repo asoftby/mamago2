@@ -1,3 +1,4 @@
+import { getCanonicalPublicAppUrl } from "@/lib/config/publicAppUrl";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import prisma from "@/lib/prisma";
@@ -26,7 +27,7 @@ export async function generateMetadata({ params }: ProgramsPageProps): Promise<M
     };
   }
 
-  const publicBase = process.env.NEXT_PUBLIC_APP_URL || "https://mamago.by";
+  const publicBase = getCanonicalPublicAppUrl();
   const cityName = cityData.name;
 
   return {

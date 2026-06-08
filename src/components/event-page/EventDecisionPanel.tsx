@@ -103,9 +103,13 @@ function renderPriceSuffix(text: string) {
 function useCountdown(targetIso?: string) {
   const [now, setNow] = useState<number | null>(null);
   useEffect(() => {
-    setNow(Date.now());
-    const id = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(id);
+    const tick = () => setNow(Date.now());
+    const startId = window.setTimeout(tick, 0);
+    const intervalId = window.setInterval(tick, 1000);
+    return () => {
+      window.clearTimeout(startId);
+      window.clearInterval(intervalId);
+    };
   }, []);
   if (!targetIso || now === null) return null;
   const ms = Math.max(0, new Date(targetIso).getTime() - now);

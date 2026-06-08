@@ -1,3 +1,4 @@
+import { getCanonicalPublicAppUrl } from "@/lib/config/publicAppUrl";
 import { notFound, permanentRedirect } from "next/navigation";
 import prisma from "@/lib/prisma";
 import { Metadata } from "next";
@@ -145,7 +146,7 @@ export async function generateMetadata({ params }: PlacePageProps): Promise<Meta
     cityId: place.cityId,
   });
 
-  const publicBase = process.env.NEXT_PUBLIC_APP_URL || "https://mamago.by";
+  const publicBase = getCanonicalPublicAppUrl();
   const logoForMeta = resolvePlaceLogoImage(place.images, place.logoImageId);
   const coverImage =
     place.seoOgImage?.trim() ||
@@ -307,7 +308,7 @@ export default async function PlacePage({ params }: PlacePageProps) {
   const locationString = getPlaceLocationString(place);
   const googleReviewsEnabled = isGoogleReviewsEnabled(place.googlePlaceId, place.googleReviewsJson);
 
-  const publicBase = process.env.NEXT_PUBLIC_APP_URL || "https://mamago.by";
+  const publicBase = getCanonicalPublicAppUrl();
   const jsonLd =
     place.seoJsonLdOverride && typeof place.seoJsonLdOverride === "object"
       ? (place.seoJsonLdOverride as Record<string, unknown>)

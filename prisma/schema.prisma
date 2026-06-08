@@ -573,6 +573,10 @@ model City {
   routes                Route[]
   searchQuickTags       SearchQuickTag[]
   searchQueryLogs       SearchQueryLog[]
+  offers                Offer[]           @relation("OfferCity")
+  activitySlugHistories ActivitySlugHistory[]
+  placeSlugHistories    PlaceSlugHistory[]
+  offerSlugHistories    OfferSlugHistory[]
 
   @@index([slug])
   @@index([isActive, isVisibleInCityFilter, priority])
@@ -659,7 +663,7 @@ model Activity {
   seoOgTitle           String?
   seoRobots            String?
   seoTitle             String?
-  slug                 String?                   @unique
+  slug                 String?
   slugUpdatedAt        DateTime?
   seoCanonicalSource   SeoCanonicalSource        @default(FALLBACK)
   business             Business?                 @relation("ActivityBusiness", fields: [businessId], references: [id])
@@ -692,6 +696,7 @@ model Activity {
   bookingCapacityPerSlot Int?
   bookingRequests        BookingRequest[]
 
+  @@unique([cityId, slug])
   @@index([placeId])
   @@index([type])
   @@index([status])
@@ -722,10 +727,13 @@ model ActivityProgramCategory {
 model ActivitySlugHistory {
   id         String   @id @default(cuid())
   activityId String
-  slug       String   @unique
+  cityId     String?
+  slug       String
   createdAt  DateTime @default(now())
   activity   Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  city       City?    @relation(fields: [cityId], references: [id], onDelete: SetNull)
 
+  @@unique([cityId, slug])
   @@index([activityId])
   @@index([slug])
 }
@@ -955,7 +963,7 @@ model Place {
   archivedAt                   DateTime?
   archivedByUserId             String?
   hasActiveImprovementRequests Boolean            @default(false)
-  slug                         String?            @unique
+  slug                         String?
   shortAddress                 String?
   slugUpdatedAt                DateTime?
   placeGroupId                 String?
@@ -1018,6 +1026,7 @@ model Place {
   primaryCategory EventCategory?      @relation("PlacePrimaryCategory", fields: [primaryCategoryId], references: [id])
   subcategories   PlaceSubcategory[]
 
+  @@unique([cityId, slug])
   @@unique([createdByUserId, createRequestId])
   @@index([createdByUserId])
   @@index([ownerBusinessId])
@@ -1197,10 +1206,13 @@ model PlaceClaimRequest {
 model PlaceSlugHistory {
   id        String   @id @default(cuid())
   placeId   String
-  slug      String   @unique
+  cityId    String?
+  slug      String
   createdAt DateTime @default(now())
   place     Place    @relation(fields: [placeId], references: [id], onDelete: Cascade)
+  city      City?    @relation(fields: [cityId], references: [id], onDelete: SetNull)
 
+  @@unique([cityId, slug])
   @@index([placeId])
   @@index([slug])
 }
@@ -1642,9 +1654,11 @@ model Offer {
   seoOgTitle               String?
   seoRobots                String?
   seoTitle                 String?
-  slug                     String?            @unique
+  slug                     String?
   slugUpdatedAt            DateTime?
   seoCanonicalSource       SeoCanonicalSource @default(FALLBACK)
+  /// Snapshot cityId из place.cityId для роутинга; заполняется save-хуком, не редактируется напрямую
+  cityId                   String?
   /// Сигналы DISCOVERY домена (entityType=OFFER), ID SignalDefinition
   discoverySignalIds       String[]           @default([])
   /// Чипы публичной витрины /[city]/classes
@@ -1708,8 +1722,10 @@ model Offer {
   offerIdeas      OfferIdea[]
   openingHours    OpeningHours?      @relation(fields: [openingHoursId], references: [id])
   place           Place              @relation(fields: [placeId], references: [id], onDelete: Cascade)
+  city            City?              @relation("OfferCity", fields: [cityId], references: [id])
   slugHistory     OfferSlugHistory[]
 
+  @@unique([cityId, slug])
   @@index([placeId])
   @@index([status])
   @@index([kind])
@@ -1717,6 +1733,7 @@ model Offer {
   @@index([ageMinMonths, ageMaxMonths])
   @@index([openingHoursId])
   @@index([slug])
+  @@index([cityId])
 }
 
 /// Сохранённые предложения в «Идеи» (отдельно от Idea с activityId)
@@ -1736,10 +1753,13 @@ model OfferIdea {
 model OfferSlugHistory {
   id        String   @id @default(cuid())
   offerId   String
-  slug      String   @unique
+  cityId    String?
+  slug      String
   createdAt DateTime @default(now())
   offer     Offer    @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  city      City?    @relation(fields: [cityId], references: [id], onDelete: SetNull)
 
+  @@unique([cityId, slug])
   @@index([offerId])
   @@index([slug])
 }
