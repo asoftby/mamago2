@@ -448,13 +448,43 @@ async function main() {
     await upsertDiscoveryClassChip(chip);
   }
 
-  // ── Cities (SYSTEM) ───────────────────────────────────────────────────────
+  // ── Geo hierarchy (Country → Region → City) ───────────────────────────────
+  console.log("  → Countries & regions");
+
+  const belarus = await prisma.country.upsert({
+    where: { slug: "belarus" },
+    update: { isActive: true, priority: 100 },
+    create: {
+      id: "country_belarus",
+      name: "Беларусь",
+      slug: "belarus",
+      isoCode: "BY",
+      isActive: true,
+      priority: 100,
+    },
+  });
+
+  const minskOblast = await prisma.region.upsert({
+    where: { countryId_slug: { countryId: belarus.id, slug: "minskaya-oblast" } },
+    update: { isActive: true, priority: 100 },
+    create: {
+      id: "region_minskaya_oblast",
+      countryId: belarus.id,
+      name: "Минская область",
+      slug: "minskaya-oblast",
+      type: "OBLAST",
+      isActive: true,
+      priority: 100,
+    },
+  });
+
   console.log("  → Cities");
 
   const minsk = await prisma.city.upsert({
-    where: { slug: "minsk" },
+    where: { countryId_slug: { countryId: belarus.id, slug: "minsk" } },
     update: {},
     create: {
+      countryId: belarus.id,
       name: "Минск",
       slug: "minsk",
       lat: 53.9006,
@@ -540,21 +570,11 @@ async function main() {
 
   // Населённые пункты Минской области — лента /minsk/kuda может включать их (см. discoveryHubExpand)
   await prisma.city.upsert({
-    where: { slug: "minskaya-oblast" },
-    update: {},
+    where: { countryId_slug: { countryId: belarus.id, slug: "marina-gorka" } },
+    update: { regionId: minskOblast.id },
     create: {
-      name: "Минская область",
-      slug: "minskaya-oblast",
-      centerLat: 53.9,
-      centerLng: 27.5667,
-      radiusKm: 120,
-      hasMetro: false,
-    },
-  });
-  await prisma.city.upsert({
-    where: { slug: "marina-gorka" },
-    update: {},
-    create: {
+      countryId: belarus.id,
+      regionId: minskOblast.id,
       name: "Марьина Горка",
       slug: "marina-gorka",
       lat: 53.5103,

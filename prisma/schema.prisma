@@ -550,15 +550,61 @@ model Genre {
   @@index([categoryId, isActive, sortOrder])
 }
 
+enum RegionType {
+  REGION
+  OBLAST
+  PROVINCE
+  STATE
+  DISTRICT
+}
+
+model Country {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  isoCode   String?  @unique
+  isActive  Boolean  @default(false)
+  priority  Int      @default(0)
+  regions   Region[]
+  cities    City[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Region {
+  id        String     @id @default(cuid())
+  countryId String
+  country   Country    @relation(fields: [countryId], references: [id], onDelete: Cascade)
+  name      String
+  slug      String
+  type      RegionType @default(REGION)
+  isActive  Boolean    @default(false)
+  priority  Int        @default(0)
+  cities    City[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  @@unique([countryId, slug])
+  @@index([countryId])
+}
+
 model City {
   id                    String            @id @default(cuid())
+  countryId             String
+  country               Country           @relation(fields: [countryId], references: [id])
+  regionId              String?
+  region                Region?           @relation(fields: [regionId], references: [id])
   name                  String
-  slug                  String            @unique
+  slug                  String
   isActive              Boolean           @default(true)
   isVisibleInCityFilter Boolean           @default(true)
   priority              Int               @default(0)
   lat                   Float?
   lng                   Float?
+  googlePlaceId         String?
+  createdFromGoogle     Boolean           @default(false)
+  /// Legacy записи (например ошибочная «Минская область» как City) — скрыты из админки и селектора.
+  isLegacyNonCity       Boolean           @default(false)
   createdAt             DateTime          @default(now())
   updatedAt             DateTime          @updatedAt
   centerLat             Float?
@@ -580,10 +626,16 @@ model City {
   activitySlugHistories ActivitySlugHistory[]
   placeSlugHistories    PlaceSlugHistory[]
   offerSlugHistories    OfferSlugHistory[]
+  articles              Article[]         @relation("ArticleCity")
+  articleSlugHistories  ArticleSlugHistory[]
 
+  @@unique([countryId, slug])
   @@index([slug])
+  @@index([countryId])
+  @@index([regionId])
   @@index([isActive, isVisibleInCityFilter, priority])
   @@index([googleName])
+  @@index([isLegacyNonCity])
 }
 
 model District {
@@ -1028,6 +1080,8 @@ model Place {
   routeStops      RouteStop[]
   primaryCategory EventCategory?      @relation("PlacePrimaryCategory", fields: [primaryCategoryId], references: [id])
   subcategories   PlaceSubcategory[]
+  /// Articles where this place is the editorial subject (relatedPlace).
+  relatedArticles Article[]           @relation("ArticleRelatedPlace")
 
   @@unique([cityId, slug])
   @@unique([createdByUserId, createRequestId])
@@ -2201,7 +2255,7 @@ model RouteSlugHistory {
 
 model Article {
   id                 String               @id @default(cuid())
-  slug               String?              @unique
+  slug               String?
   slugUpdatedAt      DateTime?
   title              String
   subtitle           String?
@@ -2216,6 +2270,11 @@ model Article {
   /// Отображаемое имя автора (если не привязан User)
   authorLabel        String?
   cityContext        String?
+  /// FK to the city this article belongs to (null = country-scope article)
+  cityId             String?
+  city               City?                @relation("ArticleCity", fields: [cityId], references: [id], onDelete: SetNull)
+  /// CITY = local article served at /{city}/blog/{slug}; COUNTRY = national article at /blog/{slug}; null = draft, scope not chosen
+  geoScope           GeoScope?
   expiresAt          DateTime?
   scheduledAt        DateTime?
   seoTitle           String?
@@ -2237,23 +2296,40 @@ model Article {
   updatedAt          DateTime             @updatedAt
   seoCanonicalSource SeoCanonicalSource   @default(FALLBACK)
   slugHistory        ArticleSlugHistory[]
+  /// The Place/venue this article is about (optional editorial context).
+  /// Does NOT determine geoScope or cityId — geography is set independently by the editor.
+  /// On DELETE SET NULL so deleting the place keeps the article.
+  relatedPlaceId     String?
+  relatedPlace       Place?               @relation("ArticleRelatedPlace", fields: [relatedPlaceId], references: [id], onDelete: SetNull)
 
+  /// Partial unique index created via raw SQL migration:
+  /// CREATE UNIQUE INDEX ... WHERE "cityId" IS NOT NULL AND "slug" IS NOT NULL
+  @@unique([cityId, slug])
   @@index([slug])
   @@index([status])
   @@index([publishedAt])
   @@index([authorUserId])
   @@index([coverImageId])
+  @@index([cityId])
+  @@index([geoScope])
+  @@index([relatedPlaceId])
 }
 
 model ArticleSlugHistory {
   id        String   @id @default(cuid())
   articleId String
-  slug      String   @unique
+  slug      String
+  cityId    String?
   createdAt DateTime @default(now())
   article   Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  city      City?    @relation(fields: [cityId], references: [id], onDelete: SetNull)
 
+  /// Partial unique index created via raw SQL migration:
+  /// CREATE UNIQUE INDEX ... WHERE "cityId" IS NOT NULL AND "slug" IS NOT NULL
+  @@unique([cityId, slug])
   @@index([articleId])
   @@index([slug])
+  @@index([cityId])
 }
 
 /// Денормализованный индекс для быстрого поиска. Источник истины — сущности Activity/Offer/Place/Route/Article.
@@ -2643,6 +2719,14 @@ enum BusinessOperationalStatus {
   ACTIVE
   DISABLED
   ARCHIVED
+}
+
+/// Geographic scope for Articles.
+/// CITY  = local article, served at /{city}/blog/{slug}
+/// COUNTRY = national article, served at /blog/{slug}
+enum GeoScope {
+  CITY
+  COUNTRY
 }
 
 enum ContentStatus {
