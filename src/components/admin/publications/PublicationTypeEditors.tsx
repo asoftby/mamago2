@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ContentStatus } from "@prisma/client";
+import { ContentStatus, type GeoScope } from "@prisma/client";
 import { Loader2 } from "lucide-react";
 import { toast } from "@/lib/toast";
 import { ActivityCardEntityPicker } from "@/components/admin/articles/ActivityCardEntityPicker";
@@ -39,10 +39,15 @@ import { createClientSavePerf } from "@/lib/perf/clientSavePerf";
 import { SeoPanel } from "@/features/admin/seo/components/SeoPanel";
 import { resolveSeoPublicBase } from "@/lib/admin/seo/seoEditorCanonical";
 import {
-  buildBreakingNewsCanonicalUrl,
   generateBreakingNewsSeoDescription,
   generateBreakingNewsSeoTitle,
 } from "@/lib/publications/breakingNewsSeo";
+import { buildArticlePublicPath } from "@/lib/routing/cityPaths";
+import { usePublicationSlugField } from "@/hooks/usePublicationSlugField";
+import { PublicationSlugField } from "@/components/admin/publications/PublicationSlugField";
+import { useHydrated } from "@/hooks/use-hydrated";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { validateArticleGeoScope } from "@/lib/article/articleGeoScopeValidation";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -72,6 +77,8 @@ function newsEditorSnapshotComparable(args: {
   seoCanonicalUrl: string;
   noindex: boolean;
   authorUserId: string | null;
+  geoScope: GeoScope | null;
+  cityId: string | null;
 }): string {
   return JSON.stringify(args);
 }
@@ -96,6 +103,7 @@ export function NewsPublicationEditor({
   const [coverImageId, setCoverImageId] = useState("");
   const [galleryIds, setGalleryIds] = useState<string[]>([]);
   const [slug, setSlug] = useState("");
+  const [pinnedSlug, setPinnedSlug] = useState<string | null>(null);
   const [bodyHtml, setBodyHtml] = useState("");
   const [pricingHtml, setPricingHtml] = useState("");
   const [linkedEntityType, setLinkedEntityType] = useState<ArticleBlockEntityType>("PLACE");
@@ -116,6 +124,12 @@ export function NewsPublicationEditor({
   const [coverImagePreviewUrl, setCoverImagePreviewUrl] = useState("");
   const [authorUserId, setAuthorUserId] = useState<string | null>(null);
   const [authorError, setAuthorError] = useState<string | null>(null);
+  const [geoScope, setGeoScope] = useState<GeoScope | null>(null);
+  const [cityId, setCityId] = useState<string | null>(null);
+  const [geoScopeError, setGeoScopeError] = useState<string | null>(null);
+  const [cities, setCities] = useState<{ id: string; name: string; slug: string }[]>([]);
+
+  const hydrated = useHydrated();
 
   const [savedComparable, setSavedComparable] = useState<string | null>(null);
 
@@ -137,6 +151,8 @@ export function NewsPublicationEditor({
       seoCanonicalUrl,
       noindex,
       authorUserId,
+      geoScope,
+      cityId,
     }),
     [
       title,
@@ -155,6 +171,8 @@ export function NewsPublicationEditor({
       seoCanonicalUrl,
       noindex,
       authorUserId,
+      geoScope,
+      cityId,
     ],
   );
 
@@ -173,6 +191,7 @@ export function NewsPublicationEditor({
       const p = parseBreakingNewsFromSnapshot(snap);
       onTitleChange(p.title);
       setSlug(p.slug);
+      setPinnedSlug(snap.slug?.trim() || null);
       setCoverImageId(p.coverImageId);
       setCoverImagePreviewUrl(snap.coverImageUrl ?? "");
       setGalleryIds(p.galleryIds);
@@ -189,6 +208,9 @@ export function NewsPublicationEditor({
       setNoindex(p.noindex);
       setAuthorUserId(p.authorUserId);
       setAuthorError(null);
+      setGeoScope(p.geoScope);
+      setCityId(p.cityId);
+      setGeoScopeError(null);
       setViews(snap.views);
       setSavedComparable(newsEditorSnapshotComparable(p));
     },
@@ -232,6 +254,33 @@ export function NewsPublicationEditor({
     };
   }, [articleId, applySnapshot]);
 
+  // Load city list for the city selector (same endpoint as ArticleEditorClient).
+  // For brand-new breaking news (articleId === null) auto-default to CITY + Minsk so editors
+  // don't accidentally publish a local story as a national item. Existing articles keep their
+  // stored geoScope/cityId because applySnapshot runs after this and overwrites the defaults.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const res = await fetch("/api/admin/articles/editor-options");
+      if (!res.ok || cancelled) return;
+      const data = (await res.json().catch(() => null)) as {
+        cities?: { id: string; name: string; slug: string }[];
+      } | null;
+      if (!data || cancelled) return;
+      setCities(data.cities ?? []);
+      if (!articleId) {
+        // Only set the default when geoScope is still null (unset by the empty snapshot).
+        // The functional-update form prevents overwriting a geoScope that was already set.
+        const minsk = data.cities?.find((c) => c.slug === "minsk");
+        if (minsk) {
+          setGeoScope((prev) => (prev === null ? "CITY" : prev));
+          setCityId((prev) => (prev === null ? minsk.id : prev));
+        }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [articleId]);
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -266,6 +315,8 @@ export function NewsPublicationEditor({
       authorLabel: input.authorLabel,
       authorUserId: input.authorUserId,
       cityContext: input.cityContext,
+      geoScope: input.geoScope,
+      cityId: input.cityId,
       status: input.status,
       publishedAt: input.publishedAt,
       scheduledAt: input.scheduledAt,
@@ -363,6 +414,13 @@ export function NewsPublicationEditor({
       return;
     }
     setAuthorError(null);
+    // Validate geo scope before publishing.
+    const geoValidation = validateArticleGeoScope({ geoScope, cityId, strict: true });
+    if (!geoValidation.ok) {
+      setGeoScopeError(geoValidation.message);
+      return;
+    }
+    setGeoScopeError(null);
     setSubmitting(true);
     setActionsBusy(true);
     try {
@@ -438,6 +496,14 @@ export function NewsPublicationEditor({
       return;
     }
     setAuthorError(null);
+    if (action === "publish") {
+      const geoValidation = validateArticleGeoScope({ geoScope, cityId, strict: true });
+      if (!geoValidation.ok) {
+        setGeoScopeError(geoValidation.message);
+        return;
+      }
+      setGeoScopeError(null);
+    }
     setModerating(true);
     setActionsBusy(true);
     try {
@@ -494,10 +560,34 @@ export function NewsPublicationEditor({
   };
 
   const publicBase = resolveSeoPublicBase();
-  const slugPreviewPath = slug.trim() ? slug.trim() : "будет-сгенерирован-автоматически";
-  const publicNewsUrl = slug.trim() ? buildBreakingNewsCanonicalUrl(slug, publicBase) : "";
+  const {
+    previewSlug,
+    onSlugChange,
+    isSlugPinned,
+    showPublishedSlugWarning,
+  } = usePublicationSlugField({
+    title,
+    slug,
+    setSlug,
+    persistedSlug: pinnedSlug,
+    isPublished: status === "PUBLISHED",
+    emptyFallback: "article",
+    slugHistorySupported: true,
+  });
+  // Derive the city slug from the cities list for URL preview.
+  const selectedCitySlug = cityId ? (cities.find((c) => c.id === cityId)?.slug ?? null) : null;
+  // Guard: when CITY is chosen but no city is selected yet, suppress the URL preview entirely
+  // rather than letting buildArticlePublicPath fall back to /blog/{slug} (which would be misleading).
+  const previewUrlReady = geoScope !== "CITY" || selectedCitySlug !== null;
+  const publicNewsUrl = previewSlug && previewUrlReady
+    ? `${publicBase}${buildArticlePublicPath({
+        slug: previewSlug,
+        geoScope: geoScope ?? undefined,
+        citySlug: selectedCitySlug,
+      })}`
+    : null;
   const previewHref = articleId?.trim() ? `/preview/articles/${articleId.trim()}` : null;
-  const publicUrl = status === "PUBLISHED" && slug.trim() ? publicNewsUrl : null;
+  const publicUrl = status === "PUBLISHED" && previewSlug ? publicNewsUrl : null;
 
   if (loadState === "loading") {
     return (
@@ -531,28 +621,100 @@ export function NewsPublicationEditor({
             onChange={(e) => onTitleChange(e.target.value)}
           />
         </div>
-        <div className="space-y-2">
-          <Label>Slug</Label>
-          <p className="text-xs text-muted-foreground">
-            Если оставить пустым, slug будет сгенерирован из заголовка при сохранении (один раз). Ниже —
-            предпросмотр публичного URL.
-          </p>
-          <Input
-            value={slug}
-            onChange={(e) => setSlug(e.target.value)}
-            className="font-mono text-sm"
-            placeholder="например: semeynyy-vykhod-v-minsk"
-          />
-          <p className="text-xs text-gray-500 break-all">
-            <span className="font-medium text-gray-700">Публичный URL: </span>
-            {publicNewsUrl || `${publicBase}/blog/${slugPreviewPath}`}
-            {!slug.trim() ? (
-              <span className="block mt-1 text-amber-800">
-                Путь «{slugPreviewPath}» — плейсхолдер; фактический slug появится после сохранения.
-              </span>
-            ) : null}
-          </p>
+        <PublicationSlugField
+          id="breaking-news-slug"
+          slug={slug}
+          onSlugChange={onSlugChange}
+          previewSlug={previewSlug}
+          previewUrl={publicNewsUrl}
+          isSlugPinned={isSlugPinned}
+          showPublishedSlugWarning={showPublishedSlugWarning}
+          slugHistorySupported
+        />
+
+        {/* ── География публикации ─────────────────────────────────── */}
+        <div className="space-y-3">
+          <div>
+            <Label>География публикации</Label>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Обязательно перед публикацией. Определяет URL и аудиторию материала.
+            </p>
+          </div>
+          {hydrated ? (
+            <RadioGroup
+              value={geoScope ?? "__unset__"}
+              onValueChange={(v) => {
+                if (v === "COUNTRY") {
+                  setGeoScope("COUNTRY");
+                  setCityId(null);
+                } else if (v === "CITY") {
+                  setGeoScope("CITY");
+                } else {
+                  setGeoScope(null);
+                  setCityId(null);
+                }
+                setGeoScopeError(null);
+              }}
+              className="gap-3"
+            >
+              <div className="flex items-start gap-2">
+                <RadioGroupItem value="COUNTRY" id="bn-geo-country" className="mt-0.5" />
+                <Label htmlFor="bn-geo-country" className="cursor-pointer font-normal">
+                  <span className="font-medium">Вся Беларусь</span>
+                  <span className="block text-xs text-muted-foreground">
+                    Материал не привязан к конкретному городу — URL: /blog/&#123;slug&#125;
+                  </span>
+                </Label>
+              </div>
+              <div className="flex items-start gap-2">
+                <RadioGroupItem value="CITY" id="bn-geo-city" className="mt-0.5" />
+                <Label htmlFor="bn-geo-city" className="cursor-pointer font-normal">
+                  <span className="font-medium">Город</span>
+                  <span className="block text-xs text-muted-foreground">
+                    Локальный материал — URL: /&#123;город&#125;/blog/&#123;slug&#125;
+                  </span>
+                </Label>
+              </div>
+            </RadioGroup>
+          ) : (
+            <div className="h-16 rounded-md border border-input bg-muted/40 animate-pulse" aria-hidden />
+          )}
+
+          {geoScope === "CITY" ? (
+            <div className="space-y-1.5 pl-6">
+              <Label htmlFor="bn-city-select">Город</Label>
+              {hydrated ? (
+                <Select
+                  value={cityId ?? "__none__"}
+                  onValueChange={(v) => {
+                    setCityId(v === "__none__" ? null : v);
+                    setGeoScopeError(null);
+                  }}
+                >
+                  <SelectTrigger id="bn-city-select" className="w-full max-w-xs">
+                    <SelectValue placeholder="Выберите город" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">Не выбран</SelectItem>
+                    {cities.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <div className="h-9 max-w-xs rounded-md border border-input bg-muted/40 animate-pulse" aria-hidden />
+              )}
+            </div>
+          ) : null}
+
+          {geoScopeError ? (
+            <p className="text-xs text-red-600">{geoScopeError}</p>
+          ) : null}
         </div>
+        {/* ─────────────────────────────────────────────────────────── */}
+
         <ArticleEditorCoverField
           value={coverImageId}
           initialPreviewUrl={coverImagePreviewUrl || undefined}
@@ -586,6 +748,9 @@ export function NewsPublicationEditor({
             />
           )}
         </div>
+        {/* TODO: Add optional Article.relatedPlaceId picker for editorial context (DB field already exists).
+              Geography must remain controlled by the geo selector above (geoScope/cityId),
+              NOT by the selected place. See Article.relatedPlace in schema.prisma. */}
         <div className="space-y-4">
           <div className="space-y-2">
             <Label>Связанное место / активность</Label>

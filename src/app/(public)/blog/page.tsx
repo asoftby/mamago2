@@ -1,6 +1,5 @@
-import prisma from "@/lib/prisma";
+import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { listCityHomeArticles } from "@/server/article/listCityHomeArticles";
 import { applyGlobalRobotsOverride } from "@/lib/seo/globalNoindex";
 import { BlogIndex } from "./BlogIndex";
 
@@ -16,18 +15,13 @@ export default async function BlogPage({
 }) {
   const { city: citySlug } = await searchParams;
 
-  const city = citySlug
-    ? await prisma.city.findUnique({
-        where: { slug: citySlug },
-        select: { id: true, slug: true, name: true },
-      })
-    : null;
-
-  const articles = city ? await listCityHomeArticles(city) : [];
+  // /blog?city=minsk would duplicate /{city}/blog — kill it at the route level.
+  // City-scoped blog listing lives exclusively at /{city}/blog.
+  if (citySlug) notFound();
 
   return (
     <main>
-      <BlogIndex articles={articles} />
+      <BlogIndex articles={[]} />
     </main>
   );
 }

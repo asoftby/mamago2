@@ -1,4 +1,4 @@
-import type { ContentStatus } from "@prisma/client";
+import type { ContentStatus, GeoScope } from "@prisma/client";
 import type { ArticleEditorSnapshot, ArticleSaveInput } from "@/lib/article/articleAdminTypes";
 import {
   newBlock,
@@ -28,6 +28,18 @@ export type BreakingNewsFormState = {
   seoCanonicalUrl: string;
   noindex: boolean;
   authorUserId: string | null;
+  /**
+   * Geographic scope of the publication.
+   * null = draft, scope not yet chosen.
+   * CITY  → cityId required → URL /{city}/blog/{slug}
+   * COUNTRY → cityId must be null → URL /blog/{slug}
+   */
+  geoScope: GeoScope | null;
+  /**
+   * City FK — required iff geoScope === "CITY".
+   * Must be null when geoScope === "COUNTRY".
+   */
+  cityId: string | null;
 };
 
 export function emptyBreakingNewsContent(): ArticleContentPayload {
@@ -74,7 +86,11 @@ export function breakingNewsStateToArticleSaveInput(
     coverImageId: state.coverImageId.trim() || null,
     authorLabel: null,
     authorUserId: state.authorUserId,
+    // cityContext is a denormalised slug — the service sets it from the city FK; pass null here.
     cityContext: null,
+    // Geography: pass through from form state so CITY breaking news get /{city}/blog/{slug}.
+    geoScope: state.geoScope,
+    cityId: state.geoScope === "COUNTRY" ? null : (state.cityId ?? null),
     status: state.status,
     publishedAt: opts.publishedAtIso,
     scheduledAt: opts.scheduledAtIso,
@@ -117,6 +133,8 @@ export function parseBreakingNewsFromSnapshot(snapshot: ArticleEditorSnapshot): 
     seoCanonicalUrl: snapshot.seoCanonicalUrl ?? "",
     noindex: snapshot.noindex,
     authorUserId: snapshot.authorUserId,
+    geoScope: snapshot.geoScope ?? null,
+    cityId: snapshot.cityId ?? null,
   };
 }
 
