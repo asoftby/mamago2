@@ -6,12 +6,12 @@ import { buildBreakingNewsCanonicalUrl } from "./breakingNewsSeo";
 
 assert.equal(
   buildBreakingNewsCanonicalUrl("srochnaya-novost", "https://mamago.by"),
-  "https://mamago.by/blog/srochnaya-novost/",
+  "https://mamago.by/blog/srochnaya-novost",
 );
 
 assert.equal(
   buildBreakingNewsCanonicalUrl("srochnaya-novost", "https://mamago.by/"),
-  "https://mamago.by/blog/srochnaya-novost/",
+  "https://mamago.by/blog/srochnaya-novost",
 );
 
 assert.equal(buildBreakingNewsCanonicalUrl("", "https://mamago.by"), "");
