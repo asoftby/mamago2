@@ -1,4 +1,14 @@
+/**
+ * /blog/[slug] — COUNTRY-scope articles only.
+ *
+ * If the slug belongs to a CITY article (geoScope === CITY), issue a
+ * 308 permanent redirect to /{city}/blog/{slug}.
+ */
 import { getCanonicalPublicAppUrl } from "@/lib/config/publicAppUrl";
+import {
+  buildCityPublicPath,
+  buildNationalArticlePath,
+} from "@/lib/routing/cityPaths";
 import { notFound, permanentRedirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/server";
 import { ArticleHeader } from "@/components/article/ArticleHeader";
@@ -24,8 +34,51 @@ import {
   shouldCountPublishedArticleViewRequest,
 } from "@/lib/article/articleViews";
 
+/**
+ * Redirect to canonical city-scoped URL if the article is CITY-scoped.
+ * Returns null if no redirect needed.
+ */
+async function resolveCityRedirect(slug: string): Promise<string | null> {
+  // Look up by slug without cityId scope — use raw DB lookup to detect geoScope
+  const article = await prisma.article.findFirst({
+    where: { slug },
+    select: { geoScope: true, city: { select: { slug: true } } },
+  });
+  if (!article) {
+    // Check history (any scope)
+    const hist = await prisma.articleSlugHistory.findFirst({
+      where: { slug },
+      include: { article: { select: { geoScope: true, city: { select: { slug: true } } } } },
+    });
+    if (hist?.article.geoScope === "CITY" && hist.article.city?.slug) {
+      // Redirect old slug → current city-scoped slug via the article's current slug
+      const current = await prisma.article.findUnique({
+        where: { id: hist.articleId },
+        select: { slug: true, city: { select: { slug: true } } },
+      });
+      if (current?.slug && current.city?.slug) {
+        return buildCityPublicPath({
+          citySlug: current.city.slug,
+          type: "article",
+          slug: current.slug,
+        });
+      }
+    }
+    return null;
+  }
+  if (article.geoScope === "CITY" && article.city?.slug) {
+    return buildCityPublicPath({
+      citySlug: article.city.slug,
+      type: "article",
+      slug,
+    });
+  }
+  return null;
+}
+
 async function getArticle(slug: string): Promise<ArticleVm | null> {
-  const resolved = await findArticleBySlug(slug);
+  // COUNTRY scope only: cityId IS NULL
+  const resolved = await findArticleBySlug(slug, null);
   if (resolved) {
     const a = await prisma.article.findUnique({
       where: { id: resolved.articleId },
@@ -71,9 +124,17 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
+
+  // If this is a CITY article, redirect immediately (metadata will follow)
+  const cityRedirect = await resolveCityRedirect(slug);
+  if (cityRedirect) {
+    permanentRedirect(cityRedirect);
+  }
+
   const publicBase = getCanonicalPublicAppUrl();
-  const defaultCanonical = `${publicBase}/blog/${slug}`;
-  const mvp = await loadArticleMvpBySlugPublic(slug);
+  const defaultCanonical = `${publicBase}${buildNationalArticlePath(slug)}`;
+  // COUNTRY scope (cityId = null)
+  const mvp = await loadArticleMvpBySlugPublic(slug, null);
   if (mvp) {
     const article = await prisma.article.findUnique({
       where: { id: mvp.id },
@@ -110,10 +171,9 @@ export async function generateMetadata({
   const article = await getArticle(slug);
   if (!article) return {};
   if ("_redirectToSlug" in article && article._redirectToSlug) {
-    permanentRedirect(`/blog/${article._redirectToSlug}`);
+    permanentRedirect(buildNationalArticlePath(article._redirectToSlug));
   }
   const seo = "_seo" in article ? article._seo : undefined;
-  /** Обложка (heroImage) — основной источник OG; затем seoOgImage (legacy / денорм) */
   const ogImageUrl =
     seo?.heroImage?.trim() || seo?.seoOgImage?.trim() || undefined;
   const noindexFlag =
@@ -195,9 +255,17 @@ export default async function ArticlePage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
+
+  // Redirect CITY articles to city-scoped URL
+  const cityRedirect = await resolveCityRedirect(slug);
+  if (cityRedirect) {
+    permanentRedirect(cityRedirect);
+  }
+
   const user = await getCurrentUser();
   const canEditPublishedArticle = user?.role === "ADMIN" || user?.role === "MODERATOR";
-  const mvp = await loadArticleMvpBySlugPublic(slug);
+  // COUNTRY scope (cityId = null)
+  const mvp = await loadArticleMvpBySlugPublic(slug, null);
   if (mvp) {
     const editHref =
       canEditPublishedArticle
@@ -212,7 +280,6 @@ export default async function ArticlePage({
       await incrementPublishedArticleViews(mvp.id);
     }
 
-    // Breaking News articles use the editorial BreakingNewsView.
     if (mvp.subtitle === BREAKING_NEWS_SUBTITLE) {
       const related = await loadRelatedBreakingNews(mvp.id);
       return (
@@ -250,7 +317,7 @@ export default async function ArticlePage({
   const article = await getArticle(slug);
   if (!article) notFound();
   if ("_redirectToSlug" in article && article._redirectToSlug) {
-    permanentRedirect(`/blog/${article._redirectToSlug}`);
+    permanentRedirect(buildNationalArticlePath(article._redirectToSlug));
   }
 
   const seo = "_seo" in article ? article._seo : undefined;
@@ -276,7 +343,7 @@ export default async function ArticlePage({
   return (
     <main className="max-w-3xl mx-auto px-4 sm:px-6 py-12 md:py-16">
       <div className="mb-4 md:mb-0">
-        <MobileSmartBackButton fallbackUrl="/minsk" />
+        <MobileSmartBackButton fallbackUrl="/" />
       </div>
       {"_seo" in article && article._seo?.id ? (
         <AnalyticsDetailBeacon
@@ -288,7 +355,7 @@ export default async function ArticlePage({
       {jsonLd && (
         <script
           type="application/ld+json"
-           
+
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
       )}

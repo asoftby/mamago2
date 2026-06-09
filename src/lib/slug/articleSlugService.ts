@@ -1,24 +1,58 @@
 /**
- * Article slug service
+ * Article slug service — city-scoped.
  *
  * Principles:
  * - Slug is auto-assigned ONCE when title becomes meaningful
  * - Slug never changes automatically afterwards
  * - Manual slug change via SEO editor stores old slug in history
+ * - All lookups are city-scoped: (cityId, slug) is the composite key
+ *   CITY articles  → cityId IS NOT NULL
+ *   COUNTRY articles → cityId IS NULL  (national blog)
  */
 
 import { prisma } from "@/lib/prisma";
-import { slugifyRu } from "@/lib/slugify";
+import { articleSlugScopeWhere } from "@/lib/slug/articleSlugScope";
 import { ensureUniqueSlug } from "@/lib/slug/ensureUniqueSlug";
 import { createArticleSlugHistoryIgnoreDuplicate } from "@/lib/slug/slugHistoryDedupe";
+import {
+  EmptyPublicationSlugError,
+  isMeaningfulPublicationTitle,
+  normalizeSlugStrict,
+  resolveSlugCandidateForSave,
+} from "@/lib/slug/publicSlug";
 import { syncArticleCanonical } from "@/lib/seo/syncEntityCanonical";
 
-async function isSlugAvailable(slug: string, excludeArticleId?: string) {
-  const existing = await prisma.article.findUnique({ where: { slug }, select: { id: true } });
+export { articleSlugScopeWhere, articlesShareSlugScope } from "@/lib/slug/articleSlugScope";
+
+/** Запись в ArticleSlugHistory при смене slug у уже опубликованной статьи. */
+export function shouldRecordArticleSlugHistory(
+  previousSlug: string | null | undefined,
+  nextSlug: string,
+): boolean {
+  return Boolean(previousSlug && previousSlug !== nextSlug);
+}
+
+/**
+ * Check whether a slug is free within a given city scope.
+ *
+ * @param slug          The slug to check.
+ * @param cityId        City scope (null = COUNTRY scope).
+ * @param excludeArticleId  Article id to exclude from the conflict check (for updates).
+ */
+async function isSlugAvailable(
+  slug: string,
+  cityId: string | null,
+  excludeArticleId?: string,
+) {
+  const scope = articleSlugScopeWhere(slug, cityId);
+  const existing = await prisma.article.findFirst({
+    where: scope,
+    select: { id: true },
+  });
   if (existing && existing.id !== excludeArticleId) return false;
 
-  const history = await prisma.articleSlugHistory.findUnique({
-    where: { slug },
+  const history = await prisma.articleSlugHistory.findFirst({
+    where: scope,
     select: { articleId: true },
   });
   if (history && history.articleId !== excludeArticleId) return false;
@@ -26,22 +60,38 @@ async function isSlugAvailable(slug: string, excludeArticleId?: string) {
   return true;
 }
 
-export async function generateArticleSlugFromTitle(title: string, excludeArticleId?: string) {
-  const base = slugifyRu((title || "article").trim(), "article");
-  return ensureUniqueSlug({ base, isAvailable: (s) => isSlugAvailable(s, excludeArticleId) });
+export async function generateArticleSlugFromTitle(
+  title: string,
+  cityId: string | null,
+  excludeArticleId?: string,
+) {
+  const base = resolveSlugCandidateForSave({
+    title: isMeaningfulPublicationTitle(title) ? title : "",
+    slugInput: null,
+    entityType: "article",
+    entityId: excludeArticleId ?? "draft",
+    allowIdFallback: true,
+  });
+  return ensureUniqueSlug({
+    base,
+    isAvailable: (s) => isSlugAvailable(s, cityId, excludeArticleId),
+  });
 }
 
-export async function assignArticleSlugIfMissing(articleId: string, title: string) {
+export async function assignArticleSlugIfMissing(
+  articleId: string,
+  title: string,
+) {
   const article = await prisma.article.findUnique({
     where: { id: articleId },
-    select: { id: true, slug: true },
+    select: { id: true, slug: true, cityId: true },
   });
   if (!article) throw new Error(`Article not found: ${articleId}`);
   if (article.slug) return article.slug;
 
-  const slug = await generateArticleSlugFromTitle(title, articleId);
+  const slug = await generateArticleSlugFromTitle(title, article.cityId, articleId);
   await prisma.$transaction(async (tx) => {
-    await createArticleSlugHistoryIgnoreDuplicate(tx, articleId, articleId);
+    await createArticleSlugHistoryIgnoreDuplicate(tx, articleId, articleId, article.cityId);
     await tx.article.update({
       where: { id: articleId },
       data: { slug, slugUpdatedAt: new Date() },
@@ -54,8 +104,8 @@ export async function assignArticleSlugIfMissing(articleId: string, title: strin
 
 export type UpdateArticleSlugOptions = {
   /**
-   * Если true — slug должен быть свободен ровно в запрошенном виде (после slugify).
-   * Иначе при конфликте к базе добавляется суффикс (-2, -3, …), как раньше.
+   * If true — slug must be free exactly as-is (after slugify).
+   * Otherwise on conflict a suffix (-2, -3, …) is appended.
    */
   strict?: boolean;
 };
@@ -66,29 +116,44 @@ export async function updateArticleSlug(
   options?: UpdateArticleSlugOptions,
 ) {
   const trimmed = newSlugRaw.trim();
-  /** Пустая строка: прежнее поведение slugifyRu (fallback), нужно для SEO-апдейтов без strict. */
-  const newSlug = trimmed ? slugifyRu(trimmed) : slugifyRu(newSlugRaw);
+  const newSlug = trimmed
+    ? normalizeSlugStrict(trimmed) || (() => { throw new EmptyPublicationSlugError(); })()
+    : normalizeSlugStrict(newSlugRaw);
+  if (!newSlug) {
+    throw new EmptyPublicationSlugError();
+  }
+
+  // We need the cityId to scope the uniqueness check
+  const article = await prisma.article.findUnique({
+    where: { id: articleId },
+    select: { slug: true, cityId: true },
+  });
+  if (!article) throw new Error(`Article not found: ${articleId}`);
+
+  const cityId = article.cityId;
 
   if (options?.strict) {
     if (!trimmed) {
       throw new Error("Укажите корректный slug или оставьте поле пустым для автогенерации");
     }
-    const ok = await isSlugAvailable(newSlug, articleId);
+    const ok = await isSlugAvailable(newSlug, cityId, articleId);
     if (!ok) {
-      throw new Error("Этот адрес (slug) уже занят другой статьёй или зарезервирован в истории URL");
+      throw new Error(
+        "Этот адрес (slug) уже занят другой статьёй или зарезервирован в истории URL",
+      );
     }
   }
 
   await prisma.$transaction(async (tx) => {
-    const article = await tx.article.findUnique({
+    const current = await tx.article.findUnique({
       where: { id: articleId },
-      select: { slug: true },
+      select: { slug: true, cityId: true },
     });
-    if (!article) throw new Error(`Article not found: ${articleId}`);
-    if (article.slug === newSlug) return;
+    if (!current) throw new Error(`Article not found: ${articleId}`);
+    if (current.slug === newSlug) return;
 
-    if (!article.slug) {
-      await createArticleSlugHistoryIgnoreDuplicate(tx, articleId, articleId);
+    if (!current.slug) {
+      await createArticleSlugHistoryIgnoreDuplicate(tx, articleId, articleId, current.cityId);
     }
 
     const finalSlug = options?.strict
@@ -96,17 +161,29 @@ export async function updateArticleSlug(
       : await ensureUniqueSlug({
           base: newSlug,
           isAvailable: async (s) => {
-            const conflict = await tx.article.findUnique({ where: { slug: s }, select: { id: true } });
-            const hist = await tx.articleSlugHistory.findUnique({
-              where: { slug: s },
+            const scope = articleSlugScopeWhere(s, current.cityId);
+            const conflict = await tx.article.findFirst({
+              where: scope,
+              select: { id: true },
+            });
+            const hist = await tx.articleSlugHistory.findFirst({
+              where: scope,
               select: { articleId: true },
             });
-            return (!conflict || conflict.id === articleId) && (!hist || hist.articleId === articleId);
+            return (
+              (!conflict || conflict.id === articleId) &&
+              (!hist || hist.articleId === articleId)
+            );
           },
         });
 
-    if (article.slug) {
-      await createArticleSlugHistoryIgnoreDuplicate(tx, articleId, article.slug);
+    if (shouldRecordArticleSlugHistory(current.slug, finalSlug)) {
+      await createArticleSlugHistoryIgnoreDuplicate(
+        tx,
+        articleId,
+        current.slug!,
+        current.cityId,
+      );
     }
     await tx.article.update({
       where: { id: articleId },
@@ -117,13 +194,27 @@ export async function updateArticleSlug(
   await syncArticleCanonical(articleId);
 }
 
-export async function findArticleBySlug(slug: string): Promise<{ articleId: string; isRedirect: boolean } | null> {
-  const current = await prisma.article.findUnique({ where: { slug }, select: { id: true } });
+/**
+ * Find an article by slug within a city scope.
+ *
+ * @param slug    The slug to look up.
+ * @param cityId  City scope (null = COUNTRY scope).
+ */
+export async function findArticleBySlug(
+  slug: string,
+  cityId: string | null,
+): Promise<{ articleId: string; isRedirect: boolean } | null> {
+  const current = await prisma.article.findFirst({
+    where: { slug, cityId: cityId ?? null },
+    select: { id: true },
+  });
   if (current) return { articleId: current.id, isRedirect: false };
 
-  const hist = await prisma.articleSlugHistory.findUnique({ where: { slug }, select: { articleId: true } });
+  const hist = await prisma.articleSlugHistory.findFirst({
+    where: { slug, cityId: cityId ?? null },
+    select: { articleId: true },
+  });
   if (hist) return { articleId: hist.articleId, isRedirect: true };
 
   return null;
 }
-

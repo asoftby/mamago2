@@ -31,9 +31,10 @@ const TRANSLITERATION_MAP: Record<string, string> = {
  * slugifyRu("Кафе \"Солнце\"") // "kafe-solntse"
  * slugifyRu("Пасхальный мастер-класс по выпечке кулича", "event") // "paskhalnyy-master-klass-po-vypechke-kulicha"
  */
-export function slugifyRu(text: string, emptyFallback: string = "place"): string {
+export function slugifyRu(text: string, emptyFallback: string | false = "place"): string {
   let raw = typeof text === "string" ? text : "";
   if (!raw.trim()) {
+    if (emptyFallback === false) return "";
     raw = emptyFallback || "item";
   }
 
@@ -63,6 +64,7 @@ export function slugifyRu(text: string, emptyFallback: string = "place"): string
 
   // If empty after cleanup, return fallback (slugified once to stay [a-z0-9-])
   if (!slug) {
+    if (emptyFallback === false) return "";
     const fb = emptyFallback.replace(/[^a-z0-9-]/gi, "").toLowerCase() || "item";
     return fb.replace(/-+/g, "-").replace(/^-+|-+$/g, "") || "item";
   }
