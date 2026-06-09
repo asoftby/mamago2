@@ -31,6 +31,10 @@ const allowedDevOrigins = Array.from(
 
 const nextConfig: NextConfig = {
   /* config options here */
+  // No-trailing-slash policy: canonical URLs never end with `/`.
+  // Incoming requests with a trailing slash are redirected (301) by middleware.
+  trailingSlash: false,
+
   // В dev React Compiler сильно раздувает время компиляции страниц (десятки секунд TTFB).
   // В production оставляем включённым.
   reactCompiler: process.env.NODE_ENV === "production",
