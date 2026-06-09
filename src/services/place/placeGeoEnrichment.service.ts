@@ -55,6 +55,7 @@ async function resolveCityId(placeCityId: string | null): Promise<string | null>
 
   // Fallback: check if there's only one city
   const cities = await prisma.city.findMany({
+    where: { isLegacyNonCity: false },
     select: { id: true, slug: true },
   });
 

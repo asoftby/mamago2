@@ -11,6 +11,8 @@
 
  
 import prisma from "@/lib/prisma";
+import { extractGeoFromGooglePlace } from "@/server/geo/extractGeoFromGooglePlace";
+import { findCityBySlug } from "@/server/geo/findCityBySlug";
 
 const EARTH_RADIUS_KM = 6371;
 
@@ -52,32 +54,15 @@ function haversineKm(
  * administrative_area_level_* ЗАПРЕЩЕНЫ — это области/регионы, не города.
  */
 function extractCityFromAddressComponents(
-  addressComponents: Array<{ long_name: string; short_name: string; types: string[] }>
-): { cityName: string | null; countryCode: string | null } {
-  let cityName: string | null = null;
-  let countryCode: string | null = null;
-
-  // Extract country code
-  const countryComponent = addressComponents.find((c) =>
-    c.types?.includes("country")
-  );
-  if (countryComponent) {
-    countryCode = countryComponent.short_name || null;
-  }
-
-  // Only locality and postal_town are valid city sources.
-  // administrative_area_level_* are regions/oblasts — NOT cities.
-  const allowedTypes = ["locality", "postal_town"];
-
-  for (const type of allowedTypes) {
-    const component = addressComponents.find((c) => c.types?.includes(type));
-    if (component?.long_name) {
-      cityName = component.long_name;
-      break;
-    }
-  }
-
-  return { cityName, countryCode };
+  addressComponents: Array<{ long_name: string; short_name: string; types: string[] }>,
+): { cityName: string | null; countryCode: string | null; regionName: string | null; needsReview: boolean } {
+  const geo = extractGeoFromGooglePlace(addressComponents);
+  return {
+    cityName: geo.cityName,
+    countryCode: geo.countryCode,
+    regionName: geo.regionName,
+    needsReview: geo.needsReview,
+  };
 }
 
 /**
@@ -95,6 +80,8 @@ async function resolveCityByCoordinates(
     // Get all cities with center coordinates (optionally filter by country if we add that field later)
     const cities = await prisma.city.findMany({
       where: {
+        isLegacyNonCity: false,
+        isActive: true,
         centerLat: { not: null },
         centerLng: { not: null },
         radiusKm: { not: null },
@@ -185,10 +172,13 @@ async function resolveCityByAddressComponents(
       return null;
     }
 
-    const { cityName, countryCode } = extractCityFromAddressComponents(addressJson);
+    const { cityName, countryCode, needsReview } = extractCityFromAddressComponents(addressJson);
 
     if (!cityName) {
-      console.log("[cityResolver] No city name found in address_components");
+      console.log("[cityResolver] No city name found in address_components (region-only or invalid)");
+      if (needsReview) {
+        console.warn("[cityResolver] Place may need manual city review — only region/admin area in address");
+      }
       return null;
     }
 
@@ -200,6 +190,7 @@ async function resolveCityByAddressComponents(
     // Strategy 1: Direct match (case-insensitive)
     let city = await prisma.city.findFirst({
       where: {
+        isLegacyNonCity: false,
         OR: [
           { googleName: { equals: cityName, mode: "insensitive" } },
           { name: { equals: cityName, mode: "insensitive" } },
@@ -230,10 +221,7 @@ async function resolveCityByAddressComponents(
       if (cityAliases.some(alias => alias.toLowerCase() === cityName.toLowerCase())) {
         console.log(`[cityResolver] Found alias match: "${cityName}" -> slug "${slug}"`);
         
-        city = await prisma.city.findFirst({
-          where: { slug },
-          select: { id: true, name: true },
-        });
+        city = await findCityBySlug(slug, { select: { id: true, name: true } });
 
         if (city) {
           console.log(`[cityResolver] ✅ Matched city by address (alias): ${city.name} (${city.id})`);

@@ -13,7 +13,10 @@ export async function lookupCityId(cityName: string): Promise<string | null> {
   if (!cityName.trim()) return null;
 
   const city = await prisma.city.findFirst({
-    where: { name: { equals: cityName.trim(), mode: "insensitive" } },
+    where: {
+      isLegacyNonCity: false,
+      name: { equals: cityName.trim(), mode: "insensitive" },
+    },
     select: { id: true },
   });
 

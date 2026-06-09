@@ -1,14 +1,10 @@
 import { unstable_cache } from "next/cache";
-import prisma from "@/lib/prisma";
+import { findCityBySlug } from "@/server/geo/findCityBySlug";
 
 const RESOLVE_CITY_ID_REVALIDATE_SECONDS = 60 * 60;
 
 async function readCityIdBySlug(citySlug: string): Promise<string | null> {
-  const city = await prisma.city.findUnique({
-    where: { slug: citySlug },
-    select: { id: true },
-  });
-
+  const city = await findCityBySlug(citySlug, { select: { id: true } });
   return city?.id ?? null;
 }
 
