@@ -1,6 +1,7 @@
 import { ActivityType, ContentStatus } from "@prisma/client";
 import type { Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
+import { findCityBySlug } from "@/server/geo/findCityBySlug";
 import { getPublicActivityDetailWhere } from "@/server/public/publicContentVisibility";
 import { activityInCityWhere } from "@/server/discovery/activityInCityWhere";
 import type { ActivityForEventPageInput } from "@/lib/event/buildEventPageDataFromPrisma";
@@ -35,7 +36,7 @@ export async function loadPublicActivityForCityPage(
     })
   | null
 > {
-  const city = await prisma.city.findUnique({ where: { slug: citySlug } });
+  const city = await findCityBySlug(citySlug);
   if (!city) return null;
 
   // Resolve slug → activityId (current or history)

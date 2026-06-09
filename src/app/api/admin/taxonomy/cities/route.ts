@@ -16,11 +16,14 @@ export async function GET(request: Request) {
     }
 
     const cities = await prisma.city.findMany({
+      where: { isLegacyNonCity: false },
       orderBy: { name: "asc" },
       select: {
         id: true,
         name: true,
         slug: true,
+        region: { select: { name: true } },
+        country: { select: { name: true } },
       },
     });
     return NextResponse.json(cities);

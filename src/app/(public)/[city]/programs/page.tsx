@@ -2,6 +2,7 @@ import { getCanonicalPublicAppUrl } from "@/lib/config/publicAppUrl";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import prisma from "@/lib/prisma";
+import { findCityBySlug } from "@/server/geo/findCityBySlug";
 import { resolveActivityVertical } from "@/lib/public/publicVerticalResolver";
 import { OfferCard } from "@/components/offers/OfferCard";
 import { formatPriceFrom } from "@/lib/formatters/format-price";
@@ -16,10 +17,7 @@ export async function generateMetadata({ params }: ProgramsPageProps): Promise<M
   const { city } = await params;
 
   // Find city
-  const cityData = await prisma.city.findUnique({
-    where: { slug: city },
-    select: { name: true },
-  });
+  const cityData = await findCityBySlug(city, { select: { name: true } });
 
   if (!cityData) {
     return {
@@ -49,8 +47,7 @@ export default async function ProgramsPage({ params }: ProgramsPageProps) {
   const { city } = await params;
 
   // Find city
-  const cityData = await prisma.city.findUnique({
-    where: { slug: city },
+  const cityData = await findCityBySlug(city, {
     select: {
       id: true,
       name: true,

@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { BirthdayBuilderShell } from "@/features/birthday/builder/components/BirthdayBuilderShell";
 import { notFound } from "next/navigation";
-import prisma from "@/lib/prisma";
+import { findCityBySlug } from "@/server/geo/findCityBySlug";
 import type { Metadata } from "next";
 
 interface PageProps {
@@ -16,7 +16,7 @@ export const metadata: Metadata = {
 export default async function BirthdayMakePage({ params }: PageProps) {
   const { city: citySlug } = await params;
 
-  const city = await prisma.city.findUnique({ where: { slug: citySlug } });
+  const city = await findCityBySlug(citySlug);
   if (!city) notFound();
 
   return (

@@ -24,7 +24,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   try {
     const cities = await prisma.city.findMany({
-      where: { isActive: true },
+      where: { isActive: true, isLegacyNonCity: false },
       select: { slug: true, updatedAt: true },
       orderBy: { name: "asc" },
       take: 50,

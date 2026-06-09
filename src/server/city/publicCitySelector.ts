@@ -7,7 +7,7 @@ export type PublicCitySelectorOption = {
   name: string;
 };
 
-/** Паттерны slug, которые указывают на административный регион, а не город. */
+/** Slug patterns that indicate administrative region, not a city. */
 const ADMINISTRATIVE_SLUG_PATTERNS = [
   /oblast$/i,
   /region$/i,
@@ -35,7 +35,6 @@ export async function listPublicCitySelectorOptions(): Promise<PublicCitySelecto
         city.isActive &&
         city.isVisibleInCityFilter &&
         (city.eventsCount > 0 || city.placesCount > 0) &&
-        // Запрет административных регионов в публичном селекторе
         isCityNameAllowed(city.name) &&
         !isAdministrativeSlug(city.slug),
     )
