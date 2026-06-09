@@ -18,6 +18,13 @@ import {
   SEO_ROBOTS_NOINDEX_FOLLOW,
 } from "@/lib/admin/seo/entities/robotsConstants";
 import { cn } from "@/lib/utils";
+import { normalizeSlug } from "@/lib/slug/publicSlug";
+import {
+  entitySupportsSlugHistoryRedirect,
+  slugChangeWarningMessageForKind,
+  slugFieldHelperText,
+  type SlugHistoryEntityKind,
+} from "@/lib/slug/slugHistorySupport";
 import { SeoEntityDiagnosticsCard } from "./SeoEntityDiagnosticsCard";
 
 export type EntitySeoEditorKind = "event" | "place" | "offer" | "route" | "article";
@@ -82,7 +89,8 @@ export function EntitySeoEditor({
   const [error, setError] = useState<string | null>(null);
   const [ok, setOk] = useState<string | null>(null);
 
-  const [slug, setSlug] = useState(safeStr(entity.slug));
+  const [initialSlug] = useState(() => safeStr(entity.slug));
+  const [slug, setSlug] = useState(initialSlug);
   const [seoTitle, setSeoTitle] = useState(safeStr(entity.seoTitle));
   const [seoDescription, setSeoDescription] = useState(safeStr(entity.seoDescription));
   const [seoH1, setSeoH1] = useState(safeStr(entity.seoH1));
@@ -116,6 +124,14 @@ export function EntitySeoEditor({
     ];
     return parts.join(" · ");
   }, [kind, entity.contentStatus, entity.citySlug]);
+
+  const isPublished = entity.contentStatus === "PUBLISHED";
+  const slugHistorySupported = entitySupportsSlugHistoryRedirect(kind as SlugHistoryEntityKind);
+  const showSlugChangeWarning =
+    isPublished &&
+    Boolean(initialSlug.trim()) &&
+    Boolean(slug.trim()) &&
+    normalizeSlug(slug, kind) !== normalizeSlug(initialSlug, kind);
 
   const preview = useMemo(() => {
     const t = seoTitle.trim() || entity.title;
@@ -180,7 +196,7 @@ export function EntitySeoEditor({
           <div>
             <div className="text-sm font-semibold">Slug (URL)</div>
             <div className="mt-1 text-xs text-gray-500">
-              Меняется только вручную. При изменении сохраняем redirect со старого slug.
+              {slugFieldHelperText(slugHistorySupported)}
             </div>
             <Input
               value={slug}
@@ -188,6 +204,11 @@ export function EntitySeoEditor({
               placeholder="my-seo-slug"
               className="mt-2"
             />
+            {showSlugChangeWarning ? (
+              <p className="mt-2 text-xs text-amber-800 rounded-md border border-amber-200 bg-amber-50/80 px-3 py-2">
+                {slugChangeWarningMessageForKind(kind as SlugHistoryEntityKind)}
+              </p>
+            ) : null}
           </div>
 
           <div>
