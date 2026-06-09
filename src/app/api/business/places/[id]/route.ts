@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
+import { MediaEntityType } from "@prisma/client";
 import { getActiveRevision } from "@/server/services/placeRevision.service";
 import { canCreateBusinessContent } from "@/lib/auth/businessContentAccess";
 import { canManagePlaceAsync } from "@/lib/auth/placeAccess";
@@ -14,6 +15,9 @@ import { assignPlaceSlugIfMissing } from "@/lib/slug/placeSlugService";
 import { validatePlaceCategoriesDraft } from "@/lib/validation/placeCategoryValidation";
 import { createRequestPerf } from "@/server/utils/requestPerf";
 import { syncPlaceMediaUsage } from "@/server/services/media/media-usage.service";
+import { attachMediaToEntity } from "@/lib/media/mediaRegistry";
+import { ensureMediaAssetForStoredFileUrl } from "@/lib/media/ensureMediaAssetForStoredFileUrl";
+import { extractMediaRelativePathFromUrl } from "@/server/media/media-storage";
 
 export async function GET(
   request: NextRequest,
@@ -235,6 +239,53 @@ export async function PATCH(
         });
         if (placeImageOk) {
           updateData.logoImageId = vid;
+        } else {
+          // vid may be a TempMedia ID (Instagram import or in-session upload during edit)
+          const tempMedia = await prisma.tempMedia.findFirst({
+            where: { id: vid, ownerUserId: user.id, status: "TEMP" },
+            select: { id: true, url: true, kind: true, width: true, height: true, blurhash: true, sortOrder: true },
+          });
+          if (tempMedia) {
+            const placeImage = await prisma.placeImage.create({
+              data: {
+                placeId: id,
+                kind: "LOGO",
+                url: tempMedia.url,
+                width: tempMedia.width,
+                height: tempMedia.height,
+                blurhash: tempMedia.blurhash,
+                sortOrder: tempMedia.sortOrder,
+              },
+            });
+            try {
+              let mediaAsset = await prisma.mediaAsset.findFirst({
+                where: { OR: [{ storageKey: tempMedia.url }, { publicUrl: tempMedia.url }] },
+              });
+              if (!mediaAsset && extractMediaRelativePathFromUrl(tempMedia.url)) {
+                mediaAsset = await ensureMediaAssetForStoredFileUrl({
+                  publicUrl: tempMedia.url,
+                  uploadedById: user.id,
+                  userRole: user.role,
+                  width: tempMedia.width,
+                  height: tempMedia.height,
+                  originalName: "place-logo.webp",
+                });
+              }
+              if (mediaAsset) {
+                await attachMediaToEntity({
+                  mediaId: mediaAsset.id,
+                  entityType: MediaEntityType.PLACE,
+                  entityId: id,
+                  field: "logo",
+                });
+              }
+            } catch { /* non-fatal — MediaAsset/MediaUsage registration */ }
+            await prisma.tempMedia.update({
+              where: { id: vid },
+              data: { status: "ATTACHED", placeId: id },
+            });
+            updateData.logoImageId = placeImage.id;
+          }
         }
       }
     }
