@@ -43,6 +43,7 @@
     "db:backup:pre": "bash scripts/db/backup.sh",
     "db:reset:safe": "pnpm db:backup && pnpm prisma migrate reset --force",
     "db:migrate:safe": "pnpm db:backup && pnpm prisma migrate dev",
+    "build-migration-manifest": "tsx scripts/build-migration-manifest.ts",
     "test:unit": "tsx src/lib/slugifyLabelToValue.test.ts",
     "test:notifications-mvp": "tsx src/lib/notifications/userNotificationPresentation.test.ts && tsx src/server/notifications/notification-renderer.test.ts && tsx src/server/notifications/notification-dedupe.test.ts && tsx src/server/notifications/notification.service.test.ts && tsx src/server/notifications/jobs/run-plan-event-reminders.test.ts",
     "test:anti-repeat": "tsx src/features/hero-weather/model/anti-repeat.test.ts",
