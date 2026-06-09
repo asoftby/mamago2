@@ -3,6 +3,8 @@
  * Pure functions — no React, no side effects.
  */
 
+import { buildNationalArticlePath } from "@/lib/routing/cityPaths";
+
 export const SEO_TITLE_LIMIT = 60;
 export const SEO_DESC_LIMIT = 160;
 
@@ -87,5 +89,5 @@ export function buildBreakingNewsCanonicalUrl(
 ): string {
   const s = slug.trim();
   if (!s) return "";
-  return `${publicBaseUrl.replace(/\/+$/, "")}/blog/${s}`;
+  return `${publicBaseUrl.replace(/\/+$/, "")}${buildNationalArticlePath(s)}`;
 }

@@ -16,6 +16,7 @@ export async function GET() {
 
   const [cities, authors] = await Promise.all([
     prisma.city.findMany({
+      where: { isLegacyNonCity: false },
       orderBy: { name: "asc" },
       select: { id: true, name: true, slug: true },
     }),
