@@ -334,7 +334,12 @@ export function MediaUploadField({
         className="sr-only"
         disabled={!canUpload || uploading}
         onChange={(event) => {
-          const files = event.target.files;
+          // HTMLInputElement.files — это «живая» коллекция; если сначала захватить
+          // event.target.files в переменную, а потом сбросить value="" (чтобы можно
+          // было повторно выбрать тот же файл), та же FileList опустеет, и
+          // handleFiles получит 0 файлов → ничего не загрузится. Поэтому копируем
+          // в массив ДО сброса value.
+          const files = event.target.files ? Array.from(event.target.files) : [];
           event.target.value = "";
           void handleFiles(files);
         }}
@@ -354,7 +359,7 @@ export function MediaUploadField({
           onDrop={(event) => {
             if (!canUpload) return;
             event.preventDefault();
-            void handleFiles(event.dataTransfer.files);
+            void handleFiles(Array.from(event.dataTransfer.files));
           }}
         >
           <div className="mx-auto flex max-w-md flex-col items-center gap-4">
