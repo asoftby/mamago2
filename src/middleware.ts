@@ -8,6 +8,10 @@ import {
   REQUEST_PATHNAME_HEADER,
   REQUEST_SEARCH_HEADER,
 } from "@/lib/auth/requireAuthRedirect";
+import {
+  shouldSkipTrailingSlashRedirect,
+  removeTrailingSlash,
+} from "@/lib/routing/trailingSlashPolicy";
 
 let didLogDevLocalHostDetection = false;
 
@@ -64,11 +68,39 @@ function applyGlobalNoindexHeader(
   return response;
 }
 
+
 export function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+
+  // ── Absolute hard exit for API routes and Next.js internals ─────────────
+  // Must come FIRST — before any redirect, rewrite, or header logic.
+  // The config.matcher already excludes /api/* via the negative lookahead, but
+  // this guard is a second line of defence (e.g. internal server-side fetches
+  // or rewrite chains that bypass the matcher).
+  if (
+    pathname.startsWith("/api/") ||
+    pathname === "/api" ||
+    pathname.startsWith("/_next/")
+  ) {
+    return NextResponse.next();
+  }
+
   const host = request.headers.get("host") || "";
   const url = request.nextUrl;
-  const pathname = url.pathname;
   const hostname = host.split(":")[0]?.toLowerCase() ?? "";
+
+  // ── Trailing-slash canonical redirect (301) ──────────────────────────────
+  // Runs before subdomain/surface logic so SEO crawlers always land on the
+  // no-slash canonical. Fires only on GET/HEAD to avoid breaking form POSTs.
+  if (
+    pathname.endsWith("/") &&
+    !shouldSkipTrailingSlashRedirect(pathname) &&
+    (request.method === "GET" || request.method === "HEAD")
+  ) {
+    const redirectUrl = new URL(request.url);
+    redirectUrl.pathname = removeTrailingSlash(pathname);
+    return NextResponse.redirect(redirectUrl, { status: 301 });
+  }
 
   if (shouldBypassSeoHeader(pathname)) {
     return nextWithRequestPath(request);
