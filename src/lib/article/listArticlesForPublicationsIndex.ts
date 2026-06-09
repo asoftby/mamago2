@@ -63,6 +63,7 @@ export async function listArticlesForPublicationsIndex(): Promise<PublicationLis
   if (rows.length > 0) {
     const ids = rows.map((r) => r.id);
     cityCatalog = await prisma.city.findMany({
+      where: { isLegacyNonCity: false },
       orderBy: { name: "asc" },
       select: { id: true, name: true, slug: true },
     });

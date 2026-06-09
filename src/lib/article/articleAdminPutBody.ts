@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ContentStatus } from "@prisma/client";
+import { ContentStatus, GeoScope } from "@prisma/client";
 import { ArticleContentPayloadSchema } from "@/lib/publications/articleMvp";
 import type { ArticleSaveInput } from "@/lib/article/articleAdminTypes";
 
@@ -14,6 +14,8 @@ export const ArticleAdminPutBodySchema = z.object({
   authorLabel: z.string().nullable().optional(),
   authorUserId: z.string().nullable().optional(),
   cityContext: z.string().nullable().optional(),
+  geoScope: z.nativeEnum(GeoScope).nullable().optional(),
+  cityId: z.string().nullable().optional(),
   status: z.nativeEnum(ContentStatus),
   publishedAt: z.string().nullable(),
   scheduledAt: z.string().nullable(),
@@ -39,6 +41,8 @@ export function articleSaveInputFromPutBody(
     authorLabel: data.authorLabel ?? null,
     authorUserId: data.authorUserId ?? null,
     cityContext: data.cityContext ?? null,
+    geoScope: data.geoScope,
+    cityId: data.cityId,
     status: data.status,
     publishedAt: data.publishedAt,
     scheduledAt: data.scheduledAt,

@@ -22,6 +22,7 @@ export async function POST(
     return NextResponse.json(snapshot);
   } catch (e) {
     console.error("[article submit]", e);
-    return NextResponse.json({ error: "Failed" }, { status: 400 });
+    const message = e instanceof Error ? e.message : "Failed";
+    return NextResponse.json({ error: message }, { status: 400 });
   }
 }

@@ -257,7 +257,7 @@ export function CityHomeJournalSection({
         {visibleArticles.map((a, index) => (
           <Link
             key={a.slug}
-            href={`/blog/${a.slug}`}
+            href={a.href}
             className={cn(
               cardShell,
               index === 0

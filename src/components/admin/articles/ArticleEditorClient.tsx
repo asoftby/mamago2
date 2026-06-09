@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ContentStatus } from "@prisma/client";
+import { ContentStatus, type GeoScope } from "@prisma/client";
 import { formatDistanceToNow } from "date-fns";
 import { ru } from "date-fns/locale";
 import { Loader2 } from "lucide-react";
@@ -32,7 +32,10 @@ import {
 } from "@/components/admin/articles/PublicationPanel";
 import { SeoPanel } from "@/features/admin/seo/components/SeoPanel";
 import { resolveSeoPublicBase } from "@/lib/admin/seo/seoEditorCanonical";
-import { matchCitySlugFromContext } from "@/lib/article/articleEditorBasics";
+import { validateArticleGeoScope } from "@/lib/article/articleGeoScopeValidation";
+import { buildArticlePublicPath } from "@/lib/routing/cityPaths";
+import { usePublicationSlugField } from "@/hooks/usePublicationSlugField";
+import { PublicationSlugField } from "@/components/admin/publications/PublicationSlugField";
 import { useHydrated } from "@/hooks/use-hydrated";
 import { useUnsavedChangesNavigationGuard } from "@/hooks/use-unsaved-changes-navigation-guard";
 import {
@@ -70,6 +73,8 @@ function snapshotComparable(args: {
   authorUserId: string | null;
   authorLabel: string;
   cityContext: string;
+  geoScope: GeoScope | null;
+  cityId: string;
   content: ArticleContentPayload;
   status: ContentStatus;
   publishedAtLocal: string;
@@ -90,6 +95,8 @@ function applySnapshot(setters: {
   setAuthorUserId: (v: string | null) => void;
   setAuthorLabel: (v: string) => void;
   setCityContext: (v: string) => void;
+  setGeoScope: (v: GeoScope | null) => void;
+  setCityId: (v: string | null) => void;
   setContent: (v: ArticleContentPayload) => void;
   setStatus: (v: ContentStatus) => void;
   setPublishedAtLocal: (v: string) => void;
@@ -107,6 +114,8 @@ function applySnapshot(setters: {
   setters.setAuthorUserId(snap.authorUserId ?? null);
   setters.setAuthorLabel(snap.authorLabel ?? "");
   setters.setCityContext(snap.cityContext ?? "");
+  setters.setGeoScope(snap.geoScope ?? null);
+  setters.setCityId(snap.cityId ?? null);
   setters.setContent(snap.content);
   setters.setStatus(snap.status);
   setters.setPublishedAtLocal(toLocalDatetimeValue(snap.publishedAt));
@@ -142,13 +151,17 @@ export function ArticleEditorClient({
 
   const [title, setTitle] = useState(initial.title);
   const [slug, setSlug] = useState(initial.slug ?? "");
+  const [pinnedSlug, setPinnedSlug] = useState<string | null>(initial.slug?.trim() || null);
   const [excerpt, setExcerpt] = useState(initial.excerpt ?? "");
   const [coverImageId, setCoverImageId] = useState(initial.coverImageId ?? "");
   const [coverImagePreviewUrl, setCoverImagePreviewUrl] = useState(initial.coverImageUrl ?? "");
   const [authorUserId, setAuthorUserId] = useState<string | null>(initial.authorUserId ?? null);
   const [authorLabel, setAuthorLabel] = useState(initial.authorLabel ?? "");
   const [cityContext, setCityContext] = useState(initial.cityContext ?? "");
+  const [geoScope, setGeoScope] = useState<GeoScope | null>(initial.geoScope ?? null);
+  const [cityId, setCityId] = useState<string | null>(initial.cityId ?? null);
   const [cities, setCities] = useState<{ id: string; name: string; slug: string }[]>([]);
+  const [geoScopeError, setGeoScopeError] = useState<string | null>(null);
   const [content, setContent] = useState<ArticleContentPayload>(initial.content);
   const [status, setStatus] = useState<ContentStatus>(initial.status);
   const [publishedAtLocal, setPublishedAtLocal] = useState(toLocalDatetimeValue(initial.publishedAt));
@@ -172,6 +185,8 @@ export function ArticleEditorClient({
       authorUserId: initial.authorUserId ?? null,
       authorLabel: initial.authorLabel ?? "",
       cityContext: initial.cityContext ?? "",
+      geoScope: initial.geoScope ?? null,
+      cityId: initial.cityId ?? "",
       content: initial.content,
       status: initial.status,
       publishedAtLocal: toLocalDatetimeValue(initial.publishedAt),
@@ -193,6 +208,8 @@ export function ArticleEditorClient({
         authorUserId,
         authorLabel,
         cityContext,
+        geoScope,
+        cityId: cityId ?? "",
         content,
         status,
         publishedAtLocal,
@@ -210,6 +227,8 @@ export function ArticleEditorClient({
       authorUserId,
       authorLabel,
       cityContext,
+      geoScope,
+      cityId,
       content,
       status,
       publishedAtLocal,
@@ -247,15 +266,79 @@ export function ArticleEditorClient({
     };
   }, []);
 
-  const slugPreviewPath = slug.trim() ? slug.trim() : "будет-сгенерирован-автоматически";
-  const publicArticleUrl = slug.trim()
-    ? `${resolveSeoPublicBase()}/blog/${slug.trim()}`
-    : undefined;
-  const publicUrl = status === "PUBLISHED" && slug.trim() ? publicArticleUrl ?? null : null;
+  const {
+    previewSlug,
+    onSlugChange,
+    hydrateSlug,
+    isSlugPinned,
+    showPublishedSlugWarning,
+  } = usePublicationSlugField({
+    title,
+    slug,
+    setSlug,
+    persistedSlug: pinnedSlug,
+    isPublished: status === "PUBLISHED",
+    emptyFallback: "article",
+    slugHistorySupported: true,
+  });
 
-  const citySlugForSelect = matchCitySlugFromContext(cityContext, cities);
-  const cityContextNotInCatalog =
-    !!cityContext.trim() && cities.length > 0 && !citySlugForSelect;
+  const selectedCity = cities.find((c) => c.id === cityId) ?? null;
+  const previewSeg = previewSlug;
+  const publicArticlePath = previewSeg
+    ? buildArticlePublicPath({
+        slug: previewSeg,
+        geoScope,
+        citySlug: selectedCity?.slug,
+      })
+    : null;
+  const publicArticleUrl = publicArticlePath
+    ? `${resolveSeoPublicBase()}${publicArticlePath}`
+    : undefined;
+  const publicUrl = status === "PUBLISHED" && publicArticlePath
+    ? `${resolveSeoPublicBase()}${publicArticlePath}`
+    : null;
+
+  const editorSetters = {
+    setTitle,
+    setSlug,
+    setExcerpt,
+    setCoverImageId,
+    setAuthorUserId,
+    setAuthorLabel,
+    setCityContext,
+    setGeoScope,
+    setCityId,
+    setContent,
+    setStatus,
+    setPublishedAtLocal,
+    setScheduledAtLocal,
+    setSeoTitle,
+    setSeoDescription,
+    setSeoCanonicalUrl,
+    setNoindex,
+    setViews,
+  };
+
+  const applyEditorSnapshot = useCallback(
+    (snap: ArticleEditorSnapshot) => {
+      applySnapshot(editorSetters, snap);
+      setPinnedSlug(snap.slug?.trim() || null);
+      hydrateSlug(snap.slug);
+    },
+    [hydrateSlug],
+  );
+
+  const validateGeoScopeForPublish = useCallback((): boolean => {
+    const result = validateArticleGeoScope({ geoScope, cityId, strict: true });
+    if (!result.ok) {
+      setGeoScopeError(result.message);
+      setError(result.message);
+      toast.error(result.message);
+      return false;
+    }
+    setGeoScopeError(null);
+    return true;
+  }, [geoScope, cityId]);
 
   const payload = useMemo(
     () => ({
@@ -268,6 +351,8 @@ export function ArticleEditorClient({
       authorLabel: authorLabel.trim() || null,
       authorUserId: authorUserId || null,
       cityContext: cityContext.trim() || null,
+      geoScope,
+      cityId,
       status,
       publishedAt: fromLocalDatetimeValue(publishedAtLocal),
       scheduledAt: fromLocalDatetimeValue(scheduledAtLocal),
@@ -288,6 +373,8 @@ export function ArticleEditorClient({
       authorLabel,
       authorUserId,
       cityContext,
+      geoScope,
+      cityId,
       status,
       publishedAtLocal,
       scheduledAtLocal,
@@ -298,6 +385,12 @@ export function ArticleEditorClient({
     ],
   );
 
+  useEffect(() => {
+    if (!geoScopeError) return;
+    const result = validateArticleGeoScope({ geoScope, cityId, strict: true });
+    if (result.ok) setGeoScopeError(null);
+  }, [geoScope, cityId, geoScopeError]);
+
   const persistComparableFromSnapshot = useCallback((snap: ArticleEditorSnapshot) => {
     savedComparableRef.current = snapshotComparable({
       title: snap.title,
@@ -307,6 +400,8 @@ export function ArticleEditorClient({
       authorUserId: snap.authorUserId ?? "",
       authorLabel: snap.authorLabel ?? "",
       cityContext: snap.cityContext ?? "",
+      geoScope: snap.geoScope ?? null,
+      cityId: snap.cityId ?? "",
       content: snap.content,
       status: snap.status,
       publishedAtLocal: toLocalDatetimeValue(snap.publishedAt),
@@ -340,27 +435,7 @@ export function ArticleEditorClient({
             return false;
           }
           const next = data as ArticleEditorSnapshot;
-          applySnapshot(
-            {
-              setTitle,
-              setSlug,
-              setExcerpt,
-              setCoverImageId,
-              setAuthorUserId,
-              setAuthorLabel,
-              setCityContext,
-              setContent,
-              setStatus,
-              setPublishedAtLocal,
-              setScheduledAtLocal,
-              setSeoTitle,
-              setSeoDescription,
-              setSeoCanonicalUrl,
-              setNoindex,
-              setViews,
-            },
-            next,
-          );
+          applyEditorSnapshot(next);
           persistComparableFromSnapshot(next);
           const updated = Date.parse(next.updatedAt);
           if (!Number.isNaN(updated)) setLastSavedAt(updated);
@@ -389,27 +464,7 @@ export function ArticleEditorClient({
           return false;
         }
         const next = data as ArticleEditorSnapshot;
-        applySnapshot(
-          {
-            setTitle,
-            setSlug,
-            setExcerpt,
-            setCoverImageId,
-            setAuthorUserId,
-            setAuthorLabel,
-            setCityContext,
-            setContent,
-            setStatus,
-            setPublishedAtLocal,
-            setScheduledAtLocal,
-            setSeoTitle,
-            setSeoDescription,
-            setSeoCanonicalUrl,
-            setNoindex,
-            setViews,
-          },
-          next,
-        );
+        applyEditorSnapshot(next);
         persistComparableFromSnapshot(next);
         const updated = Date.parse(next.updatedAt);
         if (!Number.isNaN(updated)) setLastSavedAt(updated);
@@ -428,7 +483,7 @@ export function ArticleEditorClient({
         if (!opts?.skipLoading) setSaving(false);
       }
     },
-    [hasPersistedId, initial.id, payload, persistComparableFromSnapshot, router],
+    [hasPersistedId, initial.id, payload, persistComparableFromSnapshot, router, applyEditorSnapshot],
   );
 
   const fetchSnapshot = useCallback(
@@ -443,6 +498,7 @@ export function ArticleEditorClient({
   );
 
   const submitForModeration = useCallback(async () => {
+    if (!validateGeoScopeForPublish()) return;
     setSubmitting(true);
     try {
       let articleId = initial.id.trim();
@@ -466,27 +522,7 @@ export function ArticleEditorClient({
         }
         const created = data as ArticleEditorSnapshot;
         articleId = created.id;
-        applySnapshot(
-          {
-            setTitle,
-            setSlug,
-            setExcerpt,
-            setCoverImageId,
-            setAuthorUserId,
-            setAuthorLabel,
-            setCityContext,
-            setContent,
-            setStatus,
-            setPublishedAtLocal,
-            setScheduledAtLocal,
-            setSeoTitle,
-            setSeoDescription,
-            setSeoCanonicalUrl,
-            setNoindex,
-            setViews,
-          },
-          created,
-        );
+        applyEditorSnapshot(created);
         persistComparableFromSnapshot(created);
       } else {
         const ok = await save({ silent: true, skipLoading: true });
@@ -515,27 +551,7 @@ export function ArticleEditorClient({
       }
       const next = await fetchSnapshot(articleId);
       if (next) {
-        applySnapshot(
-          {
-            setTitle,
-            setSlug,
-            setExcerpt,
-            setCoverImageId,
-            setAuthorUserId,
-            setAuthorLabel,
-            setCityContext,
-            setContent,
-            setStatus,
-            setPublishedAtLocal,
-            setScheduledAtLocal,
-            setSeoTitle,
-            setSeoDescription,
-            setSeoCanonicalUrl,
-            setNoindex,
-            setViews,
-          },
-          next,
-        );
+        applyEditorSnapshot(next);
         persistComparableFromSnapshot(next);
         const updated = Date.parse(next.updatedAt);
         if (!Number.isNaN(updated)) setLastSavedAt(updated);
@@ -557,10 +573,13 @@ export function ArticleEditorClient({
     persistComparableFromSnapshot,
     router,
     isAdminEditor,
+    validateGeoScopeForPublish,
+    applyEditorSnapshot,
   ]);
 
   const moderate = useCallback(
     async (decision: "publish" | "reject") => {
+      if (decision === "publish" && !validateGeoScopeForPublish()) return;
       setError(null);
       setModerating(true);
       try {
@@ -579,27 +598,7 @@ export function ArticleEditorClient({
         }
         const next = await fetchSnapshot(initial.id);
         if (next) {
-          applySnapshot(
-            {
-              setTitle,
-              setSlug,
-              setExcerpt,
-              setCoverImageId,
-              setAuthorUserId,
-              setAuthorLabel,
-              setCityContext,
-              setContent,
-              setStatus,
-              setPublishedAtLocal,
-              setScheduledAtLocal,
-              setSeoTitle,
-              setSeoDescription,
-              setSeoCanonicalUrl,
-              setNoindex,
-              setViews,
-            },
-            next,
-          );
+          applyEditorSnapshot(next);
           persistComparableFromSnapshot(next);
           const updated = Date.parse(next.updatedAt);
           if (!Number.isNaN(updated)) setLastSavedAt(updated);
@@ -613,7 +612,7 @@ export function ArticleEditorClient({
         setModerating(false);
       }
     },
-    [initial.id, fetchSnapshot, persistComparableFromSnapshot, router],
+    [initial.id, fetchSnapshot, persistComparableFromSnapshot, router, validateGeoScopeForPublish, applyEditorSnapshot],
   );
 
   const confirmDeleteArticle = useCallback(async () => {
@@ -693,28 +692,16 @@ export function ArticleEditorClient({
             <Label>Заголовок</Label>
             <Input value={title} onChange={(e) => setTitle(e.target.value)} />
           </div>
-          <div className="space-y-2">
-            <Label>Slug</Label>
-            <p className="text-xs text-muted-foreground">
-              Если оставить пустым, slug будет сгенерирован из заголовка при сохранении (один раз). Ниже —
-              предпросмотр публичного URL.
-            </p>
-            <Input
-              value={slug}
-              onChange={(e) => setSlug(e.target.value)}
-              className="font-mono text-sm"
-              placeholder="например: semeynyy-vykhod-v-minsk"
-            />
-            <p className="text-xs text-gray-500 break-all">
-              <span className="font-medium text-gray-700">Публичный URL: </span>
-              {publicArticleUrl}
-              {!slug.trim() ? (
-                <span className="block mt-1 text-amber-800">
-                  Путь «{slugPreviewPath}» — плейсхолдер; фактический slug появится после сохранения.
-                </span>
-              ) : null}
-            </p>
-          </div>
+          <PublicationSlugField
+            id="article-slug"
+            slug={slug}
+            onSlugChange={onSlugChange}
+            previewSlug={previewSlug}
+            previewUrl={publicArticleUrl ?? null}
+            isSlugPinned={isSlugPinned}
+            showPublishedSlugWarning={showPublishedSlugWarning}
+            slugHistorySupported
+          />
           <div className="space-y-2">
             <Label>Краткое описание для превью</Label>
             <Textarea rows={3} value={excerpt} onChange={(e) => setExcerpt(e.target.value)} />
@@ -731,43 +718,91 @@ export function ArticleEditorClient({
 
           <div className="grid gap-5 sm:grid-cols-2">
             <div className="space-y-2 sm:col-span-2">
-              <Label htmlFor="article-city">Город</Label>
+              <Label htmlFor="article-geo-scope">Охват статьи</Label>
+              <p className="text-xs text-muted-foreground">
+                Обязательно перед публикацией. Городская статья — в разделе города; национальная — на
+                /blog/&#123;slug&#125;.
+              </p>
               {hydrated ? (
                 <Select
-                  value={citySlugForSelect || "__none__"}
+                  value={geoScope ?? "__unset__"}
                   onValueChange={(v) => {
-                    if (v === "__none__") setCityContext("");
-                    else setCityContext(v);
+                    if (v === "__unset__") {
+                      setGeoScope(null);
+                      setCityId(null);
+                      setCityContext("");
+                      return;
+                    }
+                    const scope = v as GeoScope;
+                    setGeoScope(scope);
+                    if (scope === "COUNTRY") {
+                      setCityId(null);
+                      setCityContext("");
+                    }
                   }}
                 >
-                  <SelectTrigger id="article-city" className="w-full">
-                    <SelectValue placeholder="Выберите город" />
+                  <SelectTrigger id="article-geo-scope" className="w-full">
+                    <SelectValue placeholder="Выберите охват" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="__none__">Без привязки к городу</SelectItem>
-                    {cities.map((c) => (
-                      <SelectItem key={c.id} value={c.slug}>
-                        {c.name}
-                      </SelectItem>
-                    ))}
+                    <SelectItem value="__unset__">Не выбрано</SelectItem>
+                    <SelectItem value="CITY">Городская (CITY)</SelectItem>
+                    <SelectItem value="COUNTRY">Национальная (COUNTRY)</SelectItem>
                   </SelectContent>
                 </Select>
               ) : (
                 <div
-                  id="article-city"
+                  id="article-geo-scope"
                   className="flex h-9 w-full items-center rounded-md border border-input bg-muted/40 px-3 text-sm text-muted-foreground animate-pulse"
                   aria-hidden
                 >
                   …
                 </div>
               )}
-              {cityContextNotInCatalog ? (
-                <p className="text-xs text-amber-800">
-                  Сохранённое значение не совпало со справочником. Выберите город из списка или сбросьте
-                  привязку.
-                </p>
-              ) : null}
             </div>
+            {geoScope === "CITY" ? (
+              <div className="space-y-2 sm:col-span-2">
+                <Label htmlFor="article-city">Город</Label>
+                {hydrated ? (
+                  <Select
+                    value={cityId ?? "__none__"}
+                    onValueChange={(v) => {
+                      if (v === "__none__") {
+                        setCityId(null);
+                        setCityContext("");
+                        return;
+                      }
+                      const city = cities.find((c) => c.id === v);
+                      setCityId(v);
+                      setCityContext(city?.slug ?? "");
+                    }}
+                  >
+                    <SelectTrigger id="article-city" className="w-full">
+                      <SelectValue placeholder="Выберите город" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">Не выбран</SelectItem>
+                      {cities.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <div
+                    id="article-city"
+                    className="flex h-9 w-full items-center rounded-md border border-input bg-muted/40 px-3 text-sm text-muted-foreground animate-pulse"
+                    aria-hidden
+                  >
+                    …
+                  </div>
+                )}
+              </div>
+            ) : null}
+            {geoScopeError ? (
+              <p className="text-xs text-red-600 sm:col-span-2">{geoScopeError}</p>
+            ) : null}
           </div>
         </CardContent>
       </Card>

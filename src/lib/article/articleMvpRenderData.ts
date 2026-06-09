@@ -9,6 +9,10 @@ import { getOfferPublicPath, getOfferPublicSection } from "@/lib/offers/offerPub
 import { parsePriceData, type PriceData } from "@/lib/priceItems";
 import { generateSummary, mapToUIState } from "@/lib/openingHours/openingHoursMapper";
 import type { OpeningHoursWithRelations } from "@/server/services/openingHours/openingHours.types";
+import {
+  buildCityPublicPath,
+  buildNationalArticlePath,
+} from "@/lib/routing/cityPaths";
 
 /** Без coverImage / seoImageAsset — на старой БД может не быть колонки coverImageId. */
 const articleMvpBaseSelect = {
@@ -356,12 +360,29 @@ async function resolveActivityCard(
   // ARTICLE
   const article = await prisma.article.findUnique({
     where: { id: b.entityId },
-    select: { title: true, slug: true },
+    select: {
+      title: true,
+      slug: true,
+      geoScope: true,
+      city: { select: { slug: true } },
+    },
   });
   if (!article) return null;
+  let articleHref = "#";
+  if (article.slug) {
+    if (article.geoScope === "CITY" && article.city?.slug) {
+      articleHref = buildCityPublicPath({
+        citySlug: article.city.slug,
+        type: "article",
+        slug: article.slug,
+      });
+    } else {
+      articleHref = buildNationalArticlePath(article.slug);
+    }
+  }
   return {
     kind: "basic",
-    href: article.slug ? `/blog/${article.slug}` : "#",
+    href: articleHref,
     title: article.title,
   };
 }
@@ -421,8 +442,11 @@ export async function buildArticleMvpResolvedBlocks(
   return out;
 }
 
-export async function loadArticleMvpBySlugPublic(slug: string) {
-  const resolved = await findArticleBySlug(slug);
+export async function loadArticleMvpBySlugPublic(
+  slug: string,
+  cityId: string | null,
+) {
+  const resolved = await findArticleBySlug(slug, cityId);
   if (!resolved) return null;
   const article = await prisma.article.findFirst({
     where: {
