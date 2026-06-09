@@ -1,5 +1,5 @@
 import type { AnalyticsOverviewDateRange } from "@/lib/analytics/adminOverviewTypes";
-import { prisma } from "@/lib/prisma";
+import { findCityBySlug } from "@/server/geo/findCityBySlug";
 import { endOfDay, startOfDay, subDays } from "date-fns";
 
 export function resolveAnalyticsDateRange(
@@ -32,9 +32,6 @@ export function resolveAnalyticsDateRange(
 
 export async function resolveCityIdFromSlug(slug: string): Promise<string | null> {
   if (!slug.trim()) return null;
-  const row = await prisma.city.findUnique({
-    where: { slug: slug.trim() },
-    select: { id: true },
-  });
+  const row = await findCityBySlug(slug.trim(), { select: { id: true } });
   return row?.id ?? null;
 }

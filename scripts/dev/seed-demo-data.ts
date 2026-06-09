@@ -14,7 +14,9 @@ const prisma = new PrismaClient();
 async function main() {
   console.log("🎭 Seeding DEMO DATA (dev/staging only)...");
 
-  const minsk = await prisma.city.findUnique({ where: { slug: "minsk" } });
+  const minsk = await prisma.city.findFirst({
+    where: { slug: "minsk", country: { isoCode: "BY" }, isLegacyNonCity: false },
+  });
   if (!minsk) throw new Error("Run pnpm db:seed:system first — city 'minsk' not found.");
 
   // Admin user (dev only)

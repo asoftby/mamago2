@@ -7,6 +7,7 @@
  */
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { findCityBySlug } from "@/server/geo/findCityBySlug";
 import type { TrackUserEventInput, TrackUserEventResult } from "@/lib/analytics/types";
 import { applyUserBehaviorEvent } from "@/server/services/analytics/UserBehaviorAggregationService";
 import { registerPromotionActionFromUserEvent } from "@/server/services/promotion/promotion.service";
@@ -17,10 +18,7 @@ async function resolveCityId(
 ): Promise<string | null> {
   if (cityId) return cityId;
   if (!citySlug?.trim()) return null;
-  const row = await prisma.city.findUnique({
-    where: { slug: citySlug.trim() },
-    select: { id: true },
-  });
+  const row = await findCityBySlug(citySlug.trim(), { select: { id: true } });
   return row?.id ?? null;
 }
 
