@@ -12,7 +12,7 @@ import {
   buildCityPublicPath,
   buildNationalArticlePath,
   getBaseUrl,
-  withTrailingSlash,
+  stripTrailingSlash,
 } from "../src/lib/routing/cityPaths";
 
 type ManifestRow = {
@@ -26,7 +26,7 @@ type ManifestRow = {
 
 function abs(path: string): string {
   const normalized = path.startsWith("/") ? path : `/${path}`;
-  return `${getBaseUrl()}${withTrailingSlash(normalized)}`;
+  return `${getBaseUrl()}${stripTrailingSlash(normalized)}`;
 }
 
 function csvEscape(value: string): string {
@@ -86,7 +86,7 @@ async function main() {
 
     // Legacy WordPress journal segment → city blog (Minsk interim).
     if (article.geoScope === "CITY" && article.city?.slug) {
-      const legacyJournalPath = withTrailingSlash(`/journal/${article.slug}`);
+      const legacyJournalPath = stripTrailingSlash(`/journal/${article.slug}`);
       rows.push({
         rule_type: "wp_journal",
         old_url: abs(legacyJournalPath),

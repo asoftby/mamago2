@@ -14,6 +14,10 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export default async function BillingBalancePage() {
+  if (process.env.NEXT_PUBLIC_BILLING_ENABLED !== "true") {
+    redirect("/business/dashboard");
+  }
+
   const user = await getCurrentUser();
 
   if (!user) {

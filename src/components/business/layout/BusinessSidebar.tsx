@@ -40,7 +40,13 @@ export function BusinessSidebar({ onNavigate, variant = "sidebar", buildInfo }: 
           separatorClassName="border-stone-200/80"
           chromeTone="business"
         />
-        {businessNavigation.map((item, index) => {
+        {businessNavigation
+          .filter((item) =>
+            process.env.NEXT_PUBLIC_BILLING_ENABLED === "true"
+              ? true
+              : !(item.type === "item" && item.href.includes("/billing"))
+          )
+          .map((item, index) => {
           if (item.type === "item") {
             const patterns = item.match ?? [item.href];
             return (

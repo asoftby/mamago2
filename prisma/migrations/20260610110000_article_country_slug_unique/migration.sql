@@ -27,9 +27,7 @@ BEGIN
 
   IF dup_count > 0 THEN
     RAISE EXCEPTION
-      E'Cannot add COUNTRY-slug unique index: % duplicate slug(s) found in Article '
-      E'WHERE cityId IS NULL.\nDuplicate slugs: %\n'
-      E'Resolve duplicates manually (e.g. rename or delete), then re-run the migration.',
+      E'Cannot add COUNTRY-slug unique index: % duplicate slug(s) found in Article WHERE cityId IS NULL.\nDuplicate slugs: %\nResolve duplicates manually (e.g. rename or delete), then re-run the migration.',
       dup_count, dup_slugs;
   END IF;
 END $$;
@@ -57,9 +55,7 @@ BEGIN
 
   IF dup_count > 0 THEN
     RAISE EXCEPTION
-      E'Cannot add COUNTRY-slug unique index: % duplicate slug(s) found in ArticleSlugHistory '
-      E'WHERE cityId IS NULL.\nDuplicate slugs: %\n'
-      E'Resolve duplicates manually, then re-run the migration.',
+      E'Cannot add COUNTRY-slug unique index: % duplicate slug(s) found in ArticleSlugHistory WHERE cityId IS NULL.\nDuplicate slugs: %\nResolve duplicates manually, then re-run the migration.',
       dup_count, dup_slugs;
   END IF;
 END $$;
