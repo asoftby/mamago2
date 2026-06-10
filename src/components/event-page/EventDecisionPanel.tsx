@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Heart } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BYN_SYMBOL, normalizeUiCurrencyText } from "@/lib/formatters/format-price";
+import { BelarusianRubleIcon } from "@/components/icons/BelarusianRubleIcon";
 import type { EventPageData } from "@/lib/event/eventPageTypes";
 import { EventBreadcrumbs } from "./EventBreadcrumbs";
 import { OwnerEditDropdown } from "./OwnerEditDropdown";
@@ -86,16 +87,7 @@ function renderPriceSuffix(text: string) {
   return parts.flatMap((part, index) => {
     const chunk = part ? [<span key={`text-${index}`}>{part}</span>] : [];
     if (index === parts.length - 1) return chunk;
-    return [
-      ...chunk,
-      <span
-        key={`byn-${index}`}
-        aria-label="Белорусский рубль"
-        style={{ fontFamily: "nbrb, Menlo, monospace" }}
-      >
-        {BYN_SYMBOL}
-      </span>,
-    ];
+    return [...chunk, <BelarusianRubleIcon key={`byn-${index}`} />];
   });
 }
 

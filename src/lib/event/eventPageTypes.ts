@@ -4,6 +4,7 @@
  */
 
 import type { Intent } from "@/lib/intent";
+import type { MediaGalleryItem } from "@/lib/media/galleryTypes";
 
 export type EventPageBreadcrumb = {
   label: string;
@@ -134,6 +135,13 @@ export type EventPageData = {
   /** Registration / tickets utility copy. */
   bookingNotes?: string;
   cta: EventPageCtaConfig;
+  /**
+   * Медиа-галерея под cover image: Reels (первой) + дополнительные фото события.
+   * Пустой массив или undefined → блок не отображается.
+   */
+  galleryItems?: MediaGalleryItem[];
+  /** @deprecated используйте galleryItems — Reels попадает туда первым */
+  reelsUrl?: string;
   /** Редактирование в `/editor/event/...` — только для владельца (сервер подставляет href). */
   ownerEditHref?: string;
   /** Owner preview: label above the page (e.g. moderation status). */

@@ -19,6 +19,8 @@ import { PublicationStatsPanel } from "@/components/publication-stats";
 import { postAnalyticsEvent } from "@/lib/analytics/client";
 import { extractPlainTextLinesFromHtml } from "@/lib/richtext/utils";
 import { getLocalDateKey } from "@/lib/date/localDateKey";
+import { useUpcomingSessions } from "./useUpcomingSessions";
+import { formatHHMM } from "@/lib/formatters/date";
 
 // Новые конверсионные блоки
 import { EventHighlights } from "./EventHighlights";
@@ -52,10 +54,17 @@ export function ConversionEventPageView({ data }: { data: EventPageData }) {
     return () => setPublicationIntent(null);
   }, [data.discoveryIntent, setPublicationIntent]);
 
-  const sessions = data.sessions;
+  const sessions = useUpcomingSessions(data.sessions);
   const [selectedId, setSelectedId] = useState<string | null>(
-    () => data.sessions[0]?.id ?? null
+    () => data.sessions[0]?.id ?? null,
   );
+
+  useEffect(() => {
+    setSelectedId((prev) => {
+      if (prev && sessions.some((s) => s.id === prev)) return prev;
+      return sessions[0]?.id ?? null;
+    });
+  }, [sessions]);
   const [saveModalOpen, setSaveModalOpen] = useState(false);
   const [planDateChooserOpen, setPlanDateChooserOpen] = useState(false);
   const [isPrimaryLoading, setIsPrimaryLoading] = useState(false);
@@ -96,14 +105,19 @@ export function ConversionEventPageView({ data }: { data: EventPageData }) {
     return Array.from(set).sort();
   }, [sessions]);
 
-  const planSessionCountsByDate = useMemo(() => {
-    const counts: Record<string, number> = {};
+  // Group sessions by date: { "YYYY-MM-DD": [{ id, time: "HH:mm" }, ...] }
+  // Single source of truth — counts are derived from this in the modal.
+  const planSessionsByDate = useMemo(() => {
+    const map: Record<string, Array<{ id: string; time: string }>> = {};
     for (const session of sessions) {
       if (!session.startsAt) continue;
-      const iso = getLocalDateKey(new Date(session.startsAt));
-      counts[iso] = (counts[iso] ?? 0) + 1;
+      const d = new Date(session.startsAt);
+      const iso = getLocalDateKey(d);
+      const time = formatHHMM(d);
+      if (!map[iso]) map[iso] = [];
+      map[iso].push({ id: session.id, time });
     }
-    return counts;
+    return map;
   }, [sessions]);
 
   const formatPlanDateRu = useCallback((iso: string) => {
@@ -119,11 +133,11 @@ export function ConversionEventPageView({ data }: { data: EventPageData }) {
       kind: "quickdate" as const,
       title: data.title,
       eventPlanDateOptions: availablePlanDates,
-      eventPlanSessionCountsByDate: planSessionCountsByDate,
+      eventPlanSessionsByDate: planSessionsByDate,
     };
     if (availablePlanDates.length !== 1) return base;
     return { ...base, eventPlanDateISO: availablePlanDates[0]! };
-  }, [availablePlanDates, data.title, planSessionCountsByDate]);
+  }, [availablePlanDates, data.title, planSessionsByDate]);
 
   const loadSaveStatus = useCallback(async () => {
     try {
@@ -179,6 +193,7 @@ export function ConversionEventPageView({ data }: { data: EventPageData }) {
             body: JSON.stringify({
               activityId: data.id,
               date: result.dateISO,
+              activitySessionId: result.timeSlotId ?? null,
               title: data.title,
               coverImageUrl: data.media.posterUrl,
             }),

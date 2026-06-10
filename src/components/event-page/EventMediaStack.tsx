@@ -12,14 +12,11 @@ export function EventMediaStack({
   className?: string;
 }) {
   const { posterUrl, posterAlt, reel, trailerYoutubeId, trailerLabel } = media;
-  const posterRef = useRef<HTMLDivElement>(null);
   const trailerRef = useRef<HTMLDivElement>(null);
   const reelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const targets = [posterRef.current, trailerRef.current, reelRef.current].filter(
-      Boolean,
-    ) as Element[];
+    const targets = [trailerRef.current, reelRef.current].filter(Boolean) as Element[];
     const io = new IntersectionObserver(
       (entries) =>
         entries.forEach((e) => {
@@ -42,20 +39,17 @@ export function EventMediaStack({
   };
 
   return (
-    <aside
-      className={cn("flex flex-col gap-3.5 lg:sticky lg:top-6", className)}
-    >
+    <aside className={cn("flex flex-col gap-3.5", className)}>
       {/* Poster — 4:5 portrait */}
       <div
-        ref={posterRef}
         className="relative overflow-hidden rounded-[18px] bg-[#E8E0D4]"
-        style={{ ...revealStyle, aspectRatio: "4/5" }}
+        style={{ aspectRatio: "4/5" }}
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={posterUrl}
           alt={posterAlt}
-          className="h-full w-full object-cover transition-transform duration-[1200ms] ease-[cubic-bezier(0.2,0.7,0.2,1)] hover:scale-[1.04]"
+          className="h-full w-full object-cover"
           loading="eager"
           decoding="async"
         />

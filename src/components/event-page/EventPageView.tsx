@@ -12,6 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import type { EventPageData } from "@/lib/event/eventPageTypes";
 import { formatRuSessionHero } from "@/lib/event/eventPageFormat";
+import { formatHHMM } from "@/lib/formatters/date";
 import { isFavorite, toggleFavorite } from "@/lib/favorites";
 import { publicActivityPath } from "@/lib/business/eventPublicLink";
 import { SaveActivityFlowAdaptive } from "@/components/activity/SaveActivityFlowAdaptive";
@@ -28,11 +29,13 @@ import { EventSimpleBookingModal } from "./EventSimpleBookingModal";
 import { SimilarEventsSection } from "./SimilarEventsSection";
 import { EventWhyGo } from "./EventWhyGo";
 import { EventGoodFit } from "./EventGoodFit";
+import { MediaGalleryStrip } from "@/components/media/MediaGalleryStrip";
 import { PublicationStatsPanel } from "@/components/publication-stats";
 import { MobileSmartBackButton } from "@/components/shared/MobileSmartBackButton";
 import { postAnalyticsEvent } from "@/lib/analytics/client";
 import { cn } from "@/lib/utils";
 import { getLocalDateKey } from "@/lib/date/localDateKey";
+import { useUpcomingSessions } from "./useUpcomingSessions";
 
 /* ── Helpers ──────────────────────────────────────────────── */
 
@@ -189,6 +192,7 @@ function EventLocationEditorial({ venue }: { venue: NonNullable<EventPageData["v
   return (
     <LocationBlock
       name={venue.name}
+      logoUrl={venue.logoUrl}
       tagline={venue.landmark}
       address={venue.address}
       district={venue.district}
@@ -301,10 +305,17 @@ export function EventPageView({ data }: { data: EventPageData }) {
     return () => setPublicationIntent(null);
   }, [data.discoveryIntent, setPublicationIntent]);
 
-  const sessions = data.sessions;
+  const sessions = useUpcomingSessions(data.sessions);
   const [selectedId, setSelectedId] = useState<string | null>(
     () => data.sessions[0]?.id ?? null,
   );
+
+  useEffect(() => {
+    setSelectedId((prev) => {
+      if (prev && sessions.some((s) => s.id === prev)) return prev;
+      return sessions[0]?.id ?? null;
+    });
+  }, [sessions]);
   const [saveModalOpen, setSaveModalOpen] = useState(false);
   const [planDateChooserOpen, setPlanDateChooserOpen] = useState(false);
   const [isPrimaryLoading, setIsPrimaryLoading] = useState(false);
@@ -350,14 +361,19 @@ export function EventPageView({ data }: { data: EventPageData }) {
     return Array.from(set).sort();
   }, [sessions]);
 
-  const planSessionCountsByDate = useMemo(() => {
-    const counts: Record<string, number> = {};
+  // Group sessions by date: { "YYYY-MM-DD": [{ id, time: "HH:mm" }, ...] }
+  // This is the single source of truth for both time chips and session count dots.
+  const planSessionsByDate = useMemo(() => {
+    const map: Record<string, Array<{ id: string; time: string }>> = {};
     for (const session of sessions) {
       if (!session.startsAt) continue;
-      const iso = getLocalDateKey(new Date(session.startsAt));
-      counts[iso] = (counts[iso] ?? 0) + 1;
+      const d = new Date(session.startsAt);
+      const iso = getLocalDateKey(d);
+      const time = formatHHMM(d);
+      if (!map[iso]) map[iso] = [];
+      map[iso].push({ id: session.id, time });
     }
-    return counts;
+    return map;
   }, [sessions]);
 
   const formatPlanDateRu = useCallback(
@@ -375,11 +391,11 @@ export function EventPageView({ data }: { data: EventPageData }) {
       kind: "quickdate" as const,
       title: data.title,
       eventPlanDateOptions: availablePlanDates,
-      eventPlanSessionCountsByDate: planSessionCountsByDate,
+      eventPlanSessionsByDate: planSessionsByDate,
     };
     if (availablePlanDates.length !== 1) return base;
     return { ...base, eventPlanDateISO: availablePlanDates[0]! };
-  }, [availablePlanDates, data.title, planSessionCountsByDate]);
+  }, [availablePlanDates, data.title, planSessionsByDate]);
 
   const loadSaveStatus = useCallback(async () => {
     try {
@@ -429,6 +445,7 @@ export function EventPageView({ data }: { data: EventPageData }) {
             body: JSON.stringify({
               activityId: data.id,
               date: result.dateISO,
+              activitySessionId: result.timeSlotId ?? null,
               title: data.title,
               coverImageUrl: data.media.posterUrl,
             }),
@@ -564,15 +581,21 @@ export function EventPageView({ data }: { data: EventPageData }) {
           </div>
 
           {/* Mobile: media above decision panel */}
-          <div className="lg:hidden mb-8">
+          <div className="lg:hidden mb-8 space-y-2.5">
             <EventMediaStack media={data.media} />
+            {data.galleryItems && data.galleryItems.length > 0 && (
+              <MediaGalleryStrip items={data.galleryItems} maxVisible={3} />
+            )}
           </div>
 
           {/* Desktop: two-column side-by-side (media left, decision panel right) */}
           <div className="grid grid-cols-1 gap-10 lg:grid-cols-[440px_1fr] lg:gap-14 lg:items-start">
-            {/* Left: media stack (desktop only — mobile rendered above) */}
-            <div className="hidden lg:block">
+            {/* Left: media stack + gallery strip (desktop only — mobile rendered above) */}
+            <div className="hidden lg:block space-y-2.5">
               <EventMediaStack media={data.media} />
+              {data.galleryItems && data.galleryItems.length > 0 && (
+                <MediaGalleryStrip items={data.galleryItems} maxVisible={3} />
+              )}
             </div>
 
             {/* Right: decision panel */}

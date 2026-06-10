@@ -39,6 +39,8 @@ export async function loadPublicActivityForCityPage(
   const city = await findCityBySlug(citySlug);
   if (!city) return null;
 
+  const now = new Date();
+
   // Resolve slug → activityId (current or history)
   const bySlug = await findActivityBySlug(slugOrId);
   const resolvedId = bySlug?.activityId ?? slugOrId;
@@ -62,7 +64,10 @@ export async function loadPublicActivityForCityPage(
         orderBy: { sortOrder: "asc" },
         select: { id: true, url: true, mediaAssetId: true },
       },
-      sessions: { orderBy: { startsAt: "asc" } },
+      sessions: {
+        where: { startsAt: { gte: now } },
+        orderBy: { startsAt: "asc" },
+      },
       // SEO fields are scalar fields on Activity, included automatically.
       place: {
         select: {
@@ -73,6 +78,8 @@ export async function loadPublicActivityForCityPage(
           customAddress: true,
           lat: true,
           lng: true,
+          logoImageId: true,
+          images: { select: { id: true, url: true, kind: true }, orderBy: { sortOrder: "asc" } },
           districtManual: { select: { name: true } },
           districtAuto: { select: { name: true } },
           metroManual: { select: { name: true } },
@@ -156,6 +163,8 @@ export async function loadPublicActivityForCityPage(
           customAddress: activity.place.customAddress,
           lat: activity.place.lat,
           lng: activity.place.lng,
+          logoImageId: activity.place.logoImageId,
+          images: activity.place.images,
           districtManual: activity.place.districtManual,
           districtAuto: activity.place.districtAuto,
           metroManual: activity.place.metroManual,

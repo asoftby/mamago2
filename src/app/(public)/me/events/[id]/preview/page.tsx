@@ -38,6 +38,8 @@ export default async function MeEventPreviewPage({ params }: PageProps) {
           customAddress: true,
           lat: true,
           lng: true,
+          logoImageId: true,
+          images: { select: { id: true, url: true, kind: true }, orderBy: { sortOrder: "asc" } },
           districtManual: { select: { name: true } },
           districtAuto: { select: { name: true } },
           metroManual: { select: { name: true } },

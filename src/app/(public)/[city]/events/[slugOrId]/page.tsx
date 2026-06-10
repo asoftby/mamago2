@@ -13,6 +13,7 @@ import { buildEventJsonLd } from "@/lib/seo/schema/buildEventJsonLd";
 import { AnalyticsDetailBeacon } from "@/components/analytics/AnalyticsDetailBeacon";
 import { resolveCanonicalEventPublicPathBySlugOrId } from "@/lib/business/resolveCanonicalEventPublicPath";
 import { buildOgMeta } from "@/lib/seo/buildOgMeta";
+import { fetchReelsThumbnail } from "@/lib/instagram/fetchReelsThumbnail";
 
 interface EventPublicPageProps {
   params: Promise<{ city: string; slugOrId: string }>;
@@ -114,10 +115,24 @@ export default async function CityEventPublicPage({ params, searchParams }: Even
         ? "Изменения на проверке"
         : undefined;
 
+    // Try to get the actual Reels thumbnail (og:image from the Reel page).
+    // Cached 24 h by Next.js fetch cache; falls back to event poster on error.
+    const rawReelsUrl =
+      fromDb.scheduleJson &&
+      typeof fromDb.scheduleJson === "object" &&
+      "reelsUrl" in fromDb.scheduleJson &&
+      typeof (fromDb.scheduleJson as Record<string, unknown>).reelsUrl === "string"
+        ? ((fromDb.scheduleJson as Record<string, unknown>).reelsUrl as string).trim()
+        : null;
+    const reelsThumbnailUrl = rawReelsUrl
+      ? await fetchReelsThumbnail(rawReelsUrl)
+      : null;
+
     const data = buildEventPageDataFromPrismaActivity(fromDb, {
       citySlug: city,
       ownerEditHref,
       previewBannerLabel,
+      reelsThumbnailUrl: reelsThumbnailUrl ?? undefined,
     });
     return (
       <>

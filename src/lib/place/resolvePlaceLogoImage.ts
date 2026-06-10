@@ -22,3 +22,10 @@ export function resolvePlaceLogoImage(
   const byKind = images.find((img) => img.kind === "LOGO");
   return byKind?.url?.trim() ? byKind : null;
 }
+
+export function resolvePlaceLogoUrl(
+  images: PlaceImageLike[] | null | undefined,
+  logoImageId: string | null | undefined,
+): string | undefined {
+  return resolvePlaceLogoImage(images, logoImageId)?.url?.trim() || undefined;
+}
