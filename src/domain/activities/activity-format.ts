@@ -30,10 +30,10 @@ export const ACTIVITY_FORMAT_OPTIONS: ActivityFormatOption[] = [
   {
     value: "HYBRID",
     queryValue: "hybrid",
-    label: "Гибрид",
-    description: "Есть онлайн и офлайн формат",
+    label: "Онлайн + офлайн",
+    description: "Можно участвовать онлайн или прийти на место",
     icon: RefreshCw,
-    detailLabel: "Онлайн и офлайн",
+    detailLabel: "Онлайн + офлайн",
   },
 ];
 
