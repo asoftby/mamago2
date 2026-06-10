@@ -10,6 +10,8 @@ export type UsePublicationSlugFieldOptions = {
   setSlug: (value: string) => void;
   /** Slug, уже сохранённый в БД (после первого save). */
   persistedSlug: string | null;
+  /** После первого сохранения slug больше не предлагается из заголовка. */
+  slugLocked?: boolean;
   isPublished: boolean;
   emptyFallback?: string;
   /** Сущность поддерживает slug history (Article и т.п.). */
@@ -21,6 +23,7 @@ export function usePublicationSlugField({
   slug,
   setSlug,
   persistedSlug,
+  slugLocked = false,
   isPublished,
   emptyFallback = "item",
   slugHistorySupported = false,
@@ -28,23 +31,23 @@ export function usePublicationSlugField({
   const [wasSlugTouched, setWasSlugTouched] = useState(() => Boolean(persistedSlug?.trim()));
 
   useEffect(() => {
-    if (persistedSlug?.trim()) {
+    if (persistedSlug?.trim() || slugLocked) {
       setWasSlugTouched(true);
     }
-  }, [persistedSlug]);
+  }, [persistedSlug, slugLocked]);
 
   const previewSlug = useMemo(
     () =>
       buildSlugPreview({
-        title,
+        title: slugLocked ? "" : title,
         slug,
-        wasSlugTouched,
+        wasSlugTouched: wasSlugTouched || slugLocked,
         emptyFallback,
       }),
-    [title, slug, wasSlugTouched, emptyFallback],
+    [title, slug, wasSlugTouched, slugLocked, emptyFallback],
   );
 
-  const isSlugPinned = Boolean(persistedSlug?.trim());
+  const isSlugPinned = Boolean(persistedSlug?.trim()) || slugLocked;
 
   const onSlugChange = useCallback(
     (raw: string) => {

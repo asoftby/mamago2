@@ -123,6 +123,8 @@ export interface SeoPanelProps {
   onCanonicalUrlChange: (value: string) => void;
   onNoindexChange: (value: boolean) => void;
   onAutofillSeo?: () => void;
+  /** Отключить встроенный auto-fill — когда родитель сам синхронизирует поля. */
+  disableAutoFill?: boolean;
 }
 
 export function SeoPanel({
@@ -143,6 +145,7 @@ export function SeoPanel({
   onCanonicalUrlChange,
   onNoindexChange,
   onAutofillSeo,
+  disableAutoFill = false,
 }: SeoPanelProps) {
   const normalizedFallbackTitle = useMemo(
     () => truncateSeoText(normalizePlainText(fallbackTitle), SEO_TITLE_LIMIT),
@@ -171,15 +174,17 @@ export function SeoPanel({
   }, [entityKey, normalizedFallbackTitle, normalizedFallbackDescription, normalizedPublicUrl, seoTitle, seoDescription, canonicalUrl]);
 
   useEffect(() => {
+    if (disableAutoFill) return;
     const current = seoTitle.trim();
     const previousAuto = previousAutoTitleRef.current.trim();
     if (!manualTitleRef.current && (!current || current === previousAuto) && normalizedFallbackTitle) {
       onSeoTitleChange(normalizedFallbackTitle);
     }
     previousAutoTitleRef.current = normalizedFallbackTitle;
-  }, [normalizedFallbackTitle, onSeoTitleChange, seoTitle]);
+  }, [disableAutoFill, normalizedFallbackTitle, onSeoTitleChange, seoTitle]);
 
   useEffect(() => {
+    if (disableAutoFill) return;
     const current = seoDescription.trim();
     const previousAuto = previousAutoDescriptionRef.current.trim();
     if (
@@ -190,16 +195,17 @@ export function SeoPanel({
       onSeoDescriptionChange(normalizedFallbackDescription);
     }
     previousAutoDescriptionRef.current = normalizedFallbackDescription;
-  }, [normalizedFallbackDescription, onSeoDescriptionChange, seoDescription]);
+  }, [disableAutoFill, normalizedFallbackDescription, onSeoDescriptionChange, seoDescription]);
 
   useEffect(() => {
+    if (disableAutoFill) return;
     const current = canonicalUrl.trim();
     const previousAuto = previousAutoCanonicalRef.current.trim();
     if (!manualCanonicalRef.current && (!current || current === previousAuto) && normalizedPublicUrl) {
       onCanonicalUrlChange(normalizedPublicUrl);
     }
     previousAutoCanonicalRef.current = normalizedPublicUrl;
-  }, [canonicalUrl, normalizedPublicUrl, onCanonicalUrlChange]);
+  }, [canonicalUrl, disableAutoFill, normalizedPublicUrl, onCanonicalUrlChange]);
 
   const effectiveTitle = seoTitle.trim() || normalizedFallbackTitle || "Заголовок материала — mamaGo";
   const effectiveDescription =
