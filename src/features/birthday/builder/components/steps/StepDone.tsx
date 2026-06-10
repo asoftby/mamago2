@@ -1,6 +1,6 @@
 "use client";
 
-import { BYN_SYMBOL } from "@/lib/formatters/format-price";
+import { BelarusianRubleIcon } from "@/components/icons/BelarusianRubleIcon";
 import { useEffect, useMemo, useState } from "react";
 import type { BirthdayBuilderWithGate } from "../../hooks/useBirthdayBuilderWithGate";
 import {
@@ -312,7 +312,7 @@ function ScenarioRow({
             color: "rgba(20,18,16,.45)",
             marginLeft: 3,
           }}>
-              {BYN_SYMBOL}
+              <BelarusianRubleIcon />
           </span>
         </div>
       </div>
@@ -662,7 +662,7 @@ export function StepDone({
                 {totalPrice}
               </span>
               <span style={{ fontFamily: "var(--font-mono, ui-monospace)", fontSize: 11, color: "rgba(20,18,16,.45)", marginLeft: 4 }}>
-              {BYN_SYMBOL}
+              <BelarusianRubleIcon />
               </span>
             </span>
           </div>

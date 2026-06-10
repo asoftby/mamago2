@@ -1,6 +1,6 @@
 "use client";
 
-import { BYN_SYMBOL } from "@/lib/formatters/format-price";
+import { BelarusianRubleIcon } from "@/components/icons/BelarusianRubleIcon";
 import { useState } from "react";
 import type { BirthdayBuilderWithGate } from "../../hooks/useBirthdayBuilderWithGate";
 
@@ -257,7 +257,7 @@ function DetailModal({
                       <div style={{ fontFamily: "var(--font-display, Georgia, serif)", fontSize: 18, lineHeight: 1.1, letterSpacing: "-.01em", color: "#141210" }}>{b.name}</div>
                       {dimmed ? (
                         <div style={{ fontSize: 12, color: "#C24E22", marginTop: 3, fontWeight: 500 }}>
-                          {b.refund > 0 ? `вычтется −${b.refund} ${BYN_SYMBOL}` : "вам не привезут, цена не изменится"}
+                          {b.refund > 0 ? <span>вычтется −{b.refund} <BelarusianRubleIcon /></span> : "вам не привезут, цена не изменится"}
                         </div>
                       ) : (
                         <div style={{ fontFamily: "var(--font-mono, ui-monospace)", fontSize: 11, color: "rgba(20,18,16,.55)", marginTop: 3 }}>{b.meta}</div>
@@ -300,7 +300,7 @@ function DetailModal({
             </div>
             <div style={{ fontFamily: "var(--font-display, Georgia, serif)", fontSize: 28, lineHeight: 1, letterSpacing: "-.02em", color: "#141210" }}>
               {total}
-              <span style={{ fontFamily: "var(--font-mono, ui-monospace)", fontSize: 12, color: "rgba(20,18,16,.55)", marginLeft: 4 }}>{BYN_SYMBOL}</span>
+              <BelarusianRubleIcon className="ml-1 text-[rgba(20,18,16,.55)]" />
             </div>
           </div>
           <button
@@ -314,7 +314,7 @@ function DetailModal({
               transition: "background .2s",
             }}
           >
-            {selected ? "✓ Убрать из плана" : `Добавить · ${total} ${BYN_SYMBOL} →`}
+            {selected ? "✓ Убрать из плана" : <span>Добавить · {total} <BelarusianRubleIcon /> →</span>}
           </button>
         </div>
       </div>
@@ -423,7 +423,7 @@ function ExecCard({
           </button>
           <span style={{ fontFamily: "var(--font-display, Georgia, serif)", fontSize: 22, lineHeight: 1, letterSpacing: "-.02em", color: "#141210", whiteSpace: "nowrap" }}>
             {item.price}
-            <span style={{ fontFamily: "var(--font-mono, ui-monospace)", fontSize: 11, color: "rgba(20,18,16,.55)", marginLeft: 3 }}>{BYN_SYMBOL}</span>
+            <BelarusianRubleIcon className="ml-1 text-[rgba(20,18,16,.55)]" />
           </span>
         </div>
       </div>

@@ -1,17 +1,17 @@
 "use client";
 
-import { BYN_SYMBOL } from "@/lib/formatters/format-price";
 import type { BirthdayBuilderWithGate } from "../../hooks/useBirthdayBuilderWithGate";
 import { BirthdayOptionCard } from "../../../components/cards/BirthdayOptionCard";
+import { BelarusianRubleIcon } from "@/components/icons/BelarusianRubleIcon";
 import { BuilderProgress } from "../BuilderProgress";
 
 type BuilderHook = BirthdayBuilderWithGate;
 
 const BUDGET_OPTIONS = [
-  { value: "up300" as const, emoji: "💚", label: `До 300 ${BYN_SYMBOL}` },
-  { value: "300-600" as const, emoji: "💛", label: `300–600 ${BYN_SYMBOL}` },
-  { value: "600-1000" as const, emoji: "🧡", label: `600–1000 ${BYN_SYMBOL}` },
-  { value: "1000plus" as const, emoji: "💎", label: `1000+ ${BYN_SYMBOL}` },
+  { value: "up300" as const, emoji: "💚", label: <>До 300 <BelarusianRubleIcon /></> },
+  { value: "300-600" as const, emoji: "💛", label: <>300–600 <BelarusianRubleIcon /></> },
+  { value: "600-1000" as const, emoji: "🧡", label: <>600–1000 <BelarusianRubleIcon /></> },
+  { value: "1000plus" as const, emoji: "💎", label: <>1000+ <BelarusianRubleIcon /></> },
 ];
 
 export function StepBudget({ builder }: { builder: BuilderHook }) {

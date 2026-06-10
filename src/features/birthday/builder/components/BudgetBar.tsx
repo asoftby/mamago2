@@ -1,8 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import type { ReactNode } from "react";
 import type { BirthdayOffer, BirthdayBudgetGroup } from "../../types/birthday";
-import { BYN_SYMBOL, formatPrice } from "@/lib/formatters/format-price";
+import { formatPrice } from "@/lib/formatters/format-price";
+import { renderPriceWithIcon } from "@/components/icons/BelarusianRubleIcon";
 import { getBudgetRange, formatBudgetRange } from "../lib/budgetRanges";
 import { cn } from "@/lib/utils";
 
@@ -27,7 +29,7 @@ function getBudgetStatus(
   return "can_add";
 }
 
-function getStatusLabel(status: BudgetStatus, total: number, budgetMax: number): string {
+function getStatusLabel(status: BudgetStatus, total: number, budgetMax: number): ReactNode {
   switch (status) {
     case "can_add":
       return "Можно добавить ещё";
@@ -36,7 +38,7 @@ function getStatusLabel(status: BudgetStatus, total: number, budgetMax: number):
     case "almost":
       return "Почти достигли бюджета";
     case "exceeded":
-      return `Превышен на +${formatPrice(total - budgetMax, { hideZero: true })}`;
+      return <span>Превышен на +{renderPriceWithIcon(formatPrice(total - budgetMax, { hideZero: true }))}</span>;
     default:
       return "";
   }
@@ -93,7 +95,7 @@ export function BudgetBar({
   if (!budgetGroup || budgetGroup === "unknown") {
     return (
       <div className={cn("text-xs", className)}>
-        <span className="font-semibold text-foreground">{formatPrice(totalPrice, { hideZero: true })}</span>
+        <span className="font-semibold text-foreground">{renderPriceWithIcon(formatPrice(totalPrice, { hideZero: true }))}</span>
       </div>
     );
   }
@@ -115,7 +117,7 @@ export function BudgetBar({
       >
         <div className="flex items-center gap-1.5 flex-wrap">
           <span className="font-semibold text-foreground text-xs whitespace-nowrap">
-            {formatPrice(totalPrice, { hideZero: true })} из {rangeLabel}
+            {renderPriceWithIcon(formatPrice(totalPrice, { hideZero: true }))} из {rangeLabel}
           </span>
           <span className={cn("text-[11px] font-medium", statusStyles[status])}>
             {statusLabel}
@@ -132,7 +134,7 @@ export function BudgetBar({
             {breakdown.map((b) => (
               <div key={b.title} className="flex justify-between gap-2">
                 <span className="truncate">{b.label}: {b.title}</span>
-                <span className="shrink-0">{formatPrice(b.price, { hideZero: true })}</span>
+                <span className="shrink-0">{renderPriceWithIcon(formatPrice(b.price, { hideZero: true }))}</span>
               </div>
             ))}
           </div>
@@ -153,7 +155,7 @@ export function BudgetBar({
     >
       <div className="flex items-center justify-between gap-2">
         <span className="text-sm font-semibold text-foreground">
-          {formatPrice(totalPrice, { hideZero: true })} из {rangeLabel}
+          {renderPriceWithIcon(formatPrice(totalPrice, { hideZero: true }))} из {rangeLabel}
         </span>
         <span className={cn("text-sm font-medium", statusStyles[status])}>
           {statusLabel}
@@ -174,7 +176,7 @@ export function BudgetBar({
             {breakdown.map((b) => (
               <div key={b.title} className="flex justify-between gap-2 text-muted-foreground">
                 <span className="truncate">{b.label}: {b.title}</span>
-                <span className="shrink-0 font-medium text-foreground">{formatPrice(b.price, { hideZero: true })}</span>
+                <span className="shrink-0 font-medium text-foreground">{renderPriceWithIcon(formatPrice(b.price, { hideZero: true }))}</span>
               </div>
             ))}
           </div>

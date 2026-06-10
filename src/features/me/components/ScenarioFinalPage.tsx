@@ -1,6 +1,6 @@
 "use client";
 
-import { BYN_SYMBOL } from "@/lib/formatters/format-price";
+import { BelarusianRubleIcon } from "@/components/icons/BelarusianRubleIcon";
 import { useMemo } from "react";
 import {
   ArrowLeft,
@@ -40,11 +40,6 @@ function formatShortDate(dateIso: string | null): string | null {
     day: "numeric",
     month: "short",
   });
-}
-
-function formatMoney(value: number | null | undefined): string | null {
-  if (value == null) return null;
-  return `${value} ${BYN_SYMBOL}`;
 }
 
 function getStatusTone(status: PerformerStatus) {
@@ -202,9 +197,7 @@ export function AlternativePerformerCard({
             <span className="font-[var(--font-display,Georgia,serif)] text-[24px] leading-none text-[#141210]">
               {alternative.price}
             </span>
-            <span className="ml-1 text-[10px] uppercase tracking-[0.08em] text-[#8A8178]">
-              {BYN_SYMBOL}
-            </span>
+            <BelarusianRubleIcon className="ml-1 text-[#8A8178]" />
           </div>
         </div>
       </div>
@@ -302,9 +295,7 @@ export function ScenarioTimelineItem({
                 <span className="font-[var(--font-display,Georgia,serif)] text-[30px] leading-none text-[#141210]">
                   {item.price}
                 </span>
-                <span className="ml-1 text-[10px] uppercase tracking-[0.08em] text-[#8A8178]">
-                  {BYN_SYMBOL}
-                </span>
+                <BelarusianRubleIcon className="ml-1 text-[#8A8178]" />
               </div>
             ) : null}
           </div>
@@ -352,9 +343,7 @@ export function ScenarioTimeline({
           <span className="font-[var(--font-display,Georgia,serif)] text-[34px] leading-none text-[#141210]">
             {totalPrice ?? 0}
           </span>
-          <span className="ml-1 text-[11px] uppercase tracking-[0.08em] text-[#8A8178]">
-            {BYN_SYMBOL}
-          </span>
+          <BelarusianRubleIcon className="ml-1 text-[#8A8178]" />
         </div>
       </div>
     </section>
@@ -399,7 +388,7 @@ export function ScenarioStatusSummary({
         ) : null}
         {party.totalPrice != null ? (
           <Badge className="rounded-full border border-[rgba(20,18,16,0.08)] bg-white px-3 py-1.5 text-[13px] font-medium text-[#423B35]">
-            {party.totalPrice} {BYN_SYMBOL}
+            {party.totalPrice} <BelarusianRubleIcon />
           </Badge>
         ) : null}
       </div>
@@ -490,7 +479,7 @@ export function ScenarioFinalPage({
         .join(" • "),
       party.childName,
       party.guestsLabel ?? "гости уточняются",
-      party.totalPrice != null ? `${party.totalPrice} ${BYN_SYMBOL}` : null,
+      party.totalPrice != null ? `${party.totalPrice} р.` : null,
     ].filter(Boolean) as string[];
   }, [party, confirmedCount, declinedCount]);
 

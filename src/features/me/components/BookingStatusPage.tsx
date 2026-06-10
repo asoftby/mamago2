@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Check, X, Clock, Phone, Printer, Share2, Download, AlertTriangle, Star } from "lucide-react";
-import { BYN_SYMBOL } from "@/lib/formatters/format-price";
+import { BelarusianRubleIcon } from "@/components/icons/BelarusianRubleIcon";
 import type {
   AlternativePerformer,
   PerformerStatus,
@@ -114,7 +114,7 @@ function ProgressGrid({ items }: { items: ScenarioTimelineItem[] }) {
 
   const cells: Array<{
     value: React.ReactNode;
-    label: string;
+    label: React.ReactNode;
     color: string;
     bg: string;
   }> = [
@@ -123,7 +123,7 @@ function ProgressGrid({ items }: { items: ScenarioTimelineItem[] }) {
     { value: declined,  label: "Нужна замена",  color: "#D85A30", bg: "#FAECE7" },
     {
       value: hasPending ? `от ${confirmedTotal}` : total,
-      label: `${BYN_SYMBOL} итого`,
+      label: <><BelarusianRubleIcon /> итого</>,
       color: "#141210",
       bg: "#FAF7F1",
     },
@@ -326,16 +326,7 @@ function AlternativeCard({
             }}
           >
             {alt.price}
-            <span
-              style={{
-                fontFamily: "var(--font-mono, ui-monospace, monospace)",
-                fontSize: 11,
-                color: "rgba(20,18,16,.55)",
-                marginLeft: 3,
-              }}
-            >
-              {BYN_SYMBOL}
-            </span>
+            <BelarusianRubleIcon className="ml-1 text-[rgba(20,18,16,.55)]" />
           </span>
         </div>
       </div>
@@ -599,15 +590,7 @@ function VendorRow({
             >
               {item.price}
             </span>
-            <span
-              style={{
-                fontFamily: "var(--font-mono, ui-monospace, monospace)",
-                fontSize: 10,
-                color: "rgba(20,18,16,.55)",
-              }}
-            >
-              {BYN_SYMBOL}
-            </span>
+            <BelarusianRubleIcon className="text-[rgba(20,18,16,.55)]" />
           </div>
         )}
       </div>
@@ -809,7 +792,7 @@ function PageHeader({
               color: "#141210",
             }}
           >
-            {totalPrice} {BYN_SYMBOL}
+            {totalPrice} <BelarusianRubleIcon />
           </span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
@@ -1040,7 +1023,7 @@ function Footer({
             >
               {confirmedTotal}
             </span>{" "}
-            {BYN_SYMBOL}
+            <BelarusianRubleIcon />
           </span>
           {confirmedCount > 0 && (
             <span
@@ -1363,16 +1346,7 @@ export function BookingStatusPage({ party, onBack }: BookingStatusPageProps) {
             >
               {totalPrice}
             </span>
-            <span
-              style={{
-                fontFamily: "var(--font-mono, ui-monospace, monospace)",
-                fontSize: 13,
-                color: "rgba(20,18,16,.55)",
-                marginLeft: 6,
-              }}
-            >
-              {BYN_SYMBOL}
-            </span>
+            <BelarusianRubleIcon className="ml-1.5 text-[rgba(20,18,16,.55)]" />
           </span>
         </div>
       </main>

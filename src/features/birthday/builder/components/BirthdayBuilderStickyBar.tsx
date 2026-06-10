@@ -1,6 +1,7 @@
 "use client";
 
-import { BYN_SYMBOL } from "@/lib/formatters/format-price";
+import type { ReactNode } from "react";
+import { BelarusianRubleIcon } from "@/components/icons/BelarusianRubleIcon";
 import { useMemo, useState } from "react";
 import type { BirthdayBuilderWithGate } from "../hooks/useBirthdayBuilderWithGate";
 import { getBudgetEstimate } from "../../lib/getBudgetEstimate";
@@ -92,7 +93,7 @@ function getBudgetStatusShort(
   return "В пределах бюджета";
 }
 
-function DetailRow({ label, value }: { label: string; value: string }) {
+function DetailRow({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div className="flex flex-col gap-0.5 sm:flex-row sm:items-center sm:gap-3 sm:justify-between py-2 border-b border-border/60 last:border-0 last:pb-0">
       <span className="text-xs font-medium text-muted-foreground shrink-0 leading-5">
@@ -281,9 +282,9 @@ export function BirthdayBuilderStickyBar({ builder }: BirthdayBuilderStickyBarPr
     const ageText = ageGroup
       ? getDisplayedAgeLabel({ ageGroup, selectedAgeLabel }) ?? "—"
       : "—";
-    const budgetText =
+    const budgetText: ReactNode =
       budgetGroup && budgetGroup !== "unknown"
-        ? formatBudgetRange(budgetGroup) + ` ${BYN_SYMBOL}`
+        ? <>{formatBudgetRange(budgetGroup)} <BelarusianRubleIcon /></>
         : "—";
     let placeText = "—";
     if (placeType === "VENUE" && selectedBase) placeText = selectedBase.title;
@@ -404,7 +405,7 @@ export function BirthdayBuilderStickyBar({ builder }: BirthdayBuilderStickyBarPr
               <span className="text-muted-foreground">{compactSummaryParts.budgetShort}</span>
               <span className="text-muted-foreground/50">·</span>
               <span className="font-medium text-foreground">
-                {compactSummaryParts.totalRounded} {BYN_SYMBOL}
+                {compactSummaryParts.totalRounded} <BelarusianRubleIcon />
               </span>
               {compactSummaryParts.status && (
                 <>
@@ -459,7 +460,7 @@ export function BirthdayBuilderStickyBar({ builder }: BirthdayBuilderStickyBarPr
             <span className="text-muted-foreground">{compactSummaryParts.budgetShort}</span>
             <span className="text-muted-foreground/50"> · </span>
             <span className="font-medium text-foreground">
-              {compactSummaryParts.totalRounded} {BYN_SYMBOL}
+              {compactSummaryParts.totalRounded} <BelarusianRubleIcon />
             </span>
             {compactSummaryParts.status && (
               <>
@@ -522,7 +523,7 @@ export function BirthdayBuilderStickyBar({ builder }: BirthdayBuilderStickyBarPr
       <div className="border-t border-border/80 pt-2">
         <div className="flex justify-between items-baseline gap-2 text-sm">
           <span className="text-muted-foreground">Сумма выбранного</span>
-          <span className="font-semibold tabular-nums">{Math.round(totalPrice)} {BYN_SYMBOL}</span>
+          <span className="font-semibold tabular-nums">{Math.round(totalPrice)} <BelarusianRubleIcon /></span>
         </div>
         {barBudgetStatus && (
           <p

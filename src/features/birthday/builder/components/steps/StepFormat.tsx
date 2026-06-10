@@ -1,9 +1,10 @@
 "use client";
 
-import { BYN_SYMBOL } from "@/lib/formatters/format-price";
+import type { ReactNode } from "react";
 import type { BirthdayBuilderWithGate } from "../../hooks/useBirthdayBuilderWithGate";
 import type { PlaceType } from "../../types/builder";
 import type { BirthdayBudgetGroup } from "../../../types/birthday";
+import { BelarusianRubleIcon } from "@/components/icons/BelarusianRubleIcon";
 
 const FORMATS: { key: PlaceType; icon: string; title: string; sub: string }[] = [
   { key: "HOME", icon: "🏠", title: "Дома", sub: "Уютно · услуги привезут к вам" },
@@ -11,11 +12,11 @@ const FORMATS: { key: PlaceType; icon: string; title: string; sub: string }[] = 
   { key: "OUTDOOR", icon: "🌳", title: "На природе", sub: "Загородный формат" },
 ];
 
-const BUDGETS: { key: BirthdayBudgetGroup; icon: string; title: string }[] = [
-  { key: "up300", icon: "💚", title: `До 300 ${BYN_SYMBOL}` },
-  { key: "300-600", icon: "💛", title: `300–600 ${BYN_SYMBOL}` },
-  { key: "600-1000", icon: "🧡", title: `600–1000 ${BYN_SYMBOL}` },
-  { key: "1000plus", icon: "💎", title: `1000+ ${BYN_SYMBOL}` },
+const BUDGETS: { key: BirthdayBudgetGroup; icon: string; title: ReactNode }[] = [
+  { key: "up300", icon: "💚", title: <>До 300 <BelarusianRubleIcon /></> },
+  { key: "300-600", icon: "💛", title: <>300–600 <BelarusianRubleIcon /></> },
+  { key: "600-1000", icon: "🧡", title: <>600–1000 <BelarusianRubleIcon /></> },
+  { key: "1000plus", icon: "💎", title: <>1000+ <BelarusianRubleIcon /></> },
 ];
 
 function CheckIcon({ c = "#fff" }: { c?: string }) {
@@ -34,7 +35,7 @@ function OptionRow({
   onClick,
 }: {
   icon: string;
-  title: string;
+  title: ReactNode;
   sub?: string;
   selected: boolean;
   onClick: () => void;

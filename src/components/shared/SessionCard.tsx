@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { Heart } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -10,8 +11,8 @@ export interface SessionCardProps {
   isNearest?: boolean;
   /** Основная строка — дата или название смены */
   title: string;
-  /** Вспомогательная строка — время, цена */
-  subtitle?: string;
+  /** Вспомогательная строка — время, цена (может содержать React-узлы, напр. SVG-иконку валюты) */
+  subtitle?: ReactNode;
   /** Текст кнопки CTA (undefined — кнопка не отображается) */
   primaryLabel?: string;
   primaryHref?: string;
