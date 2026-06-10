@@ -7,7 +7,9 @@ import assert from "node:assert/strict";
 
 import {
   breakingNewsStateToArticleSaveInput,
+  buildBreakingNewsContent,
   BREAKING_NEWS_SUBTITLE,
+  parseBreakingNewsFromSnapshot,
   type BreakingNewsFormState,
 } from "./breakingNewsArticle";
 import { buildArticlePublicPath } from "@/lib/routing/cityPaths";
@@ -38,6 +40,69 @@ function baseState(): BreakingNewsFormState {
 }
 
 const opts = { publishedAtIso: null, scheduledAtIso: null };
+
+// ── Manual pricing is independent from linked Place ───────────────────────────
+
+{
+  const manualCost = "25,00 Br";
+  const content = buildBreakingNewsContent({
+    ...baseState(),
+    pricingHtml: manualCost,
+    linkedEntityType: "PLACE",
+    linkedEntityId: "place-123",
+  });
+  const texts = content.blocks.filter(
+    (b): b is Extract<(typeof content.blocks)[number], { type: "text" }> => b.type === "text",
+  );
+  assert.equal(texts[1]?.text, manualCost, "manual cost preserved when place is linked");
+  assert.ok(
+    content.blocks.some(
+      (b) => b.type === "activityCard" && b.entityType === "PLACE" && b.entityId === "place-123",
+    ),
+    "linked place block is still saved",
+  );
+}
+
+{
+  const parsed = parseBreakingNewsFromSnapshot({
+    id: "article-1",
+    title: "Test News",
+    slug: "test-news",
+    subtitle: BREAKING_NEWS_SUBTITLE,
+    excerpt: null,
+    content: buildBreakingNewsContent({
+      ...baseState(),
+      pricingHtml: "Бесплатно",
+      linkedEntityType: "PLACE",
+      linkedEntityId: "place-456",
+    }),
+    heroImage: null,
+    coverImageId: null,
+    coverImageUrl: null,
+    authorLabel: null,
+    authorUserId: null,
+    cityContext: null,
+    geoScope: "COUNTRY",
+    cityId: null,
+    status: "DRAFT",
+    publishedAt: null,
+    scheduledAt: null,
+    seoTitle: null,
+    seoDescription: null,
+    seoCanonicalUrl: null,
+    seoOgTitle: null,
+    seoOgDescription: null,
+    seoOgImage: null,
+    seoImageId: null,
+    seoImageUrl: null,
+    seoRobots: null,
+    noindex: false,
+    views: 0,
+    updatedAt: "2026-01-01T00:00:00.000Z",
+  });
+  assert.equal(parsed.pricingHtml, "Бесплатно", "manual cost round-trips from snapshot");
+  assert.equal(parsed.linkedEntityId, "place-456", "linked place round-trips from snapshot");
+}
 
 // ── subtitle marker is always preserved ──────────────────────────────────────
 

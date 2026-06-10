@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { ExternalLink, Loader2 } from "lucide-react";
-import { ContentStatus } from "@prisma/client";
+import { ContentStatus, type GeoScope } from "@prisma/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -15,6 +15,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { UserAuthorPicker } from "@/components/admin/publications/UserAuthorPicker";
+import {
+  PublicationGeoScopeField,
+  type PublicationGeoScopeCity,
+} from "@/components/admin/publications/PublicationGeoScopeField";
 import { useHydrated } from "@/hooks/use-hydrated";
 import { cn } from "@/lib/utils";
 
@@ -110,6 +114,15 @@ export interface PublicationPanelProps {
    * Публичный URL опубликованной записи. Если null — кнопка «Смотреть на сайте» disabled.
    */
   publicUrl?: string | null;
+
+  /** География публикации (опционально — для breaking news и др.). */
+  geoScope?: GeoScope | null;
+  onGeoScopeChange?: (scope: GeoScope | null) => void;
+  cityId?: string | null;
+  onCityIdChange?: (id: string | null) => void;
+  cities?: PublicationGeoScopeCity[];
+  geoScopeError?: string | null;
+  onGeoScopeErrorClear?: () => void;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -140,8 +153,16 @@ export function PublicationPanel({
   onReject,
   previewHref,
   publicUrl,
+  geoScope,
+  onGeoScopeChange,
+  cityId,
+  onCityIdChange,
+  cities = [],
+  geoScopeError,
+  onGeoScopeErrorClear,
 }: PublicationPanelProps) {
   const hydrated = useHydrated();
+  const showGeoScopeField = onGeoScopeChange != null;
 
   const metaParts: string[] = [];
   if (views != null) metaParts.push(`Просмотры: ${views}`);
@@ -156,6 +177,19 @@ export function PublicationPanel({
         ) : null}
       </CardHeader>
       <CardContent className="space-y-4">
+        {showGeoScopeField ? (
+          <PublicationGeoScopeField
+            geoScope={geoScope ?? null}
+            onGeoScopeChange={onGeoScopeChange}
+            cityId={cityId ?? null}
+            onCityIdChange={onCityIdChange ?? (() => {})}
+            cities={cities}
+            error={geoScopeError}
+            onErrorClear={onGeoScopeErrorClear}
+            disabled={actionsBusy}
+          />
+        ) : null}
+
         {/* ── Автор ── */}
         <div className="space-y-1.5">
           <Label>Автор публикации</Label>

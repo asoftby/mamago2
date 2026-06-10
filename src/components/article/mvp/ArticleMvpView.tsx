@@ -276,29 +276,17 @@ export function ArticleMvpView({
             }
             if (block.type === "embed") {
               const igBlockquote = block.embedRequiresInstagramScript;
-              const embedShellClass =
-                "w-full overflow-hidden rounded-xl border border-border/60 bg-muted/15 [&_iframe]:w-full [&_blockquote]:m-0 [&_blockquote]:min-w-0";
+              const embedShellClass = cn(
+                "article-embed-shell w-full overflow-hidden rounded-xl border border-border/60 bg-muted/15",
+                igBlockquote && "article-embed-shell--instagram-blockquote",
+              );
               return (
                 <figure className="not-prose my-8 md:my-10 max-w-[720px]">
                   {block.sanitizedEmbedHtml ? (
-                    igBlockquote ? (
-                      <div
-                        className={cn(
-                          embedShellClass,
-                          "py-[30px] flex justify-center items-start",
-                        )}
-                      >
-                        <div
-                          className="w-[70%] max-w-full min-w-0 [&_iframe]:w-full [&_blockquote]:m-0 [&_blockquote]:min-w-0"
-                          dangerouslySetInnerHTML={{ __html: block.sanitizedEmbedHtml }}
-                        />
-                      </div>
-                    ) : (
-                      <div
-                        className={embedShellClass}
-                        dangerouslySetInnerHTML={{ __html: block.sanitizedEmbedHtml }}
-                      />
-                    )
+                    <div
+                      className={embedShellClass}
+                      dangerouslySetInnerHTML={{ __html: block.sanitizedEmbedHtml }}
+                    />
                   ) : (
                     <div className="rounded-xl border border-dashed border-muted-foreground/35 bg-muted/25 px-4 py-6 text-center text-sm text-muted-foreground">
                       Вставка не распознана. Используйте код встраивания YouTube или Instagram.

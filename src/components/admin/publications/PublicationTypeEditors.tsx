@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ContentStatus, type GeoScope } from "@prisma/client";
 import { Loader2 } from "lucide-react";
@@ -34,7 +34,6 @@ import { PublicationPanel } from "@/components/admin/articles/PublicationPanel";
 import { ArticleBlocksEditor, ArticleTocToggle } from "@/components/admin/publications/ArticleBlocksEditor";
 import { useUnsavedChangesNavigationGuard } from "@/hooks/use-unsaved-changes-navigation-guard";
 import { PlaceLinkedContactsEditor } from "@/components/admin/publications/PlaceLinkedContactsEditor";
-import { PlaceLinkedPricesEditor } from "@/components/admin/publications/PlaceLinkedPricesEditor";
 import { createClientSavePerf } from "@/lib/perf/clientSavePerf";
 import { SeoPanel } from "@/features/admin/seo/components/SeoPanel";
 import { resolveSeoPublicBase } from "@/lib/admin/seo/seoEditorCanonical";
@@ -45,9 +44,14 @@ import {
 import { buildArticlePublicPath } from "@/lib/routing/cityPaths";
 import { usePublicationSlugField } from "@/hooks/usePublicationSlugField";
 import { PublicationSlugField } from "@/components/admin/publications/PublicationSlugField";
-import { useHydrated } from "@/hooks/use-hydrated";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { validateArticleGeoScope } from "@/lib/article/articleGeoScopeValidation";
+import { BreakingNewsLocalDraftBanner } from "@/components/admin/publications/BreakingNewsLocalDraftBanner";
+import { useBreakingNewsLocalDraft } from "@/components/admin/publications/useBreakingNewsLocalDraft";
+import {
+  breakingNewsEditorComparable,
+  clearBreakingNewsLocalDrafts,
+  type BreakingNewsLocalDraft,
+} from "@/lib/publications/breakingNewsLocalDraft";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -58,30 +62,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { PublishedSuccessDialog } from "@/components/shared/PublishedSuccessDialog";
 
-
-function newsEditorSnapshotComparable(args: {
-  title: string;
-  slug: string;
-  coverImageId: string;
-  galleryIds: string[];
-  bodyHtml: string;
-  pricingHtml: string;
-  linkedEntityType: ArticleBlockEntityType;
-  linkedEntityId: string;
-  status: ContentStatus;
-  scheduledAtLocal: string;
-  publishedAtLocal: string;
-  seoTitle: string;
-  seoDescription: string;
-  seoCanonicalUrl: string;
-  noindex: boolean;
-  authorUserId: string | null;
-  geoScope: GeoScope | null;
-  cityId: string | null;
-}): string {
-  return JSON.stringify(args);
-}
 
 export function NewsPublicationEditor({
   articleId,
@@ -129,9 +111,13 @@ export function NewsPublicationEditor({
   const [geoScopeError, setGeoScopeError] = useState<string | null>(null);
   const [cities, setCities] = useState<{ id: string; name: string; slug: string }[]>([]);
 
-  const hydrated = useHydrated();
-
   const [savedComparable, setSavedComparable] = useState<string | null>(null);
+  const [successOpen, setSuccessOpen] = useState(false);
+  const [successViewHref, setSuccessViewHref] = useState("");
+  const baselineSnapshotRef = useRef<ArticleEditorSnapshot | null>(null);
+  const seoTitleManualRef = useRef(false);
+  const seoDescriptionManualRef = useRef(false);
+  const seoCanonicalManualRef = useRef(false);
 
   const formState = useMemo(
     (): BreakingNewsFormState => ({
@@ -177,14 +163,12 @@ export function NewsPublicationEditor({
   );
 
   const currentComparable = useMemo(
-    () => newsEditorSnapshotComparable(formState),
-    [formState],
+    () => breakingNewsEditorComparable({ ...formState, coverImagePreviewUrl }),
+    [formState, coverImagePreviewUrl],
   );
 
   const dirty =
     savedComparable !== null && loadState === "ready" && currentComparable !== savedComparable;
-
-  const { leaveDialogOpen, confirmLeave, onLeaveDialogOpenChange } = useUnsavedChangesNavigationGuard(dirty);
 
   const applySnapshot = useCallback(
     (snap: ArticleEditorSnapshot) => {
@@ -212,10 +196,68 @@ export function NewsPublicationEditor({
       setCityId(p.cityId);
       setGeoScopeError(null);
       setViews(snap.views);
-      setSavedComparable(newsEditorSnapshotComparable(p));
+      seoTitleManualRef.current = Boolean(p.seoTitle.trim());
+      seoDescriptionManualRef.current = Boolean(p.seoDescription.trim());
+      seoCanonicalManualRef.current = Boolean(p.seoCanonicalUrl.trim());
+      baselineSnapshotRef.current = snap;
+      setSavedComparable(
+        breakingNewsEditorComparable({
+          ...p,
+          coverImagePreviewUrl: snap.coverImageUrl ?? "",
+        }),
+      );
     },
     [onTitleChange],
   );
+
+  const applyLocalDraft = useCallback(
+    (draft: BreakingNewsLocalDraft) => {
+      onTitleChange(draft.title);
+      setSlug(draft.slug);
+      setCoverImageId(draft.coverImageId);
+      setCoverImagePreviewUrl(draft.coverImagePreviewUrl);
+      setGalleryIds(draft.galleryIds);
+      setBodyHtml(draft.bodyHtml);
+      setPricingHtml(draft.pricingHtml);
+      setLinkedEntityType(draft.linkedEntityType);
+      setLinkedEntityId(draft.linkedEntityId);
+      setStatus(draft.status);
+      setScheduledAtLocal(draft.scheduledAtLocal);
+      setPublishedAtLocal(draft.publishedAtLocal);
+      setSeoTitle(draft.seoTitle);
+      setSeoDescription(draft.seoDescription);
+      setSeoCanonicalUrl(draft.seoCanonicalUrl);
+      setNoindex(draft.noindex);
+      setAuthorUserId(draft.authorUserId);
+      setAuthorError(null);
+      setGeoScope(draft.geoScope);
+      setCityId(draft.cityId);
+      setGeoScopeError(null);
+    },
+    [onTitleChange],
+  );
+
+  const resetToBaseline = useCallback(() => {
+    if (baselineSnapshotRef.current) {
+      applySnapshot(baselineSnapshotRef.current);
+    }
+  }, [applySnapshot]);
+
+  const {
+    showDraftBanner,
+    restoreDraft,
+    discardDraft,
+  } = useBreakingNewsLocalDraft({
+    articleId,
+    formState,
+    coverImagePreviewUrl,
+    loadState,
+    savedComparable,
+    onRestoreDraft: applyLocalDraft,
+    onDiscardDraft: resetToBaseline,
+  });
+
+  const { leaveDialogOpen, confirmLeave, onLeaveDialogOpenChange } = useUnsavedChangesNavigationGuard(dirty);
 
   useEffect(() => {
     if (!articleId) {
@@ -330,6 +372,21 @@ export function NewsPublicationEditor({
     };
   }, [formState, publishedAtLocal, scheduledAtLocal]);
 
+  const computeSnapPublicUrl = useCallback(
+    (snap: ArticleEditorSnapshot): string => {
+      if (!snap.slug) return "";
+      const citySlug = snap.cityId
+        ? (cities.find((c) => c.id === snap.cityId)?.slug ?? null)
+        : null;
+      return `${resolveSeoPublicBase()}${buildArticlePublicPath({
+        slug: snap.slug,
+        geoScope: snap.geoScope ?? undefined,
+        citySlug,
+      })}`;
+    },
+    [cities],
+  );
+
   const saveArticle = useCallback(
     async (opts?: { silent?: boolean; skipLoading?: boolean }): Promise<boolean> => {
       if (!opts?.skipLoading) {
@@ -360,6 +417,7 @@ export function NewsPublicationEditor({
           }
           const snap = data as ArticleEditorSnapshot;
           applySnapshot(snap);
+          clearBreakingNewsLocalDrafts(snap.id);
           if (!opts?.silent) {
             toast.success("Черновик сохранён");
           }
@@ -388,6 +446,7 @@ export function NewsPublicationEditor({
         }
         const snap = data as ArticleEditorSnapshot;
         applySnapshot(snap);
+        clearBreakingNewsLocalDrafts(snap.id);
         if (!opts?.silent) {
           toast.success("Черновик сохранён");
         }
@@ -479,11 +538,20 @@ export function NewsPublicationEditor({
         toast.error(msg);
         return;
       }
-      if (data && typeof data === "object" && "id" in data) {
-        applySnapshot(data as ArticleEditorSnapshot);
+      const publishedSnap = data && typeof data === "object" && "id" in data
+        ? (data as ArticleEditorSnapshot)
+        : null;
+      if (publishedSnap) {
+        applySnapshot(publishedSnap);
       }
-      toast.success(isAdminEditor ? "Опубликовано" : "Отправлено на модерацию");
+      clearBreakingNewsLocalDrafts(id);
       router.replace(`/admin/content/publications/new?type=news&id=${encodeURIComponent(id)}`);
+      if (isAdminEditor) {
+        setSuccessViewHref(publishedSnap ? computeSnapPublicUrl(publishedSnap) : "");
+        setSuccessOpen(true);
+      } else {
+        toast.success("Отправлено на модерацию");
+      }
     } finally {
       setSubmitting(false);
       setActionsBusy(false);
@@ -548,11 +616,20 @@ export function NewsPublicationEditor({
         toast.error(typeof data.error === "string" ? data.error : "Не удалось выполнить действие");
         return;
       }
-      if (data && typeof data === "object" && "id" in data) {
-        applySnapshot(data as ArticleEditorSnapshot);
+      const moderatedSnap = data && typeof data === "object" && "id" in data
+        ? (data as ArticleEditorSnapshot)
+        : null;
+      if (moderatedSnap) {
+        applySnapshot(moderatedSnap);
       }
-      toast.success(action === "publish" ? "Публикация одобрена" : "Публикация отклонена");
+      clearBreakingNewsLocalDrafts(id);
       router.replace(`/admin/content/publications/new?type=news&id=${encodeURIComponent(id)}`);
+      if (action === "publish") {
+        setSuccessViewHref(moderatedSnap ? computeSnapPublicUrl(moderatedSnap) : "");
+        setSuccessOpen(true);
+      } else {
+        toast.success("Публикация отклонена");
+      }
     } finally {
       setModerating(false);
       setActionsBusy(false);
@@ -570,6 +647,7 @@ export function NewsPublicationEditor({
     slug,
     setSlug,
     persistedSlug: pinnedSlug,
+    slugLocked: hasPersistedId,
     isPublished: status === "PUBLISHED",
     emptyFallback: "article",
     slugHistorySupported: true,
@@ -589,6 +667,21 @@ export function NewsPublicationEditor({
   const previewHref = articleId?.trim() ? `/preview/articles/${articleId.trim()}` : null;
   const publicUrl = status === "PUBLISHED" && previewSlug ? publicNewsUrl : null;
 
+  useEffect(() => {
+    if (loadState !== "ready" || seoTitleManualRef.current) return;
+    setSeoTitle(generateBreakingNewsSeoTitle(title));
+  }, [loadState, title]);
+
+  useEffect(() => {
+    if (loadState !== "ready" || seoDescriptionManualRef.current) return;
+    setSeoDescription(generateBreakingNewsSeoDescription(bodyHtml));
+  }, [bodyHtml, loadState]);
+
+  useEffect(() => {
+    if (loadState !== "ready" || seoCanonicalManualRef.current || !publicNewsUrl) return;
+    setSeoCanonicalUrl(publicNewsUrl);
+  }, [loadState, publicNewsUrl]);
+
   if (loadState === "loading") {
     return (
       <div className="flex items-center gap-2 text-sm text-muted-foreground py-8">
@@ -606,6 +699,13 @@ export function NewsPublicationEditor({
 
   return (
     <div className="space-y-8 max-w-4xl">
+      {showDraftBanner ? (
+        <BreakingNewsLocalDraftBanner
+          onRestore={restoreDraft}
+          onDiscard={discardDraft}
+          disabled={actionsBusy}
+        />
+      ) : null}
       {notBreakingWarning ? (
         <p className="text-sm rounded-md border border-amber-200 bg-amber-50/80 px-3 py-2 text-amber-950">
           Эта запись не помечена как Breaking news (ожидался служебный subtitle). Сохранение перезапишет её в
@@ -632,89 +732,6 @@ export function NewsPublicationEditor({
           slugHistorySupported
         />
 
-        {/* ── География публикации ─────────────────────────────────── */}
-        <div className="space-y-3">
-          <div>
-            <Label>География публикации</Label>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Обязательно перед публикацией. Определяет URL и аудиторию материала.
-            </p>
-          </div>
-          {hydrated ? (
-            <RadioGroup
-              value={geoScope ?? "__unset__"}
-              onValueChange={(v) => {
-                if (v === "COUNTRY") {
-                  setGeoScope("COUNTRY");
-                  setCityId(null);
-                } else if (v === "CITY") {
-                  setGeoScope("CITY");
-                } else {
-                  setGeoScope(null);
-                  setCityId(null);
-                }
-                setGeoScopeError(null);
-              }}
-              className="gap-3"
-            >
-              <div className="flex items-start gap-2">
-                <RadioGroupItem value="COUNTRY" id="bn-geo-country" className="mt-0.5" />
-                <Label htmlFor="bn-geo-country" className="cursor-pointer font-normal">
-                  <span className="font-medium">Вся Беларусь</span>
-                  <span className="block text-xs text-muted-foreground">
-                    Материал не привязан к конкретному городу — URL: /blog/&#123;slug&#125;
-                  </span>
-                </Label>
-              </div>
-              <div className="flex items-start gap-2">
-                <RadioGroupItem value="CITY" id="bn-geo-city" className="mt-0.5" />
-                <Label htmlFor="bn-geo-city" className="cursor-pointer font-normal">
-                  <span className="font-medium">Город</span>
-                  <span className="block text-xs text-muted-foreground">
-                    Локальный материал — URL: /&#123;город&#125;/blog/&#123;slug&#125;
-                  </span>
-                </Label>
-              </div>
-            </RadioGroup>
-          ) : (
-            <div className="h-16 rounded-md border border-input bg-muted/40 animate-pulse" aria-hidden />
-          )}
-
-          {geoScope === "CITY" ? (
-            <div className="space-y-1.5 pl-6">
-              <Label htmlFor="bn-city-select">Город</Label>
-              {hydrated ? (
-                <Select
-                  value={cityId ?? "__none__"}
-                  onValueChange={(v) => {
-                    setCityId(v === "__none__" ? null : v);
-                    setGeoScopeError(null);
-                  }}
-                >
-                  <SelectTrigger id="bn-city-select" className="w-full max-w-xs">
-                    <SelectValue placeholder="Выберите город" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none__">Не выбран</SelectItem>
-                    {cities.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>
-                        {c.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              ) : (
-                <div className="h-9 max-w-xs rounded-md border border-input bg-muted/40 animate-pulse" aria-hidden />
-              )}
-            </div>
-          ) : null}
-
-          {geoScopeError ? (
-            <p className="text-xs text-red-600">{geoScopeError}</p>
-          ) : null}
-        </div>
-        {/* ─────────────────────────────────────────────────────────── */}
-
         <ArticleEditorCoverField
           value={coverImageId}
           initialPreviewUrl={coverImagePreviewUrl || undefined}
@@ -735,21 +752,18 @@ export function NewsPublicationEditor({
           />
         </div>
         <div className="space-y-2">
-          <Label>Цены</Label>
-          {linkedEntityType === "PLACE" && linkedEntityId.trim() ? (
-            <PlaceLinkedPricesEditor placeId={linkedEntityId.trim()} />
-          ) : (
-            <ArticleBlockRichEditor
-              variant="text"
-              value={pricingHtml}
-              onChange={setPricingHtml}
-              placeholder="Цены, скидки, условия…"
-              minHeightClass="min-h-[200px]"
-            />
-          )}
+          <Label>Стоимость</Label>
+          <ArticleBlockRichEditor
+            variant="text"
+            value={pricingHtml}
+            onChange={setPricingHtml}
+            placeholder="Бесплатно, от 25,00 Br, уточняйте у организатора"
+            minHeightClass="min-h-[200px]"
+            disabled={actionsBusy}
+          />
         </div>
         {/* TODO: Add optional Article.relatedPlaceId picker for editorial context (DB field already exists).
-              Geography must remain controlled by the geo selector above (geoScope/cityId),
+              Geography must remain controlled by the geo selector in Publication panel (geoScope/cityId),
               NOT by the selected place. See Article.relatedPlace in schema.prisma. */}
         <div className="space-y-4">
           <div className="space-y-2">
@@ -785,13 +799,23 @@ export function NewsPublicationEditor({
         noindex={noindex}
         coverImageUrl={coverImagePreviewUrl || undefined}
         fallbackTitle={generateBreakingNewsSeoTitle(title)}
-        fallbackDescription={generateBreakingNewsSeoDescription(bodyHtml, title)}
+        fallbackDescription={generateBreakingNewsSeoDescription(bodyHtml)}
         publicUrl={publicNewsUrl || undefined}
         entityType="breaking-news"
         disabled={actionsBusy}
-        onSeoTitleChange={setSeoTitle}
-        onSeoDescriptionChange={setSeoDescription}
-        onCanonicalUrlChange={setSeoCanonicalUrl}
+        disableAutoFill
+        onSeoTitleChange={(value) => {
+          seoTitleManualRef.current = value.trim().length > 0;
+          setSeoTitle(value);
+        }}
+        onSeoDescriptionChange={(value) => {
+          seoDescriptionManualRef.current = value.trim().length > 0;
+          setSeoDescription(value);
+        }}
+        onCanonicalUrlChange={(value) => {
+          seoCanonicalManualRef.current = value.trim().length > 0;
+          setSeoCanonicalUrl(value);
+        }}
         onNoindexChange={setNoindex}
       />
 
@@ -821,6 +845,21 @@ export function NewsPublicationEditor({
         onReject={() => void moderate("reject")}
         previewHref={previewHref}
         publicUrl={publicUrl}
+        geoScope={geoScope}
+        onGeoScopeChange={setGeoScope}
+        cityId={cityId}
+        onCityIdChange={setCityId}
+        cities={cities}
+        geoScopeError={geoScopeError}
+        onGeoScopeErrorClear={() => setGeoScopeError(null)}
+      />
+
+      <PublishedSuccessDialog
+        open={successOpen}
+        onOpenChange={setSuccessOpen}
+        contentType="breaking-news"
+        viewHref={successViewHref}
+        listHref="/admin/content/publications"
       />
 
       <AlertDialog open={leaveDialogOpen} onOpenChange={onLeaveDialogOpenChange}>
