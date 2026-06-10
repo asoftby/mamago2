@@ -190,7 +190,7 @@ export function MyPlanWidget({ onOpen }: MyPlanWidgetProps) {
             style={{ fontFamily: "var(--font-sans)", fontSize: 15, fontWeight: 400, lineHeight: 1, color: "#141210" }}
           >
             Мой план{widgetState.kind === "unauthenticated" && (
-              <em style={{ fontStyle: "italic", color: "#C24E22" }}> за 10 секунд</em>
+              <em style={{ fontFamily: "Georgia, serif", fontStyle: "italic", color: "#C24E22" }}> за 10 секунд</em>
             )}
           </div>
           <div

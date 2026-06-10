@@ -6,6 +6,9 @@ import { ExternalLink } from "lucide-react";
 import { toast } from "@/lib/toast";
 import { publicActivityPath } from "@/lib/business/eventPublicLink";
 import type { SerializedPlanItem } from "./PlanPageClient";
+import { formatHHMM } from "@/lib/formatters/date";
+import { BYN_SYMBOL, formatPriceAmount, normalizeUiCurrencyText } from "@/lib/formatters/format-price";
+import { BelarusianRubleIcon } from "@/components/icons/BelarusianRubleIcon";
 
 const MONTHS_RU_GENITIVE = ["января","февраля","марта","апреля","мая","июня","июля","августа","сентября","октября","ноября","декабря"];
 const DAYS_RU_FULL: Record<number, string> = {
@@ -22,9 +25,52 @@ function formatDayLabel(dateStr: string): { weekday: string; day: number; month:
   };
 }
 
+/** HH:mm from ISO string; shared formatter for consistency across plan views. */
 function formatTime(iso: string | null): string | null {
-  if (!iso) return null;
-  return new Date(iso).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
+  return formatHHMM(iso) || null;
+}
+
+function PlanItemPriceDisplay({ priceLabel }: { priceLabel: string }) {
+  if (priceLabel.toLowerCase() === "бесплатно") {
+    return <span className="uppercase">{priceLabel}</span>;
+  }
+
+  const stripped = priceLabel
+    .replace(/^от\s+/i, "")
+    .split(BYN_SYMBOL)
+    .join("")
+    .trim();
+  const amount = formatPriceAmount(stripped);
+  if (amount) {
+    return (
+      <span style={{ display: "inline-flex", alignItems: "baseline", gap: "0.18em" }}>
+        <span>{amount}</span>
+        <BelarusianRubleIcon size="sm" />
+      </span>
+    );
+  }
+
+  return <span>{normalizeUiCurrencyText(priceLabel)}</span>;
+}
+
+function PlanItemMeta({ item }: { item: SerializedPlanItem }) {
+  const category = item.activity?.categoryLabel?.trim();
+  const priceLabel = item.activity?.priceLabel?.trim();
+  if (!category && !priceLabel) return null;
+
+  const metaStyle = {
+    fontSize: 10,
+    letterSpacing: ".12em",
+    color: "var(--primary)",
+  } as const;
+
+  return (
+    <span className="font-mono inline-flex items-center gap-[0.35em] flex-wrap" style={metaStyle}>
+      {category && <span className="uppercase">{category}</span>}
+      {category && priceLabel && <span aria-hidden>·</span>}
+      {priceLabel && <PlanItemPriceDisplay priceLabel={priceLabel} />}
+    </span>
+  );
 }
 
 function PlanItemCard({
@@ -66,14 +112,14 @@ function PlanItemCard({
         background: "#FAF7F1",
         border: "1px solid rgba(20,18,16,.10)",
         borderRadius: 18,
-        alignItems: "stretch",
+        alignItems: "center",
         transition: "border-color .18s",
       }}
       onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = "rgba(20,18,16,.28)"; }}
       onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = "rgba(20,18,16,.10)"; }}
     >
       {/* Left: time + dot */}
-      <div style={{ display: "flex", flexDirection: "column", justifyContent: "flex-start", gap: 3 }}>
+      <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", gap: 3 }}>
         {time ? (
           <>
             <span
@@ -97,17 +143,6 @@ function PlanItemCard({
             без времени
           </span>
         )}
-        <span
-          style={{
-            marginTop: 8,
-            width: 7,
-            height: 7,
-            borderRadius: 99,
-            background: "#E86A3A",
-            boxShadow: "0 0 0 3px rgba(232,106,58,.18)",
-            flexShrink: 0,
-          }}
-        />
       </div>
 
       {/* Center: body */}
@@ -123,14 +158,7 @@ function PlanItemCard({
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-          {item.activity?.type && (
-            <span
-              className="font-mono uppercase"
-              style={{ fontSize: 10, letterSpacing: ".12em", color: "#C24E22" }}
-            >
-              ● {item.activity.type}
-            </span>
-          )}
+          <PlanItemMeta item={item} />
           {unavailable && (
             <span
               className="font-mono uppercase"
@@ -165,16 +193,13 @@ function PlanItemCard({
       <div
         style={{
           display: "flex",
-          flexDirection: "column",
-          alignItems: "flex-end",
-          justifyContent: "space-between",
-          gap: 10,
+          alignItems: "center",
+          justifyContent: "center",
           paddingLeft: 16,
           minWidth: 100,
           flexShrink: 0,
         }}
       >
-        <div />
         <div style={{ display: "flex", gap: 6 }}>
           {item.activityId && !unavailable && (
             <Link
@@ -235,7 +260,7 @@ export function PlanDayList({ date, items, onRemove }: Props) {
         }}
       >
         <h2
-          className="font-display"
+          className="font-sans"
           style={{
             margin: 0,
             fontSize: "clamp(32px, 4vw, 52px)",
@@ -245,7 +270,7 @@ export function PlanDayList({ date, items, onRemove }: Props) {
           }}
         >
           {weekday},{" "}
-          <span style={{ fontStyle: "italic", color: "#C24E22" }}>
+          <span className="font-display-italic" style={{ color: "var(--primary)" }}>
             {day} {month}
           </span>
         </h2>
@@ -279,7 +304,7 @@ export function PlanDayList({ date, items, onRemove }: Props) {
           }}
         >
           <h3
-            className="font-display"
+            className="font-sans"
             style={{
               margin: 0,
               fontSize: 32,
@@ -289,7 +314,7 @@ export function PlanDayList({ date, items, onRemove }: Props) {
             }}
           >
             Нет событий{" "}
-            <span style={{ fontStyle: "italic", color: "#C24E22" }}>
+            <span className="font-display-italic" style={{ color: "var(--primary)" }}>
               на этот день
             </span>
           </h3>

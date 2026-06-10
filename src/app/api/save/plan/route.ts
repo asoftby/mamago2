@@ -4,6 +4,8 @@ import { getActivityCityIdForAnalytics } from "@/lib/analytics/activityCity";
 import { getSessionRowIdFromCookies } from "@/lib/analytics/getSessionRowId";
 import { trackUserEvent } from "@/server/services/analytics/AnalyticsEventService";
 import { addPlanItem, addRoutePlanItem, removePlanItem } from "@/server/services/plan.service";
+import { prisma } from "@/lib/prisma";
+import { getLocalDateKey } from "@/lib/date/localDateKey";
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,13 +15,15 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { activityId, routeId, planRouteSlug, date, startsAt, title, coverImageUrl, selectedPersonaIds, planAddSource } =
+    const { activityId, routeId, planRouteSlug, date, startsAt, activitySessionId, title, coverImageUrl, selectedPersonaIds, planAddSource } =
       body as {
         activityId?: string;
         routeId?: string;
         planRouteSlug?: string;
         date?: string;
         startsAt?: string;
+        /** ActivitySession.id — used to derive startsAt; validated server-side */
+        activitySessionId?: string | null;
         title?: string;
         coverImageUrl?: string;
         selectedPersonaIds?: unknown;
@@ -52,11 +56,34 @@ export async function POST(request: NextRequest) {
     }
     // Handle activity
     else if (activityId) {
+      // Resolve startsAt: prefer activitySessionId lookup; fall back to raw startsAt string.
+      let resolvedStartsAt: Date | undefined = startsAt ? new Date(startsAt) : undefined;
+
+      if (
+        typeof activitySessionId === "string" &&
+        activitySessionId.length > 0 &&
+        activitySessionId.length < 64
+      ) {
+        const session = await prisma.activitySession.findUnique({
+          where: { id: activitySessionId },
+          select: { activityId: true, startsAt: true },
+        });
+        // Validate session belongs to this activity and falls on the requested date
+        if (
+          session &&
+          session.activityId === activityId &&
+          getLocalDateKey(session.startsAt) === date
+        ) {
+          resolvedStartsAt = session.startsAt;
+        }
+        // If mismatch: silently ignore — PlanItem saved without time
+      }
+
       planItem = await addPlanItem(
         user.id,
         activityId,
         date,
-        startsAt ? new Date(startsAt) : undefined,
+        resolvedStartsAt,
         title ?? undefined,
         coverImageUrl ?? undefined
       );

@@ -12,6 +12,11 @@ import {
   getLocalDateKey,
 } from "@/lib/date/localDateKey";
 import { formatRuShortDayMonth } from "@/lib/formatters/date";
+import { PlanReminderCaption } from "@/components/plan/PlanReminderCaption";
+import {
+  getPlanReminderLabelFromPlanItem,
+  PLAN_REMINDER_LABELS,
+} from "@/lib/plan/getPlanReminderLabel";
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 const C = {
@@ -39,7 +44,11 @@ export type SaveScenario =
       eventPlanDateISO?: string;
       eventPlanDateEndISO?: string;
       eventPlanDateOptions?: string[];
-      eventPlanSessionCountsByDate?: Record<string, number>;
+      /**
+       * Session slots per date: { "YYYY-MM-DD": [{ id, time: "HH:mm" }, ...] }
+       * Used to render time chips. Session counts are derived from this.
+       */
+      eventPlanSessionsByDate?: Record<string, Array<{ id: string; time: string }>>;
     };
 
 export type SaveToPlanResult =
@@ -318,6 +327,33 @@ function IdeasRow({ onClick, ghost }: { onClick: () => void; ghost?: boolean }) 
   );
 }
 
+// ─── Shared helpers ───────────────────────────────────────────────────────────
+/** Returns HH:mm string for current local time, e.g. "14:05". */
+function currentHHMM(): string {
+  const now = new Date();
+  return `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+}
+
+/** Pick default session for a date.
+ *  - today: first slot that hasn't passed yet; if all past → last slot.
+ *  - any other day: first slot (earliest).
+ *  - no slots: null.
+ */
+function defaultSessionId(
+  iso: string,
+  sessions: Array<{ id: string; time: string }> | undefined,
+): string | null {
+  if (!sessions || sessions.length === 0) return null;
+  if (sessions.length === 1) return sessions[0]!.id;
+  const todayISO = getLocalDateKey();
+  if (iso === todayISO) {
+    const now = currentHHMM();
+    const upcoming = sessions.filter((s) => s.time > now);
+    return upcoming.length > 0 ? upcoming[0]!.id : sessions[sessions.length - 1]!.id;
+  }
+  return sessions[0]!.id;
+}
+
 // ─── Date Slider (Variant B) ──────────────────────────────────────────────────
 interface DateSliderProps {
   options: string[];  // YYYY-MM-DD sorted upcoming
@@ -435,8 +471,94 @@ function DateSlider({ options, selISO, onSelect, sessionCountsByDate }: DateSlid
   );
 }
 
+// ─── Time chip row ────────────────────────────────────────────────────────────
+function ClockIcon({ size = 14, color = "currentColor" }: { size?: number; color?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7v5l3 3" />
+    </svg>
+  );
+}
+
+interface TimeChipRowProps {
+  sessions: Array<{ id: string; time: string }>;
+  selectedId: string | null;
+  onSelect: (id: string) => void;
+}
+
+function TimeChipRow({ sessions, selectedId, onSelect }: TimeChipRowProps) {
+  const trackRef = React.useRef<HTMLDivElement>(null);
+
+  // No sessions → "по записи" info line
+  if (sessions.length === 0) {
+    return (
+      <div style={{
+        display: "flex", alignItems: "center", gap: 7, marginTop: 12,
+        padding: "10px 14px", borderRadius: 12,
+        background: C.paper, border: `1px solid ${C.line}`,
+        fontSize: 13, color: C.ink3, fontFamily: "var(--font-sans, ui-sans-serif)",
+      }}>
+        <ClockIcon size={14} color={C.ink3} />
+        <span>Время по записи — уточните у организатора</span>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ marginTop: 10 }}>
+      <div style={{
+        fontFamily: "var(--font-mono, ui-monospace)", textTransform: "uppercase" as const,
+        fontSize: 10, letterSpacing: ".12em", color: C.ink3, marginBottom: 6,
+        display: "flex", alignItems: "center", gap: 8,
+      }}>
+        <ClockIcon size={11} color={C.ink3} /> время начала
+      </div>
+      <div
+        ref={trackRef}
+        style={{
+          display: "flex", gap: 6,
+          overflowX: "auto", overflowY: "hidden",
+          flexWrap: "nowrap" as const,
+          scrollbarWidth: "none" as const,
+          padding: "2px 0 4px",
+        }}
+      >
+        <style>{`.stp-time-track::-webkit-scrollbar{display:none}`}</style>
+        {sessions.map((s) => {
+          const isSel = s.id === selectedId;
+          return (
+            <button
+              key={s.id}
+              type="button"
+              onClick={() => onSelect(s.id)}
+              style={{
+                flexShrink: 0,
+                height: 40, padding: "0 14px",
+                borderRadius: 999,
+                background: isSel ? C.accent : C.paper,
+                color: isSel ? "#fff" : C.ink,
+                border: `1px solid ${isSel ? C.accent : C.line}`,
+                fontFamily: "var(--font-mono, ui-monospace)",
+                fontSize: 13, fontWeight: 600, letterSpacing: ".03em",
+                cursor: "pointer", transition: "all .15s",
+                display: "flex", alignItems: "center",
+                whiteSpace: "nowrap" as const,
+              }}
+              onMouseEnter={(e) => { if (!isSel) e.currentTarget.style.borderColor = C.ink2; }}
+              onMouseLeave={(e) => { if (!isSel) e.currentTarget.style.borderColor = C.line; }}
+            >
+              {s.time}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ─── Dark confirmation bar ────────────────────────────────────────────────────
-function ConfirmBar({ iso, onConfirm }: { iso: string; onConfirm: () => void }) {
+function ConfirmBar({ iso, time, onConfirm }: { iso: string; time?: string | null; onConfirm: () => void }) {
   const chip = fmtDateChip(iso);
   const DOW_FULL: Record<string, string> = {
     вс: "Воскресенье", пн: "Понедельник", вт: "Вторник",
@@ -454,6 +576,11 @@ function ConfirmBar({ iso, onConfirm }: { iso: string; onConfirm: () => void }) 
           {DOW_FULL[chip.dow] ?? chip.dow},{" "}
           <span style={{ fontFamily: "var(--font-display), Georgia, serif" }}>{chip.day}</span>{" "}
           {RU_MONTHS_FULL[chip.monthIdx]}
+          {time && (
+            <span style={{ fontFamily: "var(--font-mono, ui-monospace)", fontSize: 13, fontWeight: 500, color: "rgba(250,247,241,.75)", marginLeft: 6 }}>
+              · {time}
+            </span>
+          )}
         </div>
       </div>
       <button
@@ -533,9 +660,12 @@ function AllDatesDrawer({ options, selISO, onSelect, onBack }: AllDatesDrawerPro
           </svg>
         </button>
         <div>
-          <span style={{ fontFamily: "var(--font-mono, ui-monospace)", textTransform: "uppercase" as const, fontSize: 10, letterSpacing: ".14em", color: C.accentDeep }}>● Все даты</span>
+          <span style={{ fontFamily: "var(--font-mono, ui-monospace)", textTransform: "uppercase" as const, fontSize: 10, letterSpacing: ".14em", color: "var(--primary)" }}>● Все даты</span>
           <h3 style={{ margin: "4px 0 0", fontFamily: "var(--font-sans)", fontSize: 24, letterSpacing: "-.015em", fontWeight: 600 }}>
-            {options.length} <span style={{ fontStyle: "italic", color: C.accentDeep }}>сеансов</span>
+            {options.length}{" "}
+            <span style={{ fontFamily: "Georgia, 'Times New Roman', serif", color: "var(--primary)", fontStyle: "italic", fontWeight: 500 }}>
+              {pluralRu(options.length, ["сеанс", "сеанса", "сеансов"])}
+            </span>
           </h3>
         </div>
       </div>
@@ -552,6 +682,12 @@ function AllDatesDrawer({ options, selISO, onSelect, onBack }: AllDatesDrawerPro
               {dates.map((iso) => {
                 const chip = fmtDateChip(iso);
                 const isSel = iso === selISO;
+                const isWeekend = chip.dow === "сб" || chip.dow === "вс";
+                const dowColor = isWeekend
+                  ? "var(--primary)"
+                  : isSel
+                    ? "rgba(250,247,241,.55)"
+                    : C.ink3;
                 return (
                   <button
                     key={iso}
@@ -568,7 +704,7 @@ function AllDatesDrawer({ options, selISO, onSelect, onBack }: AllDatesDrawerPro
                     onMouseEnter={(e) => { if (!isSel) e.currentTarget.style.borderColor = C.ink; }}
                     onMouseLeave={(e) => { if (!isSel) e.currentTarget.style.borderColor = C.line; }}
                   >
-                    <span style={{ fontFamily: "var(--font-mono, ui-monospace)", fontSize: 10, letterSpacing: ".12em", textTransform: "uppercase" as const, color: isSel ? "rgba(250,247,241,.55)" : C.ink3 }}>{chip.dow}</span>
+                    <span style={{ fontFamily: "var(--font-mono, ui-monospace)", fontSize: 10, letterSpacing: ".12em", textTransform: "uppercase" as const, color: dowColor }}>{chip.dow}</span>
                     <span style={{ fontFamily: "var(--font-sans)", fontSize: 24, lineHeight: 1, letterSpacing: "-.02em" }}>{chip.day}</span>
                     <span style={{ fontSize: 11, color: isSel ? "rgba(250,247,241,.55)" : C.ink3 }}>{chip.month}</span>
                   </button>
@@ -601,25 +737,44 @@ function AllDatesDrawer({ options, selISO, onSelect, onBack }: AllDatesDrawerPro
 // ─── Date Slider View (Variant B) ─────────────────────────────────────────────
 function DateSliderView({
   options, title, category,
-  onConfirm, onIdea, sessionCountsByDate,
+  onConfirm, onIdea, sessionsByDate,
 }: {
   options: string[]; title: string; category?: string;
-  onConfirm: (iso: string) => void; onIdea: () => void;
-  sessionCountsByDate?: Record<string, number>;
+  onConfirm: (iso: string, sessionId: string | null) => void; onIdea: () => void;
+  sessionsByDate?: Record<string, Array<{ id: string; time: string }>>;
 }) {
   const [selISO, setSelISO] = React.useState<string>(options[0] ?? "");
+  const [selectedSessionId, setSelectedSessionId] = React.useState<string | null>(() =>
+    defaultSessionId(options[0] ?? "", sessionsByDate?.[options[0] ?? ""])
+  );
   const [drawerOpen, setDrawerOpen] = React.useState(false);
   const FIRST = 5;
   const visible = options.slice(0, FIRST);
   const hidden = options.length - FIRST;
 
-  const handleDrawerSelect = (iso: string) => {
-    setSelISO(iso);
-  };
+  // Derive session counts (single source of truth = sessionsByDate)
+  const sessionCountsByDate = React.useMemo(() => {
+    if (!sessionsByDate) return {};
+    return Object.fromEntries(
+      Object.entries(sessionsByDate).map(([d, ss]) => [d, ss.length])
+    );
+  }, [sessionsByDate]);
 
-  const handleDrawerBack = () => {
-    setDrawerOpen(false);
-  };
+  // When date changes, recompute default time slot for that date
+  const handleDateSelect = React.useCallback((iso: string) => {
+    setSelISO(iso);
+    setSelectedSessionId(defaultSessionId(iso, sessionsByDate?.[iso]));
+  }, [sessionsByDate]);
+
+  const handleDrawerBack = () => { setDrawerOpen(false); };
+
+  // Sessions for currently selected date
+  const currentSessions = selISO && sessionsByDate ? (sessionsByDate[selISO] ?? []) : [];
+
+  // HH:mm of the selected session (for ConfirmBar display)
+  const selectedTime = selectedSessionId
+    ? (currentSessions.find((s) => s.id === selectedSessionId)?.time ?? null)
+    : null;
 
   return (
     <>
@@ -637,9 +792,9 @@ function DateSliderView({
           fontFamily: "var(--font-sans)",
           fontSize: 30, lineHeight: 1.02, letterSpacing: "-.02em", fontWeight: 400,
         }}>
-          На какой{" "}
-          <span style={{ fontFamily: "Georgia, 'Times New Roman', serif", fontStyle: "italic", color: C.accentDeep }}>день</span>{" "}
-          напомнить?
+          В какой{" "}
+          <span style={{ fontFamily: "Georgia, 'Times New Roman', serif", fontStyle: "italic", color: "var(--primary)" }}>день</span>{" "}
+          напомнить.
         </h2>
 
         {/* Event context line */}
@@ -678,9 +833,18 @@ function DateSliderView({
         <DateSlider
           options={visible}
           selISO={selISO}
-          onSelect={setSelISO}
+          onSelect={handleDateSelect}
           sessionCountsByDate={sessionCountsByDate}
         />
+
+        {/* Time chips — only rendered when sessionsByDate is provided */}
+        {sessionsByDate && (
+          <TimeChipRow
+            sessions={currentSessions}
+            selectedId={selectedSessionId}
+            onSelect={setSelectedSessionId}
+          />
+        )}
 
         {/* Show all dates button */}
         {hidden > 0 && (
@@ -709,7 +873,13 @@ function DateSliderView({
         )}
 
         {/* Confirmation bar */}
-        {selISO && <ConfirmBar iso={selISO} onConfirm={() => onConfirm(selISO)} />}
+        {selISO && (
+          <ConfirmBar
+            iso={selISO}
+            time={selectedTime}
+            onConfirm={() => onConfirm(selISO, selectedSessionId)}
+          />
+        )}
 
         <OrDivider label="или без даты" />
         <IdeasRow onClick={onIdea} ghost />
@@ -720,7 +890,7 @@ function DateSliderView({
         <AllDatesDrawer
           options={options}
           selISO={selISO}
-          onSelect={handleDrawerSelect}
+          onSelect={handleDateSelect}
           onBack={handleDrawerBack}
         />
       )}
@@ -733,6 +903,11 @@ function CalendarView({ onSelect, allowedDateKeys, onBack }: {
   onSelect: (iso: string) => void; allowedDateKeys?: string[] | null; onBack?: () => void;
 }) {
   const [value, setValue] = React.useState<Date | null>(null);
+  const selectedDateISO = value ? getLocalDateKey(value) : null;
+  const calendarReminderHint = selectedDateISO
+    ? getPlanReminderLabelFromPlanItem({ planDate: selectedDateISO }) ?? PLAN_REMINDER_LABELS.eveningBefore
+    : PLAN_REMINDER_LABELS.eveningBefore;
+
   return (
     <div style={{ padding: "24px 24px 20px" }}>
       {onBack && (
@@ -746,7 +921,7 @@ function CalendarView({ onSelect, allowedDateKeys, onBack }: {
         Выберите <span style={{ fontStyle: "italic", color: C.accentDeep }}>дату</span>
       </h2>
       <p style={{ marginTop: 8, marginBottom: 22, fontSize: 14, color: C.ink3, lineHeight: 1.5 }}>
-        Добавим в план и напомним вечером накануне.
+        Добавим в план и {calendarReminderHint}.
       </p>
       <DatePicker value={value} onDateChange={setValue} disablePast allowedDateKeys={allowedDateKeys} />
       <button
@@ -789,7 +964,7 @@ function InPlanView({ planDate, planStartsAt, planItemId, onSwitchCalendar, onRe
 
       <h2 style={{ margin: "0 0 8px", fontFamily: "var(--font-sans)", fontSize: 30, lineHeight: 1, letterSpacing: "-.02em", fontWeight: 600 }}>
         В вашем{" "}
-        <span style={{ fontFamily: "Georgia, 'Times New Roman', serif", fontStyle: "italic", fontWeight: 400, color: C.accentDeep }}>плане</span>.
+        <span style={{ fontFamily: "Georgia, 'Times New Roman', serif", fontStyle: "italic", fontWeight: 400, color: "var(--primary)" }}>плане</span>.
       </h2>
 
       {/* Бейдж — derived от planDate */}
@@ -811,11 +986,11 @@ function InPlanView({ planDate, planStartsAt, planItemId, onSwitchCalendar, onRe
           onClick={onSwitchCalendar}
           style={{
             fontFamily: "var(--font-mono, ui-monospace)", textTransform: "uppercase" as const,
-            fontSize: 10, letterSpacing: ".12em", color: C.accentDeep,
+            fontSize: 10, letterSpacing: ".12em", color: "var(--primary)",
             background: "none", border: 0, cursor: "pointer", padding: 0,
             display: "inline-flex", alignItems: "center", gap: 4,
           }}
-        ><PlusIcon size={11} color={C.accentDeep} /> ещё дату</button>
+        ><PlusIcon size={11} color="var(--primary)" /> ещё дату</button>
       } />
 
       <div style={{ marginBottom: 16 }}>
@@ -834,7 +1009,13 @@ function InPlanView({ planDate, planStartsAt, planItemId, onSwitchCalendar, onRe
                 </span>
               )}
             </div>
-            <div style={{ fontFamily: "var(--font-mono, ui-monospace)", fontSize: 11, color: C.ink3, marginTop: 3, letterSpacing: ".04em" }}>● напомним накануне вечером</div>
+            {planDate && (
+              <PlanReminderCaption
+                planDate={planDate}
+                planStartsAt={planStartsAt}
+                style={{ color: C.ink3 }}
+              />
+            )}
           </div>
           <button onClick={onSwitchCalendar} title="Изменить дату" style={{
             width: 32, height: 32, borderRadius: 99, border: `1px solid ${C.line2}`,
@@ -868,7 +1049,7 @@ function InPlanView({ planDate, planStartsAt, planItemId, onSwitchCalendar, onRe
               background: "transparent",
               border: 0,
               padding: 0,
-              color: C.accentDeep,
+              color: "var(--primary)",
               fontSize: 15,
               fontWeight: 600,
               fontFamily: "var(--font-sans)",
@@ -1037,7 +1218,10 @@ function InIdeasView({ onRemoveIdea, onSchedule, dateOptions }: {
             <div>
               <span style={{ fontFamily: "var(--font-mono, ui-monospace)", textTransform: "uppercase" as const, fontSize: 10, letterSpacing: ".14em", color: C.accentDeep }}>● Выбор даты</span>
               <h3 style={{ margin: "4px 0 0", fontFamily: "var(--font-sans)", fontSize: 24, letterSpacing: "-.015em", fontWeight: 600 }}>
-                {dateOptions.length} <span style={{ fontStyle: "italic", color: C.accentDeep }}>сеансов</span>
+                {dateOptions.length}{" "}
+                <span style={{ fontFamily: "Georgia, 'Times New Roman', serif", color: "var(--primary)", fontStyle: "italic", fontWeight: 500 }}>
+                  {pluralRu(dateOptions.length, ["сеанс", "сеанса", "сеансов"])}
+                </span>
               </h3>
             </div>
           </div>
@@ -1114,6 +1298,9 @@ function EditorialView({
   const rangeLabel = formatEventRangeSubtitle(eventPlanDateISO, eventPlanDateEndISO);
   const isSingleDate = Boolean(eventPlanDateISO) && !isLongRunning;
   const upcomingOptions = dateOptions.filter((d) => d >= todayISO);
+  const reminderHint =
+    getPlanReminderLabelFromPlanItem({ planDate: upcomingOptions[0] ?? tomorrowISO }) ??
+    PLAN_REMINDER_LABELS.eveningBefore;
 
   return (
     <div style={{ padding: "24px 24px 20px" }}>
@@ -1147,7 +1334,7 @@ function EditorialView({
         <span style={{ fontStyle: "italic", color: C.accentDeep }}>активность</span>?
       </h2>
       <p style={{ marginTop: 8, marginBottom: 22, fontSize: 14, color: C.ink3, lineHeight: 1.5 }}>
-        Положите в план на дату — напомним вечером накануне.
+        Положите в план на дату — {reminderHint}.
         {" "}Или сохраните в идеи, чтобы вернуться позже.
       </p>
 
@@ -1300,9 +1487,9 @@ export function SaveToPlanPickerBody({
     const unique = new Set(eventPlanDateOptions.map((d) => normalizePlanDateISO(d)).filter(Boolean));
     return Array.from(unique).sort() as string[];
   }, [eventPlanDateOptions]);
-  const sessionCountsByDate = React.useMemo(() => {
-    if (scenario.kind !== "quickdate") return {};
-    return scenario.eventPlanSessionCountsByDate ?? {};
+  const sessionsByDate = React.useMemo(() => {
+    if (scenario.kind !== "quickdate") return undefined;
+    return scenario.eventPlanSessionsByDate;
   }, [scenario]);
 
   const upcomingOptions = normalizedOptions.filter((d) => d >= todayISO);
@@ -1370,8 +1557,8 @@ export function SaveToPlanPickerBody({
       <DateSliderView
         options={sliderOptions}
         title={scenario.title}
-        sessionCountsByDate={sessionCountsByDate}
-        onConfirm={(iso) => onCommit({ action: "plan", dateISO: iso, timeSlotId: null })}
+        sessionsByDate={sessionsByDate}
+        onConfirm={(iso, sessionId) => onCommit({ action: "plan", dateISO: iso, timeSlotId: sessionId ?? null })}
         onIdea={() => onCommit({ action: "ideas" })}
       />
     </div>

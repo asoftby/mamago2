@@ -24,6 +24,8 @@ export type SerializedPlanItem = {
     type: string;
     coverImageUrl: string | null;
     ageLabel: string | null;
+    categoryLabel: string | null;
+    priceLabel: string | null;
   } | null;
 };
 
@@ -271,9 +273,9 @@ export function PlanPageClient({ initialItems, ideaActivityIds, initialIdeas = [
             <div className="flex items-center gap-3" style={{ marginBottom: 18, lineHeight: 1 }}>
               <span
                 className="font-mono uppercase inline-flex items-center gap-1.5"
-                style={{ fontSize: 11, letterSpacing: ".14em", color: "#C24E22" }}
+                style={{ fontSize: 11, letterSpacing: ".14em", color: "var(--primary)" }}
               >
-                <span style={{ display: "inline-block", width: 6, height: 6, borderRadius: "50%", background: "#C24E22", flexShrink: 0 }} />
+                <span style={{ display: "inline-block", width: 6, height: 6, borderRadius: "50%", background: "var(--primary)", flexShrink: 0 }} />
                 МОЙ ПЛАН
               </span>
               <span
@@ -284,7 +286,7 @@ export function PlanPageClient({ initialItems, ideaActivityIds, initialIdeas = [
               </span>
             </div>
             <h1
-              className="font-display"
+              className="font-sans"
               style={{
                 margin: 0,
                 fontSize: "clamp(56px, 8vw, 120px)",
@@ -322,12 +324,12 @@ export function PlanPageClient({ initialItems, ideaActivityIds, initialIdeas = [
             }}>
               <span
                 className="font-mono uppercase"
-                style={{ fontSize: 11, letterSpacing: ".14em", color: "#C24E22" }}
+                style={{ fontSize: 11, letterSpacing: ".14em", color: "var(--primary)" }}
               >
                 ● в плане
               </span>
               <div
-                className="font-display"
+                className="font-sans"
                 style={{ fontSize: 34, lineHeight: 1, letterSpacing: "-.02em", color: "#141210" }}
               >
                 {totalItems} {pluralizeEvents(totalItems)}

@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { PlanPageClient } from "./PlanPageClient";
 import { PlanGuestFlow } from "./PlanGuestFlow";
 import { getPlanActivityPublicAvailability } from "@/lib/plan/publicVisibility";
+import { formatPlanActivityPriceLabel } from "@/lib/plan/formatPlanActivityPriceLabel";
 import { getLatestActivePlanReminderNotification } from "@/server/services/notification.service";
 
 export default async function PlanPage() {
@@ -65,6 +66,8 @@ export default async function PlanPage() {
           type: item.activity.type,
           coverImageUrl: item.activity.coverImageUrl,
           ageLabel: item.activity.ageLabel,
+          categoryLabel: item.activity.eventCategory?.nameRu ?? null,
+          priceLabel: formatPlanActivityPriceLabel(item.activity),
         }
       : null,
   }));
