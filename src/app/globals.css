@@ -346,6 +346,47 @@ body:has([data-slot="alert-dialog-overlay"][data-state="open"]) {
   }
 }
 
+/* Activation banner: переливающийся peach-градиент */
+@keyframes mg-banner-gradient-flow {
+  0%,
+  100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+@keyframes mg-banner-orb-drift {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  50% {
+    transform: translate(28px, 14px);
+  }
+}
+
+.animate-mg-banner-gradient-flow {
+  animation: mg-banner-gradient-flow 9s ease-in-out infinite;
+}
+
+.animate-mg-banner-orb-drift {
+  animation: mg-banner-orb-drift 11s ease-in-out infinite;
+}
+
+.animate-mg-banner-orb-drift-reverse {
+  animation: mg-banner-orb-drift 13s ease-in-out infinite reverse;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-mg-banner-gradient-flow,
+  .animate-mg-banner-orb-drift,
+  .animate-mg-banner-orb-drift-reverse {
+    animation: none;
+  }
+}
+
 /* Мой план: появление карточки события в списке дня */
 @keyframes mg-plan-day-item-in {
   from {

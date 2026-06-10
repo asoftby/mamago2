@@ -82,18 +82,40 @@ function BannerShell({
   onDismiss: () => void;
 }) {
   return (
-    <div className="relative overflow-hidden rounded-[20px] border border-neutral-100 bg-white px-5 py-5 shadow-[0_2px_16px_rgba(0,0,0,0.06)] sm:px-6 sm:py-6">
+    <div className="relative overflow-hidden rounded-[20px] border border-[#ffd8c4] px-5 py-5 shadow-[0_2px_16px_rgba(245,140,90,0.12),inset_0_1px_0_rgba(255,255,255,0.9)] sm:px-6 sm:py-6">
+      <div
+        className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(255,216,196,0.42),_transparent_28%),radial-gradient(circle_at_bottom_right,_rgba(255,181,138,0.24),_transparent_34%),linear-gradient(135deg,_#fffaf5_0%,_#fff6ef_45%,_#fff9f6_100%)]"
+        aria-hidden
+      />
+      <div
+        className="pointer-events-none absolute inset-0 animate-mg-banner-gradient-flow opacity-90"
+        style={{
+          background:
+            "linear-gradient(120deg, rgba(255,241,232,0.9), rgba(255,216,196,0.55), rgba(255,181,138,0.35), rgba(255,248,244,0.85), rgba(255,224,204,0.5))",
+          backgroundSize: "300% 300%",
+        }}
+        aria-hidden
+      />
+      <div
+        className="pointer-events-none absolute -left-16 top-0 h-32 w-32 animate-mg-banner-orb-drift rounded-full bg-[radial-gradient(circle,_rgba(255,201,167,0.35),_transparent_70%)] blur-2xl"
+        aria-hidden
+      />
+      <div
+        className="pointer-events-none absolute -right-10 bottom-0 h-28 w-28 animate-mg-banner-orb-drift-reverse rounded-full bg-[radial-gradient(circle,_rgba(255,166,116,0.3),_transparent_70%)] blur-3xl"
+        aria-hidden
+      />
+
       {/* dismiss */}
       <button
         type="button"
         onClick={onDismiss}
-        className="absolute right-4 top-4 flex h-7 w-7 items-center justify-center rounded-full text-neutral-300 transition-colors hover:bg-neutral-100 hover:text-neutral-500"
+        className="absolute right-4 top-4 z-10 flex h-7 w-7 items-center justify-center rounded-full text-neutral-400 transition-colors hover:bg-white/60 hover:text-neutral-600"
         aria-label="Скрыть"
       >
         <X className="h-4 w-4" strokeWidth={2} />
       </button>
 
-      <div className="flex items-start gap-4 pr-8">
+      <div className="relative flex items-start gap-4 pr-8">
         {/* icon */}
         <div className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#FFF3EC]">
           {icon}
@@ -101,10 +123,10 @@ function BannerShell({
 
         {/* content */}
         <div className="min-w-0 flex-1 space-y-1.5">
-          <p className="leading-snug text-neutral-900" style={{ fontFamily: "Georgia, serif", fontWeight: 400, fontSize: 18 }}>
+          <p className="leading-snug text-neutral-900" style={{ fontFamily: "var(--font-sans)", fontWeight: 400, fontSize: 18 }}>
             {title}
           </p>
-          <p className="text-sm leading-relaxed text-neutral-500">
+          <p className="text-[14px] leading-[150%] text-neutral-600 sm:text-[14px]">
             {description}
           </p>
           <div className="pt-1">
