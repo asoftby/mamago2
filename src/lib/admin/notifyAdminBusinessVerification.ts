@@ -56,7 +56,7 @@ async function sendTelegram(text: string): Promise<void> {
   );
   if (!res.ok) {
     const body = await res.text();
-    console.error("[notifyAdminBusinessVerification] Telegram error:", res.status, body);
+    throw new Error(`Telegram HTTP ${res.status}: ${body}`);
   }
 }
 
@@ -76,11 +76,7 @@ async function sendWebhook(
     }),
   });
   if (!res.ok) {
-    console.error(
-      "[notifyAdminBusinessVerification] Webhook error:",
-      res.status,
-      await res.text()
-    );
+    throw new Error(`Webhook HTTP ${res.status}: ${await res.text()}`);
   }
 }
 
@@ -110,21 +106,43 @@ async function sendResendEmail(text: string, subject: string): Promise<void> {
     }),
   });
   if (!res.ok) {
-    console.error(
-      "[notifyAdminBusinessVerification] Resend error:",
-      res.status,
-      await res.text()
-    );
+    throw new Error(`Resend HTTP ${res.status}: ${await res.text()}`);
   }
+}
+
+function listMissingEnvVars(): string[] {
+  const missing: string[] = [];
+  if (!process.env.TELEGRAM_ADMIN_BOT_TOKEN) missing.push("TELEGRAM_ADMIN_BOT_TOKEN");
+  if (!process.env.TELEGRAM_ADMIN_CHAT_ID) missing.push("TELEGRAM_ADMIN_CHAT_ID");
+  if (!process.env.ADMIN_NOTIFY_WEBHOOK_URL) missing.push("ADMIN_NOTIFY_WEBHOOK_URL");
+  if (!process.env.RESEND_API_KEY) missing.push("RESEND_API_KEY");
+  if (!process.env.RESEND_FROM_EMAIL) missing.push("RESEND_FROM_EMAIL");
+  if (!process.env.ADMIN_NOTIFICATION_EMAIL) missing.push("ADMIN_NOTIFICATION_EMAIL");
+  return missing;
 }
 
 /**
  * Не бросает исключения наружу — логирует сбои в консоль.
  * Вызывать после успешного перевода заявки в PENDING.
+ * Возвращаемый промис можно не ожидать (fire-and-forget из вызывающего кода).
  */
-export function notifyAdminBusinessVerificationPending(
+export async function notifyAdminBusinessVerificationPending(
   payload: BusinessVerificationNotifyPayload
-): void {
+): Promise<void> {
+  try {
+    await notifyAdminBusinessVerificationPendingUnsafe(payload);
+  } catch (error) {
+    console.error(
+      "[notifyAdminBusinessVerification] unexpected failure",
+      payload.businessId,
+      error
+    );
+  }
+}
+
+async function notifyAdminBusinessVerificationPendingUnsafe(
+  payload: BusinessVerificationNotifyPayload
+): Promise<void> {
   const text = buildMessage(payload);
   const subject = `mamaGo: заявка на верификацию — ${payload.name}`;
 
@@ -136,21 +154,50 @@ export function notifyAdminBusinessVerificationPending(
       process.env.ADMIN_NOTIFICATION_EMAIL);
 
   if (!configured) {
-    console.info(
-      "[notifyAdminBusinessVerification] Заявка отправлена (уведомление админу не настроено: задайте TELEGRAM_* или ADMIN_NOTIFY_WEBHOOK_URL или Resend + ADMIN_NOTIFICATION_EMAIL)",
+    console.warn(
+      "[notifyAdminBusinessVerification] Ни один канал не настроен — уведомление админу не отправлено. " +
+        `Отсутствуют: ${listMissingEnvVars().join(", ")}. ` +
+        "Нужен Telegram (TELEGRAM_ADMIN_BOT_TOKEN + TELEGRAM_ADMIN_CHAT_ID), " +
+        "или ADMIN_NOTIFY_WEBHOOK_URL, или Resend (RESEND_API_KEY + RESEND_FROM_EMAIL + ADMIN_NOTIFICATION_EMAIL).",
       payload.businessId
     );
+    return;
   }
 
-  void Promise.all([
-    sendTelegram(text).catch((e) =>
-      console.error("[notifyAdminBusinessVerification] Telegram", e)
-    ),
-    sendWebhook(payload).catch((e) =>
-      console.error("[notifyAdminBusinessVerification] Webhook", e)
-    ),
-    sendResendEmail(text, subject).catch((e) =>
-      console.error("[notifyAdminBusinessVerification] Resend", e)
-    ),
-  ]);
+  const channels: Array<{ name: string; configured: boolean; run: () => Promise<void> }> = [
+    {
+      name: "telegram",
+      configured: Boolean(process.env.TELEGRAM_ADMIN_BOT_TOKEN && process.env.TELEGRAM_ADMIN_CHAT_ID),
+      run: () => sendTelegram(text),
+    },
+    {
+      name: "webhook",
+      configured: Boolean(process.env.ADMIN_NOTIFY_WEBHOOK_URL),
+      run: () => sendWebhook(payload),
+    },
+    {
+      name: "email",
+      configured: Boolean(
+        process.env.RESEND_API_KEY &&
+          process.env.RESEND_FROM_EMAIL &&
+          process.env.ADMIN_NOTIFICATION_EMAIL
+      ),
+      run: () => sendResendEmail(text, subject),
+    },
+  ];
+
+  const active = channels.filter((c) => c.configured);
+  const settled = await Promise.allSettled(active.map((c) => c.run()));
+  const summary = channels
+    .map((channel) => {
+      if (!channel.configured) return `${channel.name}=skipped`;
+      const result = settled[active.indexOf(channel)];
+      return result.status === "fulfilled"
+        ? `${channel.name}=ok`
+        : `${channel.name}=fail(${result.reason instanceof Error ? result.reason.message : String(result.reason)})`;
+    })
+    .join(" ");
+  console.info(
+    `[notifyAdminBusinessVerification] business=${payload.businessId} ${summary}`
+  );
 }
