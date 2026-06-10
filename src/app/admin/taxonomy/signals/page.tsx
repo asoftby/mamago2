@@ -134,9 +134,9 @@ export default function SignalsPage() {
   const formatDomain = (domain: SignalDomain | null) => {
     if (!domain) return "—";
     const labels = {
-      [SignalDomain.PROFILE]: "Profile",
-      [SignalDomain.DISCOVERY]: "Discovery", 
-      [SignalDomain.RECOMMENDATION]: "Recommendation"
+      [SignalDomain.PROFILE]: "Профиль",
+      [SignalDomain.DISCOVERY]: "Подборка",
+      [SignalDomain.RECOMMENDATION]: "Рекомендации",
     };
     return labels[domain] || domain;
   };
@@ -171,18 +171,18 @@ export default function SignalsPage() {
   return (
     <DiscoveryTaxonomyPageShell>
       <DiscoveryTaxonomyPageHeader
-        title="Taxonomy: Signals"
-        description="Два уровня: группа сигнала (Energy, Format, …) и значения внутри группы на странице редактирования. Под-сигнал можно создать только у корня. Откройте строку для настройки и опций."
+        title="Сигналы"
+        description="Сигналы помогают описывать интересы, формат, возраст, темп и другие признаки для подбора событий и рекомендаций. Сначала создаётся группа, затем значения внутри неё. Откройте строку, чтобы настроить параметры."
       />
 
       <div className="space-y-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-5">
-            <TabsTrigger value="all">All Signals</TabsTrigger>
-            <TabsTrigger value={SignalDomain.PROFILE}>Profile</TabsTrigger>
-            <TabsTrigger value={SignalDomain.DISCOVERY}>Discovery</TabsTrigger>
-            <TabsTrigger value={SignalDomain.RECOMMENDATION}>Recommendation</TabsTrigger>
-            <TabsTrigger value="plan">Plan onboarding</TabsTrigger>
+            <TabsTrigger value="all">Все сигналы</TabsTrigger>
+            <TabsTrigger value={SignalDomain.PROFILE}>Профиль</TabsTrigger>
+            <TabsTrigger value={SignalDomain.DISCOVERY}>Подборка</TabsTrigger>
+            <TabsTrigger value={SignalDomain.RECOMMENDATION}>Рекомендации</TabsTrigger>
+            <TabsTrigger value="plan">Онбординг плана</TabsTrigger>
           </TabsList>
 
           <TabsContent value={activeTab} className="space-y-6">
