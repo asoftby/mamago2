@@ -19,10 +19,10 @@ type FormatPriceOptions = {
 const UI_CURRENCY_RE = /\bBYN\b|\bBr\b|руб\.?|р\.|₽/gi;
 
 function formatNumber(value: number): string {
-  const hasDecimals = Math.round(value * 100) % 100 !== 0;
+  // Always 2 decimal places: 15 → "15,00", 15.5 → "15,50"
   return new Intl.NumberFormat("ru-RU", {
-    minimumFractionDigits: hasDecimals ? 2 : 0,
-    maximumFractionDigits: hasDecimals ? 2 : 0,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   }).format(value);
 }
 
@@ -104,4 +104,26 @@ export function formatTransactionAmount(amount: number): string {
   const abs = Math.abs(amount);
   const sign = amount > 0 ? "+" : "−";
   return `${sign}${formatPrice(abs, { hideZero: true })}`;
+}
+
+/**
+ * Returns only the formatted number string (no currency symbol, no prefix).
+ * Use with {@link BelarusianRubleIcon} to compose price display independently.
+ *
+ * @example
+ *   formatPriceAmount(15)      // "15,00"
+ *   formatPriceAmount(15.5)    // "15,50"
+ *   formatPriceAmount("25.4")  // "25,40"
+ *   formatPriceAmount(null)    // ""
+ */
+export function formatPriceAmount(
+  value: number | string | null | undefined,
+): string {
+  if (value == null) return "";
+  if (typeof value === "string") {
+    const parsed = parseNumberish(value.trim());
+    return parsed != null ? formatNumber(parsed) : "";
+  }
+  if (!Number.isFinite(value)) return "";
+  return formatNumber(value);
 }

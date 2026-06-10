@@ -81,6 +81,20 @@ export function formatRuShortDayMonthRange(
 }
 
 /**
+ * Format a Date or ISO string as HH:mm (24-hour, zero-padded).
+ * Deterministic: uses getHours/getMinutes, not Intl, to avoid SSR/client drift.
+ *
+ * @example formatHHMM(new Date("2024-06-09T16:05:00")) → "16:05"
+ * @example formatHHMM("2024-06-09T09:00:00")          → "09:00"
+ */
+export function formatHHMM(date: Date | string | null | undefined): string {
+  if (!date) return "";
+  const d = typeof date === "string" ? new Date(date) : date;
+  if (isNaN(d.getTime())) return "";
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
+/**
  * Dev-only validation helper
  * Ensures formatter produces expected output
  */
