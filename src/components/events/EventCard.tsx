@@ -28,6 +28,54 @@ export type EventCardProps = {
   className?: string;
 };
 
+const ONLINE_SEGMENT = /^онлайн$/i;
+
+function OnlinePulseDot() {
+  return (
+    <span
+      className="relative mx-1.5 inline-flex h-1.5 w-1.5 shrink-0 self-center"
+      aria-hidden
+    >
+      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[var(--success)] opacity-60" />
+      <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-[var(--success)]" />
+    </span>
+  );
+}
+
+function EventCardCategoryLabel({
+  label,
+  className,
+}: {
+  label: string;
+  className?: string;
+}) {
+  const parts = label
+    .split(" · ")
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  return (
+    <div
+      className={cn(
+        "font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-[rgba(20,18,16,0.55)]",
+        className,
+      )}
+    >
+      {parts.map((part, index) => {
+        const isOnline = ONLINE_SEGMENT.test(part);
+
+        return (
+          <span key={`${part}-${index}`} className="inline-flex items-center">
+            {index > 0 &&
+              (isOnline ? <OnlinePulseDot /> : <span className="mx-1">·</span>)}
+            <span className={isOnline ? "text-[var(--success)]" : undefined}>{part}</span>
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export function EventCard({
@@ -55,7 +103,7 @@ export function EventCard({
             <img
               src={imageUrl}
               alt={title}
-              className="h-full w-full object-cover transition-transform duration-[1000ms] ease-[cubic-bezier(0.2,0.7,0.2,1)] group-hover:scale-[1.04]"
+              className="h-full w-full object-cover"
             />
           ) : (
             <div
@@ -66,9 +114,10 @@ export function EventCard({
               }}
             >
               {categoryLabel && (
-                <span className="font-mono text-[11px] uppercase tracking-[0.18em] text-[rgba(20,18,16,0.30)]">
-                  {categoryLabel}
-                </span>
+                <EventCardCategoryLabel
+                  label={categoryLabel}
+                  className="text-[11px] tracking-[0.18em] text-[rgba(20,18,16,0.30)]"
+                />
               )}
             </div>
           )}
@@ -83,11 +132,7 @@ export function EventCard({
 
         {/* Text */}
         <div className="mt-3 flex flex-col gap-1 px-0.5">
-          {categoryLabel && (
-            <div className="font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-[rgba(20,18,16,0.55)]">
-              {categoryLabel}
-            </div>
-          )}
+          {categoryLabel && <EventCardCategoryLabel label={categoryLabel} />}
           <div className="line-clamp-2 text-[15px] font-semibold leading-[1.3] tracking-[-0.01em] text-[#141210] transition-colors duration-150 group-hover:text-[#C24E22]">
             {title}
           </div>
