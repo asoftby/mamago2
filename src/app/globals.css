@@ -710,3 +710,49 @@ body:has([data-slot="alert-dialog-overlay"][data-state="open"]) {
   opacity: 1;
   transform: none;
 }
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Article embeds — Instagram portrait (reels / vertical video)
+   Instagram oEmbed pillarboxes video when the frame is wider than ~326px.
+   ───────────────────────────────────────────────────────────────────────── */
+
+.article-embed-shell--instagram-blockquote,
+.article-embed--instagram-blockquote {
+  width: 100%;
+  max-width: min(100%, 326px);
+  margin-inline: auto;
+}
+
+.article-embed-shell--instagram-blockquote .instagram-media,
+.article-embed--instagram-blockquote .instagram-media {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  margin: 0 !important;
+}
+
+.article-embed-shell--instagram-blockquote iframe,
+.article-embed--instagram-blockquote iframe {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  margin: 0 !important;
+}
+
+.article-embed__instagram-frame {
+  position: relative;
+  width: 100%;
+  max-width: min(100%, 326px);
+  margin-inline: auto;
+  aspect-ratio: 9 / 16;
+  overflow: hidden;
+  border-radius: 0.75rem;
+}
+
+.article-embed__instagram-frame iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
