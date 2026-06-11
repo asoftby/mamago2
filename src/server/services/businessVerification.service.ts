@@ -6,7 +6,6 @@
 
 import prisma from "@/lib/prisma";
 import { BusinessVerificationStatus } from "@prisma/client";
-import { notifyAdminBusinessVerificationPending } from "@/lib/admin/notifyAdminBusinessVerification";
 
 /**
  * Submit business for verification
@@ -84,13 +83,18 @@ export async function submitForVerification(
     include: { owner: { select: { email: true } } },
   });
   if (full) {
-    notifyAdminBusinessVerificationPending({
+    const { notifyAdminsBusinessApplicationCreated, notifyBusinessVerificationSubmitted } =
+      await import("./notification.service");
+    notifyAdminsBusinessApplicationCreated({
       businessId: full.id,
-      name: full.name,
-      legalName: full.legalName,
-      unp: full.unp,
+      businessName: full.name,
       ownerEmail: full.owner.email,
-    });
+    }).catch((e) =>
+      console.error("[businessVerification] notifyAdminsBusinessApplicationCreated failed:", e),
+    );
+    notifyBusinessVerificationSubmitted(full.id, full.name, full.ownerUserId).catch((e) =>
+      console.error("[businessVerification] notifyBusinessVerificationSubmitted failed:", e),
+    );
   }
 }
 

@@ -83,6 +83,7 @@ model User {
   moderationLogs                    ModerationLog[]                  @relation("ModerationReviewer")
   notifications                     Notification[]
   notificationDeliveries            NotificationDelivery[]
+  updatedNotificationTemplates      NotificationTemplate[]           @relation("NotificationTemplateUpdatedBy")
   offerIdeas                        OfferIdea[]
   phoneOtps                         PhoneOtp[]
   archivedPlaces                    Place[]                          @relation("PlaceArchiver")
@@ -1720,6 +1721,8 @@ model Offer {
   discoverySignalIds       String[]           @default([])
   /// Чипы публичной витрины /[city]/classes
   classChipSlugs           String[]           @default([])
+  /// Шаги мастера, явно завершённые пользователем через «Далее» (OfferWizardStepKey)
+  wizardCompletedSteps     String[]           @default([])
 
   // Настройки записи
   bookingEnabled Boolean      @default(false)
@@ -2523,6 +2526,26 @@ model NotificationPolicy {
   @@index([scenario])
 }
 
+/// Канальный шаблон уведомления для сценария.
+/// Запись в БД — это override; дефолтные шаблоны живут в коде
+/// (NOTIFICATION_SCENARIO_REGISTRY в notificationRegistry.ts).
+/// subject: для EMAIL — тема письма, для IN_APP/TELEGRAM — заголовок сообщения.
+model NotificationTemplate {
+  id              String              @id @default(cuid())
+  /// Ключ сценария из реестра в коде (NotificationScenario или NotificationType)
+  scenarioKey     String
+  channel         NotificationChannel
+  subject         String?
+  body            String
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  updatedByUserId String?
+  updatedByUser   User?               @relation("NotificationTemplateUpdatedBy", fields: [updatedByUserId], references: [id], onDelete: SetNull)
+
+  @@unique([scenarioKey, channel])
+  @@index([scenarioKey])
+}
+
 model DevTelegramBusinessApplication {
   id                String                               @id @default(cuid())
   userId            String
@@ -2912,6 +2935,8 @@ enum NotificationType {
   BUSINESS_VERIFIED
   BUSINESS_REJECTED
   BUSINESS_NEEDS_INFO
+  /// Владелец отправил профиль бизнеса на верификацию (заявка принята, на модерации)
+  BUSINESS_VERIFICATION_SUBMITTED
   WELCOME
   REMINDER
   PLAN_TOMORROW_DIGEST

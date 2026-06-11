@@ -58,7 +58,9 @@ export function NotificationSettingsInModal({ mode }: Props) {
     <div className="space-y-4 pt-4">
       <TelegramStatusRow
         connected={data.telegramConnected}
+        canSendTelegramTest={data.canSendTelegramTest}
         onConnected={loadData}
+        onDisconnected={loadData}
       />
       {mode === "user" ? (
         <NotificationPreferencesClient

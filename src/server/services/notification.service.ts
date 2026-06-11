@@ -600,6 +600,82 @@ export async function notifyOfferRejected(
 
 // ── BUSINESS VERIFICATION ─────────────────────────────────────────────────────
 
+/**
+ * Окно дедупа для событий «подача заявки на верификацию»: защищает только от
+ * даблклика по submit. Повторная подача после NEEDS_INFO/REJECTED должна
+ * порождать новые уведомления, поэтому checkNotificationDedup (бессрочный
+ * по entityId) здесь сознательно не используется.
+ */
+const VERIFICATION_SUBMIT_DEDUP_WINDOW_MS = 5 * 60 * 1000;
+
+async function hasRecentNotification(
+  userId: string,
+  type: NotificationType,
+  entityId: string,
+): Promise<boolean> {
+  const since = new Date(Date.now() - VERIFICATION_SUBMIT_DEDUP_WINDOW_MS);
+  const existing = await prisma.notification.findFirst({
+    where: { userId, type, entityId, createdAt: { gte: since } },
+    select: { id: true },
+  });
+  return Boolean(existing);
+}
+
+/**
+ * On-site/telegram уведомление всем админам о новой заявке на верификацию.
+ */
+export async function notifyAdminsBusinessApplicationCreated(params: {
+  businessId: string;
+  businessName: string;
+  ownerEmail?: string | null;
+}) {
+  const admins = await prisma.user.findMany({
+    where: { role: "ADMIN" },
+    select: { id: true },
+  });
+
+  const created = [];
+  for (const admin of admins) {
+    if (await hasRecentNotification(admin.id, "BUSINESS_APPLICATION_CREATED", params.businessId)) {
+      continue;
+    }
+    created.push(
+      await createNotification({
+        userId: admin.id,
+        audience: "ADMIN",
+        type: "BUSINESS_APPLICATION_CREATED",
+        title: "Новая заявка на верификацию бизнеса",
+        body: `«${params.businessName}»${params.ownerEmail ? ` · ${params.ownerEmail}` : ""} — заявка ожидает проверки.`,
+        entityType: "BUSINESS",
+        entityId: params.businessId,
+      }),
+    );
+  }
+  return created;
+}
+
+/**
+ * Уведомление владельцу: заявка принята и отправлена на модерацию.
+ */
+export async function notifyBusinessVerificationSubmitted(
+  businessId: string,
+  businessName: string,
+  ownerId: string,
+) {
+  if (await hasRecentNotification(ownerId, "BUSINESS_VERIFICATION_SUBMITTED", businessId)) {
+    return null;
+  }
+
+  return createNotification({
+    userId: ownerId,
+    type: "BUSINESS_VERIFICATION_SUBMITTED",
+    title: "Заявка принята",
+    body: `Профиль «${businessName}» отправлен на модерацию. Мы сообщим о результате проверки.`,
+    entityType: "BUSINESS",
+    entityId: businessId,
+  });
+}
+
 export async function notifyBusinessVerified(businessId: string, businessName: string, ownerId: string) {
   const dedup = await checkNotificationDedup(ownerId, "BUSINESS_VERIFIED", "BUSINESS", businessId);
   if (dedup.isDuplicate) return null;

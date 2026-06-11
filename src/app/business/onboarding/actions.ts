@@ -6,7 +6,36 @@ import { z, ZodError } from "zod";
 import { getCurrentUser } from "@/lib/auth/server";
 import { getOwnedBusinessProfile } from "@/server/business/getMyBusiness";
 import prisma from "@/lib/prisma";
-import { notifyAdminBusinessVerificationPending } from "@/lib/admin/notifyAdminBusinessVerification";
+import {
+  notifyAdminsBusinessApplicationCreated,
+  notifyBusinessVerificationSubmitted,
+} from "@/server/services/notification.service";
+
+/**
+ * Fire-and-forget: on-site/telegram уведомления админам и владельцу
+ * о поданной заявке. Не блокирует ответ пользователю.
+ */
+function notifyBusinessVerificationSubmittedBundle(params: {
+  businessId: string;
+  businessName: string;
+  ownerUserId: string;
+  ownerEmail: string | null;
+}): void {
+  notifyAdminsBusinessApplicationCreated({
+    businessId: params.businessId,
+    businessName: params.businessName,
+    ownerEmail: params.ownerEmail,
+  }).catch((e) =>
+    console.error("[onboarding] notifyAdminsBusinessApplicationCreated failed:", e),
+  );
+  notifyBusinessVerificationSubmitted(
+    params.businessId,
+    params.businessName,
+    params.ownerUserId,
+  ).catch((e) =>
+    console.error("[onboarding] notifyBusinessVerificationSubmitted failed:", e),
+  );
+}
 import {
   isBusinessContactPhoneVerifiedForUser,
   normalizeBusinessContactPhone,
@@ -133,11 +162,10 @@ export async function createBusinessAction(
           status: "PENDING_VERIFICATION",
         },
       });
-      notifyAdminBusinessVerificationPending({
+      notifyBusinessVerificationSubmittedBundle({
         businessId: updated.id,
-        name: updated.name,
-        legalName: updated.legalName,
-        unp: updated.unp,
+        businessName: updated.name,
+        ownerUserId: updated.ownerUserId,
         ownerEmail: user.email ?? null,
       });
     } else {
@@ -157,11 +185,10 @@ export async function createBusinessAction(
           status: "PENDING_VERIFICATION",
         },
       });
-      notifyAdminBusinessVerificationPending({
+      notifyBusinessVerificationSubmittedBundle({
         businessId: created.id,
-        name: created.name,
-        legalName: created.legalName,
-        unp: created.unp,
+        businessName: created.name,
+        ownerUserId: created.ownerUserId,
         ownerEmail: user.email ?? null,
       });
     }
