@@ -1324,7 +1324,6 @@ model Notification {
   body       String
   entityType NotificationEntityType?
   entityId   String?
-  isRead     Boolean                @default(false)
   readAt     DateTime?
   archivedAt DateTime?
   /// Первый просмотр в центре уведомлений; null = «новое» для badge и сортировки
@@ -1347,7 +1346,7 @@ model Notification {
   @@index([userId, audience, createdAt])
   @@index([userId, scenario, createdAt])
   @@index([userId, isPinned, createdAt])
-  @@index([userId, isRead, createdAt])
+  @@index([userId, readAt, createdAt])
   @@index([userId, archivedAt, createdAt])
   @@index([userId, seenAt])
   @@index([entityType, entityId])

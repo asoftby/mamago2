@@ -27,7 +27,6 @@ export type NotificationApiRow = {
   isPinned: boolean;
   entityType: string | null;
   entityId: string | null;
-  isRead: boolean;
   readAt: string | null;
   archivedAt: string | null;
   expiresAt: string | null;

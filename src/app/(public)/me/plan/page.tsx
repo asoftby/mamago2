@@ -99,7 +99,7 @@ export default async function PlanPage() {
               ctaLabel: activeReminder.ctaLabel,
               ctaAction: activeReminder.ctaAction,
               createdAt: activeReminder.createdAt.toISOString(),
-              isRead: activeReminder.isRead,
+              isRead: activeReminder.readAt != null,
             }
           : null
       }

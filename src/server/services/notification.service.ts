@@ -357,7 +357,6 @@ export async function completeOnboardingNotification(
       archivedAt: null,
     },
     data: {
-      isRead: true,
       readAt: now,
       seenAt: now,
       archivedAt: now,
@@ -881,7 +880,7 @@ export async function markNotificationAsRead(notificationId: string, userId: str
 
   return prisma.notification.update({
     where: { id: existing.id },
-    data: { isRead: true, readAt: now, seenAt: now },
+    data: { readAt: now, seenAt: now },
   });
 }
 
@@ -889,7 +888,7 @@ export async function markAllNotificationsAsRead(userId: string) {
   const now = new Date();
   return prisma.notification.updateMany({
     where: { userId, archivedAt: null, readAt: null },
-    data: { isRead: true, readAt: now, seenAt: now },
+    data: { readAt: now, seenAt: now },
   });
 }
 
@@ -1052,7 +1051,6 @@ export async function resolveNotificationActionById(
     await prisma.notification.update({
       where: { id: notification.id },
       data: {
-        isRead: true,
         readAt: new Date(),
         seenAt: notification.seenAt ?? new Date(),
       },
@@ -1079,7 +1077,7 @@ export async function getLatestActivePlanReminderNotification(
       entityType: "PLAN_ITEM",
       createdAt: { gte: activeSince },
     },
-    orderBy: [{ isRead: "asc" }, { createdAt: "desc" }],
+    orderBy: [{ readAt: { sort: "asc", nulls: "first" } }, { createdAt: "desc" }],
     select: {
       id: true,
       title: true,
@@ -1087,7 +1085,7 @@ export async function getLatestActivePlanReminderNotification(
       ctaLabel: true,
       ctaAction: true,
       createdAt: true,
-      isRead: true,
+      readAt: true,
       scenario: true,
       entityType: true,
       entityId: true,
@@ -1102,9 +1100,9 @@ export async function markWelcomeNotificationsRead(userId: string) {
     where: {
       userId,
       type: "WELCOME",
-      OR: [{ readAt: null }, { isRead: false }],
+      readAt: null,
     },
-    data: { isRead: true, readAt: now, seenAt: now },
+    data: { readAt: now, seenAt: now },
   });
 }
 
@@ -1112,10 +1110,10 @@ export async function markWelcomeNotificationsRead(userId: string) {
 export async function getWelcomeIsRead(userId: string): Promise<boolean> {
   const welcome = await prisma.notification.findFirst({
     where: { userId, type: "WELCOME" },
-    select: { readAt: true, isRead: true },
+    select: { readAt: true },
   });
   if (!welcome) return true;
-  return welcome.readAt != null || welcome.isRead;
+  return welcome.readAt != null;
 }
 
 export async function deleteOldNotifications(daysOld = 90) {

@@ -118,7 +118,6 @@ export function NotificationsPanel({
             ? {
                 ...notification,
                 seenAt: notification.seenAt ?? new Date().toISOString(),
-                isRead: true,
                 readAt: notification.readAt ?? new Date().toISOString(),
               }
             : notification,

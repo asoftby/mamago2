@@ -136,7 +136,7 @@ export function mapApiRowToViewModel(
     category: getNotificationCategoryFromType(row.type),
     title: row.title,
     description: row.body,
-    isRead: row.isRead,
+    isRead: row.readAt != null,
     createdAt: new Date(row.createdAt),
   };
 }

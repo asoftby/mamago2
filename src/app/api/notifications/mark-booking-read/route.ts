@@ -27,7 +27,6 @@ export async function POST() {
       },
       data: {
         seenAt: now,
-        isRead: true,
         readAt: now,
       },
     });
