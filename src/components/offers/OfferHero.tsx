@@ -2,20 +2,13 @@
 
 import Link from "next/link";
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
-import Image from "next/image";
-import {
-  Play,
-  Heart,
-  X,
-  ChevronLeft,
-  ChevronRight,
-  Image as ImageIcon,
-  CalendarDays,
-} from "lucide-react";
+import { Heart, CalendarDays } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { normalizeUiCurrencyText } from "@/lib/formatters/format-price";
-import { isAppMediaUrl } from "@/lib/media/isAppMediaUrl";
+import { renderCurrencyText } from "@/components/icons/BelarusianRubleIcon";
 import type { OfferPageData, OfferScheduleItem } from "@/lib/offer/offerPageTypes";
+import { PublicationMediaColumn } from "@/components/media/PublicationMediaColumn";
+import { mapOfferPageMedia } from "@/lib/media/mapOfferPageMedia";
 import { Button } from "@/components/ui/button";
 import { RichContentRenderer } from "@/components/content/RichContentRenderer";
 import { OwnerOfferEditDropdown } from "./OwnerOfferEditDropdown";
@@ -52,28 +45,10 @@ export function OfferHero({
   onSave,
   ctaRef,
 }: OfferHeroProps) {
-  const [lightboxOpen, setLightboxOpen] = useState(false);
-  const [lightboxMode, setLightboxMode] = useState<"gallery" | "video">("gallery");
-  const [galleryIndex, setGalleryIndex] = useState(0);
-
-  const hasVideo = Boolean(data.media.videoUrl);
-  const gallery = data.media.gallery;
-  const hasGallery = gallery.length > 0;
-  const hasCover = Boolean(data.media.posterUrl);
-
-  const openGallery = (idx: number) => {
-    setGalleryIndex(idx);
-    setLightboxMode("gallery");
-    setLightboxOpen(true);
-  };
-
-  const openVideo = () => {
-    setLightboxMode("video");
-    setLightboxOpen(true);
-  };
-
-  const nextImage = () => setGalleryIndex((i) => (i + 1) % gallery.length);
-  const prevImage = () => setGalleryIndex((i) => (i - 1 + gallery.length) % gallery.length);
+  const publicationMedia = useMemo(
+    () => mapOfferPageMedia(data.media, data.title),
+    [data.media, data.title],
+  );
 
   const badgeLabel = useMemo(() => {
     switch (data.offerType) {
@@ -88,125 +63,13 @@ export function OfferHero({
     }
   }, [data.offerType]);
 
-  const THUMB_LIMIT = 5;
-  const videoSlots = hasVideo ? 1 : 0;
-  const imageSlots = THUMB_LIMIT - videoSlots;
-  const hiddenCount = Math.max(0, gallery.length - imageSlots);
-
-  const getEmbedUrl = (url: string) => {
-    if (url.includes("youtube.com/watch")) {
-      try {
-        const id = new URL(url).searchParams.get("v");
-        return `https://www.youtube.com/embed/${id}?autoplay=1`;
-      } catch {
-        return url;
-      }
-    }
-    if (url.includes("youtu.be/")) {
-      const id = url.split("youtu.be/")[1]?.split("?")[0];
-      return `https://www.youtube.com/embed/${id}?autoplay=1`;
-    }
-    if (url.includes("vimeo.com/")) {
-      const id = url.split("vimeo.com/")[1]?.split("?")[0];
-      return `https://player.vimeo.com/video/${id}?autoplay=1`;
-    }
-    return url;
-  };
-
   return (
     <section className="space-y-6 lg:space-y-10">
       <div className="grid grid-cols-1 gap-10 lg:grid-cols-[440px_1fr] lg:gap-14">
-        {/* ─── LEFT: image + thumbs ─── */}
-        <div className="flex flex-col gap-5">
-          {/* Main image */}
-          <button
-            type="button"
-            className="group relative w-full aspect-[4/3] overflow-hidden rounded-3xl bg-[#EDE8DF] shadow-sm cursor-pointer"
-            onClick={() => {
-              if (hasGallery) openGallery(0);
-              else if (hasVideo) openVideo();
-            }}
-          >
-            {hasCover ? (
-              <Image
-                src={data.media.posterUrl!}
-                alt={data.media.posterAlt ?? ""}
-                fill
-                className="object-cover transition-transform duration-[1200ms] ease-[cubic-bezier(0.2,0.7,0.2,1)] group-hover:scale-[1.04]"
-                priority
-                sizes="(max-width: 1024px) 100vw, 760px"
-                unoptimized={isAppMediaUrl(data.media.posterUrl)}
-                onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
-              />
-            ) : (
-              <div className="absolute inset-0 flex items-center justify-center bg-[#EDE8DF]">
-                <ImageIcon className="h-16 w-16 text-[rgba(20,18,16,0.25)]" />
-              </div>
-            )}
-            <div className="pointer-events-none absolute inset-0 rounded-3xl shadow-[inset_0_0_80px_rgba(0,0,0,0.10)]" />
-            {hasVideo && !hasGallery && (
-              <div className="absolute inset-0 flex items-center justify-center bg-black/15 transition-colors group-hover:bg-black/25">
-                <div className="flex h-20 w-20 items-center justify-center rounded-full bg-[#FAF7F1]/95 shadow-2xl transition-transform group-hover:scale-110">
-                  <Play className="h-8 w-8 fill-[#EF8759] text-[#E86A3A] ml-1" />
-                </div>
-              </div>
-            )}
-          </button>
-
-          {/* Thumb strip */}
-          {(hasGallery || hasVideo) && (
-            <div className="flex gap-2.5 overflow-x-auto pb-1 scrollbar-hide">
-              {hasVideo && (
-                <button
-                  type="button"
-                  onClick={openVideo}
-                  className="relative h-[88px] w-[120px] shrink-0 overflow-hidden rounded-2xl bg-[#EDE8DF] ring-2 ring-transparent transition-all hover:ring-[#E86A3A]/60"
-                >
-                  {hasCover && (
-                    <Image
-                      src={data.media.posterUrl!}
-                      alt="Видео"
-                      fill
-                      className="object-cover"
-                      sizes="120px"
-                      unoptimized={isAppMediaUrl(data.media.posterUrl)}
-                      onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
-                    />
-                  )}
-                  <div className="absolute inset-0 flex items-center justify-center bg-black/45">
-                    <Play className="h-5 w-5 fill-white text-white" />
-                  </div>
-                </button>
-              )}
-              {gallery.slice(0, imageSlots).map((img, idx) => {
-                const isLastVisible = idx === imageSlots - 1 && hiddenCount > 0;
-                return (
-                  <button
-                    key={img.id}
-                    type="button"
-                    onClick={() => openGallery(idx)}
-                    className="relative h-[88px] w-[120px] shrink-0 overflow-hidden rounded-2xl bg-[#EDE8DF] ring-2 ring-transparent transition-all hover:ring-[#E86A3A]/60"
-                  >
-                    <Image
-                      src={img.url}
-                      alt={img.alt || ""}
-                      fill
-                      className="object-cover"
-                      sizes="120px"
-                      unoptimized={isAppMediaUrl(img.url)}
-                      onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
-                    />
-                    {isLastVisible && (
-                      <div className="absolute inset-0 flex items-center justify-center bg-black/55 text-[15px] font-bold text-white">
-                        +{hiddenCount}
-                      </div>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </div>
+        <PublicationMediaColumn
+          media={publicationMedia.media}
+          galleryItems={publicationMedia.galleryItems}
+        />
 
         {/* ─── RIGHT: breadcrumbs + kicker + title + booking card ─── */}
         <div className="flex flex-col gap-5 lg:sticky lg:top-6 lg:self-start">
@@ -266,81 +129,6 @@ export function OfferHero({
         </div>
 
       </div>
-
-      {/* ─── Lightbox (без изменений) ─── */}
-      {lightboxOpen && (
-        <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/95 p-4 md:p-8"
-          onClick={() => setLightboxOpen(false)}
-        >
-          <button
-            type="button"
-            className="absolute top-5 right-5 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-[#FAF7F1]/10 text-white hover:bg-[#FAF7F1]/20"
-            onClick={() => setLightboxOpen(false)}
-          >
-            <X className="h-5 w-5" />
-          </button>
-
-          {lightboxMode === "video" && data.media.videoUrl ? (
-            <div
-              className="relative w-full max-w-5xl aspect-video"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <iframe
-                src={getEmbedUrl(data.media.videoUrl)}
-                className="h-full w-full rounded-2xl"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
-              />
-            </div>
-          ) : gallery.length > 0 ? (
-            <>
-              {gallery.length > 1 && (
-                <button
-                  type="button"
-                  className="absolute left-4 z-10 flex h-11 w-11 items-center justify-center rounded-full bg-[#FAF7F1]/10 text-white hover:bg-[#FAF7F1]/20"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    prevImage();
-                  }}
-                >
-                  <ChevronLeft className="h-6 w-6" />
-                </button>
-              )}
-              <div
-                className="relative w-full max-w-5xl aspect-[4/3]"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <Image
-                  src={gallery[galleryIndex]?.url || ""}
-                  alt={gallery[galleryIndex]?.alt || ""}
-                  fill
-                  className="object-contain"
-                  sizes="100vw"
-                  priority
-                  unoptimized={isAppMediaUrl(gallery[galleryIndex]?.url)}
-                  onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
-                />
-              </div>
-              {gallery.length > 1 && (
-                <button
-                  type="button"
-                  className="absolute right-4 z-10 flex h-11 w-11 items-center justify-center rounded-full bg-[#FAF7F1]/10 text-white hover:bg-[#FAF7F1]/20"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    nextImage();
-                  }}
-                >
-                  <ChevronRight className="h-6 w-6" />
-                </button>
-              )}
-              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full bg-[#FAF7F1]/10 px-4 py-1.5 text-[13px] font-medium text-white backdrop-blur-sm">
-                {galleryIndex + 1} / {gallery.length}
-              </div>
-            </>
-          ) : null}
-        </div>
-      )}
     </section>
   );
 }
@@ -526,6 +314,8 @@ function BookingCard({
     const raw = (p.singlePrice || p.priceFrom || "").replace(/^от\s+/i, "");
     return raw.split(" ")[0] ?? "";
   })();
+  const fallbackPriceText =
+    !priceNumber && typeof p.priceFrom === "string" ? p.priceFrom : "";
 
   const inlinePriceCaption =
     typeof p.priceCaption === "string" && p.priceCaption.trim() && !looksLikeHtml(p.priceCaption)
@@ -592,36 +382,40 @@ function BookingCard({
                 Стоимость
               </div>
               <div className="flex items-end justify-end gap-1.5">
-                <span style={{ fontFamily: "var(--font-display)", fontSize: 52, fontWeight: 400, lineHeight: 1, letterSpacing: "-0.03em", color: "#141210" }}>
+                <span style={{ fontFamily: "var(--font-display)", fontSize: 40, fontWeight: 400, lineHeight: 1, letterSpacing: "-0.03em", color: "#141210" }}>
                   {priceNumber}
                 </span>
                 <div className="flex flex-col items-end gap-0.5">
                   {p.oldPrice && (
                     <span className="font-mono text-[11px] text-[rgba(20,18,16,0.30)] line-through">
-                      {normalizeUiCurrencyText(p.oldPrice)}
+                      {renderCurrencyText(normalizeUiCurrencyText(p.oldPrice), { iconSize: "sm" })}
                     </span>
                   )}
                   {priceLabel && (
                     <span className="font-mono text-[13px] text-[rgba(20,18,16,0.55)]">
-                      {normalizeUiCurrencyText(priceLabel).replace(/ \/ /g, "/")}
+                      {renderCurrencyText(normalizeUiCurrencyText(priceLabel).replace(/ \/ /g, "/"), { iconSize: "sm" })}
                     </span>
                   )}
                 </div>
               </div>
             </div>
           </div>
-        ) : priceNumber && (
+        ) : priceNumber ? (
           <div className="mb-2 flex items-end gap-2">
             <span className="font-sans text-[72px] font-semibold leading-[0.92] tracking-[-0.04em] text-[#141210]">
               {priceNumber}
             </span>
             {priceUnit && (
               <span className="pb-2 font-mono text-[12px] leading-tight text-[rgba(20,18,16,0.55)]">
-                {normalizeUiCurrencyText(priceUnit).replace(/ \/ /g, "/")}
+                {renderCurrencyText(normalizeUiCurrencyText(priceUnit).replace(/ \/ /g, "/"), { iconSize: "sm" })}
               </span>
             )}
           </div>
-        )}
+        ) : fallbackPriceText ? (
+          <div className="mb-4 rounded-2xl border border-[rgba(20,18,16,0.10)] bg-[rgba(20,18,16,0.03)] px-4 py-3 text-[15px] text-[rgba(20,18,16,0.72)]">
+            {fallbackPriceText}
+          </div>
+        ) : null}
 
         {/* ── Place info ── */}
         {data.place && (
@@ -676,7 +470,7 @@ function BookingCard({
             <OwnerOfferEditDropdown
               offerId={data.id}
               offerType={data.offerType}
-              className="h-14 w-full rounded-full border text-[16px] font-semibold"
+              className="h-14 rounded-full"
             />
           </SidebarCardTopSection>
         ) : null}
