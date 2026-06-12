@@ -511,8 +511,8 @@ export function ReleaseHistoryPanel({
                         ) : null}
                       </div>
                       <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">
-                        <span>Опубликовано: {formatDate(release.releasedAt)}</span>
                         <span>Создано: {formatDate(release.createdAt)}</span>
+                        <span>Обновлено: {formatDate(release.updatedAt)}</span>
                       </div>
                       {release.notes.length > 0 ? (
                         <ul className="space-y-2 border-t border-border/60 pt-3">

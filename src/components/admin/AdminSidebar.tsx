@@ -89,6 +89,21 @@ function findActiveGroupId(pathname: string): string | null {
   return null;
 }
 
+/** True when any descendant nav item has a non-zero badge count. */
+function hasPendingInChildren(
+  children: AdminSidebarNavItem[],
+  getBadgeCount: (key?: string) => number | undefined,
+): boolean {
+  return children.some((child) => {
+    const count = getBadgeCount(child.badgeCountKey);
+    if (count !== undefined && count > 0) return true;
+    if (child.children?.length) {
+      return hasPendingInChildren(child.children, getBadgeCount);
+    }
+    return false;
+  });
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export function AdminSidebar({
@@ -155,6 +170,7 @@ export function AdminSidebar({
           isActive={active || childIsActive}
           isOpen={openSection === item.id}
           onToggle={() => toggleSection(item.id)}
+          hasAttention={hasPendingInChildren(item.children, getBadgeCount)}
         >
           {item.children.map((child) => renderNavItem(child, level + 1))}
         </SidebarGroup>
@@ -211,6 +227,7 @@ export function AdminSidebar({
                 isActive={groupHasActive}
                 isOpen={openSection === entry.id}
                 onToggle={() => toggleSection(entry.id)}
+                hasAttention={hasPendingInChildren(entry.children, getBadgeCount)}
               >
                 {entry.children.map((child) => renderNavItem(child))}
               </SidebarGroup>

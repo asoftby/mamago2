@@ -4,12 +4,16 @@ import { BYN_SYMBOL } from "@/lib/formatters/format-price";
 
 interface BelarusianRubleIconProps {
   className?: string;
-  size?: "default" | "sm";
+  size?: "default" | "sm" | "text" | "xs";
 }
 
 const ICON_SIZE = {
   default: { width: "0.81em", height: "1em", align: "-0.12em", translateY: undefined },
-  sm: { width: "0.65em", height: "0.82em", align: "middle", translateY: "-0.04em" },
+  /** Рядом с tabular-nums / font-bold (text-base) */
+  text: { width: "0.56em", height: "0.7em", align: "-0.06em", translateY: undefined },
+  /** Крупные суммы (text-3xl / text-4xl) */
+  xs: { width: "0.5em", height: "0.62em", align: "-0.05em", translateY: undefined },
+  sm: { width: "0.56em", height: "0.72em", align: "middle", translateY: "-0.03em" },
 } as const;
 
 /**
@@ -60,7 +64,12 @@ export function renderPriceWithIcon(
   const iconSize = options?.iconSize ?? "default";
 
   return (
-    <span className="inline-flex items-center gap-[0.22em] align-middle leading-none">
+    <span
+      className={cn(
+        "inline-flex gap-[0.18em] leading-none",
+        iconSize === "text" || iconSize === "xs" ? "items-baseline" : "items-center align-middle",
+      )}
+    >
       {parts.flatMap((part, i) => {
         const nodes: ReactNode[] = part ? [<span key={`t${i}`}>{part}</span>] : [];
         if (i < parts.length - 1) {
@@ -70,4 +79,12 @@ export function renderPriceWithIcon(
       })}
     </span>
   );
+}
+
+export function renderCurrencyText(
+  text: string | null | undefined,
+  options?: { iconSize?: BelarusianRubleIconProps["size"] },
+): ReactNode {
+  if (!text) return null;
+  return renderPriceWithIcon(text, options);
 }
