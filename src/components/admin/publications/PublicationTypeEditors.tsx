@@ -9,6 +9,7 @@ import { ActivityCardEntityPicker } from "@/components/admin/articles/ActivityCa
 import { ArticleBlockRichEditor } from "@/components/admin/articles/ArticleBlockRichEditor";
 import { ArticleEditorCoverField } from "@/components/admin/articles/ArticleEditorCoverField";
 import { ArticleEditorGalleryField } from "@/components/admin/articles/ArticleEditorGalleryField";
+import { CardMultiSelect } from "@/components/ui/card-multiselect";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -83,6 +84,7 @@ export function NewsPublicationEditor({
   const [loadError, setLoadError] = useState<string | null>(null);
   const [notBreakingWarning, setNotBreakingWarning] = useState(false);
   const [coverImageId, setCoverImageId] = useState("");
+  const [tagIds, setTagIds] = useState<string[]>([]);
   const [galleryIds, setGalleryIds] = useState<string[]>([]);
   const [slug, setSlug] = useState("");
   const [pinnedSlug, setPinnedSlug] = useState<string | null>(null);
@@ -110,6 +112,9 @@ export function NewsPublicationEditor({
   const [cityId, setCityId] = useState<string | null>(null);
   const [geoScopeError, setGeoScopeError] = useState<string | null>(null);
   const [cities, setCities] = useState<{ id: string; name: string; slug: string }[]>([]);
+  const [discoveryTags, setDiscoveryTags] = useState<
+    { id: string; title: string; description: string | null; isActive: boolean }[]
+  >([]);
 
   const [savedComparable, setSavedComparable] = useState<string | null>(null);
   const [successOpen, setSuccessOpen] = useState(false);
@@ -123,6 +128,7 @@ export function NewsPublicationEditor({
     (): BreakingNewsFormState => ({
       title,
       slug,
+      tagIds,
       coverImageId,
       galleryIds,
       bodyHtml,
@@ -143,6 +149,7 @@ export function NewsPublicationEditor({
     [
       title,
       slug,
+      tagIds,
       coverImageId,
       galleryIds,
       bodyHtml,
@@ -176,6 +183,7 @@ export function NewsPublicationEditor({
       onTitleChange(p.title);
       setSlug(p.slug);
       setPinnedSlug(snap.slug?.trim() || null);
+      setTagIds(p.tagIds);
       setCoverImageId(p.coverImageId);
       setCoverImagePreviewUrl(snap.coverImageUrl ?? "");
       setGalleryIds(p.galleryIds);
@@ -214,6 +222,7 @@ export function NewsPublicationEditor({
     (draft: BreakingNewsLocalDraft) => {
       onTitleChange(draft.title);
       setSlug(draft.slug);
+      setTagIds(draft.tagIds);
       setCoverImageId(draft.coverImageId);
       setCoverImagePreviewUrl(draft.coverImagePreviewUrl);
       setGalleryIds(draft.galleryIds);
@@ -310,6 +319,17 @@ export function NewsPublicationEditor({
       } | null;
       if (!data || cancelled) return;
       setCities(data.cities ?? []);
+      const selectedIds = tagIds.join(",");
+      const tagsUrl = selectedIds
+        ? `/api/admin/discovery-tags?selectedIds=${encodeURIComponent(selectedIds)}`
+        : "/api/admin/discovery-tags";
+      const tagsRes = await fetch(tagsUrl);
+      if (!tagsRes.ok || cancelled) return;
+      const tagsData = (await tagsRes.json().catch(() => null)) as
+        | { id: string; title: string; description: string | null; isActive: boolean }[]
+        | null;
+      if (!tagsData || cancelled) return;
+      setDiscoveryTags(tagsData);
       if (!articleId) {
         // Only set the default when geoScope is still null (unset by the empty snapshot).
         // The functional-update form prevents overwriting a geoScope that was already set.
@@ -319,9 +339,9 @@ export function NewsPublicationEditor({
           setCityId((prev) => (prev === null ? minsk.id : prev));
         }
       }
-    })();
+    })().catch(() => undefined);
     return () => { cancelled = true; };
-  }, [articleId]);
+  }, [articleId, tagIds]);
 
   useEffect(() => {
     let cancelled = false;
@@ -356,6 +376,7 @@ export function NewsPublicationEditor({
       coverImageId: input.coverImageId,
       authorLabel: input.authorLabel,
       authorUserId: input.authorUserId,
+      tagIds: input.tagIds ?? [],
       cityContext: input.cityContext,
       geoScope: input.geoScope,
       cityId: input.cityId,
@@ -731,6 +752,25 @@ export function NewsPublicationEditor({
           showPublishedSlugWarning={showPublishedSlugWarning}
           slugHistorySupported
         />
+        <div className="space-y-2">
+          <Label htmlFor="breaking-news-tags">Теги</Label>
+          <p className="text-xs text-muted-foreground">
+            Используются существующие активные Discovery теги. Создание новых тегов доступно только в админке Discovery.
+          </p>
+          <div id="breaking-news-tags">
+            <CardMultiSelect
+              placeholder="Выберите теги"
+              values={tagIds}
+              onChange={setTagIds}
+              options={discoveryTags.map((tag) => ({
+                value: tag.id,
+                label: tag.isActive ? tag.title : `${tag.title} (выключен)`,
+              }))}
+              allowClear
+              disabled={actionsBusy}
+            />
+          </div>
+        </div>
 
         <ArticleEditorCoverField
           value={coverImageId}

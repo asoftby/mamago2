@@ -14,7 +14,7 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const [cities, authors] = await Promise.all([
+  const [cities, authors, categories] = await Promise.all([
     prisma.city.findMany({
       where: { isLegacyNonCity: false },
       orderBy: { name: "asc" },
@@ -28,6 +28,16 @@ export async function GET() {
       orderBy: [{ displayName: "asc" }, { email: "asc" }],
       select: { id: true, displayName: true, email: true },
     }),
+    prisma.eventCategory.findMany({
+      where: {
+        publicationType: "ARTICLE",
+        isActive: true,
+        archivedAt: null,
+        parentId: null,
+      },
+      orderBy: [{ sortOrder: "asc" }, { nameRu: "asc" }],
+      select: { id: true, nameRu: true, slug: true },
+    }),
   ]);
 
   const authorOptions = authors.map((a) => ({
@@ -36,5 +46,13 @@ export async function GET() {
     email: a.email,
   }));
 
-  return NextResponse.json({ cities, authors: authorOptions });
+  return NextResponse.json({
+    cities,
+    authors: authorOptions,
+    categories: categories.map((c) => ({
+      id: c.id,
+      label: c.nameRu,
+      slug: c.slug,
+    })),
+  });
 }

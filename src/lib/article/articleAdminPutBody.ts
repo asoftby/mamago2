@@ -1,6 +1,9 @@
 import { z } from "zod";
 import { ContentStatus, GeoScope } from "@prisma/client";
-import { ArticleContentPayloadSchema } from "@/lib/publications/articleMvp";
+import {
+  ArticleContentPayloadSchema,
+  deriveArticleExcerptFromContent,
+} from "@/lib/publications/articleMvp";
 import type { ArticleSaveInput } from "@/lib/article/articleAdminTypes";
 
 /** Тело PUT /api/admin/articles/[id] и POST /api/admin/articles — одна и та же форма. */
@@ -14,6 +17,7 @@ export const ArticleAdminPutBodySchema = z.object({
   authorLabel: z.string().nullable().optional(),
   authorUserId: z.string().nullable().optional(),
   cityContext: z.string().nullable().optional(),
+  categoryId: z.string().nullable().optional(),
   geoScope: z.nativeEnum(GeoScope).nullable().optional(),
   cityId: z.string().nullable().optional(),
   status: z.nativeEnum(ContentStatus),
@@ -26,6 +30,7 @@ export const ArticleAdminPutBodySchema = z.object({
   seoOgDescription: z.string().nullable().optional(),
   seoRobots: z.string().nullable().optional(),
   noindex: z.boolean(),
+  tagIds: z.array(z.string()).optional(),
 });
 
 export function articleSaveInputFromPutBody(
@@ -35,12 +40,13 @@ export function articleSaveInputFromPutBody(
     title: data.title,
     slug: data.slug,
     subtitle: data.subtitle ?? null,
-    excerpt: data.excerpt ?? null,
+    excerpt: deriveArticleExcerptFromContent(data.content),
     content: data.content,
     coverImageId: data.coverImageId,
     authorLabel: data.authorLabel ?? null,
     authorUserId: data.authorUserId ?? null,
     cityContext: data.cityContext ?? null,
+    categoryId: data.categoryId ?? null,
     geoScope: data.geoScope,
     cityId: data.cityId,
     status: data.status,
@@ -53,5 +59,6 @@ export function articleSaveInputFromPutBody(
     seoOgDescription: data.seoOgDescription ?? null,
     seoRobots: data.seoRobots ?? null,
     noindex: data.noindex,
+    tagIds: data.tagIds,
   };
 }

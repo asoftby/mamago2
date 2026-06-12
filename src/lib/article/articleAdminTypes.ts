@@ -15,6 +15,8 @@ export type ArticleEditorSnapshot = {
   authorUserId: string | null;
   authorLabel: string | null;
   cityContext: string | null;
+  /** EventCategory с publicationType=ARTICLE */
+  categoryId: string | null;
   /** null in UI = охват ещё не выбран (черновик). */
   geoScope: GeoScope | null;
   cityId: string | null;
@@ -31,6 +33,8 @@ export type ArticleEditorSnapshot = {
   seoImageUrl: string | null;
   seoRobots: string | null;
   noindex: boolean;
+  /** Discovery tags attached to this publication (global tags across all cities). */
+  tagIds: string[];
   views: number;
   updatedAt: string;
 };
@@ -45,6 +49,7 @@ export type ArticleSaveInput = {
   authorLabel: string | null;
   authorUserId: string | null;
   cityContext: string | null;
+  categoryId: string | null;
   /** undefined = не менять в БД; null = охват не выбран. */
   geoScope?: GeoScope | null;
   cityId?: string | null;
@@ -58,4 +63,6 @@ export type ArticleSaveInput = {
   seoOgDescription: string | null;
   seoRobots: string | null;
   noindex: boolean;
+  /** Discovery tag IDs to attach to this publication. */
+  tagIds?: string[];
 };

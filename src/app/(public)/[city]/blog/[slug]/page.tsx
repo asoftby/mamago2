@@ -160,8 +160,10 @@ export default async function CityArticlePage({ params }: PageProps) {
           publishedAt={mvp.publishedAt}
           blocks={mvp.blocks}
           author={mvp.author}
+          tags={mvp.tags}
           related={related}
           editHref={editHref}
+          citySlug={city.slug}
         />
       </>
     );
@@ -176,7 +178,10 @@ export default async function CityArticlePage({ params }: PageProps) {
         excerpt={mvp.excerpt}
         publishedAt={mvp.publishedAt}
         blocks={mvp.blocks}
+        tags={mvp.tags}
+        categoryLabel={mvp.categoryLabel}
         editHref={editHref}
+        citySlug={city.slug}
       />
     </>
   );

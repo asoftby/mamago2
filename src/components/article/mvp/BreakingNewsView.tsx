@@ -11,6 +11,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
+import { PublicationTagChips } from "@/components/article/PublicationTagChips";
 import { MobileSmartBackButton } from "@/components/shared/MobileSmartBackButton";
 import type { ArticleMvpResolvedBlock, PlaceCardExtra } from "@/lib/article/articleMvpRenderData";
 import { articleBlockHtmlForEditor, articleBlockHtmlForPublic } from "@/lib/article/articleBlockHtml";
@@ -957,9 +958,11 @@ export interface BreakingNewsViewProps {
   publishedAt: Date | null;
   blocks: ArticleMvpResolvedBlock[];
   author: { displayName: string | null; avatarUrl: string | null } | null;
+  tags?: Array<{ slug: string; title: string }>;
   related: RelatedArticle[];
   editHref?: string;
   draftWatermark?: boolean;
+  citySlug?: string | null;
 }
 
 export function BreakingNewsView({
@@ -969,9 +972,11 @@ export function BreakingNewsView({
   publishedAt,
   blocks,
   author,
+  tags = [],
   related,
   editHref,
   draftWatermark,
+  citySlug,
 }: BreakingNewsViewProps) {
   // Extract gallery URLs from the gallery block.
   const galleryBlock = blocks.find((b): b is Extract<ArticleMvpResolvedBlock, { type: "gallery" }> => b.type === "gallery");
@@ -1023,6 +1028,11 @@ export function BreakingNewsView({
         author={author}
         editHref={editHref}
       />
+      <div className="mx-auto w-full max-w-[1200px] px-4 sm:px-6 lg:px-8">
+        <div className="max-w-[760px] pb-6">
+          <PublicationTagChips tags={tags} citySlug={citySlug} />
+        </div>
+      </div>
       <HeroGallery urls={galleryUrls} title={title} />
       <ArticleBody blocks={blocks} />
 

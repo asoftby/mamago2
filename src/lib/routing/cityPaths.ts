@@ -23,7 +23,8 @@ export type CityPathType =
   | "routes"     // /[city]/routes
   | "route"      // /[city]/routes/[slug]
   | "journal"    // /[city]/blog  (alias kept for back-compat)
-  | "article";   // /[city]/blog/[slug]
+  | "article"    // /[city]/blog/[slug]
+  | "tag";       // /[city]/tags/[slug]
 
 /**
  * Returns the canonical base URL for a country.
@@ -113,6 +114,9 @@ export function buildCityPublicPath(params: CityPublicPathParams): string {
       break;
     case "article":
       path = `/${city}/blog/${slug}`;
+      break;
+    case "tag":
+      path = `/${city}/tags/${slug}`;
       break;
   }
 

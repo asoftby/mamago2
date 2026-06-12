@@ -20,6 +20,7 @@ function baseState(): BreakingNewsFormState {
   return {
     title: "Test News",
     slug: "test-news",
+    tagIds: [],
     coverImageId: "",
     galleryIds: [],
     bodyHtml: "<p>body</p>",
@@ -82,6 +83,8 @@ const opts = { publishedAtIso: null, scheduledAtIso: null };
     authorLabel: null,
     authorUserId: null,
     cityContext: null,
+    categoryId: null,
+    tagIds: [],
     geoScope: "COUNTRY",
     cityId: null,
     status: "DRAFT",
@@ -164,6 +167,7 @@ const opts = { publishedAtIso: null, scheduledAtIso: null };
   );
   assert.equal(input.geoScope, null, "null geoScope passes through for draft");
   assert.equal(input.cityId, null, "null cityId for draft");
+  assert.deepEqual(input.tagIds, [], "empty tags persist as []");
 }
 
 // ── URL preview: buildArticlePublicPath reflects geoScope ────────────────────

@@ -14,6 +14,7 @@ export const BREAKING_NEWS_SUBTITLE = "__breaking_news__";
 export type BreakingNewsFormState = {
   title: string;
   slug: string;
+  tagIds: string[];
   coverImageId: string;
   galleryIds: string[];
   bodyHtml: string;
@@ -80,6 +81,7 @@ export function breakingNewsStateToArticleSaveInput(
   return {
     title: state.title.trim() || "Без названия",
     slug: state.slug.trim() || null,
+    tagIds: state.tagIds,
     subtitle: BREAKING_NEWS_SUBTITLE,
     excerpt: null,
     content: buildBreakingNewsContent(state),
@@ -88,6 +90,7 @@ export function breakingNewsStateToArticleSaveInput(
     authorUserId: state.authorUserId,
     // cityContext is a denormalised slug — the service sets it from the city FK; pass null here.
     cityContext: null,
+    categoryId: null,
     // Geography: pass through from form state so CITY breaking news get /{city}/blog/{slug}.
     geoScope: state.geoScope,
     cityId: state.geoScope === "COUNTRY" ? null : (state.cityId ?? null),
@@ -119,6 +122,7 @@ export function parseBreakingNewsFromSnapshot(snapshot: ArticleEditorSnapshot): 
   return {
     title: snapshot.title === "Без названия" ? "" : snapshot.title,
     slug: snapshot.slug ?? "",
+    tagIds: snapshot.tagIds,
     coverImageId: snapshot.coverImageId ?? "",
     galleryIds: gallery?.mediaIds ?? [],
     bodyHtml,

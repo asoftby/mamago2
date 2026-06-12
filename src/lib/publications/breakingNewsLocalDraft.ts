@@ -63,6 +63,7 @@ export function breakingNewsEditorComparable(
   return JSON.stringify({
     title: draft.title,
     slug: draft.slug,
+    tagIds: draft.tagIds,
     coverImageId: draft.coverImageId,
     coverImagePreviewUrl: draft.coverImagePreviewUrl,
     galleryIds: draft.galleryIds,

@@ -79,6 +79,7 @@ export async function listCityHomeArticles(city: {
       publishedAt: true,
       heroImage: true,
       coverImage: { select: { publicUrl: true } },
+      category: { select: { nameRu: true } },
     },
   });
 
@@ -92,7 +93,10 @@ export async function listCityHomeArticles(city: {
           : buildNationalArticlePath(row.slug),
       title: row.title,
       subtitle: row.subtitle === BREAKING_NEWS_SUBTITLE ? null : row.subtitle,
-      category: row.subtitle === BREAKING_NEWS_SUBTITLE ? "Новость" : "Статья",
+      category:
+        row.subtitle === BREAKING_NEWS_SUBTITLE
+          ? "Новость"
+          : row.category?.nameRu ?? "Статья",
       isBreakingNews: row.subtitle === BREAKING_NEWS_SUBTITLE,
       readTime: estimateReadTimeMinutes(extractArticlePlainText(row.contentJson, row.excerpt)),
       publishedAt: row.publishedAt,

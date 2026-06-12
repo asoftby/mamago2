@@ -34,6 +34,19 @@ const articleMvpBaseSelect = {
       avatarUrl: true,
     },
   },
+  category: {
+    select: {
+      nameRu: true,
+    },
+  },
+  tags: {
+    where: { isActive: true },
+    select: {
+      slug: true,
+      title: true,
+    },
+    orderBy: { sortOrder: "asc" },
+  },
 } as const;
 
 async function fetchArticleCoverImageId(articleId: string): Promise<string | null> {
@@ -477,6 +490,8 @@ export async function loadArticleMvpBySlugPublic(
       : article.authorLabel
         ? { displayName: article.authorLabel, avatarUrl: null }
         : null,
+    categoryLabel: article.category?.nameRu ?? null,
+    tags: article.tags,
   };
 }
 
@@ -532,5 +547,7 @@ export async function loadArticleMvpById(articleId: string) {
     heroAlt: cover?.alt ?? article.title,
     blocks,
     authorUserId: article.authorUser?.id ?? null,
+    categoryLabel: article.category?.nameRu ?? null,
+    tags: article.tags,
   };
 }

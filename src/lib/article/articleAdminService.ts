@@ -36,6 +36,7 @@ function toSnapshot(row: {
   authorUserId: string | null;
   authorLabel: string | null;
   cityContext: string | null;
+  categoryId: string | null;
   geoScope: GeoScope | null;
   cityId: string | null;
   status: ContentStatus;
@@ -51,6 +52,7 @@ function toSnapshot(row: {
   seoImageAsset: { publicUrl: string | null } | null;
   seoRobots: string | null;
   noindex: boolean;
+  tags: Array<{ id: string }>;
   views: number;
   updatedAt: Date;
 }): ArticleEditorSnapshot {
@@ -67,6 +69,7 @@ function toSnapshot(row: {
     authorUserId: row.authorUserId,
     authorLabel: row.authorLabel,
     cityContext: row.cityContext,
+    categoryId: row.categoryId,
     geoScope: row.geoScope,
     cityId: row.cityId,
     status: row.status,
@@ -82,6 +85,7 @@ function toSnapshot(row: {
     seoImageUrl: row.seoImageAsset?.publicUrl ?? null,
     seoRobots: row.seoRobots,
     noindex: row.noindex,
+    tagIds: row.tags.map((tag) => tag.id),
     views: row.views,
     updatedAt: row.updatedAt.toISOString(),
   };
@@ -110,8 +114,28 @@ const articleSelect = {
   seoRobots: true,
   geoScope: true,
   cityId: true,
+  categoryId: true,
+  tags: {
+    select: { id: true },
+  },
   updatedAt: true,
 } as const;
+
+async function assertArticleCategoryValid(categoryId: string | null): Promise<void> {
+  if (!categoryId) return;
+  const category = await prisma.eventCategory.findFirst({
+    where: {
+      id: categoryId,
+      publicationType: "ARTICLE",
+      isActive: true,
+      archivedAt: null,
+    },
+    select: { id: true },
+  });
+  if (!category) {
+    throw new Error("Выберите действительную категорию статьи");
+  }
+}
 
 function resolvedGeoScopeCityId(input: ArticleSaveInput): {
   geoScope: GeoScope | null | undefined;
@@ -320,6 +344,7 @@ export async function createArticleFromSaveInput(input: ArticleSaveInput): Promi
     }
     assertGeoScopeValidForPublish(resolvedGeo.geoScope ?? null, resolvedGeo.cityId ?? null);
   }
+  await assertArticleCategoryValid(input.categoryId);
 
   const created = await prisma.article.create({
     data: {
@@ -342,7 +367,11 @@ export async function createArticleFromSaveInput(input: ArticleSaveInput): Promi
       authorLabel: input.authorLabel,
       coverImageId: input.coverImageId,
       cityContext: input.cityContext,
+      categoryId: input.categoryId,
       noindex: input.noindex,
+      tags: input.tagIds && input.tagIds.length > 0
+        ? { connect: input.tagIds.map((id) => ({ id })) }
+        : undefined,
     },
     select: { id: true },
   });
@@ -385,6 +414,7 @@ export async function saveArticleDraft(
     }
     assertGeoScopeValidForPublish(effectiveGeoScope, effectiveCityId);
   }
+  await assertArticleCategoryValid(input.categoryId);
 
   const [coverUrl, editorial] = await Promise.all([
     resolveMediaUrl(input.coverImageId),
@@ -417,6 +447,8 @@ export async function saveArticleDraft(
       seoOgDescription: input.seoOgDescription,
       seoOgImage: seoOgImageResolved,
       seoRobots: input.noindex ? "noindex, nofollow" : input.seoRobots,
+      categoryId: input.categoryId,
+      tags: { set: (input.tagIds ?? []).map((tagId) => ({ id: tagId })) },
     },
     select: { id: true },
   });

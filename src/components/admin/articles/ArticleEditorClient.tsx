@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ContentStatus, type GeoScope } from "@prisma/client";
 import { formatDistanceToNow } from "date-fns";
@@ -9,9 +10,9 @@ import { Loader2 } from "lucide-react";
 import { toast } from "@/lib/toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { CardMultiSelect } from "@/components/ui/card-multiselect";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import {
   Select,
@@ -22,7 +23,10 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import type { ArticleEditorSnapshot } from "@/lib/article/articleAdminTypes";
-import type { ArticleContentPayload } from "@/lib/publications/articleMvp";
+import {
+  deriveArticleExcerptFromContent,
+  type ArticleContentPayload,
+} from "@/lib/publications/articleMvp";
 import { ArticleBlocksMvpEditor } from "@/components/admin/articles/ArticleBlocksMvpEditor";
 import { ArticleEditorCoverField } from "@/components/admin/articles/ArticleEditorCoverField";
 import {
@@ -68,11 +72,12 @@ function fromLocalDatetimeValue(v: string): string | null {
 function snapshotComparable(args: {
   title: string;
   slug: string;
-  excerpt: string;
   coverImageId: string;
   authorUserId: string | null;
   authorLabel: string;
   cityContext: string;
+  categoryId: string;
+  tagIds: string[];
   geoScope: GeoScope | null;
   cityId: string;
   content: ArticleContentPayload;
@@ -90,11 +95,12 @@ function snapshotComparable(args: {
 function applySnapshot(setters: {
   setTitle: (v: string) => void;
   setSlug: (v: string) => void;
-  setExcerpt: (v: string) => void;
   setCoverImageId: (v: string) => void;
   setAuthorUserId: (v: string | null) => void;
   setAuthorLabel: (v: string) => void;
   setCityContext: (v: string) => void;
+  setCategoryId: (v: string | null) => void;
+  setTagIds: (v: string[]) => void;
   setGeoScope: (v: GeoScope | null) => void;
   setCityId: (v: string | null) => void;
   setContent: (v: ArticleContentPayload) => void;
@@ -109,11 +115,12 @@ function applySnapshot(setters: {
 }, snap: ArticleEditorSnapshot) {
   setters.setTitle(snap.title);
   setters.setSlug(snap.slug ?? "");
-  setters.setExcerpt(snap.excerpt ?? "");
   setters.setCoverImageId(snap.coverImageId ?? "");
   setters.setAuthorUserId(snap.authorUserId ?? null);
   setters.setAuthorLabel(snap.authorLabel ?? "");
   setters.setCityContext(snap.cityContext ?? "");
+  setters.setCategoryId(snap.categoryId ?? null);
+  setters.setTagIds(snap.tagIds);
   setters.setGeoScope(snap.geoScope ?? null);
   setters.setCityId(snap.cityId ?? null);
   setters.setContent(snap.content);
@@ -152,15 +159,20 @@ export function ArticleEditorClient({
   const [title, setTitle] = useState(initial.title);
   const [slug, setSlug] = useState(initial.slug ?? "");
   const [pinnedSlug, setPinnedSlug] = useState<string | null>(initial.slug?.trim() || null);
-  const [excerpt, setExcerpt] = useState(initial.excerpt ?? "");
   const [coverImageId, setCoverImageId] = useState(initial.coverImageId ?? "");
   const [coverImagePreviewUrl, setCoverImagePreviewUrl] = useState(initial.coverImageUrl ?? "");
   const [authorUserId, setAuthorUserId] = useState<string | null>(initial.authorUserId ?? null);
   const [authorLabel, setAuthorLabel] = useState(initial.authorLabel ?? "");
   const [cityContext, setCityContext] = useState(initial.cityContext ?? "");
+  const [categoryId, setCategoryId] = useState<string | null>(initial.categoryId ?? null);
+  const [tagIds, setTagIds] = useState<string[]>(initial.tagIds);
   const [geoScope, setGeoScope] = useState<GeoScope | null>(initial.geoScope ?? null);
   const [cityId, setCityId] = useState<string | null>(initial.cityId ?? null);
   const [cities, setCities] = useState<{ id: string; name: string; slug: string }[]>([]);
+  const [categories, setCategories] = useState<{ id: string; label: string; slug: string }[]>([]);
+  const [discoveryTags, setDiscoveryTags] = useState<
+    { id: string; title: string; description: string | null; isActive: boolean }[]
+  >([]);
   const [geoScopeError, setGeoScopeError] = useState<string | null>(null);
   const [content, setContent] = useState<ArticleContentPayload>(initial.content);
   const [status, setStatus] = useState<ContentStatus>(initial.status);
@@ -180,11 +192,12 @@ export function ArticleEditorClient({
     snapshotComparable({
       title: initial.title,
       slug: initial.slug ?? "",
-      excerpt: initial.excerpt ?? "",
       coverImageId: initial.coverImageId ?? "",
       authorUserId: initial.authorUserId ?? null,
       authorLabel: initial.authorLabel ?? "",
       cityContext: initial.cityContext ?? "",
+      categoryId: initial.categoryId ?? "",
+      tagIds: initial.tagIds,
       geoScope: initial.geoScope ?? null,
       cityId: initial.cityId ?? "",
       content: initial.content,
@@ -203,11 +216,12 @@ export function ArticleEditorClient({
       snapshotComparable({
         title,
         slug,
-        excerpt,
         coverImageId,
         authorUserId,
         authorLabel,
         cityContext,
+        categoryId: categoryId ?? "",
+        tagIds,
         geoScope,
         cityId: cityId ?? "",
         content,
@@ -222,11 +236,12 @@ export function ArticleEditorClient({
     [
       title,
       slug,
-      excerpt,
       coverImageId,
       authorUserId,
       authorLabel,
       cityContext,
+      categoryId,
+      tagIds,
       geoScope,
       cityId,
       content,
@@ -257,14 +272,28 @@ export function ArticleEditorClient({
       const data = (await res.json().catch(() => null)) as {
         cities?: { id: string; name: string; slug: string }[];
         authors?: { id: string; label: string; email: string }[];
+        categories?: { id: string; label: string; slug: string }[];
       } | null;
       if (!data || cancelled) return;
       setCities(data.cities ?? []);
-    })();
+      setCategories(data.categories ?? []);
+
+      const selectedIds = initial.tagIds.join(",");
+      const tagsUrl = selectedIds
+        ? `/api/admin/discovery-tags?selectedIds=${encodeURIComponent(selectedIds)}`
+        : "/api/admin/discovery-tags";
+      const tagsRes = await fetch(tagsUrl);
+      if (!tagsRes.ok || cancelled) return;
+      const tagsData = (await tagsRes.json().catch(() => null)) as
+        | { id: string; title: string; description: string | null; isActive: boolean }[]
+        | null;
+      if (!tagsData || cancelled) return;
+      setDiscoveryTags(tagsData);
+    })().catch(() => undefined);
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [initial.tagIds]);
 
   const {
     previewSlug,
@@ -298,14 +327,20 @@ export function ArticleEditorClient({
     ? `${resolveSeoPublicBase()}${publicArticlePath}`
     : null;
 
+  const derivedExcerpt = useMemo(
+    () => deriveArticleExcerptFromContent(content) ?? "",
+    [content],
+  );
+
   const editorSetters = {
     setTitle,
     setSlug,
-    setExcerpt,
     setCoverImageId,
     setAuthorUserId,
     setAuthorLabel,
     setCityContext,
+    setCategoryId,
+    setTagIds,
     setGeoScope,
     setCityId,
     setContent,
@@ -345,12 +380,14 @@ export function ArticleEditorClient({
       title,
       slug: slug.trim() || null,
       subtitle: null as string | null,
-      excerpt: excerpt.trim() || null,
+      excerpt: deriveArticleExcerptFromContent(content),
       content,
       coverImageId: coverImageId.trim() || null,
       authorLabel: authorLabel.trim() || null,
       authorUserId: authorUserId || null,
       cityContext: cityContext.trim() || null,
+      categoryId,
+      tagIds,
       geoScope,
       cityId,
       status,
@@ -367,12 +404,13 @@ export function ArticleEditorClient({
     [
       title,
       slug,
-      excerpt,
       content,
       coverImageId,
       authorLabel,
       authorUserId,
       cityContext,
+      categoryId,
+      tagIds,
       geoScope,
       cityId,
       status,
@@ -395,11 +433,12 @@ export function ArticleEditorClient({
     savedComparableRef.current = snapshotComparable({
       title: snap.title,
       slug: snap.slug ?? "",
-      excerpt: snap.excerpt ?? "",
       coverImageId: snap.coverImageId ?? "",
       authorUserId: snap.authorUserId ?? "",
       authorLabel: snap.authorLabel ?? "",
       cityContext: snap.cityContext ?? "",
+      categoryId: snap.categoryId ?? "",
+      tagIds: snap.tagIds,
       geoScope: snap.geoScope ?? null,
       cityId: snap.cityId ?? "",
       content: snap.content,
@@ -684,13 +723,67 @@ export function ArticleEditorClient({
         <CardHeader>
           <CardTitle className="text-lg">Основная информация</CardTitle>
           <CardDescription>
-            Заголовок, адрес страницы, лид, обложка, автор и городской контекст
+            Заголовок, категория, адрес страницы, обложка, автор и городской контекст
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-5">
           <div className="space-y-2">
             <Label>Заголовок</Label>
             <Input value={title} onChange={(e) => setTitle(e.target.value)} />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="article-category">Категория</Label>
+            <p className="text-xs text-muted-foreground">
+              Категории журнала настраиваются в разделе{" "}
+              <Link href="/admin/taxonomy/categories?type=ARTICLE" className="underline underline-offset-2">
+                Таксономия → Категории
+              </Link>
+              .
+            </p>
+            {hydrated ? (
+              <Select
+                value={categoryId ?? "__none__"}
+                onValueChange={(v) => setCategoryId(v === "__none__" ? null : v)}
+              >
+                <SelectTrigger id="article-category" className="w-full">
+                  <SelectValue placeholder="Выберите категорию" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Не выбрано</SelectItem>
+                  {categories.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <div
+                id="article-category"
+                className="flex h-9 w-full items-center rounded-md border border-input bg-muted/40 px-3 text-sm text-muted-foreground animate-pulse"
+                aria-hidden
+              >
+                …
+              </div>
+            )}
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="article-discovery-tags">Теги</Label>
+            <p className="text-xs text-muted-foreground">
+              Теги управляют подборками и SEO-страницами, но не зависят от города публикации.
+            </p>
+            <div id="article-discovery-tags">
+              <CardMultiSelect
+                placeholder="Выберите теги"
+                values={tagIds}
+                onChange={setTagIds}
+                options={discoveryTags.map((tag) => ({
+                  value: tag.id,
+                  label: tag.isActive ? tag.title : `${tag.title} (выключен)`,
+                }))}
+                allowClear
+              />
+            </div>
           </div>
           <PublicationSlugField
             id="article-slug"
@@ -702,11 +795,6 @@ export function ArticleEditorClient({
             showPublishedSlugWarning={showPublishedSlugWarning}
             slugHistorySupported
           />
-          <div className="space-y-2">
-            <Label>Краткое описание для превью</Label>
-            <Textarea rows={3} value={excerpt} onChange={(e) => setExcerpt(e.target.value)} />
-          </div>
-
           <ArticleEditorCoverField
             value={coverImageId}
             initialPreviewUrl={initial.coverImageUrl}
@@ -829,7 +917,7 @@ export function ArticleEditorClient({
         noindex={noindex}
         coverImageUrl={coverImagePreviewUrl || initial.coverImageUrl}
         fallbackTitle={title.trim() ? `${title.trim()} — mamaGo` : ""}
-        fallbackDescription={excerpt}
+        fallbackDescription={derivedExcerpt}
         publicUrl={publicArticleUrl}
         entityType="article"
         disabled={saving || submitting || moderating || deleting}

@@ -292,6 +292,7 @@ export default async function ArticlePage({
             publishedAt={mvp.publishedAt}
             blocks={mvp.blocks}
             author={mvp.author}
+            tags={mvp.tags}
             related={related}
             editHref={editHref}
           />
@@ -308,6 +309,8 @@ export default async function ArticlePage({
           excerpt={mvp.excerpt}
           publishedAt={mvp.publishedAt}
           blocks={mvp.blocks}
+          tags={mvp.tags}
+          categoryLabel={mvp.categoryLabel}
           editHref={editHref}
         />
       </>

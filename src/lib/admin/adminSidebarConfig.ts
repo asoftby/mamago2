@@ -355,6 +355,15 @@ export const GROUP_DISCOVERY: AdminSidebarGroup = {
       matchers: [{ type: "prefix", value: adminPath("/taxonomy/categories") }],
     },
     {
+      id: "discovery-tags",
+      label: "Теги",
+      href: adminPath("/taxonomy/discovery-tags"),
+      matchers: [
+        { type: "prefix", value: adminPath("/taxonomy/discovery-tags") },
+        { type: "prefix", value: adminPath("/discovery/tags") },
+      ],
+    },
+    {
       id: "discovery-occasions",
       label: "Поводы",
       href: adminPath("/discovery/occasions"),

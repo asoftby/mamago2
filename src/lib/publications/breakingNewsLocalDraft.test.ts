@@ -17,6 +17,7 @@ function baseFormState(): BreakingNewsFormState {
   return {
     title: "",
     slug: "",
+    tagIds: [],
     coverImageId: "",
     galleryIds: [],
     bodyHtml: "",
