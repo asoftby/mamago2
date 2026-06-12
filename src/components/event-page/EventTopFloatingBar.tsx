@@ -88,7 +88,7 @@ export function EventTopFloatingBar({
             const currencyPart = spaceIdx !== -1 ? normalizedPriceLabel.slice(spaceIdx + 1) : "";
             return (
               <div className="flex items-baseline gap-1">
-                <span style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 36, fontWeight: 400, lineHeight: 1, letterSpacing: "-0.03em", color: "#141210" }}>
+                <span style={{ fontFamily: "var(--font-display)", fontSize: 36, fontWeight: 400, lineHeight: 1, letterSpacing: "-0.03em", color: "#141210" }}>
                   {numPart}
                 </span>
                 {currencyPart && (

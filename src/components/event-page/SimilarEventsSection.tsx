@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import type { EventPageSimilar } from "@/lib/event/eventPageTypes";
+import { normalizeUiCurrencyText } from "@/lib/formatters/format-price";
+import { renderCurrencyText } from "@/components/icons/BelarusianRubleIcon";
 
 export function SimilarEventsSection({
   items,
@@ -74,7 +76,7 @@ export function SimilarEventsSection({
               </Link>
               {ev.priceLabel && (
                 <div className="mt-1 font-mono text-[12px] text-[rgba(20,18,16,0.55)]">
-                  от {ev.priceLabel}
+                  {renderCurrencyText(normalizeUiCurrencyText(`от ${ev.priceLabel}`), { iconSize: "sm" })}
                 </div>
               )}
             </div>

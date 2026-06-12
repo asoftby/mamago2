@@ -1,6 +1,6 @@
 "use client";
 
-import { BYN_SYMBOL } from "@/lib/formatters/format-price";
+import { formatPriceFrom, normalizeUiCurrencyText } from "@/lib/formatters/format-price";
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
@@ -112,9 +112,9 @@ function buildEventSubtitle(activity: Activity): string {
     );
   }
   if (activity.priceText) {
-    parts.push(activity.priceText);
+    parts.push(normalizeUiCurrencyText(activity.priceText));
   } else if (activity.priceFrom != null) {
-    parts.push(`от ${activity.priceFrom} ${BYN_SYMBOL}`);
+    parts.push(formatPriceFrom(activity.priceFrom, { hideZero: true }));
   }
   if (parts.length === 0 && activity.shortDesc?.trim()) {
     return activity.shortDesc.trim();

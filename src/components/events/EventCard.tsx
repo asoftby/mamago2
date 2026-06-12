@@ -4,6 +4,7 @@ import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { SaveHeart } from "@/features/save/SaveHeart";
 import { normalizeUiCurrencyText } from "@/lib/formatters/format-price";
+import { renderCurrencyText } from "@/components/icons/BelarusianRubleIcon";
 
 // ─── Public props ────────────────────────────────────────────────────────────
 
@@ -125,7 +126,7 @@ export function EventCard({
           {/* Price badge — bottom right */}
           {priceLabel && (
             <span className="absolute bottom-3 right-3 inline-flex h-7 items-center rounded-full bg-[rgba(20,18,16,0.72)] px-3 font-mono text-[11px] font-medium text-white backdrop-blur-[4px]">
-              {normalizeUiCurrencyText(priceLabel)}
+              {renderCurrencyText(normalizeUiCurrencyText(priceLabel), { iconSize: "sm" })}
             </span>
           )}
         </div>
