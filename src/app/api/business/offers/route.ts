@@ -250,28 +250,34 @@ export async function POST(request: NextRequest) {
           classChipSlugs: data.classChipSlugs,
           wizardCompletedSteps: data.wizardCompletedSteps ?? [],
           status: data.status,
-          campProgramType: data.campProgramType,
-          // Camp fields
-          campSessions: data.campSessions as unknown as Prisma.InputJsonValue,
-          campSessionDuration: data.campSessionDuration,
-          campStayDuration: data.campStayDuration,
-          campPlacesCount: data.campPlacesCount,
-          campGroupSize: data.campGroupSize,
-          campDaySchedule: data.campDaySchedule,
-          campCanSelectDays: data.campCanSelectDays,
-          campHasExtendedCare: data.campHasExtendedCare,
-          // Accommodation fields
-          accommodationProvided: data.accommodationProvided,
-          accommodationType: data.accommodationType,
-          accommodationAddress: data.accommodationAddress,
-          accommodationRooms: data.accommodationRooms,
-          campIncludedMeals: data.campIncludedMeals,
-          campSafetyInfo: data.campSafetyInfo,
-          campMedicalInfo: data.campMedicalInfo,
-          accommodationConditions: data.accommodationConditions,
-          mealInfo: data.mealInfo,
-          transferInfo: data.transferInfo,
-          whatToBring: data.whatToBring,
+          // Camp/accommodation-поля пишем только для лагерей (campProgramType
+          // задан) — strip, не reject: клиентский гейт обходится
+          ...(data.campProgramType
+            ? {
+                campProgramType: data.campProgramType,
+                // Camp fields
+                campSessions: data.campSessions as unknown as Prisma.InputJsonValue,
+                campSessionDuration: data.campSessionDuration,
+                campStayDuration: data.campStayDuration,
+                campPlacesCount: data.campPlacesCount,
+                campGroupSize: data.campGroupSize,
+                campDaySchedule: data.campDaySchedule,
+                campCanSelectDays: data.campCanSelectDays,
+                campHasExtendedCare: data.campHasExtendedCare,
+                // Accommodation fields
+                accommodationProvided: data.accommodationProvided,
+                accommodationType: data.accommodationType,
+                accommodationAddress: data.accommodationAddress,
+                accommodationRooms: data.accommodationRooms,
+                campIncludedMeals: data.campIncludedMeals,
+                campSafetyInfo: data.campSafetyInfo,
+                campMedicalInfo: data.campMedicalInfo,
+                accommodationConditions: data.accommodationConditions,
+                mealInfo: data.mealInfo,
+                transferInfo: data.transferInfo,
+                whatToBring: data.whatToBring,
+              }
+            : {}),
           ...(data.status === "PUBLISHED" ? { publishedAt: new Date() } : {}),
         },
         select: {

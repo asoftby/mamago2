@@ -254,15 +254,21 @@ export function buildOfferCreatePayload(
     wizardCompletedSteps: opts?.wizardCompletedSteps,
     status: opts?.status ?? "DRAFT",
     gallery: data.gallery ?? [],
-    campProgramType:
-      data.offerWizardType === "CAMP" && data.campProgramType
-        ? data.campProgramType
-        : undefined,
-    // Camp fields
-    campSessions:
-      data.offerWizardType === "CAMP"
-        ? sortCampSessions(data.campSessions).map((s, i) => ({ ...s, sortOrder: i }))
-        : undefined,
+    // Camp/accommodation-поля — только для лагерей; данные скрытых шагов
+    // других типов в payload не попадают
+    ...(data.offerWizardType === "CAMP" ? buildCampFieldsForCreate(data) : {}),
+  };
+
+  return base;
+}
+
+function buildCampFieldsForCreate(data: OfferFormData) {
+  return {
+    campProgramType: data.campProgramType || undefined,
+    campSessions: sortCampSessions(data.campSessions).map((s, i) => ({
+      ...s,
+      sortOrder: i,
+    })),
     campSessionDuration: data.campSessionDuration?.trim() || undefined,
     campStayDuration: data.campStayDuration?.trim() || undefined,
     campPlacesCount: data.campPlacesCount ?? undefined,
@@ -270,7 +276,6 @@ export function buildOfferCreatePayload(
     campDaySchedule: data.campDaySchedule?.trim() || undefined,
     campCanSelectDays: data.campCanSelectDays,
     campHasExtendedCare: data.campHasExtendedCare,
-    // Accommodation fields
     accommodationProvided: data.accommodationProvided,
     accommodationType: data.accommodationType || undefined,
     accommodationAddress: data.accommodationAddress.trim() || undefined,
@@ -284,9 +289,31 @@ export function buildOfferCreatePayload(
     transferInfo: data.transferInfo?.trim() || undefined,
     whatToBring: data.whatToBring?.trim() || undefined,
   };
-
-  return base;
 }
+
+/** Тип сменился с CAMP: явные null затирают зависшие camp-данные в БД */
+const CAMP_FIELDS_WIPE = {
+  campProgramType: null,
+  campSessions: null,
+  campSessionDuration: null,
+  campStayDuration: null,
+  campPlacesCount: null,
+  campGroupSize: null,
+  campDaySchedule: null,
+  campCanSelectDays: false,
+  campHasExtendedCare: false,
+  accommodationProvided: false,
+  accommodationType: null,
+  accommodationAddress: null,
+  accommodationRooms: null,
+  campIncludedMeals: null,
+  campSafetyInfo: null,
+  campMedicalInfo: null,
+  accommodationConditions: null,
+  mealInfo: null,
+  transferInfo: null,
+  whatToBring: null,
+} as const;
 
 /** PATCH /api/business/offers/[id] — matches updateOfferSchema */
 export function buildOfferUpdatePayload(
@@ -356,35 +383,10 @@ export function buildOfferUpdatePayload(
     discoverySignalIds: data.signalIds,
     classChipSlugs: data.classChipSlugs,
     gallery: data.gallery ?? [],
-    campProgramType:
-      data.offerWizardType === "CAMP" && data.campProgramType
-        ? data.campProgramType
-        : undefined,
-    // Camp fields
-    campSessions:
-      data.offerWizardType === "CAMP"
-        ? sortCampSessions(data.campSessions).map((s, i) => ({ ...s, sortOrder: i }))
-        : undefined,
-    campSessionDuration: data.campSessionDuration?.trim() || undefined,
-    campStayDuration: data.campStayDuration?.trim() || undefined,
-    campPlacesCount: data.campPlacesCount ?? undefined,
-    campGroupSize: data.campGroupSize ?? undefined,
-    campDaySchedule: data.campDaySchedule?.trim() || undefined,
-    campCanSelectDays: data.campCanSelectDays,
-    campHasExtendedCare: data.campHasExtendedCare,
-    // Accommodation fields
-    accommodationProvided: data.accommodationProvided,
-    accommodationType: data.accommodationType || undefined,
-    accommodationAddress: data.accommodationAddress.trim() || undefined,
-    accommodationRooms: data.accommodationRooms.trim() || undefined,
-    campIncludedMeals:
-      data.campIncludedMeals.length > 0 ? data.campIncludedMeals : undefined,
-    campSafetyInfo: data.campSafetyInfo.trim() || undefined,
-    campMedicalInfo: data.campMedicalInfo.trim() || undefined,
-    accommodationConditions: data.accommodationConditions?.trim() || undefined,
-    mealInfo: data.mealInfo?.trim() || undefined,
-    transferInfo: data.transferInfo?.trim() || undefined,
-    whatToBring: data.whatToBring?.trim() || undefined,
+    // CAMP — camp/accommodation-данные; иначе явные null (затирание в БД)
+    ...(data.offerWizardType === "CAMP"
+      ? buildCampFieldsForCreate(data)
+      : CAMP_FIELDS_WIPE),
   };
 
   if (opts?.status) {

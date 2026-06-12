@@ -65,28 +65,29 @@ const updateOfferSchema = z.object({
   classChipSlugs: z.array(z.string()).optional(),
   /** Шаги мастера, явно завершённые пользователем */
   wizardCompletedSteps: z.array(offerWizardStepKeySchema).optional(),
-  campProgramType: campProgramTypeSchema,
+  // Camp/accommodation: null = «тип больше не лагерь, затереть в БД»
+  campProgramType: campProgramTypeSchema.nullable(),
   // Camp fields
-  campSessions: z.array(campSessionEntrySchema).optional(),
-  campSessionDuration: z.string().optional(),
-  campStayDuration: z.string().optional(),
-  campPlacesCount: z.number().optional(),
-  campGroupSize: z.number().optional(),
-  campDaySchedule: z.string().optional(),
+  campSessions: z.array(campSessionEntrySchema).nullable().optional(),
+  campSessionDuration: z.string().nullable().optional(),
+  campStayDuration: z.string().nullable().optional(),
+  campPlacesCount: z.number().nullable().optional(),
+  campGroupSize: z.number().nullable().optional(),
+  campDaySchedule: z.string().nullable().optional(),
   campCanSelectDays: z.boolean().optional(),
   campHasExtendedCare: z.boolean().optional(),
   // Accommodation fields
   accommodationProvided: z.boolean().optional(),
-  accommodationType: z.string().optional(),
-  accommodationAddress: z.string().optional(),
-  accommodationRooms: z.string().optional(),
-  campIncludedMeals: z.array(campMealKeySchema).optional(),
-  campSafetyInfo: z.string().optional(),
-  campMedicalInfo: z.string().optional(),
-  accommodationConditions: z.string().optional(),
-  mealInfo: z.string().optional(),
-  transferInfo: z.string().optional(),
-  whatToBring: z.string().optional(),
+  accommodationType: z.string().nullable().optional(),
+  accommodationAddress: z.string().nullable().optional(),
+  accommodationRooms: z.string().nullable().optional(),
+  campIncludedMeals: z.array(campMealKeySchema).nullable().optional(),
+  campSafetyInfo: z.string().nullable().optional(),
+  campMedicalInfo: z.string().nullable().optional(),
+  accommodationConditions: z.string().nullable().optional(),
+  mealInfo: z.string().nullable().optional(),
+  transferInfo: z.string().nullable().optional(),
+  whatToBring: z.string().nullable().optional(),
 });
 
 export async function GET(
@@ -243,7 +244,10 @@ export async function PATCH(
     
     // Camp fields
     if (data.campSessions !== undefined)
-      updateData.campSessions = data.campSessions as unknown as Prisma.InputJsonValue;
+      updateData.campSessions =
+        data.campSessions === null
+          ? Prisma.DbNull
+          : (data.campSessions as unknown as Prisma.InputJsonValue);
     if (data.campSessionDuration !== undefined) updateData.campSessionDuration = data.campSessionDuration;
     if (data.campStayDuration !== undefined) updateData.campStayDuration = data.campStayDuration;
     if (data.campPlacesCount !== undefined) updateData.campPlacesCount = data.campPlacesCount;
@@ -257,14 +261,72 @@ export async function PATCH(
     if (data.accommodationType !== undefined) updateData.accommodationType = data.accommodationType;
     if (data.accommodationAddress !== undefined) updateData.accommodationAddress = data.accommodationAddress;
     if (data.accommodationRooms !== undefined) updateData.accommodationRooms = data.accommodationRooms;
-    if (data.campIncludedMeals !== undefined) updateData.campIncludedMeals = data.campIncludedMeals;
+    if (data.campIncludedMeals !== undefined)
+      updateData.campIncludedMeals =
+        data.campIncludedMeals === null
+          ? Prisma.DbNull
+          : (data.campIncludedMeals as unknown as Prisma.InputJsonValue);
     if (data.campSafetyInfo !== undefined) updateData.campSafetyInfo = data.campSafetyInfo;
     if (data.campMedicalInfo !== undefined) updateData.campMedicalInfo = data.campMedicalInfo;
     if (data.accommodationConditions !== undefined) updateData.accommodationConditions = data.accommodationConditions;
     if (data.mealInfo !== undefined) updateData.mealInfo = data.mealInfo;
     if (data.transferInfo !== undefined) updateData.transferInfo = data.transferInfo;
     if (data.whatToBring !== undefined) updateData.whatToBring = data.whatToBring;
-    
+
+    // Не-лагерь: camp-поля из payload не применяем (strip, клиентский гейт
+    // обходится); явный campProgramType: null означает смену типа CAMP → другой —
+    // тогда зависшие camp-данные в БД затираются
+    if (!isCampOffer) {
+      const CAMP_UPDATE_KEYS = [
+        "campProgramType",
+        "campSessions",
+        "campSessionDuration",
+        "campStayDuration",
+        "campPlacesCount",
+        "campGroupSize",
+        "campDaySchedule",
+        "campCanSelectDays",
+        "campHasExtendedCare",
+        "accommodationProvided",
+        "accommodationType",
+        "accommodationAddress",
+        "accommodationRooms",
+        "campIncludedMeals",
+        "campSafetyInfo",
+        "campMedicalInfo",
+        "accommodationConditions",
+        "mealInfo",
+        "transferInfo",
+        "whatToBring",
+      ] as const;
+      for (const key of CAMP_UPDATE_KEYS) {
+        delete updateData[key];
+      }
+
+      if (data.campProgramType === null) {
+        updateData.campProgramType = null;
+        updateData.campSessions = Prisma.DbNull;
+        updateData.campSessionDuration = null;
+        updateData.campStayDuration = null;
+        updateData.campPlacesCount = null;
+        updateData.campGroupSize = null;
+        updateData.campDaySchedule = null;
+        updateData.campCanSelectDays = false;
+        updateData.campHasExtendedCare = false;
+        updateData.accommodationProvided = false;
+        updateData.accommodationType = null;
+        updateData.accommodationAddress = null;
+        updateData.accommodationRooms = null;
+        updateData.campIncludedMeals = Prisma.DbNull;
+        updateData.campSafetyInfo = null;
+        updateData.campMedicalInfo = null;
+        updateData.accommodationConditions = null;
+        updateData.mealInfo = null;
+        updateData.transferInfo = null;
+        updateData.whatToBring = null;
+      }
+    }
+
     // Update price fields if they were recalculated
     if (priceFrom !== existingOffer.priceFrom) updateData.priceFrom = priceFrom;
     if (priceText !== existingOffer.priceText) updateData.priceText = priceText;
