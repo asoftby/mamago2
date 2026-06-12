@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { Heart, Phone } from "lucide-react";
+import { Phone } from "lucide-react";
+import { PlaceSaveHeart } from "@/features/save/PlaceSaveHeart";
 import Link from "next/link";
 import Image from "next/image";
 import { isAppMediaUrl } from "@/lib/media/isAppMediaUrl";
@@ -17,6 +17,9 @@ import {
 } from "@/components/shared/SidebarCard";
 
 interface PlaceHeroProps {
+  ctaRef?: React.RefObject<HTMLDivElement | null>;
+  placeId: string;
+  placeSlug: string;
   title: string;
   shortDesc: string;
   categoryLabel?: string;
@@ -39,6 +42,9 @@ interface PlaceHeroProps {
 }
 
 export function PlaceHero({
+  ctaRef,
+  placeId,
+  placeSlug,
   title,
   shortDesc,
   categoryLabel,
@@ -59,8 +65,6 @@ export function PlaceHero({
   onShareClick,
   ownerEditPlaceId,
 }: PlaceHeroProps) {
-  const [saved, setSaved] = useState(false);
-
   const words = title.trim().split(/\s+/);
   const titleHead = words[0] ?? "";
   const titleTail = (words.length > 1 ? words.slice(1).join(" ") : "") + ".";
@@ -78,6 +82,20 @@ export function PlaceHero({
   const instagramDisplay = instagramUrl
     ? "@" + instagramUrl.replace(/^https?:\/\/(www\.)?instagram\.com\/?/, "").replace(/\/$/, "")
     : null;
+
+  const summaryLines =
+    workingHoursSummary
+      ?.split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean) ?? [];
+  const summaryPrimary = summaryLines[0];
+  const summaryExtra =
+    summaryLines.length > 1 ? summaryLines.slice(1).join("\n") : undefined;
+  const hoursDetail = todayHoursText
+    ? `сегодня ${todayHoursText}`
+    : isOpenNow != null
+      ? summaryPrimary
+      : summaryExtra;
 
   return (
     <section
@@ -222,7 +240,7 @@ export function PlaceHero({
                         <Image src={logoUrl} alt={title} width={44} height={44} className="object-cover" />
                       )
                     ) : (
-                      <span style={{ fontFamily: "var(--font-display, Georgia, serif)", fontStyle: "italic", fontWeight: 400, fontSize: 18, color: "#fff" }}>
+                      <span style={{ fontFamily: "var(--font-display)", fontStyle: "italic", fontWeight: 400, fontSize: 18, color: "#fff" }}>
                         {logoInitials}
                       </span>
                     )}
@@ -230,11 +248,15 @@ export function PlaceHero({
                   {/* Status + hours */}
                   <div style={{ minWidth: 0, flex: 1 }}>
                     <div style={{ fontFamily: "var(--font-mono, monospace)", textTransform: "uppercase", fontSize: 11, letterSpacing: ".14em", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: isOpenNow == null ? "rgba(20,18,16,.45)" : isOpenNow ? "#1F8A5B" : "#C24E22" }}>
-                      {isOpenNow != null ? `● ${isOpenNow ? "Открыто" : "Закрыто"}` : workingHoursSummary ? `● ${workingHoursSummary.split("\n")[0].trim()}` : title}
+                      {isOpenNow != null
+                        ? `● ${isOpenNow ? "Открыто" : "Закрыто"}`
+                        : summaryPrimary
+                          ? `● ${summaryPrimary}`
+                          : title}
                     </div>
-                    {(todayHoursText || workingHoursSummary) && (
+                    {hoursDetail && (
                       <div style={{ fontFamily: "var(--font-mono, monospace)", fontSize: 12, color: "rgba(20,18,16,.55)", marginTop: 2, letterSpacing: ".02em" }}>
-                        {todayHoursText ? `сегодня ${todayHoursText}` : workingHoursSummary!.split("\n")[0]}
+                        {hoursDetail}
                       </div>
                     )}
                   </div>
@@ -275,7 +297,7 @@ export function PlaceHero({
 
             {/* Позвонить + Сохранить */}
             <SidebarCardTopSection>
-              <div className="flex items-center gap-3">
+              <div ref={ctaRef} className="flex items-center gap-3">
                 {phone && (
                   <Link
                     href={`tel:${phone}`}
@@ -286,26 +308,20 @@ export function PlaceHero({
                     Позвонить
                   </Link>
                 )}
-                <button
-                  type="button"
-                  aria-label={saved ? "Сохранено" : "Сохранить"}
-                  onClick={() => setSaved((s) => !s)}
-                  className={[
-                    "flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-full border transition-all",
-                    saved
-                      ? "border-[#E86A3A] bg-[#FFE8DC] text-[#C24E22]"
-                      : "border-[rgba(20,18,16,0.18)] bg-transparent text-[rgba(20,18,16,0.45)] hover:border-[#141210] hover:text-[#141210]",
-                  ].join(" ")}
-                >
-                  <Heart className={["h-5 w-5", saved ? "fill-current" : ""].join(" ")} />
-                </button>
+                <PlaceSaveHeart
+                  placeId={placeId}
+                  placeSlug={placeSlug}
+                  placeTitle={title}
+                  coverImageUrl={logoUrl}
+                  source="place-detail"
+                />
               </div>
             </SidebarCardTopSection>
 
             {/* Owner edit */}
             {ownerEditPlaceId && (
               <SidebarCardTopSection>
-                <OwnerPlaceEditDropdown placeId={ownerEditPlaceId} className="w-full h-[52px] rounded-full" />
+                <OwnerPlaceEditDropdown placeId={ownerEditPlaceId} className="w-full h-14 rounded-full" />
               </SidebarCardTopSection>
             )}
 
@@ -350,4 +366,3 @@ export function PlaceHero({
     </section>
   );
 }
-

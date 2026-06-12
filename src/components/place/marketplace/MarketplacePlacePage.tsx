@@ -1,6 +1,8 @@
 "use client";
 
+import { useRef } from "react";
 import { PlaceHero } from "./PlaceHero";
+import { PlaceStickyActionBar } from "./PlaceStickyActionBar";
 import { PlaceEventsSection } from "./PlaceEventsSection";
 import { PlaceOffersSection } from "./PlaceOffersSection";
 import { PlaceAboutSection } from "./PlaceAboutSection";
@@ -8,6 +10,7 @@ import { PlaceAddressSection } from "./PlaceAddressSection";
 import { PlaceReviewsSection } from "./PlaceReviewsSection";
 import { PriceListBlock } from "@/components/shared/PriceListBlock";
 import { MobileSmartBackButton } from "@/components/shared/MobileSmartBackButton";
+import type { ActivityMock } from "@/types/activity";
 import type { PriceData } from "@/lib/priceItems";
 import Link from "next/link";
 import Image from "next/image";
@@ -70,15 +73,8 @@ interface MarketplacePlacePageProps {
     fallbackUrl?: string;
   };
 
-  events?: Array<{
-    id: string;
-    title: string;
-    slug: string;
-    imageUrl?: string;
-    startDate: string;
-    price?: number;
-    category?: string;
-  }>;
+  eventActivities?: ActivityMock[];
+  citySlug?: string;
 
   offers?: Array<{
     id: string;
@@ -113,11 +109,14 @@ interface MarketplacePlacePageProps {
 
 export function MarketplacePlacePage({
   place,
-  events = [],
+  eventActivities = [],
+  citySlug = "minsk",
   offers = [],
   reviews = [],
   ownerEditPlaceId,
 }: MarketplacePlacePageProps) {
+  const ctaRef = useRef<HTMLDivElement>(null);
+
   const handleShare = () => {
     if (navigator.share) {
       navigator.share({
@@ -148,14 +147,42 @@ export function MarketplacePlacePage({
 
   const galleryImages = place.images ?? [];
 
+  const summaryPrimary = place.workingHoursSummary
+    ?.split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)[0];
+  const stickyAddressLine = place.address?.trim() || undefined;
+  const stickyStatusLabel = (() => {
+    if (place.isOpenNow != null) {
+      const status = place.isOpenNow ? "Открыто" : "Закрыто";
+      return place.todayHoursText
+        ? `${status} · сегодня ${place.todayHoursText}`
+        : status;
+    }
+    if (summaryPrimary) {
+      return summaryPrimary.split("•")[0]?.trim() || summaryPrimary;
+    }
+    if (!stickyAddressLine) {
+      return [place.city, place.district].filter(Boolean).join(" · ") || undefined;
+    }
+    return undefined;
+  })();
+  const stickyDetailLine = place.title;
+
   return (
-    <div style={{ background: "#ffffff", minHeight: "100vh" }}>
+    <div
+      className="pb-[calc(5rem+env(safe-area-inset-bottom))] lg:pb-0"
+      style={{ background: "#ffffff", minHeight: "100vh" }}
+    >
       <div className="mx-auto w-full max-w-[1200px] px-4 pt-4 sm:px-6 lg:px-8">
         <MobileSmartBackButton fallbackHref={place.fallbackUrl} />
       </div>
 
       {/* Hero */}
       <PlaceHero
+        ctaRef={ctaRef}
+        placeId={place.id}
+        placeSlug={place.slug}
         title={place.title}
         shortDesc={place.shortDesc}
         address={place.address}
@@ -238,8 +265,8 @@ export function MarketplacePlacePage({
       )}
 
       {/* Events */}
-      {events.length > 0 && (
-        <PlaceEventsSection events={events} placeId={place.slug} />
+      {eventActivities.length > 0 && (
+        <PlaceEventsSection activities={eventActivities} citySlug={citySlug} />
       )}
 
       {/* Reviews */}
@@ -255,17 +282,27 @@ export function MarketplacePlacePage({
       {/* Address / Location */}
       <PlaceAddressSection
         title={place.title}
+        logoUrl={place.logoUrl}
         shortDesc={place.shortDesc ?? undefined}
         address={place.address}
         district={place.district}
         metro={place.metro}
-        phone={place.phone ?? undefined}
         latitude={place.latitude}
         longitude={place.longitude}
         mapsDirectionsUrl={place.mapsDirectionsUrl}
       />
 
-      {/* Final CTA */}
+      <PlaceStickyActionBar
+        ctaRef={ctaRef}
+        statusLabel={stickyStatusLabel}
+        addressLine={stickyAddressLine}
+        detailLine={stickyDetailLine}
+        phone={place.phone}
+        placeId={place.id}
+        placeSlug={place.slug}
+        placeTitle={place.title}
+        coverImageUrl={place.logoUrl}
+      />
     </div>
   );
 }
@@ -374,9 +411,23 @@ const DAY_FULL_NAMES: Record<string, string> = {
 function WorkingHoursSection({ summary }: { summary: string }) {
   const lines = summary.split("\n").map((l) => l.trim()).filter(Boolean);
   const statusLine = lines[0] ?? "";
+  const isByAppointment = statusLine.toLowerCase() === "по записи";
+  const noteLines = isByAppointment ? lines.slice(1) : [];
   // Day rows: "Пн: 09:00–18:00" or "Пн: выходной"
   const dayRows = lines.filter((l) => DAY_LABELS.some((d) => l.startsWith(d + ":")));
   const isOpen = statusLine.toLowerCase().startsWith("открыто");
+
+  if (isByAppointment && noteLines.length === 0 && dayRows.length === 0) {
+    return null;
+  }
+
+  const leftStatusText = isByAppointment
+    ? noteLines.join("\n")
+    : !isOpen && statusLine
+      ? statusLine
+      : isOpen
+        ? statusLine
+        : "";
 
   return (
     <section
@@ -407,19 +458,25 @@ function WorkingHoursSection({ summary }: { summary: string }) {
             style={{ fontSize: 30, lineHeight: 1, margin: "0", letterSpacing: "-.02em", color: "#141210", fontFamily: "var(--font-sans)", fontWeight: 400 }}
           >
             {isOpen ? (
-              <>Открыто <em style={{ fontFamily: "Georgia, serif", fontStyle: "italic", fontWeight: 400, color: "#1F8A5B" }}>сейчас</em></>
+              <>Открыто <em style={{ fontFamily: "var(--font-editorial)", fontStyle: "italic", fontWeight: 400, color: "#1F8A5B" }}>сейчас</em></>
             ) : (
-              <>Режим <em style={{ fontFamily: "Georgia, serif", fontStyle: "italic", fontWeight: 400, color: "#C24E22" }}>работы</em></>
+              <>Режим <em style={{ fontFamily: "var(--font-editorial)", fontStyle: "italic", fontWeight: 400, color: "#C24E22" }}>работы</em></>
             )}
           </h2>
-          <p style={{ fontSize: 15, marginTop: 14, maxWidth: 260, lineHeight: 1.5, color: "rgba(20,18,16,.55)" }}>
-            {!isOpen && statusLine ? (
-              <>
-                <span style={{ color: "#C24E22", display: "block" }}>{statusLine.split("•")[0]?.trim()}</span>
-                {statusLine.includes("•") && <span style={{ display: "block" }}>{statusLine.split("•").slice(1).join("•").trim()}</span>}
-              </>
-            ) : statusLine}
-          </p>
+          {leftStatusText ? (
+            <p style={{ fontSize: 15, marginTop: 14, maxWidth: 260, lineHeight: 1.5, color: "rgba(20,18,16,.55)" }}>
+              {!isOpen && !isByAppointment && statusLine ? (
+                <>
+                  <span style={{ color: "#C24E22", display: "block" }}>{statusLine.split("•")[0]?.trim()}</span>
+                  {statusLine.includes("•") && (
+                    <span style={{ display: "block" }}>{statusLine.split("•").slice(1).join("•").trim()}</span>
+                  )}
+                </>
+              ) : (
+                leftStatusText
+              )}
+            </p>
+          ) : null}
         </div>
 
         {/* Right: schedule */}
@@ -476,7 +533,11 @@ function WorkingHoursSection({ summary }: { summary: string }) {
                 );
               })}
             </ul>
-          ) : (
+          ) : noteLines.length > 0 ? (
+            <p style={{ fontSize: 17, color: "rgba(20,18,16,.55)", margin: 0, lineHeight: 1.5 }}>
+              {noteLines.join("\n")}
+            </p>
+          ) : isByAppointment ? null : (
             <p style={{ fontSize: 17, color: "rgba(20,18,16,.55)", margin: 0, lineHeight: 1.5 }}>
               {summary}
             </p>
@@ -710,5 +771,3 @@ function FinalCTA({ place }: { place: MarketplacePlacePageProps["place"] }) {
     </section>
   );
 }
-
-/* ─── Mobile sticky CTA ─────────────────────────────────────────────────── */
