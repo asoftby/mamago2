@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { PlanCalendarIcon } from "@/components/icons/PlanCalendarIcon";
 import { useMyPlan } from "../hooks/useMyPlan";
 import { cn } from "@/lib/utils";
 import { format, isTomorrow, parseISO } from "date-fns";
@@ -52,19 +53,13 @@ function stateToText(state: WidgetState): { label: string; value: string; badge:
   switch (state.kind) {
     case "loading": return { label: "Загрузка…", value: "", badge: null };
     case "unauthenticated": return { label: "Подберём активности", value: "под вас", badge: null };
-    case "empty": return { label: "Пока ничего", value: "не запланировано", badge: null };
+    case "empty": return { label: "", value: "", badge: null };
     case "today": return { label: "Сегодня:", value: pluralEvents(state.count), badge: state.count };
     case "week": return { label: "На неделе:", value: pluralEvents(state.count), badge: state.count };
     case "next": return { label: "Ближайшее:", value: formatNextDate(state.dateStr), badge: null };
   }
 }
 
-const CalIcon = () => (
-  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="3" y="4" width="18" height="18" rx="3"/>
-    <path d="M16 2v4M8 2v4M3 10h18"/>
-  </svg>
-);
 const ArrowIcon = () => (
   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
     <path d="M5 12h14M13 6l6 6-6 6"/>
@@ -129,11 +124,9 @@ export function MyPlanWidget({ onOpen }: MyPlanWidgetProps) {
           gap: 12,
           padding: "14px 14px 14px 12px",
           borderRadius: 999,
-          background: "rgba(255,255,255,0.35)",
-          backdropFilter: "blur(24px) saturate(1.5)",
-          WebkitBackdropFilter: "blur(24px) saturate(1.5)",
-          border: "1px solid rgba(255,255,255,0.60)",
-          boxShadow: "0 16px 30px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.70)",
+          background: "#F6F2EA",
+          border: "1px solid #EBEBEB",
+          boxShadow: "0 16px 30px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.7)",
           cursor: "pointer",
           transition: "all .22s",
           minWidth: 220,
@@ -141,12 +134,12 @@ export function MyPlanWidget({ onOpen }: MyPlanWidgetProps) {
         onMouseEnter={(e) => {
           const b = e.currentTarget as HTMLButtonElement;
           b.style.transform = "translateY(-2px)";
-          b.style.boxShadow = "0 20px 40px rgba(0,0,0,0.16), inset 0 1px 0 rgba(255,255,255,0.75)";
+          b.style.boxShadow = "0 20px 36px rgba(0,0,0,0.14), inset 0 1px 0 rgba(255,255,255,0.7)";
         }}
         onMouseLeave={(e) => {
           const b = e.currentTarget as HTMLButtonElement;
           b.style.transform = "none";
-          b.style.boxShadow = "0 16px 30px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.70)";
+          b.style.boxShadow = "0 16px 30px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.7)";
         }}
       >
         {/* Icon + badge */}
@@ -154,17 +147,17 @@ export function MyPlanWidget({ onOpen }: MyPlanWidgetProps) {
           <span
             style={{
               width: 36, height: 36, borderRadius: 99,
-              background: hasItems ? "rgba(232,106,58,0.18)" : "rgba(210,206,199,0.50)",
-              color: hasItems ? "#C24E22" : "rgba(20,18,16,.55)",
-              border: `1px solid ${hasItems ? "rgba(232,106,58,.22)" : "rgba(255,255,255,.70)"}`,
-              backdropFilter: "blur(8px)",
-              WebkitBackdropFilter: "blur(8px)",
+              background: "#FFFFFF",
+              border: hasItems ? "1px solid rgba(239,135,89,0.40)" : "1px solid #E5E7EB",
               display: "flex", alignItems: "center", justifyContent: "center",
               transition: "all .2s",
               transform: pulse ? "scale(1.12)" : "scale(1)",
+              boxShadow: "0 1px 2px rgba(20,18,16,0.05)",
             }}
           >
-            <CalIcon />
+            <PlanCalendarIcon
+              className={cn("h-5 w-5", hasItems ? "text-[#C24E22]" : "text-gray-400")}
+            />
           </span>
           {badge !== null && badge > 0 && (
             <span style={{
@@ -190,32 +183,37 @@ export function MyPlanWidget({ onOpen }: MyPlanWidgetProps) {
             style={{ fontFamily: "var(--font-sans)", fontSize: 15, fontWeight: 400, lineHeight: 1, color: "#141210" }}
           >
             Мой план{widgetState.kind === "unauthenticated" && (
-              <em style={{ fontFamily: "Georgia, serif", fontStyle: "italic", color: "#C24E22" }}> за 10 секунд</em>
+              <em style={{ fontFamily: "var(--font-editorial)", fontStyle: "italic", color: "#C24E22" }}> за 10 секунд</em>
             )}
           </div>
-          <div
-            className="font-sans"
-            style={{
-              marginTop: 3,
-              fontSize: 11,
-              overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-            }}
-          >
-            <span style={{ color: "#141210" }}>{label}</span>
-            {value && <span style={{ color: "#141210" }}> {value}</span>}
+          <div className="mt-0.5 truncate text-left text-xs leading-tight font-sans">
+            {widgetState.kind === "empty" ? (
+              <span>
+                <span className="text-neutral-900">Нет событий —</span>{" "}
+                <em className="font-pt-serif italic text-primary">
+                  соберём за 10 секунд
+                </em>
+              </span>
+            ) : widgetState.kind === "unauthenticated" ? (
+              <span className="text-neutral-400">Подберём активности под вас</span>
+            ) : (
+              <span className="text-neutral-700">
+                {label}
+                {value ? ` ${value}` : ""}
+              </span>
+            )}
           </div>
         </div>
 
         {/* Arrow */}
         <span style={{
           width: 28, height: 28, borderRadius: 99,
-          background: "rgba(210,206,199,0.50)",
-          border: "1px solid rgba(255,255,255,.50)",
+          background: "#FFFFFF",
+          border: "1px solid #E5E7EB",
           display: "flex", alignItems: "center", justifyContent: "center",
           color: "rgba(20,18,16,.55)",
           flexShrink: 0,
-          backdropFilter: "blur(8px)",
-          WebkitBackdropFilter: "blur(8px)",
+          boxShadow: "0 1px 2px rgba(20,18,16,0.05)",
         }}>
           <ArrowIcon />
         </span>

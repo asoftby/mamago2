@@ -118,7 +118,7 @@ export function WeekCalendarStrip({
               style={{ fontFamily: "Menlo, monospace", fontSize: 13, fontWeight: 400, lineHeight: 1, letterSpacing: ".08em", color: "#141210" }}
             >
               {monthLabel}{" "}
-              <span style={{ fontFamily: "var(--font-display), Georgia, serif", color: "rgba(20,18,16,.45)", fontWeight: 400, letterSpacing: "-.02em" }}>{yearLabel}</span>
+              <span style={{ fontFamily: "var(--font-display)", color: "rgba(20,18,16,.45)", fontWeight: 400, letterSpacing: "-.02em" }}>{yearLabel}</span>
             </span>
           </div>
 
@@ -177,7 +177,7 @@ export function WeekCalendarStrip({
                     {WEEKDAY_SHORT_RU[d.getDay()]}
                   </span>
                   <span
-                    style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 20, lineHeight: 1, letterSpacing: "-.02em" }}
+                    style={{ fontFamily: "var(--font-display)", fontSize: 20, lineHeight: 1, letterSpacing: "-.02em" }}
                   >
                     {d.getDate()}
                   </span>

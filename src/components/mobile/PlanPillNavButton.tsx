@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { CalendarDays } from "lucide-react";
+import { PlanCalendarIcon } from "@/components/icons/PlanCalendarIcon";
 import { cn } from "@/lib/utils";
 
 export type PlanPillNavButtonProps = {
@@ -55,58 +55,67 @@ export function PlanPillNavButton({
       aria-current={isActive ? "page" : undefined}
       aria-describedby={showEmptyHint ? emptyHintId : undefined}
       className={cn(
-        "relative flex h-11 min-w-0 flex-1 items-center rounded-full py-0 pl-3 pr-2.5",
+        "relative flex h-[52px] min-w-0 flex-1 items-center rounded-full px-5 py-0",
         "border transition-all duration-200 ease-out will-change-transform cursor-pointer touch-manipulation",
-        "active:scale-[0.985] active:transition-transform",
         chrome === "dark"
-          ? isActive
-            ? "border-[#EF8759]/50 bg-[rgba(250,247,241,0.50)] shadow-[inset_0_1px_0_rgba(255,255,255,0.18),0_6px_20px_rgba(239,135,89,0.18)]"
-            : "border-[rgba(250,247,241,0.25)] bg-[rgba(250,247,241,0.50)] shadow-[inset_0_1px_0_rgba(255,255,255,0.14)]"
-          : isActive
-            ? "border-[#EF8759]/40 bg-gradient-to-b from-white to-[#FFF8F5] shadow-[inset_0_1px_0_rgba(255,255,255,1),0_6px_20px_rgba(239,135,89,0.22)]"
-            : "border-white/75 bg-white/65 shadow-sm shadow-black/[0.05]",
+          ? cn(
+              "border-gray-200 bg-white shadow-sm active:scale-[0.98]",
+              isActive && "border-[#EF8759]/40",
+            )
+          : cn(
+              "active:scale-[0.985] active:transition-transform",
+              isActive
+                ? "border-[#EF8759]/40 bg-gradient-to-b from-white to-[#FFF8F5] shadow-[inset_0_1px_0_rgba(255,255,255,1),0_6px_20px_rgba(239,135,89,0.22)]"
+                : "border-white/75 bg-white/65 shadow-sm shadow-black/[0.05]",
+            ),
         className,
       )}
     >
       <div className="flex w-full min-w-0 items-center gap-2">
-        <CalendarDays
+        <PlanCalendarIcon
           className={cn(
-            "h-[18px] w-[18px] shrink-0 stroke-[1.75]",
+            chrome === "dark" ? "h-5 w-5" : "h-[18px] w-[18px]",
             chrome === "dark"
-              ? isActive ? "text-neutral-800" : "text-neutral-700"
+              ? isActive
+                ? "text-[#C24E22]"
+                : "text-gray-400"
               : isActive
                 ? "text-neutral-500"
                 : "text-neutral-400",
           )}
-          aria-hidden
         />
         <div className="flex min-w-0 flex-1 flex-col justify-center gap-0 text-left">
           <span
             className={cn(
-              "tracking-tight",
-              guestPlanPromo ? "leading-snug line-clamp-2" : "leading-none",
-              chrome === "dark"
-                ? isActive ? "text-neutral-900" : "text-neutral-800"
-                : isActive ? "text-gray-900" : "text-gray-800",
+              "block min-w-0 truncate text-left text-sm font-normal",
+              guestPlanPromo ? "leading-snug" : "leading-none",
+              "text-gray-700",
             )}
-            style={{ fontFamily: "var(--font-sans)", fontWeight: 400, fontSize: guestPlanPromo ? 13 : 15 }}
           >
             {guestPlanPromo ? (
-              <>Мой план <em style={{ fontStyle: "italic", color: "#C24E22" }}>за 10 секунд</em></>
+              <>
+                Мой план{" "}
+                <em style={{ fontFamily: "var(--font-editorial)", fontStyle: "italic", color: "#C24E22" }}>
+                  за 10 секунд
+                </em>
+              </>
             ) : "Мой план"}
           </span>
           {showEmptyHint && (
             <span
               id={emptyHintId}
-              className={cn(
-                "mt-0.5 text-left text-[10px] leading-tight font-sans",
-                chrome === "dark" ? "text-neutral-700" : "text-neutral-500",
-              )}
-              style={{ fontFamily: "var(--font-sans), sans-serif" }}
+              className="mt-0.5 block truncate text-left text-xs leading-tight text-neutral-400"
             >
-              {guestPlanPromo
-                ? "Подберём активности под вас"
-                : "Нет событий — соберём за 10 секунд"}
+              {guestPlanPromo ? (
+                "Подберём активности под вас"
+              ) : (
+                <>
+                  <span className="text-neutral-900">Нет событий —</span>{" "}
+                  <em className="font-pt-serif italic text-primary">
+                    соберём за 10 секунд
+                  </em>
+                </>
+              )}
             </span>
           )}
         </div>

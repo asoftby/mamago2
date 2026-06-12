@@ -194,7 +194,7 @@ export function AlternativePerformerCard({
             Подробнее
           </button>
           <div className="text-right">
-            <span className="font-[var(--font-display,Georgia,serif)] text-[24px] leading-none text-[#141210]">
+            <span className="font-[var(--font-display)] text-[24px] leading-none text-[#141210]">
               {alternative.price}
             </span>
             <BelarusianRubleIcon className="ml-1 text-[#8A8178]" />
@@ -292,7 +292,7 @@ export function ScenarioTimelineItem({
             {item.status ? <PerformerStatusBadge status={item.status} /> : null}
             {item.price != null ? (
               <div className="whitespace-nowrap text-right">
-                <span className="font-[var(--font-display,Georgia,serif)] text-[30px] leading-none text-[#141210]">
+                <span className="font-[var(--font-display)] text-[30px] leading-none text-[#141210]">
                   {item.price}
                 </span>
                 <BelarusianRubleIcon className="ml-1 text-[#8A8178]" />
@@ -340,7 +340,7 @@ export function ScenarioTimeline({
           Итого
         </span>
         <div>
-          <span className="font-[var(--font-display,Georgia,serif)] text-[34px] leading-none text-[#141210]">
+          <span className="font-[var(--font-display)] text-[34px] leading-none text-[#141210]">
             {totalPrice ?? 0}
           </span>
           <BelarusianRubleIcon className="ml-1 text-[#8A8178]" />

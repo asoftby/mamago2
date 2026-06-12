@@ -8,7 +8,7 @@ import { publicActivityPath } from "@/lib/business/eventPublicLink";
 import type { SerializedPlanItem } from "./PlanPageClient";
 import { formatHHMM } from "@/lib/formatters/date";
 import { BYN_SYMBOL, formatPriceAmount, normalizeUiCurrencyText } from "@/lib/formatters/format-price";
-import { BelarusianRubleIcon } from "@/components/icons/BelarusianRubleIcon";
+import { BelarusianRubleIcon, renderCurrencyText } from "@/components/icons/BelarusianRubleIcon";
 
 const MONTHS_RU_GENITIVE = ["января","февраля","марта","апреля","мая","июня","июля","августа","сентября","октября","ноября","декабря"];
 const DAYS_RU_FULL: Record<number, string> = {
@@ -50,7 +50,7 @@ function PlanItemPriceDisplay({ priceLabel }: { priceLabel: string }) {
     );
   }
 
-  return <span>{normalizeUiCurrencyText(priceLabel)}</span>;
+  return <span>{renderCurrencyText(normalizeUiCurrencyText(priceLabel), { iconSize: "sm" })}</span>;
 }
 
 function PlanItemMeta({ item }: { item: SerializedPlanItem }) {

@@ -980,7 +980,7 @@ export function GuestMyPlanPanel({
             <h3
               style={{
                 margin: 0,
-                fontFamily: '"InstrumentSerifNumerals", Georgia, serif',
+                fontFamily: "var(--font-display)",
                 fontSize: 36,
                 fontWeight: 400, lineHeight: 1.05, letterSpacing: "-.01em",
                 color: "#141210", maxWidth: 360,
