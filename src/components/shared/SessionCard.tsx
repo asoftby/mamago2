@@ -13,6 +13,8 @@ export interface SessionCardProps {
   title: string;
   /** Вспомогательная строка — время, цена (может содержать React-узлы, напр. SVG-иконку валюты) */
   subtitle?: ReactNode;
+  /** Дополнительный контент — описание, акция, важные условия */
+  details?: ReactNode;
   /** Текст кнопки CTA (undefined — кнопка не отображается) */
   primaryLabel?: string;
   primaryHref?: string;
@@ -28,6 +30,7 @@ export function SessionCard({
   isNearest,
   title,
   subtitle,
+  details,
   primaryLabel,
   primaryHref,
   primaryDisabled,
@@ -82,6 +85,7 @@ export function SessionCard({
               {subtitle}
             </div>
           )}
+          {details ? <div className="mt-3">{details}</div> : null}
         </div>
 
         {/* CTA column */}

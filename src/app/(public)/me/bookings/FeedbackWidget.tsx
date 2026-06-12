@@ -106,7 +106,7 @@ export function FeedbackWidget({ bookingId, onSubmitted }: Props) {
               type="button"
               onClick={handleSubmit}
               disabled={state === "submitting"}
-              className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-[#EF8759] px-4 text-[13px] font-semibold text-white transition-all hover:bg-[#e07040] disabled:opacity-60"
+              className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-[#EF8759] px-4 text-[13px] font-semibold text-white transition-all hover:bg-primary-hover disabled:opacity-60"
             >
               {state === "submitting" ? (
                 <>

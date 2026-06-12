@@ -150,7 +150,7 @@ function ProgressGrid({ items }: { items: ScenarioTimelineItem[] }) {
         >
           <div
             style={{
-              fontFamily: "var(--font-display, Georgia, serif)",
+              fontFamily: "var(--font-display)",
               fontSize: i === 3 ? 22 : 28,
               lineHeight: 1,
               letterSpacing: "-.02em",
@@ -299,7 +299,7 @@ function AlternativeCard({
         </span>
         <div
           style={{
-            fontFamily: "var(--font-display, Georgia, serif)",
+            fontFamily: "var(--font-display)",
             fontSize: 19,
             lineHeight: 1.1,
             letterSpacing: "-.015em",
@@ -318,7 +318,7 @@ function AlternativeCard({
         >
           <span
             style={{
-              fontFamily: "var(--font-display, Georgia, serif)",
+              fontFamily: "var(--font-display)",
               fontSize: 22,
               lineHeight: 1,
               letterSpacing: "-.02em",
@@ -483,7 +483,7 @@ function VendorRow({
           <h4
             style={{
               margin: 0,
-              fontFamily: "var(--font-display, Georgia, serif)",
+              fontFamily: "var(--font-display)",
               fontSize: 20,
               lineHeight: 1.1,
               letterSpacing: "-.015em",
@@ -581,7 +581,7 @@ function VendorRow({
           >
             <span
               style={{
-                fontFamily: "var(--font-display, Georgia, serif)",
+                fontFamily: "var(--font-display)",
                 fontSize: 22,
                 lineHeight: 1,
                 letterSpacing: "-.02em",
@@ -617,7 +617,7 @@ function InternalRow({ item }: { item: ScenarioTimelineItem }) {
     >
       <div
         style={{
-          fontFamily: "var(--font-display, Georgia, serif)",
+          fontFamily: "var(--font-display)",
           fontSize: 17,
           lineHeight: 1.2,
           letterSpacing: "-.01em",
@@ -681,7 +681,7 @@ function PageHeader({
       <h1
         style={{
           margin: 0,
-          fontFamily: "var(--font-display, Georgia, serif)",
+          fontFamily: "var(--font-display)",
           fontSize: "clamp(40px, 6vw, 72px)",
           lineHeight: 0.95,
           letterSpacing: "-.025em",
@@ -1016,7 +1016,7 @@ function Footer({
           >
             <span
               style={{
-                fontFamily: "var(--font-display, Georgia, serif)",
+                fontFamily: "var(--font-display)",
                 fontSize: 16,
                 verticalAlign: "middle",
               }}
@@ -1338,7 +1338,7 @@ export function BookingStatusPage({ party, onBack }: BookingStatusPageProps) {
           <span>
             <span
               style={{
-                fontFamily: "var(--font-display, Georgia, serif)",
+                fontFamily: "var(--font-display)",
                 fontSize: 36,
                 letterSpacing: "-.02em",
                 color: "#141210",
