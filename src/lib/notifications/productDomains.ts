@@ -93,6 +93,7 @@ function resolveExplicitProductDomain(
     case "BUSINESS_VERIFIED":
     case "BUSINESS_REJECTED":
     case "BUSINESS_NEEDS_INFO":
+    case "BUSINESS_VERIFICATION_SUBMITTED":
     case "BUSINESS_APPLICATION_CREATED":
     case "ADMIN_MODERATION_ITEM_CREATED":
       return "BUSINESS";

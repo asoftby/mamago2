@@ -1249,10 +1249,12 @@ export async function notifyUserPlanReminder(params: {
 // ── BOOKING ───────────────────────────────────────────────────────────────────
 
 import {
+  buildBookingActorLabel,
   buildBookingNotificationBody,
   type BookingNotificationBodyInput,
 } from "./booking/booking.formatters";
 import { resolveBookingSourceType } from "./booking/booking.types";
+import { renderNotification as renderNotificationTemplate } from "@/server/notifications/template-render.service";
 
 export interface NotifyBookingCreatedParams {
   /** userId владельца бизнеса (получатель уведомления) */
@@ -1300,16 +1302,36 @@ export async function notifyBookingCreated(params: NotifyBookingCreatedParams) {
 
   const body = buildBookingNotificationBody(bodyInput);
 
+  // Богатый payload сценария BOOKING_CREATED (см. NOTIFICATION_SCENARIO_REGISTRY).
+  // Сохраняется в metadata, чтобы dispatchDelivery отрендерил email/telegram
+  // теми же переменными.
+  const templatePayload: Record<string, string> = {
+    bookingSummary: body,
+    actor: buildBookingActorLabel(bodyInput),
+    customerName: params.customerName,
+    ...(params.childName ? { childName: params.childName } : {}),
+    ...(params.childAge != null ? { childAge: String(params.childAge) } : {}),
+    ...(params.offerTitle ? { offerTitle: params.offerTitle } : {}),
+    ...(params.activityTitle ? { activityTitle: params.activityTitle } : {}),
+    ...(params.placeTitle ? { placeTitle: params.placeTitle } : {}),
+    ...(params.campShiftTitle ? { campShiftTitle: params.campShiftTitle } : {}),
+    ...(params.campShiftDateFrom ? { campShiftDateFrom: params.campShiftDateFrom } : {}),
+    ...(params.campShiftDateTo ? { campShiftDateTo: params.campShiftDateTo } : {}),
+  };
+
+  const rendered = await renderNotificationTemplate("BOOKING_CREATED", "IN_APP", templatePayload);
+
   return createNotification({
     userId: params.ownerUserId,
     audience: "BUSINESS",
     type: "BOOKING_CREATED",
-    title: "Новая заявка",
-    body,
+    title: rendered?.subject ?? "Новая заявка",
+    body: rendered?.body ?? body,
     entityType: "BOOKING",
     entityId: params.bookingId,
     ctaLabel: "Открыть заявку",
     ctaAction: `/business/bookings?id=${params.bookingId}`,
+    metadata: { templatePayload },
   });
 }
 

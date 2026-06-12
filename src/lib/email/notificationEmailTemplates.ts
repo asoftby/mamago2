@@ -21,12 +21,14 @@ export function buildNotificationEmailTemplate(
   body: string,
   entityId?: string | null,
   ctaAction?: string | null,
+  /** Санитизированный HTML из шаблонного рендера; text-часть всегда строится из plain body */
+  bodyHtml?: string | null,
 ): EmailTemplate {
   const ctaUrl = buildCtaUrl(type, entityId, ctaAction);
   const ctaLine = ctaUrl ? `\n\nОткрыть: ${ctaUrl}` : "";
 
   const text = `${title}\n\n${body}${ctaLine}\n\n---\nmamaGo — семейный помощник`;
-  const html = buildHtml(title, body, ctaUrl);
+  const html = buildHtml(title, bodyHtml ?? body, ctaUrl);
 
   return { subject: title, text, html };
 }

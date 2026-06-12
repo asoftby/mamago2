@@ -12,6 +12,9 @@ import {
   markNotificationDeliveryRecord,
   recordSkippedNotificationDelivery,
 } from "./delivery-log";
+import { renderNotification } from "./template-render.service";
+import { buildScenarioTemplatePayloadCore } from "./template-payload-core";
+import { toPlainText } from "./template-render-core";
 
 function toAbsoluteUrl(url: string | null): string | null {
   if (!url) return null;
@@ -58,11 +61,19 @@ export async function sendEmailNotification(params: {
   }
 
   try {
+    // Шаблонный рендер (override из БД → дефолт реестра); null → текущий кодовый текст
+    const rendered = await renderNotification(
+      params.prepared.scenario,
+      "EMAIL",
+      buildScenarioTemplatePayloadCore(params.prepared.scenario, params.prepared.context),
+    );
+
     const result = await emailService.sendNotificationEmail({
       to: params.email,
-      subject: params.prepared.content.title,
-      title: params.prepared.content.title,
-      body: params.prepared.content.body,
+      subject: rendered?.subject ?? params.prepared.content.title,
+      title: rendered?.subject ?? params.prepared.content.title,
+      body: rendered ? toPlainText(rendered.body, 2000) : params.prepared.content.body,
+      bodyHtml: rendered?.body ?? null,
       ctaLabel: params.prepared.content.ctaLabel,
       ctaUrl: toAbsoluteUrl(params.prepared.content.ctaUrl),
     });
