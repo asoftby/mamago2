@@ -85,6 +85,7 @@ model User {
   notificationDeliveries            NotificationDelivery[]
   updatedNotificationTemplates      NotificationTemplate[]           @relation("NotificationTemplateUpdatedBy")
   offerIdeas                        OfferIdea[]
+  placeIdeas                        PlaceIdea[]
   phoneOtps                         PhoneOtp[]
   archivedPlaces                    Place[]                          @relation("PlaceArchiver")
   createdPlaces                     Place[]                          @relation("PlaceCreator")
@@ -305,8 +306,12 @@ model PlanItem {
   routeId       String?
   /// Slug для демо/внешнего маршрута, когда записи в Route нет (routeId = null)
   planRouteSlug String?
+  /// Место в плане (визит без привязки к событию)
+  placeId       String?
+  planPlaceSlug String?
   activity      Activity? @relation(fields: [activityId], references: [id])
   route         Route?    @relation(fields: [routeId], references: [id])
+  place         Place?    @relation(fields: [placeId], references: [id])
   user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, date])
@@ -314,6 +319,8 @@ model PlanItem {
   @@index([activityId])
   @@index([routeId])
   @@index([userId, planRouteSlug])
+  @@index([placeId])
+  @@index([userId, planPlaceSlug])
 }
 
 /// Сохранённые маршруты в «Идеи» (отдельно от Idea с activityId)
@@ -522,6 +529,7 @@ model EventCategory {
   placePrimary         Place[]                      @relation("PlacePrimaryCategory")
   placeSubcategories   PlaceSubcategory[]           @relation("PlaceSubcategoryCategory")
   filterPlacements     DiscoveryFilterPlacement[]
+  articles             Article[]                    @relation("ArticleCategory")
 
   @@unique([publicationType, slug])
   @@index([sortOrder])
@@ -1083,6 +1091,8 @@ model Place {
   subcategories   PlaceSubcategory[]
   /// Articles where this place is the editorial subject (relatedPlace).
   relatedArticles Article[]           @relation("ArticleRelatedPlace")
+  planItems       PlanItem[]
+  placeIdeas      PlaceIdea[]
 
   @@unique([cityId, slug])
   @@unique([createdByUserId, createRequestId])
@@ -1809,6 +1819,20 @@ model OfferIdea {
   @@index([offerId])
 }
 
+/// Сохранённые места в «Идеи»
+model PlaceIdea {
+  id        String   @id @default(cuid())
+  userId    String
+  placeId   String
+  createdAt DateTime @default(now())
+  place     Place    @relation(fields: [placeId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, placeId])
+  @@index([userId])
+  @@index([placeId])
+}
+
 model OfferSlugHistory {
   id        String   @id @default(cuid())
   offerId   String
@@ -2303,6 +2327,12 @@ model Article {
   /// On DELETE SET NULL so deleting the place keeps the article.
   relatedPlaceId     String?
   relatedPlace       Place?               @relation("ArticleRelatedPlace", fields: [relatedPlaceId], references: [id], onDelete: SetNull)
+  /// EventCategory с publicationType=ARTICLE (корневая категория журнала).
+  categoryId         String?
+  category           EventCategory?       @relation("ArticleCategory", fields: [categoryId], references: [id], onDelete: SetNull)
+
+  /// Managed Discovery tags attached to this publication (many-to-many).
+  tags               DiscoveryTag[]
 
   /// Partial unique index created via raw SQL migration:
   /// CREATE UNIQUE INDEX ... WHERE "cityId" IS NOT NULL AND "slug" IS NOT NULL
@@ -2315,6 +2345,7 @@ model Article {
   @@index([cityId])
   @@index([geoScope])
   @@index([relatedPlaceId])
+  @@index([categoryId])
 }
 
 model ArticleSlugHistory {
@@ -3937,6 +3968,26 @@ model DiscoveryFilterPlacement {
   @@unique([filterId, intent, categoryId])
   @@index([intent, isActive, sortOrder])
   @@index([categoryId, isActive, sortOrder])
+}
+
+
+model DiscoveryTag {
+  id             String   @id @default(cuid())
+  slug           String   @unique
+  title          String
+  description    String?
+  seoTitle       String?
+  seoDescription String?
+  isActive       Boolean  @default(true)
+  sortOrder      Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Back-relation to publications (Article stores News, Article, Breaking News)
+  articles       Article[]
+
+  @@index([slug])
+  @@index([isActive, sortOrder])
 }
 
 enum PageType {

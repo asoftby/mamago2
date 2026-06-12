@@ -14,6 +14,8 @@ import { PrismaClient, type OccasionType, type SignalDomain, type SignalEntityTy
 import { seedPlaceCategories } from "./seed/place-categories";
 import { seedEventCategories } from "./seed/event-categories";
 import { seedDiscoverySectionFilters } from "./seed/discovery-section-filters";
+import { seedDiscoveryTags } from "./seed/discovery-tags";
+import { CAMP_OFFER_DISCOVERY_GROUPS } from "../src/lib/offers/campOfferDiscoverySignals";
 
 const prisma = new PrismaClient();
 
@@ -381,6 +383,29 @@ async function main() {
   await upsertSignalWithDomain("activity-calm", "Спокойно", "DISCOVERY", ["PLACE", "EVENT", "ROUTE"], 6, [], "activity");
   await upsertSignalWithDomain("activity-social", "Социально", "DISCOVERY", ["PLACE", "EVENT", "ROUTE"], 7, [], "activity");
 
+  // Camp offer characteristics (DISCOVERY / OFFER)
+  for (const group of CAMP_OFFER_DISCOVERY_GROUPS) {
+    await upsertSignalWithDomain(
+      group.slug,
+      group.title,
+      "DISCOVERY",
+      group.entityTypes,
+      group.order,
+    );
+
+    for (const option of group.options) {
+      await upsertSignalWithDomain(
+        option.slug,
+        option.title,
+        "DISCOVERY",
+        group.entityTypes,
+        option.order,
+        [],
+        group.slug,
+      );
+    }
+  }
+
   // ═══ RECOMMENDATION DOMAIN ═══
   await upsertSignalWithDomain("tempo", "Tempo", "RECOMMENDATION", [], 1, [
     { value: "slow",   label: "Медленно",  order: 1 },
@@ -731,6 +756,11 @@ async function main() {
   // Makes the admin panel at /admin/discovery/filters the source of truth
   // for what filters appear in the public secondary-filters modal.
   await seedDiscoverySectionFilters(prisma);
+
+  // ── Discovery Tags ────────────────────────────────────────────────────────
+  // Global tags for all publication types (News, Article, Collection, Breaking News).
+  // Available city-scoped via /[city]/tags/[tagSlug] and in publication wizards.
+  await seedDiscoveryTags(prisma);
 
   console.log("✅ System seed complete.");
   console.log("   Demo/content data: run pnpm db:seed:demo");
