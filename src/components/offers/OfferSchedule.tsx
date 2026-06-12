@@ -1,11 +1,13 @@
 "use client";
 
+import { Fragment, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { CalendarDays, Clock } from "lucide-react";
 import { useMemo } from "react";
-import { cn } from "@/lib/utils";
 import type { OfferScheduleItem, ShiftCtaContext } from "@/lib/offer/offerPageTypes";
 import { SessionCard } from "@/components/shared/SessionCard";
+import { renderPriceWithIcon } from "@/components/icons/BelarusianRubleIcon";
+import { normalizeUiCurrencyText } from "@/lib/formatters/format-price";
 
 interface OfferScheduleProps {
   type: "classes" | "shifts";
@@ -25,23 +27,6 @@ export function OfferSchedule({
   onSaveShift,
   onItemCta,
 }: OfferScheduleProps) {
-  /** Помечаем «hot»-смену — первую открытую с минимальным процентом заполнения */
-  const hotShiftId = useMemo(() => {
-    if (type !== "shifts") return null;
-    const candidates = items.filter((s) => {
-      if (s.capacity === undefined || s.spotsLeft === undefined) return false;
-      if (s.spotsLeft === 0) return false;
-      const filled = 1 - s.spotsLeft / s.capacity;
-      return filled > 0 && filled < 0.7;
-    });
-    if (candidates.length === 0) return null;
-    return candidates.reduce((best, cur) => {
-      const fb = 1 - (best.spotsLeft! / best.capacity!);
-      const fc = 1 - (cur.spotsLeft! / cur.capacity!);
-      return fc < fb ? cur : best;
-    }).id;
-  }, [type, items]);
-
   /** Ближайшая предстоящая смена — первая с датой не раньше сегодня */
   const nearestShiftId = useMemo(() => {
     if (type !== "shifts") return null;
@@ -72,8 +57,8 @@ export function OfferSchedule({
             <span className="flex-1 h-px bg-gray-100 max-w-[180px]" />
           </div>
           <h2 className="tracking-[-0.02em] leading-[1] text-gray-900" style={{ fontFamily: "var(--font-sans)", fontWeight: 400, fontSize: 30 }}>
-            Выбери своё{" "}
-            <span style={{ fontFamily: "Georgia, serif", fontStyle: "italic", color: "var(--primary)" }}>лето</span>.
+            Выбери{" "}
+            <span style={{ fontFamily: "var(--font-editorial)", fontStyle: "italic", color: "var(--primary)" }}>своё лето</span>.
           </h2>
         </div>
       </div>
@@ -85,7 +70,6 @@ export function OfferSchedule({
           items={items}
           onShiftCta={onShiftCta}
           onSaveShift={onSaveShift}
-          hotShiftId={hotShiftId}
           nearestShiftId={nearestShiftId}
         />
       ) : (
@@ -107,7 +91,7 @@ function EmptySchedule({ onCta }: { onCta?: () => void }) {
       <p className="text-[16px] font-semibold text-gray-700">Расписание и стоимость уточняются</p>
       <p className="mt-1 text-[14px] text-gray-400">Оставьте заявку — мы свяжемся с вами</p>
       <Button
-        className="mt-5 h-11 rounded-full bg-[#EF8759] px-6 text-[14px] font-bold text-white hover:bg-[#e07848]"
+        className="mt-5 h-11 rounded-full bg-[#EF8759] px-6 text-[14px] font-bold text-white hover:bg-primary-hover"
         onClick={onCta}
       >
         Оставить заявку
@@ -123,13 +107,11 @@ function ShiftsList({
   items,
   onShiftCta,
   onSaveShift,
-  hotShiftId,
   nearestShiftId,
 }: {
   items: OfferScheduleItem[];
   onShiftCta?: (ctx: ShiftCtaContext) => void;
   onSaveShift?: (ctx: ShiftCtaContext) => void;
-  hotShiftId: string | null;
   nearestShiftId: string | null;
 }) {
   return (
@@ -165,6 +147,7 @@ function ShiftCard({
     dateTo: item.dateTo,
     price: item.price,
     ageRange: item.ageRange,
+    promotionDetails: item.promotionDetails,
   };
 
   const dateLabel =
@@ -175,7 +158,43 @@ function ShiftCard({
   const isFull = item.spotsLeft === 0;
   const ctaEnabled = item.ctaEnabled !== false && !isFull;
 
-  const subtitle = [dateLabel, item.price].filter(Boolean).join(" · ") || undefined;
+  const subtitle = (() => {
+    const parts: ReactNode[] = [];
+    if (dateLabel) parts.push(dateLabel);
+    if (item.price) {
+      parts.push(
+        <span key="price" className="font-semibold text-primary">
+          {renderPriceWithIcon(normalizeUiCurrencyText(item.price), { iconSize: "sm" })}
+        </span>,
+      );
+    }
+    if (parts.length === 0) return undefined;
+    return (
+      <>
+        {parts.map((part, index) => (
+          <Fragment key={index}>
+            {index > 0 ? " · " : null}
+            {part}
+          </Fragment>
+        ))}
+      </>
+    );
+  })();
+  const details =
+    item.description || item.promotionDetails ? (
+      <div className="space-y-2">
+        {item.description ? (
+          <p className="text-[14px] leading-6 text-[rgba(20,18,16,0.72)]">
+            {item.description}
+          </p>
+        ) : null}
+        {item.promotionDetails ? (
+          <div className="rounded-2xl border border-[#F2D8CA] bg-[#FFF3EB] px-3 py-2 text-[13px] leading-5 text-[#B5562D]">
+            {item.promotionDetails}
+          </div>
+        ) : null}
+      </div>
+    ) : undefined;
 
   return (
     <SessionCard
@@ -183,6 +202,7 @@ function ShiftCard({
       isNearest={isNearest}
       title={item.title ?? dateLabel ?? ""}
       subtitle={subtitle}
+      details={details}
       primaryLabel={ctaEnabled ? (item.ctaLabel ?? "Записаться") : undefined}
       primaryDisabled={!ctaEnabled}
       onPrimary={() => onShiftCta?.(ctx)}
@@ -226,14 +246,16 @@ function ClassesTable({
                 </td>
                 <td className="px-6 py-4 text-[14px] text-gray-500">{item.days || "—"}</td>
                 <td className="px-6 py-4 text-[14px] text-gray-500">{item.time || "—"}</td>
-                <td className="px-6 py-4 text-[15px] font-bold text-gray-900">
-                  {item.price || "Уточняйте"}
+                <td className="px-6 py-4 text-[15px] font-bold text-primary">
+                  {item.price
+                    ? renderPriceWithIcon(normalizeUiCurrencyText(item.price), { iconSize: "sm" })
+                    : "Уточняйте"}
                 </td>
                 <td className="px-6 py-4 text-right">
                   {item.ctaEnabled !== false && (
                     <Button
                       size="sm"
-                      className="h-9 rounded-full bg-[#EF8759] px-4 text-[13px] font-bold text-white hover:bg-[#e07848]"
+                      className="h-9 rounded-full bg-[#EF8759] px-4 text-[13px] font-bold text-white hover:bg-primary-hover"
                       onClick={() => onItemCta?.(item.id)}
                     >
                       {item.ctaLabel || "Записаться"}
@@ -268,13 +290,15 @@ function ClassesTable({
               )}
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-[16px] font-bold text-gray-900">
-                {item.price || "Уточняйте"}
+              <span className="text-[16px] font-bold text-primary">
+                {item.price
+                  ? renderPriceWithIcon(normalizeUiCurrencyText(item.price), { iconSize: "sm" })
+                  : "Уточняйте"}
               </span>
               {item.ctaEnabled !== false && (
                 <Button
                   size="sm"
-                  className="h-9 rounded-full bg-[#EF8759] px-4 text-[13px] font-bold text-white hover:bg-[#e07848]"
+                  className="h-9 rounded-full bg-[#EF8759] px-4 text-[13px] font-bold text-white hover:bg-primary-hover"
                   onClick={() => onItemCta?.(item.id)}
                 >
                   {item.ctaLabel || "Записаться"}
