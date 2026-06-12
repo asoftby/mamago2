@@ -7,6 +7,7 @@ export type {
   TimeOfDay,
   HeroWeatherContext,
 } from "./model/types";
+export type { WeatherSnapshot, WeatherOutdoorScore } from "./model/weather-snapshot";
 
 export { interpretWeather } from "./model/weather-interpreter";
 export type { WeatherProvider } from "./api/weather-provider";

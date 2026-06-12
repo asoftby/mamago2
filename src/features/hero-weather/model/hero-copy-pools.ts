@@ -9,7 +9,6 @@ export type CopyVariant = {
 export type HeroCopyPack = {
   microcopy: CopyVariant[]
   titles: CopyVariant[]
-  subtitles: CopyVariant[]
 }
 
 export type HeroPersonaMode = "guest" | "self" | "child" | "family"
@@ -46,15 +45,6 @@ export const HERO_COPY_POOLS: Record<WeatherScenario, Record<HeroPersonaMode, He
         { id: "great_guest_title_5", text: "Хочется куда-нибудь выбраться — и это легко устроить" },
         { id: "great_guest_title_6", text: "Найдём что-то интересное для всей семьи" },
         { id: "great_guest_title_7", text: "Сегодня можно устроить отличный день" }
-      ],
-      subtitles: [
-        { id: "great_guest_sub_1", text: "Собрала варианты в Минске, чтобы было проще решить, куда пойти сегодня" },
-        { id: "great_guest_sub_2", text: "Подберём прогулки, занятия и места, где можно хорошо провести время" },
-        { id: "great_guest_sub_3", text: "Уже есть идеи на сегодня — остаётся только выбрать" },
-        { id: "great_guest_sub_4", text: "Смотри, что подойдёт для семейного выхода именно сегодня" },
-        { id: "great_guest_sub_5", text: "Выбирай, сохраняй и собирай свой план без лишнего поиска" },
-        { id: "great_guest_sub_6", text: "Здесь найдутся идеи для детей любого возраста и настроения" },
-        { id: "great_guest_sub_7", text: "От парков до музеев — всё, что нужно для хорошего дня с семьёй" }
       ]
     },
     self: {
@@ -75,15 +65,6 @@ export const HERO_COPY_POOLS: Record<WeatherScenario, Record<HeroPersonaMode, He
         { id: "great_self_title_5", text: "Время для семейных приключений" },
         { id: "great_self_title_6", text: "Выберем что-нибудь приятное на сегодня" },
         { id: "great_self_title_7", text: "Устроим хороший день для всех" }
-      ],
-      subtitles: [
-        { id: "great_self_sub_1", text: "Подобрала идеи, которые точно подойдут твоей семье" },
-        { id: "great_self_sub_2", text: "Здесь есть всё — от прогулок до развлечений в помещении" },
-        { id: "great_self_sub_3", text: "Выбирай по возрасту детей и своему настроению" },
-        { id: "great_self_sub_4", text: "Сохраняй понравившиеся идеи и составляй свой план" },
-        { id: "great_self_sub_5", text: "От активных игр до спокойных занятий — найдётся всё" },
-        { id: "great_self_sub_6", text: "Каждая идея проверена другими родителями из Минска" },
-        { id: "great_self_sub_7", text: "Просто выбери и иди — всё уже готово для хорошего дня" }
       ]
     },
     child: {
@@ -104,15 +85,6 @@ export const HERO_COPY_POOLS: Record<WeatherScenario, Record<HeroPersonaMode, He
         { id: "great_child_title_5", text: "Устроим {childName} отличный день" },
         { id: "great_child_title_6", text: "Время для новых впечатлений" },
         { id: "great_child_title_7", text: "Давай найдём идею на сегодня" }
-      ],
-      subtitles: [
-        { id: "great_child_sub_1", text: "Собрала места и занятия, которые точно понравятся детям" },
-        { id: "great_child_sub_2", text: "Здесь есть идеи для любого возраста и настроения {childName}" },
-        { id: "great_child_sub_3", text: "От активных игр до творческих мастерских — выбирай по душе" },
-        { id: "great_child_sub_4", text: "Каждое место проверено родителями и подходит для детей" },
-        { id: "great_child_sub_5", text: "Сохраняй понравившиеся идеи и планируй день без стресса" },
-        { id: "great_child_sub_6", text: "Всё рядом, всё доступно — просто выбери и идите веселиться" },
-        { id: "great_child_sub_7", text: "Пусть {childName} сам выберет, что ему больше нравится" }
       ]
     },
     family: {
@@ -133,15 +105,6 @@ export const HERO_COPY_POOLS: Record<WeatherScenario, Record<HeroPersonaMode, He
         { id: "great_family_title_5", text: "Устроим день, который запомнится всем" },
         { id: "great_family_title_6", text: "Время для семейных открытий" },
         { id: "great_family_title_7", text: "Давай найдём что-то для всех возрастов" }
-      ],
-      subtitles: [
-        { id: "great_family_sub_1", text: "Здесь есть места, где будет интересно и детям, и взрослым" },
-        { id: "great_family_sub_2", text: "От парков до музеев — выбирай то, что подойдёт всей семье" },
-        { id: "great_family_sub_3", text: "Каждая идея учитывает потребности разных возрастов" },
-        { id: "great_family_sub_4", text: "Сохраняй варианты и планируй день без компромиссов" },
-        { id: "great_family_sub_5", text: "Всё проверено семьями из Минска — точно будет хорошо" },
-        { id: "great_family_sub_6", text: "Выбирай по настроению и возможностям — найдётся для всех" },
-        { id: "great_family_sub_7", text: "Пусть каждый найдёт что-то по душе в общем семейном дне" }
       ]
     }
   },
@@ -164,15 +127,6 @@ export const HERO_COPY_POOLS: Record<WeatherScenario, Record<HeroPersonaMode, He
         { id: "good_guest_title_5", text: "Давай подберём идеи для семьи" },
         { id: "good_guest_title_6", text: "Что-нибудь интересное точно найдётся" },
         { id: "good_guest_title_7", text: "Составим план на сегодня" }
-      ],
-      subtitles: [
-        { id: "good_guest_sub_1", text: "Есть варианты и для улицы, и для помещений — выбирай по настроению" },
-        { id: "good_guest_sub_2", text: "Подберём занятия, которые подойдут для любой погоды" },
-        { id: "good_guest_sub_3", text: "Здесь найдутся идеи на любой вкус и возраст" },
-        { id: "good_guest_sub_4", text: "Сохраняй понравившиеся места и планируй без спешки" },
-        { id: "good_guest_sub_5", text: "От активных прогулок до уютных кафе — всё в одном месте" },
-        { id: "good_guest_sub_6", text: "Каждая идея проверена и подходит для семей с детьми" },
-        { id: "good_guest_sub_7", text: "Выбирай то, что точно принесёт радость всей семье" }
       ]
     },
     self: {
@@ -193,15 +147,6 @@ export const HERO_COPY_POOLS: Record<WeatherScenario, Record<HeroPersonaMode, He
         { id: "good_self_title_5", text: "Выберем занятие по настроению" },
         { id: "good_self_title_6", text: "Давай составим гибкий план" },
         { id: "good_self_title_7", text: "Найдётся что-то интересное для всех" }
-      ],
-      subtitles: [
-        { id: "good_self_sub_1", text: "Подобрала варианты на разные случаи — выбирай по ситуации" },
-        { id: "good_self_sub_2", text: "Здесь есть и активные, и спокойные занятия для твоей семьи" },
-        { id: "good_self_sub_3", text: "Можно легко менять планы в зависимости от настроения детей" },
-        { id: "good_self_sub_4", text: "Сохраняй несколько вариантов — пригодится для запасного плана" },
-        { id: "good_self_sub_5", text: "От прогулок до мастер-классов — всё учтено и проверено" },
-        { id: "good_self_sub_6", text: "Каждая идея подходит для семей и легко реализуется" },
-        { id: "good_self_sub_7", text: "Выбирай то, что точно принесёт удовольствие всем" }
       ]
     },
     child: {
@@ -222,15 +167,6 @@ export const HERO_COPY_POOLS: Record<WeatherScenario, Record<HeroPersonaMode, He
         { id: "good_child_title_5", text: "Выберем что-то по настроению" },
         { id: "good_child_title_6", text: "Давай составим гибкий план" },
         { id: "good_child_title_7", text: "Найдётся что-то интересное" }
-      ],
-      subtitles: [
-        { id: "good_child_sub_1", text: "Есть варианты на разные случаи — выбирай по настроению {childName}" },
-        { id: "good_child_sub_2", text: "Здесь найдутся и активные, и спокойные занятия" },
-        { id: "good_child_sub_3", text: "Можно легко менять планы, если {childName} передумает" },
-        { id: "good_child_sub_4", text: "Сохраняй несколько идей — пригодится для запасного плана" },
-        { id: "good_child_sub_5", text: "От игровых площадок до творческих студий — всё проверено" },
-        { id: "good_child_sub_6", text: "Каждое место подходит для детей и легко доступно" },
-        { id: "good_child_sub_7", text: "Пусть {childName} сам выберет, что ему больше нравится" }
       ]
     },
     family: {
@@ -251,15 +187,6 @@ export const HERO_COPY_POOLS: Record<WeatherScenario, Record<HeroPersonaMode, He
         { id: "good_family_title_5", text: "Выберем что-то по общему настроению" },
         { id: "good_family_title_6", text: "Давай составим гибкий семейный план" },
         { id: "good_family_title_7", text: "Найдётся что-то интересное для всех возрастов" }
-      ],
-      subtitles: [
-        { id: "good_family_sub_1", text: "Есть варианты, где будет комфортно и детям, и взрослым" },
-        { id: "good_family_sub_2", text: "Здесь найдутся занятия для разных возрастов и интересов" },
-        { id: "good_family_sub_3", text: "Можно легко адаптировать планы под потребности всех" },
-        { id: "good_family_sub_4", text: "Сохраняй несколько идей — пригодится для разных ситуаций" },
-        { id: "good_family_sub_5", text: "От парков до культурных центров — всё учтено и проверено" },
-        { id: "good_family_sub_6", text: "Каждое место подходит для семейного отдыха" },
-        { id: "good_family_sub_7", text: "Пусть каждый найдёт что-то интересное в общем дне" }
       ]
     }
   },
@@ -283,15 +210,6 @@ export const HERO_COPY_POOLS: Record<WeatherScenario, Record<HeroPersonaMode, He
         { id: "mixed_guest_title_5", text: "Можно устроить хороший день в любом случае" },
         { id: "mixed_guest_title_6", text: "Давай подберём адаптивные варианты" },
         { id: "mixed_guest_title_7", text: "Найдётся что-то подходящее" }
-      ],
-      subtitles: [
-        { id: "mixed_guest_sub_1", text: "Здесь есть идеи, которые легко адаптировать под изменения погоды" },
-        { id: "mixed_guest_sub_2", text: "Выбирай места с крытыми зонами или быстрым доступом в помещения" },
-        { id: "mixed_guest_sub_3", text: "Сохраняй несколько вариантов — пригодится для смены планов" },
-        { id: "mixed_guest_sub_4", text: "От торговых центров до парков с павильонами — всё учтено" },
-        { id: "mixed_guest_sub_5", text: "Каждая идея проверена на гибкость и доступность" },
-        { id: "mixed_guest_sub_6", text: "Можно легко переключаться между активностями по ситуации" },
-        { id: "mixed_guest_sub_7", text: "Выбирай то, что точно получится реализовать" }
       ]
     },
     self: {
@@ -312,15 +230,6 @@ export const HERO_COPY_POOLS: Record<WeatherScenario, Record<HeroPersonaMode, He
         { id: "mixed_self_title_5", text: "Можно устроить отличный день в любом случае" },
         { id: "mixed_self_title_6", text: "Давай подберём надёжные варианты" },
         { id: "mixed_self_title_7", text: "Найдётся что-то подходящее для любой ситуации" }
-      ],
-      subtitles: [
-        { id: "mixed_self_sub_1", text: "Подобрала идеи, которые легко адаптировать под любые изменения" },
-        { id: "mixed_self_sub_2", text: "Здесь есть варианты с крытыми зонами и быстрым доступом в помещения" },
-        { id: "mixed_self_sub_3", text: "Сохраняй несколько идей — так будет проще менять планы" },
-        { id: "mixed_self_sub_4", text: "От крытых рынков до музеев — всё проверено на гибкость" },
-        { id: "mixed_self_sub_5", text: "Каждое место подходит для быстрой смены активности" },
-        { id: "mixed_self_sub_6", text: "Можно легко переключаться между занятиями по ситуации" },
-        { id: "mixed_self_sub_7", text: "Выбирай то, что точно получится и принесёт радость" }
       ]
     },
     child: {
@@ -341,15 +250,6 @@ export const HERO_COPY_POOLS: Record<WeatherScenario, Record<HeroPersonaMode, He
         { id: "mixed_child_title_5", text: "Можно устроить {childName} отличный день" },
         { id: "mixed_child_title_6", text: "Давай подберём надёжные идеи" },
         { id: "mixed_child_title_7", text: "Найдётся что-то подходящее" }
-      ],
-      subtitles: [
-        { id: "mixed_child_sub_1", text: "Здесь есть места, где {childName} будет весело в любую погоду" },
-        { id: "mixed_child_sub_2", text: "Выбирай варианты с крытыми зонами и быстрым доступом в помещения" },
-        { id: "mixed_child_sub_3", text: "Сохраняй несколько идей — так проще менять планы с детьми" },
-        { id: "mixed_child_sub_4", text: "От игровых центров до музеев — всё адаптировано для детей" },
-        { id: "mixed_child_sub_5", text: "Каждое место проверено на удобство для семей с детьми" },
-        { id: "mixed_child_sub_6", text: "Можно легко переключаться между занятиями по настроению {childName}" },
-        { id: "mixed_child_sub_7", text: "Пусть {childName} сам выберет из безопасных вариантов" }
       ]
     },
     family: {
@@ -370,15 +270,6 @@ export const HERO_COPY_POOLS: Record<WeatherScenario, Record<HeroPersonaMode, He
         { id: "mixed_family_title_5", text: "Можно устроить отличный день для всех" },
         { id: "mixed_family_title_6", text: "Давай подберём надёжные семейные идеи" },
         { id: "mixed_family_title_7", text: "Найдётся что-то подходящее для всех возрастов" }
-      ],
-      subtitles: [
-        { id: "mixed_family_sub_1", text: "Здесь есть места, где будет комфортно всей семье в любую погоду" },
-        { id: "mixed_family_sub_2", text: "Выбирай варианты с крытыми зонами и удобствами для всех возрастов" },
-        { id: "mixed_family_sub_3", text: "Сохраняй несколько идей — так проще адаптировать планы под всех" },
-        { id: "mixed_family_sub_4", text: "От семейных центров до музеев — всё учитывает потребности разных возрастов" },
-        { id: "mixed_family_sub_5", text: "Каждое место проверено на удобство для больших и маленьких" },
-        { id: "mixed_family_sub_6", text: "Можно легко переключаться между занятиями по общему настроению" },
-        { id: "mixed_family_sub_7", text: "Пусть каждый найдёт что-то интересное в общем семейном дне" }
       ]
     }
   },
@@ -401,15 +292,6 @@ export const HERO_COPY_POOLS: Record<WeatherScenario, Record<HeroPersonaMode, He
         { id: "rain_guest_title_5", text: "Давай найдём идеи для дождливого дня" },
         { id: "rain_guest_title_6", text: "Составим план для крытых развлечений" },
         { id: "rain_guest_title_7", text: "Дождь — не помеха хорошему дню" }
-      ],
-      subtitles: [
-        { id: "rain_guest_sub_1", text: "Собрала лучшие места в Минске, где можно провести день независимо от погоды" },
-        { id: "rain_guest_sub_2", text: "От игровых центров до музеев — всё под крышей и очень интересно" },
-        { id: "rain_guest_sub_3", text: "Здесь найдутся варианты для любого возраста и настроения" },
-        { id: "rain_guest_sub_4", text: "Выбирай уютные места, где можно согреться и повеселиться" },
-        { id: "rain_guest_sub_5", text: "Каждое место проверено семьями и подходит для детей" },
-        { id: "rain_guest_sub_6", text: "Сохраняй идеи и планируй комфортный день без зависимости от дождя" },
-        { id: "rain_guest_sub_7", text: "Пусть дождь за окном станет поводом для особенных впечатлений" }
       ]
     },
     self: {
@@ -430,15 +312,6 @@ export const HERO_COPY_POOLS: Record<WeatherScenario, Record<HeroPersonaMode, He
         { id: "rain_self_title_5", text: "Давай найдём идеи для комфортного досуга" },
         { id: "rain_self_title_6", text: "Составим план для крытых развлечений" },
         { id: "rain_self_title_7", text: "Дождь — повод для особенных планов" }
-      ],
-      subtitles: [
-        { id: "rain_self_sub_1", text: "Подобрала места, где твоей семье будет тепло, уютно и интересно" },
-        { id: "rain_self_sub_2", text: "От творческих студий до развлекательных центров — всё под крышей" },
-        { id: "rain_self_sub_3", text: "Здесь есть варианты для разных возрастов и интересов" },
-        { id: "rain_self_sub_4", text: "Выбирай места, где можно согреться душой и телом" },
-        { id: "rain_self_sub_5", text: "Каждое место проверено и подходит для семейного отдыха" },
-        { id: "rain_self_sub_6", text: "Сохраняй идеи и создавай комфортные планы на любую погоду" },
-        { id: "rain_self_sub_7", text: "Пусть дождь станет поводом для новых семейных традиций" }
       ]
     },
     child: {
@@ -459,15 +332,6 @@ export const HERO_COPY_POOLS: Record<WeatherScenario, Record<HeroPersonaMode, He
         { id: "rain_child_title_5", text: "Давай найдём идеи для комфортного досуга" },
         { id: "rain_child_title_6", text: "Составим план для крытых развлечений" },
         { id: "rain_child_title_7", text: "Дождь — повод для особенных планов" }
-      ],
-      subtitles: [
-        { id: "rain_child_sub_1", text: "Здесь есть места, где {childName} будет в восторге, несмотря на дождь" },
-        { id: "rain_child_sub_2", text: "От игровых комнат до мастер-классов — всё под крышей и очень весело" },
-        { id: "rain_child_sub_3", text: "Выбирай варианты по возрасту и интересам {childName}" },
-        { id: "rain_child_sub_4", text: "Каждое место безопасно, тепло и подходит для детей" },
-        { id: "rain_child_sub_5", text: "Сохраняй идеи и планируй комфортные дни независимо от погоды" },
-        { id: "rain_child_sub_6", text: "Пусть {childName} сам выберет из уютных и интересных вариантов" },
-        { id: "rain_child_sub_7", text: "Дождь за окном может стать началом нового приключения" }
       ]
     },
     family: {
@@ -488,15 +352,6 @@ export const HERO_COPY_POOLS: Record<WeatherScenario, Record<HeroPersonaMode, He
         { id: "rain_family_title_5", text: "Давай найдём идеи для комфортного семейного досуга" },
         { id: "rain_family_title_6", text: "Составим план для крытых семейных развлечений" },
         { id: "rain_family_title_7", text: "Дождь — повод для особенных семейных планов" }
-      ],
-      subtitles: [
-        { id: "rain_family_sub_1", text: "Здесь есть места, где будет комфортно и интересно всем возрастам" },
-        { id: "rain_family_sub_2", text: "От семейных кафе до развлекательных центров — всё под крышей" },
-        { id: "rain_family_sub_3", text: "Выбирай варианты, где каждый найдёт занятие по душе" },
-        { id: "rain_family_sub_4", text: "Каждое место проверено семьями и подходит для общего отдыха" },
-        { id: "rain_family_sub_5", text: "Сохраняй идеи и создавай уютные семейные традиции" },
-        { id: "rain_family_sub_6", text: "Пусть каждый выберет что-то интересное в общем семейном дне" },
-        { id: "rain_family_sub_7", text: "Дождь за окном может стать началом новых семейных воспоминаний" }
       ]
     }
   },
@@ -520,15 +375,6 @@ export const HERO_COPY_POOLS: Record<WeatherScenario, Record<HeroPersonaMode, He
         { id: "heavy_rain_guest_title_5", text: "Давай найдём идеи для ливневого дня" },
         { id: "heavy_rain_guest_title_6", text: "Составим план для комфортного досуга" },
         { id: "heavy_rain_guest_title_7", text: "Ливень — повод для особенных планов" }
-      ],
-      subtitles: [
-        { id: "heavy_rain_guest_sub_1", text: "Собрала самые уютные места в Минске, где точно будет сухо и интересно" },
-        { id: "heavy_rain_guest_sub_2", text: "От торговых центров до культурных пространств — всё под надёжной крышей" },
-        { id: "heavy_rain_guest_sub_3", text: "Здесь найдутся варианты для любого возраста, независимо от погоды" },
-        { id: "heavy_rain_guest_sub_4", text: "Выбирай места с хорошим отоплением и комфортной атмосферой" },
-        { id: "heavy_rain_guest_sub_5", text: "Каждое место проверено и гарантированно защищено от непогоды" },
-        { id: "heavy_rain_guest_sub_6", text: "Сохраняй идеи и планируй день без оглядки на ливень" },
-        { id: "heavy_rain_guest_sub_7", text: "Пусть сильный дождь станет поводом для новых открытий в помещении" }
       ]
     },
     self: {
@@ -549,15 +395,6 @@ export const HERO_COPY_POOLS: Record<WeatherScenario, Record<HeroPersonaMode, He
         { id: "heavy_rain_self_title_5", text: "Давай найдём идеи для комфортного досуга" },
         { id: "heavy_rain_self_title_6", text: "Составим план для тёплых развлечений" },
         { id: "heavy_rain_self_title_7", text: "Ливень — повод для особенных семейных планов" }
-      ],
-      subtitles: [
-        { id: "heavy_rain_self_sub_1", text: "Подобрала самые комфортные места, где твоей семье будет тепло и весело" },
-        { id: "heavy_rain_self_sub_2", text: "От игровых центров до музеев — всё с хорошим отоплением и атмосферой" },
-        { id: "heavy_rain_self_sub_3", text: "Здесь есть варианты для всех возрастов, полностью защищённые от непогоды" },
-        { id: "heavy_rain_self_sub_4", text: "Выбирай места, где можно расслабиться и насладиться семейным временем" },
-        { id: "heavy_rain_self_sub_5", text: "Каждое место проверено и гарантированно подходит для ливневых дней" },
-        { id: "heavy_rain_self_sub_6", text: "Сохраняй идеи и создавай уютные планы независимо от погоды" },
-        { id: "heavy_rain_self_sub_7", text: "Пусть ливень станет поводом для новых семейных традиций в тепле" }
       ]
     },
     child: {
@@ -578,15 +415,6 @@ export const HERO_COPY_POOLS: Record<WeatherScenario, Record<HeroPersonaMode, He
         { id: "heavy_rain_child_title_5", text: "Давай найдём идеи для комфортного досуга" },
         { id: "heavy_rain_child_title_6", text: "Составим план для тёплых развлечений" },
         { id: "heavy_rain_child_title_7", text: "Ливень — повод для особенных планов" }
-      ],
-      subtitles: [
-        { id: "heavy_rain_child_sub_1", text: "Здесь есть места, где {childName} будет в восторге, несмотря на ливень" },
-        { id: "heavy_rain_child_sub_2", text: "От игровых комнат до творческих студий — всё тёплое и безопасное" },
-        { id: "heavy_rain_child_sub_3", text: "Выбирай варианты по возрасту {childName}, полностью защищённые от дождя" },
-        { id: "heavy_rain_child_sub_4", text: "Каждое место с хорошим отоплением и подходит для детей" },
-        { id: "heavy_rain_child_sub_5", text: "Сохраняй идеи и планируй уютные дни независимо от погоды" },
-        { id: "heavy_rain_child_sub_6", text: "Пусть {childName} сам выберет из тёплых и интересных вариантов" },
-        { id: "heavy_rain_child_sub_7", text: "Ливень за окном может стать началом уютного приключения" }
       ]
     },
     family: {
@@ -607,15 +435,6 @@ export const HERO_COPY_POOLS: Record<WeatherScenario, Record<HeroPersonaMode, He
         { id: "heavy_rain_family_title_5", text: "Давай найдём идеи для комфортного семейного досуга" },
         { id: "heavy_rain_family_title_6", text: "Составим план для тёплых семейных развлечений" },
         { id: "heavy_rain_family_title_7", text: "Ливень — повод для особенных семейных планов" }
-      ],
-      subtitles: [
-        { id: "heavy_rain_family_sub_1", text: "Здесь есть места, где будет тепло и интересно всем возрастам" },
-        { id: "heavy_rain_family_sub_2", text: "От семейных центров до музеев — всё с отличным отоплением" },
-        { id: "heavy_rain_family_sub_3", text: "Выбирай варианты, где каждый найдёт уютное занятие по душе" },
-        { id: "heavy_rain_family_sub_4", text: "Каждое место проверено семьями и защищено от любой непогоды" },
-        { id: "heavy_rain_family_sub_5", text: "Сохраняй идеи и создавай тёплые семейные традиции" },
-        { id: "heavy_rain_family_sub_6", text: "Пусть каждый выберет что-то интересное в общем уютном дне" },
-        { id: "heavy_rain_family_sub_7", text: "Ливень за окном может стать началом самых тёплых семейных воспоминаний" }
       ]
     }
   },
@@ -638,15 +457,6 @@ export const HERO_COPY_POOLS: Record<WeatherScenario, Record<HeroPersonaMode, He
         { id: "windy_guest_title_5", text: "Давай найдём идеи для безопасного досуга" },
         { id: "windy_guest_title_6", text: "Составим план с учётом ветра" },
         { id: "windy_guest_title_7", text: "Ветер — не помеха хорошим планам" }
-      ],
-      subtitles: [
-        { id: "windy_guest_sub_1", text: "Собрала места с хорошей защитой от ветра и безопасные для детей" },
-        { id: "windy_guest_sub_2", text: "От крытых площадок до помещений — всё учитывает ветреную погоду" },
-        { id: "windy_guest_sub_3", text: "Здесь найдутся варианты, где ветер не помешает веселью" },
-        { id: "windy_guest_sub_4", text: "Выбирай места с навесами, стенами или полностью закрытые" },
-        { id: "windy_guest_sub_5", text: "Каждое место проверено на безопасность в ветреную погоду" },
-        { id: "windy_guest_sub_6", text: "Сохраняй идеи и планируй день с учётом погодных условий" },
-        { id: "windy_guest_sub_7", text: "Пусть ветер станет поводом открыть новые укрытые места" }
       ]
     },
     self: {
@@ -667,15 +477,6 @@ export const HERO_COPY_POOLS: Record<WeatherScenario, Record<HeroPersonaMode, He
         { id: "windy_self_title_5", text: "Давай найдём идеи с ветрозащитой" },
         { id: "windy_self_title_6", text: "Составим безопасный план на день" },
         { id: "windy_self_title_7", text: "Ветер — не помеха семейным планам" }
-      ],
-      subtitles: [
-        { id: "windy_self_sub_1", text: "Подобрала места, где твоей семье будет комфортно и безопасно" },
-        { id: "windy_self_sub_2", text: "От защищённых площадок до помещений — всё с учётом ветра" },
-        { id: "windy_self_sub_3", text: "Здесь есть варианты, где ветреная погода не помешает отдыху" },
-        { id: "windy_self_sub_4", text: "Выбирай места с хорошими укрытиями и безопасными зонами" },
-        { id: "windy_self_sub_5", text: "Каждое место проверено на комфорт в ветреную погоду" },
-        { id: "windy_self_sub_6", text: "Сохраняй идеи и создавай планы с заботой о безопасности" },
-        { id: "windy_self_sub_7", text: "Пусть ветер станет поводом открыть новые защищённые места" }
       ]
     },
     child: {
@@ -696,15 +497,6 @@ export const HERO_COPY_POOLS: Record<WeatherScenario, Record<HeroPersonaMode, He
         { id: "windy_child_title_5", text: "Давай найдём идеи с ветрозащитой" },
         { id: "windy_child_title_6", text: "Составим безопасный план для {childName}" },
         { id: "windy_child_title_7", text: "Ветер — не помеха детским планам" }
-      ],
-      subtitles: [
-        { id: "windy_child_sub_1", text: "Здесь есть места, где {childName} будет в безопасности от ветра" },
-        { id: "windy_child_sub_2", text: "От крытых игровых до помещений — всё защищено и безопасно" },
-        { id: "windy_child_sub_3", text: "Выбирай варианты по возрасту {childName} с хорошими укрытиями" },
-        { id: "windy_child_sub_4", text: "Каждое место проверено на детскую безопасность в ветреную погоду" },
-        { id: "windy_child_sub_5", text: "Сохраняй идеи и планируй дни с заботой о комфорте {childName}" },
-        { id: "windy_child_sub_6", text: "Пусть {childName} сам выберет из безопасных и интересных вариантов" },
-        { id: "windy_child_sub_7", text: "Ветер за окном не помешает детским открытиям в укрытии" }
       ]
     },
     family: {
@@ -725,15 +517,6 @@ export const HERO_COPY_POOLS: Record<WeatherScenario, Record<HeroPersonaMode, He
         { id: "windy_family_title_5", text: "Давай найдём идеи с ветрозащитой для всех" },
         { id: "windy_family_title_6", text: "Составим безопасный семейный план" },
         { id: "windy_family_title_7", text: "Ветер — не помеха семейным планам" }
-      ],
-      subtitles: [
-        { id: "windy_family_sub_1", text: "Здесь есть места, где будет комфортно и безопасно всем возрастам" },
-        { id: "windy_family_sub_2", text: "От защищённых площадок до семейных центров — всё с учётом ветра" },
-        { id: "windy_family_sub_3", text: "Выбирай варианты с хорошими укрытиями для всей семьи" },
-        { id: "windy_family_sub_4", text: "Каждое место проверено на семейную безопасность в ветреную погоду" },
-        { id: "windy_family_sub_5", text: "Сохраняй идеи и создавай планы с заботой о комфорте всех" },
-        { id: "windy_family_sub_6", text: "Пусть каждый найдёт что-то интересное в общем защищённом дне" },
-        { id: "windy_family_sub_7", text: "Ветер за окном не помешает семейным открытиям в укрытии" }
       ]
     }
   },
@@ -757,9 +540,6 @@ export const HERO_COPY_POOLS: Record<WeatherScenario, Record<HeroPersonaMode, He
         { id: "cold_guest_title_5", text: "Давай найдём идеи для прохладной погоды" },
         { id: "cold_guest_title_6", text: "Составим план с тёплыми и бодрящими вариантами" },
         { id: "cold_guest_title_7", text: "Холод — не помеха интересным планам" }
-      ],
-      subtitles: [
-        { id: "cold_guest_sub_1", text: "" }
       ]
     },
     self: {
@@ -780,9 +560,6 @@ export const HERO_COPY_POOLS: Record<WeatherScenario, Record<HeroPersonaMode, He
         { id: "cold_self_title_5", text: "Давай найдём идеи для холодной погоды" },
         { id: "cold_self_title_6", text: "Составим план с разными вариантами" },
         { id: "cold_self_title_7", text: "Холод — не помеха семейным планам" }
-      ],
-      subtitles: [
-        { id: "cold_self_sub_1", text: "" }
       ]
     },
     child: {
@@ -803,9 +580,6 @@ export const HERO_COPY_POOLS: Record<WeatherScenario, Record<HeroPersonaMode, He
         { id: "cold_child_title_5", text: "Давай найдём идеи для прохладной погоды" },
         { id: "cold_child_title_6", text: "Составим тёплый план для {childName}" },
         { id: "cold_child_title_7", text: "Холод — не помеха детским планам" }
-      ],
-      subtitles: [
-        { id: "cold_child_sub_1", text: "" }
       ]
     },
     family: {
@@ -826,9 +600,6 @@ export const HERO_COPY_POOLS: Record<WeatherScenario, Record<HeroPersonaMode, He
         { id: "cold_family_title_5", text: "Давай найдём идеи для прохладной погоды" },
         { id: "cold_family_title_6", text: "Составим план с разными семейными вариантами" },
         { id: "cold_family_title_7", text: "Холод — не помеха семейным планам" }
-      ],
-      subtitles: [
-        { id: "cold_family_sub_1", text: "" }
       ]
     }
   },
@@ -852,15 +623,6 @@ export const HERO_COPY_POOLS: Record<WeatherScenario, Record<HeroPersonaMode, He
         { id: "snow_guest_title_5", text: "Давай подберём что-то по настроению" },
         { id: "snow_guest_title_6", text: "Снежная погода — не повод откладывать радость" },
         { id: "snow_guest_title_7", text: "Выберем план, который подойдёт всей семье" }
-      ],
-      subtitles: [
-        { id: "snow_guest_sub_1", text: "Есть варианты и для снежных прогулок, и для тёплых занятий внутри" },
-        { id: "snow_guest_sub_2", text: "Смотри, что рядом: можно быстро сменить сцену, если станет холодно" },
-        { id: "snow_guest_sub_3", text: "Сохраняй понравившиеся места и собирай день без лишней суеты" },
-        { id: "snow_guest_sub_4", text: "Подойдёт и для малышей в коляске, и для тех, кто уже бегает по сугробам" },
-        { id: "snow_guest_sub_5", text: "Без списков на три страницы — просто выбери, что откликается" },
-        { id: "snow_guest_sub_6", text: "Минск зимой умеет быть уютным — покажу, где это особенно заметно" },
-        { id: "snow_guest_sub_7", text: "Хочется гулять или сидеть с какао — оба варианта здесь есть" }
       ]
     },
     self: {
@@ -881,15 +643,6 @@ export const HERO_COPY_POOLS: Record<WeatherScenario, Record<HeroPersonaMode, He
         { id: "snow_self_title_5", text: "Составим день так, чтобы никому не мёрзнуть зря" },
         { id: "snow_self_title_6", text: "Найдём варианты рядом — меньше дороги, больше настроения" },
         { id: "snow_self_title_7", text: "Зима — повод сделать день особенным, а не выматывающим" }
-      ],
-      subtitles: [
-        { id: "snow_self_sub_1", text: "Собрала идеи, где легко совместить прогулку и тёплую паузу" },
-        { id: "snow_self_sub_2", text: "Можно начать с улицы и перейти внутрь без длинных переездов" },
-        { id: "snow_self_sub_3", text: "Сохраняй то, что зацепило — потом вернёшься к списку в спокойную минуту" },
-        { id: "snow_self_sub_4", text: "Без навязчивых «лучших» мест — только то, что реально удобно с детьми" },
-        { id: "snow_self_sub_5", text: "Если устали от ветра — рядом обычно есть куда зайти погреться" },
-        { id: "snow_self_sub_6", text: "Выбирай по энергии: тихо, шумно, двигаться или посидеть" },
-        { id: "snow_self_sub_7", text: "День можно собрать из двух коротких кусочков — и это нормально" }
       ]
     },
     child: {
@@ -910,15 +663,6 @@ export const HERO_COPY_POOLS: Record<WeatherScenario, Record<HeroPersonaMode, He
         { id: "snow_child_title_5", text: "Выберем формат: коротко и ярко" },
         { id: "snow_child_title_6", text: "Соберём день так, чтобы {childName} не переохладился", usesChildName: true },
         { id: "snow_child_title_7", text: "Можно и покататься, и зайти погреться — как скажете вы" }
-      ],
-      subtitles: [
-        { id: "snow_child_sub_1", text: "Есть места, где детям интересно и на улице, и внутри — рядом друг с другом" },
-        { id: "snow_child_sub_2", text: "Смотри варианты по возрасту — без лишней суеты в переходах" },
-        { id: "snow_child_sub_3", text: "Сохраняй понравившееся — пригодится, если погода резко поменяется" },
-        { id: "snow_child_sub_4", text: "Если {childName} устал — обычно рядом есть куда зайти передохнуть", usesChildName: true },
-        { id: "snow_child_sub_5", text: "Без давления «надо успеть всё» — один хороший кусочек дня тоже считается" },
-        { id: "snow_child_sub_6", text: "Можно начать с простого: горячий напиток и спокойное занятие" },
-        { id: "snow_child_sub_7", text: "Зимний день лучше складывается из маленьких приятных остановок" }
       ]
     },
     family: {
@@ -939,15 +683,6 @@ export const HERO_COPY_POOLS: Record<WeatherScenario, Record<HeroPersonaMode, He
         { id: "snow_family_title_5", text: "План на день без гонок и обид" },
         { id: "snow_family_title_6", text: "Зима — повод выбрать что-то общее и простое" },
         { id: "snow_family_title_7", text: "Можно совместить прогулку и тёплую остановку для всех" }
-      ],
-      subtitles: [
-        { id: "snow_family_sub_1", text: "Здесь есть идеи, где удобно и детям побегать, и взрослым передохнуть" },
-        { id: "snow_family_sub_2", text: "Смотри варианты рядом друг с другом — меньше суеты в дороге" },
-        { id: "snow_family_sub_3", text: "Сохраняй то, что откликается всем — потом легче договориться" },
-        { id: "snow_family_sub_4", text: "Без обещаний «идеальной зимы» — просто хороший общий день" },
-        { id: "snow_family_sub_5", text: "Если кто-то устал — обычно рядом есть куда зайти погреться" },
-        { id: "snow_family_sub_6", text: "Можно собрать день из двух коротких частей — это нормально" },
-        { id: "snow_family_sub_7", text: "Главное — чтобы вечером было приятно вспоминать, а не отдыхать от плана" }
       ]
     }
   },
@@ -971,15 +706,6 @@ export const HERO_COPY_POOLS: Record<WeatherScenario, Record<HeroPersonaMode, He
         { id: "hot_guest_title_5", text: "Выберем формат: короткие выходы и тёплые паузы" },
         { id: "hot_guest_title_6", text: "Давай без гонки — просто приятный день" },
         { id: "hot_guest_title_7", text: "Можно и на свежем воздухе, и в прохладе — как легче телу" }
-      ],
-      subtitles: [
-        { id: "hot_guest_sub_1", text: "Есть места с тенью, с водой рядом и с возможностью передохнуть" },
-        { id: "hot_guest_sub_2", text: "Смотри варианты, где не нужно стоять на солнце часами" },
-        { id: "hot_guest_sub_3", text: "Сохраняй то, что кажется безопасным по ощущениям — жара у всех разная" },
-        { id: "hot_guest_sub_4", text: "Без морали — просто идеи, как провести день мягче" },
-        { id: "hot_guest_sub_5", text: "Можно совместить прогулку и прохладное помещение в одном районе" },
-        { id: "hot_guest_sub_6", text: "Если устали — это сигнал перейти в тень, а не «дотерпеть»" },
-        { id: "hot_guest_sub_7", text: "Детям особенно важны паузы — здесь это учтено в подборе" }
       ]
     },
     self: {
@@ -1000,15 +726,6 @@ export const HERO_COPY_POOLS: Record<WeatherScenario, Record<HeroPersonaMode, He
         { id: "hot_self_title_5", text: "Найдём прохладные и спокойные варианты" },
         { id: "hot_self_title_6", text: "Можно и на улице недолго, и внутри подольше" },
         { id: "hot_self_title_7", text: "День в жару — про заботу, не про рекорды" }
-      ],
-      subtitles: [
-        { id: "hot_self_sub_1", text: "Собрала идеи, где легко сделать паузу и попить воды" },
-        { id: "hot_self_sub_2", text: "Если устали — это не провал плана, а повод переключиться" },
-        { id: "hot_self_sub_3", text: "Сохраняй варианты с тенью — пригодится в полдень" },
-        { id: "hot_self_sub_4", text: "Без давления «надо успеть» — в жару лучше меньше, но приятнее" },
-        { id: "hot_self_sub_5", text: "Можно совместить короткую прогулку и долгий отдых в прохладе" },
-        { id: "hot_self_sub_6", text: "Выбирай по ощущениям: иногда лучше уют внутри, чем жара снаружи" },
-        { id: "hot_self_sub_7", text: "Детям особенно важны переключения — здесь это можно учесть" }
       ]
     },
     child: {
@@ -1029,15 +746,6 @@ export const HERO_COPY_POOLS: Record<WeatherScenario, Record<HeroPersonaMode, He
         { id: "hot_child_title_5", text: "Можно коротко на улице — и дольше в прохладе" },
         { id: "hot_child_title_6", text: "Выберем спокойный ритм для малыша" },
         { id: "hot_child_title_7", text: "Жара — повод быть к детям помягче в планах" }
-      ],
-      subtitles: [
-        { id: "hot_child_sub_1", text: "Есть места, где можно и побегать, и быстро зайти в тень" },
-        { id: "hot_child_sub_2", text: "Смотри варианты с водой и отдыхом рядом — меньше тревоги" },
-        { id: "hot_child_sub_3", text: "Сохраняй то, что кажется безопасным по самочувствию ребёнка" },
-        { id: "hot_child_sub_4", text: "Без морали — просто идеи, как провести день мягче" },
-        { id: "hot_child_sub_5", text: "Если {childName} устал — это сигнал сделать паузу, а не тянуть", usesChildName: true },
-        { id: "hot_child_sub_6", text: "Можно совместить немного солнца и много прохлады" },
-        { id: "hot_child_sub_7", text: "Жаркий день лучше складывается из маленьких приятных кусков" }
       ]
     },
     family: {
@@ -1058,15 +766,6 @@ export const HERO_COPY_POOLS: Record<WeatherScenario, Record<HeroPersonaMode, He
         { id: "hot_family_title_5", text: "Что сделаем сегодня — мягко и по-человечески?" },
         { id: "hot_family_title_6", text: "Жара — повод выбрать комфорт, а не рекорд" },
         { id: "hot_family_title_7", text: "Можно совместить немного улицы и много прохлады" }
-      ],
-      subtitles: [
-        { id: "hot_family_sub_1", text: "Здесь есть варианты с тенью и с местом передохнуть всем вместе" },
-        { id: "hot_family_sub_2", text: "Смотри идеи рядом — меньше переездов в жару" },
-        { id: "hot_family_sub_3", text: "Сохраняй то, что откликается всем — проще договориться" },
-        { id: "hot_family_sub_4", text: "Без идеального плана — просто день, где никто не таял зря" },
-        { id: "hot_family_sub_5", text: "Если кто-то устал — это повод перейти в прохладу, а не спорить" },
-        { id: "hot_family_sub_6", text: "Можно начать рано или ближе к вечеру — как удобнее телу" },
-        { id: "hot_family_sub_7", text: "Главное — чтобы вечером не хотелось только отдыхать от жары" }
       ]
     }
   },
@@ -1090,15 +789,6 @@ export const HERO_COPY_POOLS: Record<WeatherScenario, Record<HeroPersonaMode, He
         { id: "unk_guest_title_5", text: "Соберём день из того, что рядом и по душе" },
         { id: "unk_guest_title_6", text: "Посмотрим варианты в Минске — на любой вкус" },
         { id: "unk_guest_title_7", text: "Погода подождёт — а настроение можно поднять сейчас" }
-      ],
-      subtitles: [
-        { id: "unk_guest_sub_1", text: "Здесь есть и прогулки, и занятия внутри — выбирай по настроению" },
-        { id: "unk_guest_sub_2", text: "Сохраняй понравившееся — потом легче вернуться к выбору" },
-        { id: "unk_guest_sub_3", text: "Без обещаний «идеальной погоды» — просто хорошие места рядом" },
-        { id: "unk_guest_sub_4", text: "Можно начать с малого: один кусочек дня, который радует" },
-        { id: "unk_guest_sub_5", text: "Смотри варианты для детей разного возраста — без лишнего шума" },
-        { id: "unk_guest_sub_6", text: "Если планы поменяются — всегда есть запасной формат" },
-        { id: "unk_guest_sub_7", text: "Главное — чтобы вечером было приятно, а не «как мы это выдержали»" }
       ]
     },
     self: {
@@ -1119,15 +809,6 @@ export const HERO_COPY_POOLS: Record<WeatherScenario, Record<HeroPersonaMode, He
         { id: "unk_self_title_5", text: "Можно выбрать одно хорошее дело — и этого достаточно" },
         { id: "unk_self_title_6", text: "Давай без «надо успеть всё»" },
         { id: "unk_self_title_7", text: "Смотрим идеи — ты решаешь, что заходит" }
-      ],
-      subtitles: [
-        { id: "unk_self_sub_1", text: "Собрала варианты на разный случай — если что, переключишься" },
-        { id: "unk_self_sub_2", text: "Сохраняй то, что откликается — потом проще собрать неделю" },
-        { id: "unk_self_sub_3", text: "Без навязчивых «лучших мест» — только то, что реально удобно" },
-        { id: "unk_self_sub_4", text: "Если устали — это не провал, а сигнал сменить формат" },
-        { id: "unk_self_sub_5", text: "Можно совместить короткую прогулку и спокойное занятие" },
-        { id: "unk_self_sub_6", text: "Детям иногда нужен простой план — здесь такие тоже есть" },
-        { id: "unk_self_sub_7", text: "День не обязан быть идеальным — достаточно тёплого воспоминания" }
       ]
     },
     child: {
@@ -1148,15 +829,6 @@ export const HERO_COPY_POOLS: Record<WeatherScenario, Record<HeroPersonaMode, He
         { id: "unk_child_title_5", text: "Выберем формат, который не выматывает" },
         { id: "unk_child_title_6", text: "Погода подождёт — настроение важнее" },
         { id: "unk_child_title_7", text: "Смотрим варианты рядом — меньше дороги, больше спокойствия" }
-      ],
-      subtitles: [
-        { id: "unk_child_sub_1", text: "Есть места, где детям интересно без марафона по городу" },
-        { id: "unk_child_sub_2", text: "Сохраняй понравившееся — пригодится в спокойную минуту" },
-        { id: "unk_child_sub_3", text: "Без давления «надо успеть» — один шаг дня тоже считается" },
-        { id: "unk_child_sub_4", text: "Если {childName} устал — можно быстро сменить сцену", usesChildName: true },
-        { id: "unk_child_sub_5", text: "Выбирай по возрасту — без лишних сложных переездов" },
-        { id: "unk_child_sub_6", text: "Можно совместить прогулку и уютное занятие внутри" },
-        { id: "unk_child_sub_7", text: "Главное — чтобы вечером было спокойно, а не «мы выжили»" }
       ]
     },
     family: {
@@ -1177,15 +849,6 @@ export const HERO_COPY_POOLS: Record<WeatherScenario, Record<HeroPersonaMode, He
         { id: "unk_family_title_5", text: "Давай без гонки — просто хорошее время вместе" },
         { id: "unk_family_title_6", text: "Посмотрим варианты, где удобно всем возрастам" },
         { id: "unk_family_title_7", text: "Погода какая угодно — настроение можно поднять сейчас" }
-      ],
-      subtitles: [
-        { id: "unk_family_sub_1", text: "Здесь есть идеи, где легко договориться без споров о маршруте" },
-        { id: "unk_family_sub_2", text: "Сохраняй то, что откликается разным членам семьи — проще потом" },
-        { id: "unk_family_sub_3", text: "Без обещаний идеального дня — просто хороший общий вечер" },
-        { id: "unk_family_sub_4", text: "Можно совместить короткую прогулку и уютную паузу" },
-        { id: "unk_family_sub_5", text: "Если кто-то устал — это повод сменить формат, а не винить" },
-        { id: "unk_family_sub_6", text: "Выбирайте по душе — не по «как надо»" },
-        { id: "unk_family_sub_7", text: "Главное — чтобы потом было приятно вспоминать, а не отдыхать от плана" }
       ]
     }
   }

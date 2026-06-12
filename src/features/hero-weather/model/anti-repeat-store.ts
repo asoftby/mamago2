@@ -31,8 +31,7 @@ function parseStored(raw: string): AntiRepeatState | null {
         typeof row.timestamp !== "number" ||
         typeof row.scenario !== "string" ||
         typeof row.microcopyId !== "string" ||
-        typeof row.titleId !== "string" ||
-        typeof row.subtitleId !== "string"
+        typeof row.titleId !== "string"
       ) {
         continue;
       }
@@ -41,7 +40,6 @@ function parseStored(raw: string): AntiRepeatState | null {
         scenario: row.scenario as AntiRepeatEntry["scenario"],
         microcopyId: row.microcopyId,
         titleId: row.titleId,
-        subtitleId: row.subtitleId,
       });
     }
     return { version: CURRENT_VERSION, entries };

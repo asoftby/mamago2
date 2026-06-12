@@ -25,24 +25,7 @@ export type GenerateHeroCopyInput = {
 export type GeneratedHeroCopy = {
   microcopy: string;
   title: string;
-  subtitle: string;
 };
-
-// --- Evening softening (subtitle) ---
-
-const EVENING_SUBTITLE_APPEND = [
-  " Можно наметить что-то на завтра — без спешки.",
-  " Сохрани понравившиеся идеи: утром проще выбрать.",
-  " Можно спокойно полистать варианты и решить без давления.",
-  " Если сегодня устали — оставь хорошие места на завтра.",
-  " Без спешки: выбери то, что откликается.",
-  " Идеи никуда не денутся — можно вернуться к выбору завтра.",
-];
-
-const EVENING_MICRO_APPEND = [
-  " Вечером удобно спокойно присмотреть план на завтра.",
-  " Можно ничего не решать сегодня — просто сохранить пару идей.",
-];
 
 // --- Helpers ---
 
@@ -108,7 +91,7 @@ function resolveScenario(raw: string): WeatherScenario {
 }
 
 function packIsComplete(pack: HeroCopyPack): boolean {
-  return pack.microcopy.length > 0 && pack.titles.length > 0 && pack.subtitles.length > 0;
+  return pack.microcopy.length > 0 && pack.titles.length > 0;
 }
 
 /**
@@ -139,34 +122,10 @@ function resolvePack(scenario: WeatherScenario, mode: HeroPersonaContext["mode"]
   return HERO_COPY_POOLS.unknown.guest;
 }
 
-function maybeEveningSoftening(
-  microcopy: string,
-  subtitle: string,
-  timeOfDay: TimeOfDay,
-): { microcopy: string; subtitle: string } {
-  if (timeOfDay !== "evening" && timeOfDay !== "night") {
-    return { microcopy, subtitle };
-  }
-
-  let nextSub = subtitle;
-  if (Math.random() < 0.48) {
-    const extra = EVENING_SUBTITLE_APPEND[Math.floor(Math.random() * EVENING_SUBTITLE_APPEND.length)];
-    nextSub = subtitle + extra;
-  }
-
-  let nextMicro = microcopy;
-  if (Math.random() < 0.22) {
-    const extra = EVENING_MICRO_APPEND[Math.floor(Math.random() * EVENING_MICRO_APPEND.length)];
-    nextMicro = microcopy + extra;
-  }
-
-  return { microcopy: nextMicro, subtitle: nextSub };
-}
-
 // --- Main ---
 
 /**
- * Builds hero strings from a resolved pack and three variant ids (anti-repeat selection).
+ * Builds hero strings from a resolved pack and variant ids (anti-repeat selection).
  * Returns null if ids are missing from the pack or persona cannot use those variants.
  */
 export function generateHeroCopyFromSelection(
@@ -177,24 +136,16 @@ export function generateHeroCopyFromSelection(
   const pack = resolvePack(scenario, input.persona.mode);
   const microVariant = pack.microcopy.find((v) => v.id === selection.microcopyId);
   const titleVariant = pack.titles.find((v) => v.id === selection.titleId);
-  const subtitleVariant = pack.subtitles.find((v) => v.id === selection.subtitleId);
-  if (!microVariant || !titleVariant || !subtitleVariant) return null;
+  if (!microVariant || !titleVariant) return null;
   if (eligibleVariants([microVariant], input.persona).length === 0) return null;
   if (eligibleVariants([titleVariant], input.persona).length === 0) return null;
-  if (eligibleVariants([subtitleVariant], input.persona).length === 0) return null;
 
-  let microcopy = applyTemplate(microVariant.text, input.persona);
+  const microcopy = applyTemplate(microVariant.text, input.persona);
   const title = applyTemplate(titleVariant.text, input.persona);
-  let subtitle = applyTemplate(subtitleVariant.text, input.persona);
-  ({ microcopy, subtitle } = maybeEveningSoftening(microcopy, subtitle, input.weather.timeOfDay));
 
-  return { microcopy, title, subtitle };
+  return { microcopy, title };
 }
 
-/**
- * Picks ids with anti-repeat on **eligible** variants, then builds copy.
- * History scenario uses `normalizeWeatherScenario(weather.scenario)` so alerts match storage even if copy pool falls back to `unknown`.
- */
 /**
  * Same output as {@link generateHeroCopy}, plus variant ids for analytics / anti-repeat persistence.
  */
@@ -206,22 +157,16 @@ export function generateHeroCopyWithSelection(
 
   const microVariant = pickWeighted(eligibleVariants(pack.microcopy, input.persona));
   const titleVariant = pickWeighted(eligibleVariants(pack.titles, input.persona));
-  const subtitleVariant = pickWeighted(eligibleVariants(pack.subtitles, input.persona));
 
-  let microcopy = applyTemplate(microVariant.text, input.persona);
+  const microcopy = applyTemplate(microVariant.text, input.persona);
   const title = applyTemplate(titleVariant.text, input.persona);
-  let subtitle = applyTemplate(subtitleVariant.text, input.persona);
-
-  ({ microcopy, subtitle } = maybeEveningSoftening(microcopy, subtitle, input.weather.timeOfDay));
 
   return {
     microcopy,
     title,
-    subtitle,
     selection: {
       microcopyId: microVariant.id,
       titleId: titleVariant.id,
-      subtitleId: subtitleVariant.id,
     },
   };
 }
@@ -234,13 +179,12 @@ export function generateHeroCopyWithAntiRepeat(
   const pack = resolvePack(scenario, input.persona.mode);
   const microcopy = eligibleVariants(pack.microcopy, input.persona);
   const titles = eligibleVariants(pack.titles, input.persona);
-  const subtitles = eligibleVariants(pack.subtitles, input.persona);
-  if (microcopy.length === 0 || titles.length === 0 || subtitles.length === 0) return null;
+  if (microcopy.length === 0 || titles.length === 0) return null;
 
   const arScenario = normalizeWeatherScenario(input.weather.scenario);
   const selection = selectCopyVariantsWithAntiRepeat({
     scenario: arScenario,
-    packs: { microcopy, titles, subtitles },
+    packs: { microcopy, titles },
     state,
   });
   if (!selection) return null;
@@ -250,6 +194,6 @@ export function generateHeroCopyWithAntiRepeat(
 }
 
 export function generateHeroCopy(input: GenerateHeroCopyInput): GeneratedHeroCopy {
-  const { microcopy, title, subtitle } = generateHeroCopyWithSelection(input);
-  return { microcopy, title, subtitle };
+  const { microcopy, title } = generateHeroCopyWithSelection(input);
+  return { microcopy, title };
 }

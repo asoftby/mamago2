@@ -6,7 +6,6 @@ import { appendAntiRepeatEntry, loadAntiRepeatState, saveAntiRepeatState } from 
 import { normalizeWeatherScenario } from "../model/anti-repeat-types";
 import type { HeroGreetingModel } from "../lib/get-hero-context";
 import { HeroGreetingErrorBoundary } from "./HeroGreetingErrorBoundary";
-import { OptionalWeatherProvider } from "@/components/providers/OptionalWeatherProvider";
 
 export type HeroGreetingShellProps = {
   initialModel: HeroGreetingModel;
@@ -33,7 +32,7 @@ export function HeroGreetingShell({ initialModel }: HeroGreetingShellProps) {
       const ids = m.debug?.selectedIds;
       if (!ids) return;
 
-      const sig = `${ids.microcopyId}:${ids.titleId}:${ids.subtitleId}`;
+      const sig = `${ids.microcopyId}:${ids.titleId}`;
       if (typeof window !== "undefined" && window.sessionStorage) {
         const prev = window.sessionStorage.getItem("mamago.hero.persistSig");
         if (prev === sig) return;
@@ -45,7 +44,6 @@ export function HeroGreetingShell({ initialModel }: HeroGreetingShellProps) {
         scenario: normalizeWeatherScenario(m.weatherScenario),
         microcopyId: ids.microcopyId,
         titleId: ids.titleId,
-        subtitleId: ids.subtitleId,
       });
       saveAntiRepeatState(next);
 
@@ -58,8 +56,6 @@ export function HeroGreetingShell({ initialModel }: HeroGreetingShellProps) {
   }, []);
 
   return (
-    <OptionalWeatherProvider>
-      <HeroGreetingErrorBoundary model={initialModel} />
-    </OptionalWeatherProvider>
+    <HeroGreetingErrorBoundary model={initialModel} />
   );
 }

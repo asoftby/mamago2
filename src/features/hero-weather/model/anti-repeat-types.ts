@@ -18,7 +18,6 @@ export type WeatherScenario =
 export type HeroCopySelectionIds = {
   microcopyId: string;
   titleId: string;
-  subtitleId: string;
 };
 
 export type AntiRepeatEntry = {
@@ -26,7 +25,6 @@ export type AntiRepeatEntry = {
   scenario: WeatherScenario;
   microcopyId: string;
   titleId: string;
-  subtitleId: string;
 };
 
 export type AntiRepeatState = {
