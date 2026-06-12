@@ -86,6 +86,43 @@ assert.equal(wizardDraftKey("route", "edit", "abc123"), "mg.wizard.route:edit:ab
   assert.equal(readWizardDraft(storage, key, 1), null, "битая дата → null");
 }
 
+// ─── entityUpdatedAt (детекция конфликта в edit-режиме) ─────────────────────
+
+{
+  const storage = makeFakeStorage();
+  const key = wizardDraftKey("offer", "edit", "offer1");
+  const entityUpdatedAt = "2026-06-10T12:00:00.000Z";
+
+  writeWizardDraft(storage, key, 1, { title: "правки" }, { entityUpdatedAt });
+  const found = readWizardDraft<{ title: string }>(storage, key, 1);
+  assert.ok(found, "черновик с entityUpdatedAt найден");
+  assert.equal(
+    found.entityUpdatedAt?.toISOString(),
+    entityUpdatedAt,
+    "entityUpdatedAt читается из конверта",
+  );
+
+  // конверт без entityUpdatedAt (create-режим / старый Route-черновик) — поле null
+  writeWizardDraft(storage, key, 1, { title: "без поля" });
+  const plain = readWizardDraft<{ title: string }>(storage, key, 1);
+  assert.ok(plain, "конверт без entityUpdatedAt валиден (schemaVersion не бампался)");
+  assert.equal(plain.entityUpdatedAt, null, "отсутствующее поле → null");
+
+  // битое значение — не валит весь черновик
+  storage.map.set(
+    key,
+    JSON.stringify({
+      schemaVersion: 1,
+      savedAt: new Date().toISOString(),
+      data: { title: "x" },
+      entityUpdatedAt: "мусор",
+    }),
+  );
+  const broken = readWizardDraft<{ title: string }>(storage, key, 1);
+  assert.ok(broken, "черновик с битым entityUpdatedAt читается");
+  assert.equal(broken.entityUpdatedAt, null, "битое значение → null");
+}
+
 // ─── Debounce ────────────────────────────────────────────────────────────────
 
 asyncTests.push(async () => {

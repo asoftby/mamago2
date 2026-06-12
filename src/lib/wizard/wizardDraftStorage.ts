@@ -14,11 +14,14 @@ export interface WizardDraftEnvelope<TData> {
   schemaVersion: number;
   savedAt: string; // ISO
   data: TData;
+  /** updatedAt сущности на момент начала правок (edit-режим): для детекции конфликта при restore */
+  entityUpdatedAt?: string; // ISO
 }
 
 export interface StoredWizardDraft<TData> {
   data: TData;
   savedAt: Date;
+  entityUpdatedAt: Date | null;
 }
 
 /** Минимальный интерфейс хранилища (localStorage / fake в тестах) */
@@ -70,7 +73,18 @@ export function readWizardDraft<TData>(
       storage.removeItem(key);
       return null;
     }
-    return { data: parsed.data as TData, savedAt };
+    const entityUpdatedAt =
+      typeof parsed.entityUpdatedAt === "string"
+        ? new Date(parsed.entityUpdatedAt)
+        : null;
+    return {
+      data: parsed.data as TData,
+      savedAt,
+      entityUpdatedAt:
+        entityUpdatedAt && !Number.isNaN(entityUpdatedAt.getTime())
+          ? entityUpdatedAt
+          : null,
+    };
   } catch {
     try {
       storage.removeItem(key);
@@ -87,12 +101,14 @@ export function writeWizardDraft<TData>(
   key: string,
   schemaVersion: number,
   data: TData,
-  now: Date = new Date(),
+  opts?: { now?: Date; entityUpdatedAt?: string | null },
 ): Date {
+  const now = opts?.now ?? new Date();
   const envelope: WizardDraftEnvelope<TData> = {
     schemaVersion,
     savedAt: now.toISOString(),
     data,
+    ...(opts?.entityUpdatedAt ? { entityUpdatedAt: opts.entityUpdatedAt } : {}),
   };
   storage.setItem(key, JSON.stringify(envelope));
   return now;
@@ -117,6 +133,8 @@ export interface WizardDraftAutosaverOptions {
   debounceMs: number;
   onStatusChange: (status: WizardDraftStatus, lastSavedAt: Date | null) => void;
   now?: () => Date;
+  /** ISO updatedAt сущности (edit-режим) — кладётся в конверт каждой записи */
+  entityUpdatedAt?: string | null;
 }
 
 /**
@@ -156,7 +174,7 @@ export class WizardDraftAutosaver<TData> {
         this.opts.key,
         this.opts.schemaVersion,
         this.pendingData,
-        this.opts.now?.(),
+        { now: this.opts.now?.(), entityUpdatedAt: this.opts.entityUpdatedAt },
       );
       this.pendingData = null;
       this.opts.onStatusChange("saved", this.lastSavedAt);

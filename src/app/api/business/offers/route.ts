@@ -5,22 +5,26 @@ import { z } from "zod";
 import { Prisma } from "@prisma/client";
 import {
   canCreateBusinessContent,
-  canManageOwnedContent,
   canPublishContentDirectly,
 } from "@/lib/auth/businessContentAccess";
+import { canManagePlaceAsync, getUserBusinessId } from "@/lib/auth/placeAccess";
 import { assignOfferSlugIfMissing } from "@/lib/slug/offerSlugService";
 import { formatPriceFrom } from "@/lib/formatters/format-price";
+import { getMinCampSessionPrice } from "@/lib/offers/campPricing";
 import { ensurePublishedOfferHasSlug } from "@/lib/slug/publishSlugGuards";
 import { createPublishTimer, runAfterPublishResponse } from "@/server/utils/publishPipeline";
 import {
   campMealKeySchema,
   campProgramTypeSchema,
   campSessionEntrySchema,
+  offerWizardStepKeySchema,
 } from "@/lib/business/offerCampApiSchemas";
 import { syncOfferMediaUsage } from "@/server/services/media/media-usage.service";
 
 const createOfferSchema = z.object({
   source: z.enum(["PLACE", "EVENT"]),
+  /** Идемпотентность create (повтор после таймаута / double-click) */
+  createRequestId: z.string().max(64).optional(),
   selectedPlace: z.object({
     id: z.string(),
   }).optional(),
@@ -67,6 +71,8 @@ const createOfferSchema = z.object({
   status: z.enum(["DRAFT", "PENDING", "PUBLISHED"]).default("DRAFT"),
   discoverySignalIds: z.array(z.string()).default([]),
   classChipSlugs: z.array(z.string()).default([]),
+  /** Шаги мастера, явно завершённые пользователем */
+  wizardCompletedSteps: z.array(offerWizardStepKeySchema).optional(),
   campProgramType: campProgramTypeSchema,
   // Camp fields
   campSessions: z.array(campSessionEntrySchema).optional(),
@@ -91,6 +97,21 @@ const createOfferSchema = z.object({
   whatToBring: z.string().optional(),
 });
 
+/**
+ * Идемпотентность create без DB-колонки (в отличие от Place.createRequestId):
+ * in-memory кеш с TTL закрывает double-click и повтор после таймаута в рамках
+ * одного инстанса. Межинстансовый дедуп потребует колонку Offer.createRequestId
+ * (ручная миграция) — осознанный follow-up.
+ */
+const CREATE_REQUEST_TTL_MS = 10 * 60 * 1000;
+const recentCreateRequests = new Map<string, { offerId: string; expiresAt: number }>();
+
+function pruneRecentCreateRequests(now: number) {
+  for (const [key, entry] of recentCreateRequests) {
+    if (entry.expiresAt <= now) recentCreateRequests.delete(key);
+  }
+}
+
 // Re-trigger build for schema updates
 export async function POST(request: NextRequest) {
   const timer = createPublishTimer("publish:offer");
@@ -109,15 +130,57 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
+    // Идемпотентность: повтор запроса с тем же createRequestId возвращает уже созданный оффер
+    const idempotencyKey = data.createRequestId
+      ? `${user.id}:${data.createRequestId}`
+      : null;
+    if (idempotencyKey) {
+      pruneRecentCreateRequests(Date.now());
+      const recent = recentCreateRequests.get(idempotencyKey);
+      if (recent) {
+        const existing = await prisma.offer.findUnique({
+          where: { id: recent.offerId },
+          select: { id: true, title: true, status: true, slug: true, publishedAt: true },
+        });
+        if (existing) {
+          timer.mark("response");
+          timer.log({ status: existing.status, idempotent: 1 });
+          return NextResponse.json(existing);
+        }
+      }
+    }
+
     // Verify place access (владелец или админ/модератор)
     if (data.source === "PLACE" && data.selectedPlace) {
       const place = await prisma.place.findUnique({
         where: { id: data.selectedPlace.id },
-        select: { id: true, ownerBusinessId: true },
+        select: { id: true, ownerBusinessId: true, createdByUserId: true },
       });
 
-      if (!place || !place.ownerBusinessId || !canManageOwnedContent(user, place.ownerBusinessId)) {
-        return NextResponse.json({ error: "Place not found" }, { status: 404 });
+      if (!place) {
+        return NextResponse.json(
+          { error: "Место не найдено" },
+          { status: 404 },
+        );
+      }
+
+      // Место существует, но не привязано к бизнес-профилю: оффер требует привязки.
+      // Подсказку показываем только создателю места — остальным не раскрываем существование.
+      if (!place.ownerBusinessId && place.createdByUserId === user.id) {
+        return NextResponse.json(
+          {
+            error: "Место не привязано к бизнес-профилю",
+            code: "PLACE_NOT_LINKED_TO_BUSINESS",
+          },
+          { status: 422 },
+        );
+      }
+
+      if (!(await canManagePlaceAsync(user, place))) {
+        return NextResponse.json(
+          { error: "Место не найдено" },
+          { status: 404 },
+        );
       }
 
       // Check image uniqueness within place
@@ -148,7 +211,14 @@ export async function POST(request: NextRequest) {
       let priceFrom: number | null = null;
       let priceText: string | null = null;
 
-      if (data.pricingMode === "SINGLE" && data.singlePrice) {
+      const campPriceFrom = data.campProgramType
+        ? getMinCampSessionPrice(data.campSessions)
+        : null;
+
+      if (data.campProgramType) {
+        priceFrom = campPriceFrom;
+        priceText = campPriceFrom != null ? formatPriceFrom(campPriceFrom) : null;
+      } else if (data.pricingMode === "SINGLE" && data.singlePrice !== undefined) {
         priceFrom = data.singlePrice;
         priceText = data.singlePriceLabel || null;
       } else if (data.pricingMode === "MULTIPLE" && data.pricingOptions.length > 0) {
@@ -178,6 +248,7 @@ export async function POST(request: NextRequest) {
           ageMaxMonths: data.ageMaxMonths,
           discoverySignalIds: data.discoverySignalIds,
           classChipSlugs: data.classChipSlugs,
+          wizardCompletedSteps: data.wizardCompletedSteps ?? [],
           status: data.status,
           campProgramType: data.campProgramType,
           // Camp fields
@@ -212,6 +283,13 @@ export async function POST(request: NextRequest) {
         },
       });
       timer.mark("status");
+
+      if (idempotencyKey) {
+        recentCreateRequests.set(idempotencyKey, {
+          offerId: offer.id,
+          expiresAt: Date.now() + CREATE_REQUEST_TTL_MS,
+        });
+      }
 
       // Auto-assign slug only on first meaningful title fill (idempotent).
       if (offer.title.trim()) {
@@ -287,8 +365,14 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(offers);
     }
 
+    const businessId = await getUserBusinessId(user.id);
     const userPlaces = await prisma.place.findMany({
-      where: { ownerBusinessId: user.id },
+      where: {
+        OR: [
+          { createdByUserId: user.id },
+          ...(businessId ? [{ ownerBusinessId: businessId }] : []),
+        ],
+      },
       select: { id: true },
     });
 

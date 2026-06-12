@@ -5,17 +5,19 @@ import { z } from "zod";
 import { Prisma } from "@prisma/client";
 import {
   canCreateBusinessContent,
-  canManageOwnedContent,
   canPublishContentDirectly,
 } from "@/lib/auth/businessContentAccess";
+import { canManagePlaceAsync } from "@/lib/auth/placeAccess";
 import { assignOfferSlugIfMissing } from "@/lib/slug/offerSlugService";
 import { formatPriceFrom } from "@/lib/formatters/format-price";
+import { getMinCampSessionPrice } from "@/lib/offers/campPricing";
 import { ensurePublishedOfferHasSlug } from "@/lib/slug/publishSlugGuards";
 import { createPublishTimer, runAfterPublishResponse } from "@/server/utils/publishPipeline";
 import {
   campMealKeySchema,
   campProgramTypeSchema,
   campSessionEntrySchema,
+  offerWizardStepKeySchema,
 } from "@/lib/business/offerCampApiSchemas";
 import { syncOfferMediaUsage } from "@/server/services/media/media-usage.service";
 
@@ -61,6 +63,8 @@ const updateOfferSchema = z.object({
   status: z.enum(["DRAFT", "PENDING", "PUBLISHED"]).optional(),
   discoverySignalIds: z.array(z.string()).optional(),
   classChipSlugs: z.array(z.string()).optional(),
+  /** Шаги мастера, явно завершённые пользователем */
+  wizardCompletedSteps: z.array(offerWizardStepKeySchema).optional(),
   campProgramType: campProgramTypeSchema,
   // Camp fields
   campSessions: z.array(campSessionEntrySchema).optional(),
@@ -108,16 +112,13 @@ export async function GET(
             formattedAddr: true,
             customAddress: true,
             ownerBusinessId: true,
+            createdByUserId: true,
           },
         },
       },
     });
 
-    if (
-      !offer ||
-      !offer.place.ownerBusinessId ||
-      !canManageOwnedContent(user, offer.place.ownerBusinessId)
-    ) {
+    if (!offer || !(await canManagePlaceAsync(user, offer.place))) {
       return NextResponse.json({ error: "Offer not found" }, { status: 404 });
     }
 
@@ -161,16 +162,14 @@ export async function PATCH(
         title: true,
         priceFrom: true,
         priceText: true,
+        campProgramType: true,
+        campSessions: true,
         placeId: true,
-        place: { select: { ownerBusinessId: true } },
+        place: { select: { ownerBusinessId: true, createdByUserId: true } },
       },
     });
 
-    if (
-      !existingOffer ||
-      !existingOffer.place.ownerBusinessId ||
-      !canManageOwnedContent(user, existingOffer.place.ownerBusinessId)
-    ) {
+    if (!existingOffer || !(await canManagePlaceAsync(user, existingOffer.place))) {
       return NextResponse.json({ error: "Offer not found" }, { status: 404 });
     }
 
@@ -179,11 +178,14 @@ export async function PATCH(
     if (data.selectedPlace?.id) {
       const nextPlace = await prisma.place.findUnique({
         where: { id: data.selectedPlace.id },
-        select: { id: true, ownerBusinessId: true },
+        select: { id: true, ownerBusinessId: true, createdByUserId: true },
       });
 
-      if (!nextPlace || !nextPlace.ownerBusinessId || !canManageOwnedContent(user, nextPlace.ownerBusinessId)) {
-        return NextResponse.json({ error: "Place not found" }, { status: 404 });
+      if (!nextPlace || !(await canManagePlaceAsync(user, nextPlace))) {
+        return NextResponse.json(
+          { error: "Место не найдено или у вас нет прав на публикацию предложения" },
+          { status: 404 },
+        );
       }
 
       if (data.selectedPlace.id !== existingOffer.placeId) {
@@ -195,7 +197,17 @@ export async function PATCH(
     let priceFrom: number | null = existingOffer.priceFrom;
     let priceText: string | null = existingOffer.priceText;
 
-    if (data.pricingMode === "SINGLE" && data.singlePrice !== undefined) {
+    const isCampOffer =
+      data.campProgramType !== undefined
+        ? Boolean(data.campProgramType)
+        : Boolean(existingOffer.campProgramType);
+    const nextCampSessions =
+      data.campSessions !== undefined ? data.campSessions : existingOffer.campSessions;
+
+    if (isCampOffer) {
+      priceFrom = getMinCampSessionPrice(nextCampSessions);
+      priceText = priceFrom != null ? formatPriceFrom(priceFrom) : null;
+    } else if (data.pricingMode === "SINGLE" && data.singlePrice !== undefined) {
       priceFrom = data.singlePrice;
       priceText = data.singlePriceLabel || null;
     } else if (data.pricingMode === "MULTIPLE" && data.pricingOptions && data.pricingOptions.length > 0) {
@@ -215,6 +227,7 @@ export async function PATCH(
     if (data.promotionalOffer !== undefined) updateData.promotionalOffer = data.promotionalOffer;
     if (data.discoverySignalIds !== undefined) updateData.discoverySignalIds = data.discoverySignalIds;
     if (data.classChipSlugs !== undefined) updateData.classChipSlugs = data.classChipSlugs;
+    if (data.wizardCompletedSteps !== undefined) updateData.wizardCompletedSteps = data.wizardCompletedSteps;
     if (data.contactSource !== undefined) updateData.contactSource = data.contactSource;
     if (data.contactPhone !== undefined) updateData.contactPhone = data.contactPhone;
     if (data.contactWebsite !== undefined) updateData.contactWebsite = data.contactWebsite;
@@ -265,6 +278,7 @@ export async function PATCH(
         status: true,
         slug: true,
         publishedAt: true,
+        updatedAt: true,
         place: {
           select: {
             id: true,
@@ -346,15 +360,11 @@ export async function DELETE(
         status: "DRAFT",
       },
       include: {
-        place: { select: { ownerBusinessId: true } },
+        place: { select: { ownerBusinessId: true, createdByUserId: true } },
       },
     });
 
-    if (
-      !offer ||
-      !offer.place.ownerBusinessId ||
-      !canManageOwnedContent(user, offer.place.ownerBusinessId)
-    ) {
+    if (!offer || !(await canManagePlaceAsync(user, offer.place))) {
       return NextResponse.json(
         { error: "Offer not found or cannot be deleted" },
         { status: 404 }

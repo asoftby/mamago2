@@ -24,6 +24,8 @@ export interface UseWizardDraftOptions<TData> {
   /** Выключает автосейв (например, пока форма пустая). По умолчанию true */
   enabled?: boolean;
   debounceMs?: number;
+  /** ISO updatedAt сущности на момент начала правок (edit) — для детекции конфликта при restore */
+  entityUpdatedAt?: string | null;
 }
 
 export interface UseWizardDraftResult<TData> {
@@ -37,6 +39,8 @@ export interface UseWizardDraftResult<TData> {
   hasDraft: boolean;
   /** Когда был сохранён найденный черновик (для resume-баннера) */
   draftSavedAt: Date | null;
+  /** updatedAt сущности из конверта найденного черновика (детекция конфликта) */
+  draftEntityUpdatedAt: Date | null;
   /** Вернуть данные черновика и продолжить с ними; null — черновик исчез */
   restoreDraft: () => TData | null;
   /** Отклонить черновик прошлой сессии и начать заново */
@@ -64,6 +68,7 @@ export function useWizardDraft<TData>({
   data,
   enabled = true,
   debounceMs = 1500,
+  entityUpdatedAt = null,
 }: UseWizardDraftOptions<TData>): UseWizardDraftResult<TData> {
   const storageKey = useMemo(
     () => wizardDraftKey(wizardType, mode, entityId),
@@ -74,6 +79,7 @@ export function useWizardDraft<TData>({
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
   const [hasDraft, setHasDraft] = useState(false);
   const [draftSavedAt, setDraftSavedAt] = useState<Date | null>(null);
+  const [draftEntityUpdatedAt, setDraftEntityUpdatedAt] = useState<Date | null>(null);
   /** Ключ, для которого завершена начальная проверка LS (mount-гейт автосейва) */
   const [hydratedKey, setHydratedKey] = useState<string | null>(null);
 
@@ -88,9 +94,11 @@ export function useWizardDraft<TData>({
     if (found) {
       setHasDraft(true);
       setDraftSavedAt(found.savedAt);
+      setDraftEntityUpdatedAt(found.entityUpdatedAt);
     } else {
       setHasDraft(false);
       setDraftSavedAt(null);
+      setDraftEntityUpdatedAt(null);
     }
     setStatus("idle");
     setLastSavedAt(null);
@@ -109,6 +117,7 @@ export function useWizardDraft<TData>({
         setStatus(next);
         setLastSavedAt(savedAt);
       },
+      entityUpdatedAt,
     });
     autosaverRef.current = autosaver;
     return () => {
@@ -117,7 +126,7 @@ export function useWizardDraft<TData>({
       autosaver.dispose();
       autosaverRef.current = null;
     };
-  }, [storageKey, schemaVersion, debounceMs]);
+  }, [storageKey, schemaVersion, debounceMs, entityUpdatedAt]);
 
   // Планирование автосейва при изменении данных
   const isFirstDataRunRef = useRef(true);
@@ -147,6 +156,7 @@ export function useWizardDraft<TData>({
     clearWizardDraft(window.localStorage, storageKey);
     setHasDraft(false);
     setDraftSavedAt(null);
+    setDraftEntityUpdatedAt(null);
   }, [storageKey]);
 
   const markClean = useCallback(() => {
@@ -154,6 +164,7 @@ export function useWizardDraft<TData>({
     clearWizardDraft(window.localStorage, storageKey);
     setHasDraft(false);
     setDraftSavedAt(null);
+    setDraftEntityUpdatedAt(null);
     setStatus("idle");
   }, [storageKey]);
 
@@ -166,6 +177,7 @@ export function useWizardDraft<TData>({
     lastSavedAt,
     hasDraft,
     draftSavedAt,
+    draftEntityUpdatedAt,
     restoreDraft,
     discardDraft,
     markClean,
