@@ -343,7 +343,7 @@ export default async function ArticlePage({
   return (
     <main className="max-w-3xl mx-auto px-4 sm:px-6 py-12 md:py-16">
       <div className="mb-4 md:mb-0">
-        <MobileSmartBackButton fallbackUrl="/" />
+        <MobileSmartBackButton />
       </div>
       {"_seo" in article && article._seo?.id ? (
         <AnalyticsDetailBeacon

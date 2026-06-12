@@ -121,7 +121,7 @@ export function ArticleMvpView({
       ) : null}
       <ArticleReadingScrollPadding extraTopRem={readingScrollPaddingExtraRem ?? 0} />
       <div className="mb-4 md:mb-0">
-        <MobileSmartBackButton fallbackUrl="/minsk" />
+        <MobileSmartBackButton />
       </div>
       {draftWatermark ? (
         <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-900">

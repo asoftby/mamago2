@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
 import { MamaGoLogoMark } from "@/components/brand/MamaGoLogoMark";
 import { usePathname } from "next/navigation";
 import { motion, useReducedMotion } from "framer-motion";
@@ -31,6 +30,8 @@ import { SITE_CONTENT_CONTAINER_CLASS } from "@/components/ui/Container";
 import { HeaderAccountMenu } from "@/components/site/header/HeaderAccountMenu";
 import { HEADER_CHROME_ICON_BUTTON_CLASS } from "@/components/site/header/headerIconButtonClass";
 import { SearchOverlay } from "@/components/search/SearchOverlay";
+import { getCityHomeHref } from "@/lib/header/getCityHomeHref";
+import { OPEN_PUBLIC_SEARCH_EVENT, dispatchOpenPublicSearch } from "@/lib/search/openPublicSearchEvent";
 
 /** Плавный кроссфейд табов ↔ компактной капсулы (без «мигания» пустым центром). */
 const CENTER_EASE = [0.32, 0.72, 0, 1] as const;
@@ -99,25 +100,10 @@ export function SiteHeaderShell() {
   const expandedSearchVariant = "discovery";
   const compactSearchVariant = "discovery";
   const shouldShowIntentTabs = true;
+  const cityHomeHref = getCityHomeHref(citySlug);
   const isCityHomePage =
-    pathname === `/${citySlug}` || pathname === `/${citySlug}/`;
+    pathname === cityHomeHref || pathname === `${cityHomeHref}/`;
   const isPlacePage = isPlaceDetailPath(pathname);
-  const mountSearchOverlay = !isLandingHeader || isPlacePage;
-
-  const openGlobalSearch = () => {
-    if (isPlacePage) {
-      setSearchOverlayOpen(true);
-      return;
-    }
-    if (
-      typeof window !== "undefined" &&
-      window.matchMedia("(min-width: 1024px)").matches
-    ) {
-      setSearchOverlayOpen(true);
-    } else {
-      hb.actions.openSearchSurface();
-    }
-  };
 
   useEffect(() => {
     if (process.env.NODE_ENV !== "production") {
@@ -129,6 +115,17 @@ export function SiteHeaderShell() {
       }
     };
   }, [pathname]);
+
+  useEffect(() => {
+    const openSearch = () => {
+      if (typeof window === "undefined") return;
+      if (!window.matchMedia("(min-width: 1024px)").matches) return;
+      setSearchOverlayOpen(true);
+    };
+
+    window.addEventListener(OPEN_PUBLIC_SEARCH_EVENT, openSearch);
+    return () => window.removeEventListener(OPEN_PUBLIC_SEARCH_EVENT, openSearch);
+  }, []);
 
   /** Вторая строка (сегментированный поиск): на посадочных не показываем. */
   const showExpandedSearchRow = !hb.showAirbnbCompactBar;
@@ -211,7 +208,7 @@ export function SiteHeaderShell() {
             >
               <div className="flex min-w-0 items-center justify-self-start">
                 <MamaGoLogoMark
-                  href={isCityHomePage ? undefined : `/${citySlug}`}
+                  href={isCityHomePage ? undefined : cityHomeHref}
                   priority
                 />
               </div>
@@ -283,12 +280,10 @@ export function SiteHeaderShell() {
                     variant="ghost"
                     size="icon"
                     className={HEADER_CHROME_ICON_BUTTON_CLASS}
-                    aria-label="Поиск — в каталоге"
-                    asChild
+                    aria-label="Поиск"
+                    onClick={dispatchOpenPublicSearch}
                   >
-                    <Link href={`/${citySlug}/kuda`}>
-                      <Search className="h-4 w-4" />
-                    </Link>
+                    <Search className="h-4 w-4" />
                   </Button>
                 ) : (
                   <Button
@@ -297,7 +292,7 @@ export function SiteHeaderShell() {
                     size="icon"
                     className={HEADER_CHROME_ICON_BUTTON_CLASS}
                     aria-label="Поиск"
-                    onClick={openGlobalSearch}
+                    onClick={dispatchOpenPublicSearch}
                   >
                     <Search className="h-4 w-4" />
                   </Button>
@@ -330,9 +325,7 @@ export function SiteHeaderShell() {
           )}
         </div>
       </header>
-      {mountSearchOverlay ? (
-        <SearchOverlay open={searchOverlayOpen} onOpenChange={setSearchOverlayOpen} />
-      ) : null}
+      <SearchOverlay open={searchOverlayOpen} onOpenChange={setSearchOverlayOpen} />
     </>
   );
 }

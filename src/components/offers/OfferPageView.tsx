@@ -18,6 +18,7 @@ import {
   type SaveToPlanResult,
 } from "@/components/activity/SaveToPlanModal";
 import { normalizeUiCurrencyText } from "@/lib/formatters/format-price";
+import { getCityHomeHref } from "@/lib/header/getCityHomeHref";
 import { toast } from "@/lib/toast";
 
 interface OfferPageViewProps {
@@ -284,7 +285,7 @@ export function OfferPageView({
     <main className="ep-surface min-h-screen">
       <div className="mx-auto max-w-[1200px] space-y-16 px-4 py-8 sm:px-6 lg:space-y-24 lg:px-8 lg:py-12">
         <div className="mb-4 md:mb-0">
-          <MobileSmartBackButton fallbackUrl={`/${data.citySlug || "minsk"}`} />
+          <MobileSmartBackButton fallbackHref={getCityHomeHref(data.citySlug)} />
         </div>
 
         <OfferHero

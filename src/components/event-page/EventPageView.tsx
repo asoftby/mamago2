@@ -33,6 +33,7 @@ import { MediaGalleryStrip } from "@/components/media/MediaGalleryStrip";
 import { PublicationStatsPanel } from "@/components/publication-stats";
 import { MobileSmartBackButton } from "@/components/shared/MobileSmartBackButton";
 import { postAnalyticsEvent } from "@/lib/analytics/client";
+import { getCityHomeHref } from "@/lib/header/getCityHomeHref";
 import { cn } from "@/lib/utils";
 import { getLocalDateKey } from "@/lib/date/localDateKey";
 import { useUpcomingSessions } from "./useUpcomingSessions";
@@ -577,7 +578,7 @@ export function EventPageView({ data }: { data: EventPageData }) {
       <section className="pt-12 pb-14">
         <div className="mx-auto w-full max-w-[1200px] px-4 sm:px-6 lg:px-8">
           <div className="mb-4 md:mb-0">
-            <MobileSmartBackButton fallbackUrl={`/${data.citySlug || "minsk"}`} />
+            <MobileSmartBackButton fallbackHref={getCityHomeHref(data.citySlug)} />
           </div>
 
           {/* Mobile: media above decision panel */}

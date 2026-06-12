@@ -5,6 +5,7 @@ import { Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DiscoveryIntentTabs } from "@/components/city/DiscoveryIntentTabs";
 import { HEADER_CHROME_ICON_BUTTON_CLASS } from "@/components/site/header/headerIconButtonClass";
+import { getCityHomeHref } from "@/lib/header/getCityHomeHref";
 import type { Intent } from "@/lib/intent";
 
 type MobileLandingHeaderChromeProps = {
@@ -22,9 +23,11 @@ export function MobileLandingHeaderChrome({
   currentIntent,
   onSearchClick,
 }: MobileLandingHeaderChromeProps) {
+  const cityHomeHref = getCityHomeHref(citySlug);
+
   return (
     <div className="flex min-h-[52px] min-w-0 items-center gap-2">
-      <MamaGoLogoMark href={`/${citySlug}`} imageClassName="h-8 w-auto" />
+      <MamaGoLogoMark href={cityHomeHref} imageClassName="h-8 w-auto" />
       <div className="min-h-10 min-w-0 flex-1 self-center overflow-hidden">
         <DiscoveryIntentTabs
           city={citySlug}

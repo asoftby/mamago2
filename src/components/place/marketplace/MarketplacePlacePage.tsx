@@ -151,7 +151,7 @@ export function MarketplacePlacePage({
   return (
     <div style={{ background: "#ffffff", minHeight: "100vh" }}>
       <div className="mx-auto w-full max-w-[1200px] px-4 pt-4 sm:px-6 lg:px-8">
-        <MobileSmartBackButton fallbackUrl={place.fallbackUrl || "/minsk"} />
+        <MobileSmartBackButton fallbackHref={place.fallbackUrl} />
       </div>
 
       {/* Hero */}

@@ -26,6 +26,7 @@ import { DISCOVERY_INTENT_CONFIG } from "@/lib/discovery/discoveryIntentConfig";
 import { useHeaderScrolled } from "@/hooks/useHeaderScrolled";
 import { getSiteHeaderVariant } from "@/lib/site/siteHeaderVariant";
 import { OPEN_MOBILE_SEARCH_EVENT } from "@/lib/mobile/openMobileSearchEvent";
+import { OPEN_PUBLIC_SEARCH_EVENT } from "@/lib/search/openPublicSearchEvent";
 
 export function MobileHeader() {
   const [isSearchSheetOpen, setIsSearchSheetOpen] = useState(false);
@@ -62,8 +63,18 @@ export function MobileHeader() {
 
   useEffect(() => {
     const open = () => setIsSearchSheetOpen(true);
+    const openPublicSearch = () => {
+      if (typeof window === "undefined") return;
+      if (window.matchMedia("(min-width: 1024px)").matches) return;
+      open();
+    };
+
     window.addEventListener(OPEN_MOBILE_SEARCH_EVENT, open);
-    return () => window.removeEventListener(OPEN_MOBILE_SEARCH_EVENT, open);
+    window.addEventListener(OPEN_PUBLIC_SEARCH_EVENT, openPublicSearch);
+    return () => {
+      window.removeEventListener(OPEN_MOBILE_SEARCH_EVENT, open);
+      window.removeEventListener(OPEN_PUBLIC_SEARCH_EVENT, openPublicSearch);
+    };
   }, []);
 
   return (
