@@ -1,3 +1,4 @@
+import type { ActivityFormat } from "@prisma/client";
 import { formatRuShortDayMonthRange } from "@/lib/formatters/date";
 import { formatPrice, formatPriceFrom } from "@/lib/formatters/format-price";
 import { getActivityFormatLabel } from "@/domain/activities/activity-format";
@@ -5,63 +6,98 @@ import { publicActivityPath } from "@/lib/business/eventPublicLink";
 import type { ActivityMock } from "@/types/activity";
 import type { EventCardProps } from "./EventCard";
 
-// ─── Price caption ────────────────────────────────────────────────────────────
+type EventListingSource = {
+  id: string;
+  title: string;
+  slug?: string | null;
+  citySlug: string;
+  href?: string;
+  imageUrl?: string | null;
+  format?: ActivityFormat | null;
+  badge?: string | null;
+  ageFrom?: number | null;
+  dateStart?: string | null;
+  dateEnd?: string | null;
+  workingHours?: string | null;
+  priceMin?: number | null;
+  priceMax?: number | null;
+  priceListUsesOt?: boolean | null;
+};
 
 function buildPriceLabel(
-  a: Pick<ActivityMock, "priceMin" | "priceMax" | "priceListUsesOt">,
+  source: Pick<EventListingSource, "priceMin" | "priceMax" | "priceListUsesOt">,
 ): string | undefined {
-  if (a.priceMin === 0) return "бесплатно";
-  if (a.priceMin == null) return undefined;
+  if (source.priceMin === 0) return "бесплатно";
+  if (source.priceMin == null) return undefined;
   const useOt =
-    a.priceListUsesOt ??
-    !(a.priceMax != null && a.priceMin != null && a.priceMin === a.priceMax);
-  return useOt ? formatPriceFrom(a.priceMin) : formatPrice(a.priceMin);
+    source.priceListUsesOt ??
+    !(
+      source.priceMax != null &&
+      source.priceMin != null &&
+      source.priceMin === source.priceMax
+    );
+  return useOt ? formatPriceFrom(source.priceMin) : formatPrice(source.priceMin);
 }
 
-// ─── Category label ───────────────────────────────────────────────────────────
-// Shows event category (e.g. "Спектакли"), appends "· Онлайн" only for online events.
-
-function buildCategoryLabel(a: Pick<ActivityMock, "badge" | "format">): string | undefined {
+function buildCategoryLabel(
+  source: Pick<EventListingSource, "badge" | "format">,
+): string | undefined {
   const parts: (string | undefined)[] = [
-    a.badge ?? undefined,
-    a.format === "ONLINE" ? getActivityFormatLabel(a.format) : undefined,
+    source.badge ?? undefined,
+    source.format === "ONLINE" ? getActivityFormatLabel(source.format) : undefined,
   ];
   return parts.filter(Boolean).join(" · ") || undefined;
 }
 
-// ─── Meta line ────────────────────────────────────────────────────────────────
-
 function buildMetaLabel(
-  a: Pick<ActivityMock, "ageFrom" | "dateStart" | "dateEnd" | "workingHours">,
+  source: Pick<EventListingSource, "ageFrom" | "dateStart" | "dateEnd" | "workingHours">,
 ): string | undefined {
-  const age = typeof a.ageFrom === "number" ? `${a.ageFrom}+` : undefined;
-  const date = a.dateStart
-    ? formatRuShortDayMonthRange(a.dateStart, a.dateEnd ?? null)
-    : a.workingHours ?? undefined;
+  const age = typeof source.ageFrom === "number" ? `${source.ageFrom}+` : undefined;
+  const date = source.dateStart
+    ? formatRuShortDayMonthRange(source.dateStart, source.dateEnd ?? null)
+    : source.workingHours ?? undefined;
   return [age, date].filter(Boolean).join(" · ") || undefined;
 }
 
-// ─── Main adapter ─────────────────────────────────────────────────────────────
+function eventListingToEventCard(source: EventListingSource): EventCardProps {
+  const href =
+    source.href ??
+    publicActivityPath(source.id, source.citySlug, source.slug);
+
+  return {
+    id: source.id,
+    title: source.title,
+    href,
+    imageUrl: source.imageUrl ?? null,
+    categoryLabel: buildCategoryLabel(source),
+    metaLabel: buildMetaLabel(source),
+    priceLabel: buildPriceLabel(source),
+    saveMeta: {
+      dateISO: source.dateStart ?? null,
+      dateEndISO: source.dateEnd ?? null,
+    },
+  };
+}
 
 export function activityMockToEventCard(
   activity: ActivityMock,
   fallbackCitySlug: string,
 ): EventCardProps {
-  const href =
-    activity.href ??
-    publicActivityPath(activity.id, activity.citySlug ?? fallbackCitySlug, activity.slug);
-
-  return {
+  return eventListingToEventCard({
     id: activity.id,
     title: activity.title,
-    href,
+    slug: activity.slug,
+    citySlug: activity.citySlug ?? fallbackCitySlug,
+    href: activity.href,
     imageUrl: activity.image ?? null,
-    categoryLabel: buildCategoryLabel(activity),
-    metaLabel: buildMetaLabel(activity),
-    priceLabel: buildPriceLabel(activity),
-    saveMeta: {
-      dateISO: activity.dateStart ?? null,
-      dateEndISO: activity.dateEnd ?? null,
-    },
-  };
+    format: activity.format,
+    badge: activity.badge ?? null,
+    ageFrom: activity.ageFrom,
+    dateStart: activity.dateStart ?? null,
+    dateEnd: activity.dateEnd ?? null,
+    workingHours: activity.workingHours ?? null,
+    priceMin: activity.priceMin ?? null,
+    priceMax: activity.priceMax ?? null,
+    priceListUsesOt: activity.priceListUsesOt ?? null,
+  });
 }
