@@ -16,6 +16,7 @@ interface Offer {
   coverImage: string | null;
   priceFrom: number | null;
   priceText: string | null;
+  campSessions?: unknown;
   status: OfferStatus;
   dateFrom: Date | null;
   dateTo: Date | null;

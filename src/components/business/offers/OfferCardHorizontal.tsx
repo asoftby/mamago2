@@ -1,6 +1,7 @@
 "use client";
 
-import { BYN_SYMBOL } from "@/lib/formatters/format-price";
+import { formatPriceFrom, normalizeUiCurrencyText } from "@/lib/formatters/format-price";
+import { getMinCampSessionPrice } from "@/lib/offers/campPricing";
 import { useState } from "react";
 import Link from "next/link";
 import { OfferStatusBadge } from "./OfferStatusBadge";
@@ -35,6 +36,7 @@ interface Offer {
   coverImage: string | null;
   priceFrom: number | null;
   priceText: string | null;
+  campSessions?: unknown;
   status: OfferStatus;
   dateFrom: Date | null;
   dateTo: Date | null;
@@ -74,10 +76,17 @@ function buildOfferSubtitle(offer: Offer): string {
       format(new Date(offer.dateFrom), "d MMM yyyy", { locale: ru }),
     );
   }
-  if (offer.priceText) {
-    parts.push(offer.priceText);
-  } else if (offer.priceFrom != null) {
-    parts.push(`от ${offer.priceFrom} ${BYN_SYMBOL}`);
+  const campPriceFrom = offer.campProgramType
+    ? getMinCampSessionPrice(offer.campSessions)
+    : null;
+  const effectivePriceFrom = offer.campProgramType ? campPriceFrom : offer.priceFrom;
+
+  if (!offer.campProgramType && offer.priceText) {
+    parts.push(normalizeUiCurrencyText(offer.priceText));
+  } else if (effectivePriceFrom != null) {
+    parts.push(formatPriceFrom(effectivePriceFrom, { hideZero: true }));
+  } else if (offer.campProgramType) {
+    parts.push("Цена зависит от смены");
   }
   return parts.join(" · ");
 }

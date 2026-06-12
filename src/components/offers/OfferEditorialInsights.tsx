@@ -87,7 +87,7 @@ export function OfferEditorialInsights({ data }: OfferEditorialInsightsProps) {
                 </div>
                 <div
                   style={{
-                    fontFamily: "var(--font-display, Georgia, serif)",
+                    fontFamily: "var(--font-display)",
                     fontSize: "clamp(36px,4vw,52px)",
                     lineHeight: 0.94,
                     letterSpacing: "-.035em",
