@@ -3,7 +3,12 @@ import { getCurrentUser } from "@/lib/auth/server";
 import { getActivityCityIdForAnalytics } from "@/lib/analytics/activityCity";
 import { getSessionRowIdFromCookies } from "@/lib/analytics/getSessionRowId";
 import { trackUserEvent } from "@/server/services/analytics/AnalyticsEventService";
-import { addPlanItem, addRoutePlanItem, removePlanItem } from "@/server/services/plan.service";
+import {
+  addPlacePlanItem,
+  addPlanItem,
+  addRoutePlanItem,
+  removePlanItem,
+} from "@/server/services/plan.service";
 import { prisma } from "@/lib/prisma";
 import { getLocalDateKey } from "@/lib/date/localDateKey";
 
@@ -15,11 +20,25 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { activityId, routeId, planRouteSlug, date, startsAt, activitySessionId, title, coverImageUrl, selectedPersonaIds, planAddSource } =
-      body as {
+    const {
+      activityId,
+      routeId,
+      planRouteSlug,
+      placeId,
+      planPlaceSlug,
+      date,
+      startsAt,
+      activitySessionId,
+      title,
+      coverImageUrl,
+      selectedPersonaIds,
+      planAddSource,
+    } = body as {
         activityId?: string;
         routeId?: string;
         planRouteSlug?: string;
+        placeId?: string;
+        planPlaceSlug?: string;
         date?: string;
         startsAt?: string;
         /** ActivitySession.id — used to derive startsAt; validated server-side */
@@ -35,17 +54,39 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate that at least one entity type is provided
-    if (!activityId && !routeId) {
+    if (!activityId && !routeId && !placeId) {
       return NextResponse.json(
-        { error: "activityId or routeId is required" },
+        { error: "activityId, routeId or placeId is required" },
         { status: 400 }
       );
     }
 
     let planItem;
 
+    if (placeId) {
+      planItem = await addPlacePlanItem(user.id, placeId, date, planPlaceSlug ?? null, {
+        title: title ?? null,
+        coverImageUrl: coverImageUrl ?? null,
+      });
+
+      const place = await prisma.place.findUnique({
+        where: { id: placeId },
+        select: { cityId: true },
+      });
+      const sessionRowId = await getSessionRowIdFromCookies();
+      void trackUserEvent({
+        userId: user.id,
+        sessionId: sessionRowId,
+        eventType: "PLAN_ADD",
+        entityType: "PLACE",
+        entityId: placeId,
+        vertical: "CITY",
+        cityId: place?.cityId ?? null,
+        meta: { source: "detail", section: "places", targetAction: "plan" },
+      });
+    }
     // Handle route
-    if (routeId) {
+    else if (routeId) {
       planItem = await addRoutePlanItem(
         user.id,
         routeId,

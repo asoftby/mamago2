@@ -50,6 +50,8 @@ export type PlanItemWithActivity = {
   /** Present on persisted rows; synthetic UI items may omit */
   routeId?: string | null;
   planRouteSlug?: string | null;
+  placeId?: string | null;
+  planPlaceSlug?: string | null;
   date: string;
   startsAt: Date | null;
   title: string | null;
@@ -181,6 +183,113 @@ export async function addRoutePlanItem(
   void routeSlug;
   void options;
   throw new Error("Route not found");
+}
+
+type ResolvedPlaceForSave = {
+  id: string;
+  slug: string | null;
+  title: string;
+  coverImageUrl: string | null;
+};
+
+async function resolvePlaceForUserSave(
+  placeId?: string | null,
+  placeSlug?: string | null,
+): Promise<ResolvedPlaceForSave | null> {
+  const select = {
+    id: true,
+    slug: true,
+    title: true,
+    images: {
+      orderBy: { sortOrder: "asc" as const },
+      take: 1,
+      select: { url: true },
+    },
+  };
+
+  if (placeId) {
+    const row = await prisma.place.findUnique({ where: { id: placeId }, select });
+    if (row) {
+      return {
+        id: row.id,
+        slug: row.slug,
+        title: row.title,
+        coverImageUrl: row.images[0]?.url ?? null,
+      };
+    }
+  }
+
+  if (placeSlug) {
+    const row = await prisma.place.findFirst({
+      where: { slug: placeSlug, status: "PUBLISHED" },
+      select,
+    });
+    if (row) {
+      return {
+        id: row.id,
+        slug: row.slug,
+        title: row.title,
+        coverImageUrl: row.images[0]?.url ?? null,
+      };
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Добавить место в план на дату (дедупликация по userId + placeId).
+ */
+export async function addPlacePlanItem(
+  userId: string,
+  placeId: string,
+  date: string,
+  placeSlug?: string | null,
+  options?: { title?: string | null; coverImageUrl?: string | null },
+): Promise<{ id: string }> {
+  const resolved = await resolvePlaceForUserSave(placeId, placeSlug);
+  if (!resolved) {
+    throw new Error("Place not found");
+  }
+
+  const title = options?.title ?? resolved.title;
+  const coverImageUrl = options?.coverImageUrl ?? resolved.coverImageUrl;
+
+  const existing = await prisma.planItem.findFirst({
+    where: { userId, placeId: resolved.id },
+    select: { id: true },
+  });
+
+  if (existing) {
+    return prisma.planItem.update({
+      where: { id: existing.id },
+      data: {
+        date,
+        title,
+        coverImageUrl,
+        planPlaceSlug: resolved.slug,
+        activityId: null,
+        routeId: null,
+        planRouteSlug: null,
+      },
+      select: { id: true },
+    });
+  }
+
+  return prisma.planItem.create({
+    data: {
+      userId,
+      placeId: resolved.id,
+      planPlaceSlug: resolved.slug,
+      activityId: null,
+      routeId: null,
+      planRouteSlug: null,
+      date,
+      title,
+      coverImageUrl,
+    },
+    select: { id: true },
+  });
 }
 
 /**

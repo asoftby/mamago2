@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
-import { hasIdea, hasOfferIdea, hasOfferIdeaSupport } from "@/server/services/idea.service";
+import {
+  hasIdea,
+  hasOfferIdea,
+  hasOfferIdeaSupport,
+  hasPlaceIdea,
+} from "@/server/services/idea.service";
 import { prisma } from "@/lib/prisma";
 import { resolveIdeaPlanState } from "@/lib/plan/ideaPlanStatus";
 
@@ -14,12 +19,38 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const activityId = searchParams.get("activityId");
     const offerId = searchParams.get("offerId");
+    const placeId = searchParams.get("placeId");
 
-    if (!activityId && !offerId) {
+    if (!activityId && !offerId && !placeId) {
       return NextResponse.json(
-        { error: "activityId or offerId is required" },
+        { error: "activityId, offerId or placeId is required" },
         { status: 400 }
       );
+    }
+
+    if (placeId) {
+      const isIdea = await hasPlaceIdea(user.id, placeId);
+      const planItems = await prisma.planItem.findMany({
+        where: { userId: user.id, placeId },
+        select: { id: true, date: true, startsAt: true },
+        orderBy: { date: "asc" },
+      });
+      const planState = resolveIdeaPlanState(
+        planItems.map((item) => ({ id: item.id, date: item.date })),
+      );
+      const relevantPlanItem =
+        planItems.find((item) => item.id === planState.planItemId) ?? null;
+      const isSaved = isIdea || planItems.length > 0;
+
+      return NextResponse.json({
+        isSaved,
+        isIdea,
+        inPlan: planState.isPlanned,
+        planStatus: planState.planStatus,
+        planDate: planState.plannedDate ?? null,
+        planStartsAt: relevantPlanItem?.startsAt ?? null,
+        planItemId: planState.planItemId ?? null,
+      });
     }
 
     if (offerId) {
