@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
-import { ntSomic } from "@/lib/fonts";
+import { ntSomic, ptSerif } from "@/lib/fonts";
 import { Sonner } from "@/components/ui/sonner";
 import { AccountModeProvider } from "@/contexts/AccountModeContext";
 import { SaveIntentProvider } from "@/lib/save/SaveIntentContext";
@@ -30,7 +30,7 @@ export default async function RootLayout({
   const initialAuthUser = await getCurrentAuthState();
 
   return (
-    <html lang="ru" className={ntSomic.variable}>
+    <html lang="ru" className={`${ntSomic.variable} ${ptSerif.variable}`}>
       <body
         className="antialiased min-h-screen text-foreground"
       >

@@ -66,7 +66,7 @@ function ChipButton({
           "disabled:pointer-events-none disabled:opacity-50",
           isActive
             ? "border-transparent bg-[#F8C4B4]"
-            : "border-gray-200 bg-gray-100 hover:bg-gray-50",
+            : "border-gray-200 bg-white hover:bg-gray-50",
           it.className,
         )}
       >

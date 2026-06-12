@@ -3,13 +3,30 @@ import Link from "next/link";
 import { CookieSettingsFooterLink } from "@/components/shell/CookieSettingsFooterLink";
 import { FooterSocialLinks } from "@/components/shell/FooterSocialLinks";
 import { Container } from "@/components/ui/Container";
+import { cn } from "@/lib/utils";
 
-export function PublicFooter() {
+/** Высота PlaceStickyActionBar / EventStickyActionBar mobile + 45px зазор до копирайта */
+const STICKY_CTA_FOOTER_PAD =
+  "pb-[calc(46px+1.25rem+45px+env(safe-area-inset-bottom))]";
+
+type PublicFooterProps = {
+  /** Детальная страница со sticky CTA снизу — ровно 45px между копирайтом и баром */
+  withStickyCtaClearance?: boolean;
+};
+
+export function PublicFooter({ withStickyCtaClearance = false }: PublicFooterProps) {
   const currentYear = new Date().getFullYear();
 
   return (
     <footer className="border-t bg-[#F6F2EA]">
-      <Container className="py-12 md:py-16">
+      <Container
+        className={cn(
+          "pt-12 md:pt-16",
+          withStickyCtaClearance
+            ? cn(STICKY_CTA_FOOTER_PAD, "lg:pb-16")
+            : "pb-12 md:pb-16",
+        )}
+      >
         <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-12">
           {/* Column 1 */}
           <div className="flex flex-col gap-4">

@@ -59,11 +59,55 @@ body:has([data-slot="alert-dialog-overlay"][data-state="open"]) {
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
+  /* Semantic color tokens for Tailwind v4 CSS-first usage. */
+  --color-brand: var(--brand);
+  --color-brand-hover: var(--brand-hover);
+  --color-brand-active: var(--brand-active);
+  --color-brand-soft: var(--brand-soft);
+  --color-brand-soft-hover: var(--brand-soft-hover);
+  --color-brand-muted: var(--brand-muted);
+
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-active: var(--primary-active);
+  --color-primary-foreground: var(--primary-foreground);
+
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-surface-hover: var(--surface-hover);
+  --color-surface-subtle: var(--surface-subtle);
+  --color-surface-brand: var(--surface-brand);
+
+  --color-text-main: var(--text-main);
+  --color-text-muted: var(--text-muted);
+  --color-text-subtle: var(--text-subtle);
+  --color-text-brand: var(--text-brand);
+  --color-text-brand-hover: var(--text-brand-hover);
+
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-border-hover: var(--border-hover);
+  --color-border-brand: var(--border-brand);
+  --color-border-brand-soft: var(--border-brand-soft);
+
+  --color-success: var(--success);
+  --color-success-hover: var(--success-hover);
+  --color-warning: var(--warning);
+  --color-warning-hover: var(--warning-hover);
+  --color-danger: var(--danger);
+  --color-danger-hover: var(--danger-hover);
+  --color-danger-soft: var(--danger-soft);
+
+  --color-overlay-dark: var(--overlay-dark);
+  --color-overlay-dark-hover: var(--overlay-dark-hover);
+  --color-overlay-light: var(--overlay-light);
+  --color-overlay-light-hover: var(--overlay-light-hover);
+
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   /* --font-sans не переопределяем здесь: next/font/local задаёт --font-sans на <html>.
      Tailwind font-sans использует CSS var(--font-sans) напрямую через body. */
-  --font-mono: nbrb, Menlo, ui-monospace, SFMono-Regular, SF Mono, Monaco, Consolas,
+  --font-mono: Menlo, ui-monospace, SFMono-Regular, SF Mono, Monaco, Consolas,
     "Liberation Mono", "Courier New", monospace;
   
   /* Sidebar */
@@ -83,10 +127,9 @@ body:has([data-slot="alert-dialog-overlay"][data-state="open"]) {
   --color-chart-2: var(--chart-2);
   --color-chart-1: var(--chart-1);
   
-  /* Shadcn standard */
+  /* Shadcn compatibility layer */
   --color-ring: var(--ring);
   --color-input: var(--input);
-  --color-border: var(--border);
   --color-destructive: var(--destructive);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
@@ -121,51 +164,91 @@ body:has([data-slot="alert-dialog-overlay"][data-state="open"]) {
 :root {
   /* Site-wide layout */
   --site-maxw: 1200px;
-  --font-serif: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
-  --font-display: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
+  --font-editorial: var(--font-pt-serif);
+  --font-serif: var(--font-pt-serif);
+  --font-display: var(--font-pt-serif);
 
   /* Default Shadcn/Tailwind */
   --radius: 0.625rem;
-  
-  /* Design System Colors (mamaGo 2.0) */
-  /* Using exact hex values where possible, but mapping to Tailwind variables */
-  
-  /* bg white */
-  --background: #ffffff;
-  /* text #1F1F1F */
-  --foreground: #1F1F1F;
-  
-  /* primary #EF8759 */
-  --primary: #EF8759;
-  --primary-foreground: #FFFFFF;
-  
-  /* muted #6B6B6B - mapping to muted-foreground mostly, but muted bg needs to be lighter */
-  --muted: #F2F2F0; 
-  --muted-foreground: #6B6B6B;
-  
-  /* border #ECEAE6 */
-  --border: #ECEAE6;
-  --input: #ECEAE6;
-  
-  /* card bg usually white on light gray bg */
-  --card: #FFFFFF;
-  --card-foreground: #1F1F1F;
 
-  /* popover (select dropdowns, tooltips, etc.) */
-  --popover: #FFFFFF;
-  --popover-foreground: #1F1F1F;
-  
-  /* success #2FBF71 */
-  --success: #2FBF71;
-  
-  /* warning #F2A93B */
-  --warning: #F2A93B;
-  
-  /* destructive - keeping default reddish */
-  --destructive: oklch(0.577 0.245 27.325);
-  
-  /* ring */
-  --ring: #EF8759;
+  /* COLOR USAGE RULES:
+     - primary / primary-hover: главные CTA, “Добавить в план”, “Сохранить”, “Опубликовать”, business paid actions.
+     - brand / text-brand: ссылки, акцентные элементы, selected state.
+     - brand-soft / surface-brand: мягкие брендовые фоны, chips, selected cards.
+     - surface-hover: карточки, dropdown rows, neutral buttons, table rows.
+     - danger / danger-hover / danger-soft: delete, reject, destructive flows.
+     - success / success-hover: approve, publish, connected states.
+     - warning / warning-hover: pending, attention, limited balance.
+     - overlay colors: media controls only.
+     - admin blue colors should not be introduced for new primary actions unless intentionally scoped. */
+
+  /* Brand */
+  --brand: #EF8759;
+  --brand-hover: #E07848;
+  --brand-active: #C85F35;
+  --brand-soft: #FFF2EB;
+  --brand-soft-hover: #FFE8DC;
+  --brand-muted: #FAF7F1;
+
+  /* Primary action */
+  --primary: var(--brand);
+  --primary-hover: var(--brand-hover);
+  --primary-active: var(--brand-active);
+  --primary-foreground: #FFFFFF;
+
+  /* Surface */
+  --surface: #FFFFFF;
+  --surface-muted: #FAFAF9;
+  --surface-hover: #F5F5F4;
+  --surface-subtle: #FAF7F1;
+  --surface-brand: var(--brand-soft);
+
+  /* Text */
+  --text-main: #1A1410;
+  --text-muted: #6F6760;
+  --text-subtle: #9A918A;
+  --text-brand: var(--brand);
+  --text-brand-hover: var(--brand-active);
+
+  /* Border */
+  --border: #E7E0DA;
+  --border-strong: #D6CEC7;
+  --border-hover: #CEC6BA;
+  --border-brand: var(--brand);
+  --border-brand-soft: rgba(239, 135, 89, 0.35);
+  --input: var(--border);
+
+  /* States */
+  --success: #16A34A;
+  --success-hover: #15803D;
+  --warning: #F59E0B;
+  --warning-hover: #D97706;
+  --danger: #DC2626;
+  --danger-hover: #B91C1C;
+  --danger-soft: #FEF2F2;
+
+  /* Overlay / media */
+  --overlay-dark: rgba(0, 0, 0, 0.5);
+  --overlay-dark-hover: rgba(0, 0, 0, 0.7);
+  --overlay-light: rgba(255, 255, 255, 0.8);
+  --overlay-light-hover: rgba(255, 255, 255, 0.95);
+
+  /* Shadcn/base compatibility */
+  --background: var(--surface);
+  --foreground: var(--text-main);
+  --card: var(--surface);
+  --card-foreground: var(--text-main);
+  --popover: var(--surface);
+  --popover-foreground: var(--text-main);
+  --secondary: var(--surface-muted);
+  --secondary-foreground: var(--text-main);
+  --accent: var(--surface-hover);
+  --accent-foreground: var(--text-main);
+  --muted: var(--surface-muted);
+  --muted-foreground: var(--text-muted);
+  --destructive: var(--danger);
+  --destructive-foreground: #FFFFFF;
+  --ring: var(--brand);
   
   /* Custom shadows */
   --shadow-card: 0 4px 12px rgba(0, 0, 0, 0.06);
@@ -192,19 +275,21 @@ body:has([data-slot="alert-dialog-overlay"][data-state="open"]) {
   --card-foreground: oklch(0.985 0 0);
   --popover: oklch(0.145 0 0);
   --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.985 0 0);
-  --primary-foreground: oklch(0.205 0 0);
+  --primary: var(--brand);
+  --primary-hover: var(--brand-hover);
+  --primary-active: var(--brand-active);
+  --primary-foreground: #FFFFFF;
   --secondary: oklch(0.269 0 0);
   --secondary-foreground: oklch(0.985 0 0);
   --muted: oklch(0.269 0 0);
   --muted-foreground: oklch(0.708 0 0);
   --accent: oklch(0.269 0 0);
   --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.396 0.141 25.723);
-  --destructive-foreground: oklch(0.637 0.237 25.331);
+  --destructive: var(--danger);
+  --destructive-foreground: #FFFFFF;
   --border: oklch(0.269 0 0);
   --input: oklch(0.269 0 0);
-  --ring: oklch(0.439 0 0);
+  --ring: var(--brand);
   --chart-1: oklch(0.488 0.243 264.376);
   --chart-2: oklch(0.696 0.17 162.48);
   --chart-3: oklch(0.769 0.188 70.08);
@@ -239,7 +324,16 @@ body:has([data-slot="alert-dialog-overlay"][data-state="open"]) {
 
 @layer utilities {
   .font-serif {
-    font-family: var(--font-serif), ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
+    font-family: var(--font-serif), ui-serif, serif;
+  }
+  .font-editorial {
+    font-family: var(--font-editorial), ui-serif, serif;
+  }
+  .font-display {
+    font-family: var(--font-display), ui-serif, serif;
+  }
+  .font-pt-serif {
+    font-family: var(--font-pt-serif), ui-serif, serif;
   }
 }
 
@@ -709,13 +803,13 @@ body:has([data-slot="alert-dialog-overlay"][data-state="open"]) {
    ───────────────────────────────────────────────────────────────────────── */
 
 .font-display {
-  font-family: var(--font-display), Georgia, serif;
+  font-family: var(--font-display), ui-serif, serif;
   font-weight: 400;
   letter-spacing: -0.01em;
 }
 
 .font-display-italic {
-  font-family: var(--font-display), Georgia, serif;
+  font-family: var(--font-display), ui-serif, serif;
   font-style: italic;
   font-weight: 400;
   letter-spacing: -0.005em;

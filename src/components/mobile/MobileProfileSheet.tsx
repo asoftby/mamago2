@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { User } from "lucide-react";
+import { NavUserIcon } from "@/components/icons/NavUserIcon";
 import type { AccountMenuUser } from "@/lib/account/types";
 import { DefaultAuthModal } from "@/components/auth/DefaultAuthModal";
 import { MobileMenuSheet } from "@/components/mobile/MobileMenuSheet";
@@ -16,6 +16,7 @@ import { useCurrentPath } from "@/hooks/useCurrentPath";
 import {
   getNavIconButtonClassName,
   type NavIconChrome,
+  type NavIconVariant,
 } from "@/components/mobile/NavIconButton";
 
 export type MobileProfileSheetProps = {
@@ -26,6 +27,7 @@ export type MobileProfileSheetProps = {
   profileAvatarUrl?: string | null;
   compact?: boolean;
   chrome?: NavIconChrome;
+  variant?: NavIconVariant;
 };
 
 export function MobileProfileSheet({
@@ -36,6 +38,7 @@ export function MobileProfileSheet({
   profileAvatarUrl,
   compact = false,
   chrome = "light",
+  variant = "pill",
 }: MobileProfileSheetProps) {
   const { mode, hydrated } = useAccountMode();
   const family = useFamilyPersona();
@@ -59,6 +62,7 @@ export function MobileProfileSheet({
   const resolvedProfileAvatar = profileAvatarUrl ?? user?.avatarUrl ?? undefined;
   const showBadge = profileBadgeCount > 0;
   const size = compact ? "compact" : "default";
+  const bare = variant === "bare";
 
   const inner = resolvedProfileAvatar ? (
     // eslint-disable-next-line @next/next/no-img-element -- remote avatar URLs may be arbitrary
@@ -68,7 +72,14 @@ export function MobileProfileSheet({
       className={cn(
         "rounded-full object-cover ring-1",
         chrome === "dark" ? "ring-neutral-500/30" : "ring-black/[0.06]",
-        compact ? "h-8 w-8" : "h-[37px] w-[37px]",
+        bare ? "h-[52px] w-[52px]" : compact ? "h-8 w-8" : "h-[37px] w-[37px]",
+      )}
+    />
+  ) : bare || chrome === "dark" ? (
+    <NavUserIcon
+      className={cn(
+        "h-5 w-5 transition-colors duration-200",
+        isProfileActive ? "text-[#C24E22]" : "text-gray-400",
       )}
     />
   ) : (
@@ -76,29 +87,15 @@ export function MobileProfileSheet({
       className={cn(
         "flex shrink-0 items-center justify-center rounded-full transition-colors duration-200",
         compact ? "h-9 w-9" : "h-[41px] w-[41px]",
-        chrome === "dark"
-          ? isProfileActive
-            ? "bg-[#EF8759]/22"
-            : "bg-transparent"
-          : isProfileActive
-            ? "bg-[#EF8759]/12"
-            : "bg-neutral-100/95",
+        isProfileActive ? "bg-[#EF8759]/12" : "bg-neutral-100/95",
       )}
     >
-      <User
+      <NavUserIcon
         className={cn(
           "transition-colors duration-200",
           compact ? "h-[22px] w-[22px]" : "h-[26px] w-[26px]",
-          chrome === "dark"
-            ? isProfileActive
-              ? "text-[#C24E22]"
-              : "text-neutral-700"
-            : isProfileActive
-              ? "text-[#EF8759]"
-              : "text-neutral-500",
+          isProfileActive ? "text-[#EF8759]" : "text-neutral-500",
         )}
-        strokeWidth={isProfileActive ? 1.35 : 1.2}
-        absoluteStrokeWidth
       />
     </span>
   );
@@ -107,6 +104,7 @@ export function MobileProfileSheet({
     isActive: isProfileActive,
     size,
     chrome,
+    variant,
   });
 
   if (user === undefined) {
@@ -114,19 +112,10 @@ export function MobileProfileSheet({
       <div className={triggerClass} aria-hidden>
         <span
           className={cn(
-            "flex items-center justify-center rounded-full",
-            chrome === "dark" ? "bg-neutral-600/40" : "bg-neutral-100/80",
-            compact ? "h-9 w-9" : "h-[41px] w-[41px]",
+            "animate-pulse rounded-full bg-neutral-200/90",
+            bare ? "h-5 w-5" : compact ? "h-4 w-4" : "h-5 w-5",
           )}
-        >
-          <span
-            className={cn(
-              "animate-pulse rounded-full",
-              chrome === "dark" ? "bg-neutral-400/35" : "bg-neutral-200/90",
-              compact ? "h-4 w-4" : "h-5 w-5",
-            )}
-          />
-        </span>
+        />
       </div>
     );
   }

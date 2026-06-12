@@ -6,7 +6,7 @@ export function PrimaryButton({ className, ...props }: ButtonProps) {
   return (
     <Button
       className={cn(
-        "rounded-[16px] bg-primary text-primary-foreground hover:bg-primary/90 px-4 py-[14px] h-auto font-semibold text-[16px] interactive",
+        "rounded-[16px] bg-primary text-primary-foreground hover:bg-primary-hover px-4 py-[14px] h-auto font-semibold text-[16px] interactive",
         className
       )}
       {...props}

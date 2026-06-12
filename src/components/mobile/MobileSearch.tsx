@@ -299,7 +299,7 @@ export function MobileSearch({
                         type="button"
                         onMouseDown={(e) => e.preventDefault()}
                         onClick={() => handlePopularPick(lastSearch)}
-                        className="max-w-full truncate rounded-full border border-neutral-200 bg-neutral-50 px-3.5 py-2 text-left text-sm font-medium text-neutral-800 transition-colors hover:border-[#EF8759]/35 hover:bg-[#EF8759]/8 active:scale-[0.98]"
+                        className="max-w-full truncate rounded-full border border-neutral-200 bg-neutral-50 px-3.5 py-2 text-left text-sm font-medium text-neutral-800 transition-colors hover:border-border-brand-soft hover:bg-brand-soft active:scale-[0.98]"
                         title={lastSearch}
                       >
                         {lastSearch}
@@ -318,7 +318,7 @@ export function MobileSearch({
                       type="button"
                       onMouseDown={(e) => e.preventDefault()}
                       onClick={() => handlePopularPick(term)}
-                      className="rounded-full border border-neutral-200 bg-neutral-50 px-3.5 py-2 text-sm font-medium text-neutral-800 transition-colors hover:border-[#EF8759]/35 hover:bg-[#EF8759]/8 active:scale-[0.98]"
+                      className="rounded-full border border-neutral-200 bg-neutral-50 px-3.5 py-2 text-sm font-medium text-neutral-800 transition-colors hover:border-border-brand-soft hover:bg-brand-soft active:scale-[0.98]"
                     >
                       {term}
                     </button>
@@ -329,7 +329,7 @@ export function MobileSearch({
           ) : null}
 
           {showFiltersSection ? (
-            <div className="space-y-3 p-4 pt-1">{filtersSection}</div>
+            <div className="space-y-3 bg-white p-4 pt-1">{filtersSection}</div>
           ) : null}
         </>
       )}

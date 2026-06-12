@@ -9,6 +9,8 @@ export type NavIconSize = "default" | "compact";
 
 export type NavIconChrome = "light" | "dark";
 
+export type NavIconVariant = "pill" | "bare";
+
 export type NavIconButtonProps = {
   href: string;
   isActive: boolean;
@@ -28,6 +30,8 @@ export type NavIconButtonProps = {
   size?: NavIconSize;
   /** Тёмный стеклянный бар (MobileBottomNav) */
   chrome?: NavIconChrome;
+  /** bare — без круглой подложки (лого / иконка на высоту pill) */
+  variant?: NavIconVariant;
 };
 
 export function getNavIconButtonClassName({
@@ -35,21 +39,34 @@ export function getNavIconButtonClassName({
   size = "default",
   className,
   chrome = "light",
+  variant = "pill",
 }: {
   isActive: boolean;
   size?: NavIconSize;
   className?: string;
   chrome?: NavIconChrome;
+  variant?: NavIconVariant;
 }) {
+  if (variant === "bare") {
+    return cn(
+      "relative flex shrink-0 items-center justify-center",
+      "h-[52px] min-w-[52px] w-auto",
+      "transition-all duration-200 ease-out cursor-pointer touch-manipulation",
+      "active:scale-[0.96] active:transition-transform",
+      className,
+    );
+  }
+
   return cn(
     "relative flex shrink-0 items-center justify-center rounded-full",
     size === "compact" ? "h-11 w-11" : "h-[52px] w-[52px]",
     "border transition-all duration-200 ease-out will-change-transform cursor-pointer touch-manipulation",
     "active:scale-[0.96] active:transition-transform",
     chrome === "dark"
-      ? isActive
-        ? "border-[#EF8759]/50 bg-[rgba(250,247,241,0.50)] shadow-[inset_0_1px_0_rgba(255,255,255,0.18),0_4px_16px_rgba(239,135,89,0.20)]"
-        : "border-[rgba(250,247,241,0.25)] bg-[rgba(250,247,241,0.50)] shadow-[inset_0_1px_0_rgba(255,255,255,0.14)]"
+      ? cn(
+          "border-gray-200 bg-white shadow-sm active:scale-[0.98]",
+          isActive && "border-[#EF8759]/40",
+        )
       : isActive
         ? "border-[#EF8759]/35 bg-white/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_4px_14px_rgba(239,135,89,0.18)]"
         : "border-white/70 bg-white/55 shadow-sm shadow-black/[0.04]",
@@ -74,15 +91,20 @@ export function NavIconButton({
   className,
   size = "default",
   chrome = "light",
+  variant = "pill",
 }: NavIconButtonProps) {
   const showBadge = badgeCount > 0;
   const compact = size === "compact";
+  const bare = variant === "bare";
 
   return (
     <Link
       href={href}
       aria-label={ariaLabel}
-      className={getNavIconButtonClassName({ isActive, size, className, chrome })}
+      className={cn(
+        getNavIconButtonClassName({ isActive, size, className, chrome, variant }),
+        isHomeLogo && !bare && "p-[3px]",
+      )}
     >
       {avatarUrl ? (
         // eslint-disable-next-line @next/next/no-img-element -- remote avatar URLs may be arbitrary
@@ -102,9 +124,14 @@ export function NavIconButton({
           height={120}
           className={cn(
             "w-auto object-contain object-center transition-transform duration-200",
-            /* compact: как внутренний круг h-9 w-9 у колокольчика / аватар h-8 в bottom bar */
-            compact ? "h-9 max-w-[92px]" : "max-w-[85px] h-[34px]",
-            isActive && "scale-[1.04]",
+            bare
+              ? "h-[52px] max-w-[120px]"
+              : compact
+                ? "h-9 max-w-[92px]"
+                : isHomeLogo
+                  ? "h-full max-h-full w-auto max-w-full"
+                  : "max-w-[85px] h-[34px]",
+            isActive && !bare && "scale-[1.04]",
           )}
         />
       ) : (

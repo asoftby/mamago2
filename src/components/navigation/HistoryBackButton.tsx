@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
+import { canUseHistoryBack } from "@/hooks/useSmartBack";
 import { resolveSurfaceFromHostAndPathname } from "@/lib/routing/surface";
 
 type Props = {
@@ -10,18 +11,6 @@ type Props = {
   children: ReactNode;
   ariaLabel?: string;
 };
-
-function hasSameOriginReferrer() {
-  if (typeof window === "undefined") return false;
-  if (!document.referrer) return false;
-
-  try {
-    const referrer = new URL(document.referrer);
-    return referrer.origin === window.location.origin;
-  } catch {
-    return false;
-  }
-}
 
 function getSurfaceEntryFallback(currentPathname: string, fallbackHref: string): string {
   if (typeof window === "undefined") {
@@ -57,7 +46,7 @@ export function HistoryBackButton({
   const router = useRouter();
 
   const handleClick = () => {
-    if (hasSameOriginReferrer()) {
+    if (canUseHistoryBack()) {
       router.back();
       return;
     }

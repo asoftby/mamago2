@@ -136,7 +136,7 @@ export function MobileLocationPanel({
 
               {cityPickerOpen ? (
                 <div
-                  className="rounded-xl border border-gray-100 bg-gray-50/90 p-3"
+                  className="rounded-xl border border-[#EBEBEB] bg-white/70 p-3"
                   role="listbox"
                   aria-label="Выбор города"
                 >
@@ -206,7 +206,7 @@ export function MobileLocationPanel({
               "w-full flex items-center gap-2.5 p-2.5 rounded-lg transition-colors text-left",
               draft.nearby 
                 ? "bg-blue-50 border border-blue-200" 
-                : "hover:bg-white"
+                : "hover:bg-white/80"
             )}
           >
             <div className={cn(
@@ -231,7 +231,7 @@ export function MobileLocationPanel({
             <div className="space-y-1">
               <button
                 onClick={() => setShowMetroList(!showMetroList)}
-                className="w-full flex items-center gap-2.5 p-2.5 rounded-lg hover:bg-white transition-colors text-left"
+                className="w-full flex items-center gap-2.5 p-2.5 rounded-lg hover:bg-white/80 transition-colors text-left"
               >
                 <div className="flex items-center justify-center w-7 h-7 bg-green-50 rounded-full">
                   <Zap className="h-3.5 w-3.5 text-green-600" />
@@ -253,16 +253,17 @@ export function MobileLocationPanel({
               </button>
 
               {showMetroList && (
-                <div className="ml-10 space-y-1 max-h-32 overflow-y-auto bg-white rounded-lg p-2">
+                <div className="mt-2 max-h-56 space-y-1.5 overflow-y-auto overscroll-contain rounded-xl border border-gray-100 bg-white p-2.5">
                   {apiOptions.metros.map((metro) => (
                     <button
                       key={metro.value}
+                      type="button"
                       onClick={() => handleMetroSelect(metro.value)}
                       className={cn(
-                        "w-full text-left px-2.5 py-2 rounded-lg text-xs transition-colors",
+                        "flex w-full min-h-11 items-center rounded-xl px-3 py-2.5 text-left text-sm transition-colors touch-manipulation active:scale-[0.99]",
                         draft.metro === metro.value
-                          ? "bg-[#EF8759]/10 text-[#EF8759] font-medium"
-                          : "hover:bg-gray-50 text-gray-700"
+                          ? "bg-[#EF8759]/10 font-medium text-[#C24E22]"
+                          : "text-gray-800 active:bg-gray-50",
                       )}
                     >
                       {metro.label}
@@ -277,7 +278,7 @@ export function MobileLocationPanel({
             <div className="space-y-1">
               <button
                 onClick={() => setShowDistrictList(!showDistrictList)}
-                className="w-full flex items-center gap-2.5 p-2.5 rounded-lg hover:bg-white transition-colors text-left"
+                className="w-full flex items-center gap-2.5 p-2.5 rounded-lg hover:bg-white/80 transition-colors text-left"
               >
                 <div className="flex items-center justify-center w-7 h-7 bg-purple-50 rounded-full">
                   <MapPin className="h-3.5 w-3.5 text-purple-600" />
@@ -299,16 +300,17 @@ export function MobileLocationPanel({
               </button>
 
               {showDistrictList && (
-                <div className="ml-10 space-y-1 max-h-32 overflow-y-auto bg-white rounded-lg p-2">
+                <div className="mt-2 max-h-56 space-y-1.5 overflow-y-auto overscroll-contain rounded-xl border border-gray-100 bg-white p-2.5">
                   {apiOptions.districts.map((district) => (
                     <button
                       key={district.value}
+                      type="button"
                       onClick={() => handleDistrictSelect(district.value)}
                       className={cn(
-                        "w-full text-left px-2.5 py-2 rounded-lg text-xs transition-colors",
+                        "flex w-full min-h-11 items-center rounded-xl px-3 py-2.5 text-left text-sm transition-colors touch-manipulation active:scale-[0.99]",
                         draft.district === district.value
-                          ? "bg-[#EF8759]/10 text-[#EF8759] font-medium"
-                          : "hover:bg-gray-50 text-gray-700"
+                          ? "bg-[#EF8759]/10 font-medium text-[#C24E22]"
+                          : "text-gray-800 active:bg-gray-50",
                       )}
                     >
                       {district.label}
