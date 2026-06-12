@@ -94,6 +94,8 @@ export type NotificationSettingsSurfaceData = {
   telegramConfigured: boolean;
   telegramUsername?: string;
   telegramBotUsername?: string;
+  /** Тестовая отправка в Telegram — только для platform ADMIN. */
+  canSendTelegramTest: boolean;
   rows: NotificationSettingsRow[];
   groups: NotificationSettingsGroup[];
 };
@@ -409,6 +411,16 @@ const NOTIFICATION_SETTINGS_TYPE_DEFINITIONS: readonly NotificationSettingsTypeD
     defaultKind: "BUSINESS_ACTION",
   },
   {
+    type: "BUSINESS_VERIFICATION_SUBMITTED",
+    label: "Заявка на верификацию отправлена",
+    description: "",
+    audience: "BUSINESS",
+    surface: "BUSINESS",
+    groupId: "business-verification",
+    order: 5,
+    defaultKind: "BUSINESS_DECISION",
+  },
+  {
     type: "BUSINESS_APPLICATION_CREATED",
     label: "Новая заявка",
     description: "",
@@ -699,6 +711,7 @@ export function buildEmptyNotificationSettingsSurfaceData(
     surface,
     telegramConnected: false,
     telegramConfigured: false,
+    canSendTelegramTest: false,
     rows,
     groups,
   };

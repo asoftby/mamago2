@@ -48,7 +48,7 @@ const CHANNEL_OPTIONS: Array<{
 }> = [
   { key: "IN_APP", title: "В приложении", shortTitle: "приложение" },
   { key: "EMAIL", title: "Email", shortTitle: "email" },
-  { key: "TELEGRAM", title: "Telegram", shortTitle: "TG" },
+  { key: "TELEGRAM", title: "Telegram", shortTitle: "telegram" },
 ];
 
 function buildRowsMap(data: NotificationSettingsSurfaceData): RowsMap {
@@ -322,7 +322,7 @@ export function NotificationPreferencesClient({
             !telegramConfigured
               ? "border-amber-200/80 bg-amber-50/70"
               : telegramConnected
-              ? "border-emerald-200/80 bg-emerald-50/70"
+              ? "border-[#24A1DE]/20 bg-[#24A1DE]/10"
               : "border-sky-200/80 bg-sky-50/70",
           )}
         >
@@ -334,7 +334,7 @@ export function NotificationPreferencesClient({
                   !telegramConfigured
                     ? "text-amber-600"
                     : telegramConnected
-                      ? "text-emerald-600"
+                      ? "text-[#24A1DE]"
                       : "text-sky-600",
                 )}
               >

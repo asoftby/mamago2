@@ -6,12 +6,18 @@ import type {
   PreparedNotificationPayload,
 } from "@/lib/notifications/domainContracts";
 import { getCanonicalPublicAppUrl } from "@/lib/config/publicAppUrl";
-import { TelegramChannel, type TelegramReplyMarkup } from "@/server/services/telegram/TelegramChannel";
+import {
+  TelegramChannel,
+  type TelegramParseMode,
+  type TelegramReplyMarkup,
+} from "@/server/services/telegram/TelegramChannel";
 import {
   createNotificationDeliveryRecord,
   markNotificationDeliveryRecord,
   recordSkippedNotificationDelivery,
 } from "./delivery-log";
+import { renderNotification } from "./template-render.service";
+import { buildScenarioTemplatePayloadCore } from "./template-payload-core";
 
 function toAbsoluteUrl(url: string | null): string | null {
   if (!url) return null;
@@ -19,17 +25,33 @@ function toAbsoluteUrl(url: string | null): string | null {
   return `${getCanonicalPublicAppUrl()}${url.startsWith("/") ? url : `/${url}`}`;
 }
 
-function buildTelegramPayload(prepared: PreparedNotificationPayload): {
+async function buildTelegramPayload(prepared: PreparedNotificationPayload): Promise<{
   text: string;
   replyMarkup?: TelegramReplyMarkup;
-} {
-  const ctaUrl = toAbsoluteUrl(prepared.content.ctaUrl);
-  const text = `${prepared.content.title}\n\n${prepared.content.body}`;
+  parseMode?: TelegramParseMode;
+}> {
+  // Шаблонный рендер (override из БД → дефолт реестра); переменные уже
+  // HTML-эскейпнуты, тело санитизировано → parse_mode HTML.
+  // null → текущий plain-text без parse_mode.
+  const rendered = await renderNotification(
+    prepared.scenario,
+    "TELEGRAM",
+    buildScenarioTemplatePayloadCore(prepared.scenario, prepared.context),
+  );
 
-  if (!ctaUrl) return { text };
+  const text = rendered
+    ? rendered.subject
+      ? `${rendered.subject}\n\n${rendered.body}`
+      : rendered.body
+    : `${prepared.content.title}\n\n${prepared.content.body}`;
+  const parseMode: TelegramParseMode | undefined = rendered ? "HTML" : undefined;
+
+  const ctaUrl = toAbsoluteUrl(prepared.content.ctaUrl);
+  if (!ctaUrl) return { text, parseMode };
 
   return {
     text,
+    parseMode,
     replyMarkup: {
       inline_keyboard: [[{ text: prepared.content.ctaLabel ?? "Открыть", url: ctaUrl }]],
     },
@@ -60,12 +82,13 @@ export async function sendTelegramNotification(params: {
   });
 
   try {
-    const rendered = buildTelegramPayload(params.prepared);
+    const rendered = await buildTelegramPayload(params.prepared);
     const channel = new TelegramChannel();
     await channel.sendMessage({
       chatId: params.telegramChatId,
       text: rendered.text,
       replyMarkup: rendered.replyMarkup,
+      parseMode: rendered.parseMode,
     });
 
     await markNotificationDeliveryRecord(delivery.id, {
