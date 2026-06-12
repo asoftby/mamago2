@@ -72,7 +72,7 @@ export function PlaceOffersSection({
               }}
             >
               Чему{" "}
-              <em style={{ fontFamily: "Georgia, serif", fontStyle: "italic", fontWeight: 400, color: "#C24E22" }}>
+              <em style={{ fontFamily: "var(--font-editorial)", fontStyle: "italic", fontWeight: 400, color: "#C24E22" }}>
                 научим
               </em>
             </h2>
