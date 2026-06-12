@@ -467,13 +467,19 @@ function ArticleBody({ blocks }: { blocks: ArticleMvpResolvedBlock[] }) {
     <section style={{ padding: "28px 0 12px" }}>
       <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 28px" }}>
         <div style={{ maxWidth: 720, margin: "0 auto" }}>
-          {contentBlocks.map((block, i) => (
+          {contentBlocks.map((block, i) => {
+            const textBlockIndex =
+              block.type === "text"
+                ? contentBlocks.slice(0, i + 1).filter((item) => item.type === "text").length - 1
+                : -1;
+
+            return (
             <div key={block.id} style={{ marginBottom: i < contentBlocks.length - 1 ? 48 : 0 }}>
               {block.type === "text" && (
                 <div
                   className="prose prose-lg max-w-none bn-body"
                   style={{ color: C.ink, fontFamily: "var(--font-serif), Georgia, serif", fontSize: 20, lineHeight: 1.7 }}
-                  dangerouslySetInnerHTML={{ __html: articleBlockHtmlForPublic(block.text, "text") }}
+                  dangerouslySetInnerHTML={{ __html: textBlockIndex >= 0 ? articleBlockHtmlForPublic(block.text, "text") : "" }}
                 />
               )}
               {block.type === "quote" && (
@@ -496,7 +502,8 @@ function ArticleBody({ blocks }: { blocks: ArticleMvpResolvedBlock[] }) {
                 </blockquote>
               )}
             </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </section>

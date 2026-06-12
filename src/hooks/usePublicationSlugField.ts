@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
   buildSlugPreview,
   normalizeSlug,
@@ -28,13 +28,8 @@ export function usePublicationSlugField({
   emptyFallback = "item",
   slugHistorySupported = false,
 }: UsePublicationSlugFieldOptions) {
-  const [wasSlugTouched, setWasSlugTouched] = useState(() => Boolean(persistedSlug?.trim()));
-
-  useEffect(() => {
-    if (persistedSlug?.trim() || slugLocked) {
-      setWasSlugTouched(true);
-    }
-  }, [persistedSlug, slugLocked]);
+  const [wasSlugTouchedManually, setWasSlugTouchedManually] = useState(() => Boolean(persistedSlug?.trim()));
+  const wasSlugTouched = wasSlugTouchedManually || Boolean(persistedSlug?.trim()) || slugLocked;
 
   const previewSlug = useMemo(
     () =>
@@ -51,7 +46,7 @@ export function usePublicationSlugField({
 
   const onSlugChange = useCallback(
     (raw: string) => {
-      setWasSlugTouched(true);
+      setWasSlugTouchedManually(true);
       setSlug(raw);
     },
     [setSlug],
@@ -61,7 +56,7 @@ export function usePublicationSlugField({
     (nextSlug: string | null | undefined) => {
       const value = nextSlug?.trim() ?? "";
       setSlug(value);
-      setWasSlugTouched(Boolean(value));
+      setWasSlugTouchedManually(Boolean(value));
     },
     [setSlug],
   );

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useMemo } from "react";
 import type { EventPageSession } from "@/lib/event/eventPageTypes";
 import { filterUpcomingSessions } from "@/lib/event/filterUpcomingSessions";
 
@@ -9,11 +9,8 @@ import { filterUpcomingSessions } from "@/lib/event/filterUpcomingSessions";
  * to avoid hydration mismatch when a session expires between render and hydration.
  */
 export function useUpcomingSessions(serverSessions: EventPageSession[]): EventPageSession[] {
-  const [sessions, setSessions] = useState(serverSessions);
-
-  useEffect(() => {
-    setSessions(filterUpcomingSessions(serverSessions, new Date()));
-  }, [serverSessions]);
-
-  return sessions;
+  return useMemo(
+    () => filterUpcomingSessions(serverSessions, new Date()),
+    [serverSessions],
+  );
 }

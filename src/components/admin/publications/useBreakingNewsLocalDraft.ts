@@ -5,7 +5,6 @@ import type { BreakingNewsFormState } from "@/lib/publications/breakingNewsArtic
 import {
   buildBreakingNewsLocalDraft,
   breakingNewsEditorComparable,
-  clearBreakingNewsLocalDrafts,
   getBreakingNewsDraftStorageKey,
   isBreakingNewsLocalDraftEmpty,
   readBreakingNewsLocalDraft,
@@ -41,14 +40,25 @@ export function useBreakingNewsLocalDraft(args: {
   const draftCheckedRef = useRef(false);
 
   useEffect(() => {
+    let cancelled = false;
     draftCheckedRef.current = false;
     persistEnabledRef.current = false;
-    setPendingDraft(null);
+    queueMicrotask(() => {
+      if (!cancelled) {
+        setPendingDraft(null);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
   }, [storageKey]);
 
   useEffect(() => {
     if (loadState !== "ready" || savedComparable === null) return;
     if (draftCheckedRef.current) return;
+
+    let cancelled = false;
     draftCheckedRef.current = true;
     persistEnabledRef.current = true;
 
@@ -56,9 +66,17 @@ export function useBreakingNewsLocalDraft(args: {
     if (!stored || isBreakingNewsLocalDraftEmpty(stored)) return;
 
     const storedComparable = breakingNewsEditorComparable(stored);
-    if (storedComparable !== savedComparable) {
-      setPendingDraft(stored);
-    }
+    if (storedComparable === savedComparable) return;
+
+    queueMicrotask(() => {
+      if (!cancelled) {
+        setPendingDraft(stored);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
   }, [loadState, savedComparable, storageKey]);
 
   useEffect(() => {
