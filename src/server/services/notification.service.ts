@@ -892,6 +892,95 @@ export async function markAllNotificationsAsRead(userId: string) {
   });
 }
 
+/**
+ * Батч-пометка прочитанности (read-tracker: viewport ≥ 3с / клик по карточке).
+ * Идемпотентна: трогает только записи владельца с readAt IS NULL.
+ */
+export async function markNotificationsRead(
+  userId: string,
+  ids: string[],
+): Promise<{ updatedCount: number }> {
+  if (ids.length === 0) return { updatedCount: 0 };
+  const now = new Date();
+  const result = await prisma.notification.updateMany({
+    where: { id: { in: ids }, userId, readAt: null },
+    data: { readAt: now, seenAt: now },
+  });
+  return { updatedCount: result.count };
+}
+
+/**
+ * Батч-архивация по ids. Идемпотентна; уважает lifecycle:
+ * unresolved action-required уведомления молча пропускаются
+ * (та же семантика, что у archiveAllRead).
+ */
+export async function archiveNotificationsByIds(
+  userId: string,
+  ids: string[],
+): Promise<{ updatedCount: number }> {
+  if (ids.length === 0) return { updatedCount: 0 };
+  await reconcileResolvedActionRequiredNotifications(userId);
+
+  const state = await getUserActionResolutionState(userId);
+  const candidates = await prisma.notification.findMany({
+    where: { id: { in: ids }, userId, archivedAt: null },
+    select: { id: true, type: true, entityId: true, metadata: true },
+  });
+
+  const archivableIds = candidates
+    .filter((notification) => canArchiveNotification(notification, state))
+    .map((notification) => notification.id);
+
+  if (archivableIds.length === 0) return { updatedCount: 0 };
+
+  const result = await prisma.notification.updateMany({
+    where: { id: { in: archivableIds } },
+    data: { archivedAt: new Date() },
+  });
+  return { updatedCount: result.count };
+}
+
+export type NotificationFeedTab = "inbox" | "unread" | "archive";
+
+/**
+ * Курсорная страница ленты для /notifications.
+ * Стабильный порядок (createdAt desc, id desc) — без группировки
+ * «непрочитанные первыми», иначе пометка read во время скролла
+ * сдвигала бы строки и курсор давал бы дубли/пропуски.
+ */
+export async function getNotificationsPage(
+  userId: string,
+  params: {
+    tab: NotificationFeedTab;
+    cursor?: string | null;
+    limit?: number;
+    stream?: NotificationStreamFilter;
+    options?: UserNotificationsQueryOptions;
+  },
+): Promise<{ items: NotificationModel[]; nextCursor: string | null }> {
+  const limit = Math.min(Math.max(params.limit ?? 15, 1), 100);
+
+  const where = {
+    ...buildNotificationBaseWhere(userId, params.stream, params.options),
+    ...(params.tab === "archive"
+      ? { archivedAt: { not: null } }
+      : params.tab === "unread"
+        ? { archivedAt: null, readAt: null }
+        : { archivedAt: null }),
+  } satisfies Prisma.NotificationWhereInput;
+
+  const rows = await prisma.notification.findMany({
+    where,
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    take: limit + 1,
+    ...(params.cursor ? { cursor: { id: params.cursor }, skip: 1 } : {}),
+  });
+
+  const hasMore = rows.length > limit;
+  const items = hasMore ? rows.slice(0, limit) : rows;
+  return { items, nextCursor: hasMore ? items[items.length - 1].id : null };
+}
+
 export async function getUnreadCount(
   userId: string,
   stream?: NotificationStreamFilter,

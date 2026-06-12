@@ -9,6 +9,9 @@ export async function POST() {
   }
 
   await reconcileResolvedActionRequiredNotifications(user.id);
-  await markAllNotificationsAsRead(user.id);
-  return NextResponse.json({ ok: true });
+  const result = await markAllNotificationsAsRead(user.id);
+  return NextResponse.json({ ok: true, updatedCount: result.count });
 }
+
+// Семантика идемпотентного обновления — PATCH; POST оставлен для обратной совместимости.
+export { POST as PATCH };

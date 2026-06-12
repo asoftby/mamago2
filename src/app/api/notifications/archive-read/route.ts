@@ -9,5 +9,8 @@ export async function POST() {
   }
 
   const result = await archiveAllRead(user.id);
-  return NextResponse.json({ ok: true, count: result.count });
+  return NextResponse.json({ ok: true, count: result.count, updatedCount: result.count });
 }
+
+// Семантика идемпотентного обновления — PATCH; POST оставлен для обратной совместимости.
+export { POST as PATCH };
