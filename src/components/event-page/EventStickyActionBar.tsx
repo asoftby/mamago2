@@ -2,20 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
-import { BYN_SYMBOL, normalizeUiCurrencyText } from "@/lib/formatters/format-price";
-import { BelarusianRubleIcon } from "@/components/icons/BelarusianRubleIcon";
+import { renderCurrencyText } from "@/components/icons/BelarusianRubleIcon";
+import { splitUiPriceLabel } from "@/lib/formatters/format-price";
 import { Heart } from "lucide-react";
-
-function renderPriceSuffix(text: string) {
-  if (!text) return null;
-  const parts = text.split(BYN_SYMBOL);
-
-  return parts.flatMap((part, index) => {
-    const chunk = part ? [<span key={`text-${index}`}>{part}</span>] : [];
-    if (index === parts.length - 1) return chunk;
-    return [...chunk, <BelarusianRubleIcon key={`byn-${index}`} />];
-  });
-}
 
 export interface EventStickyActionBarProps {
   ctaRef?: React.RefObject<HTMLElement | null>;
@@ -106,20 +95,17 @@ export function EventStickyActionBar({
             </p>
           )}
           {(() => {
-            const normalizedPriceLabel = normalizeUiCurrencyText(priceLabel ?? "");
-            const spaceIdx = normalizedPriceLabel.lastIndexOf(" ");
-            const numPart = spaceIdx !== -1 ? normalizedPriceLabel.slice(0, spaceIdx) : normalizedPriceLabel;
-            const currencyPart = spaceIdx !== -1 ? normalizedPriceLabel.slice(spaceIdx + 1) : "";
+            const { amount, suffix } = splitUiPriceLabel(priceLabel);
             return (
               <div className="flex items-baseline gap-1">
-                <span style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 36, fontWeight: 400, lineHeight: 1, letterSpacing: "-0.03em", color: "#141210" }}>
-                  {numPart}
+                <span style={{ fontFamily: "var(--font-display)", fontSize: 36, fontWeight: 400, lineHeight: 1, letterSpacing: "-0.03em", color: "#141210" }}>
+                  {amount}
                 </span>
-                {currencyPart && (
+                {suffix ? (
                   <span className="text-[11px] text-[rgba(20,18,16,0.55)]" style={{ fontFamily: "Menlo, monospace" }}>
-                    {renderPriceSuffix(currencyPart)}
+                    {renderCurrencyText(suffix, { iconSize: "sm" })}
                   </span>
-                )}
+                ) : null}
               </div>
             );
           })()}
@@ -133,7 +119,7 @@ export function EventStickyActionBar({
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={onPrimary}
-                className="inline-flex h-10 items-center gap-2 rounded-full bg-[#E86A3A] px-5 text-[14px] font-semibold text-white transition-colors hover:bg-[#C24E22]"
+                className="inline-flex h-10 items-center gap-2 rounded-full bg-[#E86A3A] px-5 text-[14px] font-semibold text-white transition-colors hover:bg-primary-hover"
               >
                 {isPrimaryLoading ? (
                   <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
@@ -145,7 +131,7 @@ export function EventStickyActionBar({
               <button
                 type="button"
                 onClick={onBook}
-                className="inline-flex h-10 items-center gap-2 rounded-full bg-[#E86A3A] px-5 text-[14px] font-semibold text-white transition-colors hover:bg-[#C24E22]"
+                className="inline-flex h-10 items-center gap-2 rounded-full bg-[#E86A3A] px-5 text-[14px] font-semibold text-white transition-colors hover:bg-primary-hover"
               >
                 Записаться
               </button>
@@ -198,20 +184,17 @@ export function EventStickyActionBar({
         )}
         <div className="mt-0.5 flex items-baseline gap-1">
           {(() => {
-            const normalizedPriceLabel = normalizeUiCurrencyText(priceLabel ?? "");
-            const spaceIdx = normalizedPriceLabel.lastIndexOf(" ");
-            const numPart = spaceIdx !== -1 ? normalizedPriceLabel.slice(0, spaceIdx) : normalizedPriceLabel;
-            const currencyPart = spaceIdx !== -1 ? normalizedPriceLabel.slice(spaceIdx + 1) : "";
+            const { amount, suffix } = splitUiPriceLabel(priceLabel);
             return (
               <>
-                <span style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 32, fontWeight: 400, lineHeight: 1, letterSpacing: "-0.03em", color: "#141210" }}>
-                  {numPart}
+                <span style={{ fontFamily: "var(--font-display)", fontSize: 32, fontWeight: 400, lineHeight: 1, letterSpacing: "-0.03em", color: "#141210" }}>
+                  {amount}
                 </span>
-                {currencyPart && (
+                {suffix ? (
                   <span className="text-[11px] text-[rgba(20,18,16,0.55)]" style={{ fontFamily: "Menlo, monospace" }}>
-                    {renderPriceSuffix(currencyPart)}
+                    {renderCurrencyText(suffix, { iconSize: "sm" })}
                   </span>
-                )}
+                ) : null}
               </>
             );
           })()}
@@ -224,7 +207,7 @@ export function EventStickyActionBar({
           target="_blank"
           rel="noopener noreferrer"
           onClick={onPrimary}
-          className="inline-flex h-[46px] shrink-0 items-center gap-2 rounded-full bg-[#E86A3A] px-5 text-[14px] font-semibold text-white transition-colors hover:bg-[#C24E22] active:translate-y-px"
+          className="inline-flex h-[46px] shrink-0 items-center gap-2 rounded-full bg-[#E86A3A] px-5 text-[14px] font-semibold text-white transition-colors hover:bg-primary-hover active:translate-y-px"
         >
           {isPrimaryLoading ? (
             <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
@@ -236,7 +219,7 @@ export function EventStickyActionBar({
         <button
           type="button"
           onClick={onBook}
-          className="inline-flex h-[46px] shrink-0 items-center gap-2 rounded-full bg-[#E86A3A] px-5 text-[14px] font-semibold text-white transition-colors hover:bg-[#C24E22] active:translate-y-px"
+          className="inline-flex h-[46px] shrink-0 items-center gap-2 rounded-full bg-[#E86A3A] px-5 text-[14px] font-semibold text-white transition-colors hover:bg-primary-hover active:translate-y-px"
         >
           Записаться
         </button>

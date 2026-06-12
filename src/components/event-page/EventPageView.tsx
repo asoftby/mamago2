@@ -18,18 +18,19 @@ import { publicActivityPath } from "@/lib/business/eventPublicLink";
 import { SaveActivityFlowAdaptive } from "@/components/activity/SaveActivityFlowAdaptive";
 import type { SaveToPlanResult } from "@/components/activity/SaveToPlanModal";
 import { useAuthMe } from "@/features/birthday/builder/hooks/useAuthMe";
+import { normalizeUiCurrencyText } from "@/lib/formatters/format-price";
+import { renderCurrencyText } from "@/components/icons/BelarusianRubleIcon";
 import { requestPlanRefetchForDate } from "@/lib/my-plan/myPlanOpenIntent";
 import { LocationBlock } from "@/components/shared/LocationBlock";
 import { EventRichDescription } from "./EventRichDescription";
 import { EventDecisionPanel } from "./EventDecisionPanel";
-import { EventMediaStack } from "./EventMediaStack";
 import { EventSessionSelector } from "./EventSessionSelector";
 import { EventStickyActionBar } from "./EventStickyActionBar";
 import { EventSimpleBookingModal } from "./EventSimpleBookingModal";
 import { SimilarEventsSection } from "./SimilarEventsSection";
 import { EventWhyGo } from "./EventWhyGo";
 import { EventGoodFit } from "./EventGoodFit";
-import { MediaGalleryStrip } from "@/components/media/MediaGalleryStrip";
+import { PublicationMediaColumn } from "@/components/media/PublicationMediaColumn";
 import { PublicationStatsPanel } from "@/components/publication-stats";
 import { MobileSmartBackButton } from "@/components/shared/MobileSmartBackButton";
 import { postAnalyticsEvent } from "@/lib/analytics/client";
@@ -151,7 +152,7 @@ function EventAboutEditorial({
             <h2
               style={{ fontSize: 30, fontWeight: 400, lineHeight: 1.3, letterSpacing: "-0.02em", color: "#141210" }}
             >
-              <span style={{ fontFamily: "var(--font-sans)" }}>Описание </span><span style={{ fontFamily: "Georgia, serif", fontStyle: "italic", color: "var(--primary)" }}>события</span>
+              <span style={{ fontFamily: "var(--font-sans)" }}>Описание </span><span style={{ fontFamily: "var(--font-editorial)", fontStyle: "italic", color: "var(--primary)" }}>события</span>
             </h2>
           </div>
 
@@ -271,9 +272,9 @@ function EventFinalCta({
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={onBuy}
-                className="inline-flex h-16 items-center gap-2 rounded-full bg-[#E86A3A] px-7 text-[17px] font-semibold text-white transition-colors hover:bg-[#C24E22] active:translate-y-px"
+                className="inline-flex h-16 items-center gap-2 rounded-full bg-[#E86A3A] px-7 text-[17px] font-semibold text-white transition-colors hover:bg-primary-hover active:translate-y-px"
               >
-                {buyLabel}&nbsp;{priceLabel} <span aria-hidden>→</span>
+                {buyLabel}&nbsp;{renderCurrencyText(normalizeUiCurrencyText(priceLabel), { iconSize: "sm" })} <span aria-hidden>→</span>
               </a>
             )}
             <button
@@ -582,21 +583,21 @@ export function EventPageView({ data }: { data: EventPageData }) {
           </div>
 
           {/* Mobile: media above decision panel */}
-          <div className="lg:hidden mb-8 space-y-2.5">
-            <EventMediaStack media={data.media} />
-            {data.galleryItems && data.galleryItems.length > 0 && (
-              <MediaGalleryStrip items={data.galleryItems} maxVisible={3} />
-            )}
+          <div className="lg:hidden mb-8">
+            <PublicationMediaColumn
+              media={data.media}
+              galleryItems={data.galleryItems}
+            />
           </div>
 
           {/* Desktop: two-column side-by-side (media left, decision panel right) */}
           <div className="grid grid-cols-1 gap-10 lg:grid-cols-[440px_1fr] lg:gap-14 lg:items-start">
             {/* Left: media stack + gallery strip (desktop only — mobile rendered above) */}
-            <div className="hidden lg:block space-y-2.5">
-              <EventMediaStack media={data.media} />
-              {data.galleryItems && data.galleryItems.length > 0 && (
-                <MediaGalleryStrip items={data.galleryItems} maxVisible={3} />
-              )}
+            <div className="hidden lg:block">
+              <PublicationMediaColumn
+                media={data.media}
+                galleryItems={data.galleryItems}
+              />
             </div>
 
             {/* Right: decision panel */}
@@ -644,7 +645,7 @@ export function EventPageView({ data }: { data: EventPageData }) {
                 <h2
                   style={{ fontSize: 30, fontWeight: 400, lineHeight: 1.3, letterSpacing: "-0.02em", color: "#141210" }}
                 >
-                  <span style={{ fontFamily: "var(--font-sans)" }}>Выбери </span><span style={{ fontFamily: "Georgia, serif", fontStyle: "italic", color: "var(--primary)" }}>удобное время.</span>
+                  <span style={{ fontFamily: "var(--font-sans)" }}>Выбери </span><span style={{ fontFamily: "var(--font-editorial)", fontStyle: "italic", color: "var(--primary)" }}>удобное время.</span>
                 </h2>
               </div>
               <span className="inline-flex h-7 items-center rounded-full border border-[rgba(20,18,16,0.18)] px-3 text-[13px] text-[#141210]" style={{ fontFamily: "Menlo, monospace" }}>
