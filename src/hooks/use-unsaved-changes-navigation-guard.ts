@@ -7,10 +7,13 @@ import { useRouter } from "next/navigation";
  * Предупреждение при уходе со страницы с несохранёнными изменениями:
  * - закрытие вкладки / обновление (beforeunload)
  * - переход по внутренним ссылкам (модальное подтверждение + router.push)
+ * - программная навигация через `requestLeave` (кнопки «Назад» / router.back)
  */
 export function useUnsavedChangesNavigationGuard(dirty: boolean) {
   const router = useRouter();
   const pendingPathRef = useRef<string | null>(null);
+  /** Отложенное программное действие навигации (requestLeave с callback) */
+  const pendingActionRef = useRef<(() => void) | null>(null);
   /** Чтобы onOpenChange не сбросил путь до router.push после подтверждения */
   const confirmingLeaveRef = useRef(false);
   const [leaveDialogOpen, setLeaveDialogOpen] = useState(false);
@@ -55,6 +58,7 @@ export function useUnsavedChangesNavigationGuard(dirty: boolean) {
   useEffect(() => {
     if (!dirty) {
       pendingPathRef.current = null;
+      pendingActionRef.current = null;
       confirmingLeaveRef.current = false;
       queueMicrotask(() => setLeaveDialogOpen(false));
     }
@@ -62,10 +66,16 @@ export function useUnsavedChangesNavigationGuard(dirty: boolean) {
 
   const confirmLeave = useCallback(() => {
     const p = pendingPathRef.current;
+    const action = pendingActionRef.current;
     pendingPathRef.current = null;
+    pendingActionRef.current = null;
     confirmingLeaveRef.current = true;
     setLeaveDialogOpen(false);
-    if (p) router.push(p);
+    if (action) {
+      action();
+    } else if (p) {
+      router.push(p);
+    }
     queueMicrotask(() => {
       confirmingLeaveRef.current = false;
     });
@@ -75,8 +85,33 @@ export function useUnsavedChangesNavigationGuard(dirty: boolean) {
     setLeaveDialogOpen(open);
     if (!open && !confirmingLeaveRef.current) {
       pendingPathRef.current = null;
+      pendingActionRef.current = null;
     }
   }, []);
 
-  return { leaveDialogOpen, confirmLeave, onLeaveDialogOpenChange };
+  /**
+   * Программная навигация под защитой guard'а: без несохранённых изменений
+   * выполняется сразу, иначе откладывается до подтверждения в диалоге.
+   * `target` — внутренний путь (router.push) или callback (например, router.back).
+   */
+  const requestLeave = useCallback(
+    (target: string | (() => void)) => {
+      if (!dirty) {
+        if (typeof target === "function") target();
+        else router.push(target);
+        return;
+      }
+      if (typeof target === "function") {
+        pendingActionRef.current = target;
+        pendingPathRef.current = null;
+      } else {
+        pendingPathRef.current = target;
+        pendingActionRef.current = null;
+      }
+      setLeaveDialogOpen(true);
+    },
+    [dirty, router],
+  );
+
+  return { leaveDialogOpen, confirmLeave, onLeaveDialogOpenChange, requestLeave };
 }

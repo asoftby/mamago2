@@ -9,3 +9,4 @@ export { FormStepSegments } from "./FormStepSegments";
 export { FormPrimaryContentCard } from "./FormPrimaryContentCard";
 export { FormStickyActionBar } from "./FormStickyActionBar";
 export { formWizardPhaseFromFlags } from "./formWizardPhase";
+export { SaveIndicator, formatRelativeTimeRu } from "./SaveIndicator";
