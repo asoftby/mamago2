@@ -31,6 +31,8 @@ import { EventLocation } from "./EventLocation";
 import { EventRichDescription } from "./EventRichDescription";
 import { EventStickyActionBar } from "./EventStickyActionBar";
 import { EventSessionSelector } from "./EventSessionSelector";
+import { normalizeUiCurrencyText } from "@/lib/formatters/format-price";
+import { renderCurrencyText } from "@/components/icons/BelarusianRubleIcon";
 
 /**
  * Конверсионная страница события (mamaGo 2.0).
@@ -495,7 +497,7 @@ export function ConversionEventPageView({ data }: { data: EventPageData }) {
                     )}
                     {item.priceLabel && (
                       <p className="mt-auto text-[14px] font-semibold text-foreground">
-                        {item.priceLabel}
+                        {renderCurrencyText(normalizeUiCurrencyText(item.priceLabel), { iconSize: "sm" })}
                       </p>
                     )}
                   </div>

@@ -6,6 +6,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Loader2 } from "lucide-react";
 import { ResponsiveOverlay } from "@/components/ui/responsive-overlay";
+import { renderCurrencyText } from "@/components/icons/BelarusianRubleIcon";
+import { normalizeUiCurrencyText } from "@/lib/formatters/format-price";
 import type { EventSimpleBookingData, EventBookingSlot } from "@/lib/event/eventPageTypes";
 
 /* ─────────────── validation ─────────────── */
@@ -292,7 +294,7 @@ export function EventSimpleBookingModal({
               </div>
               {priceLabel && (
                 <span style={{ fontFamily: "var(--font-display)", fontSize: 22, letterSpacing: "-.015em", color: "#141210", flexShrink: 0 }}>
-                  {priceLabel}
+                  {renderCurrencyText(normalizeUiCurrencyText(priceLabel))}
                 </span>
               )}
             </div>

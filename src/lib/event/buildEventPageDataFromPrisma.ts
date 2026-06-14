@@ -52,6 +52,7 @@ export type ActivityForEventPageInput = {
     lat: number | null;
     lng: number | null;
     logoImageId?: string | null;
+    logoUrl?: string;
     images?: Array<{ id: string; url: string; kind: string }>;
     districtManual: { name: string } | null;
     districtAuto: { name: string } | null;
@@ -72,6 +73,7 @@ export type ActivityForEventPageInput = {
       lat: number | null;
       lng: number | null;
       logoImageId: string | null;
+      logoUrl?: string;
       images: Array<{ id: string; url: string; kind: string }>;
       districtManual: { name: string } | null;
       districtAuto: { name: string } | null;
@@ -274,7 +276,8 @@ function venueFromActivity(
     const v = activity.venue;
     if (v.kind === "PLACE" && v.place) {
       const cityForPlace = v.place.city?.slug ?? listingCitySlug ?? fallbackCity;
-      const logoUrl = resolvePlaceLogoUrl(v.place.images, v.place.logoImageId);
+      const logoUrl =
+        v.place.logoUrl ?? resolvePlaceLogoUrl(v.place.images, v.place.logoImageId);
       return {
         name: v.place.title,
         logoUrl,
@@ -287,9 +290,26 @@ function venueFromActivity(
       };
     }
     if (v.title || v.addressLine) {
+      const linkedPlace = activity.place;
+      const cityForPlace = linkedPlace?.city?.slug ?? listingCitySlug ?? fallbackCity;
+      const logoUrl = linkedPlace
+        ? linkedPlace.logoUrl ??
+          resolvePlaceLogoUrl(linkedPlace.images, linkedPlace.logoImageId)
+        : undefined;
+
       return {
-        name: v.title ?? activity.title,
-        address: v.addressLine ?? undefined,
+        name: v.title ?? linkedPlace?.title ?? activity.title,
+        logoUrl,
+        address:
+          v.addressLine ??
+          linkedPlace?.customAddress ??
+          linkedPlace?.formattedAddr ??
+          undefined,
+        lat: linkedPlace?.lat ?? undefined,
+        lng: linkedPlace?.lng ?? undefined,
+        district: (linkedPlace?.districtManual ?? linkedPlace?.districtAuto)?.name ?? undefined,
+        metro: (linkedPlace?.metroManual ?? linkedPlace?.metroAuto)?.name ?? undefined,
+        placeHref: linkedPlace ? publicPlaceHref(cityForPlace, linkedPlace) : undefined,
         mapUrl:
           v.addressLine != null && v.addressLine.length > 0
             ? `https://maps.google.com/?q=${encodeURIComponent(v.addressLine)}`
@@ -300,7 +320,9 @@ function venueFromActivity(
   if (activity.place) {
     if (activity.format === "ONLINE") return undefined;
     const cityForPlace = activity.place.city?.slug ?? listingCitySlug ?? fallbackCity;
-    const logoUrl = resolvePlaceLogoUrl(activity.place.images, activity.place.logoImageId);
+    const logoUrl =
+      activity.place.logoUrl ??
+      resolvePlaceLogoUrl(activity.place.images, activity.place.logoImageId);
     return {
       name: activity.place.title,
       logoUrl,

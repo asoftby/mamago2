@@ -7,6 +7,7 @@ import { activityInCityWhere } from "@/server/discovery/activityInCityWhere";
 import type { ActivityForEventPageInput } from "@/lib/event/buildEventPageDataFromPrisma";
 import { findActivityBySlug } from "@/lib/slug/activitySlugService";
 import { resolveActivityCoverUrl } from "@/lib/event/resolveActivityCoverUrl";
+import { enrichPlaceWithResolvedLogo } from "@/lib/place/resolvePlaceLogoUrlFromDb";
 
 /**
  * Публичная карточка события по `/{city}/events/{slug|id}` (опубликовано и в городе).
@@ -115,6 +116,11 @@ export async function loadPublicActivityForCityPage(
 
   if (!activity) return null;
 
+  const [place, venuePlace] = await Promise.all([
+    enrichPlaceWithResolvedLogo(activity.place),
+    enrichPlaceWithResolvedLogo(activity.venue?.place ?? null),
+  ]);
+
   const redirectToSlug =
     activity.slug && slugOrId !== activity.slug ? activity.slug : undefined;
 
@@ -154,22 +160,23 @@ export async function loadPublicActivityForCityPage(
     }),
     images: activity.images.map((img) => ({ id: img.id, url: img.url })),
     sessions: activity.sessions.map((s) => ({ id: s.id, startsAt: s.startsAt })),
-    place: activity.place
+    place: place
       ? {
-          id: activity.place.id,
-          slug: activity.place.slug,
-          title: activity.place.title,
-          formattedAddr: activity.place.formattedAddr,
-          customAddress: activity.place.customAddress,
-          lat: activity.place.lat,
-          lng: activity.place.lng,
-          logoImageId: activity.place.logoImageId,
-          images: activity.place.images,
-          districtManual: activity.place.districtManual,
-          districtAuto: activity.place.districtAuto,
-          metroManual: activity.place.metroManual,
-          metroAuto: activity.place.metroAuto,
-          city: activity.place.city,
+          id: place.id,
+          slug: place.slug,
+          title: place.title,
+          formattedAddr: place.formattedAddr,
+          customAddress: place.customAddress,
+          lat: place.lat,
+          lng: place.lng,
+          logoImageId: place.logoImageId,
+          logoUrl: place.logoUrl,
+          images: place.images,
+          districtManual: place.districtManual,
+          districtAuto: place.districtAuto,
+          metroManual: place.metroManual,
+          metroAuto: place.metroAuto,
+          city: place.city,
         }
       : null,
     venue: activity.venue
@@ -177,22 +184,23 @@ export async function loadPublicActivityForCityPage(
           kind: activity.venue.kind,
           title: activity.venue.title,
           addressLine: activity.venue.addressLine,
-          place: activity.venue.place
+          place: venuePlace
             ? {
-                id: activity.venue.place.id,
-                slug: activity.venue.place.slug,
-                title: activity.venue.place.title,
-                formattedAddr: activity.venue.place.formattedAddr,
-                customAddress: activity.venue.place.customAddress,
-                lat: activity.venue.place.lat,
-                lng: activity.venue.place.lng,
-                logoImageId: activity.venue.place.logoImageId,
-                images: activity.venue.place.images,
-                districtManual: activity.venue.place.districtManual,
-                districtAuto: activity.venue.place.districtAuto,
-                metroManual: activity.venue.place.metroManual,
-                metroAuto: activity.venue.place.metroAuto,
-                city: activity.venue.place.city,
+                id: venuePlace.id,
+                slug: venuePlace.slug,
+                title: venuePlace.title,
+                formattedAddr: venuePlace.formattedAddr,
+                customAddress: venuePlace.customAddress,
+                lat: venuePlace.lat,
+                lng: venuePlace.lng,
+                logoImageId: venuePlace.logoImageId,
+                logoUrl: venuePlace.logoUrl,
+                images: venuePlace.images,
+                districtManual: venuePlace.districtManual,
+                districtAuto: venuePlace.districtAuto,
+                metroManual: venuePlace.metroManual,
+                metroAuto: venuePlace.metroAuto,
+                city: venuePlace.city,
               }
             : null,
         }
