@@ -5,7 +5,7 @@
  */
 
 import prisma from "@/lib/prisma";
-import { BusinessVerificationStatus } from "@prisma/client";
+import { BusinessMemberRole, BusinessVerificationStatus } from "@prisma/client";
 
 /**
  * Submit business for verification
@@ -109,7 +109,7 @@ export async function approve(
 ): Promise<void> {
   const business = await prisma.business.findUnique({
     where: { id: businessId },
-    select: { verificationStatus: true },
+    select: { verificationStatus: true, ownerUserId: true },
   });
 
   if (!business) {
@@ -143,6 +143,19 @@ export async function approve(
     }),
     prisma.businessVerificationLog.create({
       data: { businessId, statusFrom, statusTo, note: note || "Approved", reviewedByUserId: actorUserId },
+    }),
+    // Establish the canonical OWNER membership so cabinet access no longer
+    // depends on the transitional Business.ownerUserId fallback in
+    // getPartnerCabinetBusiness. Idempotent on the [businessId, userId] unique.
+    prisma.businessMember.upsert({
+      where: { businessId_userId: { businessId, userId: business.ownerUserId } },
+      create: {
+        businessId,
+        userId: business.ownerUserId,
+        role: BusinessMemberRole.OWNER,
+        isActive: true,
+      },
+      update: { role: BusinessMemberRole.OWNER, isActive: true },
     }),
   ]);
 

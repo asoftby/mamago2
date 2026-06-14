@@ -22,7 +22,7 @@ import type {
 import { getScenarioMeta } from "../scenario-meta";
 import { ScenarioEnabledToggle, ScenarioTestSendButton } from "./ScenarioPageActions";
 import { ScenarioTabNav } from "./ScenarioTabNav";
-import { TemplatesTab, type SavedTemplate } from "./TemplatesTab";
+import { TemplatesTab, type SavedTemplate, type ScenarioDefinitionProps } from "./TemplatesTab";
 import { PolicyEditForm } from "./PolicyEditForm";
 
 export const dynamic = "force-dynamic";
@@ -137,6 +137,13 @@ export default async function AdminScenarioPage({
 
   // Templates tab data — only fetched when needed
   const definition = getNotificationScenarioDefinition(key);
+  // Extract plain serializable props — Zod payloadSchema cannot cross the RSC boundary
+  const scenarioDef: ScenarioDefinitionProps | null = definition
+    ? {
+        variables: Object.keys(definition.payloadSchema.shape),
+        defaults: definition.defaults,
+      }
+    : null;
   let savedTemplates: SavedTemplate[] = [];
   let hasTelegramLinked = false;
 
@@ -396,17 +403,17 @@ export default async function AdminScenarioPage({
         </div>
       )}
 
-      {activeTab === "templates" && definition && (
+      {activeTab === "templates" && scenarioDef && (
         <TemplatesTab
           scenarioKey={key}
-          definition={definition}
+          scenarioDef={scenarioDef}
           savedTemplates={savedTemplates}
           initialChannel={initialChannel}
           hasTelegramLinked={hasTelegramLinked}
         />
       )}
 
-      {activeTab === "templates" && !definition && (
+      {activeTab === "templates" && !scenarioDef && (
         <div className="rounded-3xl border border-amber-200 bg-amber-50 px-6 py-10 text-center text-sm text-amber-800">
           Определение сценария не найдено в реестре — шаблоны недоступны.
         </div>

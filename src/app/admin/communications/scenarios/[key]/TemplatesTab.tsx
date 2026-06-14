@@ -8,9 +8,15 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import type { NotificationScenarioDefinition, ScenarioTemplateDefault } from "@/lib/notifications/notificationRegistry";
+import type { ScenarioTemplateDefault } from "@/lib/notifications/notificationRegistry";
 
 type Channel = "IN_APP" | "EMAIL" | "TELEGRAM";
+
+/** Plain serializable version of the scenario definition — no Zod objects. */
+export type ScenarioDefinitionProps = {
+  variables: string[];
+  defaults: Partial<Record<Channel, ScenarioTemplateDefault>>;
+};
 
 export type SavedTemplate = {
   channel: Channel;
@@ -23,7 +29,7 @@ export type SavedTemplate = {
 type TemplateEditorProps = {
   scenarioKey: string;
   channel: Channel;
-  definition: NotificationScenarioDefinition;
+  scenarioDef: ScenarioDefinitionProps;
   savedTemplate: SavedTemplate | null;
   hasTelegramLinked: boolean;
   onSaved: (template: SavedTemplate) => void;
@@ -74,15 +80,15 @@ function VariableHints({
 function TemplateEditor({
   scenarioKey,
   channel,
-  definition,
+  scenarioDef,
   savedTemplate,
   hasTelegramLinked,
   onSaved,
   onReset,
 }: TemplateEditorProps) {
   const router = useRouter();
-  const defaultEntry = definition.defaults[channel] as ScenarioTemplateDefault | undefined;
-  const variables = Object.keys(definition.payloadSchema.shape);
+  const defaultEntry = scenarioDef.defaults[channel] as ScenarioTemplateDefault | undefined;
+  const variables = scenarioDef.variables;
 
   const initialSubject = savedTemplate?.subject ?? (
     defaultEntry?.kind === "template" ? (defaultEntry.subject ?? "") : ""
@@ -432,7 +438,7 @@ function TemplateEditor({
 
 type TemplatesTabProps = {
   scenarioKey: string;
-  definition: NotificationScenarioDefinition;
+  scenarioDef: ScenarioDefinitionProps;
   savedTemplates: SavedTemplate[];
   initialChannel: Channel;
   hasTelegramLinked: boolean;
@@ -440,13 +446,13 @@ type TemplatesTabProps = {
 
 export function TemplatesTab({
   scenarioKey,
-  definition,
+  scenarioDef,
   savedTemplates,
   initialChannel,
   hasTelegramLinked,
 }: TemplatesTabProps) {
   const availableChannels = (["IN_APP", "EMAIL", "TELEGRAM"] as Channel[]).filter(
-    (ch) => ch in definition.defaults,
+    (ch) => ch in scenarioDef.defaults,
   );
 
   const activeChannel = availableChannels.includes(initialChannel) ? initialChannel : availableChannels[0];
@@ -506,7 +512,7 @@ export function TemplatesTab({
               <TemplateEditor
                 scenarioKey={scenarioKey}
                 channel={ch}
-                definition={definition}
+                scenarioDef={scenarioDef}
                 savedTemplate={templates[ch]}
                 hasTelegramLinked={hasTelegramLinked}
                 onSaved={(t) => handleSaved(ch, t)}

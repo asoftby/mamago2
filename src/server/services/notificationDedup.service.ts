@@ -108,7 +108,12 @@ const DEDUP_WINDOWS: Record<NotificationType, number | null> = {
   BUSINESS_VERIFIED: null,
   BUSINESS_REJECTED: null,
   BUSINESS_NEEDS_INFO: null,
-  BUSINESS_APPLICATION_CREATED: null,
+  // Повторная подача после NEEDS_INFO/REJECTED — легитимное событие: эти типы
+  // не one-time (null), иначе delivery-дедуп подавлял бы Telegram/email при
+  // ресабмите навсегда. Окно тут только против даблклика по submit; короткий
+  // 5-минутный гард для in-app живёт в notification.service.
+  BUSINESS_VERIFICATION_SUBMITTED: 1,
+  BUSINESS_APPLICATION_CREATED: 1,
   ADMIN_MODERATION_ITEM_CREATED: null,
 
   // System notifications (no dedup needed)

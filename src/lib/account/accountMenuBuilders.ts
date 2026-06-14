@@ -164,13 +164,19 @@ export function buildPublicSiteAccountModel(input: {
       businessLabel: "MamaGo",
       ctaBlock: hasBusinessProfile
         ? undefined
-        : {
-            title: "Нужен бизнес-профиль?",
-            actionLabel: "Подключить бизнес",
-            onAction: () => {
-              onGoToBusinessAccount();
+        : user.businessVerificationStatus === "PENDING"
+          ? {
+              variant: "pending" as const,
+              title: "Ваша заявка на проверке",
+            }
+          : {
+              variant: "connect" as const,
+              title: "Нужен бизнес-профиль?",
+              actionLabel: "Подключить бизнес",
+              onAction: () => {
+                onGoToBusinessAccount();
+              },
             },
-          },
       onLogout,
       logoutMode: "fetch",
       loggingOut,
