@@ -11,6 +11,7 @@ import {
   ALLOWED_UPLOAD_MIME_TYPES,
   ALLOWED_UPLOAD_MIME_TYPE_SET,
   MAX_UPLOAD_SIZE_MB,
+  getFileTooLargeMessage,
   normalizeUploadMimeType,
 } from "@/lib/uploads/uploadConfig";
 
@@ -85,7 +86,10 @@ export function validateImageFile(
   if (sizeBytes > maxBytes) {
     return {
       valid: false,
-      error: `File too large: ${(sizeBytes / 1024 / 1024).toFixed(2)}MB. Max: ${config.maxUploadSizeMB}MB`,
+      error:
+        config.maxUploadSizeMB === MAX_UPLOAD_SIZE_MB
+          ? getFileTooLargeMessage()
+          : `Файл слишком большой. Максимальный размер — ${config.maxUploadSizeMB} МБ.`,
     };
   }
 

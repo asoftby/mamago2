@@ -9,14 +9,29 @@ import {
   FormPrimaryContentCard,
   FormStickyActionBar,
   formWizardPhaseFromFlags,
+  SaveIndicator,
+  formatRelativeTimeRu,
 } from "@/components/form-shell";
 import { WizardProgress } from "@/components/ui/wizard-progress";
 import { getBusinessFormActionLabels, businessFormCopy } from "../businessFormLabels";
 import { canPublishContentDirectly } from "@/lib/auth/businessContentAccess";
 import { useWizardSession } from "@/hooks/useWizardSession";
+import { useWizardDraft } from "@/hooks/useWizardDraft";
+import { useUnsavedChangesNavigationGuard } from "@/hooks/use-unsaved-changes-navigation-guard";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
 
 import type { PlaceFormData, PlaceWizardMode } from "./types";
-import type { Place } from "@prisma/client";
+import type { Place, ContentStatus } from "@prisma/client";
 import { createClientSavePerf } from "@/lib/perf/clientSavePerf";
 import { WIZARD_STEPS, TOTAL_STEPS, getStepLabel } from "./config";
 import { getDefaultFormData, hasMeaningfulContent } from "./defaults";
@@ -38,8 +53,7 @@ import {
 } from "@/lib/content-editor/types";
 import type { Role } from "@prisma/client";
 import { navigateToCompatibleHref } from "@/lib/routing/clientNavigation";
-
-const LOCAL_STORAGE_KEY = "place-wizard-draft";
+import { PlaceStatusBadge } from "@/components/business/place/PlaceStatusBadge";
 
 /**
  * Validate returnTo URL to prevent open redirects
@@ -74,6 +88,8 @@ interface PlaceWizardProps {
   returnTo?: string;
   /** Серверный `?step=` — чтобы не было гонки с начальным состоянием шага. */
   initialEditStep?: number;
+  /** Активная ревизия для overlay-статуса (только edit mode). */
+  activeRevision?: { id: string; status: string } | null;
 }
 
 /** POST /api/business/places expects { createRequestId, status, data } — not a flat payload. */
@@ -109,6 +125,7 @@ export function PlaceWizard({
   contentEditorNav,
   returnTo,
   initialEditStep,
+  activeRevision,
 }: PlaceWizardProps) {
   const router = useRouter();
   const surface: ContentEditorSurface = editorSurface ?? "business";
@@ -132,39 +149,46 @@ export function PlaceWizard({
     if (mode === "edit" && place) {
       return mapPlaceToFormData(place);
     }
-
-    // Create mode: try to restore from localStorage
-    if (mode === "create") {
-      try {
-        const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          return { ...getDefaultFormData(), ...parsed };
-        }
-      } catch (e) {
-        console.error("Failed to restore draft:", e);
-      }
-    }
-
     return getDefaultFormData();
   });
 
   const [isSaving, setIsSaving] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
+  const [autosaveError, setAutosaveError] = useState(false);
   const [originalData, setOriginalData] = useState<PlaceFormData>(() =>
     mode === "edit" && place ? mapPlaceToFormData(place) : getDefaultFormData()
   );
   const autosaveInFlightRef = useRef(false);
+  const pendingAutosaveChangesRef = useRef<Record<string, unknown> | null>(null);
 
-  /** Stable idempotency key for create — must match API contract. */
-  const [createRequestId] = useState(() => {
-    if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-      return crypto.randomUUID();
-    }
-    // Fallback for non-secure contexts
-    return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+  // isDirty: формула изменилась относительно baseline
+  const isDirty = useMemo(
+    () => JSON.stringify(formData) !== JSON.stringify(originalData),
+    [formData, originalData],
+  );
+
+  // ── useWizardDraft (create mode: LS-черновик + resume-баннер) ───────────────
+  const PLACE_WIZARD_SCHEMA_VERSION = 1;
+  const draft = useWizardDraft<PlaceFormData>({
+    wizardType: "place",
+    mode,
+    entityId: mode === "edit" ? place?.id ?? null : null,
+    schemaVersion: PLACE_WIZARD_SCHEMA_VERSION,
+    data: formData,
+    enabled: mode === "create" ? hasMeaningfulContent(formData) : isDirty,
   });
+
+  // createRequestId: для create — берём из draft (стабильный UUID)
+  const createRequestId = draft.createRequestId;
+
+  // ── Navigation guard ────────────────────────────────────────────────────────
+  const guardActive =
+    (mode === "create" && hasMeaningfulContent(formData) && !isSubmitting) ||
+    (mode === "edit" && isDirty && !isSaving && !isSubmitting);
+
+  const { leaveDialogOpen, confirmLeave, onLeaveDialogOpenChange, requestLeave } =
+    useUnsavedChangesNavigationGuard(guardActive);
 
   // Wizard session for temp media
   const { wizardSessionId, clearSession } = useWizardSession({
@@ -176,21 +200,15 @@ export function PlaceWizard({
   // Autosave effect
   useEffect(() => {
     if (mode === "create") {
-      // Local autosave for create mode
-      const timer = setTimeout(() => {
-        if (hasMeaningfulContent(formData)) {
-          try {
-            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(formData));
-            setLastSaved(new Date());
-          } catch (e) {
-            console.error("Failed to save draft:", e);
-          }
-        }
-      }, 1000);
-
-      return () => clearTimeout(timer);
+      // Create mode: draft autosave handled by useWizardDraft hook
+      return;
     } else if (mode === "edit") {
-      // API autosave for edit mode
+      // API autosave for edit mode — only for draft/non-published or admin.
+      // Published non-admin edits go through revision flow on explicit save/submit.
+      const isPublished = place?.status === "PUBLISHED";
+      const isAdmin = userRole === "ADMIN";
+      if (isPublished && !isAdmin) return;
+
       if (isSaving || isSubmitting || autosaveInFlightRef.current) {
         return;
       }
@@ -203,12 +221,13 @@ export function PlaceWizard({
 
       return () => clearTimeout(timer);
     }
-  }, [formData, mode, originalData, isSaving, isSubmitting]);
+  }, [formData, mode, originalData, isSaving, isSubmitting, place?.status, userRole]);
 
   // Auto-save for edit mode
-  const handleAutoSave = async (changes: Record<string, unknown>) => {
+  const handleAutoSave = useCallback(async (changes: Record<string, unknown>) => {
     if (!place?.id || autosaveInFlightRef.current || isSaving || isSubmitting) return;
 
+    pendingAutosaveChangesRef.current = changes;
     try {
       autosaveInFlightRef.current = true;
       const perf = createClientSavePerf("save-place:client", {
@@ -220,18 +239,22 @@ export function PlaceWizard({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(changes),
       });
+      perf.log({ status: response.status, mode: "autosave" });
 
       if (response.ok) {
         setLastSaved(new Date());
+        setAutosaveError(false);
         setOriginalData((prev) => ({ ...prev, ...changes }));
+        pendingAutosaveChangesRef.current = null;
+      } else {
+        setAutosaveError(true);
       }
-      perf.log({ status: response.status, mode: "autosave" });
-    } catch (error) {
-      console.error("Autosave failed:", error);
+    } catch {
+      setAutosaveError(true);
     } finally {
       autosaveInFlightRef.current = false;
     }
-  };
+  }, [place?.id, isSaving, isSubmitting]);
 
   // Update form data
   const handleChange = useCallback(
@@ -258,7 +281,7 @@ export function PlaceWizard({
   const handlePrev = () => {
     // On first step, go back to where user came from
     if (currentStep === 1) {
-      router.push(afterSubmitDestination);
+      requestLeave(afterSubmitDestination);
       return;
     }
 
@@ -268,7 +291,8 @@ export function PlaceWizard({
   };
 
   const handleGoToStep = (step: number) => {
-    if (step >= 1 && step <= TOTAL_STEPS) {
+    // Allow backward navigation freely; forward only up to currentStep+1 (sequential)
+    if (step >= 1 && step <= TOTAL_STEPS && (step <= currentStep + 1 || step < currentStep)) {
       setCurrentStep(step);
     }
   };
@@ -309,9 +333,7 @@ export function PlaceWizard({
 
         const result = await response.json();
 
-        // Clear local draft
-        localStorage.removeItem(LOCAL_STORAGE_KEY);
-
+        draft.markClean();
         toast.success("Черновик сохранен");
 
         if (onComplete) {
@@ -380,10 +402,6 @@ export function PlaceWizard({
         return;
       }
 
-      console.log("[PlaceWizard] Saving changes:", changes);
-      console.log("[PlaceWizard] Place status:", formData.status);
-      console.log("[PlaceWizard] User role:", userRole);
-
       // ADMIN может редактировать опубликованные места напрямую
       // Остальные пользователи должны создавать ревизию
       const isPublished = formData.status === "PUBLISHED";
@@ -391,50 +409,61 @@ export function PlaceWizard({
       const needsRevision = isPublished && !isAdmin;
 
       if (needsRevision) {
-        console.log("[PlaceWizard] Published place (non-admin) - using revision flow");
-
         // 1. Получить или создать ревизию
-        const revisionResponse = await fetch(`/api/business/places/${place.id}/revision`, {
-          method: "GET",
-        });
+        const revisionResponse = await fetch(`/api/business/places/${place.id}/revision`);
 
         if (!revisionResponse.ok) {
           const errorText = await revisionResponse.text();
-          console.error("[PlaceWizard] Failed to get revision:", errorText);
-          throw new Error("Не удалось создать ревизию");
+          const errorData = parseJsonErrorPayload(errorText);
+          throw new Error(errorData.message || errorData.error || "Не удалось создать ревизию");
         }
 
         const { revision } = await revisionResponse.json();
-        console.log("[PlaceWizard] Got revision:", revision.id);
 
-        // 2. Сохранить изменения в ревизию
-        const saveResponse = await fetch(`/api/business/places/${place.id}/revision`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            revisionId: revision.id,
-            data: changes,
-          }),
-        });
+        // 2. Сохранить изменения данных в ревизию
+        if (Object.keys(changes).length > 0) {
+          const saveResponse = await fetch(`/api/business/places/${place.id}/revision`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ revisionId: revision.id, data: changes }),
+          });
 
-        console.log("[PlaceWizard] Revision save response:", saveResponse.status, saveResponse.statusText);
-
-        if (!saveResponse.ok) {
-          const errorText = await saveResponse.text();
-          console.error("[PlaceWizard] Failed to save revision:", errorText);
-          const errorData = parseJsonErrorPayload(errorText);
-
-          const errorMessage = errorData.message || errorData.error || "Failed to save revision";
-          throw new Error(errorMessage);
+          if (!saveResponse.ok) {
+            const errorData = parseJsonErrorPayload(await saveResponse.text());
+            throw new Error(errorData.message || errorData.error || "Failed to save revision");
+          }
         }
 
-        console.log("[PlaceWizard] Revision saved successfully");
+        // 3. Сохранить изменения режима работы в ревизию
+        if (openingHoursChanged && formData.openingHoursData !== null) {
+          const ohResponse = await fetch(`/api/business/places/${place.id}/revision/opening-hours`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ revisionId: revision.id, data: formData.openingHoursData }),
+          });
+
+          if (!ohResponse.ok) {
+            const errorData = await ohResponse.json().catch(() => ({}));
+            throw new Error(errorData.message || errorData.error || "Failed to save opening hours revision");
+          }
+        }
+
+        // 4. Отправить ревизию на модерацию
+        const submitResponse = await fetch(`/api/business/places/${place.id}/revision/submit`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ revisionId: revision.id }),
+        });
+
+        if (!submitResponse.ok) {
+          const errorData = await submitResponse.json().catch(() => ({}));
+          throw new Error(errorData.message || errorData.error || "Failed to submit revision");
+        }
+
         setOriginalData(formData);
         toast.success("Изменения отправлены на модерацию");
       } else {
         // Для черновиков или ADMIN - прямое сохранение
-        console.log("[PlaceWizard] Direct save:", isAdmin ? "(ADMIN)" : "(DRAFT)");
-
         if (Object.keys(changes).length > 0) {
           const response = await fetch(`/api/business/places/${place.id}`, {
             method: "PATCH",
@@ -442,22 +471,9 @@ export function PlaceWizard({
             body: JSON.stringify(changes),
           });
 
-          console.log("[PlaceWizard] Response status:", response.status, response.statusText);
-
           if (!response.ok) {
-            const errorText = await response.text();
-            console.error("[PlaceWizard] Error response text:", errorText);
-            const errorData = parseJsonErrorPayload(errorText);
-
-            console.error("[PlaceWizard] Failed to save place:", {
-              status: response.status,
-              statusText: response.statusText,
-              error: errorData,
-              changes,
-            });
-
-            const errorMessage = errorData.message || errorData.error || "Failed to save";
-            throw new Error(errorMessage);
+            const errorData = parseJsonErrorPayload(await response.text());
+            throw new Error(errorData.message || errorData.error || "Failed to save");
           }
         }
 
@@ -474,7 +490,6 @@ export function PlaceWizard({
           }
         }
 
-        console.log("[PlaceWizard] Save successful");
         setOriginalData(formData);
         toast.success("Изменения сохранены");
       }
@@ -512,7 +527,6 @@ export function PlaceWizard({
       return;
     }
 
-    console.time("[publish:place:client]");
     setIsSubmitting(true);
 
     try {
@@ -543,9 +557,7 @@ export function PlaceWizard({
 
         const result = await response.json();
 
-        // Clear local draft
-        localStorage.removeItem(LOCAL_STORAGE_KEY);
-
+        draft.markClean();
         toast.success(
           publishDirect ? "Место опубликовано" : "Место отправлено на модерацию",
         );
@@ -596,21 +608,57 @@ export function PlaceWizard({
             setOriginalData(formData);
             toast.success("Изменения сохранены");
           } else {
-          // Non-admin: create revision for published place
+          // Non-admin: create/update revision for published place and submit
           const changes = extractChanges(formData, originalData);
+          const openingHoursChanged =
+            JSON.stringify(formData.openingHoursData) !== JSON.stringify(originalData.openingHoursData);
 
-          const response = await fetch(`/api/business/places/${place.id}/revision`, {
+          // 1. Получить или создать ревизию
+          const revisionResponse = await fetch(`/api/business/places/${place.id}/revision`);
+          if (!revisionResponse.ok) {
+            const errorData = await revisionResponse.json().catch(() => ({}));
+            throw new Error(errorData.message || errorData.error || "Не удалось создать ревизию");
+          }
+          const { revision } = await revisionResponse.json();
+
+          // 2. Сохранить данные в ревизию
+          if (Object.keys(changes).length > 0) {
+            const saveResponse = await fetch(`/api/business/places/${place.id}/revision`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ revisionId: revision.id, data: changes }),
+            });
+            if (!saveResponse.ok) {
+              const errorData = await saveResponse.json().catch(() => ({}));
+              throw new Error(errorData.message || errorData.error || "Failed to save revision");
+            }
+          }
+
+          // 3. Сохранить режим работы в ревизию
+          if (openingHoursChanged && formData.openingHoursData !== null) {
+            const ohResponse = await fetch(
+              `/api/business/places/${place.id}/revision/opening-hours`,
+              {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ revisionId: revision.id, data: formData.openingHoursData }),
+              },
+            );
+            if (!ohResponse.ok) {
+              const errorData = await ohResponse.json().catch(() => ({}));
+              throw new Error(errorData.message || errorData.error || "Failed to save opening hours revision");
+            }
+          }
+
+          // 4. Отправить ревизию на модерацию
+          const submitResponse = await fetch(`/api/business/places/${place.id}/revision/submit`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              changes,
-              openingHoursData: formData.openingHoursData,
-            }),
+            body: JSON.stringify({ revisionId: revision.id }),
           });
-
-          if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.message || error.error || "Failed to submit revision");
+          if (!submitResponse.ok) {
+            const errorData = await submitResponse.json().catch(() => ({}));
+            throw new Error(errorData.message || errorData.error || "Failed to submit revision");
           }
 
           setOriginalData(formData);
@@ -697,7 +745,6 @@ export function PlaceWizard({
       console.error("Submit error:", error);
       toast.error(error instanceof Error ? error.message : "Ошибка отправки");
     } finally {
-      console.timeEnd("[publish:place:client]");
       setIsSubmitting(false);
     }
   };
@@ -771,7 +818,39 @@ export function PlaceWizard({
           TOTAL_STEPS,
           getStepLabel(currentStep)
         )}
-        trailing={lastSaved ? businessFormCopy.savedAt(lastSaved) : undefined}
+        trailing={
+          <div className="flex flex-col items-end gap-1">
+            {mode === "edit" && place && (
+              <PlaceStatusBadge
+                status={place.status as ContentStatus}
+                hasActiveRevision={!!activeRevision}
+                revisionStatus={activeRevision?.status}
+              />
+            )}
+            {mode === "edit" ? (
+              <SaveIndicator
+                status={autosaveError ? "error" : isSaving ? "saving" : lastSaved ? "saved" : "idle"}
+                lastSavedAt={lastSaved}
+                onRetry={
+                  autosaveError && pendingAutosaveChangesRef.current
+                    ? () => {
+                        setAutosaveError(false);
+                        if (pendingAutosaveChangesRef.current) {
+                          handleAutoSave(pendingAutosaveChangesRef.current);
+                        }
+                      }
+                    : undefined
+                }
+              />
+            ) : (
+              <SaveIndicator
+                status={draft.status}
+                lastSavedAt={draft.lastSavedAt}
+                onRetry={draft.status === "error" ? draft.retry : undefined}
+              />
+            )}
+          </div>
+        }
       >
         <div className="space-y-3">
           <WizardProgress
@@ -784,6 +863,35 @@ export function PlaceWizard({
           </div>
         </div>
       </FormWizardHeader>
+
+      {/* Resume-баннер черновика (только create mode) */}
+      {mode === "create" && draft.hasDraft && (
+        <div className="mx-auto w-full max-w-4xl px-4 pt-4 sm:px-6">
+          <div className="flex flex-col gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-amber-900">
+              У вас есть незавершённый черновик
+              {draft.draftSavedAt
+                ? ` (${formatRelativeTimeRu(draft.draftSavedAt)})`
+                : ""}
+              . Продолжить с него?
+            </p>
+            <div className="flex shrink-0 gap-2">
+              <Button variant="outline" size="sm" onClick={() => draft.discardDraft()}>
+                Начать заново
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => {
+                  const restored = draft.restoreDraft();
+                  if (restored) setFormData(restored);
+                }}
+              >
+                Продолжить
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <FormPrimaryContentCard>{renderStep()}</FormPrimaryContentCard>
 
@@ -811,6 +919,23 @@ export function PlaceWizard({
           !stepValidation.isValid || isSubmitting || isSaving
         }
       />
+
+      <AlertDialog open={leaveDialogOpen} onOpenChange={onLeaveDialogOpenChange}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Уйти со страницы?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {mode === "create"
+                ? "Черновик остаётся на этом устройстве — вы сможете продолжить позже."
+                : "Изменения ещё не сохранены. Уйти?"}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Остаться</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmLeave}>Уйти</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </FormWizardShell>
   );
 }

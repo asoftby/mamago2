@@ -5,7 +5,11 @@ import { Upload, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useImageUpload, type UploadedImage } from "@/hooks/useImageUpload";
 import { useRouter } from "next/navigation";
-import { UPLOAD_IMAGE_ACCEPT, UPLOAD_IMAGE_FORMATS_LABEL } from "@/lib/uploads/uploadConfig";
+import {
+  MAX_IMAGE_FILE_SIZE_MB,
+  UPLOAD_IMAGE_ACCEPT,
+  getUploadHintText,
+} from "@/lib/uploads/uploadConfig";
 
 interface AdminMediaUploaderProps {
   onUploadComplete?: () => void;
@@ -17,7 +21,7 @@ export function AdminMediaUploader({ onUploadComplete }: AdminMediaUploaderProps
   const [uploadedImages, setUploadedImages] = useState<UploadedImage[]>([]);
 
   const { uploadImage, uploading, progress } = useImageUpload({
-    maxSizeMB: 10,
+    maxSizeMB: MAX_IMAGE_FILE_SIZE_MB,
     maxWidthOrHeight: 4096,
     quality: 0.9,
     onUploadComplete: (image) => {
@@ -96,7 +100,7 @@ export function AdminMediaUploader({ onUploadComplete }: AdminMediaUploaderProps
                 Нажмите или перетащите изображения
               </p>
               <p className="text-xs text-gray-500 mt-1">
-                {UPLOAD_IMAGE_FORMATS_LABEL} до 10MB
+                {getUploadHintText()}
               </p>
               <p className="text-xs text-gray-500">
                 Поддерживается множественная загрузка

@@ -26,7 +26,12 @@ import {
   useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { UPLOAD_IMAGE_ACCEPT } from "@/lib/uploads/uploadConfig";
+import {
+  MAX_IMAGE_FILE_SIZE_MB,
+  UPLOAD_IMAGE_ACCEPT,
+  getFileTooLargeMessage,
+  validateUploadMimeType,
+} from "@/lib/uploads/uploadConfig";
 
 export interface GalleryItem {
   id: string;
@@ -196,7 +201,7 @@ export function PlaceGalleryUploadTemp({
   const hasRestoredTempMedia = useRef(false); // Track if temp media was restored (use ref to avoid re-renders)
 
   const { uploadImage } = useImageUpload({
-    maxSizeMB: 5,
+    maxSizeMB: MAX_IMAGE_FILE_SIZE_MB,
     maxWidthOrHeight: 1920,
     quality: 0.9,
   });
@@ -367,12 +372,12 @@ export function PlaceGalleryUploadTemp({
 
     // Validate files
     const validFiles = fileArray.filter((file) => {
-      if (!file.type.startsWith("image/")) {
+      if (!validateUploadMimeType(file)) {
         toast.error(`${file.name} не является изображением`);
         return false;
       }
-      if (file.size > 5 * 1024 * 1024) {
-        toast.error(`${file.name} превышает 5MB`);
+      if (file.size > MAX_IMAGE_FILE_SIZE_MB * 1024 * 1024) {
+        toast.error(getFileTooLargeMessage());
         return false;
       }
       return true;
@@ -421,7 +426,7 @@ export function PlaceGalleryUploadTemp({
 
         if (!response.ok) {
           const errorData = await response.json();
-          throw new Error(errorData.error || "Failed to save image");
+          throw new Error(errorData.message || errorData.error || "Failed to save image");
         }
 
         const { media } = await response.json();

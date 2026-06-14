@@ -22,7 +22,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
-import { UPLOAD_IMAGE_ACCEPT, UPLOAD_IMAGE_FORMATS_LABEL } from "@/lib/uploads/uploadConfig";
+import {
+  MAX_IMAGE_FILE_SIZE_MB,
+  MAX_IMAGE_FILES,
+  UPLOAD_IMAGE_ACCEPT,
+  getFileTooLargeMessage,
+  getUploadHintText,
+} from "@/lib/uploads/uploadConfig";
 
 export type MediaUploadMode = "single" | "multiple";
 
@@ -139,8 +145,8 @@ export function MediaUploadField({
   const [librarySelection, setLibrarySelection] = useState<Set<string>>(() => new Set());
   const [uploading, setUploading] = useState(false);
 
-  const effectiveMaxFiles = mode === "single" ? 1 : Math.max(1, maxFiles ?? 12);
-  const effectiveMaxSizeMb = maxSizeMb ?? (mode === "single" ? 5 : 3);
+  const effectiveMaxFiles = mode === "single" ? 1 : Math.max(1, maxFiles ?? MAX_IMAGE_FILES);
+  const effectiveMaxSizeMb = maxSizeMb ?? MAX_IMAGE_FILE_SIZE_MB;
   const emptyHint = mode === "single" ? singleEmptyHint : multipleEmptyHint;
   const canUpload = allowUpload && !disabled && typeof onUploadFiles === "function";
   const canOpenLibrary = allowMediaLibrary && !disabled && typeof loadMediaLibraryItems === "function";
@@ -169,7 +175,11 @@ export function MediaUploadField({
         return false;
       }
       if (file.size > effectiveMaxSizeMb * 1024 * 1024) {
-        toast.error(`Файл «${file.name}» превышает лимит ${effectiveMaxSizeMb} MB`);
+        toast.error(
+          effectiveMaxSizeMb === MAX_IMAGE_FILE_SIZE_MB
+            ? getFileTooLargeMessage()
+            : `Файл слишком большой. Максимальный размер — ${effectiveMaxSizeMb} МБ.`,
+        );
         return false;
       }
     }
@@ -373,8 +383,11 @@ export function MediaUploadField({
             <div className="space-y-1.5">
               <p className="text-sm font-medium text-foreground">{emptyHint}</p>
               <p className="text-xs text-muted-foreground">
-                Поддерживаются {UPLOAD_IMAGE_FORMATS_LABEL}. До {effectiveMaxSizeMb} MB
-                {mode === "multiple" ? `, максимум ${effectiveMaxFiles} файлов` : ""}.
+                {mode === "multiple"
+                  ? getUploadHintText(effectiveMaxFiles)
+                  : effectiveMaxSizeMb === MAX_IMAGE_FILE_SIZE_MB
+                    ? getUploadHintText(effectiveMaxFiles, false)
+                    : `Поддерживаются JPEG, JPG, PNG, WebP, GIF, AVIF, HEIC, HEIF. До ${effectiveMaxSizeMb} МБ.`}
               </p>
             </div>
             {actionButtons}

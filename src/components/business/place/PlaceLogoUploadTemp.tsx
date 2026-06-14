@@ -9,7 +9,11 @@ import { useState, useEffect, useRef } from "react";
 import { Upload, X, Loader2 } from "lucide-react";
 import { useImageUpload } from "@/hooks/useImageUpload";
 import { toast } from "@/lib/toast";
-import { UPLOAD_IMAGE_ACCEPT } from "@/lib/uploads/uploadConfig";
+import {
+  MAX_IMAGE_FILE_SIZE_MB,
+  UPLOAD_IMAGE_ACCEPT,
+  validateUploadMimeType,
+} from "@/lib/uploads/uploadConfig";
 
 interface PlaceLogoUploadTempProps {
   wizardSessionId: string;
@@ -31,7 +35,7 @@ export function PlaceLogoUploadTemp({
   const hasRestoredTempMedia = useRef(false); // Track if temp media was restored (use ref to avoid re-renders)
 
   const { uploadImage } = useImageUpload({
-    maxSizeMB: 5,
+    maxSizeMB: MAX_IMAGE_FILE_SIZE_MB,
     maxWidthOrHeight: 1024,
     quality: 0.9,
   });
@@ -86,14 +90,8 @@ export function PlaceLogoUploadTemp({
 
   const handleFileSelect = async (file: File) => {
     // Validate file type
-    if (!file.type.startsWith("image/")) {
+    if (!validateUploadMimeType(file)) {
       toast.error("Пожалуйста, выберите изображение");
-      return;
-    }
-
-    // Validate file size (5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error("Размер файла не должен превышать 5MB");
       return;
     }
 
@@ -131,7 +129,7 @@ export function PlaceLogoUploadTemp({
           statusText: response.statusText,
           error: errorData,
         });
-        throw new Error(errorData.error || `Failed to save logo (${response.status})`);
+        throw new Error(errorData.message || errorData.error || `Failed to save logo (${response.status})`);
       }
 
       const { media } = await response.json();

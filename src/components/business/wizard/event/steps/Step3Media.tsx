@@ -41,6 +41,11 @@ import {
   useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import {
+  MAX_IMAGE_FILE_SIZE_MB,
+  getFileTooLargeMessage,
+  validateUploadMimeType,
+} from "@/lib/uploads/uploadConfig";
 
 interface Step3MediaProps {
   data: EventFormData;
@@ -311,7 +316,7 @@ export function Step3Media({
   }
 
   const { uploadImage } = useImageUpload({
-    maxSizeMB: 5,
+    maxSizeMB: MAX_IMAGE_FILE_SIZE_MB,
     maxWidthOrHeight: 1920,
     quality: 0.9,
   });
@@ -643,12 +648,12 @@ export function Step3Media({
   const handleCoverFilesSelect = async (files: File[]) => {
     const file = files[0];
     if (!file) return;
-    if (!file.type.startsWith("image/")) {
+    if (!validateUploadMimeType(file)) {
       toast.error("Пожалуйста, выберите изображение");
       return;
     }
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error("Размер файла не должен превышать 5MB");
+    if (file.size > MAX_IMAGE_FILE_SIZE_MB * 1024 * 1024) {
+      toast.error(getFileTooLargeMessage());
       return;
     }
 
@@ -672,12 +677,12 @@ export function Step3Media({
   const handleGalleryFilesSelect = async (files: FileList | File[]) => {
     const fileArray = Array.from(files);
     const validFiles = fileArray.filter((file) => {
-      if (!file.type.startsWith("image/")) {
+      if (!validateUploadMimeType(file)) {
         toast.error(`${file.name} не является изображением`);
         return false;
       }
-      if (file.size > 5 * 1024 * 1024) {
-        toast.error(`${file.name} превышает 5MB`);
+      if (file.size > MAX_IMAGE_FILE_SIZE_MB * 1024 * 1024) {
+        toast.error(getFileTooLargeMessage());
         return false;
       }
       return true;

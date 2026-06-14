@@ -8,6 +8,7 @@ import { encode } from "blurhash";
 import {
   ALLOWED_UPLOAD_MIME_TYPES,
   MAX_UPLOAD_SIZE_MB,
+  getFileTooLargeMessage,
   normalizeUploadMimeType,
   resolveUploadMimeType,
 } from "@/lib/uploads/uploadConfig";
@@ -266,7 +267,7 @@ export function validateImageFile(
   if (sizeMB > maxSizeMB) {
     return {
       valid: false,
-      error: `File too large. Max size: ${maxSizeMB}MB`,
+      error: maxSizeMB === MAX_UPLOAD_SIZE_MB ? getFileTooLargeMessage() : `Файл слишком большой. Максимальный размер — ${maxSizeMB} МБ.`,
     };
   }
 

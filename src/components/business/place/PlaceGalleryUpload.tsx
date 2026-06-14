@@ -22,7 +22,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { cn } from "@/lib/utils";
-import { UPLOAD_IMAGE_ACCEPT } from "@/lib/uploads/uploadConfig";
+import { MAX_IMAGE_FILE_SIZE_MB, UPLOAD_IMAGE_ACCEPT, validateUploadMimeType } from "@/lib/uploads/uploadConfig";
 
 export interface GalleryItem {
   id: string;
@@ -71,7 +71,7 @@ export function PlaceGalleryUpload({
   };
 
   const { uploadImage } = useImageUpload({
-    maxSizeMB: 5,
+    maxSizeMB: MAX_IMAGE_FILE_SIZE_MB,
     maxWidthOrHeight: 2048,
     quality: 0.9,
   });
@@ -107,7 +107,7 @@ export function PlaceGalleryUpload({
 
       try {
         // Validate file type
-        if (!file.type.startsWith("image/")) {
+        if (!validateUploadMimeType(file)) {
           throw new Error("Пожалуйста, выберите изображение");
         }
 
@@ -134,7 +134,7 @@ export function PlaceGalleryUpload({
 
         if (!response.ok) {
           const errorData = await response.json();
-          throw new Error(errorData.error || "Failed to save image");
+          throw new Error(errorData.message || errorData.error || "Failed to save image");
         }
 
         const data = await response.json();

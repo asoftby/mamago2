@@ -30,14 +30,21 @@ export const UPLOAD_IMAGE_EXTENSIONS = [
   ".heif",
 ] as const;
 
-export const UPLOAD_MAX_FILE_SIZE_MB = 15;
-export const UPLOAD_MAX_FILE_SIZE = UPLOAD_MAX_FILE_SIZE_MB * 1024 * 1024;
+export const MAX_IMAGE_FILE_SIZE_MB = 10;
+export const MAX_IMAGE_FILE_SIZE_BYTES = MAX_IMAGE_FILE_SIZE_MB * 1024 * 1024;
+export const MAX_IMAGE_FILES = 12;
+
+export const ACCEPTED_IMAGE_MIME_TYPES = UPLOAD_IMAGE_MIME_TYPES;
+export const ACCEPTED_IMAGE_FORMATS = UPLOAD_IMAGE_EXTENSIONS;
+
+export const UPLOAD_MAX_FILE_SIZE_MB = MAX_IMAGE_FILE_SIZE_MB;
+export const UPLOAD_MAX_FILE_SIZE = MAX_IMAGE_FILE_SIZE_BYTES;
 
 export const MAX_UPLOAD_SIZE_MB = UPLOAD_MAX_FILE_SIZE_MB;
 export const MAX_UPLOAD_SIZE_BYTES = UPLOAD_MAX_FILE_SIZE;
 
-export const ALLOWED_UPLOAD_MIME_TYPES = UPLOAD_IMAGE_MIME_TYPES;
-export const ALLOWED_UPLOAD_MIME_TYPE_SET = new Set<string>(UPLOAD_IMAGE_MIME_TYPES);
+export const ALLOWED_UPLOAD_MIME_TYPES = ACCEPTED_IMAGE_MIME_TYPES;
+export const ALLOWED_UPLOAD_MIME_TYPE_SET = new Set<string>(ACCEPTED_IMAGE_MIME_TYPES);
 
 export const UPLOAD_IMAGE_ACCEPT = [
   "image/jpeg",
@@ -47,6 +54,23 @@ export const UPLOAD_IMAGE_ACCEPT = [
 ].join(",");
 
 export const UPLOAD_IMAGE_FORMATS_LABEL = "JPEG, JPG, PNG, WebP, GIF, AVIF, HEIC, HEIF";
+
+export function getUploadFileSizeLimitLabel(): string {
+  return `${MAX_IMAGE_FILE_SIZE_MB} МБ`;
+}
+
+export function getUploadFileCountLimitLabel(maxFiles: number = MAX_IMAGE_FILES): string {
+  return `${maxFiles} ${maxFiles === 1 ? "файл" : "файлов"}`;
+}
+
+export function getUploadHintText(maxFiles: number = MAX_IMAGE_FILES, includeFileCount: boolean = true): string {
+  const base = `Поддерживаются ${UPLOAD_IMAGE_FORMATS_LABEL}. До ${getUploadFileSizeLimitLabel()}`;
+  return includeFileCount ? `${base}, максимум ${getUploadFileCountLimitLabel(maxFiles)}.` : `${base}.`;
+}
+
+export function getFileTooLargeMessage(): string {
+  return `Файл слишком большой. Максимальный размер — ${getUploadFileSizeLimitLabel()}.`;
+}
 
 export function normalizeUploadMimeType(
   mimeType: string | null | undefined,
@@ -92,6 +116,10 @@ export function resolveUploadMimeType(file: Pick<File, "name" | "type">): string
   return normalizedType ?? inferredType;
 }
 
+export function validateUploadMimeType(file: Pick<File, "name" | "type">): boolean {
+  return resolveUploadMimeType(file) !== null;
+}
+
 export function isAllowedUploadMimeType(
   mimeType: string | null | undefined,
   fileName?: string | null | undefined,
@@ -107,7 +135,7 @@ export function getUploadErrorMessage(errorCode: string | null | undefined, fall
     case "INVALID_FILE_TYPE":
       return "Неподдерживаемый формат файла.";
     case "FILE_TOO_LARGE":
-      return `Файл слишком большой. Максимум ${UPLOAD_MAX_FILE_SIZE_MB} MB.`;
+      return getFileTooLargeMessage();
     case "UNAUTHORIZED":
       return "Нужно войти в систему, чтобы загружать файлы.";
     case "FORBIDDEN":

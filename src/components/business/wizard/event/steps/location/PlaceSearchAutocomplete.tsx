@@ -30,6 +30,8 @@ interface PlaceSearchAutocompleteProps {
   placeholder?: string;
   selectedPlaceId?: string | null;
   createPlaceHint?: string | null;
+  /** Только площадки пользователя (для привязки оффера к месту). */
+  ownPlacesOnly?: boolean;
 }
 
 const GENERIC_PLACE_NAMES = [
@@ -83,6 +85,7 @@ export function PlaceSearchAutocomplete({
   placeholder = "Найти место по названию или адресу",
   selectedPlaceId,
   createPlaceHint,
+  ownPlacesOnly = false,
 }: PlaceSearchAutocompleteProps) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<PlaceResult[]>([]);
@@ -109,8 +112,9 @@ export function PlaceSearchAutocomplete({
     setIsOpen(true);
     
     try {
+      const scope = ownPlacesOnly ? "&scope=own" : "";
       const response = await fetch(
-        `/api/business/places/search?q=${encodeURIComponent(searchQuery)}`
+        `/api/business/places/search?q=${encodeURIComponent(searchQuery)}${scope}`,
       );
       
       if (!response.ok) {
@@ -129,7 +133,7 @@ export function PlaceSearchAutocomplete({
     } finally {
       setIsSearching(false);
     }
-  }, []);
+  }, [ownPlacesOnly]);
 
   // Debounced search
   useEffect(() => {
