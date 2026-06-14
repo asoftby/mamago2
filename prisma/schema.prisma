@@ -1709,6 +1709,7 @@ model Offer {
   status                   OfferStatus        @default(DRAFT)
   publishedAt              DateTime?
   rejectionReason          String?
+  createRequestId          String?            @unique
   createdAt                DateTime           @default(now())
   updatedAt                DateTime           @updatedAt
   inheritPlaceOpeningHours Boolean            @default(true)

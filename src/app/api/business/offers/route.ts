@@ -97,21 +97,6 @@ const createOfferSchema = z.object({
   whatToBring: z.string().optional(),
 });
 
-/**
- * Идемпотентность create без DB-колонки (в отличие от Place.createRequestId):
- * in-memory кеш с TTL закрывает double-click и повтор после таймаута в рамках
- * одного инстанса. Межинстансовый дедуп потребует колонку Offer.createRequestId
- * (ручная миграция) — осознанный follow-up.
- */
-const CREATE_REQUEST_TTL_MS = 10 * 60 * 1000;
-const recentCreateRequests = new Map<string, { offerId: string; expiresAt: number }>();
-
-function pruneRecentCreateRequests(now: number) {
-  for (const [key, entry] of recentCreateRequests) {
-    if (entry.expiresAt <= now) recentCreateRequests.delete(key);
-  }
-}
-
 // Re-trigger build for schema updates
 export async function POST(request: NextRequest) {
   const timer = createPublishTimer("publish:offer");
@@ -135,18 +120,14 @@ export async function POST(request: NextRequest) {
       ? `${user.id}:${data.createRequestId}`
       : null;
     if (idempotencyKey) {
-      pruneRecentCreateRequests(Date.now());
-      const recent = recentCreateRequests.get(idempotencyKey);
-      if (recent) {
-        const existing = await prisma.offer.findUnique({
-          where: { id: recent.offerId },
-          select: { id: true, title: true, status: true, slug: true, publishedAt: true },
-        });
-        if (existing) {
-          timer.mark("response");
-          timer.log({ status: existing.status, idempotent: 1 });
-          return NextResponse.json(existing);
-        }
+      const existing = await prisma.offer.findUnique({
+        where: { createRequestId: idempotencyKey },
+        select: { id: true, title: true, status: true, slug: true, publishedAt: true },
+      });
+      if (existing) {
+        timer.mark("response");
+        timer.log({ status: existing.status, idempotent: 1 });
+        return NextResponse.json(existing);
       }
     }
 
@@ -229,6 +210,7 @@ export async function POST(request: NextRequest) {
       const offer = await prisma.offer.create({
         data: {
           placeId: place.id,
+          createRequestId: idempotencyKey ?? undefined,
           kind: dbKind,
           contactSource: data.contactSource ?? "manual",
           contactPhone: data.contactPhone,
@@ -289,13 +271,6 @@ export async function POST(request: NextRequest) {
         },
       });
       timer.mark("status");
-
-      if (idempotencyKey) {
-        recentCreateRequests.set(idempotencyKey, {
-          offerId: offer.id,
-          expiresAt: Date.now() + CREATE_REQUEST_TTL_MS,
-        });
-      }
 
       // Auto-assign slug only on first meaningful title fill (idempotent).
       if (offer.title.trim()) {
