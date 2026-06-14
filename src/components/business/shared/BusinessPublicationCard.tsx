@@ -8,6 +8,8 @@ import Image from "next/image";
 import { TrendingUp, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { isAppMediaUrl } from "@/lib/media/isAppMediaUrl";
+import { normalizeUiCurrencyText } from "@/lib/formatters/format-price";
+import { renderCurrencyText } from "@/components/icons/BelarusianRubleIcon";
 
 // ─── Action button style tokens ───────────────────────────────────────────────
 
@@ -49,7 +51,7 @@ type BusinessPublicationCardProps = {
   title: string;
   titleHref?: string;
   typeChip?: ReactNode;
-  subtitle: string;
+  subtitle: ReactNode;
   statusRow?: ReactNode;
   updatedLine?: string | null;
   createdLine?: string | null;
@@ -213,7 +215,11 @@ export function BusinessPublicationCard({
 
             {/* Subtitle */}
             {subtitle ? (
-              <p className="truncate text-sm text-stone-500">{subtitle}</p>
+              <p className="truncate text-sm text-stone-500">
+                {typeof subtitle === "string"
+                  ? renderCurrencyText(normalizeUiCurrencyText(subtitle), { iconSize: "sm" })
+                  : subtitle}
+              </p>
             ) : null}
 
             {/* Status row */}

@@ -1,5 +1,6 @@
 import type { PriceItem } from "@/lib/priceItems";
 import { normalizeUiCurrencyText } from "@/lib/formatters/format-price";
+import { renderCurrencyText } from "@/components/icons/BelarusianRubleIcon";
 
 interface PriceListBlockProps {
   items: PriceItem[];
@@ -78,10 +79,12 @@ export function PriceListBlock({ items, note, updatedAt }: PriceListBlockProps) 
             <span className="text-xs text-muted-foreground w-4 shrink-0">{index + 1}.</span>
             <span className="flex-1 text-sm text-foreground">{item.label}</span>
             <span className="font-serif text-base font-medium text-foreground tabular-nums">
-              {normalizeUiCurrencyText(item.price)}
+              {renderCurrencyText(normalizeUiCurrencyText(item.price))}
             </span>
             {item.unit && (
-              <span className="text-xs text-muted-foreground">{normalizeUiCurrencyText(item.unit)}</span>
+              <span className="text-xs text-muted-foreground">
+                {renderCurrencyText(normalizeUiCurrencyText(item.unit), { iconSize: "sm" })}
+              </span>
             )}
           </div>
         ))}

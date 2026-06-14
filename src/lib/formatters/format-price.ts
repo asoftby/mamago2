@@ -4,9 +4,9 @@
  * RULE: user-facing prices must be displayed only through this formatter layer.
  * Technical currency codes like `BYN` may still exist in DB/API/schema contexts.
  */
+import { DEFAULT_CURRENCY } from "@/config/currency";
 
-// The custom NBRB font exposes the Belarusian ruble sign at U+E901.
-export const BELARUS_CURRENCY_SYMBOL = "\uE901";
+export const BELARUS_CURRENCY_SYMBOL = DEFAULT_CURRENCY.symbol;
 export const BYN_SYMBOL = BELARUS_CURRENCY_SYMBOL;
 
 type FormatPriceOptions = {
@@ -45,6 +45,30 @@ export function normalizeUiCurrencyText(
     .trim();
 }
 
+/** Число и хвост (символ BYN + единица), без разрыва по пробелу внутри суммы. */
+export function splitUiPriceLabel(value: string | null | undefined): {
+  amount: string;
+  suffix: string;
+} {
+  const normalized = normalizeUiCurrencyText(value);
+  if (!normalized) return { amount: "", suffix: "" };
+
+  const symbolIdx = normalized.indexOf(BYN_SYMBOL);
+  if (symbolIdx !== -1) {
+    return {
+      amount: normalized.slice(0, symbolIdx).trim(),
+      suffix: normalized.slice(symbolIdx).trim(),
+    };
+  }
+
+  const spaceIdx = normalized.lastIndexOf(" ");
+  if (spaceIdx === -1) return { amount: normalized, suffix: "" };
+  return {
+    amount: normalized.slice(0, spaceIdx).trim(),
+    suffix: normalized.slice(spaceIdx + 1).trim(),
+  };
+}
+
 export function formatPrice(
   value: number | string | null | undefined,
   options: FormatPriceOptions = {},
@@ -68,6 +92,8 @@ export function formatPrice(
   const formatted = `${formatNumber(value)} ${currencySymbol}`;
   return options.fromPrefix ? `от ${formatted}` : formatted;
 }
+
+export const formatMoney = formatPrice;
 
 export function formatPriceFrom(
   value: number | string | null | undefined,
@@ -127,3 +153,5 @@ export function formatPriceAmount(
   if (!Number.isFinite(value)) return "";
   return formatNumber(value);
 }
+
+export const formatMoneyAmount = formatPriceAmount;
