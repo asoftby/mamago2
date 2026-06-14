@@ -1,6 +1,7 @@
 // Step 2: Public Information
 // Inherits Event Wizard Step2Description pattern
 
+import { useEffect, useMemo, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -9,10 +10,15 @@ import { AGE_OPTIONS } from "@/lib/config/ages";
 import { RichDescriptionEditor } from "@/components/editor/RichDescriptionEditor";
 import { AiDescriptionAssistant } from "@/components/ai/AiDescriptionAssistant";
 import type { OfferFormData } from "../types";
-import { StructuredDiscoverySignalPicker } from "../../shared/StructuredDiscoverySignalPicker";
+import {
+  StructuredDiscoverySignalPicker,
+  type GroupConfig,
+  type SignalGroup,
+} from "../../shared/StructuredDiscoverySignalPicker";
 import { OfferClassChipPicker } from "../components/OfferClassChipPicker";
 import { SignalEntityType } from "@prisma/client";
 import { getProgramTypeLabel } from "@/lib/public/publicVerticalResolver";
+import { CAMP_OFFER_DISCOVERY_PICKER_CONFIGS } from "@/lib/offers/campOfferDiscoverySignals";
 
 interface Step2InformationProps {
   data: OfferFormData;
@@ -20,8 +26,88 @@ interface Step2InformationProps {
   isEditable: boolean;
 }
 
+const DEFAULT_OFFER_CHARACTERISTIC_GROUPS: GroupConfig[] = [
+  {
+    slug: "discovery-activity",
+    title: "Чем будут заниматься",
+    required: true,
+    min: 1,
+    max: 4,
+    helperText: "Основные виды активности",
+  },
+  {
+    slug: "discovery-format",
+    title: "Где проходит",
+    required: true,
+    min: 1,
+    helperText: "Формат проведения",
+  },
+  {
+    slug: "discovery-participation",
+    title: "Как проходит",
+    required: true,
+    min: 1,
+    helperText: "Формат участия",
+  },
+  {
+    slug: "discovery-intention",
+    title: "Для чего это подходит",
+    required: false,
+    max: 3,
+    helperText: "Сценарии использования (опционально)",
+  },
+  {
+    slug: "discovery-feature",
+    title: "Особенности",
+    required: false,
+    max: 5,
+    helperText: "Дополнительные преимущества (опционально)",
+  },
+];
+
 export function Step2Information({ data, onChange, isEditable }: Step2InformationProps) {
   const isCampOffer = data.offerWizardType === "CAMP";
+  const [signalGroups, setSignalGroups] = useState<SignalGroup[] | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    fetch("/api/public/signals/discovery?entityType=OFFER&includeDeprecated=true")
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        return response.json();
+      })
+      .then((payload: { groups?: SignalGroup[] }) => {
+        if (!cancelled) {
+          setSignalGroups(payload.groups ?? []);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setSignalGroups([]);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const characteristicGroupConfigs = useMemo(
+    () =>
+      isCampOffer
+        ? [...CAMP_OFFER_DISCOVERY_PICKER_CONFIGS]
+        : DEFAULT_OFFER_CHARACTERISTIC_GROUPS,
+    [isCampOffer],
+  );
+
+  const characteristicGroups = useMemo(() => {
+    if (!signalGroups) return null;
+    const allowedSlugs = new Set(characteristicGroupConfigs.map((group) => group.slug));
+    return signalGroups.filter((group) => allowedSlugs.has(group.slug));
+  }, [characteristicGroupConfigs, signalGroups]);
 
   const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     onChange({ title: e.target.value });
@@ -119,10 +205,25 @@ export function Step2Information({ data, onChange, isEditable }: Step2Informatio
             ageRange: data.ageGroups,
             place: data.placeTitle,
             price:
-              data.pricingMode === "single"
+              data.offerWizardType === "CAMP"
+                ? data.campSessions
+                    .map((session) =>
+                      session.priceOverride.trim()
+                        ? `${session.title || "Смена"}: ${session.priceOverride}`
+                        : "",
+                    )
+                    .filter(Boolean)
+                    .join("; ")
+                : data.pricingMode === "single"
                 ? `${data.singlePrice} ${data.singleCurrency}`.trim()
                 : data.pricingOptions.map((option) => `${option.title}: ${option.price}`).join("; "),
-            discount: data.promotionDetails,
+            discount:
+              data.offerWizardType === "CAMP"
+                ? data.campSessions
+                    .map((session) => session.promotionDetails)
+                    .filter((value) => value.trim().length > 0)
+                    .join("\n")
+                : data.promotionDetails,
             validityDates: data.campSessions
               .map((session) => [session.dateFrom, session.dateTo].filter(Boolean).join(" — "))
               .filter(Boolean),
@@ -202,95 +303,33 @@ export function Step2Information({ data, onChange, isEditable }: Step2Informatio
         </p>
       </div>
 
-      {/* Discovery Signals - Structured */}
-      <div className="space-y-4">
-        <div>
-          <h3 className="text-lg font-semibold mb-1">Характеристики предложения</h3>
-          <p className="text-sm text-muted-foreground">
-            Помогают пользователям найти это предложение в каталоге
-          </p>
-        </div>
+      {characteristicGroups && characteristicGroups.length > 0 ? (
+        <div className="space-y-4">
+          <div>
+            <h3 className="text-lg font-semibold mb-1">Характеристики предложения</h3>
+            <p className="text-sm text-muted-foreground">
+              {isCampOffer
+                ? "Помогают родителям понять формат, условия и кому подойдёт программа"
+                : "Помогают пользователям найти это предложение в каталоге"}
+            </p>
+          </div>
 
-        <StructuredDiscoverySignalPicker
-          entityType={SignalEntityType.OFFER}
-          value={data.signalIds ?? []}
-          onChange={(ids) => onChange({ signalIds: ids })}
-          disabled={!isEditable}
-          groupConfigs={[
-            {
-              slug: "discovery-activity",
-              title: "Чем будут заниматься",
-              required: true,
-              min: 1,
-              max: 4,
-              helperText: "Основные виды активности",
-              preferredOptionValues: isCampOffer
-                ? ["discovery-activity-educational"]
-                : undefined,
-            },
-            {
-              slug: "discovery-format",
-              title: "Где проходит",
-              required: true,
-              min: 1,
-              helperText: "Формат проведения",
-              preferredOptionValues: isCampOffer
-                ? ["discovery-format-indoor", "discovery-format-outdoor"]
-                : undefined,
-            },
-            {
-              slug: "discovery-participation",
-              title: "Как проходит",
-              required: true,
-              min: 1,
-              helperText: "Формат участия",
-              preferredOptionValues: isCampOffer
-                ? [
-                    "discovery-participation-group",
-                    "discovery-participation-without-parents",
-                  ]
-                : undefined,
-            },
-            {
-              slug: "discovery-intention",
-              title: "Для чего это подходит",
-              required: false,
-              max: isCampOffer ? 5 : 3,
-              helperText: "Сценарии использования (опционально)",
-              preferredOptionValues: isCampOffer
-                ? [
-                    "discovery-intention-useful-vacation",
-                    "discovery-intention-vacation-childcare",
-                    "discovery-intention-improve-english",
-                    "discovery-intention-communication-skills",
-                  ]
-                : undefined,
-            },
-            {
-              slug: "discovery-feature",
-              title: "Особенности",
-              required: false,
-              max: 5,
-              helperText: "Дополнительные преимущества (опционально)",
-              preferredOptionValues: isCampOffer
-                ? [
-                    "discovery-feature-vacation",
-                    "discovery-feature-full-day",
-                    "discovery-feature-half-day",
-                    "discovery-feature-meals",
-                    "discovery-feature-limited",
-                  ]
-                : undefined,
-            },
-          ]}
-        />
-      </div>
+          <StructuredDiscoverySignalPicker
+            entityType={SignalEntityType.OFFER}
+            value={data.signalIds ?? []}
+            onChange={(ids) => onChange({ signalIds: ids })}
+            disabled={!isEditable}
+            groupConfigs={characteristicGroupConfigs}
+            preloadedGroups={characteristicGroups}
+          />
+        </div>
+      ) : null}
 
       <div className="space-y-3">
         <div>
-          <h3 className="text-lg font-semibold mb-1">Чипы витрины “Занятия”</h3>
+          <h3 className="text-lg font-semibold mb-1">Чипы витрины «Занятия»</h3>
           <p className="text-sm text-muted-foreground">
-            Помогают показать предложение в конкретных категориях на странице занятий. Без выбора предложение останется только в чипе “Все”.
+            Помогают показать предложение в конкретных категориях на странице занятий. Без выбора предложение останется только в чипе «Все».
           </p>
         </div>
         <OfferClassChipPicker

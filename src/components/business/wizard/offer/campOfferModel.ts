@@ -23,6 +23,7 @@ export function createEmptyCampSession(sortOrder: number): CampSessionEntry {
     spotsLeft: null,
     priceOverride: "",
     description: "",
+    promotionDetails: "",
   };
 }
 
@@ -90,6 +91,8 @@ export function normalizeCampSessionRecord(raw: unknown, index: number): CampSes
     spotsLeft,
     priceOverride: typeof o.priceOverride === "string" ? o.priceOverride : "",
     description: typeof o.description === "string" ? o.description : "",
+    promotionDetails:
+      typeof o.promotionDetails === "string" ? o.promotionDetails : "",
   };
 }
 

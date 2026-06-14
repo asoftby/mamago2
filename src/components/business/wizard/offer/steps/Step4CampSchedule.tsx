@@ -326,7 +326,7 @@ export function Step4CampSchedule({ data, onChange, isEditable }: Step4CampSched
                       </Label>
                       <Input
                         id={`price-${session.id}`}
-                        placeholder="Если отличается от основной цены предложения"
+                        placeholder="Например: 850"
                         value={session.priceOverride}
                         onChange={(e) =>
                           patchSession(session.id, { priceOverride: e.target.value })
@@ -343,6 +343,20 @@ export function Step4CampSchedule({ data, onChange, isEditable }: Step4CampSched
                         value={session.description}
                         onChange={(value) => patchSession(session.id, { description: value })}
                         placeholder="Чем эта смена отличается от других: язык, смена темы, интенсивность…"
+                        disabled={!isEditable}
+                        minHeight={140}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <WizardRichTextField
+                        label="Акционные данные"
+                        helperText="Например: скидка за раннее бронирование, акция, бонусы, специальные условия для этой смены"
+                        value={session.promotionDetails}
+                        onChange={(value) =>
+                          patchSession(session.id, { promotionDetails: value })
+                        }
+                        placeholder="Скидка за раннее бронирование, бонусы, специальные условия для этой смены…"
                         disabled={!isEditable}
                         minHeight={140}
                       />

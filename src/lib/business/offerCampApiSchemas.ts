@@ -17,6 +17,7 @@ export const campSessionEntrySchema = z
     spotsLeft: z.number().nullable().optional(),
     priceOverride: z.string().optional().nullable(),
     description: z.string().optional().nullable(),
+    promotionDetails: z.string().optional().nullable(),
   })
   .passthrough();
 
@@ -25,3 +26,16 @@ export const campProgramTypeSchema = z
   .optional();
 
 export const campMealKeySchema = z.enum(["breakfast", "lunch", "dinner", "snacks"]);
+
+/** Ключ шага мастера предложения (Offer.wizardCompletedSteps) */
+export const offerWizardStepKeySchema = z.enum([
+  "type",
+  "details",
+  "photo",
+  "conditions",
+  "campSchedule",
+  "accommodation",
+  "price",
+  "contacts",
+  "review",
+]);

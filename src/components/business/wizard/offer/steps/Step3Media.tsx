@@ -4,6 +4,7 @@ import { useCallback } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { MediaUploadField, type MediaUploadItem } from "@/components/media/MediaUploadField";
+import { MAX_IMAGE_FILES } from "@/lib/uploads/uploadConfig";
 import type { OfferFormData } from "../types";
 import { isValidVideoUrl } from "../mappers";
 
@@ -40,13 +41,18 @@ async function uploadFilesToPublicMedia(files: File[]): Promise<MediaUploadItem[
 
     const payload = (await response.json().catch(() => ({}))) as {
       error?: string;
+      message?: string;
       url?: string;
       mediaId?: string | null;
     };
 
     if (!response.ok) {
       throw new Error(
-        typeof payload.error === "string" ? payload.error : `Ошибка загрузки файла «${file.name}»`,
+        typeof payload.message === "string"
+          ? payload.message
+          : typeof payload.error === "string"
+            ? payload.error
+            : `Ошибка загрузки файла «${file.name}»`,
       );
     }
 
@@ -143,7 +149,6 @@ export function Step3Media({ data, onChange, isEditable }: Step3MediaProps) {
         mode="single"
         value={coverValue}
         onChange={handleCoverChange}
-        maxSizeMb={5}
         disabled={!isEditable}
         allowMediaLibrary
         allowUpload
@@ -158,8 +163,7 @@ export function Step3Media({ data, onChange, isEditable }: Step3MediaProps) {
         mode="multiple"
         value={galleryValue}
         onChange={handleGalleryChange}
-        maxFiles={12}
-        maxSizeMb={3}
+        maxFiles={MAX_IMAGE_FILES}
         disabled={!isEditable}
         allowMediaLibrary
         allowUpload

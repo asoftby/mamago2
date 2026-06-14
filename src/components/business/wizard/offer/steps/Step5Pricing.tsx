@@ -119,6 +119,19 @@ export function Step5Pricing({
     () => getPublicationAccessFromOffer(data),
     [data],
   );
+
+  if (data.offerWizardType === "CAMP") {
+    return (
+      <PublicationAccessEditor
+        entityType="offer"
+        value={publicationAccess}
+        onChange={(value) => onChange(buildOfferAccessPatch(value))}
+        allowedMethods={["details", "timeslots", "prebooking", "external", "contact"]}
+        disabled={!isEditable}
+      />
+    );
+  }
+
   const hasPriceCaption = isRichTextMeaningful(data.priceCaption);
   const hasPromotionDetails = isRichTextMeaningful(data.promotionDetails);
 

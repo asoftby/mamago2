@@ -84,16 +84,6 @@ export function Step1Type({ data, onChange, isEditable }: Step1TypeProps) {
           );
         })}
       </div>
-
-      {/* Info box */}
-      {data.offerWizardType && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <h4 className="font-medium text-blue-900 mb-1">Выбран тип:</h4>
-          <p className="text-sm text-blue-700">
-            {offerTypeOptions.find(o => o.value === data.offerWizardType)?.label}
-          </p>
-        </div>
-      )}
     </div>
   );
 }
