@@ -279,6 +279,12 @@ export const GROUP_CONTENT: AdminSidebarGroup = {
       matchers: [{ type: "prefix", value: adminPath("/content/publications") }],
     },
     {
+      id: "content-editorial-requests",
+      label: "Editorial Requests",
+      href: adminPath("/content/editorial-requests"),
+      matchers: [{ type: "prefix", value: adminPath("/content/editorial-requests") }],
+    },
+    {
       id: "content-pages",
       label: "Страницы",
       href: adminPath("/pages"),

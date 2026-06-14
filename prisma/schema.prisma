@@ -636,6 +636,7 @@ model City {
   placeSlugHistories    PlaceSlugHistory[]
   offerSlugHistories    OfferSlugHistory[]
   articles              Article[]         @relation("ArticleCity")
+  editorialRequests     EditorialRequest[] @relation("EditorialRequestCity")
   articleSlugHistories  ArticleSlugHistory[]
 
   @@unique([countryId, slug])
@@ -2365,6 +2366,25 @@ model ArticleSlugHistory {
   @@index([cityId])
 }
 
+model EditorialRequest {
+  id          String                 @id @default(cuid())
+  title       String
+  description String?
+  cityId      String?
+  status      EditorialRequestStatus @default(DRAFT)
+  deadlineAt  DateTime?
+  criteria    Json?
+  createdById String?
+  createdAt   DateTime               @default(now())
+  updatedAt   DateTime               @updatedAt
+  city        City?                  @relation("EditorialRequestCity", fields: [cityId], references: [id], onDelete: SetNull)
+
+  @@index([cityId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([updatedAt])
+}
+
 /// Денормализованный индекс для быстрого поиска. Источник истины — сущности Activity/Offer/Place/Route/Article.
 model SearchDocument {
   id          String           @id @default(cuid())
@@ -2780,6 +2800,12 @@ enum BusinessOperationalStatus {
 enum GeoScope {
   CITY
   COUNTRY
+}
+
+enum EditorialRequestStatus {
+  DRAFT
+  READY
+  ARCHIVED
 }
 
 enum ContentStatus {
