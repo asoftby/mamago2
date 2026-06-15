@@ -12,6 +12,8 @@ export const DEFAULT_CURRENCY = {
   /** ISO 4217 currency code — use only in technical/API/schema contexts. */
   code: "BYN",
   name: "Белорусский рубль",
+  /** Private-use glyph from the official NBRB font; UI should render it via shared helpers/icon. */
+  symbol: "\uE901",
   /** Number of decimal places shown in UI. */
   fractionDigits: 2,
   /** Decimal separator for user-facing output. */
@@ -21,3 +23,6 @@ export const DEFAULT_CURRENCY = {
 } as const;
 
 export type CurrencyConfig = typeof DEFAULT_CURRENCY;
+export const CURRENCY = {
+  BYN: DEFAULT_CURRENCY,
+} as const;

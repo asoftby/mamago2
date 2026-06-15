@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { BYN_SYMBOL, formatPrice, normalizeUiCurrencyText } from "@/lib/formatters/format-price";
+import { renderCurrencyText } from "@/components/icons/BelarusianRubleIcon";
 import { BusinessSurfaceCard } from "@/components/business/ui/BusinessSurfaceCard";
 import { PromotionPublicationType } from "@prisma/client";
 import { PROMOTION_MIN_BUDGET, PROMOTION_MAX_BUDGET } from "@/lib/promotion/shared";
@@ -51,7 +52,10 @@ function ValueBlock() {
         </li>
       </ul>
       <div className="rounded-xl border border-stone-100 bg-stone-50 px-3.5 py-2.5 text-xs text-stone-500">
-        {normalizeUiCurrencyText("~0.5 BYN за сохранение · ~1 BYN за заинтересованного клиента")}
+        {renderCurrencyText(
+          normalizeUiCurrencyText("~0.5 BYN за сохранение · ~1 BYN за заинтересованного клиента"),
+          { iconSize: "sm" },
+        )}
       </div>
     </div>
   );
