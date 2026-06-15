@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { PublicFooter } from "@/components/shell/PublicFooter";
 import { MobileBottomNav } from "@/components/mobile/MobileBottomNav";
 import { MobileBottomBarShell } from "@/components/layout/MobileBottomBarShell";
+import { BetaTipMobile } from "@/components/shared/BetaTip";
 import { shouldHideMobileBottomNav } from "@/lib/intent";
 import { cn } from "@/lib/utils";
 import { useNavigationReloadDebug } from "@/hooks/useNavigationReloadDebug";
@@ -43,22 +44,21 @@ export function PublicLayoutBody({ children }: { children: React.ReactNode }) {
         {children}
       </main>
 
-      <div
-        className={cn(
-          !hideBottomBar ? MOBILE_MAIN_BOTTOM : "pb-0 lg:pb-0",
-        )}
-      >
-        <PublicFooter />
+      <div className={cn(!hideBottomBar ? MOBILE_MAIN_BOTTOM : "pb-0 lg:pb-0")}>
+        <PublicFooter withStickyCtaClearance={hideBottomBar} />
       </div>
 
       {!hideBottomBar ? (
-        <MobileBottomBarShell>
-          <Suspense
-            fallback={<div className="h-[5.75rem] shrink-0" aria-hidden />}
-          >
-            <MobileBottomNav />
-          </Suspense>
-        </MobileBottomBarShell>
+        <>
+          <BetaTipMobile />
+          <MobileBottomBarShell>
+            <Suspense
+              fallback={<div className="h-[5.75rem] shrink-0" aria-hidden />}
+            >
+              <MobileBottomNav />
+            </Suspense>
+          </MobileBottomBarShell>
+        </>
       ) : null}
     </>
   );

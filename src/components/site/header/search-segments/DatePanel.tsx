@@ -20,9 +20,11 @@ interface DatePanelProps {
   onClose: () => void;
   applied: DiscoveryFilters;
   actions: { setDraft: (patch: FilterPatch) => void };
+  /** Мобильный sheet: фон как у хедера, без отдельной белой карточки */
+  embedded?: boolean;
 }
 
-export function DatePanel({ onClose, applied, actions }: DatePanelProps) {
+export function DatePanel({ onClose, applied, actions, embedded = false }: DatePanelProps) {
   const handleWhenChange = (val: WhenValue) => {
     let patch: FilterPatch = {};
     if (!val) {
@@ -118,10 +120,17 @@ export function DatePanel({ onClose, applied, actions }: DatePanelProps) {
   ];
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-200 shadow-lg overflow-hidden">
-      <div className="p-6">
+    <div
+      className={cn(
+        "overflow-hidden rounded-2xl",
+        embedded
+          ? "bg-[#F6F2EA]"
+          : "border border-gray-200 bg-white shadow-lg",
+      )}
+    >
+      <div className={embedded ? "space-y-3 p-4" : "p-6"}>
         {/* Quick Options - без заголовка и иконок */}
-        <div className="mb-6">
+        <div className={cn(embedded ? "p-0" : "mb-6")}>
           <div className="grid grid-cols-3 gap-3">
             {quickOptions.map((option) => (
               <button
@@ -131,7 +140,9 @@ export function DatePanel({ onClose, applied, actions }: DatePanelProps) {
                   "flex items-center justify-center p-3 rounded-xl border transition-colors text-sm font-medium",
                   applied.whenPreset === option.id.toUpperCase()
                     ? "border-[#EF8759] bg-[#EF8759]/5 text-[#EF8759]"
-                    : "border-gray-200 hover:border-gray-300 hover:bg-gray-50"
+                    : embedded
+                      ? "border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50"
+                      : "border-gray-200 hover:border-gray-300 hover:bg-gray-50",
                 )}
               >
                 {option.label}
@@ -141,7 +152,7 @@ export function DatePanel({ onClose, applied, actions }: DatePanelProps) {
         </div>
 
         {/* Calendar - без границы */}
-        <div>
+        <div className={cn(embedded && "rounded-xl bg-white p-3")}>
           <WhenSelect
             value={whenValue}
             onChange={handleWhenChange}

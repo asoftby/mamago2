@@ -136,7 +136,7 @@ export function PlanSuggestionsSheet({
               onAddToPlan(suggestionItem);
               onOpenChange(false);
             }}
-            className="h-12 w-full bg-[#EF8759] text-base font-semibold hover:bg-[#e07040]"
+            className="h-12 w-full bg-[#EF8759] text-base font-semibold hover:bg-primary-hover"
           >
             Добавить в план
           </Button>

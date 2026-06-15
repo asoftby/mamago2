@@ -5,8 +5,7 @@
  */
 
 import prisma from "@/lib/prisma";
-import { BusinessVerificationStatus } from "@prisma/client";
-import { notifyAdminBusinessVerificationPending } from "@/lib/admin/notifyAdminBusinessVerification";
+import { BusinessMemberRole, BusinessVerificationStatus } from "@prisma/client";
 
 /**
  * Submit business for verification
@@ -84,13 +83,18 @@ export async function submitForVerification(
     include: { owner: { select: { email: true } } },
   });
   if (full) {
-    notifyAdminBusinessVerificationPending({
+    const { notifyAdminsBusinessApplicationCreated, notifyBusinessVerificationSubmitted } =
+      await import("./notification.service");
+    notifyAdminsBusinessApplicationCreated({
       businessId: full.id,
-      name: full.name,
-      legalName: full.legalName,
-      unp: full.unp,
+      businessName: full.name,
       ownerEmail: full.owner.email,
-    });
+    }).catch((e) =>
+      console.error("[businessVerification] notifyAdminsBusinessApplicationCreated failed:", e),
+    );
+    notifyBusinessVerificationSubmitted(full.id, full.name, full.ownerUserId).catch((e) =>
+      console.error("[businessVerification] notifyBusinessVerificationSubmitted failed:", e),
+    );
   }
 }
 
@@ -105,7 +109,7 @@ export async function approve(
 ): Promise<void> {
   const business = await prisma.business.findUnique({
     where: { id: businessId },
-    select: { verificationStatus: true },
+    select: { verificationStatus: true, ownerUserId: true },
   });
 
   if (!business) {
@@ -139,6 +143,19 @@ export async function approve(
     }),
     prisma.businessVerificationLog.create({
       data: { businessId, statusFrom, statusTo, note: note || "Approved", reviewedByUserId: actorUserId },
+    }),
+    // Establish the canonical OWNER membership so cabinet access no longer
+    // depends on the transitional Business.ownerUserId fallback in
+    // getPartnerCabinetBusiness. Idempotent on the [businessId, userId] unique.
+    prisma.businessMember.upsert({
+      where: { businessId_userId: { businessId, userId: business.ownerUserId } },
+      create: {
+        businessId,
+        userId: business.ownerUserId,
+        role: BusinessMemberRole.OWNER,
+        isActive: true,
+      },
+      update: { role: BusinessMemberRole.OWNER, isActive: true },
     }),
   ]);
 

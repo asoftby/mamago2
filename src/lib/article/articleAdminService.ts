@@ -1,4 +1,4 @@
-import type { ContentStatus } from "@prisma/client";
+import type { ContentStatus, GeoScope } from "@prisma/client";
 import { Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import type { ArticleEditorSnapshot, ArticleSaveInput } from "@/lib/article/articleAdminTypes";
@@ -7,9 +7,15 @@ import {
   parseArticleContentJson,
   serializeArticleContent,
 } from "@/lib/publications/articleMvp";
-import { assignArticleSlugIfMissing, updateArticleSlug } from "@/lib/slug/articleSlugService";
+import { resolveArticleSlugOnSave } from "@/lib/slug/resolvePublicationSlug";
+import { ensurePublishedArticleHasSlug } from "@/lib/slug/publishSlugGuards";
 import { syncArticleCanonical } from "@/lib/seo/syncEntityCanonical";
 import { createRequestPerf } from "@/server/utils/requestPerf";
+import {
+  ARTICLE_GEO_SCOPE_MESSAGES,
+  isPublishLikeStatus,
+  validateArticleGeoScope,
+} from "@/lib/article/articleGeoScopeValidation";
 
 export type { ArticleEditorSnapshot, ArticleSaveInput } from "@/lib/article/articleAdminTypes";
 export {
@@ -30,6 +36,9 @@ function toSnapshot(row: {
   authorUserId: string | null;
   authorLabel: string | null;
   cityContext: string | null;
+  categoryId: string | null;
+  geoScope: GeoScope | null;
+  cityId: string | null;
   status: ContentStatus;
   publishedAt: Date | null;
   scheduledAt: Date | null;
@@ -43,6 +52,7 @@ function toSnapshot(row: {
   seoImageAsset: { publicUrl: string | null } | null;
   seoRobots: string | null;
   noindex: boolean;
+  tags: Array<{ id: string }>;
   views: number;
   updatedAt: Date;
 }): ArticleEditorSnapshot {
@@ -59,6 +69,9 @@ function toSnapshot(row: {
     authorUserId: row.authorUserId,
     authorLabel: row.authorLabel,
     cityContext: row.cityContext,
+    categoryId: row.categoryId,
+    geoScope: row.geoScope,
+    cityId: row.cityId,
     status: row.status,
     publishedAt: row.publishedAt?.toISOString() ?? null,
     scheduledAt: row.scheduledAt?.toISOString() ?? null,
@@ -72,6 +85,7 @@ function toSnapshot(row: {
     seoImageUrl: row.seoImageAsset?.publicUrl ?? null,
     seoRobots: row.seoRobots,
     noindex: row.noindex,
+    tagIds: row.tags.map((tag) => tag.id),
     views: row.views,
     updatedAt: row.updatedAt.toISOString(),
   };
@@ -98,8 +112,107 @@ const articleSelect = {
   seoOgDescription: true,
   seoOgImage: true,
   seoRobots: true,
+  geoScope: true,
+  cityId: true,
+  categoryId: true,
+  tags: {
+    select: { id: true },
+  },
   updatedAt: true,
 } as const;
+
+async function assertArticleCategoryValid(categoryId: string | null): Promise<void> {
+  if (!categoryId) return;
+  const category = await prisma.eventCategory.findFirst({
+    where: {
+      id: categoryId,
+      publicationType: "ARTICLE",
+      isActive: true,
+      archivedAt: null,
+    },
+    select: { id: true },
+  });
+  if (!category) {
+    throw new Error("Выберите действительную категорию статьи");
+  }
+}
+
+function resolvedGeoScopeCityId(input: ArticleSaveInput): {
+  geoScope: GeoScope | null | undefined;
+  cityId: string | null | undefined;
+} {
+  if (input.geoScope === undefined) {
+    return { geoScope: undefined, cityId: undefined };
+  }
+  if (input.geoScope === null) {
+    return { geoScope: null, cityId: null };
+  }
+  if (input.geoScope === "COUNTRY") {
+    return { geoScope: "COUNTRY", cityId: null };
+  }
+  return { geoScope: "CITY", cityId: input.cityId?.trim() || null };
+}
+
+async function applyArticleGeoScope(
+  id: string,
+  input: ArticleSaveInput,
+): Promise<{ geoScope: GeoScope | null; cityId: string | null } | null> {
+  const resolved = resolvedGeoScopeCityId(input);
+  if (resolved.geoScope === undefined) return null;
+  if (resolved.geoScope === null) {
+    await prisma.$executeRaw(
+      Prisma.sql`UPDATE "Article"
+        SET "geoScope" = NULL, "cityId" = NULL, "cityContext" = NULL
+        WHERE id = ${id}`,
+    );
+    return { geoScope: null, cityId: null };
+  }
+
+  let cityContext: string | null = input.cityContext;
+  if (resolved.geoScope === "COUNTRY") {
+    cityContext = null;
+  } else if (resolved.cityId) {
+    const city = await prisma.city.findUnique({
+      where: { id: resolved.cityId },
+      select: { slug: true },
+    });
+    cityContext = city?.slug ?? input.cityContext;
+  }
+
+  await prisma.$executeRaw(
+    Prisma.sql`UPDATE "Article"
+      SET "geoScope" = ${resolved.geoScope}::"GeoScope",
+          "cityId" = ${resolved.cityId},
+          "cityContext" = ${cityContext}
+      WHERE id = ${id}`,
+  );
+
+  return { geoScope: resolved.geoScope, cityId: resolved.cityId ?? null };
+}
+
+async function fetchArticleGeoScope(
+  id: string,
+): Promise<{ geoScope: GeoScope | null; cityId: string | null }> {
+  const row = await prisma.article.findUnique({
+    where: { id },
+    select: { geoScope: true, cityId: true },
+  });
+  if (!row) throw new Error("Article not found");
+  return row;
+}
+
+function assertGeoScopeValidForPublish(
+  geoScope: GeoScope | null,
+  cityId: string | null,
+): void {
+  const result = validateArticleGeoScope({ geoScope, cityId, strict: true });
+  if (!result.ok) throw new Error(result.message);
+}
+
+async function assertArticleGeoScopeValidForPublish(id: string): Promise<void> {
+  const row = await fetchArticleGeoScope(id);
+  assertGeoScopeValidForPublish(row.geoScope, row.cityId);
+}
 
 async function fetchArticleMvpEditorialColumns(id: string): Promise<{
   coverImageId: string | null;
@@ -223,6 +336,15 @@ export async function createArticleFromSaveInput(input: ArticleSaveInput): Promi
   const publishedAt = input.publishedAt ? new Date(input.publishedAt) : null;
   const scheduledAt = input.scheduledAt ? new Date(input.scheduledAt) : null;
   const seoOgImageResolved = coverUrl ?? null;
+  const resolvedGeo = resolvedGeoScopeCityId(input);
+
+  if (isPublishLikeStatus(input.status)) {
+    if (input.geoScope == null) {
+      throw new Error(ARTICLE_GEO_SCOPE_MESSAGES.scopeRequired);
+    }
+    assertGeoScopeValidForPublish(resolvedGeo.geoScope ?? null, resolvedGeo.cityId ?? null);
+  }
+  await assertArticleCategoryValid(input.categoryId);
 
   const created = await prisma.article.create({
     data: {
@@ -245,19 +367,27 @@ export async function createArticleFromSaveInput(input: ArticleSaveInput): Promi
       authorLabel: input.authorLabel,
       coverImageId: input.coverImageId,
       cityContext: input.cityContext,
+      categoryId: input.categoryId,
       noindex: input.noindex,
+      tags: input.tagIds && input.tagIds.length > 0
+        ? { connect: input.tagIds.map((id) => ({ id })) }
+        : undefined,
     },
     select: { id: true },
   });
   perf.mark("db");
 
-  if (input.slug?.trim()) {
-    await updateArticleSlug(created.id, input.slug.trim(), { strict: true });
-  } else {
-    await assignArticleSlugIfMissing(created.id, input.title);
+  if (resolvedGeo.geoScope !== undefined) {
+    await applyArticleGeoScope(created.id, input);
   }
+
+  await resolveArticleSlugOnSave(created.id, input.title, input.slug);
   await syncArticleCanonical(created.id);
   perf.mark("seo");
+
+  if (isPublishLikeStatus(input.status)) {
+    await assertArticleGeoScopeValidForPublish(created.id);
+  }
 
   const next = await getArticleForEditor(created.id);
   if (!next) throw new Error("Article missing after create");
@@ -271,6 +401,21 @@ export async function saveArticleDraft(
   input: ArticleSaveInput,
 ): Promise<ArticleEditorSnapshot> {
   const perf = createRequestPerf("save-article:service:update");
+  const resolvedGeo = resolvedGeoScopeCityId(input);
+  const currentGeo = await fetchArticleGeoScope(id);
+  const effectiveGeoScope =
+    resolvedGeo.geoScope !== undefined ? resolvedGeo.geoScope : currentGeo.geoScope;
+  const effectiveCityId =
+    resolvedGeo.geoScope !== undefined ? (resolvedGeo.cityId ?? null) : currentGeo.cityId;
+
+  if (isPublishLikeStatus(input.status)) {
+    if (input.geoScope == null) {
+      throw new Error(ARTICLE_GEO_SCOPE_MESSAGES.scopeRequired);
+    }
+    assertGeoScopeValidForPublish(effectiveGeoScope, effectiveCityId);
+  }
+  await assertArticleCategoryValid(input.categoryId);
+
   const [coverUrl, editorial] = await Promise.all([
     resolveMediaUrl(input.coverImageId),
     fetchArticleMvpEditorialColumns(id),
@@ -302,17 +447,26 @@ export async function saveArticleDraft(
       seoOgDescription: input.seoOgDescription,
       seoOgImage: seoOgImageResolved,
       seoRobots: input.noindex ? "noindex, nofollow" : input.seoRobots,
+      categoryId: input.categoryId,
+      tags: { set: (input.tagIds ?? []).map((tagId) => ({ id: tagId })) },
     },
     select: { id: true },
   });
   perf.mark("db");
 
+  if (resolvedGeo.geoScope !== undefined) {
+    await applyArticleGeoScope(id, input);
+  } else {
+    await Promise.allSettled([
+      prisma.$executeRaw(
+        Prisma.sql`UPDATE "Article" SET "cityContext" = ${input.cityContext} WHERE id = ${id}`,
+      ),
+    ]);
+  }
+
   await Promise.allSettled([
     prisma.$executeRaw(
       Prisma.sql`UPDATE "Article" SET "coverImageId" = ${input.coverImageId} WHERE id = ${id}`,
-    ),
-    prisma.$executeRaw(
-      Prisma.sql`UPDATE "Article" SET "cityContext" = ${input.cityContext} WHERE id = ${id}`,
     ),
     prisma.$executeRaw(
       Prisma.sql`UPDATE "Article" SET "scheduledAt" = ${scheduledAt} WHERE id = ${id}`,
@@ -330,11 +484,7 @@ export async function saveArticleDraft(
   ]);
   perf.mark("editorial-writes");
 
-  if (input.slug?.trim()) {
-    await updateArticleSlug(id, input.slug.trim(), { strict: true });
-  } else {
-    await assignArticleSlugIfMissing(id, input.title);
-  }
+  await resolveArticleSlugOnSave(id, input.title, input.slug);
 
   await syncArticleCanonical(id);
   perf.mark("seo");
@@ -347,6 +497,14 @@ export async function saveArticleDraft(
 }
 
 export async function submitArticleForModeration(id: string): Promise<ArticleEditorSnapshot> {
+  await assertArticleGeoScopeValidForPublish(id);
+  const row = await prisma.article.findUnique({
+    where: { id },
+    select: { title: true, slug: true },
+  });
+  if (row && !row.slug?.trim()) {
+    await resolveArticleSlugOnSave(id, row.title, null);
+  }
   await prisma.article.update({
     where: { id },
     data: { status: "PENDING" },
@@ -371,6 +529,7 @@ export async function moderateArticle(
     if (!rejected) throw new Error("Article missing after reject");
     return rejected;
   }
+  await assertArticleGeoScopeValidForPublish(id);
   await prisma.article.update({
     where: { id },
     data: {
@@ -379,6 +538,7 @@ export async function moderateArticle(
     },
     select: { id: true },
   });
+  await ensurePublishedArticleHasSlug(id);
   await syncArticleCanonical(id);
   const published = await getArticleForEditor(id);
   if (!published) throw new Error("Article missing after publish");

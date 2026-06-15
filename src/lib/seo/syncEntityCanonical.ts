@@ -1,6 +1,10 @@
 import { SeoCanonicalSource } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { resolveCanonicalEventPublicPathById } from "@/lib/business/resolveCanonicalEventPublicPath";
+import {
+  buildCityPublicPath,
+  buildNationalArticlePath,
+} from "@/lib/routing/cityPaths";
 
 function absoluteBase(): string {
   return (process.env.NEXT_PUBLIC_APP_URL || "https://mamago.by").replace(/\/$/, "");
@@ -104,12 +108,21 @@ export async function syncArticleCanonical(articleId: string): Promise<void> {
   try {
     const row = await prisma.article.findUnique({
       where: { id: articleId },
-      select: { id: true, slug: true, seoCanonicalSource: true },
+      select: {
+        id: true,
+        slug: true,
+        seoCanonicalSource: true,
+        geoScope: true,
+        city: { select: { slug: true } },
+      },
     });
     if (!row || row.seoCanonicalSource === SeoCanonicalSource.MANUAL) return;
 
     const seg = row.slug?.trim() || row.id;
-    const path = `/blog/${seg}`;
+    const path =
+      row.geoScope === "CITY" && row.city?.slug
+        ? buildCityPublicPath({ citySlug: row.city.slug, type: "article", slug: seg })
+        : buildNationalArticlePath(seg);
     const absolute = `${absoluteBase()}${path}`;
     const hasSlug = !!row.slug?.trim();
 

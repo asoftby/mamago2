@@ -602,8 +602,7 @@ export function WhenSelect({
 
   if (variant === "embedded") {
     return (
-      <div className={cn("flex flex-col gap-4", className)}>
-        {/* Calendar - убираем дублирующиеся кнопки пресетов */}
+      <div className={cn("flex flex-col gap-4 bg-white", className)}>
         {renderCalendar()}
       </div>
     );

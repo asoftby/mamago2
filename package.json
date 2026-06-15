@@ -7,7 +7,14 @@
   },
   "pnpm": {
     "overrides": {
-      "brace-expansion@<1.1.13": ">=1.1.13"
+      "brace-expansion@<1.1.13": ">=1.1.13",
+      "fast-uri@<=3.1.1": "3.1.2",
+      "brace-expansion@>=5.0.0 <5.0.6": "5.0.6",
+      "ws@>=8.0.0 <8.20.1": "8.20.1",
+      "hono@<4.12.21": "4.12.21",
+      "qs@<6.15.2": "6.15.2",
+      "ip-address@<=10.1.0": "10.1.1",
+      "esbuild@<0.28.1": "0.28.1"
     }
   },
   "scripts": {
@@ -15,10 +22,10 @@
     "dev:turbo": "ulimit -n 65536 && next dev --turbo -H 0.0.0.0",
     "dev:webpack": "next dev",
     "email:preview": "react-email dev --dir ./emails --port 3011",
-    "build": "NODE_OPTIONS=--max-old-space-size=8192 next build --webpack",
+    "build": "NODE_OPTIONS=--max-old-space-size=3072 next build --webpack",
     "start": "next start",
     "lint": "eslint",
-    "check": "tsc --noEmit && eslint src --quiet && NODE_OPTIONS=--max-old-space-size=8192 next build --webpack",
+    "check": "tsc --noEmit && eslint src --quiet && NODE_OPTIONS=--max-old-space-size=3072 next build --webpack",
     "postinstall": "prisma generate",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
@@ -43,8 +50,10 @@
     "db:backup:pre": "bash scripts/db/backup.sh",
     "db:reset:safe": "pnpm db:backup && pnpm prisma migrate reset --force",
     "db:migrate:safe": "pnpm db:backup && pnpm prisma migrate dev",
+    "build-migration-manifest": "tsx scripts/build-migration-manifest.ts",
     "test:unit": "tsx src/lib/slugifyLabelToValue.test.ts",
-    "test:notifications-mvp": "tsx src/lib/notifications/userNotificationPresentation.test.ts && tsx src/server/notifications/notification-renderer.test.ts && tsx src/server/notifications/notification-dedupe.test.ts && tsx src/server/notifications/notification.service.test.ts && tsx src/server/notifications/jobs/run-plan-event-reminders.test.ts",
+    "test:notifications-mvp": "tsx src/lib/notifications/userNotificationPresentation.test.ts && tsx src/server/notifications/notification-renderer.test.ts && tsx src/server/notifications/notification-dedupe.test.ts && tsx src/server/notifications/notification.service.test.ts && tsx src/server/notifications/jobs/run-plan-event-reminders.test.ts && tsx src/server/notifications/template-render.test.ts",
+    "test:notification-templates": "tsx src/server/notifications/template-render.test.ts",
     "test:anti-repeat": "tsx src/features/hero-weather/model/anti-repeat.test.ts",
     "test:weather-provider": "tsx src/features/hero-weather/api/weather-provider.test.ts",
     "search:reindex": "tsx scripts/search-reindex.ts",
@@ -89,7 +98,7 @@
     "grammy": "^1.42.0",
     "libphonenumber-js": "^1.12.40",
     "lucide-react": "^0.575.0",
-    "next": "16.2.4",
+    "next": "16.2.9",
     "next-themes": "^0.4.6",
     "prisma": "6.19.2",
     "radix-ui": "^1.4.3",

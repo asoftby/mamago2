@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { Prisma, SignalDomain, SignalEntityType, SignalStatus } from "@prisma/client";
+import { Prisma, SignalDomain, SignalEntityType, SignalStatus, SignalUsageType } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth/server";
 import { canManageSignalDefinitions } from "@/lib/auth/signalDefinitionsAdmin";
@@ -46,6 +46,8 @@ export async function GET(req: Request) {
     const domain = url.searchParams.get("domain");
     const entityType = url.searchParams.get("entityType");
     const includeDeprecated = url.searchParams.get("includeDeprecated") === "true";
+    const planOnboarding = url.searchParams.get("planOnboarding") === "true";
+    const usageType = url.searchParams.get("usageType");
 
     // Build where clause
     const where: Prisma.SignalDefinitionWhereInput = {};
@@ -53,6 +55,24 @@ export async function GET(req: Request) {
     // By default, return only ACTIVE signals unless includeDeprecated is true
     if (!includeDeprecated) {
       where.status = "ACTIVE";
+    }
+
+    if (planOnboarding) {
+      where.OR = [
+        { usageType: { in: [SignalUsageType.PLAN_ADULT_PREFERENCE, SignalUsageType.PLAN_LEISURE_FORMAT] } },
+        {
+          parent: {
+            usageType: {
+              in: [SignalUsageType.PLAN_ADULT_PREFERENCE, SignalUsageType.PLAN_LEISURE_FORMAT],
+            },
+          },
+        },
+      ];
+    } else if (usageType && Object.values(SignalUsageType).includes(usageType as SignalUsageType)) {
+      where.OR = [
+        { usageType: usageType as SignalUsageType },
+        { parent: { usageType: usageType as SignalUsageType } },
+      ];
     }
 
     // Filter by domain if provided
@@ -132,6 +152,13 @@ export async function POST(req: Request) {
       ? body.replacedById 
       : null;
 
+    const usageType =
+      body.usageType === null || body.usageType === ""
+        ? null
+        : Object.values(SignalUsageType).includes(body.usageType)
+          ? (body.usageType as SignalUsageType)
+          : null;
+
     if (!title) {
       return NextResponse.json({ error: "title is required" }, { status: 400 });
     }
@@ -186,6 +213,7 @@ export async function POST(req: Request) {
         entityTypes,
         status,
         replacedById,
+        usageType,
       },
       include: {
         parent: { select: { id: true, title: true, slug: true } },

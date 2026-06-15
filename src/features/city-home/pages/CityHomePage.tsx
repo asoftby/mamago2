@@ -12,6 +12,7 @@ import {
   CityHomeRoutesSection,
 } from "@/features/city-home/components/CityHomeContentRows";
 import prisma from "@/lib/prisma";
+import { findCityBySlug } from "@/server/geo/findCityBySlug";
 import { getCurrentUser } from "@/lib/auth/server";
 import { getKudaDiscoveryFeed } from "@/server/discovery/kudaDiscoveryFeed";
 import { listPublicRoutesByCity, listPublicRoutesByCityIds } from "@/server/services/route.service";
@@ -28,13 +29,14 @@ interface CityHomePageProps {
 
 export default async function CityHomePage({ citySlug }: CityHomePageProps) {
   const [city, user] = await Promise.all([
-    prisma.city.findUnique({ where: { slug: citySlug } }),
+    findCityBySlug(citySlug),
     getCurrentUser(),
   ]);
 
   if (!city) notFound();
 
   const heroModel = await getHeroContext({
+    cityId: city.id,
     citySlug: city.slug,
     cityName: city.name,
     cityCenterLat: city.centerLat ?? city.lat ?? undefined,

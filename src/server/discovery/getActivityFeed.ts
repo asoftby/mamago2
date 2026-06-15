@@ -1,13 +1,12 @@
 import prisma from "@/lib/prisma";
+import { findCityBySlug } from "@/server/geo/findCityBySlug";
 import { DiscoveryState } from "@/lib/discovery/urlState";
 import { getPublicListingActivityWhere } from "@/server/public/publicContentVisibility";
 import type { Prisma } from "@prisma/client";
 
 export async function getActivityFeed(citySlug: string, state: DiscoveryState) {
   // 1. Find city
-  const city = await prisma.city.findUnique({
-    where: { slug: citySlug },
-  });
+  const city = await findCityBySlug(citySlug);
 
   if (!city) {
     return null;

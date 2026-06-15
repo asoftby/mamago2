@@ -59,6 +59,7 @@ export interface OfferScheduleItem {
   priceLabel?: string;
   promoLabel?: string;
   description?: string;
+  promotionDetails?: string;
 }
 
 export interface ShiftCtaContext {
@@ -68,6 +69,7 @@ export interface ShiftCtaContext {
   dateTo?: string;
   price?: string;
   ageRange?: string;
+  promotionDetails?: string;
 }
 
 export interface OfferReview {

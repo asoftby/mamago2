@@ -2,13 +2,13 @@ import prisma from "@/lib/prisma";
 
 /**
  * Для ленты «Куда пойти» хаб может включать не только сам город, но и связанные населённые пункты
- * (например Минск + Минская область), без смены URL — пользователь по-прежнему на /minsk/kuda.
+ * (например Минск + Марьина Горка), без смены URL — пользователь по-прежнему на /minsk/kuda.
  *
  * Ключ — slug города-хаба из URL; значение — дополнительные slug городов из справочника `City`.
  * Сам хаб в список не дублируем: он берётся из текущей страницы.
  */
 export const DISCOVERY_HUB_EXTRA_CITY_SLUGS: Readonly<Record<string, readonly string[]>> = {
-  minsk: ["minskaya-oblast", "marina-gorka"],
+  minsk: ["marina-gorka"],
 };
 
 export async function resolveKudaDiscoveryCityIds(
@@ -22,7 +22,7 @@ export async function resolveKudaDiscoveryCityIds(
 
   const slugs = [hubCitySlug, ...extras];
   const rows = await prisma.city.findMany({
-    where: { slug: { in: slugs } },
+    where: { slug: { in: slugs }, isLegacyNonCity: false },
     select: { id: true, slug: true },
   });
 

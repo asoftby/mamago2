@@ -443,7 +443,7 @@ export function RouteDetailClient({ route }: Props) {
         <div className="bg-[#F8F8F7] border-b border-neutral-100">
           <Container className="max-w-2xl">
             <div className="flex items-center justify-between h-12 pt-[20px]">
-              <MobileSmartBackButton fallbackUrl="/minsk" className="shrink-0" />
+              <MobileSmartBackButton className="shrink-0" />
               <Link
                 href="/routes"
                 className="hidden items-center gap-1.5 text-sm font-medium text-neutral-600 transition-colors hover:text-neutral-900 md:inline-flex"

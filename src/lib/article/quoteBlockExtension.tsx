@@ -11,7 +11,7 @@ function QuoteBlockNodeView({ node, updateAttributes }: NodeViewProps) {
       as="div"
       className="border-l-4 border-muted-foreground/30 pl-4 py-1 my-1 space-y-2"
     >
-      <NodeViewContent as="div" className="italic" />
+      <NodeViewContent as="div" className="font-display-italic" />
       <div className="flex gap-2" contentEditable={false}>
         <Input
           placeholder="Автор (опционально)"

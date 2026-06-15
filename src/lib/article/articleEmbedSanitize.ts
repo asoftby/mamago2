@@ -66,12 +66,11 @@ function normalizeInstagramIframeSrc(src: string): string | null {
   }
 }
 
-function buildSafeIframe(src: string, title: string, aspectClass: "video" | "auto"): string {
-  const aspectStyle =
-    aspectClass === "video"
-      ? "aspect-ratio:16/9;min-height:200px"
-      : "min-height:320px;min-width:240px";
-  return `<iframe src="${escapeAttr(src)}" title="${escapeAttr(title)}" loading="lazy" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen="" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" style="width:100%;max-width:100%;border:0;border-radius:0.75rem;${aspectStyle}"></iframe>`;
+function buildSafeIframe(src: string, title: string, aspectClass: "video" | "portrait"): string {
+  if (aspectClass === "portrait") {
+    return `<div class="article-embed__instagram-frame"><iframe src="${escapeAttr(src)}" title="${escapeAttr(title)}" loading="lazy" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen="" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"></iframe></div>`;
+  }
+  return `<iframe src="${escapeAttr(src)}" title="${escapeAttr(title)}" loading="lazy" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen="" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" style="width:100%;max-width:100%;border:0;border-radius:0.75rem;aspect-ratio:16/9;min-height:200px"></iframe>`;
 }
 
 function extractFirstIframeOpenTag(html: string): string | null {
@@ -97,7 +96,7 @@ function tryIframe(html: string): ArticleEmbedResolveResult | null {
   const ig = normalizeInstagramIframeSrc(srcRaw);
   if (ig) {
     return {
-      sanitizedHtml: `<div class="article-embed article-embed--instagram">${buildSafeIframe(ig, "Instagram", "auto")}</div>`,
+      sanitizedHtml: `<div class="article-embed article-embed--instagram">${buildSafeIframe(ig, "Instagram", "portrait")}</div>`,
       provider: "instagram",
       requiresInstagramScript: false,
     };

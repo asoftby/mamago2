@@ -14,7 +14,9 @@ const prisma = new PrismaClient();
 async function main() {
   console.log("🎭 Seeding DEMO DATA (dev/staging only)...");
 
-  const minsk = await prisma.city.findUnique({ where: { slug: "minsk" } });
+  const minsk = await prisma.city.findFirst({
+    where: { slug: "minsk", country: { isoCode: "BY" }, isLegacyNonCity: false },
+  });
   if (!minsk) throw new Error("Run pnpm db:seed:system first — city 'minsk' not found.");
 
   // Admin user (dev only)
@@ -23,6 +25,31 @@ async function main() {
     update: { role: "ADMIN" },
     create: { email: "admin@mamago.local", passwordHash: "dev-only", role: "ADMIN" },
   });
+
+  // Business user (dev only) — for /editor login
+  const businessUser = await prisma.user.upsert({
+    where: { email: "business@mamago.local" },
+    update: { role: "BUSINESS_OWNER" },
+    create: { email: "business@mamago.local", passwordHash: "dev-only", role: "BUSINESS_OWNER" },
+  });
+  const devBusiness = await prisma.business.upsert({
+    where: { ownerUserId: businessUser.id },
+    update: {},
+    create: {
+      ownerUserId: businessUser.id,
+      name: "Dev Business",
+      status: "APPROVED",
+      verificationStatus: "VERIFIED",
+      isVerified: true,
+    },
+  });
+  await prisma.businessMember.upsert({
+    where: { businessId_userId: { businessId: devBusiness.id, userId: businessUser.id } },
+    update: {},
+    create: { businessId: devBusiness.id, userId: businessUser.id, role: "OWNER" },
+  });
+  console.log(`  → Business user: business@mamago.local (dev-only passwordHash)`);
+  console.log(`  → Business: ${devBusiness.name} (id: ${devBusiness.id})`);
 
   // Demo Place
   const demoPlace = await prisma.place.upsert({

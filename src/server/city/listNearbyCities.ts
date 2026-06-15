@@ -36,6 +36,7 @@ export async function listNearbyCities(
     where: {
       id: { not: city.id },
       isActive: true,
+      isLegacyNonCity: false,
       centerLat: { not: null },
       centerLng: { not: null },
     },

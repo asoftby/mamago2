@@ -67,7 +67,7 @@ export function pickWeightedNonRepeating(
 
 export function countRecentMatches(
   entries: AntiRepeatEntry[],
-  field: "microcopyId" | "titleId" | "subtitleId",
+  field: "microcopyId" | "titleId",
   id: string,
   lastN?: number,
 ): number {
@@ -99,7 +99,6 @@ function diffAgainstPrevious(
   let d = 0;
   if (ids.microcopyId !== prev.microcopyId) d++;
   if (ids.titleId !== prev.titleId) d++;
-  if (ids.subtitleId !== prev.subtitleId) d++;
   return d;
 }
 
@@ -113,7 +112,7 @@ function pickDifferentFrom(
 }
 
 /**
- * Picks micro/title/subtitle ids with anti-repeat heuristics.
+ * Picks micro/title ids with anti-repeat heuristics.
  * Global `state.entries` is **oldest first, newest last** (append-only).
  */
 export function selectHeroCopyIdsWithAntiRepeat(input: {
@@ -121,21 +120,19 @@ export function selectHeroCopyIdsWithAntiRepeat(input: {
   candidateIds: {
     microcopy: PickCandidate[];
     titles: PickCandidate[];
-    subtitles: PickCandidate[];
   };
   state: AntiRepeatState;
 }): HeroCopySelectionIds | null {
   const { scenario, candidateIds, state } = input;
-  const { microcopy, titles, subtitles } = candidateIds;
+  const { microcopy, titles } = candidateIds;
 
-  if (microcopy.length === 0 || titles.length === 0 || subtitles.length === 0) {
+  if (microcopy.length === 0 || titles.length === 0) {
     return null;
   }
 
   const entries = state.entries;
   const microHist = entries.map((e) => e.microcopyId);
   const titleHist = entries.map((e) => e.titleId);
-  const subHist = entries.map((e) => e.subtitleId);
 
   const microPick = pickWeightedNonRepeating(microcopy, microHist, {
     avoidLastN: 3,
@@ -145,17 +142,12 @@ export function selectHeroCopyIdsWithAntiRepeat(input: {
     avoidLastN: 5,
     fallbackToAny: true,
   });
-  const subPick = pickWeightedNonRepeating(subtitles, subHist, {
-    avoidLastN: 5,
-    fallbackToAny: true,
-  });
 
-  if (!microPick || !titlePick || !subPick) return null;
+  if (!microPick || !titlePick) return null;
 
   let ids: HeroCopySelectionIds = {
     microcopyId: microPick.id,
     titleId: titlePick.id,
-    subtitleId: subPick.id,
   };
 
   const recentSame = getRecentEntriesForScenario(entries, scenario, 1);
@@ -163,7 +155,7 @@ export function selectHeroCopyIdsWithAntiRepeat(input: {
 
   if (lastSame) {
     let guard = 0;
-    while (diffAgainstPrevious(ids, lastSame) < 2 && guard < 10) {
+    while (diffAgainstPrevious(ids, lastSame) < 1 && guard < 10) {
       guard++;
       if (ids.microcopyId === lastSame.microcopyId) {
         const alt = pickDifferentFrom(microcopy, lastSame.microcopyId);
@@ -174,12 +166,6 @@ export function selectHeroCopyIdsWithAntiRepeat(input: {
       if (ids.titleId === lastSame.titleId) {
         const alt = pickDifferentFrom(titles, lastSame.titleId);
         if (alt) ids = { ...ids, titleId: alt.id };
-        else break;
-        continue;
-      }
-      if (ids.subtitleId === lastSame.subtitleId) {
-        const alt = pickDifferentFrom(subtitles, lastSame.subtitleId);
-        if (alt) ids = { ...ids, subtitleId: alt.id };
         else break;
         continue;
       }
@@ -202,7 +188,6 @@ export function selectCopyVariantsWithAntiRepeat(input: {
   packs: {
     microcopy: CopyVariant[];
     titles: CopyVariant[];
-    subtitles: CopyVariant[];
   };
   state: AntiRepeatState;
 }): HeroCopySelectionIds | null {
@@ -211,7 +196,6 @@ export function selectCopyVariantsWithAntiRepeat(input: {
     candidateIds: {
       microcopy: input.packs.microcopy.map(copyVariantToCandidate),
       titles: input.packs.titles.map(copyVariantToCandidate),
-      subtitles: input.packs.subtitles.map(copyVariantToCandidate),
     },
     state: input.state,
   });

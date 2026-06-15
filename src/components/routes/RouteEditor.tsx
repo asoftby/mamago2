@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { Container } from "@/components/ui/Container";
@@ -24,6 +24,19 @@ import {
   Wallet,
 } from "lucide-react";
 import { toast } from "@/lib/toast";
+import { useWizardDraft } from "@/hooks/useWizardDraft";
+import { useUnsavedChangesNavigationGuard } from "@/hooks/use-unsaved-changes-navigation-guard";
+import { SaveIndicator, formatRelativeTimeRu } from "@/components/form-shell";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   summarizeRouteBudget,
   type LegacyBudgetLevel,
@@ -127,6 +140,19 @@ const BASE_STATE: WizardState = {
   stops: [makeEmptyStop(), makeEmptyStop()],
   visibility: "PUBLIC",
 };
+
+/** Версия схемы черновика в localStorage; bump при несовместимом изменении WizardState */
+const ROUTE_WIZARD_DRAFT_SCHEMA_VERSION = 1;
+
+/** Пустую форму не автосохраняем */
+function isMeaningfulRouteDraft(state: WizardState): boolean {
+  return (
+    state.title.trim().length > 0 ||
+    state.ageTags.length > 0 ||
+    state.budgetLevel !== null ||
+    state.stops.some((s) => s.location !== null || s.note.trim().length > 0)
+  );
+}
 
 function normalizeEditableStop(stop: EditableRouteStop): EditableRouteStop {
   return {
@@ -827,6 +853,43 @@ export function RouteEditor({
 
   const isEdit = mode === "edit";
 
+  // ── Черновик в localStorage + индикатор сохранения ─────────────────────────
+  const stateJson = useMemo(() => JSON.stringify(state), [state]);
+  /** Снимок состояния, совпадающего с сервером (или начального) — база для dirty */
+  const baselineJsonRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (baselineJsonRef.current === null) {
+      baselineJsonRef.current = stateJson;
+    }
+  }, [stateJson]);
+  const dirty =
+    baselineJsonRef.current !== null && baselineJsonRef.current !== stateJson;
+
+  const draft = useWizardDraft<WizardState>({
+    wizardType: "route",
+    mode,
+    entityId: isEdit ? routeId : null,
+    schemaVersion: ROUTE_WIZARD_DRAFT_SCHEMA_VERSION,
+    data: state,
+    enabled: dirty && isMeaningfulRouteDraft(state),
+  });
+
+  const { leaveDialogOpen, confirmLeave, onLeaveDialogOpenChange, requestLeave } =
+    useUnsavedChangesNavigationGuard(dirty);
+
+  const handleRestoreDraft = () => {
+    const restored = draft.restoreDraft();
+    if (!restored) return;
+    setState({
+      ...BASE_STATE,
+      ...restored,
+      stops:
+        restored.stops.length > 0
+          ? restored.stops.map(normalizeEditableStop)
+          : BASE_STATE.stops,
+    });
+  };
+
   const handleSave = async (publish: boolean) => {
     if (saving) return;
     setSaving(true);
@@ -894,6 +957,10 @@ export function RouteEditor({
 
       const { slug } = await res.json();
 
+      // Сохранено на сервере: локальный черновик больше не нужен, guard снят
+      draft.markClean();
+      baselineJsonRef.current = JSON.stringify(state);
+
       if (isEdit) {
         toast.success(publish ? "Маршрут обновлён" : "Изменения сохранены");
         router.push(`/routes/${slug}`);
@@ -920,7 +987,9 @@ export function RouteEditor({
       <Container className="max-w-lg py-6 pb-20">
         <div className="flex items-center gap-3 mb-6">
           <button
-            onClick={() => (step > 1 ? setStep((s) => s - 1) : router.back())}
+            onClick={() =>
+              step > 1 ? setStep((s) => s - 1) : requestLeave(() => router.back())
+            }
             className="p-2 rounded-xl text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100 transition-colors"
           >
             <ArrowLeft className="w-5 h-5" />
@@ -931,6 +1000,12 @@ export function RouteEditor({
             </h1>
             <p className="text-xs text-neutral-400">Шаг {step} из 3</p>
           </div>
+          <SaveIndicator
+            status={draft.status}
+            lastSavedAt={draft.lastSavedAt}
+            onRetry={draft.retry}
+            className="hidden sm:inline-flex"
+          />
           <Button
             variant="outline"
             size="sm"
@@ -943,6 +1018,31 @@ export function RouteEditor({
             {draftButtonLabel}
           </Button>
         </div>
+
+        {draft.hasDraft && (
+          <div className="mb-5 flex flex-col gap-3 rounded-2xl border border-neutral-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-neutral-700">
+              У вас есть незавершённый черновик
+              {draft.draftSavedAt
+                ? ` (${formatRelativeTimeRu(draft.draftSavedAt)})`
+                : ""}
+              . Продолжить с него?
+            </p>
+            <div className="flex shrink-0 gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="rounded-xl border-neutral-200"
+                onClick={() => draft.discardDraft()}
+              >
+                Начать заново
+              </Button>
+              <Button size="sm" className="rounded-xl" onClick={handleRestoreDraft}>
+                Продолжить
+              </Button>
+            </div>
+          </div>
+        )}
 
         <StepIndicator step={step} />
 
@@ -971,6 +1071,22 @@ export function RouteEditor({
           />
         )}
       </Container>
+
+      <AlertDialog open={leaveDialogOpen} onOpenChange={onLeaveDialogOpenChange}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Уйти со страницы?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Изменения не сохранены на сервере. Черновик остаётся на этом
+              устройстве — вы сможете продолжить позже.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Остаться</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmLeave}>Уйти</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

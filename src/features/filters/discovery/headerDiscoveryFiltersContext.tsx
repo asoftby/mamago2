@@ -92,16 +92,19 @@ export function HeaderDiscoveryFiltersProvider({
       }
 
       if (targetCitySlug === activeCitySlugRef.current) {
-        setState((prev) => ({
-          citySlug: targetCitySlug,
-          metros:
-            prev.citySlug === targetCitySlug ? prev.metros : [],
-          districts:
-            prev.citySlug === targetCitySlug ? prev.districts : [],
-          loading: true,
-          error: null,
-          hasLoaded: prev.citySlug === targetCitySlug ? prev.hasLoaded : false,
-        }));
+        setState((prev) => {
+          if (prev.citySlug === targetCitySlug && prev.loading) {
+            return prev;
+          }
+          return {
+            citySlug: targetCitySlug,
+            metros: prev.citySlug === targetCitySlug ? prev.metros : [],
+            districts: prev.citySlug === targetCitySlug ? prev.districts : [],
+            loading: true,
+            error: null,
+            hasLoaded: prev.citySlug === targetCitySlug ? prev.hasLoaded : false,
+          };
+        });
       }
 
       try {

@@ -1,5 +1,6 @@
 import prisma from "@/lib/prisma";
 import { BREAKING_NEWS_SUBTITLE } from "@/lib/publications/breakingNewsArticle";
+import { buildArticlePublicPath } from "@/lib/routing/cityPaths";
 import { parseArticleContentJson } from "@/lib/publications/articleMvp";
 import { stripHtml } from "@/lib/search/sanitizeSearchText";
 
@@ -50,6 +51,8 @@ export async function listBreakingNewsArticles(
       seoOgImage: true,
       publishedAt: true,
       slug: true,
+      geoScope: true,
+      city: { select: { slug: true } },
     },
   });
 
@@ -98,7 +101,13 @@ export async function listBreakingNewsArticles(
           r.seoOgImage?.trim() ||
           null,
         publishedAt: r.publishedAt.toISOString(),
-        href: r.slug ? `/blog/${r.slug}` : null,
+        href: r.slug
+          ? buildArticlePublicPath({
+              slug: r.slug,
+              geoScope: r.geoScope ?? undefined,
+              citySlug: r.city?.slug ?? null,
+            })
+          : null,
       };
     });
 }

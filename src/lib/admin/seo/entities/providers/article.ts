@@ -1,4 +1,4 @@
-import { ContentStatus } from "@prisma/client";
+import { ContentStatus, GeoScope } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import type { SeoEntityProvider } from "../types";
 import {
@@ -12,6 +12,10 @@ import {
   SEO_ROBOTS_INDEX_FOLLOW,
   SEO_ROBOTS_NOINDEX_FOLLOW,
 } from "@/lib/admin/seo/entities/robotsConstants";
+import {
+  buildCityPublicPath,
+  buildNationalArticlePath,
+} from "@/lib/routing/cityPaths";
 
 const ARTICLE_LIST_LIMIT = 400;
 
@@ -32,6 +36,8 @@ export const articleProvider: SeoEntityProvider = {
         excerpt: true,
         status: true,
         updatedAt: true,
+        geoScope: true,
+        city: { select: { slug: true } },
         seoH1: true,
         seoTitle: true,
         seoDescription: true,
@@ -44,7 +50,10 @@ export const articleProvider: SeoEntityProvider = {
     return articles.map((a) => {
       const published = a.status === ContentStatus.PUBLISHED;
       const seg = a.slug?.trim() || a.id;
-      const path = `/blog/${seg}`;
+      const path =
+        a.geoScope === GeoScope.CITY && a.city?.slug
+          ? buildCityPublicPath({ citySlug: a.city.slug, type: "article", slug: seg })
+          : buildNationalArticlePath(seg);
       const canonical = a.seoCanonicalUrl?.trim() || path;
       const entityDiagnostics = buildSegmentEntityDiagnostics("article", {
         entityId: a.id,
@@ -85,6 +94,8 @@ export const articleProvider: SeoEntityProvider = {
         excerpt: true,
         slug: true,
         status: true,
+        geoScope: true,
+        city: { select: { slug: true } },
         seoTitle: true,
         seoDescription: true,
         seoH1: true,
@@ -124,7 +135,7 @@ export const articleProvider: SeoEntityProvider = {
       seoJsonLdOverride: (a.seoJsonLdOverride as unknown) ?? null,
       urlDiagnostics,
       contentStatus: a.status,
-      citySlug: null,
+      citySlug: a.city?.slug ?? null,
     };
   },
 
@@ -181,7 +192,7 @@ export const articleProvider: SeoEntityProvider = {
     if (a.seoJsonLdOverride && typeof a.seoJsonLdOverride === "object") {
       return a.seoJsonLdOverride as Record<string, unknown>;
     }
-    const publicBase = process.env.NEXT_PUBLIC_APP_URL || "https://mamago.by";
+    const publicBase = (process.env.NEXT_PUBLIC_APP_URL || "https://mamago.by").replace(/\/$/, "");
     return buildArticleJsonLd({ article: a, publicBase });
   },
 };

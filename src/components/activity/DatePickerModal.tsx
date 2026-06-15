@@ -268,7 +268,7 @@ export function DatePickerModal({
         {/* Заголовок */}
         <h2 style={{
           margin: "0 0 8px",
-          fontFamily: "Georgia, 'Times New Roman', 'DejaVu Serif', serif",
+          fontFamily: "var(--font-editorial)",
           fontSize: 30, fontWeight: 400,
           lineHeight: 1.1, letterSpacing: "-0.5px",
           color: C.text,
@@ -623,7 +623,7 @@ export function DatePickerModal({
       }}>
         <div style={{ flex: 1, height: 1, background: C.border }} />
         <span style={{
-          fontFamily: "Georgia, 'Times New Roman', serif",
+          fontFamily: "var(--font-editorial)",
           fontStyle: "italic", fontSize: 15, color: C.textSec,
           whiteSpace: "nowrap",
         }}>

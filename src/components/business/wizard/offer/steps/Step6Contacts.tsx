@@ -337,7 +337,8 @@ export function Step6Contacts({ data, onChange, isEditable }: Step6ContactsProps
           </div>
           <PlaceSearchAutocomplete
             selectedPlaceId={data.placeId}
-            placeholder="Название места или адрес"
+            ownPlacesOnly
+            placeholder="Название вашего места"
             onCreatePlace={(initialName) => {
               toast.message(
                 initialName.trim()

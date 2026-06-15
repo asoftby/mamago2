@@ -98,7 +98,7 @@ export function ActivityForm({ data, onChange }: ActivityFormProps) {
           {[
             { value: "free", label: "Бесплатно" },
             { value: "fixed", label: "Фиксированная цена" },
-            { value: "from", label: 'Цена "от"' },
+            { value: "from", label: 'Цена «от»' },
             { value: "on-request", label: "По запросу" },
           ].map((mode) => (
             <button

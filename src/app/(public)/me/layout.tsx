@@ -1,8 +1,15 @@
 import React from "react";
+import { getCurrentUser } from "@/lib/auth/server";
+import { redirectToLogin } from "@/lib/auth/requireAuthRedirect";
 
 /**
  * Личный кабинет /me: шрифт наследуется от root layout через <html className={ntSomic.variable}>.
  */
-export default function MeLayout({ children }: { children: React.ReactNode }) {
+export default async function MeLayout({ children }: { children: React.ReactNode }) {
+  const user = await getCurrentUser();
+  if (!user) {
+    await redirectToLogin();
+  }
+
   return <div className="min-w-0 antialiased">{children}</div>;
 }

@@ -5,17 +5,22 @@ import { useSmartBack } from "@/hooks/useSmartBack";
 import { cn } from "@/lib/utils";
 
 type MobileSmartBackButtonProps = {
-  fallbackUrl?: string;
+  fallbackHref?: string;
   label?: string;
   className?: string;
 };
 
+/**
+ * Единая мобильная кнопка «Назад» для публичных detail-страниц.
+ * Внутренний переход → router.back(), внешний/прямой заход → fallbackHref.
+ * Видна только на mobile (md:hidden).
+ */
 export function MobileSmartBackButton({
-  fallbackUrl = "/minsk",
+  fallbackHref,
   label = "Назад",
   className,
 }: MobileSmartBackButtonProps) {
-  const goBack = useSmartBack(fallbackUrl);
+  const goBack = useSmartBack(fallbackHref);
 
   return (
     <button

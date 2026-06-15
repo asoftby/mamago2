@@ -8,7 +8,7 @@ import {
   getTelegramConfig,
   requireTelegramConfig,
 } from "@/server/config/telegram.config";
-import { markWelcomeNotificationsRead } from "@/server/services/notification.service";
+import { markWelcomeNotificationsRead, completeOnboardingNotification } from "@/server/services/notification.service";
 
 const TELEGRAM_LINK_TTL_MS = 15 * 60 * 1000;
 
@@ -377,6 +377,7 @@ export async function consumeTelegramLinkToken(params: {
   });
 
   await markWelcomeNotificationsRead(linkToken.userId);
+  await completeOnboardingNotification(linkToken.userId, "CONNECT_TELEGRAM");
 
   return { ok: true as const, userId: linkToken.userId };
 }

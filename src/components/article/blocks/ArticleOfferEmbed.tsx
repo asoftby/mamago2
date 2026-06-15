@@ -5,6 +5,8 @@ import { useState } from "react";
 import { Star } from "lucide-react";
 import { SaveHeart } from "@/features/save/SaveHeart";
 import { CampShiftBookingOverlay } from "@/components/offers/CampShiftBookingOverlay";
+import { normalizeUiCurrencyText } from "@/lib/formatters/format-price";
+import { renderCurrencyText } from "@/components/icons/BelarusianRubleIcon";
 import type { ArticleShiftPreview, ResolvedOfferEmbedCard } from "@/lib/article/articleMvpRenderData";
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
@@ -649,7 +651,7 @@ export function ArticleOfferEmbed({ card }: { card: ResolvedOfferEmbedCard }) {
                       lineHeight: 1, letterSpacing: "-0.02em",
                       color: T.paper,
                     }}>
-                      {activeShift.price ?? card.priceLabel}
+                      {renderCurrencyText(normalizeUiCurrencyText(activeShift.price ?? card.priceLabel ?? ""), { iconSize: "sm" })}
                     </span>
                   </div>
                 )}
@@ -715,7 +717,7 @@ export function ArticleOfferEmbed({ card }: { card: ResolvedOfferEmbedCard }) {
                   lineHeight: 1, letterSpacing: "-0.02em",
                   color: T.ink,
                 }}>
-                  {card.priceLabel}
+                  {renderCurrencyText(normalizeUiCurrencyText(card.priceLabel), { iconSize: "sm" })}
                 </span>
               </div>
             )}

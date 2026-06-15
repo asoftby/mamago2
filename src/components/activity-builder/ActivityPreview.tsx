@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import type { ActivityFormData } from "./types";
 import { BookingDateSelector } from "@/components/booking/BookingDateSelector";
 import { BookingSlotSelector } from "@/components/booking/BookingSlotSelector";
+import { renderCurrencyText } from "@/components/icons/BelarusianRubleIcon";
 import type { BookingDateOption } from "@/components/booking/types";
 import { formatPrice, formatPriceFrom } from "@/lib/formatters/format-price";
 
@@ -96,7 +97,7 @@ export function ActivityPreview({ data }: ActivityPreviewProps) {
 
         {/* Price */}
         <div>
-          <div className="text-2xl font-bold text-gray-900">{priceLabel}</div>
+          <div className="text-2xl font-bold text-gray-900">{renderCurrencyText(priceLabel)}</div>
           {data.pricingMode === "fixed" && (
             <p className="text-xs text-gray-500 mt-0.5">за {data.activityType === "event" ? "участие" : "занятие"}</p>
           )}

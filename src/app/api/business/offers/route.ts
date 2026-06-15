@@ -5,22 +5,26 @@ import { z } from "zod";
 import { Prisma } from "@prisma/client";
 import {
   canCreateBusinessContent,
-  canManageOwnedContent,
   canPublishContentDirectly,
 } from "@/lib/auth/businessContentAccess";
+import { canManagePlaceAsync, getUserBusinessId } from "@/lib/auth/placeAccess";
 import { assignOfferSlugIfMissing } from "@/lib/slug/offerSlugService";
 import { formatPriceFrom } from "@/lib/formatters/format-price";
+import { getMinCampSessionPrice } from "@/lib/offers/campPricing";
 import { ensurePublishedOfferHasSlug } from "@/lib/slug/publishSlugGuards";
 import { createPublishTimer, runAfterPublishResponse } from "@/server/utils/publishPipeline";
 import {
   campMealKeySchema,
   campProgramTypeSchema,
   campSessionEntrySchema,
+  offerWizardStepKeySchema,
 } from "@/lib/business/offerCampApiSchemas";
 import { syncOfferMediaUsage } from "@/server/services/media/media-usage.service";
 
 const createOfferSchema = z.object({
   source: z.enum(["PLACE", "EVENT"]),
+  /** Идемпотентность create (повтор после таймаута / double-click) */
+  createRequestId: z.string().max(64).optional(),
   selectedPlace: z.object({
     id: z.string(),
   }).optional(),
@@ -67,6 +71,8 @@ const createOfferSchema = z.object({
   status: z.enum(["DRAFT", "PENDING", "PUBLISHED"]).default("DRAFT"),
   discoverySignalIds: z.array(z.string()).default([]),
   classChipSlugs: z.array(z.string()).default([]),
+  /** Шаги мастера, явно завершённые пользователем */
+  wizardCompletedSteps: z.array(offerWizardStepKeySchema).optional(),
   campProgramType: campProgramTypeSchema,
   // Camp fields
   campSessions: z.array(campSessionEntrySchema).optional(),
@@ -109,15 +115,53 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
+    // Идемпотентность: повтор запроса с тем же createRequestId возвращает уже созданный оффер
+    const idempotencyKey = data.createRequestId
+      ? `${user.id}:${data.createRequestId}`
+      : null;
+    if (idempotencyKey) {
+      const existing = await prisma.offer.findUnique({
+        where: { createRequestId: idempotencyKey },
+        select: { id: true, title: true, status: true, slug: true, publishedAt: true },
+      });
+      if (existing) {
+        timer.mark("response");
+        timer.log({ status: existing.status, idempotent: 1 });
+        return NextResponse.json(existing);
+      }
+    }
+
     // Verify place access (владелец или админ/модератор)
     if (data.source === "PLACE" && data.selectedPlace) {
       const place = await prisma.place.findUnique({
         where: { id: data.selectedPlace.id },
-        select: { id: true, ownerBusinessId: true },
+        select: { id: true, ownerBusinessId: true, createdByUserId: true },
       });
 
-      if (!place || !place.ownerBusinessId || !canManageOwnedContent(user, place.ownerBusinessId)) {
-        return NextResponse.json({ error: "Place not found" }, { status: 404 });
+      if (!place) {
+        return NextResponse.json(
+          { error: "Место не найдено" },
+          { status: 404 },
+        );
+      }
+
+      // Место существует, но не привязано к бизнес-профилю: оффер требует привязки.
+      // Подсказку показываем только создателю места — остальным не раскрываем существование.
+      if (!place.ownerBusinessId && place.createdByUserId === user.id) {
+        return NextResponse.json(
+          {
+            error: "Место не привязано к бизнес-профилю",
+            code: "PLACE_NOT_LINKED_TO_BUSINESS",
+          },
+          { status: 422 },
+        );
+      }
+
+      if (!(await canManagePlaceAsync(user, place))) {
+        return NextResponse.json(
+          { error: "Место не найдено" },
+          { status: 404 },
+        );
       }
 
       // Check image uniqueness within place
@@ -148,7 +192,14 @@ export async function POST(request: NextRequest) {
       let priceFrom: number | null = null;
       let priceText: string | null = null;
 
-      if (data.pricingMode === "SINGLE" && data.singlePrice) {
+      const campPriceFrom = data.campProgramType
+        ? getMinCampSessionPrice(data.campSessions)
+        : null;
+
+      if (data.campProgramType) {
+        priceFrom = campPriceFrom;
+        priceText = campPriceFrom != null ? formatPriceFrom(campPriceFrom) : null;
+      } else if (data.pricingMode === "SINGLE" && data.singlePrice !== undefined) {
         priceFrom = data.singlePrice;
         priceText = data.singlePriceLabel || null;
       } else if (data.pricingMode === "MULTIPLE" && data.pricingOptions.length > 0) {
@@ -159,6 +210,7 @@ export async function POST(request: NextRequest) {
       const offer = await prisma.offer.create({
         data: {
           placeId: place.id,
+          createRequestId: idempotencyKey ?? undefined,
           kind: dbKind,
           contactSource: data.contactSource ?? "manual",
           contactPhone: data.contactPhone,
@@ -178,29 +230,36 @@ export async function POST(request: NextRequest) {
           ageMaxMonths: data.ageMaxMonths,
           discoverySignalIds: data.discoverySignalIds,
           classChipSlugs: data.classChipSlugs,
+          wizardCompletedSteps: data.wizardCompletedSteps ?? [],
           status: data.status,
-          campProgramType: data.campProgramType,
-          // Camp fields
-          campSessions: data.campSessions as unknown as Prisma.InputJsonValue,
-          campSessionDuration: data.campSessionDuration,
-          campStayDuration: data.campStayDuration,
-          campPlacesCount: data.campPlacesCount,
-          campGroupSize: data.campGroupSize,
-          campDaySchedule: data.campDaySchedule,
-          campCanSelectDays: data.campCanSelectDays,
-          campHasExtendedCare: data.campHasExtendedCare,
-          // Accommodation fields
-          accommodationProvided: data.accommodationProvided,
-          accommodationType: data.accommodationType,
-          accommodationAddress: data.accommodationAddress,
-          accommodationRooms: data.accommodationRooms,
-          campIncludedMeals: data.campIncludedMeals,
-          campSafetyInfo: data.campSafetyInfo,
-          campMedicalInfo: data.campMedicalInfo,
-          accommodationConditions: data.accommodationConditions,
-          mealInfo: data.mealInfo,
-          transferInfo: data.transferInfo,
-          whatToBring: data.whatToBring,
+          // Camp/accommodation-поля пишем только для лагерей (campProgramType
+          // задан) — strip, не reject: клиентский гейт обходится
+          ...(data.campProgramType
+            ? {
+                campProgramType: data.campProgramType,
+                // Camp fields
+                campSessions: data.campSessions as unknown as Prisma.InputJsonValue,
+                campSessionDuration: data.campSessionDuration,
+                campStayDuration: data.campStayDuration,
+                campPlacesCount: data.campPlacesCount,
+                campGroupSize: data.campGroupSize,
+                campDaySchedule: data.campDaySchedule,
+                campCanSelectDays: data.campCanSelectDays,
+                campHasExtendedCare: data.campHasExtendedCare,
+                // Accommodation fields
+                accommodationProvided: data.accommodationProvided,
+                accommodationType: data.accommodationType,
+                accommodationAddress: data.accommodationAddress,
+                accommodationRooms: data.accommodationRooms,
+                campIncludedMeals: data.campIncludedMeals,
+                campSafetyInfo: data.campSafetyInfo,
+                campMedicalInfo: data.campMedicalInfo,
+                accommodationConditions: data.accommodationConditions,
+                mealInfo: data.mealInfo,
+                transferInfo: data.transferInfo,
+                whatToBring: data.whatToBring,
+              }
+            : {}),
           ...(data.status === "PUBLISHED" ? { publishedAt: new Date() } : {}),
         },
         select: {
@@ -287,8 +346,14 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(offers);
     }
 
+    const businessId = await getUserBusinessId(user.id);
     const userPlaces = await prisma.place.findMany({
-      where: { ownerBusinessId: user.id },
+      where: {
+        OR: [
+          { createdByUserId: user.id },
+          ...(businessId ? [{ ownerBusinessId: businessId }] : []),
+        ],
+      },
       select: { id: true },
     });
 

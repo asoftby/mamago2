@@ -61,12 +61,6 @@ export class HeroGreetingErrorBoundary extends React.Component<
             <span className="whitespace-pre-wrap">{model.title}</span>
           </h1>
         </div>
-
-        {model.subtitle ? (
-          <p className="mt-2 max-w-xl text-sm leading-relaxed text-neutral-600 sm:text-[15px] [text-wrap:balance]">
-            <span className="whitespace-pre-wrap">{model.subtitle}</span>
-          </p>
-        ) : null}
       </div>
     );
   }

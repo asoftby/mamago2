@@ -3,6 +3,8 @@
 import { useState } from "react";
 import type { EventPageData } from "@/lib/event/eventPageTypes";
 import { formatRuSessionHero } from "@/lib/event/eventPageFormat";
+import { normalizeUiCurrencyText } from "@/lib/formatters/format-price";
+import { renderCurrencyText } from "@/components/icons/BelarusianRubleIcon";
 
 export function ModernEventPageView({ data }: { data: EventPageData }) {
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(
@@ -13,6 +15,7 @@ export function ModernEventPageView({ data }: { data: EventPageData }) {
   const sessionLine = selectedSession
     ? formatRuSessionHero(selectedSession.startsAt)
     : "Расписание уточняется";
+  const priceLabel = normalizeUiCurrencyText(data.priceLabel ?? "");
 
   return (
     <main className="py-12 md:py-20 px-4 sm:px-6 lg:px-8 mx-auto max-w-[1200px]">
@@ -99,7 +102,7 @@ export function ModernEventPageView({ data }: { data: EventPageData }) {
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                 <div>
                   <div className="flex items-baseline gap-1">
-                    <span className="text-2xl font-extrabold">{data.priceLabel}</span>
+                    <span className="text-2xl font-extrabold">{renderCurrencyText(priceLabel)}</span>
                     <span className="text-gray-500 font-medium">/ person</span>
                   </div>
                   <div className="flex items-center gap-1 text-sm font-semibold mt-1">
@@ -281,7 +284,7 @@ export function ModernEventPageView({ data }: { data: EventPageData }) {
       <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-zinc-100 px-6 py-4 flex justify-between items-center z-50">
         <div>
           <p className="font-bold text-lg">
-            {data.priceLabel} <span className="text-sm font-normal text-gray-500">/ person</span>
+            {renderCurrencyText(priceLabel)} <span className="text-sm font-normal text-gray-500">/ person</span>
           </p>
           <p className="text-xs font-bold underline">{sessionLine}</p>
         </div>

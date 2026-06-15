@@ -11,7 +11,7 @@
 import { NextResponse } from "next/server";
 import {
   MAX_UPLOAD_SIZE_BYTES,
-  MAX_UPLOAD_SIZE_MB,
+  getFileTooLargeMessage,
   resolveUploadMimeType,
 } from "./uploadConfig";
 import { jsonUploadError } from "./uploadErrors";
@@ -26,7 +26,7 @@ export function validateUploadPreflight(file: File): NextResponse | null {
   if (file.size > MAX_UPLOAD_SIZE_BYTES) {
     return jsonUploadError(
       "FILE_TOO_LARGE",
-      `File is too large: ${(file.size / 1024 / 1024).toFixed(2)}MB. Max: ${MAX_UPLOAD_SIZE_MB}MB`,
+      getFileTooLargeMessage(),
       413,
     );
   }

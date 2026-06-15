@@ -127,7 +127,6 @@ export function ArticleEditorGalleryField({
         onChange(items.map((item) => item.id));
       }}
       maxFiles={24}
-      maxSizeMb={3}
       allowMediaLibrary
       allowUpload
       allowReorder

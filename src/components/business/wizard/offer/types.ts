@@ -38,6 +38,7 @@ export interface CampSessionEntry {
   spotsLeft: number | null;
   priceOverride: string;
   description: string;
+  promotionDetails: string;
 }
 
 /** Step keys for wizard */

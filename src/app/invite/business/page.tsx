@@ -9,6 +9,7 @@ import { getCurrentUser } from "@/lib/auth/server";
 import { BusinessInviteStatusCard } from "@/components/business/team/BusinessInviteStatusCard";
 import { getCurrentRequestRoutingContext } from "@/lib/routing/requestContext";
 import { buildSurfaceRedirectDestination } from "@/lib/routing/surface";
+import { buildAuthUrl } from "@/lib/auth/redirectTo";
 import {
   acceptBusinessInvite,
   buildBusinessInviteAcceptPath,
@@ -23,15 +24,15 @@ type InvitePageSearchParams = {
 const SUPPORT_EMAIL = "support@mamago.by";
 
 function buildLoginHref(params: { token: string; email: string; mode?: "register" }) {
-  const search = new URLSearchParams();
-  search.set("next", buildBusinessInviteAcceptPath(params.token));
-  search.set("email", params.email);
-  search.set("invite", "business-team");
-  search.set("invitationToken", params.token);
-  if (params.mode === "register") {
-    search.set("mode", "register");
-  }
-  return `/login?${search.toString()}`;
+  return buildAuthUrl({
+    mode: params.mode === "register" ? "register" : "login",
+    redirectTo: buildBusinessInviteAcceptPath(params.token),
+    extra: {
+      email: params.email,
+      invite: "business-team",
+      invitationToken: params.token,
+    },
+  });
 }
 
 function buildLogoutAction(nextHref: string) {

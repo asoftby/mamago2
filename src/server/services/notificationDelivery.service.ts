@@ -40,9 +40,41 @@ import { buildNotificationEmailTemplate } from "@/lib/email/notificationEmailTem
 import { resolveNotificationChannels } from "@/lib/notifications/resolveNotificationChannels";
 import type { UserForChannelResolution } from "@/lib/notifications/resolveNotificationChannels";
 import { getActiveTelegramConnectionForCurrentEnvironment } from "@/server/services/telegram/telegramConnection.service";
-import { TelegramChannel } from "@/server/services/telegram/TelegramChannel";
+import { TelegramChannel, type TelegramParseMode, type TelegramReplyMarkup } from "@/server/services/telegram/TelegramChannel";
 import { renderNotificationTelegramMessage } from "@/server/services/telegram/TelegramTemplateRenderer";
 import { isOneTimeNotificationType } from "./notificationDedup.service";
+import {
+  buildLegacyTemplatePayload,
+  renderNotification as renderNotificationTemplate,
+} from "@/server/notifications/template-render.service";
+import { toPlainText } from "@/server/notifications/template-render-core";
+
+/**
+ * Текст telegram-сообщения: шаблонный рендер (override из БД → дефолт реестра,
+ * переменные HTML-эскейпнуты → parse_mode HTML); при null — текущий
+ * plain-рендер из TelegramTemplateRenderer. Кнопки всегда из текущего
+ * рендера (CTA вне шаблонов, ограничение v1).
+ */
+async function buildTelegramMessageForNotification(notification: Notification): Promise<{
+  text: string;
+  replyMarkup?: TelegramReplyMarkup;
+  parseMode?: TelegramParseMode;
+}> {
+  const fallback = renderNotificationTelegramMessage(notification);
+  const templated = await renderNotificationTemplate(
+    notification.type,
+    "TELEGRAM",
+    buildLegacyTemplatePayload(notification),
+  );
+
+  if (!templated) return fallback;
+
+  return {
+    text: templated.subject ? `${templated.subject}\n\n${templated.body}` : templated.body,
+    replyMarkup: fallback.replyMarkup,
+    parseMode: "HTML",
+  };
+}
 
 function buildDeliveryDedupeKey(
   notification: Notification,
@@ -187,13 +219,20 @@ async function handleEmail(
     return;
   }
 
-  // Build and send
+  // Build and send: шаблонный рендер (override → дефолт), null → текущий текст
+  const templated = await renderNotificationTemplate(
+    notification.type,
+    "EMAIL",
+    buildLegacyTemplatePayload(notification),
+  );
+
   const template = buildNotificationEmailTemplate(
     notification.type as NotificationType,
-    notification.title,
-    notification.body,
+    templated?.subject ?? notification.title,
+    templated ? toPlainText(templated.body, 4000) : notification.body,
     notification.entityId,
     notification.ctaAction,
+    templated?.body ?? null,
   );
 
   const result = await sendEmail({ to: user.email, ...template });
@@ -311,12 +350,13 @@ async function handleTelegram(notificationId: string, enabled: boolean): Promise
       return;
     }
 
-    const rendered = renderNotificationTelegramMessage(notification);
+    const rendered = await buildTelegramMessageForNotification(notification);
     const channel = new TelegramChannel();
     await channel.sendMessage({
       chatId: connection.telegramChatId,
       text: rendered.text,
       replyMarkup: rendered.replyMarkup,
+      parseMode: rendered.parseMode,
     });
 
     await prisma.notificationDelivery.update({
@@ -373,6 +413,9 @@ function isTransientError(errorMessage: string | null): boolean {
     "EMAIL_NOT_CONFIGURED",
     "EMAIL_PROVIDER_NOT_IMPLEMENTED",
     "TELEGRAM_BOT_NOT_CONFIGURED",
+    // Reconciled stale PENDING: the original send may have actually succeeded
+    // before the crash, so auto-retry risks a double-send. Manual resend only.
+    STALE_PENDING_ERROR,
   ];
   
   if (permanentErrors.some(err => errorMessage.includes(err))) {
@@ -450,12 +493,19 @@ export async function retryFailedDelivery(
         return false;
       }
 
+      const templated = await renderNotificationTemplate(
+        delivery.notification.type,
+        "EMAIL",
+        buildLegacyTemplatePayload(delivery.notification),
+      );
+
       const template = buildNotificationEmailTemplate(
         delivery.notification.type as NotificationType,
-        delivery.notification.title,
-        delivery.notification.body,
+        templated?.subject ?? delivery.notification.title,
+        templated ? toPlainText(templated.body, 4000) : delivery.notification.body,
         delivery.notification.entityId,
         delivery.notification.ctaAction,
+        templated?.body ?? null,
       );
 
       const result = await sendEmail({ to: user.email, ...template });
@@ -483,12 +533,13 @@ export async function retryFailedDelivery(
         return false;
       }
 
-      const rendered = renderNotificationTelegramMessage(delivery.notification);
+      const rendered = await buildTelegramMessageForNotification(delivery.notification);
       const channel = new TelegramChannel();
       await channel.sendMessage({
         chatId: connection.telegramChatId,
         text: rendered.text,
         replyMarkup: rendered.replyMarkup,
+        parseMode: rendered.parseMode,
       });
 
       await prisma.notificationDelivery.update({
@@ -587,6 +638,49 @@ export async function resendNotificationDelivery(
   }
 
   return false;
+}
+
+// ── Stale PENDING reconciliation ──────────────────────────────────────────────
+
+// Must not contain "timeout" — isTransientError() pattern-matches that
+// substring and would route the row into the automatic retry path.
+export const STALE_PENDING_ERROR = "STALE_PENDING_RECONCILED";
+export const STALE_PENDING_THRESHOLD_MINUTES = 10;
+
+/**
+ * Marks deliveries stuck in PENDING as FAILED.
+ *
+ * A row stays PENDING forever when the process dies between the upsert and the
+ * post-send status update (observed with short-lived tsx scripts). Such a row
+ * also suppresses future deliveries with the same dedupeKey, so it must be
+ * resolved one way or another.
+ *
+ * We deliberately do NOT auto-resend here: the crash may have happened after a
+ * successful sendMessage but before the SENT update, so an automatic retry
+ * could double-send. FAILED + STALE_PENDING_RECONCILED surfaces the row in the
+ * admin diagnostics where it can be resent manually; the message is listed as
+ * permanent in isTransientError(), so the automatic retry path skips it.
+ */
+export async function reconcileStalePendingDeliveries(
+  olderThanMinutes = STALE_PENDING_THRESHOLD_MINUTES,
+): Promise<number> {
+  const threshold = new Date(Date.now() - olderThanMinutes * 60_000);
+  const result = await prisma.notificationDelivery.updateMany({
+    where: {
+      status: "PENDING",
+      channel: { in: ["EMAIL", "TELEGRAM"] },
+      createdAt: { lt: threshold },
+    },
+    data: { status: "FAILED", errorMessage: STALE_PENDING_ERROR },
+  });
+
+  if (result.count > 0) {
+    console.warn(
+      `[delivery:reconcile] Marked ${result.count} stale PENDING deliveries as FAILED (older than ${olderThanMinutes}m)`,
+    );
+  }
+
+  return result.count;
 }
 
 // ── Delivery Diagnostics ──────────────────────────────────────────────────────

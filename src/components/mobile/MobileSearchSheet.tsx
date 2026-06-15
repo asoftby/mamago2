@@ -825,12 +825,12 @@ export function MobileSearchSheet({
         ref={(node) => {
           sectionRefs.current[id] = node;
         }}
-        className="scroll-mt-3 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm"
+        className="scroll-mt-3 overflow-hidden rounded-xl border border-[#EBEBEB] bg-[#F6F2EA] shadow-sm"
       >
         <button
           type="button"
           onClick={() => handleSectionHeaderClick(id)}
-          className="flex w-full items-center justify-between p-4 text-left transition-colors hover:bg-gray-50 active:bg-gray-100/80"
+          className="flex w-full items-center justify-between p-4 text-left transition-colors hover:bg-black/[0.03] active:bg-black/[0.05]"
         >
           <div className="min-w-0 pr-3">
             <div className="text-[15px] font-semibold tracking-tight text-gray-900">
@@ -853,7 +853,7 @@ export function MobileSearchSheet({
           />
         </button>
         {expanded ? (
-          <div className="border-t border-gray-100 bg-gray-50/90">
+          <div className="border-t border-[#EBEBEB] bg-[#F6F2EA]">
             {children}
           </div>
         ) : null}
@@ -935,8 +935,9 @@ export function MobileSearchSheet({
                 "date",
                 "Когда",
                 getDateText(),
-                <div className="p-4">
+                <div className="p-0">
                   <DatePanel
+                    embedded
                     onClose={() => {}}
                     applied={sheetDraft}
                     actions={sheetActions}
@@ -1023,7 +1024,7 @@ export function MobileSearchSheet({
           <button
             type="button"
             onClick={handleBottomPrimaryClick}
-            className="min-w-[10rem] shrink-0 rounded-xl bg-[#EF8759] px-5 py-3.5 text-[15px] font-semibold text-white transition-colors hover:bg-[#e67c4f] active:scale-[0.98]"
+            className="min-w-[10rem] shrink-0 rounded-xl bg-[#EF8759] px-5 py-3.5 text-[15px] font-semibold text-white transition-colors hover:bg-primary-hover active:scale-[0.98]"
           >
             {bottomPrimaryLabel}
           </button>

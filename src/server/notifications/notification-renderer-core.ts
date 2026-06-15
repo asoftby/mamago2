@@ -8,7 +8,7 @@ import type {
 
 const MINSK_TIME_ZONE = "Europe/Minsk";
 
-function formatTime(date: Date): string {
+export function formatTime(date: Date): string {
   return new Intl.DateTimeFormat("ru-RU", {
     hour: "2-digit",
     minute: "2-digit",
@@ -16,7 +16,7 @@ function formatTime(date: Date): string {
   }).format(date);
 }
 
-function formatDateKey(date: Date): string {
+export function formatDateKey(date: Date): string {
   const formatter = new Intl.DateTimeFormat("en-CA", {
     year: "numeric",
     month: "2-digit",
@@ -49,10 +49,9 @@ function renderDigestLine(item: PlanTomorrowDigestContext["items"][number]): str
   return `${titleLine}\n📍 ${item.placeName}`;
 }
 
-function renderPlanTomorrowDigest(
-  context: PlanTomorrowDigestContext,
-): RenderedNotificationContent {
-  const body = context.items
+/** Готовый текст позиций дайджеста — переиспользуется шаблонным payload-builder'ом. */
+export function buildDigestItemsText(items: PlanTomorrowDigestContext["items"]): string {
+  return items
     .slice()
     .sort((left, right) => {
       const leftTs = left.startsAt?.getTime() ?? Number.MAX_SAFE_INTEGER;
@@ -61,6 +60,12 @@ function renderPlanTomorrowDigest(
     })
     .map(renderDigestLine)
     .join("\n\n");
+}
+
+function renderPlanTomorrowDigest(
+  context: PlanTomorrowDigestContext,
+): RenderedNotificationContent {
+  const body = buildDigestItemsText(context.items);
 
   return {
     title: "Завтра в плане",

@@ -1,4 +1,8 @@
 import { z } from "zod";
+import {
+  extractPlainTextFromHtml,
+  extractPlainTextLinesFromHtml,
+} from "@/lib/richtext/utils";
 import { randomId } from "@/lib/utils/randomId";
 
 /** Версия формата `Article.contentJson` */
@@ -82,6 +86,36 @@ export function articleStarterContent(): ArticleContentPayload {
     version: ARTICLE_CONTENT_VERSION,
     blocks: [newBlock("intro"), newBlock("text")],
   };
+}
+
+const ARTICLE_LEAD_EXCERPT_MAX = 220;
+
+/** Полный лид статьи (блок intro) — для шапки на странице. */
+export function deriveArticleLeadPlainText(
+  content: ArticleContentPayload | { blocks: ArticleBlockMvp[] },
+): string | null {
+  const intro = content.blocks.find((b) => b.type === "intro");
+  if (!intro || intro.type !== "intro") return null;
+  const text = extractPlainTextFromHtml(intro.text);
+  return text || null;
+}
+
+/** Превью статьи: первые строки блока intro (лид). */
+export function deriveArticleExcerptFromContent(
+  content: ArticleContentPayload,
+): string | null {
+  const intro = content.blocks.find((b) => b.type === "intro");
+  if (!intro || intro.type !== "intro") return null;
+
+  const lines = extractPlainTextLinesFromHtml(intro.text);
+  if (lines.length === 0) return null;
+
+  let text = lines.slice(0, 2).join(" ").replace(/\s+/g, " ").trim();
+  if (!text) return null;
+  if (text.length > ARTICLE_LEAD_EXCERPT_MAX) {
+    text = `${text.slice(0, ARTICLE_LEAD_EXCERPT_MAX - 1).trim()}…`;
+  }
+  return text;
 }
 
 export function newBlock(

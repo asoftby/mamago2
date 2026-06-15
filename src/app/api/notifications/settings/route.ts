@@ -69,7 +69,10 @@ export async function GET(req: NextRequest) {
   }
 
   const data = await getNotificationSettingsSurfaceData(context.viewer.id, surface);
-  return NextResponse.json(data);
+  return NextResponse.json({
+    ...data,
+    canSendTelegramTest: context.viewer.role === "ADMIN",
+  });
 }
 
 export async function PATCH(req: NextRequest) {

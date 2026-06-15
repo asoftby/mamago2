@@ -15,7 +15,7 @@ function SubmitButton() {
     <button
       type="submit"
       disabled={pending}
-      className="w-full h-12 rounded-xl bg-[#EF8759] hover:bg-[#e07040] disabled:opacity-50 text-white font-medium transition-colors"
+      className="w-full h-12 rounded-xl bg-[#EF8759] hover:bg-primary-hover disabled:opacity-50 text-white font-medium transition-colors"
     >
       {pending ? "Отправляем..." : "Отправить инструкции"}
     </button>

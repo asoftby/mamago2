@@ -4,9 +4,11 @@
  *
  * Query:
  * - stream: "user" | "business"
- * - tab: "inbox" | "unread" | "archived"
+ * - tab: "inbox" | "unread" | "archive" (legacy-алиас: "archived")
  * - limit (default 15, max 100)
- * - offset (default 0)
+ * - cursor: id последнего элемента предыдущей страницы → курсорный режим,
+ *   стабильный порядок (createdAt desc, id desc), в ответе nextCursor
+ * - offset (default 0) — legacy-режим, если cursor не передан
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -19,11 +21,14 @@ import { getTelegramLinkStatus } from "@/server/services/telegramLink.service";
 import {
   countUserArchived,
   countUnifiedNotifications,
+  enrichNotificationsWithLifecycle,
   getAccessibleSurfacesForUser,
+  getNotificationsPage,
   getUnreadCount,
   getUserArchived,
   getUserInbox,
   getWelcomeIsRead,
+  reconcileResolvedActionRequiredNotifications,
 } from "@/server/notifications/notification.service";
 import { resolveNotificationAudienceUser } from "@/server/notifications/resolveNotificationAudienceUser";
 
@@ -44,13 +49,15 @@ export async function GET(req: NextRequest) {
     const telegramStatus = await getTelegramLinkStatus({ userId: user.id });
 
     const { searchParams } = new URL(req.url);
-    const tab = searchParams.get("tab") === "archived"
-      ? "archived"
-      : searchParams.get("tab") === "unread"
+    const tabRaw = searchParams.get("tab");
+    const tab = tabRaw === "archived" || tabRaw === "archive"
+      ? "archive"
+      : tabRaw === "unread"
         ? "unread"
         : "inbox";
     const limitRaw = parseInt(searchParams.get("limit") || "15", 10);
     const offset = Math.max(0, parseInt(searchParams.get("offset") || "0", 10));
+    const cursor = searchParams.get("cursor");
     const stream = parseStream(searchParams.get("stream"));
 
     const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(limitRaw, 100) : 15;
@@ -63,8 +70,22 @@ export async function GET(req: NextRequest) {
       accessibleSurfaces,
     };
 
+    const resolutionState = await reconcileResolvedActionRequiredNotifications(user.id);
+
+    const cursorMode = searchParams.has("cursor");
     let notifications;
-    if (tab === "archived") {
+    let nextCursor: string | null = null;
+    if (cursorMode) {
+      const page = await getNotificationsPage(user.id, {
+        tab,
+        cursor: cursor || null,
+        limit,
+        stream,
+        options: queryOpts,
+      });
+      notifications = page.items;
+      nextCursor = page.nextCursor;
+    } else if (tab === "archive") {
       notifications = await getUserArchived(user.id, {
         limit,
         offset,
@@ -84,16 +105,24 @@ export async function GET(req: NextRequest) {
     const unreadCount = await getUnreadCount(user.id, stream, queryOpts);
     const welcomeIsRead = await getWelcomeIsRead(user.id);
     const total =
-      tab === "archived"
+      tab === "archive"
         ? await countUserArchived(user.id, { stream, options: queryOpts })
         : await countUnifiedNotifications(user.id, stream, queryOpts);
-    const hasMore = offset + notifications.length < total;
+    const hasMore = cursorMode
+      ? nextCursor != null
+      : offset + notifications.length < total;
+
+    const enrichedNotifications = enrichNotificationsWithLifecycle(
+      notifications,
+      resolutionState,
+    );
 
     return NextResponse.json({
-      notifications,
+      notifications: enrichedNotifications,
       unreadCount,
       total,
       hasMore,
+      nextCursor,
       telegramConnected: telegramStatus.linked,
       welcomeIsRead,
       showTelegramPrompt: shouldShowTelegramPrompt({

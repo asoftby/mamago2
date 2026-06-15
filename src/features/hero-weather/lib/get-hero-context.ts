@@ -6,18 +6,19 @@ import { interpretWeather } from "../model/weather-interpreter";
 import type { ActivityBias, TimeOfDay } from "../model/types";
 import { getCityCoordsBySlug, getDefaultBelarusFallbackCoords } from "./belarus-city-coordinates";
 import { weatherDiagLog } from "./weather-diag-log";
+import { deriveWeatherSnapshot } from "./derive-weather-snapshot";
 import {
   getWeatherCopy,
   resolveHomeWeatherScenario,
   type HomeWeatherScenario,
 } from "./weather-scenario-layer";
+import type { WeatherSnapshot } from "../model/weather-snapshot";
 
 export type HeroDebugWeatherSource = "open-meteo" | "fallback";
 
 export type HeroGreetingModel = {
   microcopy: string;
   title: string;
-  subtitle: string;
   emoji: string;
   weatherScenario: string;
   weatherDayScenario: HomeWeatherScenario;
@@ -26,6 +27,8 @@ export type HeroGreetingModel = {
   timeOfDay: TimeOfDay;
   personaMode: HeroPersonaContext["mode"];
   cityName?: string;
+  citySlug?: string;
+  weatherSnapshot?: WeatherSnapshot | null;
   /** Hint for feed ranking / filters below the hero. */
   preferredContext?: "outdoor" | "indoor" | "mixed" | "caution";
   debug?: {
@@ -36,7 +39,6 @@ export type HeroGreetingModel = {
     selectedIds?: {
       microcopyId: string;
       titleId: string;
-      subtitleId: string;
     };
   };
 };
@@ -121,7 +123,6 @@ export function getFallbackHeroModel(overrides?: Partial<Pick<HeroGreetingModel,
       maxTemperatureC: null,
     }),
     title: "Давай найдём что-нибудь для семьи",
-    subtitle: "Уже собрала варианты, чтобы выбирать было проще",
     emoji: "✨",
     weatherScenario: "unknown",
     weatherDayScenario: "cloudy_mixed",
@@ -130,6 +131,8 @@ export function getFallbackHeroModel(overrides?: Partial<Pick<HeroGreetingModel,
     timeOfDay: "day",
     personaMode,
     cityName: overrides?.cityName,
+    citySlug: undefined,
+    weatherSnapshot: null,
     preferredContext: "mixed",
     debug: {
       scenario: "unknown",
@@ -144,6 +147,7 @@ export function getFallbackHeroModel(overrides?: Partial<Pick<HeroGreetingModel,
  * Server-safe orchestrator: weather → interpret → copy (+ ids for anti-repeat).
  */
 export async function getHeroContext(input?: {
+  cityId?: string;
   citySlug?: string;
   cityName?: string;
   /** From Prisma `City.centerLat` / `lat` when available */
@@ -215,6 +219,15 @@ export async function getHeroContext(input?: {
       scenario: wx.scenario,
       maxTemperatureC: wx.maxTemperatureC,
     });
+    const weatherSnapshot =
+      input?.citySlug && cityName
+        ? deriveWeatherSnapshot({
+            raw,
+            cityId: input.cityId,
+            citySlug: input.citySlug,
+            cityName,
+          })
+        : null;
 
     return {
       microcopy: getWeatherCopy({
@@ -224,7 +237,6 @@ export async function getHeroContext(input?: {
         maxTemperatureC: wx.maxTemperatureC,
       }),
       title: generated.title,
-      subtitle: generated.subtitle,
       emoji: wx.emoji,
       weatherScenario: wx.scenario,
       weatherDayScenario,
@@ -233,6 +245,8 @@ export async function getHeroContext(input?: {
       timeOfDay: wx.timeOfDay,
       personaMode: persona.mode,
       cityName,
+      citySlug: input?.citySlug,
+      weatherSnapshot,
       preferredContext: scenarioToPreferredContext(wx.scenario),
       debug: {
         scenario: wx.scenario,
@@ -242,7 +256,6 @@ export async function getHeroContext(input?: {
         selectedIds: {
           microcopyId: `weather-summary:${wx.scenario}:${Math.round(wx.maxTemperatureC ?? 0)}`,
           titleId: generated.selection.titleId,
-          subtitleId: generated.selection.subtitleId,
         },
       },
     };

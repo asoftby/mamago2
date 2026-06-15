@@ -16,6 +16,8 @@ type AdminCityRow = {
   priority: number;
   eventsCount: number;
   placesCount: number;
+  regionName: string | null;
+  countryName: string;
 };
 
 export default function CitiesPage() {
@@ -84,6 +86,7 @@ export default function CitiesPage() {
         <h1 className="text-2xl font-bold text-gray-900 md:text-xl">Города</h1>
         <p className="mt-1 text-sm text-gray-600">
           Здесь управляется city selector и доступность городов в публичном каталоге.
+          Области и регионы хранятся отдельно и не отображаются в этом списке.
         </p>
       </div>
 
@@ -94,75 +97,81 @@ export default function CitiesPage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="overflow-hidden rounded-lg border border-gray-200">
-            <div className="grid grid-cols-[minmax(180px,1.2fr)_minmax(160px,1fr)_100px_170px_110px_110px] gap-4 border-b bg-gray-50 p-4 text-sm font-medium text-gray-700">
-              <div>Город</div>
-              <div>Slug</div>
-              <div>Активен</div>
-              <div>Показывать в фильтре</div>
-              <div>События</div>
-              <div>Места</div>
-            </div>
+          <div className="overflow-x-auto">
+            <div className="min-w-[900px] overflow-hidden rounded-lg border border-gray-200">
+              <div className="grid grid-cols-[minmax(140px,1fr)_minmax(120px,0.8fr)_minmax(100px,0.7fr)_minmax(140px,0.9fr)_80px_150px_80px_80px] gap-3 border-b bg-gray-50 p-4 text-sm font-medium text-gray-700">
+                <div>Город</div>
+                <div>Область</div>
+                <div>Страна</div>
+                <div>Slug</div>
+                <div>Активен</div>
+                <div>Показывать в фильтре</div>
+                <div>События</div>
+                <div>Места</div>
+              </div>
 
-            <div className="divide-y divide-gray-200">
-              {cities.map((city) => {
-                const disabled = savingId === city.id;
-                return (
-                  <div
-                    key={city.id}
-                    className="grid grid-cols-[minmax(180px,1.2fr)_minmax(160px,1fr)_100px_170px_110px_110px] items-center gap-4 p-4 text-sm"
-                  >
-                    <div className="min-w-0">
-                      <div className="font-medium text-gray-900">{city.name}</div>
-                      <div className="mt-1 flex items-center gap-2">
-                        <span className="text-xs text-gray-500">priority</span>
-                        <Input
-                          type="number"
-                          value={city.priority}
-                          className="h-8 w-20"
-                          onChange={(e) => {
-                            const next = Number(e.target.value || 0);
-                            setCities((prev) =>
-                              prev.map((row) =>
-                                row.id === city.id ? { ...row, priority: next } : row,
-                              ),
-                            );
-                          }}
-                          onBlur={() => void patchCity(city.id, { priority: city.priority })}
+              <div className="divide-y divide-gray-200">
+                {cities.map((city) => {
+                  const disabled = savingId === city.id;
+                  return (
+                    <div
+                      key={city.id}
+                      className="grid grid-cols-[minmax(140px,1fr)_minmax(120px,0.8fr)_minmax(100px,0.7fr)_minmax(140px,0.9fr)_80px_150px_80px_80px] items-center gap-3 p-4 text-sm"
+                    >
+                      <div className="min-w-0">
+                        <div className="font-medium text-gray-900">{city.name}</div>
+                        <div className="mt-1 flex items-center gap-2">
+                          <span className="text-xs text-gray-500">priority</span>
+                          <Input
+                            type="number"
+                            value={city.priority}
+                            className="h-8 w-20"
+                            onChange={(e) => {
+                              const next = Number(e.target.value || 0);
+                              setCities((prev) =>
+                                prev.map((row) =>
+                                  row.id === city.id ? { ...row, priority: next } : row,
+                                ),
+                              );
+                            }}
+                            onBlur={() => void patchCity(city.id, { priority: city.priority })}
+                            disabled={disabled}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="text-gray-600">{city.regionName ?? "—"}</div>
+                      <div className="text-gray-600">{city.countryName}</div>
+                      <div className="text-gray-600">{city.slug}</div>
+
+                      <div>
+                        <Switch
+                          checked={city.isActive}
+                          onCheckedChange={(checked) =>
+                            void patchCity(city.id, { isActive: checked })
+                          }
                           disabled={disabled}
                         />
                       </div>
+
+                      <div>
+                        <Switch
+                          checked={city.isVisibleInCityFilter}
+                          onCheckedChange={(checked) =>
+                            void patchCity(city.id, {
+                              isVisibleInCityFilter: checked,
+                            })
+                          }
+                          disabled={disabled}
+                        />
+                      </div>
+
+                      <div className="font-medium text-gray-900">{city.eventsCount}</div>
+                      <div className="font-medium text-gray-900">{city.placesCount}</div>
                     </div>
-
-                    <div className="text-gray-600">{city.slug}</div>
-
-                    <div>
-                      <Switch
-                        checked={city.isActive}
-                        onCheckedChange={(checked) =>
-                          void patchCity(city.id, { isActive: checked })
-                        }
-                        disabled={disabled}
-                      />
-                    </div>
-
-                    <div>
-                      <Switch
-                        checked={city.isVisibleInCityFilter}
-                        onCheckedChange={(checked) =>
-                          void patchCity(city.id, {
-                            isVisibleInCityFilter: checked,
-                          })
-                        }
-                        disabled={disabled}
-                      />
-                    </div>
-
-                    <div className="font-medium text-gray-900">{city.eventsCount}</div>
-                    <div className="font-medium text-gray-900">{city.placesCount}</div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
           </div>
         </CardContent>

@@ -16,7 +16,6 @@ import { resolveHasBusinessProfile } from "@/lib/account/isBusinessAccountRole";
 import { useProfileDropdownHandlers } from "@/lib/account/useProfileDropdownHandlers";
 import { accountProfileTriggerLetter } from "@/lib/account/userInitials";
 import { BusinessSidebar } from "./BusinessSidebar";
-import { BuildModeBadge } from "@/components/backoffice/BuildModeBadge";
 import type { BuildInfo } from "@/lib/system/buildInfo";
 
 interface BusinessHeaderProps {
@@ -82,12 +81,6 @@ export function BusinessHeader({ user, buildInfo }: BusinessHeaderProps) {
               <span className="hidden sm:inline">mamaGo Business</span>
               <span className="sm:hidden">Business</span>
             </span>
-            <div className="shrink-0 sm:hidden">
-              <BuildModeBadge buildInfo={buildInfo} />
-            </div>
-            <div className="hidden shrink-0 sm:block">
-              <BuildModeBadge buildInfo={buildInfo} compact />
-            </div>
           </div>
 
           <div className="ml-auto flex shrink-0 items-center gap-2">
@@ -118,7 +111,7 @@ export function BusinessHeader({ user, buildInfo }: BusinessHeaderProps) {
         title="Навигация"
         showCloseButton={true}
       >
-        <BusinessSidebar variant="sheet" onNavigate={() => setMobileNavOpen(false)} />
+        <BusinessSidebar variant="sheet" onNavigate={() => setMobileNavOpen(false)} buildInfo={buildInfo} />
       </BottomSheet>
     </>
   );

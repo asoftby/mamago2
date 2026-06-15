@@ -20,7 +20,7 @@ export function BusinessShell({ children, user, buildInfo }: BusinessShellProps)
       <div className="flex min-h-[calc(100vh-4rem)]">
         {/* Left Sidebar - hidden on mobile */}
         <div className="hidden lg:flex lg:flex-col self-stretch">
-          <BusinessSidebar />
+          <BusinessSidebar buildInfo={buildInfo} />
         </div>
 
         {/* Right Content Area */}

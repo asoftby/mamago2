@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useBirthdayBuilderWithGate } from "../hooks/useBirthdayBuilderWithGate";
 import { useBirthdayAgeSignals } from "../hooks/useBirthdayAgeSignals";
 import { BirthdayAgeSignalHydration } from "./BirthdayAgeSignalHydration";
@@ -314,8 +314,18 @@ function buildSubmittedScenarioParty(params: {
 }
 
 function BirthdayBuilderShellInner({ citySlug }: Props) {
+  const router = useRouter();
   const builder = useBirthdayBuilderWithGate();
   const ageSignals = useBirthdayAgeSignals();
+  const closeFallbackHref = `/${citySlug}/birthday`;
+
+  const handleClose = () => {
+    if (typeof window !== "undefined" && window.history.length > 1) {
+      router.back();
+      return;
+    }
+    router.push(closeFallbackHref);
+  };
   const { state, nextStep, prevStep } = builder;
   const currentStep = state.ui.currentStep as BuilderStep;
   const [submittedScenario, setSubmittedScenario] =
@@ -417,8 +427,10 @@ function BirthdayBuilderShellInner({ citySlug }: Props) {
               padding: "16px 28px",
             }}
           >
-            <Link
-              href={`/${citySlug}/birthday`}
+            <button
+              type="button"
+              onClick={handleClose}
+              aria-label="Закрыть"
               style={{
                 display: "inline-flex",
                 alignItems: "center",
@@ -430,8 +442,8 @@ function BirthdayBuilderShellInner({ citySlug }: Props) {
                 fontSize: 13,
                 fontWeight: 500,
                 color: "#3A332B",
-                textDecoration: "none",
                 background: "transparent",
+                cursor: "pointer",
                 transition: "all .15s",
               }}
             >
@@ -439,7 +451,7 @@ function BirthdayBuilderShellInner({ citySlug }: Props) {
                 <CloseIcon />
               </span>
               Закрыть
-            </Link>
+            </button>
             <BuilderProgressDots currentStep={currentStep} />
           </div>
         </div>

@@ -7,6 +7,7 @@ import { ru } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { BusinessSurfaceCard } from "@/components/business/ui/BusinessSurfaceCard";
 import { formatPrice } from "@/lib/formatters/format-price";
+import { renderCurrencyText } from "@/components/icons/BelarusianRubleIcon";
 import { DepositTopUpTrigger } from "@/components/business/billing/DepositTopUpTrigger";
 import { DashboardHeader } from "@/components/business/dashboard/DashboardHeader";
 import { DashboardActionStack } from "@/components/business/dashboard/DashboardActionStack";
@@ -91,17 +92,12 @@ function BalancePanel({
 
       {/* Balance amount */}
       <div>
-        <p
-          className={cn(
-            "text-4xl font-semibold tracking-tight",
-            isEmpty ? "text-primary" : "text-stone-950",
-          )}
-        >
-          {formatPrice(balance)}
+        <p className="text-4xl font-semibold tracking-tight text-stone-950">
+          {renderCurrencyText(formatPrice(balance, { hideZero: true }), { iconSize: "xs" })}
         </p>
 
         {isEmpty ? (
-          <p className="mt-2 text-sm text-primary">
+          <p className="mt-2 text-sm text-stone-950">
             Недостаточно средств для продвижения
           </p>
         ) : (
@@ -211,13 +207,16 @@ function PublicationsCard({
           <p className="mt-2 text-sm text-stone-500">Создайте первую публикацию, чтобы начать получать спрос</p>
         </div>
       ) : noPromotion ? (
-        <div>
-          <p className="text-3xl font-semibold tracking-tight text-stone-950">{totalPublications}</p>
-          <p className="mt-1.5 text-sm text-stone-500">
-            публикаций ·{" "}
-            <span className="text-primary font-medium">0 активных продвижений</span>
-          </p>
-          <p className="mt-1 text-sm text-stone-500">Запустите продвижение, чтобы получать лиды</p>
+        <div className="space-y-2">
+          <div className="flex items-baseline gap-2">
+            <span className="text-3xl font-semibold tracking-tight text-stone-950">{totalPublications}</span>
+            <span className="text-sm text-stone-500">публикаций</span>
+          </div>
+          <div className="flex items-baseline gap-2">
+            <span className="text-xl font-semibold text-stone-700">{activePromotions}</span>
+            <span className="text-sm text-stone-500">активных продвижений</span>
+          </div>
+          <p className="text-sm text-stone-500">Запустите продвижение, чтобы получать лиды</p>
         </div>
       ) : (
         <div className="space-y-2">

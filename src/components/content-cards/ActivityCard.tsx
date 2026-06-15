@@ -2,6 +2,7 @@ import Link from "next/link";
 import { CalendarDays, Heart, ImageIcon, MapPin } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { MediaCover } from "@/components/ui/media-cover";
+import { renderCurrencyText } from "@/components/icons/BelarusianRubleIcon";
 import { cn } from "@/lib/utils";
 import type { ActivityCardItem } from "@/features/activities";
 
@@ -132,7 +133,7 @@ export function ActivityCard({
                 {item.priceLabel ? (
                   <div className="absolute bottom-3 right-3">
                     <Badge className="rounded-full border-0 bg-[rgba(41,36,31,0.78)] px-3 py-1 font-mono text-[11px] font-medium text-white shadow-[0_10px_24px_rgba(20,18,16,0.12)] backdrop-blur-md">
-                      {item.priceLabel}
+                      {renderCurrencyText(item.priceLabel, { iconSize: "sm" })}
                     </Badge>
                   </div>
                 ) : null}
@@ -149,7 +150,7 @@ export function ActivityCard({
 
                 <h3
                   className={cn(
-                    "line-clamp-3 text-balance font-semibold leading-[1.28] tracking-[-0.015em] text-[#141210] transition-colors duration-200 group-hover:text-[#C65D2E]",
+                    "line-clamp-3 text-balance font-semibold leading-[1.28] tracking-[-0.015em] text-[#141210] transition-colors duration-200 group-hover:text-text-brand-hover",
                     isCompact ? "text-[17px]" : "text-[18px] sm:text-[20px]",
                   )}
                 >

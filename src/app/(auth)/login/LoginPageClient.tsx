@@ -2,12 +2,14 @@
 
 import { AuthForm } from "@/components/auth/AuthForm";
 import { PageCloseButton } from "@/components/ui/page-close-button";
+import { getSafeRedirectPath } from "@/lib/auth/redirectTo";
+import { getPostAuthRedirect } from "@/lib/auth/postAuthRedirect";
 
 type Mode = "login" | "register";
 
 interface Props {
   showResetSuccess?: boolean;
-  next?: string;
+  redirectTo?: string;
   initialMode?: Mode;
   initialEmail?: string;
   inviteKind?: string;
@@ -16,12 +18,14 @@ interface Props {
 
 export function LoginPageClient({
   showResetSuccess,
-  next,
+  redirectTo,
   initialMode = "login",
   initialEmail = "",
   inviteKind,
   invitationToken,
 }: Props) {
+  const safeRedirectTo = getSafeRedirectPath(redirectTo, getPostAuthRedirect());
+
   const inviteNotice =
     inviteKind === "business-team" ? (
       <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-900">
@@ -36,7 +40,7 @@ export function LoginPageClient({
       <AuthForm
         open
         onRequestClose={() => {}}
-        nextHref={next ?? "/me"}
+        nextHref={safeRedirectTo}
         title="Вход в mamaGo"
         subtitle="Планируйте лучшее время с детьми"
         hideCloseButton

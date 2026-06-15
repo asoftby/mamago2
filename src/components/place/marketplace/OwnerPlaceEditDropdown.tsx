@@ -1,19 +1,10 @@
 "use client";
 
-import Link from "next/link";
-import { ChevronDown } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { OwnerWizardEditDropdown } from "@/components/shared/OwnerWizardEditDropdown";
 import { editorPlaceEditHref } from "@/lib/content-editor/types";
 import { PLACE_WIZARD_STEPS } from "@/components/business/wizard/place/placeWizardSteps.config";
 import { TOTAL_STEPS } from "@/components/business/wizard/place/config";
 import { businessFormCopy } from "@/components/business/wizard/businessFormLabels";
-import { cn } from "@/lib/utils";
 
 export function OwnerPlaceEditDropdown({
   placeId,
@@ -24,7 +15,7 @@ export function OwnerPlaceEditDropdown({
 }) {
   const base = editorPlaceEditHref(placeId);
 
-  const items = [
+  const steps = [
     ...PLACE_WIZARD_STEPS.map((s) => ({
       href: `${base}?step=${encodeURIComponent(String(s.id))}`,
       label: s.title,
@@ -35,37 +26,5 @@ export function OwnerPlaceEditDropdown({
     },
   ];
 
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button
-          type="button"
-          variant="outline"
-          className={cn(
-            className,
-            "border-black bg-black text-white shadow-none hover:bg-neutral-900 hover:text-white [&_svg]:text-white",
-          )}
-          aria-haspopup="menu"
-        >
-          Редактировать
-          <ChevronDown className="ml-1 size-4 shrink-0" aria-hidden />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent
-        align="start"
-        className="max-h-[min(70vh,420px)] overflow-y-auto border-border bg-popover p-2 text-popover-foreground shadow-md"
-      >
-        {items.map((it) => (
-          <DropdownMenuItem key={it.href} className="cursor-pointer p-0">
-            <Link
-              href={it.href}
-              className="block w-full px-3 py-2.5 text-left text-sm"
-            >
-              {it.label}
-            </Link>
-          </DropdownMenuItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
+  return <OwnerWizardEditDropdown steps={steps} className={className} />;
 }

@@ -17,7 +17,8 @@ import { runPostAuthPipeline } from "@/lib/post-auth/pipeline";
 import { trackAuthCompleted, applyPostAuthCompletionOutcome } from "@/lib/post-auth/resolver";
 import { trackPostAuthEvent } from "@/lib/post-auth/analytics";
 import { getPostAuthRedirect } from "@/lib/auth/postAuthRedirect";
-import { navigateToSurface } from "@/lib/routing/clientNavigation";
+import { navigateToCompatibleHref } from "@/lib/routing/clientNavigation";
+import { getSafeRedirectPath } from "@/lib/auth/redirectTo";
 
 export type AuthModalPhase = "auth" | "completion";
 
@@ -95,11 +96,8 @@ export function DefaultAuthModal({
           toast,
         });
       } else if (authEntryPoint === "profile") {
-        // Профиль уже был готов при открытии completion — иначе редирект не вызывался
-        navigateToSurface(router, {
-          targetSurface: "public",
-          targetPath: "/me",
-        });
+        const target = getSafeRedirectPath(nextHref, "/me");
+        navigateToCompatibleHref(router, target, { replace: true });
       }
       onAuthSuccess?.();
       onOpenChange(false);

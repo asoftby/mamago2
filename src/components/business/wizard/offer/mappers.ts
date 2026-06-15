@@ -179,7 +179,12 @@ export function isValidVideoUrl(url: string): boolean {
 /** POST /api/business/offers — matches createOfferSchema */
 export function buildOfferCreatePayload(
   data: OfferFormData,
-  opts?: { status?: "DRAFT" | "PENDING" | "PUBLISHED" }
+  opts?: {
+    status?: "DRAFT" | "PENDING" | "PUBLISHED";
+    wizardCompletedSteps?: string[];
+    /** Идемпотентность create: повтор запроса с тем же id не создаёт дубль */
+    createRequestId?: string;
+  }
 ) {
   if (!data.placeId) {
     throw new Error("placeId is required to create offer payload");
@@ -193,6 +198,7 @@ export function buildOfferCreatePayload(
 
   const base = {
     source: "PLACE" as const,
+    createRequestId: opts?.createRequestId,
     selectedPlace: { id: data.placeId },
     kind: formKindToApiKind(data),
     title: data.title.trim() || "Новое предложение",
@@ -201,18 +207,34 @@ export function buildOfferCreatePayload(
     ...ages,
     coverImage: data.coverImage ?? undefined,
     videoUrl: data.videoUrl?.trim() || undefined,
-    priceCaption: data.priceCaption?.trim() || undefined,
-    promotionDetails: data.promotionDetails?.trim() || undefined,
-    promotionalOffer: createExcerpt(data.promotionDetails, 120) || undefined,
+    priceCaption:
+      data.offerWizardType === "CAMP"
+        ? undefined
+        : data.priceCaption?.trim() || undefined,
+    promotionDetails:
+      data.offerWizardType === "CAMP"
+        ? undefined
+        : data.promotionDetails?.trim() || undefined,
+    promotionalOffer:
+      data.offerWizardType === "CAMP"
+        ? undefined
+        : createExcerpt(data.promotionDetails, 120) || undefined,
     pricingMode,
-    singlePrice: parsePrice(data.singlePrice),
-    singlePriceLabel: richTextToLegacyPriceText(data.priceCaption),
-    pricingOptions: data.pricingOptions.map((o) => ({
-      title: o.title.trim(),
-      price: parsePrice(o.price) ?? 0,
-      oldPrice: o.oldPrice ? parsePrice(o.oldPrice) : undefined,
-      description: o.description?.trim() || undefined,
-    })),
+    singlePrice:
+      data.offerWizardType === "CAMP" ? undefined : parsePrice(data.singlePrice),
+    singlePriceLabel:
+      data.offerWizardType === "CAMP"
+        ? undefined
+        : richTextToLegacyPriceText(data.priceCaption),
+    pricingOptions:
+      data.offerWizardType === "CAMP"
+        ? []
+        : data.pricingOptions.map((o) => ({
+            title: o.title.trim(),
+            price: parsePrice(o.price) ?? 0,
+            oldPrice: o.oldPrice ? parsePrice(o.oldPrice) : undefined,
+            description: o.description?.trim() || undefined,
+          })),
     ctaType: accessFields.ctaType,
     phone: accessFields.phone,
     website: accessFields.website,
@@ -229,17 +251,24 @@ export function buildOfferCreatePayload(
       })),
     discoverySignalIds: data.signalIds,
     classChipSlugs: data.classChipSlugs,
+    wizardCompletedSteps: opts?.wizardCompletedSteps,
     status: opts?.status ?? "DRAFT",
     gallery: data.gallery ?? [],
-    campProgramType:
-      data.offerWizardType === "CAMP" && data.campProgramType
-        ? data.campProgramType
-        : undefined,
-    // Camp fields
-    campSessions:
-      data.offerWizardType === "CAMP"
-        ? sortCampSessions(data.campSessions).map((s, i) => ({ ...s, sortOrder: i }))
-        : undefined,
+    // Camp/accommodation-поля — только для лагерей; данные скрытых шагов
+    // других типов в payload не попадают
+    ...(data.offerWizardType === "CAMP" ? buildCampFieldsForCreate(data) : {}),
+  };
+
+  return base;
+}
+
+function buildCampFieldsForCreate(data: OfferFormData) {
+  return {
+    campProgramType: data.campProgramType || undefined,
+    campSessions: sortCampSessions(data.campSessions).map((s, i) => ({
+      ...s,
+      sortOrder: i,
+    })),
     campSessionDuration: data.campSessionDuration?.trim() || undefined,
     campStayDuration: data.campStayDuration?.trim() || undefined,
     campPlacesCount: data.campPlacesCount ?? undefined,
@@ -247,7 +276,6 @@ export function buildOfferCreatePayload(
     campDaySchedule: data.campDaySchedule?.trim() || undefined,
     campCanSelectDays: data.campCanSelectDays,
     campHasExtendedCare: data.campHasExtendedCare,
-    // Accommodation fields
     accommodationProvided: data.accommodationProvided,
     accommodationType: data.accommodationType || undefined,
     accommodationAddress: data.accommodationAddress.trim() || undefined,
@@ -261,14 +289,39 @@ export function buildOfferCreatePayload(
     transferInfo: data.transferInfo?.trim() || undefined,
     whatToBring: data.whatToBring?.trim() || undefined,
   };
-
-  return base;
 }
+
+/** Тип сменился с CAMP: явные null затирают зависшие camp-данные в БД */
+const CAMP_FIELDS_WIPE = {
+  campProgramType: null,
+  campSessions: null,
+  campSessionDuration: null,
+  campStayDuration: null,
+  campPlacesCount: null,
+  campGroupSize: null,
+  campDaySchedule: null,
+  campCanSelectDays: false,
+  campHasExtendedCare: false,
+  accommodationProvided: false,
+  accommodationType: null,
+  accommodationAddress: null,
+  accommodationRooms: null,
+  campIncludedMeals: null,
+  campSafetyInfo: null,
+  campMedicalInfo: null,
+  accommodationConditions: null,
+  mealInfo: null,
+  transferInfo: null,
+  whatToBring: null,
+} as const;
 
 /** PATCH /api/business/offers/[id] — matches updateOfferSchema */
 export function buildOfferUpdatePayload(
   data: OfferFormData,
-  opts?: { status?: "DRAFT" | "PENDING" | "PUBLISHED" }
+  opts?: {
+    status?: "DRAFT" | "PENDING" | "PUBLISHED";
+    wizardCompletedSteps?: string[];
+  }
 ) {
   const pricingMode = data.pricingMode === "multiple" ? "MULTIPLE" : "SINGLE";
   const ages = ageGroupsToMonths(data.ageGroups);
@@ -285,18 +338,34 @@ export function buildOfferUpdatePayload(
     ...ages,
     coverImage: data.coverImage ?? undefined,
     videoUrl: data.videoUrl?.trim() || undefined,
-    priceCaption: data.priceCaption?.trim() || undefined,
-    promotionDetails: data.promotionDetails?.trim() || undefined,
-    promotionalOffer: createExcerpt(data.promotionDetails, 120) || undefined,
+    priceCaption:
+      data.offerWizardType === "CAMP"
+        ? undefined
+        : data.priceCaption?.trim() || undefined,
+    promotionDetails:
+      data.offerWizardType === "CAMP"
+        ? undefined
+        : data.promotionDetails?.trim() || undefined,
+    promotionalOffer:
+      data.offerWizardType === "CAMP"
+        ? undefined
+        : createExcerpt(data.promotionDetails, 120) || undefined,
     pricingMode,
-    singlePrice: parsePrice(data.singlePrice),
-    singlePriceLabel: richTextToLegacyPriceText(data.priceCaption),
-    pricingOptions: data.pricingOptions.map((o) => ({
-      title: o.title.trim(),
-      price: parsePrice(o.price) ?? 0,
-      oldPrice: o.oldPrice ? parsePrice(o.oldPrice) : undefined,
-      description: o.description?.trim() || undefined,
-    })),
+    singlePrice:
+      data.offerWizardType === "CAMP" ? undefined : parsePrice(data.singlePrice),
+    singlePriceLabel:
+      data.offerWizardType === "CAMP"
+        ? undefined
+        : richTextToLegacyPriceText(data.priceCaption),
+    pricingOptions:
+      data.offerWizardType === "CAMP"
+        ? []
+        : data.pricingOptions.map((o) => ({
+            title: o.title.trim(),
+            price: parsePrice(o.price) ?? 0,
+            oldPrice: o.oldPrice ? parsePrice(o.oldPrice) : undefined,
+            description: o.description?.trim() || undefined,
+          })),
     ctaType: accessFields.ctaType,
     phone: accessFields.phone,
     website: accessFields.website,
@@ -314,39 +383,18 @@ export function buildOfferUpdatePayload(
     discoverySignalIds: data.signalIds,
     classChipSlugs: data.classChipSlugs,
     gallery: data.gallery ?? [],
-    campProgramType:
-      data.offerWizardType === "CAMP" && data.campProgramType
-        ? data.campProgramType
-        : undefined,
-    // Camp fields
-    campSessions:
-      data.offerWizardType === "CAMP"
-        ? sortCampSessions(data.campSessions).map((s, i) => ({ ...s, sortOrder: i }))
-        : undefined,
-    campSessionDuration: data.campSessionDuration?.trim() || undefined,
-    campStayDuration: data.campStayDuration?.trim() || undefined,
-    campPlacesCount: data.campPlacesCount ?? undefined,
-    campGroupSize: data.campGroupSize ?? undefined,
-    campDaySchedule: data.campDaySchedule?.trim() || undefined,
-    campCanSelectDays: data.campCanSelectDays,
-    campHasExtendedCare: data.campHasExtendedCare,
-    // Accommodation fields
-    accommodationProvided: data.accommodationProvided,
-    accommodationType: data.accommodationType || undefined,
-    accommodationAddress: data.accommodationAddress.trim() || undefined,
-    accommodationRooms: data.accommodationRooms.trim() || undefined,
-    campIncludedMeals:
-      data.campIncludedMeals.length > 0 ? data.campIncludedMeals : undefined,
-    campSafetyInfo: data.campSafetyInfo.trim() || undefined,
-    campMedicalInfo: data.campMedicalInfo.trim() || undefined,
-    accommodationConditions: data.accommodationConditions?.trim() || undefined,
-    mealInfo: data.mealInfo?.trim() || undefined,
-    transferInfo: data.transferInfo?.trim() || undefined,
-    whatToBring: data.whatToBring?.trim() || undefined,
+    // CAMP — camp/accommodation-данные; иначе явные null (затирание в БД)
+    ...(data.offerWizardType === "CAMP"
+      ? buildCampFieldsForCreate(data)
+      : CAMP_FIELDS_WIPE),
   };
 
   if (opts?.status) {
     payload.status = opts.status;
+  }
+
+  if (opts?.wizardCompletedSteps) {
+    payload.wizardCompletedSteps = opts.wizardCompletedSteps;
   }
 
   return payload;
@@ -456,16 +504,20 @@ export function mapOfferToFormData(offer: {
     coverImage: offer.coverImage,
     gallery,
     videoUrl: offer.videoUrl ?? null,
-    priceCaption: offer.priceCaption
-      ? offer.priceCaption
-      : offer.priceText
-        ? plainTextToRichTextHtml(offer.priceText)
-        : "",
-    promotionDetails: offer.promotionDetails
-      ? offer.promotionDetails
-      : offer.promotionalOffer
-        ? plainTextToRichTextHtml(offer.promotionalOffer)
-        : "",
+    priceCaption: isCamp
+      ? ""
+      : offer.priceCaption
+        ? offer.priceCaption
+        : offer.priceText
+          ? plainTextToRichTextHtml(offer.priceText)
+          : "",
+    promotionDetails: isCamp
+      ? ""
+      : offer.promotionDetails
+        ? offer.promotionDetails
+        : offer.promotionalOffer
+          ? plainTextToRichTextHtml(offer.promotionalOffer)
+          : "",
     pricingMode: "single",
     singlePrice: offer.priceFrom != null ? String(offer.priceFrom) : "",
     singleCurrency: "BYN",
@@ -479,6 +531,7 @@ export function mapOfferToFormData(offer: {
     campSessions: campSessions.map((session) => ({
       ...session,
       description: normalizeRichTextEditorValue(session.description),
+      promotionDetails: normalizeRichTextEditorValue(session.promotionDetails),
     })),
     campSessionDuration: offer.campSessionDuration ?? "",
     campStayDuration: offer.campStayDuration ?? "",

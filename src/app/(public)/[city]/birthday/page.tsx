@@ -13,7 +13,7 @@ export default async function BirthdayPage({ params, searchParams }: PageProps) 
   return (
     <>
       <div className="mx-auto w-full max-w-[1200px] px-4 pt-4 sm:px-6 lg:px-8">
-        <MobileSmartBackButton fallbackUrl={`/${citySlug}`} />
+        <MobileSmartBackButton fallbackHref={`/${citySlug}`} />
       </div>
       <CityShell
         citySlug={citySlug}

@@ -23,6 +23,13 @@ export async function POST() {
       );
     }
 
+    if (user.role !== "ADMIN") {
+      return NextResponse.json(
+        { ok: false, code: "FORBIDDEN" },
+        { status: 403 }
+      );
+    }
+
     // 2. Проверить активное Telegram подключение
     const connection = await getActiveTelegramConnectionForCurrentEnvironment(user.id);
     

@@ -85,7 +85,7 @@ export function StableCardSelector<T extends string>({
                     {isSelected && (
                       <Badge 
                         variant="default" 
-                        className="bg-[#EF8759] hover:bg-[#EF8759]/90 text-xs"
+                        className="bg-primary hover:bg-primary-hover text-xs"
                       >
                         Выбрано
                       </Badge>
@@ -165,19 +165,14 @@ export function StableCardSelectorSmall<T extends string>({
               <CardContent className="p-3">
                 <div className="flex items-start gap-3">
                   {Icon && (
-                    <Icon 
-                      className={cn(
-                        "w-4 h-4 mt-1 flex-shrink-0",
-                        isSelected ? "text-[#EF8759]" : "text-primary"
-                      )} 
-                    />
+                    <Icon className="mt-1 h-4 w-4 flex-shrink-0 text-primary" />
                   )}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                       <h5 className="font-medium text-sm">{option.label}</h5>
                       {isSelected && (
                         <Badge 
-                          className="bg-[#EF8759] hover:bg-[#EF8759]/90 text-xs"
+                          className="bg-primary hover:bg-primary-hover text-xs"
                         >
                           Выбрано
                         </Badge>

@@ -274,3 +274,31 @@ export async function hasOfferIdea(userId: string, offerId: string): Promise<boo
     throw error;
   }
 }
+
+/** Сохранить место в «Идеи» (idempotent). */
+export async function addPlaceIdea(userId: string, placeId: string) {
+  return prisma.placeIdea.upsert({
+    where: {
+      userId_placeId: { userId, placeId },
+    },
+    create: { userId, placeId },
+    update: {},
+  });
+}
+
+/** Удалить место из «Идей». */
+export async function removePlaceIdea(userId: string, placeId: string): Promise<void> {
+  await prisma.placeIdea.deleteMany({
+    where: { userId, placeId },
+  });
+}
+
+/** Проверить, сохранено ли место в «Идеях». */
+export async function hasPlaceIdea(userId: string, placeId: string): Promise<boolean> {
+  const row = await prisma.placeIdea.findUnique({
+    where: {
+      userId_placeId: { userId, placeId },
+    },
+  });
+  return row !== null;
+}

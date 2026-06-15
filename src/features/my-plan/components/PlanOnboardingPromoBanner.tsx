@@ -76,7 +76,7 @@ export function PlanOnboardingPromoBanner({
               className={cn(
                 "rounded-full px-4 py-2 text-sm font-medium transition-colors",
                 isChild
-                  ? "bg-[#EF8759] text-white hover:bg-[#e07040]"
+                  ? "bg-[#EF8759] text-white hover:bg-primary-hover"
                   : "bg-neutral-900 text-white hover:bg-neutral-800",
               )}
             >

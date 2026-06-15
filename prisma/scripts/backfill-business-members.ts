@@ -1,6 +1,15 @@
 /**
- * Одноразовый бэкфилл: для каждого Business создаёт BusinessMember(OWNER) по ownerUserId.
- * Запуск после миграции: pnpm tsx prisma/scripts/backfill-business-members.ts
+ * Backfill: для каждого Business без ACTIVE OWNER membership создаёт
+ * BusinessMember(OWNER, isActive) по ownerUserId. Идемпотентно (upsert по
+ * unique [businessId, userId]), транзакционно.
+ *
+ * Цель — снять зависимость кабинета от transitional-fallback в
+ * getPartnerCabinetBusiness (см. тикет «BusinessMember backfill»).
+ *
+ * Dry-run (по умолчанию — НИЧЕГО не пишет, только отчёт):
+ *   set -a; source .env; set +a; npx tsx prisma/scripts/backfill-business-members.ts
+ * Применить:
+ *   set -a; source .env; set +a; npx tsx prisma/scripts/backfill-business-members.ts --apply
  */
 
 import { BusinessMemberRole, PrismaClient } from "@prisma/client";
@@ -8,28 +17,62 @@ import { BusinessMemberRole, PrismaClient } from "@prisma/client";
 const prisma = new PrismaClient();
 
 async function main() {
+  const apply = process.argv.includes("--apply");
+  const mode = apply ? "APPLY" : "DRY-RUN";
+
   const businesses = await prisma.business.findMany({
-    select: { id: true, ownerUserId: true },
+    select: {
+      id: true,
+      name: true,
+      ownerUserId: true,
+      members: { where: { isActive: true, role: "OWNER" }, select: { id: true } },
+    },
   });
 
-  if (businesses.length === 0) {
-    console.log("No businesses — nothing to do.");
+  const needBackfill = businesses.filter((b) => b.members.length === 0);
+  const skippableNullOwner = needBackfill.filter((b) => !b.ownerUserId);
+  const actionable = needBackfill.filter((b) => b.ownerUserId);
+
+  console.log(`=== Backfill BusinessMember (OWNER) — ${mode} ===`);
+  console.log(`Total businesses:                 ${businesses.length}`);
+  console.log(`Already have ACTIVE OWNER:         ${businesses.length - needBackfill.length}`);
+  console.log(`Missing ACTIVE OWNER:             ${needBackfill.length}`);
+  console.log(`  → backfillable (has owner):      ${actionable.length}`);
+  console.log(`  → SKIPPED (null ownerUserId):    ${skippableNullOwner.length}`);
+  for (const b of skippableNullOwner) {
+    console.warn(`    ! ${b.id} "${b.name}" has no ownerUserId — manual review needed`);
+  }
+
+  if (actionable.length === 0) {
+    console.log("Nothing to backfill.");
     return;
   }
 
-  const result = await prisma.businessMember.createMany({
-    data: businesses
-      .filter((b) => b.ownerUserId !== null)
-      .map((b) => ({
-        businessId: b.id,
-        userId: b.ownerUserId!,
-        role: BusinessMemberRole.OWNER,
-        isActive: true,
-      })),
-    skipDuplicates: true,
-  });
+  for (const b of actionable) {
+    console.log(`  ${apply ? "+" : "would create"} OWNER member: business=${b.id} "${b.name}" user=${b.ownerUserId}`);
+  }
 
-  console.log(`BusinessMember rows created (skipped duplicates): ${result.count}`);
+  if (!apply) {
+    console.log("\nDry-run only. Re-run with --apply to write.");
+    return;
+  }
+
+  const created = await prisma.$transaction(
+    actionable.map((b) =>
+      prisma.businessMember.upsert({
+        where: { businessId_userId: { businessId: b.id, userId: b.ownerUserId! } },
+        create: {
+          businessId: b.id,
+          userId: b.ownerUserId!,
+          role: BusinessMemberRole.OWNER,
+          isActive: true,
+        },
+        update: { role: BusinessMemberRole.OWNER, isActive: true },
+      }),
+    ),
+  );
+
+  console.log(`\nDone. Upserted ${created.length} OWNER membership row(s).`);
 }
 
 main()

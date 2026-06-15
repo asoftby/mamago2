@@ -168,7 +168,11 @@ function EmbedBlockEditor({
           <>
             <p className="text-muted-foreground mb-2">Предпросмотр</p>
             <div
-              className="max-w-full overflow-hidden [&_iframe]:max-w-full"
+              className={cn(
+                "max-w-full overflow-hidden article-embed-shell",
+                resolved.requiresInstagramScript && "article-embed-shell--instagram-blockquote",
+                resolved.provider === "instagram" && !resolved.requiresInstagramScript && "article-embed--instagram",
+              )}
               dangerouslySetInnerHTML={{ __html: resolved.sanitizedHtml }}
             />
             {resolved.requiresInstagramScript ? (

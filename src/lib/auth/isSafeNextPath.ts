@@ -1,10 +1,10 @@
+import { getSafeRedirectPath } from "./redirectTo";
+
 /**
- * Разрешённые значения query `next` после логина: только относительные пути приложения.
+ * Разрешённые значения query `next` / `redirectTo` после логина: только относительные пути приложения.
+ * @deprecated Prefer getSafeRedirectPath(value, fallback) for resolved paths.
  */
 export function isSafeNextPath(next: string | undefined): boolean {
-  if (!next || typeof next !== "string") return false;
-  const t = next.trim();
-  if (!t.startsWith("/") || t.startsWith("//")) return false;
-  if (t.includes("://")) return false;
-  return true;
+  if (!next) return false;
+  return getSafeRedirectPath(next, "") !== "";
 }

@@ -15,9 +15,11 @@ export async function getCurrentAuthState(): Promise<AuthenticatedAppUser | null
   }
 
   const business = await getMyBusiness(user.id);
-  const hasApprovedBusinessProfile = business
-    ? getEffectiveVerificationStatus(business) === "APPROVED"
-    : false;
+  const businessVerificationStatus = business
+    ? getEffectiveVerificationStatus(business)
+    : null;
+  const hasApprovedBusinessProfile =
+    businessVerificationStatus === "APPROVED";
 
   return {
     id: user.id,
@@ -34,5 +36,6 @@ export async function getCurrentAuthState(): Promise<AuthenticatedAppUser | null
     preferenceSignalIds: user.preferenceSignalIds,
     leisureFormatSignalId: user.leisureFormatSignalId,
     hasApprovedBusinessProfile,
+    businessVerificationStatus,
   };
 }

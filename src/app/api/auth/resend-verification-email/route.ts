@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import { resendVerificationEmailForUser } from "@/server/auth/email-verification";
+import { completeOnboardingNotification } from "@/server/services/notification.service";
 
 /**
  * POST /api/auth/resend-verification-email
@@ -13,14 +14,27 @@ export async function POST() {
       return NextResponse.json({ error: "Требуется вход" }, { status: 401 });
     }
 
+    const email = user.email?.trim();
+    if (!email) {
+      return NextResponse.json(
+        {
+          code: "NO_EMAIL" as const,
+          message: "Укажите email в профиле, чтобы подтвердить почту.",
+        },
+        { status: 400 },
+      );
+    }
+
     if (user.emailVerifiedAt) {
+      await completeOnboardingNotification(user.id, "VERIFY_EMAIL");
       return NextResponse.json({
         ok: true,
         alreadyVerified: true,
+        email,
       });
     }
 
-    const result = await resendVerificationEmailForUser(user.id, user.email);
+    const result = await resendVerificationEmailForUser(user.id, email);
 
     if ("rateLimited" in result && result.rateLimited) {
       return NextResponse.json(
@@ -33,9 +47,11 @@ export async function POST() {
     }
 
     if ("sent" in result && !result.sent) {
+      await completeOnboardingNotification(user.id, "VERIFY_EMAIL");
       return NextResponse.json({
         ok: true,
         alreadyVerified: true,
+        email,
       });
     }
 
@@ -43,6 +59,7 @@ export async function POST() {
       ok: true,
       sent: true,
       alreadyVerified: false,
+      email,
     });
   } catch (e) {
     console.error("[auth/resend-verification-email]", e);

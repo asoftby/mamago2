@@ -53,6 +53,7 @@ import { toast } from "@/lib/toast";
 import { SavedProfileChildCard } from "./SavedProfileChildCard";
 import { DatePicker } from "@/components/ui/date-picker";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
+import { buildAuthUrl } from "@/lib/auth/redirectTo";
 
 type BuilderHook = BirthdayBuilderWithGate;
 
@@ -280,7 +281,7 @@ function PartyForChildSectionInner({
   const loginHref = useMemo(() => {
     const qs = searchParams.toString();
     const full = `${pathname}${qs ? `?${qs}` : ""}`;
-    return `/login?next=${encodeURIComponent(full)}`;
+    return buildAuthUrl({ redirectTo: full });
   }, [pathname, searchParams]);
 
   /** Обычная загрузка детей; при bbAuth=1 список подтягивает сценарий после логина */

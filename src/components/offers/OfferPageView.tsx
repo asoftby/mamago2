@@ -18,6 +18,7 @@ import {
   type SaveToPlanResult,
 } from "@/components/activity/SaveToPlanModal";
 import { normalizeUiCurrencyText } from "@/lib/formatters/format-price";
+import { getCityHomeHref } from "@/lib/header/getCityHomeHref";
 import { toast } from "@/lib/toast";
 
 interface OfferPageViewProps {
@@ -54,6 +55,7 @@ function mapItemToShiftContext(item: OfferScheduleItem): ShiftCtaContext {
     dateTo: item.dateTo,
     price: item.price,
     ageRange: item.ageRange,
+    promotionDetails: item.promotionDetails,
   };
 }
 
@@ -156,12 +158,13 @@ export function OfferPageView({
 
   const stickyPriceLabel = useMemo(() => {
     const p = data.pricing;
-    const raw = (p.priceDisplay || p.singlePrice || p.priceFrom || "").replace(/^от\s+/i, "");
-    if (!raw) return "";
-    const parts = raw.split(" ");
-    const num = parts[0] ?? "";
-    const unit = normalizeUiCurrencyText(p.priceUnit || parts.slice(1).join(" "));
-    return unit ? `${num} ${unit}` : num;
+    const amount = (p.priceDisplay || "").trim();
+    if (amount) {
+      const unit = normalizeUiCurrencyText(p.priceUnit || "");
+      return unit ? `${amount} ${unit}` : amount;
+    }
+    const fallback = (p.singlePrice || p.priceFrom || "").replace(/^от\s+/i, "").trim();
+    return normalizeUiCurrencyText(fallback);
   }, [data.pricing]);
 
   const stickySessionLine = useMemo(() => {
@@ -284,7 +287,7 @@ export function OfferPageView({
     <main className="ep-surface min-h-screen">
       <div className="mx-auto max-w-[1200px] space-y-16 px-4 py-8 sm:px-6 lg:space-y-24 lg:px-8 lg:py-12">
         <div className="mb-4 md:mb-0">
-          <MobileSmartBackButton fallbackUrl={`/${data.citySlug || "minsk"}`} />
+          <MobileSmartBackButton fallbackHref={getCityHomeHref(data.citySlug)} />
         </div>
 
         <OfferHero

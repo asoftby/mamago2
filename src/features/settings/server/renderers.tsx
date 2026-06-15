@@ -176,10 +176,10 @@ export async function renderNotificationSettingsPage(
   surfaceScope: SettingsScope = "USER",
 ) {
   const context = await requireSettingsContext({ requestedScope: surfaceScope });
-  const data = await getNotificationSettingsSurfaceData(
-    context.viewer.id,
-    surfaceScope,
-  );
+  const data = {
+    ...(await getNotificationSettingsSurfaceData(context.viewer.id, surfaceScope)),
+    canSendTelegramTest: context.viewer.role === "ADMIN",
+  };
 
   if (surfaceScope === "ADMIN") {
     return (

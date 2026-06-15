@@ -29,7 +29,7 @@ export function MyPlanHeader({ onClose, compact = false }: MyPlanHeaderProps) {
           color: "#141210",
         }}
       >
-        Мой <em style={{ fontFamily: "Georgia, serif", fontStyle: "italic", color: "#C24E22" }}>план</em>
+        Мой <em style={{ fontFamily: "var(--font-editorial)", fontStyle: "italic", color: "#C24E22" }}>план</em>
       </h2>
 
       <button

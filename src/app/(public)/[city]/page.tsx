@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import CityHomePage from "@/features/city-home/pages/CityHomePage";
 import { buildCityHubMetadata } from "@/lib/seo/cityKudaListingMetadata";
 import { applyGlobalRobotsOverride } from "@/lib/seo/globalNoindex";
-import prisma from "@/lib/prisma";
+import { findCityBySlug } from "@/server/geo/findCityBySlug";
 
 export const dynamic = "force-dynamic";
 
@@ -25,8 +25,8 @@ export default async function CityPage({ params, searchParams }: PageProps) {
   const { city: citySlug } = await params;
   await searchParams;
 
-  const city = await prisma.city.findFirst({
-    where: { slug: citySlug.toLowerCase(), isActive: true },
+  const city = await findCityBySlug(citySlug.toLowerCase(), {
+    isActive: true,
     select: { slug: true },
   });
 

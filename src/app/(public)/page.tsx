@@ -18,7 +18,7 @@ export const metadata: Metadata = applyGlobalRobotsOverride({
 
 export default async function NationalHubPage() {
   const cities = await prisma.city.findMany({
-    where: { isActive: true },
+    where: { isActive: true, isLegacyNonCity: false, isVisibleInCityFilter: true },
     orderBy: [{ priority: "desc" }, { name: "asc" }],
     select: { slug: true, name: true },
   });

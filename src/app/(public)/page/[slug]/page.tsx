@@ -49,7 +49,7 @@ export default async function PublicPage({ params }: PageProps) {
     <div className="min-h-screen bg-white">
       <div className="max-w-4xl mx-auto px-4 py-12 sm:px-6 lg:px-8">
         <div className="mb-4 md:mb-0">
-          <MobileSmartBackButton fallbackUrl="/minsk" />
+          <MobileSmartBackButton />
         </div>
 
         {/* Header */}

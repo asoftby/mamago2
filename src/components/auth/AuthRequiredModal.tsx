@@ -2,6 +2,7 @@
 
 import { X, LogIn } from "lucide-react";
 import { AuthForm } from "./AuthForm";
+import { useCurrentPath } from "@/hooks/useCurrentPath";
 
 interface AuthRequiredModalProps {
   isOpen: boolean;
@@ -16,6 +17,7 @@ export function AuthRequiredModal({
   reason = "review",
   entityName,
 }: AuthRequiredModalProps) {
+  const currentPath = useCurrentPath();
   const getTitle = () => {
     switch (reason) {
       case "review":
@@ -82,7 +84,7 @@ export function AuthRequiredModal({
             <AuthForm
               open={isOpen}
               onRequestClose={onClose}
-              nextHref={typeof window !== "undefined" ? window.location.pathname : "/"}
+              nextHref={currentPath}
               title=""
               subtitle=""
               hideCloseButton={true}

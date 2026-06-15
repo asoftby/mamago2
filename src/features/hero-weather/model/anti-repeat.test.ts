@@ -22,14 +22,12 @@ import { loadAntiRepeatState, pruneAntiRepeatState, saveAntiRepeatState } from "
         scenario: "great_outdoor",
         microcopyId: "m1",
         titleId: "t1",
-        subtitleId: "s1",
       },
       {
         timestamp: now - 1000,
         scenario: "great_outdoor",
         microcopyId: "m2",
         titleId: "t2",
-        subtitleId: "s2",
       },
     ],
   };
@@ -70,7 +68,7 @@ import { loadAntiRepeatState, pruneAntiRepeatState, saveAntiRepeatState } from "
   assert.equal(pickedNone, null);
 }
 
-// --- 4. same scenario: try to differ at least 2 fields from last entry ---
+// --- 4. same scenario: try to differ from last entry ---
 
 {
   const entries: AntiRepeatEntry[] = [
@@ -79,7 +77,6 @@ import { loadAntiRepeatState, pruneAntiRepeatState, saveAntiRepeatState } from "
       scenario: "great_outdoor",
       microcopyId: "m1",
       titleId: "t1",
-      subtitleId: "s1",
     },
   ];
   const state: AntiRepeatState = { version: 1, entries };
@@ -92,10 +89,6 @@ import { loadAntiRepeatState, pruneAntiRepeatState, saveAntiRepeatState } from "
       { id: "t1", weight: 1 },
       { id: "t2", weight: 1 },
     ],
-    subtitles: [
-      { id: "s1", weight: 1 },
-      { id: "s2", weight: 1 },
-    ],
   };
 
   let sawGood = false;
@@ -106,24 +99,23 @@ import { loadAntiRepeatState, pruneAntiRepeatState, saveAntiRepeatState } from "
       state,
     });
     assert.ok(ids);
-    let diff = 0;
-    if (ids!.microcopyId !== "m1") diff++;
-    if (ids!.titleId !== "t1") diff++;
-    if (ids!.subtitleId !== "s1") diff++;
-    if (diff >= 2) {
+    const diff =
+      (ids!.microcopyId !== "m1" ? 1 : 0) +
+      (ids!.titleId !== "t1" ? 1 : 0);
+    if (diff >= 1) {
       sawGood = true;
       break;
     }
   }
-  assert.equal(sawGood, true, "expected >=2 fields different from lastSame over trials");
+  assert.equal(sawGood, true, "expected at least one field different from lastSame over trials");
 }
 
 // countRecentMatches sanity
 {
   const entries: AntiRepeatEntry[] = [
-    { timestamp: 1, scenario: "unknown", microcopyId: "a", titleId: "t", subtitleId: "s" },
-    { timestamp: 2, scenario: "unknown", microcopyId: "a", titleId: "t", subtitleId: "s" },
-    { timestamp: 3, scenario: "unknown", microcopyId: "b", titleId: "t", subtitleId: "s" },
+    { timestamp: 1, scenario: "unknown", microcopyId: "a", titleId: "t" },
+    { timestamp: 2, scenario: "unknown", microcopyId: "a", titleId: "t" },
+    { timestamp: 3, scenario: "unknown", microcopyId: "b", titleId: "t" },
   ];
   assert.equal(countRecentMatches(entries, "microcopyId", "a", 2), 1);
 }
@@ -158,5 +150,4 @@ import { loadAntiRepeatState, pruneAntiRepeatState, saveAntiRepeatState } from "
   }
 }
 
- 
 console.log("anti-repeat tests: OK");

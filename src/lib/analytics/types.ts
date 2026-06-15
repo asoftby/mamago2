@@ -9,7 +9,7 @@ import type {
  */
 export type AnalyticsMetaPayload = {
   source?: "listing" | "detail" | "recommendation" | "plan";
-  section?: "home" | "afisha" | "offers" | "routes" | "journal";
+  section?: "home" | "afisha" | "offers" | "routes" | "journal" | "places";
   position?: number;
   /** Краткое описание фильтров (строка), не полный объект фильтра */
   filterSummary?: string;

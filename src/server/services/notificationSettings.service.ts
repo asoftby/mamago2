@@ -76,6 +76,7 @@ export async function getNotificationSettingsSurfaceData(
       telegramConfigured: telegramStatus.configured,
       telegramUsername: telegramStatus.username ?? undefined,
       telegramBotUsername: telegramStatus.botUsername ?? undefined,
+      canSendTelegramTest: false,
     };
   }
 
@@ -156,6 +157,7 @@ export async function getNotificationSettingsSurfaceData(
     telegramConfigured: telegramStatus.configured,
     telegramUsername: telegramStatus.username ?? undefined,
     telegramBotUsername: telegramStatus.botUsername ?? undefined,
+    canSendTelegramTest: false,
     rows,
     groups,
   };

@@ -3,6 +3,7 @@
 import { useState, useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { normalizeUiCurrencyText } from "@/lib/formatters/format-price";
+import { renderCurrencyText } from "@/components/icons/BelarusianRubleIcon";
 import type { BookingProduct } from "./types";
 import { BookingAvailabilityBadge } from "./BookingAvailabilityBadge";
 import { BookingDateSelector } from "./BookingDateSelector";
@@ -88,9 +89,13 @@ export function BookingCard({ product, className }: BookingCardProps) {
 
         {/* Price */}
         <div>
-          <div className="text-2xl font-bold text-gray-900">{normalizeUiCurrencyText(product.priceLabel)}</div>
+          <div className="text-2xl font-bold text-gray-900">
+            {renderCurrencyText(normalizeUiCurrencyText(product.priceLabel))}
+          </div>
           {product.priceSubtext && (
-            <p className="text-xs text-gray-500 mt-0.5">{normalizeUiCurrencyText(product.priceSubtext)}</p>
+            <p className="text-xs text-gray-500 mt-0.5">
+              {renderCurrencyText(normalizeUiCurrencyText(product.priceSubtext), { iconSize: "sm" })}
+            </p>
           )}
         </div>
       </div>

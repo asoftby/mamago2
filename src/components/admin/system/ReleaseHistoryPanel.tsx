@@ -54,6 +54,7 @@ import type {
   ReleaseNoteTypeValue,
 } from "@/types/release";
 import { cn } from "@/lib/utils";
+import { randomId } from "@/lib/utils/randomId";
 
 type ReleaseHistoryPanelProps = {
   initialReleases: ReleaseListItem[];
@@ -69,7 +70,6 @@ type NoteDraft = {
 type ReleaseFormState = {
   version: string;
   title: string;
-  description: string;
   notes: NoteDraft[];
 };
 
@@ -77,27 +77,32 @@ const NOTE_TYPE_OPTIONS: Array<{
   value: ReleaseNoteTypeValue;
   label: string;
 }> = [
-  { value: "FEATURE", label: "Фича" },
-  { value: "FIX", label: "Исправление" },
-  { value: "IMPROVEMENT", label: "Улучшение" },
-  { value: "BREAKING", label: "Важно" },
-  { value: "INTERNAL", label: "Внутреннее" },
+  { value: "feature", label: "Фича" },
+  { value: "fix", label: "Фикс" },
+  { value: "improvement", label: "Улучшение" },
+  { value: "security", label: "Безопасность" },
 ];
 
 const NOTE_TYPE_LABEL: Record<ReleaseNoteTypeValue, string> = {
-  FEATURE: "Фича",
-  FIX: "Исправление",
-  IMPROVEMENT: "Улучшение",
-  BREAKING: "Важно",
-  INTERNAL: "Внутреннее",
+  feature: "Фича",
+  fix: "Фикс",
+  improvement: "Улучшение",
+  security: "Безопасность",
+};
+
+const NOTE_TYPE_BADGE_CLASS: Record<ReleaseNoteTypeValue, string> = {
+  feature: "bg-blue-100 text-blue-700",
+  fix: "bg-rose-100 text-rose-700",
+  improvement: "bg-amber-100 text-amber-700",
+  security: "bg-green-100 text-green-700",
 };
 
 function createNoteDraft(
   partial?: Partial<NoteDraft>,
 ): NoteDraft {
   return {
-    key: partial?.key ?? crypto.randomUUID(),
-    type: partial?.type ?? "FEATURE",
+    key: partial?.key ?? randomId(),
+    type: partial?.type ?? "feature",
     title: partial?.title ?? "",
     description: partial?.description ?? "",
   };
@@ -107,7 +112,6 @@ function emptyFormState(): ReleaseFormState {
   return {
     version: "",
     title: "",
-    description: "",
     notes: [],
   };
 }
@@ -116,7 +120,6 @@ function releaseToFormState(release: ReleaseListItem): ReleaseFormState {
   return {
     version: release.version,
     title: release.title,
-    description: release.description ?? "",
     notes: release.notes.map((note) =>
       createNoteDraft({
         key: note.id,
@@ -218,7 +221,7 @@ export function ReleaseHistoryPanel({
   const addNote = useCallback(() => {
     setForm((prev) => ({
       ...prev,
-      notes: [...prev.notes, createNoteDraft()],
+      notes: [createNoteDraft(), ...prev.notes],
     }));
   }, []);
 
@@ -256,7 +259,6 @@ export function ReleaseHistoryPanel({
     return {
       version: form.version.trim(),
       title: form.title.trim(),
-      description: form.description.trim() || null,
       notes: notesToPayload(form.notes),
     };
   }, [form]);
@@ -509,8 +511,8 @@ export function ReleaseHistoryPanel({
                         ) : null}
                       </div>
                       <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">
-                        <span>Опубликовано: {formatDate(release.releasedAt)}</span>
                         <span>Создано: {formatDate(release.createdAt)}</span>
+                        <span>Обновлено: {formatDate(release.updatedAt)}</span>
                       </div>
                       {release.notes.length > 0 ? (
                         <ul className="space-y-2 border-t border-border/60 pt-3">
@@ -519,9 +521,12 @@ export function ReleaseHistoryPanel({
                               key={note.id}
                               className="flex items-start gap-2 text-sm"
                             >
-                              <Badge variant="outline" className="mt-0.5 shrink-0">
+                              <span className={cn(
+                                "mt-0.5 shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium",
+                                NOTE_TYPE_BADGE_CLASS[note.type],
+                              )}>
                                 {NOTE_TYPE_LABEL[note.type]}
-                              </Badge>
+                              </span>
                               <div className="min-w-0">
                                 <p className="font-medium text-foreground">
                                   {note.title}
@@ -595,7 +600,7 @@ export function ReleaseHistoryPanel({
 
       <Sheet open={sheetOpen} onOpenChange={(open) => !open && closeSheet()}>
         <SheetContent className="flex w-full flex-col overflow-y-auto sm:max-w-xl">
-          <SheetHeader>
+          <SheetHeader className="shrink-0">
             <SheetTitle>
               {isEditing ? "Редактировать версию" : "Новая версия"}
             </SheetTitle>
@@ -606,16 +611,35 @@ export function ReleaseHistoryPanel({
             </SheetDescription>
           </SheetHeader>
 
-          <div className="flex-1 space-y-5 py-4">
+          <div className="space-y-5 px-4 pb-2">
             <div className="space-y-2">
               <Label htmlFor="release-version">Version</Label>
               <Input
                 id="release-version"
                 value={form.version}
-                onChange={(event) =>
-                  updateFormField("version", event.target.value)
-                }
+                onChange={(event) => {
+                  const raw = event.target.value;
+                  const isDeleting = raw.length < form.version.length;
+
+                  if (isDeleting) {
+                    // On delete: preserve structure, just clean up stray chars/dots
+                    const cleaned = raw
+                      .replace(/[^\d.]/g, "")
+                      .replace(/\.{2,}/g, ".")
+                      .replace(/^\.|\.$/g, "");
+                    const parts = cleaned.split(".").slice(0, 3).map((s) => s.slice(0, 3));
+                    updateFormField("version", parts.join("."));
+                  } else {
+                    // On add: extract digits only and auto-insert dots → X.X.XXX
+                    const digits = raw.replace(/\D/g, "").slice(0, 5);
+                    let masked = digits.slice(0, 1);
+                    if (digits.length > 1) masked += "." + digits[1];
+                    if (digits.length > 2) masked += "." + digits.slice(2);
+                    updateFormField("version", masked);
+                  }
+                }}
                 placeholder="1.2.0"
+                inputMode="decimal"
               />
             </div>
 
@@ -631,22 +655,9 @@ export function ReleaseHistoryPanel({
               />
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="release-description">Description</Label>
-              <Textarea
-                id="release-description"
-                value={form.description}
-                onChange={(event) =>
-                  updateFormField("description", event.target.value)
-                }
-                placeholder="Краткое описание релиза"
-                rows={3}
-              />
-            </div>
-
-            <div className="space-y-3">
+            <div className="space-y-4">
               <div className="flex items-center justify-between gap-3">
-                <Label>Notes</Label>
+                <Label className="text-sm font-medium">Notes</Label>
                 <Button type="button" variant="outline" size="sm" onClick={addNote}>
                   <Plus className="mr-2 h-4 w-4" />
                   Добавить пункт
@@ -654,19 +665,19 @@ export function ReleaseHistoryPanel({
               </div>
 
               {form.notes.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
+                <p className="rounded-lg border border-dashed border-border/80 bg-muted/10 px-4 py-6 text-center text-sm text-muted-foreground">
                   Пока нет пунктов изменений.
                 </p>
               ) : (
-                <div className="space-y-3">
+                <div className="space-y-4">
                   {form.notes.map((note) => (
                     <div
                       key={note.key}
                       className={cn(
-                        "rounded-lg border border-border/80 bg-muted/10 p-3",
+                        "rounded-xl border border-border/80 bg-muted/10 p-4",
                       )}
                     >
-                      <div className="mb-3 flex items-center justify-between gap-2">
+                      <div className="mb-4 flex items-center justify-between gap-2">
                         <div className="flex items-center gap-2 text-muted-foreground">
                           <GripVertical className="h-4 w-4" />
                           <span className="text-xs uppercase tracking-wide">
@@ -703,7 +714,12 @@ export function ReleaseHistoryPanel({
                                   key={option.value}
                                   value={option.value}
                                 >
-                                  {option.label}
+                                  <span className={cn(
+                                    "rounded-full px-2 py-0.5 text-[11px] font-medium",
+                                    NOTE_TYPE_BADGE_CLASS[option.value],
+                                  )}>
+                                    {option.label}
+                                  </span>
                                 </SelectItem>
                               ))}
                             </SelectContent>
@@ -744,7 +760,7 @@ export function ReleaseHistoryPanel({
             </div>
           </div>
 
-          <SheetFooter className="gap-2 sm:flex-col sm:space-x-0">
+          <SheetFooter className="mt-0 shrink-0 gap-2 border-t bg-background px-4 pb-4 pt-4 sm:flex-col sm:space-x-0">
             <Button
               type="button"
               variant="outline"

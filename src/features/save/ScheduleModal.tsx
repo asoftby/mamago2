@@ -2,6 +2,11 @@
 
 import React, { useState, useCallback } from "react";
 import { getTodayStart } from "@/lib/date/getTodayStart";
+import {
+  getPlanReminderLabel,
+  PLAN_REMINDER_LABELS,
+  resolvePlanEventDateTime,
+} from "@/lib/plan/getPlanReminderLabel";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type Session = {
@@ -288,6 +293,11 @@ function PhaseEditorial({
   const sub1 = first
     ? `${fmtDateLong(first.date)}${first.startsAt ? ` · ${fmtTime(first.startsAt)}` : ""}`
     : "";
+  const reminderHint = first
+    ? getPlanReminderLabel({
+        eventDateTime: resolvePlanEventDateTime(first.date, first.startsAt ?? null),
+      }) ?? PLAN_REMINDER_LABELS.eveningBefore
+    : PLAN_REMINDER_LABELS.eveningBefore;
 
   return (
     <>
@@ -306,7 +316,7 @@ function PhaseEditorial({
       </h2>
       <p style={{ marginTop: 10, marginBottom: 22, fontSize: 14, color: C.ink3, lineHeight: 1.5 }}>
         {hasSessions
-          ? "Положите в план на дату — напомним вечером накануне. Или сохраните в идеи."
+          ? `Положите в план на дату — ${reminderHint}. Или сохраните в идеи.`
           : "Сохраните в идеи, чтобы вернуться к этому позже."}
       </p>
 
@@ -561,6 +571,10 @@ function PhaseCustomDate({
 }) {
   const [date, setDate] = useState("");
   const minDate = getTodayStart().toISOString().split("T")[0];
+  const calendarReminderHint = date
+    ? getPlanReminderLabel({ eventDateTime: resolvePlanEventDateTime(date) }) ??
+      PLAN_REMINDER_LABELS.eveningBefore
+    : PLAN_REMINDER_LABELS.eveningBefore;
 
   return (
     <>
@@ -598,7 +612,7 @@ function PhaseCustomDate({
         <span style={{ fontStyle: "italic", color: C.accentDeep }}>дату</span>
       </h2>
       <p style={{ marginTop: 8, marginBottom: 22, fontSize: 14, color: C.ink3, lineHeight: 1.5 }}>
-        Добавим в план и напомним вечером накануне.
+        Добавим в план и {calendarReminderHint}.
       </p>
 
       <div style={{

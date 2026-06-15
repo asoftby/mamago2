@@ -7,9 +7,11 @@ import { trackUserEvent } from "@/server/services/analytics/AnalyticsEventServic
 import {
   addIdea,
   addOfferIdea,
+  addPlaceIdea,
   hasOfferIdeaSupport,
   removeIdea,
   removeOfferIdea,
+  removePlaceIdea,
 } from "@/server/services/idea.service";
 
 export async function POST(request: NextRequest) {
@@ -20,16 +22,37 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { activityId, offerId } = body as {
+    const { activityId, offerId, placeId } = body as {
       activityId?: string;
       offerId?: string;
+      placeId?: string;
     };
 
-    if (!activityId && !offerId) {
+    if (!activityId && !offerId && !placeId) {
       return NextResponse.json(
-        { error: "activityId or offerId is required" },
+        { error: "activityId, offerId or placeId is required" },
         { status: 400 }
       );
+    }
+
+    if (placeId) {
+      const idea = await addPlaceIdea(user.id, placeId);
+      const place = await prisma.place.findUnique({
+        where: { id: placeId },
+        select: { cityId: true },
+      });
+      const sessionRowId = await getSessionRowIdFromCookies();
+      void trackUserEvent({
+        userId: user.id,
+        sessionId: sessionRowId,
+        eventType: "SAVE",
+        entityType: "PLACE",
+        entityId: placeId,
+        vertical: "CITY",
+        cityId: place?.cityId ?? null,
+        meta: { source: "detail", section: "places", targetAction: "ideas" },
+      });
+      return NextResponse.json({ success: true, idea });
     }
 
     if (activityId) {
@@ -97,15 +120,18 @@ export async function DELETE(request: NextRequest) {
     const activityId = searchParams.get("activityId");
     const offerId = searchParams.get("offerId");
     const routeId = searchParams.get("routeId");
+    const placeId = searchParams.get("placeId");
 
-    if (!activityId && !offerId && !routeId) {
+    if (!activityId && !offerId && !routeId && !placeId) {
       return NextResponse.json(
-        { error: "activityId, offerId or routeId is required" },
+        { error: "activityId, offerId, routeId or placeId is required" },
         { status: 400 }
       );
     }
 
-    if (activityId) {
+    if (placeId) {
+      await removePlaceIdea(user.id, placeId);
+    } else if (activityId) {
       await removeIdea(user.id, activityId);
     } else if (offerId) {
       if (!hasOfferIdeaSupport()) {

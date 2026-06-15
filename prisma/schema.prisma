@@ -83,7 +83,9 @@ model User {
   moderationLogs                    ModerationLog[]                  @relation("ModerationReviewer")
   notifications                     Notification[]
   notificationDeliveries            NotificationDelivery[]
+  updatedNotificationTemplates      NotificationTemplate[]           @relation("NotificationTemplateUpdatedBy")
   offerIdeas                        OfferIdea[]
+  placeIdeas                        PlaceIdea[]
   phoneOtps                         PhoneOtp[]
   archivedPlaces                    Place[]                          @relation("PlaceArchiver")
   createdPlaces                     Place[]                          @relation("PlaceCreator")
@@ -304,8 +306,12 @@ model PlanItem {
   routeId       String?
   /// Slug для демо/внешнего маршрута, когда записи в Route нет (routeId = null)
   planRouteSlug String?
+  /// Место в плане (визит без привязки к событию)
+  placeId       String?
+  planPlaceSlug String?
   activity      Activity? @relation(fields: [activityId], references: [id])
   route         Route?    @relation(fields: [routeId], references: [id])
+  place         Place?    @relation(fields: [placeId], references: [id])
   user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, date])
@@ -313,6 +319,8 @@ model PlanItem {
   @@index([activityId])
   @@index([routeId])
   @@index([userId, planRouteSlug])
+  @@index([placeId])
+  @@index([userId, planPlaceSlug])
 }
 
 /// Сохранённые маршруты в «Идеи» (отдельно от Idea с activityId)
@@ -351,6 +359,8 @@ model SignalDefinition {
   status       SignalStatus       @default(ACTIVE)
   /// ID сигнала, который заменяет текущий (для устаревших сигналов)
   replacedById String?
+  /// Назначение сигнала в продукте (mini-onboarding плана, …)
+  usageType    SignalUsageType?
   parent       SignalDefinition?  @relation("SignalDefinitionHierarchy", fields: [parentId], references: [id], onDelete: Restrict)
   children     SignalDefinition[] @relation("SignalDefinitionHierarchy")
   /// Сигнал, который заменяет текущий
@@ -363,6 +373,7 @@ model SignalDefinition {
   @@index([parentId, order])
   @@index([domain])
   @@index([status])
+  @@index([usageType])
 }
 
 model SignalOption {
@@ -518,6 +529,7 @@ model EventCategory {
   placePrimary         Place[]                      @relation("PlacePrimaryCategory")
   placeSubcategories   PlaceSubcategory[]           @relation("PlaceSubcategoryCategory")
   filterPlacements     DiscoveryFilterPlacement[]
+  articles             Article[]                    @relation("ArticleCategory")
 
   @@unique([publicationType, slug])
   @@index([sortOrder])
@@ -547,15 +559,61 @@ model Genre {
   @@index([categoryId, isActive, sortOrder])
 }
 
+enum RegionType {
+  REGION
+  OBLAST
+  PROVINCE
+  STATE
+  DISTRICT
+}
+
+model Country {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  isoCode   String?  @unique
+  isActive  Boolean  @default(false)
+  priority  Int      @default(0)
+  regions   Region[]
+  cities    City[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Region {
+  id        String     @id @default(cuid())
+  countryId String
+  country   Country    @relation(fields: [countryId], references: [id], onDelete: Cascade)
+  name      String
+  slug      String
+  type      RegionType @default(REGION)
+  isActive  Boolean    @default(false)
+  priority  Int        @default(0)
+  cities    City[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  @@unique([countryId, slug])
+  @@index([countryId])
+}
+
 model City {
   id                    String            @id @default(cuid())
+  countryId             String
+  country               Country           @relation(fields: [countryId], references: [id])
+  regionId              String?
+  region                Region?           @relation(fields: [regionId], references: [id])
   name                  String
-  slug                  String            @unique
+  slug                  String
   isActive              Boolean           @default(true)
   isVisibleInCityFilter Boolean           @default(true)
   priority              Int               @default(0)
   lat                   Float?
   lng                   Float?
+  googlePlaceId         String?
+  createdFromGoogle     Boolean           @default(false)
+  /// Legacy записи (например ошибочная «Минская область» как City) — скрыты из админки и селектора.
+  isLegacyNonCity       Boolean           @default(false)
   createdAt             DateTime          @default(now())
   updatedAt             DateTime          @updatedAt
   centerLat             Float?
@@ -577,10 +635,17 @@ model City {
   activitySlugHistories ActivitySlugHistory[]
   placeSlugHistories    PlaceSlugHistory[]
   offerSlugHistories    OfferSlugHistory[]
+  articles              Article[]         @relation("ArticleCity")
+  editorialRequests     EditorialRequest[] @relation("EditorialRequestCity")
+  articleSlugHistories  ArticleSlugHistory[]
 
+  @@unique([countryId, slug])
   @@index([slug])
+  @@index([countryId])
+  @@index([regionId])
   @@index([isActive, isVisibleInCityFilter, priority])
   @@index([googleName])
+  @@index([isLegacyNonCity])
 }
 
 model District {
@@ -1025,6 +1090,10 @@ model Place {
   routeStops      RouteStop[]
   primaryCategory EventCategory?      @relation("PlacePrimaryCategory", fields: [primaryCategoryId], references: [id])
   subcategories   PlaceSubcategory[]
+  /// Articles where this place is the editorial subject (relatedPlace).
+  relatedArticles Article[]           @relation("ArticleRelatedPlace")
+  planItems       PlanItem[]
+  placeIdeas      PlaceIdea[]
 
   @@unique([cityId, slug])
   @@unique([createdByUserId, createRequestId])
@@ -1266,7 +1335,6 @@ model Notification {
   body       String
   entityType NotificationEntityType?
   entityId   String?
-  isRead     Boolean                @default(false)
   readAt     DateTime?
   archivedAt DateTime?
   /// Первый просмотр в центре уведомлений; null = «новое» для badge и сортировки
@@ -1289,7 +1357,7 @@ model Notification {
   @@index([userId, audience, createdAt])
   @@index([userId, scenario, createdAt])
   @@index([userId, isPinned, createdAt])
-  @@index([userId, isRead, createdAt])
+  @@index([userId, readAt, createdAt])
   @@index([userId, archivedAt, createdAt])
   @@index([userId, seenAt])
   @@index([entityType, entityId])
@@ -1641,6 +1709,7 @@ model Offer {
   status                   OfferStatus        @default(DRAFT)
   publishedAt              DateTime?
   rejectionReason          String?
+  createRequestId          String?            @unique
   createdAt                DateTime           @default(now())
   updatedAt                DateTime           @updatedAt
   inheritPlaceOpeningHours Boolean            @default(true)
@@ -1663,6 +1732,8 @@ model Offer {
   discoverySignalIds       String[]           @default([])
   /// Чипы публичной витрины /[city]/classes
   classChipSlugs           String[]           @default([])
+  /// Шаги мастера, явно завершённые пользователем через «Далее» (OfferWizardStepKey)
+  wizardCompletedSteps     String[]           @default([])
 
   // Настройки записи
   bookingEnabled Boolean      @default(false)
@@ -1748,6 +1819,20 @@ model OfferIdea {
   @@unique([userId, offerId])
   @@index([userId])
   @@index([offerId])
+}
+
+/// Сохранённые места в «Идеи»
+model PlaceIdea {
+  id        String   @id @default(cuid())
+  userId    String
+  placeId   String
+  createdAt DateTime @default(now())
+  place     Place    @relation(fields: [placeId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, placeId])
+  @@index([userId])
+  @@index([placeId])
 }
 
 model OfferSlugHistory {
@@ -2198,7 +2283,7 @@ model RouteSlugHistory {
 
 model Article {
   id                 String               @id @default(cuid())
-  slug               String?              @unique
+  slug               String?
   slugUpdatedAt      DateTime?
   title              String
   subtitle           String?
@@ -2213,6 +2298,11 @@ model Article {
   /// Отображаемое имя автора (если не привязан User)
   authorLabel        String?
   cityContext        String?
+  /// FK to the city this article belongs to (null = country-scope article)
+  cityId             String?
+  city               City?                @relation("ArticleCity", fields: [cityId], references: [id], onDelete: SetNull)
+  /// CITY = local article served at /{city}/blog/{slug}; COUNTRY = national article at /blog/{slug}; null = draft, scope not chosen
+  geoScope           GeoScope?
   expiresAt          DateTime?
   scheduledAt        DateTime?
   seoTitle           String?
@@ -2234,23 +2324,66 @@ model Article {
   updatedAt          DateTime             @updatedAt
   seoCanonicalSource SeoCanonicalSource   @default(FALLBACK)
   slugHistory        ArticleSlugHistory[]
+  /// The Place/venue this article is about (optional editorial context).
+  /// Does NOT determine geoScope or cityId — geography is set independently by the editor.
+  /// On DELETE SET NULL so deleting the place keeps the article.
+  relatedPlaceId     String?
+  relatedPlace       Place?               @relation("ArticleRelatedPlace", fields: [relatedPlaceId], references: [id], onDelete: SetNull)
+  /// EventCategory с publicationType=ARTICLE (корневая категория журнала).
+  categoryId         String?
+  category           EventCategory?       @relation("ArticleCategory", fields: [categoryId], references: [id], onDelete: SetNull)
 
+  /// Managed Discovery tags attached to this publication (many-to-many).
+  tags               DiscoveryTag[]
+
+  /// Partial unique index created via raw SQL migration:
+  /// CREATE UNIQUE INDEX ... WHERE "cityId" IS NOT NULL AND "slug" IS NOT NULL
+  @@unique([cityId, slug])
   @@index([slug])
   @@index([status])
   @@index([publishedAt])
   @@index([authorUserId])
   @@index([coverImageId])
+  @@index([cityId])
+  @@index([geoScope])
+  @@index([relatedPlaceId])
+  @@index([categoryId])
 }
 
 model ArticleSlugHistory {
   id        String   @id @default(cuid())
   articleId String
-  slug      String   @unique
+  slug      String
+  cityId    String?
   createdAt DateTime @default(now())
   article   Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  city      City?    @relation(fields: [cityId], references: [id], onDelete: SetNull)
 
+  /// Partial unique index created via raw SQL migration:
+  /// CREATE UNIQUE INDEX ... WHERE "cityId" IS NOT NULL AND "slug" IS NOT NULL
+  @@unique([cityId, slug])
   @@index([articleId])
   @@index([slug])
+  @@index([cityId])
+}
+
+model EditorialRequest {
+  id          String                 @id @default(cuid())
+  title       String
+  description String?
+  cityId      String?
+  status      EditorialRequestStatus @default(DRAFT)
+  deadlineAt  DateTime?
+  criteria    Json?
+  createdById String?
+  createdAt   DateTime               @default(now())
+  updatedAt   DateTime               @updatedAt
+  city        City?                  @relation("EditorialRequestCity", fields: [cityId], references: [id], onDelete: SetNull)
+
+  @@index([cityId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([updatedAt])
 }
 
 /// Денормализованный индекс для быстрого поиска. Источник истины — сущности Activity/Offer/Place/Route/Article.
@@ -2444,6 +2577,26 @@ model NotificationPolicy {
   @@index([scenario])
 }
 
+/// Канальный шаблон уведомления для сценария.
+/// Запись в БД — это override; дефолтные шаблоны живут в коде
+/// (NOTIFICATION_SCENARIO_REGISTRY в notificationRegistry.ts).
+/// subject: для EMAIL — тема письма, для IN_APP/TELEGRAM — заголовок сообщения.
+model NotificationTemplate {
+  id              String              @id @default(cuid())
+  /// Ключ сценария из реестра в коде (NotificationScenario или NotificationType)
+  scenarioKey     String
+  channel         NotificationChannel
+  subject         String?
+  body            String
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  updatedByUserId String?
+  updatedByUser   User?               @relation("NotificationTemplateUpdatedBy", fields: [updatedByUserId], references: [id], onDelete: SetNull)
+
+  @@unique([scenarioKey, channel])
+  @@index([scenarioKey])
+}
+
 model DevTelegramBusinessApplication {
   id                String                               @id @default(cuid())
   userId            String
@@ -2480,6 +2633,11 @@ enum SignalEntityType {
 enum SignalStatus {
   ACTIVE
   DEPRECATED
+}
+
+enum SignalUsageType {
+  PLAN_ADULT_PREFERENCE
+  PLAN_LEISURE_FORMAT
 }
 
 enum Role {
@@ -2634,6 +2792,20 @@ enum BusinessVerificationStatus {
 enum BusinessOperationalStatus {
   ACTIVE
   DISABLED
+  ARCHIVED
+}
+
+/// Geographic scope for Articles.
+/// CITY  = local article, served at /{city}/blog/{slug}
+/// COUNTRY = national article, served at /blog/{slug}
+enum GeoScope {
+  CITY
+  COUNTRY
+}
+
+enum EditorialRequestStatus {
+  DRAFT
+  READY
   ARCHIVED
 }
 
@@ -2820,6 +2992,8 @@ enum NotificationType {
   BUSINESS_VERIFIED
   BUSINESS_REJECTED
   BUSINESS_NEEDS_INFO
+  /// Владелец отправил профиль бизнеса на верификацию (заявка принята, на модерации)
+  BUSINESS_VERIFICATION_SUBMITTED
   WELCOME
   REMINDER
   PLAN_TOMORROW_DIGEST
@@ -3463,11 +3637,10 @@ enum ReleaseStatus {
 }
 
 enum ReleaseNoteType {
-  FEATURE
-  FIX
-  IMPROVEMENT
-  BREAKING
-  INTERNAL
+  feature
+  fix
+  improvement
+  security
 }
 
 /// Тип публикации для записи/заказа
@@ -3822,6 +3995,26 @@ model DiscoveryFilterPlacement {
   @@unique([filterId, intent, categoryId])
   @@index([intent, isActive, sortOrder])
   @@index([categoryId, isActive, sortOrder])
+}
+
+
+model DiscoveryTag {
+  id             String   @id @default(cuid())
+  slug           String   @unique
+  title          String
+  description    String?
+  seoTitle       String?
+  seoDescription String?
+  isActive       Boolean  @default(true)
+  sortOrder      Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Back-relation to publications (Article stores News, Article, Breaking News)
+  articles       Article[]
+
+  @@index([slug])
+  @@index([isActive, sortOrder])
 }
 
 enum PageType {

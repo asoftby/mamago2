@@ -414,7 +414,7 @@ export const useNotificationStore = create<NotificationState & NotificationStore
         const ts = new Date().toISOString();
         set((s) => ({
           items: s.items.map((n) =>
-            n.id === id ? { ...n, seenAt: n.seenAt ?? ts, isRead: true, readAt: n.readAt ?? ts } : n,
+            n.id === id ? { ...n, seenAt: n.seenAt ?? ts, readAt: n.readAt ?? ts } : n,
           ),
         }));
       },

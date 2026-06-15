@@ -13,6 +13,8 @@ export type BuildInfo = {
   nodeEnv: string | null;
   vercelEnv: string | null;
   appVersion: string;
+  /** Version from the Release table (isCurrent = true). Populated by layouts; null if no published release. */
+  currentReleaseVersion: string | null;
   branch: string | null;
   commitSha: string | null;
   commitShortSha: string | null;
@@ -90,6 +92,7 @@ export function getBuildInfo(): BuildInfo {
     nodeEnv,
     vercelEnv,
     appVersion: String(packageJson.version ?? "0.0.0"),
+    currentReleaseVersion: null,
     branch: readEnv("VERCEL_GIT_COMMIT_REF") ?? readEnv("GIT_BRANCH"),
     commitSha,
     commitShortSha: commitSha ? commitSha.slice(0, 7) : null,

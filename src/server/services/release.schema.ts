@@ -12,7 +12,7 @@ const nullableText = z
   .transform((value) => emptyToNull(value));
 
 export const releaseNoteInputSchema = z.object({
-  type: z.enum(["FEATURE", "FIX", "IMPROVEMENT", "BREAKING", "INTERNAL"]),
+  type: z.enum(["feature", "fix", "improvement", "security"]),
   title: z.string().trim().min(2),
   description: nullableText,
 });
@@ -20,14 +20,12 @@ export const releaseNoteInputSchema = z.object({
 export const createReleaseInputSchema = z.object({
   version: z.string().trim().min(1),
   title: z.string().trim().min(2),
-  description: nullableText,
   notes: z.array(releaseNoteInputSchema).max(50).default([]),
 });
 
 export const updateReleaseInputSchema = z.object({
   version: z.string().trim().min(1).optional(),
   title: z.string().trim().min(2).optional(),
-  description: nullableText,
   notes: z.array(releaseNoteInputSchema).max(50).optional(),
 });
 

@@ -17,6 +17,7 @@ import { getCurrentRequestRoutingContext } from "@/lib/routing/requestContext";
 import { ExternalLink } from "lucide-react";
 import { getEventStep1Taxonomies } from "@/server/admin/activities/get-activity-form-data";
 import { resolveCanonicalEventPublicPathById } from "@/lib/business/resolveCanonicalEventPublicPath";
+import { toAbsolutePublicUrl } from "@/lib/business/eventPublicLink";
 
 function surfaceFromHostAndPath(host: string | undefined, pathname: string): ContentEditorSurface {
   const resolved = resolveSurfaceFromHostAndPathname(host, pathname);
@@ -152,7 +153,7 @@ export default async function EditorEditEventPage({
     null;
   const publicPath =
     event.status === "PUBLISHED"
-      ? await resolveCanonicalEventPublicPathById(event.id)
+      ? toAbsolutePublicUrl(await resolveCanonicalEventPublicPathById(event.id))
       : null;
   const headerAction =
     originalUrl || publicPath ? (
@@ -191,16 +192,20 @@ export default async function EditorEditEventPage({
     ...routing,
   });
 
-  if (!business) {
+  const isPrivilegedUser = user.role === "ADMIN" || user.role === "MODERATOR";
+
+  if (!business && !isPrivilegedUser) {
     redirect("/business");
   }
 
-  const businessProps = {
-    id: business.id,
-    name: business.name,
-    description: business.legalName || undefined,
-    phone: business.phone || undefined,
-  };
+  const businessProps = business
+    ? {
+        id: business.id,
+        name: business.name,
+        description: business.legalName || undefined,
+        phone: business.phone || undefined,
+      }
+    : undefined;
 
   return (
     <ContentEditorChrome

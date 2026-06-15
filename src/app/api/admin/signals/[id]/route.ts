@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { Prisma, SignalDomain, SignalEntityType, SignalStatus } from "@prisma/client";
+import { Prisma, SignalDomain, SignalEntityType, SignalStatus, SignalUsageType } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth/server";
 import { canManageSignalDefinitions } from "@/lib/auth/signalDefinitionsAdmin";
@@ -224,6 +224,16 @@ export async function PATCH(req: Request, { params }: RouteParams) {
       data.replacedById = body.replacedById;
     } else {
       return NextResponse.json({ error: "replacedById must be a string or null" }, { status: 400 });
+    }
+  }
+
+  if (body.usageType !== undefined) {
+    if (body.usageType === null || body.usageType === "") {
+      data.usageType = null;
+    } else if (Object.values(SignalUsageType).includes(body.usageType)) {
+      data.usageType = body.usageType as SignalUsageType;
+    } else {
+      return NextResponse.json({ error: "Invalid usageType value" }, { status: 400 });
     }
   }
 

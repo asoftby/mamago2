@@ -6,7 +6,7 @@ import type { SignalEntityType } from "@prisma/client";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 
-type SignalOption = {
+export type SignalOption = {
   id: string;
   label: string;
   value: string;
@@ -14,7 +14,7 @@ type SignalOption = {
   active: boolean; // false = DEPRECATED
 };
 
-type SignalGroup = {
+export type SignalGroup = {
   id: string;
   slug: string;
   title: string;
@@ -23,7 +23,7 @@ type SignalGroup = {
   options: SignalOption[];
 };
 
-interface GroupConfig {
+export interface GroupConfig {
   slug: string;
   title: string;
   required: boolean;
@@ -42,6 +42,8 @@ interface StructuredDiscoverySignalPickerProps {
   disabled?: boolean;
   /** Конфигурация групп с валидацией */
   groupConfigs: GroupConfig[];
+  /** Предзагруженные группы, чтобы не дублировать fetch и можно было скрыть пустой блок на уровне родителя */
+  preloadedGroups?: SignalGroup[] | null;
 }
 
 /**
@@ -59,12 +61,18 @@ export function StructuredDiscoverySignalPicker({
   onChange,
   disabled = false,
   groupConfigs,
+  preloadedGroups,
 }: StructuredDiscoverySignalPickerProps) {
-  const [groups, setGroups] = useState<SignalGroup[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [fetchedGroups, setFetchedGroups] = useState<SignalGroup[]>([]);
+  const [loading, setLoading] = useState(preloadedGroups == null);
   const [error, setError] = useState<string | null>(null);
+  const groups = preloadedGroups ?? fetchedGroups;
 
   useEffect(() => {
+    if (preloadedGroups != null) {
+      return;
+    }
+
     let cancelled = false;
     
     // Use queueMicrotask to avoid synchronous setState in effect
@@ -87,14 +95,14 @@ export function StructuredDiscoverySignalPicker({
       })
       .then((data: { groups?: SignalGroup[] }) => {
         if (!cancelled) {
-          setGroups(data.groups ?? []);
+          setFetchedGroups(data.groups ?? []);
           setError(null);
         }
       })
       .catch((err) => {
         if (!cancelled) {
           console.error(`[StructuredDiscoverySignalPicker] Failed to load signals for ${entityType}:`, err);
-          setGroups([]);
+          setFetchedGroups([]);
           setError(err instanceof Error ? err.message : "Failed to load signals");
         }
       })
@@ -105,7 +113,7 @@ export function StructuredDiscoverySignalPicker({
     return () => {
       cancelled = true;
     };
-  }, [entityType]);
+  }, [entityType, preloadedGroups]);
 
   if (loading) return <div className="h-12" />; // Placeholder during loading
 

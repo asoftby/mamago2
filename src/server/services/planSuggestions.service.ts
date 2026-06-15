@@ -1,5 +1,6 @@
 import { ActivityType, type Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { findCityBySlug } from "@/server/geo/findCityBySlug";
 import { getPublicListingActivityWhere } from "@/server/public/publicContentVisibility";
 import { activityInAnyOfCitiesWhere } from "@/server/discovery/activityInCityWhere";
 import { resolveKudaDiscoveryCityIds } from "@/server/discovery/discoveryHubExpand";
@@ -68,9 +69,7 @@ export async function listPlanSuggestionsForCity(input: {
 }): Promise<PlanSuggestionActivity[]> {
   const take = input.take ?? 6;
   const ageRangeValues = (input.ageRangeValues ?? []).filter(Boolean);
-  const city = await prisma.city.findUnique({
-    where: { slug: input.citySlug.toLowerCase() },
-  });
+  const city = await findCityBySlug(input.citySlug.toLowerCase());
   if (!city) return [];
 
   const { primaryCityId, expandedCityIds } = await resolveKudaDiscoveryCityIds(

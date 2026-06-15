@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
+import { findCityBySlug } from "@/server/geo/findCityBySlug";
 import { CityDiscoveryShell } from "./CityDiscoveryShell";
 import { Intent } from "@/lib/intent";
 import { listPublicRoutesByCity } from "@/server/services/route.service";
@@ -34,7 +35,7 @@ function isSectionSystemFilterTableMissing(error: unknown): boolean {
 
 export async function CityShell({ citySlug, intent, searchParams }: CityShellProps) {
   const [city, user, systemFilters] = await Promise.all([
-    prisma.city.findUnique({ where: { slug: citySlug } }),
+    findCityBySlug(citySlug),
     getCurrentUser(),
     prisma.sectionSystemFilter
       .findMany({

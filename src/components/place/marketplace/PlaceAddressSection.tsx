@@ -4,12 +4,12 @@ import { LocationBlock } from "@/components/shared/LocationBlock";
 
 interface PlaceAddressSectionProps {
   title: string;
+  logoUrl?: string | null;
   shortDesc?: string;
   tagline?: string;
   address?: string;
   district?: string;
   metro?: string;
-  phone?: string;
   latitude?: number;
   longitude?: number;
   mapsDirectionsUrl?: string;
@@ -17,11 +17,11 @@ interface PlaceAddressSectionProps {
 
 export function PlaceAddressSection({
   title,
+  logoUrl,
   tagline,
   address,
   district,
   metro,
-  phone,
   latitude,
   longitude,
   mapsDirectionsUrl,
@@ -29,11 +29,11 @@ export function PlaceAddressSection({
   return (
     <LocationBlock
       name={title}
+      logoUrl={logoUrl ?? undefined}
       tagline={tagline}
       address={address}
       district={district}
       metro={metro}
-      phone={phone}
       lat={latitude}
       lng={longitude}
       routeUrl={mapsDirectionsUrl}

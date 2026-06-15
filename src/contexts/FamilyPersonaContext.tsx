@@ -312,6 +312,7 @@ export function FamilyPersonaProvider({ children }: { children: React.ReactNode 
             email: me.email,
             role: me.role,
             hasApprovedBusinessProfile: me.hasApprovedBusinessProfile,
+            businessVerificationStatus: me.businessVerificationStatus ?? null,
             businessBalanceBYN: me.businessBalanceBYN,
             displayName: me.displayName ?? null,
             avatarUrl: me.avatarUrl ?? null,

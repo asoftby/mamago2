@@ -14,6 +14,13 @@
 
 import prisma from "@/lib/prisma";
 import {
+  canArchiveNotification,
+  enrichNotificationsWithLifecycle,
+  getUserActionResolutionState,
+  NotificationArchiveBlockedError,
+} from "@/server/notifications/notification-lifecycle";
+import { getTelegramLinkStatus } from "@/server/services/telegramLink.service";
+import {
   Prisma,
   type Notification as NotificationModel,
   type NotificationActionMode,
@@ -139,7 +146,7 @@ interface CreateNotificationParams {
   expiresAt?: Date | null;
 }
 
-type OnboardingNotificationKind = "VERIFY_EMAIL" | "VERIFY_PHONE";
+type OnboardingNotificationKind = "VERIFY_EMAIL" | "VERIFY_PHONE" | "CONNECT_TELEGRAM";
 
 const ONBOARDING_NOTIFICATION_CONFIG: Record<
   OnboardingNotificationKind,
@@ -157,7 +164,7 @@ const ONBOARDING_NOTIFICATION_CONFIG: Record<
     title: "Подтвердите email",
     body: "Подтвердите почту, чтобы сохранить доступ к аккаунту и получать важные уведомления.",
     ctaLabel: "Подтвердить",
-    actionUrl: "/settings/security",
+    actionUrl: "/me/settings/account",
     metadata: { kind: "VERIFY_EMAIL" },
   },
   VERIFY_PHONE: {
@@ -167,6 +174,14 @@ const ONBOARDING_NOTIFICATION_CONFIG: Record<
     ctaLabel: "Подтвердить",
     actionUrl: "/settings/security",
     metadata: { kind: "VERIFY_PHONE" },
+  },
+  CONNECT_TELEGRAM: {
+    entityId: "CONNECT_TELEGRAM",
+    title: "Подключите Telegram",
+    body: "Получайте уведомления о заявках, планах и событиях прямо в Telegram.",
+    ctaLabel: "Подключить",
+    actionUrl: "/me/settings/notifications",
+    metadata: { kind: "CONNECT_TELEGRAM" },
   },
 };
 
@@ -297,24 +312,29 @@ async function ensureOnboardingNotification(
 }
 
 export async function ensureUserOnboardingNotifications(userId: string) {
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: {
-      id: true,
-      emailVerifiedAt: true,
-      phoneVerifiedAt: true,
-    },
-  });
+  const [user, telegramStatus] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        emailVerifiedAt: true,
+        phoneVerifiedAt: true,
+      },
+    }),
+    getTelegramLinkStatus({ userId }),
+  ]);
 
   if (!user) return null;
 
   const results = await Promise.all([
     user.emailVerifiedAt == null
       ? ensureOnboardingNotification(user.id, "VERIFY_EMAIL")
-      : null,
-    user.phoneVerifiedAt == null
-      ? ensureOnboardingNotification(user.id, "VERIFY_PHONE")
-      : null,
+      : completeOnboardingNotification(user.id, "VERIFY_EMAIL"),
+    // телефон запрашивается контекстно, не в онбординге
+    // ensureOnboardingNotification(user.id, "VERIFY_PHONE"),
+    telegramStatus.linked
+      ? completeOnboardingNotification(user.id, "CONNECT_TELEGRAM")
+      : ensureOnboardingNotification(user.id, "CONNECT_TELEGRAM"),
   ]);
 
   return results;
@@ -337,12 +357,30 @@ export async function completeOnboardingNotification(
       archivedAt: null,
     },
     data: {
-      isRead: true,
       readAt: now,
       seenAt: now,
       archivedAt: now,
     },
   });
+}
+
+/** Синхронизирует action-required onboarding-уведомления с фактическим состоянием аккаунта. */
+export async function reconcileResolvedActionRequiredNotifications(userId: string) {
+  const state = await getUserActionResolutionState(userId);
+
+  await Promise.all([
+    state.emailVerified
+      ? completeOnboardingNotification(userId, "VERIFY_EMAIL")
+      : Promise.resolve(),
+    state.telegramLinked
+      ? completeOnboardingNotification(userId, "CONNECT_TELEGRAM")
+      : Promise.resolve(),
+    state.phoneVerified
+      ? completeOnboardingNotification(userId, "VERIFY_PHONE")
+      : Promise.resolve(),
+  ]);
+
+  return state;
 }
 
 // ── PLACE ─────────────────────────────────────────────────────────────────────
@@ -561,6 +599,82 @@ export async function notifyOfferRejected(
 
 // ── BUSINESS VERIFICATION ─────────────────────────────────────────────────────
 
+/**
+ * Окно дедупа для событий «подача заявки на верификацию»: защищает только от
+ * даблклика по submit. Повторная подача после NEEDS_INFO/REJECTED должна
+ * порождать новые уведомления, поэтому checkNotificationDedup (бессрочный
+ * по entityId) здесь сознательно не используется.
+ */
+const VERIFICATION_SUBMIT_DEDUP_WINDOW_MS = 5 * 60 * 1000;
+
+async function hasRecentNotification(
+  userId: string,
+  type: NotificationType,
+  entityId: string,
+): Promise<boolean> {
+  const since = new Date(Date.now() - VERIFICATION_SUBMIT_DEDUP_WINDOW_MS);
+  const existing = await prisma.notification.findFirst({
+    where: { userId, type, entityId, createdAt: { gte: since } },
+    select: { id: true },
+  });
+  return Boolean(existing);
+}
+
+/**
+ * On-site/telegram уведомление всем админам о новой заявке на верификацию.
+ */
+export async function notifyAdminsBusinessApplicationCreated(params: {
+  businessId: string;
+  businessName: string;
+  ownerEmail?: string | null;
+}) {
+  const admins = await prisma.user.findMany({
+    where: { role: "ADMIN" },
+    select: { id: true },
+  });
+
+  const created = [];
+  for (const admin of admins) {
+    if (await hasRecentNotification(admin.id, "BUSINESS_APPLICATION_CREATED", params.businessId)) {
+      continue;
+    }
+    created.push(
+      await createNotification({
+        userId: admin.id,
+        audience: "ADMIN",
+        type: "BUSINESS_APPLICATION_CREATED",
+        title: "Новая заявка на верификацию бизнеса",
+        body: `«${params.businessName}»${params.ownerEmail ? ` · ${params.ownerEmail}` : ""} — заявка ожидает проверки.`,
+        entityType: "BUSINESS",
+        entityId: params.businessId,
+      }),
+    );
+  }
+  return created;
+}
+
+/**
+ * Уведомление владельцу: заявка принята и отправлена на модерацию.
+ */
+export async function notifyBusinessVerificationSubmitted(
+  businessId: string,
+  businessName: string,
+  ownerId: string,
+) {
+  if (await hasRecentNotification(ownerId, "BUSINESS_VERIFICATION_SUBMITTED", businessId)) {
+    return null;
+  }
+
+  return createNotification({
+    userId: ownerId,
+    type: "BUSINESS_VERIFICATION_SUBMITTED",
+    title: "Заявка принята",
+    body: `Профиль «${businessName}» отправлен на модерацию. Мы сообщим о результате проверки.`,
+    entityType: "BUSINESS",
+    entityId: businessId,
+  });
+}
+
 export async function notifyBusinessVerified(businessId: string, businessName: string, ownerId: string) {
   const dedup = await checkNotificationDedup(ownerId, "BUSINESS_VERIFIED", "BUSINESS", businessId);
   if (dedup.isDuplicate) return null;
@@ -766,7 +880,7 @@ export async function markNotificationAsRead(notificationId: string, userId: str
 
   return prisma.notification.update({
     where: { id: existing.id },
-    data: { isRead: true, readAt: now, seenAt: now },
+    data: { readAt: now, seenAt: now },
   });
 }
 
@@ -774,8 +888,97 @@ export async function markAllNotificationsAsRead(userId: string) {
   const now = new Date();
   return prisma.notification.updateMany({
     where: { userId, archivedAt: null, readAt: null },
-    data: { isRead: true, readAt: now, seenAt: now },
+    data: { readAt: now, seenAt: now },
   });
+}
+
+/**
+ * Батч-пометка прочитанности (read-tracker: viewport ≥ 3с / клик по карточке).
+ * Идемпотентна: трогает только записи владельца с readAt IS NULL.
+ */
+export async function markNotificationsRead(
+  userId: string,
+  ids: string[],
+): Promise<{ updatedCount: number }> {
+  if (ids.length === 0) return { updatedCount: 0 };
+  const now = new Date();
+  const result = await prisma.notification.updateMany({
+    where: { id: { in: ids }, userId, readAt: null },
+    data: { readAt: now, seenAt: now },
+  });
+  return { updatedCount: result.count };
+}
+
+/**
+ * Батч-архивация по ids. Идемпотентна; уважает lifecycle:
+ * unresolved action-required уведомления молча пропускаются
+ * (та же семантика, что у archiveAllRead).
+ */
+export async function archiveNotificationsByIds(
+  userId: string,
+  ids: string[],
+): Promise<{ updatedCount: number }> {
+  if (ids.length === 0) return { updatedCount: 0 };
+  await reconcileResolvedActionRequiredNotifications(userId);
+
+  const state = await getUserActionResolutionState(userId);
+  const candidates = await prisma.notification.findMany({
+    where: { id: { in: ids }, userId, archivedAt: null },
+    select: { id: true, type: true, entityId: true, metadata: true },
+  });
+
+  const archivableIds = candidates
+    .filter((notification) => canArchiveNotification(notification, state))
+    .map((notification) => notification.id);
+
+  if (archivableIds.length === 0) return { updatedCount: 0 };
+
+  const result = await prisma.notification.updateMany({
+    where: { id: { in: archivableIds } },
+    data: { archivedAt: new Date() },
+  });
+  return { updatedCount: result.count };
+}
+
+export type NotificationFeedTab = "inbox" | "unread" | "archive";
+
+/**
+ * Курсорная страница ленты для /notifications.
+ * Стабильный порядок (createdAt desc, id desc) — без группировки
+ * «непрочитанные первыми», иначе пометка read во время скролла
+ * сдвигала бы строки и курсор давал бы дубли/пропуски.
+ */
+export async function getNotificationsPage(
+  userId: string,
+  params: {
+    tab: NotificationFeedTab;
+    cursor?: string | null;
+    limit?: number;
+    stream?: NotificationStreamFilter;
+    options?: UserNotificationsQueryOptions;
+  },
+): Promise<{ items: NotificationModel[]; nextCursor: string | null }> {
+  const limit = Math.min(Math.max(params.limit ?? 15, 1), 100);
+
+  const where = {
+    ...buildNotificationBaseWhere(userId, params.stream, params.options),
+    ...(params.tab === "archive"
+      ? { archivedAt: { not: null } }
+      : params.tab === "unread"
+        ? { archivedAt: null, readAt: null }
+        : { archivedAt: null }),
+  } satisfies Prisma.NotificationWhereInput;
+
+  const rows = await prisma.notification.findMany({
+    where,
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    take: limit + 1,
+    ...(params.cursor ? { cursor: { id: params.cursor }, skip: 1 } : {}),
+  });
+
+  const hasMore = rows.length > limit;
+  const items = hasMore ? rows.slice(0, limit) : rows;
+  return { items, nextCursor: hasMore ? items[items.length - 1].id : null };
 }
 
 export async function getUnreadCount(
@@ -854,11 +1057,17 @@ export async function countUserArchived(
 }
 
 export async function archiveNotification(userId: string, notificationId: string) {
+  await reconcileResolvedActionRequiredNotifications(userId);
+
   const existing = await prisma.notification.findFirst({
     where: { id: notificationId, userId },
-    select: { id: true },
   });
   if (!existing) throw new Error("Notification not found");
+
+  const state = await getUserActionResolutionState(userId);
+  if (!canArchiveNotification(existing, state)) {
+    throw new NotificationArchiveBlockedError();
+  }
 
   return prisma.notification.update({
     where: { id: existing.id },
@@ -867,14 +1076,37 @@ export async function archiveNotification(userId: string, notificationId: string
 }
 
 export async function archiveAllRead(userId: string) {
-  return prisma.notification.updateMany({
+  await reconcileResolvedActionRequiredNotifications(userId);
+
+  const state = await getUserActionResolutionState(userId);
+  const candidates = await prisma.notification.findMany({
     where: {
       userId,
       archivedAt: null,
       readAt: { not: null },
     },
+    select: {
+      id: true,
+      type: true,
+      entityId: true,
+      metadata: true,
+    },
+  });
+
+  const archivableIds = candidates
+    .filter((notification) => canArchiveNotification(notification, state))
+    .map((notification) => notification.id);
+
+  if (archivableIds.length === 0) {
+    return { count: 0 };
+  }
+
+  const result = await prisma.notification.updateMany({
+    where: { id: { in: archivableIds } },
     data: { archivedAt: new Date() },
   });
+
+  return { count: result.count };
 }
 
 export async function restoreNotification(userId: string, notificationId: string) {
@@ -908,7 +1140,6 @@ export async function resolveNotificationActionById(
     await prisma.notification.update({
       where: { id: notification.id },
       data: {
-        isRead: true,
         readAt: new Date(),
         seenAt: notification.seenAt ?? new Date(),
       },
@@ -935,7 +1166,7 @@ export async function getLatestActivePlanReminderNotification(
       entityType: "PLAN_ITEM",
       createdAt: { gte: activeSince },
     },
-    orderBy: [{ isRead: "asc" }, { createdAt: "desc" }],
+    orderBy: [{ readAt: { sort: "asc", nulls: "first" } }, { createdAt: "desc" }],
     select: {
       id: true,
       title: true,
@@ -943,7 +1174,7 @@ export async function getLatestActivePlanReminderNotification(
       ctaLabel: true,
       ctaAction: true,
       createdAt: true,
-      isRead: true,
+      readAt: true,
       scenario: true,
       entityType: true,
       entityId: true,
@@ -958,9 +1189,9 @@ export async function markWelcomeNotificationsRead(userId: string) {
     where: {
       userId,
       type: "WELCOME",
-      OR: [{ readAt: null }, { isRead: false }],
+      readAt: null,
     },
-    data: { isRead: true, readAt: now, seenAt: now },
+    data: { readAt: now, seenAt: now },
   });
 }
 
@@ -968,10 +1199,10 @@ export async function markWelcomeNotificationsRead(userId: string) {
 export async function getWelcomeIsRead(userId: string): Promise<boolean> {
   const welcome = await prisma.notification.findFirst({
     where: { userId, type: "WELCOME" },
-    select: { readAt: true, isRead: true },
+    select: { readAt: true },
   });
   if (!welcome) return true;
-  return welcome.readAt != null || welcome.isRead;
+  return welcome.readAt != null;
 }
 
 export async function deleteOldNotifications(daysOld = 90) {
@@ -1018,10 +1249,12 @@ export async function notifyUserPlanReminder(params: {
 // ── BOOKING ───────────────────────────────────────────────────────────────────
 
 import {
+  buildBookingActorLabel,
   buildBookingNotificationBody,
   type BookingNotificationBodyInput,
 } from "./booking/booking.formatters";
 import { resolveBookingSourceType } from "./booking/booking.types";
+import { renderNotification as renderNotificationTemplate } from "@/server/notifications/template-render.service";
 
 export interface NotifyBookingCreatedParams {
   /** userId владельца бизнеса (получатель уведомления) */
@@ -1069,16 +1302,36 @@ export async function notifyBookingCreated(params: NotifyBookingCreatedParams) {
 
   const body = buildBookingNotificationBody(bodyInput);
 
+  // Богатый payload сценария BOOKING_CREATED (см. NOTIFICATION_SCENARIO_REGISTRY).
+  // Сохраняется в metadata, чтобы dispatchDelivery отрендерил email/telegram
+  // теми же переменными.
+  const templatePayload: Record<string, string> = {
+    bookingSummary: body,
+    actor: buildBookingActorLabel(bodyInput),
+    customerName: params.customerName,
+    ...(params.childName ? { childName: params.childName } : {}),
+    ...(params.childAge != null ? { childAge: String(params.childAge) } : {}),
+    ...(params.offerTitle ? { offerTitle: params.offerTitle } : {}),
+    ...(params.activityTitle ? { activityTitle: params.activityTitle } : {}),
+    ...(params.placeTitle ? { placeTitle: params.placeTitle } : {}),
+    ...(params.campShiftTitle ? { campShiftTitle: params.campShiftTitle } : {}),
+    ...(params.campShiftDateFrom ? { campShiftDateFrom: params.campShiftDateFrom } : {}),
+    ...(params.campShiftDateTo ? { campShiftDateTo: params.campShiftDateTo } : {}),
+  };
+
+  const rendered = await renderNotificationTemplate("BOOKING_CREATED", "IN_APP", templatePayload);
+
   return createNotification({
     userId: params.ownerUserId,
     audience: "BUSINESS",
     type: "BOOKING_CREATED",
-    title: "Новая заявка",
-    body,
+    title: rendered?.subject ?? "Новая заявка",
+    body: rendered?.body ?? body,
     entityType: "BOOKING",
     entityId: params.bookingId,
     ctaLabel: "Открыть заявку",
     ctaAction: `/business/bookings?id=${params.bookingId}`,
+    metadata: { templatePayload },
   });
 }
 

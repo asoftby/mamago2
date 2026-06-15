@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Heart } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BYN_SYMBOL, normalizeUiCurrencyText } from "@/lib/formatters/format-price";
+import { BelarusianRubleIcon } from "@/components/icons/BelarusianRubleIcon";
 import type { EventPageData } from "@/lib/event/eventPageTypes";
 import { EventBreadcrumbs } from "./EventBreadcrumbs";
 import { OwnerEditDropdown } from "./OwnerEditDropdown";
@@ -79,23 +80,17 @@ function splitTitle(title: string): { head: string; tail: string } {
   return { head: t.slice(0, idx), tail: t.slice(idx + 1) };
 }
 
-function renderPriceSuffix(text: string) {
+function renderPriceSuffix(
+  text: string,
+  iconSize: "default" | "sm" = "default",
+) {
   if (!text) return null;
   const parts = text.split(BYN_SYMBOL);
 
   return parts.flatMap((part, index) => {
     const chunk = part ? [<span key={`text-${index}`}>{part}</span>] : [];
     if (index === parts.length - 1) return chunk;
-    return [
-      ...chunk,
-      <span
-        key={`byn-${index}`}
-        aria-label="Белорусский рубль"
-        style={{ fontFamily: "nbrb, Menlo, monospace" }}
-      >
-        {BYN_SYMBOL}
-      </span>,
-    ];
+    return [...chunk, <BelarusianRubleIcon key={`byn-${index}`} size={iconSize} />];
   });
 }
 
@@ -256,15 +251,21 @@ export function EventDecisionPanel({
               const numPart = spaceIdx !== -1 ? priceStr.slice(0, spaceIdx) : priceStr;
               const currencyPart = spaceIdx !== -1 ? priceStr.slice(spaceIdx + 1) : "";
               return (
-                <div className="flex items-baseline justify-end gap-1">
-                  <span style={{ fontFamily: "var(--font-display)", fontSize: 52, fontWeight: 400, lineHeight: 1, letterSpacing: "-0.03em", color: "#141210" }}>
-                    {numPart}
-                  </span>
-                  {currencyPart && (
-                    <span className="text-[13px] text-[rgba(20,18,16,0.55)]" style={{ fontFamily: "Menlo, monospace" }}>
-                      {renderPriceSuffix(currencyPart)}
+                <div>
+                  <div className="flex items-baseline justify-end gap-1">
+                    <span className="font-pt-serif text-[40px] font-normal leading-tight tracking-[-1px] text-[#141210]">
+                      {numPart}
                     </span>
-                  )}
+                    {currencyPart && (
+                      <span
+                        className="inline-flex items-center text-[13px] text-[rgba(20,18,16,0.55)]"
+                        style={{ fontFamily: "Menlo, monospace" }}
+                      >
+                        {renderPriceSuffix(currencyPart, "sm")}
+                      </span>
+                    )}
+                  </div>
+                  <div className="mt-1.5 h-5" aria-hidden />
                 </div>
               );
             })()}
@@ -374,7 +375,7 @@ export function EventDecisionPanel({
           <SidebarCardTopSection mt={20} pt={20}>
             <OwnerEditDropdown
               eventId={data.id}
-              className="h-14 w-full rounded-full border border-[rgba(20,18,16,0.18)] text-[16px] font-semibold text-[rgba(20,18,16,0.55)]"
+              className="h-14 rounded-full"
             />
           </SidebarCardTopSection>
         )}

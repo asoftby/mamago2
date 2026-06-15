@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Bell } from "lucide-react";
+import { NavBellIcon } from "@/components/icons/NavBellIcon";
 import { usePathname } from "next/navigation";
 import {
   getNavIconButtonClassName,
@@ -29,7 +29,7 @@ export type MobileBottomNavProps = {
   profileAvatarUrl?: string | null;
 };
 
-const NAV_ICON_SIZE = "compact" as const;
+const NAV_ICON_SIZE = "default" as const;
 
 /**
  * Bottom bar: Главная · «Мой план» · Уведомления · Профиль.
@@ -83,23 +83,7 @@ export function MobileBottomNav({
           "pointer-events-auto mx-3 mb-[max(0.5rem,env(safe-area-inset-bottom))]",
         )}
       >
-        <div
-          className="flex items-center gap-1.5 rounded-[28px] p-2 pl-2 pr-2"
-          style={{
-            background: "rgba(30, 28, 26, 0.55)",
-            backdropFilter: "blur(40px) saturate(1.8)",
-            WebkitBackdropFilter: "blur(40px) saturate(1.8)",
-            border: "1px solid rgba(255,255,255,0.14)",
-            boxShadow: [
-              "inset 0 1px 0 rgba(255,255,255,.16)",
-              "inset 0 -1px 0 rgba(0,0,0,.30)",
-              "inset 1px 0 0 rgba(255,255,255,.08)",
-              "inset -1px 0 0 rgba(255,255,255,.05)",
-              "0 16px 48px rgba(0,0,0,.45)",
-              "0 4px 16px rgba(0,0,0,.30)",
-            ].join(", "),
-          }}
-        >
+        <div className="flex items-center gap-1.5 rounded-[28px] border border-[#EBEBEB] bg-[#F6F2EA] p-2 pl-2 pr-2 shadow-[0_4px_20px_rgba(0,0,0,0.08)]">
           <NavIconButton
             href={homeHref}
             isActive={isHomeActive}
@@ -107,6 +91,7 @@ export function MobileBottomNav({
             isHomeLogo
             size={NAV_ICON_SIZE}
             chrome="dark"
+            variant="bare"
           />
 
           <PlanPillNavButton
@@ -132,30 +117,15 @@ export function MobileBottomNav({
                 chrome: "dark",
               })}
             >
-              <span
+              <NavBellIcon
                 className={cn(
-                  "relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-colors duration-200",
+                  "h-5 w-5 transition-colors duration-200",
                   displayUnreadCount > 0 && "animate-nav-notify-pulse",
-                  isNotificationsActive
-                    ? "bg-[#EF8759]/22"
-                    : displayUnreadCount > 0
-                      ? "bg-[#EF8759]/24"
-                      : "bg-transparent",
+                  isNotificationsActive || displayUnreadCount > 0
+                    ? "text-[#C24E22]"
+                    : "text-gray-400",
                 )}
-              >
-                <Bell
-                  className={cn(
-                    "h-[22px] w-[22px] transition-colors duration-200",
-                    isNotificationsActive || displayUnreadCount > 0
-                      ? "text-[#C24E22]"
-                      : "text-neutral-700",
-                  )}
-                  strokeWidth={
-                    isNotificationsActive || displayUnreadCount > 0 ? 1.35 : 1.2
-                  }
-                  absoluteStrokeWidth
-                />
-              </span>
+              />
               {displayUnreadCount > 0 && (
                 <span
                   className={cn(
@@ -193,7 +163,6 @@ export function MobileBottomNav({
             isProfileActive={isProfileActive}
             profileBadgeCount={profileBadgeCount}
             profileAvatarUrl={resolvedProfileAvatar}
-            compact
             chrome="dark"
           />
         </div>

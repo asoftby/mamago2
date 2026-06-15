@@ -1,6 +1,6 @@
 "use client";
 
-import { BYN_SYMBOL } from "@/lib/formatters/format-price";
+import { BelarusianRubleIcon } from "@/components/icons/BelarusianRubleIcon";
 import Link from "next/link";
 import Image from "next/image";
 import { getOfferPublicPath } from "@/lib/offers/offerPublicUrl";
@@ -72,7 +72,7 @@ export function PlaceOffersSection({
               }}
             >
               Чему{" "}
-              <em style={{ fontFamily: "Georgia, serif", fontStyle: "italic", fontWeight: 400, color: "#C24E22" }}>
+              <em style={{ fontFamily: "var(--font-editorial)", fontStyle: "italic", fontWeight: 400, color: "#C24E22" }}>
                 научим
               </em>
             </h2>
@@ -177,7 +177,7 @@ function OfferCardEditorial({ offer, href }: { offer: Offer; href: string }) {
               alignItems: "center",
             }}
           >
-            от {offer.price} {BYN_SYMBOL}
+            от {offer.price} <BelarusianRubleIcon />
           </span>
         )}
       </div>
@@ -217,7 +217,7 @@ function OfferCardEditorial({ offer, href }: { offer: Offer; href: string }) {
               marginTop: 4,
             }}
           >
-            от {offer.price} {BYN_SYMBOL}
+            от {offer.price} <BelarusianRubleIcon />
           </div>
         )}
       </div>

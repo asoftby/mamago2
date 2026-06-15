@@ -12,6 +12,10 @@ import { getCurrentUser } from "@/lib/auth/server";
 import { emailService } from "@/features/email/server/email-service";
 import { getTelegramConfig } from "@/server/config/telegram.config";
 import {
+  reconcileStalePendingDeliveries,
+  STALE_PENDING_THRESHOLD_MINUTES,
+} from "@/server/services/notificationDelivery.service";
+import {
   AdminNotificationTestButtons,
   ResendDeliveryButton,
 } from "./AdminNotificationsDiagnosticsClient";
@@ -70,7 +74,12 @@ export default async function AdminSystemNotificationsPage({
       : {}),
   };
 
-  const [notifications, deliveries, failedDeliveries] = await Promise.all([
+  // Lazy reconciliation: deliveries stuck in PENDING (process died between
+  // upsert and the post-send update) become FAILED + STALE_PENDING_TIMEOUT
+  // and get the manual Resend action below.
+  const reconciledCount = await reconcileStalePendingDeliveries();
+
+  const [notifications, deliveries, failedDeliveries, pendingCount] = await Promise.all([
     prisma.notification.findMany({
       where: notificationWhere,
       orderBy: { createdAt: "desc" },
@@ -110,6 +119,9 @@ export default async function AdminSystemNotificationsPage({
           select: { id: true, type: true, title: true },
         },
       },
+    }),
+    prisma.notificationDelivery.count({
+      where: { status: "PENDING", channel: { in: ["EMAIL", "TELEGRAM"] } },
     }),
   ]);
 
@@ -152,6 +164,8 @@ export default async function AdminSystemNotificationsPage({
             `Notifications shown: ${notifications.length}`,
             `Deliveries shown: ${deliveries.length}`,
             `Failed deliveries: ${failedDeliveries.length}`,
+            `Pending (in flight, <${STALE_PENDING_THRESHOLD_MINUTES}m): ${pendingCount}`,
+            `Stale PENDING → FAILED at this load: ${reconciledCount}`,
           ]}
         />
       </section>

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { requireAdminOrModeratorApiUser } from "@/lib/auth/requireAdminApi";
+import { invalidateAdminCityRowsCache } from "@/server/city/cityAdminData";
 
 export const runtime = "nodejs";
 
@@ -41,6 +42,7 @@ export async function PATCH(
       },
     });
 
+    invalidateAdminCityRowsCache();
     return NextResponse.json(updated);
   } catch (error) {
     console.error("Error updating city:", error);

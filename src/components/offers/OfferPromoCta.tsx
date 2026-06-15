@@ -118,7 +118,7 @@ export function OfferPromoCta({
         <button
           type="button"
           onClick={onPrimary}
-          className="inline-flex items-center gap-2 rounded-full bg-[#EF8759] px-7 py-3.5 text-[15px] font-semibold text-white shadow-sm transition-colors hover:bg-[#C2522A] active:scale-[0.98]"
+          className="inline-flex items-center gap-2 rounded-full bg-[#EF8759] px-7 py-3.5 text-[15px] font-semibold text-white shadow-sm transition-colors hover:bg-primary-hover active:scale-[0.98]"
         >
           {primaryLabel} <span aria-hidden>→</span>
         </button>

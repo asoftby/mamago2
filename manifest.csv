@@ -1,0 +1,3 @@
+rule_type,old_url,new_url,entity_type,entity_id,notes
+canonical,,http://mamago.local:3000/minsk/blog/demo-premium-article,article,cmq42f7h3000cwseo8luklncb,published canonical target
+wp_journal,http://mamago.local:3000/journal/demo-premium-article,http://mamago.local:3000/minsk/blog/demo-premium-article,article,cmq42f7h3000cwseo8luklncb,WordPress /journal/{slug} → city blog

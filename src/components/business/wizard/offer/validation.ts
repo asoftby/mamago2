@@ -133,15 +133,17 @@ function validateStep2(data: OfferFormData): ValidationResult {
 
   // Validate Discovery Signals (structured groups)
   const signalIds = data.signalIds ?? [];
-  
-  // Basic validation: check if signals are selected
-  if (signalIds.length === 0) {
-    errors.push("Выберите характеристики предложения (активность, формат, участие)");
-  } else {
-    // More specific validation would require loading signal definitions
-    // For now, we rely on the UI component to enforce min/max
-    if (signalIds.length < 3) {
-      warnings.push("Рекомендуется выбрать минимум 3 характеристики (по одной из каждой обязательной группы)");
+
+  if (data.offerWizardType !== "CAMP") {
+    // Basic validation: check if signals are selected
+    if (signalIds.length === 0) {
+      errors.push("Выберите характеристики предложения (активность, формат, участие)");
+    } else {
+      // More specific validation would require loading signal definitions
+      // For now, we rely on the UI component to enforce min/max
+      if (signalIds.length < 3) {
+        warnings.push("Рекомендуется выбрать минимум 3 характеристики (по одной из каждой обязательной группы)");
+      }
     }
   }
 
@@ -153,7 +155,7 @@ function validateStep2(data: OfferFormData): ValidationResult {
     data.title.trim().length >= 3 &&
     data.shortDescription.trim().length >= 10 &&
     data.shortDescription.length <= 120 &&
-    signalIds.length >= 3 // Минимум: 1 activity + 1 format + 1 participation
+    (data.offerWizardType === "CAMP" || signalIds.length >= 3)
   );
 
   return {
@@ -247,18 +249,19 @@ function validateStep5(data: OfferFormData): ValidationResult {
   const pricingErrors: string[] = [];
   const participationErrors: string[] = [];
   const warnings: string[] = [];
+  const isCampOffer = data.offerWizardType === "CAMP";
 
-  if (!data.pricingMode) {
+  if (!isCampOffer && !data.pricingMode) {
     pricingErrors.push("Выберите режим ценообразования");
   }
 
-  if (data.pricingMode === "single") {
+  if (!isCampOffer && data.pricingMode === "single") {
     if (!data.singlePrice || data.singlePrice.trim().length === 0) {
       pricingErrors.push("Укажите цену");
     }
   }
 
-  if (data.pricingMode === "multiple") {
+  if (!isCampOffer && data.pricingMode === "multiple") {
     if (data.pricingOptions.length === 0) {
       pricingErrors.push("Добавьте хотя бы один вариант цены");
     } else {
@@ -301,10 +304,11 @@ function validateStep5(data: OfferFormData): ValidationResult {
   }
 
   const isComplete = Boolean(
-    data.pricingMode &&
-    ((data.pricingMode === "single" && data.singlePrice.trim()) ||
-     (data.pricingMode === "multiple" && data.pricingOptions.length > 0 &&
-      data.pricingOptions.every(opt => opt.title.trim() && opt.price.trim()))) &&
+    (isCampOffer ||
+      (data.pricingMode &&
+        ((data.pricingMode === "single" && data.singlePrice.trim()) ||
+         (data.pricingMode === "multiple" && data.pricingOptions.length > 0 &&
+          data.pricingOptions.every(opt => opt.title.trim() && opt.price.trim()))))) &&
     (data.publicationAccess
       ? validatePublicationAccess(data.publicationAccess).valid
       : Boolean(data.ctaType))

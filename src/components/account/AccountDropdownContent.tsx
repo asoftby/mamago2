@@ -2,7 +2,7 @@
 
 import { BYN_SYMBOL } from "@/lib/formatters/format-price";
 import Link from "next/link";
-import { Building2, Check, LogOut, Shield, UserRound } from "lucide-react";
+import { Building2, Check, Clock3, LogOut, Shield, UserRound } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   accountDropdownIconClass,
@@ -66,9 +66,10 @@ export type AccountDropdownContentProps = {
   businessBalanceBYN?: number;
   onTopUpBalance?: () => void;
   ctaBlock?: {
+    variant?: "connect" | "pending";
     title: string;
-    actionLabel: string;
-    onAction: () => void;
+    actionLabel?: string;
+    onAction?: () => void;
   };
   /**
    * Админ-хост: переключатель «Личный аккаунт» / «Админ-панель» (`chromeTone="admin"` даёт серый лоток).
@@ -375,23 +376,55 @@ export function AccountDropdownContent({
 
       {ctaBlock ? (
         <div className="border-t border-gray-200 px-3 py-3">
-          <div className="rounded-xl border border-blue-200 bg-blue-50 p-3">
+          <div
+            className={cn(
+              "rounded-xl border p-3",
+              ctaBlock.variant === "pending"
+                ? "border-yellow-200 bg-yellow-50"
+                : "border-blue-200 bg-blue-50",
+            )}
+          >
             <div className="flex items-center justify-between gap-3">
-              <p className="text-xs font-medium text-blue-900">{ctaBlock.title}</p>
-              <div className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-blue-100 text-blue-700">
-                <Building2 className="h-4 w-4" aria-hidden />
+              <p
+                className={cn(
+                  "text-xs font-medium",
+                  ctaBlock.variant === "pending" ? "text-yellow-900" : "text-blue-900",
+                )}
+              >
+                {ctaBlock.title}
+              </p>
+              <div
+                className={cn(
+                  "inline-flex h-7 w-7 items-center justify-center rounded-lg",
+                  ctaBlock.variant === "pending"
+                    ? "bg-yellow-100 text-yellow-700"
+                    : "bg-blue-100 text-blue-700",
+                )}
+              >
+                {ctaBlock.variant === "pending" ? (
+                  <Clock3 className="h-4 w-4" aria-hidden />
+                ) : (
+                  <Building2 className="h-4 w-4" aria-hidden />
+                )}
               </div>
             </div>
-            <button
-              type="button"
-              className="mt-2 text-xs font-semibold text-blue-700 hover:text-blue-800"
-              onClick={() => {
-                ctaBlock.onAction();
-                onNavigate?.();
-              }}
-            >
-              {ctaBlock.actionLabel}
-            </button>
+            {ctaBlock.actionLabel && ctaBlock.onAction ? (
+              <button
+                type="button"
+                className={cn(
+                  "mt-2 text-xs font-semibold",
+                  ctaBlock.variant === "pending"
+                    ? "text-yellow-800 hover:text-yellow-900"
+                    : "text-blue-700 hover:text-blue-800",
+                )}
+                onClick={() => {
+                  ctaBlock.onAction?.();
+                  onNavigate?.();
+                }}
+              >
+                {ctaBlock.actionLabel}
+              </button>
+            ) : null}
           </div>
         </div>
       ) : null}

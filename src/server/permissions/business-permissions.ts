@@ -107,6 +107,12 @@ export async function getPartnerCabinetBusiness(userId: string): Promise<Busines
     return member.business;
   }
 
+  // @deprecated transitional fallback — ticket "BusinessMember backfill".
+  // Approve now creates the OWNER membership (businessVerification.service.ts)
+  // and the backfill (prisma/scripts/backfill-business-members.ts) ensures every
+  // existing business has one, so this branch should no longer be reachable.
+  // DO NOT REMOVE until the backfill has run on prod and lived a week without
+  // partners losing cabinet access.
   return getOwnedBusinessForUser(userId);
 }
 

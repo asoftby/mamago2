@@ -80,6 +80,7 @@ export default async function OffersPage({
           coverImage: true,
           priceFrom: true,
           priceText: true,
+          campSessions: true,
           dateFrom: true,
           dateTo: true,
           updatedAt: true,

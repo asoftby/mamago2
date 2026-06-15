@@ -1,6 +1,6 @@
 "use client";
 
-import { BYN_SYMBOL } from "@/lib/formatters/format-price";
+import { BelarusianRubleIcon } from "@/components/icons/BelarusianRubleIcon";
 import type { BirthdayBuilderState, BuilderStep } from "../types/builder";
 
 const MONTHS_RU = [
@@ -145,7 +145,7 @@ export function BuilderSummaryBar({
                   fontWeight: overBudget ? 700 : 500,
                 }}
               >
-                {totalPrice} {BYN_SYMBOL}{overBudget ? " ● превышен бюджет" : ""}
+                {Math.round(totalPrice)} <BelarusianRubleIcon />{overBudget ? " ● превышен бюджет" : ""}
               </span>
               {!overBudget && (
                 <span style={{ color: "#1F8A5B" }}>●</span>

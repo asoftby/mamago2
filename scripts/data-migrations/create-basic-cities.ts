@@ -10,9 +10,11 @@ async function createBasicCities() {
   console.log("🏙️ Creating basic cities");
   
   try {
-    // Create Minsk (main city)
+    const belarus = await prisma.country.findUnique({ where: { slug: "belarus" } });
+    if (!belarus) throw new Error("Country belarus not found — run geo migration first");
+
     const minsk = await prisma.city.upsert({
-      where: { slug: "minsk" },
+      where: { countryId_slug: { countryId: belarus.id, slug: "minsk" } },
       update: {
         name: "Минск",
         centerLat: 53.9,
@@ -21,6 +23,7 @@ async function createBasicCities() {
         googleName: "Minsk",
       },
       create: {
+        countryId: belarus.id,
         slug: "minsk",
         name: "Минск",
         centerLat: 53.9,

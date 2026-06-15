@@ -11,6 +11,8 @@ import type {
 import type { NotificationAudience } from "@prisma/client";
 import { createNotificationDeliveryRecord, recordSkippedNotificationDelivery } from "./delivery-log";
 import { resolveNotificationTypeForScenario } from "./notification-scenario";
+import { renderNotification } from "./template-render.service";
+import { buildScenarioTemplatePayloadCore } from "./template-payload-core";
 
 type InAppDeliveryRecord = {
   notificationId: string;
@@ -135,14 +137,21 @@ export async function sendInAppNotification(
   const payloadJson = buildInAppPayloadJson(prepared);
   const entity = resolveNotificationEntity(prepared);
 
+  // Шаблонный рендер (override из БД → дефолт реестра); null → текущий кодовый текст
+  const rendered = await renderNotification(
+    prepared.scenario,
+    "IN_APP",
+    buildScenarioTemplatePayloadCore(prepared.scenario, prepared.context),
+  );
+
   const notification = await prisma.notification.create({
     data: {
       userId: prepared.userId,
       audience: resolveNotificationAudience(prepared.scenario),
       type: resolveNotificationTypeForScenario(prepared.scenario),
       scenario: prepared.scenario,
-      title: prepared.content.title,
-      body: prepared.content.body,
+      title: rendered?.subject ?? prepared.content.title,
+      body: rendered?.body ?? prepared.content.body,
       ctaLabel: prepared.content.ctaLabel,
       ctaAction: prepared.content.ctaUrl,
       entityType: entity.entityType,

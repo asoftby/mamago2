@@ -4,10 +4,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
-import {
-  canCreateBusinessContent,
-  canManageOwnedContent,
-} from "@/lib/auth/businessContentAccess";
+import { canCreateBusinessContent } from "@/lib/auth/businessContentAccess";
+import { canManagePlaceAsync } from "@/lib/auth/placeAccess";
 
 export async function GET(request: NextRequest) {
   try {
@@ -30,14 +28,14 @@ export async function GET(request: NextRequest) {
 
     const place = await prisma.place.findUnique({
       where: { id: placeId },
-      select: { ownerBusinessId: true },
+      select: { ownerBusinessId: true, createdByUserId: true },
     });
 
     if (!place) {
       return NextResponse.json({ error: "Place not found" }, { status: 404 });
     }
 
-    if (!place.ownerBusinessId || !canManageOwnedContent(user, place.ownerBusinessId)) {
+    if (!(await canManagePlaceAsync(user, place))) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 

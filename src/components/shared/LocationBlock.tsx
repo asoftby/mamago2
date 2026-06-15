@@ -1,7 +1,8 @@
 "use client";
 
-import { Navigation } from "lucide-react";
+import { Copy } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { toast } from "@/lib/toast";
 
 /** Строит HTML-страницу для srcDoc-iframe: CartoDB Positron + кастомный пulsing-пин */
 function buildMapHtml(lat: number, lng: number): string {
@@ -79,8 +80,6 @@ export interface LocationBlockProps {
   routeUrl?: string;
   /** Ссылка «Подробнее о месте» */
   placeHref?: string;
-  /** Телефон для кнопки «Позвонить» */
-  phone?: string;
   /** Лейбл секции. По умолчанию «Где проходит» */
   kicker?: string;
   className?: string;
@@ -99,11 +98,46 @@ export function LocationBlock({
   mapUrl,
   routeUrl,
   placeHref,
-  phone,
   kicker = "Где проходит",
   className,
 }: LocationBlockProps) {
   const hasCoords = typeof lat === "number" && typeof lng === "number";
+  const coordsLabel = hasCoords
+    ? `${lat!.toFixed(4)}° N, ${lng!.toFixed(4)}° E`
+    : null;
+  const coordsClipboard = hasCoords ? `${lat}, ${lng}` : null;
+
+  const copyCoords = async () => {
+    if (!coordsClipboard) return;
+
+    const copyWithFallback = () => {
+      const textArea = document.createElement("textarea");
+      textArea.value = coordsClipboard;
+      textArea.setAttribute("readonly", "");
+      textArea.style.position = "fixed";
+      textArea.style.opacity = "0";
+      document.body.appendChild(textArea);
+      textArea.select();
+      const copied = document.execCommand("copy");
+      document.body.removeChild(textArea);
+      return copied;
+    };
+
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(coordsClipboard);
+      } else if (!copyWithFallback()) {
+        throw new Error("clipboard unavailable");
+      }
+      toast.success("Координаты скопированы");
+    } catch {
+      if (copyWithFallback()) {
+        toast.success("Координаты скопированы");
+      } else {
+        toast.error("Не удалось скопировать координаты");
+      }
+    }
+  };
 
   const mapsHref =
     routeUrl ??
@@ -188,11 +222,27 @@ export function LocationBlock({
               </div>
             </div>
 
-            {/* Address */}
+            {/* Address + coordinates */}
             {address && (
-              <p className="mb-5 text-[14px] leading-[1.65] text-[rgba(20,18,16,0.55)]">
+              <p
+                className={cn(
+                  "text-[14px] leading-[1.65] text-[rgba(20,18,16,0.55)]",
+                  hasCoords ? "mb-0" : "mb-5",
+                )}
+              >
                 {address}
               </p>
+            )}
+            {coordsLabel && coordsClipboard && (
+              <button
+                type="button"
+                onClick={copyCoords}
+                className="mb-5 mt-4 inline-flex w-fit max-w-full items-center gap-2 rounded-md font-mono text-[10px] text-[rgba(20,18,16,0.55)] transition-colors hover:text-[#141210]"
+                aria-label="Скопировать координаты"
+              >
+                <span>{coordsLabel}</span>
+                <Copy className="h-3.5 w-3.5 shrink-0 opacity-70" aria-hidden />
+              </button>
             )}
 
             {/* Chips */}
@@ -230,14 +280,6 @@ export function LocationBlock({
                   Подробнее о месте
                 </a>
               )}
-              {phone && (
-                <a
-                  href={`tel:${phone}`}
-                  className="inline-flex items-center gap-2 rounded-full border border-[rgba(20,18,16,0.18)] bg-[#FAF7F1] px-5 py-2.5 text-[14px] font-semibold text-[#141210] transition-colors hover:border-[#141210]"
-                >
-                  Позвонить
-                </a>
-              )}
             </div>
           </div>
 
@@ -264,35 +306,6 @@ export function LocationBlock({
                     className="h-full w-full object-cover"
                   />
                 ) : null}
-
-                {/* Bottom overlay */}
-                <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between rounded-[14px] border border-[rgba(20,18,16,0.10)] bg-[rgba(250,247,241,0.96)] px-4 py-3 backdrop-blur-sm">
-                  <div className="min-w-0">
-                    <p className="truncate text-[13px] font-semibold text-[#141210]">
-                      &ldquo;{name}&rdquo;
-                    </p>
-                    {hasCoords ? (
-                      <p className="font-mono text-[10px] text-[rgba(20,18,16,0.55)]">
-                        {lat!.toFixed(4)}° N, {lng!.toFixed(4)}° E
-                      </p>
-                    ) : address ? (
-                      <p className="font-mono text-[10px] text-[rgba(20,18,16,0.55)]">
-                        {address}
-                      </p>
-                    ) : null}
-                  </div>
-                  {mapsHref && (
-                    <a
-                      href={mapsHref}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="ml-4 flex shrink-0 items-center gap-1.5 text-[13px] font-semibold text-[#141210] transition-colors hover:text-[#E86A3A]"
-                    >
-                      <Navigation className="h-3.5 w-3.5" />
-                      Маршрут
-                    </a>
-                  )}
-                </div>
               </div>
             </div>
           )}

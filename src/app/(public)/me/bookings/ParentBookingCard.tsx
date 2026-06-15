@@ -127,7 +127,7 @@ export function ParentBookingCard({ booking }: Props) {
             {publicationHref ? (
               <Link
                 href={publicationHref}
-                className="hover:text-[#EF8759] transition-colors"
+                className="hover:text-text-brand transition-colors"
               >
                 {display.title}
               </Link>

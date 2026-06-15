@@ -41,7 +41,7 @@ function PromptBody({
         <Button
           type="button"
           onClick={onAddToPlan}
-          className="h-12 flex-1 rounded-full bg-[#EF8759] text-[15px] font-semibold text-white hover:bg-[#e07848]"
+          className="h-12 flex-1 rounded-full bg-[#EF8759] text-[15px] font-semibold text-white hover:bg-primary-hover"
         >
           Добавить в план
         </Button>

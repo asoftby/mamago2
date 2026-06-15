@@ -20,8 +20,14 @@ import type {
   PlanTomorrowDigestContext,
 } from "@/lib/notifications/domainContracts";
 export {
+  enrichNotificationsWithLifecycle,
+  getUserActionResolutionState,
+  NotificationArchiveBlockedError,
+} from "@/server/notifications/notification-lifecycle";
+export {
   archiveAllRead,
   archiveNotification,
+  archiveNotificationsByIds,
   countUserArchived,
   countUnifiedNotifications,
   completeOnboardingNotification,
@@ -36,9 +42,11 @@ export {
   getUserArchived,
   getUserInbox,
   getUserNotifications,
+  getNotificationsPage,
   getWelcomeIsRead,
   markAllNotificationsAsRead,
   markNotificationAsRead,
+  markNotificationsRead,
   markUnseenNotificationsAsSeen,
   notifyActivityApproved,
   notifyActivityNeedsChanges,
@@ -65,6 +73,7 @@ export {
   notifyUserPlanReminder,
   notifyWelcomeNewUser,
   resolveNotificationActionById,
+  reconcileResolvedActionRequiredNotifications,
   restoreNotification,
 } from "@/server/services/notification.service";
 

@@ -352,6 +352,11 @@ export function CampShiftBookingOverlay({
                         <span className="font-semibold text-[#D96534]">{selectedShift.price}</span>
                       ) : null}
                     </div>
+                    {selectedShift.promotionDetails ? (
+                      <div className="rounded-2xl border border-[#F2D8CA] bg-[#FFF3EB] px-3 py-2 text-[13px] leading-5 text-[#B5562D]">
+                        {selectedShift.promotionDetails}
+                      </div>
+                    ) : null}
                   </div>
                   {shiftOptions.length > 1 ? (
                     <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[#F0DDD0] bg-white text-[#EF8759]">
@@ -395,6 +400,11 @@ export function CampShiftBookingOverlay({
                             {optionDateLabel ? (
                               <div className="mt-0.5 text-[13px] text-neutral-500">
                                 {optionDateLabel}
+                              </div>
+                            ) : null}
+                            {option.promotionDetails ? (
+                              <div className="mt-2 rounded-2xl border border-[#F2D8CA] bg-[#FFF7F1] px-3 py-2 text-[12px] leading-5 text-[#B5562D]">
+                                {option.promotionDetails}
                               </div>
                             ) : null}
                           </div>

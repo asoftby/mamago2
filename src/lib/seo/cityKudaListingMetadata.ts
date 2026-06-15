@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import prisma from "@/lib/prisma";
+import { findCityBySlug } from "@/server/geo/findCityBySlug";
 import { getBaseUrl } from "@/lib/routing/cityPaths";
 
 /** Canonical base URL for the public site (BY). */
@@ -16,10 +16,7 @@ export function cityEventsListingPath(citySlug: string): string {
 export async function buildCityEventsListingMetadata(
   citySlug: string,
 ): Promise<Metadata> {
-  const city = await prisma.city.findUnique({
-    where: { slug: citySlug },
-    select: { name: true },
-  });
+  const city = await findCityBySlug(citySlug, { select: { name: true } });
   if (!city) return {};
   const base = publicSiteBase();
   const canonical = `${base}${cityEventsListingPath(citySlug)}`;
@@ -35,10 +32,7 @@ export async function buildCityEventsListingMetadata(
  * The hub is its own rankable page — NOT a redirect/alias to /events.
  */
 export async function buildCityHubMetadata(citySlug: string): Promise<Metadata> {
-  const city = await prisma.city.findUnique({
-    where: { slug: citySlug },
-    select: { name: true },
-  });
+  const city = await findCityBySlug(citySlug, { select: { name: true } });
   if (!city) return {};
   const base = publicSiteBase();
   const canonical = `${base}/${citySlug}`;

@@ -27,6 +27,7 @@ export const businessFormCopy = {
   reviewStepShortTitle: "Проверка и отправка",
   stepSubtitle: (current: number, total: number, stepTitle: string) =>
     `Шаг ${current} из ${total}: ${stepTitle}`,
+  /** @deprecated Используйте SaveIndicator из form-shell (статусы + относительное время); удалить после миграции всех визардов на useWizardDraft */
   savedAt: (d: Date) => `Сохранено ${d.toLocaleTimeString()}`,
   place: {
     createTitle: "Новое место",

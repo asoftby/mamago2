@@ -21,6 +21,7 @@ export interface UploadedImageResult {
 }
 
 const DEFAULT_TIMEOUT_MS = 10000; // 10 seconds
+const MAX_RESPONSE_BYTES = 10 * 1024 * 1024; // 10 MB
 
 export async function uploadImageFromUrl(
   imageUrl: string,
@@ -41,12 +42,18 @@ export async function uploadImageFromUrl(
   try {
     const response = await fetch(imageUrl, {
       signal: controller.signal,
+      // Never follow redirects — the redirect target would bypass the SSRF allowlist check
+      redirect: "manual",
       headers: {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
       },
     });
 
     clearTimeout(timeoutId);
+
+    if (response.type === "opaqueredirect" || (response.status >= 300 && response.status < 400)) {
+      throw new Error(`Image URL redirected (status ${response.status}); redirects are not followed for security`);
+    }
 
     if (!response.ok) {
       throw new Error(`Failed to download image: ${response.status}`);
@@ -57,8 +64,28 @@ export async function uploadImageFromUrl(
       throw new Error(`Invalid content type: ${contentType}`);
     }
 
-    const arrayBuffer = await response.arrayBuffer();
-    buffer = Buffer.from(arrayBuffer);
+    // Reject oversized responses before reading the body
+    const contentLength = response.headers.get("content-length");
+    if (contentLength && parseInt(contentLength, 10) > MAX_RESPONSE_BYTES) {
+      throw new Error(`Image too large: ${contentLength} bytes (max ${MAX_RESPONSE_BYTES})`);
+    }
+
+    // Stream body with hard size cap to prevent memory exhaustion
+    const reader = response.body?.getReader();
+    if (!reader) throw new Error("No response body");
+    const chunks: Uint8Array[] = [];
+    let totalBytes = 0;
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      totalBytes += value.byteLength;
+      if (totalBytes > MAX_RESPONSE_BYTES) {
+        await reader.cancel();
+        throw new Error(`Image too large: exceeds ${MAX_RESPONSE_BYTES} bytes`);
+      }
+      chunks.push(value);
+    }
+    buffer = Buffer.concat(chunks.map((c) => Buffer.from(c)));
     console.log("[uploadFromUrl] Downloaded image, size:", buffer.length, "bytes");
   } catch (error) {
     clearTimeout(timeoutId);

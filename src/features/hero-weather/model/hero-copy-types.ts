@@ -40,7 +40,6 @@ export type GeneratedHeroCopyWithDebug = GeneratedHeroCopy & {
     selectedIds: {
       microcopyId: string;
       titleId: string;
-      subtitleId: string;
     };
   };
 };

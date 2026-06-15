@@ -14,6 +14,8 @@ import { PrismaClient, type OccasionType, type SignalDomain, type SignalEntityTy
 import { seedPlaceCategories } from "./seed/place-categories";
 import { seedEventCategories } from "./seed/event-categories";
 import { seedDiscoverySectionFilters } from "./seed/discovery-section-filters";
+import { seedDiscoveryTags } from "./seed/discovery-tags";
+import { CAMP_OFFER_DISCOVERY_GROUPS } from "../src/lib/offers/campOfferDiscoverySignals";
 
 const prisma = new PrismaClient();
 
@@ -161,6 +163,42 @@ async function upsertSignalGroupChild(
   });
 }
 
+async function upsertPlanOnboardingRoot(
+  slug: string,
+  title: string,
+  usageType: "PLAN_ADULT_PREFERENCE" | "PLAN_LEISURE_FORMAT",
+  order: number,
+) {
+  return prisma.signalDefinition.upsert({
+    where: { slug },
+    update: {
+      title,
+      titleEn: title,
+      order,
+      isActive: true,
+      isSystem: true,
+      parentId: null,
+      status: "ACTIVE",
+      domain: "PROFILE",
+      entityTypes: ["USER"],
+      usageType,
+    },
+    create: {
+      slug,
+      title,
+      titleEn: title,
+      order,
+      isActive: true,
+      isSystem: true,
+      parentId: null,
+      status: "ACTIVE",
+      domain: "PROFILE",
+      entityTypes: ["USER"],
+      usageType,
+    },
+  });
+}
+
 const APPROVED_OCCASIONS: Array<{
   slug: string;
   name: string;
@@ -282,7 +320,51 @@ async function main() {
   await upsertSignalWithDomain("preferences", "Предпочтения", "PROFILE", ["USER"], 3);
   await upsertSignalWithDomain("preferences-aesthetics", "Эстетика", "PROFILE", ["USER"], 1, [], "preferences");
   await upsertSignalWithDomain("preferences-coffee", "Кофе", "PROFILE", ["USER"], 2, [], "preferences");
-  await upsertSignalWithDomain("preferences-family", "Семейно", "PROFILE", ["USER"], 3, [], "preferences");
+  await upsertSignalWithDomain("preferences-walks", "Прогулки", "PROFILE", ["USER"], 3, [], "preferences");
+  await upsertSignalWithDomain("preferences-scenic", "Красивые места", "PROFILE", ["USER"], 4, [], "preferences");
+  await upsertSignalWithDomain("preferences-calm", "Спокойно", "PROFILE", ["USER"], 5, [], "preferences");
+  await upsertSignalWithDomain("preferences-family", "Семейно", "PROFILE", ["USER"], 6, [], "preferences");
+
+  // Mini-onboarding «Мой план» — data-driven chips по usageType
+  const planPrefRoot = await upsertPlanOnboardingRoot(
+    "plan-adult-preference",
+    "Plan: предпочтения взрослого",
+    "PLAN_ADULT_PREFERENCE",
+    4,
+  );
+  const planPrefItems: Array<[string, string, number]> = [
+    ["plan-pref-coffee", "Кофе", 1],
+    ["plan-pref-walks", "Прогулки", 2],
+    ["plan-pref-scenic", "Красивые места", 3],
+    ["plan-pref-calm", "Спокойно", 4],
+    ["plan-pref-active", "Активно", 5],
+    ["plan-pref-culture", "Культура", 6],
+    ["plan-pref-creative", "Творчество", 7],
+    ["plan-pref-food", "Еда", 8],
+    ["plan-pref-nature", "Природа", 9],
+    ["plan-pref-family", "Семейно", 10],
+    ["plan-pref-budget", "Недорого", 11],
+    ["plan-pref-new-place", "Новое место", 12],
+  ];
+  for (const [slug, title, order] of planPrefItems) {
+    await upsertSignalGroupChild(planPrefRoot.id, slug, title, order);
+  }
+
+  const planFormatRoot = await upsertPlanOnboardingRoot(
+    "plan-leisure-format",
+    "Plan: формат досуга",
+    "PLAN_LEISURE_FORMAT",
+    5,
+  );
+  const planFormatItems: Array<[string, string, number]> = [
+    ["plan-format-outdoor", "На улице", 1],
+    ["plan-format-indoor", "В помещении", 2],
+    ["plan-format-mixed", "Смешанный", 3],
+    ["plan-format-home", "Дома", 4],
+  ];
+  for (const [slug, title, order] of planFormatItems) {
+    await upsertSignalGroupChild(planFormatRoot.id, slug, title, order);
+  }
 
   // ═══ DISCOVERY DOMAIN ═══
   // Format группа
@@ -301,6 +383,29 @@ async function main() {
   await upsertSignalWithDomain("activity-calm", "Спокойно", "DISCOVERY", ["PLACE", "EVENT", "ROUTE"], 6, [], "activity");
   await upsertSignalWithDomain("activity-social", "Социально", "DISCOVERY", ["PLACE", "EVENT", "ROUTE"], 7, [], "activity");
 
+  // Camp offer characteristics (DISCOVERY / OFFER)
+  for (const group of CAMP_OFFER_DISCOVERY_GROUPS) {
+    await upsertSignalWithDomain(
+      group.slug,
+      group.title,
+      "DISCOVERY",
+      group.entityTypes,
+      group.order,
+    );
+
+    for (const option of group.options) {
+      await upsertSignalWithDomain(
+        option.slug,
+        option.title,
+        "DISCOVERY",
+        group.entityTypes,
+        option.order,
+        [],
+        group.slug,
+      );
+    }
+  }
+
   // ═══ RECOMMENDATION DOMAIN ═══
   await upsertSignalWithDomain("tempo", "Tempo", "RECOMMENDATION", [], 1, [
     { value: "slow",   label: "Медленно",  order: 1 },
@@ -317,7 +422,7 @@ async function main() {
   // ═══ LEGACY SIGNALS (для обратной совместимости) ═══
   // Старые сигналы остаются для совместимости, но помечены как DEPRECATED в миграции
   const leisureRoot = await upsertSignalGroupRoot("leisure-format", "Формат досуга", 11);
-  await upsertSignalGroupChild(leisureRoot.id, "leisure-format-home", "Дома", 1);
+  await upsertSignalGroupChild(leisureRoot.id, "leisure-format-home", "В помещении", 1);
   await upsertSignalGroupChild(leisureRoot.id, "leisure-format-outdoor", "На улице", 2);
   await upsertSignalGroupChild(leisureRoot.id, "leisure-format-mixed", "Смешанный", 3);
 
@@ -368,13 +473,43 @@ async function main() {
     await upsertDiscoveryClassChip(chip);
   }
 
-  // ── Cities (SYSTEM) ───────────────────────────────────────────────────────
+  // ── Geo hierarchy (Country → Region → City) ───────────────────────────────
+  console.log("  → Countries & regions");
+
+  const belarus = await prisma.country.upsert({
+    where: { slug: "belarus" },
+    update: { isActive: true, priority: 100 },
+    create: {
+      id: "country_belarus",
+      name: "Беларусь",
+      slug: "belarus",
+      isoCode: "BY",
+      isActive: true,
+      priority: 100,
+    },
+  });
+
+  const minskOblast = await prisma.region.upsert({
+    where: { countryId_slug: { countryId: belarus.id, slug: "minskaya-oblast" } },
+    update: { isActive: true, priority: 100 },
+    create: {
+      id: "region_minskaya_oblast",
+      countryId: belarus.id,
+      name: "Минская область",
+      slug: "minskaya-oblast",
+      type: "OBLAST",
+      isActive: true,
+      priority: 100,
+    },
+  });
+
   console.log("  → Cities");
 
   const minsk = await prisma.city.upsert({
-    where: { slug: "minsk" },
+    where: { countryId_slug: { countryId: belarus.id, slug: "minsk" } },
     update: {},
     create: {
+      countryId: belarus.id,
       name: "Минск",
       slug: "minsk",
       lat: 53.9006,
@@ -460,21 +595,11 @@ async function main() {
 
   // Населённые пункты Минской области — лента /minsk/kuda может включать их (см. discoveryHubExpand)
   await prisma.city.upsert({
-    where: { slug: "minskaya-oblast" },
-    update: {},
+    where: { countryId_slug: { countryId: belarus.id, slug: "marina-gorka" } },
+    update: { regionId: minskOblast.id },
     create: {
-      name: "Минская область",
-      slug: "minskaya-oblast",
-      centerLat: 53.9,
-      centerLng: 27.5667,
-      radiusKm: 120,
-      hasMetro: false,
-    },
-  });
-  await prisma.city.upsert({
-    where: { slug: "marina-gorka" },
-    update: {},
-    create: {
+      countryId: belarus.id,
+      regionId: minskOblast.id,
       name: "Марьина Горка",
       slug: "marina-gorka",
       lat: 53.5103,
@@ -631,6 +756,11 @@ async function main() {
   // Makes the admin panel at /admin/discovery/filters the source of truth
   // for what filters appear in the public secondary-filters modal.
   await seedDiscoverySectionFilters(prisma);
+
+  // ── Discovery Tags ────────────────────────────────────────────────────────
+  // Global tags for all publication types (News, Article, Collection, Breaking News).
+  // Available city-scoped via /[city]/tags/[tagSlug] and in publication wizards.
+  await seedDiscoveryTags(prisma);
 
   console.log("✅ System seed complete.");
   console.log("   Demo/content data: run pnpm db:seed:demo");

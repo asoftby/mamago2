@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "@/lib/toast";
 import {
@@ -8,29 +8,46 @@ import {
   FormWizardHeader,
   FormPrimaryContentCard,
   FormStickyActionBar,
+  SaveIndicator,
+  formatRelativeTimeRu,
   formWizardPhaseFromFlags,
 } from "@/components/form-shell";
+import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { WizardProgress } from "@/components/ui/wizard-progress";
 import { getBusinessFormActionLabels, businessFormCopy } from "../businessFormLabels";
 import { canPublishContentDirectly } from "@/lib/auth/businessContentAccess";
 import { useWizardSession } from "@/hooks/useWizardSession";
+import { useWizardDraft } from "@/hooks/useWizardDraft";
+import { useUnsavedChangesNavigationGuard } from "@/hooks/use-unsaved-changes-navigation-guard";
 
 import type { OfferFormData, OfferWizardMode, OfferWizardStepKey } from "./types";
 import { getDefaultFormData, hasMeaningfulContent } from "./defaults";
 import { validateForSubmit, type ValidationResult } from "./validation";
-import { 
-  getStepsForOfferType, 
-  getStepNumber, 
+import {
+  getStepsForOfferType,
+  getStepNumber,
   isStepComplete,
+  getMissingFieldsForStep,
   getNextStepKey,
   getPreviousStepKey,
+  normalizeWizardCompletedSteps,
+  ALL_OFFER_WIZARD_STEP_KEYS,
 } from "./offerWizardSteps.config";
 import {
   buildOfferCreatePayload,
   buildOfferUpdatePayload,
   mapOfferToFormData,
 } from "./mappers";
-import { plainTextToRichTextHtml } from "@/lib/richtext/utils";
 
 import { Step8Review } from "./steps/Step8Review";
 import { Step4CampSchedule } from "./steps/Step4CampSchedule";
@@ -75,7 +92,18 @@ interface OfferWizardProps {
   initialStepNumber?: number;
 }
 
-const LOCAL_STORAGE_KEY = "offer-wizard-draft";
+/** Ключ автосейва до миграции на useWizardDraft — подчищается на mount */
+const LEGACY_LOCAL_STORAGE_KEY = "offer-wizard-draft";
+
+/** Версия схемы черновика; bump при несовместимом изменении OfferFormData/шагов */
+const OFFER_WIZARD_DRAFT_SCHEMA_VERSION = 1;
+
+/** Черновик мастера: данные формы + прогресс прохождения шагов */
+interface OfferWizardDraftData {
+  formData: OfferFormData;
+  completedSteps: OfferWizardStepKey[];
+  currentStep: OfferWizardStepKey;
+}
 
 export function OfferWizard({
   mode,
@@ -119,6 +147,43 @@ export function OfferWizard({
     return initialSteps[idx]?.key ?? "type";
   });
   
+  // Шаги, явно завершённые пользователем через «Далее» (не выводятся из валидности данных)
+  const [completedSteps, setCompletedSteps] = useState<OfferWizardStepKey[]>(() => {
+    if (mode === "edit" && offer) {
+      // Опубликованное/отправленное предложение: данные уже подтверждены пользователем
+      if (offer.status !== "DRAFT") {
+        return ALL_OFFER_WIZARD_STEP_KEYS;
+      }
+      return normalizeWizardCompletedSteps(offer.wizardCompletedSteps);
+    }
+    return [];
+  });
+
+  const markStepCompleted = useCallback((stepKey: OfferWizardStepKey) => {
+    setCompletedSteps((prev) => (prev.includes(stepKey) ? prev : [...prev, stepKey]));
+  }, []);
+
+  // Инвалидация: completed-шаг, чьи данные стали невалидными, теряет отметку
+  // навсегда — обратно только через «Далее» на этом шаге.
+  useEffect(() => {
+    setCompletedSteps((prev) => {
+      const next = prev.filter((key) => isStepComplete(key, formData));
+      return next.length === prev.length ? prev : next;
+    });
+  }, [formData]);
+
+  // Смена типа предложения после прохождения шагов: набор шагов меняется,
+  // старые отметки недостоверны — сбрасываем полностью.
+  const prevWizardTypeRef = useRef(formData.offerWizardType);
+  useEffect(() => {
+    if (prevWizardTypeRef.current !== formData.offerWizardType) {
+      if (prevWizardTypeRef.current !== null) {
+        setCompletedSteps([]);
+      }
+      prevWizardTypeRef.current = formData.offerWizardType;
+    }
+  }, [formData.offerWizardType]);
+
   // Normalize current step if offer type changes
   useEffect(() => {
     const currentStepNum = getStepNumber(formData.offerWizardType, currentStepKey);
@@ -127,33 +192,15 @@ export function OfferWizard({
     }
   }, [formData.offerWizardType, currentStepKey]);
   
-  // Restore from localStorage after hydration
+  // Дочистка черновика старого формата (до useWizardDraft): не восстанавливаем,
+  // формат и ключ несовместимы
   useEffect(() => {
-    if (mode === "create") {
-      try {
-        const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        const defaults = getDefaultFormData(defaultPlaceId ?? null);
-        if (typeof parsed.singlePriceLabel === "string" && !parsed.priceCaption) {
-          parsed.priceCaption = plainTextToRichTextHtml(parsed.singlePriceLabel);
-        }
-        if (typeof parsed.promotionalOffer === "string" && !parsed.promotionDetails) {
-          parsed.promotionDetails = plainTextToRichTextHtml(parsed.promotionalOffer);
-        }
-        if (!parsed.placeId && defaultPlaceId) {
-          parsed.placeId = defaultPlaceId;
-        }
-        setFormData({
-          ...defaults,
-          ...parsed,
-          });
-        }
-      } catch (e) {
-        console.error("Failed to restore draft:", e);
-      }
+    try {
+      localStorage.removeItem(LEGACY_LOCAL_STORAGE_KEY);
+    } catch {
+      /* noop */
     }
-  }, [mode, defaultPlaceId]);
+  }, []);
 
   useEffect(() => {
     if (!defaultPlaceId) return;
@@ -168,7 +215,6 @@ export function OfferWizard({
   );
   const [isSaving, setIsSaving] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [lastSaved, setLastSaved] = useState<Date | null>(null);
 
   const { wizardSessionId } = useWizardSession({
     userId,
@@ -176,23 +222,68 @@ export function OfferWizard({
     entityId: mode === "edit" ? offer?.id : undefined,
   });
 
-  // Autosave effect
-  useEffect(() => {
-    if (mode === "create" && typeof window !== "undefined") {
-      const timer = setTimeout(() => {
-        if (hasMeaningfulContent(formData)) {
-          try {
-            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(formData));
-            setLastSaved(new Date());
-          } catch (e) {
-            console.error("Failed to save draft:", e);
-          }
-        }
-      }, 2000);
-      
-      return () => clearTimeout(timer);
+  // ── Черновик (localStorage) + dirty-база для guard'а ───────────────────────
+  /** Состояние формы, совпадающее с сервером (edit) или дефолтами (create) */
+  const [baselineFormJson, setBaselineFormJson] = useState(() =>
+    JSON.stringify(
+      mode === "edit" && offer
+        ? mapOfferToFormData(offer)
+        : getDefaultFormData(defaultPlaceId ?? null),
+    ),
+  );
+  const formJson = useMemo(() => JSON.stringify(formData), [formData]);
+  const isDirty = formJson !== baselineFormJson;
+
+  /** updatedAt оффера, которому соответствует baseline (обновляется после PATCH) */
+  const [entityUpdatedAtIso, setEntityUpdatedAtIso] = useState<string | null>(() =>
+    mode === "edit" && offer ? new Date(offer.updatedAt).toISOString() : null,
+  );
+
+  const draftData = useMemo<OfferWizardDraftData>(
+    () => ({ formData, completedSteps, currentStep: currentStepKey }),
+    [formData, completedSteps, currentStepKey],
+  );
+
+  const draft = useWizardDraft<OfferWizardDraftData>({
+    wizardType: "offer",
+    mode,
+    entityId: mode === "edit" ? offer?.id ?? null : null,
+    schemaVersion: OFFER_WIZARD_DRAFT_SCHEMA_VERSION,
+    data: draftData,
+    enabled: mode === "create" ? hasMeaningfulContent(formData) : isDirty,
+    entityUpdatedAt: entityUpdatedAtIso,
+  });
+
+  const { leaveDialogOpen, confirmLeave, onLeaveDialogOpenChange, requestLeave } =
+    useUnsavedChangesNavigationGuard(
+      mode === "edit" && isDirty && !isSaving && !isSubmitting,
+    );
+
+  /** Черновик сделан против другой версии оффера (правили в другом месте) */
+  const draftConflictsWithEntity =
+    mode === "edit" &&
+    draft.hasDraft &&
+    entityUpdatedAtIso != null &&
+    draft.draftEntityUpdatedAt != null &&
+    draft.draftEntityUpdatedAt.toISOString() !== entityUpdatedAtIso;
+
+  const handleRestoreDraft = () => {
+    const restored = draft.restoreDraft();
+    if (!restored) return;
+    const defaults = getDefaultFormData(defaultPlaceId ?? null);
+    const nextFormData = { ...defaults, ...restored.formData };
+    if (!nextFormData.placeId && defaultPlaceId) {
+      nextFormData.placeId = defaultPlaceId;
     }
-  }, [formData, mode]);
+    setFormData(nextFormData);
+    setCompletedSteps(normalizeWizardCompletedSteps(restored.completedSteps));
+    const nextSteps = getStepsForOfferType(nextFormData.offerWizardType);
+    setCurrentStepKey(
+      nextSteps.some((s) => s.key === restored.currentStep)
+        ? restored.currentStep
+        : "type",
+    );
+  };
 
   useEffect(() => {
     if (formData.offerWizardType !== "CAMP") return;
@@ -244,6 +335,17 @@ export function OfferWizard({
 
   // Navigation by step key
   const handleNext = () => {
+    // Шаг помечается completed только здесь — после успешной валидации по «Далее»
+    if (!isStepComplete(currentStepKey, formData)) {
+      const missing = getMissingFieldsForStep(currentStepKey, formData);
+      toast.error(
+        missing.length > 0
+          ? `Заполните: ${missing.join(", ")}`
+          : "Заполните обязательные поля шага",
+      );
+      return;
+    }
+    markStepCompleted(currentStepKey);
     const nextKey = getNextStepKey(formData.offerWizardType, currentStepKey);
     if (nextKey) {
       setCurrentStepKey(nextKey);
@@ -255,7 +357,8 @@ export function OfferWizard({
     if (prevKey) {
       setCurrentStepKey(prevKey);
     } else {
-      router.push(afterSubmitDestination);
+      // Уход из мастера: в edit-режиме с несохранёнными правками — через guard
+      requestLeave(afterSubmitDestination);
     }
   };
 
@@ -281,49 +384,62 @@ export function OfferWizard({
       }
 
       if (offerId) {
-        const payload = buildOfferUpdatePayload(
-          formData,
-          mode === "edit" && canDirectPublish ? { status: "PUBLISHED" } : undefined,
-        );
+        const payload = buildOfferUpdatePayload(formData, {
+          ...(mode === "edit" && canDirectPublish ? { status: "PUBLISHED" as const } : {}),
+          wizardCompletedSteps: completedSteps,
+        });
         const response = await fetch(`/api/business/offers/${offerId}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
         });
-        
+
         if (!response.ok) {
           const errorData = await response.json();
           const errorMessage = errorData.message || errorData.error || "Failed to update draft";
           throw new Error(errorMessage);
         }
+
+        // Сервер сохранил правки: локальный черновик не нужен, dirty-база — текущее состояние
+        const saved = await response.json().catch(() => null);
+        if (saved?.updatedAt) {
+          setEntityUpdatedAtIso(new Date(saved.updatedAt).toISOString());
+        }
+        setBaselineFormJson(JSON.stringify(formData));
+        draft.markClean();
       } else {
         if (!placeId) {
           toast.error("Не выбрано место для предложения");
           return;
         }
-        const createPayload = buildOfferCreatePayload(formData, { status: "DRAFT" });
+        const createPayload = buildOfferCreatePayload(formData, {
+          status: "DRAFT",
+          wizardCompletedSteps: completedSteps,
+          createRequestId: draft.createRequestId,
+        });
         const response = await fetch("/api/business/offers", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(createPayload),
         });
-        
+
         if (!response.ok) {
           const errorData = await response.json();
           const errorMessage = errorData.message || errorData.error || "Failed to create draft";
           throw new Error(errorMessage);
         }
-        
+
         const data = await response.json();
         setOfferId(data.id);
-        
+        draft.markClean();
+
         if (onComplete) {
           onComplete(data.id);
         } else {
           router.push(editorOfferEditHref(data.id));
         }
       }
-      
+
       toast.success(
         offerId
           ? canDirectPublish && mode === "edit"
@@ -331,11 +447,6 @@ export function OfferWizard({
             : "Изменения сохранены"
           : "Черновик сохранён",
       );
-      setLastSaved(new Date());
-      
-      if (mode === "create" && typeof window !== "undefined") {
-        localStorage.removeItem(LOCAL_STORAGE_KEY);
-      }
     } catch (error: unknown) {
       console.error("Save draft error:", error);
       toast.error(error instanceof Error ? error.message : "Ошибка сохранения");
@@ -360,17 +471,21 @@ export function OfferWizard({
       const placeId = formData.placeId ?? undefined;
 
       if (mode === "create" && !placeId) {
-        toast.error("Не выбрано место для предложения");
+        toast.error("Выберите своё место на шаге «Контакты» перед публикацией");
         return;
       }
 
       if (!offerId) {
         if (!placeId) {
-          toast.error("Не выбрано место для предложения");
+          toast.error("Выберите своё место на шаге «Контакты» перед публикацией");
           return;
         }
         const finalStatus = canPublishContentDirectly(userRole) ? "PUBLISHED" : "PENDING";
-        const createPayload = buildOfferCreatePayload(formData, { status: finalStatus });
+        const createPayload = buildOfferCreatePayload(formData, {
+          status: finalStatus,
+          wizardCompletedSteps: completedSteps,
+          createRequestId: draft.createRequestId,
+        });
         const createResponse = await fetch("/api/business/offers", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -391,11 +506,9 @@ export function OfferWizard({
             ? "Предложение опубликовано"
             : "Предложение отправлено на модерацию",
         );
-        
-        if (mode === "create" && typeof window !== "undefined") {
-          localStorage.removeItem(LOCAL_STORAGE_KEY);
-        }
-        
+
+        draft.markClean();
+
         if (onComplete) {
           onComplete(createData.id);
         } else {
@@ -407,6 +520,7 @@ export function OfferWizard({
       const canDirectPublish = canPublishContentDirectly(userRole);
       const updatePayload = buildOfferUpdatePayload(formData, {
         status: canDirectPublish ? "PUBLISHED" : "PENDING",
+        wizardCompletedSteps: completedSteps,
       });
       const response = await fetch(`/api/business/offers/${offerId}`, {
         method: "PATCH",
@@ -425,11 +539,10 @@ export function OfferWizard({
           ? "Изменения опубликованы"
           : "Предложение отправлено на модерацию",
       );
-      
-      if (mode === "create" && typeof window !== "undefined") {
-        localStorage.removeItem(LOCAL_STORAGE_KEY);
-      }
-      
+
+      setBaselineFormJson(JSON.stringify(formData));
+      draft.markClean();
+
       if (onComplete) {
         onComplete(offerId);
       } else if (mode === "create") {
@@ -499,16 +612,33 @@ export function OfferWizard({
     ? validateForSubmit(formData)
     : { isValid: true, isComplete: true, errors: [], warnings: [] };
 
-  const progressSteps = useMemo(
-    () => [
-      ...steps.map((s, idx) => ({
-        id: idx + 1,
-        label: s.shortLabel,
-        isComplete: isStepComplete(s.key, formData),
-      })),
-    ],
-    [formData, steps]
-  );
+  // Эффективный статус: шаг пройден через «Далее» И его данные всё ещё валидны.
+  // «Проверка» — только когда эффективно завершены все предыдущие шаги.
+  const progressSteps = useMemo(() => {
+    const isEffectivelyCompleted = (key: OfferWizardStepKey): boolean => {
+      if (!completedSteps.includes(key) || !isStepComplete(key, formData)) {
+        return false;
+      }
+      if (key === "review") {
+        return steps.every(
+          (s) => s.key === "review" || isEffectivelyCompleted(s.key),
+        );
+      }
+      return true;
+    };
+
+    const effective = steps.map((s) => isEffectivelyCompleted(s.key));
+    const firstIncompleteIdx = effective.findIndex((done) => !done);
+
+    return steps.map((s, idx) => ({
+      id: idx + 1,
+      label: s.shortLabel,
+      isComplete: effective[idx],
+      // Кликабельны: completed-шаги, текущий и первый незавершённый
+      isDisabled:
+        !effective[idx] && idx + 1 !== currentStepNum && idx !== firstIncompleteIdx,
+    }));
+  }, [completedSteps, formData, steps, currentStepNum]);
 
   const phase = formWizardPhaseFromFlags({ isSaving, isSubmitting });
   const actionLabels = useMemo(() => {
@@ -540,7 +670,13 @@ export function OfferWizard({
           totalSteps,
           isReviewStep ? businessFormCopy.reviewStepShortTitle : stepTitle
         )}
-        trailing={lastSaved ? businessFormCopy.savedAt(lastSaved) : undefined}
+        trailing={
+          <SaveIndicator
+            status={draft.status}
+            lastSavedAt={draft.lastSavedAt}
+            onRetry={draft.retry}
+          />
+        }
       >
         <WizardProgress
           steps={progressSteps}
@@ -548,6 +684,46 @@ export function OfferWizard({
           onStepChange={handleGoToStep}
         />
       </FormWizardHeader>
+
+      {draft.hasDraft && (
+        <div className="mx-auto w-full max-w-4xl px-4 pt-4 sm:px-6">
+          <div className="flex flex-col gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-amber-900">
+              {draftConflictsWithEntity ? (
+                <>
+                  Предложение было изменено после сохранения черновика
+                  {draft.draftSavedAt
+                    ? ` (черновик — ${formatRelativeTimeRu(draft.draftSavedAt)})`
+                    : ""}
+                  . Какую версию использовать?
+                </>
+              ) : (
+                <>
+                  У вас есть незавершённый черновик
+                  {draft.draftSavedAt
+                    ? ` (${formatRelativeTimeRu(draft.draftSavedAt)})`
+                    : ""}
+                  . Продолжить с него?
+                </>
+              )}
+            </p>
+            <div className="flex shrink-0 gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => draft.discardDraft()}
+              >
+                {draftConflictsWithEntity
+                  ? "Взять актуальную версию"
+                  : "Начать заново"}
+              </Button>
+              <Button size="sm" onClick={handleRestoreDraft}>
+                {draftConflictsWithEntity ? "Применить черновик" : "Продолжить"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <FormPrimaryContentCard>{renderStep()}</FormPrimaryContentCard>
 
@@ -567,6 +743,22 @@ export function OfferWizard({
           isSubmitting || isSaving || !submitValidation.isComplete
         }
       />
+
+      <AlertDialog open={leaveDialogOpen} onOpenChange={onLeaveDialogOpenChange}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Уйти со страницы?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Изменения не сохранены на сервере. Черновик остаётся на этом
+              устройстве — вы сможете продолжить позже.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Остаться</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmLeave}>Уйти</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </FormWizardShell>
   );
 }

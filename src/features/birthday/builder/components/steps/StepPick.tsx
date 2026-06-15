@@ -1,6 +1,6 @@
 "use client";
 
-import { BYN_SYMBOL } from "@/lib/formatters/format-price";
+import { BelarusianRubleIcon } from "@/components/icons/BelarusianRubleIcon";
 import { useState } from "react";
 import type { BirthdayBuilderWithGate } from "../../hooks/useBirthdayBuilderWithGate";
 
@@ -231,7 +231,7 @@ function DetailModal({
           <span style={{ fontFamily: "var(--font-mono, ui-monospace)", fontSize: 11, letterSpacing: ".14em", textTransform: "uppercase", color: "#C24E22" }}>
             ● {item.tag}
           </span>
-          <h3 style={{ fontFamily: "var(--font-display, Georgia, serif)", fontWeight: 400, margin: "10px 0 0", fontSize: 30, lineHeight: 1.05, letterSpacing: "-.02em", color: "#141210" }}>
+          <h3 style={{ fontFamily: "var(--font-display)", fontWeight: 400, margin: "10px 0 0", fontSize: 30, lineHeight: 1.05, letterSpacing: "-.02em", color: "#141210" }}>
             {item.title}
           </h3>
           <p style={{ marginTop: 12, fontSize: 15, lineHeight: 1.6, color: "#3A332B" }}>{item.desc}</p>
@@ -254,10 +254,10 @@ function DetailModal({
                       <div style={{ fontFamily: "var(--font-mono, ui-monospace)", fontSize: 9, letterSpacing: ".14em", textTransform: "uppercase", color: "#C24E22", marginBottom: 2 }}>
                         {CAT_LABEL[b.cat]}
                       </div>
-                      <div style={{ fontFamily: "var(--font-display, Georgia, serif)", fontSize: 18, lineHeight: 1.1, letterSpacing: "-.01em", color: "#141210" }}>{b.name}</div>
+                      <div style={{ fontFamily: "var(--font-display)", fontSize: 18, lineHeight: 1.1, letterSpacing: "-.01em", color: "#141210" }}>{b.name}</div>
                       {dimmed ? (
                         <div style={{ fontSize: 12, color: "#C24E22", marginTop: 3, fontWeight: 500 }}>
-                          {b.refund > 0 ? `вычтется −${b.refund} ${BYN_SYMBOL}` : "вам не привезут, цена не изменится"}
+                          {b.refund > 0 ? <span>вычтется −{b.refund} <BelarusianRubleIcon /></span> : "вам не привезут, цена не изменится"}
                         </div>
                       ) : (
                         <div style={{ fontFamily: "var(--font-mono, ui-monospace)", fontSize: 11, color: "rgba(20,18,16,.55)", marginTop: 3 }}>{b.meta}</div>
@@ -298,9 +298,9 @@ function DetailModal({
             <div style={{ fontFamily: "var(--font-mono, ui-monospace)", fontSize: 10, color: "rgba(20,18,16,.55)", letterSpacing: ".08em", textTransform: "uppercase" }}>
               стоимость
             </div>
-            <div style={{ fontFamily: "var(--font-display, Georgia, serif)", fontSize: 28, lineHeight: 1, letterSpacing: "-.02em", color: "#141210" }}>
+            <div style={{ fontFamily: "var(--font-display)", fontSize: 28, lineHeight: 1, letterSpacing: "-.02em", color: "#141210" }}>
               {total}
-              <span style={{ fontFamily: "var(--font-mono, ui-monospace)", fontSize: 12, color: "rgba(20,18,16,.55)", marginLeft: 4 }}>{BYN_SYMBOL}</span>
+              <BelarusianRubleIcon className="ml-1 text-[rgba(20,18,16,.55)]" />
             </div>
           </div>
           <button
@@ -314,7 +314,7 @@ function DetailModal({
               transition: "background .2s",
             }}
           >
-            {selected ? "✓ Убрать из плана" : `Добавить · ${total} ${BYN_SYMBOL} →`}
+            {selected ? "✓ Убрать из плана" : <span>Добавить · {total} <BelarusianRubleIcon /> →</span>}
           </button>
         </div>
       </div>
@@ -400,7 +400,7 @@ function ExecCard({
             {(() => {
               const [main, sub] = item.title.split(" · ");
               return sub ? (
-                <>{main} <em style={{ fontFamily: "Georgia, serif", fontStyle: "italic", fontWeight: 400 }}>({sub})</em></>
+                <>{main} <em style={{ fontFamily: "var(--font-editorial)", fontStyle: "italic", fontWeight: 400 }}>({sub})</em></>
               ) : item.title;
             })()}
           </h4>
@@ -421,9 +421,9 @@ function ExecCard({
           <button type="button" onClick={onOpen} style={{ background: "none", border: 0, padding: 0, cursor: "pointer", fontSize: 12, color: "#3A332B", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 4, textDecoration: "underline", textUnderlineOffset: 3 }}>
             Подробнее
           </button>
-          <span style={{ fontFamily: "var(--font-display, Georgia, serif)", fontSize: 22, lineHeight: 1, letterSpacing: "-.02em", color: "#141210", whiteSpace: "nowrap" }}>
+          <span style={{ fontFamily: "var(--font-display)", fontSize: 22, lineHeight: 1, letterSpacing: "-.02em", color: "#141210", whiteSpace: "nowrap" }}>
             {item.price}
-            <span style={{ fontFamily: "var(--font-mono, ui-monospace)", fontSize: 11, color: "rgba(20,18,16,.55)", marginLeft: 3 }}>{BYN_SYMBOL}</span>
+            <BelarusianRubleIcon className="ml-1 text-[rgba(20,18,16,.55)]" />
           </span>
         </div>
       </div>
@@ -486,7 +486,7 @@ export function StepPick({ builder }: Props) {
         }}
       >
         Соберите{" "}
-        <span style={{ fontFamily: "Georgia, serif", fontStyle: "italic", fontWeight: 400, color: "#E86A3A" }}>команду</span>
+        <span style={{ fontFamily: "var(--font-editorial)", fontStyle: "italic", fontWeight: 400, color: "#E86A3A" }}>команду</span>
       </h2>
 
       <p style={{ maxWidth: 560, marginTop: 14, fontSize: 16, color: "#3A332B" }}>

@@ -2,10 +2,10 @@
 
 import { useCallback, useMemo, useRef, useState } from "react";
 
-export type ResendVerificationCode = "RATE_LIMIT" | "ERROR";
+export type ResendVerificationCode = "RATE_LIMIT" | "ERROR" | "NO_EMAIL";
 
 export type ResendVerificationResult =
-  | { ok: true; alreadyVerified: boolean }
+  | { ok: true; alreadyVerified: boolean; email?: string }
   | {
       ok: false;
       code?: ResendVerificationCode;
@@ -36,7 +36,17 @@ export function useResendVerificationEmail() {
         alreadyVerified?: boolean;
         code?: string;
         message?: string;
+        email?: string;
       };
+
+      if (res.status === 400 && data.code === "NO_EMAIL") {
+        return {
+          ok: false,
+          code: "NO_EMAIL",
+          message:
+            data.message ?? "Укажите email в профиле, чтобы подтвердить почту.",
+        };
+      }
 
       if (res.status === 429) {
         return {
@@ -55,10 +65,10 @@ export function useResendVerificationEmail() {
       }
 
       if (data.alreadyVerified) {
-        return { ok: true, alreadyVerified: true };
+        return { ok: true, alreadyVerified: true, email: data.email };
       }
 
-      return { ok: true, alreadyVerified: false };
+      return { ok: true, alreadyVerified: false, email: data.email };
     } catch {
       return { ok: false, code: "ERROR", message: MSG_ERROR };
     } finally {

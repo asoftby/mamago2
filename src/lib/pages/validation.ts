@@ -1,24 +1,15 @@
 import { z } from "zod";
 import { PageType, PageStatus, PageVisibility } from "@prisma/client";
+import { normalizeSlug as normalizePublicationSlug, slugifyTitle } from "@/lib/slug/publicSlug";
 
-/**
- * Нормализация slug: lowercase, kebab-case, без пробелов
- */
+/** @deprecated Используйте `normalizeSlug` из `@/lib/slug/publicSlug`. */
 export function normalizeSlug(slug: string): string {
-  return slug
-    .toLowerCase()
-    .trim()
-    .replace(/\s+/g, "-")
-    .replace(/[^a-z0-9-]/g, "")
-    .replace(/-+/g, "-")
-    .replace(/^-|-$/g, "");
+  return normalizePublicationSlug(slug, "page");
 }
 
-/**
- * Генерация slug из title
- */
+/** Генерация slug из title (совпадает с server-side `slugifyRu`). */
 export function generateSlugFromTitle(title: string): string {
-  return normalizeSlug(title);
+  return slugifyTitle(title, "page");
 }
 
 /**

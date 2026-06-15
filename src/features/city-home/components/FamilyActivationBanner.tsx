@@ -104,7 +104,7 @@ export function FamilyActivationBanner() {
           </p>
           <Button
             type="button"
-            className="h-11 w-full bg-[#EF8759] text-white hover:bg-[#e07848] sm:w-auto sm:min-w-[200px]"
+            className="h-11 w-full bg-[#EF8759] text-white hover:bg-primary-hover sm:w-auto sm:min-w-[200px]"
             onClick={() => setAddOpen(true)}
           >
             Добавить ребёнка

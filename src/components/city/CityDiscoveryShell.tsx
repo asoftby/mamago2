@@ -50,7 +50,7 @@ function BirthdayQuickStartBanner({ city }: { city: string }) {
         {/* CTA Button */}
         <Link
           href={`/${city}/birthday/make`}
-          className="group inline-flex shrink-0 items-center gap-2 rounded-full bg-[#EF8759] px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-[#e07848] hover:shadow-md"
+          className="group inline-flex shrink-0 items-center gap-2 rounded-full bg-[#EF8759] px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-hover hover:shadow-md"
         >
           Собрать праздник
           <svg 

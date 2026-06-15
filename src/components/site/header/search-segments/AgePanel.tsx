@@ -93,6 +93,11 @@ export function AgePanel({
 
   const showChildrenBlock = (availableChildren.length > 0 && !!onToggleChild) || showAdultChip;
 
+  const idleChipClass = embedded
+    ? "border-gray-200 bg-white text-gray-900 hover:bg-gray-50"
+    : "border-gray-200 bg-gray-100 text-gray-900 hover:bg-gray-50";
+  const idleChipDisabledHover = embedded ? "hover:bg-white" : "hover:bg-gray-100";
+
   type PersonaChipRow =
     | { kind: "adult" }
     | { kind: "child"; child: (typeof availableChildren)[number] };
@@ -144,9 +149,9 @@ export function AgePanel({
                   "inline-flex max-w-full shrink-0 items-center justify-center rounded-full border px-5 py-2.5 text-sm font-medium transition-colors",
                   isActive
                     ? "border-transparent bg-[#F8C4B4] text-gray-900"
-                    : "border-gray-200 bg-gray-100 text-gray-900 hover:bg-gray-50",
+                    : idleChipClass,
                   personaPickAtLimit && !isSelected
-                    ? "cursor-not-allowed opacity-45 hover:bg-gray-100"
+                    ? `cursor-not-allowed opacity-45 ${idleChipDisabledHover}`
                     : "",
                 ].join(" ")}
               >
@@ -172,8 +177,8 @@ export function AgePanel({
                 "inline-flex max-w-full shrink-0 items-center justify-center rounded-full border px-5 py-2.5 text-sm font-medium transition-colors",
                 isActive
                   ? "border-transparent bg-[#F8C4B4] text-gray-900"
-                  : "border-gray-200 bg-gray-100 text-gray-900 hover:bg-gray-50",
-                pickBlocked ? "cursor-not-allowed opacity-45 hover:bg-gray-100" : "",
+                  : idleChipClass,
+                pickBlocked ? `cursor-not-allowed opacity-45 ${idleChipDisabledHover}` : "",
               ].join(" ")}
             >
               {child.name}
@@ -189,7 +194,7 @@ export function AgePanel({
               "inline-flex max-w-full shrink-0 items-center justify-center rounded-full border px-5 py-2.5 text-sm font-medium transition-colors",
               whoFreeMode
                 ? "border-transparent bg-[#F8C4B4] text-gray-900"
-                : "border-gray-200 bg-gray-100 text-gray-900 hover:bg-gray-50",
+                : idleChipClass,
             ].join(" ")}
           >
             Свободный поиск

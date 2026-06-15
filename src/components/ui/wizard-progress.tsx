@@ -7,6 +7,8 @@ export interface WizardProgressStep {
   id: number;
   label: string;
   isComplete?: boolean;
+  /** Шаг недоступен для прямого перехода по клику */
+  isDisabled?: boolean;
 }
 
 interface WizardProgressProps {
@@ -43,6 +45,7 @@ export function WizardProgress({
       {steps.map((step) => {
         const isActive = step.id === currentStep;
         const isDone = !!step.isComplete;
+        const isDisabled = !!step.isDisabled && !isActive;
 
         return (
           <button
@@ -51,10 +54,12 @@ export function WizardProgress({
             type="button"
             role="tab"
             aria-selected={isActive}
+            disabled={isDisabled}
             onClick={() => onStepChange(step.id)}
             className={cn(
               "group relative flex flex-1 flex-col items-center gap-1.5",
-              "cursor-pointer select-none pb-3 pt-1",
+              "select-none pb-3 pt-1",
+              isDisabled ? "cursor-not-allowed" : "cursor-pointer",
               "transition-colors duration-150",
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#EF8759]/40 focus-visible:ring-offset-1",
             )}
@@ -67,7 +72,9 @@ export function WizardProgress({
                   ? "text-[#EF8759]"
                   : isDone
                     ? "text-gray-700 group-hover:text-gray-900"
-                    : "text-gray-400 group-hover:text-gray-600",
+                    : isDisabled
+                      ? "text-gray-300"
+                      : "text-gray-400 group-hover:text-gray-600",
               )}
             >
               {step.label}
@@ -82,7 +89,9 @@ export function WizardProgress({
                   ? "bg-[#EF8759] text-white ring-2 ring-[#EF8759]/30"
                   : isDone
                     ? "bg-[#EF8759] text-white"
-                    : "bg-gray-100 text-gray-400 group-hover:bg-gray-200",
+                    : isDisabled
+                      ? "bg-gray-50 text-gray-300"
+                      : "bg-gray-100 text-gray-400 group-hover:bg-gray-200",
               )}
             >
               {step.id}
@@ -97,7 +106,9 @@ export function WizardProgress({
                   ? "bg-[#EF8759]"
                   : isDone
                     ? "bg-gray-200 group-hover:bg-gray-300"
-                    : "bg-transparent group-hover:bg-gray-100",
+                    : isDisabled
+                      ? "bg-transparent"
+                      : "bg-transparent group-hover:bg-gray-100",
               )}
             />
           </button>

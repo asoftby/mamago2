@@ -71,10 +71,10 @@ const severityIcons = {
 };
 
 import { formatPrice } from "@/lib/formatters/format-price";
+import { renderCurrencyText } from "@/components/icons/BelarusianRubleIcon";
 
-// Format currency — kept for local use, delegates to shared formatter
-function formatCurrency(amount: number): string {
-  return formatPrice(amount, { hideZero: true });
+function formatCurrency(amount: number): ReactNode {
+  return renderCurrencyText(formatPrice(amount, { hideZero: true }), { iconSize: "text" });
 }
 
 export default function AdminDashboardPage() {

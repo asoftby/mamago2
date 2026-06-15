@@ -20,6 +20,25 @@ export interface OfferWizardStepDef {
   shortLabel: string;
 }
 
+/** Все возможные ключи шагов мастера (для нормализации данных из БД/localStorage). */
+export const ALL_OFFER_WIZARD_STEP_KEYS: OfferWizardStepKey[] = [
+  "type",
+  "details",
+  "photo",
+  "conditions",
+  "campSchedule",
+  "accommodation",
+  "price",
+  "contacts",
+  "review",
+];
+
+/** Отфильтровать сырое значение (БД/localStorage) до валидных ключей шагов. */
+export function normalizeWizardCompletedSteps(raw: unknown): OfferWizardStepKey[] {
+  if (!Array.isArray(raw)) return [];
+  return ALL_OFFER_WIZARD_STEP_KEYS.filter((key) => raw.includes(key));
+}
+
 /**
  * Legacy export for backward compatibility
  * Maps to getStepsForOfferType
@@ -53,6 +72,13 @@ export function buildReviewSections(_data: OfferFormData): ReviewSection[] {
 export function getStepsForOfferType(type: OfferWizardType | null): OfferWizardStepDef[] {
   if (!type) return [];
 
+  const priceStepTitle = type === "CAMP" ? "Участие" : "Цена";
+  const priceStepDescription =
+    type === "CAMP"
+      ? "Способ участия и условия получения"
+      : "Стоимость, способ участия и условия получения";
+  const priceStepShortLabel = type === "CAMP" ? "Участие" : "Цена";
+
   const baseSteps: Record<OfferWizardStepKey, Omit<OfferWizardStepDef, "key">> = {
     type: {
       title: "Тип предложения",
@@ -85,9 +111,9 @@ export function getStepsForOfferType(type: OfferWizardType | null): OfferWizardS
       shortLabel: "Размещение",
     },
     price: {
-      title: "Цена",
-      description: "Стоимость, способ участия и условия получения",
-      shortLabel: "Цена",
+      title: priceStepTitle,
+      description: priceStepDescription,
+      shortLabel: priceStepShortLabel,
     },
     contacts: {
       title: "Контакты",
@@ -261,11 +287,13 @@ export function isStepComplete(
     case "price":
       {
         const hasValidPricing =
-          !!data.pricingMode &&
-          (data.pricingMode === "single"
-            ? !!data.singlePrice.trim()
-            : data.pricingOptions.length > 0 &&
-              data.pricingOptions.every((opt) => opt.title.trim() && opt.price.trim()));
+          data.offerWizardType === "CAMP"
+            ? true
+            : !!data.pricingMode &&
+              (data.pricingMode === "single"
+                ? !!data.singlePrice.trim()
+                : data.pricingOptions.length > 0 &&
+                  data.pricingOptions.every((opt) => opt.title.trim() && opt.price.trim()));
 
         if (!hasValidPricing) return false;
 
@@ -386,12 +414,14 @@ export function getMissingFieldsForStep(
       break;
 
     case "price":
-      if (!data.pricingMode) {
-        missing.push("Режим ценообразования");
-      } else if (data.pricingMode === "single" && !data.singlePrice.trim()) {
-        missing.push("Цена");
-      } else if (data.pricingMode === "multiple" && data.pricingOptions.length === 0) {
-        missing.push("Варианты цен");
+      if (data.offerWizardType !== "CAMP") {
+        if (!data.pricingMode) {
+          missing.push("Режим ценообразования");
+        } else if (data.pricingMode === "single" && !data.singlePrice.trim()) {
+          missing.push("Цена");
+        } else if (data.pricingMode === "multiple" && data.pricingOptions.length === 0) {
+          missing.push("Варианты цен");
+        }
       }
       if (data.publicationAccess) {
         const validation = validatePublicationAccess(data.publicationAccess);

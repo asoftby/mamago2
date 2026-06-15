@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { Bell } from "lucide-react";
+import { ArrowLeft, Bell } from "lucide-react";
 import { CheckCheck } from "lucide-react";
 import { Settings } from "lucide-react";
 import { ModalCloseButton } from "@/components/ui/modal-close-button";
@@ -19,6 +19,8 @@ import type { NotificationApiRow } from "@/lib/notifications/types";
 import { useRouter } from "next/navigation";
 import { NotificationModal } from "./NotificationModal";
 import { NotificationListItem } from "./NotificationListItem";
+import { NotificationSettingsInModal } from "./NotificationSettingsInModal";
+import { useOnboardingNotificationCta } from "@/features/notifications/hooks/useOnboardingNotificationCta";
 
 export type NotificationsPanelProps = {
   /** Вызывается при закрытии popover/sheet (кнопка X и т.д.) */
@@ -47,13 +49,22 @@ export function NotificationsPanel({
   const [modalNotification, setModalNotification] = useState<NotificationApiRow | null>(null);
   const [modalTitle, setModalTitle] = useState<string | null>(null);
   const [modalBody, setModalBody] = useState<string | null>(null);
+  const [view, setView] = useState<"list" | "settings">("list");
+  const settingsButtonRef = useRef<HTMLButtonElement>(null);
+  const backButtonRef = useRef<HTMLButtonElement>(null);
 
   const handleClosePanel = () => {
+    setView("list");
     onClose();
   };
 
+  useEffect(() => {
+    if (!open) {
+      setView("list");
+    }
+  }, [open]);
+
   const notificationsPageHref = stream === "business" ? "/business/notifications" : "/notifications";
-  const settingsPageHref = `${notificationsPageHref}?tab=settings`;
 
   const refreshCounts = useCallback(async () => {
     if (onNotificationRead) {
@@ -107,7 +118,6 @@ export function NotificationsPanel({
             ? {
                 ...notification,
                 seenAt: notification.seenAt ?? new Date().toISOString(),
-                isRead: true,
                 readAt: notification.readAt ?? new Date().toISOString(),
               }
             : notification,
@@ -116,6 +126,46 @@ export function NotificationsPanel({
       await refreshCounts();
     },
     [refreshCounts],
+  );
+
+  const refreshPanel = useCallback(async () => {
+    await refreshCounts();
+    await refreshRecent();
+  }, [refreshCounts, refreshRecent]);
+
+  const openSettings = useCallback(() => {
+    // Вложенная NotificationModal перекрывала бы настройки — закрываем её первой.
+    setModalNotification(null);
+    setModalTitle(null);
+    setModalBody(null);
+    setView("settings");
+    window.setTimeout(() => backButtonRef.current?.focus(), 0);
+  }, []);
+
+  const backToList = useCallback(() => {
+    setView("list");
+    // Настройки могли изменить набор/состояние уведомлений — список нужен свежий.
+    void refreshPanel();
+    window.setTimeout(() => settingsButtonRef.current?.focus(), 0);
+  }, [refreshPanel]);
+
+  const { handleCtaClick: handleOnboardingCta, getCtaProps } =
+    useOnboardingNotificationCta({
+      onRefresh: refreshPanel,
+    });
+
+  const handleCtaClick = useCallback(
+    async (notification: NotificationApiRow) => {
+      const handled = await handleOnboardingCta(notification);
+      if (handled) {
+        return;
+      }
+
+      if (!notification.actionUrl) return;
+      onClose();
+      router.push(notification.actionUrl);
+    },
+    [handleOnboardingCta, onClose, router],
   );
 
   const handleRowClick = useCallback(
@@ -150,34 +200,69 @@ export function NotificationsPanel({
 
   return (
     <div className="flex max-h-[min(85vh,640px)] min-h-[320px] min-w-0 flex-col overflow-hidden bg-white">
-      <div className="flex shrink-0 items-center justify-between gap-3 border-b border-neutral-200/90 px-4 py-3 sm:px-5">
-        <div className="min-w-0">
-          <h2 className="text-lg font-semibold text-neutral-900">Уведомления</h2>
-        </div>
-        <div className="flex items-center gap-1">
-          {stream === "business" ? (
-            <Button
-              asChild
+      <span className="sr-only" aria-live="polite">
+        {view === "list" ? "Уведомления" : "Настройки уведомлений"}
+      </span>
+      {view === "list" ? (
+        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-neutral-200/90 px-4 py-3 sm:px-5">
+          <div className="min-w-0">
+            <h2 className="text-lg font-semibold text-neutral-900">Уведомления</h2>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              ref={settingsButtonRef}
               type="button"
-              variant="ghost"
-              size="icon"
-              className="h-9 w-9 shrink-0 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800"
+              onClick={openSettings}
+              aria-label="Настройки уведомлений"
+              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white text-neutral-600 shadow-sm transition-colors hover:bg-neutral-50 hover:text-neutral-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900/20"
             >
-              <Link href={settingsPageHref} onClick={handleClosePanel} aria-label="Настройки уведомлений">
-                <Settings className="h-4 w-4" />
-              </Link>
-            </Button>
-          ) : null}
+              <Settings className="h-[18px] w-[18px] shrink-0" aria-hidden />
+            </button>
+            {showHeaderClose ? (
+              <ModalCloseButton
+                type="button"
+                className="shrink-0"
+                aria-label="Закрыть уведомления"
+                onClick={handleClosePanel}
+              />
+            ) : null}
+          </div>
+        </div>
+      ) : (
+        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-neutral-200/90 px-4 py-3 sm:px-5">
+          <div className="flex min-w-0 flex-1 items-center gap-2">
+            <button
+              ref={backButtonRef}
+              type="button"
+              onClick={backToList}
+              aria-label="Назад к списку"
+              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white text-neutral-600 shadow-sm transition-colors hover:bg-neutral-50 hover:text-neutral-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900/20"
+            >
+              <ArrowLeft className="h-[18px] w-[18px] shrink-0" aria-hidden />
+            </button>
+            <h2 className="truncate text-lg font-semibold text-neutral-900">
+              Настройки уведомлений
+            </h2>
+          </div>
           {showHeaderClose ? (
             <ModalCloseButton
               type="button"
               className="shrink-0"
+              aria-label="Закрыть уведомления"
               onClick={handleClosePanel}
             />
           ) : null}
         </div>
-      </div>
+      )}
 
+      {view === "settings" ? (
+        <div className="min-h-0 flex-1 overflow-y-auto bg-neutral-50 px-4 pb-4 pt-0 sm:px-5 sm:pb-5">
+          <NotificationSettingsInModal
+            mode={stream === "business" ? "business" : "user"}
+          />
+        </div>
+      ) : (
+        <>
       <div className="min-h-0 flex-1 bg-white">
         {loading ? (
           <div className="space-y-3 p-4">
@@ -198,14 +283,21 @@ export function NotificationsPanel({
         ) : (
           <ScrollArea className="h-full max-h-[min(56vh,520px)]">
             <div className="divide-y divide-gray-100 bg-white">
-              {items.map((notification) => (
-                <NotificationListItem
-                  key={notification.id}
-                  notification={notification}
-                  compact
-                  onClick={handleRowClick}
-                />
-              ))}
+              {items.map((notification) => {
+                const ctaProps = getCtaProps(notification);
+                return (
+                  <NotificationListItem
+                    key={notification.id}
+                    notification={notification}
+                    compact
+                    onClick={handleRowClick}
+                    onCtaClick={handleCtaClick}
+                    ctaLabel={ctaProps.label}
+                    ctaLoading={ctaProps.loading}
+                    ctaDisabled={ctaProps.disabled}
+                  />
+                );
+              })}
             </div>
           </ScrollArea>
         )}
@@ -236,6 +328,8 @@ export function NotificationsPanel({
           </Button>
         </div>
       </div>
+        </>
+      )}
 
       <NotificationModal
         open={modalNotification != null}

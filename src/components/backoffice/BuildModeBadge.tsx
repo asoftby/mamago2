@@ -5,6 +5,8 @@ import { cn } from "@/lib/utils";
 type BuildModeBadgeProps = {
   buildInfo: BuildInfo;
   compact?: boolean;
+  /** Show only the version number, without the environment label */
+  versionOnly?: boolean;
 };
 
 const TONE_CLASS_BY_MODE: Record<BuildInfo["tone"], string> = {
@@ -18,10 +20,24 @@ const TONE_CLASS_BY_MODE: Record<BuildInfo["tone"], string> = {
 export function BuildModeBadge({
   buildInfo,
   compact = false,
+  versionOnly = false,
 }: BuildModeBadgeProps) {
+  const versionText = buildInfo.commitShortSha
+    ? `v${buildInfo.appVersion} · ${buildInfo.commitShortSha}`
+    : `v${buildInfo.appVersion}`;
+
   const compactText = buildInfo.commitShortSha
     ? `${buildInfo.label} · v${buildInfo.appVersion} · ${buildInfo.commitShortSha}`
     : `${buildInfo.label} · v${buildInfo.appVersion}`;
+
+  let label: string;
+  if (versionOnly) {
+    label = versionText;
+  } else if (compact) {
+    label = compactText;
+  } else {
+    label = buildInfo.label;
+  }
 
   return (
     <Badge
@@ -31,7 +47,7 @@ export function BuildModeBadge({
         TONE_CLASS_BY_MODE[buildInfo.tone],
       )}
     >
-      {compact ? compactText : buildInfo.label}
+      {label}
     </Badge>
   );
 }

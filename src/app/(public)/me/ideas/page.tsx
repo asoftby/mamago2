@@ -15,6 +15,7 @@ import { publicActivityPath } from "@/lib/business/eventPublicLink";
 import { formatRuShortDayMonthRange } from "@/lib/formatters/date";
 import { formatPriceFrom, normalizeUiCurrencyText } from "@/lib/formatters/format-price";
 import { normalizePricingMode } from "@/components/business/wizard/event/pricingMode";
+import { getMinCampSessionPrice } from "@/lib/offers/campPricing";
 
 export const metadata = { title: "Мои идеи — mamaGo" };
 
@@ -94,14 +95,21 @@ function getOfferAgeLabel(ageMinMonths: number | null | undefined): string | nul
 function getOfferPriceLabel(offer: {
   priceText?: string | null;
   priceFrom?: number | null;
+  campProgramType?: string | null;
+  campSessions?: unknown;
   currency?: string | null;
 }): string | null {
-  if (offer.priceFrom == null) {
+  const effectivePriceFrom = offer.campProgramType
+    ? getMinCampSessionPrice(offer.campSessions)
+    : (offer.priceFrom ?? null);
+
+  if (effectivePriceFrom == null) {
     const direct = offer.priceText?.trim();
-    return direct ? normalizeUiCurrencyText(direct) : null;
+    if (direct) return normalizeUiCurrencyText(direct);
+    return offer.campProgramType ? "Цена зависит от смены" : null;
   }
-  if (offer.priceFrom === 0) return "бесплатно";
-  return formatPriceFrom(offer.priceFrom);
+  if (effectivePriceFrom === 0) return "бесплатно";
+  return formatPriceFrom(effectivePriceFrom);
 }
 
 function getOfferDateMetaLabel(offer: {

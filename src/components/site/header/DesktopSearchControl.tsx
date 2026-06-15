@@ -152,15 +152,18 @@ function CityHubDesktopSearchControl({
     }
   };
 
+  const loadHeaderGeoFilters = headerGeoFilters?.loadGeoFilters;
+  const headerGeoCitySlug = headerGeoFilters?.citySlug;
+
   useEffect(() => {
-    if (!headerGeoFilters || headerGeoFilters.citySlug !== citySlug) {
+    if (!loadHeaderGeoFilters || headerGeoCitySlug !== citySlug) {
       return;
     }
     if (!applied.metro && !applied.district) {
       return;
     }
-    void headerGeoFilters.loadGeoFilters();
-  }, [applied.district, applied.metro, citySlug, headerGeoFilters]);
+    void loadHeaderGeoFilters(citySlug);
+  }, [applied.district, applied.metro, citySlug, headerGeoCitySlug, loadHeaderGeoFilters]);
 
   useEffect(() => {
     if (activePanel === "none" || mode !== "expanded") return;
@@ -511,19 +514,23 @@ function DiscoveryDesktopSearchControl({
     setPendingCitySlug(citySlug);
   }, [citySlug]);
 
+  const loadDiscoveryHeaderGeoFilters = headerGeoFilters?.loadGeoFilters;
+  const discoveryHeaderGeoCitySlug = headerGeoFilters?.citySlug;
+
   useEffect(() => {
-    if (!headerGeoFilters || headerGeoFilters.citySlug !== citySlug) {
+    if (!loadDiscoveryHeaderGeoFilters || discoveryHeaderGeoCitySlug !== citySlug) {
       return;
     }
     if (!formDisplayFilters.metro && !formDisplayFilters.district) {
       return;
     }
-    void headerGeoFilters.loadGeoFilters();
+    void loadDiscoveryHeaderGeoFilters(citySlug);
   }, [
     citySlug,
     formDisplayFilters.district,
     formDisplayFilters.metro,
-    headerGeoFilters,
+    discoveryHeaderGeoCitySlug,
+    loadDiscoveryHeaderGeoFilters,
   ]);
 
   useEffect(() => {

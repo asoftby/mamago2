@@ -103,7 +103,7 @@ function RouteGridCard({
         {/* Title + meta */}
         <div className="px-1">
           <Link href={`/routes/${route.slug}`} className="block">
-            <p className="text-sm font-semibold leading-snug text-[#141210] line-clamp-2 transition-colors group-hover:text-[#EF8759]">
+            <p className="text-sm font-semibold leading-snug text-[#141210] line-clamp-2 transition-colors group-hover:text-text-brand">
               {route.title}
             </p>
             <p className="mt-1 text-xs text-[rgba(20,18,16,0.5)] line-clamp-1">

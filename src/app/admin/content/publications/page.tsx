@@ -6,6 +6,7 @@ export default async function AdminPublicationsPage() {
   const [rows, cities] = await Promise.all([
     listArticlesForPublicationsIndex(),
     prisma.city.findMany({
+      where: { isLegacyNonCity: false },
       orderBy: { name: "asc" },
       select: { id: true, name: true, slug: true },
     }),

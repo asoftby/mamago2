@@ -12,10 +12,17 @@ export type TelegramReplyMarkup = {
   inline_keyboard: TelegramInlineKeyboardButton[][];
 };
 
+/**
+ * Opt-in: HTML включается только для текстов из шаблонного рендера,
+ * где переменные уже HTML-эскейпнуты. Plain-text отправки не трогаем.
+ */
+export type TelegramParseMode = "HTML";
+
 type SendMessageInput = {
   chatId: string;
   text: string;
   replyMarkup?: TelegramReplyMarkup;
+  parseMode?: TelegramParseMode;
 };
 
 type EditMessageInput = {
@@ -23,6 +30,7 @@ type EditMessageInput = {
   messageId: number;
   text: string;
   replyMarkup?: TelegramReplyMarkup;
+  parseMode?: TelegramParseMode;
 };
 
 type AnswerCallbackInput = {
@@ -33,6 +41,17 @@ type AnswerCallbackInput = {
 
 type TelegramSendResult = {
   message_id: number;
+};
+
+export type TelegramBotInfo = {
+  username: string;
+};
+
+export type TelegramWebhookInfo = {
+  url: string;
+  pending_update_count: number;
+  last_error_date?: number;
+  last_error_message?: string;
 };
 
 async function callTelegramApi<T>(method: string, payload: Record<string, unknown>): Promise<T> {
@@ -69,6 +88,7 @@ export class TelegramChannel {
       chat_id: input.chatId,
       text: input.text,
       reply_markup: input.replyMarkup,
+      ...(input.parseMode ? { parse_mode: input.parseMode } : {}),
     });
   }
 
@@ -78,6 +98,7 @@ export class TelegramChannel {
       message_id: input.messageId,
       text: input.text,
       reply_markup: input.replyMarkup,
+      ...(input.parseMode ? { parse_mode: input.parseMode } : {}),
     });
   }
 
@@ -87,5 +108,13 @@ export class TelegramChannel {
       text: input.text,
       show_alert: input.showAlert ?? false,
     });
+  }
+
+  async getMe(): Promise<TelegramBotInfo> {
+    return callTelegramApi<TelegramBotInfo>("getMe", {});
+  }
+
+  async getWebhookInfo(): Promise<TelegramWebhookInfo> {
+    return callTelegramApi<TelegramWebhookInfo>("getWebhookInfo", {});
   }
 }

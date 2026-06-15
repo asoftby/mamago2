@@ -279,6 +279,12 @@ export const GROUP_CONTENT: AdminSidebarGroup = {
       matchers: [{ type: "prefix", value: adminPath("/content/publications") }],
     },
     {
+      id: "content-editorial-requests",
+      label: "Editorial Requests",
+      href: adminPath("/content/editorial-requests"),
+      matchers: [{ type: "prefix", value: adminPath("/content/editorial-requests") }],
+    },
+    {
       id: "content-pages",
       label: "Страницы",
       href: adminPath("/pages"),
@@ -353,6 +359,15 @@ export const GROUP_DISCOVERY: AdminSidebarGroup = {
       label: "Категории",
       href: adminPath("/taxonomy/categories"),
       matchers: [{ type: "prefix", value: adminPath("/taxonomy/categories") }],
+    },
+    {
+      id: "discovery-tags",
+      label: "Теги",
+      href: adminPath("/taxonomy/discovery-tags"),
+      matchers: [
+        { type: "prefix", value: adminPath("/taxonomy/discovery-tags") },
+        { type: "prefix", value: adminPath("/discovery/tags") },
+      ],
     },
     {
       id: "discovery-occasions",

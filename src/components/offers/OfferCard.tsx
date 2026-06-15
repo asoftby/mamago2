@@ -4,6 +4,7 @@ import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { SaveHeart } from "@/features/save/SaveHeart";
 import { normalizeUiCurrencyText } from "@/lib/formatters/format-price";
+import { renderPriceWithIcon } from "@/components/icons/BelarusianRubleIcon";
 
 export type OfferCardProps = {
   id: string;
@@ -86,7 +87,7 @@ export function OfferCard({
           {/* Price badge — bottom right */}
           {priceLabel && (
             <span className="absolute bottom-3 right-3 inline-flex h-7 items-center rounded-full px-3 font-mono text-[11px] font-medium backdrop-blur-[4px] bg-[rgba(20,18,16,0.72)] text-white">
-              {normalizeUiCurrencyText(priceLabel)}
+              {renderPriceWithIcon(normalizeUiCurrencyText(priceLabel ?? ""))}
             </span>
           )}
         </div>

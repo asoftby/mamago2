@@ -8,6 +8,7 @@ import { canManageActivityById } from "@/lib/auth/activityAccess";
 import prisma from "@/lib/prisma";
 import { EventPageView } from "@/components/event-page/EventPageView";
 import { buildEventPageDataFromPrismaActivity } from "@/lib/event/buildEventPageDataFromPrisma";
+import { enrichPlaceWithResolvedLogo } from "@/lib/place/resolvePlaceLogoUrlFromDb";
 import { editorEventEditHref } from "@/lib/content-editor/types";
 
 type PageProps = { params: Promise<{ id: string }> };
@@ -38,6 +39,8 @@ export default async function MeEventPreviewPage({ params }: PageProps) {
           customAddress: true,
           lat: true,
           lng: true,
+          logoImageId: true,
+          images: { select: { id: true, url: true, kind: true }, orderBy: { sortOrder: "asc" } },
           districtManual: { select: { name: true } },
           districtAuto: { select: { name: true } },
           metroManual: { select: { name: true } },
@@ -75,6 +78,11 @@ export default async function MeEventPreviewPage({ params }: PageProps) {
     notFound();
   }
 
+  const [place, venuePlace] = await Promise.all([
+    enrichPlaceWithResolvedLogo(activity.place),
+    enrichPlaceWithResolvedLogo(activity.venue?.place ?? null),
+  ]);
+
   let citySlug = activity.place?.city?.slug;
   if (!citySlug && activity.cityId) {
     const city = await prisma.city.findUnique({
@@ -91,12 +99,24 @@ export default async function MeEventPreviewPage({ params }: PageProps) {
         ? "На модерации"
         : undefined;
 
-  const data = buildEventPageDataFromPrismaActivity(activity, {
-    citySlug,
-    previewBannerLabel,
-    hidePublicationStats: true,
-    ownerEditHref: editorEventEditHref(activity.id),
-  });
+  const data = buildEventPageDataFromPrismaActivity(
+    {
+      ...activity,
+      place,
+      venue: activity.venue
+        ? {
+            ...activity.venue,
+            place: venuePlace,
+          }
+        : null,
+    },
+    {
+      citySlug,
+      previewBannerLabel,
+      hidePublicationStats: true,
+      ownerEditHref: editorEventEditHref(activity.id),
+    },
+  );
 
   return (
     <Suspense fallback={<EventPageView data={data} />}>

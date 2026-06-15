@@ -22,8 +22,9 @@ export type CityPathType =
   | "offer"      // /[city]/offers/[section]/[slug]
   | "routes"     // /[city]/routes
   | "route"      // /[city]/routes/[slug]
-  | "journal"    // /[city]/journal
-  | "article";   // /[city]/journal/[slug]
+  | "journal"    // /[city]/blog  (alias kept for back-compat)
+  | "article"    // /[city]/blog/[slug]
+  | "tag";       // /[city]/tags/[slug]
 
 /**
  * Returns the canonical base URL for a country.
@@ -45,6 +46,28 @@ export function getCountryFromHost(_host: string): CountryCode {
   return "BY";
 }
 
+/**
+ * Strips trailing slash from a public path.
+ * Root `/` is the only exception — it stays as `/`.
+ *
+ * This is the canonical normaliser for the no-trailing-slash URL policy.
+ *
+ * @example
+ * stripTrailingSlash("/")             → "/"
+ * stripTrailingSlash("/minsk/")       → "/minsk"
+ * stripTrailingSlash("/minsk/events") → "/minsk/events"
+ */
+export function stripTrailingSlash(path: string): string {
+  if (!path || path === "/") return "/";
+  return path.endsWith("/") ? path.slice(0, -1) : path;
+}
+
+/**
+ * @deprecated Renamed to stripTrailingSlash — no-trailing-slash policy.
+ * Kept for one-step migration; remove callers and delete this alias.
+ */
+export const withTrailingSlash = stripTrailingSlash;
+
 export interface CityPublicPathParams {
   citySlug: string;
   type: CityPathType;
@@ -60,28 +83,44 @@ export function buildCityPublicPath(params: CityPublicPathParams): string {
   const { citySlug, type, section, slug } = params;
   const city = citySlug.toLowerCase();
 
+  let path: string;
   switch (type) {
     case "hub":
-      return `/${city}`;
+      path = `/${city}`;
+      break;
     case "events":
-      return `/${city}/events`;
+      path = `/${city}/events`;
+      break;
     case "places":
-      return `/${city}/places`;
+      path = `/${city}/places`;
+      break;
     case "place":
-      return `/${city}/places/${slug}`;
+      path = `/${city}/places/${slug}`;
+      break;
     case "offerList":
-      return `/${city}/offers/${section}`;
+      path = `/${city}/offers/${section}`;
+      break;
     case "offer":
-      return `/${city}/offers/${section}/${slug}`;
+      path = `/${city}/offers/${section}/${slug}`;
+      break;
     case "routes":
-      return `/${city}/routes`;
+      path = `/${city}/routes`;
+      break;
     case "route":
-      return `/${city}/routes/${slug}`;
+      path = `/${city}/routes/${slug}`;
+      break;
     case "journal":
-      return `/${city}/journal`;
+      path = `/${city}/blog`;
+      break;
     case "article":
-      return `/${city}/journal/${slug}`;
+      path = `/${city}/blog/${slug}`;
+      break;
+    case "tag":
+      path = `/${city}/tags/${slug}`;
+      break;
   }
+
+  return path;
 }
 
 /**
@@ -92,4 +131,44 @@ export function buildCityPublicUrl(
   countryCode: CountryCode = "BY",
 ): string {
   return `${getBaseUrl(countryCode)}${buildCityPublicPath(params)}`;
+}
+
+/**
+ * Builds the canonical path for a COUNTRY-scope (national) article.
+ * National articles live at /blog/{slug}.
+ */
+export function buildNationalArticlePath(slug: string): string {
+  return `/blog/${slug}`;
+}
+
+/**
+ * Article public path by geo scope (no trailing slash).
+ * CITY → /{city}/blog/{slug} ; COUNTRY (and breaking news) → /blog/{slug}.
+ */
+export function buildArticlePublicPath(args: {
+  slug: string;
+  geoScope?: "CITY" | "COUNTRY" | null;
+  citySlug?: string | null;
+}): string {
+  const { slug, geoScope, citySlug } = args;
+  if (geoScope === "CITY" && citySlug) {
+    return buildCityPublicPath({ citySlug, type: "article", slug });
+  }
+  return buildNationalArticlePath(slug);
+}
+
+/** Absolute canonical public URL (no trailing slash). */
+export function buildAbsoluteCanonicalUrl(
+  path: string,
+  countryCode: CountryCode = "BY",
+): string {
+  const normalized = path.startsWith("/") ? path : `/${path}`;
+  return `${getBaseUrl(countryCode)}${stripTrailingSlash(normalized)}`;
+}
+
+/**
+ * Builds the absolute canonical URL for a COUNTRY-scope (national) article.
+ */
+export function buildNationalArticleUrl(slug: string, countryCode: CountryCode = "BY"): string {
+  return `${getBaseUrl(countryCode)}${buildNationalArticlePath(slug)}`;
 }

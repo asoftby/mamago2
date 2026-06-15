@@ -125,7 +125,7 @@ export function RangeCalendar({ range, setRange }: RangeCalendarProps) {
 
         <span
           style={{
-            fontFamily: "var(--font-display, Georgia, serif)",
+            fontFamily: "var(--font-display)",
             fontSize: 24,
             letterSpacing: "-.01em",
             textTransform: "capitalize",

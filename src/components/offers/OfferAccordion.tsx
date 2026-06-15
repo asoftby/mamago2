@@ -314,7 +314,7 @@ export function OfferAccordion({ data }: OfferAccordionProps) {
       {hasDescription && (
         <AccordionRow
           kicker={String(kickerIndex++).padStart(2, "0")}
-          title={<><span style={{ fontFamily: "var(--font-sans)" }}>Описание </span><span style={{ fontFamily: "Georgia, serif", fontStyle: "italic", color: "var(--primary)" }}>предложения</span></>}
+          title={<><span style={{ fontFamily: "var(--font-sans)" }}>Описание </span><span style={{ fontFamily: "var(--font-editorial)", fontStyle: "italic", color: "var(--primary)" }}>предложения</span></>}
           isOpen={openItems.has("about")}
           onToggle={() => toggle("about")}
         >
@@ -324,7 +324,7 @@ export function OfferAccordion({ data }: OfferAccordionProps) {
 
       <AccordionRow
         kicker={String(kickerIndex++).padStart(2, "0")}
-        title={<><span style={{ fontFamily: "var(--font-sans)" }}>Расписание </span><span style={{ fontFamily: "Georgia, serif", fontStyle: "italic", color: "var(--primary)" }}>дня</span></>}
+        title={<><span style={{ fontFamily: "var(--font-sans)" }}>Расписание </span><span style={{ fontFamily: "var(--font-editorial)", fontStyle: "italic", color: "var(--primary)" }}>дня</span></>}
         isOpen={openItems.has("schedule")}
         onToggle={() => toggle("schedule")}
       >

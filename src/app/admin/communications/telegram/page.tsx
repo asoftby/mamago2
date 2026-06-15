@@ -4,6 +4,7 @@ import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { adminPath } from "@/lib/routing/surface";
+import { TelegramHealthCard } from "./TelegramHealthCard";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -18,6 +19,8 @@ export default function AdminCommunicationsTelegramPage() {
       />
 
       <div className="grid gap-6 xl:grid-cols-2">
+        <TelegramHealthCard />
+
         <Card className="rounded-3xl border-stone-200/90">
           <CardHeader>
             <div className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-sky-50 text-sky-600">

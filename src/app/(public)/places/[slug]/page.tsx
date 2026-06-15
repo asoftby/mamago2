@@ -17,8 +17,13 @@ import { buildPublicWorkingHoursText } from "@/server/services/openingHours/open
 import { getOpeningStatus } from "@/server/services/openingHours/openingHours.service";
 import type { OpeningHoursWithRelations } from "@/server/services/openingHours/openingHours.types";
 import { resolvePlaceLogoImage } from "@/lib/place/resolvePlaceLogoImage";
+import { resolvePlaceLogoUrlFromDb } from "@/lib/place/resolvePlaceLogoUrlFromDb";
 import { parsePriceData } from "@/lib/priceItems";
 import { isGoogleReviewsEnabled } from "@/lib/place/googleReviewsMeta";
+import {
+  loadUpcomingPlaceEvents,
+  mapUpcomingPlaceEventsToActivityMocks,
+} from "@/lib/place/loadUpcomingPlaceEvents";
 
 interface PlacePageProps {
   params: Promise<{ slug: string }>;
@@ -324,6 +329,7 @@ export default async function PlacePage({ params }: PlacePageProps) {
         });
 
   const logoImage = resolvePlaceLogoImage(place.images, place.logoImageId);
+  const logoUrl = await resolvePlaceLogoUrlFromDb(place.images, place.logoImageId);
   const galleryImages = place.images
     .filter((img) => img.kind === "GALLERY")
     .filter((img) => !logoImage || img.id !== logoImage.id)
@@ -334,28 +340,14 @@ export default async function PlacePage({ params }: PlacePageProps) {
       alt: place.title,
     }));
 
-  // Fetch upcoming events for this place
-  const upcomingEvents = await prisma.activity.findMany({
-    where: {
-      placeId: place.id,
-      type: "EVENT",
-      status: "PUBLISHED",
-      nextOccurrenceAt: {
-        gte: new Date(),
-      },
-    },
-    select: {
-      id: true,
-      title: true,
-      slug: true,
-      nextOccurrenceAt: true,
-      coverImageUrl: true,
-      priceFrom: true,
-      eventCategory: {
-        select: { nameRu: true },
-      },
-    },
-    orderBy: { nextOccurrenceAt: "asc" },
+  const now = new Date();
+
+  // Fetch upcoming public events for this place using the same visibility rules
+  // as public feeds, including session-based fallback when nextOccurrenceAt is stale.
+  const upcomingEvents = await loadUpcomingPlaceEvents({
+    placeId: place.id,
+    cityId: place.cityId,
+    now,
     take: 10,
   });
 
@@ -429,17 +421,15 @@ export default async function PlacePage({ params }: PlacePageProps) {
       status: place.status,
     }));
 
-  // Format data for premium components
-  const formattedEvents = upcomingEvents.map((event) => ({
-    id: event.id,
-    title: event.title,
-    slug: event.slug || event.id,
-    imageUrl: event.coverImageUrl || undefined,
-    startDate: event.nextOccurrenceAt?.toISOString() || new Date().toISOString(),
-    location: locationString || undefined,
-    price: event.priceFrom || undefined,
-    category: event.eventCategory?.nameRu,
-  }));
+  const placeCitySlug = place.city?.slug || "minsk";
+  const placeCitySlugById = new Map(
+    place.cityId ? [[place.cityId, placeCitySlug] as const] : [],
+  );
+  const eventActivities = mapUpcomingPlaceEventsToActivityMocks(upcomingEvents, {
+    hubCityId: place.cityId ?? "",
+    citySlugById: placeCitySlugById,
+    currentUserId: currentUser?.id ?? null,
+  });
 
   const formattedOffers = activeOffers.map((offer) => ({
     id: offer.id,
@@ -499,7 +489,9 @@ export default async function PlacePage({ params }: PlacePageProps) {
       openingHoursResolved as OpeningHoursWithRelations,
       new Date(),
     );
-    isOpenNow = openingStatus.isOpen;
+    if (openingHoursResolved.mode !== "BY_APPOINTMENT") {
+      isOpenNow = openingStatus.isOpen;
+    }
     if (openingStatus.todayIntervals && openingStatus.todayIntervals.length > 0) {
       todayHoursText = openingStatus.todayIntervals
         .map((i) => `${i.startTime.slice(0, 5)} — ${i.endTime.slice(0, 5)}`)
@@ -522,7 +514,7 @@ export default async function PlacePage({ params }: PlacePageProps) {
     slug: place.slug || place.id,
     shortDesc: place.shortDesc,
     description: place.description || place.shortDesc,
-    logoUrl: logoImage?.url,
+    logoUrl: logoUrl ?? logoImage?.url,
     rating: averageRating,
     reviewCount: totalReviewCount,
     
@@ -579,7 +571,8 @@ export default async function PlacePage({ params }: PlacePageProps) {
       />
       <MarketplacePlacePage
         place={marketplacePlaceData}
-        events={formattedEvents}
+        eventActivities={eventActivities}
+        citySlug={placeCitySlug}
         offers={formattedOffers}
         reviews={placeReviews}
         ownerEditPlaceId={canShowPlaceEditor ? place.id : undefined}

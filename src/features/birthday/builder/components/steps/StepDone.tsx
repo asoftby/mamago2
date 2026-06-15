@@ -1,6 +1,6 @@
 "use client";
 
-import { BYN_SYMBOL } from "@/lib/formatters/format-price";
+import { BelarusianRubleIcon } from "@/components/icons/BelarusianRubleIcon";
 import { useEffect, useMemo, useState } from "react";
 import type { BirthdayBuilderWithGate } from "../../hooks/useBirthdayBuilderWithGate";
 import {
@@ -300,7 +300,7 @@ function ScenarioRow({
         {/* Right: price */}
         <div style={{ textAlign: "right", flexShrink: 0 }}>
           <span style={{
-            fontFamily: "var(--font-display, Georgia, serif)",
+            fontFamily: "var(--font-display)",
             fontSize: 18,
             color: "#141210",
           }}>
@@ -312,7 +312,7 @@ function ScenarioRow({
             color: "rgba(20,18,16,.45)",
             marginLeft: 3,
           }}>
-              {BYN_SYMBOL}
+              <BelarusianRubleIcon />
           </span>
         </div>
       </div>
@@ -527,7 +527,7 @@ export function StepDone({
         color: "#141210",
       }}>
         Праздник{" "}
-        <span style={{ fontFamily: "Georgia, serif", fontStyle: "italic", fontWeight: 400, color: "#E86A3A" }}>собран</span>{" "}
+        <span style={{ fontFamily: "var(--font-editorial)", fontStyle: "italic", fontWeight: 400, color: "#E86A3A" }}>собран</span>{" "}
         🎉
       </h2>
 
@@ -658,11 +658,11 @@ export function StepDone({
               Итого
             </span>
             <span>
-              <span style={{ fontFamily: "var(--font-display, Georgia, serif)", fontSize: 22, color: "#141210" }}>
+              <span style={{ fontFamily: "var(--font-display)", fontSize: 22, color: "#141210" }}>
                 {totalPrice}
               </span>
               <span style={{ fontFamily: "var(--font-mono, ui-monospace)", fontSize: 11, color: "rgba(20,18,16,.45)", marginLeft: 4 }}>
-              {BYN_SYMBOL}
+              <BelarusianRubleIcon />
               </span>
             </span>
           </div>

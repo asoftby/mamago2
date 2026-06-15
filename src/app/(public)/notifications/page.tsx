@@ -1,11 +1,11 @@
-import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/server";
 import { NotificationCenter } from "@/components/business/notifications/NotificationCenter";
+import { redirectToLogin } from "@/lib/auth/requireAuthRedirect";
 
 export default async function NotificationsPage() {
   const user = await getCurrentUser();
   if (!user) {
-    redirect("/login?next=/notifications");
+    await redirectToLogin({ redirectTo: "/notifications" });
   }
 
   return (

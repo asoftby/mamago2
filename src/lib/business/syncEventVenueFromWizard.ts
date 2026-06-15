@@ -1,4 +1,5 @@
 import prisma from "@/lib/prisma";
+import { findCityBySlug } from "@/server/geo/findCityBySlug";
 import { EventVenueKind } from "@prisma/client";
 
 const VALID_KINDS = new Set<string>(Object.values(EventVenueKind));
@@ -16,13 +17,10 @@ export async function resolveCityIdFromWizardInput(
     select: { id: true },
   });
   if (byId) return byId.id;
-  const bySlug = await prisma.city.findUnique({
-    where: { slug: s },
-    select: { id: true },
-  });
+  const bySlug = await findCityBySlug(s, { select: { id: true } });
   if (bySlug) return bySlug.id;
   const byName = await prisma.city.findFirst({
-    where: { name: s },
+    where: { name: s, isLegacyNonCity: false },
     select: { id: true },
   });
   return byName?.id ?? null;

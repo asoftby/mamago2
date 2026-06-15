@@ -110,7 +110,6 @@ export async function createRelease(
       data: {
         version: input.version,
         title: input.title,
-        description: input.description ?? null,
         status: "DRAFT",
         notes: {
           create: mapNotesForCreate(input.notes),
@@ -141,7 +140,6 @@ export async function updateRelease(
 
   if (input.version !== undefined) data.version = input.version;
   if (input.title !== undefined) data.title = input.title;
-  if (input.description !== undefined) data.description = input.description;
 
   try {
     const release = await prisma.$transaction(async (tx) => {
@@ -233,5 +231,19 @@ export async function deleteRelease(id: string): Promise<void> {
     );
   }
 
-  await prisma.release.delete({ where: { id } });
+  await prisma.$transaction(async (tx) => {
+    await tx.release.delete({ where: { id } });
+
+    // Defensive: if the deleted release was somehow isCurrent, promote the next published release
+    if (existing.isCurrent) {
+      const next = await tx.release.findFirst({
+        where: { status: "PUBLISHED", id: { not: id } },
+        orderBy: { releasedAt: { sort: "desc", nulls: "last" } },
+        select: { id: true },
+      });
+      if (next) {
+        await tx.release.update({ where: { id: next.id }, data: { isCurrent: true } });
+      }
+    }
+  });
 }

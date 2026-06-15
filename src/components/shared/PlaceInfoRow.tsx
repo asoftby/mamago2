@@ -51,7 +51,7 @@ export function PlaceInfoRow({ name, logoUrl, address, district, metro, href }: 
         ) : (
           <span
             style={{
-              fontFamily: "var(--font-display, Georgia, serif)",
+              fontFamily: "var(--font-display)",
               fontStyle: "italic",
               fontWeight: 400,
               fontSize: 14,

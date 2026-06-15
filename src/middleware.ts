@@ -4,6 +4,14 @@ import { resolveSubdomainMiddlewareDecision } from "@/lib/routing/subdomainMiddl
 import { isDevLocalHost, resolveSurfaceFromHostAndPathname } from "@/lib/routing/surface";
 import { stripPublicDiscoverySearchParams } from "@/lib/routing/publicDiscoverySearchParams";
 import { isGlobalNoindexEnabled } from "@/lib/seo/globalNoindex";
+import {
+  REQUEST_PATHNAME_HEADER,
+  REQUEST_SEARCH_HEADER,
+} from "@/lib/auth/requireAuthRedirect";
+import {
+  shouldSkipTrailingSlashRedirect,
+  removeTrailingSlash,
+} from "@/lib/routing/trailingSlashPolicy";
 
 let didLogDevLocalHostDetection = false;
 
@@ -20,6 +28,25 @@ function shouldBypassSeoHeader(pathname: string): boolean {
     pathname.startsWith("/uploads") ||
     pathname.includes(".")
   );
+}
+
+function withRequestPathHeaders(request: NextRequest): Headers {
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set(REQUEST_PATHNAME_HEADER, request.nextUrl.pathname);
+  requestHeaders.set(REQUEST_SEARCH_HEADER, request.nextUrl.search);
+  return requestHeaders;
+}
+
+function nextWithRequestPath(request: NextRequest): NextResponse {
+  return NextResponse.next({
+    request: { headers: withRequestPathHeaders(request) },
+  });
+}
+
+function rewriteWithRequestPath(request: NextRequest, url: URL): NextResponse {
+  return NextResponse.rewrite(url, {
+    request: { headers: withRequestPathHeaders(request) },
+  });
 }
 
 function applyGlobalNoindexHeader(
@@ -41,14 +68,42 @@ function applyGlobalNoindexHeader(
   return response;
 }
 
+
 export function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+
+  // ── Absolute hard exit for API routes and Next.js internals ─────────────
+  // Must come FIRST — before any redirect, rewrite, or header logic.
+  // The config.matcher already excludes /api/* via the negative lookahead, but
+  // this guard is a second line of defence (e.g. internal server-side fetches
+  // or rewrite chains that bypass the matcher).
+  if (
+    pathname.startsWith("/api/") ||
+    pathname === "/api" ||
+    pathname.startsWith("/_next/")
+  ) {
+    return NextResponse.next();
+  }
+
   const host = request.headers.get("host") || "";
   const url = request.nextUrl;
-  const pathname = url.pathname;
   const hostname = host.split(":")[0]?.toLowerCase() ?? "";
 
+  // ── Trailing-slash canonical redirect (301) ──────────────────────────────
+  // Runs before subdomain/surface logic so SEO crawlers always land on the
+  // no-slash canonical. Fires only on GET/HEAD to avoid breaking form POSTs.
+  if (
+    pathname.endsWith("/") &&
+    !shouldSkipTrailingSlashRedirect(pathname) &&
+    (request.method === "GET" || request.method === "HEAD")
+  ) {
+    const redirectUrl = new URL(request.url);
+    redirectUrl.pathname = removeTrailingSlash(pathname);
+    return NextResponse.redirect(redirectUrl, { status: 301 });
+  }
+
   if (shouldBypassSeoHeader(pathname)) {
-    return NextResponse.next();
+    return nextWithRequestPath(request);
   }
 
   if (
@@ -83,9 +138,9 @@ export function middleware(request: NextRequest) {
   if (decision.kind === "rewrite") {
     url.pathname = decision.pathname;
     url.search = search;
-    return applyGlobalNoindexHeader(NextResponse.rewrite(url), {
-      pathname,
-      surface,
+    return applyGlobalNoindexHeader(rewriteWithRequestPath(request, url), {
+        pathname,
+        surface,
     });
   }
 
@@ -94,7 +149,7 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  return applyGlobalNoindexHeader(NextResponse.next(), {
+  return applyGlobalNoindexHeader(nextWithRequestPath(request), {
     pathname,
     surface,
   });

@@ -11,6 +11,8 @@ import {
 } from "../lib/email-links";
 import { EMAIL_SUBJECTS } from "../lib/email-subjects";
 import { getResendClient } from "./resend-client";
+import { renderNotification } from "@/server/notifications/template-render.service";
+import { toPlainText } from "@/server/notifications/template-render-core";
 
 function isEmailEnabled(): boolean {
   return process.env.EMAIL_ENABLED === "true";
@@ -209,6 +211,8 @@ export class EmailService {
     subject: string;
     title: string;
     body: string;
+    /** Санитизированный HTML из шаблонного рендера; рендерится внутри стандартной обёртки вместо body */
+    bodyHtml?: string | null;
     ctaLabel?: string | null;
     ctaUrl?: string | null;
   }): Promise<{ status: "SENT" | "SKIPPED" | "FAILED"; reason?: string; messageId?: string }> {
@@ -247,6 +251,7 @@ export class EmailService {
           <TransactionalNotificationTemplate
             title={params.title}
             body={params.body}
+            bodyHtml={params.bodyHtml}
             ctaLabel={params.ctaLabel}
             ctaUrl={params.ctaUrl}
           />
@@ -299,6 +304,28 @@ export class EmailService {
     }
 
     const verifyUrl = buildVerifyEmailUrl(params.token);
+
+    // Override из админки рендерится внутри стандартной обёртки;
+    // без override — текущий React Email-компонент (дефолт kind:"code")
+    const override = await renderNotification("VERIFY_EMAIL", "EMAIL", { verifyUrl });
+    if (override) {
+      await sendViaResend({
+        kind: "verify-email",
+        intendedTo: params.to,
+        subject: override.subject ?? EMAIL_SUBJECTS.verifyEmail,
+        react: (
+          <TransactionalNotificationTemplate
+            title={override.subject ?? EMAIL_SUBJECTS.verifyEmail}
+            body={toPlainText(override.body, 2000)}
+            bodyHtml={override.body}
+            ctaLabel="Подтвердить email"
+            ctaUrl={verifyUrl}
+          />
+        ),
+      });
+      return;
+    }
+
     await sendViaResend({
       kind: "verify-email",
       intendedTo: params.to,
@@ -323,6 +350,26 @@ export class EmailService {
     }
 
     const resetUrl = buildPasswordResetUrl(params.token);
+
+    const override = await renderNotification("RESET_PASSWORD", "EMAIL", { resetUrl });
+    if (override) {
+      await sendViaResend({
+        kind: "password-reset",
+        intendedTo: params.to,
+        subject: override.subject ?? EMAIL_SUBJECTS.passwordReset,
+        react: (
+          <TransactionalNotificationTemplate
+            title={override.subject ?? EMAIL_SUBJECTS.passwordReset}
+            body={toPlainText(override.body, 2000)}
+            bodyHtml={override.body}
+            ctaLabel="Сбросить пароль"
+            ctaUrl={resetUrl}
+          />
+        ),
+      });
+      return;
+    }
+
     await sendViaResend({
       kind: "password-reset",
       intendedTo: params.to,
@@ -354,6 +401,29 @@ export class EmailService {
     // WELCOME is transactional — always sent, no marketingEmailsEnabled check
 
     assertConfiguredForResend();
+
+    const welcomeCtaUrl = params.ctaUrl ?? "https://mamago.by/me/plan";
+    const override = await renderNotification("WELCOME_EMAIL", "EMAIL", {
+      ...(params.userName ? { userName: params.userName } : {}),
+      ctaUrl: welcomeCtaUrl,
+    });
+    if (override) {
+      await sendViaResend({
+        kind: "welcome",
+        intendedTo: params.to,
+        subject: override.subject ?? EMAIL_SUBJECTS.welcome,
+        react: (
+          <TransactionalNotificationTemplate
+            title={override.subject ?? EMAIL_SUBJECTS.welcome}
+            body={toPlainText(override.body, 2000)}
+            bodyHtml={override.body}
+            ctaLabel="Открыть mamaGo"
+            ctaUrl={welcomeCtaUrl}
+          />
+        ),
+      });
+      return;
+    }
 
     await sendViaResend({
       kind: "welcome",
@@ -406,6 +476,8 @@ export const emailService = new EmailService();
 function TransactionalNotificationTemplate(props: {
   title: string;
   body: string;
+  /** Уже санитизированный HTML (sanitizeEmailHtml) — контент из шаблонов админки */
+  bodyHtml?: string | null;
   ctaLabel?: string | null;
   ctaUrl?: string | null;
 }) {
@@ -421,7 +493,14 @@ function TransactionalNotificationTemplate(props: {
         }}
       >
         <h2 style={{ marginBottom: 8 }}>{props.title}</h2>
-        <p style={{ color: "#555", lineHeight: 1.6 }}>{props.body}</p>
+        {props.bodyHtml ? (
+          <div
+            style={{ color: "#555", lineHeight: 1.6, whiteSpace: "pre-line" }}
+            dangerouslySetInnerHTML={{ __html: props.bodyHtml }}
+          />
+        ) : (
+          <p style={{ color: "#555", lineHeight: 1.6 }}>{props.body}</p>
+        )}
         {props.ctaUrl ? (
           <p style={{ marginTop: 20 }}>
             <a

@@ -71,6 +71,14 @@ export function resolveSubdomainMiddlewareDecision(params: {
 }): MiddlewareDecision {
   const { host, protocol, pathname, search, publicAppUrl } = params;
   const hostname = host.split(":")[0]?.toLowerCase() ?? "";
+
+  // API routes must never be rewritten or redirected by subdomain logic.
+  // This is a second line of defence after the middleware.ts hard exit and the
+  // config.matcher exclusion.
+  if (pathname.startsWith("/api/") || pathname === "/api") {
+    return { kind: "next" };
+  }
+
   const isLocalhost = isDevLocalHost(hostname);
 
   if (isLocalhost) {

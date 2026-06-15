@@ -141,7 +141,7 @@ export function BlogIndex({ articles }: { articles: CityHomeJournalArticle[] }) 
 function FeaturedArticle({ article }: { article: CityHomeJournalArticle }) {
   return (
     <Link
-      href={`/blog/${article.slug}`}
+      href={article.href}
       className="group grid grid-cols-1 sm:grid-cols-2 gap-8 sm:gap-12 py-12 border-b border-border"
     >
       {/* Image */}
@@ -212,7 +212,7 @@ function ArticleRow({ article, idx }: { article: CityHomeJournalArticle; idx: nu
 
   return (
     <Link
-      href={`/blog/${article.slug}`}
+      href={article.href}
       className="group grid grid-cols-1 sm:grid-cols-[200px_1fr_180px] gap-4 sm:gap-9 py-8 border-t border-border last:border-b items-center transition-[padding] duration-200 hover:sm:pl-2"
     >
       {/* Meta */}

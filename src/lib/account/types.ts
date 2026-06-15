@@ -5,6 +5,14 @@ export type AccountMenuUser = {
   role: string;
   /** true when partner business exists and is APPROVED */
   hasApprovedBusinessProfile?: boolean;
+  /** Статус заявки на бизнес-профиль (если бизнес уже создан) */
+  businessVerificationStatus?:
+    | "DRAFT"
+    | "PENDING"
+    | "NEEDS_INFO"
+    | "APPROVED"
+    | "REJECTED"
+    | null;
   /** Business deposit balance in BYN for account dropdown (business surface only) */
   businessBalanceBYN?: number;
   displayName?: string | null;

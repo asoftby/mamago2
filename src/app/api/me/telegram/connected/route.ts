@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import { getTelegramLinkStatus } from "@/server/services/telegramLink.service";
-import { markWelcomeNotificationsRead } from "@/server/services/notification.service";
+import { markWelcomeNotificationsRead, completeOnboardingNotification } from "@/server/services/notification.service";
 
 /**
  * POST — legacy helper after deep link.
@@ -20,6 +20,7 @@ export async function POST() {
     }
 
     await markWelcomeNotificationsRead(user.id);
+    await completeOnboardingNotification(user.id, "CONNECT_TELEGRAM");
 
     return NextResponse.json({ ok: true, message: "Telegram подключён ✅" });
   } catch (e) {

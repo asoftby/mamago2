@@ -8,6 +8,7 @@ import { SaveHeart } from "@/features/save/SaveHeart";
 import { SaveToPlanResult } from "./SaveToPlanModal";
 import { formatRuShortDayMonthRange } from "@/lib/formatters/date";
 import { formatPrice, formatPriceFrom, normalizeUiCurrencyText } from "@/lib/formatters/format-price";
+import { renderPriceWithIcon } from "@/components/icons/BelarusianRubleIcon";
 import { publicActivityPath } from "@/lib/business/eventPublicLink";
 import { useOptionalCity } from "@/contexts/CityContext";
 import { DEFAULT_CITY_SLUG } from "@/lib/city/resolveCityContext";
@@ -209,7 +210,7 @@ export function ActivityCard(props: AdapterProps) {
             )}
             {base.priceText && (
               <span className="absolute bottom-3 right-3 inline-flex h-7 items-center rounded-full px-3 font-mono text-[11px] font-medium backdrop-blur-[4px] bg-[rgba(20,18,16,0.72)] text-white">
-                {normalizeUiCurrencyText(base.priceText)}
+                {renderPriceWithIcon(normalizeUiCurrencyText(base.priceText))}
               </span>
             )}
           </div>
@@ -268,7 +269,7 @@ export function ActivityCard(props: AdapterProps) {
           {/* Price badge — bottom right */}
           {base.priceText && (
             <span className="absolute bottom-3 right-3 inline-flex h-7 items-center rounded-full px-3 font-mono text-[11px] font-medium backdrop-blur-[4px] bg-[rgba(20,18,16,0.72)] text-white">
-              {normalizeUiCurrencyText(base.priceText)}
+              {renderPriceWithIcon(normalizeUiCurrencyText(base.priceText))}
             </span>
           )}
         </div>

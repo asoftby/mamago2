@@ -14,12 +14,19 @@ export type AdminCityRow = {
   priority: number;
   eventsCount: number;
   placesCount: number;
+  regionName: string | null;
+  countryName: string;
 };
 
 /** Server-side memory cache for admin city rows (revalidated every 5 minutes) */
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 let cachedRows: AdminCityRow[] | null = null;
 let cacheUpdatedAt = 0;
+
+export function invalidateAdminCityRowsCache(): void {
+  cachedRows = null;
+  cacheUpdatedAt = 0;
+}
 
 async function countPublicEventsForCity(cityId: string): Promise<number> {
   const pubActivity = getPublicListingActivityWhere();
@@ -48,13 +55,13 @@ async function countPublicPlacesForCity(cityId: string): Promise<number> {
 }
 
 export async function listAdminCityRows(): Promise<AdminCityRow[]> {
-  // Return cached data if still fresh
   const now = Date.now();
   if (cachedRows && now - cacheUpdatedAt < CACHE_TTL) {
     return cachedRows;
   }
 
   const cities = await prisma.city.findMany({
+    where: { isLegacyNonCity: false },
     orderBy: [{ priority: "desc" }, { name: "asc" }],
     select: {
       id: true,
@@ -63,6 +70,8 @@ export async function listAdminCityRows(): Promise<AdminCityRow[]> {
       isActive: true,
       isVisibleInCityFilter: true,
       priority: true,
+      region: { select: { name: true } },
+      country: { select: { name: true } },
     },
   });
 
@@ -74,14 +83,20 @@ export async function listAdminCityRows(): Promise<AdminCityRow[]> {
       ]);
 
       return {
-        ...city,
+        id: city.id,
+        name: city.name,
+        slug: city.slug,
+        isActive: city.isActive,
+        isVisibleInCityFilter: city.isVisibleInCityFilter,
+        priority: city.priority,
         eventsCount,
         placesCount,
+        regionName: city.region?.name ?? null,
+        countryName: city.country.name,
       };
     }),
   );
 
-  // Update cache
   cachedRows = rows;
   cacheUpdatedAt = now;
 

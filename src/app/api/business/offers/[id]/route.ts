@@ -5,17 +5,19 @@ import { z } from "zod";
 import { Prisma } from "@prisma/client";
 import {
   canCreateBusinessContent,
-  canManageOwnedContent,
   canPublishContentDirectly,
 } from "@/lib/auth/businessContentAccess";
+import { canManagePlaceAsync } from "@/lib/auth/placeAccess";
 import { assignOfferSlugIfMissing } from "@/lib/slug/offerSlugService";
 import { formatPriceFrom } from "@/lib/formatters/format-price";
+import { getMinCampSessionPrice } from "@/lib/offers/campPricing";
 import { ensurePublishedOfferHasSlug } from "@/lib/slug/publishSlugGuards";
 import { createPublishTimer, runAfterPublishResponse } from "@/server/utils/publishPipeline";
 import {
   campMealKeySchema,
   campProgramTypeSchema,
   campSessionEntrySchema,
+  offerWizardStepKeySchema,
 } from "@/lib/business/offerCampApiSchemas";
 import { syncOfferMediaUsage } from "@/server/services/media/media-usage.service";
 
@@ -61,28 +63,31 @@ const updateOfferSchema = z.object({
   status: z.enum(["DRAFT", "PENDING", "PUBLISHED"]).optional(),
   discoverySignalIds: z.array(z.string()).optional(),
   classChipSlugs: z.array(z.string()).optional(),
-  campProgramType: campProgramTypeSchema,
+  /** Шаги мастера, явно завершённые пользователем */
+  wizardCompletedSteps: z.array(offerWizardStepKeySchema).optional(),
+  // Camp/accommodation: null = «тип больше не лагерь, затереть в БД»
+  campProgramType: campProgramTypeSchema.nullable(),
   // Camp fields
-  campSessions: z.array(campSessionEntrySchema).optional(),
-  campSessionDuration: z.string().optional(),
-  campStayDuration: z.string().optional(),
-  campPlacesCount: z.number().optional(),
-  campGroupSize: z.number().optional(),
-  campDaySchedule: z.string().optional(),
+  campSessions: z.array(campSessionEntrySchema).nullable().optional(),
+  campSessionDuration: z.string().nullable().optional(),
+  campStayDuration: z.string().nullable().optional(),
+  campPlacesCount: z.number().nullable().optional(),
+  campGroupSize: z.number().nullable().optional(),
+  campDaySchedule: z.string().nullable().optional(),
   campCanSelectDays: z.boolean().optional(),
   campHasExtendedCare: z.boolean().optional(),
   // Accommodation fields
   accommodationProvided: z.boolean().optional(),
-  accommodationType: z.string().optional(),
-  accommodationAddress: z.string().optional(),
-  accommodationRooms: z.string().optional(),
-  campIncludedMeals: z.array(campMealKeySchema).optional(),
-  campSafetyInfo: z.string().optional(),
-  campMedicalInfo: z.string().optional(),
-  accommodationConditions: z.string().optional(),
-  mealInfo: z.string().optional(),
-  transferInfo: z.string().optional(),
-  whatToBring: z.string().optional(),
+  accommodationType: z.string().nullable().optional(),
+  accommodationAddress: z.string().nullable().optional(),
+  accommodationRooms: z.string().nullable().optional(),
+  campIncludedMeals: z.array(campMealKeySchema).nullable().optional(),
+  campSafetyInfo: z.string().nullable().optional(),
+  campMedicalInfo: z.string().nullable().optional(),
+  accommodationConditions: z.string().nullable().optional(),
+  mealInfo: z.string().nullable().optional(),
+  transferInfo: z.string().nullable().optional(),
+  whatToBring: z.string().nullable().optional(),
 });
 
 export async function GET(
@@ -108,16 +113,13 @@ export async function GET(
             formattedAddr: true,
             customAddress: true,
             ownerBusinessId: true,
+            createdByUserId: true,
           },
         },
       },
     });
 
-    if (
-      !offer ||
-      !offer.place.ownerBusinessId ||
-      !canManageOwnedContent(user, offer.place.ownerBusinessId)
-    ) {
+    if (!offer || !(await canManagePlaceAsync(user, offer.place))) {
       return NextResponse.json({ error: "Offer not found" }, { status: 404 });
     }
 
@@ -161,16 +163,14 @@ export async function PATCH(
         title: true,
         priceFrom: true,
         priceText: true,
+        campProgramType: true,
+        campSessions: true,
         placeId: true,
-        place: { select: { ownerBusinessId: true } },
+        place: { select: { ownerBusinessId: true, createdByUserId: true } },
       },
     });
 
-    if (
-      !existingOffer ||
-      !existingOffer.place.ownerBusinessId ||
-      !canManageOwnedContent(user, existingOffer.place.ownerBusinessId)
-    ) {
+    if (!existingOffer || !(await canManagePlaceAsync(user, existingOffer.place))) {
       return NextResponse.json({ error: "Offer not found" }, { status: 404 });
     }
 
@@ -179,11 +179,14 @@ export async function PATCH(
     if (data.selectedPlace?.id) {
       const nextPlace = await prisma.place.findUnique({
         where: { id: data.selectedPlace.id },
-        select: { id: true, ownerBusinessId: true },
+        select: { id: true, ownerBusinessId: true, createdByUserId: true },
       });
 
-      if (!nextPlace || !nextPlace.ownerBusinessId || !canManageOwnedContent(user, nextPlace.ownerBusinessId)) {
-        return NextResponse.json({ error: "Place not found" }, { status: 404 });
+      if (!nextPlace || !(await canManagePlaceAsync(user, nextPlace))) {
+        return NextResponse.json(
+          { error: "Место не найдено или у вас нет прав на публикацию предложения" },
+          { status: 404 },
+        );
       }
 
       if (data.selectedPlace.id !== existingOffer.placeId) {
@@ -195,7 +198,17 @@ export async function PATCH(
     let priceFrom: number | null = existingOffer.priceFrom;
     let priceText: string | null = existingOffer.priceText;
 
-    if (data.pricingMode === "SINGLE" && data.singlePrice !== undefined) {
+    const isCampOffer =
+      data.campProgramType !== undefined
+        ? Boolean(data.campProgramType)
+        : Boolean(existingOffer.campProgramType);
+    const nextCampSessions =
+      data.campSessions !== undefined ? data.campSessions : existingOffer.campSessions;
+
+    if (isCampOffer) {
+      priceFrom = getMinCampSessionPrice(nextCampSessions);
+      priceText = priceFrom != null ? formatPriceFrom(priceFrom) : null;
+    } else if (data.pricingMode === "SINGLE" && data.singlePrice !== undefined) {
       priceFrom = data.singlePrice;
       priceText = data.singlePriceLabel || null;
     } else if (data.pricingMode === "MULTIPLE" && data.pricingOptions && data.pricingOptions.length > 0) {
@@ -215,6 +228,7 @@ export async function PATCH(
     if (data.promotionalOffer !== undefined) updateData.promotionalOffer = data.promotionalOffer;
     if (data.discoverySignalIds !== undefined) updateData.discoverySignalIds = data.discoverySignalIds;
     if (data.classChipSlugs !== undefined) updateData.classChipSlugs = data.classChipSlugs;
+    if (data.wizardCompletedSteps !== undefined) updateData.wizardCompletedSteps = data.wizardCompletedSteps;
     if (data.contactSource !== undefined) updateData.contactSource = data.contactSource;
     if (data.contactPhone !== undefined) updateData.contactPhone = data.contactPhone;
     if (data.contactWebsite !== undefined) updateData.contactWebsite = data.contactWebsite;
@@ -230,7 +244,10 @@ export async function PATCH(
     
     // Camp fields
     if (data.campSessions !== undefined)
-      updateData.campSessions = data.campSessions as unknown as Prisma.InputJsonValue;
+      updateData.campSessions =
+        data.campSessions === null
+          ? Prisma.DbNull
+          : (data.campSessions as unknown as Prisma.InputJsonValue);
     if (data.campSessionDuration !== undefined) updateData.campSessionDuration = data.campSessionDuration;
     if (data.campStayDuration !== undefined) updateData.campStayDuration = data.campStayDuration;
     if (data.campPlacesCount !== undefined) updateData.campPlacesCount = data.campPlacesCount;
@@ -244,14 +261,72 @@ export async function PATCH(
     if (data.accommodationType !== undefined) updateData.accommodationType = data.accommodationType;
     if (data.accommodationAddress !== undefined) updateData.accommodationAddress = data.accommodationAddress;
     if (data.accommodationRooms !== undefined) updateData.accommodationRooms = data.accommodationRooms;
-    if (data.campIncludedMeals !== undefined) updateData.campIncludedMeals = data.campIncludedMeals;
+    if (data.campIncludedMeals !== undefined)
+      updateData.campIncludedMeals =
+        data.campIncludedMeals === null
+          ? Prisma.DbNull
+          : (data.campIncludedMeals as unknown as Prisma.InputJsonValue);
     if (data.campSafetyInfo !== undefined) updateData.campSafetyInfo = data.campSafetyInfo;
     if (data.campMedicalInfo !== undefined) updateData.campMedicalInfo = data.campMedicalInfo;
     if (data.accommodationConditions !== undefined) updateData.accommodationConditions = data.accommodationConditions;
     if (data.mealInfo !== undefined) updateData.mealInfo = data.mealInfo;
     if (data.transferInfo !== undefined) updateData.transferInfo = data.transferInfo;
     if (data.whatToBring !== undefined) updateData.whatToBring = data.whatToBring;
-    
+
+    // Не-лагерь: camp-поля из payload не применяем (strip, клиентский гейт
+    // обходится); явный campProgramType: null означает смену типа CAMP → другой —
+    // тогда зависшие camp-данные в БД затираются
+    if (!isCampOffer) {
+      const CAMP_UPDATE_KEYS = [
+        "campProgramType",
+        "campSessions",
+        "campSessionDuration",
+        "campStayDuration",
+        "campPlacesCount",
+        "campGroupSize",
+        "campDaySchedule",
+        "campCanSelectDays",
+        "campHasExtendedCare",
+        "accommodationProvided",
+        "accommodationType",
+        "accommodationAddress",
+        "accommodationRooms",
+        "campIncludedMeals",
+        "campSafetyInfo",
+        "campMedicalInfo",
+        "accommodationConditions",
+        "mealInfo",
+        "transferInfo",
+        "whatToBring",
+      ] as const;
+      for (const key of CAMP_UPDATE_KEYS) {
+        delete updateData[key];
+      }
+
+      if (data.campProgramType === null) {
+        updateData.campProgramType = null;
+        updateData.campSessions = Prisma.DbNull;
+        updateData.campSessionDuration = null;
+        updateData.campStayDuration = null;
+        updateData.campPlacesCount = null;
+        updateData.campGroupSize = null;
+        updateData.campDaySchedule = null;
+        updateData.campCanSelectDays = false;
+        updateData.campHasExtendedCare = false;
+        updateData.accommodationProvided = false;
+        updateData.accommodationType = null;
+        updateData.accommodationAddress = null;
+        updateData.accommodationRooms = null;
+        updateData.campIncludedMeals = Prisma.DbNull;
+        updateData.campSafetyInfo = null;
+        updateData.campMedicalInfo = null;
+        updateData.accommodationConditions = null;
+        updateData.mealInfo = null;
+        updateData.transferInfo = null;
+        updateData.whatToBring = null;
+      }
+    }
+
     // Update price fields if they were recalculated
     if (priceFrom !== existingOffer.priceFrom) updateData.priceFrom = priceFrom;
     if (priceText !== existingOffer.priceText) updateData.priceText = priceText;
@@ -265,6 +340,7 @@ export async function PATCH(
         status: true,
         slug: true,
         publishedAt: true,
+        updatedAt: true,
         place: {
           select: {
             id: true,
@@ -346,15 +422,11 @@ export async function DELETE(
         status: "DRAFT",
       },
       include: {
-        place: { select: { ownerBusinessId: true } },
+        place: { select: { ownerBusinessId: true, createdByUserId: true } },
       },
     });
 
-    if (
-      !offer ||
-      !offer.place.ownerBusinessId ||
-      !canManageOwnedContent(user, offer.place.ownerBusinessId)
-    ) {
+    if (!offer || !(await canManagePlaceAsync(user, offer.place))) {
       return NextResponse.json(
         { error: "Offer not found or cannot be deleted" },
         { status: 404 }

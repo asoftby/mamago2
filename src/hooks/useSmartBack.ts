@@ -2,34 +2,45 @@
 
 import { useRouter } from "next/navigation";
 import { useCallback } from "react";
+import { useCityHomeHref } from "@/hooks/useCityHomeHref";
 
-function shouldUseHistoryBack(referrer: string): boolean {
-  if (typeof window === "undefined" || !referrer) {
+function hasSameOriginReferrer(): boolean {
+  if (typeof window === "undefined" || !document.referrer) {
     return false;
   }
 
   try {
-    const referrerUrl = new URL(referrer);
-    return referrerUrl.host === window.location.host;
+    const referrerUrl = new URL(document.referrer);
+    return referrerUrl.origin === window.location.origin;
   } catch {
     return false;
   }
 }
 
-export function useSmartBack(fallbackUrl = "/minsk") {
+/**
+ * Безопасно ли делать router.back(): пользователь пришёл изнутри сайта
+ * (same-origin referrer) и в истории есть куда возвращаться.
+ * Вызывать только из клиентских обработчиков.
+ */
+export function canUseHistoryBack(): boolean {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  return hasSameOriginReferrer() && window.history.length > 1;
+}
+
+export function useSmartBack(fallbackHref?: string) {
   const router = useRouter();
+  const cityHomeHref = useCityHomeHref();
+  const resolvedFallbackHref = fallbackHref ?? cityHomeHref;
 
   return useCallback(() => {
-    if (typeof window === "undefined") {
-      router.push(fallbackUrl);
-      return;
-    }
-
-    if (shouldUseHistoryBack(document.referrer)) {
+    if (canUseHistoryBack()) {
       router.back();
       return;
     }
 
-    router.push(fallbackUrl);
-  }, [fallbackUrl, router]);
+    router.push(resolvedFallbackHref);
+  }, [resolvedFallbackHref, router]);
 }

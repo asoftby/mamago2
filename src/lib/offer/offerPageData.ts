@@ -2,9 +2,14 @@ import prisma from "@/lib/prisma";
 import type { Prisma } from "@prisma/client";
 import type { OfferPageData, OfferType, OfferCtaType, OfferGalleryImage, OfferScheduleItem } from "./offerPageTypes";
 import { formatAgeRange, formatPrice } from "./offerPageFormat";
-import { BELARUS_CURRENCY_SYMBOL, normalizeUiCurrencyText } from "@/lib/formatters/format-price";
-import { resolvePlaceLogoImage } from "@/lib/place/resolvePlaceLogoImage";
-import { isMediaAssetCuid } from "@/lib/media/isMediaAssetCuid";
+import {
+  BELARUS_CURRENCY_SYMBOL,
+  formatPriceAmount,
+  normalizeUiCurrencyText,
+} from "@/lib/formatters/format-price";
+import { getMinCampSessionPrice, parseCampSessionPrice } from "@/lib/offers/campPricing";
+import { CAMP_OFFER_DISCOVERY_GROUP_SLUGS } from "@/lib/offers/campOfferDiscoverySignals";
+import { resolvePlaceLogoUrlFromDb } from "@/lib/place/resolvePlaceLogoUrlFromDb";
 import { isGoogleReviewsEnabled } from "@/lib/place/googleReviewsMeta";
 
 interface GetOfferPageDataParams {
@@ -18,8 +23,9 @@ type CampSessionJson = {
   title?: string;
   dateFrom?: string;
   dateTo?: string;
-  priceOverride?: number;
+  priceOverride?: number | string;
   description?: string;
+  promotionDetails?: string;
   ageFrom?: number;
   ageTo?: number;
   spotsLeft?: number;
@@ -38,6 +44,16 @@ function asOptionalNumber(value: unknown): number | undefined {
   return typeof value === "number" && Number.isFinite(value) ? value : undefined;
 }
 
+function formatCampSessionAgeRange(
+  ageFrom?: number,
+  ageTo?: number,
+): string | undefined {
+  if (ageFrom == null && ageTo == null) return undefined;
+  if (ageFrom != null && ageTo != null) return `${ageFrom}–${ageTo} лет`;
+  if (ageFrom != null) return `от ${ageFrom} лет`;
+  return `до ${ageTo} лет`;
+}
+
 function parseCampSession(value: Prisma.JsonValue, index: number): OfferScheduleItem | null {
   if (!isCampSessionJson(value)) return null;
 
@@ -46,7 +62,7 @@ function parseCampSession(value: Prisma.JsonValue, index: number): OfferSchedule
   const dateTo = asOptionalString(session.dateTo);
   const ageFrom = asOptionalNumber(session.ageFrom);
   const ageTo = asOptionalNumber(session.ageTo);
-  const priceOverride = asOptionalNumber(session.priceOverride);
+  const priceOverride = parseCampSessionPrice(session.priceOverride) ?? undefined;
 
   return {
     id: asOptionalString(session.id) ?? `camp-session-${index}`,
@@ -56,11 +72,9 @@ function parseCampSession(value: Prisma.JsonValue, index: number): OfferSchedule
       : undefined,
     dateTo: dateTo ? new Date(dateTo).toLocaleDateString("ru-RU") : undefined,
     price: priceOverride != null ? formatPrice(priceOverride) : undefined,
-    description: asOptionalString(session.description),
-    ageRange:
-      ageFrom != null || ageTo != null
-        ? `${ageFrom ?? ""}-${ageTo ?? ""}`
-        : undefined,
+    description: asOptionalString(stripHtml(session.description)),
+    promotionDetails: asOptionalString(stripHtml(session.promotionDetails)),
+    ageRange: formatCampSessionAgeRange(ageFrom, ageTo),
     spotsLeft: asOptionalNumber(session.spotsLeft),
     capacity: asOptionalNumber(session.capacity),
     ctaEnabled: true,
@@ -164,6 +178,7 @@ export async function getOfferPageData({
   section,
   slug,
 }: GetOfferPageDataParams): Promise<OfferPageData | null> {
+  void section;
   // 1. Fetch offer with all related data
   // Note: Offer unique constraint is @@unique([cityId, slug]), so findUnique({ where: { slug } })
   // is invalid. Use findFirst to look up by slug across cityId values (including null).
@@ -192,23 +207,9 @@ export async function getOfferPageData({
     return null;
   }
 
-  // 2a. Place logo: PlaceImage (resolvePlaceLogoImage) or legacy MediaAsset id
-  let placeLogoUrl: string | undefined;
-  if (offer.place) {
-    const resolved = resolvePlaceLogoImage(offer.place.images, offer.place.logoImageId);
-    placeLogoUrl = resolved?.url?.trim() || undefined;
-    if (
-      !placeLogoUrl &&
-      offer.place.logoImageId &&
-      isMediaAssetCuid(offer.place.logoImageId)
-    ) {
-      const logoAsset = await prisma.mediaAsset.findUnique({
-        where: { id: offer.place.logoImageId },
-        select: { publicUrl: true },
-      });
-      placeLogoUrl = logoAsset?.publicUrl?.trim() || undefined;
-    }
-  }
+  const placeLogoUrl = offer.place
+    ? await resolvePlaceLogoUrlFromDb(offer.place.images, offer.place.logoImageId)
+    : undefined;
 
   // 2. Fetch reviews from PlaceReview (only MAMAGO source)
   const reviews = await prisma.placeReview.findMany({
@@ -229,6 +230,31 @@ export async function getOfferPageData({
     },
   });
 
+  const selectedCampCharacteristics =
+    offer.campProgramType && offer.discoverySignalIds.length > 0
+      ? await prisma.signalDefinition.findMany({
+          where: {
+            id: { in: offer.discoverySignalIds },
+            parent: {
+              slug: { in: CAMP_OFFER_DISCOVERY_GROUP_SLUGS },
+            },
+          },
+          select: {
+            id: true,
+            title: true,
+            order: true,
+            parent: {
+              select: {
+                slug: true,
+                title: true,
+                order: true,
+              },
+            },
+          },
+          orderBy: [{ parent: { order: "asc" } }, { order: "asc" }],
+        })
+      : [];
+
   // 3. Map to OfferPageData
   
   // Determine offer type
@@ -245,8 +271,12 @@ export async function getOfferPageData({
 
   // Map schedule items
   const campSessionsRaw = Array.isArray(offer.campSessions) ? offer.campSessions : [];
-  const fallbackShiftPrice = offer.priceFrom
-    ? formatPrice(offer.priceFrom)
+  const derivedCampPriceFrom =
+    offerType === "CAMP" ? getMinCampSessionPrice(campSessionsRaw) : null;
+  const effectivePriceFrom =
+    offerType === "CAMP" ? derivedCampPriceFrom : offer.priceFrom;
+  const fallbackShiftPrice = effectivePriceFrom != null
+    ? formatPrice(effectivePriceFrom)
     : undefined;
   const scheduleItems: OfferScheduleItem[] = campSessionsRaw
     .map((session, index) => parseCampSession(session, index))
@@ -254,16 +284,30 @@ export async function getOfferPageData({
     .map((item) => ({ ...item, price: item.price ?? fallbackShiftPrice }));
 
   // Map pricing
-  const pricingMode = offer.priceFrom ? "single" : "multiple";
-  const plainPriceCaption = stripHtml(offer.priceCaption);
-  const parsedDiscounts = extractDiscountsFromPromotionDetails(offer.promotionDetails);
-  const promoPercent = extractPromoPercent(offer.promoTitle, offer.promotionalOffer, offer.promotionDetails);
-  const inferredOldPrice = formatOldPriceFromPercent(offer.priceFrom, promoPercent);
-  const promotionText = resolvePromotionText({
-    promoTitle: offer.promoTitle,
-    promotionalOffer: offer.promotionalOffer,
-    hasDiscounts: parsedDiscounts.length > 0,
-  });
+  const pricingMode = effectivePriceFrom != null ? "single" : "multiple";
+  const plainPriceCaption =
+    offerType === "CAMP" ? "" : stripHtml(offer.priceCaption);
+  const parsedDiscounts =
+    offerType === "CAMP"
+      ? []
+      : extractDiscountsFromPromotionDetails(offer.promotionDetails);
+  const promoPercent =
+    offerType === "CAMP"
+      ? null
+      : extractPromoPercent(
+          offer.promoTitle,
+          offer.promotionalOffer,
+          offer.promotionDetails,
+        );
+  const inferredOldPrice = formatOldPriceFromPercent(effectivePriceFrom, promoPercent);
+  const promotionText =
+    offerType === "CAMP"
+      ? undefined
+      : resolvePromotionText({
+          promoTitle: offer.promoTitle,
+          promotionalOffer: offer.promotionalOffer,
+          hasDiscounts: parsedDiscounts.length > 0,
+        });
   
   // Map meta grid
   const metaGrid = [
@@ -334,17 +378,28 @@ export async function getOfferPageData({
     
     pricing: {
       mode: pricingMode,
-      singlePrice: offer.priceFrom ? formatPrice(offer.priceFrom) : undefined,
-      priceCaption: normalizeUiCurrencyText(offer.priceCaption || undefined) || undefined,
-      priceDisplay: offer.priceFrom ? new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 0 }).format(offer.priceFrom) : undefined,
+      singlePrice: effectivePriceFrom != null ? formatPrice(effectivePriceFrom) : undefined,
+      priceCaption:
+        offerType === "CAMP"
+          ? undefined
+          : normalizeUiCurrencyText(offer.priceCaption || undefined) || undefined,
+      priceDisplay:
+        effectivePriceFrom != null ? formatPriceAmount(effectivePriceFrom) : undefined,
       priceUnit: resolvePriceUnit({
         offerType,
         plainPriceCaption,
       }),
+      priceFrom:
+        offerType === "CAMP" && effectivePriceFrom == null
+          ? "Цена зависит от смены"
+          : effectivePriceFrom != null
+            ? formatPrice(effectivePriceFrom)
+            : undefined,
       promotionText,
-      promoTitle: offer.promoTitle || undefined,
+      promoTitle: offerType === "CAMP" ? undefined : offer.promoTitle || undefined,
       promoUntil: offer.promoUntil ? offer.promoUntil.toISOString() : undefined,
-      promotionDetails: offer.promotionDetails || undefined,
+      promotionDetails:
+        offerType === "CAMP" ? undefined : offer.promotionDetails || undefined,
       discounts: parsedDiscounts.length > 0 ? parsedDiscounts : undefined,
       oldPrice: inferredOldPrice,
     },
@@ -401,6 +456,13 @@ export async function getOfferPageData({
     averageRating: reviews.length > 0 
       ? reviews.reduce((acc, r) => acc + r.rating, 0) / reviews.length 
       : undefined,
+    perks:
+      offerType === "CAMP" && selectedCampCharacteristics.length > 0
+        ? selectedCampCharacteristics.slice(0, 5).map((signal) => ({
+            label: signal.parent?.title ?? "Характеристика",
+            stat: signal.title,
+          }))
+        : undefined,
 
     cta: {
       type: ctaType,

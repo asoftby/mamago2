@@ -11,10 +11,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
+import { PublicationTagChips } from "@/components/article/PublicationTagChips";
 import { MobileSmartBackButton } from "@/components/shared/MobileSmartBackButton";
 import type { ArticleMvpResolvedBlock, PlaceCardExtra } from "@/lib/article/articleMvpRenderData";
 import { articleBlockHtmlForEditor, articleBlockHtmlForPublic } from "@/lib/article/articleBlockHtml";
 import { SaveHeart } from "@/features/save/SaveHeart";
+import { getCityHomeHref } from "@/lib/header/getCityHomeHref";
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 
@@ -46,6 +48,15 @@ const capsStyle: React.CSSProperties = {
   color: C.ink3,
 };
 
+function SectionKicker({ label }: { label: string }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 18 }}>
+      <span style={{ ...capsStyle, color: C.ink }}>{label}</span>
+      <span style={{ flex: 1, height: 1, background: C.line }} />
+    </div>
+  );
+}
+
 // ─── Reading progress ─────────────────────────────────────────────────────────
 
 function ReadingProgress() {
@@ -69,21 +80,46 @@ function ReadingProgress() {
 
 // ─── Marquee ticker ───────────────────────────────────────────────────────────
 
+const MARQUEE_ITEM_GAP = 20;
+
+function MarqueeDot() {
+  return (
+    <span
+      aria-hidden
+      style={{
+        width: 5,
+        height: 5,
+        borderRadius: 99,
+        background: "#fff",
+        opacity: 0.65,
+        flexShrink: 0,
+      }}
+    />
+  );
+}
+
 function Marquee({ items }: { items: string[] }) {
   const half = Array.from({ length: 15 }, () => items).flat();
   const row = [...half, ...half];
   return (
     <div style={{ background: C.breaking, color: "#fff", overflow: "hidden" }}>
       <div style={{
-        display: "flex", whiteSpace: "nowrap", width: "max-content",
+        display: "flex",
+        alignItems: "center",
+        gap: MARQUEE_ITEM_GAP,
+        whiteSpace: "nowrap",
+        width: "max-content",
         animation: "bn-marquee 18s linear infinite",
         padding: "9px 0",
-        fontFamily: FONT_MONO, fontSize: 11, letterSpacing: ".08em", textTransform: "uppercase",
+        fontFamily: FONT_MONO,
+        fontSize: 11,
+        letterSpacing: ".08em",
+        textTransform: "uppercase",
       }}>
         {row.map((t, i) => (
-          <span key={i} style={{ display: "inline-flex", alignItems: "center", gap: 18, padding: "0 18px" }}>
-            <span style={{ opacity: .9 }}>{t}</span>
-            <span style={{ width: 5, height: 5, borderRadius: 99, background: "#fff", opacity: .65 }} />
+          <span key={i} style={{ display: "contents" }}>
+            <MarqueeDot />
+            <span style={{ opacity: 0.9 }}>{t}</span>
           </span>
         ))}
       </div>
@@ -233,13 +269,22 @@ function NewsHero({
           {/* Meta row */}
           <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 18, flexWrap: "wrap" }}>
             <span style={{
-              display: "inline-flex", alignItems: "center", gap: 6,
-              height: 26, padding: "0 10px", borderRadius: 999,
-              background: C.breaking, color: "#fff",
+              display: "inline-flex", alignItems: "center", gap: 8,
+              color: C.breaking,
               fontFamily: FONT_MONO, letterSpacing: ".14em", textTransform: "uppercase",
               fontSize: 11, fontWeight: 500,
             }}>
-              <span style={{ width: 6, height: 6, borderRadius: 99, background: "#fff", animation: "bn-blink 1.6s ease-in-out infinite" }} />
+              <span
+                aria-hidden
+                style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: 99,
+                  background: C.breaking,
+                  flexShrink: 0,
+                  animation: "bn-pulse 1.6s ease-out infinite",
+                }}
+              />
               Breaking News
             </span>
             <span style={{ ...capsStyle, color: C.ink2 }}>Минск</span>
@@ -467,14 +512,27 @@ function ArticleBody({ blocks }: { blocks: ArticleMvpResolvedBlock[] }) {
     <section style={{ padding: "28px 0 12px" }}>
       <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 28px" }}>
         <div style={{ maxWidth: 720, margin: "0 auto" }}>
-          {contentBlocks.map((block, i) => (
+          {contentBlocks.map((block, i) => {
+            const textBlockIndex =
+              block.type === "text"
+                ? contentBlocks.slice(0, i + 1).filter((item) => item.type === "text").length - 1
+                : -1;
+            const isPricingTextBlock = block.type === "text" && textBlockIndex === 1;
+            if (block.type === "text" && isPricingTextBlock && !block.text.trim()) {
+              return null;
+            }
+
+            return (
             <div key={block.id} style={{ marginBottom: i < contentBlocks.length - 1 ? 48 : 0 }}>
               {block.type === "text" && (
-                <div
-                  className="prose prose-lg max-w-none bn-body"
-                  style={{ color: C.ink, fontFamily: "var(--font-serif), Georgia, serif", fontSize: 20, lineHeight: 1.7 }}
-                  dangerouslySetInnerHTML={{ __html: articleBlockHtmlForPublic(block.text, "text") }}
-                />
+                <>
+                  {isPricingTextBlock ? <SectionKicker label="Сколько стоит" /> : null}
+                  <div
+                    className="bn-body"
+                    style={{ color: C.ink, fontFamily: "var(--font-serif)", fontSize: 20, lineHeight: 1.7 }}
+                    dangerouslySetInnerHTML={{ __html: articleBlockHtmlForPublic(block.text, "text") }}
+                  />
+                </>
               )}
               {block.type === "quote" && (
                 <blockquote style={{ display: "flex", gap: 20, margin: 0, padding: 0 }}>
@@ -482,7 +540,7 @@ function ArticleBody({ blocks }: { blocks: ArticleMvpResolvedBlock[] }) {
                   <div style={{ minWidth: 0, flex: 1, paddingBlock: 4 }}>
                     <div
                       className="bn-body"
-                      style={{ fontFamily: "var(--font-serif), Georgia, serif", fontSize: 22, lineHeight: 1.6, color: C.ink, fontStyle: "italic" }}
+                      style={{ fontFamily: "var(--font-serif)", fontSize: 22, lineHeight: 1.6, color: C.ink, fontStyle: "italic" }}
                       dangerouslySetInnerHTML={{ __html: articleBlockHtmlForEditor(block.text, "quote") }}
                     />
                     {(block.attribution || block.authorRole) && (
@@ -496,7 +554,8 @@ function ArticleBody({ blocks }: { blocks: ArticleMvpResolvedBlock[] }) {
                 </blockquote>
               )}
             </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </section>
@@ -514,31 +573,14 @@ function PriceSection({ placeExtra }: { placeExtra: PlaceCardExtra }) {
     .format(new Date(priceUpdatedAt))
     .replace(/ г\.$/, "");
 
-  const plural = (n: number) => {
-    const mod10 = n % 10;
-    const mod100 = n % 100;
-    if (mod100 >= 11 && mod100 <= 14) return "позиций";
-    if (mod10 === 1) return "позиция";
-    if (mod10 >= 2 && mod10 <= 4) return "позиции";
-    return "позиций";
-  };
-
   return (
     <section style={{ padding: "40px 0 0" }}>
       <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 28px" }}>
         <div style={{ maxWidth: 720, margin: "0 auto" }}>
-          {/* Header */}
-          <div style={{
-            display: "flex", alignItems: "center", gap: 14,
-            paddingBottom: 14, borderBottom: `1px solid ${C.line}`,
-          }}>
-            <span style={{ ...capsStyle, color: C.ink }}>Сколько стоит</span>
-            <span style={{ flex: 1, height: 1, background: C.line }} />
-            <span style={capsStyle}>{String(items.length).padStart(2, "0")} {plural(items.length)}</span>
-          </div>
+          <SectionKicker label="Сколько стоит" />
 
           {/* Rows */}
-          <div>
+          <div style={{ borderTop: `1px solid ${C.line}` }}>
             {items.map((item, i) => (
               <div key={item.id} style={{
                 display: "flex", alignItems: "baseline", gap: 16,
@@ -681,11 +723,7 @@ function LinkedEntityCard({
     <section style={{ padding: "40px 0 12px" }}>
       <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 28px" }}>
         <div style={{ maxWidth: 720, margin: "0 auto" }}>
-          {/* Kicker */}
-          <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 18 }}>
-            <span style={{ ...capsStyle, color: C.ink }}>О чём речь</span>
-            <span style={{ flex: 1, height: 1, background: C.line }} />
-          </div>
+          <SectionKicker label="О чём речь" />
 
           <div
             className="bn-place-card"
@@ -921,6 +959,19 @@ function GlobalStyles() {
     <style>{`
       .bn-body p { margin-top: 0; margin-bottom: 1.4em; }
       .bn-body p:last-child { margin-bottom: 0; }
+      /* Как в редакторе: переносы внутри одного <p> выглядят отдельными строками */
+      .bn-body p br { display: block; margin-bottom: 0.65em; }
+      .bn-body p br:last-child { margin-bottom: 0; }
+      .bn-body ul, .bn-body ol { margin-top: 0; margin-bottom: 1.4em; padding-left: 1.5em; }
+      .bn-body ul { list-style-type: disc; }
+      .bn-body ol { list-style-type: decimal; }
+      .bn-body li { display: list-item; margin-bottom: 0.4em; }
+      .bn-body li:last-child { margin-bottom: 0; }
+      .bn-body li > p { margin-bottom: 0.4em; }
+      .bn-body li > p:last-child { margin-bottom: 0; }
+      .bn-body strong, .bn-body b { font-weight: 600; }
+      .bn-body em, .bn-body i { font-style: italic; }
+      .bn-body a { color: ${C.accent}; text-decoration: underline; text-underline-offset: 3px; }
       @keyframes bn-marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
       @keyframes bn-blink { 0%, 60% { opacity: 1; } 80% { opacity: .25; } 100% { opacity: 1; } }
       @keyframes bn-pulse { 0% { box-shadow: 0 0 0 0 rgba(214,52,43,.55); } 70% { box-shadow: 0 0 0 12px rgba(214,52,43,0); } 100% { box-shadow: 0 0 0 0 rgba(214,52,43,0); } }
@@ -950,9 +1001,11 @@ export interface BreakingNewsViewProps {
   publishedAt: Date | null;
   blocks: ArticleMvpResolvedBlock[];
   author: { displayName: string | null; avatarUrl: string | null } | null;
+  tags?: Array<{ slug: string; title: string }>;
   related: RelatedArticle[];
   editHref?: string;
   draftWatermark?: boolean;
+  citySlug?: string | null;
 }
 
 export function BreakingNewsView({
@@ -962,10 +1015,14 @@ export function BreakingNewsView({
   publishedAt,
   blocks,
   author,
+  tags = [],
   related,
   editHref,
   draftWatermark,
+  citySlug,
 }: BreakingNewsViewProps) {
+  const cityHomeHref = getCityHomeHref(citySlug);
+
   // Extract gallery URLs from the gallery block.
   const galleryBlock = blocks.find((b): b is Extract<ArticleMvpResolvedBlock, { type: "gallery" }> => b.type === "gallery");
   const galleryUrls = galleryBlock ? galleryBlock.imageUrls.filter((u): u is string => Boolean(u)) : [];
@@ -979,7 +1036,7 @@ export function BreakingNewsView({
   const breadcrumbs = ["Главная", "Журнал", title];
 
   return (
-    <div style={{ background: C.bg, color: C.ink, minHeight: "100vh", position: "relative" }}>
+    <div style={{ background: "#fff", color: C.ink, minHeight: "100vh", position: "relative" }}>
       <GlobalStyles />
 
       {/* Grain texture overlay */}
@@ -1004,7 +1061,7 @@ export function BreakingNewsView({
       )}
 
       <div className="mx-auto w-full max-w-[1200px] px-4 pt-4 sm:px-6 lg:px-8">
-        <MobileSmartBackButton fallbackUrl="/minsk" />
+        <MobileSmartBackButton fallbackHref={cityHomeHref} />
       </div>
 
       <Breadcrumbs items={breadcrumbs} />
@@ -1016,6 +1073,11 @@ export function BreakingNewsView({
         author={author}
         editHref={editHref}
       />
+      <div className="mx-auto w-full max-w-[1200px] px-4 sm:px-6 lg:px-8">
+        <div className="max-w-[760px] pb-6">
+          <PublicationTagChips tags={tags} citySlug={citySlug} />
+        </div>
+      </div>
       <HeroGallery urls={galleryUrls} title={title} />
       <ArticleBody blocks={blocks} />
 

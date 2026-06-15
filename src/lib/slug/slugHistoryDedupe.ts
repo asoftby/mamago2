@@ -48,9 +48,10 @@ export async function createArticleSlugHistoryIgnoreDuplicate(
   tx: Prisma.TransactionClient,
   articleId: string,
   slug: string,
+  cityId?: string | null,
 ): Promise<void> {
   try {
-    await tx.articleSlugHistory.create({ data: { articleId, slug } });
+    await tx.articleSlugHistory.create({ data: { articleId, slug, cityId } });
   } catch (e) {
     if (!isUniqueViolation(e)) throw e;
   }

@@ -1,9 +1,15 @@
 import prisma from "@/lib/prisma";
+import {
+  buildCityPublicPath,
+  buildNationalArticlePath,
+} from "@/lib/routing/cityPaths";
 import { parseArticleContentJson } from "@/lib/publications/articleMvp";
 import { BREAKING_NEWS_SUBTITLE } from "@/lib/publications/breakingNewsArticle";
 
 export type CityHomeJournalArticle = {
   slug: string;
+  /** Pre-computed canonical public href (/{city}/blog/{slug} or /blog/{slug}) */
+  href: string;
   title: string;
   subtitle: string | null;
   category: string;
@@ -55,15 +61,17 @@ export async function listCityHomeArticles(city: {
       slug: { not: null },
       publishedAt: { not: null },
       OR: [
-        { cityContext: city.slug },
-        { cityContext: city.name },
-        { subtitle: BREAKING_NEWS_SUBTITLE, cityContext: null },
+        // CITY-scoped articles for this city
+        { geoScope: "CITY", cityId: city.id },
+        // Breaking news: country-scope articles shown on every city home
+        { subtitle: BREAKING_NEWS_SUBTITLE, geoScope: "COUNTRY" },
       ],
     },
     orderBy: [{ publishedAt: "desc" }, { updatedAt: "desc" }],
     take: 6,
     select: {
       slug: true,
+      geoScope: true,
       title: true,
       subtitle: true,
       excerpt: true,
@@ -71,6 +79,7 @@ export async function listCityHomeArticles(city: {
       publishedAt: true,
       heroImage: true,
       coverImage: { select: { publicUrl: true } },
+      category: { select: { nameRu: true } },
     },
   });
 
@@ -78,9 +87,16 @@ export async function listCityHomeArticles(city: {
     .filter((row): row is typeof row & { slug: string } => Boolean(row.slug))
     .map((row) => ({
       slug: row.slug,
+      href:
+        row.geoScope === "CITY"
+          ? buildCityPublicPath({ citySlug: city.slug, type: "article", slug: row.slug })
+          : buildNationalArticlePath(row.slug),
       title: row.title,
       subtitle: row.subtitle === BREAKING_NEWS_SUBTITLE ? null : row.subtitle,
-      category: row.subtitle === BREAKING_NEWS_SUBTITLE ? "Новость" : "Статья",
+      category:
+        row.subtitle === BREAKING_NEWS_SUBTITLE
+          ? "Новость"
+          : row.category?.nameRu ?? "Статья",
       isBreakingNews: row.subtitle === BREAKING_NEWS_SUBTITLE,
       readTime: estimateReadTimeMinutes(extractArticlePlainText(row.contentJson, row.excerpt)),
       publishedAt: row.publishedAt,

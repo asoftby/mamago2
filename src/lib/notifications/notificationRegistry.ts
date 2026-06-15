@@ -11,6 +11,8 @@
  * ВАЖНО: Этот файл должен быть client-safe (без server-only зависимостей)
  */
 
+import { z } from "zod";
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export type NotificationAudience = "USER" | "BUSINESS" | "ADMIN";
@@ -473,6 +475,25 @@ export const NOTIFICATION_REGISTRY: Record<string, NotificationRegistryEntry> = 
     category: "BUSINESS",
   },
 
+  BUSINESS_VERIFICATION_SUBMITTED: {
+    type: "BUSINESS_VERIFICATION_SUBMITTED",
+    audience: "BUSINESS",
+    surface: "BUSINESS",
+    groupId: "business",
+    label: "Заявка на верификацию отправлена",
+    description: "Профиль бизнеса принят и отправлен на модерацию",
+    defaultChannels: { inApp: true, email: false, telegram: true },
+    entityType: "BUSINESS",
+    ctaLabel: "Статус заявки",
+    resolveHref: () => "/business/verification",
+    telegram: {
+      enabledByDefault: true,
+      template: "business_verification_submitted",
+    },
+    importance: "NORMAL",
+    category: "BUSINESS",
+  },
+
   BUSINESS_APPLICATION_CREATED: {
     type: "BUSINESS_APPLICATION_CREATED",
     audience: "ADMIN",
@@ -762,4 +783,287 @@ export function validateNotificationRegistry(prismaNotificationTypes: string[]):
   if (missingInPrisma.length === 0 && missingInRegistry.length === 0) {
     console.debug("[NotificationRegistry] ✅ Registry and Prisma enum are in sync");
   }
+}
+
+// ─── Scenario Template Registry ───────────────────────────────────────────────
+//
+// Сценарий — единица настройки шаблонов уведомлений: для каждого сценария
+// определены Zod-схема переменных payload, сэмпл для превью/тестов и дефолтные
+// шаблоны per-канал. Дефолты живут в коде; запись NotificationTemplate в БД —
+// это override (см. prisma/schema.prisma → NotificationTemplate).
+//
+// Синтаксис шаблона: {{var}} — простая интерполяция, без выражений и eval.
+// subject: для EMAIL — тема письма, для IN_APP/TELEGRAM — заголовок сообщения.
+// CTA (label/url) шаблонами не настраивается — задаётся кодом/registry.
+//
+// Список сценариев определяется ТОЛЬКО здесь. Админка сценарии не создаёт.
+
+export type ScenarioTemplateChannel = "IN_APP" | "EMAIL" | "TELEGRAM";
+
+export type ScenarioTemplateDefault =
+  | { kind: "template"; subject: string | null; body: string }
+  /**
+   * Дефолтный рендер остаётся за кодом (React Email-компонент);
+   * override из БД заменяет его {{var}}-шаблоном.
+   */
+  | { kind: "code"; note: string };
+
+export interface NotificationScenarioDefinition {
+  key: string;
+  audience: NotificationAudience;
+  description: string;
+  /** Плоские строковые переменные, доступные в шаблоне как {{var}} */
+  payloadSchema: z.ZodObject<z.ZodRawShape>;
+  /** Сэмпл-payload для live-превью и валидации шаблонов */
+  samplePayload: Record<string, string>;
+  /** Дефолтные шаблоны по каналам; канал без дефолта шаблонами не рендерится */
+  defaults: Partial<Record<ScenarioTemplateChannel, ScenarioTemplateDefault>>;
+  /**
+   * true — сценарий сгенерирован из legacy NotificationType с generic-схемой
+   * {title, body, ctaLabel, ctaUrl}: тексты формируются в notifyXxx и
+   * прокидываются в шаблон как готовые строки.
+   */
+  isLegacyGeneric: boolean;
+}
+
+/**
+ * Иконка Telegram-сообщения по типу уведомления.
+ * Перенесено из TelegramTemplateRenderer (префиксная логика) — единый источник
+ * для генерации дефолтных шаблонов и канального рендера.
+ */
+export function getTelegramIconForNotificationType(type: string): string {
+  if (type.startsWith("BOOKING_")) return "📌";
+  if (type.startsWith("PLACE_")) return "📍";
+  if (type.startsWith("ACTIVITY_")) return "🎟️";
+  if (type.startsWith("OFFER_")) return "🎁";
+  if (type.startsWith("BUSINESS_")) return "🏢";
+  if (type.startsWith("ADMIN_")) return "🛠";
+  if (type === "REMINDER" || type === "PLAN_TOMORROW_DIGEST") return "⏰";
+  return "🔔";
+}
+
+/** Generic-схема legacy-сценариев (вариант А): готовые строки из notifyXxx. */
+const legacyNotificationPayloadSchema = z.object({
+  title: z.string(),
+  body: z.string(),
+  ctaLabel: z.string().optional(),
+  ctaUrl: z.string().optional(),
+});
+
+const LEGACY_SAMPLE_PAYLOAD: Record<string, string> = {
+  title: "Заголовок уведомления",
+  body: "Текст уведомления для предпросмотра шаблона.",
+  ctaLabel: "Открыть",
+  ctaUrl: "/me",
+};
+
+/**
+ * Явные сценарии: богатые схемы переменных и дефолтные тексты,
+ * перенесённые 1:1 из текущих хардкодов
+ * (notification-renderer-core.ts, notifyBookingCreated, email-service).
+ */
+const EXPLICIT_SCENARIO_DEFINITIONS: Record<string, NotificationScenarioDefinition> = {
+  PLAN_EVENT_2H_BEFORE: {
+    key: "PLAN_EVENT_2H_BEFORE",
+    audience: "USER",
+    description: "Напоминание о событии в плане перед началом.",
+    payloadSchema: z.object({
+      eventTitle: z.string(),
+      startsAtTime: z.string(),
+      startsAtDate: z.string(),
+      placeName: z.string().optional(),
+      cityName: z.string().optional(),
+    }),
+    samplePayload: {
+      eventTitle: "Детская йога в парке",
+      startsAtTime: "16:00",
+      startsAtDate: "2026-06-12",
+      placeName: "Парк Горького",
+      cityName: "Минск",
+    },
+    defaults: {
+      IN_APP: {
+        kind: "template",
+        subject: "Скоро событие",
+        body: "В {{startsAtTime}} у вас в плане: {{eventTitle}}",
+      },
+      EMAIL: {
+        kind: "template",
+        subject: "Скоро событие",
+        body: "В {{startsAtTime}} у вас в плане: {{eventTitle}}",
+      },
+      TELEGRAM: {
+        kind: "template",
+        subject: "Скоро событие",
+        body: "В {{startsAtTime}} у вас в плане: {{eventTitle}}",
+      },
+    },
+    isLegacyGeneric: false,
+  },
+
+  PLAN_TOMORROW_DIGEST: {
+    key: "PLAN_TOMORROW_DIGEST",
+    audience: "USER",
+    description: "Сводка на завтра по событиям в плане пользователя.",
+    payloadSchema: z.object({
+      digestDate: z.string(),
+      /** Готовые строки позиций дайджеста (время — название — место), собираются кодом */
+      itemsText: z.string(),
+    }),
+    samplePayload: {
+      digestDate: "2026-06-12",
+      itemsText: "10:00 — Детская йога в парке\n📍 Парк Горького\n\n14:00 — Мастер-класс по лепке\n📍 Студия «Глина»",
+    },
+    defaults: {
+      IN_APP: { kind: "template", subject: "Завтра в плане", body: "{{itemsText}}" },
+      EMAIL: { kind: "template", subject: "Завтра в плане", body: "{{itemsText}}" },
+      TELEGRAM: { kind: "template", subject: "Завтра в плане", body: "{{itemsText}}" },
+    },
+    isLegacyGeneric: false,
+  },
+
+  BOOKING_CREATED: {
+    key: "BOOKING_CREATED",
+    audience: "BUSINESS",
+    description: "Новая заявка на запись для бизнеса.",
+    payloadSchema: z.object({
+      /** Готовая фраза из buildBookingNotificationBody — дефолт использует её 1:1 */
+      bookingSummary: z.string(),
+      /** «Имя ребёнка (N лет)» либо имя клиента — как в текущем форматтере */
+      actor: z.string(),
+      customerName: z.string(),
+      childName: z.string().optional(),
+      childAge: z.string().optional(),
+      offerTitle: z.string().optional(),
+      activityTitle: z.string().optional(),
+      placeTitle: z.string().optional(),
+      campShiftTitle: z.string().optional(),
+      campShiftDateFrom: z.string().optional(),
+      campShiftDateTo: z.string().optional(),
+    }),
+    samplePayload: {
+      bookingSummary: "Маша (6 лет) оставил заявку на «Детская йога»",
+      actor: "Маша (6 лет)",
+      customerName: "Анна Петрова",
+      childName: "Маша",
+      childAge: "6",
+      offerTitle: "Детская йога",
+    },
+    defaults: {
+      IN_APP: { kind: "template", subject: "Новая заявка", body: "{{bookingSummary}}" },
+      EMAIL: { kind: "template", subject: "Новая заявка", body: "{{bookingSummary}}" },
+      TELEGRAM: { kind: "template", subject: "📌 Новая заявка", body: "{{bookingSummary}}" },
+    },
+    isLegacyGeneric: false,
+  },
+
+  VERIFY_EMAIL: {
+    key: "VERIFY_EMAIL",
+    audience: "USER",
+    description: "Подтверждение email-адреса (transactional).",
+    payloadSchema: z.object({
+      verifyUrl: z.string(),
+    }),
+    samplePayload: {
+      verifyUrl: "https://mamago.by/verify-email?token=demo",
+    },
+    defaults: {
+      EMAIL: {
+        kind: "code",
+        note: "React Email: VerifyEmailTemplate (src/features/email/templates/verify-email)",
+      },
+    },
+    isLegacyGeneric: false,
+  },
+
+  RESET_PASSWORD: {
+    key: "RESET_PASSWORD",
+    audience: "USER",
+    description: "Восстановление пароля (transactional).",
+    payloadSchema: z.object({
+      resetUrl: z.string(),
+    }),
+    samplePayload: {
+      resetUrl: "https://mamago.by/reset-password?token=demo",
+    },
+    defaults: {
+      EMAIL: {
+        kind: "code",
+        note: "React Email: PasswordResetTemplate (src/features/email/templates/password-reset)",
+      },
+    },
+    isLegacyGeneric: false,
+  },
+
+  WELCOME_EMAIL: {
+    key: "WELCOME_EMAIL",
+    audience: "USER",
+    description: "Приветственное письмо новому пользователю (transactional). Ключ отделён от in-app типа WELCOME.",
+    payloadSchema: z.object({
+      userName: z.string().optional(),
+      ctaUrl: z.string(),
+    }),
+    samplePayload: {
+      userName: "Анна",
+      ctaUrl: "https://mamago.by/me",
+    },
+    defaults: {
+      EMAIL: {
+        kind: "code",
+        note: "React Email: MamagoWelcomeTemplate (emails/mamago-welcome)",
+      },
+    },
+    isLegacyGeneric: false,
+  },
+};
+
+/**
+ * Legacy-сценарий из записи NOTIFICATION_REGISTRY: generic-схема, дефолты
+ * воспроизводят текущий рендер 1:1 (in-app/email — passthrough title/body,
+ * telegram — иконка + title/body из telegram-конфига registry).
+ */
+function buildLegacyScenarioDefinition(
+  entry: NotificationRegistryEntry,
+): NotificationScenarioDefinition {
+  const icon = getTelegramIconForNotificationType(entry.type);
+
+  return {
+    key: entry.type,
+    audience: entry.audience,
+    description: entry.description,
+    payloadSchema: legacyNotificationPayloadSchema,
+    samplePayload: { ...LEGACY_SAMPLE_PAYLOAD },
+    defaults: {
+      IN_APP: { kind: "template", subject: "{{title}}", body: "{{body}}" },
+      EMAIL: { kind: "template", subject: "{{title}}", body: "{{body}}" },
+      TELEGRAM: {
+        kind: "template",
+        subject: `${icon} ${entry.telegram.title ?? "{{title}}"}`,
+        body: entry.telegram.body ?? "{{body}}",
+      },
+    },
+    isLegacyGeneric: true,
+  };
+}
+
+export const NOTIFICATION_SCENARIO_REGISTRY: Record<string, NotificationScenarioDefinition> = {
+  ...Object.fromEntries(
+    Object.values(NOTIFICATION_REGISTRY)
+      .filter((entry) => !(entry.type in EXPLICIT_SCENARIO_DEFINITIONS))
+      .map((entry) => [entry.type, buildLegacyScenarioDefinition(entry)]),
+  ),
+  ...EXPLICIT_SCENARIO_DEFINITIONS,
+};
+
+export function getNotificationScenarioDefinition(
+  key: string,
+): NotificationScenarioDefinition | null {
+  return NOTIFICATION_SCENARIO_REGISTRY[key] ?? null;
+}
+
+/** Список переменных, разрешённых в шаблонах сценария (для валидации и подсказок в UI). */
+export function getScenarioTemplateVariables(key: string): string[] {
+  const definition = getNotificationScenarioDefinition(key);
+  if (!definition) return [];
+  return Object.keys(definition.payloadSchema.shape);
 }

@@ -86,7 +86,7 @@ export function NotificationCacheProvider({ children }: { children: ReactNode })
       ...prev,
       notifications: prev.notifications.map((n) =>
         ids.includes(n.id)
-          ? { ...n, seenAt: n.seenAt ?? new Date().toISOString(), isRead: true }
+          ? { ...n, seenAt: n.seenAt ?? new Date().toISOString() }
           : n
       ),
     }));

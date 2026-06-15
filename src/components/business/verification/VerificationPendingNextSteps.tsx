@@ -2,10 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { PrimaryButton } from "@/components/ui/PrimaryButton";
-import { Button } from "@/components/ui/button";
-import { DEFAULT_CITY_HUB_PATH } from "@/lib/intent";
-
-const PRICING_PATH = "/business/pricing";
+import { navigateToSurface } from "@/lib/routing/clientNavigation";
 
 export function VerificationPendingNextSteps() {
   const router = useRouter();
@@ -19,18 +16,15 @@ export function VerificationPendingNextSteps() {
         <PrimaryButton
           type="button"
           className="w-full sm:w-auto sm:min-w-[200px]"
-          onClick={() => router.push(DEFAULT_CITY_HUB_PATH)}
+          onClick={() =>
+            navigateToSurface(router, {
+              targetSurface: "public",
+              targetPath: "/",
+            })
+          }
         >
           На главную
         </PrimaryButton>
-        <Button
-          type="button"
-          variant="outline"
-          className="w-full sm:w-auto sm:min-w-[200px] h-auto rounded-[16px] px-4 py-[14px] text-[16px] font-semibold bg-white"
-          onClick={() => router.push(PRICING_PATH)}
-        >
-          Посмотреть тарифы
-        </Button>
       </div>
     </div>
   );

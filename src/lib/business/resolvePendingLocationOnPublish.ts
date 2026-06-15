@@ -206,7 +206,10 @@ export async function resolvePendingLocationOnPublish(
       if (byId) {
         cityId = byId.id;
       } else {
-        const bySlug = await tx.city.findUnique({ where: { slug: cityRaw }, select: { id: true } });
+        const bySlug = await tx.city.findFirst({
+          where: { slug: cityRaw, isLegacyNonCity: false, country: { isoCode: "BY" } },
+          select: { id: true },
+        });
         cityId = bySlug?.id ?? null;
       }
     }

@@ -3,11 +3,10 @@
  * Pure functions — no React, no side effects.
  */
 
+import { buildNationalArticlePath } from "@/lib/routing/cityPaths";
+
 export const SEO_TITLE_LIMIT = 60;
 export const SEO_DESC_LIMIT = 160;
-
-const SITE_NAME = "mamaGo";
-const SITE_SUFFIX = ` — ${SITE_NAME}`;
 
 // ─── Text utilities ───────────────────────────────────────────────────────────
 
@@ -39,40 +38,26 @@ export function truncateSeoText(text: string, limit: number): string {
 // ─── Auto-generators ─────────────────────────────────────────────────────────
 
 /**
- * Auto-generate SEO title from article title + optional city name.
- *
- * Format: "{title} в {city} — mamaGo"  or  "{title} — mamaGo"
- * Truncated to SEO_TITLE_LIMIT if needed.
+ * Auto-generate SEO title from the latest article headline.
+ * Uses the headline as-is, truncated to SEO_TITLE_LIMIT.
  */
-export function generateBreakingNewsSeoTitle(
-  title: string,
-  cityName?: string,
-): string {
+export function generateBreakingNewsSeoTitle(title: string, _cityName?: string): string {
   const base = title.trim();
   if (!base) return "";
-
-  const city = cityName?.trim();
-  const suffix = city ? ` в ${city}${SITE_SUFFIX}` : SITE_SUFFIX;
-  return truncateSeoText(base + suffix, SEO_TITLE_LIMIT);
+  return truncateSeoText(base, SEO_TITLE_LIMIT);
 }
 
 /**
  * Auto-generate SEO description from article body HTML.
- *
- * Strips tags, appends a call-to-action, truncates to SEO_DESC_LIMIT.
- * Falls back to title-based description when body is empty.
+ * Uses the first SEO_DESC_LIMIT characters of plain text.
  */
 export function generateBreakingNewsSeoDescription(
   bodyHtml: string,
-  fallbackTitle?: string,
+  _fallbackTitle?: string,
 ): string {
   const plain = stripHtml(bodyHtml);
-
-  const base = plain || fallbackTitle?.trim() || "";
-  if (!base) return "";
-
-  const withCta = `${base}. Подробности для родителей на ${SITE_NAME}.`;
-  return truncateSeoText(withCta, SEO_DESC_LIMIT);
+  if (!plain) return "";
+  return truncateSeoText(plain, SEO_DESC_LIMIT);
 }
 
 /**
@@ -87,5 +72,5 @@ export function buildBreakingNewsCanonicalUrl(
 ): string {
   const s = slug.trim();
   if (!s) return "";
-  return `${publicBaseUrl.replace(/\/+$/, "")}/blog/${s}`;
+  return `${publicBaseUrl.replace(/\/+$/, "")}${buildNationalArticlePath(s)}`;
 }

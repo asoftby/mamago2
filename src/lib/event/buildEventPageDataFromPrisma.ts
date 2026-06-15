@@ -1,11 +1,12 @@
 import type { ActivityFormat, EventVenueKind } from "@prisma/client";
 import type { Intent } from "@/lib/intent";
 import { DEFAULT_CITY_HUB_PATH } from "@/lib/intent";
+import type { MediaGalleryItem } from "@/lib/media/galleryTypes";
 import { extractPlainTextFromHtml } from "@/lib/richtext/utils";
 import { sanitizeRichContent } from "@/components/content/RichContentRenderer";
-import { resolvePlaceLogoImage } from "@/lib/place/resolvePlaceLogoImage";
+import { resolvePlaceLogoUrl } from "@/lib/place/resolvePlaceLogoImage";
 import { resolveActivityCoverUrl } from "@/lib/event/resolveActivityCoverUrl";
-import { BYN_SYMBOL, formatPriceFrom } from "@/lib/formatters/format-price";
+import { BYN_SYMBOL, formatPriceAmount, formatPriceFrom } from "@/lib/formatters/format-price";
 import type { EventPageData } from "./eventPageTypes";
 import {
   getActivityFormatDetailLabel,
@@ -50,6 +51,9 @@ export type ActivityForEventPageInput = {
     customAddress: string | null;
     lat: number | null;
     lng: number | null;
+    logoImageId?: string | null;
+    logoUrl?: string;
+    images?: Array<{ id: string; url: string; kind: string }>;
     districtManual: { name: string } | null;
     districtAuto: { name: string } | null;
     metroManual: { name: string } | null;
@@ -69,6 +73,7 @@ export type ActivityForEventPageInput = {
       lat: number | null;
       lng: number | null;
       logoImageId: string | null;
+      logoUrl?: string;
       images: Array<{ id: string; url: string; kind: string }>;
       districtManual: { name: string } | null;
       districtAuto: { name: string } | null;
@@ -106,6 +111,10 @@ function priceTextWithCurrencyIfNeeded(text: string): string {
   ) {
     return text;
   }
+  // Если это чистое число (напр. "15" или "15.50") — форматируем через formatPriceAmount,
+  // чтобы получить "15,00" с фиксированными двумя знаками после запятой.
+  const numStr = formatPriceAmount(text);
+  if (numStr) return `${numStr} ${BYN_SYMBOL}`;
   return `${text} ${BYN_SYMBOL}`;
 }
 
@@ -267,10 +276,11 @@ function venueFromActivity(
     const v = activity.venue;
     if (v.kind === "PLACE" && v.place) {
       const cityForPlace = v.place.city?.slug ?? listingCitySlug ?? fallbackCity;
-      const logoResolved = resolvePlaceLogoImage(v.place.images, v.place.logoImageId);
+      const logoUrl =
+        v.place.logoUrl ?? resolvePlaceLogoUrl(v.place.images, v.place.logoImageId);
       return {
         name: v.place.title,
-        logoUrl: logoResolved?.url?.trim() || undefined,
+        logoUrl,
         address: v.place.customAddress ?? v.place.formattedAddr ?? undefined,
         lat: v.place.lat ?? undefined,
         lng: v.place.lng ?? undefined,
@@ -280,9 +290,26 @@ function venueFromActivity(
       };
     }
     if (v.title || v.addressLine) {
+      const linkedPlace = activity.place;
+      const cityForPlace = linkedPlace?.city?.slug ?? listingCitySlug ?? fallbackCity;
+      const logoUrl = linkedPlace
+        ? linkedPlace.logoUrl ??
+          resolvePlaceLogoUrl(linkedPlace.images, linkedPlace.logoImageId)
+        : undefined;
+
       return {
-        name: v.title ?? activity.title,
-        address: v.addressLine ?? undefined,
+        name: v.title ?? linkedPlace?.title ?? activity.title,
+        logoUrl,
+        address:
+          v.addressLine ??
+          linkedPlace?.customAddress ??
+          linkedPlace?.formattedAddr ??
+          undefined,
+        lat: linkedPlace?.lat ?? undefined,
+        lng: linkedPlace?.lng ?? undefined,
+        district: (linkedPlace?.districtManual ?? linkedPlace?.districtAuto)?.name ?? undefined,
+        metro: (linkedPlace?.metroManual ?? linkedPlace?.metroAuto)?.name ?? undefined,
+        placeHref: linkedPlace ? publicPlaceHref(cityForPlace, linkedPlace) : undefined,
         mapUrl:
           v.addressLine != null && v.addressLine.length > 0
             ? `https://maps.google.com/?q=${encodeURIComponent(v.addressLine)}`
@@ -293,8 +320,12 @@ function venueFromActivity(
   if (activity.place) {
     if (activity.format === "ONLINE") return undefined;
     const cityForPlace = activity.place.city?.slug ?? listingCitySlug ?? fallbackCity;
+    const logoUrl =
+      activity.place.logoUrl ??
+      resolvePlaceLogoUrl(activity.place.images, activity.place.logoImageId);
     return {
       name: activity.place.title,
+      logoUrl,
       address: activity.place.customAddress ?? activity.place.formattedAddr ?? undefined,
       lat: activity.place.lat ?? undefined,
       lng: activity.place.lng ?? undefined,
@@ -337,6 +368,8 @@ export function buildEventPageDataFromPrismaActivity(
     previewBannerLabel?: string;
     hidePublicationStats?: boolean;
     ownerEditHref?: string;
+    /** Pre-fetched Instagram Reels thumbnail URL (og:image from the Reel page). */
+    reelsThumbnailUrl?: string;
   }
 ): EventPageData {
   const citySlug =
@@ -406,10 +439,74 @@ export function buildEventPageDataFromPrismaActivity(
       purchaseUrl: resolvePurchaseUrl(activity),
       simpleBooking: resolveSimpleBooking(activity.id, activity),
     },
+    reelsUrl: resolveReelsUrl(activity),
+    galleryItems: buildGalleryItems(activity, poster, options?.reelsThumbnailUrl),
     ownerEditHref: options?.ownerEditHref,
     previewBannerLabel: options?.previewBannerLabel,
     hidePublicationStats: options?.hidePublicationStats ?? true,
   };
 
   return data;
+}
+
+function resolveReelsUrl(activity: Pick<ActivityForEventPageInput, "scheduleJson">): string | undefined {
+  const raw = activity.scheduleJson;
+  if (!raw || typeof raw !== "object") return undefined;
+  const json = raw as Record<string, unknown>;
+  const url = typeof json.reelsUrl === "string" ? json.reelsUrl.trim() : "";
+  return url && isHttpUrl(url) ? url : undefined;
+}
+
+/**
+ * Builds the gallery strip items shown under the cover image:
+ * [reels?, ...extra photos (excl. cover)]
+ */
+function buildGalleryItems(
+  activity: ActivityForEventPageInput,
+  resolvedPosterUrl: string,
+  reelsThumbnailUrl?: string,
+): MediaGalleryItem[] | undefined {
+  const reelsUrl = resolveReelsUrl(activity);
+
+  // Extra gallery images = all images except the one used as cover
+  const rawImages = activity.images ?? [];
+  const coverId = activity.coverImageId?.trim();
+
+  const extraImages = rawImages.filter((img) => {
+    if (!img.url?.trim()) return false;
+    if (coverId) {
+      if (img.id === coverId || (img as { mediaAssetId?: string | null }).mediaAssetId === coverId) {
+        return false;
+      }
+    }
+    // Also exclude by resolved URL match (covers legacy coverImageUrl path)
+    if (img.url === resolvedPosterUrl) return false;
+    return true;
+  });
+
+  const items: MediaGalleryItem[] = [];
+
+  if (reelsUrl) {
+    const thumbnailSrc =
+      reelsThumbnailUrl ??
+      (resolvedPosterUrl !== "/og-default.jpg" ? resolvedPosterUrl : undefined);
+    items.push({
+      type: "reels",
+      id: "reels",
+      url: reelsUrl,
+      thumbnailSrc,
+      title: "Reels о событии",
+    });
+  }
+
+  for (const img of extraImages) {
+    items.push({
+      type: "image",
+      id: img.id,
+      src: img.url,
+      alt: activity.title,
+    });
+  }
+
+  return items.length > 0 ? items : undefined;
 }

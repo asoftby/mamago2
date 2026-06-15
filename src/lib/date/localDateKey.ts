@@ -1,9 +1,15 @@
-function pad2(value: number): string {
-  return String(value).padStart(2, "0");
-}
+import { DEFAULT_TZ } from "@/server/geo/geoConstants";
 
-export function getLocalDateKey(date: Date = new Date()): string {
-  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
+export function getLocalDateKey(
+  date: Date = new Date(),
+  timeZone: string = DEFAULT_TZ,
+): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date);
 }
 
 function parseLocalDateKey(dateKey: string): Date {
