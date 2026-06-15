@@ -342,7 +342,7 @@ export function StepConfirmation({ builder }: { builder: BuilderHook }) {
         <button
           type="button"
           onClick={resetBuilder}
-          className="rounded-xl bg-[#EF8759] px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#e07848]"
+          className="rounded-xl bg-[#EF8759] px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-primary-hover"
         >
           Создать новый праздник
         </button>
@@ -580,7 +580,7 @@ export function StepConfirmation({ builder }: { builder: BuilderHook }) {
           className={cn(
             "w-full rounded-2xl px-4 py-4 text-base font-semibold transition-all",
             selectedCount > 0 && validOffers.length > 0
-              ? "bg-[#EF8759] text-white shadow-sm hover:bg-[#e07848]"
+              ? "bg-[#EF8759] text-white shadow-sm hover:bg-primary-hover"
               : "cursor-not-allowed bg-muted text-muted-foreground",
           )}
         >

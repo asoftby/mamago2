@@ -123,7 +123,7 @@ export function StepFormat({ builder }: Props) {
         }}
       >
         Где и за{" "}
-        <span style={{ fontFamily: "Georgia, serif", fontStyle: "italic", fontWeight: 400, color: "#E86A3A" }}>сколько</span>?
+        <span style={{ fontFamily: "var(--font-editorial)", fontStyle: "italic", fontWeight: 400, color: "#E86A3A" }}>сколько</span>?
       </h2>
 
       <div

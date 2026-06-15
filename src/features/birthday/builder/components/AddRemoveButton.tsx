@@ -110,7 +110,7 @@ export function AddRemoveButton({
           ? "bg-[#EF8759] text-white"
           : showHoverRemove
             ? "bg-amber-50 border-2 border-amber-300 text-amber-800 hover:bg-amber-100"
-            : "bg-white border border-border text-foreground hover:border-[#EF8759] hover:bg-orange-50",
+            : "bg-white border border-border text-foreground hover:border-border-brand hover:bg-brand-soft",
         className
       )}
     >

@@ -675,7 +675,7 @@ export function BirthdayBuilderStickyBar({ builder }: BirthdayBuilderStickyBarPr
                   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#EF8759]/40 focus-visible:ring-offset-2",
                   "disabled:opacity-50 disabled:pointer-events-none",
                   forwardBlock.isPrimary
-                    ? "bg-[#EF8759] text-white hover:bg-[#e07848] shadow-sm"
+                    ? "bg-[#EF8759] text-white hover:bg-primary-hover shadow-sm"
                     : "border border-border bg-white text-foreground hover:bg-muted/50"
                 )}
               >
