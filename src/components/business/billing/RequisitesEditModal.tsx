@@ -96,7 +96,7 @@ export function RequisitesEditModal({
                   value={formData.legalName}
                   onChange={(e) => handleChange("legalName", e.target.value)}
                   className="w-full px-3 py-2 border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#EF8759] focus:border-transparent"
-                  placeholder='ООО "Детский центр развития"'
+                  placeholder='ООО «Детский центр развития»'
                   required
                 />
               </div>
@@ -149,7 +149,7 @@ export function RequisitesEditModal({
                   value={formData.bankName}
                   onChange={(e) => handleChange("bankName", e.target.value)}
                   className="w-full px-3 py-2 border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#EF8759] focus:border-transparent"
-                  placeholder='ОАО "Беларусбанк"'
+                  placeholder='ОАО «Беларусбанк»'
                 />
               </div>
 

@@ -32,7 +32,7 @@ export function RoutesTabs({ value, items, onChange }: RoutesTabsProps) {
                 "inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium transition-all",
                 active
                   ? "border-[#141210] bg-[#141210] text-white shadow-[0_10px_24px_rgba(20,18,16,0.14)]"
-                  : "border-[rgba(20,18,16,0.1)] bg-white text-[rgba(20,18,16,0.7)] hover:border-[rgba(20,18,16,0.2)] hover:bg-[#FFF8F5]",
+                  : "border-[rgba(20,18,16,0.1)] bg-white text-[rgba(20,18,16,0.7)] hover:border-[rgba(20,18,16,0.2)] hover:bg-brand-soft",
               )}
             >
               <span>{item.label}</span>

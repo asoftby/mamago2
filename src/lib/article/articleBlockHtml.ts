@@ -206,7 +206,7 @@ function renderInlineQuoteBlocks(html: string): string {
       const authorRole = extractHtmlAttribute(attrs, "data-author-role").trim();
       const footer =
         author || authorRole
-          ? `<footer style="margin-top:14px;font-size:11px;line-height:1.4;letter-spacing:.08em;text-transform:uppercase;opacity:.68;font-family:var(--font-sans),system-ui,sans-serif;">${
+          ? `<footer style="margin-top:14px;font-size:13px;line-height:1.4;font-weight:400;opacity:.68;font-family:var(--font-sans),system-ui,sans-serif;">${
               author ? `<span>&mdash; ${escapeHtml(author)}</span>` : ""
             }${
               author && authorRole ? `<span style="margin:0 8px;">&middot;</span>` : ""

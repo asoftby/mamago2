@@ -225,7 +225,7 @@ export function OnboardingForm({
           onChange={handleLegalNameChange}
           minLength={2}
           maxLength={200}
-          placeholder="ООО 'Детский центр Радуга'"
+          placeholder="ООО «Детский центр Радуга»"
         />
         {showFieldErrors && state.fieldErrors?.legalName && (
           <p className="mt-1 text-sm text-red-600">

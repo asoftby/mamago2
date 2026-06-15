@@ -273,7 +273,7 @@ export function CompactSaveAuthPanel({
           <button
             type="submit"
             disabled={loading}
-            className="h-11 w-full rounded-xl bg-[#EF8759] font-medium text-white transition-colors hover:bg-[#e07040] disabled:opacity-50"
+            className="h-11 w-full rounded-xl bg-[#EF8759] font-medium text-white transition-colors hover:bg-primary-hover disabled:opacity-50"
           >
             {loading
               ? "Загрузка..."

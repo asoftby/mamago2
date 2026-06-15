@@ -30,12 +30,12 @@ export const mockBillingProfileComplete = (): BillingProfile => {
     businessId: 'mock-business-1',
     
     // Company
-    legalName: 'ООО "Детский центр развития"',
+    legalName: 'ООО «Детский центр развития»',
     unp: '123456789',
     legalAddress: 'г. Минск, ул. Ленина, д. 1, оф. 101',
     
     // Bank
-    bankName: 'ОАО "Беларусбанк"',
+    bankName: 'ОАО «Беларусбанк»',
     bankCode: 'AKBBBY2X',
     accountNumber: 'BY86AKBB30120000000000000933',
     
@@ -96,7 +96,7 @@ export const mockInvoicesWithData = (): Invoice[] => {
       issuedAt: new Date('2026-04-01'),
       dueAt: new Date('2026-04-08'),
       paidAt: new Date('2026-04-05'),
-      description: 'Подписка на тариф "Стандарт"',
+      description: 'Подписка на тариф «Стандарт»',
       pdfUrl: '/mock/invoice-220.pdf',
       createdAt: new Date('2026-04-01'),
       updatedAt: new Date('2026-04-05'),

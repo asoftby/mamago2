@@ -79,7 +79,7 @@ export function ArticleHeader({
       {/* Subtitle / dek */}
       {subtitle && (
         <p
-          className="text-lg md:text-xl text-muted-foreground leading-relaxed font-sans font-normal"
+          className="text-[22px] text-muted-foreground leading-relaxed font-serif font-normal"
         >
           {subtitle}
         </p>

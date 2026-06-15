@@ -215,7 +215,7 @@ function ShareContent({
         Поде&shy;литься{" "}
         <span
           style={{
-            fontFamily: "Georgia, serif",
+            fontFamily: "var(--font-editorial)",
             fontStyle: "italic",
             fontWeight: 400,
             color: T.accentDeep,

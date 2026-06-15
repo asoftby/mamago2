@@ -270,7 +270,7 @@ function OrDivider({ label = "или" }: { label?: string }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 14, margin: "18px 0 14px" }}>
       <span style={{ flex: 1, height: 1, background: C.line }} />
-      <span style={{ fontFamily: "Georgia, 'Times New Roman', serif", fontStyle: "italic", fontSize: 16, color: C.ink3 }}>{label}</span>
+      <span style={{ fontFamily: "var(--font-editorial)", fontStyle: "italic", fontSize: 16, color: C.ink3 }}>{label}</span>
       <span style={{ flex: 1, height: 1, background: C.line }} />
     </div>
   );
@@ -448,7 +448,7 @@ function DateSlider({ options, selISO, onSelect, sessionCountsByDate }: DateSlid
               onMouseLeave={(e) => { if (!isSel) e.currentTarget.style.borderColor = C.line; }}
             >
               <span style={{ fontFamily: "var(--font-mono, ui-monospace)", fontSize: 10, letterSpacing: ".1em", textTransform: "uppercase", color: isSel ? "rgba(250,247,241,.6)" : C.ink3 }}>{chip.dow}</span>
-              <span style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 28, lineHeight: 1, letterSpacing: "-.02em" }}>{chip.day}</span>
+              <span style={{ fontFamily: "var(--font-display)", fontSize: 28, lineHeight: 1, letterSpacing: "-.02em" }}>{chip.day}</span>
               <span style={{ fontFamily: "var(--font-mono, ui-monospace)", fontSize: 9, letterSpacing: ".08em", color: isSel ? "rgba(250,247,241,.55)" : C.ink3 }}>{chip.month}</span>
               {dotsCount > 0 ? (
                 <span
@@ -574,7 +574,7 @@ function ConfirmBar({ iso, time, onConfirm }: { iso: string; time?: string | nul
         <div style={{ fontFamily: "var(--font-mono, ui-monospace)", textTransform: "uppercase" as const, fontSize: 10, letterSpacing: ".1em", color: "rgba(250,247,241,.55)", marginBottom: 3 }}>● выбрано</div>
         <div style={{ fontSize: 15, fontWeight: 600, letterSpacing: "-.01em" }}>
           {DOW_FULL[chip.dow] ?? chip.dow},{" "}
-          <span style={{ fontFamily: "var(--font-display), Georgia, serif" }}>{chip.day}</span>{" "}
+          <span style={{ fontFamily: "var(--font-display)" }}>{chip.day}</span>{" "}
           {RU_MONTHS_FULL[chip.monthIdx]}
           {time && (
             <span style={{ fontFamily: "var(--font-mono, ui-monospace)", fontSize: 13, fontWeight: 500, color: "rgba(250,247,241,.75)", marginLeft: 6 }}>
@@ -663,7 +663,7 @@ function AllDatesDrawer({ options, selISO, onSelect, onBack }: AllDatesDrawerPro
           <span style={{ fontFamily: "var(--font-mono, ui-monospace)", textTransform: "uppercase" as const, fontSize: 10, letterSpacing: ".14em", color: "var(--primary)" }}>● Все даты</span>
           <h3 style={{ margin: "4px 0 0", fontFamily: "var(--font-sans)", fontSize: 24, letterSpacing: "-.015em", fontWeight: 600 }}>
             {options.length}{" "}
-            <span style={{ fontFamily: "Georgia, 'Times New Roman', serif", color: "var(--primary)", fontStyle: "italic", fontWeight: 500 }}>
+            <span style={{ fontFamily: "var(--font-editorial)", color: "var(--primary)", fontStyle: "italic", fontWeight: 500 }}>
               {pluralRu(options.length, ["сеанс", "сеанса", "сеансов"])}
             </span>
           </h3>
@@ -793,7 +793,7 @@ function DateSliderView({
           fontSize: 30, lineHeight: 1.02, letterSpacing: "-.02em", fontWeight: 400,
         }}>
           В какой{" "}
-          <span style={{ fontFamily: "Georgia, 'Times New Roman', serif", fontStyle: "italic", color: "var(--primary)" }}>день</span>{" "}
+          <span style={{ fontFamily: "var(--font-editorial)", fontStyle: "italic", color: "var(--primary)" }}>день</span>{" "}
           напомнить.
         </h2>
 
@@ -822,7 +822,7 @@ function DateSliderView({
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
           <span style={{ fontFamily: "var(--font-sans)", fontSize: 18, letterSpacing: "-.01em", fontWeight: 400 }}>
             {RU_MONTHS_NAMED[fmtDateChip(options[0]).monthIdx]}{" "}
-            <span style={{ fontFamily: "var(--font-display), Georgia, serif", color: C.ink3 }}>{parseLocalDate(options[0]).getFullYear()}</span>
+            <span style={{ fontFamily: "var(--font-display)", color: C.ink3 }}>{parseLocalDate(options[0]).getFullYear()}</span>
           </span>
           <span style={{ fontFamily: "var(--font-mono, ui-monospace)", fontSize: 10, color: C.ink3, letterSpacing: ".1em", textTransform: "uppercase" as const }}>
             {options.length} {pluralDat(options.length)}
@@ -964,7 +964,7 @@ function InPlanView({ planDate, planStartsAt, planItemId, onSwitchCalendar, onRe
 
       <h2 style={{ margin: "0 0 8px", fontFamily: "var(--font-sans)", fontSize: 30, lineHeight: 1, letterSpacing: "-.02em", fontWeight: 600 }}>
         В вашем{" "}
-        <span style={{ fontFamily: "Georgia, 'Times New Roman', serif", fontStyle: "italic", fontWeight: 400, color: "var(--primary)" }}>плане</span>.
+        <span style={{ fontFamily: "var(--font-editorial)", fontStyle: "italic", fontWeight: 400, color: "var(--primary)" }}>плане</span>.
       </h2>
 
       {/* Бейдж — derived от planDate */}
@@ -1219,7 +1219,7 @@ function InIdeasView({ onRemoveIdea, onSchedule, dateOptions }: {
               <span style={{ fontFamily: "var(--font-mono, ui-monospace)", textTransform: "uppercase" as const, fontSize: 10, letterSpacing: ".14em", color: C.accentDeep }}>● Выбор даты</span>
               <h3 style={{ margin: "4px 0 0", fontFamily: "var(--font-sans)", fontSize: 24, letterSpacing: "-.015em", fontWeight: 600 }}>
                 {dateOptions.length}{" "}
-                <span style={{ fontFamily: "Georgia, 'Times New Roman', serif", color: "var(--primary)", fontStyle: "italic", fontWeight: 500 }}>
+                <span style={{ fontFamily: "var(--font-editorial)", color: "var(--primary)", fontStyle: "italic", fontWeight: 500 }}>
                   {pluralRu(dateOptions.length, ["сеанс", "сеанса", "сеансов"])}
                 </span>
               </h3>

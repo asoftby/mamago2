@@ -456,7 +456,7 @@ export default async function ImportReviewPage({
               Что делать первым
             </div>
             <p className="mt-2 text-sm leading-6 text-amber-900">
-              Начинайте с блока “Нужно проверить”. Если очередь пуста, переходите
+              Начинайте с блока «Нужно проверить». Если очередь пуста, переходите
               к источникам или запускайте новый импорт.
             </p>
             <div className="mt-4 text-xs font-medium uppercase tracking-[0.18em] text-amber-700">
@@ -646,7 +646,7 @@ function FilteredEmptyState({
             href={resetHref}
             className="inline-flex items-center justify-center rounded-2xl bg-stone-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-stone-800"
           >
-            Показать очередь “Нужно проверить”
+            Показать очередь «Нужно проверить»
           </Link>
           <Link
             href="/admin/import/review?status=ALL"
