@@ -14,7 +14,10 @@
       "hono@<4.12.21": "4.12.21",
       "qs@<6.15.2": "6.15.2",
       "ip-address@<=10.1.0": "10.1.1",
-      "esbuild@<0.28.1": "0.28.1"
+      "esbuild@<0.28.1": "0.28.1",
+      "@react-email/preview-server>next": "16.2.9",
+      "postcss": "8.5.10",
+      "effect": "3.20.0"
     }
   },
   "scripts": {
