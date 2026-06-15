@@ -192,6 +192,9 @@ export default withSentryConfig(nextConfig, {
   // Automatically tree-shake Sentry logger statements to reduce bundle size
   disableLogger: true,
 
+  // Skip sourcemap upload when no auth token is present (e.g. Docker CI builds)
+  sourcemaps: { disable: !process.env.SENTRY_AUTH_TOKEN },
+
   // Enables automatic instrumentation of Vercel Cron Monitors. (Does not yet work with App Router route handlers.)
   // See the following for more information:
   // https://docs.sentry.io/product/crons/
