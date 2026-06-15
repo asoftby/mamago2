@@ -503,6 +503,12 @@ export const GROUP_SYSTEM: AdminSidebarGroup = {
       href: adminPath("/system/build"),
       matchers: [{ type: "prefix", value: adminPath("/system/build") }],
     },
+    {
+      id: "system-branding",
+      label: "Оформление",
+      href: adminPath("/system/branding"),
+      matchers: [{ type: "prefix", value: adminPath("/system/branding") }],
+    },
   ],
 };
 
