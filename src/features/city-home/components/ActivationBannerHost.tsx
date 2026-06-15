@@ -135,7 +135,7 @@ function BannerShell({
               onClick={onCta}
               className={
                 ctaStyle === "primary"
-                  ? "inline-flex h-10 items-center rounded-full bg-[#EF8759] px-5 text-sm font-semibold text-white transition-all hover:bg-[#e07040] active:scale-[0.97]"
+                  ? "inline-flex h-10 items-center rounded-full bg-[#EF8759] px-5 text-sm font-semibold text-white transition-all hover:bg-primary-hover active:scale-[0.97]"
                   : "inline-flex h-9 items-start rounded-full border border-neutral-200 bg-white px-4 pt-[7px] text-sm font-medium text-neutral-700 transition-all hover:border-neutral-300 hover:bg-neutral-50 active:scale-[0.97]"
               }
             >

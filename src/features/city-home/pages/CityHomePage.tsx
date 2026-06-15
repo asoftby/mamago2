@@ -36,6 +36,7 @@ export default async function CityHomePage({ citySlug }: CityHomePageProps) {
   if (!city) notFound();
 
   const heroModel = await getHeroContext({
+    cityId: city.id,
     citySlug: city.slug,
     cityName: city.name,
     cityCenterLat: city.centerLat ?? city.lat ?? undefined,

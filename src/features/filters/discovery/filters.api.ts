@@ -141,6 +141,13 @@ export function useDiscoveryFilterOptions(
     citySlug != null &&
     headerFilters.citySlug === citySlug;
 
+  const headerLoading = headerFilters?.loading ?? false;
+  const headerHasLoaded = headerFilters?.hasLoaded ?? false;
+  const headerError = headerFilters?.error ?? null;
+  const headerMetros = headerFilters?.metros;
+  const headerDistricts = headerFilters?.districts;
+  const loadGeoFilters = headerFilters?.loadGeoFilters;
+
   const [options, setOptions] = React.useState<DiscoveryFilterOptions>(EMPTY_OPTIONS);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<Error | null>(null);
@@ -150,31 +157,30 @@ export function useDiscoveryFilterOptions(
 
     async function load() {
       try {
-        setError(null);
-
         if (!citySlug) {
           if (mounted) {
             setOptions(EMPTY_OPTIONS);
             setLoading(false);
+            setError(null);
           }
           return;
         }
 
-        if (matchesHeaderScope && headerFilters) {
-          if (!headerFilters.hasLoaded && !defer) {
-            await headerFilters.loadGeoFilters();
+        if (matchesHeaderScope && loadGeoFilters) {
+          if (!headerHasLoaded && !defer) {
+            await loadGeoFilters(citySlug);
           }
 
-          if (!headerFilters.hasLoaded && !headerFilters.loading) {
+          if (!headerHasLoaded && !headerLoading) {
             if (mounted) {
               setOptions(EMPTY_OPTIONS);
               setLoading(false);
-              setError(headerFilters.error);
+              setError(headerError);
             }
             return;
           }
 
-          if (headerFilters.loading) {
+          if (headerLoading) {
             if (mounted) setLoading(true);
             return;
           }
@@ -182,16 +188,16 @@ export function useDiscoveryFilterOptions(
           if (mounted) {
             setOptions({
               ages: [],
-              metros: headerFilters.metros,
-              districts: headerFilters.districts,
+              metros: headerMetros ?? [],
+              districts: headerDistricts ?? [],
             });
             setLoading(false);
-            setError(headerFilters.error);
+            setError(headerError);
           }
           return;
         }
 
-        setLoading(true);
+        if (mounted) setLoading(true);
 
         const pair = await fetchMetroDistrictFilterOptions(citySlug);
 
@@ -220,7 +226,17 @@ export function useDiscoveryFilterOptions(
     return () => {
       mounted = false;
     };
-  }, [citySlug, defer, matchesHeaderScope, headerFilters]);
+  }, [
+    citySlug,
+    defer,
+    matchesHeaderScope,
+    headerLoading,
+    headerHasLoaded,
+    headerError,
+    headerMetros,
+    headerDistricts,
+    loadGeoFilters,
+  ]);
 
   return { options, loading, error };
 }

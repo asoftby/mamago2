@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo } from "react";
-import { EventCard, activityMockToEventCard } from "@/components/events";
+import { EventCard, activityMockToEventCard, EVENT_CARD_SHELL } from "@/components/events";
 import { OfferCard } from "@/components/offers/OfferCard";
 import { RouteCard } from "@/components/routes/RouteCard";
 import { CityHomeSection } from "@/features/city-home/components/CityHomeSection";
@@ -25,10 +25,8 @@ import {
 } from "@/features/city-home/lib/audiencePersonalization";
 import { applyPersonaRanking } from "@/features/city-home/lib/personaRanking";
 
-const cardShell =
-  "shrink-0 snap-start w-[44vw] min-w-[160px] max-w-[230px] sm:max-w-[250px] " +
-  "lg:w-[calc((100%-4.5rem)/4)] lg:max-w-none";
-const kudaCardShell = cardShell;
+const cardShell = EVENT_CARD_SHELL;
+const kudaCardShell = EVENT_CARD_SHELL;
 
 function buildKudaSectionTitle(input: {
   citySlug: string;
@@ -291,9 +289,6 @@ export function CityHomeJournalSection({
             <p className="text-sm font-semibold text-neutral-900 leading-snug line-clamp-3 mt-2">
               {a.title}
             </p>
-            {a.subtitle ? (
-              <p className="text-xs text-neutral-500 mt-1 line-clamp-2">{a.subtitle}</p>
-            ) : null}
             <p className="text-xs text-neutral-400 mt-3">{a.readTime} мин чтения</p>
           </Link>
         ))}

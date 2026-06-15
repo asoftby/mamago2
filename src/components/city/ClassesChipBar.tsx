@@ -37,7 +37,7 @@ export function ClassesChipBar({
         className:
           chip.slug === activeChipSlug
             ? "border-[#EF8759] bg-[#EF8759] text-white"
-            : "border-[#E7DED9] bg-[#FFF8F4] text-neutral-800 hover:border-[#EF8759]/40 hover:bg-[#FFF2EB]",
+            : "border-[#E7DED9] bg-[#FFF8F4] text-neutral-800 hover:border-border-brand-soft hover:bg-brand-soft",
       })),
     [activeChipSlug, chips, pathname, router, searchParams],
   );

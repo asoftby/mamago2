@@ -234,7 +234,7 @@ function FamilyActivationAddChildForm({
       <div className="shrink-0 border-t border-neutral-100 bg-background px-5 py-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
         <Button
           type="submit"
-          className="h-11 w-full bg-[#EF8759] text-white hover:bg-[#e07848]"
+          className="h-11 w-full bg-[#EF8759] text-white hover:bg-primary-hover"
           disabled={!canSave || isLoading}
         >
           {isLoading ? "Сохранение..." : "Сохранить"}

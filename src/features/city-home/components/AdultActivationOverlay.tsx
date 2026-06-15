@@ -198,7 +198,7 @@ function AdultActivationForm({
             Пропустить
           </Button>
           <Button
-            className="flex-1 rounded-2xl bg-[#EF8759] text-white hover:bg-[#e07848]"
+            className="flex-1 rounded-2xl bg-[#EF8759] text-white hover:bg-primary-hover"
             onClick={handleSave}
             disabled={saving || !canSave}
           >
