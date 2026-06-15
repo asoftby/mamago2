@@ -108,7 +108,6 @@ export function ArticleEditorCoverField({
         setResolvedPreviewUrl(item?.url ?? null);
         onChange(item?.id ?? "", item?.url ?? null);
       }}
-      maxSizeMb={5}
       allowMediaLibrary
       allowUpload
       onUploadFiles={uploadFiles}

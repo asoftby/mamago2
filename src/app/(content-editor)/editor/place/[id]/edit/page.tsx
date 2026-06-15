@@ -13,6 +13,7 @@ import { parsePlaceEditorStepQuery } from "@/lib/business/placeEditorStepQuery";
 import { TOTAL_STEPS } from "@/components/business/wizard/place/config";
 import { buildSurfaceRedirectDestination, resolveSurfaceFromHostAndPathname } from "@/lib/routing/surface";
 import { getCurrentRequestRoutingContext } from "@/lib/routing/requestContext";
+import prisma from "@/lib/prisma";
 
 function surfaceFromHostAndPath(host: string | undefined, pathname: string): ContentEditorSurface {
   const resolved = resolveSurfaceFromHostAndPathname(host, pathname);
@@ -57,6 +58,18 @@ export default async function EditorEditPlacePage({
   if (!place || !placeForWizard) {
     notFound();
   }
+
+  const activeRevision =
+    place.status === "PUBLISHED"
+      ? await prisma.placeRevision.findFirst({
+          where: {
+            placeId: place.id,
+            status: { in: ["DRAFT", "PENDING", "NEEDS_REVISION"] },
+          },
+          select: { id: true, status: true },
+          orderBy: { createdAt: "desc" },
+        })
+      : null;
 
   const canEdit = await canEditPlace(user, {
     placeId: place.id,
@@ -107,6 +120,7 @@ export default async function EditorEditPlacePage({
         contentEditorNav={nav}
         returnTo={returnTo}
         initialEditStep={initialEditStep}
+        activeRevision={activeRevision}
       />
     </ContentEditorChrome>
   );

@@ -227,14 +227,21 @@ export interface BookingNotificationBodyInput {
  *   EVENT:      "Иван Петров оставил заявку на «Мастер-класс»"
  *   OFFER:      "Анна оставила заявку на «Английский язык»"
  */
-export function buildBookingNotificationBody(
-  input: BookingNotificationBodyInput,
+/** «Имя ребёнка (N лет)» либо имя клиента — переиспользуется шаблонами уведомлений. */
+export function buildBookingActorLabel(
+  input: Pick<BookingNotificationBodyInput, "customerName" | "childName" | "childAge">,
 ): string {
-  const actor = input.childName
+  return input.childName
     ? input.childAge != null
       ? `${input.childName} (${input.childAge} лет)`
       : input.childName
     : input.customerName;
+}
+
+export function buildBookingNotificationBody(
+  input: BookingNotificationBodyInput,
+): string {
+  const actor = buildBookingActorLabel(input);
 
   switch (input.sourceType) {
     case "CAMP_SHIFT": {
