@@ -9,7 +9,7 @@ RUN pnpm install --frozen-lockfile
 
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
-RUN pnpm build
+RUN pnpm build:ci
 
 FROM node:22-alpine AS runner
 WORKDIR /app
