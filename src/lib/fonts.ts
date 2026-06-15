@@ -1,3 +1,4 @@
+import { PT_Serif } from "next/font/google";
 import localFont from "next/font/local";
 
 /**
@@ -34,5 +35,16 @@ export const ntSomic = localFont({
   variable: "--font-sans",
   display: "swap",
   preload: false,
-  fallback: ["nbrb", "ui-sans-serif", "system-ui", "sans-serif"],
+  fallback: ["ui-sans-serif", "system-ui", "sans-serif"],
+});
+
+/** PT Serif — погодная строка героя и другие акцентные serif-поверхности. */
+export const ptSerif = PT_Serif({
+  weight: ["400", "700"],
+  style: ["normal", "italic"],
+  subsets: ["cyrillic", "latin"],
+  variable: "--font-pt-serif",
+  display: "swap",
+  preload: false,
+  fallback: ["ui-serif", "serif"],
 });

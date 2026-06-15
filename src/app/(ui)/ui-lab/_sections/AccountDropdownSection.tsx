@@ -69,6 +69,39 @@ export function AccountDropdownSection() {
     loggingOut: false,
   });
 
+  const personalPendingBusiness = buildPublicSiteAccountModel({
+    user: {
+      id: "lab",
+      email: "partner@example.com",
+      role: "USER",
+      businessVerificationStatus: "PENDING",
+    },
+    mode: "personal",
+    initials: "ПР",
+    onNavigate: noop,
+    onGoToAdminAccount: noop,
+    onGoToBusinessAccount: noop,
+    onSwitchMode: noop,
+    onGoToHome: noop,
+    onGoToPersonalAccount: noop,
+    onGoToPersonalIdeas: noop,
+    onGoToPersonalPlan: noop,
+    onGoToPersonalBookings: noop,
+    onGoToPersonalRoutes: noop,
+    onGoToSettings: noop,
+    onGoToBusinessDashboard: noop,
+    onGoToBusinessRoot: noop,
+    onGoToBusinessPublications: noop,
+    onGoToBusinessBookings: noop,
+    onGoToBusinessClients: noop,
+    onGoToBusinessAnalytics: noop,
+    onGoToBusinessPromotion: noop,
+    onGoToBusinessBilling: noop,
+    hasBusinessProfile: false,
+    onLogout: noop,
+    loggingOut: false,
+  });
+
   const personalAdmin = buildPublicSiteAccountModel({
     user: { id: "lab", email: "admin@example.com", role: "ADMIN" },
     mode: "personal",
@@ -166,6 +199,19 @@ export function AccountDropdownSection() {
             </p>
             <DropdownChrome>
               <AccountDropdownContent {...pickContent(personalUser)} />
+            </DropdownChrome>
+          </div>
+
+          <div className="space-y-3">
+            <h4 className="text-sm font-semibold text-gray-900">
+              Личный кабинет, заявка на бизнес на проверке
+            </h4>
+            <p className="text-xs text-muted-foreground">
+              CTA-блок: «Ваша заявка на проверке» на светло-жёлтом фоне вместо
+              «Подключить бизнес».
+            </p>
+            <DropdownChrome>
+              <AccountDropdownContent {...pickContent(personalPendingBusiness)} />
             </DropdownChrome>
           </div>
 
