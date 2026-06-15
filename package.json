@@ -14,7 +14,10 @@
       "hono@<4.12.21": "4.12.21",
       "qs@<6.15.2": "6.15.2",
       "ip-address@<=10.1.0": "10.1.1",
-      "esbuild@<0.28.1": "0.28.1"
+      "esbuild@<0.28.1": "0.28.1",
+      "@react-email/preview-server>next": "16.2.9",
+      "postcss": "8.5.10",
+      "effect": "3.20.0"
     }
   },
   "scripts": {
@@ -22,10 +25,11 @@
     "dev:turbo": "ulimit -n 65536 && next dev --turbo -H 0.0.0.0",
     "dev:webpack": "next dev",
     "email:preview": "react-email dev --dir ./emails --port 3011",
-    "build": "NODE_OPTIONS=--max-old-space-size=3072 next build --webpack",
+    "build": "NODE_OPTIONS=--max-old-space-size=4096 next build --webpack",
+    "build:ci": "NODE_OPTIONS=--max-old-space-size=3072 next build --webpack",
     "start": "next start",
     "lint": "eslint",
-    "check": "tsc --noEmit && eslint src --quiet && NODE_OPTIONS=--max-old-space-size=3072 next build --webpack",
+    "check": "tsc --noEmit && eslint src --quiet && pnpm build",
     "postinstall": "prisma generate",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
@@ -108,7 +112,7 @@
     "react-hook-form": "^7.71.2",
     "react-phone-number-input": "^3.4.16",
     "react-responsive": "^10.0.1",
-    "resend": "^6.12.2",
+    "resend": "^6.12.4",
     "server-only": "^0.0.1",
     "sharp": "^0.33.5",
     "sonner": "^2.0.7",

@@ -2206,6 +2206,8 @@ model MediaAsset {
   activityImages   ActivityImage[]  @relation("ActivityGalleryImageAsset")
   articleCovers    Article[]        @relation("ArticleCover")
   articleSeoImages Article[]        @relation("ArticleSeoImage")
+  brandingLogo     BrandingConfig[] @relation("BrandingLogo")
+  brandingFavicon  BrandingConfig[] @relation("BrandingFavicon")
 
   @@index([kind])
   @@index([status])
@@ -4036,4 +4038,20 @@ enum PageVisibility {
   PUBLIC      // Публичная (в sitemap, доступна всем)
   PRIVATE     // Приватная (не показывать публично)
   UNLISTED    // По прямой ссылке (не в sitemap)
+}
+
+model BrandingConfig {
+  id               String      @id @default("singleton")
+  logoAssetId      String?
+  logoAsset        MediaAsset? @relation("BrandingLogo", fields: [logoAssetId], references: [id])
+  faviconAssetId   String?
+  faviconAsset     MediaAsset? @relation("BrandingFavicon", fields: [faviconAssetId], references: [id])
+  colorPrimary     String?
+  colorAccent      String?
+  colorBackground  String?
+  colorSurface     String?
+  colorText        String?
+  fontHeading      String?
+  fontBody         String?
+  updatedAt        DateTime    @updatedAt
 }
