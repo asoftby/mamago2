@@ -38,12 +38,12 @@ Recommended MVP shape:
 
 ### Business
 
-Canonical business entity is `Business` in [prisma/schema.prisma](/Users/shapovalovalexey/dev/mamago2/prisma/schema.prisma:867).
+Canonical business entity is `Business` in [prisma/schema.prisma](prisma/schema.prisma:867).
 
 Important facts:
 
 1. `Business.ownerUserId` is unique, so one owner user has one canonical business row.
-2. Team access is modeled separately via `BusinessMember`; cabinet access now prefers membership over legacy owner fallback in [src/server/permissions/business-permissions.ts](/Users/shapovalovalexey/dev/mamago2/src/server/permissions/business-permissions.ts:1).
+2. Team access is modeled separately via `BusinessMember`; cabinet access now prefers membership over legacy owner fallback in [src/server/permissions/business-permissions.ts](src/server/permissions/business-permissions.ts:1).
 3. Business has both workflow status (`status`, `verificationStatus`) and soft-operational visibility (`operationalStatus`).
 4. Business does not have its own Telegram identity fields.
 5. Billing is already attached directly to `Business` via `billingAccount`.
@@ -52,13 +52,13 @@ This means business eligibility can be decided cleanly, but Telegram delivery st
 
 ### Offer ownership and taxonomy
 
-Canonical offer entity is `Offer` in [prisma/schema.prisma](/Users/shapovalovalexey/dev/mamago2/prisma/schema.prisma:1676).
+Canonical offer entity is `Offer` in [prisma/schema.prisma](prisma/schema.prisma:1676).
 
 Important facts:
 
 1. `Offer` belongs to `Place` through `placeId`.
-2. `Place` belongs to a business through `ownerBusinessId` in [prisma/schema.prisma](/Users/shapovalovalexey/dev/mamago2/prisma/schema.prisma:984).
-3. Business offer creation already enforces place ownership and linked business requirements in [src/app/api/business/offers/route.ts](/Users/shapovalovalexey/dev/mamago2/src/app/api/business/offers/route.ts:1).
+2. `Place` belongs to a business through `ownerBusinessId` in [prisma/schema.prisma](prisma/schema.prisma:984).
+3. Business offer creation already enforces place ownership and linked business requirements in [src/app/api/business/offers/route.ts](src/app/api/business/offers/route.ts:1).
 4. Offer matching fields already exist:
 5. `status`
 6. `kind`
@@ -74,12 +74,12 @@ This is the strongest signal that the platform is already structured around “p
 Discovery is split:
 
 1. `Activity` powers public events/discovery feeds.
-2. Offers also have a separate public-discovery path, especially for classes/camps, in [src/server/discovery/classesDiscoveryFeed.ts](/Users/shapovalovalexey/dev/mamago2/src/server/discovery/classesDiscoveryFeed.ts:1).
+2. Offers also have a separate public-discovery path, especially for classes/camps, in [src/server/discovery/classesDiscoveryFeed.ts](src/server/discovery/classesDiscoveryFeed.ts:1).
 
 Critical finding:
 
 1. Offer discovery already uses `getPublicPublishedOfferWhere()` and then traverses `offer.place.ownerBusinessId`.
-2. Public visibility already filters out disabled/archived businesses via [src/server/public/publicContentVisibility.ts](/Users/shapovalovalexey/dev/mamago2/src/server/public/publicContentVisibility.ts:1).
+2. Public visibility already filters out disabled/archived businesses via [src/server/public/publicContentVisibility.ts](src/server/public/publicContentVisibility.ts:1).
 
 So the system already contains reusable offer-to-business eligibility logic. Duplicating matching rules elsewhere would be a mistake.
 
@@ -87,9 +87,9 @@ So the system already contains reusable offer-to-business eligibility logic. Dup
 
 Article infrastructure is real and reusable:
 
-1. `Article` exists in [prisma/schema.prisma](/Users/shapovalovalexey/dev/mamago2/prisma/schema.prisma:2283).
-2. Admin editor/service are mature in [src/lib/article/articleAdminService.ts](/Users/shapovalovalexey/dev/mamago2/src/lib/article/articleAdminService.ts:1) and [src/components/admin/articles/ArticleEditorClient.tsx](/Users/shapovalovalexey/dev/mamago2/src/components/admin/articles/ArticleEditorClient.tsx:1).
-3. Article blocks can embed `OFFER` cards through `activityCard` blocks and resolve them in [src/lib/article/articleMvpRenderData.ts](/Users/shapovalovalexey/dev/mamago2/src/lib/article/articleMvpRenderData.ts:171).
+1. `Article` exists in [prisma/schema.prisma](prisma/schema.prisma:2283).
+2. Admin editor/service are mature in [src/lib/article/articleAdminService.ts](src/lib/article/articleAdminService.ts:1) and [src/components/admin/articles/ArticleEditorClient.tsx](src/components/admin/articles/ArticleEditorClient.tsx:1).
+3. Article blocks can embed `OFFER` cards through `activityCard` blocks and resolve them in [src/lib/article/articleMvpRenderData.ts](src/lib/article/articleMvpRenderData.ts:171).
 
 There is no existing “article <-> selected businesses accepted into editorial request” relation, but the rendering/editor layer is ready to consume accepted offers later.
 
@@ -98,16 +98,16 @@ There is no existing “article <-> selected businesses accepted into editorial 
 Notification foundation is strong:
 
 1. `Notification`, `NotificationDelivery`, `UserNotificationPreference`, `NotificationPolicy`, `NotificationTemplate` already exist in schema.
-2. `createNotification()` is the existing entry point in [src/server/services/notification.service.ts](/Users/shapovalovalexey/dev/mamago2/src/server/services/notification.service.ts:1).
-3. Business notification surface already exists in the cabinet at [src/app/business/(protected)/notifications/page.tsx](/Users/shapovalovalexey/dev/mamago2/src/app/business/(protected)/notifications/page.tsx:1).
+2. `createNotification()` is the existing entry point in [src/server/services/notification.service.ts](src/server/services/notification.service.ts:1).
+3. Business notification surface already exists in the cabinet at [src/app/business/(protected)/notifications/page.tsx](src/app/business/(protected)/notifications/page.tsx:1).
 
 Telegram readiness is partial:
 
 1. User-to-Telegram linking is implemented through `TelegramLinkToken` and `TelegramConnection`.
 2. Delivery to Telegram is implemented.
 3. Inline keyboard support exists in `TelegramChannel`.
-4. Generic notification delivery currently builds URL CTA buttons, not business-action callbacks, in [src/server/notifications/telegram-delivery.ts](/Users/shapovalovalexey/dev/mamago2/src/server/notifications/telegram-delivery.ts:1).
-5. Callback mutation flow exists only for `DevTelegramBusinessApplication` in [src/server/services/telegram/TelegramWebhookService.ts](/Users/shapovalovalexey/dev/mamago2/src/server/services/telegram/TelegramWebhookService.ts:1).
+4. Generic notification delivery currently builds URL CTA buttons, not business-action callbacks, in [src/server/notifications/telegram-delivery.ts](src/server/notifications/telegram-delivery.ts:1).
+5. Callback mutation flow exists only for `DevTelegramBusinessApplication` in [src/server/services/telegram/TelegramWebhookService.ts](src/server/services/telegram/TelegramWebhookService.ts:1).
 
 So Telegram is not “missing”, but editorial confirmations are not plug-and-play yet.
 
@@ -131,28 +131,28 @@ That means “charge after admin approval” is feasible, but should be modeled 
 
 ### Core models
 
-1. `Business` / `BusinessMember` / `BusinessInvite`: [prisma/schema.prisma](/Users/shapovalovalexey/dev/mamago2/prisma/schema.prisma:867)
-2. `Place`: [prisma/schema.prisma](/Users/shapovalovalexey/dev/mamago2/prisma/schema.prisma:984)
-3. `Offer`: [prisma/schema.prisma](/Users/shapovalovalexey/dev/mamago2/prisma/schema.prisma:1676)
-4. `Activity`: [prisma/schema.prisma](/Users/shapovalovalexey/dev/mamago2/prisma/schema.prisma:687)
-5. `Article`: [prisma/schema.prisma](/Users/shapovalovalexey/dev/mamago2/prisma/schema.prisma:2283)
-6. `Notification` / `NotificationDelivery`: [prisma/schema.prisma](/Users/shapovalovalexey/dev/mamago2/prisma/schema.prisma:1327), [prisma/schema.prisma](/Users/shapovalovalexey/dev/mamago2/prisma/schema.prisma:2484)
-7. `TelegramConnection` / `TelegramLinkToken`: [prisma/schema.prisma](/Users/shapovalovalexey/dev/mamago2/prisma/schema.prisma:206), [prisma/schema.prisma](/Users/shapovalovalexey/dev/mamago2/prisma/schema.prisma:221)
-8. `BillingAccount` / `BillingTransaction`: [prisma/schema.prisma](/Users/shapovalovalexey/dev/mamago2/prisma/schema.prisma:1863), [prisma/schema.prisma](/Users/shapovalovalexey/dev/mamago2/prisma/schema.prisma:1963)
-9. `SignalDefinition` / `EventCategory` / `DiscoveryTag`: [prisma/schema.prisma](/Users/shapovalovalexey/dev/mamago2/prisma/schema.prisma:339), [prisma/schema.prisma](/Users/shapovalovalexey/dev/mamago2/prisma/schema.prisma:503), [prisma/schema.prisma](/Users/shapovalovalexey/dev/mamago2/prisma/schema.prisma:3975)
+1. `Business` / `BusinessMember` / `BusinessInvite`: [prisma/schema.prisma](prisma/schema.prisma:867)
+2. `Place`: [prisma/schema.prisma](prisma/schema.prisma:984)
+3. `Offer`: [prisma/schema.prisma](prisma/schema.prisma:1676)
+4. `Activity`: [prisma/schema.prisma](prisma/schema.prisma:687)
+5. `Article`: [prisma/schema.prisma](prisma/schema.prisma:2283)
+6. `Notification` / `NotificationDelivery`: [prisma/schema.prisma](prisma/schema.prisma:1327), [prisma/schema.prisma](prisma/schema.prisma:2484)
+7. `TelegramConnection` / `TelegramLinkToken`: [prisma/schema.prisma](prisma/schema.prisma:206), [prisma/schema.prisma](prisma/schema.prisma:221)
+8. `BillingAccount` / `BillingTransaction`: [prisma/schema.prisma](prisma/schema.prisma:1863), [prisma/schema.prisma](prisma/schema.prisma:1963)
+9. `SignalDefinition` / `EventCategory` / `DiscoveryTag`: [prisma/schema.prisma](prisma/schema.prisma:339), [prisma/schema.prisma](prisma/schema.prisma:503), [prisma/schema.prisma](prisma/schema.prisma:3975)
 
 ### Key services/routes
 
-1. Business permissions: [src/server/permissions/business-permissions.ts](/Users/shapovalovalexey/dev/mamago2/src/server/permissions/business-permissions.ts:1)
-2. Business workspace and current offer queries: [src/server/services/business/businessWorkspace.service.ts](/Users/shapovalovalexey/dev/mamago2/src/server/services/business/businessWorkspace.service.ts:1)
-3. Offer create/list flow: [src/app/api/business/offers/route.ts](/Users/shapovalovalexey/dev/mamago2/src/app/api/business/offers/route.ts:1)
-4. Activity business alignment: [src/lib/auth/activityAccess.ts](/Users/shapovalovalexey/dev/mamago2/src/lib/auth/activityAccess.ts:1)
-5. Public offer visibility: [src/server/public/publicContentVisibility.ts](/Users/shapovalovalexey/dev/mamago2/src/server/public/publicContentVisibility.ts:1)
-6. Offer discovery feed: [src/server/discovery/classesDiscoveryFeed.ts](/Users/shapovalovalexey/dev/mamago2/src/server/discovery/classesDiscoveryFeed.ts:1)
-7. Notification service: [src/server/services/notification.service.ts](/Users/shapovalovalexey/dev/mamago2/src/server/services/notification.service.ts:1)
-8. Notification delivery: [src/server/services/notificationDelivery.service.ts](/Users/shapovalovalexey/dev/mamago2/src/server/services/notificationDelivery.service.ts:1)
-9. Telegram link/webhook: [src/server/services/telegramLink.service.ts](/Users/shapovalovalexey/dev/mamago2/src/server/services/telegramLink.service.ts:1), [src/server/services/telegram/TelegramWebhookService.ts](/Users/shapovalovalexey/dev/mamago2/src/server/services/telegram/TelegramWebhookService.ts:1)
-10. Article admin/editor/render: [src/lib/article/articleAdminService.ts](/Users/shapovalovalexey/dev/mamago2/src/lib/article/articleAdminService.ts:1), [src/lib/article/articleMvpRenderData.ts](/Users/shapovalovalexey/dev/mamago2/src/lib/article/articleMvpRenderData.ts:171)
+1. Business permissions: [src/server/permissions/business-permissions.ts](src/server/permissions/business-permissions.ts:1)
+2. Business workspace and current offer queries: [src/server/services/business/businessWorkspace.service.ts](src/server/services/business/businessWorkspace.service.ts:1)
+3. Offer create/list flow: [src/app/api/business/offers/route.ts](src/app/api/business/offers/route.ts:1)
+4. Activity business alignment: [src/lib/auth/activityAccess.ts](src/lib/auth/activityAccess.ts:1)
+5. Public offer visibility: [src/server/public/publicContentVisibility.ts](src/server/public/publicContentVisibility.ts:1)
+6. Offer discovery feed: [src/server/discovery/classesDiscoveryFeed.ts](src/server/discovery/classesDiscoveryFeed.ts:1)
+7. Notification service: [src/server/services/notification.service.ts](src/server/services/notification.service.ts:1)
+8. Notification delivery: [src/server/services/notificationDelivery.service.ts](src/server/services/notificationDelivery.service.ts:1)
+9. Telegram link/webhook: [src/server/services/telegramLink.service.ts](src/server/services/telegramLink.service.ts:1), [src/server/services/telegram/TelegramWebhookService.ts](src/server/services/telegram/TelegramWebhookService.ts:1)
+10. Article admin/editor/render: [src/lib/article/articleAdminService.ts](src/lib/article/articleAdminService.ts:1), [src/lib/article/articleMvpRenderData.ts](src/lib/article/articleMvpRenderData.ts:171)
 
 ## 4. Current matching capabilities
 
