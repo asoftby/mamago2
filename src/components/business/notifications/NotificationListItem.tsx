@@ -2,7 +2,6 @@
 
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { ChevronRight } from "lucide-react";
 import type { NotificationEntityType, NotificationType } from "@prisma/client";
 import { formatDistanceToNow } from "date-fns";
 import { ru } from "date-fns/locale";
@@ -31,6 +30,38 @@ type NotificationListItemProps = {
 
 function isUnreadRow(notification: NotificationApiRow): boolean {
   return notification.readAt == null;
+}
+
+/** Contextual label for the single navigate-through CTA on navigable cards. */
+function resolveNavigableCtaLabel(type: string): string {
+  switch (type) {
+    case "BOOKING_REQUEST":
+    case "BOOKING_CREATED":
+      return "Открыть заявку";
+    case "BOOKING_CONFIRMED":
+    case "BOOKING_COMPLETED":
+    case "BOOKING_FEEDBACK_REQUEST":
+      return "Смотреть заказ";
+    case "PLACE_APPROVED":
+    case "PLACE_NEEDS_CHANGES":
+    case "PLACE_REJECTED":
+    case "PLACE_UPDATE_APPROVED":
+    case "PLACE_UPDATE_NEEDS_REVISION":
+    case "PLACE_UPDATE_REJECTED":
+    case "OFFER_APPROVED":
+    case "OFFER_NEEDS_CHANGES":
+    case "OFFER_REJECTED":
+    case "ACTIVITY_APPROVED":
+    case "ACTIVITY_NEEDS_CHANGES":
+    case "ACTIVITY_REJECTED":
+      return "Открыть";
+    case "BUSINESS_VERIFIED":
+    case "BUSINESS_REJECTED":
+    case "BUSINESS_NEEDS_INFO":
+      return "Перейти";
+    default:
+      return "Перейти";
+  }
 }
 
 export function NotificationListItem({
@@ -139,11 +170,20 @@ export function NotificationListItem({
             {content}
           </button>
         )}
-        {isNavigable ? (
-          <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-        ) : null}
         {trailingAction}
       </div>
+      {isNavigable && !showCta ? (
+        // Single navigate-through CTA. Rendered as a sibling of the card <Link>
+        // (not nested inside the anchor) and is itself a link to the /n/[id]
+        // resolver, so it marks read + redirects like the card body.
+        <div className={cn("mt-2", compact ? "pl-8" : "pl-9")}>
+          <Button asChild type="button" variant="outline" size="xs">
+            <Link href={`/n/${notification.id}`}>
+              {resolveNavigableCtaLabel(notification.type)}
+            </Link>
+          </Button>
+        </div>
+      ) : null}
       {showCta ? (
         <div className={cn("mt-2", compact ? "pl-8" : "pl-9")}>
           <Button
