@@ -875,7 +875,7 @@ model Business {
   phone                   String?
   contactPhoneVerifiedAt  DateTime?
   status                  BusinessStatus             @default(DRAFT)
-  unp                     String?
+  unp                     String?                    @unique
   approvedAt              DateTime?
   rejectedAt              DateTime?
   reviewNote              String?

@@ -43,7 +43,25 @@ import {
 
 type ActionState =
   | { ok: true }
-  | { ok: false; message: string; fieldErrors?: Record<string, string[]> };
+  | {
+      ok: false;
+      message: string;
+      code?: "BUSINESS_UNP_ALREADY_EXISTS";
+      field?: "unp";
+      fieldErrors?: Record<string, string[]>;
+    };
+
+const UNP_ALREADY_EXISTS_MESSAGE =
+  "Бизнес с таким УНП уже зарегистрирован. Если это ваш бизнес, отправьте запрос на доступ.";
+
+function buildUnpAlreadyExistsError(): ActionState {
+  return {
+    ok: false,
+    message: UNP_ALREADY_EXISTS_MESSAGE,
+    code: "BUSINESS_UNP_ALREADY_EXISTS",
+    field: "unp",
+  };
+}
 
 const onboardingSchema = z.object({
   unp: z.string().regex(/^[0-9]{9}$/, "УНП должен содержать 9 цифр"),
@@ -96,6 +114,17 @@ export async function createBusinessAction(
     // Validate
     const validated = onboardingSchema.parse(payload);
     const phoneE164 = normalizeBusinessContactPhone(validated.phone);
+
+    // Duplicate УНП guard: Business.ownerUserId is unique (one business per owner), so a
+    // match owned by a different user always means a different, conflicting business —
+    // this single check covers both the create and the update (resubmit) branches below.
+    const businessWithSameUnp = await prisma.business.findFirst({
+      where: { unp: validated.unp },
+      select: { ownerUserId: true },
+    });
+    if (businessWithSameUnp && businessWithSameUnp.ownerUserId !== user.id) {
+      return buildUnpAlreadyExistsError();
+    }
 
     // Check if business already exists
     const existing = await getOwnedBusinessProfile(user.id);
@@ -212,10 +241,23 @@ export async function createBusinessAction(
       };
     }
 
-    // Handle Prisma unique constraint error (P2002)
+    // Handle Prisma unique constraint error (P2002) — defense-in-depth against a
+    // race condition where two requests pass the findFirst check concurrently.
     if (e && typeof e === "object" && "code" in e && e.code === "P2002") {
-      // UNP already exists - redirect to verification
-      redirect("/business/verification");
+      const target = "meta" in e && e.meta && typeof e.meta === "object" && "target" in e.meta
+        ? e.meta.target
+        : undefined;
+      const targetsUnp =
+        Array.isArray(target) ? target.includes("unp") : target === "unp";
+      if (targetsUnp) {
+        return buildUnpAlreadyExistsError();
+      }
+
+      console.error("Business creation error (P2002):", e);
+      return {
+        ok: false,
+        message: "Не удалось отправить заявку. Попробуйте ещё раз.",
+      };
     }
 
     // Generic error

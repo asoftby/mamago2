@@ -198,7 +198,12 @@ export function OnboardingForm({
           value={unp}
           required
           onValueChange={handleUnpChange}
-          fieldError={showFieldErrors ? state.fieldErrors?.unp?.[0] : undefined}
+          fieldError={
+            showFieldErrors
+              ? state.fieldErrors?.unp?.[0] ??
+                (state.field === "unp" ? state.message : undefined)
+              : undefined
+          }
           onResolved={(result) => {
             if (result.legalName && !isLegalNameTouched) {
               setLegalName(result.legalName);
@@ -258,7 +263,7 @@ export function OnboardingForm({
         />
       </div>
 
-      {showFieldErrors && state.message && !state.fieldErrors && (
+      {showFieldErrors && state.message && !state.fieldErrors && state.field !== "unp" && (
         <div className="bg-red-50 border border-red-200 rounded-md p-4">
           <p className="text-sm text-red-800">{state.message}</p>
         </div>
