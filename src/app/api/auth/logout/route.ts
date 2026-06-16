@@ -45,7 +45,8 @@ export async function POST(request: NextRequest) {
 
     // Redirect through the canonical surface helper; localhost remains only a legacy fallback.
     const redirectUrl = new URL(redirectDestination, request.url);
-    
+    redirectUrl.searchParams.set("loggedOut", "1");
+
     // Create redirect response
     const response = NextResponse.redirect(redirectUrl, 303);
     
@@ -58,6 +59,7 @@ export async function POST(request: NextRequest) {
     console.error("Logout error:", error);
     // Even on error, redirect to homepage
     const redirectUrl = new URL(redirectDestination, request.url);
+    redirectUrl.searchParams.set("loggedOut", "1");
     const response = NextResponse.redirect(redirectUrl, 303);
     const requestHost = request.headers.get("host") ?? undefined;
     deleteSessionCookie(response, requestHost);

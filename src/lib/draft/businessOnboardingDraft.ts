@@ -1,9 +1,18 @@
 /**
  * Business Onboarding Draft Storage
- * Persists form data in localStorage to survive page refreshes
+ * Persists form data in localStorage to survive page refreshes.
+ *
+ * The storage key is scoped per userId so that switching accounts on the
+ * same browser never resurfaces a previous user's unsaved draft.
  */
 
-const DRAFT_KEY = "mg_business_onboarding_draft_v1";
+const DRAFT_KEY_PREFIX = "mg_business_onboarding_draft_v1:";
+/** Legacy global key used before drafts were user-scoped — only ever removed, never read. */
+const LEGACY_DRAFT_KEY = "mg_business_onboarding_draft_v1";
+
+function draftKey(userId: string): string {
+  return `${DRAFT_KEY_PREFIX}${userId}`;
+}
 
 export interface BusinessOnboardingDraft {
   unp?: string;
@@ -20,13 +29,13 @@ export interface BusinessOnboardingDraft {
  * Load draft from localStorage
  * Returns null if no draft exists or if draft is invalid
  */
-export function loadDraft(): BusinessOnboardingDraft | null {
-  if (typeof window === "undefined") {
+export function loadDraft(userId: string): BusinessOnboardingDraft | null {
+  if (typeof window === "undefined" || !userId) {
     return null;
   }
 
   try {
-    const stored = localStorage.getItem(DRAFT_KEY);
+    const stored = localStorage.getItem(draftKey(userId));
     if (!stored) {
       return null;
     }
@@ -81,20 +90,23 @@ export function loadDraft(): BusinessOnboardingDraft | null {
  * Save partial draft to localStorage
  * Merges with existing draft
  */
-export function saveDraft(partial: Partial<BusinessOnboardingDraft>): void {
-  if (typeof window === "undefined") {
+export function saveDraft(
+  userId: string,
+  partial: Partial<BusinessOnboardingDraft>
+): void {
+  if (typeof window === "undefined" || !userId) {
     return;
   }
 
   try {
-    const existing = loadDraft() || {};
+    const existing = loadDraft(userId) || {};
     const updated: BusinessOnboardingDraft = {
       ...existing,
       ...partial,
       updatedAt: Date.now(),
     };
 
-    localStorage.setItem(DRAFT_KEY, JSON.stringify(updated));
+    localStorage.setItem(draftKey(userId), JSON.stringify(updated));
   } catch (error) {
     console.error("Failed to save draft:", error);
   }
@@ -103,14 +115,27 @@ export function saveDraft(partial: Partial<BusinessOnboardingDraft>): void {
 /**
  * Clear draft from localStorage
  */
-export function clearDraft(): void {
+export function clearDraft(userId: string): void {
+  if (typeof window === "undefined" || !userId) {
+    return;
+  }
+
+  try {
+    localStorage.removeItem(draftKey(userId));
+  } catch (error) {
+    console.error("Failed to clear draft:", error);
+  }
+}
+
+/** Removes the pre-user-scoping global draft key, if it still lingers from an older session. */
+export function clearLegacyGlobalDraft(): void {
   if (typeof window === "undefined") {
     return;
   }
 
   try {
-    localStorage.removeItem(DRAFT_KEY);
-  } catch (error) {
-    console.error("Failed to clear draft:", error);
+    localStorage.removeItem(LEGACY_DRAFT_KEY);
+  } catch {
+    /* ignore */
   }
 }

@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { Suspense } from "react";
 import "./globals.css";
 import { ntSomic, ptSerif } from "@/lib/fonts";
 import { Sonner } from "@/components/ui/sonner";
@@ -8,6 +9,7 @@ import { AuthProvider } from "@/lib/auth/AuthProvider";
 import { getCurrentAuthState } from "@/lib/auth/getCurrentAuthState";
 import { PendingActionProvider } from "@/contexts/PendingActionContext";
 import { GateFlowController } from "@/components/auth/GateFlowController";
+import { LogoutSuccessListener } from "@/components/auth/LogoutSuccessListener";
 import { MobileTapDiagnostics } from "@/components/dev/MobileTapDiagnostics";
 import { getBrandingConfig } from "@/lib/branding";
 
@@ -59,6 +61,9 @@ export default async function RootLayout({
                 {children}
                 <GateFlowController />
                 <MobileTapDiagnostics />
+                <Suspense fallback={null}>
+                  <LogoutSuccessListener />
+                </Suspense>
               </AccountModeProvider>
             </PendingActionProvider>
           </AuthProvider>

@@ -53,23 +53,22 @@ export function useProfileDropdownHandlers(input: {
   const onLogout = useCallback(async () => {
     setLoggingOut(true);
     try {
-      const res = await fetch("/api/auth/logout", {
-        method: "POST",
-        credentials: "same-origin",
-      });
-      if (res.ok || res.redirected) {
-        closeMenu();
-        notifyAuthStateChanged();
-        navigateToSurface(router, {
-          targetSurface: "public",
-          targetPath: "/",
-          replace: true,
-        });
-      }
+      closeMenu();
+      notifyAuthStateChanged();
+
+      const form = document.createElement("form");
+      form.method = "POST";
+      form.action = "/api/auth/logout";
+      form.style.display = "none";
+      document.body.appendChild(form);
+      form.requestSubmit();
     } finally {
-      setLoggingOut(false);
+      // If navigation is blocked and the page does not unload, restore the button state.
+      window.setTimeout(() => {
+        setLoggingOut(false);
+      }, 1000);
     }
-  }, [router, closeMenu, setLoggingOut]);
+  }, [closeMenu, setLoggingOut]);
 
   const onGoToHome = useCallback(() => {
     navigateToSurface(router, { targetSurface: "public", targetPath: "/" });
