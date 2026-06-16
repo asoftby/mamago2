@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { ChevronRight } from "lucide-react";
 import type { NotificationEntityType, NotificationType } from "@prisma/client";
 import { formatDistanceToNow } from "date-fns";
 import { ru } from "date-fns/locale";
@@ -170,13 +171,17 @@ export function NotificationListItem({
             {content}
           </button>
         )}
+        {isNavigable && compact ? (
+          // Dropdown (compact): chevron affordance instead of a full CTA button.
+          <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+        ) : null}
         {trailingAction}
       </div>
-      {isNavigable && !showCta ? (
-        // Single navigate-through CTA. Rendered as a sibling of the card <Link>
-        // (not nested inside the anchor) and is itself a link to the /n/[id]
-        // resolver, so it marks read + redirects like the card body.
-        <div className={cn("mt-2", compact ? "pl-8" : "pl-9")}>
+      {isNavigable && !showCta && !compact ? (
+        // Full-page feed: single navigate-through CTA. Rendered as a sibling of
+        // the card <Link> (not nested inside the anchor) and is itself a link to
+        // the /n/[id] resolver, so it marks read + redirects like the card body.
+        <div className="mt-2 pl-9">
           <Button asChild type="button" variant="outline" size="xs">
             <Link href={`/n/${notification.id}`}>
               {resolveNavigableCtaLabel(notification.type)}
