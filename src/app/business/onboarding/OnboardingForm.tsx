@@ -7,6 +7,7 @@ import { PrimaryButton } from "@/components/ui/PrimaryButton";
 import { Input } from "@/components/ui/input";
 import { PhoneVerificationField } from "@/components/phone/PhoneVerificationField";
 import { UnpLookupField } from "@/components/business/UnpLookupField";
+import { AccessRequestPanel } from "./AccessRequestPanel";
 import {
   loadDraft,
   saveDraft,
@@ -218,6 +219,9 @@ export function OnboardingForm({
             }
           }}
         />
+        {showFieldErrors && state.code === "BUSINESS_UNP_ALREADY_EXISTS" && (
+          <AccessRequestPanel unp={unp} />
+        )}
       </div>
 
       <div>

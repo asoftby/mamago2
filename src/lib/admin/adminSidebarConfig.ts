@@ -186,6 +186,12 @@ export const GROUP_B2B: AdminSidebarGroup = {
       matchers: [{ type: "prefix", value: adminPath("/b2b/partners") }],
     },
     {
+      id: "b2b-access-requests",
+      label: "Доступы",
+      href: adminPath("/b2b/access-requests"),
+      matchers: [{ type: "prefix", value: adminPath("/b2b/access-requests") }],
+    },
+    {
       id: "b2b-orders",
       label: "Заказы",
       href: adminPath("/orders"),

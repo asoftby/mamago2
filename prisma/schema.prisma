@@ -92,6 +92,8 @@ model User {
   moderatedPlaces                   Place[]                          @relation("PlaceModerator")
   reviewedPlaceClaimRequests        PlaceClaimRequest[]              @relation("ClaimReviewer")
   placeClaimRequests                PlaceClaimRequest[]              @relation("ClaimRequester")
+  businessAccessRequests            BusinessAccessRequest[]          @relation("BusinessAccessRequester")
+  reviewedBusinessAccessRequests    BusinessAccessRequest[]          @relation("BusinessAccessRequestReviewedBy")
   placeRevisions                    PlaceRevision[]                  @relation("PlaceRevisionReviewer")
   planItems                         PlanItem[]
   routes                            Route[]                          @relation("RouteAuthor")
@@ -902,6 +904,7 @@ model Business {
   organizers              Organizer[]
   promotions              Promotion[]
   claimRequests           PlaceClaimRequest[]        @relation("ClaimedPlaces")
+  accessRequests          BusinessAccessRequest[]
 
   @@index([ownerUserId])
   @@index([status])
@@ -980,6 +983,47 @@ model BusinessVerificationLog {
   reviewedBy       User?                      @relation("ReviewedBy", fields: [reviewedByUserId], references: [id])
 
   @@index([businessId, createdAt])
+}
+
+/// Заявка пользователя на доступ к Business, который уже зарегистрирован другим owner'ом (по УНП).
+model BusinessAccessRequest {
+  id                String                       @id @default(cuid())
+  businessId        String
+  requesterUserId   String
+  unp               String
+  name              String
+  phone             String?
+  email             String?
+  requesterRole     BusinessAccessRequesterRole
+  comment           String?
+  status            BusinessAccessRequestStatus  @default(PENDING)
+  reviewedAt        DateTime?
+  reviewedByAdminId String?
+  createdAt         DateTime                     @default(now())
+  updatedAt         DateTime                     @updatedAt
+  business          Business                     @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  requesterUser     User                         @relation("BusinessAccessRequester", fields: [requesterUserId], references: [id], onDelete: Cascade)
+  reviewedByAdmin   User?                        @relation("BusinessAccessRequestReviewedBy", fields: [reviewedByAdminId], references: [id], onDelete: SetNull)
+
+  @@index([businessId])
+  @@index([requesterUserId])
+  @@index([status])
+  @@index([unp])
+}
+
+enum BusinessAccessRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  NEEDS_INFO
+}
+
+enum BusinessAccessRequesterRole {
+  OWNER
+  DIRECTOR
+  MARKETER
+  MANAGER
+  OTHER
 }
 
 model Place {
