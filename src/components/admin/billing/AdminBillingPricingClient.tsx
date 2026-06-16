@@ -20,6 +20,7 @@ import {
   formatBillingActionPrice,
 } from "@/lib/billing/actionPricing";
 import { formatPrice } from "@/lib/formatters/format-price";
+import { renderCurrencyText } from "@/components/icons/BelarusianRubleIcon";
 
 type RateWithNumbers = {
   id: string;
@@ -271,14 +272,14 @@ export function AdminBillingPricingClient({
                     <p className="mt-1 text-xs text-gray-500">
                       {form.pricingType === "FREE"
                         ? "Бесплатно"
-                        : formatBillingActionPrice({
+                        : renderCurrencyText(formatBillingActionPrice({
                             pricingType: form.pricingType,
                             fixedAmount: form.fixedAmount ? Number(form.fixedAmount) : null,
                             percentRate: form.percentRate ? Number(form.percentRate) : null,
                             minimumAmount: form.minimumAmount ? Number(form.minimumAmount) : null,
                             maximumAmount: form.maximumAmount ? Number(form.maximumAmount) : null,
                             currency: "BYN",
-                          })}
+                          }))}
                     </p>
                   </div>
                   <label className="flex items-center gap-2 text-sm text-gray-700">
@@ -575,7 +576,7 @@ export function AdminBillingPricingClient({
                       <div>
                         <p className="text-sm font-medium text-gray-900">{BILLING_ACTION_TITLES[item.actionType]}</p>
                         <p className="mt-1 text-sm text-gray-600">
-                          {item.rule ? formatBillingActionPrice(toRateLike(item.rule)) : "Не тарифицируется"}
+                          {item.rule ? renderCurrencyText(formatBillingActionPrice(toRateLike(item.rule))) : "Не тарифицируется"}
                         </p>
                       </div>
                       <div className="flex flex-wrap items-center gap-2">
@@ -624,7 +625,7 @@ export function AdminBillingPricingClient({
                       {sortedBusinessRates.map((rate) => (
                         <tr key={rate.id}>
                           <td className="px-4 py-3 text-gray-900">{BILLING_ACTION_TITLES[rate.actionType]}</td>
-                          <td className="px-4 py-3 text-gray-700">{formatBillingActionPrice(toRateLike(rate))}</td>
+                          <td className="px-4 py-3 text-gray-700">{renderCurrencyText(formatBillingActionPrice(toRateLike(rate)))}</td>
                           <td className="px-4 py-3 text-gray-700">{BILLING_PRICING_TYPE_LABELS[rate.pricingType]}</td>
                           <td className="px-4 py-3 text-gray-700">
                             {formatBillingActionPeriod({
@@ -668,7 +669,7 @@ export function AdminBillingPricingClient({
                   {plan._count.subscriptions} подписок
                 </Badge>
               </div>
-              <p className="mt-4 text-lg font-semibold text-gray-900">{formatPrice(plan.price.toNumber())}</p>
+              <p className="mt-4 text-lg font-semibold text-gray-900">{renderCurrencyText(formatPrice(plan.price.toNumber()))}</p>
             </div>
           ))}
         </div>

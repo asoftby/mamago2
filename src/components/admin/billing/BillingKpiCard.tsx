@@ -1,9 +1,10 @@
+import type { ReactNode } from "react";
 import { LucideIcon } from "lucide-react";
 
 interface BillingKpiCardProps {
   icon: LucideIcon;
   label: string;
-  value: string | number;
+  value: ReactNode;
   subtitle?: string;
   trend?: {
     value: string;

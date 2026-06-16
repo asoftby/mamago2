@@ -35,8 +35,8 @@ export default async function AdminCommunicationsOverviewPage() {
                 </CardDescription>
               </div>
               <Button asChild className="rounded-2xl">
-                <Link href={adminPath("/communications/email-studio")}>
-                  Открыть Email Studio
+                <Link href={adminPath("/communications/channels/email")}>
+                  Открыть Email-шаблоны
                   <ArrowRight className="h-4 w-4" />
                 </Link>
               </Button>

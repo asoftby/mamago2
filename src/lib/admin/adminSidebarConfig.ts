@@ -51,22 +51,31 @@ export const NAV_COMMUNICATIONS: AdminSidebarNavItem = {
       matchers: [{ type: "exact", value: adminPath("/communications") }],
     },
     {
-      id: "communications-broadcasts",
-      label: "Сообщения",
-      href: adminPath("/broadcasts"),
-      matchers: [{ type: "prefix", value: adminPath("/broadcasts") }],
+      id: "communications-scenarios",
+      label: "Сценарии",
+      href: adminPath("/communications/notifications"),
+      matchers: [
+        { type: "exact", value: adminPath("/communications/notifications") },
+        { type: "prefix", value: adminPath("/communications/scenarios") },
+      ],
     },
     {
-      id: "communications-email-studio",
-      label: "Email Studio",
-      href: adminPath("/communications/email-studio"),
-      matchers: [{ type: "prefix", value: adminPath("/communications/email-studio") }],
+      id: "communications-channels",
+      label: "Каналы",
+      href: adminPath("/communications/channels/email"),
+      matchers: [{ type: "prefix", value: adminPath("/communications/channels") }],
     },
     {
       id: "communications-notification-deliveries",
       label: "Deliveries",
       href: adminPath("/communications/notifications/deliveries"),
       matchers: [{ type: "prefix", value: adminPath("/communications/notifications/deliveries") }],
+    },
+    {
+      id: "communications-editorial-requests",
+      label: "Редакционные запросы",
+      href: adminPath("/content/editorial-requests"),
+      matchers: [{ type: "prefix", value: adminPath("/content/editorial-requests") }],
     },
   ],
 };
@@ -277,12 +286,6 @@ export const GROUP_CONTENT: AdminSidebarGroup = {
       label: "Публикации",
       href: adminPath("/content/publications"),
       matchers: [{ type: "prefix", value: adminPath("/content/publications") }],
-    },
-    {
-      id: "content-editorial-requests",
-      label: "Editorial Requests",
-      href: adminPath("/content/editorial-requests"),
-      matchers: [{ type: "prefix", value: adminPath("/content/editorial-requests") }],
     },
     {
       id: "content-pages",

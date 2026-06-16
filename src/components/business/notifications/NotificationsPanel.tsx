@@ -17,7 +17,6 @@ import {
 import { useNotificationStore } from "@/features/notifications/store";
 import type { NotificationApiRow } from "@/lib/notifications/types";
 import { useRouter } from "next/navigation";
-import { NotificationModal } from "./NotificationModal";
 import { NotificationListItem } from "./NotificationListItem";
 import { NotificationSettingsInModal } from "./NotificationSettingsInModal";
 import { useOnboardingNotificationCta } from "@/features/notifications/hooks/useOnboardingNotificationCta";
@@ -46,9 +45,6 @@ export function NotificationsPanel({
   const [items, setItems] = useState<NotificationApiRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [markingAllRead, setMarkingAllRead] = useState(false);
-  const [modalNotification, setModalNotification] = useState<NotificationApiRow | null>(null);
-  const [modalTitle, setModalTitle] = useState<string | null>(null);
-  const [modalBody, setModalBody] = useState<string | null>(null);
   const [view, setView] = useState<"list" | "settings">("list");
   const settingsButtonRef = useRef<HTMLButtonElement>(null);
   const backButtonRef = useRef<HTMLButtonElement>(null);
@@ -134,10 +130,6 @@ export function NotificationsPanel({
   }, [refreshCounts, refreshRecent]);
 
   const openSettings = useCallback(() => {
-    // Вложенная NotificationModal перекрывала бы настройки — закрываем её первой.
-    setModalNotification(null);
-    setModalTitle(null);
-    setModalBody(null);
     setView("settings");
     window.setTimeout(() => backButtonRef.current?.focus(), 0);
   }, []);
@@ -178,15 +170,6 @@ export function NotificationsPanel({
             void markItemAsReadLocally(notificationId);
           },
           onClose,
-          onOpenModal: (item, action) => {
-            setModalNotification({
-              ...item,
-              actionUrl: action.actionUrl,
-              readAt: item.readAt ?? new Date().toISOString(),
-            });
-            setModalTitle(action.modalTitle);
-            setModalBody(action.modalBody);
-          },
         });
       } catch (error) {
         console.error(error);
@@ -263,7 +246,7 @@ export function NotificationsPanel({
         </div>
       ) : (
         <>
-      <div className="min-h-0 flex-1 bg-white">
+      <div className="min-h-0 flex-1 overflow-hidden bg-white">
         {loading ? (
           <div className="space-y-3 p-4">
             {[1, 2, 3].map((i) => (
@@ -281,7 +264,7 @@ export function NotificationsPanel({
             </p>
           </div>
         ) : (
-          <ScrollArea className="h-full max-h-[min(56vh,520px)]">
+          <ScrollArea className="max-h-[min(56vh,520px)]">
             <div className="divide-y divide-gray-100 bg-white">
               {items.map((notification) => {
                 const ctaProps = getCtaProps(notification);
@@ -331,19 +314,6 @@ export function NotificationsPanel({
         </>
       )}
 
-      <NotificationModal
-        open={modalNotification != null}
-        notification={modalNotification}
-        title={modalTitle}
-        body={modalBody}
-        onOpenChange={(nextOpen) => {
-          if (!nextOpen) {
-            setModalNotification(null);
-            setModalTitle(null);
-            setModalBody(null);
-          }
-        }}
-      />
     </div>
   );
 }

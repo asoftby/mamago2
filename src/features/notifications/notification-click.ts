@@ -29,17 +29,11 @@ export async function fetchResolvedNotificationAction(
 export async function handleNotificationClick(params: {
   notification: NotificationApiRow;
   router: AppRouterInstance;
-  onOpenModal: (notification: NotificationApiRow, action: ResolvedAction) => void;
   onAfterRead?: (notificationId: string) => void;
   onClose?: () => void;
 }) {
   const action = await fetchResolvedNotificationAction(params.notification.id);
   params.onAfterRead?.(params.notification.id);
-
-  if (action.actionMode === "MODAL" || action.actionMode === "NONE") {
-    params.onOpenModal(params.notification, action);
-    return;
-  }
 
   if (action.actionMode === "EXTERNAL_URL" && action.actionUrl) {
     window.open(action.actionUrl, "_blank", "noopener,noreferrer");
@@ -47,11 +41,12 @@ export async function handleNotificationClick(params: {
     return;
   }
 
-  if (action.actionMode === "PAGE" && action.actionUrl) {
+  if ((action.actionMode === "PAGE" || action.actionMode === "MODAL") && action.actionUrl) {
     params.router.push(action.actionUrl);
     params.onClose?.();
     return;
   }
 
-  params.onOpenModal(params.notification, action);
+  // NONE or MODAL without URL — just mark as read, no navigation
+  params.onClose?.();
 }

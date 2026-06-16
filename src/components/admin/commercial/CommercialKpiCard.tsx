@@ -1,34 +1,43 @@
 import { LucideIcon } from "lucide-react";
+import { cn } from "@/lib/utils";
+
+type Accent = "default" | "green" | "yellow" | "red";
+
+const accentStyles: Record<Accent, { iconWrap: string; icon: string; value: string }> = {
+  default: { iconWrap: "bg-blue-50",   icon: "text-blue-600",  value: "text-gray-900" },
+  green:   { iconWrap: "bg-green-50",  icon: "text-green-600", value: "text-green-700" },
+  yellow:  { iconWrap: "bg-amber-50",  icon: "text-amber-600", value: "text-amber-700" },
+  red:     { iconWrap: "bg-red-50",    icon: "text-red-600",   value: "text-red-700" },
+};
 
 interface CommercialKpiCardProps {
   icon: LucideIcon;
   label: string;
   value: string | number;
-  subtitle?: string;
-  alert?: boolean;
+  context?: string;
+  accent?: Accent;
 }
 
 export function CommercialKpiCard({
   icon: Icon,
   label,
   value,
-  subtitle,
-  alert = false,
+  context,
+  accent = "default",
 }: CommercialKpiCardProps) {
+  const s = accentStyles[accent];
   return (
-    <div className={`bg-white rounded-lg shadow p-4 ${alert ? "border-2 border-orange-300" : ""}`}>
-      <div className="flex items-center gap-3">
-        <div className={`p-2 rounded-lg ${alert ? "bg-orange-100" : "bg-blue-100"}`}>
-          <Icon className={`w-5 h-5 ${alert ? "text-orange-600" : "text-blue-600"}`} />
+    <div className="bg-white rounded-lg border border-gray-200 p-4">
+      <div className="flex items-center gap-1.5 mb-2">
+        <div className={cn("p-1 rounded", s.iconWrap)}>
+          <Icon className={cn("w-3.5 h-3.5", s.icon)} />
         </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-xs text-gray-600 truncate">{label}</p>
-          <p className={`text-xl font-semibold ${alert ? "text-orange-600" : "text-gray-900"}`}>
-            {value}
-          </p>
-          {subtitle && <p className="text-xs text-gray-500">{subtitle}</p>}
-        </div>
+        <span className="text-[11px] uppercase tracking-wide font-medium text-gray-500">
+          {label}
+        </span>
       </div>
+      <p className={cn("text-[28px] font-medium leading-none", s.value)}>{value}</p>
+      {context && <p className="text-xs text-gray-500 mt-1.5">{context}</p>}
     </div>
   );
 }

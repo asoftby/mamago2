@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { X } from "lucide-react";
 import { formatPrice } from "@/lib/formatters/format-price";
+import { renderCurrencyText } from "@/components/icons/BelarusianRubleIcon";
 import { format } from "date-fns";
 import { ru } from "date-fns/locale";
 
@@ -142,7 +143,7 @@ export function HistoryModal({ account, onClose }: Props) {
                         }`}
                       >
                         {tx.amount >= 0 ? "+" : ""}
-                        {formatPrice(tx.amount, { hideZero: true })}
+                        {renderCurrencyText(formatPrice(tx.amount, { hideZero: true }))}
                       </p>
                       <p className="text-xs text-gray-500">
                         {format(new Date(tx.occurredAt), "dd MMM yyyy, HH:mm", {

@@ -1,4 +1,5 @@
 import { formatTransactionAmount } from "@/lib/formatters/format-price";
+import { renderCurrencyText } from "@/components/icons/BelarusianRubleIcon";
 
 interface TransactionAmountProps {
   amount: number;
@@ -10,7 +11,7 @@ export function TransactionAmount({ amount }: TransactionAmountProps) {
 
   return (
     <span className={`font-medium ${isPositive ? "text-green-600" : "text-gray-900"}`}>
-      {formatTransactionAmount(amount)}
+      {renderCurrencyText(formatTransactionAmount(amount))}
     </span>
   );
 }

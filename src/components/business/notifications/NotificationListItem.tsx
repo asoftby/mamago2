@@ -45,7 +45,7 @@ export function NotificationListItem({
   const contextBadge = getNotificationProductDomainBadge(notification);
 
   const resolvedCtaLabel = ctaLabel ?? notification.ctaLabel;
-  const showCta = Boolean(resolvedCtaLabel && onCtaClick);
+  const showCta = Boolean(resolvedCtaLabel && onCtaClick && notification.actionUrl != null);
 
   return (
     <div

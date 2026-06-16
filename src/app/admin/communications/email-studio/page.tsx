@@ -1,8 +1,6 @@
-import { EmailTemplatesPageClient } from "@/components/admin/email-studio/EmailTemplatesPageClient";
-
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
+import { redirect } from "next/navigation";
+import { adminPath } from "@/lib/routing/surface";
 
 export default function AdminCommunicationsEmailStudioPage() {
-  return <EmailTemplatesPageClient />;
+  redirect(adminPath("/communications/channels/email"));
 }
