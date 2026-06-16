@@ -1,14 +1,12 @@
 #!/bin/sh
 set -e
 
-# Ensures required system/reference data exists (Country, Region, City "minsk",
-# districts, metro stations, place/event categories, signals, filters, discovery tags).
+# TEMPORARY: unconditional run to verify system seed fixes /minsk 404s after
+# a dev DB reset. Revert to the MAMAGO_RUN_SYSTEM_SEED_ON_START=true gate
+# once confirmed on dev.
 # prisma/seed.ts is idempotent and creates SYSTEM data only — no mock/demo content.
-# Gate behind an env flag so production never runs this implicitly.
-if [ "$MAMAGO_RUN_SYSTEM_SEED_ON_START" = "true" ]; then
-  echo "Ensuring system reference data..."
-  pnpm db:seed:system
-fi
+echo "Ensuring system reference data..."
+pnpm db:seed:system
 
 echo "Starting Next.js server..."
 exec node server.js
