@@ -158,6 +158,27 @@ export function resolveNotificationPageUrl(params: {
       return params.entityId
         ? `/admin/b2b/requests?status=PENDING&open=${params.entityId}`
         : "/admin/b2b/requests?status=PENDING";
+    case "OFFER_APPROVED":
+    case "OFFER_NEEDS_CHANGES":
+    case "OFFER_REJECTED":
+      return params.entityId
+        ? `/business/offers/${params.entityId}/edit`
+        : "/business/offers";
+    case "ACTIVITY_APPROVED":
+    case "ACTIVITY_NEEDS_CHANGES":
+    case "ACTIVITY_REJECTED":
+      return params.entityId
+        ? `/business/events/${params.entityId}/edit`
+        : "/business/events";
+    case "LEAD_CREATED":
+      return params.entityId
+        ? `/business/bookings?id=${params.entityId}`
+        : "/business/bookings";
+    case "PAYMENT_INFO":
+      return "/business/billing";
+    case "SECURITY_ALERT":
+      // /me/settings/security does not exist yet — fall back to settings root
+      return "/me/settings";
     default:
       return null;
   }
