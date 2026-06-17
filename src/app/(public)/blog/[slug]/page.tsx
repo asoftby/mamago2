@@ -21,6 +21,8 @@ import { ArticlePlacesShowcaseBlock } from "@/components/article/blocks/ArticleP
 import prisma from "@/lib/prisma";
 import { findArticleBySlug } from "@/lib/slug/articleSlugService";
 import { buildArticleJsonLd } from "@/lib/seo/schema/buildArticleJsonLd";
+import { buildBreadcrumbJsonLd } from "@/lib/seo/schema/buildBreadcrumbJsonLd";
+import { JsonLd } from "@/components/seo/JsonLd";
 import { buildOgMeta } from "@/lib/seo/buildOgMeta";
 import type { ArticleVm } from "@/lib/blog/articleTypes";
 import { AnalyticsDetailBeacon } from "@/components/analytics/AnalyticsDetailBeacon";
@@ -340,6 +342,14 @@ export default async function ArticlePage({
             publicBase,
           })
         : null;
+  const breadcrumbJsonLd = buildBreadcrumbJsonLd(
+    [
+      { name: "Главная", path: "/" },
+      { name: "Журнал", path: "/blog" },
+      { name: article.title, path: buildNationalArticlePath(article.slug) },
+    ],
+    publicBase,
+  );
   const legacyEditHref =
     canEditPublishedArticle && seo?.id ? `/admin/content/articles/${seo.id}/edit` : undefined;
 
@@ -355,13 +365,7 @@ export default async function ArticlePage({
           vertical="CITY"
         />
       ) : null}
-      {jsonLd && (
-        <script
-          type="application/ld+json"
-
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
-        />
-      )}
+      <JsonLd data={[jsonLd, breadcrumbJsonLd].filter(Boolean) as Record<string, unknown>[]} />
       <ArticleHeader
         title={article.title}
         subtitle={article.subtitle}
