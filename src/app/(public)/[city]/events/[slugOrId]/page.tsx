@@ -101,10 +101,40 @@ export default async function CityEventPublicPage({ params, searchParams }: Even
     }
 
     const publicBase = getCanonicalPublicAppUrl();
+    const canonicalUrl =
+      fromDb.seoCanonicalUrl?.trim() ||
+      `${publicBase}/${city}/events/${fromDb.slug ?? fromDb.id}`;
+    const locationName =
+      fromDb.venue?.place?.title ||
+      fromDb.venue?.title ||
+      fromDb.place?.title ||
+      undefined;
+    const locationAddress =
+      fromDb.venue?.place?.formattedAddr ||
+      fromDb.venue?.place?.customAddress ||
+      fromDb.venue?.addressLine ||
+      fromDb.place?.formattedAddr ||
+      fromDb.place?.customAddress ||
+      undefined;
     const jsonLd =
       fromDb.seoJsonLdOverride && typeof fromDb.seoJsonLdOverride === "object"
         ? (fromDb.seoJsonLdOverride as Record<string, unknown>)
-        : buildEventJsonLd({ activity: fromDb, citySlug: city, publicBase });
+        : buildEventJsonLd({
+            canonicalUrl,
+            title: fromDb.title,
+            description: fromDb.shortDesc,
+            image: fromDb.seoOgImage?.trim() || fromDb.coverImageUrl,
+            sessions: fromDb.sessions,
+            format: fromDb.format,
+            location:
+              locationName || locationAddress
+                ? {
+                    name: locationName,
+                    address: locationAddress,
+                  }
+                : undefined,
+            publicBaseUrl: publicBase,
+          });
     const breadcrumbJsonLd = buildBreadcrumbJsonLd(
       [
         { name: "Главная", path: "/" },
