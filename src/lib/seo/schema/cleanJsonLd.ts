@@ -1,13 +1,3 @@
-type JsonLdValue =
-  | string
-  | number
-  | boolean
-  | null
-  | undefined
-  | Date
-  | JsonLdValue[]
-  | { [key: string]: JsonLdValue };
-
 function isEmptyObject(value: unknown): boolean {
   return (
     typeof value === "object" &&
@@ -17,7 +7,7 @@ function isEmptyObject(value: unknown): boolean {
   );
 }
 
-export function cleanJsonLd<T extends JsonLdValue>(value: T): unknown {
+export function cleanJsonLd(value: unknown): unknown {
   if (value === null || value === undefined) return undefined;
 
   if (value instanceof Date) {
