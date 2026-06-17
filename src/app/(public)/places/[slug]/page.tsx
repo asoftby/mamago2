@@ -5,7 +5,7 @@ import { Metadata } from "next";
 import { JsonLd } from "@/components/seo/JsonLd";
 import { getPlaceDisplayTitle } from "@/lib/placeDisplayTitle";
 import { findPlaceBySlug } from "@/lib/slug/placeSlugService";
-import { formatMarketplaceHeroAddress, getPlaceLocationString } from "@/lib/placeLocationString";
+import { formatMarketplaceHeroAddress } from "@/lib/placeLocationString";
 import { isPlacePubliclyVisible } from "@/lib/plan/publicVisibility";
 import { buildBreadcrumbJsonLd } from "@/lib/seo/schema/buildBreadcrumbJsonLd";
 import { buildPlaceJsonLd } from "@/lib/seo/schema/buildPlaceJsonLd";
@@ -311,24 +311,8 @@ export default async function PlacePage({ params }: PlacePageProps) {
     cityId: place.cityId,
   });
 
-  // Get formatted location string
-  const locationString = getPlaceLocationString(place);
   const googleReviewsEnabled = isGoogleReviewsEnabled(place.googlePlaceId, place.googleReviewsJson);
-
   const publicBase = getCanonicalPublicAppUrl();
-  const jsonLd =
-    place.seoJsonLdOverride && typeof place.seoJsonLdOverride === "object"
-      ? (place.seoJsonLdOverride as Record<string, unknown>)
-      : buildPlaceJsonLd({
-          place: {
-            title: place.title,
-            description: place.description,
-            slug: place.slug,
-            formattedAddr: place.formattedAddr,
-            customAddress: place.customAddress,
-          },
-          publicBase,
-        });
 
   const logoImage = resolvePlaceLogoImage(place.images, place.logoImageId);
   const logoUrl = await resolvePlaceLogoUrlFromDb(place.images, place.logoImageId);
@@ -453,6 +437,18 @@ export default async function PlacePage({ params }: PlacePageProps) {
 
   const heroAddressRaw =
     place.formattedAddr?.trim() || place.customAddress?.trim() || "";
+  const resolvedInstagramUrl =
+    resolveInstagramProfileHref(place.instagramUrl, place.instagramHandle) || undefined;
+  const marketplaceAddress =
+    formatMarketplaceHeroAddress({
+      city: place.city,
+      shortAddress: place.shortAddress,
+      formattedAddr: place.formattedAddr,
+      customAddress: place.customAddress,
+      floor: place.floor,
+      unit: place.unit,
+      unitLabel: place.unitLabel,
+    }) || undefined;
 
   const mapsOpenUrl = buildGoogleMapsPlaceUrl(place.lat, place.lng, heroAddressRaw);
   const mapsDirectionsUrl = buildGoogleMapsDirectionsUrl(
@@ -509,6 +505,25 @@ export default async function PlacePage({ params }: PlacePageProps) {
     { label: displayTitle },
   ];
   const canonicalPath = `/places/${place.slug ?? place.id}`;
+  const canonicalUrl = `${publicBase}${canonicalPath}`;
+  const jsonLd =
+    place.seoJsonLdOverride && typeof place.seoJsonLdOverride === "object"
+      ? (place.seoJsonLdOverride as Record<string, unknown>)
+      : buildPlaceJsonLd({
+          canonicalUrl,
+          name: displayTitle,
+          description: place.description || place.shortDesc,
+          image: logoUrl || galleryImages[0]?.url,
+          address: marketplaceAddress,
+          lat: place.lat,
+          lng: place.lng,
+          phone: place.phone,
+          website: place.website,
+          instagramUrl: resolvedInstagramUrl,
+          rating: averageRating,
+          reviewCount: totalReviewCount,
+          publicBaseUrl: publicBase,
+        });
   const breadcrumbJsonLd = buildBreadcrumbJsonLd(
     [
       { name: "Главная", path: "/" },
@@ -535,19 +550,10 @@ export default async function PlacePage({ params }: PlacePageProps) {
     phone: place.phone || undefined,
     website: place.website || undefined,
     instagramUrl:
-      resolveInstagramProfileHref(place.instagramUrl, place.instagramHandle) || undefined,
-    
+      resolvedInstagramUrl,
+
     // Location
-    address:
-      formatMarketplaceHeroAddress({
-        city: place.city,
-        shortAddress: place.shortAddress,
-        formattedAddr: place.formattedAddr,
-        customAddress: place.customAddress,
-        floor: place.floor,
-        unit: place.unit,
-        unitLabel: place.unitLabel,
-      }) || undefined,
+    address: marketplaceAddress,
     city: place.city?.name,
     district: districtName || undefined,
     metro: metroName || undefined,
