@@ -176,7 +176,6 @@ export default async function CanonicalOfferPage({ params, searchParams }: PageP
     "name": data.media.videoLabel || data.title,
     "description": data.shortDescription || data.title,
     "thumbnailUrl": data.media.videoThumbnail || data.media.posterUrl,
-    "uploadDate": new Date().toISOString(), // Fallback
     "contentUrl": data.media.videoUrl,
     "embedUrl": data.media.videoUrl,
   } : null;
