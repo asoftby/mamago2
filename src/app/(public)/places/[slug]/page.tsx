@@ -2,10 +2,12 @@ import { getCanonicalPublicAppUrl } from "@/lib/config/publicAppUrl";
 import { notFound, permanentRedirect } from "next/navigation";
 import prisma from "@/lib/prisma";
 import { Metadata } from "next";
+import { JsonLd } from "@/components/seo/JsonLd";
 import { getPlaceDisplayTitle } from "@/lib/placeDisplayTitle";
 import { findPlaceBySlug } from "@/lib/slug/placeSlugService";
 import { formatMarketplaceHeroAddress, getPlaceLocationString } from "@/lib/placeLocationString";
 import { isPlacePubliclyVisible } from "@/lib/plan/publicVisibility";
+import { buildBreadcrumbJsonLd } from "@/lib/seo/schema/buildBreadcrumbJsonLd";
 import { buildPlaceJsonLd } from "@/lib/seo/schema/buildPlaceJsonLd";
 import { AnalyticsDetailBeacon } from "@/components/analytics/AnalyticsDetailBeacon";
 import { buildOgMeta } from "@/lib/seo/buildOgMeta";
@@ -506,6 +508,17 @@ export default async function PlacePage({ params }: PlacePageProps) {
       : [{ label: "Места", href: "/places" }]),
     { label: displayTitle },
   ];
+  const canonicalPath = `/places/${place.slug ?? place.id}`;
+  const breadcrumbJsonLd = buildBreadcrumbJsonLd(
+    [
+      { name: "Главная", path: "/" },
+      ...(place.city?.slug && place.city.name
+        ? [{ name: place.city.name, path: `/${place.city.slug}` }]
+        : []),
+      { name: displayTitle, path: canonicalPath },
+    ],
+    publicBase,
+  );
 
   // Prepare place data for marketplace component
   const marketplacePlaceData = {
@@ -565,10 +578,8 @@ export default async function PlacePage({ params }: PlacePageProps) {
         vertical="CITY"
         cityId={place.cityId}
       />
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
-      />
+      <JsonLd data={jsonLd} />
+      <JsonLd data={breadcrumbJsonLd} />
       <MarketplacePlacePage
         place={marketplacePlaceData}
         eventActivities={eventActivities}
