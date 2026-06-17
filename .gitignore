@@ -74,3 +74,4 @@ ts-errors.txt
 
 # Local AI assistant files
 .claude/
+graphify-out/
