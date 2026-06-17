@@ -5,6 +5,8 @@ import { RouteDetailClient } from "./RouteDetailClient";
 import prisma from "@/lib/prisma";
 import { findRouteBySlug } from "@/lib/slug/routeSlugService";
 import { buildRouteJsonLd } from "@/lib/seo/schema/buildRouteJsonLd";
+import { buildBreadcrumbJsonLd } from "@/lib/seo/schema/buildBreadcrumbJsonLd";
+import { JsonLd } from "@/components/seo/JsonLd";
 import { AnalyticsDetailBeacon } from "@/components/analytics/AnalyticsDetailBeacon";
 import { buildOgMeta } from "@/lib/seo/buildOgMeta";
 import { summarizeRouteBudget } from "@/lib/routes/routeBudget";
@@ -202,6 +204,15 @@ export default async function RouteDetailPage({ params }: Props) {
         db.seoJsonLdOverride && typeof db.seoJsonLdOverride === "object"
           ? (db.seoJsonLdOverride as Record<string, unknown>)
           : buildRouteJsonLd({ route: db, publicBase });
+      const routePath = `/routes/${db.slug ?? db.id}`;
+      const breadcrumbJsonLd = buildBreadcrumbJsonLd(
+        [
+          { name: "Главная", path: "/" },
+          { name: "Маршруты", path: "/routes" },
+          { name: db.title, path: routePath },
+        ],
+        publicBase,
+      );
 
       return (
         <>
@@ -211,10 +222,7 @@ export default async function RouteDetailPage({ params }: Props) {
             vertical="CITY"
             cityId={db.cityId}
           />
-          <script
-            type="application/ld+json"
-            dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
-          />
+          <JsonLd data={[jsonLd, breadcrumbJsonLd].filter(Boolean) as Record<string, unknown>[]} />
           <RouteDetailClient route={route} />
         </>
       );
