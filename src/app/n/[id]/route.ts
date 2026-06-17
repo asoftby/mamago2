@@ -1,7 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
+import { buildAuthUrl, getSafeRedirectPath } from "@/lib/auth/redirectTo";
 import prisma from "@/lib/prisma";
 import { resolveNotificationPageUrl } from "@/server/notifications/notification-action-resolver";
+
+function redirectToRelativePath(path: string, status = 307): NextResponse {
+  return new NextResponse(null, {
+    status,
+    headers: {
+      Location: path,
+    },
+  });
+}
 
 /**
  * GET /n/[id] — notification click-through resolver.
@@ -12,18 +22,18 @@ import { resolveNotificationPageUrl } from "@/server/notifications/notification-
  * and navigation happen server-side in one request.
  */
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
 
   const user = await getCurrentUser();
   if (!user) {
-    const loginUrl = new URL(
-      `/login?redirectTo=${encodeURIComponent(`/n/${id}`)}`,
-      request.url,
+    return redirectToRelativePath(
+      buildAuthUrl({
+        redirectTo: `/n/${id}`,
+      }),
     );
-    return NextResponse.redirect(loginUrl);
   }
 
   const notification = await prisma.notification.findFirst({
@@ -40,7 +50,7 @@ export async function GET(
   });
 
   if (!notification) {
-    return NextResponse.redirect(new URL("/", request.url));
+    return redirectToRelativePath("/");
   }
 
   if (notification.readAt === null) {
@@ -61,5 +71,14 @@ export async function GET(
     actionUrl: notification.actionUrl,
   });
 
-  return NextResponse.redirect(new URL(destination ?? "/notifications", request.url));
+  const safeInternalDestination = getSafeRedirectPath(destination, "");
+  if (safeInternalDestination) {
+    return redirectToRelativePath(safeInternalDestination);
+  }
+
+  if (destination && /^https?:\/\//i.test(destination)) {
+    return NextResponse.redirect(destination);
+  }
+
+  return redirectToRelativePath("/notifications");
 }

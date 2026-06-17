@@ -115,3 +115,6 @@ export function buildCurrentPath(pathname: string, search?: string | null): stri
   if (!search || search.length === 0) return pathname;
   return search.startsWith("?") ? `${pathname}${search}` : `${pathname}?${search}`;
 }
+
+// TODO: extend with intent param after callbackUrl is stable
+// Example: /auth?redirectTo=/minsk/events/slug&intent=add-to-plan
