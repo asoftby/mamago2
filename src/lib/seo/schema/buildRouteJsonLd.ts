@@ -1,3 +1,5 @@
+import { absolutePublicUrl } from "@/lib/seo/schema/url";
+
 /**
  * MVP schema for Route:
  * Use `ItemList` (stable, widely supported) with places as list items.
@@ -8,7 +10,7 @@ export function buildRouteJsonLd(args: {
     slug: string;
     title: string;
     stops: Array<{
-      place?: { id: string; title: string } | null;
+      place?: { id?: string; slug?: string | null; title: string } | null;
       customTitle?: string | null;
     }>;
   };
@@ -28,8 +30,9 @@ export function buildRouteJsonLd(args: {
       "@type": "ListItem",
       position: idx + 1,
       name: s.place?.title ?? s.customTitle ?? `Stop ${idx + 1}`,
-      url: s.place?.id ? `${publicBase}/places/${s.place.id}` : undefined,
+      url: s.place?.slug
+        ? absolutePublicUrl(`/places/${s.place.slug}`, publicBase)
+        : undefined,
     })),
   };
 }
-

@@ -152,6 +152,7 @@ export default async function RouteDetailPage({ params }: Props) {
             place: {
               select: {
                 id: true,
+                slug: true,
                 title: true,
                 formattedAddr: true,
                 shortAddress: true,
