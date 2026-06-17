@@ -10,6 +10,8 @@ import { buildEventPageDataFromPrismaActivity } from "@/lib/event/buildEventPage
 import { getCurrentUser } from "@/lib/auth/server";
 import { editorEventEditHref } from "@/lib/content-editor/types";
 import { buildEventJsonLd } from "@/lib/seo/schema/buildEventJsonLd";
+import { buildBreadcrumbJsonLd } from "@/lib/seo/schema/buildBreadcrumbJsonLd";
+import { JsonLd } from "@/components/seo/JsonLd";
 import { AnalyticsDetailBeacon } from "@/components/analytics/AnalyticsDetailBeacon";
 import { resolveCanonicalEventPublicPathBySlugOrId } from "@/lib/business/resolveCanonicalEventPublicPath";
 import { buildOgMeta } from "@/lib/seo/buildOgMeta";
@@ -103,6 +105,15 @@ export default async function CityEventPublicPage({ params, searchParams }: Even
       fromDb.seoJsonLdOverride && typeof fromDb.seoJsonLdOverride === "object"
         ? (fromDb.seoJsonLdOverride as Record<string, unknown>)
         : buildEventJsonLd({ activity: fromDb, citySlug: city, publicBase });
+    const breadcrumbJsonLd = buildBreadcrumbJsonLd(
+      [
+        { name: "Главная", path: "/" },
+        { name: city, path: `/${city}` },
+        { name: "Афиша", path: `/${city}/events` },
+        { name: fromDb.title, path: `/${city}/events/${fromDb.slug ?? fromDb.id}` },
+      ],
+      publicBase,
+    );
 
     const user = await getCurrentUser();
     const ownerEditHref =
@@ -143,11 +154,7 @@ export default async function CityEventPublicPage({ params, searchParams }: Even
           cityId={fromDb.cityId}
           citySlug={city}
         />
-        <script
-          type="application/ld+json"
-           
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
-        />
+        <JsonLd data={[jsonLd, breadcrumbJsonLd].filter(Boolean) as Record<string, unknown>[]} />
         <EventPageView data={data} />
       </>
     );
