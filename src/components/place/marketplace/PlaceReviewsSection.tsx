@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { format } from "date-fns";
 import { ru } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -24,6 +24,12 @@ interface Review {
   ownerReplyText?: string | null;
   ownerReplyAuthorName?: string | null;
   ownerReplyCreatedAt?: Date | string | null;
+}
+
+function shouldUseRelativeTime(review: Review): boolean {
+  if (!review.relativeTimeDescription) return false;
+  if (review.source !== "GOOGLE") return true;
+  return /[А-Яа-яЁё]/u.test(review.relativeTimeDescription);
 }
 
 interface PlaceReviewsSectionProps {
@@ -120,7 +126,13 @@ export function PlaceReviewsSection({
           }}
         >
           {reviews.slice(0, 3).map((review, i) => (
-            <ReviewCard key={review.id} review={review} layout="grid" delay={i * 70} />
+            <ReviewCard
+              key={review.id}
+              review={review}
+              layout="grid"
+              delay={i * 70}
+              onShowMore={() => setAllOpen(true)}
+            />
           ))}
         </div>
       </div>
@@ -168,12 +180,36 @@ function ReviewCard({
   review,
   layout,
   delay = 0,
+  onShowMore,
 }: {
   review: Review;
   layout: "grid" | "list";
   delay?: number;
+  onShowMore?: () => void;
 }) {
   const isGrid = layout === "grid";
+  const textRef = useRef<HTMLParagraphElement>(null);
+  const [isTruncated, setIsTruncated] = useState(false);
+
+  useLayoutEffect(() => {
+    if (!isGrid || !review.text?.trim()) {
+      setIsTruncated(false);
+      return;
+    }
+
+    const el = textRef.current;
+    if (!el) return;
+
+    const checkTruncation = () => {
+      setIsTruncated(el.scrollHeight > el.clientHeight + 1);
+    };
+
+    checkTruncation();
+
+    const observer = new ResizeObserver(checkTruncation);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [isGrid, review.text]);
 
   const initials = review.authorName
     .split(" ")
@@ -182,9 +218,9 @@ function ReviewCard({
     .toUpperCase()
     .slice(0, 2);
 
-  const formattedDate =
-    review.relativeTimeDescription ||
-    format(new Date(review.publishedAt), "d MMMM yyyy", { locale: ru });
+  const formattedDate = shouldUseRelativeTime(review)
+    ? review.relativeTimeDescription!
+    : format(new Date(review.publishedAt), "d MMMM yyyy", { locale: ru });
 
   const replyAt = review.ownerReplyCreatedAt
     ? format(new Date(review.ownerReplyCreatedAt), "d MMMM yyyy", { locale: ru })
@@ -256,18 +292,51 @@ function ReviewCard({
 
       {/* Quote text in serif */}
       {review.text && (
-        <p
-          style={{
-            margin: 0,
-            fontFamily: "var(--font-serif)",
-            fontSize: 18,
-            lineHeight: 1.3,
-            letterSpacing: "-.01em",
-            color: "#141210",
-          }}
-        >
-          «{review.text}»
-        </p>
+        <>
+          <p
+            ref={textRef}
+            style={{
+              margin: 0,
+              fontFamily: "var(--font-serif)",
+              fontSize: 16,
+              lineHeight: 1.3,
+              letterSpacing: "-.01em",
+              color: "#141210",
+              ...(isGrid
+                ? {
+                    display: "-webkit-box",
+                    WebkitLineClamp: 5,
+                    WebkitBoxOrient: "vertical",
+                    overflow: "hidden",
+                  }
+                : {}),
+            }}
+          >
+            «{review.text}»
+          </p>
+          {isGrid && isTruncated && onShowMore ? (
+            <button
+              type="button"
+              onClick={onShowMore}
+              style={{
+                alignSelf: "flex-start",
+                marginTop: -4,
+                background: "none",
+                border: "none",
+                padding: 0,
+                fontSize: 14,
+                fontWeight: 600,
+                color: "#141210",
+                textDecoration: "underline",
+                textUnderlineOffset: 3,
+                cursor: "pointer",
+                fontFamily: "inherit",
+              }}
+            >
+              Показать еще
+            </button>
+          ) : null}
+        </>
       )}
 
       {/* Owner reply - only in list mode */}
