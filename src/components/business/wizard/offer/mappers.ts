@@ -1,5 +1,13 @@
 import type { OfferKind } from "@prisma/client";
-import type { OfferFormData, CampLodgingTypeKey } from "./types";
+import type {
+  OfferFormData,
+  CampLodgingTypeKey,
+  OfferPlacementKey,
+  OfferPlacementStatus,
+  OfferProductType,
+  BirthdayRole,
+  BirthdayLocationType,
+} from "./types";
 import { getDefaultFormData } from "./defaults";
 import type { PublicationAccess } from "@/features/publication-access";
 import {
@@ -39,13 +47,168 @@ function parseCampProgramTypeFromDb(
 }
 
 function inferOfferWizardTypeFromOffer(offer: {
+  productType?: OfferProductType | null;
   campProgramType?: string | null;
   campSessions?: unknown;
 }): OfferFormData["offerWizardType"] {
+  if (offer.productType === "CAMP") return "CAMP";
+  if (offer.productType === "REGULAR_ACTIVITY") return "REGULAR";
+  if (
+    offer.productType === "PLACE_VISIT" ||
+    offer.productType === "ONE_TIME_ACTIVITY" ||
+    offer.productType === "PARTY_SERVICE" ||
+    offer.productType === "PARTY_PACKAGE"
+  ) {
+    return "SINGLE";
+  }
   if (parseCampProgramTypeFromDb(offer.campProgramType)) return "CAMP";
   const sessions = normalizeCampSessionsFromDb(offer.campSessions);
   if (sessions.length > 0) return "CAMP";
   return null;
+}
+
+function inferProductTypeFromOffer(offer: {
+  productType?: OfferProductType | null;
+  campProgramType?: string | null;
+  kind: OfferKind;
+}): OfferProductType {
+  if (offer.productType) return offer.productType;
+  if (parseCampProgramTypeFromDb(offer.campProgramType)) return "CAMP";
+  if (offer.kind === "EVENT") return "ONE_TIME_ACTIVITY";
+  return "PLACE_VISIT";
+}
+
+function inferProductTypeFromForm(data: OfferFormData): OfferProductType | undefined {
+  if (data.productType) return data.productType;
+  if (data.offerWizardType === "CAMP") return "CAMP";
+  if (data.offerWizardType === "REGULAR") return "REGULAR_ACTIVITY";
+  return undefined;
+}
+
+function inferRequestedPlacementsFromForm(
+  data: OfferFormData,
+  productType: OfferProductType | undefined,
+): OfferPlacementKey[] | undefined {
+  if (data.productType) return data.requestedPlacements;
+  if (data.requestedPlacements.length > 0) return data.requestedPlacements;
+  if (!productType) return undefined;
+
+  switch (productType) {
+    case "CAMP":
+      return ["CAMPS"];
+    case "REGULAR_ACTIVITY":
+      return ["CLASSES"];
+    case "ONE_TIME_ACTIVITY":
+      return ["WHERE_TO_GO"];
+    default:
+      return undefined;
+  }
+}
+
+function defaultRequestedPlacementsForProductType(
+  productType: OfferProductType | undefined,
+): OfferPlacementKey[] {
+  switch (productType) {
+    case "CAMP":
+      return ["CAMPS"];
+    case "REGULAR_ACTIVITY":
+      return ["CLASSES"];
+    case "ONE_TIME_ACTIVITY":
+    case "PLACE_VISIT":
+      return ["WHERE_TO_GO"];
+    case "PARTY_SERVICE":
+    case "PARTY_PACKAGE":
+      return ["BIRTHDAY"];
+    default:
+      return [];
+  }
+}
+
+function mapBirthdayDetailsForApi(
+  data: OfferFormData,
+): {
+  role?: BirthdayRole | null;
+  locationType?: BirthdayLocationType | null;
+  durationMinutes?: number | null;
+  minChildren?: number | null;
+  maxChildren?: number | null;
+  priceFrom?: number | null;
+  included?: string | null;
+  program?: string | null;
+  note?: string | null;
+} | null {
+  if (!data.requestedPlacements.includes("BIRTHDAY")) {
+    return null;
+  }
+
+  const details = data.birthdayDetails;
+  const priceFrom = parsePrice(details.priceFrom);
+  return {
+    role: details.role,
+    locationType: details.locationType,
+    durationMinutes: details.durationMinutes,
+    minChildren: details.minChildren,
+    maxChildren: details.maxChildren,
+    priceFrom: priceFrom ?? null,
+    included: details.included.trim() || null,
+    program: details.program.trim() || null,
+    note: details.note.trim() || null,
+  };
+}
+
+function parsePlacementKeyArray(
+  placements: unknown,
+): OfferPlacementKey[] {
+  if (!Array.isArray(placements)) return [];
+
+  return placements
+    .map((placement) =>
+      placement &&
+      typeof placement === "object" &&
+      "key" in placement &&
+      typeof placement.key === "string"
+        ? placement.key
+        : null,
+    )
+    .filter(
+      (key): key is OfferPlacementKey =>
+        key === "WHERE_TO_GO" ||
+        key === "CLASSES" ||
+        key === "CAMPS" ||
+        key === "BIRTHDAY",
+    );
+}
+
+function parsePlacementStatusMap(
+  placements: unknown,
+): OfferFormData["placementStatuses"] {
+  if (!Array.isArray(placements)) return {};
+
+  return placements.reduce<OfferFormData["placementStatuses"]>((acc, placement) => {
+    if (
+      placement &&
+      typeof placement === "object" &&
+      "key" in placement &&
+      "status" in placement &&
+      typeof placement.key === "string" &&
+      typeof placement.status === "string"
+    ) {
+      const key = placement.key;
+      const status = placement.status;
+      if (
+        (key === "WHERE_TO_GO" ||
+          key === "CLASSES" ||
+          key === "CAMPS" ||
+          key === "BIRTHDAY") &&
+        (status === "REQUESTED" ||
+          status === "APPROVED" ||
+          status === "REJECTED")
+      ) {
+        acc[key as OfferPlacementKey] = status as OfferPlacementStatus;
+      }
+    }
+    return acc;
+  }, {});
 }
 
 function formKindToApiKind(
@@ -195,6 +358,8 @@ export function buildOfferCreatePayload(
     data.publicationAccess,
     data,
   );
+  const productType = inferProductTypeFromForm(data);
+  const requestedPlacements = inferRequestedPlacementsFromForm(data, productType);
 
   const base = {
     source: "PLACE" as const,
@@ -254,6 +419,9 @@ export function buildOfferCreatePayload(
     wizardCompletedSteps: opts?.wizardCompletedSteps,
     status: opts?.status ?? "DRAFT",
     gallery: data.gallery ?? [],
+    productType,
+    requestedPlacements,
+    birthdayDetails: mapBirthdayDetailsForApi(data),
     // Camp/accommodation-поля — только для лагерей; данные скрытых шагов
     // других типов в payload не попадают
     ...(data.offerWizardType === "CAMP" ? buildCampFieldsForCreate(data) : {}),
@@ -329,6 +497,8 @@ export function buildOfferUpdatePayload(
     data.publicationAccess,
     data,
   );
+  const productType = inferProductTypeFromForm(data);
+  const requestedPlacements = inferRequestedPlacementsFromForm(data, productType);
 
   const payload: Record<string, unknown> = {
     selectedPlace: data.placeId ? { id: data.placeId } : undefined,
@@ -383,6 +553,9 @@ export function buildOfferUpdatePayload(
     discoverySignalIds: data.signalIds,
     classChipSlugs: data.classChipSlugs,
     gallery: data.gallery ?? [],
+    productType,
+    requestedPlacements,
+    birthdayDetails: mapBirthdayDetailsForApi(data),
     // CAMP — camp/accommodation-данные; иначе явные null (затирание в БД)
     ...(data.offerWizardType === "CAMP"
       ? buildCampFieldsForCreate(data)
@@ -405,6 +578,19 @@ export function mapOfferToFormData(offer: {
   placeId?: string | null;
   place?: { title?: string | null } | null;
   kind: OfferKind;
+  productType?: OfferProductType | null;
+  placements?: Array<{ key: OfferPlacementKey; status?: OfferPlacementStatus | null }> | null;
+  birthdayDetails?: {
+    role?: BirthdayRole | null;
+    locationType?: BirthdayLocationType | null;
+    durationMinutes?: number | null;
+    minChildren?: number | null;
+    maxChildren?: number | null;
+    priceFrom?: number | string | null;
+    included?: string | null;
+    program?: string | null;
+    note?: string | null;
+  } | null;
   title: string;
   description: string | null;
   coverImage: string | null;
@@ -466,6 +652,9 @@ export function mapOfferToFormData(offer: {
 
   const inferredWizardType = inferOfferWizardTypeFromOffer(offer);
   const isCamp = inferredWizardType === "CAMP";
+  const productType = inferProductTypeFromOffer(offer);
+  const requestedPlacements = parsePlacementKeyArray(offer.placements);
+  const placementStatuses = parsePlacementStatusMap(offer.placements);
   const socialLinks = Array.isArray(offer.contactSocialLinks)
     ? offer.contactSocialLinks
         .filter(
@@ -493,8 +682,40 @@ export function mapOfferToFormData(offer: {
   return {
     ...defaults,
     offerWizardType: inferredWizardType,
-    offerKind: isCamp ? "course" : offer.kind === "EVENT" ? "course" : "service",
-    durationType: isCamp ? "camp" : offer.kind === "EVENT" ? "single" : null,
+    productType,
+    requestedPlacements:
+      requestedPlacements.length > 0
+        ? requestedPlacements
+        : defaultRequestedPlacementsForProductType(productType),
+    placementStatuses,
+    birthdayDetails: {
+      role: offer.birthdayDetails?.role ?? null,
+      locationType: offer.birthdayDetails?.locationType ?? null,
+      durationMinutes: offer.birthdayDetails?.durationMinutes ?? null,
+      minChildren: offer.birthdayDetails?.minChildren ?? null,
+      maxChildren: offer.birthdayDetails?.maxChildren ?? null,
+      priceFrom:
+        offer.birthdayDetails?.priceFrom != null
+          ? String(offer.birthdayDetails.priceFrom)
+          : "",
+      included: offer.birthdayDetails?.included ?? "",
+      program: offer.birthdayDetails?.program ?? "",
+      note: offer.birthdayDetails?.note ?? "",
+    },
+    offerKind:
+      productType === "PARTY_PACKAGE"
+        ? "birthday"
+        : isCamp || offer.kind === "EVENT"
+          ? "course"
+          : "service",
+    durationType:
+      productType === "REGULAR_ACTIVITY"
+        ? "recurring"
+        : isCamp
+          ? "camp"
+          : offer.kind === "EVENT"
+            ? "single"
+            : null,
     campProgramType: parseCampProgramTypeFromDb(offer.campProgramType),
     placeId: offer.placeId ?? null,
     placeTitle: offer.place?.title ?? "",

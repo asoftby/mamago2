@@ -23,6 +23,7 @@ export interface OfferWizardStepDef {
 /** Все возможные ключи шагов мастера (для нормализации данных из БД/localStorage). */
 export const ALL_OFFER_WIZARD_STEP_KEYS: OfferWizardStepKey[] = [
   "type",
+  "placements",
   "details",
   "photo",
   "conditions",
@@ -81,9 +82,14 @@ export function getStepsForOfferType(type: OfferWizardType | null): OfferWizardS
 
   const baseSteps: Record<OfferWizardStepKey, Omit<OfferWizardStepDef, "key">> = {
     type: {
-      title: "Тип предложения",
-      description: "Что предлагается пользователям?",
-      shortLabel: "Тип",
+      title: "Что вы хотите добавить?",
+      description: "Выберите формат предложения, который точнее всего описывает ваш продукт.",
+      shortLabel: "Формат",
+    },
+    placements: {
+      title: "Где это может быть полезно родителям?",
+      description: "Выберите сценарии, в которых предложение действительно релевантно.",
+      shortLabel: "Сценарии",
     },
     details: {
       title: "Детали",
@@ -133,6 +139,7 @@ export function getStepsForOfferType(type: OfferWizardType | null): OfferWizardS
     // SINGLE and REGULAR have the same step sequence
     stepKeys = [
       "type",
+      "placements",
       "details",
       "photo",
       "conditions",
@@ -144,6 +151,7 @@ export function getStepsForOfferType(type: OfferWizardType | null): OfferWizardS
     // CAMP has additional steps for schedule and accommodation
     stepKeys = [
       "type",
+      "placements",
       "details",
       "photo",
       "campSchedule",
@@ -240,7 +248,16 @@ export function isStepComplete(
 ): boolean {
   switch (stepKey) {
     case "type":
-      return !!data.offerWizardType;
+      return !!data.offerWizardType && !!data.productType;
+
+    case "placements":
+      if (data.requestedPlacements.length === 0) return false;
+      if (!data.requestedPlacements.includes("BIRTHDAY")) return true;
+      return Boolean(
+        data.birthdayDetails.role &&
+          (data.birthdayDetails.priceFrom.trim() || data.birthdayDetails.note.trim()) &&
+          (data.birthdayDetails.included.trim() || data.birthdayDetails.program.trim()),
+      );
 
     case "details":
       if (data.offerWizardType === "CAMP") {
@@ -260,7 +277,10 @@ export function isStepComplete(
 
     case "conditions":
       // For SINGLE/REGULAR
-      if (data.offerWizardType === "SINGLE" || data.offerWizardType === "REGULAR") {
+      if (
+        data.productType === "ONE_TIME_ACTIVITY" ||
+        data.productType === "REGULAR_ACTIVITY"
+      ) {
         return !!(data.classDuration.trim() && data.classFormat);
       }
       return true;
@@ -364,7 +384,28 @@ export function getMissingFieldsForStep(
 
   switch (stepKey) {
     case "type":
-      if (!data.offerWizardType) missing.push("Тип предложения");
+      if (!data.productType) missing.push("Формат предложения");
+      break;
+
+    case "placements":
+      if (data.requestedPlacements.length === 0) {
+        missing.push("Хотя бы один сценарий размещения");
+      }
+      if (data.requestedPlacements.includes("BIRTHDAY")) {
+        if (!data.birthdayDetails.role) missing.push("Роль в празднике");
+        if (
+          !data.birthdayDetails.priceFrom.trim() &&
+          !data.birthdayDetails.note.trim()
+        ) {
+          missing.push("Цена от или важные условия");
+        }
+        if (
+          !data.birthdayDetails.included.trim() &&
+          !data.birthdayDetails.program.trim()
+        ) {
+          missing.push("Что входит или описание программы");
+        }
+      }
       break;
 
     case "details":
@@ -381,7 +422,10 @@ export function getMissingFieldsForStep(
       break;
 
     case "conditions":
-      if (data.offerWizardType === "SINGLE" || data.offerWizardType === "REGULAR") {
+      if (
+        data.productType === "ONE_TIME_ACTIVITY" ||
+        data.productType === "REGULAR_ACTIVITY"
+      ) {
         if (!data.classDuration.trim()) missing.push("Продолжительность занятия");
         if (!data.classFormat) missing.push("Формат занятия");
       }

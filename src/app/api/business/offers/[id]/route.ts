@@ -19,7 +19,43 @@ import {
   campSessionEntrySchema,
   offerWizardStepKeySchema,
 } from "@/lib/business/offerCampApiSchemas";
+import {
+  inferOfferProductType,
+  mapProductTypeToLegacyKind,
+} from "@/lib/offers/offerPersistenceCompatibility";
+import { syncOfferPersistenceLayer } from "@/server/offers/offerPersistence";
 import { syncOfferMediaUsage } from "@/server/services/media/media-usage.service";
+
+const offerProductTypeSchema = z.enum([
+  "PLACE_VISIT",
+  "ONE_TIME_ACTIVITY",
+  "REGULAR_ACTIVITY",
+  "CAMP",
+  "PARTY_SERVICE",
+  "PARTY_PACKAGE",
+]);
+
+const offerPlacementKeySchema = z.enum([
+  "WHERE_TO_GO",
+  "CLASSES",
+  "CAMPS",
+  "BIRTHDAY",
+]);
+
+const birthdayRoleSchema = z.enum([
+  "VENUE",
+  "ANIMATOR",
+  "SHOW",
+  "MASTER_CLASS",
+  "CAKE",
+  "CATERING",
+  "DECOR",
+  "PHOTO_VIDEO",
+  "PACKAGE",
+  "OTHER",
+]);
+
+const birthdayLocationTypeSchema = z.enum(["ON_SITE", "OFF_SITE", "BOTH"]);
 
 const updateOfferSchema = z.object({
   selectedPlace: z.object({
@@ -65,6 +101,19 @@ const updateOfferSchema = z.object({
   classChipSlugs: z.array(z.string()).optional(),
   /** Шаги мастера, явно завершённые пользователем */
   wizardCompletedSteps: z.array(offerWizardStepKeySchema).optional(),
+  productType: offerProductTypeSchema.optional(),
+  requestedPlacements: z.array(offerPlacementKeySchema).optional(),
+  birthdayDetails: z.object({
+    role: birthdayRoleSchema.nullable().optional(),
+    locationType: birthdayLocationTypeSchema.nullable().optional(),
+    durationMinutes: z.number().int().nullable().optional(),
+    minChildren: z.number().int().nullable().optional(),
+    maxChildren: z.number().int().nullable().optional(),
+    priceFrom: z.number().nullable().optional(),
+    included: z.string().nullable().optional(),
+    program: z.string().nullable().optional(),
+    note: z.string().nullable().optional(),
+  }).nullable().optional(),
   // Camp/accommodation: null = «тип больше не лагерь, затереть в БД»
   campProgramType: campProgramTypeSchema.nullable(),
   // Camp fields
@@ -116,6 +165,8 @@ export async function GET(
             createdByUserId: true,
           },
         },
+        placements: true,
+        birthdayDetails: true,
       },
     });
 
@@ -161,6 +212,8 @@ export async function PATCH(
       select: {
         id: true,
         title: true,
+        kind: true,
+        productType: true,
         priceFrom: true,
         priceText: true,
         campProgramType: true,
@@ -330,26 +383,65 @@ export async function PATCH(
     // Update price fields if they were recalculated
     if (priceFrom !== existingOffer.priceFrom) updateData.priceFrom = priceFrom;
     if (priceText !== existingOffer.priceText) updateData.priceText = priceText;
+    const productType =
+      data.productType !== undefined
+        ? data.productType
+        : existingOffer.productType ??
+          inferOfferProductType({
+            campProgramType:
+              data.campProgramType !== undefined
+                ? data.campProgramType
+                : existingOffer.campProgramType,
+            kind: existingOffer.kind,
+          });
+    const shouldPersistProductType =
+      data.productType !== undefined || existingOffer.productType == null;
 
-    const offer = await prisma.offer.update({
-      where: { id },
-      data: updateData,
-      select: {
-        id: true,
-        title: true,
-        status: true,
-        slug: true,
-        publishedAt: true,
-        updatedAt: true,
-        place: {
-          select: {
-            id: true,
-            title: true,
-            formattedAddr: true,
-            customAddress: true,
+    if (shouldPersistProductType) {
+      updateData.productType = productType;
+      updateData.kind = mapProductTypeToLegacyKind(productType);
+    }
+
+    const offer = await prisma.$transaction(async (tx) => {
+      await tx.offer.update({
+        where: { id },
+        data: updateData,
+      });
+
+      await syncOfferPersistenceLayer({
+        db: tx,
+        offerId: id,
+        actorUserId: user.id,
+        productType,
+        requestedPlacementsStrategy: "preserve_if_missing",
+        requestedPlacements: data.requestedPlacements,
+        requestedPlacementsProvided: data.requestedPlacements !== undefined,
+        birthdayDetails: data.birthdayDetails,
+        birthdayDetailsProvided: data.birthdayDetails !== undefined,
+      });
+
+      return tx.offer.findUniqueOrThrow({
+        where: { id },
+        select: {
+          id: true,
+          title: true,
+          status: true,
+          slug: true,
+          publishedAt: true,
+          updatedAt: true,
+          productType: true,
+          placements: true,
+          birthdayDetails: true,
+          place: {
+            select: {
+              id: true,
+              title: true,
+              formattedAddr: true,
+              customAddress: true,
+            },
           },
         },
-      },
+      });
     });
     timer.mark("status");
 
