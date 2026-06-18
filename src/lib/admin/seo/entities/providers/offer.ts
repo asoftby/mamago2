@@ -7,12 +7,13 @@ import {
 } from "../utils";
 import { buildSegmentEntityDiagnostics } from "../buildEntityDiagnostics";
 import { applyOfferSeoUpdate } from "@/lib/admin/seo/entities/applyEntitySeoUpdate";
-import { buildOfferJsonLd } from "@/lib/seo/schema/buildOfferJsonLd";
+import { buildOfferStructuredData } from "@/lib/seo/schema/buildOfferStructuredData";
 import {
   SEO_ROBOTS_INDEX_FOLLOW,
   SEO_ROBOTS_NOINDEX_FOLLOW,
 } from "@/lib/admin/seo/entities/robotsConstants";
-import type { OfferJsonLdOffer, OfferJsonLdPlace } from "@/lib/seo/schema/buildOfferJsonLd";
+import { resolveOfferStructuredDataType } from "@/lib/seo/schema/buildOfferJsonLd";
+import { getOfferPublicPath } from "@/lib/offers/offerPublicUrl";
 
 const OFFER_LIST_LIMIT = 300;
 
@@ -174,8 +175,17 @@ export const offerProvider: SeoEntityProvider = {
         coverImage: true,
         kind: true,
         campProgramType: true,
+        seoCanonicalUrl: true,
         seoJsonLdOverride: true,
-        place: { select: { title: true, slug: true, city: { select: { slug: true } } } },
+        place: {
+          select: {
+            title: true,
+            slug: true,
+            formattedAddr: true,
+            customAddress: true,
+            city: { select: { slug: true } },
+          },
+        },
       },
     });
     if (!o) return null;
@@ -183,10 +193,29 @@ export const offerProvider: SeoEntityProvider = {
       return o.seoJsonLdOverride as Record<string, unknown>;
     }
     const publicBase = process.env.NEXT_PUBLIC_APP_URL || "https://mamago.by";
-    return buildOfferJsonLd({
-      offer: o satisfies OfferJsonLdOffer,
-      place: o.place satisfies OfferJsonLdPlace,
-      publicBase,
+    const citySlug = o.place?.city?.slug || "minsk";
+    const canonicalUrl =
+      o.seoCanonicalUrl?.trim() ||
+      `${publicBase}${getOfferPublicPath(o, citySlug)}`;
+
+    return buildOfferStructuredData({
+      canonicalUrl,
+      publicType: resolveOfferStructuredDataType(o),
+      title: o.title,
+      description: o.description,
+      image: o.coverImage,
+      price: o.priceFrom,
+      priceText: o.priceText,
+      priceCurrency: "BYN",
+      place: o.place
+        ? {
+            name: o.place.title,
+            slug: o.place.slug,
+            address: o.place.formattedAddr || o.place.customAddress,
+            url: o.place.slug ? `/places/${o.place.slug}` : undefined,
+          }
+        : null,
+      publicBaseUrl: publicBase,
     });
   },
 };

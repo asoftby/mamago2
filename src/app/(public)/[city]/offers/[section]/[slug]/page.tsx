@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { notFound, permanentRedirect } from "next/navigation";
 import prisma from "@/lib/prisma";
 import { findOfferBySlug } from "@/lib/slug/offerSlugService";
-import { buildOfferJsonLd } from "@/lib/seo/schema/buildOfferJsonLd";
+import { buildOfferStructuredData } from "@/lib/seo/schema/buildOfferStructuredData";
 import { buildBreadcrumbJsonLd } from "@/lib/seo/schema/buildBreadcrumbJsonLd";
 import { JsonLd } from "@/components/seo/JsonLd";
 import { AnalyticsDetailBeacon } from "@/components/analytics/AnalyticsDetailBeacon";
@@ -14,7 +14,7 @@ import { OfferPageView } from "@/components/offers";
 import { getCurrentUser } from "@/lib/auth/server";
 import { canShowOfferOwnerEditOnPublicPage } from "@/lib/permissions/offerEditPermissions";
 import { mockSummerCamp, mockLesnayaSkazka } from "@/lib/offer/offerPageMock";
-import type { OfferJsonLdOffer, OfferJsonLdPlace } from "@/lib/seo/schema/buildOfferJsonLd";
+import { resolveOfferStructuredDataType } from "@/lib/seo/schema/buildOfferJsonLd";
 
 interface PageProps {
   params: Promise<{ city: string; section: string; slug: string }>;
@@ -146,16 +146,29 @@ export default async function CanonicalOfferPage({ params, searchParams }: PageP
 
   const publicBase = getCanonicalPublicAppUrl();
   const canonicalPath = getOfferPublicPath(offer, city);
+  const canonicalUrl = `${publicBase}${canonicalPath}`;
   
   // 1. Offer JSON-LD
   const offerJsonLd =
     offer.seoJsonLdOverride && typeof offer.seoJsonLdOverride === "object"
       ? (offer.seoJsonLdOverride as Record<string, unknown>)
-      : buildOfferJsonLd({
-          offer: offer satisfies OfferJsonLdOffer,
-          place: offer.place satisfies OfferJsonLdPlace,
-          citySlug: city,
-          publicBase,
+      : buildOfferStructuredData({
+          canonicalUrl,
+          publicType: resolveOfferStructuredDataType(offer),
+          title: offer.title,
+          description: offer.description,
+          image: offer.coverImage,
+          price: offer.priceFrom,
+          priceText: offer.priceText,
+          priceCurrency: "BYN",
+          place: offer.place
+            ? {
+                name: offer.place.title,
+                slug: offer.place.slug,
+                url: offer.place.slug ? `/places/${offer.place.slug}` : undefined,
+              }
+            : null,
+          publicBaseUrl: publicBase,
         });
 
   // 2. BreadcrumbList JSON-LD
