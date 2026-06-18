@@ -1042,11 +1042,14 @@ model Place {
   category                     String
   countryCode                  String?
   customAddress                String?
+  displayAddress               String?
   description                  String?
+  directionsNote               String?
   formattedAddr                String?
   googlePlaceId                String?
   instagramHandle              String?
   instagramUrl                 String?
+  locationName                 String?
   locationSource               LocationSource     @default(MANUAL)
   logoImageId                  String?
   shortDesc                    String
@@ -1238,12 +1241,15 @@ model PlaceRevision {
   googlePlaceId         String?
   lat                   Float?
   lng                   Float?
+  displayAddress        String?
   formattedAddr         String?
   addressJson           Json?
+  directionsNote        String?
   countryCode           String?
   cityId                String?
   locationSource        LocationSource?
   customAddress         String?
+  locationName          String?
   districtAutoId        String?
   districtManualId      String?
   metroAutoId           String?
