@@ -2,17 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { JetBrains_Mono } from "next/font/google";
 import { AddParticipantModal } from "@/components/children/AddParticipantModal";
-
-/* JetBrains Mono is scoped to caps labels on this page. Body sans uses the global
-   NTSomic (`--font-sans` from root layout); display serif uses PT Serif. */
-const fontMono = JetBrains_Mono({
-  subsets: ["latin", "cyrillic"],
-  weight: ["400", "500"],
-  variable: "--font-acc-mono",
-  display: "swap",
-});
 
 /* ============================================================
    1:1 port of the Claude Design "Мой аккаунт" page.
@@ -164,7 +154,7 @@ export function AccountDesign(props: AccountDesignProps) {
   const [isAddMemberOpen, setIsAddMemberOpen] = useState(false);
 
   return (
-    <div className={`mg-acc ${fontMono.variable}`}>
+    <div className="mg-acc">
       <style>{CSS}</style>
 
       <div className="mg-acc__content">
@@ -474,7 +464,7 @@ const CSS = `
 .mg-acc{
   --font-display:var(--font-pt-serif),Georgia,serif;
   --font-body:var(--font-sans),ui-sans-serif,system-ui,sans-serif;
-  --font-mono:var(--font-acc-mono),ui-monospace,monospace;
+  --acc-font-mono:var(--font-mono),ui-monospace,monospace;
   --bg:#ffffff; --paper:#FAF7F1; --ink:#141210;
   --ink-2:#3A332B; --ink-3:rgba(20,18,16,.55);
   --line:rgba(20,18,16,.10); --line-2:rgba(20,18,16,.18);
@@ -492,8 +482,8 @@ const CSS = `
 .mg-acc::before{display:none}
 .mg-acc__content{position:relative;z-index:1;background:#fff}
 .mg-acc .serif{font-family:var(--font-display);font-weight:400;letter-spacing:-.01em}
-.mg-acc .mono{font-family:var(--font-mono);letter-spacing:.02em}
-.mg-acc .caps{font-family:var(--font-mono);text-transform:uppercase;font-size:11px;letter-spacing:.14em;color:var(--ink-3)}
+.mg-acc .mono{font-family:var(--acc-font-mono);letter-spacing:.02em}
+.mg-acc .caps{font-family:var(--acc-font-mono);text-transform:uppercase;font-size:11px;letter-spacing:.14em;color:var(--ink-3)}
 .mg-acc a{color:inherit;text-decoration:none}
 .mg-acc button{font-family:inherit;cursor:pointer;border:0;background:none;color:inherit}
 .mg-acc ::selection{background:var(--accent);color:#fff}
@@ -525,7 +515,7 @@ const CSS = `
 .mg-acc .booking-card:hover{border-color:var(--ink);transform:translateY(-2px)}
 
 /* Pills */
-.mg-acc .pill{display:inline-flex;align-items:center;gap:5px;height:22px;padding:0 9px;border-radius:99px;font-family:var(--font-mono);font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;white-space:nowrap}
+.mg-acc .pill{display:inline-flex;align-items:center;gap:5px;height:22px;padding:0 9px;border-radius:99px;font-family:var(--acc-font-mono);font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;white-space:nowrap}
 .mg-acc .pill-ok{background:var(--ok-bg);color:var(--ok)}
 .mg-acc .pill-draft{background:rgba(20,18,16,.07);color:var(--ink-3)}
 .mg-acc .pill-warn{background:var(--warn-bg);color:var(--warn)}
