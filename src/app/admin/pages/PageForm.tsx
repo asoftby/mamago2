@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { PageType, PageStatus, PageVisibility } from "@prisma/client";
 import { toast } from "sonner";
 import { generateSlugFromTitle } from "@/lib/pages/validation";
+import { getPagePublicPath, getPagePublicUrl } from "@/lib/pagePublicUrl";
 import { Save, Eye, Archive, X } from "lucide-react";
 
 type PageFormProps = {
@@ -131,10 +132,10 @@ export function PageForm({ mode, pageId, initialData }: PageFormProps) {
   }
 
   function getPublicUrl(): string {
-    if (formData.type === "LEGAL") {
-      return `/legal/${formData.slug}`;
-    }
-    return `/page/${formData.slug}`;
+    return getPagePublicUrl({
+      type: formData.type,
+      slug: formData.slug,
+    });
   }
 
   return (
@@ -173,7 +174,7 @@ export function PageForm({ mode, pageId, initialData }: PageFormProps) {
               placeholder="privacy-policy"
             />
             <p className="text-xs text-gray-500 mt-1">
-              URL: {formData.type === "LEGAL" ? "/legal/" : "/page/"}
+              URL: {getPagePublicPath({ type: formData.type, slug: "" }).replace(/\/$/u, "")}/
               {formData.slug || "slug"}
             </p>
           </div>
