@@ -2,14 +2,12 @@ import Link from "next/link";
 import type { ComponentType, ReactNode } from "react";
 import { formatDistanceToNow } from "date-fns";
 import { ru } from "date-fns/locale";
+import { startOfDay } from "date-fns";
 import {
   AlertTriangle,
   CheckCircle,
   Clock,
-  DollarSign,
   FileText,
-  TrendingUp,
-  Users,
   AlertCircle,
   Image,
   Tag,
@@ -17,42 +15,22 @@ import {
 } from "lucide-react";
 import {
   getActionCenterData,
-  getRevenueSnapshot,
   getMoneyRadarData,
   getNeedsAttentionData,
   getContentQueuesData,
   getContentQualityData,
   getRecentActivityData,
+  getRevenueSnapshot,
 } from "@/lib/admin/dashboardData";
 import { cn } from "@/lib/utils";
+import { formatPrice } from "@/lib/formatters/format-price";
+import { renderCurrencyText } from "@/components/icons/BelarusianRubleIcon";
+import { FinanceSectionClient } from "./_components/FinanceSectionClient";
 
-function FinanceStatCard({
-  icon: Icon,
-  iconClassName,
-  label,
-  value,
-  sublabel,
-}: {
-  icon: ComponentType<{ className?: string }>;
-  iconClassName: string;
-  label: string;
-  value: ReactNode;
-  sublabel?: string;
-}) {
-  return (
-    <div className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-lg border border-gray-200 bg-white p-3 sm:p-4">
-      <div className="mb-2 flex min-w-0 items-start gap-2">
-        <Icon className={cn("mt-0.5 h-4 w-4 shrink-0", iconClassName)} />
-        <p className="min-w-0 break-words text-sm leading-snug text-gray-600">{label}</p>
-      </div>
-      <p className="min-w-0 break-words text-base font-bold tabular-nums leading-tight text-gray-900">
-        {value}
-      </p>
-      {sublabel ? (
-        <p className="mt-1 min-w-0 break-words text-xs text-gray-500">{sublabel}</p>
-      ) : null}
-    </div>
-  );
+function formatCurrency(amount: number): ReactNode {
+  return renderCurrencyText(formatPrice(amount, { hideZero: true }), {
+    iconSize: "text",
+  });
 }
 
 // Severity color mapping
@@ -70,22 +48,27 @@ const severityIcons = {
   critical: AlertTriangle,
 };
 
-import { formatPrice } from "@/lib/formatters/format-price";
-import { renderCurrencyText } from "@/components/icons/BelarusianRubleIcon";
+export default async function AdminDashboardPage() {
+  const now = new Date();
+  const defaultFrom = startOfDay(now);
 
-function formatCurrency(amount: number): ReactNode {
-  return renderCurrencyText(formatPrice(amount, { hideZero: true }), { iconSize: "text" });
-}
-
-export default function AdminDashboardPage() {
-  const actionCenter = getActionCenterData();
-  const revenue = getRevenueSnapshot();
-  const moneyRadar = getMoneyRadarData();
-  const needsAttention = getNeedsAttentionData();
-  const contentQueues = getContentQueuesData();
-  const contentQuality = getContentQualityData();
-  const recentActivity = getRecentActivityData();
-  console.log("[API] real data used", { endpoint: "admin-dashboard", empty: true });
+  const [
+    actionCenter,
+    revenueSnapshot,
+    moneyRadar,
+    needsAttention,
+    contentQueues,
+    contentQuality,
+    recentActivity,
+  ] = await Promise.all([
+    getActionCenterData(),
+    getRevenueSnapshot(defaultFrom, now),
+    getMoneyRadarData(),
+    getNeedsAttentionData(),
+    getContentQueuesData(),
+    getContentQualityData(),
+    getRecentActivityData(),
+  ]);
 
   return (
     <div className="p-6 md:p-4 space-y-6">
@@ -93,13 +76,17 @@ export default function AdminDashboardPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl md:text-xl font-bold">Dashboard</h1>
-          <p className="text-sm text-gray-600 mt-1">Обзор платформы и операционный контроль</p>
+          <p className="text-sm text-gray-600 mt-1">
+            Обзор платформы и операционный контроль
+          </p>
         </div>
       </div>
 
       {/* 1. Action Center */}
       <section>
-        <h2 className="text-lg md:text-base font-semibold text-gray-900 mb-4">Требует действий</h2>
+        <h2 className="text-lg md:text-base font-semibold text-gray-900 mb-4">
+          Требует действий
+        </h2>
         <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {actionCenter.map((item) => {
             const Icon = severityIcons[item.severity];
@@ -122,49 +109,14 @@ export default function AdminDashboardPage() {
         </div>
       </section>
 
-      {/* 2. Revenue Snapshot */}
-      <section>
-        <h2 className="text-lg md:text-base font-semibold text-gray-900 mb-4">Финансы</h2>
-        <div className="grid min-w-0 grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-5">
-          <FinanceStatCard
-            icon={DollarSign}
-            iconClassName="text-green-600"
-            label="Выручка сегодня"
-            value={formatCurrency(revenue.revenueToday)}
-          />
-          <FinanceStatCard
-            icon={TrendingUp}
-            iconClassName="text-blue-600"
-            label="MRR"
-            value={formatCurrency(revenue.mrr)}
-          />
-          <FinanceStatCard
-            icon={TrendingUp}
-            iconClassName="text-purple-600"
-            label="Буст"
-            value={formatCurrency(revenue.boostRevenue30d)}
-            sublabel="За 30 дней"
-          />
-          <FinanceStatCard
-            icon={CheckCircle}
-            iconClassName="text-green-600"
-            label="Новые подписки"
-            value={revenue.newSubscriptions30d}
-            sublabel="За 30 дней"
-          />
-          <FinanceStatCard
-            icon={Users}
-            iconClassName="text-blue-600"
-            label="Лиды"
-            value={revenue.leadsGenerated30d}
-            sublabel="За 30 дней"
-          />
-        </div>
-      </section>
+      {/* 2. Revenue Snapshot — client component with period filter */}
+      <FinanceSectionClient initialData={revenueSnapshot} />
 
       {/* 3. Money Radar */}
       <section>
-        <h2 className="text-lg md:text-base font-semibold text-gray-900 mb-4">Возможности монетизации</h2>
+        <h2 className="text-lg md:text-base font-semibold text-gray-900 mb-4">
+          Возможности монетизации
+        </h2>
         <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {moneyRadar.map((item) => (
             <Link
@@ -189,7 +141,9 @@ export default function AdminDashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Needs Attention */}
         <section>
-          <h2 className="text-lg md:text-base font-semibold text-gray-900 mb-4">Требует внимания</h2>
+          <h2 className="text-lg md:text-base font-semibold text-gray-900 mb-4">
+            Требует внимания
+          </h2>
           <div className="bg-white rounded-lg border border-gray-200 divide-y divide-gray-200">
             {needsAttention.slice(0, 5).map((item) => {
               const Icon = severityIcons[item.severity];
@@ -203,8 +157,12 @@ export default function AdminDashboardPage() {
                     <Icon className="w-4 h-4" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900 truncate">{item.title}</p>
-                    <p className="text-xs text-gray-600 mt-0.5">{item.description}</p>
+                    <p className="text-sm font-medium text-gray-900 truncate">
+                      {item.title}
+                    </p>
+                    <p className="text-xs text-gray-600 mt-0.5">
+                      {item.description}
+                    </p>
                   </div>
                 </Link>
               );
@@ -214,7 +172,9 @@ export default function AdminDashboardPage() {
 
         {/* Content Queues */}
         <section>
-          <h2 className="text-lg md:text-base font-semibold text-gray-900 mb-4">Очереди модерации</h2>
+          <h2 className="text-lg md:text-base font-semibold text-gray-900 mb-4">
+            Очереди модерации
+          </h2>
           <div className="bg-white rounded-lg border border-gray-200 divide-y divide-gray-200">
             {contentQueues.map((item) => (
               <Link
@@ -224,9 +184,13 @@ export default function AdminDashboardPage() {
               >
                 <div className="flex items-center gap-3">
                   <FileText className="w-5 h-5 text-gray-400" />
-                  <span className="text-sm font-medium text-gray-900">{item.label}</span>
+                  <span className="text-sm font-medium text-gray-900">
+                    {item.label}
+                  </span>
                 </div>
-                <span className="text-base font-bold text-gray-900">{item.count}</span>
+                <span className="text-base font-bold text-gray-900">
+                  {item.count}
+                </span>
               </Link>
             ))}
           </div>
@@ -235,17 +199,20 @@ export default function AdminDashboardPage() {
 
       {/* 6. Content Quality */}
       <section>
-        <h2 className="text-lg md:text-base font-semibold text-gray-900 mb-4">Качество контента</h2>
+        <h2 className="text-lg md:text-base font-semibold text-gray-900 mb-4">
+          Качество контента
+        </h2>
         <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {contentQuality.map((item) => {
-            const icons = {
+            const icons: Record<string, ComponentType<{ className?: string }>> = {
               no_cover: Image,
               no_seo: Tag,
               no_taxonomy: Tag,
               duplicates: Copy,
             };
-            const Icon = icons[item.link.split("=")[1] as keyof typeof icons] || AlertCircle;
-            
+            const filterParam = item.link.split("=")[1];
+            const Icon = (filterParam && icons[filterParam]) || AlertCircle;
+
             return (
               <Link
                 key={item.id}
@@ -254,13 +221,15 @@ export default function AdminDashboardPage() {
                   item.severity === "high"
                     ? "bg-orange-50 border-orange-200"
                     : item.severity === "medium"
-                    ? "bg-yellow-50 border-yellow-200"
-                    : "bg-gray-50 border-gray-200"
+                      ? "bg-yellow-50 border-yellow-200"
+                      : "bg-gray-50 border-gray-200"
                 }`}
               >
                 <div className="flex items-start justify-between mb-2">
                   <Icon className="w-5 h-5 text-gray-600" />
-                  <span className="text-base font-bold text-gray-900">{item.count}</span>
+                  <span className="text-base font-bold text-gray-900">
+                    {item.count}
+                  </span>
                 </div>
                 <p className="text-sm font-medium text-gray-900">{item.label}</p>
               </Link>
@@ -271,7 +240,9 @@ export default function AdminDashboardPage() {
 
       {/* 7. Recent Activity */}
       <section>
-        <h2 className="text-lg md:text-base font-semibold text-gray-900 mb-4">Последняя активность</h2>
+        <h2 className="text-lg md:text-base font-semibold text-gray-900 mb-4">
+          Последняя активность
+        </h2>
         <div className="bg-white rounded-lg border border-gray-200 divide-y divide-gray-200">
           {recentActivity.map((item) => {
             const typeColors = {
@@ -280,45 +251,47 @@ export default function AdminDashboardPage() {
               edit: "bg-yellow-100 text-yellow-700",
               request: "bg-purple-100 text-purple-700",
             };
+            const typeLabel = {
+              approval: "Одобрено",
+              creation: "Создано",
+              edit: "Изменено",
+              request: "Запрос",
+            };
+
+            const content = (
+              <>
+                <div
+                  className={`px-2 py-1 rounded text-xs font-medium ${typeColors[item.type]}`}
+                >
+                  {typeLabel[item.type]}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm text-gray-900">
+                    <span className="font-medium">{item.actor}</span>{" "}
+                    {item.action}{" "}
+                    <span className="font-medium">{item.entity}</span>
+                  </p>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    {formatDistanceToNow(item.timestamp, {
+                      addSuffix: true,
+                      locale: ru,
+                    })}
+                  </p>
+                </div>
+              </>
+            );
 
             return (
-              <div key={item.id} className="p-4 hover:bg-gray-50 transition-colors">
+              <div
+                key={item.id}
+                className="p-4 hover:bg-gray-50 transition-colors"
+              >
                 {item.link ? (
                   <Link href={item.link} className="flex items-start gap-3">
-                    <div className={`px-2 py-1 rounded text-xs font-medium ${typeColors[item.type]}`}>
-                      {item.type === "approval" && "Одобрено"}
-                      {item.type === "creation" && "Создано"}
-                      {item.type === "edit" && "Изменено"}
-                      {item.type === "request" && "Запрос"}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm text-gray-900">
-                        <span className="font-medium">{item.actor}</span> {item.action}{" "}
-                        <span className="font-medium">{item.entity}</span>
-                      </p>
-                      <p className="text-xs text-gray-500 mt-0.5">
-                        {formatDistanceToNow(item.timestamp, { addSuffix: true, locale: ru })}
-                      </p>
-                    </div>
+                    {content}
                   </Link>
                 ) : (
-                  <div className="flex items-start gap-3">
-                    <div className={`px-2 py-1 rounded text-xs font-medium ${typeColors[item.type]}`}>
-                      {item.type === "approval" && "Одобрено"}
-                      {item.type === "creation" && "Создано"}
-                      {item.type === "edit" && "Изменено"}
-                      {item.type === "request" && "Запрос"}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm text-gray-900">
-                        <span className="font-medium">{item.actor}</span> {item.action}{" "}
-                        <span className="font-medium">{item.entity}</span>
-                      </p>
-                      <p className="text-xs text-gray-500 mt-0.5">
-                        {formatDistanceToNow(item.timestamp, { addSuffix: true, locale: ru })}
-                      </p>
-                    </div>
-                  </div>
+                  <div className="flex items-start gap-3">{content}</div>
                 )}
               </div>
             );

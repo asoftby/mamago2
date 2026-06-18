@@ -5,9 +5,7 @@ type PageProps = {
   params: Promise<{ id: string }>;
 };
 
-export default async function AdminEmailStudioEditorCompatibilityPage({
-  params,
-}: PageProps) {
+export default async function AdminEmailStudioEditorCompatibilityPage({ params }: PageProps) {
   const { id } = await params;
-  redirect(adminPath(`/communications/email-studio/${id}`));
+  redirect(adminPath(`/communications/channels/email/${id}`));
 }

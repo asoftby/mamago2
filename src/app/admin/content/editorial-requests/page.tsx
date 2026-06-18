@@ -22,7 +22,7 @@ export default async function AdminEditorialRequestsPage() {
   return (
     <div className="space-y-6 p-6 md:p-4">
       <AdminPageHeader
-        title="Editorial Requests"
+        title="Редакционные запросы"
         subtitle="Внутренние редакционные запросы с preview бизнесов по опубликованным офферам."
         actions={
           <Link

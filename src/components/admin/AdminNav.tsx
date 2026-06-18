@@ -81,7 +81,7 @@ const NAV_SECTIONS: NavSection[] = [
     title: "Communications",
     items: [
       { label: "Overview", href: adminPath("/communications") },
-      { label: "Email Studio", href: adminPath("/communications/email-studio") },
+      { label: "Каналы → Email", href: adminPath("/communications/channels/email") },
       { label: "Уведомления", href: adminPath("/communications/notifications") },
       { label: "Telegram", href: adminPath("/communications/telegram") },
       { label: "Deliveries", href: adminPath("/communications/notifications/deliveries") },

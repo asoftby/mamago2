@@ -20,8 +20,8 @@ export interface ValidationResult {
 export function validateForDraft(data: OfferFormData): ValidationResult {
   const errors: string[] = [];
   
-  if (!data.offerKind) {
-    errors.push("Выберите тип предложения");
+  if (!data.productType && !data.offerKind) {
+    errors.push("Выберите формат предложения");
   }
   
   if (!data.title || data.title.trim().length === 0) {
@@ -44,17 +44,27 @@ export function validateStep(step: number, data: OfferFormData): ValidationResul
     case 1:
       return validateStep1(data);
     case 2:
-      return validateStep2(data);
+      return validatePlacementsStep(data);
     case 3:
-      return validateStep3(data);
+      return validateStep2(data);
     case 4:
-      return validateStep4(data);
+      return validateStep3(data);
     case 5:
-      return validateStep5(data);
+      return data.offerWizardType === "CAMP"
+        ? validateCampScheduleStep(data)
+        : validateStep4(data);
     case 6:
-      return validateStep6(data);
+      return data.offerWizardType === "CAMP"
+        ? validateAccommodationStep(data)
+        : validateStep5(data);
     case 7:
-      return validateCampScheduleStep(data);
+      return data.offerWizardType === "CAMP"
+        ? validateStep5(data)
+        : validateStep6(data);
+    case 8:
+      return data.offerWizardType === "CAMP"
+        ? validateStep6(data)
+        : { isValid: true, isComplete: true, errors: [], warnings: [] };
     default:
       return { isValid: true, isComplete: true, errors: [], warnings: [] };
   }
@@ -67,32 +77,51 @@ function validateStep1(data: OfferFormData): ValidationResult {
   const errors: string[] = [];
   const warnings: string[] = [];
 
-  if (!data.offerKind) {
-    errors.push("Выберите тип предложения");
-  }
-
-  if (data.offerKind === "course" && !data.durationType) {
-    errors.push("Выберите формат занятий");
-  }
-
-  if (data.offerKind === "service") {
-    if (!data.serviceType) {
-      errors.push("Выберите тип услуги");
-    }
-    if (!data.locationType) {
-      errors.push("Выберите где оказывается услуга");
-    }
+  if (!data.productType) {
+    errors.push("Выберите формат предложения");
   }
 
   const isComplete = Boolean(
-    data.offerKind &&
-    (data.offerKind !== "course" || data.durationType) &&
-    (data.offerKind !== "service" || (data.serviceType && data.locationType))
+    data.productType && data.offerWizardType
   );
 
   return {
     isValid: errors.length === 0,
     isComplete,
+    errors,
+    warnings,
+  };
+}
+
+function validatePlacementsStep(data: OfferFormData): ValidationResult {
+  const errors: string[] = [];
+  const warnings: string[] = [];
+
+  if (data.requestedPlacements.length === 0) {
+    errors.push("Выберите хотя бы один сценарий размещения");
+  }
+
+  if (data.requestedPlacements.includes("BIRTHDAY")) {
+    if (!data.birthdayDetails.role) {
+      errors.push("Выберите роль предложения для праздника");
+    }
+    if (
+      !data.birthdayDetails.priceFrom.trim() &&
+      !data.birthdayDetails.note.trim()
+    ) {
+      errors.push("Укажите цену от или важные условия для праздника");
+    }
+    if (
+      !data.birthdayDetails.included.trim() &&
+      !data.birthdayDetails.program.trim()
+    ) {
+      errors.push("Укажите, что входит, или опишите программу праздника");
+    }
+  }
+
+  return {
+    isValid: errors.length === 0,
+    isComplete: errors.length === 0,
     errors,
     warnings,
   };
@@ -198,13 +227,15 @@ function validateStep4(data: OfferFormData): ValidationResult {
   const errors: string[] = [];
   const warnings: string[] = [];
 
-  if (!data.offerKind) {
+  if (!data.productType) {
     errors.push("Сначала выберите тип предложения");
     return { isValid: false, isComplete: false, errors, warnings };
   }
 
-  // Validate based on offer kind
-  if (data.offerKind === "course") {
+  if (
+    data.productType === "ONE_TIME_ACTIVITY" ||
+    data.productType === "REGULAR_ACTIVITY"
+  ) {
     if (!data.classDuration || data.classDuration.trim().length === 0) {
       errors.push("Укажите продолжительность занятия");
     }
@@ -213,25 +244,11 @@ function validateStep4(data: OfferFormData): ValidationResult {
     }
   }
 
-  if (data.offerKind === "birthday") {
-    if (!data.partyProgram || data.partyProgram.trim().length === 0) {
-      errors.push("Опишите программу праздника");
-    }
-    if (!data.partyDuration || data.partyDuration.trim().length === 0) {
-      errors.push("Укажите продолжительность праздника");
-    }
-  }
-
-  if (data.offerKind === "service") {
-    if (!data.serviceDescription || data.serviceDescription.trim().length === 0) {
-      errors.push("Опишите услугу");
-    }
-  }
-
   const isComplete = Boolean(
-    (data.offerKind === "course" && data.classDuration.trim() && data.classFormat) ||
-    (data.offerKind === "birthday" && data.partyProgram.trim() && data.partyDuration.trim()) ||
-    (data.offerKind === "service" && data.serviceDescription.trim())
+    data.productType === "ONE_TIME_ACTIVITY" ||
+    data.productType === "REGULAR_ACTIVITY"
+      ? data.classDuration.trim() && data.classFormat
+      : true
   );
 
   return {
@@ -488,6 +505,9 @@ export function validateForSubmit(data: OfferFormData): ValidationResult {
         break;
       case "details":
         result = validateStep2(data);
+        break;
+      case "placements":
+        result = validatePlacementsStep(data);
         break;
       case "photo":
         result = validateStep3(data);

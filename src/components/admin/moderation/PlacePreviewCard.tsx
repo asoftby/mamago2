@@ -2,11 +2,13 @@
 
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { MapPin, Phone, Globe, Instagram, Clock } from "lucide-react";
+import { MapPin, Phone, Globe, Instagram, Clock, ExternalLink, MessageSquare, Star } from "lucide-react";
 import { sortAgeKeys } from "@/lib/config/ages";
 import { getCategoryLabel } from "@/lib/placeCategoryLabels";
 import { getFormatLabel } from "@/lib/placeChips";
 import { RichContentRenderer } from "@/components/content/RichContentRenderer";
+import { isGoogleReviewsEnabled } from "@/lib/place/googleReviewsMeta";
+import Link from "next/link";
 
 interface PlacePreviewCardProps {
   place: {
@@ -26,6 +28,23 @@ interface PlacePreviewCardProps {
       url: string;
       kind: string;
     }>;
+    googlePlaceId?: string | null;
+    googleRating?: number | null;
+    googleUserRatingsTotal?: number | null;
+    googleReviewsJson?: unknown;
+    reviews?: Array<{
+      id: string;
+      source: "MAMAGO" | "GOOGLE";
+      status: "PUBLISHED" | "PENDING" | "HIDDEN";
+      authorName: string;
+      rating: number;
+      text: string | null;
+      createdAt: Date | string;
+      ownerReplyText?: string | null;
+    }>;
+    _count?: {
+      reviews: number;
+    };
     openingHours?: {
       mode: string;
       rules?: Array<{
@@ -43,6 +62,9 @@ interface PlacePreviewCardProps {
 export function PlacePreviewCard({ place }: PlacePreviewCardProps) {
   const logoImage = place.images.find(img => img.kind === "LOGO");
   const galleryImages = place.images.filter(img => img.kind === "GALLERY").slice(0, 6);
+  const reviews = place.reviews ?? [];
+  const totalReviews = place._count?.reviews ?? reviews.length;
+  const googleReviewsEnabled = isGoogleReviewsEnabled(place.googlePlaceId, place.googleReviewsJson);
   
   return (
     <Card>
@@ -254,6 +276,91 @@ export function PlacePreviewCard({ place }: PlacePreviewCardProps) {
             )}
           </div>
         )}
+
+        <div className="space-y-4 border-t pt-6">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <MessageSquare className="h-5 w-5 text-gray-700" />
+              <h3 className="font-semibold text-gray-900">Отзывы</h3>
+            </div>
+            <Link
+              href="/admin/moderation/reviews"
+              className="inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700"
+            >
+              Review Center
+              <ExternalLink className="h-4 w-4" />
+            </Link>
+          </div>
+
+          {googleReviewsEnabled && (place.googleRating || place.googleUserRatingsTotal) ? (
+            <div className="rounded-lg border border-blue-100 bg-blue-50 p-4">
+              <div className="text-sm font-medium text-blue-900">Google рейтинг</div>
+              <div className="mt-1 flex items-center gap-2 text-sm text-blue-800">
+                {place.googleRating ? (
+                  <>
+                    <span className="font-semibold">{place.googleRating.toFixed(1)}</span>
+                    <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                  </>
+                ) : null}
+                <span>
+                  {place.googleUserRatingsTotal
+                    ? `${place.googleUserRatingsTotal.toLocaleString("ru-RU")} оценок`
+                    : "Оценки из Google доступны"}
+                </span>
+              </div>
+            </div>
+          ) : null}
+
+          {reviews.length === 0 ? (
+            <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-5 text-sm text-gray-600">
+              Отзывов пока нет
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <div className="text-sm text-gray-600">
+                {totalReviews > reviews.length
+                  ? `Показаны последние ${reviews.length} из ${totalReviews} отзывов`
+                  : `${totalReviews} отзывов`}
+              </div>
+
+              {reviews.map((review) => (
+                <div key={review.id} className="rounded-lg border border-gray-200 p-4">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <div className="font-medium text-gray-900">{review.authorName}</div>
+                      <div className="mt-1 text-xs text-gray-500">
+                        {new Date(review.createdAt).toLocaleDateString("ru-RU")} · {review.source}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1 text-amber-500">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <Star
+                          key={star}
+                          className={`h-4 w-4 ${star <= review.rating ? "fill-current" : "fill-gray-200 text-gray-200"}`}
+                        />
+                      ))}
+                    </div>
+                  </div>
+
+                  {review.text ? (
+                    <p className="mt-3 whitespace-pre-line text-sm leading-relaxed text-gray-700">
+                      {review.text}
+                    </p>
+                  ) : (
+                    <p className="mt-3 text-sm text-gray-500">Текст отзыва не указан</p>
+                  )}
+
+                  {review.ownerReplyText ? (
+                    <div className="mt-3 rounded-md bg-blue-50 p-3 text-sm text-blue-900">
+                      <div className="mb-1 font-medium">Ответ владельца</div>
+                      <p className="whitespace-pre-line">{review.ownerReplyText}</p>
+                    </div>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </CardContent>
     </Card>
   );

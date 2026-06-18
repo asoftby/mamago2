@@ -1,13 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Archive, Bell, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/lib/toast";
 import type { NotificationApiRow } from "@/lib/notifications/types";
 import { cn } from "@/lib/utils";
-import { NotificationModal } from "./NotificationModal";
 import { trackNotificationEvent } from "@/lib/notifications/notificationAnalytics";
 import { handleNotificationClick } from "@/features/notifications/notification-click";
 import { useNotificationStore } from "@/features/notifications/store";
@@ -40,10 +39,6 @@ export function NotificationFeed({
   const showTelegramPrompt = useNotificationStore((s) => s.showTelegramPrompt);
   const fetchMoreNotifications = useNotificationStore((s) => s.fetchMoreNotifications);
   const clearError = useNotificationStore((s) => s.clearError);
-
-  const [modalNotification, setModalNotification] = useState<NotificationApiRow | null>(null);
-  const [modalTitle, setModalTitle] = useState<string | null>(null);
-  const [modalBody, setModalBody] = useState<string | null>(null);
 
   const telegramBannerViewedRef = useRef(false);
 
@@ -108,15 +103,6 @@ export function NotificationFeed({
             void markAsReadLocally(notificationId);
           },
           onClose,
-          onOpenModal: (item, action) => {
-            setModalNotification({
-              ...item,
-              actionUrl: action.actionUrl,
-              readAt: item.readAt ?? new Date().toISOString(),
-            });
-            setModalTitle(action.modalTitle);
-            setModalBody(action.modalBody);
-          },
         });
       } catch (clickError) {
         console.error(clickError);
@@ -287,19 +273,6 @@ export function NotificationFeed({
         ) : null}
       </div>
 
-      <NotificationModal
-        open={modalNotification != null}
-        notification={modalNotification}
-        title={modalTitle}
-        body={modalBody}
-        onOpenChange={(nextOpen) => {
-          if (!nextOpen) {
-            setModalNotification(null);
-            setModalTitle(null);
-            setModalBody(null);
-          }
-        }}
-      />
     </>
   );
 }

@@ -92,6 +92,8 @@ model User {
   moderatedPlaces                   Place[]                          @relation("PlaceModerator")
   reviewedPlaceClaimRequests        PlaceClaimRequest[]              @relation("ClaimReviewer")
   placeClaimRequests                PlaceClaimRequest[]              @relation("ClaimRequester")
+  businessAccessRequests            BusinessAccessRequest[]          @relation("BusinessAccessRequester")
+  reviewedBusinessAccessRequests    BusinessAccessRequest[]          @relation("BusinessAccessRequestReviewedBy")
   placeRevisions                    PlaceRevision[]                  @relation("PlaceRevisionReviewer")
   planItems                         PlanItem[]
   routes                            Route[]                          @relation("RouteAuthor")
@@ -113,6 +115,8 @@ model User {
   searchQueryLogs                   SearchQueryLog[]
   createdPages                      Page[]                           @relation("PageCreatedBy")
   updatedPages                      Page[]                           @relation("PageUpdatedBy")
+  requestedOfferPlacements          OfferPlacement[]                 @relation("OfferPlacementRequestedBy")
+  reviewedOfferPlacements           OfferPlacement[]                 @relation("OfferPlacementReviewedBy")
 
   @@index([email])
   @@index([resetToken])
@@ -875,7 +879,7 @@ model Business {
   phone                   String?
   contactPhoneVerifiedAt  DateTime?
   status                  BusinessStatus             @default(DRAFT)
-  unp                     String?
+  unp                     String?                    @unique
   approvedAt              DateTime?
   rejectedAt              DateTime?
   reviewNote              String?
@@ -902,6 +906,7 @@ model Business {
   organizers              Organizer[]
   promotions              Promotion[]
   claimRequests           PlaceClaimRequest[]        @relation("ClaimedPlaces")
+  accessRequests          BusinessAccessRequest[]
 
   @@index([ownerUserId])
   @@index([status])
@@ -982,6 +987,47 @@ model BusinessVerificationLog {
   @@index([businessId, createdAt])
 }
 
+/// Заявка пользователя на доступ к Business, который уже зарегистрирован другим owner'ом (по УНП).
+model BusinessAccessRequest {
+  id                String                       @id @default(cuid())
+  businessId        String
+  requesterUserId   String
+  unp               String
+  name              String
+  phone             String?
+  email             String?
+  requesterRole     BusinessAccessRequesterRole
+  comment           String?
+  status            BusinessAccessRequestStatus  @default(PENDING)
+  reviewedAt        DateTime?
+  reviewedByAdminId String?
+  createdAt         DateTime                     @default(now())
+  updatedAt         DateTime                     @updatedAt
+  business          Business                     @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  requesterUser     User                         @relation("BusinessAccessRequester", fields: [requesterUserId], references: [id], onDelete: Cascade)
+  reviewedByAdmin   User?                        @relation("BusinessAccessRequestReviewedBy", fields: [reviewedByAdminId], references: [id], onDelete: SetNull)
+
+  @@index([businessId])
+  @@index([requesterUserId])
+  @@index([status])
+  @@index([unp])
+}
+
+enum BusinessAccessRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  NEEDS_INFO
+}
+
+enum BusinessAccessRequesterRole {
+  OWNER
+  DIRECTOR
+  MARKETER
+  MANAGER
+  OTHER
+}
+
 model Place {
   id                           String             @id @default(cuid())
   title                        String
@@ -998,11 +1044,14 @@ model Place {
   category                     String
   countryCode                  String?
   customAddress                String?
+  displayAddress               String?
   description                  String?
+  directionsNote               String?
   formattedAddr                String?
   googlePlaceId                String?
   instagramHandle              String?
   instagramUrl                 String?
+  locationName                 String?
   locationSource               LocationSource     @default(MANUAL)
   logoImageId                  String?
   shortDesc                    String
@@ -1194,12 +1243,15 @@ model PlaceRevision {
   googlePlaceId         String?
   lat                   Float?
   lng                   Float?
+  displayAddress        String?
   formattedAddr         String?
   addressJson           Json?
+  directionsNote        String?
   countryCode           String?
   cityId                String?
   locationSource        LocationSource?
   customAddress         String?
+  locationName          String?
   districtAutoId        String?
   districtManualId      String?
   metroAutoId           String?
@@ -1677,6 +1729,7 @@ model OpeningHoursExceptionInterval {
 model Offer {
   id                       String             @id @default(cuid())
   placeId                  String
+  productType              OfferProductType?
   /// Источник контактных данных предложения: manual | place
   contactSource            String?            @default("manual")
   /// Ручной телефон предложения (fallback, если не берём контакты из места)
@@ -1789,9 +1842,11 @@ model Offer {
   whatToBring              String?
 
   boosts          Boost[]
+  birthdayDetails OfferBirthdayDetails?
   bookingRequests BookingRequest[]
   offerIdeas      OfferIdea[]
   openingHours    OpeningHours?      @relation(fields: [openingHoursId], references: [id])
+  placements      OfferPlacement[]
   place           Place              @relation(fields: [placeId], references: [id], onDelete: Cascade)
   city            City?              @relation("OfferCity", fields: [cityId], references: [id])
   slugHistory     OfferSlugHistory[]
@@ -1800,11 +1855,51 @@ model Offer {
   @@index([placeId])
   @@index([status])
   @@index([kind])
+  @@index([productType])
   @@index([dateFrom])
   @@index([ageMinMonths, ageMaxMonths])
   @@index([openingHoursId])
   @@index([slug])
   @@index([cityId])
+}
+
+model OfferPlacement {
+  id              String               @id @default(cuid())
+  offerId         String
+  key             OfferPlacementKey
+  status          OfferPlacementStatus @default(REQUESTED)
+  requestedAt     DateTime             @default(now())
+  requestedById   String?
+  reviewedAt      DateTime?
+  reviewedById    String?
+  rejectionReason String?
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+  offer           Offer                @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  requestedBy     User?                @relation("OfferPlacementRequestedBy", fields: [requestedById], references: [id], onDelete: SetNull)
+  reviewedBy      User?                @relation("OfferPlacementReviewedBy", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  @@unique([offerId, key])
+  @@index([key, status])
+  @@index([offerId, status])
+  @@index([reviewedById, status])
+}
+
+model OfferBirthdayDetails {
+  id              String               @id @default(cuid())
+  offerId         String               @unique
+  role            BirthdayRole
+  locationType    BirthdayLocationType?
+  durationMinutes Int?
+  minChildren     Int?
+  maxChildren     Int?
+  priceFrom       Decimal?             @db.Decimal(10, 2)
+  included        String?
+  program         String?
+  note            String?
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+  offer           Offer                @relation(fields: [offerId], references: [id], onDelete: Cascade)
 }
 
 /// Сохранённые предложения в «Идеи» (отдельно от Idea с activityId)
@@ -2765,6 +2860,47 @@ enum EventVenueKind {
 enum OfferKind {
   EVENT
   SERVICE
+}
+
+enum OfferProductType {
+  PLACE_VISIT
+  ONE_TIME_ACTIVITY
+  REGULAR_ACTIVITY
+  CAMP
+  PARTY_SERVICE
+  PARTY_PACKAGE
+}
+
+enum OfferPlacementKey {
+  WHERE_TO_GO
+  CLASSES
+  CAMPS
+  BIRTHDAY
+}
+
+enum OfferPlacementStatus {
+  REQUESTED
+  APPROVED
+  REJECTED
+}
+
+enum BirthdayRole {
+  VENUE
+  ANIMATOR
+  SHOW
+  MASTER_CLASS
+  CAKE
+  CATERING
+  DECOR
+  PHOTO_VIDEO
+  PACKAGE
+  OTHER
+}
+
+enum BirthdayLocationType {
+  ON_SITE
+  OFF_SITE
+  BOTH
 }
 
 enum OfferStatus {

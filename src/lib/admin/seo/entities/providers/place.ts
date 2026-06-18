@@ -173,9 +173,18 @@ export const placeProvider: SeoEntityProvider = {
       select: {
         title: true,
         description: true,
+        shortDesc: true,
         slug: true,
         formattedAddr: true,
         customAddress: true,
+        lat: true,
+        lng: true,
+        phone: true,
+        website: true,
+        instagramUrl: true,
+        seoOgImage: true,
+        googleRating: true,
+        googleUserRatingsTotal: true,
         seoJsonLdOverride: true,
       },
     });
@@ -184,7 +193,23 @@ export const placeProvider: SeoEntityProvider = {
       return p.seoJsonLdOverride as Record<string, unknown>;
     }
     const publicBase = process.env.NEXT_PUBLIC_APP_URL || "https://mamago.by";
-    return buildPlaceJsonLd({ place: p, publicBase });
+    const canonicalUrl = p.slug
+      ? `${publicBase}/places/${p.slug}`
+      : `${publicBase}/places/${entityId}`;
+    return buildPlaceJsonLd({
+      canonicalUrl,
+      name: p.title,
+      description: p.description || p.shortDesc,
+      image: p.seoOgImage,
+      address: p.formattedAddr || p.customAddress,
+      lat: p.lat,
+      lng: p.lng,
+      phone: p.phone,
+      website: p.website,
+      instagramUrl: p.instagramUrl,
+      rating: p.googleRating,
+      reviewCount: p.googleUserRatingsTotal,
+      publicBaseUrl: publicBase,
+    });
   },
 };
-

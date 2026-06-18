@@ -3,7 +3,9 @@ import type { Metadata } from "next";
 import { notFound, permanentRedirect } from "next/navigation";
 import prisma from "@/lib/prisma";
 import { findOfferBySlug } from "@/lib/slug/offerSlugService";
-import { buildOfferJsonLd } from "@/lib/seo/schema/buildOfferJsonLd";
+import { buildOfferStructuredData } from "@/lib/seo/schema/buildOfferStructuredData";
+import { buildBreadcrumbJsonLd } from "@/lib/seo/schema/buildBreadcrumbJsonLd";
+import { JsonLd } from "@/components/seo/JsonLd";
 import { AnalyticsDetailBeacon } from "@/components/analytics/AnalyticsDetailBeacon";
 import { buildOgMeta } from "@/lib/seo/buildOgMeta";
 import { getOfferPublicPath, getOfferPublicSection, parseOfferPublicSection } from "@/lib/offers/offerPublicUrl";
@@ -12,7 +14,7 @@ import { OfferPageView } from "@/components/offers";
 import { getCurrentUser } from "@/lib/auth/server";
 import { canShowOfferOwnerEditOnPublicPage } from "@/lib/permissions/offerEditPermissions";
 import { mockSummerCamp, mockLesnayaSkazka } from "@/lib/offer/offerPageMock";
-import type { OfferJsonLdOffer, OfferJsonLdPlace } from "@/lib/seo/schema/buildOfferJsonLd";
+import { resolveOfferStructuredDataType } from "@/lib/seo/schema/buildOfferJsonLd";
 
 interface PageProps {
   params: Promise<{ city: string; section: string; slug: string }>;
@@ -143,49 +145,42 @@ export default async function CanonicalOfferPage({ params, searchParams }: PageP
   }
 
   const publicBase = getCanonicalPublicAppUrl();
+  const canonicalPath = getOfferPublicPath(offer, city);
+  const canonicalUrl = `${publicBase}${canonicalPath}`;
   
   // 1. Offer JSON-LD
   const offerJsonLd =
     offer.seoJsonLdOverride && typeof offer.seoJsonLdOverride === "object"
       ? (offer.seoJsonLdOverride as Record<string, unknown>)
-      : buildOfferJsonLd({
-          offer: offer satisfies OfferJsonLdOffer,
-          place: offer.place satisfies OfferJsonLdPlace,
-          citySlug: city,
-          publicBase,
+      : buildOfferStructuredData({
+          canonicalUrl,
+          publicType: resolveOfferStructuredDataType(offer),
+          title: offer.title,
+          description: offer.description,
+          image: offer.coverImage,
+          price: offer.priceFrom,
+          priceText: offer.priceText,
+          priceCurrency: "BYN",
+          place: offer.place
+            ? {
+                name: offer.place.title,
+                slug: offer.place.slug,
+                url: offer.place.slug ? `/places/${offer.place.slug}` : undefined,
+              }
+            : null,
+          publicBaseUrl: publicBase,
         });
 
   // 2. BreadcrumbList JSON-LD
-  const breadcrumbJsonLd = {
-    "@context": "https://schema.org",
-    "@type": "BreadcrumbList",
-    "itemListElement": [
-      {
-        "@type": "ListItem",
-        "position": 1,
-        "name": "Главная",
-        "item": publicBase
-      },
-      {
-        "@type": "ListItem",
-        "position": 2,
-        "name": city,
-        "item": `${publicBase}/${city}`
-      },
-      {
-        "@type": "ListItem",
-        "position": 3,
-        "name": "Предложения",
-        "item": `${publicBase}/${city}/offers`
-      },
-      {
-        "@type": "ListItem",
-        "position": 4,
-        "name": data.title,
-        "item": `${publicBase}${getOfferPublicPath(offer, city)}`
-      }
-    ]
-  };
+  const breadcrumbJsonLd = buildBreadcrumbJsonLd(
+    [
+      { name: "Главная", path: "/" },
+      { name: city, path: `/${city}` },
+      { name: "Предложения", path: `/${city}/offers` },
+      { name: data.title, path: canonicalPath },
+    ],
+    publicBase,
+  );
 
   // 3. VideoObject JSON-LD (если есть видео)
   const videoJsonLd = data.media.videoUrl ? {
@@ -194,7 +189,6 @@ export default async function CanonicalOfferPage({ params, searchParams }: PageP
     "name": data.media.videoLabel || data.title,
     "description": data.shortDescription || data.title,
     "thumbnailUrl": data.media.videoThumbnail || data.media.posterUrl,
-    "uploadDate": new Date().toISOString(), // Fallback
     "contentUrl": data.media.videoUrl,
     "embedUrl": data.media.videoUrl,
   } : null;
@@ -207,20 +201,7 @@ export default async function CanonicalOfferPage({ params, searchParams }: PageP
         vertical="CITY"
         cityId={offer.placeId}
       />
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(offerJsonLd) }}
-      />
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
-      />
-      {videoJsonLd && (
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(videoJsonLd) }}
-        />
-      )}
+      <JsonLd data={[offerJsonLd, breadcrumbJsonLd, videoJsonLd].filter(Boolean) as Record<string, unknown>[]} />
       <OfferPageView data={data} canEditOffer={canEditOffer} />
     </>
   );

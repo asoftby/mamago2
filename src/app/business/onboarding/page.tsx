@@ -103,6 +103,7 @@ export default async function OnboardingPage() {
           )}
 
           <OnboardingForm
+            currentUserId={user.id}
             initialData={normalizedInitialData}
             accountPhoneE164={user.phoneE164 ?? null}
             initialBusinessContactOtpState={initialBusinessContactOtpState}

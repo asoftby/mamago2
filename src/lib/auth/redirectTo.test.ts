@@ -13,6 +13,12 @@ assert.equal(getSafeRedirectPath("/minsk/events?age=3-6", "/"), "/minsk/events?a
 assert.equal(getSafeRedirectPath("https://evil.com", "/fallback"), "/fallback");
 assert.equal(getSafeRedirectPath("//evil.com", "/fallback"), "/fallback");
 assert.equal(getSafeRedirectPath("", "/fallback"), "/fallback");
+assert.equal(getSafeRedirectPath("/login", "/fallback"), "/fallback");
+assert.equal(getSafeRedirectPath("/login?mode=register", "/fallback"), "/fallback");
+assert.equal(getSafeRedirectPath("/register", "/fallback"), "/fallback");
+assert.equal(getSafeRedirectPath("/auth", "/fallback"), "/fallback");
+assert.equal(getSafeRedirectPath("/profile-entry", "/fallback"), "/fallback");
+assert.equal(getSafeRedirectPath("/login-page", "/fallback"), "/login-page");
 
 const bothParams = new URLSearchParams("next=/old&redirectTo=/new");
 assert.equal(readRedirectParam(bothParams), "/new");

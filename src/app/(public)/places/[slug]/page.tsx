@@ -2,10 +2,12 @@ import { getCanonicalPublicAppUrl } from "@/lib/config/publicAppUrl";
 import { notFound, permanentRedirect } from "next/navigation";
 import prisma from "@/lib/prisma";
 import { Metadata } from "next";
+import { JsonLd } from "@/components/seo/JsonLd";
 import { getPlaceDisplayTitle } from "@/lib/placeDisplayTitle";
 import { findPlaceBySlug } from "@/lib/slug/placeSlugService";
-import { formatMarketplaceHeroAddress, getPlaceLocationString } from "@/lib/placeLocationString";
+import { formatMarketplaceHeroAddress } from "@/lib/placeLocationString";
 import { isPlacePubliclyVisible } from "@/lib/plan/publicVisibility";
+import { buildBreadcrumbJsonLd } from "@/lib/seo/schema/buildBreadcrumbJsonLd";
 import { buildPlaceJsonLd } from "@/lib/seo/schema/buildPlaceJsonLd";
 import { AnalyticsDetailBeacon } from "@/components/analytics/AnalyticsDetailBeacon";
 import { buildOgMeta } from "@/lib/seo/buildOgMeta";
@@ -19,11 +21,15 @@ import type { OpeningHoursWithRelations } from "@/server/services/openingHours/o
 import { resolvePlaceLogoImage } from "@/lib/place/resolvePlaceLogoImage";
 import { resolvePlaceLogoUrlFromDb } from "@/lib/place/resolvePlaceLogoUrlFromDb";
 import { parsePriceData } from "@/lib/priceItems";
-import { isGoogleReviewsEnabled } from "@/lib/place/googleReviewsMeta";
+import {
+  isGoogleReviewsEnabled,
+  readGoogleReviewsPayload,
+} from "@/lib/place/googleReviewsMeta";
 import {
   loadUpcomingPlaceEvents,
   mapUpcomingPlaceEventsToActivityMocks,
 } from "@/lib/place/loadUpcomingPlaceEvents";
+import type { StoredGoogleReview } from "@/types/google-places";
 
 interface PlacePageProps {
   params: Promise<{ slug: string }>;
@@ -309,24 +315,12 @@ export default async function PlacePage({ params }: PlacePageProps) {
     cityId: place.cityId,
   });
 
-  // Get formatted location string
-  const locationString = getPlaceLocationString(place);
-  const googleReviewsEnabled = isGoogleReviewsEnabled(place.googlePlaceId, place.googleReviewsJson);
-
+  const googleReviewsEnabled = isGoogleReviewsEnabled(
+    place.googlePlaceId,
+    place.googleReviewsJson,
+  );
+  const googleReviewsPayload = readGoogleReviewsPayload(place.googleReviewsJson);
   const publicBase = getCanonicalPublicAppUrl();
-  const jsonLd =
-    place.seoJsonLdOverride && typeof place.seoJsonLdOverride === "object"
-      ? (place.seoJsonLdOverride as Record<string, unknown>)
-      : buildPlaceJsonLd({
-          place: {
-            title: place.title,
-            description: place.description,
-            slug: place.slug,
-            formattedAddr: place.formattedAddr,
-            customAddress: place.customAddress,
-          },
-          publicBase,
-        });
 
   const logoImage = resolvePlaceLogoImage(place.images, place.logoImageId);
   const logoUrl = await resolvePlaceLogoUrlFromDb(place.images, place.logoImageId);
@@ -376,7 +370,6 @@ export default async function PlacePage({ params }: PlacePageProps) {
     where: {
       placeId: place.id,
       status: "PUBLISHED",
-      ...(googleReviewsEnabled ? {} : { source: { not: "GOOGLE" as const } }),
     },
     select: {
       id: true,
@@ -400,7 +393,6 @@ export default async function PlacePage({ params }: PlacePageProps) {
     where: {
       placeId: place.id,
       status: "PUBLISHED",
-      ...(googleReviewsEnabled ? {} : { source: { not: "GOOGLE" as const } }),
     },
     _avg: {
       rating: true,
@@ -408,8 +400,31 @@ export default async function PlacePage({ params }: PlacePageProps) {
     _count: true,
   });
 
-  const averageRating = reviewStats._avg.rating || undefined;
-  const totalReviewCount = reviewStats._count;
+  const hasPersistedGoogleReviews = placeReviews.some((review) => review.source === "GOOGLE");
+  const fallbackGoogleReviews = !hasPersistedGoogleReviews && googleReviewsEnabled
+    ? mapStoredGoogleReviewsToPublicReviews(googleReviewsPayload?.reviews)
+    : [];
+
+  const combinedReviews = [...placeReviews, ...fallbackGoogleReviews].sort(
+    (left, right) =>
+      new Date(right.publishedAt).getTime() - new Date(left.publishedAt).getTime(),
+  );
+
+  const fallbackGoogleStats = getFallbackGoogleStats({
+    placeGoogleRating: place.googleRating,
+    placeGoogleUserRatingsTotal: place.googleUserRatingsTotal,
+    googleReviews: fallbackGoogleReviews,
+  });
+
+  const averageRating = fallbackGoogleStats
+    ? combineAverageRatings({
+        primaryAverage: reviewStats._avg.rating,
+        primaryCount: reviewStats._count,
+        secondaryAverage: fallbackGoogleStats.averageRating,
+        secondaryCount: fallbackGoogleStats.reviewCount,
+      })
+    : reviewStats._avg.rating || undefined;
+  const totalReviewCount = reviewStats._count + (fallbackGoogleStats?.reviewCount ?? 0);
 
   const currentUser = await getCurrentUser();
   const canShowPlaceEditor =
@@ -451,6 +466,18 @@ export default async function PlacePage({ params }: PlacePageProps) {
 
   const heroAddressRaw =
     place.formattedAddr?.trim() || place.customAddress?.trim() || "";
+  const resolvedInstagramUrl =
+    resolveInstagramProfileHref(place.instagramUrl, place.instagramHandle) || undefined;
+  const marketplaceAddress =
+    formatMarketplaceHeroAddress({
+      city: place.city,
+      shortAddress: place.shortAddress,
+      formattedAddr: place.formattedAddr,
+      customAddress: place.customAddress,
+      floor: place.floor,
+      unit: place.unit,
+      unitLabel: place.unitLabel,
+    }) || undefined;
 
   const mapsOpenUrl = buildGoogleMapsPlaceUrl(place.lat, place.lng, heroAddressRaw);
   const mapsDirectionsUrl = buildGoogleMapsDirectionsUrl(
@@ -506,6 +533,36 @@ export default async function PlacePage({ params }: PlacePageProps) {
       : [{ label: "Места", href: "/places" }]),
     { label: displayTitle },
   ];
+  const canonicalPath = `/places/${place.slug ?? place.id}`;
+  const canonicalUrl = `${publicBase}${canonicalPath}`;
+  const jsonLd =
+    place.seoJsonLdOverride && typeof place.seoJsonLdOverride === "object"
+      ? (place.seoJsonLdOverride as Record<string, unknown>)
+      : buildPlaceJsonLd({
+          canonicalUrl,
+          name: displayTitle,
+          description: place.description || place.shortDesc,
+          image: logoUrl || galleryImages[0]?.url,
+          address: marketplaceAddress,
+          lat: place.lat,
+          lng: place.lng,
+          phone: place.phone,
+          website: place.website,
+          instagramUrl: resolvedInstagramUrl,
+          rating: averageRating,
+          reviewCount: totalReviewCount,
+          publicBaseUrl: publicBase,
+        });
+  const breadcrumbJsonLd = buildBreadcrumbJsonLd(
+    [
+      { name: "Главная", path: "/" },
+      ...(place.city?.slug && place.city.name
+        ? [{ name: place.city.name, path: `/${place.city.slug}` }]
+        : []),
+      { name: displayTitle, path: canonicalPath },
+    ],
+    publicBase,
+  );
 
   // Prepare place data for marketplace component
   const marketplacePlaceData = {
@@ -522,19 +579,10 @@ export default async function PlacePage({ params }: PlacePageProps) {
     phone: place.phone || undefined,
     website: place.website || undefined,
     instagramUrl:
-      resolveInstagramProfileHref(place.instagramUrl, place.instagramHandle) || undefined,
-    
+      resolvedInstagramUrl,
+
     // Location
-    address:
-      formatMarketplaceHeroAddress({
-        city: place.city,
-        shortAddress: place.shortAddress,
-        formattedAddr: place.formattedAddr,
-        customAddress: place.customAddress,
-        floor: place.floor,
-        unit: place.unit,
-        unitLabel: place.unitLabel,
-      }) || undefined,
+    address: marketplaceAddress,
     city: place.city?.name,
     district: districtName || undefined,
     metro: metroName || undefined,
@@ -565,20 +613,85 @@ export default async function PlacePage({ params }: PlacePageProps) {
         vertical="CITY"
         cityId={place.cityId}
       />
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
-      />
+      <JsonLd data={jsonLd} />
+      <JsonLd data={breadcrumbJsonLd} />
       <MarketplacePlacePage
         place={marketplacePlaceData}
         eventActivities={eventActivities}
         citySlug={placeCitySlug}
         offers={formattedOffers}
-        reviews={placeReviews}
+        reviews={combinedReviews}
         ownerEditPlaceId={canShowPlaceEditor ? place.id : undefined}
       />
     </>
   );
+}
+
+function mapStoredGoogleReviewsToPublicReviews(
+  reviews: StoredGoogleReview[] | undefined,
+) {
+  if (!reviews || reviews.length === 0) {
+    return [];
+  }
+
+  return reviews.map((review, index) => ({
+    id: `google-json-${index}-${review.publishTime}`,
+    source: "GOOGLE" as const,
+    authorName: review.authorName,
+    authorAvatarUrl: review.authorPhotoUri ?? null,
+    rating: review.rating,
+    text: review.originalText ?? review.text ?? null,
+    publishedAt: review.publishTime,
+    relativeTimeDescription: null,
+    ownerReplyText: null,
+    ownerReplyAuthorName: null,
+    ownerReplyCreatedAt: null,
+  }));
+}
+
+function getFallbackGoogleStats(input: {
+  placeGoogleRating: number | null;
+  placeGoogleUserRatingsTotal: number | null;
+  googleReviews: Array<{ rating: number }> | undefined;
+}): { averageRating: number; reviewCount: number } | null {
+  if (
+    input.placeGoogleRating != null &&
+    input.placeGoogleUserRatingsTotal != null &&
+    input.placeGoogleUserRatingsTotal > 0
+  ) {
+    return {
+      averageRating: input.placeGoogleRating,
+      reviewCount: input.placeGoogleUserRatingsTotal,
+    };
+  }
+
+  if (!input.googleReviews || input.googleReviews.length === 0) {
+    return null;
+  }
+
+  const reviewCount = input.googleReviews.length;
+  const averageRating =
+    input.googleReviews.reduce((sum, review) => sum + review.rating, 0) / reviewCount;
+
+  return { averageRating, reviewCount };
+}
+
+function combineAverageRatings(input: {
+  primaryAverage: number | null;
+  primaryCount: number;
+  secondaryAverage: number;
+  secondaryCount: number;
+}): number | undefined {
+  const weightedPrimary = input.primaryAverage != null
+    ? input.primaryAverage * input.primaryCount
+    : 0;
+  const totalCount = input.primaryCount + input.secondaryCount;
+
+  if (totalCount === 0) {
+    return undefined;
+  }
+
+  return (weightedPrimary + input.secondaryAverage * input.secondaryCount) / totalCount;
 }
 
 function buildGoogleMapsPlaceUrl(

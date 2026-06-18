@@ -1,5 +1,10 @@
 import React, { Suspense } from "react";
+import { JsonLd } from "@/components/seo/JsonLd";
 import { SiteHeader } from "@/components/site/header";
+import { getCanonicalPublicAppUrl } from "@/lib/config/publicAppUrl";
+import { buildOrganizationJsonLd } from "@/lib/seo/schema/buildOrganizationJsonLd";
+import { buildWebSiteJsonLd } from "@/lib/seo/schema/buildWebSiteJsonLd";
+import { getPublicSocialLinks } from "@/lib/site/publicSocialLinks";
 import { PublicLayoutBody } from "./PublicLayoutBody";
 import { HeaderDiscoveryFiltersProviderWrapper } from "./HeaderDiscoveryFiltersProviderWrapper";
 import { PublicationIntentProvider } from "@/contexts/PublicationIntentContext";
@@ -17,6 +22,16 @@ export default function PublicGroupLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const publicBase = getCanonicalPublicAppUrl();
+  const sameAs = getPublicSocialLinks().map((link) => link.href);
+  const organizationJsonLd = buildOrganizationJsonLd({
+    publicBase,
+    sameAs,
+  });
+  const webSiteJsonLd = buildWebSiteJsonLd({
+    publicBase,
+  });
+
   return (
     <PublicProviders>
       <RefinementFiltersProvider>
@@ -25,6 +40,7 @@ export default function PublicGroupLayout({
           <HeaderDiscoveryFiltersProviderWrapper>
             <DiscoveryBudgetProvider>
               <div className="flex min-h-screen flex-col bg-background">
+                <JsonLd data={[organizationJsonLd, webSiteJsonLd]} />
                 <SiteHeader />
 
                 <PublicLayoutBody>{children}</PublicLayoutBody>

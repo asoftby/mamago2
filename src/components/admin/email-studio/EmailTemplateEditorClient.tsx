@@ -665,7 +665,7 @@ export function EmailTemplateEditorClient({ templateId }: { templateId: string }
         throw new Error(await readErrorMessage(response));
       }
       setDeleteDialogOpen(false);
-      router.push("/admin/communications/email-studio");
+      router.push("/admin/communications/channels/email");
       router.refresh();
     } catch (error) {
       setDeleteError(error instanceof Error ? error.message : "Не удалось удалить шаблон.");
@@ -727,7 +727,7 @@ export function EmailTemplateEditorClient({ templateId }: { templateId: string }
         <AdminPageHeader
           title="Email Studio"
           subtitle="Загружаем редактор…"
-          backHref="/admin/communications/email-studio"
+          backHref="/admin/communications/channels/email"
         />
         <div className="grid gap-6">
           {Array.from({ length: 3 }).map((_, index) => (
@@ -750,7 +750,7 @@ export function EmailTemplateEditorClient({ templateId }: { templateId: string }
         <AdminPageHeader
           title="Email Studio"
           subtitle="Не удалось открыть редактор."
-          backHref="/admin/communications/email-studio"
+          backHref="/admin/communications/channels/email"
         />
         <Card>
           <CardContent className="space-y-4 pt-6">
@@ -762,7 +762,7 @@ export function EmailTemplateEditorClient({ templateId }: { templateId: string }
                 Повторить
               </Button>
               <Button variant="outline" asChild>
-                <Link href="/admin/communications/email-studio">Назад к шаблонам</Link>
+                <Link href="/admin/communications/channels/email">Назад к шаблонам</Link>
               </Button>
             </div>
           </CardContent>
@@ -779,7 +779,7 @@ export function EmailTemplateEditorClient({ templateId }: { templateId: string }
           subtitle={`${getEmailTemplateTypeRuLabel(editor.type)} · ${getEmailTemplateClassificationLabel(
             getEmailTemplateClassification(editor.type),
           )} · Обновлён ${formatDate(editor.updatedAt)}`}
-          backHref="/admin/communications/email-studio"
+          backHref="/admin/communications/channels/email"
           actions={
             <>
               <Button

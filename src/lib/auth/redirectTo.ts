@@ -4,6 +4,15 @@ export const REDIRECT_TO_PARAM = "redirectTo";
 /** Legacy query param — still accepted when reading, not written to new URLs. */
 export const LEGACY_NEXT_PARAM = "next";
 
+/** Auth-flow pages themselves are never valid redirect targets (would loop back into auth). */
+const AUTH_REDIRECT_DENYLIST = ["/auth", "/login", "/register", "/profile-entry"];
+
+function isDenylistedRedirectPath(path: string): boolean {
+  return AUTH_REDIRECT_DENYLIST.some(
+    (denied) => path === denied || path.startsWith(`${denied}/`) || path.startsWith(`${denied}?`),
+  );
+}
+
 export type AuthUrlMode = "login" | "register";
 
 type SearchParamSource =
@@ -24,7 +33,8 @@ function readParam(source: SearchParamSource, key: string): string | undefined {
 }
 
 /**
- * Validates redirect target: internal relative path only (no open redirects).
+ * Validates redirect target: internal relative path only (no open redirects),
+ * and not an auth-flow page itself (no redirect loops back into login/register).
  */
 export function getSafeRedirectPath(
   value: string | null | undefined,
@@ -44,6 +54,7 @@ export function getSafeRedirectPath(
 
   if (!candidate.startsWith("/") || candidate.startsWith("//")) return fallback;
   if (candidate.includes("://")) return fallback;
+  if (isDenylistedRedirectPath(candidate)) return fallback;
 
   return candidate;
 }

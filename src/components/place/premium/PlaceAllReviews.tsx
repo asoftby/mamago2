@@ -21,6 +21,12 @@ interface Review {
   ownerReplyCreatedAt?: Date | null;
 }
 
+function shouldUseRelativeTime(review: Review): boolean {
+  if (!review.relativeTimeDescription) return false;
+  if (review.source !== "GOOGLE") return true;
+  return /[А-Яа-яЁё]/u.test(review.relativeTimeDescription);
+}
+
 interface PlaceAllReviewsProps {
   reviews: Review[];
   averageRating?: number;
@@ -261,7 +267,9 @@ export function PlaceAllReviews({
                         ))}
                       </div>
                       <span className="text-sm text-[#8D92A8]">
-                        {review.relativeTimeDescription || formatDate(review.publishedAt)}
+                        {shouldUseRelativeTime(review)
+                          ? review.relativeTimeDescription
+                          : formatDate(review.publishedAt)}
                       </span>
                     </div>
                   </div>

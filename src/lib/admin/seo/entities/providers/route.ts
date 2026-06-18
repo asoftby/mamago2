@@ -162,7 +162,12 @@ export const routeProvider: SeoEntityProvider = {
   async buildSchema(entityId) {
     const r = await prisma.route.findUnique({
       where: { id: entityId },
-      include: { stops: { orderBy: { order: "asc" }, include: { place: { select: { id: true, title: true } } } } },
+      include: {
+        stops: {
+          orderBy: { order: "asc" },
+          include: { place: { select: { id: true, slug: true, title: true } } },
+        },
+      },
     });
     if (!r) return null;
     if (r.seoJsonLdOverride && typeof r.seoJsonLdOverride === "object") {
@@ -172,4 +177,3 @@ export const routeProvider: SeoEntityProvider = {
     return buildRouteJsonLd({ route: { slug: r.slug, title: r.title, stops: r.stops }, publicBase });
   },
 };
-

@@ -1,5 +1,5 @@
  
-import { useMemo, useCallback, useEffect } from "react";
+import { useMemo, useCallback, useEffect, useSyncExternalStore } from "react";
 import {
   useSearchParams,
   useRouter,
@@ -285,6 +285,11 @@ export function useDiscoveryFilters() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const optionalCity = useOptionalCity();
+  const hasMounted = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
 
   const cityForSession = useMemo(() => {
     return getCityFromPath(pathname) ?? optionalCity?.citySlug ?? "minsk";
@@ -305,7 +310,7 @@ export function useDiscoveryFilters() {
     if (!isDiscoveryFiltersEmpty(appliedFromUrl)) {
       return appliedFromUrl;
     }
-    if (typeof window === "undefined") {
+    if (!hasMounted || typeof window === "undefined") {
       return appliedFromUrl;
     }
     if (
@@ -322,7 +327,7 @@ export function useDiscoveryFilters() {
       }
     }
     return appliedFromUrl;
-  }, [appliedFromUrl, publicationIntent, cityForSession, pathname]);
+  }, [appliedFromUrl, hasMounted, publicationIntent, cityForSession, pathname]);
 
   /** Сохраняем фильтры раздела при просмотре списка discovery */
   useEffect(() => {

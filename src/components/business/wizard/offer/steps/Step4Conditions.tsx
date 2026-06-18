@@ -14,6 +14,14 @@ interface Step4ConditionsProps {
 }
 
 export function Step4Conditions({ data, onChange, isEditable }: Step4ConditionsProps) {
+  const isActivityProduct =
+    data.productType === "ONE_TIME_ACTIVITY" ||
+    data.productType === "REGULAR_ACTIVITY";
+  const isVisitProduct = data.productType === "PLACE_VISIT";
+  const isPartyProduct =
+    data.productType === "PARTY_SERVICE" ||
+    data.productType === "PARTY_PACKAGE";
+
   const renderClassFields = () => (
     <div className="space-y-4">
       <div className="space-y-2">
@@ -178,9 +186,28 @@ export function Step4Conditions({ data, onChange, isEditable }: Step4ConditionsP
         </div>
       )}
 
-      {data.offerKind === "course" && renderClassFields()}
-      {data.offerKind === "birthday" && renderPartyFields()}
-      {data.offerKind === "service" && renderServiceFields()}
+      {isActivityProduct && renderClassFields()}
+
+      {isVisitProduct ? (
+        <div className="rounded-2xl border border-border/70 bg-muted/30 p-4 text-sm text-muted-foreground">
+          Для посещения места отдельные условия на этом шаге не обязательны.
+          Основной сценарий и birthday-условия, если они нужны, заполняются на шаге
+          размещения.
+        </div>
+      ) : null}
+
+      {isPartyProduct ? (
+        <div className="space-y-4">
+          <div className="rounded-2xl border border-border/70 bg-muted/30 p-4 text-sm text-muted-foreground">
+            Основные условия для праздника уже задаются на шаге со сценариями
+            размещения. Здесь можно оставить дополнительные пояснения в общем
+            описании и блоке цены.
+          </div>
+          {data.productType === "PARTY_PACKAGE"
+            ? renderPartyFields()
+            : renderServiceFields()}
+        </div>
+      ) : null}
     </div>
   );
 }

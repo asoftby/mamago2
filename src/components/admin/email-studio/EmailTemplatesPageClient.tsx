@@ -111,7 +111,7 @@ export function EmailTemplatesPageClient() {
       }
 
       const data = (await response.json()) as { template: EmailTemplateListRow };
-      router.push(`/admin/communications/email-studio/${data.template.id}`);
+      router.push(`/admin/communications/channels/email/${data.template.id}`);
     } catch (createError) {
       setError(createError instanceof Error ? createError.message : "Не удалось создать шаблон.");
     } finally {
@@ -346,7 +346,7 @@ export function EmailTemplatesPageClient() {
                       <td className="px-4 py-4">
                         <div className="flex justify-end gap-2">
                           <Button variant="outline" size="sm" asChild>
-                            <Link href={`/admin/communications/email-studio/${template.id}`}>
+                            <Link href={`/admin/communications/channels/email/${template.id}`}>
                               <ExternalLink className="size-4" />
                               Открыть
                             </Link>

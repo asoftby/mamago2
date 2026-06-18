@@ -7,10 +7,12 @@ import { PrimaryButton } from "@/components/ui/PrimaryButton";
 import { Input } from "@/components/ui/input";
 import { PhoneVerificationField } from "@/components/phone/PhoneVerificationField";
 import { UnpLookupField } from "@/components/business/UnpLookupField";
+import { AccessRequestPanel } from "./AccessRequestPanel";
 import {
   loadDraft,
   saveDraft,
   clearDraft,
+  clearLegacyGlobalDraft,
 } from "@/lib/draft/businessOnboardingDraft";
 import {
   type BusinessContactOtpClientState,
@@ -55,10 +57,13 @@ function defaultVerifiedPhoneFromProps(
 }
 
 export function OnboardingForm({
+  currentUserId,
   initialData,
   accountPhoneE164 = null,
   initialBusinessContactOtpState,
 }: {
+  /** ID текущего авторизованного пользователя — используется для скоупинга localStorage draft */
+  currentUserId: string;
   initialData?: { unp?: string; legalName?: string; phone?: string | null; contactPhoneVerifiedAt?: string | null } | null;
   /** Номер из аккаунта (как правило, подтверждённый при регистрации) — если в заявке ещё нет телефона */
   accountPhoneE164?: string | null;
@@ -83,12 +88,14 @@ export function OnboardingForm({
 
   // Load draft on mount (only if no initialData)
   useEffect(() => {
+    clearLegacyGlobalDraft();
+
     if (initialData) {
       // Skip draft loading if we have initial data from database
       return;
     }
 
-    const draft = loadDraft();
+    const draft = loadDraft(currentUserId);
     if (!draft) return;
 
     queueMicrotask(() => {
@@ -116,16 +123,16 @@ export function OnboardingForm({
         setVerifiedPhoneE164(draft.verifiedPhoneE164);
       }
     });
-  }, [initialData, accountPhoneE164]);
+  }, [initialData, accountPhoneE164, currentUserId]);
 
   // Debounced save helper
-  const debouncedSave = (data: Parameters<typeof saveDraft>[0]) => {
+  const debouncedSave = (data: Parameters<typeof saveDraft>[1]) => {
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
     }
 
     saveTimeoutRef.current = setTimeout(() => {
-      saveDraft(data);
+      saveDraft(currentUserId, data);
     }, 400); // 400ms debounce
   };
 
@@ -169,10 +176,10 @@ export function OnboardingForm({
   useEffect(() => {
     if (state?.ok) {
       // Form was submitted successfully (will redirect)
-      clearDraft();
+      clearDraft(currentUserId);
       console.log("Draft cleared after successful submission");
     }
-  }, [state]);
+  }, [state, currentUserId]);
 
   const isPhoneVerified = isVerifiedPhoneMatch({
     currentPhoneE164: phoneE164,
@@ -192,13 +199,18 @@ export function OnboardingForm({
           value={unp}
           required
           onValueChange={handleUnpChange}
-          fieldError={showFieldErrors ? state.fieldErrors?.unp?.[0] : undefined}
+          fieldError={
+            showFieldErrors
+              ? state.fieldErrors?.unp?.[0] ??
+                (state.field === "unp" ? state.message : undefined)
+              : undefined
+          }
           onResolved={(result) => {
             if (result.legalName && !isLegalNameTouched) {
               setLegalName(result.legalName);
             }
             if (result.legalName) {
-              saveDraft({
+              saveDraft(currentUserId, {
                 companyData: {
                   legalName: result.legalName,
                   source: result.source ?? undefined,
@@ -207,6 +219,9 @@ export function OnboardingForm({
             }
           }}
         />
+        {showFieldErrors && state.code === "BUSINESS_UNP_ALREADY_EXISTS" && (
+          <AccessRequestPanel unp={unp} />
+        )}
       </div>
 
       <div>
@@ -252,7 +267,7 @@ export function OnboardingForm({
         />
       </div>
 
-      {showFieldErrors && state.message && !state.fieldErrors && (
+      {showFieldErrors && state.message && !state.fieldErrors && state.field !== "unp" && (
         <div className="bg-red-50 border border-red-200 rounded-md p-4">
           <p className="text-sm text-red-800">{state.message}</p>
         </div>

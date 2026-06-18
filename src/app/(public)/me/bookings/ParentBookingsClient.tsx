@@ -1,144 +1,186 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Search, Sparkles } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { peachPrimaryCtaLinkClassName } from "@/lib/peachPrimaryCtaLink";
-import type { ParentBookingsResult } from "@/server/services/booking/parentBookings.service";
-import { ParentBookingCard } from "./ParentBookingCard";
+import type { ParentBookingsResult, ParentBookingItem } from "@/server/services/booking/parentBookings.service";
+import { Reveal } from "./components/Reveal";
+import { IcArrow, IcCalendar } from "./components/icons";
+import { BookingRecordCard } from "./components/BookingRecordCard";
+import styles from "./bookings.module.css";
 
 interface Props {
   bookings: ParentBookingsResult;
 }
 
-export function ParentBookingsClient({ bookings }: Props) {
-  const { active, completed, cancelled } = bookings;
-  const total = active.length + completed.length + cancelled.length;
+type Filter = "ALL" | "ACTIVE" | "COMPLETED" | "CANCELLED";
 
-  return (
-    <div className="space-y-6">
-      {/* ── Header ── */}
-      <div className="flex items-center gap-3">
-        <Link
-          href="/me"
-          className="flex h-9 w-9 items-center justify-center rounded-full border border-neutral-200 bg-white text-neutral-500 transition-colors hover:border-neutral-300 hover:text-neutral-900"
-          aria-label="Назад"
-        >
-          <ArrowLeft className="h-4 w-4" />
-        </Link>
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">
-            Мои записи
-          </h1>
-          {total > 0 && (
-            <p className="text-sm text-neutral-400 mt-0.5">
-              {total} {pluralBookings(total)}
-            </p>
-          )}
-        </div>
-      </div>
-
-      {/* ── Empty state ── */}
-      {total === 0 && <EmptyState />}
-
-      {/* ── Active / Upcoming ── */}
-      {active.length > 0 && (
-        <section>
-          <SectionTitle>Активные</SectionTitle>
-          <div className="space-y-3">
-            {active.map((b) => (
-              <ParentBookingCard key={b.id} booking={b} />
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* ── Completed ── */}
-      {completed.length > 0 && (
-        <section>
-          <SectionTitle>Завершённые</SectionTitle>
-          <div className="space-y-3">
-            {completed.map((b) => (
-              <ParentBookingCard key={b.id} booking={b} />
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* ── Cancelled ── */}
-      {cancelled.length > 0 && (
-        <section>
-          <SectionTitle muted>Отменённые</SectionTitle>
-          <div className="space-y-3">
-            {cancelled.map((b) => (
-              <ParentBookingCard key={b.id} booking={b} />
-            ))}
-          </div>
-        </section>
-      )}
-    </div>
-  );
-}
-
-// ─── Section title ────────────────────────────────────────────────────────────
-
-function SectionTitle({
-  children,
-  muted,
-}: {
-  children: React.ReactNode;
-  muted?: boolean;
-}) {
-  return (
-    <h2
-      className={cn(
-        "mb-3 text-[13px] font-semibold uppercase tracking-widest",
-        muted ? "text-neutral-300" : "text-neutral-400",
-      )}
-    >
-      {children}
-    </h2>
-  );
-}
-
-// ─── Empty state ──────────────────────────────────────────────────────────────
-
-function EmptyState() {
-  return (
-    <div className="flex flex-col items-center gap-6 rounded-3xl border border-dashed border-neutral-200 bg-white px-6 py-14 text-center">
-      <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[#fff4ee]">
-        <Sparkles className="h-7 w-7 text-[#EF8759]" />
-      </div>
-      <div className="space-y-2">
-        <p className="text-lg font-semibold text-neutral-900">
-          Здесь будут ваши записи
-        </p>
-        <p className="max-w-xs text-sm text-neutral-400 leading-relaxed">
-          Когда вы запишетесь на занятие, лагерь или мероприятие — всё появится здесь.
-        </p>
-      </div>
-      <div className="flex flex-col items-center gap-3 sm:flex-row">
-        <Link href="/search" className={peachPrimaryCtaLinkClassName()}>
-          <Search className="h-4 w-4" />
-          Найти занятия
-        </Link>
-        <Link
-          href="/"
-          className="inline-flex items-center gap-2 rounded-full border border-neutral-200 bg-white px-5 py-3 text-[13px] font-medium text-neutral-600 transition-colors hover:border-neutral-300 hover:text-neutral-900 sm:px-[22px] sm:py-[13px] sm:text-[14px]"
-        >
-          Куда пойти
-        </Link>
-      </div>
-    </div>
-  );
-}
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+const FILTERS: { value: Filter; label: string }[] = [
+  { value: "ALL", label: "Все" },
+  { value: "ACTIVE", label: "Активные" },
+  { value: "COMPLETED", label: "Завершённые" },
+  { value: "CANCELLED", label: "Отменённые" },
+];
 
 function pluralBookings(n: number): string {
   const mod10 = n % 10;
   const mod100 = n % 100;
   if (mod10 === 1 && mod100 !== 11) return "запись";
-  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return "записи";
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return "записи";
   return "записей";
+}
+
+export function ParentBookingsClient({ bookings }: Props) {
+  const { active, completed, cancelled } = bookings;
+  const [filter, setFilter] = useState<Filter>("ALL");
+
+  const counts = useMemo(
+    () => ({
+      ALL: active.length + completed.length + cancelled.length,
+      ACTIVE: active.length,
+      COMPLETED: completed.length,
+      CANCELLED: cancelled.length,
+    }),
+    [active.length, completed.length, cancelled.length],
+  );
+
+  const visible: ParentBookingItem[] = useMemo(() => {
+    switch (filter) {
+      case "ACTIVE":
+        return active;
+      case "COMPLETED":
+        return completed;
+      case "CANCELLED":
+        return cancelled;
+      default:
+        return [...active, ...completed, ...cancelled];
+    }
+  }, [filter, active, completed, cancelled]);
+
+  const total = counts.ALL;
+
+  return (
+    <div className={styles.page}>
+      {/* Breadcrumbs */}
+      <div className={`${styles.wrap} ${styles.breadcrumbs}`}>
+        <Link href="/me">← Профиль</Link>
+        <span style={{ opacity: 0.5 }}>→</span>
+        <span style={{ color: "var(--ink)" }}>Мои записи</span>
+      </div>
+
+      {/* Hero */}
+      <section style={{ paddingTop: 20, paddingBottom: 36 }}>
+        <div className={`${styles.wrap} ${styles.heroGrid}`}>
+          <Reveal>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 18 }}>
+              <span className={styles.caps} style={{ color: "var(--accent-deep)" }}>
+                ● Профиль · записи
+              </span>
+              <span style={{ width: 5, height: 5, borderRadius: 99, background: "var(--ink-3)" }} />
+              <span className={styles.caps}>Заявки и брони</span>
+            </div>
+            <h1 className={styles.heroTitle}>
+              Мои{" "}
+              <span className={styles.heroTitleAccent}>записи.</span>
+            </h1>
+            <p className={styles.heroLead}>
+              Заявки на&nbsp;занятия, лагеря и&nbsp;мероприятия. Следите за&nbsp;статусом — мы&nbsp;напомним
+              накануне каждой.
+            </p>
+          </Reveal>
+
+          {total > 0 ? (
+            <Reveal className={styles.heroSide}>
+              <div className={styles.countCard}>
+                <span className={styles.caps} style={{ color: "var(--accent-deep)" }}>
+                  ● в записях
+                </span>
+                <div className={styles.serif} style={{ fontSize: 34, lineHeight: 1, letterSpacing: "-.02em" }}>
+                  {total} {pluralBookings(total)}
+                </div>
+                <div
+                  className={styles.mono}
+                  style={{
+                    fontSize: 11,
+                    color: "var(--ink-3)",
+                    letterSpacing: ".06em",
+                    textTransform: "uppercase",
+                  }}
+                >
+                  ● {counts.ACTIVE} активны · {counts.COMPLETED} завершены
+                </div>
+              </div>
+            </Reveal>
+          ) : null}
+        </div>
+      </section>
+
+      {/* Filters */}
+      {total > 0 ? (
+        <section className={styles.wrap} style={{ marginBottom: 24 }}>
+          <Reveal className={styles.filters}>
+            {FILTERS.map((f) => (
+              <button
+                key={f.value}
+                type="button"
+                onClick={() => setFilter(f.value)}
+                className={`${styles.pill} ${f.value === filter ? styles.pillSolid : ""}`.trim()}
+              >
+                {f.label}
+                <span className={styles.count}>{String(counts[f.value]).padStart(2, "0")}</span>
+              </button>
+            ))}
+          </Reveal>
+        </section>
+      ) : null}
+
+      {/* List / Empty */}
+      <section className={styles.wrap} style={{ paddingBottom: 80 }}>
+        {visible.length > 0 ? (
+          <div className={styles.recList}>
+            {visible.map((b) => (
+              <BookingRecordCard key={b.id} booking={b} />
+            ))}
+          </div>
+        ) : (
+          <EmptyState empty={total === 0} />
+        )}
+      </section>
+    </div>
+  );
+}
+
+function EmptyState({ empty }: { empty: boolean }) {
+  return (
+    <Reveal className={styles.empty}>
+      <div className={styles.emptySpark}>
+        <IcCalendar />
+      </div>
+      <h3 className={styles.emptyTitle}>
+        {empty ? (
+          <>
+            Здесь будут{" "}
+            <span className={styles.emptyTitleAccent}>ваши записи</span>
+          </>
+        ) : (
+          <>
+            В этой группе{" "}
+            <span className={styles.emptyTitleAccent}>пока пусто</span>
+          </>
+        )}
+      </h3>
+      <p className={styles.emptyLead}>
+        {empty
+          ? "Когда вы запишетесь на занятие, лагерь или мероприятие — всё появится здесь."
+          : "Записей с таким статусом нет. Загляните в другие вкладки или найдите новые занятия."}
+      </p>
+      <div className={styles.emptyActions}>
+        <Link href="/search" className={`${styles.btn} ${styles.btnAccent}`}>
+          Найти занятия
+        </Link>
+        <Link href="/" className={`${styles.btn} ${styles.btnGhost}`}>
+          Куда пойти <IcArrow />
+        </Link>
+      </div>
+    </Reveal>
+  );
 }

@@ -21,9 +21,4 @@ ALTER TABLE "BrandingConfig" ADD CONSTRAINT "BrandingConfig_logoAssetId_fkey" FO
 -- AddForeignKey
 ALTER TABLE "BrandingConfig" ADD CONSTRAINT "BrandingConfig_faviconAssetId_fkey" FOREIGN KEY ("faviconAssetId") REFERENCES "MediaAsset"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
--- AddForeignKey
-ALTER TABLE "_ArticleToDiscoveryTag" ADD CONSTRAINT "_ArticleToDiscoveryTag_A_fkey" FOREIGN KEY ("A") REFERENCES "Article"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "_ArticleToDiscoveryTag" ADD CONSTRAINT "_ArticleToDiscoveryTag_B_fkey" FOREIGN KEY ("B") REFERENCES "DiscoveryTag"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 

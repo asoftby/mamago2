@@ -2,6 +2,7 @@
 
 import { useCallback, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useNotificationStore } from "@/features/notifications/store/notification-store";
 import { Bell, Mail, MessageCircle, RefreshCw, RotateCcw, Send, Save } from "lucide-react";
 import { toast } from "@/lib/toast";
 import { Button } from "@/components/ui/button";
@@ -231,6 +232,8 @@ function TemplateEditor({
     }
   };
 
+  const channelLabel = CHANNEL_META[channel].label;
+
   const handleTest = async () => {
     if (channel === "TELEGRAM" && !hasTelegramLinked) {
       toast.error("Telegram не подключён. Привяжите Telegram в настройках профиля, чтобы получить тестовое сообщение.");
@@ -240,14 +243,17 @@ function TemplateEditor({
     setTesting(true);
     try {
       const resp = await fetch(
-        `/api/admin/communications/scenarios/${scenarioKey}/test`,
-        { method: "POST", credentials: "include" },
+        `/api/admin/communications/scenarios/${scenarioKey}/templates/test`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ channel, subject: subject || null, body }),
+        },
       );
       const data = (await resp.json().catch(() => ({}))) as {
         ok?: boolean;
-        status?: "SENT" | "SKIPPED";
-        reason?: string;
-        deliveries?: Array<{ channel: string; status: string; errorMessage?: string | null }>;
+        status?: string;
         error?: string;
       };
 
@@ -256,18 +262,10 @@ function TemplateEditor({
         return;
       }
 
-      const channelDelivery = data.deliveries?.find((d) => d.channel === channel);
-      if (!channelDelivery) {
-        toast.info("Канал не участвовал в тестовой отправке");
-        return;
-      }
+      toast.success(`Тест отправлен в ${channelLabel}`);
 
-      if (channelDelivery.status === "SENT") {
-        toast.success(`Тест по ${channel} отправлен`);
-      } else if (channelDelivery.errorMessage) {
-        toast.error(`${channel}: ${channelDelivery.errorMessage}`);
-      } else {
-        toast.info(`${channel}: ${channelDelivery.status}`);
+      if (channel === "IN_APP") {
+        void useNotificationStore.getState().refreshUnreadOnly({ force: true });
       }
     } catch {
       toast.error("Не удалось отправить тестовое уведомление");
@@ -402,7 +400,7 @@ function TemplateEditor({
             className="rounded-2xl"
           >
             <Send className="h-4 w-4" />
-            {testing ? "Отправляем…" : "Тест мне"}
+            {testing ? "Отправляем…" : `Тест в ${channelLabel}`}
           </Button>
           {channel === "TELEGRAM" && !hasTelegramLinked && (
             <p className="text-xs text-rose-600">

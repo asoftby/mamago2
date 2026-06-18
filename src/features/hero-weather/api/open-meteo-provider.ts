@@ -144,7 +144,7 @@ export class OpenMeteoWeatherProvider implements WeatherProvider {
     const json = await fetchJsonWithTimeout<unknown>(url, {
       timeoutMs: 10_000,
       init: {
-        next: { revalidate: 300 },
+        next: { revalidate: 1800 },
       } as RequestInit,
     });
     if (!json) {

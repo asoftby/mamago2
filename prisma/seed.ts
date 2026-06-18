@@ -15,7 +15,7 @@ import { seedPlaceCategories } from "./seed/place-categories";
 import { seedEventCategories } from "./seed/event-categories";
 import { seedDiscoverySectionFilters } from "./seed/discovery-section-filters";
 import { seedDiscoveryTags } from "./seed/discovery-tags";
-import { CAMP_OFFER_DISCOVERY_GROUPS } from "../src/lib/offers/campOfferDiscoverySignals";
+import { CAMP_OFFER_DISCOVERY_GROUPS } from "./seed/camp-offer-discovery-signals";
 
 const prisma = new PrismaClient();
 

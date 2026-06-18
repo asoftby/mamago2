@@ -19,12 +19,15 @@ import { buildOgMeta } from "@/lib/seo/buildOgMeta";
 import { AnalyticsDetailBeacon } from "@/components/analytics/AnalyticsDetailBeacon";
 import { ArticleMvpView } from "@/components/article/mvp/ArticleMvpView";
 import { BreakingNewsView } from "@/components/article/mvp/BreakingNewsView";
+import { JsonLd } from "@/components/seo/JsonLd";
 import { BREAKING_NEWS_SUBTITLE } from "@/lib/publications/breakingNewsArticle";
 import {
   incrementPublishedArticleViews,
   shouldCountPublishedArticleViewRequest,
 } from "@/lib/article/articleViews";
 import { applyGlobalRobotsOverride } from "@/lib/seo/globalNoindex";
+import { buildArticleJsonLd } from "@/lib/seo/schema/buildArticleJsonLd";
+import { buildBreadcrumbJsonLd } from "@/lib/seo/schema/buildBreadcrumbJsonLd";
 
 interface PageProps {
   params: Promise<{ city: string; slug: string }>;
@@ -116,6 +119,9 @@ export default async function CityArticlePage({ params }: PageProps) {
       geoScope: true,
       slug: true,
       cityId: true,
+      updatedAt: true,
+      seoCanonicalUrl: true,
+      seoJsonLdOverride: true,
     },
   });
   if (!articleRow) notFound();
@@ -147,12 +153,48 @@ export default async function CityArticlePage({ params }: PageProps) {
       ? `/admin/content/publications/new?type=news&id=${mvp.id}`
       : `/admin/content/articles/${mvp.id}/edit`
     : undefined;
+  const publicBase = getCanonicalPublicAppUrl();
+  const canonicalPath = buildCityPublicPath({
+    citySlug: city.slug,
+    type: "article",
+    slug: articleRow.slug ?? slug,
+  });
+  const schemaJsonLd =
+    articleRow.seoJsonLdOverride && typeof articleRow.seoJsonLdOverride === "object"
+      ? (articleRow.seoJsonLdOverride as Record<string, unknown>)
+      : buildArticleJsonLd({
+          canonicalUrl: articleRow.seoCanonicalUrl?.trim() || `${publicBase}${canonicalPath}`,
+          headline: mvp.title,
+          description: mvp.excerpt,
+          image: mvp.heroUrl,
+          datePublished: mvp.publishedAt,
+          dateModified: articleRow.updatedAt,
+          authorName: mvp.author?.displayName,
+          publisherName: "mamaGo",
+          articleSection: mvp.categoryLabel,
+          keywords: mvp.tags.map((tag) => tag.title),
+          isNews: mvp.subtitle === BREAKING_NEWS_SUBTITLE,
+          publicBaseUrl: publicBase,
+        });
+  const breadcrumbJsonLd = buildBreadcrumbJsonLd(
+    [
+      { name: "Главная", path: "/" },
+      { name: city.name, path: `/${city.slug}` },
+      { name: mvp.title, path: canonicalPath },
+    ],
+    publicBase,
+  );
 
   if (mvp.subtitle === BREAKING_NEWS_SUBTITLE) {
     const related = await loadRelatedBreakingNews(mvp.id);
     return (
       <>
         <AnalyticsDetailBeacon entityType="ARTICLE" entityId={mvp.id} vertical="CITY" />
+        <JsonLd
+          data={[schemaJsonLd, breadcrumbJsonLd].filter(
+            (item): item is Record<string, unknown> => Boolean(item),
+          )}
+        />
         <BreakingNewsView
           articleId={mvp.id}
           title={mvp.title}
@@ -172,6 +214,11 @@ export default async function CityArticlePage({ params }: PageProps) {
   return (
     <>
       <AnalyticsDetailBeacon entityType="ARTICLE" entityId={mvp.id} vertical="CITY" />
+      <JsonLd
+        data={[schemaJsonLd, breadcrumbJsonLd].filter(
+          (item): item is Record<string, unknown> => Boolean(item),
+        )}
+      />
       <ArticleMvpView
         title={mvp.title}
         subtitle={mvp.subtitle}

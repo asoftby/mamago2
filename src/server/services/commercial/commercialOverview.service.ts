@@ -17,18 +17,25 @@ export async function getAdminCommercialOverview() {
   const now = new Date();
 
   // Get counts
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
   const [
     activeContracts,
+    newContractsThisMonth,
     expiringContracts,
     expiredContracts,
     activePlacements,
     expiringPlacements,
     expiredPlacements,
     activeServicePlacements,
+    expiringServicePlacements,
     expiredServicePlacements,
   ] = await Promise.all([
     prisma.businessContract.count({
       where: { status: "ACTIVE" },
+    }),
+    prisma.businessContract.count({
+      where: { status: "ACTIVE", createdAt: { gte: startOfMonth } },
     }),
     prisma.businessContract.count({
       where: { status: "EXPIRING" },
@@ -47,6 +54,9 @@ export async function getAdminCommercialOverview() {
     }),
     prisma.businessServicePlacement.count({
       where: { status: "ACTIVE" },
+    }),
+    prisma.businessServicePlacement.count({
+      where: { status: "EXPIRING" },
     }),
     prisma.businessServicePlacement.count({
       where: { status: "EXPIRED" },
@@ -59,6 +69,7 @@ export async function getAdminCommercialOverview() {
   return {
     contracts: {
       active: activeContracts,
+      newThisMonth: newContractsThisMonth,
       expiring: expiringContracts,
       expired: expiredContracts,
     },
@@ -69,6 +80,7 @@ export async function getAdminCommercialOverview() {
     },
     servicePlacements: {
       active: activeServicePlacements,
+      expiring: expiringServicePlacements,
       expired: expiredServicePlacements,
     },
     businessesNeedingAttention,

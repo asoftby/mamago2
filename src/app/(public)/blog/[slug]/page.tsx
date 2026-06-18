@@ -21,6 +21,8 @@ import { ArticlePlacesShowcaseBlock } from "@/components/article/blocks/ArticleP
 import prisma from "@/lib/prisma";
 import { findArticleBySlug } from "@/lib/slug/articleSlugService";
 import { buildArticleJsonLd } from "@/lib/seo/schema/buildArticleJsonLd";
+import { buildBreadcrumbJsonLd } from "@/lib/seo/schema/buildBreadcrumbJsonLd";
+import { JsonLd } from "@/components/seo/JsonLd";
 import { buildOgMeta } from "@/lib/seo/buildOgMeta";
 import type { ArticleVm } from "@/lib/blog/articleTypes";
 import { AnalyticsDetailBeacon } from "@/components/analytics/AnalyticsDetailBeacon";
@@ -90,6 +92,25 @@ async function getArticle(slug: string): Promise<ArticleVm | null> {
         excerpt: true,
         heroImage: true,
         publishedAt: true,
+        updatedAt: true,
+        authorLabel: true,
+        authorUser: {
+          select: {
+            displayName: true,
+          },
+        },
+        category: {
+          select: {
+            nameRu: true,
+          },
+        },
+        tags: {
+          where: { isActive: true },
+          select: {
+            title: true,
+          },
+          orderBy: { sortOrder: "asc" },
+        },
         seoTitle: true,
         seoDescription: true,
         seoH1: true,
@@ -116,6 +137,18 @@ async function getArticle(slug: string): Promise<ArticleVm | null> {
     };
   }
   return null;
+}
+
+async function getArticleSchemaData(articleId: string) {
+  return prisma.article.findUnique({
+    where: { id: articleId },
+    select: {
+      slug: true,
+      updatedAt: true,
+      seoCanonicalUrl: true,
+      seoJsonLdOverride: true,
+    },
+  });
 }
 
 export async function generateMetadata({
@@ -267,6 +300,35 @@ export default async function ArticlePage({
   // COUNTRY scope (cityId = null)
   const mvp = await loadArticleMvpBySlugPublic(slug, null);
   if (mvp) {
+    const schemaArticle = await getArticleSchemaData(mvp.id);
+    const publicBase = getCanonicalPublicAppUrl();
+    const canonicalPath = buildNationalArticlePath(mvp.slug ?? slug);
+    const canonicalUrl = schemaArticle?.seoCanonicalUrl?.trim() || `${publicBase}${canonicalPath}`;
+    const articleJsonLd =
+      schemaArticle?.seoJsonLdOverride && typeof schemaArticle.seoJsonLdOverride === "object"
+        ? (schemaArticle.seoJsonLdOverride as Record<string, unknown>)
+        : buildArticleJsonLd({
+            canonicalUrl,
+            headline: mvp.title,
+            description: mvp.excerpt,
+            image: mvp.heroUrl,
+            datePublished: mvp.publishedAt,
+            dateModified: schemaArticle?.updatedAt,
+            authorName: mvp.author?.displayName,
+            publisherName: "mamaGo",
+            articleSection: mvp.categoryLabel,
+            keywords: mvp.tags.map((tag) => tag.title),
+            isNews: mvp.subtitle === BREAKING_NEWS_SUBTITLE,
+            publicBaseUrl: publicBase,
+          });
+    const breadcrumbJsonLd = buildBreadcrumbJsonLd(
+      [
+        { name: "Главная", path: "/" },
+        { name: "Журнал", path: "/blog" },
+        { name: mvp.title, path: canonicalPath },
+      ],
+      publicBase,
+    );
     const editHref =
       canEditPublishedArticle
         ? (
@@ -285,6 +347,11 @@ export default async function ArticlePage({
       return (
         <>
           <AnalyticsDetailBeacon entityType="ARTICLE" entityId={mvp.id} vertical="CITY" />
+          <JsonLd
+            data={[articleJsonLd, breadcrumbJsonLd].filter(
+              (item): item is Record<string, unknown> => Boolean(item),
+            )}
+          />
           <BreakingNewsView
             articleId={mvp.id}
             title={mvp.title}
@@ -303,6 +370,11 @@ export default async function ArticlePage({
     return (
       <>
         <AnalyticsDetailBeacon entityType="ARTICLE" entityId={mvp.id} vertical="CITY" />
+        <JsonLd
+          data={[articleJsonLd, breadcrumbJsonLd].filter(
+            (item): item is Record<string, unknown> => Boolean(item),
+          )}
+        />
         <ArticleMvpView
           title={mvp.title}
           subtitle={mvp.subtitle}
@@ -330,16 +402,28 @@ export default async function ArticlePage({
       ? (seo.seoJsonLdOverride as Record<string, unknown>)
       : seo
         ? buildArticleJsonLd({
-            article: {
-              slug: seo.slug,
-              title: seo.title,
-              excerpt: seo.excerpt,
-              heroImage: seo.heroImage,
-              publishedAt: seo.publishedAt,
-            },
-            publicBase,
+            canonicalUrl:
+              seo.seoCanonicalUrl?.trim() || `${publicBase}${buildNationalArticlePath(article.slug)}`,
+            headline: seo.title,
+            description: seo.excerpt,
+            image: seo.heroImage || seo.seoOgImage,
+            datePublished: seo.publishedAt,
+            dateModified: seo.updatedAt,
+            authorName: seo.authorUser?.displayName || seo.authorLabel,
+            publisherName: "mamaGo",
+            articleSection: seo.category?.nameRu,
+            keywords: seo.tags?.map((tag) => tag.title),
+            publicBaseUrl: publicBase,
           })
         : null;
+  const breadcrumbJsonLd = buildBreadcrumbJsonLd(
+    [
+      { name: "Главная", path: "/" },
+      { name: "Журнал", path: "/blog" },
+      { name: article.title, path: buildNationalArticlePath(article.slug) },
+    ],
+    publicBase,
+  );
   const legacyEditHref =
     canEditPublishedArticle && seo?.id ? `/admin/content/articles/${seo.id}/edit` : undefined;
 
@@ -355,13 +439,7 @@ export default async function ArticlePage({
           vertical="CITY"
         />
       ) : null}
-      {jsonLd && (
-        <script
-          type="application/ld+json"
-
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
-        />
-      )}
+      <JsonLd data={[jsonLd, breadcrumbJsonLd].filter(Boolean) as Record<string, unknown>[]} />
       <ArticleHeader
         title={article.title}
         subtitle={article.subtitle}

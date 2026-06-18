@@ -53,7 +53,7 @@ export function GoogleReviewsSync({
   );
 
   const refreshPreview = useCallback(
-    async (syncReviews: boolean) => {
+    async (syncReviews: boolean, forceEnable = false) => {
       if (!googlePlaceId) return;
       setIsLoading(true);
       setError(null);
@@ -85,7 +85,8 @@ export function GoogleReviewsSync({
           googlePlaceAddress: previewData.formattedAddress,
         });
 
-        const nextMeta = enabled
+        const shouldEnableReviews = forceEnable || enabled;
+        const nextMeta = shouldEnableReviews
           ? { ...classified, enabled: true, matchStatus: "CONFIRMED" as const, disabledReason: null }
           : classified;
 
@@ -107,6 +108,7 @@ export function GoogleReviewsSync({
               rating?: number | null;
               ratingsTotal?: number | null;
               syncedAt?: string;
+              googleReviewsJson?: unknown;
             };
           };
           if (!syncRes.ok) {
@@ -117,6 +119,12 @@ export function GoogleReviewsSync({
             googleRating: syncData.data?.rating ?? previewData.rating ?? null,
             googleUserRatingsTotal:
               syncData.data?.ratingsTotal ?? previewData.userRatingCount ?? null,
+            googleReviewsSyncedAt: syncData.data?.syncedAt
+              ? new Date(syncData.data.syncedAt)
+              : null,
+            googleReviewsJson:
+              syncData.data?.googleReviewsJson ??
+              mergeGoogleReviewsMeta(googleReviewsJson, nextMeta),
           });
         }
 
@@ -173,6 +181,10 @@ export function GoogleReviewsSync({
   };
 
   const enableReviews = () => {
+    if (placeId) {
+      void refreshPreview(true, true);
+      return;
+    }
     applyMetaPatch({
       googleReviewsJson: mergeGoogleReviewsMeta(googleReviewsJson, {
         enabled: true,

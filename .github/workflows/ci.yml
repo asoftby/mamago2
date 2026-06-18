@@ -35,3 +35,5 @@ jobs:
 
       - name: Type check
         run: pnpm tsc --noEmit
+        env:
+          NODE_OPTIONS: --max-old-space-size=6144

@@ -41,25 +41,7 @@ export function UnpLookupField({
 }: UnpLookupFieldProps) {
   const [isLookupLoading, setIsLookupLoading] = useState(false);
   const [lookupError, setLookupError] = useState("");
-  const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
   const lookupTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  useEffect(() => {
-    if (!isLookupLoading) {
-      setSecondsLeft(null);
-      return;
-    }
-
-    setSecondsLeft(59);
-    const timer = window.setInterval(() => {
-      setSecondsLeft((prev) => {
-        if (prev === null) return null;
-        return prev <= 0 ? 0 : prev - 1;
-      });
-    }, 1000);
-
-    return () => window.clearInterval(timer);
-  }, [isLookupLoading]);
 
   useEffect(() => {
     return () => {
@@ -96,7 +78,7 @@ export function UnpLookupField({
           source: json.source,
         });
       } else {
-        setLookupError("Не удалось определить автоматически. Проверьте УНП или заполните название вручную.");
+        setLookupError("Не удалось быстро определить название. Заполните вручную — мы проверим данные при модерации.");
         onResolved?.({
           legalName: null,
           source: null,
@@ -104,7 +86,7 @@ export function UnpLookupField({
       }
     } catch (error) {
       console.error("[UnpLookupField] Lookup failed:", error);
-      setLookupError("Не удалось выполнить поиск. Заполните название вручную.");
+      setLookupError("Не удалось быстро определить название. Заполните вручную — мы проверим данные при модерации.");
       onResolved?.({
         legalName: null,
         source: null,
@@ -176,17 +158,7 @@ export function UnpLookupField({
       </div>
 
       {isLookupLoading ? (
-        <div className="mt-1 space-y-0.5 text-xs text-gray-600">
-          <p>
-            Определяем организацию по УНП...{" "}
-            <span className="tabular-nums font-medium text-gray-800">
-              {secondsLeft !== null
-                ? `${Math.floor(secondsLeft / 60)}:${(secondsLeft % 60).toString().padStart(2, "0")}`
-                : "0:59"}
-            </span>
-          </p>
-          <p className="text-gray-500">Обычно это занимает около минуты. Пожалуйста, подождите.</p>
-        </div>
+        <p className="mt-1 text-xs text-gray-600">Пробуем определить организацию автоматически…</p>
       ) : null}
 
       {!isLookupLoading && lookupError ? (
