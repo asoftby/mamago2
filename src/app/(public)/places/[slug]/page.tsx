@@ -21,11 +21,15 @@ import type { OpeningHoursWithRelations } from "@/server/services/openingHours/o
 import { resolvePlaceLogoImage } from "@/lib/place/resolvePlaceLogoImage";
 import { resolvePlaceLogoUrlFromDb } from "@/lib/place/resolvePlaceLogoUrlFromDb";
 import { parsePriceData } from "@/lib/priceItems";
-import { isGoogleReviewsEnabled } from "@/lib/place/googleReviewsMeta";
+import {
+  isGoogleReviewsEnabled,
+  readGoogleReviewsPayload,
+} from "@/lib/place/googleReviewsMeta";
 import {
   loadUpcomingPlaceEvents,
   mapUpcomingPlaceEventsToActivityMocks,
 } from "@/lib/place/loadUpcomingPlaceEvents";
+import type { StoredGoogleReview } from "@/types/google-places";
 
 interface PlacePageProps {
   params: Promise<{ slug: string }>;
@@ -311,7 +315,11 @@ export default async function PlacePage({ params }: PlacePageProps) {
     cityId: place.cityId,
   });
 
-  const googleReviewsEnabled = isGoogleReviewsEnabled(place.googlePlaceId, place.googleReviewsJson);
+  const googleReviewsEnabled = isGoogleReviewsEnabled(
+    place.googlePlaceId,
+    place.googleReviewsJson,
+  );
+  const googleReviewsPayload = readGoogleReviewsPayload(place.googleReviewsJson);
   const publicBase = getCanonicalPublicAppUrl();
 
   const logoImage = resolvePlaceLogoImage(place.images, place.logoImageId);
@@ -362,7 +370,6 @@ export default async function PlacePage({ params }: PlacePageProps) {
     where: {
       placeId: place.id,
       status: "PUBLISHED",
-      ...(googleReviewsEnabled ? {} : { source: { not: "GOOGLE" as const } }),
     },
     select: {
       id: true,
@@ -386,7 +393,6 @@ export default async function PlacePage({ params }: PlacePageProps) {
     where: {
       placeId: place.id,
       status: "PUBLISHED",
-      ...(googleReviewsEnabled ? {} : { source: { not: "GOOGLE" as const } }),
     },
     _avg: {
       rating: true,
@@ -394,8 +400,31 @@ export default async function PlacePage({ params }: PlacePageProps) {
     _count: true,
   });
 
-  const averageRating = reviewStats._avg.rating || undefined;
-  const totalReviewCount = reviewStats._count;
+  const hasPersistedGoogleReviews = placeReviews.some((review) => review.source === "GOOGLE");
+  const fallbackGoogleReviews = !hasPersistedGoogleReviews && googleReviewsEnabled
+    ? mapStoredGoogleReviewsToPublicReviews(googleReviewsPayload?.reviews)
+    : [];
+
+  const combinedReviews = [...placeReviews, ...fallbackGoogleReviews].sort(
+    (left, right) =>
+      new Date(right.publishedAt).getTime() - new Date(left.publishedAt).getTime(),
+  );
+
+  const fallbackGoogleStats = getFallbackGoogleStats({
+    placeGoogleRating: place.googleRating,
+    placeGoogleUserRatingsTotal: place.googleUserRatingsTotal,
+    googleReviews: fallbackGoogleReviews,
+  });
+
+  const averageRating = fallbackGoogleStats
+    ? combineAverageRatings({
+        primaryAverage: reviewStats._avg.rating,
+        primaryCount: reviewStats._count,
+        secondaryAverage: fallbackGoogleStats.averageRating,
+        secondaryCount: fallbackGoogleStats.reviewCount,
+      })
+    : reviewStats._avg.rating || undefined;
+  const totalReviewCount = reviewStats._count + (fallbackGoogleStats?.reviewCount ?? 0);
 
   const currentUser = await getCurrentUser();
   const canShowPlaceEditor =
@@ -591,11 +620,78 @@ export default async function PlacePage({ params }: PlacePageProps) {
         eventActivities={eventActivities}
         citySlug={placeCitySlug}
         offers={formattedOffers}
-        reviews={placeReviews}
+        reviews={combinedReviews}
         ownerEditPlaceId={canShowPlaceEditor ? place.id : undefined}
       />
     </>
   );
+}
+
+function mapStoredGoogleReviewsToPublicReviews(
+  reviews: StoredGoogleReview[] | undefined,
+) {
+  if (!reviews || reviews.length === 0) {
+    return [];
+  }
+
+  return reviews.map((review, index) => ({
+    id: `google-json-${index}-${review.publishTime}`,
+    source: "GOOGLE" as const,
+    authorName: review.authorName,
+    authorAvatarUrl: review.authorPhotoUri ?? null,
+    rating: review.rating,
+    text: review.text || null,
+    publishedAt: review.publishTime,
+    relativeTimeDescription: review.relativeTime || null,
+    ownerReplyText: null,
+    ownerReplyAuthorName: null,
+    ownerReplyCreatedAt: null,
+  }));
+}
+
+function getFallbackGoogleStats(input: {
+  placeGoogleRating: number | null;
+  placeGoogleUserRatingsTotal: number | null;
+  googleReviews: Array<{ rating: number }> | undefined;
+}): { averageRating: number; reviewCount: number } | null {
+  if (
+    input.placeGoogleRating != null &&
+    input.placeGoogleUserRatingsTotal != null &&
+    input.placeGoogleUserRatingsTotal > 0
+  ) {
+    return {
+      averageRating: input.placeGoogleRating,
+      reviewCount: input.placeGoogleUserRatingsTotal,
+    };
+  }
+
+  if (!input.googleReviews || input.googleReviews.length === 0) {
+    return null;
+  }
+
+  const reviewCount = input.googleReviews.length;
+  const averageRating =
+    input.googleReviews.reduce((sum, review) => sum + review.rating, 0) / reviewCount;
+
+  return { averageRating, reviewCount };
+}
+
+function combineAverageRatings(input: {
+  primaryAverage: number | null;
+  primaryCount: number;
+  secondaryAverage: number;
+  secondaryCount: number;
+}): number | undefined {
+  const weightedPrimary = input.primaryAverage != null
+    ? input.primaryAverage * input.primaryCount
+    : 0;
+  const totalCount = input.primaryCount + input.secondaryCount;
+
+  if (totalCount === 0) {
+    return undefined;
+  }
+
+  return (weightedPrimary + input.secondaryAverage * input.secondaryCount) / totalCount;
 }
 
 function buildGoogleMapsPlaceUrl(
