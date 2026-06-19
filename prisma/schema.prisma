@@ -1840,6 +1840,8 @@ model Offer {
   transferInfo             String?
   /// What to bring
   whatToBring              String?
+  /// Отображаемый хвост деталей по типу. Фильтруемые поля — отдельные колонки.
+  details                  Json?
 
   boosts          Boost[]
   birthdayDetails OfferBirthdayDetails?
@@ -1850,6 +1852,9 @@ model Offer {
   place           Place              @relation(fields: [placeId], references: [id], onDelete: Cascade)
   city            City?              @relation("OfferCity", fields: [cityId], references: [id])
   slugHistory     OfferSlugHistory[]
+  sessions        OfferSession[]
+  components      PackageComponent[] @relation("PackageOf")
+  referencedBy    PackageComponent[] @relation("ReferencedBy")
 
   @@unique([cityId, slug])
   @@index([placeId])
@@ -1900,6 +1905,43 @@ model OfferBirthdayDetails {
   createdAt       DateTime             @default(now())
   updatedAt       DateTime             @updatedAt
   offer           Offer                @relation(fields: [offerId], references: [id], onDelete: Cascade)
+}
+
+/// Смены/сессии предложения (queryable строки для date/budget фильтров в ленте).
+/// Fase 1: заполняется только для CAMP (продатированные смены).
+/// Существующий campSessions JSON остаётся — новые лагеря пишут сюда + JSON.
+model OfferSession {
+  id       String   @id @default(cuid())
+  offerId  String
+  offer    Offer    @relation(fields: [offerId], references: [id], onDelete: Cascade)
+
+  startAt  DateTime
+  endAt    DateTime
+  capacity Int?
+  /// Числовая цена (для бюджет-фильтра)
+  price    Decimal? @db.Decimal(10, 2)
+
+  @@index([offerId])
+  @@index([startAt, endAt])
+  @@index([price])
+}
+
+/// Состав пакета «Праздник под ключ» (реляционный, не JSON).
+/// Fase 1: структура без CPA и vendor-constraint в схеме.
+model PackageComponent {
+  id            String            @id @default(cuid())
+  packageId     String
+  package       Offer             @relation("PackageOf", fields: [packageId], references: [id], onDelete: Cascade)
+  refOfferId    String?
+  refOffer      Offer?            @relation("ReferencedBy", fields: [refOfferId], references: [id], onDelete: SetNull)
+  category      ComponentCategory
+  title         String
+  priceSnapshot Decimal?          @db.Decimal(10, 2)
+  isOptional    Boolean           @default(false)
+  priceDelta    Decimal?          @db.Decimal(10, 2)
+  position      Int
+
+  @@index([packageId, position])
 }
 
 /// Сохранённые предложения в «Идеи» (отдельно от Idea с activityId)
@@ -2869,6 +2911,19 @@ enum OfferProductType {
   CAMP
   PARTY_SERVICE
   PARTY_PACKAGE
+}
+
+/// Категории компонентов пакета (PackageComponent.category)
+enum ComponentCategory {
+  ANIMATOR
+  SHOW
+  CAKE
+  DECOR
+  PHOTO
+  FOOD
+  VENUE
+  PROGRAM
+  OTHER
 }
 
 enum OfferPlacementKey {
