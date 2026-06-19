@@ -122,6 +122,8 @@ const createOfferSchema = z.object({
     program: z.string().nullable().optional(),
     note: z.string().nullable().optional(),
   }).optional(),
+  /** Type-specific display details (Offer.details JSONB). Validated per productType client-side. */
+  details: z.record(z.string(), z.unknown()).optional(),
   campProgramType: campProgramTypeSchema,
   // Camp fields
   campSessions: z.array(campSessionEntrySchema).optional(),
@@ -290,6 +292,7 @@ export async function POST(request: NextRequest) {
             discoverySignalIds: data.discoverySignalIds,
             classChipSlugs: data.classChipSlugs,
             wizardCompletedSteps: data.wizardCompletedSteps ?? [],
+            details: data.details as Prisma.InputJsonValue | undefined,
             status: data.status,
             ...(data.campProgramType
               ? {

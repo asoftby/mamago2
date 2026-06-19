@@ -47,6 +47,9 @@ export type CampLodgingTypeKey =
 
 export type CampMealKey = "breakfast" | "lunch" | "dinner" | "snacks";
 
+export type PlaceAmenityKey = "parking" | "cafe" | "stroller" | "changing_table";
+export type PlaceEntryModel = "free" | "paid";
+
 export interface CampSessionEntry {
   id: string;
   /** Для будущей сортировки drag-and-drop */
@@ -192,6 +195,12 @@ export interface OfferFormData {
   /** Привязка к чипам публичной витрины /[city]/classes. */
   classChipSlugs: string[];
   
+  // PLACE_VISIT type-specific details (written to Offer.details JSON)
+  placeVisitDetails: {
+    entryModel: PlaceEntryModel | null;
+    amenities: PlaceAmenityKey[];
+  };
+
   // Booking Settings (only for ctaType = "забронировать")
   bookingSettings: {
     mode: "request" | "slot" | "external" | null;

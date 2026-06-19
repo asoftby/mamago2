@@ -115,6 +115,8 @@ const updateOfferSchema = z.object({
     note: z.string().nullable().optional(),
   }).nullable().optional(),
   // Camp/accommodation: null = «тип больше не лагерь, затереть в БД»
+  /** Type-specific display details (Offer.details JSONB). Null clears the field. */
+  details: z.record(z.string(), z.unknown()).nullable().optional(),
   campProgramType: campProgramTypeSchema.nullable(),
   // Camp fields
   campSessions: z.array(campSessionEntrySchema).nullable().optional(),
@@ -282,6 +284,9 @@ export async function PATCH(
     if (data.discoverySignalIds !== undefined) updateData.discoverySignalIds = data.discoverySignalIds;
     if (data.classChipSlugs !== undefined) updateData.classChipSlugs = data.classChipSlugs;
     if (data.wizardCompletedSteps !== undefined) updateData.wizardCompletedSteps = data.wizardCompletedSteps;
+    if (data.details !== undefined)
+      updateData.details =
+        data.details === null ? Prisma.DbNull : (data.details as Prisma.InputJsonValue);
     if (data.contactSource !== undefined) updateData.contactSource = data.contactSource;
     if (data.contactPhone !== undefined) updateData.contactPhone = data.contactPhone;
     if (data.contactWebsite !== undefined) updateData.contactWebsite = data.contactWebsite;

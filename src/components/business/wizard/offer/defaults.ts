@@ -116,6 +116,12 @@ export function getDefaultFormData(defaultPlaceId: string | null = null): OfferF
     signalIds: [],
     classChipSlugs: [],
     
+    // PLACE_VISIT type-specific details
+    placeVisitDetails: {
+      entryModel: null,
+      amenities: [],
+    },
+
     // Booking Settings (only for ctaType = "забронировать")
     bookingSettings: {
       mode: null,

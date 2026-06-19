@@ -3,9 +3,10 @@
 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { StableCardSelector } from "@/components/ui/stable-card-selector";
 import { WizardRichTextField } from "@/components/business/wizard/shared/WizardRichTextField";
-import type { OfferFormData } from "../types";
+import type { OfferFormData, PlaceAmenityKey } from "../types";
 
 interface Step4ConditionsProps {
   data: OfferFormData;
@@ -21,6 +22,63 @@ export function Step4Conditions({ data, onChange, isEditable }: Step4ConditionsP
   const isPartyProduct =
     data.productType === "PARTY_SERVICE" ||
     data.productType === "PARTY_PACKAGE";
+
+  const AMENITY_OPTIONS: { key: PlaceAmenityKey; label: string }[] = [
+    { key: "parking", label: "Парковка" },
+    { key: "cafe", label: "Кафе / буфет" },
+    { key: "stroller", label: "Можно с коляской" },
+    { key: "changing_table", label: "Пеленальный столик" },
+  ];
+
+  const renderPlaceVisitFields = () => {
+    const { entryModel, amenities } = data.placeVisitDetails;
+
+    const toggleAmenity = (key: PlaceAmenityKey, checked: boolean) => {
+      const next = checked
+        ? [...amenities, key]
+        : amenities.filter((a) => a !== key);
+      onChange({ placeVisitDetails: { ...data.placeVisitDetails, amenities: next } });
+    };
+
+    return (
+      <div className="space-y-6">
+        <div className="space-y-3">
+          <Label>Вход</Label>
+          <StableCardSelector
+            value={entryModel}
+            onValueChange={(v: "free" | "paid") =>
+              onChange({ placeVisitDetails: { ...data.placeVisitDetails, entryModel: v } })
+            }
+            options={[
+              { value: "free" as const, label: "Бесплатный", description: "Посещение без входного билета" },
+              { value: "paid" as const, label: "Платный", description: "Требуется входной билет / плата за вход" },
+            ]}
+            isEditable={isEditable}
+            className="grid grid-cols-2 gap-3"
+          />
+        </div>
+
+        <div className="space-y-3">
+          <Label>Удобства</Label>
+          <div className="grid grid-cols-2 gap-3">
+            {AMENITY_OPTIONS.map(({ key, label }) => (
+              <label
+                key={key}
+                className="flex cursor-pointer items-center gap-2 rounded-xl border border-border/70 px-3 py-2.5 text-sm hover:bg-muted/40"
+              >
+                <Checkbox
+                  checked={amenities.includes(key)}
+                  onCheckedChange={(checked) => toggleAmenity(key, Boolean(checked))}
+                  disabled={!isEditable}
+                />
+                {label}
+              </label>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   const renderClassFields = () => (
     <div className="space-y-4">
@@ -188,13 +246,7 @@ export function Step4Conditions({ data, onChange, isEditable }: Step4ConditionsP
 
       {isActivityProduct && renderClassFields()}
 
-      {isVisitProduct ? (
-        <div className="rounded-2xl border border-border/70 bg-muted/30 p-4 text-sm text-muted-foreground">
-          Для посещения места отдельные условия на этом шаге не обязательны.
-          Основной сценарий и birthday-условия, если они нужны, заполняются на шаге
-          размещения.
-        </div>
-      ) : null}
+      {isVisitProduct ? renderPlaceVisitFields() : null}
 
       {isPartyProduct ? (
         <div className="space-y-4">

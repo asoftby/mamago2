@@ -7,8 +7,11 @@ import type {
   OfferProductType,
   BirthdayRole,
   BirthdayLocationType,
+  PlaceAmenityKey,
+  PlaceEntryModel,
 } from "./types";
 import { getDefaultFormData } from "./defaults";
+import { placeDetails as placeDetailsSchema } from "@/lib/offers/offer-types/details-schemas";
 import type { PublicationAccess } from "@/features/publication-access";
 import {
   createExcerpt,
@@ -20,6 +23,28 @@ import {
   normalizeCampMealsFromDb,
   sortCampSessions,
 } from "./campOfferModel";
+
+const PLACE_AMENITY_KEYS = new Set<PlaceAmenityKey>([
+  "parking",
+  "cafe",
+  "stroller",
+  "changing_table",
+]);
+
+function parsePlaceVisitDetailsFromDb(
+  details: unknown,
+): OfferFormData["placeVisitDetails"] {
+  const parsed = placeDetailsSchema.safeParse(details);
+  if (!parsed.success) {
+    return { entryModel: null, amenities: [] };
+  }
+  return {
+    entryModel: (parsed.data.entryModel ?? null) as PlaceEntryModel | null,
+    amenities: (parsed.data.amenities ?? []).filter((a): a is PlaceAmenityKey =>
+      PLACE_AMENITY_KEYS.has(a as PlaceAmenityKey),
+    ),
+  };
+}
 
 const CAMP_LODGING_KEYS = new Set<CampLodgingTypeKey>([
   "hotel",
@@ -422,12 +447,22 @@ export function buildOfferCreatePayload(
     productType,
     requestedPlacements,
     birthdayDetails: mapBirthdayDetailsForApi(data),
+    details: buildPlaceVisitDetails(data),
     // Camp/accommodation-поля — только для лагерей; данные скрытых шагов
     // других типов в payload не попадают
     ...(data.offerWizardType === "CAMP" ? buildCampFieldsForCreate(data) : {}),
   };
 
   return base;
+}
+
+function buildPlaceVisitDetails(data: OfferFormData): Record<string, unknown> | undefined {
+  if (data.productType !== "PLACE_VISIT") return undefined;
+  const { entryModel, amenities } = data.placeVisitDetails;
+  const result: Record<string, unknown> = {};
+  if (entryModel != null) result.entryModel = entryModel;
+  if (amenities.length > 0) result.amenities = amenities;
+  return Object.keys(result).length > 0 ? result : undefined;
 }
 
 function buildCampFieldsForCreate(data: OfferFormData) {
@@ -556,6 +591,7 @@ export function buildOfferUpdatePayload(
     productType,
     requestedPlacements,
     birthdayDetails: mapBirthdayDetailsForApi(data),
+    details: buildPlaceVisitDetails(data),
     // CAMP — camp/accommodation-данные; иначе явные null (затирание в БД)
     ...(data.offerWizardType === "CAMP"
       ? buildCampFieldsForCreate(data)
@@ -631,6 +667,7 @@ export function mapOfferToFormData(offer: {
   contactPhone?: string | null;
   contactWebsite?: string | null;
   contactSocialLinks?: unknown;
+  details?: unknown;
 }): OfferFormData {
   const defaults = getDefaultFormData(offer.placeId ?? null);
 
@@ -748,6 +785,7 @@ export function mapOfferToFormData(offer: {
     socialLinks,
     signalIds: offer.discoverySignalIds ?? [],
     classChipSlugs: offer.classChipSlugs ?? [],
+    placeVisitDetails: parsePlaceVisitDetailsFromDb(offer.details),
     // Camp fields
     campSessions: campSessions.map((session) => ({
       ...session,
