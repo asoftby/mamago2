@@ -11,7 +11,10 @@ import type {
   PlaceEntryModel,
 } from "./types";
 import { getDefaultFormData } from "./defaults";
-import { placeDetails as placeDetailsSchema } from "@/lib/offers/offer-types/details-schemas";
+import {
+  placeDetails as placeDetailsSchema,
+  classDetails as classDetailsSchema,
+} from "@/lib/offers/offer-types/details-schemas";
 import type { PublicationAccess } from "@/features/publication-access";
 import {
   createExcerpt,
@@ -43,6 +46,21 @@ function parsePlaceVisitDetailsFromDb(
     amenities: (parsed.data.amenities ?? []).filter((a): a is PlaceAmenityKey =>
       PLACE_AMENITY_KEYS.has(a as PlaceAmenityKey),
     ),
+  };
+}
+
+function parseActivityDetailsFromDb(details: unknown): {
+  classDuration: string;
+  classGroupSize: string;
+  classFormat: OfferFormData["classFormat"];
+} {
+  const parsed = classDetailsSchema.safeParse(details);
+  if (!parsed.success) return { classDuration: "", classGroupSize: "", classFormat: null };
+  const { duration, groupSize, format } = parsed.data;
+  return {
+    classDuration: duration ?? "",
+    classGroupSize: groupSize ?? "",
+    classFormat: (format ?? null) as OfferFormData["classFormat"],
   };
 }
 
@@ -447,7 +465,7 @@ export function buildOfferCreatePayload(
     productType,
     requestedPlacements,
     birthdayDetails: mapBirthdayDetailsForApi(data),
-    details: buildPlaceVisitDetails(data),
+    details: buildTypeDetails(data),
     // Camp/accommodation-поля — только для лагерей; данные скрытых шагов
     // других типов в payload не попадают
     ...(data.offerWizardType === "CAMP" ? buildCampFieldsForCreate(data) : {}),
@@ -456,13 +474,25 @@ export function buildOfferCreatePayload(
   return base;
 }
 
-function buildPlaceVisitDetails(data: OfferFormData): Record<string, unknown> | undefined {
-  if (data.productType !== "PLACE_VISIT") return undefined;
-  const { entryModel, amenities } = data.placeVisitDetails;
-  const result: Record<string, unknown> = {};
-  if (entryModel != null) result.entryModel = entryModel;
-  if (amenities.length > 0) result.amenities = amenities;
-  return Object.keys(result).length > 0 ? result : undefined;
+function buildTypeDetails(data: OfferFormData): Record<string, unknown> | undefined {
+  if (data.productType === "PLACE_VISIT") {
+    const { entryModel, amenities } = data.placeVisitDetails;
+    const result: Record<string, unknown> = {};
+    if (entryModel != null) result.entryModel = entryModel;
+    if (amenities.length > 0) result.amenities = amenities;
+    return Object.keys(result).length > 0 ? result : undefined;
+  }
+  if (
+    data.productType === "ONE_TIME_ACTIVITY" ||
+    data.productType === "REGULAR_ACTIVITY"
+  ) {
+    const result: Record<string, unknown> = {};
+    if (data.classDuration) result.duration = data.classDuration;
+    if (data.classGroupSize) result.groupSize = data.classGroupSize;
+    if (data.classFormat != null) result.format = data.classFormat;
+    return Object.keys(result).length > 0 ? result : undefined;
+  }
+  return undefined;
 }
 
 function buildCampFieldsForCreate(data: OfferFormData) {
@@ -591,7 +621,7 @@ export function buildOfferUpdatePayload(
     productType,
     requestedPlacements,
     birthdayDetails: mapBirthdayDetailsForApi(data),
-    details: buildPlaceVisitDetails(data),
+    details: buildTypeDetails(data),
     // CAMP — camp/accommodation-данные; иначе явные null (затирание в БД)
     ...(data.offerWizardType === "CAMP"
       ? buildCampFieldsForCreate(data)
@@ -786,6 +816,9 @@ export function mapOfferToFormData(offer: {
     signalIds: offer.discoverySignalIds ?? [],
     classChipSlugs: offer.classChipSlugs ?? [],
     placeVisitDetails: parsePlaceVisitDetailsFromDb(offer.details),
+    ...(productType === "ONE_TIME_ACTIVITY" || productType === "REGULAR_ACTIVITY"
+      ? parseActivityDetailsFromDb(offer.details)
+      : {}),
     // Camp fields
     campSessions: campSessions.map((session) => ({
       ...session,
