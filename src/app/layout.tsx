@@ -12,11 +12,12 @@ import { GateFlowController } from "@/components/auth/GateFlowController";
 import { LogoutSuccessListener } from "@/components/auth/LogoutSuccessListener";
 import { MobileTapDiagnostics } from "@/components/dev/MobileTapDiagnostics";
 import { getBrandingConfig } from "@/lib/branding";
+import { applyGlobalRobotsOverride } from "@/lib/seo/globalNoindex";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = applyGlobalRobotsOverride({
   title: "mamaGo 2.0",
   description: "Next Generation City Guide",
-};
+});
 
 export const viewport: Viewport = {
   width: "device-width",

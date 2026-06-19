@@ -53,14 +53,9 @@ function applyGlobalNoindexHeader(
   response: NextResponse,
   params: {
     pathname: string;
-    surface: "public" | "admin" | "business";
   },
 ): NextResponse {
-  if (
-    !isGlobalNoindexEnabled() ||
-    params.surface !== "public" ||
-    shouldBypassSeoHeader(params.pathname)
-  ) {
+  if (!isGlobalNoindexEnabled() || shouldBypassSeoHeader(params.pathname)) {
     return response;
   }
 
@@ -139,8 +134,7 @@ export function middleware(request: NextRequest) {
     url.pathname = decision.pathname;
     url.search = search;
     return applyGlobalNoindexHeader(rewriteWithRequestPath(request, url), {
-        pathname,
-        surface,
+      pathname,
     });
   }
 
@@ -151,7 +145,6 @@ export function middleware(request: NextRequest) {
 
   return applyGlobalNoindexHeader(nextWithRequestPath(request), {
     pathname,
-    surface,
   });
 }
 
