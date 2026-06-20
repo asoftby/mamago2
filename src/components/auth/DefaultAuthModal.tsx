@@ -94,6 +94,7 @@ export function DefaultAuthModal({
           router,
           returnTo: nextHref,
           toast,
+          profileJustCompleted: true,
         });
       } else if (authEntryPoint === "profile") {
         const target = getSafeRedirectPath(nextHref, "/me");

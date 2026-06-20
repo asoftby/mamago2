@@ -1235,6 +1235,18 @@ export async function notifyUserPlanReminder(params: {
   body: string;
   entityId?: string | null;
 }) {
+  // Dedup: one reminder per plan item (exact dedup, no time window)
+  const dedup = await checkNotificationDedup(
+    params.userId,
+    "REMINDER",
+    "PLAN_ITEM",
+    params.entityId,
+  );
+  if (dedup.isDuplicate) {
+    console.warn("[notification] REMINDER deduplicated:", params.entityId);
+    return null;
+  }
+
   return createNotification({
     userId: params.userId,
     audience: "USER",
@@ -1280,6 +1292,18 @@ export interface NotifyBookingCreatedParams {
  * Тело строится через buildBookingNotificationBody — без лагерь-специфичных assumptions.
  */
 export async function notifyBookingCreated(params: NotifyBookingCreatedParams) {
+  // Dedup: one notification per booking (exact dedup, no time window)
+  const dedup = await checkNotificationDedup(
+    params.ownerUserId,
+    "BOOKING_CREATED",
+    "BOOKING",
+    params.bookingId,
+  );
+  if (dedup.isDuplicate) {
+    console.warn("[notification] BOOKING_CREATED deduplicated:", params.bookingId);
+    return null;
+  }
+
   const sourceType = resolveBookingSourceType({
     campShiftId: params.campShiftId ?? null,
     offerId: params.offerId ?? null,

@@ -270,7 +270,7 @@ export function ReviewForm({
       <DefaultAuthModal
         open={showAuthModal}
         onOpenChange={setShowAuthModal}
-        nextHref={typeof window !== "undefined" ? window.location.pathname : "/"}
+        nextHref={typeof window !== "undefined" ? window.location.pathname + window.location.search : "/"}
         title="Войдите чтобы оставить отзыв"
         subtitle="Это поможет нам убедиться что отзывы оставляют реальные люди"
         authEntryPoint="profile"

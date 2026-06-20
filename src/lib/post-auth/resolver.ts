@@ -5,6 +5,7 @@ import {
   navigateToSurface,
 } from "@/lib/routing/clientNavigation";
 import { getSafeRedirectPath } from "@/lib/auth/redirectTo";
+import { getRandomLoginSuccessMessage } from "@/lib/notifications/authMessages";
 
 type RouterLike = { push: (href: string) => void; replace: (href: string) => void };
 
@@ -20,14 +21,25 @@ export function applyPostAuthCompletionOutcome(
     toast: typeof import("sonner").toast;
     /** Не вызывать router.push/replace (например overlay «Мой план» уже переключается на план) */
     skipNavigation?: boolean;
+    /**
+     * true — пользователь только что завершил заполнение профиля
+     * (показываем «Профиль заполнен»); false/undefined — обычный успешный
+     * вход с уже готовым профилем (показываем приветствие).
+     */
+    profileJustCompleted?: boolean;
   },
 ): void {
-  const { isMobile, router, returnTo, toast, skipNavigation } = options;
+  const { isMobile, router, returnTo, toast, skipNavigation, profileJustCompleted } =
+    options;
 
   switch (source) {
     case "profile":
       if (!skipNavigation) {
-        toast.success("Профиль заполнен");
+        toast.success(
+          profileJustCompleted
+            ? "Профиль заполнен"
+            : getRandomLoginSuccessMessage(),
+        );
         const target = getSafeRedirectPath(returnTo, "");
         if (target) {
           navigateToCompatibleHref(router, target, { replace: true });
