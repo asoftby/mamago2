@@ -120,7 +120,6 @@ export function MobileBottomNav({
               <NavBellIcon
                 className={cn(
                   "h-5 w-5 transition-colors duration-200",
-                  displayUnreadCount > 0 && "animate-nav-notify-pulse",
                   isNotificationsActive || displayUnreadCount > 0
                     ? "text-[#C24E22]"
                     : "text-gray-400",
@@ -129,7 +128,7 @@ export function MobileBottomNav({
               {displayUnreadCount > 0 && (
                 <span
                   className={cn(
-                    "absolute -right-0.5 -top-0.5 flex min-h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[#EF8759] px-1 text-[10px] font-semibold leading-none text-white shadow-sm ring-2 ring-neutral-900/95",
+                    "absolute -right-0.5 -top-0.5 flex min-h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[#EF8759] px-1 text-[10px] font-semibold leading-none text-white animate-nav-notify-pulse",
                   )}
                   aria-hidden
                 >

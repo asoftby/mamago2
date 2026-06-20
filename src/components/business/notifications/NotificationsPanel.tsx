@@ -7,7 +7,6 @@ import { CheckCheck } from "lucide-react";
 import { Settings } from "lucide-react";
 import { ModalCloseButton } from "@/components/ui/modal-close-button";
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "@/lib/toast";
 import { handleNotificationClick } from "@/features/notifications/notification-click";
 import {
@@ -182,7 +181,7 @@ export function NotificationsPanel({
   const hasUnread = useMemo(() => items.some((item) => item.readAt == null), [items]);
 
   return (
-    <div className="flex max-h-[min(85vh,640px)] min-h-[320px] min-w-0 flex-col overflow-hidden bg-white">
+    <div className="flex h-full min-h-[320px] min-w-0 flex-col overflow-hidden bg-white md:h-auto md:max-h-[min(85vh,640px)]">
       <span className="sr-only" aria-live="polite">
         {view === "list" ? "Уведомления" : "Настройки уведомлений"}
       </span>
@@ -246,7 +245,7 @@ export function NotificationsPanel({
         </div>
       ) : (
         <>
-      <div className="min-h-0 flex-1 overflow-hidden bg-white">
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-white">
         {loading ? (
           <div className="space-y-3 p-4">
             {[1, 2, 3].map((i) => (
@@ -264,25 +263,23 @@ export function NotificationsPanel({
             </p>
           </div>
         ) : (
-          <ScrollArea className="max-h-[min(56vh,520px)]">
-            <div className="divide-y divide-gray-100 bg-white">
-              {items.map((notification) => {
-                const ctaProps = getCtaProps(notification);
-                return (
-                  <NotificationListItem
-                    key={notification.id}
-                    notification={notification}
-                    compact
-                    onClick={handleRowClick}
-                    onCtaClick={handleCtaClick}
-                    ctaLabel={ctaProps.label}
-                    ctaLoading={ctaProps.loading}
-                    ctaDisabled={ctaProps.disabled}
-                  />
-                );
-              })}
-            </div>
-          </ScrollArea>
+          <div className="divide-y divide-gray-100 bg-white">
+            {items.map((notification) => {
+              const ctaProps = getCtaProps(notification);
+              return (
+                <NotificationListItem
+                  key={notification.id}
+                  notification={notification}
+                  compact
+                  onClick={handleRowClick}
+                  onCtaClick={handleCtaClick}
+                  ctaLabel={ctaProps.label}
+                  ctaLoading={ctaProps.loading}
+                  ctaDisabled={ctaProps.disabled}
+                />
+              );
+            })}
+          </div>
         )}
       </div>
 
