@@ -2,18 +2,9 @@
 
 import { RichContentRenderer } from "@/components/content/RichContentRenderer";
 import { cn } from "@/lib/utils";
-import Link from "next/link";
 
 interface PlaceAboutSectionProps {
   description: string;
-  phone?: string;
-  website?: string;
-  instagramUrl?: string;
-  facebookUrl?: string;
-  vkUrl?: string;
-  youtubeUrl?: string;
-  telegramUrl?: string;
-  tiktokUrl?: string;
   yearFounded?: number;
   ageRange?: string;
   format?: string;
@@ -22,14 +13,6 @@ interface PlaceAboutSectionProps {
 
 export function PlaceAboutSection({
   description,
-  phone,
-  website,
-  instagramUrl,
-  facebookUrl,
-  vkUrl,
-  youtubeUrl,
-  telegramUrl,
-  tiktokUrl,
   yearFounded,
   ageRange,
   format,
@@ -42,17 +25,8 @@ export function PlaceAboutSection({
     yearFounded ? `с ${yearFounded}` : null,
   ].filter(Boolean) as string[];
 
-  const socialLinks = [
-    { url: instagramUrl, label: "Instagram", icon: "◎" },
-    { url: facebookUrl, label: "Facebook", icon: "f" },
-    { url: vkUrl, label: "VK", icon: "VK" },
-    { url: youtubeUrl, label: "YouTube", icon: "▶" },
-    { url: telegramUrl, label: "Telegram", icon: "✈" },
-    { url: tiktokUrl, label: "TikTok", icon: "♪" },
-  ].filter((l) => l.url);
-
   const hasContent =
-    description.trim().length > 0 || chips.length > 0 || socialLinks.length > 0;
+    description.trim().length > 0 || chips.length > 0;
 
   if (!hasContent) return null;
 
@@ -97,37 +71,6 @@ export function PlaceAboutSection({
               о месте
             </em>
           </h2>
-
-          {/* Social links */}
-          {socialLinks.length > 0 && (
-            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 28 }}>
-              {socialLinks.map((link) => (
-                <Link
-                  key={link.label}
-                  href={link.url!}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  title={link.label}
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    width: 38,
-                    height: 38,
-                    borderRadius: 99,
-                    border: "1px solid rgba(20,18,16,.18)",
-                    background: "#FAF7F1",
-                    color: "#3A332B",
-                    fontSize: 14,
-                    textDecoration: "none",
-                    transition: "background .2s",
-                  }}
-                >
-                  {link.icon}
-                </Link>
-              ))}
-            </div>
-          )}
         </div>
 
         {/* Right: description + chips */}

@@ -1,54 +1,79 @@
-import type { ActivityForEventPageInput } from "@/lib/event/buildEventPageDataFromPrisma";
+import { absolutePublicImageUrl } from "@/lib/seo/schema/url";
 
-export function buildEventJsonLd(args: {
-  activity: ActivityForEventPageInput & { slug?: string | null };
-  citySlug: string;
-  publicBase: string;
-}): Record<string, unknown> {
-  const { activity, citySlug, publicBase } = args;
-  const starts = activity.sessions?.[0]?.startsAt;
-  const ends = activity.sessions?.[activity.sessions.length - 1]?.startsAt;
+export type EventAttendanceFormat = "ONLINE" | "OFFLINE" | "HYBRID" | string | null | undefined;
 
-  const url =
-    activity.slug ? `${publicBase}/${citySlug}/events/${activity.slug}` : undefined;
+export type BuildEventJsonLdInput = {
+  canonicalUrl: string;
+  title: string;
+  description?: string | null;
+  image?: string | null;
+  sessions?: Array<{
+    startsAt?: Date | string | null;
+  }> | null;
+  format?: EventAttendanceFormat;
+  location?: {
+    name?: string | null;
+    address?: string | null;
+  } | null;
+  publicBaseUrl?: string;
+};
 
-  const image =
-    activity.coverImageUrl?.trim() ||
-    activity.images?.[0]?.url ||
-    undefined;
+function normalizeSessionDate(value: Date | string | null | undefined): Date | null {
+  if (!value) return null;
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
 
-  const venueTitle =
-    activity.venue?.place?.title ||
-    activity.venue?.title ||
-    activity.place?.title ||
-    undefined;
-  const venueAddress =
-    activity.venue?.place?.formattedAddr ||
-    activity.venue?.addressLine ||
-    activity.place?.formattedAddr ||
-    undefined;
+export function pickEventStartDate(
+  sessions: Array<{ startsAt?: Date | string | null }>,
+): string | undefined {
+  const normalized = sessions
+    .map((session) => normalizeSessionDate(session.startsAt))
+    .filter((date): date is Date => date !== null)
+    .sort((left, right) => left.getTime() - right.getTime());
 
-  const location =
-    venueTitle || venueAddress
-      ? {
-          "@type": "Place",
-          name: venueTitle,
-          address: venueAddress,
-        }
-      : undefined;
+  if (normalized.length === 0) return undefined;
+
+  const nowTs = Date.now();
+  const nextUpcoming = normalized.find((date) => date.getTime() >= nowTs);
+  return (nextUpcoming ?? normalized[0])?.toISOString();
+}
+
+function mapAttendanceMode(format: EventAttendanceFormat): string | undefined {
+  switch (format) {
+    case "ONLINE":
+      return "https://schema.org/OnlineEventAttendanceMode";
+    case "OFFLINE":
+      return "https://schema.org/OfflineEventAttendanceMode";
+    case "HYBRID":
+      return "https://schema.org/MixedEventAttendanceMode";
+    default:
+      return undefined;
+  }
+}
+
+export function buildEventJsonLd(input: BuildEventJsonLdInput): Record<string, unknown> {
+  const image = absolutePublicImageUrl(input.image, input.publicBaseUrl);
+  const locationName = input.location?.name?.trim() || undefined;
+  const locationAddress = input.location?.address?.trim() || undefined;
 
   return {
     "@context": "https://schema.org",
     "@type": "Event",
-    name: activity.title,
-    description: activity.shortDesc,
-    startDate: starts ? starts.toISOString() : undefined,
-    endDate: ends ? ends.toISOString() : undefined,
+    "@id": `${input.canonicalUrl}#event`,
+    url: input.canonicalUrl,
+    name: input.title,
+    description: input.description?.trim() || undefined,
     image: image ? [image] : undefined,
-    location,
-    url,
-    eventStatus: "https://schema.org/EventScheduled",
-    eventAttendanceMode: "https://schema.org/OfflineEventAttendanceMode",
+    startDate: pickEventStartDate(input.sessions ?? []),
+    location:
+      locationName || locationAddress
+        ? {
+            "@type": "Place",
+            name: locationName,
+            address: locationAddress,
+          }
+        : undefined,
+    eventAttendanceMode: mapAttendanceMode(input.format),
   };
 }
-

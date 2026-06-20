@@ -15,6 +15,20 @@ export function getDefaultFormData(defaultPlaceId: string | null = null): OfferF
   return {
     // Step 1: Offer Type
     offerWizardType: null,
+    productType: null,
+    requestedPlacements: [],
+    placementStatuses: {},
+    birthdayDetails: {
+      role: null,
+      locationType: null,
+      durationMinutes: null,
+      minChildren: null,
+      maxChildren: null,
+      priceFrom: "",
+      included: "",
+      program: "",
+      note: "",
+    },
     
     // Legacy fields (for backward compatibility)
     offerKind: null,
@@ -102,6 +116,12 @@ export function getDefaultFormData(defaultPlaceId: string | null = null): OfferF
     signalIds: [],
     classChipSlugs: [],
     
+    // PLACE_VISIT type-specific details
+    placeVisitDetails: {
+      entryModel: null,
+      amenities: [],
+    },
+
     // Booking Settings (only for ctaType = "забронировать")
     bookingSettings: {
       mode: null,
@@ -131,6 +151,7 @@ export function getDefaultFormData(defaultPlaceId: string | null = null): OfferF
  */
 export function hasMeaningfulContent(data: OfferFormData): boolean {
   return !!(
+    data.productType ||
     data.offerKind ||
     data.title ||
     data.shortDescription
@@ -142,7 +163,7 @@ export function hasMeaningfulContent(data: OfferFormData): boolean {
  */
 export function canSaveAsDraft(data: OfferFormData): boolean {
   return !!(
-    data.offerKind &&
+    (data.productType || data.offerKind) &&
     data.title.trim().length > 0
   );
 }

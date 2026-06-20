@@ -64,6 +64,7 @@ import { navigateToCompatibleHref } from "@/lib/routing/clientNavigation";
 
 // Import step components
 import { Step1Type } from "./steps/Step1Type";
+import { Step2Placements } from "./steps/Step2Placements";
 import { Step2Information } from "./steps/Step2Information";
 import { Step3Media } from "./steps/Step3Media";
 import { Step4Conditions } from "./steps/Step4Conditions";
@@ -584,6 +585,8 @@ export function OfferWizard({
     switch (currentStepKey) {
       case "type":
         return <Step1Type {...commonProps} />;
+      case "placements":
+        return <Step2Placements {...commonProps} />;
       case "details":
         return <Step2Information {...commonProps} />;
       case "photo":
@@ -607,6 +610,7 @@ export function OfferWizard({
   const canNext = currentStepKey !== "review" && currentStepNum < totalSteps;
   const canPrev = true;
   const isReviewStep = currentStepKey === "review";
+  const isChoosingOfferType = currentStepKey === "type" && !formData.productType;
 
   const submitValidation: ValidationResult = isReviewStep
     ? validateForSubmit(formData)
@@ -656,6 +660,13 @@ export function OfferWizard({
 
   const currentStepDef = steps.find(s => s.key === currentStepKey);
   const stepTitle = currentStepDef?.title || "Шаг";
+  const subtitle = isChoosingOfferType
+    ? "Выберите формат, с которого начнём"
+    : businessFormCopy.stepSubtitle(
+        currentStepNum,
+        totalSteps,
+        isReviewStep ? businessFormCopy.reviewStepShortTitle : stepTitle,
+      );
 
   return (
     <FormWizardShell>
@@ -665,11 +676,7 @@ export function OfferWizard({
             ? businessFormCopy.offer.createTitle
             : businessFormCopy.offer.editTitle(offer?.title)
         }
-        subtitle={businessFormCopy.stepSubtitle(
-          currentStepNum,
-          totalSteps,
-          isReviewStep ? businessFormCopy.reviewStepShortTitle : stepTitle
-        )}
+        subtitle={subtitle}
         trailing={
           <SaveIndicator
             status={draft.status}
@@ -678,11 +685,13 @@ export function OfferWizard({
           />
         }
       >
-        <WizardProgress
-          steps={progressSteps}
-          currentStep={currentStepNum}
-          onStepChange={handleGoToStep}
-        />
+        {!isChoosingOfferType ? (
+          <WizardProgress
+            steps={progressSteps}
+            currentStep={currentStepNum}
+            onStepChange={handleGoToStep}
+          />
+        ) : null}
       </FormWizardHeader>
 
       {draft.hasDraft && (

@@ -31,11 +31,12 @@ export async function getPlaceDetails(
 
   try {
     // New API v1 format: places/{place_id}
-    const url = `${GOOGLE_PLACES_API_URL}/${placeId}`;
+    const url = new URL(`${GOOGLE_PLACES_API_URL}/${placeId}`);
+    url.searchParams.set("languageCode", "ru");
     
     console.log("[Google Places] Fetching place details:", {
       placeId,
-      url,
+      url: url.toString(),
       hasApiKey: !!GOOGLE_PLACES_API_KEY,
     });
 
@@ -115,7 +116,10 @@ export function convertGoogleReviewsToStored(
     authorPhotoUri: review.authorAttribution.photoUri,
     rating: review.rating,
     relativeTime: review.relativePublishTimeDescription,
-    text: review.text.text,
+    text: review.originalText?.text ?? review.text?.text ?? "",
+    originalText: review.originalText?.text ?? undefined,
+    textLanguageCode: review.text?.languageCode ?? undefined,
+    originalTextLanguageCode: review.originalText?.languageCode ?? undefined,
     publishTime: review.publishTime,
   }));
 }

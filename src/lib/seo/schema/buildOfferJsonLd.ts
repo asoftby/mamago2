@@ -1,4 +1,8 @@
 import { getOfferPublicSection } from "@/lib/offers/offerPublicUrl";
+import {
+  buildOfferStructuredData,
+  type OfferStructuredDataType,
+} from "@/lib/seo/schema/buildOfferStructuredData";
 
 export type OfferJsonLdOffer = {
   title: string;
@@ -15,8 +19,19 @@ export type OfferJsonLdOffer = {
 export type OfferJsonLdPlace = {
   title: string;
   slug: string | null;
+  address?: string | null;
   city?: { slug: string } | null;
 } | null;
+
+export function resolveOfferStructuredDataType(offer: {
+  kind: string;
+  campProgramType?: string | null;
+}): OfferStructuredDataType {
+  if (offer.campProgramType) return "CAMP";
+  if (offer.kind === "SERVICE") return "SERVICE";
+  if (offer.kind === "EVENT") return "EVENT_LIKE";
+  return "PROMO";
+}
 
 export function buildOfferJsonLd(args: {
   offer: OfferJsonLdOffer;
@@ -25,35 +40,30 @@ export function buildOfferJsonLd(args: {
   publicBase: string;
 }): Record<string, unknown> {
   const { offer, place, citySlug, publicBase } = args;
-  
+
   const effectiveCitySlug = citySlug || place?.city?.slug || "minsk";
   const section = getOfferPublicSection(offer);
-  const url = offer.slug ? `${publicBase}/${effectiveCitySlug}/offers/${section}/${offer.slug}` : undefined;
-  const image = offer.coverImage ?? undefined;
+  const canonicalUrl = offer.slug
+    ? `${publicBase}/${effectiveCitySlug}/offers/${section}/${offer.slug}`
+    : `${publicBase}/${effectiveCitySlug}/offers/${section}`;
 
-  const seller = place?.title
-    ? {
-        "@type": "Organization",
-        name: place.title,
-        url: place.slug ? `${publicBase}/places/${place.slug}` : undefined,
-      }
-    : undefined;
-
-  return {
-    "@context": "https://schema.org",
-    "@type": "Offer",
-    name: offer.title,
-    description: offer.description ?? undefined,
-    url,
-    image: image ? [image] : undefined,
-    price: offer.priceFrom ?? undefined,
+  return buildOfferStructuredData({
+    canonicalUrl,
+    publicType: resolveOfferStructuredDataType(offer),
+    title: offer.title,
+    description: offer.description,
+    image: offer.coverImage,
+    price: offer.priceFrom,
+    priceText: offer.priceText,
     priceCurrency: "BYN",
-    priceSpecification: offer.priceText
+    place: place
       ? {
-          "@type": "PriceSpecification",
-          description: offer.priceText,
+          name: place.title,
+          slug: place.slug,
+          address: place.address,
+          url: place.slug ? `/places/${place.slug}` : undefined,
         }
-      : undefined,
-    seller,
-  };
+      : null,
+    publicBaseUrl: publicBase,
+  });
 }

@@ -115,6 +115,8 @@ model User {
   searchQueryLogs                   SearchQueryLog[]
   createdPages                      Page[]                           @relation("PageCreatedBy")
   updatedPages                      Page[]                           @relation("PageUpdatedBy")
+  requestedOfferPlacements          OfferPlacement[]                 @relation("OfferPlacementRequestedBy")
+  reviewedOfferPlacements           OfferPlacement[]                 @relation("OfferPlacementReviewedBy")
 
   @@index([email])
   @@index([resetToken])
@@ -1042,11 +1044,14 @@ model Place {
   category                     String
   countryCode                  String?
   customAddress                String?
+  displayAddress               String?
   description                  String?
+  directionsNote               String?
   formattedAddr                String?
   googlePlaceId                String?
   instagramHandle              String?
   instagramUrl                 String?
+  locationName                 String?
   locationSource               LocationSource     @default(MANUAL)
   logoImageId                  String?
   shortDesc                    String
@@ -1238,12 +1243,15 @@ model PlaceRevision {
   googlePlaceId         String?
   lat                   Float?
   lng                   Float?
+  displayAddress        String?
   formattedAddr         String?
   addressJson           Json?
+  directionsNote        String?
   countryCode           String?
   cityId                String?
   locationSource        LocationSource?
   customAddress         String?
+  locationName          String?
   districtAutoId        String?
   districtManualId      String?
   metroAutoId           String?
@@ -1721,6 +1729,7 @@ model OpeningHoursExceptionInterval {
 model Offer {
   id                       String             @id @default(cuid())
   placeId                  String
+  productType              OfferProductType?
   /// Источник контактных данных предложения: manual | place
   contactSource            String?            @default("manual")
   /// Ручной телефон предложения (fallback, если не берём контакты из места)
@@ -1831,24 +1840,108 @@ model Offer {
   transferInfo             String?
   /// What to bring
   whatToBring              String?
+  /// Отображаемый хвост деталей по типу. Фильтруемые поля — отдельные колонки.
+  details                  Json?
 
   boosts          Boost[]
+  birthdayDetails OfferBirthdayDetails?
   bookingRequests BookingRequest[]
   offerIdeas      OfferIdea[]
   openingHours    OpeningHours?      @relation(fields: [openingHoursId], references: [id])
+  placements      OfferPlacement[]
   place           Place              @relation(fields: [placeId], references: [id], onDelete: Cascade)
   city            City?              @relation("OfferCity", fields: [cityId], references: [id])
   slugHistory     OfferSlugHistory[]
+  sessions        OfferSession[]
+  components      PackageComponent[] @relation("PackageOf")
+  referencedBy    PackageComponent[] @relation("ReferencedBy")
 
   @@unique([cityId, slug])
   @@index([placeId])
   @@index([status])
   @@index([kind])
+  @@index([productType])
   @@index([dateFrom])
   @@index([ageMinMonths, ageMaxMonths])
   @@index([openingHoursId])
   @@index([slug])
   @@index([cityId])
+}
+
+model OfferPlacement {
+  id              String               @id @default(cuid())
+  offerId         String
+  key             OfferPlacementKey
+  status          OfferPlacementStatus @default(REQUESTED)
+  requestedAt     DateTime             @default(now())
+  requestedById   String?
+  reviewedAt      DateTime?
+  reviewedById    String?
+  rejectionReason String?
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+  offer           Offer                @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  requestedBy     User?                @relation("OfferPlacementRequestedBy", fields: [requestedById], references: [id], onDelete: SetNull)
+  reviewedBy      User?                @relation("OfferPlacementReviewedBy", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  @@unique([offerId, key])
+  @@index([key, status])
+  @@index([offerId, status])
+  @@index([reviewedById, status])
+}
+
+model OfferBirthdayDetails {
+  id              String               @id @default(cuid())
+  offerId         String               @unique
+  role            BirthdayRole
+  locationType    BirthdayLocationType?
+  durationMinutes Int?
+  minChildren     Int?
+  maxChildren     Int?
+  priceFrom       Decimal?             @db.Decimal(10, 2)
+  included        String?
+  program         String?
+  note            String?
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+  offer           Offer                @relation(fields: [offerId], references: [id], onDelete: Cascade)
+}
+
+/// Смены/сессии предложения (queryable строки для date/budget фильтров в ленте).
+/// Fase 1: заполняется только для CAMP (продатированные смены).
+/// Существующий campSessions JSON остаётся — новые лагеря пишут сюда + JSON.
+model OfferSession {
+  id       String   @id @default(cuid())
+  offerId  String
+  offer    Offer    @relation(fields: [offerId], references: [id], onDelete: Cascade)
+
+  startAt  DateTime
+  endAt    DateTime
+  capacity Int?
+  /// Числовая цена (для бюджет-фильтра)
+  price    Decimal? @db.Decimal(10, 2)
+
+  @@index([offerId])
+  @@index([startAt, endAt])
+  @@index([price])
+}
+
+/// Состав пакета «Праздник под ключ» (реляционный, не JSON).
+/// Fase 1: структура без CPA и vendor-constraint в схеме.
+model PackageComponent {
+  id            String            @id @default(cuid())
+  packageId     String
+  package       Offer             @relation("PackageOf", fields: [packageId], references: [id], onDelete: Cascade)
+  refOfferId    String?
+  refOffer      Offer?            @relation("ReferencedBy", fields: [refOfferId], references: [id], onDelete: SetNull)
+  category      ComponentCategory
+  title         String
+  priceSnapshot Decimal?          @db.Decimal(10, 2)
+  isOptional    Boolean           @default(false)
+  priceDelta    Decimal?          @db.Decimal(10, 2)
+  position      Int
+
+  @@index([packageId, position])
 }
 
 /// Сохранённые предложения в «Идеи» (отдельно от Idea с activityId)
@@ -2809,6 +2902,60 @@ enum EventVenueKind {
 enum OfferKind {
   EVENT
   SERVICE
+}
+
+enum OfferProductType {
+  PLACE_VISIT
+  ONE_TIME_ACTIVITY
+  REGULAR_ACTIVITY
+  CAMP
+  PARTY_SERVICE
+  PARTY_PACKAGE
+}
+
+/// Категории компонентов пакета (PackageComponent.category)
+enum ComponentCategory {
+  ANIMATOR
+  SHOW
+  CAKE
+  DECOR
+  PHOTO
+  FOOD
+  VENUE
+  PROGRAM
+  OTHER
+}
+
+enum OfferPlacementKey {
+  WHERE_TO_GO
+  CLASSES
+  CAMPS
+  BIRTHDAY
+}
+
+enum OfferPlacementStatus {
+  REQUESTED
+  APPROVED
+  REJECTED
+}
+
+enum BirthdayRole {
+  VENUE
+  ANIMATOR
+  SHOW
+  MASTER_CLASS
+  CAKE
+  CATERING
+  DECOR
+  PHOTO_VIDEO
+  PACKAGE
+  OTHER
+}
+
+enum BirthdayLocationType {
+  ON_SITE
+  OFF_SITE
+  BOTH
 }
 
 enum OfferStatus {

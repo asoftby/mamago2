@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth/server";
-import { getPlaceDetails } from "@/lib/google-places/client";
+import {
+  convertGoogleReviewsToStored,
+  getPlaceDetails,
+} from "@/lib/google-places/client";
 import { classifyGoogleReviewsMatch, mergeGoogleReviewsMeta, readGoogleReviewsPayload } from "@/lib/place/googleReviewsMeta";
 import { Prisma } from "@prisma/client";
 
@@ -165,19 +168,19 @@ export async function POST(
               authorName: googleReview.authorAttribution.displayName,
               authorAvatarUrl: googleReview.authorAttribution.photoUri || null,
               rating: googleReview.rating,
-              text: googleReview.text?.text || null,
+              text: googleReview.originalText?.text ?? googleReview.text?.text ?? null,
               language: googleReview.text?.languageCode || null,
               publishedAt: new Date(googleReview.publishTime),
-              relativeTimeDescription: googleReview.relativePublishTimeDescription || null,
+              relativeTimeDescription: null,
               status: "PUBLISHED", // Google отзывы сразу опубликованы
             },
             update: {
               authorName: googleReview.authorAttribution.displayName,
               authorAvatarUrl: googleReview.authorAttribution.photoUri || null,
               rating: googleReview.rating,
-              text: googleReview.text?.text || null,
+              text: googleReview.originalText?.text ?? googleReview.text?.text ?? null,
               language: googleReview.text?.languageCode || null,
-              relativeTimeDescription: googleReview.relativePublishTimeDescription || null,
+              relativeTimeDescription: null,
               // publishedAt не обновляем - оставляем оригинальную дату
             },
           });
@@ -220,17 +223,31 @@ export async function POST(
       ? { ...classified, enabled: true, matchStatus: "CONFIRMED" as const, disabledReason: null }
       : classified;
 
+    const storedGoogleReviews = convertGoogleReviewsToStored(placeDetails);
+    const syncedAt = new Date();
+    const nextPayload = {
+      ...(currentPayload ?? {}),
+      reviews: storedGoogleReviews,
+      syncedAt: syncedAt.toISOString(),
+      meta: {
+        enabled: false,
+        matchStatus: "DISABLED" as const,
+        disabledReason: null,
+        googlePlaceName: null,
+        googlePlaceAddress: null,
+        confirmedManually: false,
+        ...mergeGoogleReviewsMeta(place.googleReviewsJson, nextMeta).meta,
+      },
+    };
+
     const updatedPlace = await prisma.place.update({
       where: { id: placeId },
       data: {
         googleRating: placeDetails.rating || null,
         googleUserRatingsTotal: placeDetails.userRatingCount || null,
-        googleReviewsSyncedAt: new Date(),
+        googleReviewsSyncedAt: syncedAt,
         googleMapsUri: placeDetails.googleMapsUri || null,
-        googleReviewsJson: mergeGoogleReviewsMeta(
-          place.googleReviewsJson,
-          nextMeta,
-        ) as Prisma.InputJsonValue,
+        googleReviewsJson: nextPayload as unknown as Prisma.InputJsonValue,
       },
       select: {
         id: true,
@@ -253,6 +270,7 @@ export async function POST(
         reviewsCreated: createdCount,
         reviewsUpdated: updatedCount,
         syncedAt: updatedPlace.googleReviewsSyncedAt,
+        googleReviewsJson: updatedPlace.googleReviewsJson,
       },
     });
   } catch (error) {

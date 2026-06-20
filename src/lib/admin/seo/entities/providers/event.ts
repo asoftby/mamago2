@@ -14,7 +14,10 @@ import {
   SEO_ROBOTS_INDEX_FOLLOW,
   SEO_ROBOTS_NOINDEX_FOLLOW,
 } from "@/lib/admin/seo/entities/robotsConstants";
-import { resolveCanonicalCitySlugForEvent } from "@/lib/business/eventPublicLink";
+import {
+  canonicalPublicActivityPath,
+  resolveCanonicalCitySlugForEvent,
+} from "@/lib/business/eventPublicLink";
 
 const EVENT_LIST_LIMIT = 500;
 
@@ -214,19 +217,71 @@ export const eventProvider: SeoEntityProvider = {
     const a = await prisma.activity.findUnique({
       where: { id: entityId },
       select: {
+        id: true,
         slug: true,
+        cityId: true,
+        seoCanonicalUrl: true,
         seoJsonLdOverride: true,
         place: { select: { city: { select: { slug: true } } } },
+        venue: { select: { cityId: true } },
       },
     });
     if (!a?.slug) return null;
     if (a.seoJsonLdOverride && typeof a.seoJsonLdOverride === "object") {
       return a.seoJsonLdOverride as Record<string, unknown>;
     }
-    const citySlug = a.place?.city?.slug ?? "minsk";
+    const [activityCity, venueCity] = await Promise.all([
+      a.cityId
+        ? prisma.city.findUnique({ where: { id: a.cityId }, select: { slug: true } })
+        : Promise.resolve(null),
+      a.venue?.cityId
+        ? prisma.city.findUnique({ where: { id: a.venue.cityId }, select: { slug: true } })
+        : Promise.resolve(null),
+    ]);
+    const citySlug = resolveCanonicalCitySlugForEvent({
+      activityCitySlug: activityCity?.slug ?? null,
+      placeCitySlug: a.place?.city?.slug ?? null,
+      venueCitySlug: venueCity?.slug ?? null,
+    });
     const loaded = await loadPublicActivityForCityPage(citySlug, a.slug);
     if (!loaded) return null;
     const publicBase = process.env.NEXT_PUBLIC_APP_URL || "https://mamago.by";
-    return buildEventJsonLd({ activity: loaded, citySlug, publicBase });
+    const canonicalUrl =
+      loaded.seoCanonicalUrl?.trim() ||
+      `${publicBase}${canonicalPublicActivityPath({
+        activityId: loaded.id,
+        activitySlug: loaded.slug,
+        activityCitySlug: activityCity?.slug ?? null,
+        placeCitySlug: loaded.place?.city?.slug ?? null,
+        venueCitySlug: loaded.venue?.place?.city?.slug ?? venueCity?.slug ?? null,
+      })}`;
+    const locationName =
+      loaded.venue?.place?.title ||
+      loaded.venue?.title ||
+      loaded.place?.title ||
+      undefined;
+    const locationAddress =
+      loaded.venue?.place?.formattedAddr ||
+      loaded.venue?.place?.customAddress ||
+      loaded.venue?.addressLine ||
+      loaded.place?.formattedAddr ||
+      loaded.place?.customAddress ||
+      undefined;
+    return buildEventJsonLd({
+      canonicalUrl,
+      title: loaded.title,
+      description: loaded.shortDesc,
+      image: loaded.seoOgImage?.trim() || loaded.coverImageUrl,
+      sessions: loaded.sessions,
+      format: loaded.format,
+      location:
+        locationName || locationAddress
+          ? {
+              name: locationName,
+              address: locationAddress,
+            }
+          : undefined,
+      publicBaseUrl: publicBase,
+    });
   },
 };

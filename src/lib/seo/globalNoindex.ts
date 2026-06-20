@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 const DEFAULT_PUBLIC_SITE_URL = "https://mamago.by";
+const RELEASE_INDEXING_ENV = "SITE_INDEXING_ENABLED";
 
 export const GLOBAL_NOINDEX_ROBOTS: NonNullable<Metadata["robots"]> = {
   index: false,
@@ -23,8 +24,9 @@ function resolveEnvironmentSummary(): string {
 
 export function isGlobalNoindexEnabled(): boolean {
   if (readBooleanEnv("SITE_NOINDEX_FORCE")) return true;
+  if (readBooleanEnv(RELEASE_INDEXING_ENV)) return false;
   if (readBooleanEnv("SITE_NOINDEX_DEFAULT")) return true;
-  return false;
+  return true;
 }
 
 export function getGlobalNoindexReason(): string {
@@ -34,11 +36,15 @@ export function getGlobalNoindexReason(): string {
     return `Глобальный noindex принудительно включён через SITE_NOINDEX_FORCE=true (${envSummary}).`;
   }
 
+  if (readBooleanEnv(RELEASE_INDEXING_ENV)) {
+    return `Глобальный noindex выключен через ${RELEASE_INDEXING_ENV}=true (${envSummary}).`;
+  }
+
   if (readBooleanEnv("SITE_NOINDEX_DEFAULT")) {
     return `Глобальный noindex включён по умолчанию через SITE_NOINDEX_DEFAULT=true (${envSummary}).`;
   }
 
-  return `Глобальный noindex выключен (${envSummary}).`;
+  return `Глобальный noindex включён по умолчанию до релиза (${envSummary}).`;
 }
 
 export function applyGlobalRobotsOverride(metadata: Metadata): Metadata {

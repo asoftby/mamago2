@@ -8,6 +8,31 @@ export type OfferWizardMode = "create" | "edit";
 /** Offer types for wizard */
 export type OfferWizardType = "SINGLE" | "REGULAR" | "CAMP";
 export type OfferContactSource = "manual" | "place";
+export type OfferProductType =
+  | "PLACE_VISIT"
+  | "ONE_TIME_ACTIVITY"
+  | "REGULAR_ACTIVITY"
+  | "CAMP"
+  | "PARTY_SERVICE"
+  | "PARTY_PACKAGE";
+export type OfferPlacementKey =
+  | "WHERE_TO_GO"
+  | "CLASSES"
+  | "CAMPS"
+  | "BIRTHDAY";
+export type OfferPlacementStatus = "REQUESTED" | "APPROVED" | "REJECTED";
+export type BirthdayRole =
+  | "VENUE"
+  | "ANIMATOR"
+  | "SHOW"
+  | "MASTER_CLASS"
+  | "CAKE"
+  | "CATERING"
+  | "DECOR"
+  | "PHOTO_VIDEO"
+  | "PACKAGE"
+  | "OTHER";
+export type BirthdayLocationType = "ON_SITE" | "OFF_SITE" | "BOTH";
 
 /** Смена лагеря (шаг «Смены и расписание») */
 export type CampSessionKind = "day" | "full_day" | "residential";
@@ -21,6 +46,9 @@ export type CampLodgingTypeKey =
   | "other";
 
 export type CampMealKey = "breakfast" | "lunch" | "dinner" | "snacks";
+
+export type PlaceAmenityKey = "parking" | "cafe" | "stroller" | "changing_table";
+export type PlaceEntryModel = "free" | "paid";
 
 export interface CampSessionEntry {
   id: string;
@@ -44,6 +72,7 @@ export interface CampSessionEntry {
 /** Step keys for wizard */
 export type OfferWizardStepKey =
   | "type"
+  | "placements"
   | "details"
   | "photo"
   | "conditions"
@@ -61,6 +90,20 @@ export type OfferWizardStepKey =
 export interface OfferFormData {
   // Step 1: Offer Type
   offerWizardType: OfferWizardType | null; // SINGLE, REGULAR, or CAMP
+  productType: OfferProductType | null;
+  requestedPlacements: OfferPlacementKey[];
+  placementStatuses: Partial<Record<OfferPlacementKey, OfferPlacementStatus>>;
+  birthdayDetails: {
+    role: BirthdayRole | null;
+    locationType: BirthdayLocationType | null;
+    durationMinutes: number | null;
+    minChildren: number | null;
+    maxChildren: number | null;
+    priceFrom: string;
+    included: string;
+    program: string;
+    note: string;
+  };
   
   // Legacy fields (for backward compatibility)
   offerKind: "course" | "birthday" | "service" | null;
@@ -152,6 +195,12 @@ export interface OfferFormData {
   /** Привязка к чипам публичной витрины /[city]/classes. */
   classChipSlugs: string[];
   
+  // PLACE_VISIT type-specific details (written to Offer.details JSON)
+  placeVisitDetails: {
+    entryModel: PlaceEntryModel | null;
+    amenities: PlaceAmenityKey[];
+  };
+
   // Booking Settings (only for ctaType = "забронировать")
   bookingSettings: {
     mode: "request" | "slot" | "external" | null;

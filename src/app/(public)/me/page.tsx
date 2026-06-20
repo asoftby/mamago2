@@ -7,56 +7,73 @@ import {
   getCurrentWeekStart,
 } from "@/server/services/plan.service";
 import { listRoutesByUser } from "@/server/services/route.service";
-import { Container } from "@/components/ui/Container";
-import { ChildrenCard } from "@/features/me/components/ChildrenCard";
 import { mapFamilyRoleToLabel } from "@/lib/account/mapFamilyRoleToLabel";
-import { MyBirthdaysCard } from "@/features/me/components/MyBirthdaysCard";
-import { UserGreeting } from "@/features/me/components/UserGreeting";
 import { listUserBirthdayParties } from "@/server/services/userBirthdays.service";
-import Link from "next/link";
-import { MapPin, Plus, CalendarCheck } from "lucide-react";
-import { RouteActions } from "@/features/me/components/RouteActions";
 import { buildAdultPreferenceDisplayLine } from "@/lib/adultPersonaSignals/buildAdultPreferenceLine";
-import { cn } from "@/lib/utils";
-import { peachPrimaryCtaLinkClassName } from "@/lib/peachPrimaryCtaLink";
+import { getSystemInterestLabel } from "@/lib/config/interests";
 import { summarizeRouteBudget } from "@/lib/routes/routeBudget";
+import { getPartyDisplayTitle } from "@/features/me/lib/userBirthdayPartyUi";
+import { getPartyScenarioFlowUi } from "@/features/me/lib/partyScenarioFlow";
+import { getBirthdayBuilderHref } from "@/lib/birthday/getBirthdayBuilderHref";
+import {
+  AccountDesign,
+  type AccountFamilyMember,
+  type AccountRoute,
+  type AccountParty,
+} from "@/features/me/components/account/AccountDesign";
 
 type PageProps = {
   searchParams: Promise<{ date?: string }>;
 };
 
-export default async function MePage({ searchParams }: PageProps) {
-  const params = await searchParams;
+/** «6 лет» / «8 мес.» / «Возраст не указан». */
+function ageLine(birthDate: Date | null): string {
+  if (!birthDate || Number.isNaN(birthDate.getTime())) return "Возраст не указан";
+  const now = new Date();
+  const months =
+    (now.getFullYear() - birthDate.getFullYear()) * 12 +
+    (now.getMonth() - birthDate.getMonth());
+  if (months < 12) return `${months} мес.`;
+  const years = Math.floor(months / 12);
+  return `${years} ${years === 1 ? "год" : years < 5 ? "года" : "лет"}`;
+}
 
-  // Check authentication
+/** «6 июня · 13:00–16:00» — separator matches the design. */
+function partyDateTime(dateIso: string | null, start: string | null, end: string | null): string {
+  if (!dateIso) return [start, end].filter(Boolean).join("–");
+  const d = new Date(`${dateIso}T12:00:00`);
+  const dateStr = Number.isNaN(d.getTime())
+    ? dateIso
+    : d.toLocaleDateString("ru-RU", { day: "numeric", month: "long" });
+  const time = start && end ? `${start}–${end}` : (start ?? "");
+  return time ? `${dateStr} · ${time}` : dateStr;
+}
+
+export default async function MePage({ searchParams }: PageProps) {
+  await searchParams;
+
   const user = await getCurrentUser();
   if (!user) {
     redirect("/login");
   }
 
-  // Fetch children with interests using separate queries to avoid TypeScript issues
+  // ── Children (with interests, raw queries to dodge TS issues) ──
   const childrenRaw = await prisma.child.findMany({
     where: { parentId: user.id },
     orderBy: { createdAt: "desc" },
   });
-
-  // Fetch interests separately if there are children
-  const childIds = childrenRaw.map((child) => child.id);
+  const childIds = childrenRaw.map((c) => c.id);
 
   type SystemInterest = { childId: string; interestSlug: string };
   type CustomInterest = { childId: string; label: string };
-
   let systemInterestsData: SystemInterest[] = [];
   let customInterestsData: CustomInterest[] = [];
-
   if (childIds.length > 0) {
-    // Use raw queries to avoid TypeScript issues
     systemInterestsData = (await prisma.$queryRaw`
       SELECT "childId", "interestSlug"
       FROM "ChildInterest"
       WHERE "childId" = ANY(${childIds})
     `) as SystemInterest[];
-
     customInterestsData = (await prisma.$queryRaw`
       SELECT "childId", "label"
       FROM "ChildCustomInterest"
@@ -64,51 +81,20 @@ export default async function MePage({ searchParams }: PageProps) {
     `) as CustomInterest[];
   }
 
-  // Transform the data to match expected interface
-  const children = childrenRaw.map((child) => ({
-    id: child.id,
-    name: child.name,
-    birthDate: child.birthDate,
-    systemInterests: systemInterestsData
-      .filter((interest) => interest.childId === child.id)
-      .map((interest) => ({ interestSlug: interest.interestSlug })),
-    customInterests: customInterestsData
-      .filter((interest) => interest.childId === child.id)
-      .map((interest) => ({ label: interest.label })),
-  }));
-
-  // Load plan items for current week
+  // ── Plan (kept for parity with prior data loading) ──
   const weekStart = getCurrentWeekStart();
   const planItems = await listPlanItemsByWeek(user.id, weekStart);
-  const planItemsByDate = groupPlanItemsByDate(planItems);
+  groupPlanItemsByDate(planItems);
 
-  // Load user's routes
+  // ── Routes & parties ──
   const userRoutes = await listRoutesByUser(user.id).catch(() => []);
-
   const birthdayParties = await listUserBirthdayParties(user.id);
 
-  // Generate week dates for display
-  const weekDates = Array.from({ length: 7 }, (_, i) => {
-    const date = new Date(weekStart);
-    date.setDate(date.getDate() + i);
-    return date.toISOString().split("T")[0];
-  });
-
-  // Today hero
-  const todayDate = new Date().toISOString().split("T")[0];
-  const todayItems = planItemsByDate[todayDate] ?? [];
+  // ── Greeting / identity ──
   const hour = new Date().getHours();
-  const greetingWord =
-    hour < 6
-      ? "Доброй ночи"
-      : hour < 12
-        ? "Доброе утро"
-        : hour < 18
-          ? "Добрый день"
-          : "Добрый вечер";
-  const firstName =
-    user.displayName ?? user.email?.split("@")[0] ?? "Пользователь";
-  const greeting = `${greetingWord}, ${firstName}`;
+  const greeting =
+    hour < 6 ? "Доброй ночи" : hour < 12 ? "Доброе утро" : hour < 18 ? "Добрый день" : "Добрый вечер";
+  const firstName = user.displayName ?? user.email?.split("@")[0] ?? "Пользователь";
 
   const preferenceDisplayLine = await buildAdultPreferenceDisplayLine({
     preferenceSignalIds: user.preferenceSignalIds ?? [],
@@ -117,147 +103,84 @@ export default async function MePage({ searchParams }: PageProps) {
     leisureFormatSummary: user.leisureFormatSummary,
   });
 
+  // ── Family: adult first, then children ──
+  const adultRole = [mapFamilyRoleToLabel(user.familyRole), user.ageBandLabel]
+    .filter((v) => v && String(v).trim())
+    .join(" · ");
+  const family: AccountFamilyMember[] = [
+    {
+      key: "me",
+      initial: firstName.charAt(0).toUpperCase(),
+      name: user.displayName?.trim() || "Я",
+      role: adultRole || "Родитель",
+      hint: preferenceDisplayLine?.trim() || "Настроим рекомендации",
+    },
+    ...childrenRaw.map((child): AccountFamilyMember => {
+      const interests = [
+        ...systemInterestsData
+          .filter((i) => i.childId === child.id)
+          .map((i) => getSystemInterestLabel(i.interestSlug)),
+        ...customInterestsData
+          .filter((c) => c.childId === child.id)
+          .map((c) => c.label),
+      ].filter(Boolean);
+      return {
+        key: child.id,
+        initial: child.name.charAt(0).toUpperCase(),
+        name: child.name,
+        role: ageLine(child.birthDate ? new Date(child.birthDate) : null),
+        interests: interests.slice(0, 3),
+        hint: "Добавьте интересы",
+      };
+    }),
+  ];
+
+  // ── Routes ──
+  const routes: AccountRoute[] = userRoutes.map((r) => ({
+    id: r.id,
+    title: r.title,
+    points: r.stops.length,
+    price: summarizeRouteBudget(r.stops).label,
+    status: r.status === "PUBLISHED" ? "published" : "draft",
+    href: `/routes/${r.slug}`,
+  }));
+
+  // ── Parties ──
+  const parties: AccountParty[] = birthdayParties.map((p) => {
+    const chips = getPartyScenarioFlowUi(p)?.visible ?? [];
+    const confirmedFromChips = chips.filter((c) => c.confirmed).length;
+    return {
+      id: p.id,
+      name: getPartyDisplayTitle(p),
+      dateTime: partyDateTime(p.dateIso, p.timeStart, p.timeEnd),
+      confirmedOf: p.confirmationCount ?? confirmedFromChips,
+      total: p.confirmationTotal ?? chips.length,
+      chips,
+      href: `/me/birthdays/${p.id}`,
+    };
+  });
+
+  const stats = [
+    { n: family.length, label: "в семье" },
+    { n: routes.length, label: "маршрут" },
+    { n: parties.length, label: "праздник" },
+  ];
+
   return (
-    <div className="min-h-screen bg-background py-8">
-      <Container className="max-w-4xl">
-        <div className="space-y-6">
-          {/* ── Greeting ── */}
-          <UserGreeting greeting={greeting} />
-
-          {/* Children */}
-          <ChildrenCard
-            adult={{
-              displayName: user.displayName,
-              avatarUrl: user.avatarUrl,
-              initialChar: firstName.charAt(0),
-              roleLabel: mapFamilyRoleToLabel(user.familyRole),
-              ageBandLabel: user.ageBandLabel,
-              preferenceSummary: user.preferenceSummary,
-              leisureFormatSummary: user.leisureFormatSummary,
-              preferenceDisplayLine,
-            }}
-          >
-            {children}
-          </ChildrenCard>
-
-          {/* My Bookings shortcut */}
-          <Link
-            href="/me/bookings"
-            className="flex items-center justify-between rounded-2xl border border-neutral-100 bg-white px-5 py-4 shadow-sm transition-shadow hover:shadow-md"
-          >
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#fff4ee]">
-                <CalendarCheck className="h-5 w-5 text-[#EF8759]" />
-              </div>
-              <div>
-                <p className="text-[15px] font-semibold text-neutral-900">Мои записи</p>
-                <p className="text-[12px] text-neutral-400">Заявки и бронирования</p>
-              </div>
-            </div>
-            <svg className="h-4 w-4 text-neutral-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-            </svg>
-          </Link>
-
-          {/* My Routes */}
-          <div className="bg-white rounded-2xl border border-neutral-100 shadow-sm overflow-hidden">            <div className="flex items-center justify-between px-5 py-4 border-b border-neutral-100">
-              <div className="flex items-center gap-2 min-w-0">
-                <MapPin className="h-5 w-5 text-primary shrink-0" aria-hidden />
-                <h2 className="text-xl md:text-2xl font-semibold tracking-tight leading-tight text-neutral-900 truncate">
-                  Мои маршруты
-                </h2>{" "}
-              </div>
-              <Link
-                href="/routes/new"
-                className="flex items-center gap-1.5 text-sm font-medium text-neutral-500 hover:text-neutral-900 transition-colors"
-              >
-                <Plus className="w-4 h-4" />
-                Создать
-              </Link>
-            </div>
-
-            {userRoutes.length === 0 ? (
-              <div className="px-5 py-8 text-center">
-                <p className="text-sm text-neutral-400">
-                  У вас пока нет маршрутов
-                </p>
-                <Link
-                  href="/routes/new"
-                  className={cn(peachPrimaryCtaLinkClassName(), "mt-3")}
-                >
-                  <Plus className="h-4 w-4 transition-transform duration-200 group-hover:scale-110 sm:h-[18px] sm:w-[18px]" />
-                  Создать первый маршрут
-                </Link>
-              </div>
-            ) : (
-              <div className="divide-y divide-neutral-100">
-                {userRoutes.map((route) => (
-                  <div
-                    key={route.id}
-                    className="flex items-center gap-4 px-5 py-4 hover:bg-neutral-50 transition-colors group"
-                  >
-                    <Link
-                      href={`/routes/${route.slug}`}
-                      className="flex items-center gap-4 flex-1 min-w-0"
-                    >
-                      {/* Cover */}
-                      <div className="w-14 h-14 rounded-xl overflow-hidden bg-neutral-100 shrink-0">
-                        {route.coverImageUrl ? (
-                          <img
-                            src={route.coverImageUrl}
-                            alt={route.title}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center">
-                            <MapPin className="w-5 h-5 text-neutral-300" />
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Info */}
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-neutral-900 truncate">
-                          {route.title}
-                        </p>
-                        <div className="flex items-center gap-3 mt-0.5 text-xs text-neutral-400">
-                          <span className="flex items-center gap-1">
-                            <MapPin className="w-3 h-3" />
-                            {route.stops.length} точки
-                          </span>
-                          <span>
-                            {summarizeRouteBudget(route.stops).label}
-                          </span>
-                          <span
-                            className={`px-1.5 py-0.5 rounded-full text-[10px] font-medium ${
-                              route.status === "PUBLISHED"
-                                ? "bg-green-50 text-green-700"
-                                : "bg-neutral-100 text-neutral-500"
-                            }`}
-                          >
-                            {route.status === "PUBLISHED"
-                              ? "Опубликован"
-                              : "Черновик"}
-                          </span>
-                        </div>
-                      </div>
-                    </Link>
-
-                    <RouteActions
-                      routeId={route.id}
-                      routeSlug={route.slug}
-                      routeTitle={route.title}
-                    />
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Birthday parties */}
-          <MyBirthdaysCard parties={birthdayParties} />
-        </div>
-      </Container>
-    </div>
+    <AccountDesign
+      userName={firstName}
+      greeting={greeting}
+      stats={stats}
+      settingsHref="/me/settings"
+      homeHref="/"
+      family={family}
+      manageFamilyHref="/me/profile"
+      bookingsHref="/me/bookings"
+      routes={routes}
+      createRouteHref="/routes/new"
+      parties={parties}
+      partiesHref="/me/birthdays"
+      createPartyHref={getBirthdayBuilderHref()}
+    />
   );
 }

@@ -193,7 +193,17 @@ export const articleProvider: SeoEntityProvider = {
       return a.seoJsonLdOverride as Record<string, unknown>;
     }
     const publicBase = (process.env.NEXT_PUBLIC_APP_URL || "https://mamago.by").replace(/\/$/, "");
-    return buildArticleJsonLd({ article: a, publicBase });
+    const canonicalUrl = a.slug
+      ? `${publicBase}${buildNationalArticlePath(a.slug)}`
+      : `${publicBase}/blog/${entityId}`;
+    return buildArticleJsonLd({
+      canonicalUrl,
+      headline: a.title,
+      description: a.excerpt,
+      image: a.heroImage,
+      datePublished: a.publishedAt,
+      publisherName: "mamaGo",
+      publicBaseUrl: publicBase,
+    });
   },
 };
-

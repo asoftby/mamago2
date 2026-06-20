@@ -19,7 +19,43 @@ import {
   campSessionEntrySchema,
   offerWizardStepKeySchema,
 } from "@/lib/business/offerCampApiSchemas";
+import {
+  inferOfferProductType,
+  mapProductTypeToLegacyKind,
+} from "@/lib/offers/offerPersistenceCompatibility";
+import { syncOfferPersistenceLayer } from "@/server/offers/offerPersistence";
 import { syncOfferMediaUsage } from "@/server/services/media/media-usage.service";
+
+const offerProductTypeSchema = z.enum([
+  "PLACE_VISIT",
+  "ONE_TIME_ACTIVITY",
+  "REGULAR_ACTIVITY",
+  "CAMP",
+  "PARTY_SERVICE",
+  "PARTY_PACKAGE",
+]);
+
+const offerPlacementKeySchema = z.enum([
+  "WHERE_TO_GO",
+  "CLASSES",
+  "CAMPS",
+  "BIRTHDAY",
+]);
+
+const birthdayRoleSchema = z.enum([
+  "VENUE",
+  "ANIMATOR",
+  "SHOW",
+  "MASTER_CLASS",
+  "CAKE",
+  "CATERING",
+  "DECOR",
+  "PHOTO_VIDEO",
+  "PACKAGE",
+  "OTHER",
+]);
+
+const birthdayLocationTypeSchema = z.enum(["ON_SITE", "OFF_SITE", "BOTH"]);
 
 const createOfferSchema = z.object({
   source: z.enum(["PLACE", "EVENT"]),
@@ -73,6 +109,21 @@ const createOfferSchema = z.object({
   classChipSlugs: z.array(z.string()).default([]),
   /** Шаги мастера, явно завершённые пользователем */
   wizardCompletedSteps: z.array(offerWizardStepKeySchema).optional(),
+  productType: offerProductTypeSchema.optional(),
+  requestedPlacements: z.array(offerPlacementKeySchema).optional(),
+  birthdayDetails: z.object({
+    role: birthdayRoleSchema.nullable().optional(),
+    locationType: birthdayLocationTypeSchema.nullable().optional(),
+    durationMinutes: z.number().int().nullable().optional(),
+    minChildren: z.number().int().nullable().optional(),
+    maxChildren: z.number().int().nullable().optional(),
+    priceFrom: z.number().nullable().optional(),
+    included: z.string().nullable().optional(),
+    program: z.string().nullable().optional(),
+    note: z.string().nullable().optional(),
+  }).optional(),
+  /** Type-specific display details (Offer.details JSONB). Validated per productType client-side. */
+  details: z.record(z.string(), z.unknown()).optional(),
   campProgramType: campProgramTypeSchema,
   // Camp fields
   campSessions: z.array(campSessionEntrySchema).optional(),
@@ -185,8 +236,16 @@ export async function POST(request: NextRequest) {
       // Note: This assumes gallery is stored as a JSON array field
       // Adjust based on actual schema implementation
 
-      // Map offer kind to database enum
-      const dbKind = data.kind === "EVENT_TICKET" ? "EVENT" : "SERVICE";
+      const productType =
+        data.productType ??
+        (data.campProgramType
+          ? "CAMP"
+          : data.kind === "EVENT_TICKET"
+            ? "ONE_TIME_ACTIVITY"
+            : data.kind === "CLASS"
+              ? "REGULAR_ACTIVITY"
+              : inferOfferProductType({ kind: "SERVICE" }));
+      const dbKind = mapProductTypeToLegacyKind(productType);
 
       // Calculate price fields
       let priceFrom: number | null = null;
@@ -207,68 +266,91 @@ export async function POST(request: NextRequest) {
         priceText = formatPriceFrom(priceFrom);
       }
 
-      const offer = await prisma.offer.create({
-        data: {
-          placeId: place.id,
-          createRequestId: idempotencyKey ?? undefined,
-          kind: dbKind,
-          contactSource: data.contactSource ?? "manual",
-          contactPhone: data.contactPhone,
-          contactWebsite: data.contactWebsite,
-          contactSocialLinks: data.contactSocialLinks as Prisma.InputJsonValue | undefined,
-          title: data.title,
-          description: data.shortDescription,
-          coverImage: data.coverImage,
-          galleryImages: data.gallery ?? [],
-          videoUrl: data.videoUrl,
-          priceCaption: data.priceCaption,
-          promotionDetails: data.promotionDetails,
-          promotionalOffer: data.promotionalOffer,
-          priceFrom,
-          priceText,
-          ageMinMonths: data.ageMinMonths,
-          ageMaxMonths: data.ageMaxMonths,
-          discoverySignalIds: data.discoverySignalIds,
-          classChipSlugs: data.classChipSlugs,
-          wizardCompletedSteps: data.wizardCompletedSteps ?? [],
-          status: data.status,
-          // Camp/accommodation-поля пишем только для лагерей (campProgramType
-          // задан) — strip, не reject: клиентский гейт обходится
-          ...(data.campProgramType
-            ? {
-                campProgramType: data.campProgramType,
-                // Camp fields
-                campSessions: data.campSessions as unknown as Prisma.InputJsonValue,
-                campSessionDuration: data.campSessionDuration,
-                campStayDuration: data.campStayDuration,
-                campPlacesCount: data.campPlacesCount,
-                campGroupSize: data.campGroupSize,
-                campDaySchedule: data.campDaySchedule,
-                campCanSelectDays: data.campCanSelectDays,
-                campHasExtendedCare: data.campHasExtendedCare,
-                // Accommodation fields
-                accommodationProvided: data.accommodationProvided,
-                accommodationType: data.accommodationType,
-                accommodationAddress: data.accommodationAddress,
-                accommodationRooms: data.accommodationRooms,
-                campIncludedMeals: data.campIncludedMeals,
-                campSafetyInfo: data.campSafetyInfo,
-                campMedicalInfo: data.campMedicalInfo,
-                accommodationConditions: data.accommodationConditions,
-                mealInfo: data.mealInfo,
-                transferInfo: data.transferInfo,
-                whatToBring: data.whatToBring,
-              }
-            : {}),
-          ...(data.status === "PUBLISHED" ? { publishedAt: new Date() } : {}),
-        },
-        select: {
-          id: true,
-          title: true,
-          status: true,
-          slug: true,
-          publishedAt: true,
-        },
+      const offer = await prisma.$transaction(async (tx) => {
+        const createdOffer = await tx.offer.create({
+          data: {
+            placeId: place.id,
+            createRequestId: idempotencyKey ?? undefined,
+            kind: dbKind,
+            productType,
+            contactSource: data.contactSource ?? "manual",
+            contactPhone: data.contactPhone,
+            contactWebsite: data.contactWebsite,
+            contactSocialLinks: data.contactSocialLinks as Prisma.InputJsonValue | undefined,
+            title: data.title,
+            description: data.shortDescription,
+            coverImage: data.coverImage,
+            galleryImages: data.gallery ?? [],
+            videoUrl: data.videoUrl,
+            priceCaption: data.priceCaption,
+            promotionDetails: data.promotionDetails,
+            promotionalOffer: data.promotionalOffer,
+            priceFrom,
+            priceText,
+            ageMinMonths: data.ageMinMonths,
+            ageMaxMonths: data.ageMaxMonths,
+            discoverySignalIds: data.discoverySignalIds,
+            classChipSlugs: data.classChipSlugs,
+            wizardCompletedSteps: data.wizardCompletedSteps ?? [],
+            details: data.details as Prisma.InputJsonValue | undefined,
+            status: data.status,
+            ...(data.campProgramType
+              ? {
+                  campProgramType: data.campProgramType,
+                  campSessions: data.campSessions as unknown as Prisma.InputJsonValue,
+                  campSessionDuration: data.campSessionDuration,
+                  campStayDuration: data.campStayDuration,
+                  campPlacesCount: data.campPlacesCount,
+                  campGroupSize: data.campGroupSize,
+                  campDaySchedule: data.campDaySchedule,
+                  campCanSelectDays: data.campCanSelectDays,
+                  campHasExtendedCare: data.campHasExtendedCare,
+                  accommodationProvided: data.accommodationProvided,
+                  accommodationType: data.accommodationType,
+                  accommodationAddress: data.accommodationAddress,
+                  accommodationRooms: data.accommodationRooms,
+                  campIncludedMeals: data.campIncludedMeals,
+                  campSafetyInfo: data.campSafetyInfo,
+                  campMedicalInfo: data.campMedicalInfo,
+                  accommodationConditions: data.accommodationConditions,
+                  mealInfo: data.mealInfo,
+                  transferInfo: data.transferInfo,
+                  whatToBring: data.whatToBring,
+                }
+              : {}),
+            ...(data.status === "PUBLISHED" ? { publishedAt: new Date() } : {}),
+          },
+          select: {
+            id: true,
+            title: true,
+            status: true,
+            slug: true,
+            publishedAt: true,
+          },
+        });
+
+        await syncOfferPersistenceLayer({
+          db: tx,
+          offerId: createdOffer.id,
+          actorUserId: user.id,
+          productType,
+          requestedPlacements: data.requestedPlacements,
+          birthdayDetails: data.birthdayDetails,
+        });
+
+        return tx.offer.findUniqueOrThrow({
+          where: { id: createdOffer.id },
+          select: {
+            id: true,
+            title: true,
+            status: true,
+            slug: true,
+            publishedAt: true,
+            productType: true,
+            placements: true,
+            birthdayDetails: true,
+          },
+        });
       });
       timer.mark("status");
 
@@ -340,6 +422,8 @@ export async function GET(request: NextRequest) {
               title: true,
             },
           },
+          placements: true,
+          birthdayDetails: true,
         },
         orderBy: { createdAt: "desc" },
       });
@@ -372,6 +456,8 @@ export async function GET(request: NextRequest) {
                   title: true,
                 },
               },
+              placements: true,
+              birthdayDetails: true,
             },
             orderBy: { createdAt: "desc" },
           })

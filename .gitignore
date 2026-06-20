@@ -77,3 +77,4 @@ ts-errors.txt
 # Graphify local knowledge graph output
 graphify-out/
 .graphify/
+graphify-out/

@@ -1,1 +1,10 @@
+branch="$(git branch --show-current)"
+remote_name="${1:-}"
+
+if [ "$remote_name" = "origin" ] && [ "$branch" = "main" ]; then
+  echo "Direct push to origin/main is blocked."
+  echo "Use the permanent flow: local -> dev -> main."
+  exit 1
+fi
+
 pnpm check:push

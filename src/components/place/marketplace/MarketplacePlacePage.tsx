@@ -116,6 +116,9 @@ export function MarketplacePlacePage({
   ownerEditPlaceId,
 }: MarketplacePlacePageProps) {
   const ctaRef = useRef<HTMLDivElement>(null);
+  const hasRenderableReviews = reviews.length > 0;
+  const displayReviewCount = hasRenderableReviews ? place.reviewCount : undefined;
+  const displayRating = hasRenderableReviews ? place.rating : undefined;
 
   const handleShare = () => {
     if (navigator.share) {
@@ -131,8 +134,8 @@ export function MarketplacePlacePage({
 
   // Build meta strip items from available data
   const metaItems: Array<[string, string, string]> = [];
-  if (place.rating != null && (place.reviewCount ?? 0) > 0) {
-    metaItems.push(["Рейтинг", `${place.rating.toFixed(1)} / ${place.reviewCount} отз.`, "01"]);
+  if (displayRating != null && (displayReviewCount ?? 0) > 0) {
+    metaItems.push(["Рейтинг", `${displayRating.toFixed(1)} / ${displayReviewCount} отз.`, "01"]);
   }
   if (place.ageRange) metaItems.push(["Возраст", place.ageRange, String(metaItems.length + 1).padStart(2, "0")]);
   if (place.workingHoursSummary) {
@@ -191,8 +194,8 @@ export function MarketplacePlacePage({
         website={place.website}
         instagramUrl={place.instagramUrl}
         logoUrl={place.logoUrl}
-        rating={place.rating}
-        reviewCount={place.reviewCount}
+        rating={displayRating}
+        reviewCount={displayReviewCount}
         categoryLabel={place.categoryLabel}
         city={place.city}
         district={place.district}
@@ -212,14 +215,6 @@ export function MarketplacePlacePage({
       {/* About */}
       <PlaceAboutSection
         description={place.description}
-        phone={place.phone}
-        website={place.website}
-        instagramUrl={place.instagramUrl}
-        facebookUrl={place.facebookUrl}
-        vkUrl={place.vkUrl}
-        youtubeUrl={place.youtubeUrl}
-        telegramUrl={place.telegramUrl}
-        tiktokUrl={place.tiktokUrl}
         yearFounded={place.yearFounded}
         ageRange={place.ageRange}
         format={place.format}
@@ -274,8 +269,8 @@ export function MarketplacePlacePage({
         <PlaceReviewsSection
           reviews={reviews}
           placeId={place.slug}
-          rating={place.rating}
-          reviewCount={place.reviewCount}
+          rating={displayRating}
+          reviewCount={displayReviewCount}
         />
       )}
 

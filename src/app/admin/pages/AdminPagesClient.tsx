@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Search, Filter, ExternalLink, Archive, Edit } from "lucide-react";
+import { Plus, Search, Filter, ExternalLink, Edit } from "lucide-react";
 import { PageType, PageStatus, PageVisibility } from "@prisma/client";
+import { getPagePublicUrl } from "@/lib/pagePublicUrl";
 import { toast } from "sonner";
 
 type Page = {
@@ -83,10 +84,10 @@ export function AdminPagesClient() {
   }
 
   function getPublicUrl(page: Page): string {
-    if (page.type === "LEGAL") {
-      return `/legal/${page.slug}`;
-    }
-    return `/page/${page.slug}`;
+    return getPagePublicUrl({
+      type: page.type,
+      slug: page.slug,
+    });
   }
 
   function getStatusBadgeClass(status: PageStatus): string {

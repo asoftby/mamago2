@@ -11,7 +11,6 @@ import { PlaceModerationSidebar } from "@/components/admin/moderation/PlaceModer
 import { getPlacePublicUrl } from "@/lib/placePublicUrl";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import { PlaceFormData } from "@/components/business/wizard/place/types";
 import { ContentStatus, PlaceKind } from "@prisma/client";
@@ -95,6 +94,20 @@ export default async function PlaceModerationPage({
               name: true,
             },
           },
+        },
+      },
+      reviews: {
+        where: {
+          status: "PUBLISHED",
+        },
+        orderBy: {
+          createdAt: "desc",
+        },
+        take: 5,
+      },
+      _count: {
+        select: {
+          reviews: true,
         },
       },
     },

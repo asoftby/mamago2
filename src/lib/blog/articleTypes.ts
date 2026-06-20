@@ -9,6 +9,7 @@ export type DbArticleSeo = Pick<
   | "excerpt"
   | "heroImage"
   | "publishedAt"
+  | "updatedAt"
   | "seoTitle"
   | "seoDescription"
   | "seoH1"
@@ -19,7 +20,14 @@ export type DbArticleSeo = Pick<
   | "seoRobots"
   | "seoJsonLdOverride"
   | "noindex"
+  | "authorLabel"
 >;
+
+export type DbArticleSeoAuthor = {
+  authorUser?: { displayName: string | null } | null;
+  category?: { nameRu: string | null } | null;
+  tags?: Array<{ title: string }>;
+};
 
 export type DbBackedArticle = {
   slug: string;
@@ -30,7 +38,7 @@ export type DbBackedArticle = {
   publishedAt: string;
   heroImage: string | null;
   _redirectToSlug: string | null;
-  _seo: DbArticleSeo;
+  _seo: DbArticleSeo & DbArticleSeoAuthor;
 };
 
 export type MockArticle = {
@@ -44,4 +52,3 @@ export type MockArticle = {
 };
 
 export type ArticleVm = DbBackedArticle | MockArticle;
-

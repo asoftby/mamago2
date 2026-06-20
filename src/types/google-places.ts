@@ -62,8 +62,11 @@ export interface StoredGoogleReview {
   authorName: string;
   authorPhotoUri?: string;
   rating: number;
-  relativeTime: string;
+  relativeTime?: string;
   text: string;
+  originalText?: string;
+  textLanguageCode?: string;
+  originalTextLanguageCode?: string;
   publishTime: string;
 }
 

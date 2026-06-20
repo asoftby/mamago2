@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Star, MessageSquare, Edit, Trash, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { getAbsolutePlacePublicUrl } from "@/lib/placePublicUrl";
 import Link from "next/link";
 import {
   Select,
@@ -278,7 +279,10 @@ export default function BusinessReviewsPage() {
                   <div className="flex items-center gap-2 flex-wrap">
                     <h3 className="font-semibold text-lg">{review.place.title}</h3>
                     <Link
-                      href={`/places/${review.place.slug || review.place.id}`}
+                      href={getAbsolutePlacePublicUrl({
+                        slug: review.place.slug,
+                        id: review.place.id,
+                      }) ?? "#"}
                       target="_blank"
                       className="text-blue-600 hover:text-blue-700"
                     >
