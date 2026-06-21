@@ -3,7 +3,7 @@ export type PublicSocialKey = "instagram" | "tiktok" | "telegram";
 /** Если в .env не задано — чтобы в футере всегда были три иконки. Переопределите через NEXT_PUBLIC_SOCIAL_*. */
 const FALLBACK_SOCIAL: Record<PublicSocialKey, string> = {
   instagram: "https://www.instagram.com/mamago.by/",
-  tiktok: "https://www.tiktok.com/@mamago.by",
+  tiktok: "https://www.tiktok.com/@tanya_mamago",
   telegram: "https://t.me/mamago_2_bot",
 };
 
