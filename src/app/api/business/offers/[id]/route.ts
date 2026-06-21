@@ -57,6 +57,12 @@ const birthdayRoleSchema = z.enum([
 
 const birthdayLocationTypeSchema = z.enum(["ON_SITE", "OFF_SITE", "BOTH"]);
 
+const partyCategorySchema = z.enum([
+  "VENUE", "ANIMATOR", "SHOW", "MASTER_CLASS", "CAKE", "FOOD", "DECOR", "PHOTO", "PROGRAM", "OTHER",
+]);
+
+const partyOccasionSchema = z.enum(["BIRTHDAY", "GRADUATION"]);
+
 const updateOfferSchema = z.object({
   selectedPlace: z.object({
     id: z.string(),
@@ -117,6 +123,12 @@ const updateOfferSchema = z.object({
   // Camp/accommodation: null = «тип больше не лагерь, затереть в БД»
   /** Type-specific display details (Offer.details JSONB). Null clears the field. */
   details: z.record(z.string(), z.unknown()).nullable().optional(),
+  // PARTY_SERVICE filterable columns (Phase 3b-2)
+  category: partyCategorySchema.nullable().optional(),
+  partyLocationType: birthdayLocationTypeSchema.nullable().optional(),
+  minChildren: z.number().int().nullable().optional(),
+  maxChildren: z.number().int().nullable().optional(),
+  occasions: z.array(partyOccasionSchema).optional(),
   campProgramType: campProgramTypeSchema.nullable(),
   // Camp fields
   campSessions: z.array(campSessionEntrySchema).nullable().optional(),
@@ -287,6 +299,12 @@ export async function PATCH(
     if (data.details !== undefined)
       updateData.details =
         data.details === null ? Prisma.DbNull : (data.details as Prisma.InputJsonValue);
+    // PARTY_SERVICE filterable columns
+    if (data.category !== undefined) updateData.category = data.category;
+    if (data.partyLocationType !== undefined) updateData.partyLocationType = data.partyLocationType;
+    if (data.minChildren !== undefined) updateData.minChildren = data.minChildren;
+    if (data.maxChildren !== undefined) updateData.maxChildren = data.maxChildren;
+    if (data.occasions !== undefined) updateData.occasions = data.occasions;
     if (data.contactSource !== undefined) updateData.contactSource = data.contactSource;
     if (data.contactPhone !== undefined) updateData.contactPhone = data.contactPhone;
     if (data.contactWebsite !== undefined) updateData.contactWebsite = data.contactWebsite;

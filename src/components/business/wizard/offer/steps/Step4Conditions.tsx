@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { StableCardSelector } from "@/components/ui/stable-card-selector";
 import { WizardRichTextField } from "@/components/business/wizard/shared/WizardRichTextField";
-import type { OfferFormData, PlaceAmenityKey } from "../types";
+import type { OfferFormData, PlaceAmenityKey, PartyOccasion } from "../types";
 
 interface Step4ConditionsProps {
   data: OfferFormData;
@@ -190,44 +190,37 @@ export function Step4Conditions({ data, onChange, isEditable }: Step4ConditionsP
     </div>
   );
 
-  const renderServiceFields = () => (
-    <div className="space-y-4">
-      <div className="space-y-2">
-        <WizardRichTextField
-          label="Описание услуги"
-          required
-          helperText="Что входит в услугу, как проходит процесс и что важно знать заранее."
-          value={data.serviceDescription}
-          onChange={(value) => onChange({ serviceDescription: value })}
-          placeholder="Опишите что включает услуга, как проходит процесс..."
-          disabled={!isEditable}
-          minHeight={140}
-        />
-      </div>
+  const OCCASION_OPTIONS: { key: PartyOccasion; label: string }[] = [
+    { key: "BIRTHDAY", label: "День рождения" },
+    { key: "GRADUATION", label: "Выпускной" },
+  ];
 
-      <div className="space-y-2">
-        <Label htmlFor="serviceDuration">Продолжительность</Label>
-        <Input
-          id="serviceDuration"
-          placeholder="Например: 2 часа, весь день, по договоренности"
-          value={data.serviceDuration}
-          onChange={(e) => onChange({ serviceDuration: e.target.value })}
-          disabled={!isEditable}
-        />
-      </div>
+  const renderServiceOccasions = () => {
+    const toggleOccasion = (key: PartyOccasion, checked: boolean) => {
+      const next = checked
+        ? Array.from(new Set([...data.occasions, key]))
+        : data.occasions.filter((o) => o !== key);
+      onChange({ occasions: next });
+    };
 
+    return (
       <div className="space-y-2">
-        <Label htmlFor="serviceDeliveryArea">Зона обслуживания</Label>
-        <Input
-          id="serviceDeliveryArea"
-          placeholder="Например: Минск и область, весь город"
-          value={data.serviceDeliveryArea}
-          onChange={(e) => onChange({ serviceDeliveryArea: e.target.value })}
-          disabled={!isEditable}
-        />
+        <Label>Для каких праздников подходит</Label>
+        <div className="flex flex-wrap gap-4">
+          {OCCASION_OPTIONS.map(({ key, label }) => (
+            <label key={key} className="flex items-center gap-2 cursor-pointer">
+              <Checkbox
+                checked={data.occasions.includes(key)}
+                onCheckedChange={(checked) => toggleOccasion(key, checked === true)}
+                disabled={!isEditable}
+              />
+              <span className="text-sm">{label}</span>
+            </label>
+          ))}
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <div className="space-y-6">
@@ -257,7 +250,7 @@ export function Step4Conditions({ data, onChange, isEditable }: Step4ConditionsP
           </div>
           {data.productType === "PARTY_PACKAGE"
             ? renderPartyFields()
-            : renderServiceFields()}
+            : renderServiceOccasions()}
         </div>
       ) : null}
     </div>

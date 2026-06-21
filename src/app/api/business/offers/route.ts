@@ -57,6 +57,12 @@ const birthdayRoleSchema = z.enum([
 
 const birthdayLocationTypeSchema = z.enum(["ON_SITE", "OFF_SITE", "BOTH"]);
 
+const partyCategorySchema = z.enum([
+  "VENUE", "ANIMATOR", "SHOW", "MASTER_CLASS", "CAKE", "FOOD", "DECOR", "PHOTO", "PROGRAM", "OTHER",
+]);
+
+const partyOccasionSchema = z.enum(["BIRTHDAY", "GRADUATION"]);
+
 const createOfferSchema = z.object({
   source: z.enum(["PLACE", "EVENT"]),
   /** Идемпотентность create (повтор после таймаута / double-click) */
@@ -124,6 +130,12 @@ const createOfferSchema = z.object({
   }).optional(),
   /** Type-specific display details (Offer.details JSONB). Validated per productType client-side. */
   details: z.record(z.string(), z.unknown()).optional(),
+  // PARTY_SERVICE filterable columns (Phase 3b-2)
+  category: partyCategorySchema.nullable().optional(),
+  partyLocationType: birthdayLocationTypeSchema.nullable().optional(),
+  minChildren: z.number().int().nullable().optional(),
+  maxChildren: z.number().int().nullable().optional(),
+  occasions: z.array(partyOccasionSchema).optional(),
   campProgramType: campProgramTypeSchema,
   // Camp fields
   campSessions: z.array(campSessionEntrySchema).optional(),
@@ -293,6 +305,14 @@ export async function POST(request: NextRequest) {
             classChipSlugs: data.classChipSlugs,
             wizardCompletedSteps: data.wizardCompletedSteps ?? [],
             details: data.details as Prisma.InputJsonValue | undefined,
+            // PARTY_SERVICE: write filterable fields to Offer columns
+            ...(productType === "PARTY_SERVICE" ? {
+              category: data.category ?? undefined,
+              partyLocationType: data.partyLocationType ?? undefined,
+              minChildren: data.minChildren ?? undefined,
+              maxChildren: data.maxChildren ?? undefined,
+              occasions: data.occasions ?? [],
+            } : {}),
             status: data.status,
             ...(data.campProgramType
               ? {

@@ -1,7 +1,10 @@
 // Offer Wizard Types
 // Refactored for multi-type support (SINGLE, REGULAR, CAMP)
 
+import type { PartyCategory, PartyOccasion } from "@prisma/client";
 import type { PublicationAccess } from "@/features/publication-access";
+
+export type { PartyCategory, PartyOccasion };
 
 export type OfferWizardMode = "create" | "edit";
 
@@ -150,10 +153,9 @@ export interface OfferFormData {
   partyChildrenCount: string;
   partyIncluded: string;
   
-  // Service fields
-  serviceDescription: string;
-  serviceDuration: string;
-  serviceDeliveryArea: string;
+  // PARTY_SERVICE filterable fields (Phase 3b-2)
+  partyCategory: PartyCategory | null;
+  occasions: PartyOccasion[];
   
   // Step 5 (for CAMP): Accommodation
   accommodationProvided: boolean;

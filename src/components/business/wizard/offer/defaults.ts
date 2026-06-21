@@ -73,10 +73,9 @@ export function getDefaultFormData(defaultPlaceId: string | null = null): OfferF
     partyChildrenCount: "",
     partyIncluded: "",
     
-    // Service fields
-    serviceDescription: "",
-    serviceDuration: "",
-    serviceDeliveryArea: "",
+    // PARTY_SERVICE filterable fields (Phase 3b-2)
+    partyCategory: null,
+    occasions: [],
     
     // Step 5 (for CAMP): Accommodation
     accommodationProvided: false,

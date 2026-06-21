@@ -10,6 +10,7 @@ import type {
   OfferFormData,
   OfferPlacementKey,
   OfferPlacementStatus,
+  PartyCategory,
 } from "../types";
 
 interface Step2PlacementsProps {
@@ -74,12 +75,27 @@ const birthdayLocationOptions = [
   { value: "BOTH" as const, label: "Оба варианта", description: "Можно провести и у вас, и на выезде." },
 ];
 
+const partyCategoryOptions = [
+  { value: "VENUE" as const, label: "Площадка / аренда", description: "Локация, пространство или отдельный зал для праздника." },
+  { value: "ANIMATOR" as const, label: "Аниматор / ведущий", description: "Ведущий, герой, аниматор или интерактив." },
+  { value: "SHOW" as const, label: "Шоу / программа", description: "Научное, музыкальное, тематическое или игровое шоу." },
+  { value: "MASTER_CLASS" as const, label: "Мастер-класс", description: "Творческий или образовательный формат для праздника." },
+  { value: "CAKE" as const, label: "Торт / сладкий стол", description: "Кондитерский или сладкий блок праздника." },
+  { value: "FOOD" as const, label: "Еда / кейтеринг", description: "Фуршет, закуски, catering или праздничное меню." },
+  { value: "DECOR" as const, label: "Декор", description: "Украшение пространства, фотозона, шары и оформление." },
+  { value: "PHOTO" as const, label: "Фото / видео", description: "Съёмка, фотограф, видеограф или контент-пакет." },
+  { value: "PROGRAM" as const, label: "Праздник под ключ", description: "Полный пакет с программой и организацией." },
+  { value: "OTHER" as const, label: "Другое", description: "Нестандартный формат, который тоже релевантен празднику." },
+];
+
 export function Step2Placements({
   data,
   onChange,
   isEditable,
 }: Step2PlacementsProps) {
   const hasBirthdayPlacement = data.requestedPlacements.includes("BIRTHDAY");
+  const isPartyService = data.productType === "PARTY_SERVICE";
+  const showPartySection = isPartyService || hasBirthdayPlacement;
 
   const togglePlacement = (key: OfferPlacementKey, checked: boolean) => {
     onChange((prev) => {
@@ -156,7 +172,7 @@ export function Step2Placements({
         })}
       </div>
 
-      {hasBirthdayPlacement ? (
+      {showPartySection ? (
         <div className="space-y-6 rounded-3xl border border-[#EF8759]/30 bg-orange-50/60 p-5">
           <div>
             <h3 className="text-lg font-semibold">Условия для праздника</h3>
@@ -167,14 +183,24 @@ export function Step2Placements({
           </div>
 
           <div className="space-y-2">
-            <Label>Роль в празднике <span className="text-red-500">*</span></Label>
-            <StableCardSelector<BirthdayRole>
-              value={data.birthdayDetails.role}
-              onValueChange={(role) => updateBirthdayDetails({ role })}
-              options={birthdayRoleOptions}
-              isEditable={isEditable}
-              className="grid gap-3 md:grid-cols-2"
-            />
+            <Label>{isPartyService ? "Категория услуги" : "Роль в празднике"} <span className="text-red-500">*</span></Label>
+            {isPartyService ? (
+              <StableCardSelector<PartyCategory>
+                value={data.partyCategory}
+                onValueChange={(partyCategory) => onChange({ partyCategory })}
+                options={partyCategoryOptions}
+                isEditable={isEditable}
+                className="grid gap-3 md:grid-cols-2"
+              />
+            ) : (
+              <StableCardSelector<BirthdayRole>
+                value={data.birthdayDetails.role}
+                onValueChange={(role) => updateBirthdayDetails({ role })}
+                options={birthdayRoleOptions}
+                isEditable={isEditable}
+                className="grid gap-3 md:grid-cols-2"
+              />
+            )}
           </div>
 
           <div className="space-y-2">

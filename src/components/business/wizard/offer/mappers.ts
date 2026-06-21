@@ -1,4 +1,4 @@
-import type { OfferKind } from "@prisma/client";
+import type { OfferKind, PartyCategory, PartyOccasion } from "@prisma/client";
 import type {
   OfferFormData,
   CampLodgingTypeKey,
@@ -14,6 +14,7 @@ import { getDefaultFormData } from "./defaults";
 import {
   placeDetails as placeDetailsSchema,
   classDetails as classDetailsSchema,
+  serviceDetails as serviceDetailsSchema,
 } from "@/lib/offers/offer-types/details-schemas";
 import type { PublicationAccess } from "@/features/publication-access";
 import {
@@ -46,6 +47,41 @@ function parsePlaceVisitDetailsFromDb(
     amenities: (parsed.data.amenities ?? []).filter((a): a is PlaceAmenityKey =>
       PLACE_AMENITY_KEYS.has(a as PlaceAmenityKey),
     ),
+  };
+}
+
+const BIRTHDAY_ROLE_TO_PARTY_CATEGORY: Partial<Record<BirthdayRole, PartyCategory>> = {
+  VENUE: "VENUE",
+  ANIMATOR: "ANIMATOR",
+  SHOW: "SHOW",
+  MASTER_CLASS: "MASTER_CLASS",
+  CAKE: "CAKE",
+  CATERING: "FOOD",
+  DECOR: "DECOR",
+  PHOTO_VIDEO: "PHOTO",
+  PACKAGE: "PROGRAM",
+  OTHER: "OTHER",
+};
+
+function mapBirthdayRoleToPartyCategory(role: BirthdayRole | null | undefined): PartyCategory | null {
+  if (!role) return null;
+  return BIRTHDAY_ROLE_TO_PARTY_CATEGORY[role] ?? null;
+}
+
+function parseServiceDetailsFromDb(details: unknown): {
+  program: string;
+  included: string;
+  note: string;
+  durationMinutes: number | null;
+} {
+  const parsed = serviceDetailsSchema.safeParse(details);
+  if (!parsed.success) return { program: "", included: "", note: "", durationMinutes: null };
+  const d = parsed.data;
+  return {
+    program: d.program ?? "",
+    included: d.included ?? "",
+    note: d.note ?? "",
+    durationMinutes: d.durationMinutes ?? null,
   };
 }
 
@@ -180,7 +216,8 @@ function mapBirthdayDetailsForApi(
   program?: string | null;
   note?: string | null;
 } | null {
-  if (!data.requestedPlacements.includes("BIRTHDAY")) {
+  // PARTY_SERVICE uses single-write to Offer columns; never write to OfferBirthdayDetails.
+  if (!data.requestedPlacements.includes("BIRTHDAY") || data.productType === "PARTY_SERVICE") {
     return null;
   }
 
@@ -466,6 +503,14 @@ export function buildOfferCreatePayload(
     requestedPlacements,
     birthdayDetails: mapBirthdayDetailsForApi(data),
     details: buildTypeDetails(data),
+    // PARTY_SERVICE: filterable party fields → Offer columns (single-write, no OfferBirthdayDetails)
+    ...(data.productType === "PARTY_SERVICE" ? {
+      category: data.partyCategory ?? undefined,
+      partyLocationType: data.birthdayDetails.locationType ?? undefined,
+      minChildren: data.birthdayDetails.minChildren ?? undefined,
+      maxChildren: data.birthdayDetails.maxChildren ?? undefined,
+      occasions: data.occasions,
+    } : {}),
     // Camp/accommodation-поля — только для лагерей; данные скрытых шагов
     // других типов в payload не попадают
     ...(data.offerWizardType === "CAMP" ? buildCampFieldsForCreate(data) : {}),
@@ -490,6 +535,15 @@ function buildTypeDetails(data: OfferFormData): Record<string, unknown> | undefi
     if (data.classDuration) result.duration = data.classDuration;
     if (data.classGroupSize) result.groupSize = data.classGroupSize;
     if (data.classFormat != null) result.format = data.classFormat;
+    return Object.keys(result).length > 0 ? result : undefined;
+  }
+  if (data.productType === "PARTY_SERVICE") {
+    const bd = data.birthdayDetails;
+    const result: Record<string, unknown> = {};
+    if (bd.durationMinutes != null) result.durationMinutes = bd.durationMinutes;
+    if (bd.program.trim()) result.program = bd.program.trim();
+    if (bd.included.trim()) result.included = bd.included.trim();
+    if (bd.note.trim()) result.note = bd.note.trim();
     return Object.keys(result).length > 0 ? result : undefined;
   }
   return undefined;
@@ -622,6 +676,14 @@ export function buildOfferUpdatePayload(
     requestedPlacements,
     birthdayDetails: mapBirthdayDetailsForApi(data),
     details: buildTypeDetails(data),
+    // PARTY_SERVICE: filterable party fields → Offer columns (single-write, no OfferBirthdayDetails)
+    ...(data.productType === "PARTY_SERVICE" ? {
+      category: data.partyCategory ?? undefined,
+      partyLocationType: data.birthdayDetails.locationType ?? undefined,
+      minChildren: data.birthdayDetails.minChildren ?? undefined,
+      maxChildren: data.birthdayDetails.maxChildren ?? undefined,
+      occasions: data.occasions,
+    } : {}),
     // CAMP — camp/accommodation-данные; иначе явные null (затирание в БД)
     ...(data.offerWizardType === "CAMP"
       ? buildCampFieldsForCreate(data)
@@ -698,6 +760,12 @@ export function mapOfferToFormData(offer: {
   contactWebsite?: string | null;
   contactSocialLinks?: unknown;
   details?: unknown;
+  // Phase 3b-1 party-filter columns (PARTY_SERVICE canon)
+  category?: PartyCategory | null;
+  partyLocationType?: BirthdayLocationType | null;
+  minChildren?: number | null;
+  maxChildren?: number | null;
+  occasions?: PartyOccasion[];
 }): OfferFormData {
   const defaults = getDefaultFormData(offer.placeId ?? null);
 
@@ -720,6 +788,8 @@ export function mapOfferToFormData(offer: {
   const inferredWizardType = inferOfferWizardTypeFromOffer(offer);
   const isCamp = inferredWizardType === "CAMP";
   const productType = inferProductTypeFromOffer(offer);
+  const isPartyService = productType === "PARTY_SERVICE";
+  const serviceDetails = isPartyService ? parseServiceDetailsFromDb(offer.details) : null;
   const requestedPlacements = parsePlacementKeyArray(offer.placements);
   const placementStatuses = parsePlacementStatusMap(offer.placements);
   const socialLinks = Array.isArray(offer.contactSocialLinks)
@@ -757,18 +827,38 @@ export function mapOfferToFormData(offer: {
     placementStatuses,
     birthdayDetails: {
       role: offer.birthdayDetails?.role ?? null,
-      locationType: offer.birthdayDetails?.locationType ?? null,
-      durationMinutes: offer.birthdayDetails?.durationMinutes ?? null,
-      minChildren: offer.birthdayDetails?.minChildren ?? null,
-      maxChildren: offer.birthdayDetails?.maxChildren ?? null,
+      // Dual-read: canon Offer columns win over legacy OfferBirthdayDetails for PARTY_SERVICE
+      locationType: isPartyService
+        ? (offer.partyLocationType ?? offer.birthdayDetails?.locationType ?? null)
+        : (offer.birthdayDetails?.locationType ?? null),
+      durationMinutes: isPartyService
+        ? (serviceDetails?.durationMinutes ?? offer.birthdayDetails?.durationMinutes ?? null)
+        : (offer.birthdayDetails?.durationMinutes ?? null),
+      minChildren: isPartyService
+        ? (offer.minChildren ?? offer.birthdayDetails?.minChildren ?? null)
+        : (offer.birthdayDetails?.minChildren ?? null),
+      maxChildren: isPartyService
+        ? (offer.maxChildren ?? offer.birthdayDetails?.maxChildren ?? null)
+        : (offer.birthdayDetails?.maxChildren ?? null),
       priceFrom:
         offer.birthdayDetails?.priceFrom != null
           ? String(offer.birthdayDetails.priceFrom)
           : "",
-      included: offer.birthdayDetails?.included ?? "",
-      program: offer.birthdayDetails?.program ?? "",
-      note: offer.birthdayDetails?.note ?? "",
+      included: isPartyService
+        ? (serviceDetails?.included ?? offer.birthdayDetails?.included ?? "")
+        : (offer.birthdayDetails?.included ?? ""),
+      program: isPartyService
+        ? (serviceDetails?.program ?? offer.birthdayDetails?.program ?? "")
+        : (offer.birthdayDetails?.program ?? ""),
+      note: isPartyService
+        ? (serviceDetails?.note ?? offer.birthdayDetails?.note ?? "")
+        : (offer.birthdayDetails?.note ?? ""),
     },
+    // PARTY_SERVICE: partyCategory from canon (Offer.category) or legacy role mapping
+    partyCategory: isPartyService
+      ? (offer.category ?? mapBirthdayRoleToPartyCategory(offer.birthdayDetails?.role))
+      : null,
+    occasions: isPartyService ? (offer.occasions ?? []) : [],
     offerKind:
       productType === "PARTY_PACKAGE"
         ? "birthday"
