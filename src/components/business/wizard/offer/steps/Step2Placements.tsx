@@ -95,7 +95,8 @@ export function Step2Placements({
 }: Step2PlacementsProps) {
   const hasBirthdayPlacement = data.requestedPlacements.includes("BIRTHDAY");
   const isPartyService = data.productType === "PARTY_SERVICE";
-  const showPartySection = isPartyService || hasBirthdayPlacement;
+  const isPartyPackage = data.productType === "PARTY_PACKAGE";
+  const showPartySection = isPartyService || isPartyPackage || hasBirthdayPlacement;
 
   const togglePlacement = (key: OfferPlacementKey, checked: boolean) => {
     onChange((prev) => {

@@ -67,13 +67,7 @@ export function getDefaultFormData(defaultPlaceId: string | null = null): OfferF
     campCanSelectDays: false,
     campHasExtendedCare: false,
     
-    // Party fields
-    partyProgram: "",
-    partyDuration: "",
-    partyChildrenCount: "",
-    partyIncluded: "",
-    
-    // PARTY_SERVICE filterable fields (Phase 3b-2)
+    // PARTY_SERVICE filterable fields (Phase 3b-2); PARTY_PACKAGE shares occasions (Phase 3b-3)
     partyCategory: null,
     occasions: [],
     

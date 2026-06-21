@@ -5,7 +5,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { StableCardSelector } from "@/components/ui/stable-card-selector";
-import { WizardRichTextField } from "@/components/business/wizard/shared/WizardRichTextField";
 import type { OfferFormData, PlaceAmenityKey, PartyOccasion } from "../types";
 
 interface Step4ConditionsProps {
@@ -137,65 +136,12 @@ export function Step4Conditions({ data, onChange, isEditable }: Step4ConditionsP
     </div>
   );
 
-  const renderPartyFields = () => (
-    <div className="space-y-4">
-      <div className="space-y-2">
-        <WizardRichTextField
-          label="Программа праздника"
-          required
-          helperText="Игры, развлечения, мастер-классы и другие ключевые элементы программы."
-          value={data.partyProgram}
-          onChange={(value) => onChange({ partyProgram: value })}
-          placeholder="Опишите программу: игры, развлечения, мастер-классы..."
-          disabled={!isEditable}
-          minHeight={140}
-        />
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="partyDuration">
-          Продолжительность <span className="text-red-500">*</span>
-        </Label>
-        <Input
-          id="partyDuration"
-          placeholder="Например: 2 часа, 3 часа"
-          value={data.partyDuration}
-          onChange={(e) => onChange({ partyDuration: e.target.value })}
-          disabled={!isEditable}
-        />
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="partyChildrenCount">Количество детей</Label>
-        <Input
-          id="partyChildrenCount"
-          placeholder="Например: до 10 детей, от 5 до 15"
-          value={data.partyChildrenCount}
-          onChange={(e) => onChange({ partyChildrenCount: e.target.value })}
-          disabled={!isEditable}
-        />
-      </div>
-
-      <div className="space-y-2">
-        <WizardRichTextField
-          label="Что включено"
-          helperText="Коротко перечислите, что уже входит в пакет."
-          value={data.partyIncluded}
-          onChange={(value) => onChange({ partyIncluded: value })}
-          placeholder="Например: украшение зала, торт, подарки..."
-          disabled={!isEditable}
-          minHeight={140}
-        />
-      </div>
-    </div>
-  );
-
   const OCCASION_OPTIONS: { key: PartyOccasion; label: string }[] = [
     { key: "BIRTHDAY", label: "День рождения" },
     { key: "GRADUATION", label: "Выпускной" },
   ];
 
-  const renderServiceOccasions = () => {
+  const renderOccasionsSection = () => {
     const toggleOccasion = (key: PartyOccasion, checked: boolean) => {
       const next = checked
         ? Array.from(new Set([...data.occasions, key]))
@@ -248,9 +194,7 @@ export function Step4Conditions({ data, onChange, isEditable }: Step4ConditionsP
             размещения. Здесь можно оставить дополнительные пояснения в общем
             описании и блоке цены.
           </div>
-          {data.productType === "PARTY_PACKAGE"
-            ? renderPartyFields()
-            : renderServiceOccasions()}
+          {renderOccasionsSection()}
         </div>
       ) : null}
     </div>

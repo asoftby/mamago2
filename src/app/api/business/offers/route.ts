@@ -305,8 +305,8 @@ export async function POST(request: NextRequest) {
             classChipSlugs: data.classChipSlugs,
             wizardCompletedSteps: data.wizardCompletedSteps ?? [],
             details: data.details as Prisma.InputJsonValue | undefined,
-            // PARTY_SERVICE: write filterable fields to Offer columns
-            ...(productType === "PARTY_SERVICE" ? {
+            // PARTY_SERVICE/PARTY_PACKAGE: write filterable fields to Offer columns
+            ...(productType === "PARTY_SERVICE" || productType === "PARTY_PACKAGE" ? {
               category: data.category ?? undefined,
               partyLocationType: data.partyLocationType ?? undefined,
               minChildren: data.minChildren ?? undefined,

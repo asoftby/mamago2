@@ -230,9 +230,6 @@ export function Step2Information({ data, onChange, isEditable }: Step2Informatio
             conditions: [
               data.classDuration,
               data.classGroupSize,
-              data.partyDuration,
-              data.partyChildrenCount,
-              data.partyIncluded,
               data.ctaInstructions,
             ],
             schedule: [data.campSessionDuration, data.campStayDuration, data.campDaySchedule],

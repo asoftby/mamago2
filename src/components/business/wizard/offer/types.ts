@@ -147,13 +147,7 @@ export interface OfferFormData {
   campCanSelectDays: boolean; // Can select individual days
   campHasExtendedCare: boolean; // Has extended care option
   
-  // Party fields
-  partyProgram: string;
-  partyDuration: string;
-  partyChildrenCount: string;
-  partyIncluded: string;
-  
-  // PARTY_SERVICE filterable fields (Phase 3b-2)
+  // PARTY_SERVICE filterable fields (Phase 3b-2); PARTY_PACKAGE shares occasions (Phase 3b-3)
   partyCategory: PartyCategory | null;
   occasions: PartyOccasion[];
   
