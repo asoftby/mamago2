@@ -6,6 +6,7 @@ import { appendBirthdayBuilderAuthParam } from "@/lib/auth/appendBirthdayBuilder
 import { getPostAuthRedirect } from "@/lib/auth/postAuthRedirect";
 import { getSafeRedirectPath } from "@/lib/auth/redirectTo";
 import { notifyAuthStateChanged, notifyNotificationsChanged } from "@/lib/auth/client";
+import { getPostAuthContext, savePostAuthContext, type AuthAction } from "@/lib/post-auth";
 import { navigateToCompatibleHref } from "@/lib/routing/clientNavigation";
 import { toast } from "@/lib/toast";
 import { VERIFICATION_EMAIL_SEND_FAILED_AFTER_REGISTRATION_TOAST } from "@/lib/auth/registrationVerificationToast";
@@ -18,6 +19,20 @@ export type AuthFinishContext = "modal" | "embedded";
 export function isValidEmail(value: string): boolean {
   const v = value.trim();
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+}
+
+function parseAuthAction(value: unknown, fallback: AuthAction): AuthAction {
+  return value === "login" || value === "signup" ? value : fallback;
+}
+
+function saveAuthActionToPostAuthContext(authAction: AuthAction) {
+  const context = getPostAuthContext();
+  if (!context) return;
+
+  savePostAuthContext({
+    ...context,
+    authAction,
+  });
 }
 
 
@@ -123,7 +138,7 @@ export function useAuthCredentialsFlow({
       }
       navigateToCompatibleHref(router, target, { replace: true });
     },
-    [embedded, beforeFinishAuthSession, onAuthSuccess, router, skipRedirectAfterAuth],
+    [embedded, beforeFinishAuthSession, nextHref, onAuthSuccess, router, skipRedirectAfterAuth],
   );
 
   const submitLogin = useCallback(async () => {
@@ -149,6 +164,7 @@ export function useAuthCredentialsFlow({
         );
         return;
       }
+      saveAuthActionToPostAuthContext(parseAuthAction(data.authAction, "login"));
       const raw =
         typeof data.redirectTo === "string" && data.redirectTo.length > 0
           ? data.redirectTo
@@ -189,6 +205,7 @@ export function useAuthCredentialsFlow({
       if (data.verificationEmailSendFailed === true) {
         toast.message(VERIFICATION_EMAIL_SEND_FAILED_AFTER_REGISTRATION_TOAST);
       }
+      saveAuthActionToPostAuthContext(parseAuthAction(data.authAction, "signup"));
       const raw =
         typeof data.redirectTo === "string" && data.redirectTo.length > 0
           ? data.redirectTo

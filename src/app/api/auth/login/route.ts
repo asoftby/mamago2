@@ -133,6 +133,7 @@ export async function POST(request: NextRequest) {
     // Create response with user data
     const response = NextResponse.json({
       success: true,
+      authAction: "login" as const,
       user: {
         id: user.id,
         email: user.email,

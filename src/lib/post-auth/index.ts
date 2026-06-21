@@ -1,4 +1,5 @@
 export type {
+  AuthAction,
   AuthEntryPoint,
   PostAuthContext,
   PendingPostAuthAction,
@@ -13,6 +14,7 @@ export type {
 export {
   savePostAuthContext,
   getPostAuthContext,
+  clearPostAuthAction,
   clearPostAuthContext,
 } from "./storage";
 export {
