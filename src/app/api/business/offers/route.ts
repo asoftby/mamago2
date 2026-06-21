@@ -24,6 +24,7 @@ import {
   mapProductTypeToLegacyKind,
 } from "@/lib/offers/offerPersistenceCompatibility";
 import { syncOfferPersistenceLayer } from "@/server/offers/offerPersistence";
+import { projectCampSessions } from "@/server/offers/campSessionProjection";
 import { syncOfferMediaUsage } from "@/server/services/media/media-usage.service";
 
 const offerProductTypeSchema = z.enum([
@@ -357,6 +358,11 @@ export async function POST(request: NextRequest) {
           requestedPlacements: data.requestedPlacements,
           birthdayDetails: data.birthdayDetails,
         });
+
+        // CAMP: project campSessions JSON (canon) into queryable OfferSession rows
+        if (data.campProgramType) {
+          await projectCampSessions(tx, createdOffer.id, data.campSessions);
+        }
 
         return tx.offer.findUniqueOrThrow({
           where: { id: createdOffer.id },

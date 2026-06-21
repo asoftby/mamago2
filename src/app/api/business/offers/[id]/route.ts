@@ -24,6 +24,7 @@ import {
   mapProductTypeToLegacyKind,
 } from "@/lib/offers/offerPersistenceCompatibility";
 import { syncOfferPersistenceLayer } from "@/server/offers/offerPersistence";
+import { projectCampSessions } from "@/server/offers/campSessionProjection";
 import { syncOfferMediaUsage } from "@/server/services/media/media-usage.service";
 
 const offerProductTypeSchema = z.enum([
@@ -442,6 +443,10 @@ export async function PATCH(
         birthdayDetails: data.birthdayDetails,
         birthdayDetailsProvided: data.birthdayDetails !== undefined,
       });
+
+      // CAMP: rebuild OfferSession projection from current campSessions canon
+      // (clears all rows when isCampOffer is false, e.g. type switched away from CAMP)
+      await projectCampSessions(tx, id, isCampOffer ? nextCampSessions : []);
 
       return tx.offer.findUniqueOrThrow({
         where: { id },
