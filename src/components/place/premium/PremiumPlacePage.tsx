@@ -9,6 +9,8 @@ import { PlaceAllReviews } from "./PlaceAllReviews";
 import { motion } from "framer-motion";
 import { Phone } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { NormalizedPlacePhone } from "@/lib/place/placePhones";
+import { PlacePhoneActionButton } from "@/components/place/PlacePhoneActions";
 
 interface PremiumPlacePageProps {
   place: {
@@ -28,7 +30,7 @@ interface PremiumPlacePageProps {
     capacity?: number;
 
     // Contact
-    phone?: string;
+    phones: NormalizedPlacePhone[];
     email?: string;
     website?: string;
     instagramUrl?: string;
@@ -190,7 +192,7 @@ export function PremiumPlacePage({
 
           <aside className="min-w-0">
             <PlaceSidebarCard
-              phone={place.phone}
+              phones={place.phones}
               website={place.website}
               instagramUrl={place.instagramUrl}
               placeName={place.title}
@@ -200,12 +202,20 @@ export function PremiumPlacePage({
       </div>
 
       <div className="fixed inset-x-3 bottom-3 z-50 rounded-[28px] border border-white/60 bg-white/80 p-2 shadow-[0_24px_80px_rgba(17,19,34,0.18)] backdrop-blur-2xl lg:hidden">
-        <MobileAction
-          href={place.phone ? `tel:${place.phone}` : "#"}
-          icon={<Phone className="h-4 w-4" />}
-          label="Позвонить"
-          primary
-        />
+        {place.phones.length > 0 ? (
+          <PlacePhoneActionButton
+            phones={place.phones}
+            placeTitle={place.title}
+            className="flex w-full items-center justify-center"
+          >
+            <MobileAction
+              asSpan
+              icon={<Phone className="h-4 w-4" />}
+              label="Позвонить"
+              primary
+            />
+          </PlacePhoneActionButton>
+        ) : null}
       </div>
     </div>
   );
@@ -337,23 +347,33 @@ function MobileAction({
   icon,
   label,
   primary,
+  asSpan = false,
 }: {
-  href: string;
+  href?: string;
   icon: React.ReactNode;
   label: string;
   primary?: boolean;
+  asSpan?: boolean;
 }) {
-  return (
-    <a
-      href={href}
-      className={`flex h-12 w-full items-center justify-center gap-2 rounded-2xl text-sm font-black ${
-        primary
-          ? "bg-gradient-to-r from-[#EF8759] to-[#6C63FF] text-white shadow-[0_12px_30px_rgba(108,99,255,0.28)]"
-          : "bg-white/80 text-[#17192A]"
-      }`}
-    >
+  const className = `flex h-12 w-full items-center justify-center gap-2 rounded-2xl text-sm font-black ${
+    primary
+      ? "bg-gradient-to-r from-[#EF8759] to-[#6C63FF] text-white shadow-[0_12px_30px_rgba(108,99,255,0.28)]"
+      : "bg-white/80 text-[#17192A]"
+  }`;
+  const content = (
+    <>
       {icon}
       {label}
+    </>
+  );
+
+  if (asSpan) {
+    return <span className={className}>{content}</span>;
+  }
+
+  return (
+    <a href={href} className={className}>
+      {content}
     </a>
   );
 }

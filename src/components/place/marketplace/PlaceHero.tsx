@@ -6,6 +6,8 @@ import Link from "next/link";
 import Image from "next/image";
 import { isAppMediaUrl } from "@/lib/media/isAppMediaUrl";
 import { OwnerPlaceEditDropdown } from "./OwnerPlaceEditDropdown";
+import type { NormalizedPlacePhone } from "@/lib/place/placePhones";
+import { PlacePhoneActionButton } from "@/components/place/PlacePhoneActions";
 import {
   SidebarCard,
   SidebarCardSection,
@@ -13,7 +15,6 @@ import {
   SidebarCardAddressRow,
   SidebarCardContactRow,
   SidebarCardShare,
-  SidebarCardPrimaryLink,
 } from "@/components/shared/SidebarCard";
 
 interface PlaceHeroProps {
@@ -27,7 +28,7 @@ interface PlaceHeroProps {
   district?: string;
   address?: string;
   metro?: string;
-  phone?: string;
+  phones: NormalizedPlacePhone[];
   website?: string;
   instagramUrl?: string;
   logoUrl?: string | null;
@@ -52,7 +53,7 @@ export function PlaceHero({
   district,
   address,
   metro,
-  phone,
+  phones,
   website,
   instagramUrl,
   logoUrl,
@@ -272,9 +273,17 @@ export function PlaceHero({
             )}
 
             {/* Contacts */}
-            {(website || instagramUrl) && (
+            {(phones.length > 0 || website || instagramUrl) && (
               <SidebarCardSection>
                 <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  {phones.map((phone, index) => (
+                    <SidebarCardContactRow
+                      key={`${phone.href}-${index}`}
+                      label={phone.label}
+                      href={phone.href}
+                      value={phone.value}
+                    />
+                  ))}
                   {website && websiteDisplay && (
                     <SidebarCardContactRow
                       label="Сайт"
@@ -298,15 +307,15 @@ export function PlaceHero({
             {/* Позвонить + Сохранить */}
             <SidebarCardTopSection>
               <div ref={ctaRef} className="flex items-center gap-3">
-                {phone && (
-                  <Link
-                    href={`tel:${phone}`}
+                {phones.length > 0 && (
+                  <PlacePhoneActionButton
+                    phones={phones}
+                    placeTitle={title}
                     className="flex h-14 flex-1 items-center justify-center gap-2 rounded-full bg-[#EF8759] text-[15px] font-semibold text-white transition-colors hover:bg-[#E86A3A]"
-                    style={{ textDecoration: "none" }}
                   >
                     <Phone className="h-4 w-4 shrink-0" />
                     Позвонить
-                  </Link>
+                  </PlacePhoneActionButton>
                 )}
                 <PlaceSaveHeart
                   placeId={placeId}

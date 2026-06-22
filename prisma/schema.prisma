@@ -1035,6 +1035,11 @@ model Place {
   lat                          Float?
   lng                          Float?
   phone                        String?
+  phoneLabel                   String?
+  phone2                       String?
+  phone2Label                  String?
+  phone3                       String?
+  phone3Label                  String?
   website                      String?
   createdAt                    DateTime           @default(now())
   updatedAt                    DateTime           @updatedAt
@@ -1264,6 +1269,11 @@ model PlaceRevision {
   floor                 String?
   unit                  String?
   phone                 String?
+  phoneLabel            String?
+  phone2                String?
+  phone2Label           String?
+  phone3                String?
+  phone3Label           String?
   website               String?
   instagramHandle       String?
   instagramUrl          String?

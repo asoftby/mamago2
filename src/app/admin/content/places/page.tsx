@@ -61,6 +61,21 @@ async function getPlaces(params: SearchParams) {
           email: true,
         },
       },
+      revisions: {
+        where: {
+          status: {
+            in: ["DRAFT", "PENDING", "NEEDS_REVISION"],
+          },
+        },
+        select: {
+          id: true,
+          status: true,
+        },
+        take: 1,
+        orderBy: {
+          createdAt: "desc",
+        },
+      },
     },
     orderBy: {
       createdAt: "desc",
@@ -110,6 +125,36 @@ function PlacesTable({ places }: { places: Awaited<ReturnType<typeof getPlaces>>
             const statusConfig =
               MODERATION_CONTENT_STATUS_CONFIG[place.status] ||
               MODERATION_CONTENT_STATUS_CONFIG.DRAFT;
+            const hasActiveRevision =
+              place.status === "PUBLISHED" &&
+              place.revisions.some((revision) => revision.status === "PENDING");
+            const action = (() => {
+              if (place.status === "DRAFT") {
+                return {
+                  href: `/editor/place/${place.id}/edit?returnTo=${encodeURIComponent(`/admin/content/places/${place.id}`)}`,
+                  label: "Открыть в редакторе",
+                };
+              }
+
+              if (place.status === "PENDING") {
+                return {
+                  href: `/admin/content/places/${place.id}`,
+                  label: "Модерировать",
+                };
+              }
+
+              if (hasActiveRevision) {
+                return {
+                  href: `/admin/content/places/${place.id}`,
+                  label: "Проверить изменения",
+                };
+              }
+
+              return {
+                href: `/admin/content/places/${place.id}`,
+                label: "Открыть",
+              };
+            })();
             
             // Extract street and house number from formattedAddr or customAddress
             const fullAddress = place.formattedAddr || place.customAddress || "";
@@ -145,10 +190,10 @@ function PlacesTable({ places }: { places: Awaited<ReturnType<typeof getPlaces>>
                 </td>
                 <td className="px-4 py-3">
                   <Link
-                    href={`/admin/content/places/${place.id}`}
+                    href={action.href}
                     className="text-blue-600 hover:text-blue-800 font-medium"
                   >
-                    Review
+                    {action.label}
                   </Link>
                 </td>
               </tr>

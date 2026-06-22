@@ -34,6 +34,7 @@ import {
 } from "@/lib/validation/placeCategoryValidation";
 import { createPublishTimer, runAfterPublishResponse } from "@/server/utils/publishPipeline";
 import { syncPlaceMediaUsage } from "@/server/services/media/media-usage.service";
+import { normalizePlacePhoneFields } from "@/lib/place/placePhones";
 
 async function finalizePublishedPlaceSlugIfNeeded(placeId: string, isPublished: boolean) {
   if (!isPublished) return;
@@ -147,6 +148,7 @@ export async function POST(request: NextRequest) {
           category: String(data.category ?? "").trim() || "other",
         }
       : data;
+    const phones = normalizePlacePhoneFields(d);
     timer.mark("validate");
 
     // Get user's business (if exists)
@@ -234,7 +236,12 @@ export async function POST(request: NextRequest) {
         logoImageId: d.wizardSessionId ? null : d.logoImageId || null,
 
         // Step 4 fields
-        phone: d.phone || null,
+        phone: phones.phone,
+        phoneLabel: phones.phoneLabel,
+        phone2: phones.phone2,
+        phone2Label: phones.phone2Label,
+        phone3: phones.phone3,
+        phone3Label: phones.phone3Label,
         website: d.website || null,
         instagramHandle: d.instagramHandle || null,
         instagramUrl: d.instagramUrl || null,
@@ -493,8 +500,26 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const errorCode =
+      typeof error === "object" && error !== null && "code" in error
+        ? String((error as { code?: unknown }).code)
+        : undefined;
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+
     return NextResponse.json(
-      { error: "INTERNAL_SERVER_ERROR", message: "Failed to create place" },
+      {
+        error: "INTERNAL_SERVER_ERROR",
+        message: errorMessage,
+        code: errorCode,
+        details:
+          process.env.NODE_ENV === "development"
+            ? {
+                name: error instanceof Error ? error.name : undefined,
+                message: errorMessage,
+                stack: error instanceof Error ? error.stack : undefined,
+              }
+            : undefined,
+      },
       { status: 500 }
     );
   }

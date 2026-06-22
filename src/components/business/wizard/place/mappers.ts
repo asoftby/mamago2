@@ -6,6 +6,7 @@ import type { OpeningHoursWithRelations } from "@/server/services/openingHours/o
 import { normalizeVisitFormats } from "@/hooks/useVisitFormats";
 import { resolvePlaceLogoImage } from "@/lib/place/resolvePlaceLogoImage";
 import { parsePriceData } from "@/lib/priceItems";
+import { normalizePlacePhoneFields } from "@/lib/place/placePhones";
 
 type PlaceWithRelations = Place & {
   images?: PrismaPlaceImage[];
@@ -20,6 +21,7 @@ export function mapPlaceToFormData(
   place: PlaceWithRelations
 ): PlaceFormData {
   const defaults = getDefaultFormData();
+  const phones = normalizePlacePhoneFields(place);
   
   return {
     ...defaults,
@@ -67,7 +69,12 @@ export function mapPlaceToFormData(
     googleMapsUri: place.googleMapsUri,
     
     // Step 3: Contacts
-    phone: place.phone,
+    phone: phones.phone,
+    phoneLabel: phones.phoneLabel,
+    phone2: phones.phone2,
+    phone2Label: phones.phone2Label,
+    phone3: phones.phone3,
+    phone3Label: phones.phone3Label,
     website: place.website,
     instagramHandle: place.instagramHandle,
     instagramUrl: place.instagramUrl,
@@ -99,6 +106,8 @@ export function mapPlaceToFormData(
  * Map form data to Place payload for API submission
  */
 export function buildPlacePayload(data: PlaceFormData): Partial<Place> & { subcategoryIds?: string[] } {
+  const phones = normalizePlacePhoneFields(data);
+
   return {
     // Step 1: Profile
     title: data.title,
@@ -131,7 +140,12 @@ export function buildPlacePayload(data: PlaceFormData): Partial<Place> & { subca
     googleMapsUri: data.googleMapsUri,
     
     // Step 3: Contacts
-    phone: data.phone,
+    phone: phones.phone,
+    phoneLabel: phones.phoneLabel,
+    phone2: phones.phone2,
+    phone2Label: phones.phone2Label,
+    phone3: phones.phone3,
+    phone3Label: phones.phone3Label,
     website: data.website,
     instagramHandle: data.instagramHandle,
     instagramUrl: data.instagramUrl,

@@ -39,9 +39,10 @@ interface PlaceRevisionModerationViewProps {
     title: string;
     updatedAt: Date;
     images?: Array<{ id: string; url: string; kind: string; sortOrder?: number }>;
-    openingHours?: Record<string, unknown> | null;
+    openingHours?: OpeningHoursWithRelations | null;
     city?: { id: string; name: string; hasMetro?: boolean | null; metroMaxDistanceM?: number | null } | null;
-    owner?: { business: { name: string } | null } | null;
+    createdBy?: { business: { name: string } | null } | null;
+    ownerBusiness?: { id: string; name: string } | null;
     status: string;
     slug?: string | null;
     districtManual?: { name: string } | null;
@@ -50,8 +51,28 @@ interface PlaceRevisionModerationViewProps {
     metroAuto?: { name: string } | null;
     metroManualDistanceM?: number | null;
     metroAutoDistanceM?: number | null;
+    displayAddress?: string | null;
     formattedAddr?: string | null;
     customAddress?: string | null;
+    locationName?: string | null;
+    directionsNote?: string | null;
+    placeKind?: string | null;
+    floor?: string | null;
+    unit?: string | null;
+    unitLabel?: string | null;
+    shortDesc?: string | null;
+    description?: string | null;
+    category?: string | null;
+    phone?: string | null;
+    website?: string | null;
+    instagramHandle?: string | null;
+    instagramUrl?: string | null;
+    ageTags?: string[];
+    visitFormats?: string[];
+    activityTypes?: string[];
+    placeGroupId?: string | null;
+    lat?: number | null;
+    lng?: number | null;
     googlePlaceId?: string | null;
     googleRating?: number | null;
     googleUserRatingsTotal?: number | null;
@@ -65,10 +86,11 @@ interface PlaceRevisionModerationViewProps {
     createdAt: Date;
     submittedAt?: Date | null;
     images?: Array<{ id: string; url: string; kind: string; sortOrder?: number }>;
-    openingHours?: Record<string, unknown> | null;
+    openingHours?: OpeningHoursWithRelations | null;
     ageTags: string[];
     visitFormats: string[];
     activityTypes: string[];
+    city?: { id: string; name: string } | null;
     districtManual?: { name: string } | null;
     districtAuto?: { name: string } | null;
     districtManualId?: string | null;
@@ -79,11 +101,56 @@ interface PlaceRevisionModerationViewProps {
     metroAutoId?: string | null;
     metroManualDistanceM?: number | null;
     metroAutoDistanceM?: number | null;
+    displayAddress?: string | null;
     formattedAddr?: string | null;
     customAddress?: string | null;
+    locationName?: string | null;
+    directionsNote?: string | null;
+    placeKind?: string | null;
+    floor?: string | null;
+    unit?: string | null;
+    unitLabel?: string | null;
+    shortDesc?: string | null;
+    description?: string | null;
+    category?: string | null;
+    phone?: string | null;
+    website?: string | null;
+    instagramHandle?: string | null;
+    instagramUrl?: string | null;
+    placeGroupId?: string | null;
+    lat?: number | null;
+    lng?: number | null;
+    moderatorComment?: string | null;
+    reviewedAt?: Date | null;
+    revisionRequestedAt?: Date | null;
+    revisionResubmittedAt?: Date | null;
     [key: string]: unknown;
   };
 }
+
+const BLOCK_FIELDS = {
+  basic: ["title", "shortDesc", "description", "category", "placeKind"],
+  location: [
+    "formattedAddr",
+    "displayAddress",
+    "locationName",
+    "directionsNote",
+    "floor",
+    "unit",
+    "cityName",
+    "districtName",
+    "metroName",
+    "placeGroupId",
+  ],
+  geo: ["lat", "lng"],
+  contacts: ["phone", "website", "instagramUrl", "instagramHandle"],
+  reviewMeta: [
+    "moderatorComment",
+    "reviewedAt",
+    "revisionRequestedAt",
+    "revisionResubmittedAt",
+  ],
+} as const;
 
 export function PlaceRevisionModerationView({
   place,
@@ -133,79 +200,108 @@ export function PlaceRevisionModerationView({
 
   // Compute diff
   const diff = useMemo(() => {
-    // DEBUG: Log raw data for investigation
-    console.log("[PlaceRevisionModerationView] Computing diff:", {
-      placeId: place.id,
-      placeTitle: place.title,
-      placeUpdatedAt: place.updatedAt,
-      revisionId: revision.id,
-      revisionTitle: revision.title,
-      revisionStatus: revision.status,
-      revisionCreatedAt: revision.createdAt,
-      revisionSubmittedAt: revision.submittedAt,
-    });
-
-    // Field configuration for comparison
     const fieldConfig = [
       { field: "title" as const, label: "Название" },
       { field: "shortDesc" as const, label: "Краткое описание" },
       { field: "description" as const, label: "Полное описание" },
       { field: "category" as const, label: "Категория" },
+      { field: "placeKind" as const, label: "Тип места" },
       { field: "formattedAddr" as const, label: "Адрес" },
+      { field: "displayAddress" as const, label: "Адрес для показа" },
       { field: "customAddress" as const, label: "Дополнительный адрес" },
+      { field: "locationName" as const, label: "Ориентир" },
+      { field: "directionsNote" as const, label: "Как найти" },
+      { field: "floor" as const, label: "Этаж" },
+      { field: "unit" as const, label: "Помещение / кабинет" },
+      { field: "cityName" as const, label: "Город" },
+      { field: "districtName" as const, label: "Район" },
+      { field: "metroName" as const, label: "Метро" },
+      { field: "lat" as const, label: "Широта" },
+      { field: "lng" as const, label: "Долгота" },
       { field: "phone" as const, label: "Телефон" },
       { field: "website" as const, label: "Веб-сайт" },
+      { field: "instagramUrl" as const, label: "Instagram URL" },
       { field: "instagramHandle" as const, label: "Instagram" },
       { field: "ageTags" as const, label: "Возрастные группы" },
       { field: "visitFormats" as const, label: "Форматы посещения" },
       { field: "activityTypes" as const, label: "Типы активностей" },
       { field: "placeGroupId" as const, label: "Принадлежность к сети" },
+      { field: "moderatorComment" as const, label: "Комментарий модератора" },
+      { field: "reviewedAt" as const, label: "Последний review" },
+      { field: "revisionRequestedAt" as const, label: "Правки запрошены" },
+      { field: "revisionResubmittedAt" as const, label: "Правки повторно отправлены" },
     ];
 
-    // Prepare data for comparison
-    // IMPORTANT: Revision fields can be null (meaning "not changed")
-    // For diff, we need to compare actual values, not null-coalesced values
-    // If revision field is null, it means no change was made to that field
-    
+    const placeDistrictName = place.districtManual?.name ?? place.districtAuto?.name ?? null;
+    const revisionDistrictName =
+      revision.districtManual?.name ?? revision.districtAuto?.name ?? placeDistrictName;
+    const placeMetroName = place.metroManual?.name ?? place.metroAuto?.name ?? null;
+    const revisionMetroName =
+      revision.metroManual?.name ?? revision.metroAuto?.name ?? placeMetroName;
+
     const oldData = {
       title: place.title,
       shortDesc: place.shortDesc,
       description: place.description,
       category: place.category,
+      placeKind: place.placeKind,
       formattedAddr: place.formattedAddr,
+      displayAddress: place.displayAddress,
       customAddress: place.customAddress,
+      locationName: place.locationName,
+      directionsNote: place.directionsNote,
+      floor: place.floor,
+      unit: place.unit,
+      cityName: place.city?.name ?? null,
+      districtName: placeDistrictName,
+      metroName: placeMetroName,
+      lat: place.lat,
+      lng: place.lng,
       phone: place.phone,
       website: place.website,
+      instagramUrl: place.instagramUrl,
       instagramHandle: place.instagramHandle,
-      ageTags: place.ageTags,
-      visitFormats: place.visitFormats,
-      activityTypes: place.activityTypes,
+      ageTags: place.ageTags ?? [],
+      visitFormats: place.visitFormats ?? [],
+      activityTypes: place.activityTypes ?? [],
       placeGroupId: place.placeGroupId,
+      moderatorComment: null,
+      reviewedAt: null,
+      revisionRequestedAt: null,
+      revisionResubmittedAt: null,
     };
 
-    // For newData, use revision value if it exists (not null), otherwise use place value
-    // This correctly handles the case where revision.field === null means "unchanged"
     const newData = {
       title: revision.title !== null ? revision.title : place.title,
       shortDesc: revision.shortDesc !== null ? revision.shortDesc : place.shortDesc,
       description: revision.description !== null ? revision.description : place.description,
       category: revision.category !== null ? revision.category : place.category,
+      placeKind: revision.placeKind !== null ? revision.placeKind : place.placeKind,
       formattedAddr: revision.formattedAddr !== null ? revision.formattedAddr : place.formattedAddr,
+      displayAddress: revision.displayAddress !== null ? revision.displayAddress : place.displayAddress,
       customAddress: revision.customAddress !== null ? revision.customAddress : place.customAddress,
+      locationName: revision.locationName !== null ? revision.locationName : place.locationName,
+      directionsNote: revision.directionsNote !== null ? revision.directionsNote : place.directionsNote,
+      floor: revision.floor !== null ? revision.floor : place.floor,
+      unit: revision.unit !== null ? revision.unit : place.unit,
+      cityName: revision.city?.name ?? place.city?.name ?? null,
+      districtName: revisionDistrictName,
+      metroName: revisionMetroName,
+      lat: revision.lat !== null ? revision.lat : place.lat,
+      lng: revision.lng !== null ? revision.lng : place.lng,
       phone: revision.phone !== null ? revision.phone : place.phone,
       website: revision.website !== null ? revision.website : place.website,
+      instagramUrl: revision.instagramUrl !== null ? revision.instagramUrl : place.instagramUrl,
       instagramHandle: revision.instagramHandle !== null ? revision.instagramHandle : place.instagramHandle,
-      ageTags: revision.ageTags.length > 0 ? revision.ageTags : place.ageTags,
-      visitFormats: revision.visitFormats.length > 0 ? revision.visitFormats : place.visitFormats,
-      activityTypes: revision.activityTypes.length > 0 ? revision.activityTypes : place.activityTypes,
+      ageTags: revision.ageTags.length > 0 ? revision.ageTags : place.ageTags ?? [],
+      visitFormats: revision.visitFormats.length > 0 ? revision.visitFormats : place.visitFormats ?? [],
+      activityTypes: revision.activityTypes.length > 0 ? revision.activityTypes : place.activityTypes ?? [],
       placeGroupId: revision.placeGroupId !== undefined ? revision.placeGroupId : place.placeGroupId,
+      moderatorComment: revision.moderatorComment ?? null,
+      reviewedAt: revision.reviewedAt ?? null,
+      revisionRequestedAt: revision.revisionRequestedAt ?? null,
+      revisionResubmittedAt: revision.revisionResubmittedAt ?? null,
     };
-
-    // DEBUG: Log comparison data
-    console.log("[PlaceRevisionModerationView] Comparison data:", {
-      oldData,
-      newData,
-    });
 
     // Compare fields
     const allFieldChanges = compareFields(oldData, newData, fieldConfig);
@@ -271,17 +367,6 @@ export function PlaceRevisionModerationView({
       totalChanges: changedFieldsCount + baseSummary.addedPhotos + baseSummary.removedPhotos,
     };
 
-    // DEBUG: Log results
-    console.log("[PlaceRevisionModerationView] Diff results:", {
-      totalFields: allFieldChanges.length,
-      changedFields: changedFields.length,
-      changedFieldNames: changedFields.map(c => c.field),
-      addedPhotos: imageChanges.added.length,
-      removedPhotos: imageChanges.removed.length,
-      openingHoursChangeType: openingHoursChange.changeType,
-      totalChanges: summary.totalChanges,
-    });
-
     return {
       allFieldChanges,
       changedFields,
@@ -293,7 +378,13 @@ export function PlaceRevisionModerationView({
 
   // Location info (from revision if changed, otherwise from place)
   const displayAddress =
-    revision.formattedAddr ?? place.formattedAddr ?? revision.customAddress ?? place.customAddress ?? "Адрес не указан";
+    revision.displayAddress ??
+    place.displayAddress ??
+    revision.formattedAddr ??
+    place.formattedAddr ??
+    revision.customAddress ??
+    place.customAddress ??
+    "Адрес не указан";
   
   const districtName =
     (revision.districtManual as { name: string } | null)?.name ??
@@ -321,6 +412,26 @@ export function PlaceRevisionModerationView({
     cityHasMetro &&
     metroDistance !== 0 &&
     metroDistance <= metroMaxDistance;
+  const businessName = place.ownerBusiness?.name ?? place.createdBy?.business?.name ?? null;
+  const filterBlock = (fields: readonly string[]) =>
+    diff.changedFields.filter((change) => fields.includes(change.field));
+  const groupedChanges = {
+    basic: filterBlock(BLOCK_FIELDS.basic),
+    location: filterBlock(BLOCK_FIELDS.location),
+    geo: filterBlock(BLOCK_FIELDS.geo),
+    contacts: filterBlock(BLOCK_FIELDS.contacts),
+    reviewMeta: filterBlock(BLOCK_FIELDS.reviewMeta),
+  };
+  const locationContext: string[] = [
+    (revision.locationName ?? place.locationName) ? `Ориентир: ${revision.locationName ?? place.locationName}` : null,
+    (revision.directionsNote ?? place.directionsNote)
+      ? `Как найти: ${revision.directionsNote ?? place.directionsNote}`
+      : null,
+    (revision.floor ?? place.floor) ? `Этаж: ${revision.floor ?? place.floor}` : null,
+    (revision.unit ?? place.unit)
+      ? `${revision.unitLabel ?? place.unitLabel ?? "Помещение"}: ${revision.unit ?? place.unit}`
+      : null,
+  ].filter((value): value is string => Boolean(value));
 
   const handleModerate = async (
     action: "APPROVE" | "NEEDS_REVISION" | "REJECT"
@@ -381,12 +492,12 @@ export function PlaceRevisionModerationView({
           className="inline-flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 mb-4"
         >
           <ArrowLeft className="w-4 h-4" />
-          Back to queue
+          Назад к очереди
         </Link>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">
-              Place Update Moderation
+              Проверка изменений места
             </h1>
             <p className="text-sm text-gray-600 mt-1">
               {revision.title ?? place.title}
@@ -438,15 +549,22 @@ export function PlaceRevisionModerationView({
             </div>
           )}
 
-          {/* Changed Fields */}
-          {diff.changedFields.length > 0 && (
+          {groupedChanges.basic.length > 0 && (
             <div>
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">
-                Изменённые поля
-              </h2>
+              <h2 className="mb-4 text-xl font-semibold text-gray-900">Основное</h2>
               <div className="space-y-4">
-                {diff.changedFields.map((change) => {
-                  // Use special component for placeGroupId
+                {groupedChanges.basic.map((change) => (
+                  <FieldDiff key={change.field} change={change} />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {groupedChanges.location.length > 0 && (
+            <div>
+              <h2 className="mb-4 text-xl font-semibold text-gray-900">Локация</h2>
+              <div className="space-y-4">
+                {groupedChanges.location.map((change) => {
                   if (change.field === "placeGroupId") {
                     return (
                       <PlaceGroupDiff
@@ -458,8 +576,31 @@ export function PlaceRevisionModerationView({
                       />
                     );
                   }
+
                   return <FieldDiff key={change.field} change={change} />;
                 })}
+              </div>
+            </div>
+          )}
+
+          {groupedChanges.geo.length > 0 && (
+            <div>
+              <h2 className="mb-4 text-xl font-semibold text-gray-900">Координаты</h2>
+              <div className="space-y-4">
+                {groupedChanges.geo.map((change) => (
+                  <FieldDiff key={change.field} change={change} />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {groupedChanges.contacts.length > 0 && (
+            <div>
+              <h2 className="mb-4 text-xl font-semibold text-gray-900">Контакты</h2>
+              <div className="space-y-4">
+                {groupedChanges.contacts.map((change) => (
+                  <FieldDiff key={change.field} change={change} />
+                ))}
               </div>
             </div>
           )}
@@ -484,13 +625,20 @@ export function PlaceRevisionModerationView({
             </div>
           )}
 
-          {/* Location Info (if relevant) */}
-          {(districtName || shouldShowMetro) && (
+          {/* Location Info (context) */}
+          {(districtName || shouldShowMetro || locationContext.length > 0) && (
             <div className="border border-gray-200 rounded-lg p-4 bg-white">
               <h3 className="text-sm font-semibold text-gray-900 mb-3">
                 Местоположение
               </h3>
               <p className="text-sm text-gray-700 mb-3">{displayAddress}</p>
+              {locationContext.length > 0 && (
+                <div className="mb-3 space-y-1 rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm text-gray-600">
+                  {locationContext.map((item) => (
+                    <p key={item}>{item}</p>
+                  ))}
+                </div>
+              )}
               <div className="mb-3">
                 <GoogleReviewsStatusBadge
                   googlePlaceId={place.googlePlaceId}
@@ -516,43 +664,54 @@ export function PlaceRevisionModerationView({
               </div>
             </div>
           )}
+
+          {groupedChanges.reviewMeta.length > 0 && (
+            <div>
+              <h2 className="mb-4 text-xl font-semibold text-gray-900">История review</h2>
+              <div className="space-y-4">
+                {groupedChanges.reviewMeta.map((change) => (
+                  <FieldDiff key={change.field} change={change} />
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* RIGHT COLUMN: Moderation Panel (Sticky) */}
         <div className="lg:col-span-1">
           <div className="sticky top-6 border border-gray-200 rounded-lg p-6 bg-white shadow-sm">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">
-              Moderation
+              Модерация
             </h3>
 
             {/* Revision Info */}
             <div className="space-y-3 mb-6 pb-6 border-b">
               <div>
-                <span className="text-sm font-medium text-gray-600">Type:</span>
-                <p className="text-sm text-gray-900 mt-1">Place Update</p>
+                <span className="text-sm font-medium text-gray-600">Тип:</span>
+                <p className="text-sm text-gray-900 mt-1">Изменения места</p>
               </div>
 
               {place.city && (
                 <div>
-                  <span className="text-sm font-medium text-gray-600">City:</span>
+                  <span className="text-sm font-medium text-gray-600">Город:</span>
                   <p className="text-sm text-gray-900 mt-1">{place.city.name}</p>
                 </div>
               )}
 
-              {place.owner?.business && (
+              {businessName && (
                 <div>
                   <span className="text-sm font-medium text-gray-600">
-                    Business:
+                    Бизнес:
                   </span>
                   <p className="text-sm text-gray-900 mt-1">
-                    {place.owner.business.name}
+                    {businessName}
                   </p>
                 </div>
               )}
 
               <div>
                 <span className="text-sm font-medium text-gray-600">
-                  Submitted:
+                  Отправлено:
                 </span>
                 <p className="text-sm text-gray-900 mt-1">
                   {revision.submittedAt
@@ -566,24 +725,66 @@ export function PlaceRevisionModerationView({
 
               <div>
                 <span className="text-sm font-medium text-gray-600">
-                  Changes:
+                  Изменений:
                 </span>
                 <p className="text-sm text-gray-900 mt-1">
                   {diff.summary.totalChanges} total
                 </p>
               </div>
 
+              {revision.reviewedAt && (
+                <div>
+                  <span className="text-sm font-medium text-gray-600">
+                    Проверено:
+                  </span>
+                  <p className="text-sm text-gray-900 mt-1">
+                    {formatDistanceToNow(revision.reviewedAt, {
+                      addSuffix: true,
+                      locale: ru,
+                    })}
+                  </p>
+                </div>
+              )}
+
+              {revision.revisionRequestedAt && (
+                <div>
+                  <span className="text-sm font-medium text-gray-600">
+                    Запрос доработки:
+                  </span>
+                  <p className="text-sm text-gray-900 mt-1">
+                    {formatDistanceToNow(revision.revisionRequestedAt, {
+                      addSuffix: true,
+                      locale: ru,
+                    })}
+                  </p>
+                </div>
+              )}
+
+              {revision.revisionResubmittedAt && (
+                <div>
+                  <span className="text-sm font-medium text-gray-600">
+                    Переотправлено:
+                  </span>
+                  <p className="text-sm text-gray-900 mt-1">
+                    {formatDistanceToNow(revision.revisionResubmittedAt, {
+                      addSuffix: true,
+                      locale: ru,
+                    })}
+                  </p>
+                </div>
+              )}
+
               {/* Display Title Info */}
               <div>
                 <span className="text-sm font-medium text-gray-600">
-                  Public Display:
+                  Публичное название:
                 </span>
                 <p className="text-sm text-gray-900 mt-1 font-medium">
                   {displayTitle}
                 </p>
                 {hasDuplicates && (
                   <p className="text-xs text-amber-600 mt-1">
-                    ⚠️ Title conflicts with other places in this city. Address added for disambiguation.
+                    Название конфликтует с другими местами в городе. Для различения используется адрес.
                   </p>
                 )}
               </div>
@@ -623,7 +824,7 @@ export function PlaceRevisionModerationView({
                 disabled={isSubmitting}
                 className="w-full bg-green-600 hover:bg-green-700"
               >
-                {isSubmitting ? "Processing..." : diff.summary.totalChanges === 0 ? "Approve (No Changes)" : "Approve Changes"}
+                {isSubmitting ? "Обработка..." : diff.summary.totalChanges === 0 ? "Одобрить без изменений" : "Одобрить изменения"}
               </Button>
 
               <Button
@@ -632,7 +833,7 @@ export function PlaceRevisionModerationView({
                 variant="outline"
                 className="w-full"
               >
-                Request Changes
+                На доработку
               </Button>
 
               <Button
@@ -641,7 +842,7 @@ export function PlaceRevisionModerationView({
                 variant="destructive"
                 className="w-full"
               >
-                Reject Update
+                Отклонить
               </Button>
             </div>
 

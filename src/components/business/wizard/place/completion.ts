@@ -133,7 +133,11 @@ export function getPlaceCompletion(data: PlaceFormData): CompletionResult {
   }
   
   // Check phone
-  if (data.phone && data.phone.trim().length > 0) {
+  if (
+    (data.phone && data.phone.trim().length > 0) ||
+    (data.phone2 && data.phone2.trim().length > 0) ||
+    (data.phone3 && data.phone3.trim().length > 0)
+  ) {
     achievedScore += FIELD_WEIGHTS.phone;
     completedFields.push("phone");
   } else {

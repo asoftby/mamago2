@@ -53,6 +53,11 @@ export interface PlaceFormData {
   
   // Step 3: Contacts
   phone: string | null;
+  phoneLabel: string | null;
+  phone2: string | null;
+  phone2Label: string | null;
+  phone3: string | null;
+  phone3Label: string | null;
   website: string | null;
   instagramHandle: string | null;
   instagramUrl: string | null;

@@ -9,6 +9,7 @@ import {
   notifyPlaceUpdateRejected,
 } from "./notification.service";
 import { mapToCreatePayload } from "@/lib/openingHours";
+import { normalizePlacePhoneFields } from "@/lib/place/placePhones";
 
 /**
  * Data structure for revision snapshot fields
@@ -40,6 +41,11 @@ export interface PlaceRevisionData {
   floor?: string | null;
   unit?: string | null;
   phone?: string | null;
+  phoneLabel?: string | null;
+  phone2?: string | null;
+  phone2Label?: string | null;
+  phone3?: string | null;
+  phone3Label?: string | null;
   website?: string | null;
   instagramHandle?: string | null;
   instagramUrl?: string | null;
@@ -218,6 +224,11 @@ export async function getOrCreatePlaceRevision(
       floor: place.floor,
       unit: place.unit,
       phone: place.phone,
+      phoneLabel: place.phoneLabel,
+      phone2: place.phone2,
+      phone2Label: place.phone2Label,
+      phone3: place.phone3,
+      phone3Label: place.phone3Label,
       website: place.website,
       instagramHandle: place.instagramHandle,
       instagramUrl: place.instagramUrl,
@@ -286,6 +297,30 @@ export async function savePlaceRevisionDraft(
 
   // Extract wizardSessionId if provided
   const { wizardSessionId, ...revisionData } = data;
+  const hasPhoneFieldUpdates =
+    revisionData.phone !== undefined ||
+    revisionData.phoneLabel !== undefined ||
+    revisionData.phone2 !== undefined ||
+    revisionData.phone2Label !== undefined ||
+    revisionData.phone3 !== undefined ||
+    revisionData.phone3Label !== undefined;
+  const normalizedPhoneFields = hasPhoneFieldUpdates
+    ? normalizePlacePhoneFields({
+        phone: revisionData.phone !== undefined ? revisionData.phone : revision.phone,
+        phoneLabel:
+          revisionData.phoneLabel !== undefined ? revisionData.phoneLabel : revision.phoneLabel,
+        phone2: revisionData.phone2 !== undefined ? revisionData.phone2 : revision.phone2,
+        phone2Label:
+          revisionData.phone2Label !== undefined
+            ? revisionData.phone2Label
+            : revision.phone2Label,
+        phone3: revisionData.phone3 !== undefined ? revisionData.phone3 : revision.phone3,
+        phone3Label:
+          revisionData.phone3Label !== undefined
+            ? revisionData.phone3Label
+            : revision.phone3Label,
+      })
+    : null;
 
   // Filter out fields that don't exist in PlaceRevision model
   // PlaceRevision uses logoImageId, not logoMediaId
@@ -344,7 +379,10 @@ export async function savePlaceRevisionDraft(
 
   // Filter out null values from validData (Prisma expects undefined for optional fields)
   const validDataFiltered = Object.fromEntries(
-    Object.entries(validData).filter(([, v]) => v !== null)
+    Object.entries({
+      ...validData,
+      ...(normalizedPhoneFields ?? {}),
+    }).filter(([, v]) => v !== undefined)
   ) as Prisma.AtLeast<Prisma.PlaceRevisionUpdateInput, 'id'>;
 
   // Update revision with only valid PlaceRevision fields
@@ -841,7 +879,12 @@ export async function approvePlaceRevision(
         unitLabel: revision.unitLabel ?? revision.place.unitLabel,
         floor: revision.floor ?? revision.place.floor,
         unit: revision.unit ?? revision.place.unit,
-        phone: revision.phone ?? revision.place.phone,
+        phone: revision.phone,
+        phoneLabel: revision.phone ? revision.phoneLabel : null,
+        phone2: revision.phone2,
+        phone2Label: revision.phone2 ? revision.phone2Label : null,
+        phone3: revision.phone3,
+        phone3Label: revision.phone3 ? revision.phone3Label : null,
         website: revision.website ?? revision.place.website,
         instagramHandle: revision.instagramHandle ?? revision.place.instagramHandle,
         instagramUrl: revision.instagramUrl ?? revision.place.instagramUrl,

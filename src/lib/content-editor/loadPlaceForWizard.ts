@@ -75,6 +75,15 @@ export async function loadPlaceForWizard(placeId: string) {
   const placeForWizard = activeRevision
     ? {
         ...place,
+        phone: activeRevision.phone,
+        phoneLabel: activeRevision.phoneLabel,
+        phone2: activeRevision.phone2,
+        phone2Label: activeRevision.phone2Label,
+        phone3: activeRevision.phone3,
+        phone3Label: activeRevision.phone3Label,
+        website: activeRevision.website,
+        instagramHandle: activeRevision.instagramHandle,
+        instagramUrl: activeRevision.instagramUrl,
         images: activeRevision.images,
         placeGroupId:
           activeRevision.placeGroupId !== undefined ? activeRevision.placeGroupId : place.placeGroupId,

@@ -15,6 +15,7 @@ import type { PriceData } from "@/lib/priceItems";
 import Link from "next/link";
 import Image from "next/image";
 import { isAppMediaUrl } from "@/lib/media/isAppMediaUrl";
+import type { NormalizedPlacePhone } from "@/lib/place/placePhones";
 
 interface MarketplacePlacePageProps {
   place: {
@@ -28,7 +29,7 @@ interface MarketplacePlacePageProps {
     reviewCount?: number;
 
     // Contact
-    phone?: string;
+    phones: NormalizedPlacePhone[];
     website?: string;
     instagramUrl?: string;
     facebookUrl?: string;
@@ -190,7 +191,7 @@ export function MarketplacePlacePage({
         shortDesc={place.shortDesc}
         address={place.address}
         metro={place.metro}
-        phone={place.phone}
+        phones={place.phones}
         website={place.website}
         instagramUrl={place.instagramUrl}
         logoUrl={place.logoUrl}
@@ -292,7 +293,7 @@ export function MarketplacePlacePage({
         statusLabel={stickyStatusLabel}
         addressLine={stickyAddressLine}
         detailLine={stickyDetailLine}
-        phone={place.phone}
+        phones={place.phones}
         placeId={place.id}
         placeSlug={place.slug}
         placeTitle={place.title}
@@ -665,7 +666,7 @@ function GallerySection({
 /* ─── Final CTA ─────────────────────────────────────────────────────────── */
 
 function FinalCTA({ place }: { place: MarketplacePlacePageProps["place"] }) {
-  const hasPhone = !!place.phone;
+  const hasPhone = place.phones.length > 0;
   const hasWebsite = !!place.website;
 
   if (!hasPhone && !hasWebsite) return null;
@@ -710,7 +711,7 @@ function FinalCTA({ place }: { place: MarketplacePlacePageProps["place"] }) {
           >
             {hasPhone && (
               <a
-                href={`tel:${place.phone}`}
+                href={place.phones[0].href}
                 style={{
                   display: "inline-flex",
                   alignItems: "center",

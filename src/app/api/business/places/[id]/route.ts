@@ -18,6 +18,7 @@ import { syncPlaceMediaUsage } from "@/server/services/media/media-usage.service
 import { attachMediaToEntity } from "@/lib/media/mediaRegistry";
 import { ensureMediaAssetForStoredFileUrl } from "@/lib/media/ensureMediaAssetForStoredFileUrl";
 import { extractMediaRelativePathFromUrl } from "@/server/media/media-storage";
+import { normalizePlacePhoneFields } from "@/lib/place/placePhones";
 
 export async function GET(
   request: NextRequest,
@@ -163,6 +164,12 @@ export async function PATCH(
         createdByUserId: true,
         ownerBusinessId: true,
         status: true,
+        phone: true,
+        phoneLabel: true,
+        phone2: true,
+        phone2Label: true,
+        phone3: true,
+        phone3Label: true,
         primaryCategoryId: true,
         subcategories: {
           orderBy: { position: "asc" },
@@ -219,6 +226,15 @@ export async function PATCH(
       }
     }
     perf.mark("validate");
+
+    const normalizedPhones = normalizePlacePhoneFields({
+      phone: body.phone !== undefined ? body.phone : existing.phone,
+      phoneLabel: body.phoneLabel !== undefined ? body.phoneLabel : existing.phoneLabel,
+      phone2: body.phone2 !== undefined ? body.phone2 : existing.phone2,
+      phone2Label: body.phone2Label !== undefined ? body.phone2Label : existing.phone2Label,
+      phone3: body.phone3 !== undefined ? body.phone3 : existing.phone3,
+      phone3Label: body.phone3Label !== undefined ? body.phone3Label : existing.phone3Label,
+    });
 
     // Lenient validation for autosave - only check types/formats
     const updateData: Record<string, unknown> = {};
@@ -289,7 +305,21 @@ export async function PATCH(
         }
       }
     }
-    if (body.phone !== undefined) updateData.phone = body.phone ? String(body.phone) : null;
+    if (
+      body.phone !== undefined ||
+      body.phoneLabel !== undefined ||
+      body.phone2 !== undefined ||
+      body.phone2Label !== undefined ||
+      body.phone3 !== undefined ||
+      body.phone3Label !== undefined
+    ) {
+      updateData.phone = normalizedPhones.phone;
+      updateData.phoneLabel = normalizedPhones.phoneLabel;
+      updateData.phone2 = normalizedPhones.phone2;
+      updateData.phone2Label = normalizedPhones.phone2Label;
+      updateData.phone3 = normalizedPhones.phone3;
+      updateData.phone3Label = normalizedPhones.phone3Label;
+    }
     if (body.website !== undefined) updateData.website = body.website ? String(body.website) : null;
     if (body.instagramHandle !== undefined) updateData.instagramHandle = body.instagramHandle ? String(body.instagramHandle) : null;
     if (body.instagramUrl !== undefined) updateData.instagramUrl = body.instagramUrl ? String(body.instagramUrl) : null;

@@ -33,6 +33,11 @@ export function getDefaultFormData(): PlaceFormData {
     
     // Step 3: Contacts
     phone: null,
+    phoneLabel: null,
+    phone2: null,
+    phone2Label: null,
+    phone3: null,
+    phone3Label: null,
     website: null,
     instagramHandle: null,
     instagramUrl: null,
@@ -98,7 +103,13 @@ export function hasMeaningfulContent(data: PlaceFormData): boolean {
   }
   
   // Check contacts
-  if (data.phone || data.website || data.instagramHandle) {
+  if (
+    data.phone ||
+    data.phone2 ||
+    data.phone3 ||
+    data.website ||
+    data.instagramHandle
+  ) {
     return true;
   }
   

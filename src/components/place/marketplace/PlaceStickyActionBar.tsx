@@ -4,13 +4,15 @@ import { useEffect, useState } from "react";
 import { Phone } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PlaceSaveHeart } from "@/features/save/PlaceSaveHeart";
+import type { NormalizedPlacePhone } from "@/lib/place/placePhones";
+import { PlacePhoneActionButton } from "@/components/place/PlacePhoneActions";
 
 export interface PlaceStickyActionBarProps {
   ctaRef?: React.RefObject<HTMLElement | null>;
   statusLabel?: string;
   addressLine?: string;
   detailLine?: string;
-  phone?: string;
+  phones: NormalizedPlacePhone[];
   placeId: string;
   placeSlug: string;
   placeTitle: string;
@@ -23,7 +25,7 @@ export function PlaceStickyActionBar({
   statusLabel,
   addressLine,
   detailLine,
-  phone,
+  phones,
   placeId,
   placeSlug,
   placeTitle,
@@ -31,8 +33,6 @@ export function PlaceStickyActionBar({
   className,
 }: PlaceStickyActionBarProps) {
   const [ctaPassed, setCtaPassed] = useState(false);
-  const telHref = phone ? `tel:${phone.replace(/\s/g, "")}` : undefined;
-
   useEffect(() => {
     const el = ctaRef?.current;
     const syncFromScroll = () => {
@@ -59,7 +59,7 @@ export function PlaceStickyActionBar({
     };
   }, [ctaRef]);
 
-  if (!telHref && !placeId) return null;
+  if (phones.length === 0 && !placeId) return null;
 
   return (
     <div
@@ -96,14 +96,15 @@ export function PlaceStickyActionBar({
         )}
       </div>
 
-      {telHref && (
-        <a
-          href={telHref}
+      {phones.length > 0 && (
+        <PlacePhoneActionButton
+          phones={phones}
+          placeTitle={placeTitle}
           className="inline-flex h-[46px] shrink-0 items-center gap-2 rounded-full bg-[#E86A3A] px-5 text-[14px] font-semibold text-white transition-colors hover:bg-primary-hover active:translate-y-px"
         >
           <Phone className="h-4 w-4 shrink-0" aria-hidden />
           Позвонить
-        </a>
+        </PlacePhoneActionButton>
       )}
 
       <PlaceSaveHeart

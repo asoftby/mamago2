@@ -76,7 +76,13 @@ export function validateStep3(data: PlaceFormData): StepValidation {
   const errors: string[] = [];
   
   // Contacts are optional, but check if any are provided
-  const hasAnyContact = !!(data.phone || data.website || data.instagramHandle);
+  const hasAnyContact = !!(
+    data.phone ||
+    data.phone2 ||
+    data.phone3 ||
+    data.website ||
+    data.instagramHandle
+  );
   
   return {
     isValid: true, // Always valid (optional step)

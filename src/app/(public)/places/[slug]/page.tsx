@@ -21,6 +21,7 @@ import type { OpeningHoursWithRelations } from "@/server/services/openingHours/o
 import { resolvePlaceLogoImage } from "@/lib/place/resolvePlaceLogoImage";
 import { resolvePlaceLogoUrlFromDb } from "@/lib/place/resolvePlaceLogoUrlFromDb";
 import { parsePriceData } from "@/lib/priceItems";
+import { getNormalizedPlacePhones } from "@/lib/place/placePhones";
 import {
   isGoogleReviewsEnabled,
   readGoogleReviewsPayload,
@@ -478,6 +479,7 @@ export default async function PlacePage({ params }: PlacePageProps) {
       unit: place.unit,
       unitLabel: place.unitLabel,
     }) || undefined;
+  const placePhones = getNormalizedPlacePhones(place);
 
   const mapsOpenUrl = buildGoogleMapsPlaceUrl(place.lat, place.lng, heroAddressRaw);
   const mapsDirectionsUrl = buildGoogleMapsDirectionsUrl(
@@ -576,7 +578,7 @@ export default async function PlacePage({ params }: PlacePageProps) {
     reviewCount: totalReviewCount,
     
     // Contact
-    phone: place.phone || undefined,
+    phones: placePhones,
     website: place.website || undefined,
     instagramUrl:
       resolvedInstagramUrl,
