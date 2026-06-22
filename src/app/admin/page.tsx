@@ -265,7 +265,7 @@ export default async function AdminDashboardPage() {
                 >
                   {typeLabel[item.type]}
                 </div>
-                <div className="flex-1 min-w-0">
+                  <div className="flex-1 min-w-0">
                   <p className="text-sm text-gray-900">
                     {item.message ? (
                       item.entity ? (
