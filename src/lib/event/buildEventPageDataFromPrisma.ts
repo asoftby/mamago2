@@ -14,6 +14,7 @@ import {
 } from "@/domain/activities/activity-format";
 import { ageFromPlusBadgeFromAgeTags } from "@/lib/event/activityAgeBounds";
 import { getActivityDateDisplay } from "@/lib/event/getActivityDateDisplay";
+import { getNormalizedPhones, type NormalizedPhone } from "@/lib/phones/normalizePhones";
 
 const FALLBACK_POSTER = "/og-default.jpg";
 
@@ -43,6 +44,13 @@ export type ActivityForEventPageInput = {
   coverImageId?: string | null;
   images: Array<{ id: string; url: string; mediaAssetId?: string | null }>;
   sessions: Array<{ id: string; startsAt: Date }>;
+  /** Контактные телефоны события (собственные, до фоллбэка на площадку) */
+  phone?: string | null;
+  phoneLabel?: string | null;
+  phone2?: string | null;
+  phone2Label?: string | null;
+  phone3?: string | null;
+  phone3Label?: string | null;
   place: {
     id: string;
     slug: string | null;
@@ -59,6 +67,12 @@ export type ActivityForEventPageInput = {
     metroManual: { name: string } | null;
     metroAuto: { name: string } | null;
     city: { slug: string } | null;
+    phone?: string | null;
+    phoneLabel?: string | null;
+    phone2?: string | null;
+    phone2Label?: string | null;
+    phone3?: string | null;
+    phone3Label?: string | null;
   } | null;
   venue: {
     kind: EventVenueKind;
@@ -80,6 +94,12 @@ export type ActivityForEventPageInput = {
       metroManual: { name: string } | null;
       metroAuto: { name: string } | null;
       city: { slug: string } | null;
+      phone?: string | null;
+      phoneLabel?: string | null;
+      phone2?: string | null;
+      phone2Label?: string | null;
+      phone3?: string | null;
+      phone3Label?: string | null;
     } | null;
   } | null;
   eventCategory: { nameRu: string } | null;
@@ -126,6 +146,21 @@ function priceLabel(activity: Pick<ActivityForEventPageInput, "priceText" | "pri
     return formatPriceFrom(activity.priceFrom);
   }
   return "Уточняйте цену";
+}
+
+function resolveActivityPhones(activity: ActivityForEventPageInput): NormalizedPhone[] {
+  const ownPhones = getNormalizedPhones({
+    phone: activity.phone,
+    phoneLabel: activity.phoneLabel,
+    phone2: activity.phone2,
+    phone2Label: activity.phone2Label,
+    phone3: activity.phone3,
+    phone3Label: activity.phone3Label,
+  });
+  if (ownPhones.length > 0) return ownPhones;
+
+  const fallbackPlace = activity.place ?? activity.venue?.place ?? null;
+  return fallbackPlace ? getNormalizedPhones(fallbackPlace) : [];
 }
 
 function isHttpUrl(value: string): boolean {
@@ -438,6 +473,7 @@ export function buildEventPageDataFromPrismaActivity(
       saveLabel: "В идеи",
       purchaseUrl: resolvePurchaseUrl(activity),
       simpleBooking: resolveSimpleBooking(activity.id, activity),
+      phones: resolveActivityPhones(activity),
     },
     reelsUrl: resolveReelsUrl(activity),
     galleryItems: buildGalleryItems(activity, poster, options?.reelsThumbnailUrl),

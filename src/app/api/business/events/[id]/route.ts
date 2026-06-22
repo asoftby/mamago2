@@ -204,6 +204,12 @@ export async function PATCH(
         priceTo: true,
         priceText: true,
         currency: true,
+        phone: true,
+        phoneLabel: true,
+        phone2: true,
+        phone2Label: true,
+        phone3: true,
+        phone3Label: true,
         venue: {
           select: {
             kind: true,
@@ -507,6 +513,24 @@ export async function PATCH(
     }
     if (body.currency !== undefined && body.currency !== existing.currency) {
       updateData.currency = body.currency;
+    }
+    if (body.phone !== undefined && body.phone !== (existing.phone ?? "")) {
+      updateData.phone = body.phone || null;
+    }
+    if (body.phoneLabel !== undefined && body.phoneLabel !== existing.phoneLabel) {
+      updateData.phoneLabel = body.phoneLabel || null;
+    }
+    if (body.phone2 !== undefined && body.phone2 !== existing.phone2) {
+      updateData.phone2 = body.phone2 || null;
+    }
+    if (body.phone2Label !== undefined && body.phone2Label !== existing.phone2Label) {
+      updateData.phone2Label = body.phone2Label || null;
+    }
+    if (body.phone3 !== undefined && body.phone3 !== existing.phone3) {
+      updateData.phone3 = body.phone3 || null;
+    }
+    if (body.phone3Label !== undefined && body.phone3Label !== existing.phone3Label) {
+      updateData.phone3Label = body.phone3Label || null;
     }
     if (body.priceItems !== undefined) {
       updateData.priceItems = body.priceItems ?? null;

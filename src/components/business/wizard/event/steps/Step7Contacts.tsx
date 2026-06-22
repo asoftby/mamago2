@@ -3,11 +3,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { InternationalPhoneInput } from "@/components/phone/InternationalPhoneInput";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Globe, Instagram, Phone, Plus, X } from "lucide-react";
 import { formSocialPlatformSelectTriggerClassName } from "@/components/ui/form-control-dimensions";
+import { MultiPhoneFields } from "@/components/business/wizard/shared/MultiPhoneFields";
 import { createDefaultSocialLink } from "../defaults";
 import type { EventFormData, SocialLink } from "../types";
 import { inferSocialNetworkFromUrl } from "@/lib/content-editor/importContactsHint";
@@ -39,6 +39,11 @@ const SOCIAL_URL_PLACEHOLDER: Record<SocialLink["network"], string> = {
 export function Step7Contacts({ data, onChange, isEditable, eventId }: Step7ContactsProps) {
   const [placeContacts, setPlaceContacts] = useState<{
     phone: string;
+    phoneLabel: string;
+    phone2: string;
+    phone2Label: string;
+    phone3: string;
+    phone3Label: string;
     website: string;
     socialLinks: SocialLink[];
   } | null>(null);
@@ -68,12 +73,22 @@ export function Step7Contacts({ data, onChange, isEditable, eventId }: Step7Cont
       if (!response.ok) return;
       const payload = (await response.json()) as {
         phone?: string;
+        phoneLabel?: string;
+        phone2?: string;
+        phone2Label?: string;
+        phone3?: string;
+        phone3Label?: string;
         website?: string;
         socialLinks?: SocialLink[];
       };
       if (!cancelled) {
         setPlaceContacts({
           phone: payload.phone ?? "",
+          phoneLabel: payload.phoneLabel ?? "",
+          phone2: payload.phone2 ?? "",
+          phone2Label: payload.phone2Label ?? "",
+          phone3: payload.phone3 ?? "",
+          phone3Label: payload.phone3Label ?? "",
           website: payload.website ?? "",
           socialLinks: Array.isArray(payload.socialLinks) ? payload.socialLinks : [],
         });
@@ -127,9 +142,50 @@ export function Step7Contacts({ data, onChange, isEditable, eventId }: Step7Cont
     };
   }, [eventId]);
 
+  useEffect(() => {
+    if (!placeContacts || effectiveContactMode !== "inherit") return;
+
+    if (
+      data.phone === placeContacts.phone &&
+      data.phoneLabel === (placeContacts.phoneLabel || null) &&
+      data.phone2 === (placeContacts.phone2 || null) &&
+      data.phone2Label === (placeContacts.phone2Label || null) &&
+      data.phone3 === (placeContacts.phone3 || null) &&
+      data.phone3Label === (placeContacts.phone3Label || null)
+    ) {
+      return;
+    }
+
+    onChange({
+      phone: placeContacts.phone,
+      phoneLabel: placeContacts.phoneLabel || null,
+      phone2: placeContacts.phone2 || null,
+      phone2Label: placeContacts.phone2Label || null,
+      phone3: placeContacts.phone3 || null,
+      phone3Label: placeContacts.phone3Label || null,
+    });
+  }, [
+    effectiveContactMode,
+    placeContacts,
+    data.phone,
+    data.phoneLabel,
+    data.phone2,
+    data.phone2Label,
+    data.phone3,
+    data.phone3Label,
+    onChange,
+  ]);
+
   const inheritedItems = useMemo(
     () => [
-      { label: "Телефон", value: placeContacts?.phone?.trim() || "Не указан", icon: Phone },
+      {
+        label: "Телефон",
+        value:
+          [placeContacts?.phone, placeContacts?.phone2, placeContacts?.phone3]
+            .filter((value): value is string => Boolean(value?.trim()))
+            .join(", ") || "Не указан",
+        icon: Phone,
+      },
       { label: "Сайт", value: placeContacts?.website?.trim() || "Не указан", icon: Globe },
       {
         label: "Соцсети",
@@ -303,16 +359,29 @@ export function Step7Contacts({ data, onChange, isEditable, eventId }: Step7Cont
             </div>
           ) : null}
 
-          {/* Phone (stored as E.164) */}
-          <div className="space-y-2">
-            <Label htmlFor="phone">Телефон</Label>
-            <InternationalPhoneInput
-              id="phone"
-              value={data.phone}
-              onChange={(phone) => onChange({ phone, contactMode: "override" })}
-              disabled={!isEditable}
-            />
-          </div>
+          {/* Phones (primary stored as E.164) */}
+          <MultiPhoneFields
+            idPrefix="event-contact"
+            isEditable={isEditable}
+            primary={{ phone: data.phone || null, label: data.phoneLabel }}
+            secondary={{ phone: data.phone2, label: data.phone2Label }}
+            tertiary={{ phone: data.phone3, label: data.phone3Label }}
+            onChange={(slot, value) => {
+              const updates: Partial<EventFormData> = { contactMode: "override" };
+              if (slot === "primary") {
+                updates.phone = value.phone ?? "";
+                updates.phoneLabel = value.label;
+              } else if (slot === "secondary") {
+                updates.phone2 = value.phone;
+                updates.phone2Label = value.label;
+              } else {
+                updates.phone3 = value.phone;
+                updates.phone3Label = value.label;
+              }
+              onChange(updates);
+            }}
+            hint="Подпись поможет посетителям выбрать нужный номер: организатор, билеты."
+          />
 
           {/* Website */}
           <div className="space-y-2">

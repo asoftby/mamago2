@@ -757,6 +757,14 @@ model Activity {
 
   priceItems             Json?
 
+  // Контактные телефоны активности
+  phone                  String?
+  phoneLabel             String?
+  phone2                 String?
+  phone2Label            String?
+  phone3                 String?
+  phone3Label            String?
+
   // Настройки записи
   bookingEnabled         Boolean          @default(false)
   bookingMode            BookingMode?
@@ -1744,6 +1752,14 @@ model Offer {
   contactSource            String?            @default("manual")
   /// Ручной телефон предложения (fallback, если не берём контакты из места)
   contactPhone             String?
+  /// Подпись основного телефона (например, "администратор")
+  contactPhoneLabel        String?
+  /// Доп. телефон предложения
+  contactPhone2            String?
+  contactPhone2Label       String?
+  /// Доп. телефон предложения
+  contactPhone3            String?
+  contactPhone3Label       String?
   /// Ручной сайт предложения
   contactWebsite           String?
   /// Ручные соцсети предложения (JSON array)

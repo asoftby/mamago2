@@ -3,6 +3,8 @@
  * Этот файл — единственный источник правды для всех компонентов секции /offers.
  */
 
+import type { NormalizedPhone } from "@/lib/phones/normalizePhones";
+
 export interface OfferMediaItem {
   id: string;
   url: string;
@@ -176,6 +178,7 @@ export interface OfferPageData {
     /** Legacy extended fields */
     type?: OfferCtaType;
     phone?: string;
+    phones?: NormalizedPhone[];
     link?: string;
     instructions?: string;
   };

@@ -11,6 +11,9 @@ import { getMinCampSessionPrice, parseCampSessionPrice } from "@/lib/offers/camp
 import { CAMP_OFFER_DISCOVERY_GROUP_SLUGS } from "@/lib/offers/campOfferDiscoverySignals";
 import { resolvePlaceLogoUrlFromDb } from "@/lib/place/resolvePlaceLogoUrlFromDb";
 import { isGoogleReviewsEnabled } from "@/lib/place/googleReviewsMeta";
+import { getNormalizedPhones } from "@/lib/phones/normalizePhones";
+import { getNormalizedOfferPhones } from "@/lib/offer/offerPhones";
+import { getNormalizedPlacePhones } from "@/lib/place/placePhones";
 
 interface GetOfferPageDataParams {
   citySlug: string;
@@ -464,14 +467,28 @@ export async function getOfferPageData({
           }))
         : undefined,
 
-    cta: {
-      type: ctaType,
-      primaryLabel,
-      secondaryLabel: "В план",
-      phone: offer.bookingPhone || offer.contactPhone || offer.place?.phone || undefined,
-      link: offer.contactWebsite || offer.place?.website || undefined,
-      instructions: offer.bookingNote || undefined,
-    },
+    cta: (() => {
+      const phones = offer.bookingPhone
+        ? getNormalizedPhones({ phone: offer.bookingPhone })
+        : (() => {
+            const ownPhones = getNormalizedOfferPhones(offer);
+            return ownPhones.length > 0
+              ? ownPhones
+              : offer.place
+                ? getNormalizedPlacePhones(offer.place)
+                : [];
+          })();
+
+      return {
+        type: ctaType,
+        primaryLabel,
+        secondaryLabel: "В план",
+        phone: phones[0]?.value,
+        phones,
+        link: offer.contactWebsite || offer.place?.website || undefined,
+        instructions: offer.bookingNote || undefined,
+      };
+    })(),
 
     similar: [], // Will be implemented later
     

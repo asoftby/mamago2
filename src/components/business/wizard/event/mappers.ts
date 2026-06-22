@@ -501,8 +501,13 @@ export function mapEventToFormData(event: ActivityWithRelations): EventFormData 
         ? "inherit"
         : "override";
   formData.phone = normalizePhoneToE164(
-    typeof contacts?.phone === "string" ? contacts.phone : "",
+    event.phone ?? (typeof contacts?.phone === "string" ? contacts.phone : ""),
   );
+  formData.phoneLabel = event.phoneLabel ?? null;
+  formData.phone2 = event.phone2 ?? null;
+  formData.phone2Label = event.phone2Label ?? null;
+  formData.phone3 = event.phone3 ?? null;
+  formData.phone3Label = event.phone3Label ?? null;
   formData.website = typeof contacts?.website === "string" ? contacts.website : "";
   const rawSocial = Array.isArray(contacts?.socialLinks)
     ? (contacts.socialLinks as EventFormData["socialLinks"])
@@ -578,6 +583,12 @@ type EventPayload = {
   priceDetails?: string;
   priceItems?: unknown;
   currency: string;
+  phone?: string | null;
+  phoneLabel?: string | null;
+  phone2?: string | null;
+  phone2Label?: string | null;
+  phone3?: string | null;
+  phone3Label?: string | null;
   coverImageId: string | null;
   galleryMediaIds: string[];
   occasionIds: string[];
@@ -761,6 +772,12 @@ export function buildEventPayload(data: EventFormData): EventPayload {
     priceDetails: data.priceDetails,
     priceItems: data.priceItems,
     currency: "BYN",
+    phone: normalizePhoneToE164(data.phone) || null,
+    phoneLabel: data.phoneLabel,
+    phone2: data.phone2,
+    phone2Label: data.phone2Label,
+    phone3: data.phone3,
+    phone3Label: data.phone3Label,
 
     coverImageId: data.coverImage,
     galleryMediaIds: Array.isArray(data.gallery) ? data.gallery.filter(Boolean) : [],

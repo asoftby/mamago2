@@ -20,6 +20,7 @@ import {
 import { normalizeUiCurrencyText } from "@/lib/formatters/format-price";
 import { getCityHomeHref } from "@/lib/header/getCityHomeHref";
 import { toast } from "@/lib/toast";
+import { CallModal } from "@/components/shared/CallModal";
 
 interface OfferPageViewProps {
   data: OfferPageData;
@@ -103,6 +104,7 @@ export function OfferPageView({
   const [saveTargetShift, setSaveTargetShift] = useState<ShiftCtaContext | null>(null);
   const [saveModalOpen, setSaveModalOpen] = useState(false);
   const [isIdeaSaved, setIsIdeaSaved] = useState(false);
+  const [callModalOpen, setCallModalOpen] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -205,11 +207,16 @@ export function OfferPageView({
       openBookingForShift(nearestShift);
       return;
     }
+    const phones = data.cta.phones ?? [];
+    if (phones.length > 1) {
+      setCallModalOpen(true);
+      return;
+    }
     const phone = data.cta.phone?.replace(/[^\d+]/g, "");
     if (phone && typeof window !== "undefined") {
       window.location.href = `tel:${phone}`;
     }
-  }, [data.cta.phone, onPrimary, openBookingForShift, shiftOptions]);
+  }, [data.cta.phone, data.cta.phones, onPrimary, openBookingForShift, shiftOptions]);
 
   const handleSave = useCallback(() => {
     if (onSave) {
@@ -363,6 +370,13 @@ export function OfferPageView({
         inPlan={isPlanSaved}
         planDate={planDate}
         planStartsAt={null}
+      />
+
+      <CallModal
+        open={callModalOpen}
+        onOpenChange={setCallModalOpen}
+        phones={data.cta.phones ?? []}
+        subtitle={data.title}
       />
     </main>
   );

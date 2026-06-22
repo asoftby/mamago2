@@ -434,6 +434,11 @@ export function buildOfferCreatePayload(
     bookingInstructions: accessFields.bookingInstructions,
     contactSource: data.contactSource,
     contactPhone: data.phone.trim() || undefined,
+    contactPhoneLabel: data.phoneLabel?.trim() || null,
+    contactPhone2: data.phone2?.trim() || null,
+    contactPhone2Label: data.phone2Label?.trim() || null,
+    contactPhone3: data.phone3?.trim() || null,
+    contactPhone3Label: data.phone3Label?.trim() || null,
     contactWebsite: data.website.trim() || undefined,
     contactSocialLinks: data.socialLinks
       .filter((link) => link.url.trim().length > 0)
@@ -625,6 +630,11 @@ export function buildOfferUpdatePayload(
     bookingInstructions: accessFields.bookingInstructions,
     contactSource: data.contactSource,
     contactPhone: data.phone.trim() || undefined,
+    contactPhoneLabel: data.phoneLabel?.trim() || null,
+    contactPhone2: data.phone2?.trim() || null,
+    contactPhone2Label: data.phone2Label?.trim() || null,
+    contactPhone3: data.phone3?.trim() || null,
+    contactPhone3Label: data.phone3Label?.trim() || null,
     contactWebsite: data.website.trim() || undefined,
     contactSocialLinks: data.socialLinks
       .filter((link) => link.url.trim().length > 0)
@@ -703,6 +713,11 @@ export function mapOfferToFormData(offer: {
   whatToBring?: string | null;
   contactSource?: string | null;
   contactPhone?: string | null;
+  contactPhoneLabel?: string | null;
+  contactPhone2?: string | null;
+  contactPhone2Label?: string | null;
+  contactPhone3?: string | null;
+  contactPhone3Label?: string | null;
   contactWebsite?: string | null;
   contactSocialLinks?: unknown;
   details?: unknown;
@@ -833,6 +848,11 @@ export function mapOfferToFormData(offer: {
     singleCurrency: "BYN",
     contactSource: offer.contactSource === "place" ? "place" : "manual",
     phone: offer.contactPhone ?? "",
+    phoneLabel: offer.contactPhoneLabel ?? null,
+    phone2: offer.contactPhone2 ?? null,
+    phone2Label: offer.contactPhone2Label ?? null,
+    phone3: offer.contactPhone3 ?? null,
+    phone3Label: offer.contactPhone3Label ?? null,
     website: offer.contactWebsite ?? "",
     socialLinks,
     signalIds: offer.discoverySignalIds ?? [],

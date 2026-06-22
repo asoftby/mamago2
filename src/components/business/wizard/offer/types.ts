@@ -176,6 +176,11 @@ export interface OfferFormData {
   // Step 6/7: Contacts
   contactSource: OfferContactSource;
   phone: string;
+  phoneLabel: string | null;
+  phone2: string | null;
+  phone2Label: string | null;
+  phone3: string | null;
+  phone3Label: string | null;
   website: string;
   socialLinks: SocialLink[];
   

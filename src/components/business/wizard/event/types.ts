@@ -186,6 +186,11 @@ export interface EventFormData {
   // Step 7: Contacts
   contactMode: "inherit" | "override";
   phone: string;
+  phoneLabel: string | null;
+  phone2: string | null;
+  phone2Label: string | null;
+  phone3: string | null;
+  phone3Label: string | null;
   website: string;
   socialLinks: SocialLink[];
   

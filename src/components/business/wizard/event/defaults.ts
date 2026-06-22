@@ -131,6 +131,11 @@ export function getDefaultFormData(): EventFormData {
     // Step 7: Contacts
     contactMode: "inherit",
     phone: "",
+    phoneLabel: null,
+    phone2: null,
+    phone2Label: null,
+    phone3: null,
+    phone3Label: null,
     website: "",
     socialLinks: [createDefaultSocialLink("social-initial")],
     

@@ -5,6 +5,7 @@
 
 import type { Intent } from "@/lib/intent";
 import type { MediaGalleryItem } from "@/lib/media/galleryTypes";
+import type { NormalizedPhone } from "@/lib/phones/normalizePhones";
 
 export type EventPageBreadcrumb = {
   label: string;
@@ -75,6 +76,8 @@ export type EventPageCtaConfig = {
   purchaseUrl?: string;
   /** Данные для записи через встроенную форму (режим simple-booking). */
   simpleBooking?: EventSimpleBookingData;
+  /** Контактные телефоны события (свои или унаследованные от площадки). */
+  phones?: NormalizedPhone[];
 };
 
 export type EventPageSimilar = {

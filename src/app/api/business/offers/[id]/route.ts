@@ -82,6 +82,11 @@ const updateOfferSchema = z.object({
   bookingInstructions: z.string().optional(),
   contactSource: z.enum(["manual", "place"]).optional(),
   contactPhone: z.string().optional(),
+  contactPhoneLabel: z.string().nullable().optional(),
+  contactPhone2: z.string().nullable().optional(),
+  contactPhone2Label: z.string().nullable().optional(),
+  contactPhone3: z.string().nullable().optional(),
+  contactPhone3Label: z.string().nullable().optional(),
   contactWebsite: z.string().optional(),
   contactSocialLinks: z.array(
     z.object({
@@ -283,6 +288,11 @@ export async function PATCH(
     if (data.occasions !== undefined) updateData.occasions = data.occasions;
     if (data.contactSource !== undefined) updateData.contactSource = data.contactSource;
     if (data.contactPhone !== undefined) updateData.contactPhone = data.contactPhone;
+    if (data.contactPhoneLabel !== undefined) updateData.contactPhoneLabel = data.contactPhoneLabel;
+    if (data.contactPhone2 !== undefined) updateData.contactPhone2 = data.contactPhone2;
+    if (data.contactPhone2Label !== undefined) updateData.contactPhone2Label = data.contactPhone2Label;
+    if (data.contactPhone3 !== undefined) updateData.contactPhone3 = data.contactPhone3;
+    if (data.contactPhone3Label !== undefined) updateData.contactPhone3Label = data.contactPhone3Label;
     if (data.contactWebsite !== undefined) updateData.contactWebsite = data.contactWebsite;
     if (data.contactSocialLinks !== undefined)
       updateData.contactSocialLinks = data.contactSocialLinks as unknown as Prisma.InputJsonValue;

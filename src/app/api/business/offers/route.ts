@@ -90,6 +90,11 @@ const createOfferSchema = z.object({
   bookingInstructions: z.string().optional(),
   contactSource: z.enum(["manual", "place"]).optional(),
   contactPhone: z.string().optional(),
+  contactPhoneLabel: z.string().nullable().optional(),
+  contactPhone2: z.string().nullable().optional(),
+  contactPhone2Label: z.string().nullable().optional(),
+  contactPhone3: z.string().nullable().optional(),
+  contactPhone3Label: z.string().nullable().optional(),
   contactWebsite: z.string().optional(),
   contactSocialLinks: z.array(
     z.object({
@@ -264,6 +269,11 @@ export async function POST(request: NextRequest) {
             productType,
             contactSource: data.contactSource ?? "manual",
             contactPhone: data.contactPhone,
+            contactPhoneLabel: data.contactPhoneLabel,
+            contactPhone2: data.contactPhone2,
+            contactPhone2Label: data.contactPhone2Label,
+            contactPhone3: data.contactPhone3,
+            contactPhone3Label: data.contactPhone3Label,
             contactWebsite: data.contactWebsite,
             contactSocialLinks: data.contactSocialLinks as Prisma.InputJsonValue | undefined,
             title: data.title,

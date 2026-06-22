@@ -200,6 +200,14 @@ export async function POST(request: NextRequest) {
         priceTo: body.priceTo,
         priceText: body.priceText,
         currency: body.currency || "BYN",
+
+        // Contact phones
+        phone: typeof body.phone === "string" ? body.phone || null : null,
+        phoneLabel: typeof body.phoneLabel === "string" ? body.phoneLabel || null : null,
+        phone2: typeof body.phone2 === "string" ? body.phone2 || null : null,
+        phone2Label: typeof body.phone2Label === "string" ? body.phone2Label || null : null,
+        phone3: typeof body.phone3 === "string" ? body.phone3 || null : null,
+        phone3Label: typeof body.phone3Label === "string" ? body.phone3Label || null : null,
         
         // Images
         coverImageId: resolvedCoverImageId,

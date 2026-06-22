@@ -95,6 +95,11 @@ export function getDefaultFormData(defaultPlaceId: string | null = null): OfferF
     // Step 6/7: Contacts
     contactSource: "manual",
     phone: "",
+    phoneLabel: null,
+    phone2: null,
+    phone2Label: null,
+    phone3: null,
+    phone3Label: null,
     website: "",
     socialLinks: [],
     
