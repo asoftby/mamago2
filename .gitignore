@@ -58,6 +58,7 @@ storage/uploads/*
 .react-email/
 backups/
 backups/db/
+.local-db-backups/
 notes/
 *.backup
 *.sql
