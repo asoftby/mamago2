@@ -52,6 +52,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { resolveDraftTitle } from "@/lib/content-editor/resolveDraftTitle";
 
 
 function toLocalDatetimeValue(iso: string | null): string {
@@ -256,6 +257,7 @@ export function ArticleEditorClient({
   );
 
   const dirty = currentComparable !== savedComparableRef.current;
+  const displayTitle = resolveDraftTitle(title, "Новая статья");
 
   const { leaveDialogOpen, confirmLeave, onLeaveDialogOpenChange } = useUnsavedChangesNavigationGuard(dirty);
 
@@ -701,7 +703,7 @@ export function ArticleEditorClient({
         <div className="min-w-0 flex-1 pr-2">
           <p className="text-xs font-medium text-muted-foreground mb-1">Статья</p>
           <h1 className="text-2xl md:text-xl font-bold text-gray-900 line-clamp-3 break-words">
-            {title.trim() || "Без названия"}
+            {displayTitle}
           </h1>
         </div>
         <div className="flex flex-col items-end gap-1 shrink-0 text-right ml-auto">

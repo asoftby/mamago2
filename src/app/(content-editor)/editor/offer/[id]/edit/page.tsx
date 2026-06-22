@@ -102,7 +102,7 @@ export default async function EditorEditOfferPage({
 
   return (
     <ContentEditorChrome
-      title="Редактирование предложения"
+      title="Новое предложение"
       backHref={backHref}
       surface={surface}
     >

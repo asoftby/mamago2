@@ -61,6 +61,7 @@ import {
   type ContentEditorSurface,
 } from "@/lib/content-editor/types";
 import { navigateToCompatibleHref } from "@/lib/routing/clientNavigation";
+import { resolveDraftTitle } from "@/lib/content-editor/resolveDraftTitle";
 
 // Import step components
 import { Step1Type } from "./steps/Step1Type";
@@ -668,14 +669,15 @@ export function OfferWizard({
         isReviewStep ? businessFormCopy.reviewStepShortTitle : stepTitle,
       );
 
+  const displayTitle = resolveDraftTitle(
+    formData.title,
+    businessFormCopy.offer.createTitle,
+  );
+
   return (
     <FormWizardShell>
       <FormWizardHeader
-        title={
-          mode === "create"
-            ? businessFormCopy.offer.createTitle
-            : businessFormCopy.offer.editTitle(offer?.title)
-        }
+        title={displayTitle}
         subtitle={subtitle}
         trailing={
           <SaveIndicator

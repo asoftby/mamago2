@@ -106,8 +106,7 @@ export default async function EditorEditPlacePage({
     ...routing,
   });
 
-  const title =
-    place.status === "PUBLISHED" ? "Редактирование места" : "Место — черновик";
+  const title = "Новое место";
 
   return (
     <ContentEditorChrome title={title} backHref={backHref} surface={surface}>

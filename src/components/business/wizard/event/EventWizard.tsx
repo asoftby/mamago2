@@ -74,6 +74,7 @@ import { useAiEnrichment } from "./useAiEnrichment";
 import { applyAiEnrichmentToDraft } from "@/lib/event/applyAiEnrichment";
 import { createClientSavePerf } from "@/lib/perf/clientSavePerf";
 import { stableJsonStringify } from "@/lib/json/stableJsonStringify";
+import { resolveDraftTitle } from "@/lib/content-editor/resolveDraftTitle";
 
 type AiSuggestedFields = {
   participationFormat: boolean;
@@ -1201,22 +1202,10 @@ function EventWizardInner({
   // Determine if editable
   const isEditable = true; // TODO: Add proper logic
 
-  const displayTitleRaw = formData.title?.trim() ?? "";
-  const displayTitle = (() => {
-    if (mode === "edit") {
-      // В режиме редактирования — всегда показываем "Редактирование события: название"
-      return businessFormCopy.event.editTitle(
-        displayTitleRaw.length > 60
-          ? `${displayTitleRaw.slice(0, 57)}...`
-          : displayTitleRaw || undefined
-      );
-    }
-    // В режиме создания — показываем название по мере ввода
-    if (displayTitleRaw.length === 0) return businessFormCopy.event.createTitle;
-    return displayTitleRaw.length <= 60
-      ? displayTitleRaw
-      : `${displayTitleRaw.slice(0, 57)}...`;
-  })();
+  const displayTitle = resolveDraftTitle(
+    formData.title,
+    businessFormCopy.event.createTitle,
+  );
 
   // Check if form is valid for submission (only on review step)
   const submitValidation = currentStep === TOTAL_STEPS ? validateForSubmit(formData) : { isValid: true };

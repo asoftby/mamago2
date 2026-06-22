@@ -209,7 +209,7 @@ export default async function EditorEditEventPage({
 
   return (
     <ContentEditorChrome
-      title="Редактирование события"
+      title="Новое событие"
       backHref={backHref}
       surface={surface}
       headerAction={headerAction}
