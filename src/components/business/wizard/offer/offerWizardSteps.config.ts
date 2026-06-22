@@ -87,8 +87,8 @@ export function getStepsForOfferType(type: OfferWizardType | null): OfferWizardS
       shortLabel: "Формат",
     },
     placements: {
-      title: "Где это может быть полезно родителям?",
-      description: "Выберите сценарии, в которых предложение действительно релевантно.",
+      title: "Что вы предлагаете?",
+      description: "Выберите сценарии — это поможет родителям найти ваше предложение в нужном разделе.",
       shortLabel: "Сценарии",
     },
     details: {
@@ -252,6 +252,10 @@ export function isStepComplete(
 
     case "placements":
       if (data.requestedPlacements.length === 0) return false;
+      // PARTY_SERVICE: category + format only — duration/included/program/note moved to "conditions" (Phase 3c relayout).
+      if (data.productType === "PARTY_SERVICE") {
+        return Boolean(data.partyCategory && data.birthdayDetails.locationType);
+      }
       if (!data.requestedPlacements.includes("BIRTHDAY")) return true;
       return Boolean(
         data.birthdayDetails.role &&
@@ -282,6 +286,12 @@ export function isStepComplete(
         data.productType === "REGULAR_ACTIVITY"
       ) {
         return !!(data.classDuration.trim() && data.classFormat);
+      }
+      // PARTY_SERVICE: included/program moved here from "placements" (Phase 3c relayout).
+      if (data.productType === "PARTY_SERVICE") {
+        return Boolean(
+          data.birthdayDetails.included.trim() || data.birthdayDetails.program.trim(),
+        );
       }
       return true;
 
@@ -391,6 +401,12 @@ export function getMissingFieldsForStep(
       if (data.requestedPlacements.length === 0) {
         missing.push("Хотя бы один сценарий размещения");
       }
+      // PARTY_SERVICE: category + format only — duration/included/program/note moved to "conditions" (Phase 3c relayout).
+      if (data.productType === "PARTY_SERVICE") {
+        if (!data.partyCategory) missing.push("Категория услуги");
+        if (!data.birthdayDetails.locationType) missing.push("Формат проведения");
+        break;
+      }
       if (data.requestedPlacements.includes("BIRTHDAY")) {
         if (!data.birthdayDetails.role) missing.push("Роль в празднике");
         if (
@@ -428,6 +444,14 @@ export function getMissingFieldsForStep(
       ) {
         if (!data.classDuration.trim()) missing.push("Продолжительность занятия");
         if (!data.classFormat) missing.push("Формат занятия");
+      }
+      // PARTY_SERVICE: included/program moved here from "placements" (Phase 3c relayout).
+      if (
+        data.productType === "PARTY_SERVICE" &&
+        !data.birthdayDetails.included.trim() &&
+        !data.birthdayDetails.program.trim()
+      ) {
+        missing.push("Что входит или описание программы");
       }
       break;
 
