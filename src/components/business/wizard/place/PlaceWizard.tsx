@@ -551,8 +551,28 @@ export function PlaceWizard({
         perf.log({ status: response.status, mode: publishDirect ? "publish" : "submit" });
 
         if (!response.ok) {
-          const error = await response.json();
-          throw new Error(error.message || error.error || "Failed to submit");
+          const errorText = await response.text();
+          let errorPayload: Record<string, unknown> | null = null;
+
+          try {
+            errorPayload = errorText ? (JSON.parse(errorText) as Record<string, unknown>) : null;
+          } catch {
+            errorPayload = errorText ? { raw: errorText } : null;
+          }
+
+          console.error("[PlaceWizard] create place failed", {
+            status: response.status,
+            statusText: response.statusText,
+            response: errorPayload,
+            payload: body,
+          });
+
+          throw new Error(
+            (typeof errorPayload?.message === "string" && errorPayload.message) ||
+              (typeof errorPayload?.error === "string" && errorPayload.error) ||
+              (typeof errorPayload?.details === "string" && errorPayload.details) ||
+              `Failed to submit place (${response.status})`
+          );
         }
 
         const result = await response.json();
