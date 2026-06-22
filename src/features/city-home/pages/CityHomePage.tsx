@@ -104,6 +104,11 @@ export default async function CityHomePage({ citySlug }: CityHomePageProps) {
   const nearbyRouteItems = nearbyRoutesPreviewDb.slice(0, 6);
   const classesMode = localClasses.length > 0 ? "local" : nearbyClasses.length > 0 ? "nearby" : "empty";
   const routesMode = localRouteItems.length > 0 ? "local" : nearbyRouteItems.length > 0 ? "nearby" : "empty";
+  const hasHomeContent =
+    kudaPreview.length > 0 ||
+    classesMode !== "empty" ||
+    routesMode !== "empty" ||
+    journalArticles.length > 0;
 
   return (
     <div className="min-h-screen pb-20">
@@ -115,6 +120,18 @@ export default async function CityHomePage({ citySlug }: CityHomePageProps) {
         </div>
 
         <StoriesSection cityId={city.id} citySlug={city.slug} />
+
+        {!hasHomeContent ? (
+          <section className="rounded-3xl border border-dashed bg-muted/30 px-5 py-6 sm:px-6">
+            <h2 className="text-xl font-semibold text-foreground">
+              В {getCityNominativeName(city.slug)} пока нет опубликованного контента
+            </h2>
+            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
+              Когда в базе появятся опубликованные события, занятия, маршруты или статьи, они
+              автоматически отобразятся на главной странице города.
+            </p>
+          </section>
+        ) : null}
 
         <CityHomeKudaSection activities={kudaPreview} />
 
