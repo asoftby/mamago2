@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { buildCurrentBrowserCompatibleDestination } from "@/lib/routing/clientNavigation";
 
 interface BackButtonProps {
   href?: string;
@@ -14,7 +15,7 @@ export function BackButton({ href, label = "Назад" }: BackButtonProps) {
 
   const handleClick = () => {
     if (href) {
-      router.push(href);
+      router.push(buildCurrentBrowserCompatibleDestination(href));
     } else {
       router.back();
     }

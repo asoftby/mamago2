@@ -91,6 +91,18 @@ export function resolveSubdomainMiddlewareDecision(params: {
   const adminSafeSearch = isAdminHost ? stripPublicDiscoverySearchParams(search) : search;
 
   if (isBusinessHost || isAdminHost) {
+    if (isAdminHost && (pathname === "/dashboard" || pathname === "/admin/dashboard")) {
+      return {
+        kind: "redirect",
+        location: buildSameHostLocation({
+          protocol,
+          host,
+          pathname: "/",
+          search: adminSafeSearch,
+        }),
+      };
+    }
+
     if (isPublicInviteRoute(pathname)) {
       return {
         kind: "redirect",

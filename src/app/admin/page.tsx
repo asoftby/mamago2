@@ -75,7 +75,7 @@ export default async function AdminDashboardPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl md:text-xl font-bold">Dashboard</h1>
+          <h1 className="text-2xl md:text-xl font-bold">Панель управления</h1>
           <p className="text-sm text-gray-600 mt-1">
             Обзор платформы и операционный контроль
           </p>
@@ -267,9 +267,22 @@ export default async function AdminDashboardPage() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm text-gray-900">
-                    <span className="font-medium">{item.actor}</span>{" "}
-                    {item.action}{" "}
-                    <span className="font-medium">{item.entity}</span>
+                    {item.message ? (
+                      item.entity ? (
+                        <>
+                          {item.message}{" "}
+                          <span className="font-medium">{item.entity}</span>
+                        </>
+                      ) : (
+                        item.message
+                      )
+                    ) : (
+                      <>
+                        <span className="font-medium">{item.actor}</span>{" "}
+                        {item.action}{" "}
+                        <span className="font-medium">{item.entity}</span>
+                      </>
+                    )}
                   </p>
                   <p className="text-xs text-gray-500 mt-0.5">
                     {formatDistanceToNow(item.timestamp, {

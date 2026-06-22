@@ -33,7 +33,7 @@ import {
 
 export const NAV_MAIN: AdminSidebarNavItem = {
   id: "main",
-  label: "Главная",
+  label: "Панель управления",
   href: adminPath(""),
   icon: LayoutDashboard,
 };

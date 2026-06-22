@@ -123,7 +123,11 @@ export function FinanceSectionClient({
       ? `${format(customRange.from, "dd.MM.yyyy")} — ${format(customRange.to, "dd.MM.yyyy")}`
       : "Интервал";
 
-  const prevLabel = `${PREV_LABELS[period]} ${formatCurrency(data.revenuePrev)}`;
+  const prevLabel = (
+    <>
+      {PREV_LABELS[period]} {formatCurrency(data.revenuePrev)}
+    </>
+  );
 
   const periodSublabel =
     period === "today"

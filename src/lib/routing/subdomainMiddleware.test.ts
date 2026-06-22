@@ -90,6 +90,32 @@ assert.deepEqual(
   resolveSubdomainMiddlewareDecision({
     host: "admin.mamago.by",
     protocol: "https:",
+    pathname: "/dashboard",
+    search: "",
+  }),
+  {
+    kind: "redirect",
+    location: "https://admin.mamago.by/",
+  },
+);
+
+assert.deepEqual(
+  resolveSubdomainMiddlewareDecision({
+    host: "admin.mamago.by",
+    protocol: "https:",
+    pathname: "/admin/dashboard",
+    search: "",
+  }),
+  {
+    kind: "redirect",
+    location: "https://admin.mamago.by/",
+  },
+);
+
+assert.deepEqual(
+  resolveSubdomainMiddlewareDecision({
+    host: "admin.mamago.by",
+    protocol: "https:",
     pathname: "/ranking",
     search: "",
   }),

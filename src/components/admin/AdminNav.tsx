@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { buildCurrentBrowserCompatibleDestination } from "@/lib/routing/clientNavigation";
 import { cn } from "@/lib/utils";
 import {
   MODERATION_NAV_ITEMS,
@@ -117,21 +118,23 @@ const NAV_SECTIONS: NavSection[] = [
 
 export function AdminNav() {
   const pathname = usePathname();
+  const dashboardHref = buildCurrentBrowserCompatibleDestination(adminPath(""));
 
   return (
     <nav className="flex flex-col gap-6">
       {/* Dashboard - always at top */}
       <div>
         <Link
-          href={adminPath("")}
+          href={dashboardHref}
+          suppressHydrationWarning
           className={cn(
             "block px-3 py-2 text-sm rounded-md transition-colors",
-            pathname === adminPath("")
+            (pathname === "/" || pathname === adminPath(""))
               ? "bg-primary/10 text-primary font-medium"
               : "text-gray-700 hover:bg-gray-100"
           )}
         >
-          Dashboard
+          Панель управления
         </Link>
       </div>
 
@@ -150,7 +153,8 @@ export function AdminNav() {
               return (
                 <Link
                   key={item.href}
-                  href={item.href}
+                  href={buildCurrentBrowserCompatibleDestination(item.href)}
+                  suppressHydrationWarning
                   className={cn(
                     "block px-3 py-2 text-sm rounded-md transition-colors",
                     active

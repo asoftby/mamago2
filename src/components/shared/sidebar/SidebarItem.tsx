@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { LucideIcon } from "lucide-react";
+import { buildCurrentBrowserCompatibleDestination } from "@/lib/routing/clientNavigation";
 import { cn } from "@/lib/utils";
 
 interface SidebarItemProps {
@@ -25,6 +26,8 @@ export function SidebarItem({
   onClick,
   hasAttention = false,
 }: SidebarItemProps) {
+  const compatibleHref = buildCurrentBrowserCompatibleDestination(href);
+
   const handleClick = () => {
     // Call onClick immediately before navigation
     if (onClick) {
@@ -44,8 +47,9 @@ export function SidebarItem({
 
     return (
       <Link
-        href={href}
+        href={compatibleHref}
         onClick={handleClick}
+        suppressHydrationWarning
         className={cn(
           "flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-150",
           "ml-3",
@@ -83,8 +87,9 @@ export function SidebarItem({
 
   return (
     <Link
-      href={href}
+      href={compatibleHref}
       onClick={handleClick}
+      suppressHydrationWarning
       className={cn(
         "flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-medium transition-all duration-150",
         primaryStateClass
