@@ -43,20 +43,7 @@ const offerPlacementKeySchema = z.enum([
   "BIRTHDAY",
 ]);
 
-const birthdayRoleSchema = z.enum([
-  "VENUE",
-  "ANIMATOR",
-  "SHOW",
-  "MASTER_CLASS",
-  "CAKE",
-  "CATERING",
-  "DECOR",
-  "PHOTO_VIDEO",
-  "PACKAGE",
-  "OTHER",
-]);
-
-const birthdayLocationTypeSchema = z.enum(["ON_SITE", "OFF_SITE", "BOTH"]);
+const partyLocationTypeSchema = z.enum(["ON_SITE", "OFF_SITE", "BOTH"]);
 
 const partyCategorySchema = z.enum([
   "VENUE", "ANIMATOR", "SHOW", "MASTER_CLASS", "CAKE", "FOOD", "DECOR", "PHOTO", "PROGRAM", "OTHER",
@@ -110,23 +97,12 @@ const updateOfferSchema = z.object({
   wizardCompletedSteps: z.array(offerWizardStepKeySchema).optional(),
   productType: offerProductTypeSchema.optional(),
   requestedPlacements: z.array(offerPlacementKeySchema).optional(),
-  birthdayDetails: z.object({
-    role: birthdayRoleSchema.nullable().optional(),
-    locationType: birthdayLocationTypeSchema.nullable().optional(),
-    durationMinutes: z.number().int().nullable().optional(),
-    minChildren: z.number().int().nullable().optional(),
-    maxChildren: z.number().int().nullable().optional(),
-    priceFrom: z.number().nullable().optional(),
-    included: z.string().nullable().optional(),
-    program: z.string().nullable().optional(),
-    note: z.string().nullable().optional(),
-  }).nullable().optional(),
   // Camp/accommodation: null = «тип больше не лагерь, затереть в БД»
   /** Type-specific display details (Offer.details JSONB). Null clears the field. */
   details: z.record(z.string(), z.unknown()).nullable().optional(),
   // PARTY_SERVICE filterable columns (Phase 3b-2)
   category: partyCategorySchema.nullable().optional(),
-  partyLocationType: birthdayLocationTypeSchema.nullable().optional(),
+  partyLocationType: partyLocationTypeSchema.nullable().optional(),
   minChildren: z.number().int().nullable().optional(),
   maxChildren: z.number().int().nullable().optional(),
   occasions: z.array(partyOccasionSchema).optional(),
@@ -181,7 +157,6 @@ export async function GET(
           },
         },
         placements: true,
-        birthdayDetails: true,
       },
     });
 
@@ -426,6 +401,24 @@ export async function PATCH(
       updateData.kind = mapProductTypeToLegacyKind(productType);
     }
 
+    // Тип сменился с party (PARTY_SERVICE/PARTY_PACKAGE) на другой — зависшие
+    // party-колонки и party-ветка details затираются (аналог CAMP-wipe выше).
+    const wasPartyOffer =
+      existingOffer.productType === "PARTY_SERVICE" ||
+      existingOffer.productType === "PARTY_PACKAGE";
+    const isPartyOffer =
+      productType === "PARTY_SERVICE" || productType === "PARTY_PACKAGE";
+    if (wasPartyOffer && !isPartyOffer) {
+      updateData.category = null;
+      updateData.partyLocationType = null;
+      updateData.minChildren = null;
+      updateData.maxChildren = null;
+      updateData.occasions = [];
+      if (data.details === undefined) {
+        updateData.details = Prisma.DbNull;
+      }
+    }
+
     const offer = await prisma.$transaction(async (tx) => {
       await tx.offer.update({
         where: { id },
@@ -440,8 +433,6 @@ export async function PATCH(
         requestedPlacementsStrategy: "preserve_if_missing",
         requestedPlacements: data.requestedPlacements,
         requestedPlacementsProvided: data.requestedPlacements !== undefined,
-        birthdayDetails: data.birthdayDetails,
-        birthdayDetailsProvided: data.birthdayDetails !== undefined,
       });
 
       // CAMP: rebuild OfferSession projection from current campSessions canon
@@ -459,7 +450,6 @@ export async function PATCH(
           updatedAt: true,
           productType: true,
           placements: true,
-          birthdayDetails: true,
           place: {
             select: {
               id: true,

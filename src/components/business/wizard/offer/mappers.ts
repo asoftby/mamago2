@@ -5,7 +5,6 @@ import type {
   OfferPlacementKey,
   OfferPlacementStatus,
   OfferProductType,
-  BirthdayRole,
   BirthdayLocationType,
   PlaceAmenityKey,
   PlaceEntryModel,
@@ -48,24 +47,6 @@ function parsePlaceVisitDetailsFromDb(
       PLACE_AMENITY_KEYS.has(a as PlaceAmenityKey),
     ),
   };
-}
-
-const BIRTHDAY_ROLE_TO_PARTY_CATEGORY: Partial<Record<BirthdayRole, PartyCategory>> = {
-  VENUE: "VENUE",
-  ANIMATOR: "ANIMATOR",
-  SHOW: "SHOW",
-  MASTER_CLASS: "MASTER_CLASS",
-  CAKE: "CAKE",
-  CATERING: "FOOD",
-  DECOR: "DECOR",
-  PHOTO_VIDEO: "PHOTO",
-  PACKAGE: "PROGRAM",
-  OTHER: "OTHER",
-};
-
-function mapBirthdayRoleToPartyCategory(role: BirthdayRole | null | undefined): PartyCategory | null {
-  if (!role) return null;
-  return BIRTHDAY_ROLE_TO_PARTY_CATEGORY[role] ?? null;
 }
 
 function parseServiceDetailsFromDb(details: unknown): {
@@ -201,43 +182,6 @@ function defaultRequestedPlacementsForProductType(
     default:
       return [];
   }
-}
-
-function mapBirthdayDetailsForApi(
-  data: OfferFormData,
-): {
-  role?: BirthdayRole | null;
-  locationType?: BirthdayLocationType | null;
-  durationMinutes?: number | null;
-  minChildren?: number | null;
-  maxChildren?: number | null;
-  priceFrom?: number | null;
-  included?: string | null;
-  program?: string | null;
-  note?: string | null;
-} | null {
-  // PARTY_SERVICE/PARTY_PACKAGE use single-write to Offer columns; never write to OfferBirthdayDetails.
-  if (
-    !data.requestedPlacements.includes("BIRTHDAY") ||
-    data.productType === "PARTY_SERVICE" ||
-    data.productType === "PARTY_PACKAGE"
-  ) {
-    return null;
-  }
-
-  const details = data.birthdayDetails;
-  const priceFrom = parsePrice(details.priceFrom);
-  return {
-    role: details.role,
-    locationType: details.locationType,
-    durationMinutes: details.durationMinutes,
-    minChildren: details.minChildren,
-    maxChildren: details.maxChildren,
-    priceFrom: priceFrom ?? null,
-    included: details.included.trim() || null,
-    program: details.program.trim() || null,
-    note: details.note.trim() || null,
-  };
 }
 
 function parsePlacementKeyArray(
@@ -505,9 +449,8 @@ export function buildOfferCreatePayload(
     gallery: data.gallery ?? [],
     productType,
     requestedPlacements,
-    birthdayDetails: mapBirthdayDetailsForApi(data),
     details: buildTypeDetails(data),
-    // PARTY_SERVICE/PARTY_PACKAGE: filterable party fields → Offer columns (single-write, no OfferBirthdayDetails)
+    // PARTY_SERVICE/PARTY_PACKAGE: filterable party fields → Offer columns (single-write)
     ...(buildPartyFilterColumns(data) ?? {}),
     // Camp/accommodation-поля — только для лагерей; данные скрытых шагов
     // других типов в payload не попадают
@@ -695,9 +638,8 @@ export function buildOfferUpdatePayload(
     gallery: data.gallery ?? [],
     productType,
     requestedPlacements,
-    birthdayDetails: mapBirthdayDetailsForApi(data),
     details: buildTypeDetails(data),
-    // PARTY_SERVICE/PARTY_PACKAGE: filterable party fields → Offer columns (single-write, no OfferBirthdayDetails)
+    // PARTY_SERVICE/PARTY_PACKAGE: filterable party fields → Offer columns (single-write)
     ...(buildPartyFilterColumns(data) ?? {}),
     // CAMP — camp/accommodation-данные; иначе явные null (затирание в БД)
     ...(data.offerWizardType === "CAMP"
@@ -723,17 +665,6 @@ export function mapOfferToFormData(offer: {
   kind: OfferKind;
   productType?: OfferProductType | null;
   placements?: Array<{ key: OfferPlacementKey; status?: OfferPlacementStatus | null }> | null;
-  birthdayDetails?: {
-    role?: BirthdayRole | null;
-    locationType?: BirthdayLocationType | null;
-    durationMinutes?: number | null;
-    minChildren?: number | null;
-    maxChildren?: number | null;
-    priceFrom?: number | string | null;
-    included?: string | null;
-    program?: string | null;
-    note?: string | null;
-  } | null;
   title: string;
   description: string | null;
   coverImage: string | null;
@@ -843,40 +774,22 @@ export function mapOfferToFormData(offer: {
         ? requestedPlacements
         : defaultRequestedPlacementsForProductType(productType),
     placementStatuses,
+    // birthdayDetails: legacy OfferBirthdayDetails table removed in Phase 4a (was always empty).
+    // PARTY_SERVICE/PARTY_PACKAGE canon lives on Offer columns/details JSON; the generic
+    // BIRTHDAY-checkbox sub-form (non-party types) has no persistence — defaults only.
     birthdayDetails: {
-      role: offer.birthdayDetails?.role ?? null,
-      // Dual-read: canon Offer columns win over legacy OfferBirthdayDetails for PARTY_SERVICE/PARTY_PACKAGE
-      locationType: usesPartyColumns
-        ? (offer.partyLocationType ?? offer.birthdayDetails?.locationType ?? null)
-        : (offer.birthdayDetails?.locationType ?? null),
-      durationMinutes: usesPartyColumns
-        ? (serviceDetails?.durationMinutes ?? offer.birthdayDetails?.durationMinutes ?? null)
-        : (offer.birthdayDetails?.durationMinutes ?? null),
-      minChildren: usesPartyColumns
-        ? (offer.minChildren ?? offer.birthdayDetails?.minChildren ?? null)
-        : (offer.birthdayDetails?.minChildren ?? null),
-      maxChildren: usesPartyColumns
-        ? (offer.maxChildren ?? offer.birthdayDetails?.maxChildren ?? null)
-        : (offer.birthdayDetails?.maxChildren ?? null),
-      priceFrom:
-        offer.birthdayDetails?.priceFrom != null
-          ? String(offer.birthdayDetails.priceFrom)
-          : "",
-      included: usesPartyColumns
-        ? (serviceDetails?.included ?? offer.birthdayDetails?.included ?? "")
-        : (offer.birthdayDetails?.included ?? ""),
-      program: usesPartyColumns
-        ? (serviceDetails?.program ?? offer.birthdayDetails?.program ?? "")
-        : (offer.birthdayDetails?.program ?? ""),
-      note: usesPartyColumns
-        ? (serviceDetails?.note ?? offer.birthdayDetails?.note ?? "")
-        : (offer.birthdayDetails?.note ?? ""),
+      role: null,
+      locationType: usesPartyColumns ? (offer.partyLocationType ?? null) : null,
+      durationMinutes: usesPartyColumns ? (serviceDetails?.durationMinutes ?? null) : null,
+      minChildren: usesPartyColumns ? (offer.minChildren ?? null) : null,
+      maxChildren: usesPartyColumns ? (offer.maxChildren ?? null) : null,
+      priceFrom: "",
+      included: usesPartyColumns ? (serviceDetails?.included ?? "") : "",
+      program: usesPartyColumns ? (serviceDetails?.program ?? "") : "",
+      note: usesPartyColumns ? (serviceDetails?.note ?? "") : "",
     },
-    // PARTY_SERVICE only: partyCategory from canon (Offer.category) or legacy role mapping.
-    // PARTY_PACKAGE has no single category — role=PACKAGE never maps into category, stays null.
-    partyCategory: isPartyService
-      ? (offer.category ?? mapBirthdayRoleToPartyCategory(offer.birthdayDetails?.role))
-      : null,
+    // PARTY_SERVICE only: partyCategory from canon Offer.category. PARTY_PACKAGE has no single category.
+    partyCategory: isPartyService ? (offer.category ?? null) : null,
     occasions: usesPartyColumns ? (offer.occasions ?? []) : [],
     offerKind:
       productType === "PARTY_PACKAGE"

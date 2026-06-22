@@ -1,6 +1,4 @@
 import type {
-  BirthdayLocationType,
-  BirthdayRole,
   Offer,
   OfferPlacementKey,
   OfferProductType,
@@ -12,18 +10,6 @@ const ALL_PLACEMENT_KEYS: OfferPlacementKey[] = [
   "CAMPS",
   "BIRTHDAY",
 ];
-
-export type OfferBirthdayDetailsInput = {
-  role?: BirthdayRole | null;
-  locationType?: BirthdayLocationType | null;
-  durationMinutes?: number | null;
-  minChildren?: number | null;
-  maxChildren?: number | null;
-  priceFrom?: number | null;
-  included?: string | null;
-  program?: string | null;
-  note?: string | null;
-} | null;
 
 export function normalizePlacementKeys(
   keys: readonly string[] | null | undefined,
@@ -60,16 +46,6 @@ export function inferRequestedPlacements(params: {
     default:
       return [];
   }
-}
-
-export function supportsBirthdayDetails(
-  productType: OfferProductType | null | undefined,
-  requestedPlacements?: readonly string[] | null,
-): boolean {
-  if (productType === "PARTY_SERVICE" || productType === "PARTY_PACKAGE") {
-    return true;
-  }
-  return normalizePlacementKeys(requestedPlacements).includes("BIRTHDAY");
 }
 
 export function mapProductTypeToLegacyKind(

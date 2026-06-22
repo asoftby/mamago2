@@ -2,29 +2,9 @@ import type { Prisma, OfferProductType } from "@prisma/client";
 import {
   inferRequestedPlacements,
   normalizePlacementKeys,
-  supportsBirthdayDetails,
-  type OfferBirthdayDetailsInput,
 } from "@/lib/offers/offerPersistenceCompatibility";
 
-type PrismaLike = Pick<
-  Prisma.TransactionClient,
-  "offerPlacement" | "offerBirthdayDetails"
->;
-
-function hasBirthdayDetailsContent(input: OfferBirthdayDetailsInput): input is NonNullable<OfferBirthdayDetailsInput> {
-  if (!input) return false;
-  return Boolean(
-    input.role ||
-      input.locationType ||
-      input.durationMinutes != null ||
-      input.minChildren != null ||
-      input.maxChildren != null ||
-      input.priceFrom != null ||
-      input.included?.trim() ||
-      input.program?.trim() ||
-      input.note?.trim(),
-  );
-}
+type PrismaLike = Pick<Prisma.TransactionClient, "offerPlacement">;
 
 export async function syncOfferPersistenceLayer(params: {
   db: PrismaLike;
@@ -34,8 +14,6 @@ export async function syncOfferPersistenceLayer(params: {
   requestedPlacementsStrategy?: "infer_if_missing" | "preserve_if_missing";
   requestedPlacements?: readonly string[] | null;
   requestedPlacementsProvided?: boolean;
-  birthdayDetails?: OfferBirthdayDetailsInput;
-  birthdayDetailsProvided?: boolean;
 }) {
   const requestedPlacementsStrategy =
     params.requestedPlacementsStrategy ?? "infer_if_missing";
@@ -113,57 +91,4 @@ export async function syncOfferPersistenceLayer(params: {
       });
     }
   }
-
-  const birthdayDetailsProvided =
-    params.birthdayDetailsProvided ?? params.birthdayDetails !== undefined;
-  if (!birthdayDetailsProvided) {
-    return;
-  }
-
-  const birthdayDetails = params.birthdayDetails ?? null;
-  if (birthdayDetails === null) {
-    await params.db.offerBirthdayDetails.deleteMany({
-      where: { offerId: params.offerId },
-    });
-    return;
-  }
-
-  if (!hasBirthdayDetailsContent(birthdayDetails) || !birthdayDetails.role) {
-    return;
-  }
-
-  const birthdayEnabled = supportsBirthdayDetails(
-    params.productType,
-    placementKeys ?? undefined,
-  );
-  if (!birthdayEnabled) {
-    return;
-  }
-
-  await params.db.offerBirthdayDetails.upsert({
-    where: { offerId: params.offerId },
-    update: {
-      role: birthdayDetails.role,
-      locationType: birthdayDetails.locationType ?? null,
-      durationMinutes: birthdayDetails.durationMinutes ?? null,
-      minChildren: birthdayDetails.minChildren ?? null,
-      maxChildren: birthdayDetails.maxChildren ?? null,
-      priceFrom: birthdayDetails.priceFrom ?? null,
-      included: birthdayDetails.included?.trim() || null,
-      program: birthdayDetails.program?.trim() || null,
-      note: birthdayDetails.note?.trim() || null,
-    },
-    create: {
-      offerId: params.offerId,
-      role: birthdayDetails.role,
-      locationType: birthdayDetails.locationType ?? null,
-      durationMinutes: birthdayDetails.durationMinutes ?? null,
-      minChildren: birthdayDetails.minChildren ?? null,
-      maxChildren: birthdayDetails.maxChildren ?? null,
-      priceFrom: birthdayDetails.priceFrom ?? null,
-      included: birthdayDetails.included?.trim() || null,
-      program: birthdayDetails.program?.trim() || null,
-      note: birthdayDetails.note?.trim() || null,
-    },
-  });
 }

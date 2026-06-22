@@ -1856,8 +1856,8 @@ model Offer {
   // Party-фильтры (Phase 3b-1 — колонки пусты; write-path в 3b-2)
   /// Категория party-услуги (SERVICE); у PACKAGE category=null, состав через PackageComponent.
   category                 PartyCategory?
-  /// Формат локации party-оффера (у нас / выезд / оба). Реиспользует BirthdayLocationType; имя legacy-ish, переименуем при сносе OfferBirthdayDetails в Фазе 4.
-  partyLocationType        BirthdayLocationType?
+  /// Формат локации party-оффера (у нас / выезд / оба).
+  partyLocationType        PartyLocationType?
   // Note: spec calls this `locationType`, but partyLocationType avoids shadowing the form's legacy string `locationType` field in 3b-2 mapper
   /// Минимальное и максимальное число детей для party-услуги
   minChildren              Int?
@@ -1866,7 +1866,6 @@ model Offer {
   occasions                PartyOccasion[]      @default([])
 
   boosts          Boost[]
-  birthdayDetails OfferBirthdayDetails?
   bookingRequests BookingRequest[]
   offerIdeas      OfferIdea[]
   openingHours    OpeningHours?      @relation(fields: [openingHoursId], references: [id])
@@ -1913,23 +1912,6 @@ model OfferPlacement {
   @@index([key, status])
   @@index([offerId, status])
   @@index([reviewedById, status])
-}
-
-model OfferBirthdayDetails {
-  id              String               @id @default(cuid())
-  offerId         String               @unique
-  role            BirthdayRole
-  locationType    BirthdayLocationType?
-  durationMinutes Int?
-  minChildren     Int?
-  maxChildren     Int?
-  priceFrom       Decimal?             @db.Decimal(10, 2)
-  included        String?
-  program         String?
-  note            String?
-  createdAt       DateTime             @default(now())
-  updatedAt       DateTime             @updatedAt
-  offer           Offer                @relation(fields: [offerId], references: [id], onDelete: Cascade)
 }
 
 /// Смены/сессии предложения (queryable строки для date/budget фильтров в ленте).
@@ -2940,8 +2922,7 @@ enum OfferProductType {
 
 /// Единый канон категорий: состав пакета (PackageComponent.category) + фильтр услуг (Offer.category).
 /// Переименован из ComponentCategory (Phase 3b-1); PackageComponent пуста — бэкфилл не нужен.
-/// BirthdayRole.CATERING → FOOD, BirthdayRole.PHOTO_VIDEO → PHOTO (бэкфилл в Фазе 4).
-/// BirthdayRole.PACKAGE — не категория (тип известен из productType), в канон не входит.
+/// Legacy enum BirthdayRole (CATERING/PHOTO_VIDEO/PACKAGE) снесён в Phase 4a — был пуст, без данных для бэкфилла.
 enum PartyCategory {
   VENUE
   ANIMATOR
@@ -2975,20 +2956,9 @@ enum OfferPlacementStatus {
   REJECTED
 }
 
-enum BirthdayRole {
-  VENUE
-  ANIMATOR
-  SHOW
-  MASTER_CLASS
-  CAKE
-  CATERING
-  DECOR
-  PHOTO_VIDEO
-  PACKAGE
-  OTHER
-}
-
-enum BirthdayLocationType {
+/// Формат локации party-оффера (у нас / выезд / оба). Переименован из BirthdayLocationType
+/// (Phase 4a — снос пустой legacy OfferBirthdayDetails; этот enum остаётся каноном для Offer.partyLocationType).
+enum PartyLocationType {
   ON_SITE
   OFF_SITE
   BOTH

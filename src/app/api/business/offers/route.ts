@@ -43,20 +43,7 @@ const offerPlacementKeySchema = z.enum([
   "BIRTHDAY",
 ]);
 
-const birthdayRoleSchema = z.enum([
-  "VENUE",
-  "ANIMATOR",
-  "SHOW",
-  "MASTER_CLASS",
-  "CAKE",
-  "CATERING",
-  "DECOR",
-  "PHOTO_VIDEO",
-  "PACKAGE",
-  "OTHER",
-]);
-
-const birthdayLocationTypeSchema = z.enum(["ON_SITE", "OFF_SITE", "BOTH"]);
+const partyLocationTypeSchema = z.enum(["ON_SITE", "OFF_SITE", "BOTH"]);
 
 const partyCategorySchema = z.enum([
   "VENUE", "ANIMATOR", "SHOW", "MASTER_CLASS", "CAKE", "FOOD", "DECOR", "PHOTO", "PROGRAM", "OTHER",
@@ -118,22 +105,11 @@ const createOfferSchema = z.object({
   wizardCompletedSteps: z.array(offerWizardStepKeySchema).optional(),
   productType: offerProductTypeSchema.optional(),
   requestedPlacements: z.array(offerPlacementKeySchema).optional(),
-  birthdayDetails: z.object({
-    role: birthdayRoleSchema.nullable().optional(),
-    locationType: birthdayLocationTypeSchema.nullable().optional(),
-    durationMinutes: z.number().int().nullable().optional(),
-    minChildren: z.number().int().nullable().optional(),
-    maxChildren: z.number().int().nullable().optional(),
-    priceFrom: z.number().nullable().optional(),
-    included: z.string().nullable().optional(),
-    program: z.string().nullable().optional(),
-    note: z.string().nullable().optional(),
-  }).optional(),
   /** Type-specific display details (Offer.details JSONB). Validated per productType client-side. */
   details: z.record(z.string(), z.unknown()).optional(),
   // PARTY_SERVICE filterable columns (Phase 3b-2)
   category: partyCategorySchema.nullable().optional(),
-  partyLocationType: birthdayLocationTypeSchema.nullable().optional(),
+  partyLocationType: partyLocationTypeSchema.nullable().optional(),
   minChildren: z.number().int().nullable().optional(),
   maxChildren: z.number().int().nullable().optional(),
   occasions: z.array(partyOccasionSchema).optional(),
@@ -356,7 +332,6 @@ export async function POST(request: NextRequest) {
           actorUserId: user.id,
           productType,
           requestedPlacements: data.requestedPlacements,
-          birthdayDetails: data.birthdayDetails,
         });
 
         // CAMP: project campSessions JSON (canon) into queryable OfferSession rows
@@ -374,7 +349,6 @@ export async function POST(request: NextRequest) {
             publishedAt: true,
             productType: true,
             placements: true,
-            birthdayDetails: true,
           },
         });
       });
@@ -449,7 +423,6 @@ export async function GET(request: NextRequest) {
             },
           },
           placements: true,
-          birthdayDetails: true,
         },
         orderBy: { createdAt: "desc" },
       });
@@ -483,7 +456,6 @@ export async function GET(request: NextRequest) {
                 },
               },
               placements: true,
-              birthdayDetails: true,
             },
             orderBy: { createdAt: "desc" },
           })
