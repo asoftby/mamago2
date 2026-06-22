@@ -39,15 +39,14 @@ interface Step1ProfileProps {
 }
 
 export function Step1Profile({ data, onChange, isEditable = true }: Step1ProfileProps) {
+  const normalizeDescriptionForEditor = (value: string | null | undefined) => {
+    const raw = value || "";
+    return raw && !/<[a-z][\s\S]*>/i.test(raw) ? plainTextToRichTextHtml(raw) : raw;
+  };
+
   const [title, setTitle] = useState(() => data.title);
   const [shortDesc, setShortDesc] = useState(() => data.shortDesc);
-  const [description, setDescription] = useState(() => {
-    const raw = data.description || "";
-    // Normalize plain text to HTML if needed (legacy data)
-    return raw && !/<[a-z][\s\S]*>/i.test(raw)
-      ? plainTextToRichTextHtml(raw)
-      : raw;
-  });
+  const [description, setDescription] = useState(() => normalizeDescriptionForEditor(data.description));
   const [showFullDescription, setShowFullDescription] = useState(false);
   const [ageTags, setAgeTags] = useState<string[]>(() => data.ageTags || []);
   // Normalize legacy values (indoor → format-indoor) on init
@@ -64,6 +63,34 @@ export function Step1Profile({ data, onChange, isEditable = true }: Step1Profile
 
   // Categories from DB
   const [dbCategories, setDbCategories] = useState<PlaceCategoryRoot[] | null>(null);
+
+  useEffect(() => {
+    setTitle(data.title);
+  }, [data.title]);
+
+  useEffect(() => {
+    setShortDesc(data.shortDesc);
+  }, [data.shortDesc]);
+
+  useEffect(() => {
+    setDescription(normalizeDescriptionForEditor(data.description));
+  }, [data.description]);
+
+  useEffect(() => {
+    setAgeTags(data.ageTags || []);
+  }, [data.ageTags]);
+
+  useEffect(() => {
+    setVisitFormats(normalizeVisitFormats(data.visitFormats || []));
+  }, [data.visitFormats]);
+
+  useEffect(() => {
+    setPrimaryCategoryId(data.primaryCategoryId ?? "");
+  }, [data.primaryCategoryId]);
+
+  useEffect(() => {
+    setSubcategoryIds(data.subcategoryIds ?? []);
+  }, [data.subcategoryIds]);
 
   useEffect(() => {
     fetch("/api/public/place-categories")

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { OpeningHoursEditor } from "@/components/openingHours";
 import type { OpeningHoursData } from "@/components/openingHours";
 import { createDefaultUIState, generateSummary } from "@/lib/openingHours";
@@ -22,6 +22,10 @@ export function Step5OpeningHours({
   const [localData, setLocalData] = useState<OpeningHoursData | null>(() =>
     data.openingHoursData || createDefaultUIState()
   );
+
+  useEffect(() => {
+    setLocalData(data.openingHoursData || createDefaultUIState());
+  }, [data.openingHoursData]);
 
   const handleChange = (openingHoursData: OpeningHoursData) => {
     setLocalData(openingHoursData);
