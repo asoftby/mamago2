@@ -127,6 +127,7 @@ export function OfferWizard({
     ...contentEditorNav,
   };
   const afterSubmitDestination = returnTo ?? nav.afterSubmitListPath;
+  const isPublishedEditMode = mode === "edit" && offer?.status === "PUBLISHED";
   
   const [formData, setFormData] = useState<OfferFormData>(() => {
     if (mode === "edit" && offer) {
@@ -650,9 +651,10 @@ export function OfferWizard({
       isComplete: effective[idx],
       // Кликабельны: completed-шаги, текущий и первый незавершённый
       isDisabled:
+        !isPublishedEditMode &&
         !effective[idx] && idx + 1 !== currentStepNum && idx !== firstIncompleteIdx,
     }));
-  }, [completedSteps, formData, steps, currentStepNum]);
+  }, [completedSteps, currentStepNum, formData, isPublishedEditMode, steps]);
 
   const phase = formWizardPhaseFromFlags({ isSaving, isSubmitting });
   const actionLabels = useMemo(() => {

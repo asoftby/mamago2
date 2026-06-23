@@ -152,6 +152,7 @@ export function PlaceWizard({
     }
     return getDefaultFormData();
   });
+  const isPublishedEditMode = mode === "edit" && place?.status === "PUBLISHED";
 
   const [isSaving, setIsSaving] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -292,8 +293,15 @@ export function PlaceWizard({
   };
 
   const handleGoToStep = (step: number) => {
+    if (step < 1 || step > TOTAL_STEPS) return;
+
+    if (isPublishedEditMode) {
+      setCurrentStep(step);
+      return;
+    }
+
     // Allow backward navigation freely; forward only up to currentStep+1 (sequential)
-    if (step >= 1 && step <= TOTAL_STEPS && (step <= currentStep + 1 || step < currentStep)) {
+    if (step <= currentStep + 1 || step < currentStep) {
       setCurrentStep(step);
     }
   };

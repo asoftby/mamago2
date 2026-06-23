@@ -797,6 +797,11 @@ function EventWizardInner({
   const handleGoToStep = (step: number) => {
     if (step < 1 || step > TOTAL_STEPS) return;
 
+    if (mode === "edit" && event?.status === ContentStatus.PUBLISHED) {
+      setCurrentStep(step);
+      return;
+    }
+
     // Allow going back freely
     if (step <= currentStep) {
       setCurrentStep(step);
