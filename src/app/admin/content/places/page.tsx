@@ -101,22 +101,22 @@ function PlacesTable({ places }: { places: Awaited<ReturnType<typeof getPlaces>>
         <thead className="bg-gray-50 border-b border-gray-200">
           <tr>
             <th className="px-4 py-3 text-left font-medium text-gray-700">
-              Name
+              Название
             </th>
             <th className="px-4 py-3 text-left font-medium text-gray-700">
-              City
+              Город
             </th>
             <th className="px-4 py-3 text-left font-medium text-gray-700">
-              Business
+              Бизнес
             </th>
             <th className="px-4 py-3 text-left font-medium text-gray-700">
-              Status
+              Статус
             </th>
             <th className="px-4 py-3 text-left font-medium text-gray-700">
-              Created
+              Создано
             </th>
             <th className="px-4 py-3 text-left font-medium text-gray-700">
-              Actions
+              Действия
             </th>
           </tr>
         </thead>
@@ -222,9 +222,9 @@ export default async function PlacesListPage({
       {/* AdminPageHeader */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl md:text-xl font-bold">Places</h1>
+          <h1 className="text-2xl md:text-xl font-bold">Места</h1>
           <p className="text-sm text-gray-600 mt-1">
-            All places submitted by businesses
+            Все места, добавленные бизнесами
           </p>
         </div>
       </div>
@@ -233,7 +233,7 @@ export default async function PlacesListPage({
       <PlacesFilters cities={cities} />
 
       {/* AdminPageContent */}
-      <Suspense fallback={<div>Loading...</div>}>
+      <Suspense fallback={<div>Загрузка...</div>}>
         <PlacesTable places={places} />
       </Suspense>
     </div>
