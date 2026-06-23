@@ -132,13 +132,21 @@ export function PublicationsIndexClient({
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const res = await fetch("/api/admin/articles/editor-options");
-      if (!res.ok || cancelled) return;
-      const data = (await res.json().catch(() => null)) as {
-        authors?: { id: string; label: string; email: string }[];
-      } | null;
-      if (!data?.authors || cancelled) return;
-      setAuthorOptions(data.authors);
+      try {
+        const res = await fetch("/api/admin/articles/editor-options");
+        if (!res.ok || cancelled) return;
+        const data = (await res.json().catch(() => null)) as {
+          authors?: { id: string; label: string; email: string }[];
+        } | null;
+        if (!data?.authors || cancelled) return;
+        setAuthorOptions(data.authors);
+      } catch (error) {
+        if (cancelled) return;
+        console.warn(
+          "[PublicationsIndexClient] failed to load article editor options",
+          error,
+        );
+      }
     })();
     return () => {
       cancelled = true;
