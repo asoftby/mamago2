@@ -825,14 +825,15 @@ export function PlaceWizard({
     [userRole],
   );
 
+  const liveTitle = useMemo(() => {
+    const trimmedTitle = formData.title?.trim();
+    return trimmedTitle || businessFormCopy.place.createTitle;
+  }, [formData.title]);
+
   return (
     <FormWizardShell>
       <FormWizardHeader
-        title={
-          mode === "create"
-            ? businessFormCopy.place.createTitle
-            : businessFormCopy.place.editTitle(place?.title)
-        }
+        title={liveTitle}
         subtitle={businessFormCopy.stepSubtitle(
           currentStep,
           TOTAL_STEPS,

@@ -9,6 +9,12 @@ interface CompletionProgressProps {
   className?: string;
 }
 
+function getProgressTextClass(progress: number): string {
+  if (progress <= 40) return "text-muted-foreground";
+  if (progress <= 75) return "text-amber-600";
+  return "text-green-600";
+}
+
 export function CompletionProgress({ data, className = "" }: CompletionProgressProps) {
   const [mounted, setMounted] = useState(false);
   const completion = getPlaceCompletion(data);
@@ -26,7 +32,7 @@ export function CompletionProgress({ data, className = "" }: CompletionProgressP
   if (!mounted) {
     return (
       <div className={`text-right ${className}`}>
-        <span className="text-sm text-gray-400">
+        <span className="text-sm text-muted-foreground">
           Заполнено на 0%
         </span>
       </div>
@@ -35,7 +41,7 @@ export function CompletionProgress({ data, className = "" }: CompletionProgressP
 
   return (
     <div className={`text-right ${className}`}>
-      <span className="text-sm text-gray-400">
+      <span className={`text-sm ${getProgressTextClass(percent)}`}>
         Заполнено на {percent}%
       </span>
     </div>
