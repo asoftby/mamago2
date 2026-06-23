@@ -24,17 +24,6 @@ export type OfferPlacementKey =
   | "CAMPS"
   | "BIRTHDAY";
 export type OfferPlacementStatus = "REQUESTED" | "APPROVED" | "REJECTED";
-export type BirthdayRole =
-  | "VENUE"
-  | "ANIMATOR"
-  | "SHOW"
-  | "MASTER_CLASS"
-  | "CAKE"
-  | "CATERING"
-  | "DECOR"
-  | "PHOTO_VIDEO"
-  | "PACKAGE"
-  | "OTHER";
 export type BirthdayLocationType = "ON_SITE" | "OFF_SITE" | "BOTH";
 
 /** Смена лагеря (шаг «Смены и расписание») */
@@ -97,12 +86,10 @@ export interface OfferFormData {
   requestedPlacements: OfferPlacementKey[];
   placementStatuses: Partial<Record<OfferPlacementKey, OfferPlacementStatus>>;
   birthdayDetails: {
-    role: BirthdayRole | null;
     locationType: BirthdayLocationType | null;
     durationMinutes: number | null;
     minChildren: number | null;
     maxChildren: number | null;
-    priceFrom: string;
     included: string;
     program: string;
     note: string;

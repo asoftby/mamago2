@@ -101,19 +101,18 @@ function validatePlacementsStep(data: OfferFormData): ValidationResult {
     errors.push("Выберите хотя бы один сценарий размещения");
   }
 
-  if (data.requestedPlacements.includes("BIRTHDAY")) {
-    if (!data.birthdayDetails.role) {
-      errors.push("Выберите роль предложения для праздника");
-    }
-    if (
-      !data.birthdayDetails.priceFrom.trim() &&
-      !data.birthdayDetails.note.trim()
-    ) {
-      errors.push("Укажите цену от или важные условия для праздника");
-    }
+  // PARTY_SERVICE/PARTY_PACKAGE persist birthdayDetails (locationType/duration/
+  // included/program/note) via real Offer columns + details JSON. The plain
+  // "Организовать праздник" checkbox on other product types has no extra
+  // fields to fill, so no extra requirements apply there.
+  if (
+    data.requestedPlacements.includes("BIRTHDAY") &&
+    (data.productType === "PARTY_SERVICE" || data.productType === "PARTY_PACKAGE")
+  ) {
     if (
       !data.birthdayDetails.included.trim() &&
-      !data.birthdayDetails.program.trim()
+      !data.birthdayDetails.program.trim() &&
+      !data.birthdayDetails.note.trim()
     ) {
       errors.push("Укажите, что входит, или опишите программу праздника");
     }

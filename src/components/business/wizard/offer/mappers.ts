@@ -789,16 +789,13 @@ export function mapOfferToFormData(offer: {
         ? requestedPlacements
         : defaultRequestedPlacementsForProductType(productType),
     placementStatuses,
-    // birthdayDetails: legacy OfferBirthdayDetails table removed in Phase 4a (was always empty).
-    // PARTY_SERVICE/PARTY_PACKAGE canon lives on Offer columns/details JSON; the generic
-    // BIRTHDAY-checkbox sub-form (non-party types) has no persistence — defaults only.
+    // birthdayDetails: PARTY_SERVICE/PARTY_PACKAGE canon lives on Offer columns/details JSON;
+    // the plain BIRTHDAY-checkbox case (non-party types) has no extra fields to persist.
     birthdayDetails: {
-      role: null,
       locationType: usesPartyColumns ? (offer.partyLocationType ?? null) : null,
       durationMinutes: usesPartyColumns ? (serviceDetails?.durationMinutes ?? null) : null,
       minChildren: usesPartyColumns ? (offer.minChildren ?? null) : null,
       maxChildren: usesPartyColumns ? (offer.maxChildren ?? null) : null,
-      priceFrom: "",
       included: usesPartyColumns ? (serviceDetails?.included ?? "") : "",
       program: usesPartyColumns ? (serviceDetails?.program ?? "") : "",
       note: usesPartyColumns ? (serviceDetails?.note ?? "") : "",

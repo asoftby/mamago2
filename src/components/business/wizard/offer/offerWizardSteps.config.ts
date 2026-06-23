@@ -256,12 +256,15 @@ export function isStepComplete(
       if (data.productType === "PARTY_SERVICE") {
         return Boolean(data.partyCategory && data.birthdayDetails.locationType);
       }
-      if (!data.requestedPlacements.includes("BIRTHDAY")) return true;
-      return Boolean(
-        data.birthdayDetails.role &&
-          (data.birthdayDetails.priceFrom.trim() || data.birthdayDetails.note.trim()) &&
-          (data.birthdayDetails.included.trim() || data.birthdayDetails.program.trim()),
-      );
+      // PARTY_PACKAGE: format + duration/included/program/note are filled here (no "conditions" sub-form for it).
+      if (data.productType === "PARTY_PACKAGE") {
+        return Boolean(
+          data.birthdayDetails.locationType &&
+            (data.birthdayDetails.included.trim() || data.birthdayDetails.program.trim()),
+        );
+      }
+      // Plain "Организовать праздник" checkbox on other product types has no extra fields.
+      return true;
 
     case "details":
       if (data.offerWizardType === "CAMP") {
@@ -407,14 +410,9 @@ export function getMissingFieldsForStep(
         if (!data.birthdayDetails.locationType) missing.push("Формат проведения");
         break;
       }
-      if (data.requestedPlacements.includes("BIRTHDAY")) {
-        if (!data.birthdayDetails.role) missing.push("Роль в празднике");
-        if (
-          !data.birthdayDetails.priceFrom.trim() &&
-          !data.birthdayDetails.note.trim()
-        ) {
-          missing.push("Цена от или важные условия");
-        }
+      // PARTY_PACKAGE: format + duration/included/program/note are filled here (no "conditions" sub-form for it).
+      if (data.productType === "PARTY_PACKAGE") {
+        if (!data.birthdayDetails.locationType) missing.push("Формат проведения");
         if (
           !data.birthdayDetails.included.trim() &&
           !data.birthdayDetails.program.trim()

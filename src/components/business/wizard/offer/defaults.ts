@@ -19,12 +19,10 @@ export function getDefaultFormData(defaultPlaceId: string | null = null): OfferF
     requestedPlacements: [],
     placementStatuses: {},
     birthdayDetails: {
-      role: null,
       locationType: null,
       durationMinutes: null,
       minChildren: null,
       maxChildren: null,
-      priceFrom: "",
       included: "",
       program: "",
       note: "",
