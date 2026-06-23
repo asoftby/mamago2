@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { MapPin, Navigation, Phone, Globe, Instagram, ArrowLeft, ExternalLink, Clock, Building2 } from "lucide-react";
@@ -19,6 +19,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { getFormatLabel } from "@/lib/placeChips";
 import { GoogleReviewsStatusBadge } from "@/components/admin/moderation/GoogleReviewsStatusBadge";
 import { DAY_SHORT_LABELS, ALL_DAYS, MODE_LABELS } from "@/components/openingHours/openingHours.types";
+import { getPlaceDetailBackLink } from "@/lib/admin/placeDetailNavigation";
 import type { OpeningHoursWithRelations } from "@/server/services/openingHours/openingHours.types";
 
 const STATUS_CONFIG = {
@@ -128,8 +129,10 @@ function formatOpeningHours(openingHours: OpeningHoursWithRelations | null | und
 
 export function PlaceModerationView({ place }: PlaceModerationViewProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [comment, setComment] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const backLink = getPlaceDetailBackLink(searchParams.get("returnTo"));
 
   const statusConfig = STATUS_CONFIG[place.status as keyof typeof STATUS_CONFIG] || STATUS_CONFIG.DRAFT;
 
@@ -210,11 +213,11 @@ export function PlaceModerationView({ place }: PlaceModerationViewProps) {
       <div className="mb-6">
         <div className="mb-4 flex flex-wrap items-center gap-3">
           <Link
-            href="/admin/moderation/queue"
+            href={backLink.href}
             className="inline-flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900"
           >
             <ArrowLeft className="w-4 h-4" />
-            Назад к очереди
+            {backLink.label}
           </Link>
           <Button variant="outline" size="sm" asChild>
             <Link

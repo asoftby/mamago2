@@ -7,7 +7,7 @@
 
 import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, MapPin, Navigation, ExternalLink } from "lucide-react";
@@ -32,6 +32,7 @@ import { PlaceDangerZone } from "./moderation/PlaceDangerZone";
 import { Textarea } from "@/components/ui/textarea";
 import type { OpeningHoursWithRelations } from "@/server/services/openingHours/openingHours.types";
 import { GoogleReviewsStatusBadge } from "@/components/admin/moderation/GoogleReviewsStatusBadge";
+import { getPlaceDetailBackLink } from "@/lib/admin/placeDetailNavigation";
 
 interface PlaceRevisionModerationViewProps {
   place: {
@@ -157,11 +158,13 @@ export function PlaceRevisionModerationView({
   revision,
 }: PlaceRevisionModerationViewProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [comment, setComment] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [microEdits, setMicroEdits] = useState<Array<{ id: string; fieldName: string; oldValue: string | null; newValue: string | null; editType: string; comment: string | null; createdAt: string; moderator: { email: string } }>>([]);
   const [displayTitle, setDisplayTitle] = useState<string>(place.title);
   const [hasDuplicates, setHasDuplicates] = useState<boolean>(false);
+  const backLink = getPlaceDetailBackLink(searchParams.get("returnTo"));
 
   // Fetch micro-edits for this place
   useEffect(() => {
@@ -488,11 +491,11 @@ export function PlaceRevisionModerationView({
       {/* Header */}
       <div className="mb-6">
         <Link
-          href="/admin/moderation/queue"
+          href={backLink.href}
           className="inline-flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 mb-4"
         >
           <ArrowLeft className="w-4 h-4" />
-          Назад к очереди
+          {backLink.label}
         </Link>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>

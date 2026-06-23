@@ -3,6 +3,7 @@ import { ActivityType } from "@prisma/client";
 import { Badge } from "@/components/ui/badge";
 import { formatDistanceToNow } from "date-fns";
 import { ru } from "date-fns/locale";
+import { getPlaceDetailHref } from "@/lib/admin/placeDetailNavigation";
 import { ModerationQueueTable, type ModerationQueueTableItem } from "./_components/ModerationQueueTable";
 
 const QUEUE_RETURN = "/admin/moderation/queue";
@@ -145,7 +146,7 @@ async function getQueueItems(): Promise<QueueItem[]> {
     businessName: place.createdBy.business?.name || place.createdBy.email,
     submittedAt: place.createdAt,
     submittedAtLabel: formatDistanceToNow(place.createdAt, { addSuffix: true, locale: ru }),
-    reviewHref: `/admin/content/places/${place.id}`,
+    reviewHref: getPlaceDetailHref(place.id, QUEUE_RETURN),
   }));
 
   const revisionItems: QueueItem[] = pendingRevisions.map((revision) => ({
@@ -158,7 +159,7 @@ async function getQueueItems(): Promise<QueueItem[]> {
       revision.place.createdBy.business?.name || revision.place.createdBy.email,
     submittedAt: revision.submittedAt || new Date(),
     submittedAtLabel: formatDistanceToNow(revision.submittedAt || new Date(), { addSuffix: true, locale: ru }),
-    reviewHref: `/admin/content/places/${revision.place.id}?mode=revision`,
+    reviewHref: `${getPlaceDetailHref(revision.place.id, QUEUE_RETURN)}&mode=revision`,
   }));
 
   const items = [

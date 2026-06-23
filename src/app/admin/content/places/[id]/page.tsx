@@ -14,6 +14,7 @@ import { ArrowLeft } from "lucide-react";
 import { PlaceFormData } from "@/components/business/wizard/place/types";
 import { ContentStatus, PlaceKind } from "@prisma/client";
 import Link from "next/link";
+import { getPlaceDetailBackLink } from "@/lib/admin/placeDetailNavigation";
 import {
   loadImprovementRequestsForPlace,
   loadPendingPlaceRevision,
@@ -26,7 +27,7 @@ export default async function PlaceModerationPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ mode?: string }>;
+  searchParams: Promise<{ mode?: string; returnTo?: string }>;
 }) {
   const user = await getCurrentUser();
 
@@ -35,7 +36,8 @@ export default async function PlaceModerationPage({
   }
 
   const { id } = await params;
-  const { mode } = await searchParams;
+  const { mode, returnTo } = await searchParams;
+  const backLink = getPlaceDetailBackLink(returnTo);
 
   const place = await loadPlaceForBasicModeration(id);
 
@@ -161,11 +163,11 @@ export default async function PlaceModerationPage({
             <div className="max-w-7xl mx-auto px-6 py-4">
               <div className="flex items-center justify-between mb-4">
                 <Link
-                  href="/admin/moderation/queue"
+                  href={backLink.href}
                   className="inline-flex items-center text-sm text-gray-600 hover:text-gray-900"
                 >
                   <ArrowLeft className="w-4 h-4 mr-1" />
-                  Назад к очереди
+                  {backLink.label}
                 </Link>
               </div>
 

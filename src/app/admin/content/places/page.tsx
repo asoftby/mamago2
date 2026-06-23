@@ -7,6 +7,7 @@ import { formatDistanceToNow } from "date-fns";
 import { ru } from "date-fns/locale";
 import { MODERATION_CONTENT_STATUS_CONFIG } from "@/lib/admin/moderationContentStatusBadges";
 import { getModerationFilterCities } from "@/lib/admin/moderationAdminQueries";
+import { getPlaceDetailHref } from "@/lib/admin/placeDetailNavigation";
 import { PlacesFilters } from "./PlacesFilters";
 
 export const dynamic = "force-dynamic";
@@ -24,6 +25,20 @@ function parseContentStatusFilter(
 interface SearchParams {
   status?: string;
   cityId?: string;
+  [key: string]: string | undefined;
+}
+
+function buildReturnTo(params: SearchParams): string {
+  const query = new URLSearchParams();
+
+  Object.entries(params).forEach(([key, value]) => {
+    if (typeof value === "string" && value.length > 0) {
+      query.set(key, value);
+    }
+  });
+
+  const search = query.toString();
+  return `/admin/content/places${search ? `?${search}` : ""}`;
 }
 
 async function getPlaces(params: SearchParams) {
@@ -86,7 +101,13 @@ async function getPlaces(params: SearchParams) {
   return places;
 }
 
-function PlacesTable({ places }: { places: Awaited<ReturnType<typeof getPlaces>> }) {
+function PlacesTable({
+  places,
+  returnTo,
+}: {
+  places: Awaited<ReturnType<typeof getPlaces>>;
+  returnTo: string;
+}) {
   if (places.length === 0) {
     return (
       <div className="text-center py-12 text-gray-500">
@@ -138,20 +159,20 @@ function PlacesTable({ places }: { places: Awaited<ReturnType<typeof getPlaces>>
 
               if (place.status === "PENDING") {
                 return {
-                  href: `/admin/content/places/${place.id}`,
+                  href: getPlaceDetailHref(place.id, returnTo),
                   label: "Модерировать",
                 };
               }
 
               if (hasActiveRevision) {
                 return {
-                  href: `/admin/content/places/${place.id}`,
+                  href: getPlaceDetailHref(place.id, returnTo),
                   label: "Проверить изменения",
                 };
               }
 
               return {
-                href: `/admin/content/places/${place.id}`,
+                href: getPlaceDetailHref(place.id, returnTo),
                 label: "Открыть",
               };
             })();
@@ -216,6 +237,7 @@ export default async function PlacesListPage({
     getPlaces(params),
     getModerationFilterCities(),
   ]);
+  const returnTo = buildReturnTo(params);
 
   return (
     <div className="p-6 md:p-4 space-y-6">
@@ -234,7 +256,7 @@ export default async function PlacesListPage({
 
       {/* AdminPageContent */}
       <Suspense fallback={<div>Загрузка...</div>}>
-        <PlacesTable places={places} />
+        <PlacesTable places={places} returnTo={returnTo} />
       </Suspense>
     </div>
   );
