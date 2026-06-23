@@ -4,6 +4,7 @@
  */
 
 import type { NormalizedPhone } from "@/lib/phones/normalizePhones";
+import type { FaqItem } from "@/lib/faq/faqItems";
 
 export interface OfferMediaItem {
   id: string;
@@ -189,6 +190,7 @@ export interface OfferPageData {
   };
 
   reviews?: OfferReview[];
+  faqItems?: FaqItem[];
 
   /** SEO metadata — used by programs page and JSON-LD builder */
   seo?: {

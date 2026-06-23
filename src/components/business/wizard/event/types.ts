@@ -9,6 +9,7 @@ import type {
 } from "@/lib/age/ageMapping";
 import type { PublicationAccess } from "@/features/publication-access";
 import type { PriceData } from "@/lib/priceItems";
+import type { FaqItem } from "@/lib/faq/faqItems";
 
 export type EventWizardMode = "create" | "edit";
 
@@ -193,6 +194,7 @@ export interface EventFormData {
   phone3Label: string | null;
   website: string;
   socialLinks: SocialLink[];
+  faqItems: FaqItem[];
   
   // Step 8: Organizer
   organizerMode: "existing" | "import" | "manual";

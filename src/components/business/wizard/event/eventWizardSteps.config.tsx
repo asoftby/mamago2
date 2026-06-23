@@ -19,6 +19,7 @@ import { Step4DateTime } from "./steps/Step4DateTime";
 import { Step5PricingParticipation } from "./steps/Step5PricingParticipation";
 import { Step7Contacts } from "./steps/Step7Contacts";
 import { Step8Organizer } from "./steps/Step8Organizer";
+import { FaqStep } from "../shared/FaqStep";
 
 /**
  * Event Wizard Steps Configuration
@@ -508,6 +509,29 @@ export const EVENT_WIZARD_STEPS: WizardStepConfig<EventFormData>[] = [
       }
       return missing;
     },
+  },
+
+  {
+    id: 9,
+    key: "faq",
+    shortLabel: "Вопросы",
+    title: "Частые вопросы",
+    description: "Необязательный блок с важными уточнениями для родителей",
+    component: ({ data, onChange }) => (
+      <FaqStep
+        kind="event"
+        value={data.faqItems}
+        onChange={(faqItems) => onChange({ faqItems })}
+      />
+    ),
+    isComplete: () => true,
+    getSummary: (data) => [
+      {
+        label: "Вопросы",
+        value: data.faqItems.length > 0 ? `${data.faqItems.length} вопросов` : "Не добавлен",
+      },
+    ],
+    getMissingFields: () => [],
   },
 ];
 

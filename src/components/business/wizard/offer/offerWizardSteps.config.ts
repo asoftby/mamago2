@@ -31,6 +31,7 @@ export const ALL_OFFER_WIZARD_STEP_KEYS: OfferWizardStepKey[] = [
   "accommodation",
   "price",
   "contacts",
+  "faq",
   "review",
 ];
 
@@ -126,6 +127,11 @@ export function getStepsForOfferType(type: OfferWizardType | null): OfferWizardS
       description: "Адрес, телефоны, сайт и социальные сети",
       shortLabel: "Контакты",
     },
+    faq: {
+      title: "Частые вопросы",
+      description: "Необязательный блок с ответами на частые вопросы родителей",
+      shortLabel: "Вопросы",
+    },
     review: {
       title: "Проверка",
       description: "Проверка и отправка на модерацию",
@@ -145,6 +151,7 @@ export function getStepsForOfferType(type: OfferWizardType | null): OfferWizardS
       "conditions",
       "price",
       "contacts",
+      "faq",
       "review",
     ];
   } else if (type === "CAMP") {
@@ -158,6 +165,7 @@ export function getStepsForOfferType(type: OfferWizardType | null): OfferWizardS
       "accommodation",
       "price",
       "contacts",
+      "faq",
       "review",
     ];
   }
@@ -376,6 +384,9 @@ export function isStepComplete(
 
     case "contacts":
       return isOfferContactsComplete(data);
+
+    case "faq":
+      return true;
 
     case "review":
       // Review step is complete when all previous steps are complete

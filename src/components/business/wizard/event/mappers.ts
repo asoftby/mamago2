@@ -22,6 +22,7 @@ import { DEFAULT_ACTIVITY_FORMAT, normalizeActivityFormat } from "@/domain/activ
 import { normalizeRichTextEditorValue } from "@/lib/richtext/utils";
 import { expandScheduleItemDates } from "@/lib/event/expandScheduleItemDates";
 import { parsePriceData } from "@/lib/priceItems";
+import { normalizeFaqItems } from "@/lib/faq/faqItems";
 
 /** Extracts the first numeric value from a price string (e.g. "от 48.00 руб." → 48). */
 function parseNumericPrice(s: string): number | undefined {
@@ -405,6 +406,7 @@ export function mapEventToFormData(event: ActivityWithRelations): EventFormData 
       ? normalizeRichTextEditorValue(scheduleJson.priceDetails)
       : "";
   formData.priceItems = parsePriceData((event as { priceItems?: unknown }).priceItems);
+  formData.faqItems = normalizeFaqItems((event as { faqItems?: unknown }).faqItems);
   formData.ticketLink = typeof scheduleJson.ticketLink === "string" ? scheduleJson.ticketLink : "";
 
   formData.participationMode = normalizeParticipationMode(scheduleJson.participationMode);
@@ -582,6 +584,7 @@ type EventPayload = {
   priceText: string;
   priceDetails?: string;
   priceItems?: unknown;
+  faqItems?: unknown;
   currency: string;
   phone?: string | null;
   phoneLabel?: string | null;
@@ -771,6 +774,7 @@ export function buildEventPayload(data: EventFormData): EventPayload {
           : "",
     priceDetails: data.priceDetails,
     priceItems: data.priceItems,
+    faqItems: normalizeFaqItems(data.faqItems),
     currency: "BYN",
     phone: normalizePhoneToE164(data.phone) || null,
     phoneLabel: data.phoneLabel,

@@ -7,6 +7,7 @@ import { ImprovementRequestList, type ImprovementRequest } from "@/components/ad
 import { PlaceDangerZone } from "@/components/admin/moderation/PlaceDangerZone";
 import { PlacePreviewCard } from "@/components/admin/moderation/PlacePreviewCard";
 import { PlaceModerationSidebar } from "@/components/admin/moderation/PlaceModerationSidebar";
+import { FaqReadonlySection } from "@/components/admin/moderation/FaqReadonlySection";
 import { getPlacePublicUrl } from "@/lib/placePublicUrl";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,6 +16,7 @@ import { PlaceFormData } from "@/components/business/wizard/place/types";
 import { ContentStatus, PlaceKind } from "@prisma/client";
 import Link from "next/link";
 import { getPlaceDetailBackLink } from "@/lib/admin/placeDetailNavigation";
+import { normalizeFaqItems } from "@/lib/faq/faqItems";
 import {
   loadImprovementRequestsForPlace,
   loadPendingPlaceRevision,
@@ -89,6 +91,7 @@ export default async function PlaceModerationPage({
         description: fullPlace.description,
         ageTags: fullPlace.ageTags || [],
         visitFormats: fullPlace.visitFormats || [],
+        faqItems: normalizeFaqItems(fullPlace.faqItems),
         primaryCategoryId: fullPlace.primaryCategoryId ?? null,
         subcategoryIds: [],
         lat: fullPlace.lat,
@@ -196,6 +199,9 @@ export default async function PlaceModerationPage({
               {/* Left Column - Place Preview */}
               <div>
                 <PlacePreviewCard place={fullPlace} />
+                <div className="mt-6">
+                  <FaqReadonlySection items={fullPlace.faqItems} />
+                </div>
               </div>
 
               {/* Right Column - Moderation Sidebar */}
@@ -282,6 +288,7 @@ export default async function PlaceModerationPage({
     description: fullPlace.description,
     ageTags: fullPlace.ageTags || [],
     visitFormats: fullPlace.visitFormats || [],
+    faqItems: normalizeFaqItems(fullPlace.faqItems),
     primaryCategoryId: fullPlace.primaryCategoryId ?? null,
     subcategoryIds: [],
     lat: fullPlace.lat,
@@ -381,6 +388,9 @@ export default async function PlaceModerationPage({
         <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-6">
           <div>
             <PlacePreviewCard place={fullPlace} />
+            <div className="mt-6">
+              <FaqReadonlySection items={fullPlace.faqItems} />
+            </div>
           </div>
           <div>
             <PlaceModerationSidebar

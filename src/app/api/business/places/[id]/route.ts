@@ -19,6 +19,7 @@ import { attachMediaToEntity } from "@/lib/media/mediaRegistry";
 import { ensureMediaAssetForStoredFileUrl } from "@/lib/media/ensureMediaAssetForStoredFileUrl";
 import { extractMediaRelativePathFromUrl } from "@/server/media/media-storage";
 import { normalizePlacePhoneFields } from "@/lib/place/placePhones";
+import { normalizeFaqItems } from "@/lib/faq/faqItems";
 
 export async function GET(
   request: NextRequest,
@@ -235,6 +236,8 @@ export async function PATCH(
       phone3: body.phone3 !== undefined ? body.phone3 : existing.phone3,
       phone3Label: body.phone3Label !== undefined ? body.phone3Label : existing.phone3Label,
     });
+    const normalizedFaqItems =
+      body.faqItems !== undefined ? normalizeFaqItems(body.faqItems) : undefined;
 
     // Lenient validation for autosave - only check types/formats
     const updateData: Record<string, unknown> = {};
@@ -243,6 +246,7 @@ export async function PATCH(
     if (body.category !== undefined) updateData.category = String(body.category);
     if (body.shortDesc !== undefined) updateData.shortDesc = String(body.shortDesc);
     if (body.description !== undefined) updateData.description = body.description ? String(body.description) : null;
+    if (normalizedFaqItems !== undefined) updateData.faqItems = normalizedFaqItems;
     if (body.logoImageId !== undefined) {
       const v = body.logoImageId;
       if (v === null) {

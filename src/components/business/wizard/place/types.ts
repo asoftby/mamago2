@@ -1,6 +1,7 @@
 import type { ContentStatus, PlaceKind, Prisma } from "@prisma/client";
 import type { OpeningHoursData } from "@/components/openingHours";
 import type { PriceData } from "@/lib/priceItems";
+import type { FaqItem } from "@/lib/faq/faqItems";
 
 /**
  * Unified form data for Place wizard
@@ -77,6 +78,7 @@ export interface PlaceFormData {
 
   // Prices
   priceItems: PriceData;
+  faqItems: FaqItem[];
   
   // Hierarchy
   placeKind: PlaceKind;

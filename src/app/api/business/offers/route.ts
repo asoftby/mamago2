@@ -26,6 +26,7 @@ import {
 import { syncOfferPersistenceLayer } from "@/server/offers/offerPersistence";
 import { projectCampSessions } from "@/server/offers/campSessionProjection";
 import { syncOfferMediaUsage } from "@/server/services/media/media-usage.service";
+import { normalizeFaqItems } from "@/lib/faq/faqItems";
 
 const offerProductTypeSchema = z.enum([
   "PLACE_VISIT",
@@ -103,6 +104,7 @@ const createOfferSchema = z.object({
       url: z.string(),
     }),
   ).optional(),
+  faqItems: z.array(z.record(z.string(), z.unknown())).nullish(),
   status: z.enum(["DRAFT", "PENDING", "PUBLISHED"]).default("DRAFT"),
   discoverySignalIds: z.array(z.string()).default([]),
   classChipSlugs: z.array(z.string()).default([]),
@@ -154,6 +156,7 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     const data = createOfferSchema.parse(body);
+    const faqItems = normalizeFaqItems(data.faqItems);
     timer.mark("validate");
 
     if (data.status === "PUBLISHED" && !canPublishContentDirectly(user.role)) {
@@ -291,6 +294,7 @@ export async function POST(request: NextRequest) {
             discoverySignalIds: data.discoverySignalIds,
             classChipSlugs: data.classChipSlugs,
             wizardCompletedSteps: data.wizardCompletedSteps ?? [],
+            faqItems: faqItems as unknown as Prisma.InputJsonValue,
             details: data.details as Prisma.InputJsonValue | undefined,
             // PARTY_SERVICE/PARTY_PACKAGE: write filterable fields to Offer columns
             ...(productType === "PARTY_SERVICE" || productType === "PARTY_PACKAGE" ? {

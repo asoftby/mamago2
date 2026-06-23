@@ -9,7 +9,8 @@ export const WIZARD_STEPS = [
   { id: 3, key: "contacts", label: "Контакты" },
   { id: 4, key: "photos", label: "Фото" },
   { id: 5, key: "openingHours", label: "Режим работы" },
-  { id: 6, key: "review", label: "Проверка" },
+  { id: 6, key: "faq", label: "Вопросы" },
+  { id: 7, key: "review", label: "Проверка" },
 ] as const;
 
 export const TOTAL_STEPS = WIZARD_STEPS.length;

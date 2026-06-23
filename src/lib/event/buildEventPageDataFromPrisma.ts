@@ -15,6 +15,7 @@ import {
 import { ageFromPlusBadgeFromAgeTags } from "@/lib/event/activityAgeBounds";
 import { getActivityDateDisplay } from "@/lib/event/getActivityDateDisplay";
 import { getNormalizedPhones, type NormalizedPhone } from "@/lib/phones/normalizePhones";
+import { normalizeFaqItems } from "@/lib/faq/faqItems";
 
 const FALLBACK_POSTER = "/og-default.jpg";
 
@@ -37,6 +38,7 @@ export type ActivityForEventPageInput = {
   priceFrom: number | null;
   currency: string | null;
   priceDetails: string | null;
+  faqItems?: unknown | null;
   scheduleJson?: unknown | null;
   /** Денормализованный URL обложки; может дублировать запись по coverImageId в images */
   coverImageUrl: string | null;
@@ -467,6 +469,7 @@ export function buildEventPageDataFromPrismaActivity(
     ],
     priceLabel: priceLabel(activity),
     priceDetails: activity.priceDetails ?? undefined,
+    faqItems: normalizeFaqItems(activity.faqItems),
     cta: {
       planLabel: "В план",
       buyLabel: activity.format === "ONLINE" ? "Участвовать онлайн" : "Купить билет",

@@ -75,6 +75,7 @@ import { applyAiEnrichmentToDraft } from "@/lib/event/applyAiEnrichment";
 import { createClientSavePerf } from "@/lib/perf/clientSavePerf";
 import { stableJsonStringify } from "@/lib/json/stableJsonStringify";
 import { resolveDraftTitle } from "@/lib/content-editor/resolveDraftTitle";
+import { FaqStep } from "../shared/FaqStep";
 
 type AiSuggestedFields = {
   participationFormat: boolean;
@@ -1264,6 +1265,16 @@ function EventWizardInner({
           isAiLoading={isAiLoading}
           isAiDone={isAiDone}
           onLoadingGenresChange={setIsLoadingGenres}
+        />
+      );
+    }
+
+    if (stepConfig.key === "faq") {
+      return (
+        <FaqStep
+          kind="event"
+          value={formData.faqItems}
+          onChange={(faqItems) => handleChange({ faqItems })}
         />
       );
     }

@@ -32,6 +32,7 @@ import { PlaceDangerZone } from "./moderation/PlaceDangerZone";
 import { Textarea } from "@/components/ui/textarea";
 import type { OpeningHoursWithRelations } from "@/server/services/openingHours/openingHours.types";
 import { GoogleReviewsStatusBadge } from "@/components/admin/moderation/GoogleReviewsStatusBadge";
+import { FaqReadonlySection } from "@/components/admin/moderation/FaqReadonlySection";
 import { getPlaceDetailBackLink } from "@/lib/admin/placeDetailNavigation";
 
 interface PlaceRevisionModerationViewProps {
@@ -63,6 +64,7 @@ interface PlaceRevisionModerationViewProps {
     unitLabel?: string | null;
     shortDesc?: string | null;
     description?: string | null;
+    faqItems?: unknown;
     category?: string | null;
     phone?: string | null;
     website?: string | null;
@@ -113,6 +115,7 @@ interface PlaceRevisionModerationViewProps {
     unitLabel?: string | null;
     shortDesc?: string | null;
     description?: string | null;
+    faqItems?: unknown;
     category?: string | null;
     phone?: string | null;
     website?: string | null;
@@ -165,6 +168,7 @@ export function PlaceRevisionModerationView({
   const [displayTitle, setDisplayTitle] = useState<string>(place.title);
   const [hasDuplicates, setHasDuplicates] = useState<boolean>(false);
   const backLink = getPlaceDetailBackLink(searchParams.get("returnTo"));
+  const effectiveFaqItems = revision.faqItems !== undefined ? revision.faqItems : place.faqItems;
 
   // Fetch micro-edits for this place
   useEffect(() => {
@@ -667,6 +671,8 @@ export function PlaceRevisionModerationView({
               </div>
             </div>
           )}
+
+          <FaqReadonlySection items={effectiveFaqItems} />
 
           {groupedChanges.reviewMeta.length > 0 && (
             <div>

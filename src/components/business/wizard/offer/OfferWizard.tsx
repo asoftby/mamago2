@@ -71,6 +71,7 @@ import { Step3Media } from "./steps/Step3Media";
 import { Step4Conditions } from "./steps/Step4Conditions";
 import { Step5Pricing } from "./steps/Step5Pricing";
 import { Step6Contacts } from "./steps/Step6Contacts";
+import { FaqStep } from "../shared/FaqStep";
 
 interface OfferWizardProps {
   mode: OfferWizardMode;
@@ -602,6 +603,14 @@ export function OfferWizard({
         return <Step5Pricing {...commonProps} />;
       case "contacts":
         return <Step6Contacts {...commonProps} />;
+      case "faq":
+        return (
+          <FaqStep
+            kind="offer"
+            value={formData.faqItems}
+            onChange={(faqItems) => handleChange({ faqItems })}
+          />
+        );
       default:
         return null;
     }

@@ -46,6 +46,7 @@ import {
   findMediaAssetByReference,
   normalizeMediaDisplayUrl,
 } from "@/lib/media/resolveMediaAssetReference";
+import { normalizeFaqItems } from "@/lib/faq/faqItems";
 
 /**
  * GET /api/business/events/[id]
@@ -159,6 +160,7 @@ export async function PATCH(
     }
 
     const body = await request.json();
+    const faqItems = body.faqItems !== undefined ? normalizeFaqItems(body.faqItems) : undefined;
     perf.mark("parse-body");
 
     const summary = await fetchActivityEventRowSummary(id);
@@ -534,6 +536,9 @@ export async function PATCH(
     }
     if (body.priceItems !== undefined) {
       updateData.priceItems = body.priceItems ?? null;
+    }
+    if (faqItems !== undefined) {
+      updateData.faqItems = faqItems as unknown as Prisma.InputJsonValue;
     }
 
     if (body.coverImageId !== undefined && resolvedCoverImageId !== existing.coverImageId) {

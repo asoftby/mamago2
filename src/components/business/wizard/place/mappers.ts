@@ -7,6 +7,7 @@ import { normalizeVisitFormats } from "@/hooks/useVisitFormats";
 import { resolvePlaceLogoImage } from "@/lib/place/resolvePlaceLogoImage";
 import { parsePriceData } from "@/lib/priceItems";
 import { normalizePlacePhoneFields } from "@/lib/place/placePhones";
+import { normalizeFaqItems } from "@/lib/faq/faqItems";
 
 type PlaceWithRelations = Place & {
   images?: PrismaPlaceImage[];
@@ -90,6 +91,7 @@ export function mapPlaceToFormData(
 
     // Prices
     priceItems: parsePriceData(place.priceItems),
+    faqItems: normalizeFaqItems(place.faqItems),
 
     // Hierarchy
     placeKind: place.placeKind,
@@ -157,6 +159,7 @@ export function buildPlacePayload(data: PlaceFormData): Partial<Place> & { subca
     // openingHoursId is set by backend after creating OpeningHours record
 
     priceItems: data.priceItems as unknown as Prisma.JsonValue,
+    faqItems: normalizeFaqItems(data.faqItems) as unknown as Prisma.JsonValue,
 
     // Hierarchy
     placeKind: data.placeKind,

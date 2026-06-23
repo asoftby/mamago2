@@ -3,6 +3,7 @@
 
 import type { PartyCategory, PartyOccasion } from "@prisma/client";
 import type { PublicationAccess } from "@/features/publication-access";
+import type { FaqItem } from "@/lib/faq/faqItems";
 
 export type { PartyCategory, PartyOccasion };
 
@@ -72,6 +73,7 @@ export type OfferWizardStepKey =
   | "accommodation"
   | "price"
   | "contacts"
+  | "faq"
   | "review";
 
 /**
@@ -170,6 +172,7 @@ export interface OfferFormData {
   phone3Label: string | null;
   website: string;
   socialLinks: SocialLink[];
+  faqItems: FaqItem[];
   
   // Step 7/8: CTA and Publication
   publicationAccess: PublicationAccess | null;

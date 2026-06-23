@@ -36,6 +36,7 @@ import {
   findMediaAssetByReference,
   normalizeMediaDisplayUrl,
 } from "@/lib/media/resolveMediaAssetReference";
+import { normalizeFaqItems } from "@/lib/faq/faqItems";
 
 /**
  * POST /api/business/events
@@ -55,6 +56,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
+    const faqItems = normalizeFaqItems(body.faqItems);
     perf.mark("parse");
 
     const title = typeof body.title === "string" && body.title.trim() ? body.title : "Новое событие";
@@ -200,6 +202,7 @@ export async function POST(request: NextRequest) {
         priceTo: body.priceTo,
         priceText: body.priceText,
         currency: body.currency || "BYN",
+        faqItems: faqItems as unknown as Prisma.InputJsonValue,
 
         // Contact phones
         phone: typeof body.phone === "string" ? body.phone || null : null,

@@ -26,6 +26,7 @@ import {
   normalizeCampMealsFromDb,
   sortCampSessions,
 } from "./campOfferModel";
+import { normalizeFaqItems } from "@/lib/faq/faqItems";
 
 const PLACE_AMENITY_KEYS = new Set<PlaceAmenityKey>([
   "parking",
@@ -450,6 +451,7 @@ export function buildOfferCreatePayload(
     discoverySignalIds: data.signalIds,
     classChipSlugs: data.classChipSlugs,
     wizardCompletedSteps: opts?.wizardCompletedSteps,
+    faqItems: normalizeFaqItems(data.faqItems),
     status: opts?.status ?? "DRAFT",
     gallery: data.gallery ?? [],
     productType,
@@ -727,6 +729,7 @@ export function mapOfferToFormData(offer: {
   minChildren?: number | null;
   maxChildren?: number | null;
   occasions?: PartyOccasion[];
+  faqItems?: unknown;
 }): OfferFormData {
   const defaults = getDefaultFormData(offer.placeId ?? null);
 
@@ -852,6 +855,7 @@ export function mapOfferToFormData(offer: {
     phone3Label: offer.contactPhone3Label ?? null,
     website: offer.contactWebsite ?? "",
     socialLinks,
+    faqItems: normalizeFaqItems(offer.faqItems),
     signalIds: offer.discoverySignalIds ?? [],
     classChipSlugs: offer.classChipSlugs ?? [],
     placeVisitDetails: parsePlaceVisitDetailsFromDb(offer.details),

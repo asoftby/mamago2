@@ -11,6 +11,7 @@ import { getCurrentUser } from "@/lib/auth/server";
 import { editorEventEditHref } from "@/lib/content-editor/types";
 import { buildEventJsonLd } from "@/lib/seo/schema/buildEventJsonLd";
 import { buildBreadcrumbJsonLd } from "@/lib/seo/schema/buildBreadcrumbJsonLd";
+import { buildFaqJsonLd } from "@/lib/seo/schema/buildFaqJsonLd";
 import { JsonLd } from "@/components/seo/JsonLd";
 import { AnalyticsDetailBeacon } from "@/components/analytics/AnalyticsDetailBeacon";
 import { resolveCanonicalEventPublicPathBySlugOrId } from "@/lib/business/resolveCanonicalEventPublicPath";
@@ -175,6 +176,7 @@ export default async function CityEventPublicPage({ params, searchParams }: Even
       previewBannerLabel,
       reelsThumbnailUrl: reelsThumbnailUrl ?? undefined,
     });
+    const faqJsonLd = buildFaqJsonLd(data.faqItems);
     return (
       <>
         <AnalyticsDetailBeacon
@@ -184,7 +186,9 @@ export default async function CityEventPublicPage({ params, searchParams }: Even
           cityId={fromDb.cityId}
           citySlug={city}
         />
-        <JsonLd data={[jsonLd, breadcrumbJsonLd].filter(Boolean) as Record<string, unknown>[]} />
+        <JsonLd
+          data={[jsonLd, breadcrumbJsonLd, faqJsonLd].filter(Boolean) as Record<string, unknown>[]}
+        />
         <EventPageView data={data} />
       </>
     );

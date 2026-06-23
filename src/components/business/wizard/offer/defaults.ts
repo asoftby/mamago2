@@ -100,6 +100,7 @@ export function getDefaultFormData(defaultPlaceId: string | null = null): OfferF
     phone3Label: null,
     website: "",
     socialLinks: [],
+    faqItems: [],
     
     // Step 7/8: CTA and Publication
     publicationAccess: null,

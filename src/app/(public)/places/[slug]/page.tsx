@@ -8,6 +8,7 @@ import { findPlaceBySlug } from "@/lib/slug/placeSlugService";
 import { formatMarketplaceHeroAddress } from "@/lib/placeLocationString";
 import { isPlacePubliclyVisible } from "@/lib/plan/publicVisibility";
 import { buildBreadcrumbJsonLd } from "@/lib/seo/schema/buildBreadcrumbJsonLd";
+import { buildFaqJsonLd } from "@/lib/seo/schema/buildFaqJsonLd";
 import { buildPlaceJsonLd } from "@/lib/seo/schema/buildPlaceJsonLd";
 import { AnalyticsDetailBeacon } from "@/components/analytics/AnalyticsDetailBeacon";
 import { buildOgMeta } from "@/lib/seo/buildOgMeta";
@@ -30,6 +31,7 @@ import {
   loadUpcomingPlaceEvents,
   mapUpcomingPlaceEventsToActivityMocks,
 } from "@/lib/place/loadUpcomingPlaceEvents";
+import { normalizeFaqItems } from "@/lib/faq/faqItems";
 import type { StoredGoogleReview } from "@/types/google-places";
 
 interface PlacePageProps {
@@ -565,6 +567,8 @@ export default async function PlacePage({ params }: PlacePageProps) {
     ],
     publicBase,
   );
+  const faqItems = normalizeFaqItems(place.faqItems);
+  const faqJsonLd = buildFaqJsonLd(faqItems);
 
   // Prepare place data for marketplace component
   const marketplacePlaceData = {
@@ -604,6 +608,7 @@ export default async function PlacePage({ params }: PlacePageProps) {
     images: galleryImages.length > 0 ? galleryImages : undefined,
 
     priceData: parsePriceData(place.priceItems),
+    faqItems,
     updatedAt: place.updatedAt,
   };
 
@@ -615,8 +620,9 @@ export default async function PlacePage({ params }: PlacePageProps) {
         vertical="CITY"
         cityId={place.cityId}
       />
-      <JsonLd data={jsonLd} />
-      <JsonLd data={breadcrumbJsonLd} />
+      <JsonLd
+        data={[jsonLd, breadcrumbJsonLd, faqJsonLd].filter(Boolean) as Record<string, unknown>[]}
+      />
       <MarketplacePlacePage
         place={marketplacePlaceData}
         eventActivities={eventActivities}

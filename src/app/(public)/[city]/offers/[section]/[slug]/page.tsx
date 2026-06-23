@@ -5,6 +5,7 @@ import prisma from "@/lib/prisma";
 import { findOfferBySlug } from "@/lib/slug/offerSlugService";
 import { buildOfferStructuredData } from "@/lib/seo/schema/buildOfferStructuredData";
 import { buildBreadcrumbJsonLd } from "@/lib/seo/schema/buildBreadcrumbJsonLd";
+import { buildFaqJsonLd } from "@/lib/seo/schema/buildFaqJsonLd";
 import { JsonLd } from "@/components/seo/JsonLd";
 import { AnalyticsDetailBeacon } from "@/components/analytics/AnalyticsDetailBeacon";
 import { buildOgMeta } from "@/lib/seo/buildOgMeta";
@@ -192,6 +193,7 @@ export default async function CanonicalOfferPage({ params, searchParams }: PageP
     "contentUrl": data.media.videoUrl,
     "embedUrl": data.media.videoUrl,
   } : null;
+  const faqJsonLd = buildFaqJsonLd(data.faqItems);
 
   return (
     <>
@@ -201,7 +203,14 @@ export default async function CanonicalOfferPage({ params, searchParams }: PageP
         vertical="CITY"
         cityId={offer.placeId}
       />
-      <JsonLd data={[offerJsonLd, breadcrumbJsonLd, videoJsonLd].filter(Boolean) as Record<string, unknown>[]} />
+      <JsonLd
+        data={
+          [offerJsonLd, breadcrumbJsonLd, videoJsonLd, faqJsonLd].filter(Boolean) as Record<
+            string,
+            unknown
+          >[]
+        }
+      />
       <OfferPageView data={data} canEditOffer={canEditOffer} />
     </>
   );

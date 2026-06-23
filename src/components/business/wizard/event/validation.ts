@@ -59,6 +59,8 @@ export function validateStep(step: number, data: EventFormData): ValidationResul
     case 8:
       return validateStep8(data);
     case 9:
+      return validateStep9(data);
+    case 10:
       return validateForSubmit(data);
     default:
       return { isValid: true, isComplete: true, errors: [], warnings: [] };
@@ -433,7 +435,7 @@ export function validateForSubmit(data: EventFormData): ValidationResult {
   const allWarnings: string[] = [];
 
   // Validate all required steps
-  for (let step = 1; step <= 8; step++) {
+  for (let step = 1; step <= 9; step++) {
     const result = validateStep(step, data);
     if (!result.isComplete) {
       allErrors.push(`Шаг ${step}: не заполнены обязательные поля`);
@@ -448,6 +450,11 @@ export function validateForSubmit(data: EventFormData): ValidationResult {
     errors: allErrors,
     warnings: allWarnings,
   };
+}
+
+function validateStep9(data: EventFormData): ValidationResult {
+  void data;
+  return { isValid: true, isComplete: true, errors: [], warnings: [] };
 }
 
 // Helper functions

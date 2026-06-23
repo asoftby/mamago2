@@ -756,6 +756,7 @@ model Activity {
   discoverySignalIds   String[]                  @default([])
 
   priceItems             Json?
+  faqItems               Json?
 
   // Контактные телефоны активности
   phone                  String?
@@ -1125,6 +1126,7 @@ model Place {
   googleMapsUri           String?
 
   priceItems              Json?
+  faqItems                Json?
 
   activities      Activity[]          @relation("PlaceActivities")
   bookingRequests BookingRequest[]
@@ -1288,6 +1290,7 @@ model PlaceRevision {
   ageTags               String[]
   visitFormats          String[]
   activityTypes         String[]
+  faqItems              Json?
   createdAt             DateTime             @default(now())
   updatedAt             DateTime             @updatedAt
   improvementRequestId  String?
@@ -1813,6 +1816,7 @@ model Offer {
   classChipSlugs           String[]           @default([])
   /// Шаги мастера, явно завершённые пользователем через «Далее» (OfferWizardStepKey)
   wizardCompletedSteps     String[]           @default([])
+  faqItems                 Json?
 
   // Настройки записи
   bookingEnabled Boolean      @default(false)

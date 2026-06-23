@@ -14,6 +14,7 @@ import { isGoogleReviewsEnabled } from "@/lib/place/googleReviewsMeta";
 import { getNormalizedPhones } from "@/lib/phones/normalizePhones";
 import { getNormalizedOfferPhones } from "@/lib/offer/offerPhones";
 import { getNormalizedPlacePhones } from "@/lib/place/placePhones";
+import { normalizeFaqItems } from "@/lib/faq/faqItems";
 
 interface GetOfferPageDataParams {
   citySlug: string;
@@ -455,6 +456,7 @@ export async function getOfferPageData({
         year: "numeric" 
       }),
     })),
+    faqItems: normalizeFaqItems(offer.faqItems),
     reviewsCount: reviews.length,
     averageRating: reviews.length > 0 
       ? reviews.reduce((acc, r) => acc + r.rating, 0) / reviews.length 

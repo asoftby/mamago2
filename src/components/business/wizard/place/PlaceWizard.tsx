@@ -43,6 +43,7 @@ import { Step2Location } from "./steps/Step2Location";
 import { Step3Contacts } from "./steps/Step3Contacts";
 import { Step4Photos } from "./steps/Step4Photos";
 import { Step5OpeningHours } from "./steps/Step5OpeningHours";
+import { FaqStep } from "../shared/FaqStep";
 import { Step6Review } from "./steps/Step6Review";
 import { CompletionProgress } from "./CompletionProgress";
 import {
@@ -519,7 +520,7 @@ export function PlaceWizard({
       // Go to first incomplete step
       for (let i = 1; i <= TOTAL_STEPS; i++) {
         const stepValidation = validateStep(i, formData);
-        if (!stepValidation.isComplete && i < 6) {
+        if (!stepValidation.isComplete && i < 7) {
           setCurrentStep(i);
           break;
         }
@@ -732,7 +733,7 @@ export function PlaceWizard({
 
               for (const field of error.missing) {
                 const step = fieldToStep[field];
-                if (step !== undefined && step < 6) {
+                if (step !== undefined && step < 7) {
                   setCurrentStep(step);
                   break;
                 }
@@ -793,6 +794,14 @@ export function PlaceWizard({
       case 5:
         return <Step5OpeningHours {...commonProps} />;
       case 6:
+        return (
+          <FaqStep
+            kind="place"
+            value={formData.faqItems}
+            onChange={(faqItems) => handleChange({ faqItems })}
+          />
+        );
+      case 7:
         return <Step6Review data={formData} isSubmitting={isSubmitting} onGoToStep={handleGoToStep} />;
       default:
         return null;
@@ -802,7 +811,7 @@ export function PlaceWizard({
   const stepValidation = validateStep(currentStep, formData);
   const canNext = currentStep < TOTAL_STEPS;
   const canPrev = true; // Always show back button (on step 1 it goes to returnTo)
-  const isReviewStep = currentStep === 6;
+  const isReviewStep = currentStep === 7;
 
   const segments = useMemo(
     () => WIZARD_STEPS.map((s) => ({ id: s.id, title: s.label })),

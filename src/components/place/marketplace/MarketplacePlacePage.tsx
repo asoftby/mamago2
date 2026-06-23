@@ -10,8 +10,10 @@ import { PlaceAddressSection } from "./PlaceAddressSection";
 import { PlaceReviewsSection } from "./PlaceReviewsSection";
 import { PriceListBlock } from "@/components/shared/PriceListBlock";
 import { MobileSmartBackButton } from "@/components/shared/MobileSmartBackButton";
+import { FaqSection } from "@/components/public/FaqSection";
 import type { ActivityMock } from "@/types/activity";
 import type { PriceData } from "@/lib/priceItems";
+import type { FaqItem } from "@/lib/faq/faqItems";
 import Link from "next/link";
 import Image from "next/image";
 import { isAppMediaUrl } from "@/lib/media/isAppMediaUrl";
@@ -70,6 +72,7 @@ interface MarketplacePlacePageProps {
     }>;
 
     priceData?: PriceData;
+    faqItems?: FaqItem[];
     updatedAt?: Date | string | null;
     fallbackUrl?: string;
   };
@@ -221,6 +224,8 @@ export function MarketplacePlacePage({
         format={place.format}
         categories={place.categories}
       />
+
+      <FaqSection items={place.faqItems} />
 
       {/* Working Hours */}
       {place.workingHoursSummary && (

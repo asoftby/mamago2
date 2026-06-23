@@ -10,6 +10,7 @@ import {
 } from "./notification.service";
 import { mapToCreatePayload } from "@/lib/openingHours";
 import { normalizePlacePhoneFields } from "@/lib/place/placePhones";
+import { normalizeFaqItems } from "@/lib/faq/faqItems";
 
 /**
  * Data structure for revision snapshot fields
@@ -53,6 +54,7 @@ export interface PlaceRevisionData {
   visitFormats?: string[];
   activityTypes?: string[];
   placeGroupId?: string | null;
+  faqItems?: Prisma.InputJsonValue;
 }
 
 // Structural type used only for fingerprinting — must be compatible with
@@ -235,6 +237,7 @@ export async function getOrCreatePlaceRevision(
       ageTags: place.ageTags,
       visitFormats: place.visitFormats,
       activityTypes: place.activityTypes,
+      faqItems: place.faqItems as Prisma.InputJsonValue,
       placeGroupId: place.placeGroupId,
       // Copy images
       images: {
@@ -321,6 +324,8 @@ export async function savePlaceRevisionDraft(
             : revision.phone3Label,
       })
     : null;
+  const normalizedFaqItems =
+    revisionData.faqItems !== undefined ? normalizeFaqItems(revisionData.faqItems) : undefined;
 
   // Filter out fields that don't exist in PlaceRevision model
   // PlaceRevision uses logoImageId, not logoMediaId
@@ -382,6 +387,9 @@ export async function savePlaceRevisionDraft(
     Object.entries({
       ...validData,
       ...(normalizedPhoneFields ?? {}),
+      ...(normalizedFaqItems !== undefined
+        ? { faqItems: normalizedFaqItems as unknown as Prisma.InputJsonValue }
+        : {}),
     }).filter(([, v]) => v !== undefined)
   ) as Prisma.AtLeast<Prisma.PlaceRevisionUpdateInput, 'id'>;
 

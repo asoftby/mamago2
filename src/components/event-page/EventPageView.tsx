@@ -28,6 +28,7 @@ import { EventSessionSelector } from "./EventSessionSelector";
 import { EventStickyActionBar } from "./EventStickyActionBar";
 import { EventSimpleBookingModal } from "./EventSimpleBookingModal";
 import { SimilarEventsSection } from "./SimilarEventsSection";
+import { FaqSection } from "@/components/public/FaqSection";
 import { EventWhyGo } from "./EventWhyGo";
 import { EventGoodFit } from "./EventGoodFit";
 import { PublicationMediaColumn } from "@/components/media/PublicationMediaColumn";
@@ -628,6 +629,8 @@ export function EventPageView({ data }: { data: EventPageData }) {
         about={data.about}
         descriptionHtml={data.about.descriptionHtml}
       />
+
+      <FaqSection items={data.faqItems} />
 
 
       {/* ── Sessions ─── */}

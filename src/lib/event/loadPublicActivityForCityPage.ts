@@ -32,6 +32,7 @@ export async function loadPublicActivityForCityPage(
       seoOgImage: string | null;
       seoRobots: string | null;
       seoJsonLdOverride: unknown | null;
+      faqItems: unknown | null;
       ownerUserId: string;
       _redirectToSlug?: string;
     })
@@ -159,6 +160,7 @@ export async function loadPublicActivityForCityPage(
     priceFrom: activity.priceFrom,
     currency: activity.currency,
     priceDetails: activity.priceDetails,
+    faqItems: (activity.faqItems as unknown) ?? null,
     scheduleJson: activity.scheduleJson,
     coverImageId: activity.coverImageId,
     coverImageUrl: resolveActivityCoverUrl({

@@ -21,6 +21,7 @@ import { normalizeUiCurrencyText } from "@/lib/formatters/format-price";
 import { getCityHomeHref } from "@/lib/header/getCityHomeHref";
 import { toast } from "@/lib/toast";
 import { CallModal } from "@/components/shared/CallModal";
+import { FaqSection } from "@/components/public/FaqSection";
 
 interface OfferPageViewProps {
   data: OfferPageData;
@@ -312,6 +313,8 @@ export function OfferPageView({
         <OfferEditorialInsights data={data} />
 
         <OfferAccordion data={data} />
+
+        <FaqSection items={data.faqItems} />
 
         {data.schedule && data.schedule.items.length > 0 && (
           <OfferSchedule

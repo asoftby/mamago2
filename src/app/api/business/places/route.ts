@@ -11,6 +11,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
 import { ContentStatus, PlaceKind, LocationSource, MediaEntityType } from "@prisma/client";
 import { updatePlaceLocation } from "@/services/place/placeLocation.service";
 import { extractStreetName } from "@/lib/slug/slugUtils";
@@ -35,6 +36,7 @@ import {
 import { createPublishTimer, runAfterPublishResponse } from "@/server/utils/publishPipeline";
 import { syncPlaceMediaUsage } from "@/server/services/media/media-usage.service";
 import { normalizePlacePhoneFields } from "@/lib/place/placePhones";
+import { normalizeFaqItems } from "@/lib/faq/faqItems";
 
 async function finalizePublishedPlaceSlugIfNeeded(placeId: string, isPublished: boolean) {
   if (!isPublished) return;
@@ -149,6 +151,7 @@ export async function POST(request: NextRequest) {
         }
       : data;
     const phones = normalizePlacePhoneFields(d);
+    const faqItems = normalizeFaqItems(d.faqItems);
     timer.mark("validate");
 
     // Get user's business (if exists)
@@ -210,6 +213,7 @@ export async function POST(request: NextRequest) {
         visitFormats: d.visitFormats || [],
         primaryCategoryId: d.primaryCategoryId || null,
         discoverySignalIds: Array.isArray(d.discoverySignalIds) ? d.discoverySignalIds : [],
+        faqItems: faqItems as unknown as Prisma.InputJsonValue,
 
         // Step 2 fields
         lat: d.lat || null,

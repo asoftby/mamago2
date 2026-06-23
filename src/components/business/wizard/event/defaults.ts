@@ -138,6 +138,7 @@ export function getDefaultFormData(): EventFormData {
     phone3Label: null,
     website: "",
     socialLinks: [createDefaultSocialLink("social-initial")],
+    faqItems: [],
     
     // Step 8: Organizer
     organizerMode: "manual",

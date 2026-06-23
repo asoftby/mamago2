@@ -26,6 +26,7 @@ import {
 import { syncOfferPersistenceLayer } from "@/server/offers/offerPersistence";
 import { projectCampSessions } from "@/server/offers/campSessionProjection";
 import { syncOfferMediaUsage } from "@/server/services/media/media-usage.service";
+import { normalizeFaqItems } from "@/lib/faq/faqItems";
 
 const offerProductTypeSchema = z.enum([
   "PLACE_VISIT",
@@ -95,6 +96,7 @@ const updateOfferSchema = z.object({
       url: z.string(),
     }),
   ).optional(),
+  faqItems: z.array(z.record(z.string(), z.unknown())).nullish(),
   status: z.enum(["DRAFT", "PENDING", "PUBLISHED"]).optional(),
   discoverySignalIds: z.array(z.string()).optional(),
   classChipSlugs: z.array(z.string()).optional(),
@@ -196,6 +198,7 @@ export async function PATCH(
     const { id } = await params;
     const body = await request.json();
     const data = updateOfferSchema.parse(body);
+    const faqItems = data.faqItems !== undefined ? normalizeFaqItems(data.faqItems) : undefined;
     timer.mark("validate");
 
     if (data.status === "PUBLISHED" && !canPublishContentDirectly(user.role)) {
@@ -277,6 +280,7 @@ export async function PATCH(
     if (data.discoverySignalIds !== undefined) updateData.discoverySignalIds = data.discoverySignalIds;
     if (data.classChipSlugs !== undefined) updateData.classChipSlugs = data.classChipSlugs;
     if (data.wizardCompletedSteps !== undefined) updateData.wizardCompletedSteps = data.wizardCompletedSteps;
+    if (faqItems !== undefined) updateData.faqItems = faqItems as unknown as Prisma.InputJsonValue;
     if (data.details !== undefined)
       updateData.details =
         data.details === null ? Prisma.DbNull : (data.details as Prisma.InputJsonValue);

@@ -53,6 +53,7 @@ export function getDefaultFormData(): PlaceFormData {
 
     // Prices
     priceItems: { items: [], note: "" },
+    faqItems: [],
 
     // Hierarchy
     placeKind: PlaceKind.STANDALONE,

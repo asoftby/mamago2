@@ -13,6 +13,7 @@ import { Step2Location } from "./steps/Step2Location";
 import { Step3Contacts } from "./steps/Step3Contacts";
 import { Step4Photos } from "./steps/Step4Photos";
 import { Step5OpeningHours } from "./steps/Step5OpeningHours";
+import { FaqStep } from "../shared/FaqStep";
 import { Step6Review } from "./steps/Step6Review";
 
 /**
@@ -200,6 +201,28 @@ export const PLACE_WIZARD_STEPS: WizardStepConfig<PlaceFormData>[] = [
     ],
     
     getMissingFields: (data) => [], // Optional step
+  },
+  {
+    id: 6,
+    key: "faq",
+    shortLabel: "Вопросы",
+    title: "Частые вопросы",
+    description: "Необязательный блок с ответами на частые вопросы родителей",
+    component: ({ data, onChange }) => (
+      <FaqStep
+        kind="place"
+        value={data.faqItems}
+        onChange={(faqItems) => onChange({ faqItems })}
+      />
+    ),
+    isComplete: () => true,
+    getSummary: (data) => [
+      {
+        label: "Вопросы",
+        value: data.faqItems.length > 0 ? `${data.faqItems.length} вопросов` : "Не добавлен",
+      },
+    ],
+    getMissingFields: () => [],
   },
 ];
 

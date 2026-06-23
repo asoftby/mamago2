@@ -6,6 +6,7 @@
 import type { Intent } from "@/lib/intent";
 import type { MediaGalleryItem } from "@/lib/media/galleryTypes";
 import type { NormalizedPhone } from "@/lib/phones/normalizePhones";
+import type { FaqItem } from "@/lib/faq/faqItems";
 
 export type EventPageBreadcrumb = {
   label: string;
@@ -137,6 +138,7 @@ export type EventPageData = {
   priceDetails?: string;
   /** Registration / tickets utility copy. */
   bookingNotes?: string;
+  faqItems?: FaqItem[];
   cta: EventPageCtaConfig;
   /**
    * Медиа-галерея под cover image: Reels (первой) + дополнительные фото события.

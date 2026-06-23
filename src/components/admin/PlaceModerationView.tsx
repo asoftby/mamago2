@@ -18,6 +18,7 @@ import { PlaceDangerZone } from "@/components/admin/moderation/PlaceDangerZone";
 import { Textarea } from "@/components/ui/textarea";
 import { getFormatLabel } from "@/lib/placeChips";
 import { GoogleReviewsStatusBadge } from "@/components/admin/moderation/GoogleReviewsStatusBadge";
+import { FaqReadonlySection } from "@/components/admin/moderation/FaqReadonlySection";
 import { DAY_SHORT_LABELS, ALL_DAYS, MODE_LABELS } from "@/components/openingHours/openingHours.types";
 import { getPlaceDetailBackLink } from "@/lib/admin/placeDetailNavigation";
 import type { OpeningHoursWithRelations } from "@/server/services/openingHours/openingHours.types";
@@ -50,6 +51,7 @@ interface PlaceModerationViewProps {
     images: Array<{ id: string; url: string; kind: string; sortOrder: number; width?: number | null; height?: number | null; blurhash?: string | null }>;
     shortDesc?: string | null;
     description?: string | null;
+    faqItems?: unknown;
     lat?: number | null;
     lng?: number | null;
     placeKind?: string | null;
@@ -279,6 +281,8 @@ export function PlaceModerationView({ place }: PlaceModerationViewProps) {
               />
             </div>
           )}
+
+          <FaqReadonlySection items={place.faqItems} />
 
           {/* Location */}
           <div>
