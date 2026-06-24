@@ -220,7 +220,7 @@ export function AdminPlaceGroupManager({
                 <p className="text-xs text-gray-500">
                   {selectedPlaces.length > 0
                     ? `Связано мест: ${selectedPlaces.length}`
-                    : "Сейчас это место не связано с другими местами."}
+                    : "Найдите место, которое нужно показать рядом с этой локацией."}
                 </p>
               </div>
 

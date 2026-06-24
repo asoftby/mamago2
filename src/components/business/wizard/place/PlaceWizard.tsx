@@ -56,6 +56,7 @@ import type { Role } from "@prisma/client";
 import { navigateToCompatibleHref } from "@/lib/routing/clientNavigation";
 import { PlaceStatusBadge } from "@/components/business/place/PlaceStatusBadge";
 import { PlaceGroupSelector } from "@/components/business/place/PlaceGroupSelector";
+import { AdminPlaceGroupManager } from "@/components/admin/AdminPlaceGroupManager";
 
 /**
  * Validate returnTo URL to prevent open redirects
@@ -879,9 +880,9 @@ export function PlaceWizard({
     () => WIZARD_STEPS.map((s) => ({
       id: s.id,
       label: s.label,
-      isComplete: s.id < currentStep,
+      isComplete: validateStep(s.id, formData).isComplete,
     })),
-    [currentStep]
+    [formData]
   );
 
   const phase = formWizardPhaseFromFlags({ isSaving, isSubmitting });
@@ -895,6 +896,10 @@ export function PlaceWizard({
     const trimmedTitle = formData.title?.trim();
     return trimmedTitle || businessFormCopy.place.createTitle;
   }, [formData.title]);
+
+  const showBusinessRelatedPlaces = surface === "business" && currentStep === 1;
+  const showAdminRelatedPlaces =
+    surface === "admin" && mode === "edit" && currentStep === 1 && !!place?.id;
 
   return (
     <FormWizardShell>
@@ -984,7 +989,7 @@ export function PlaceWizard({
         <div className="space-y-6">
           {renderStep()}
 
-          {surface === "business" ? (
+          {showBusinessRelatedPlaces ? (
             <PlaceGroupSelector
               currentPlaceId={mode === "edit" ? place?.id : undefined}
               currentGroupId={mode === "edit" ? currentPlaceGroupId : undefined}
@@ -1001,6 +1006,13 @@ export function PlaceWizard({
                   ? "Пока нет других мест для связи. После создания ещё одного места вы сможете связать их между собой."
                   : "Пока нет других мест для связи."
               }
+            />
+          ) : null}
+
+          {showAdminRelatedPlaces ? (
+            <AdminPlaceGroupManager
+              currentPlaceId={place!.id}
+              currentGroupId={currentPlaceGroupId}
             />
           ) : null}
         </div>

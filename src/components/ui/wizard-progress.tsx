@@ -71,7 +71,7 @@ export function WizardProgress({
                 isActive
                   ? "text-[#EF8759]"
                   : isDone
-                    ? "text-gray-700 group-hover:text-gray-900"
+                    ? "text-[#C96A3D] group-hover:text-[#A9532D]"
                     : isDisabled
                       ? "text-gray-300"
                       : "text-gray-400 group-hover:text-gray-600",
@@ -105,7 +105,7 @@ export function WizardProgress({
                 isActive
                   ? "bg-[#EF8759]"
                   : isDone
-                    ? "bg-gray-200 group-hover:bg-gray-300"
+                    ? "bg-[#F2B18D] group-hover:bg-[#EF8759]"
                     : isDisabled
                       ? "bg-transparent"
                       : "bg-transparent group-hover:bg-gray-100",
