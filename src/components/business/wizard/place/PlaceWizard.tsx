@@ -55,6 +55,7 @@ import {
 import type { Role } from "@prisma/client";
 import { navigateToCompatibleHref } from "@/lib/routing/clientNavigation";
 import { PlaceStatusBadge } from "@/components/business/place/PlaceStatusBadge";
+import { PlaceGroupSelector } from "@/components/business/place/PlaceGroupSelector";
 
 /**
  * Validate returnTo URL to prevent open redirects
@@ -158,11 +159,18 @@ export function PlaceWizard({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [autosaveError, setAutosaveError] = useState(false);
+  const [currentPlaceGroupId, setCurrentPlaceGroupId] = useState<string | null>(
+    place?.placeGroupId ?? null,
+  );
   const [originalData, setOriginalData] = useState<PlaceFormData>(() =>
     mode === "edit" && place ? mapPlaceToFormData(place) : getDefaultFormData()
   );
   const autosaveInFlightRef = useRef(false);
   const pendingAutosaveChangesRef = useRef<Record<string, unknown> | null>(null);
+
+  useEffect(() => {
+    setCurrentPlaceGroupId(place?.placeGroupId ?? null);
+  }, [place?.placeGroupId]);
 
   // isDirty: формула изменилась относительно baseline
   const isDirty = useMemo(
@@ -932,6 +940,17 @@ export function PlaceWizard({
       )}
 
       <FormPrimaryContentCard>{renderStep()}</FormPrimaryContentCard>
+
+      {surface === "business" && mode === "edit" && place?.id ? (
+        <div className="mx-auto w-full max-w-4xl px-4 pb-4 sm:px-6">
+          <PlaceGroupSelector
+            currentPlaceId={place.id}
+            currentGroupId={currentPlaceGroupId}
+            onGroupIdChange={setCurrentPlaceGroupId}
+            disabled={!isEditable || isSaving || isSubmitting}
+          />
+        </div>
+      ) : null}
 
       <FormStickyActionBar
         phase={phase}

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth/server";
+import { getUserBusinessId } from "@/lib/auth/placeAccess";
 
 export async function GET(request: NextRequest) {
   try {
@@ -10,19 +11,14 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url);
-    const ownerBusinessId = searchParams.get("ownerBusinessId");
     const excludeId = searchParams.get("excludeId");
+    const ownerBusinessId = await getUserBusinessId(user.id);
 
     if (!ownerBusinessId) {
       return NextResponse.json(
-        { error: "ownerBusinessId is required" },
-        { status: 400 }
+        { error: "Business context is required" },
+        { status: 403 }
       );
-    }
-
-    // Verify user owns these places or is admin
-    if (user.id !== ownerBusinessId && user.role !== "ADMIN" && user.role !== "MODERATOR") {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     const places = await prisma.place.findMany({
