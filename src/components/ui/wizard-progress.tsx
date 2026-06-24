@@ -104,7 +104,7 @@ export function WizardProgress({
                 "absolute bottom-0 left-0 right-0 h-0.5 rounded-full transition-all duration-200",
                 isActive
                   ? "bg-[#EF8759]"
-                  : "bg-transparent group-hover:bg-gray-100",
+                  : "bg-gray-200 group-hover:bg-gray-300",
               )}
             />
           </button>

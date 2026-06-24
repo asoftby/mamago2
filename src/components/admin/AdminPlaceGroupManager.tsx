@@ -2,9 +2,11 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { AlertCircle, Loader2, Search } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { CONTENT_STATUS_META, contentStatusPublicationPillClass } from "@/lib/content-status-meta";
 
 type AdminPlaceOption = {
   id: string;
@@ -20,6 +22,23 @@ type AdminPlaceGroupManagerProps = {
   currentPlaceId: string;
   currentGroupId?: string | null;
 };
+
+function getPlaceStatusPresentation(status?: string) {
+  const normalizedStatus = status ?? "DRAFT";
+  const meta = CONTENT_STATUS_META[normalizedStatus as keyof typeof CONTENT_STATUS_META];
+
+  if (meta) {
+    return {
+      label: meta.label,
+      className: contentStatusPublicationPillClass(normalizedStatus as keyof typeof CONTENT_STATUS_META),
+    };
+  }
+
+  return {
+    label: normalizedStatus,
+    className: "border-stone-200 bg-stone-50 text-stone-600",
+  };
+}
 
 export function AdminPlaceGroupManager({
   currentPlaceId,
@@ -237,15 +256,15 @@ export function AdminPlaceGroupManager({
                   disabled={isSaving}
                 />
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-gray-900">{place.title}</p>
-                  <p className="text-xs text-gray-500">
-                    {place.shortAddress || place.formattedAddr || "Без адреса"}
-                  </p>
-                  <p className="mt-1 text-xs text-gray-400">
-                    {place.ownerBusiness?.name
-                      ? `${place.ownerBusiness.name} · ${place.status ?? "UNKNOWN"}`
-                      : place.status ?? "UNKNOWN"}
-                  </p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-medium text-gray-900">{place.title}</p>
+                    <Badge
+                      variant="outline"
+                      className={`rounded-full border px-2 py-0.5 text-[11px] font-medium ${getPlaceStatusPresentation(place.status).className}`}
+                    >
+                      {getPlaceStatusPresentation(place.status).label}
+                    </Badge>
+                  </div>
                 </div>
               </label>
             ))}

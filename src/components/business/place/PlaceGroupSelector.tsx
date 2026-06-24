@@ -4,10 +4,12 @@ import React, { useEffect, useMemo, useState } from "react";
 import { AlertCircle, Loader2, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { CONTENT_STATUS_META, contentStatusPublicationPillClass } from "@/lib/content-status-meta";
 
 type RelatedPlaceOption = {
   id: string;
@@ -16,6 +18,23 @@ type RelatedPlaceOption = {
   placeGroupId?: string | null;
   status?: string;
 };
+
+function getPlaceStatusPresentation(status?: string) {
+  const normalizedStatus = status ?? "DRAFT";
+  const meta = CONTENT_STATUS_META[normalizedStatus as keyof typeof CONTENT_STATUS_META];
+
+  if (meta) {
+    return {
+      label: meta.label,
+      className: contentStatusPublicationPillClass(normalizedStatus as keyof typeof CONTENT_STATUS_META),
+    };
+  }
+
+  return {
+    label: normalizedStatus,
+    className: "border-stone-200 bg-stone-50 text-stone-600",
+  };
+}
 
 type PlaceGroupSelectorProps = {
   currentPlaceId?: string;
@@ -262,14 +281,20 @@ export function PlaceGroupSelector({
                   disabled={disabled || isSaving}
                 />
                 <div className="min-w-0 flex-1">
-                  <Label className="cursor-pointer text-sm font-medium text-foreground">
-                    {place.title}
-                  </Label>
-                  {place.shortAddress && (
-                    <p className="mt-0.5 text-xs text-muted-foreground">
-                      {place.shortAddress}
-                    </p>
-                  )}
+                  <div className="flex items-center gap-2">
+                    <Label className="cursor-pointer text-sm font-medium text-foreground">
+                      {place.title}
+                    </Label>
+                    <Badge
+                      variant="outline"
+                      className={cn(
+                        "rounded-full border px-2 py-0.5 text-[11px] font-medium",
+                        getPlaceStatusPresentation(place.status).className,
+                      )}
+                    >
+                      {getPlaceStatusPresentation(place.status).label}
+                    </Badge>
+                  </div>
                 </div>
               </label>
             ))}
