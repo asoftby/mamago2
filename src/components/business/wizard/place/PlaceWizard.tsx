@@ -159,6 +159,7 @@ export function PlaceWizard({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [autosaveError, setAutosaveError] = useState(false);
+  const [selectedRelatedPlaceIds, setSelectedRelatedPlaceIds] = useState<string[]>([]);
   const [currentPlaceGroupId, setCurrentPlaceGroupId] = useState<string | null>(
     place?.placeGroupId ?? null,
   );
@@ -206,6 +207,42 @@ export function PlaceWizard({
     wizardType: "place",
     entityId: mode === "edit" ? place?.id : undefined,
   });
+
+  const persistRelatedPlacesAfterCreate = useCallback(
+    async (createdPlaceId: string) => {
+      if (selectedRelatedPlaceIds.length === 0) {
+        return;
+      }
+
+      try {
+        const response = await fetch(`/api/business/places/${createdPlaceId}/group`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ relatedPlaceIds: selectedRelatedPlaceIds }),
+        });
+
+        if (!response.ok) {
+          const payload = (await response.json().catch(() => ({}))) as {
+            error?: string;
+            message?: string;
+          };
+          throw new Error(
+            payload.message ||
+              payload.error ||
+              "Failed to save related places after creation",
+          );
+        }
+      } catch (error) {
+        console.error("Failed to save related places after create:", error);
+        toast.error(
+          "Место создано, но связанные места не удалось сохранить. Их можно добавить позже в редактировании.",
+        );
+      }
+    },
+    [selectedRelatedPlaceIds],
+  );
 
   // Autosave effect
   useEffect(() => {
@@ -349,6 +386,8 @@ export function PlaceWizard({
         }
 
         const result = await response.json();
+
+        await persistRelatedPlacesAfterCreate(result.place.id);
 
         draft.markClean();
         toast.success("Черновик сохранен");
@@ -593,6 +632,8 @@ export function PlaceWizard({
         }
 
         const result = await response.json();
+
+        await persistRelatedPlacesAfterCreate(result.place.id);
 
         draft.markClean();
         toast.success(
@@ -941,13 +982,24 @@ export function PlaceWizard({
 
       <FormPrimaryContentCard>{renderStep()}</FormPrimaryContentCard>
 
-      {surface === "business" && mode === "edit" && place?.id ? (
+      {surface === "business" ? (
         <div className="mx-auto w-full max-w-4xl px-4 pb-4 sm:px-6">
           <PlaceGroupSelector
-            currentPlaceId={place.id}
-            currentGroupId={currentPlaceGroupId}
-            onGroupIdChange={setCurrentPlaceGroupId}
-            disabled={!isEditable || isSaving || isSubmitting}
+            currentPlaceId={mode === "edit" ? place?.id : undefined}
+            currentGroupId={mode === "edit" ? currentPlaceGroupId : undefined}
+            onGroupIdChange={mode === "edit" ? setCurrentPlaceGroupId : undefined}
+            selectedPlaceIds={mode === "create" ? selectedRelatedPlaceIds : undefined}
+            onSelectedPlaceIdsChange={
+              mode === "create" ? setSelectedRelatedPlaceIds : undefined
+            }
+            disabled={
+              mode === "edit" ? !isEditable || isSaving || isSubmitting : isSaving || isSubmitting
+            }
+            emptyStateDescription={
+              mode === "create"
+                ? "Пока нет других мест для связи. После создания ещё одного места вы сможете связать их между собой."
+                : "Пока нет других мест для связи."
+            }
           />
         </div>
       ) : null}

@@ -16,25 +16,42 @@ type RelatedPlaceOption = {
 };
 
 type PlaceGroupSelectorProps = {
-  currentPlaceId: string;
+  currentPlaceId?: string;
   currentGroupId?: string | null;
   onGroupIdChange?: (groupId: string | null) => void;
+  selectedPlaceIds?: string[];
+  onSelectedPlaceIdsChange?: (placeIds: string[]) => void;
   className?: string;
   disabled?: boolean;
+  emptyStateDescription?: string;
 };
 
 export function PlaceGroupSelector({
   currentPlaceId,
   currentGroupId,
   onGroupIdChange,
+  selectedPlaceIds: selectedPlaceIdsProp,
+  onSelectedPlaceIdsChange,
   className,
   disabled = false,
+  emptyStateDescription = "Пока нет других мест для связи.",
 }: PlaceGroupSelectorProps) {
   const [places, setPlaces] = useState<RelatedPlaceOption[]>([]);
-  const [selectedPlaceIds, setSelectedPlaceIds] = useState<string[]>([]);
+  const [selectedPlaceIdsState, setSelectedPlaceIdsState] = useState<string[]>(
+    selectedPlaceIdsProp ?? [],
+  );
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const isDeferredMode = !currentPlaceId;
+
+  const selectedPlaceIds = selectedPlaceIdsProp ?? selectedPlaceIdsState;
+
+  useEffect(() => {
+    if (selectedPlaceIdsProp) {
+      setSelectedPlaceIdsState(selectedPlaceIdsProp);
+    }
+  }, [selectedPlaceIdsProp]);
 
   useEffect(() => {
     let isMounted = true;
@@ -44,7 +61,10 @@ export function PlaceGroupSelector({
         setIsLoading(true);
         setError(null);
 
-        const params = new URLSearchParams({ excludeId: currentPlaceId });
+        const params = new URLSearchParams();
+        if (currentPlaceId) {
+          params.set("excludeId", currentPlaceId);
+        }
         const response = await fetch(`/api/business/places/list?${params.toString()}`);
 
         if (!response.ok) {
@@ -57,7 +77,13 @@ export function PlaceGroupSelector({
         const nextPlaces = data.places ?? [];
         setPlaces(nextPlaces);
 
-        if (currentGroupId) {
+        if (selectedPlaceIdsProp) {
+          setSelectedPlaceIdsState(
+            selectedPlaceIdsProp.filter((placeId) =>
+              nextPlaces.some((place) => place.id === placeId),
+            ),
+          );
+        } else if (currentGroupId) {
           setSelectedPlaceIds(
             nextPlaces
               .filter((place) => place.placeGroupId === currentGroupId)
@@ -83,17 +109,27 @@ export function PlaceGroupSelector({
     return () => {
       isMounted = false;
     };
-  }, [currentPlaceId, currentGroupId]);
+  }, [currentPlaceId, currentGroupId, selectedPlaceIdsProp]);
 
   const selectedCount = selectedPlaceIds.length;
   const selectedSet = useMemo(() => new Set(selectedPlaceIds), [selectedPlaceIds]);
 
+  const setSelectedPlaceIds = (nextSelectedIds: string[]) => {
+    setSelectedPlaceIdsState(nextSelectedIds);
+    onSelectedPlaceIdsChange?.(nextSelectedIds);
+  };
+
   async function saveSelection(nextSelectedIds: string[]) {
+    if (isDeferredMode) {
+      setSelectedPlaceIds(nextSelectedIds);
+      return;
+    }
+
     setIsSaving(true);
     setError(null);
 
     try {
-      const response = await fetch(`/api/business/places/${currentPlaceId}/group`, {
+      const response = await fetch(`/api/business/places/${currentPlaceId!}/group`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -140,7 +176,7 @@ export function PlaceGroupSelector({
         <div className="space-y-1">
           <h3 className="text-base font-semibold text-foreground">Связанные места</h3>
           <p className="text-sm text-muted-foreground">
-            Пока нет других мест для связи.
+            {emptyStateDescription}
           </p>
         </div>
       </section>
