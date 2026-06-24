@@ -17,6 +17,7 @@ import { ContentStatus, PlaceKind } from "@prisma/client";
 import Link from "next/link";
 import { getPlaceDetailBackLink } from "@/lib/admin/placeDetailNavigation";
 import { normalizeFaqItems } from "@/lib/faq/faqItems";
+import { AdminPlaceGroupManager } from "@/components/admin/AdminPlaceGroupManager";
 import {
   loadImprovementRequestsForPlace,
   loadPendingPlaceRevision,
@@ -52,6 +53,12 @@ export default async function PlaceModerationPage({
       <div className="min-h-screen bg-gray-50">
         <div className="max-w-7xl mx-auto px-6 py-8">
           <PlaceModerationView place={place} />
+          <div className="mt-6">
+            <AdminPlaceGroupManager
+              currentPlaceId={place.id}
+              currentGroupId={place.placeGroupId}
+            />
+          </div>
         </div>
       </div>
     );
@@ -71,7 +78,17 @@ export default async function PlaceModerationPage({
 
     if (revision && revision.status === "PENDING") {
       // Show revision moderation view
-      return <PlaceRevisionModerationView place={fullPlace} revision={revision} />;
+      return (
+        <div className="space-y-6 bg-gray-50 pb-8">
+          <PlaceRevisionModerationView place={fullPlace} revision={revision} />
+          <div className="mx-auto w-full max-w-7xl px-6">
+            <AdminPlaceGroupManager
+              currentPlaceId={fullPlace.id}
+              currentGroupId={fullPlace.placeGroupId}
+            />
+          </div>
+        </div>
+      );
     }
 
     // If place is PUBLISHED but no pending revision, show improvement request form
@@ -201,6 +218,12 @@ export default async function PlaceModerationPage({
                 <PlacePreviewCard place={fullPlace} />
                 <div className="mt-6">
                   <FaqReadonlySection items={fullPlace.faqItems} />
+                </div>
+                <div className="mt-6">
+                  <AdminPlaceGroupManager
+                    currentPlaceId={fullPlace.id}
+                    currentGroupId={fullPlace.placeGroupId}
+                  />
                 </div>
               </div>
 
@@ -390,6 +413,12 @@ export default async function PlaceModerationPage({
             <PlacePreviewCard place={fullPlace} />
             <div className="mt-6">
               <FaqReadonlySection items={fullPlace.faqItems} />
+            </div>
+            <div className="mt-6">
+              <AdminPlaceGroupManager
+                currentPlaceId={fullPlace.id}
+                currentGroupId={fullPlace.placeGroupId}
+              />
             </div>
           </div>
           <div>
