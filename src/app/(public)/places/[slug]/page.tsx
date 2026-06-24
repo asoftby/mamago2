@@ -308,6 +308,100 @@ export default async function PlacePage({ params }: PlacePageProps) {
     notFound();
   }
 
+  const relatedPlacesRaw = place.placeGroupId
+    ? await prisma.place.findMany({
+        where: {
+          placeGroupId: place.placeGroupId,
+          id: { not: place.id },
+          status: "PUBLISHED",
+          archivedAt: null,
+        },
+        select: {
+          id: true,
+          slug: true,
+          title: true,
+          shortAddress: true,
+          formattedAddr: true,
+          customAddress: true,
+          city: {
+            select: {
+              name: true,
+            },
+          },
+          districtAuto: {
+            select: {
+              name: true,
+            },
+          },
+          districtManual: {
+            select: {
+              name: true,
+            },
+          },
+          metroAuto: {
+            select: {
+              name: true,
+            },
+          },
+          metroManual: {
+            select: {
+              name: true,
+            },
+          },
+          ownerBusiness: {
+            select: {
+              operationalStatus: true,
+            },
+          },
+          images: {
+            select: {
+              url: true,
+              kind: true,
+              sortOrder: true,
+            },
+            orderBy: {
+              sortOrder: "asc",
+            },
+            take: 8,
+          },
+        },
+        orderBy: {
+          createdAt: "asc",
+        },
+        take: 12,
+      })
+    : [];
+
+  const relatedPlaces = relatedPlacesRaw
+    .filter((relatedPlace) =>
+      isPlacePubliclyVisible({
+        status: "PUBLISHED",
+        archivedAt: null,
+        owner: relatedPlace.ownerBusiness
+          ? { business: relatedPlace.ownerBusiness }
+          : null,
+      }),
+    )
+    .map((relatedPlace) => ({
+      id: relatedPlace.id,
+      slug: relatedPlace.slug || relatedPlace.id,
+      title: relatedPlace.title,
+      coverImage:
+        relatedPlace.images.find((image) => image.kind === "GALLERY")?.url ||
+        relatedPlace.images[0]?.url ||
+        null,
+      cityAddress:
+        formatMarketplaceHeroAddress({
+          city: relatedPlace.city,
+          shortAddress: relatedPlace.shortAddress,
+          formattedAddr: relatedPlace.formattedAddr,
+          customAddress: relatedPlace.customAddress,
+        }) || undefined,
+      district:
+        relatedPlace.districtManual?.name || relatedPlace.districtAuto?.name || undefined,
+      metro: relatedPlace.metroManual?.name || relatedPlace.metroAuto?.name || undefined,
+    }));
+
   // Get display title with duplicate check
   const displayTitle = await getPlaceDisplayTitle(prisma, {
     id: place.id,
@@ -630,6 +724,7 @@ export default async function PlacePage({ params }: PlacePageProps) {
         offers={formattedOffers}
         reviews={combinedReviews}
         ownerEditPlaceId={canShowPlaceEditor ? place.id : undefined}
+        relatedPlaces={relatedPlaces}
       />
     </>
   );

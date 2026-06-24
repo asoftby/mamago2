@@ -16,7 +16,6 @@ export type NetworkPlace = {
 };
 
 export type PlaceNetworkSectionProps = {
-  networkName: string;
   places: NetworkPlace[];
   currentPlaceId: string;
   onSaveToggle?: (placeId: string) => void;
@@ -24,7 +23,6 @@ export type PlaceNetworkSectionProps = {
 };
 
 export function PlaceNetworkSection({
-  networkName,
   places,
   currentPlaceId,
   onSaveToggle,
@@ -33,8 +31,7 @@ export function PlaceNetworkSection({
   // Filter out current place and only show published places
   const otherPlaces = places.filter((place) => place.id !== currentPlaceId);
 
-  // Don't show section if less than 2 places
-  if (otherPlaces.length < 2) {
+  if (otherPlaces.length === 0) {
     return null;
   }
 
@@ -45,10 +42,10 @@ export function PlaceNetworkSection({
     <section className={className}>
       <div className="mb-4">
         <h2 className="text-xl font-semibold text-foreground">
-          Другие места сети {networkName}
+          Другие места
         </h2>
         <p className="text-sm text-muted-foreground">
-          {otherPlaces.length} {otherPlaces.length === 1 ? "филиал" : otherPlaces.length < 5 ? "филиала" : "филиалов"} в городе
+          Места, которые связаны с этой локацией
         </p>
       </div>
 

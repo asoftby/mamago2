@@ -8,6 +8,7 @@ import { PlaceOffersSection } from "./PlaceOffersSection";
 import { PlaceAboutSection } from "./PlaceAboutSection";
 import { PlaceAddressSection } from "./PlaceAddressSection";
 import { PlaceReviewsSection } from "./PlaceReviewsSection";
+import { PlaceNetworkSection, type NetworkPlace } from "@/components/place/PlaceNetworkSection";
 import { PriceListBlock } from "@/components/shared/PriceListBlock";
 import { MobileSmartBackButton } from "@/components/shared/MobileSmartBackButton";
 import { FaqSection } from "@/components/public/FaqSection";
@@ -109,6 +110,7 @@ interface MarketplacePlacePageProps {
 
   /** Показать «Редактировать» с шагами визарда (те же права, что у редактора места). */
   ownerEditPlaceId?: string;
+  relatedPlaces?: NetworkPlace[];
 }
 
 export function MarketplacePlacePage({
@@ -118,6 +120,7 @@ export function MarketplacePlacePage({
   offers = [],
   reviews = [],
   ownerEditPlaceId,
+  relatedPlaces = [],
 }: MarketplacePlacePageProps) {
   const ctaRef = useRef<HTMLDivElement>(null);
   const hasRenderableReviews = reviews.length > 0;
@@ -277,6 +280,13 @@ export function MarketplacePlacePage({
           placeId={place.slug}
           rating={displayRating}
           reviewCount={displayReviewCount}
+        />
+      )}
+
+      {relatedPlaces.length > 0 && (
+        <PlaceNetworkSection
+          places={relatedPlaces}
+          currentPlaceId={place.id}
         />
       )}
 
