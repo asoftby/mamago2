@@ -9,7 +9,11 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { CONTENT_STATUS_META, contentStatusPublicationPillClass } from "@/lib/content-status-meta";
+import {
+  CONTENT_STATUS_META,
+  contentStatusPublicationLabel,
+  contentStatusPublicationPillClass,
+} from "@/lib/content-status-meta";
 
 type RelatedPlaceOption = {
   id: string;
@@ -25,7 +29,7 @@ function getPlaceStatusPresentation(status?: string) {
 
   if (meta) {
     return {
-      label: meta.label,
+      label: contentStatusPublicationLabel(normalizedStatus as keyof typeof CONTENT_STATUS_META),
       className: contentStatusPublicationPillClass(normalizedStatus as keyof typeof CONTENT_STATUS_META),
     };
   }
@@ -270,7 +274,7 @@ export function PlaceGroupSelector({
               <label
                 key={place.id}
                 className={cn(
-                  "flex cursor-pointer items-start gap-3 px-4 py-3 transition-colors",
+                  "flex cursor-pointer items-center gap-3 px-4 py-3 transition-colors",
                   !disabled && !isSaving && "hover:bg-muted/40",
                   (disabled || isSaving) && "cursor-not-allowed opacity-70",
                 )}
@@ -279,22 +283,21 @@ export function PlaceGroupSelector({
                   checked={selectedSet.has(place.id)}
                   onCheckedChange={() => void handleToggle(place.id)}
                   disabled={disabled || isSaving}
+                  className="self-center"
                 />
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <Label className="cursor-pointer text-sm font-medium text-foreground">
+                <div className="flex min-w-0 flex-1 items-center gap-2">
+                    <Label className="min-w-0 flex-1 cursor-pointer truncate text-sm font-medium text-foreground">
                       {place.title}
                     </Label>
                     <Badge
                       variant="outline"
                       className={cn(
-                        "rounded-full border px-2 py-0.5 text-[11px] font-medium",
+                        "shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-medium",
                         getPlaceStatusPresentation(place.status).className,
                       )}
                     >
                       {getPlaceStatusPresentation(place.status).label}
                     </Badge>
-                  </div>
                 </div>
               </label>
             ))}

@@ -6,7 +6,11 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { CONTENT_STATUS_META, contentStatusPublicationPillClass } from "@/lib/content-status-meta";
+import {
+  CONTENT_STATUS_META,
+  contentStatusPublicationLabel,
+  contentStatusPublicationPillClass,
+} from "@/lib/content-status-meta";
 
 type AdminPlaceOption = {
   id: string;
@@ -29,7 +33,7 @@ function getPlaceStatusPresentation(status?: string) {
 
   if (meta) {
     return {
-      label: meta.label,
+      label: contentStatusPublicationLabel(normalizedStatus as keyof typeof CONTENT_STATUS_META),
       className: contentStatusPublicationPillClass(normalizedStatus as keyof typeof CONTENT_STATUS_META),
     };
   }
@@ -248,23 +252,24 @@ export function AdminPlaceGroupManager({
             {visiblePlaces.map((place) => (
               <label
                 key={place.id}
-                className="flex cursor-pointer items-start gap-3 px-4 py-3 transition-colors hover:bg-gray-50"
+                className="flex cursor-pointer items-center gap-3 px-4 py-3 transition-colors hover:bg-gray-50"
               >
                 <Checkbox
                   checked={selectedIdSet.has(place.id)}
                   onCheckedChange={() => void handleToggle(place)}
                   disabled={isSaving}
+                  className="self-center"
                 />
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <p className="text-sm font-medium text-gray-900">{place.title}</p>
+                <div className="flex min-w-0 flex-1 items-center gap-2">
+                    <p className="min-w-0 flex-1 truncate text-sm font-medium text-gray-900">
+                      {place.title}
+                    </p>
                     <Badge
                       variant="outline"
-                      className={`rounded-full border px-2 py-0.5 text-[11px] font-medium ${getPlaceStatusPresentation(place.status).className}`}
+                      className={`shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-medium ${getPlaceStatusPresentation(place.status).className}`}
                     >
                       {getPlaceStatusPresentation(place.status).label}
                     </Badge>
-                  </div>
                 </div>
               </label>
             ))}
