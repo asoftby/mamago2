@@ -980,29 +980,31 @@ export function PlaceWizard({
         </div>
       )}
 
-      <FormPrimaryContentCard>{renderStep()}</FormPrimaryContentCard>
+      <FormPrimaryContentCard>
+        <div className="space-y-6">
+          {renderStep()}
 
-      {surface === "business" ? (
-        <div className="mx-auto w-full max-w-4xl px-4 pb-4 sm:px-6">
-          <PlaceGroupSelector
-            currentPlaceId={mode === "edit" ? place?.id : undefined}
-            currentGroupId={mode === "edit" ? currentPlaceGroupId : undefined}
-            onGroupIdChange={mode === "edit" ? setCurrentPlaceGroupId : undefined}
-            selectedPlaceIds={mode === "create" ? selectedRelatedPlaceIds : undefined}
-            onSelectedPlaceIdsChange={
-              mode === "create" ? setSelectedRelatedPlaceIds : undefined
-            }
-            disabled={
-              mode === "edit" ? !isEditable || isSaving || isSubmitting : isSaving || isSubmitting
-            }
-            emptyStateDescription={
-              mode === "create"
-                ? "Пока нет других мест для связи. После создания ещё одного места вы сможете связать их между собой."
-                : "Пока нет других мест для связи."
-            }
-          />
+          {surface === "business" ? (
+            <PlaceGroupSelector
+              currentPlaceId={mode === "edit" ? place?.id : undefined}
+              currentGroupId={mode === "edit" ? currentPlaceGroupId : undefined}
+              onGroupIdChange={mode === "edit" ? setCurrentPlaceGroupId : undefined}
+              selectedPlaceIds={mode === "create" ? selectedRelatedPlaceIds : undefined}
+              onSelectedPlaceIdsChange={
+                mode === "create" ? setSelectedRelatedPlaceIds : undefined
+              }
+              disabled={
+                mode === "edit" ? !isEditable || isSaving || isSubmitting : isSaving || isSubmitting
+              }
+              emptyStateDescription={
+                mode === "create"
+                  ? "Пока нет других мест для связи. После создания ещё одного места вы сможете связать их между собой."
+                  : "Пока нет других мест для связи."
+              }
+            />
+          ) : null}
         </div>
-      ) : null}
+      </FormPrimaryContentCard>
 
       <FormStickyActionBar
         phase={phase}
