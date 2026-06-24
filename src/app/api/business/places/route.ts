@@ -37,6 +37,11 @@ import { createPublishTimer, runAfterPublishResponse } from "@/server/utils/publ
 import { syncPlaceMediaUsage } from "@/server/services/media/media-usage.service";
 import { normalizePlacePhoneFields } from "@/lib/place/placePhones";
 import { normalizeFaqItems } from "@/lib/faq/faqItems";
+import {
+  mapToCreatePayload as mapOpeningHoursToCreatePayload,
+  validateOpeningHours,
+} from "@/lib/openingHours";
+import type { OpeningHoursData } from "@/components/openingHours";
 
 async function finalizePublishedPlaceSlugIfNeeded(placeId: string, isPublished: boolean) {
   if (!isPublished) return;
@@ -152,6 +157,22 @@ export async function POST(request: NextRequest) {
       : data;
     const phones = normalizePlacePhoneFields(d);
     const faqItems = normalizeFaqItems(d.faqItems);
+    const openingHoursData =
+      d.openingHoursData === undefined ? undefined : (d.openingHoursData as OpeningHoursData | null);
+
+    if (openingHoursData) {
+      const openingHoursValidation = validateOpeningHours(openingHoursData);
+      if (!openingHoursValidation.valid) {
+        return NextResponse.json(
+          {
+            error: "OPENING_HOURS_VALIDATION_ERROR",
+            message: "Opening hours validation failed",
+            details: openingHoursValidation.errors,
+          },
+          { status: 400 }
+        );
+      }
+    }
     timer.mark("validate");
 
     // Get user's business (if exists)
@@ -256,6 +277,18 @@ export async function POST(request: NextRequest) {
         unit: d.unit || null,
       },
     });
+
+    if (openingHoursData) {
+      const openingHours = await prisma.openingHours.create({
+        data: mapOpeningHoursToCreatePayload(openingHoursData),
+        select: { id: true },
+      });
+
+      await prisma.place.update({
+        where: { id: place.id },
+        data: { openingHoursId: openingHours.id },
+      });
+    }
 
     console.log("[places/POST] ✅ Created place:", place.id, "status:", place.status);
     timer.mark("db");
