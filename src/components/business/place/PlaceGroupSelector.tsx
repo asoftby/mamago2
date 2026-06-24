@@ -1,11 +1,13 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import { AlertCircle, Loader2 } from "lucide-react";
+import { AlertCircle, Loader2, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 
 type RelatedPlaceOption = {
   id: string;
@@ -43,6 +45,8 @@ export function PlaceGroupSelector({
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+  const [visibleCount, setVisibleCount] = useState(5);
   const isDeferredMode = !currentPlaceId;
 
   const selectedPlaceIds = selectedPlaceIdsProp ?? selectedPlaceIdsState;
@@ -113,6 +117,30 @@ export function PlaceGroupSelector({
 
   const selectedCount = selectedPlaceIds.length;
   const selectedSet = useMemo(() => new Set(selectedPlaceIds), [selectedPlaceIds]);
+  const normalizedQuery = query.trim().toLowerCase();
+  const isSearching = normalizedQuery.length >= 2;
+  const filteredPlaces = useMemo(() => {
+    if (!isSearching) {
+      return places;
+    }
+
+    return places.filter((place) => {
+      const haystack = [place.title, place.shortAddress]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return haystack.includes(normalizedQuery);
+    });
+  }, [isSearching, normalizedQuery, places]);
+  const visiblePlaces = useMemo(
+    () => (isSearching ? filteredPlaces : filteredPlaces.slice(0, visibleCount)),
+    [filteredPlaces, isSearching, visibleCount],
+  );
+  const canShowMore = !isSearching && filteredPlaces.length > visibleCount;
+
+  useEffect(() => {
+    setVisibleCount(5);
+  }, [query]);
 
   const setSelectedPlaceIds = (nextSelectedIds: string[]) => {
     setSelectedPlaceIdsState(nextSelectedIds);
@@ -171,16 +199,7 @@ export function PlaceGroupSelector({
   }
 
   if (!isLoading && places.length === 0) {
-    return (
-      <section className={cn("rounded-3xl border bg-background p-6", className)}>
-        <div className="space-y-1">
-          <h3 className="text-base font-semibold text-foreground">Связанные места</h3>
-          <p className="text-sm text-muted-foreground">
-            {emptyStateDescription}
-          </p>
-        </div>
-      </section>
-    );
+    return null;
   }
 
   return (
@@ -205,15 +224,30 @@ export function PlaceGroupSelector({
         </Alert>
       )}
 
+      <div className="relative mt-4">
+        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="Найти место по названию или адресу"
+          className="pl-9"
+          disabled={disabled || isSaving}
+        />
+      </div>
+
       <div className="mt-4 rounded-2xl border">
         {isLoading ? (
           <div className="flex items-center gap-2 px-4 py-6 text-sm text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin" />
             Загрузка мест...
           </div>
+        ) : filteredPlaces.length === 0 ? (
+          <div className="px-4 py-6 text-sm text-muted-foreground">
+            {isSearching ? "Ничего не найдено." : emptyStateDescription}
+          </div>
         ) : (
           <div className="divide-y">
-            {places.map((place) => (
+            {visiblePlaces.map((place) => (
               <label
                 key={place.id}
                 className={cn(
@@ -250,6 +284,20 @@ export function PlaceGroupSelector({
             : "Сейчас это место не связано с другими местами."}
         </p>
       )}
+
+      {canShowMore ? (
+        <div className="mt-3">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setVisibleCount((current) => current + 5)}
+            disabled={disabled || isSaving}
+          >
+            Показать ещё
+          </Button>
+        </div>
+      ) : null}
     </section>
   );
 }

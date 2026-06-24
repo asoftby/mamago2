@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { AlertCircle, Loader2, Search } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -27,13 +26,14 @@ export function AdminPlaceGroupManager({
   currentGroupId,
 }: AdminPlaceGroupManagerProps) {
   const [query, setQuery] = useState("");
-  const [searchResults, setSearchResults] = useState<AdminPlaceOption[]>([]);
+  const [places, setPlaces] = useState<AdminPlaceOption[]>([]);
   const [selectedPlaces, setSelectedPlaces] = useState<AdminPlaceOption[]>([]);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [isSearching, setIsSearching] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const normalizedQuery = query.trim();
+  const isSearchMode = normalizedQuery.length >= 2;
 
   useEffect(() => {
     let isMounted = true;
@@ -82,32 +82,29 @@ export function AdminPlaceGroupManager({
   useEffect(() => {
     let isMounted = true;
 
-    async function searchPlaces() {
-      const trimmed = query.trim();
-      if (trimmed.length < 2) {
-        setSearchResults([]);
-        return;
-      }
-
+    async function loadPlaces() {
       try {
         setIsSearching(true);
-        const params = new URLSearchParams({
-          q: trimmed,
-          excludeId: currentPlaceId,
-        });
+        setError(null);
+
+        const params = new URLSearchParams({ excludeId: currentPlaceId });
+        if (normalizedQuery.length >= 2) {
+          params.set("q", normalizedQuery);
+        }
+
         const response = await fetch(`/api/admin/places/search?${params.toString()}`);
         if (!response.ok) {
-          throw new Error("Не удалось выполнить поиск");
+          throw new Error("Не удалось загрузить список мест");
         }
 
         const payload = (await response.json()) as { places?: AdminPlaceOption[] };
         if (isMounted) {
-          setSearchResults(payload.places ?? []);
+          setPlaces(payload.places ?? []);
         }
-      } catch (searchError) {
-        console.error("Failed to search places for admin group:", searchError);
+      } catch (loadError) {
+        console.error("Failed to load admin places:", loadError);
         if (isMounted) {
-          setError("Не удалось выполнить поиск мест");
+          setError("Не удалось загрузить список мест");
         }
       } finally {
         if (isMounted) {
@@ -116,42 +113,45 @@ export function AdminPlaceGroupManager({
       }
     }
 
-    void searchPlaces();
+    void loadPlaces();
 
     return () => {
       isMounted = false;
     };
-  }, [currentPlaceId, query]);
+  }, [currentPlaceId, normalizedQuery]);
 
   const selectedIdSet = useMemo(
     () => new Set(selectedPlaces.map((place) => place.id)),
     [selectedPlaces],
   );
 
-  function togglePlace(place: AdminPlaceOption) {
-    setSuccessMessage(null);
-    setError(null);
-    setSelectedPlaces((current) => {
-      if (current.some((item) => item.id === place.id)) {
-        return current.filter((item) => item.id !== place.id);
+  const visiblePlaces = useMemo(() => {
+    const merged = [...selectedPlaces];
+
+    for (const place of places) {
+      if (!merged.some((item) => item.id === place.id)) {
+        merged.push(place);
       }
-      return [...current, place];
-    });
-  }
+    }
 
-  async function handleSave() {
+    return merged;
+  }, [places, selectedPlaces]);
+
+  async function saveSelection(nextSelectedPlaces: AdminPlaceOption[]) {
+    const previousSelectedPlaces = selectedPlaces;
+
+    setSelectedPlaces(nextSelectedPlaces);
+    setIsSaving(true);
+    setError(null);
+
     try {
-      setIsSaving(true);
-      setError(null);
-      setSuccessMessage(null);
-
       const response = await fetch(`/api/admin/places/${currentPlaceId}/group`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          relatedPlaceIds: selectedPlaces.map((place) => place.id),
+          relatedPlaceIds: nextSelectedPlaces.map((place) => place.id),
         }),
       });
 
@@ -160,10 +160,9 @@ export function AdminPlaceGroupManager({
       if (!response.ok) {
         throw new Error(payload.error || "Не удалось сохранить связанные места");
       }
-
-      setSuccessMessage("Связанные места сохранены.");
     } catch (saveError) {
       console.error("Failed to save admin place group:", saveError);
+      setSelectedPlaces(previousSelectedPlaces);
       setError(
         saveError instanceof Error
           ? saveError.message
@@ -174,12 +173,25 @@ export function AdminPlaceGroupManager({
     }
   }
 
+  async function handleToggle(place: AdminPlaceOption) {
+    if (isSaving) return;
+
+    const nextSelectedPlaces = selectedIdSet.has(place.id)
+      ? selectedPlaces.filter((item) => item.id !== place.id)
+      : [...selectedPlaces, place];
+
+    await saveSelection(nextSelectedPlaces);
+  }
+
   return (
     <section className="rounded-3xl border bg-white p-6 shadow-sm">
       <div className="space-y-1">
         <h2 className="text-base font-semibold text-gray-900">Связанные места</h2>
         <p className="text-sm text-gray-600">
           Выберите места, которые нужно показать рядом с этой локацией.
+        </p>
+        <p className="text-xs text-gray-500">
+          Админ может связывать места любых владельцев.
         </p>
       </div>
 
@@ -190,120 +202,60 @@ export function AdminPlaceGroupManager({
         </Alert>
       )}
 
-      {successMessage && (
-        <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
-          {successMessage}
-        </div>
-      )}
-
-      <div className="mt-4 space-y-3">
-        <div className="relative">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-          <Input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Найти место по названию или адресу"
-            className="pl-9"
-          />
-        </div>
-
-        <div className="rounded-2xl border">
-          {isInitialLoading ? (
-            <div className="flex items-center gap-2 px-4 py-6 text-sm text-gray-500">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Загрузка текущих связей...
-            </div>
-          ) : (
-            <div className="p-4">
-              <div className="mb-3">
-                <p className="text-sm font-medium text-gray-900">Выбрано</p>
-                <p className="text-xs text-gray-500">
-                  {selectedPlaces.length > 0
-                    ? `Связано мест: ${selectedPlaces.length}`
-                    : "Найдите место, которое нужно показать рядом с этой локацией."}
-                </p>
-              </div>
-
-              {selectedPlaces.length > 0 ? (
-                <div className="space-y-2">
-                  {selectedPlaces.map((place) => (
-                    <label
-                      key={place.id}
-                      className="flex cursor-pointer items-start gap-3 rounded-2xl border px-3 py-3 hover:bg-gray-50"
-                    >
-                      <Checkbox
-                        checked={true}
-                        onCheckedChange={() => togglePlace(place)}
-                        disabled={isSaving}
-                      />
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium text-gray-900">{place.title}</p>
-                        <p className="text-xs text-gray-500">
-                          {place.shortAddress || place.formattedAddr || "Без адреса"}
-                        </p>
-                      </div>
-                    </label>
-                  ))}
-                </div>
-              ) : null}
-            </div>
-          )}
-        </div>
-
-        <div className="rounded-2xl border">
-          <div className="border-b px-4 py-3">
-            <p className="text-sm font-medium text-gray-900">Результаты поиска</p>
-            <p className="text-xs text-gray-500">
-              Админ может связывать места любых владельцев.
-            </p>
-          </div>
-
-          {query.trim().length < 2 ? (
-            <div className="px-4 py-6 text-sm text-gray-500">
-              Введите минимум 2 символа, чтобы найти места.
-            </div>
-          ) : isSearching ? (
-            <div className="flex items-center gap-2 px-4 py-6 text-sm text-gray-500">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Ищем места...
-            </div>
-          ) : searchResults.length === 0 ? (
-            <div className="px-4 py-6 text-sm text-gray-500">Ничего не найдено.</div>
-          ) : (
-            <div className="divide-y">
-              {searchResults.map((place) => (
-                <label
-                  key={place.id}
-                  className="flex cursor-pointer items-start gap-3 px-4 py-3 hover:bg-gray-50"
-                >
-                  <Checkbox
-                    checked={selectedIdSet.has(place.id)}
-                    onCheckedChange={() => togglePlace(place)}
-                    disabled={isSaving}
-                  />
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-gray-900">{place.title}</p>
-                    <p className="text-xs text-gray-500">
-                      {place.shortAddress || place.formattedAddr || "Без адреса"}
-                    </p>
-                    <p className="mt-1 text-xs text-gray-400">
-                      {place.ownerBusiness?.name
-                        ? `${place.ownerBusiness.name} · ${place.status ?? "UNKNOWN"}`
-                        : place.status ?? "UNKNOWN"}
-                    </p>
-                  </div>
-                </label>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <div className="flex justify-end">
-          <Button onClick={() => void handleSave()} disabled={isSaving || isInitialLoading}>
-            {isSaving ? "Сохраняем..." : "Сохранить связанные места"}
-          </Button>
-        </div>
+      <div className="relative mt-4">
+        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+        <Input
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="Найти место по названию или адресу"
+          className="pl-9"
+        />
       </div>
+
+      <div className="mt-4 rounded-2xl border">
+        {isInitialLoading || isSearching ? (
+          <div className="flex items-center gap-2 px-4 py-6 text-sm text-gray-500">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            {isInitialLoading ? "Загрузка связанных мест..." : "Загрузка списка мест..."}
+          </div>
+        ) : visiblePlaces.length === 0 ? (
+          <div className="px-4 py-6 text-sm text-gray-500">
+            {isSearchMode
+              ? "Ничего не найдено."
+              : "Найдите место, которое нужно показать рядом с этой локацией."}
+          </div>
+        ) : (
+          <div className="divide-y">
+            {visiblePlaces.map((place) => (
+              <label
+                key={place.id}
+                className="flex cursor-pointer items-start gap-3 px-4 py-3 transition-colors hover:bg-gray-50"
+              >
+                <Checkbox
+                  checked={selectedIdSet.has(place.id)}
+                  onCheckedChange={() => void handleToggle(place)}
+                  disabled={isSaving}
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-gray-900">{place.title}</p>
+                  <p className="text-xs text-gray-500">
+                    {place.shortAddress || place.formattedAddr || "Без адреса"}
+                  </p>
+                  <p className="mt-1 text-xs text-gray-400">
+                    {place.ownerBusiness?.name
+                      ? `${place.ownerBusiness.name} · ${place.status ?? "UNKNOWN"}`
+                      : place.status ?? "UNKNOWN"}
+                  </p>
+                </div>
+              </label>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {selectedPlaces.length > 0 ? (
+        <p className="mt-3 text-sm text-gray-500">Связано мест: {selectedPlaces.length}</p>
+      ) : null}
     </section>
   );
 }

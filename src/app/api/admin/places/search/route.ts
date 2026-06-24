@@ -12,20 +12,19 @@ export async function GET(request: NextRequest) {
   const q = request.nextUrl.searchParams.get("q")?.trim() ?? "";
   const excludeId = request.nextUrl.searchParams.get("excludeId")?.trim() ?? "";
 
-  if (q.length < 2) {
-    return NextResponse.json({ places: [] });
-  }
-
   try {
     const places = await prisma.place.findMany({
       where: {
         archivedAt: null,
         id: excludeId ? { not: excludeId } : undefined,
-        OR: [
-          { title: { contains: q, mode: "insensitive" } },
-          { shortAddress: { contains: q, mode: "insensitive" } },
-          { formattedAddr: { contains: q, mode: "insensitive" } },
-        ],
+        OR:
+          q.length >= 2
+            ? [
+                { title: { contains: q, mode: "insensitive" } },
+                { shortAddress: { contains: q, mode: "insensitive" } },
+                { formattedAddr: { contains: q, mode: "insensitive" } },
+              ]
+            : undefined,
       },
       select: {
         id: true,
@@ -40,8 +39,8 @@ export async function GET(request: NextRequest) {
           },
         },
       },
-      orderBy: [{ title: "asc" }, { createdAt: "desc" }],
-      take: 20,
+      orderBy: q.length >= 2 ? [{ title: "asc" }, { createdAt: "desc" }] : [{ createdAt: "desc" }],
+      take: q.length >= 2 ? 20 : 5,
     });
 
     return NextResponse.json({ places });
