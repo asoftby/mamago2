@@ -192,7 +192,14 @@ export function SidebarCardContactRow({
 /* ─── Share button ───────────────────────────────────────────────────────── */
 
 /** Кнопка «Поделиться» — открывает ShareModal. */
-export function SidebarCardShare({ title }: { title: string }) {
+export function SidebarCardShare({
+  title,
+  entityNoun,
+}: {
+  title: string;
+  /** Слово в заголовке модалки: «местом» | «предложением» | «событием» (default). */
+  entityNoun?: string;
+}) {
   const [open, setOpen] = useState(false);
   const url =
     typeof window !== "undefined" ? window.location.href : "";
@@ -223,6 +230,7 @@ export function SidebarCardShare({ title }: { title: string }) {
         onOpenChange={setOpen}
         url={url}
         title={title}
+        entityNoun={entityNoun}
       />
     </>
   );

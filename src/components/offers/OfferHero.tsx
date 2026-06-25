@@ -511,7 +511,7 @@ function BookingCard({
                 )}
               </div>
             ) : <span />}
-            <SidebarCardShare title={data.title} />
+            <SidebarCardShare title={data.title} entityNoun="предложением" />
           </div>
         </SidebarCardTopSection>
       </SidebarCard>

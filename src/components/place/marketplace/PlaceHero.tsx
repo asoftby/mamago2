@@ -350,7 +350,7 @@ export function PlaceHero({
                     </a>
                   </div>
                 ) : <span />}
-                <SidebarCardShare title={title} />
+                <SidebarCardShare title={title} entityNoun="местом" />
               </div>
             </SidebarCardTopSection>
           </SidebarCard>
