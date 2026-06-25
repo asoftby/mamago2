@@ -133,6 +133,7 @@ export default async function PlaceModerationPage({
         website: fullPlace.website,
         instagramHandle: fullPlace.instagramHandle,
         instagramUrl: fullPlace.instagramUrl,
+        reelsUrl: fullPlace.reelsUrl,
         logoImageId: fullPlace.logoImageId,
         logoUrl: fullPlace.images.find(img => img.kind === "LOGO")?.url || null,
         images: fullPlace.images.map(img => ({
@@ -336,6 +337,7 @@ export default async function PlaceModerationPage({
     website: fullPlace.website,
     instagramHandle: fullPlace.instagramHandle,
     instagramUrl: fullPlace.instagramUrl,
+    reelsUrl: fullPlace.reelsUrl,
     logoImageId: fullPlace.logoImageId,
     logoUrl: fullPlace.images.find((img) => img.kind === "LOGO")?.url || null,
     images: fullPlace.images.map((img) => ({

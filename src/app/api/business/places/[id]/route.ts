@@ -327,6 +327,7 @@ export async function PATCH(
     if (body.website !== undefined) updateData.website = body.website ? String(body.website) : null;
     if (body.instagramHandle !== undefined) updateData.instagramHandle = body.instagramHandle ? String(body.instagramHandle) : null;
     if (body.instagramUrl !== undefined) updateData.instagramUrl = body.instagramUrl ? String(body.instagramUrl) : null;
+    if (body.reelsUrl !== undefined) updateData.reelsUrl = body.reelsUrl ? String(body.reelsUrl) : null;
     if (body.ageTags !== undefined) updateData.ageTags = Array.isArray(body.ageTags) ? body.ageTags : [];
     if (body.visitFormats !== undefined) updateData.visitFormats = Array.isArray(body.visitFormats) ? body.visitFormats : [];
     if (body.placeKind !== undefined) updateData.placeKind = body.placeKind;

@@ -16,6 +16,8 @@ import {
   SidebarCardContactRow,
   SidebarCardShare,
 } from "@/components/shared/SidebarCard";
+import { MediaGalleryStrip } from "@/components/media/MediaGalleryStrip";
+import type { MediaGalleryItem } from "@/lib/media/galleryTypes";
 
 interface PlaceHeroProps {
   ctaRef?: React.RefObject<HTMLDivElement | null>;
@@ -40,6 +42,9 @@ interface PlaceHeroProps {
   breadcrumbItems: Array<{ label: string; href?: string }>;
   onShareClick?: () => void;
   ownerEditPlaceId?: string;
+  media?: {
+    galleryItems: MediaGalleryItem[];
+  };
 }
 
 export function PlaceHero({
@@ -65,10 +70,12 @@ export function PlaceHero({
   breadcrumbItems,
   onShareClick,
   ownerEditPlaceId,
+  media,
 }: PlaceHeroProps) {
-  const words = title.trim().split(/\s+/);
-  const titleHead = words[0] ?? "";
-  const titleTail = (words.length > 1 ? words.slice(1).join(" ") : "") + ".";
+  const trimmedTitle = title.trim();
+  // Заголовок одной строкой (без принудительного переноса после первого слова),
+  // с editorial-точкой в конце, если её ещё нет.
+  const titleDisplay = /[.!?]$/.test(trimmedTitle) ? trimmedTitle : `${trimmedTitle}.`;
 
   const logoInitials = title
     .split(/\s+/)
@@ -201,13 +208,7 @@ export function PlaceHero({
               color: "#141210",
             }}
           >
-            {titleHead && (
-              <>
-                {titleHead}
-                <br />
-              </>
-            )}
-            <span>{titleTail}</span>
+            {titleDisplay}
           </h1>
 
           {/* Subtitle */}
@@ -223,6 +224,11 @@ export function PlaceHero({
             {shortDesc}
           </div>
 
+          {media && media.galleryItems.length > 0 && (
+            <div style={{ marginTop: 8 }}>
+              <MediaGalleryStrip items={media.galleryItems} maxVisible={3} />
+            </div>
+          )}
         </div>
 
         {/* Right: sticky decision card */}
@@ -272,18 +278,10 @@ export function PlaceHero({
               </SidebarCardSection>
             )}
 
-            {/* Contacts */}
-            {(phones.length > 0 || website || instagramUrl) && (
+            {/* Contacts (телефоны не дублируем — есть кнопка «Позвонить») */}
+            {(website || instagramUrl) && (
               <SidebarCardSection>
                 <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                  {phones.map((phone, index) => (
-                    <SidebarCardContactRow
-                      key={`${phone.href}-${index}`}
-                      label={phone.label}
-                      href={phone.href}
-                      value={phone.value}
-                    />
-                  ))}
                   {website && websiteDisplay && (
                     <SidebarCardContactRow
                       label="Сайт"

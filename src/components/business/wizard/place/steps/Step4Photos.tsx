@@ -4,6 +4,9 @@ import { useCallback, useMemo } from "react";
 import { PlaceLogoUploadTemp } from "@/components/business/place/PlaceLogoUploadTemp";
 import { PlaceGalleryUploadTemp, type GalleryItem } from "@/components/business/place/PlaceGalleryUploadTemp";
 import { InstagramAvatarImport } from "@/components/business/place/InstagramAvatarImport";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { isValidVideoUrl } from "@/components/business/wizard/offer/mappers";
 import type { PlaceFormData, PlaceImage } from "../types";
 
 interface Step4PhotosProps {
@@ -28,7 +31,7 @@ export function Step4Photos({
   const showInstagramImport = !!instagramHandle && !!wizardSessionId;
 
   // Convert PlaceImage[] to GalleryItem[]
-  const initialGalleryItems: GalleryItem[] = useMemo(() => 
+  const initialGalleryItems: GalleryItem[] = useMemo(() =>
     galleryImages.map((img) => ({
       id: img.id,
       url: img.url,
@@ -36,6 +39,8 @@ export function Step4Photos({
       height: img.height ?? undefined,
       blurhash: img.blurhash || undefined,
       status: "done" as const,
+      // Уже привязанные к месту фото — удаляются через /places/[id]/images, а не /temp-media.
+      source: "place" as const,
     })), [galleryImages]
   );
 
@@ -58,6 +63,16 @@ export function Step4Photos({
       images: [...withoutLogo, newLogo],
     });
   }, [onChange, data.images]);
+
+  const handleReelsUrlChange = useCallback(
+    (event: React.ChangeEvent<HTMLInputElement>) => {
+      onChange({ reelsUrl: event.target.value || null });
+    },
+    [onChange],
+  );
+
+  const reelsUrl = data.reelsUrl || "";
+  const reelsUrlError = reelsUrl && !isValidVideoUrl(reelsUrl) ? "Некорректная ссылка на видео" : null;
 
   const handleGalleryImagesChange = useCallback((galleryItems: GalleryItem[]) => {
     console.log("[Step4Photos] Gallery changed:", galleryItems.length, "images");
@@ -118,10 +133,28 @@ export function Step4Photos({
         </p>
         <PlaceGalleryUploadTemp
           wizardSessionId={wizardSessionId || ""}
+          placeId={data.id}
           initialImages={initialGalleryItems}
           onImagesChange={handleGalleryImagesChange}
           disabled={!isEditable}
         />
+      </div>
+
+      {/* Reels */}
+      <div className="space-y-2">
+        <Label htmlFor="reelsUrl">Reels (необязательно)</Label>
+        <Input
+          id="reelsUrl"
+          placeholder="Ссылка на Instagram Reels, YouTube или Shorts"
+          value={reelsUrl}
+          onChange={handleReelsUrlChange}
+          disabled={!isEditable}
+          className={reelsUrlError ? "border-red-500" : ""}
+        />
+        {reelsUrlError ? <p className="text-xs text-red-500">{reelsUrlError}</p> : null}
+        <p className="text-sm text-muted-foreground">
+          Покажем как первый маленький блок медиа-сетки на странице места
+        </p>
       </div>
     </div>
   );

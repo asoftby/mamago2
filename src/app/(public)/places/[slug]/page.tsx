@@ -21,6 +21,8 @@ import { getOpeningStatus } from "@/server/services/openingHours/openingHours.se
 import type { OpeningHoursWithRelations } from "@/server/services/openingHours/openingHours.types";
 import { resolvePlaceLogoImage } from "@/lib/place/resolvePlaceLogoImage";
 import { resolvePlaceLogoUrlFromDb } from "@/lib/place/resolvePlaceLogoUrlFromDb";
+import { mapPlacePageMedia } from "@/lib/media/mapPlacePageMedia";
+import { fetchReelsThumbnail } from "@/lib/instagram/fetchReelsThumbnail";
 import { parsePriceData } from "@/lib/priceItems";
 import { getNormalizedPlacePhones } from "@/lib/place/placePhones";
 import {
@@ -423,15 +425,14 @@ export default async function PlacePage({ params }: PlacePageProps) {
 
   const logoImage = resolvePlaceLogoImage(place.images, place.logoImageId);
   const logoUrl = await resolvePlaceLogoUrlFromDb(place.images, place.logoImageId);
-  const galleryImages = place.images
-    .filter((img) => img.kind === "GALLERY")
-    .filter((img) => !logoImage || img.id !== logoImage.id)
-    .sort((a, b) => a.sortOrder - b.sortOrder)
-    .map((img) => ({
-      id: img.id,
-      url: img.url,
-      alt: place.title,
-    }));
+  const reelsThumbnailUrl = place.reelsUrl
+    ? await fetchReelsThumbnail(place.reelsUrl)
+    : null;
+  const placeMedia = mapPlacePageMedia(place.images, {
+    reelsUrl: place.reelsUrl,
+    reelsThumbnailUrl,
+    title: displayTitle,
+  });
 
   const now = new Date();
 
@@ -642,7 +643,7 @@ export default async function PlacePage({ params }: PlacePageProps) {
           canonicalUrl,
           name: displayTitle,
           description: place.description || place.shortDesc,
-          image: logoUrl || galleryImages[0]?.url,
+          image: logoUrl || placeMedia.posterUrl,
           address: marketplaceAddress,
           lat: place.lat,
           lng: place.lng,
@@ -701,7 +702,7 @@ export default async function PlacePage({ params }: PlacePageProps) {
     fallbackUrl: `/${place.city?.slug || "minsk"}`,
 
     // Media
-    images: galleryImages.length > 0 ? galleryImages : undefined,
+    media: placeMedia,
 
     priceData: parsePriceData(place.priceItems),
     faqItems,

@@ -4,54 +4,13 @@ import { useCallback, useEffect, useState } from "react";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { MediaGalleryItem } from "@/lib/media/galleryTypes";
-
-/* ─── Instagram embed URL helper ────────────────────────────── */
-function toInstagramEmbedUrl(url: string): string | null {
-  const match = url.match(/instagram\.com\/(?:reel|p)\/([\w-]+)/i);
-  if (!match) return null;
-  return `https://www.instagram.com/p/${match[1]}/embed/`;
-}
+import { InstagramReelEmbed } from "./InstagramReelEmbed";
 
 /* ─── Single item renderer ──────────────────────────────────── */
 function LightboxItem({ item }: { item: MediaGalleryItem }) {
   if (item.type === "reels") {
-    const embedSrc = toInstagramEmbedUrl(item.url);
-    return (
-      <div
-        className="mx-auto"
-        style={{ width: "min(90vw, calc(88svh * 9 / 16))" }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        {embedSrc && (
-          /*
-           * Crop Instagram's own header (~60 px) and footer (~56 px).
-           * The iframe is made taller than the container and shifted up so
-           * only the video area is visible through overflow:hidden.
-           */
-          <div
-            className="relative w-full overflow-hidden rounded-[18px] bg-black"
-            style={{ aspectRatio: "9 / 14", maxHeight: "88svh" }}
-          >
-            <iframe
-              title={item.title ?? "Instagram Reels"}
-              src={embedSrc}
-              allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
-              allowFullScreen
-              loading="lazy"
-              scrolling="no"
-              style={{
-                position: "absolute",
-                top: "-60px",
-                left: 0,
-                width: "100%",
-                height: "calc(100% + 116px)",
-                border: "none",
-              }}
-            />
-          </div>
-        )}
-      </div>
-    );
+    // Официальный embed.js-плеер: Reels воспроизводится инлайн в модалке.
+    return <InstagramReelEmbed url={item.url} title={item.title} />;
   }
 
   return (

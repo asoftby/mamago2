@@ -270,6 +270,7 @@ export async function POST(request: NextRequest) {
         website: d.website || null,
         instagramHandle: d.instagramHandle || null,
         instagramUrl: d.instagramUrl || null,
+        reelsUrl: d.reelsUrl || null,
 
         // Hierarchy
         placeKind: d.placeKind || PlaceKind.STANDALONE,

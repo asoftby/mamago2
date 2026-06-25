@@ -46,6 +46,7 @@ export function getDefaultFormData(): PlaceFormData {
     logoImageId: null,
     logoUrl: null,
     images: [],
+    reelsUrl: null,
 
     // Step 5: Opening Hours
     openingHoursId: null,

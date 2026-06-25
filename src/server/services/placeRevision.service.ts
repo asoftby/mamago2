@@ -50,6 +50,7 @@ export interface PlaceRevisionData {
   website?: string | null;
   instagramHandle?: string | null;
   instagramUrl?: string | null;
+  reelsUrl?: string | null;
   ageTags?: string[];
   visitFormats?: string[];
   activityTypes?: string[];
@@ -234,6 +235,7 @@ export async function getOrCreatePlaceRevision(
       website: place.website,
       instagramHandle: place.instagramHandle,
       instagramUrl: place.instagramUrl,
+      reelsUrl: place.reelsUrl,
       ageTags: place.ageTags,
       visitFormats: place.visitFormats,
       activityTypes: place.activityTypes,
@@ -896,6 +898,7 @@ export async function approvePlaceRevision(
         website: revision.website ?? revision.place.website,
         instagramHandle: revision.instagramHandle ?? revision.place.instagramHandle,
         instagramUrl: revision.instagramUrl ?? revision.place.instagramUrl,
+        reelsUrl: revision.reelsUrl ?? revision.place.reelsUrl,
         ageTags: revision.ageTags,
         visitFormats: revision.visitFormats,
         activityTypes: revision.activityTypes,

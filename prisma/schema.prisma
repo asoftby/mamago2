@@ -1065,6 +1065,7 @@ model Place {
   googlePlaceId                String?
   instagramHandle              String?
   instagramUrl                 String?
+  reelsUrl                     String?
   locationName                 String?
   locationSource               LocationSource     @default(MANUAL)
   logoImageId                  String?
@@ -1287,6 +1288,7 @@ model PlaceRevision {
   website               String?
   instagramHandle       String?
   instagramUrl          String?
+  reelsUrl              String?
   ageTags               String[]
   visitFormats          String[]
   activityTypes         String[]

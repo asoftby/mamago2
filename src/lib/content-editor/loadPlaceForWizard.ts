@@ -84,6 +84,7 @@ export async function loadPlaceForWizard(placeId: string) {
         website: activeRevision.website,
         instagramHandle: activeRevision.instagramHandle,
         instagramUrl: activeRevision.instagramUrl,
+        reelsUrl: activeRevision.reelsUrl,
         images: activeRevision.images,
         placeGroupId:
           activeRevision.placeGroupId !== undefined ? activeRevision.placeGroupId : place.placeGroupId,

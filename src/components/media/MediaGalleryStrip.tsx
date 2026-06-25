@@ -51,7 +51,7 @@ function Tile({
         className={cn(
           "absolute inset-0 transition-opacity",
           overflowCount
-            ? "bg-black/60"
+            ? "bg-black/35"
             : isReels
               ? "bg-black/30 group-hover:bg-black/40"
               : "bg-black/0 group-hover:bg-black/15",

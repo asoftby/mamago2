@@ -62,11 +62,12 @@ export interface PlaceFormData {
   website: string | null;
   instagramHandle: string | null;
   instagramUrl: string | null;
-  
+
   // Step 4: Photos
   logoImageId: string | null;
   logoUrl: string | null;
   images: PlaceImage[];
+  reelsUrl: string | null;
   
   // Temp media tracking (for create mode)
   tempLogoMediaId?: string | null;
