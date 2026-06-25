@@ -320,12 +320,19 @@ export default async function PlacePage({ params }: PlacePageProps) {
           id: true,
           slug: true,
           title: true,
+          category: true,
+          logoImageId: true,
           shortAddress: true,
           formattedAddr: true,
           customAddress: true,
           city: {
             select: {
               name: true,
+            },
+          },
+          primaryCategory: {
+            select: {
+              nameRu: true,
             },
           },
           districtAuto: {
@@ -355,6 +362,7 @@ export default async function PlacePage({ params }: PlacePageProps) {
           },
           images: {
             select: {
+              id: true,
               url: true,
               kind: true,
               sortOrder: true,
@@ -384,19 +392,13 @@ export default async function PlacePage({ params }: PlacePageProps) {
     )
     .map((relatedPlace) => ({
       id: relatedPlace.id,
-      slug: relatedPlace.slug || relatedPlace.id,
       title: relatedPlace.title,
-      coverImage:
-        relatedPlace.images.find((image) => image.kind === "GALLERY")?.url ||
-        relatedPlace.images[0]?.url ||
-        null,
-      cityAddress:
-        formatMarketplaceHeroAddress({
-          city: relatedPlace.city,
-          shortAddress: relatedPlace.shortAddress,
-          formattedAddr: relatedPlace.formattedAddr,
-          customAddress: relatedPlace.customAddress,
-        }) || undefined,
+      href: `/places/${relatedPlace.slug || relatedPlace.id}`,
+      category:
+        relatedPlace.primaryCategory?.nameRu?.trim() ||
+        relatedPlace.category?.trim() ||
+        undefined,
+      logoUrl: resolvePlaceLogoImage(relatedPlace.images, relatedPlace.logoImageId)?.url,
       district:
         relatedPlace.districtManual?.name || relatedPlace.districtAuto?.name || undefined,
       metro: relatedPlace.metroManual?.name || relatedPlace.metroAuto?.name || undefined,

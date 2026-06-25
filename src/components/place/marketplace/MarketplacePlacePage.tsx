@@ -284,10 +284,7 @@ export function MarketplacePlacePage({
       )}
 
       {relatedPlaces.length > 0 && (
-        <PlaceNetworkSection
-          places={relatedPlaces}
-          currentPlaceId={place.id}
-        />
+        <PlaceNetworkSection places={relatedPlaces} />
       )}
 
       {/* Address / Location */}
