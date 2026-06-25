@@ -477,12 +477,15 @@ export function PlaceWizard({
 
         const { revision } = await revisionResponse.json();
 
-        // 2. Сохранить изменения данных в ревизию
-        if (Object.keys(changes).length > 0) {
+        // 2. Сохранить изменения данных в ревизию (+ attach фото/лого из wizardSessionId)
+        if (Object.keys(changes).length > 0 || wizardSessionId) {
           const saveResponse = await fetch(`/api/business/places/${place.id}/revision`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ revisionId: revision.id, data: changes }),
+            body: JSON.stringify({
+              revisionId: revision.id,
+              data: { ...changes, wizardSessionId },
+            }),
           });
 
           if (!saveResponse.ok) {
@@ -520,12 +523,12 @@ export function PlaceWizard({
         setOriginalData(formData);
         toast.success("Изменения отправлены на модерацию");
       } else {
-        // Для черновиков или ADMIN - прямое сохранение
-        if (Object.keys(changes).length > 0) {
+        // Для черновиков или ADMIN - прямое сохранение (+ attach фото/лого из wizardSessionId)
+        if (Object.keys(changes).length > 0 || wizardSessionId) {
           const response = await fetch(`/api/business/places/${place.id}`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(changes),
+            body: JSON.stringify({ ...changes, wizardSessionId }),
           });
 
           if (!response.ok) {
@@ -657,14 +660,14 @@ export function PlaceWizard({
           const isAdmin = userRole === "ADMIN" || userRole === "MODERATOR";
 
           if (isAdmin) {
-            // Admin: save directly without revision
+            // Admin: save directly without revision (+ attach фото/лого из wizardSessionId)
             const changes = extractChanges(formData, originalData);
 
-            if (Object.keys(changes).length > 0) {
+            if (Object.keys(changes).length > 0 || wizardSessionId) {
               const response = await fetch(`/api/business/places/${place.id}`, {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(changes),
+                body: JSON.stringify({ ...changes, wizardSessionId }),
               });
               if (!response.ok) {
                 const error = await response.json();
@@ -700,12 +703,15 @@ export function PlaceWizard({
           }
           const { revision } = await revisionResponse.json();
 
-          // 2. Сохранить данные в ревизию
-          if (Object.keys(changes).length > 0) {
+          // 2. Сохранить данные в ревизию (+ attach фото/лого из wizardSessionId)
+          if (Object.keys(changes).length > 0 || wizardSessionId) {
             const saveResponse = await fetch(`/api/business/places/${place.id}/revision`, {
               method: "PATCH",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ revisionId: revision.id, data: changes }),
+              body: JSON.stringify({
+                revisionId: revision.id,
+                data: { ...changes, wizardSessionId },
+              }),
             });
             if (!saveResponse.ok) {
               const errorData = await saveResponse.json().catch(() => ({}));

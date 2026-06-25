@@ -359,6 +359,77 @@ export async function PATCH(
     if (body.googleMapsUri !== undefined) updateData.googleMapsUri = body.googleMapsUri;
     if (body.priceItems !== undefined) updateData.priceItems = body.priceItems ?? null;
 
+    // Bulk-attach any TEMP media uploaded during this wizard session (gallery photos,
+    // and logo if it wasn't already resolved above via a direct logoImageId tempMedia id).
+    let attachedSessionMedia = false;
+    if (typeof body.wizardSessionId === "string" && body.wizardSessionId.trim()) {
+      const sessionId = body.wizardSessionId.trim();
+      const tempMediaList = await prisma.tempMedia.findMany({
+        where: { ownerUserId: user.id, wizardSessionId: sessionId, status: "TEMP" },
+        orderBy: [{ kind: "asc" }, { sortOrder: "asc" }],
+      });
+
+      if (tempMediaList.length > 0) {
+        attachedSessionMedia = true;
+        let newLogoImageId: string | null = null;
+
+        for (const media of tempMediaList) {
+          const kind = media.kind === "PLACE_LOGO" ? "LOGO" : "GALLERY";
+
+          const placeImage = await prisma.placeImage.create({
+            data: {
+              placeId: id,
+              kind,
+              url: media.url,
+              width: media.width,
+              height: media.height,
+              blurhash: media.blurhash,
+              sortOrder: media.sortOrder,
+            },
+          });
+
+          try {
+            let mediaAsset = await prisma.mediaAsset.findFirst({
+              where: { OR: [{ storageKey: media.url }, { publicUrl: media.url }] },
+            });
+            if (!mediaAsset && extractMediaRelativePathFromUrl(media.url)) {
+              mediaAsset = await ensureMediaAssetForStoredFileUrl({
+                publicUrl: media.url,
+                uploadedById: user.id,
+                userRole: user.role,
+                width: media.width,
+                height: media.height,
+                originalName: kind === "LOGO" ? "place-logo.webp" : "place-gallery.webp",
+              });
+            }
+            if (mediaAsset) {
+              await attachMediaToEntity({
+                mediaId: mediaAsset.id,
+                entityType: MediaEntityType.PLACE,
+                entityId: id,
+                field: kind === "LOGO" ? "logo" : "gallery",
+              });
+            }
+          } catch {
+            /* non-fatal — MediaAsset/MediaUsage registration */
+          }
+
+          await prisma.tempMedia.update({
+            where: { id: media.id },
+            data: { status: "ATTACHED", placeId: id },
+          });
+
+          if (kind === "LOGO") {
+            newLogoImageId = placeImage.id;
+          }
+        }
+
+        if (newLogoImageId) {
+          updateData.logoImageId = newLogoImageId;
+        }
+      }
+    }
+
     await prisma.place.update({
       where: { id },
       data: updateData,
@@ -411,8 +482,8 @@ export async function PATCH(
     });
     perf.mark("response");
 
-    // Sync media usage if logo changed (don't block on errors)
-    if (body.logoImageId !== undefined) {
+    // Sync media usage if logo or gallery changed (don't block on errors)
+    if (body.logoImageId !== undefined || attachedSessionMedia) {
       try {
         await syncPlaceMediaUsage(id);
       } catch (error) {

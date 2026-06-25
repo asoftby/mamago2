@@ -40,10 +40,19 @@ export interface GalleryItem {
   height?: number;
   blurhash?: string;
   status: "uploading" | "done" | "error";
+  /**
+   * Откуда взялась картинка:
+   * - "temp" — загружена в текущую wizard-сессию (TempMedia), удаляется через /temp-media.
+   * - "place" — уже привязанное к месту фото (PlaceImage), удаляется через /places/[id]/images.
+   * Если не задано — считаем "temp" (обратная совместимость с create-флоу).
+   */
+  source?: "temp" | "place";
 }
 
 interface PlaceGalleryUploadTempProps {
   wizardSessionId: string;
+  /** Нужен в edit-режиме, чтобы удалять уже привязанные PlaceImage. */
+  placeId?: string;
   initialImages?: GalleryItem[];
   onImagesChange?: (images: GalleryItem[]) => void;
   disabled?: boolean;
@@ -189,6 +198,7 @@ function ImageItemContent({
 
 export function PlaceGalleryUploadTemp({
   wizardSessionId,
+  placeId,
   initialImages = [],
   onImagesChange,
   disabled = false,
@@ -232,6 +242,7 @@ export function PlaceGalleryUploadTemp({
               height: m.height ?? undefined,
               blurhash: m.blurhash || undefined,
               status: "done" as const,
+              source: "temp" as const,
             }));
           
           if (galleryMedia.length > 0) {
@@ -390,6 +401,7 @@ export function PlaceGalleryUploadTemp({
       id: `temp-${Date.now()}-${Math.random()}`,
       url: URL.createObjectURL(file),
       status: "uploading" as const,
+      source: "temp" as const,
     }));
 
     setImages((prev) => [...prev, ...placeholders]);
@@ -442,6 +454,7 @@ export function PlaceGalleryUploadTemp({
                   height: uploadedImage.height,
                   blurhash: uploadedImage.blurhash,
                   status: "done" as const,
+                  source: "temp" as const,
                 }
               : img
           )
@@ -504,14 +517,25 @@ export function PlaceGalleryUploadTemp({
 
   const handleRemove = async (imageId: string) => {
     if (disabled) return;
+
+    const removed = images.find((img) => img.id === imageId);
     // Optimistic update
     setImages((prev) => prev.filter((img) => img.id !== imageId));
 
-    // Delete from server
+    // Local-only placeholders (still uploading) have no server row yet.
+    if (removed && removed.status !== "done") {
+      return;
+    }
+
+    // Route to the correct endpoint: attached PlaceImage vs in-session TempMedia.
+    const isPlaceImage = removed?.source === "place";
+    const endpoint =
+      isPlaceImage && placeId
+        ? `/api/business/places/${placeId}/images/${imageId}`
+        : `/api/business/temp-media/${imageId}`;
+
     try {
-      const response = await fetch(`/api/business/temp-media/${imageId}`, {
-        method: "DELETE",
-      });
+      const response = await fetch(endpoint, { method: "DELETE" });
 
       if (!response.ok) {
         throw new Error("Failed to delete image");
@@ -519,7 +543,12 @@ export function PlaceGalleryUploadTemp({
     } catch (error) {
       console.error("Delete image error:", error);
       toast.error("Ошибка удаления фото");
-      // TODO: Revert optimistic update
+      // Revert optimistic update so the user can retry.
+      if (removed) {
+        setImages((prev) =>
+          prev.some((img) => img.id === imageId) ? prev : [...prev, removed],
+        );
+      }
     }
   };
 

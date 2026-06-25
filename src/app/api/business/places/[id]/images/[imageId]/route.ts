@@ -32,7 +32,9 @@ export async function DELETE(
       return NextResponse.json({ error: "Place not found" }, { status: 404 });
     }
 
-    if (!place.ownerBusinessId || !(await canManagePlaceAsync(user, place))) {
+    // canManagePlaceAsync already covers admin/moderator, business members, and the
+    // creator of a business-less place — no separate ownerBusinessId precondition needed.
+    if (!(await canManagePlaceAsync(user, place))) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
