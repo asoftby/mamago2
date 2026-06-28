@@ -3,6 +3,7 @@ import { publicActivityPath } from "@/lib/business/eventPublicLink";
 import { SEARCH_BOOST } from "@/lib/search/constants";
 import { activityMetaLine } from "@/lib/search/metaLines";
 import { buildSearchText, summarizeForSearchCard } from "@/lib/search/sanitizeSearchText";
+import { normalizeRichTextCurrency } from "@/lib/formatters/format-price";
 
 export type SearchDocUpsertFields = {
   entityType: SearchEntityType;
@@ -61,7 +62,9 @@ export async function buildActivityDocument(
     activity.shortDesc,
     activity.description,
     activity.priceText,
-    activity.priceDetails,
+    // plain-text канал (поисковый индекс/SEO-сниппет): валюта как текст "Br",
+    // иначе в индекс попадёт PUA-тофу из старых не пересохранённых записей.
+    normalizeRichTextCurrency(activity.priceDetails),
     activity.ageLabel,
     ...activity.ageTags,
     activity.eventCategory?.nameRu,
