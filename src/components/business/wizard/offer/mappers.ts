@@ -21,6 +21,7 @@ import {
   normalizeRichTextEditorValue,
   plainTextToRichTextHtml,
 } from "@/lib/richtext/utils";
+import { normalizeRichTextCurrency } from "@/lib/formatters/format-price";
 import {
   normalizeCampSessionsFromDb,
   normalizeCampMealsFromDb,
@@ -832,16 +833,16 @@ export function mapOfferToFormData(offer: {
     priceCaption: isCamp
       ? ""
       : offer.priceCaption
-        ? offer.priceCaption
+        ? normalizeRichTextCurrency(offer.priceCaption)
         : offer.priceText
-          ? plainTextToRichTextHtml(offer.priceText)
+          ? plainTextToRichTextHtml(normalizeRichTextCurrency(offer.priceText))
           : "",
     promotionDetails: isCamp
       ? ""
       : offer.promotionDetails
-        ? offer.promotionDetails
+        ? normalizeRichTextCurrency(offer.promotionDetails)
         : offer.promotionalOffer
-          ? plainTextToRichTextHtml(offer.promotionalOffer)
+          ? plainTextToRichTextHtml(normalizeRichTextCurrency(offer.promotionalOffer))
           : "",
     pricingMode: "single",
     singlePrice: offer.priceFrom != null ? String(offer.priceFrom) : "",

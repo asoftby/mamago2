@@ -16,11 +16,12 @@ import { normalizePhoneToE164 } from "@/lib/phone/e164";
 import { createDefaultScheduleItem, createDefaultSocialLink } from "./defaults";
 import { computeEventShortDesc } from "@/lib/business/eventShortDesc";
 import { detectAgeBuckets } from "@/lib/age/ageMapping";
-import { sortAgeKeys } from "@/lib/config/ages";
+import { AGE_OPTIONS, formatAgeKeys, getCombinedAgeRange, sortAgeKeys } from "@/lib/config/ages";
 import type { EventOrganizerInput } from "@/lib/business/eventOrganizer";
 import { DEFAULT_ACTIVITY_FORMAT, normalizeActivityFormat } from "@/domain/activities/activity-format";
 import { normalizeRichTextEditorValue } from "@/lib/richtext/utils";
 import { expandScheduleItemDates } from "@/lib/event/expandScheduleItemDates";
+import { normalizeRichTextCurrency, normalizeUiCurrencyText } from "@/lib/formatters/format-price";
 import { parsePriceData } from "@/lib/priceItems";
 import { normalizeFaqItems } from "@/lib/faq/faqItems";
 
@@ -35,6 +36,9 @@ export type ActivityWithRelations = Activity & {
   id: string;
   title: string | null;
   description: string | null;
+  ageLabel?: string | null;
+  ageMaxMonths?: number | null;
+  ageMinMonths?: number | null;
   ageTags: string[];
   scheduleJson: Record<string, unknown> | null;
   coverImageId: string | null;
@@ -73,6 +77,45 @@ export type ActivityWithRelations = Activity & {
   } | null;
   programCategoryLinks?: Array<{ categoryId: string }>;
 };
+
+function normalizeAgeKeys(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return sortAgeKeys(value.filter((item): item is string => typeof item === "string" && item.trim().length > 0));
+}
+
+function ageBucketsFromMonthRange(
+  ageMinMonths: number | null | undefined,
+  ageMaxMonths: number | null | undefined,
+): string[] {
+  if (ageMinMonths == null && ageMaxMonths == null) return [];
+
+  const rangeStart = ageMinMonths ?? 0;
+  const rangeEnd = ageMaxMonths ?? Number.POSITIVE_INFINITY;
+
+  return sortAgeKeys(
+    AGE_OPTIONS.filter((option) => {
+      const bucketStart = option.minMonths;
+      const bucketEnd = option.maxMonths ?? Number.POSITIVE_INFINITY;
+      return rangeStart < bucketEnd && rangeEnd > bucketStart;
+    }).map((option) => option.key),
+  );
+}
+
+function deriveSavedAgeBuckets(event: {
+  ageTags?: string[] | null;
+  ageMinMonths?: number | null;
+  ageMaxMonths?: number | null;
+  ageLabel?: string | null;
+}): string[] {
+  const fromAgeTags = normalizeAgeKeys(event.ageTags ?? []);
+  if (fromAgeTags.length > 0) return fromAgeTags;
+
+  const fromMonthRange = ageBucketsFromMonthRange(event.ageMinMonths, event.ageMaxMonths);
+  if (fromMonthRange.length > 0) return fromMonthRange;
+
+  const fromAgeLabel = detectAgeBuckets(event.ageLabel);
+  return sortAgeKeys(fromAgeLabel.suggestedBuckets);
+}
 
 /**
  * Применяет данные из pendingLocation в UI-поля formData.
@@ -128,9 +171,14 @@ export function mapEventToFormData(event: ActivityWithRelations): EventFormData 
   // Step 1: Basics
   formData.title = event.title || "";
   formData.format = normalizeActivityFormat(event.format, DEFAULT_ACTIVITY_FORMAT);
-  formData.ageTags = Array.isArray(event.ageTags) ? event.ageTags : [];
-
   const scheduleJson = (event.scheduleJson || {}) as Record<string, unknown>;
+  const persistedAgeRangeIds = normalizeAgeKeys(scheduleJson.ageRangeIds);
+  const derivedSavedAgeBuckets = deriveSavedAgeBuckets(event);
+  const resolvedAgeBuckets =
+    persistedAgeRangeIds.length > 0 ? persistedAgeRangeIds : derivedSavedAgeBuckets;
+
+  formData.ageRangeIds = resolvedAgeBuckets;
+  formData.ageTags = resolvedAgeBuckets;
 
   formData.eventFormats = resolveEventFormatsFromScheduleJson(scheduleJson);
   // Optional multi-select «Интересы» (за пределами eventFormats).
@@ -154,9 +202,6 @@ export function mapEventToFormData(event: ActivityWithRelations): EventFormData 
     (typeof scheduleJson.categoryId === "string" ? scheduleJson.categoryId : null) ?? null;
   formData.subcategoryId =
     (typeof scheduleJson.subcategoryId === "string" ? scheduleJson.subcategoryId : null) ?? null;
-  formData.ageRangeIds = Array.isArray(scheduleJson.ageRangeIds)
-    ? (scheduleJson.ageRangeIds as string[])
-    : [];
   const rawAgeDetection = scheduleJson.ageDetection;
   if (rawAgeDetection && typeof rawAgeDetection === "object") {
     const detection = rawAgeDetection as Record<string, unknown>;
@@ -182,18 +227,23 @@ export function mapEventToFormData(event: ActivityWithRelations): EventFormData 
       typeof scheduleJson.importedAgeText === "string" ? scheduleJson.importedAgeText : null,
     );
   }
+  const currentAgeSelection = sortAgeKeys(formData.ageRangeIds);
+  const suggestedAgeSelection = sortAgeKeys(formData.ageDetection?.suggestedBuckets ?? []);
+  const currentAgeMatchesDetection =
+    currentAgeSelection.length > 0 &&
+    currentAgeSelection.join("|") === suggestedAgeSelection.join("|");
+  const hasPersistedAgeSelection = currentAgeSelection.length > 0;
+
   formData.ageDetectionUserOverride =
     typeof scheduleJson.ageDetectionUserOverride === "boolean"
       ? scheduleJson.ageDetectionUserOverride
-      : false;
+      : hasPersistedAgeSelection;
   formData.ageDetectionAutoApplied =
     typeof scheduleJson.ageDetectionAutoApplied === "boolean"
-      ? scheduleJson.ageDetectionAutoApplied
+      ? scheduleJson.ageDetectionAutoApplied && currentAgeMatchesDetection
       : !formData.ageDetectionUserOverride &&
         formData.ageDetection?.confidence === "high" &&
-        formData.ageRangeIds.length > 0 &&
-        sortAgeKeys(formData.ageRangeIds).join("|") ===
-          sortAgeKeys(formData.ageDetection?.suggestedBuckets ?? []).join("|");
+        currentAgeMatchesDetection;
   formData.categorySlug =
     (typeof scheduleJson.categorySlug === "string" ? scheduleJson.categorySlug : null) ?? null;
   formData.categoryPathLabel =
@@ -305,9 +355,6 @@ export function mapEventToFormData(event: ActivityWithRelations): EventFormData 
   }
 
   formData.categoryIds = formData.categoryId ? [formData.categoryId] : [];
-  if (formData.ageRangeIds.length === 0 && formData.ageTags.length > 0) {
-    formData.ageRangeIds = [...formData.ageTags];
-  }
 
   // Step 2: Description
   formData.fullDescription = normalizeRichTextEditorValue(event.description);
@@ -379,7 +426,8 @@ export function mapEventToFormData(event: ActivityWithRelations): EventFormData 
         : [createDefaultScheduleItem()];
 
   // Step 5: Pricing & Participation
-  const priceTextRaw = typeof event.priceText === "string" ? event.priceText : "";
+  const priceTextRaw =
+    typeof event.priceText === "string" ? normalizeUiCurrencyText(event.priceText) : "";
   const priceFromDb = event.priceFrom != null ? Number(event.priceFrom) : null;
   const priceToDb = event.priceTo != null ? Number(event.priceTo) : null;
 
@@ -403,7 +451,7 @@ export function mapEventToFormData(event: ActivityWithRelations): EventFormData 
   }
   formData.priceDetails =
     typeof scheduleJson.priceDetails === "string"
-      ? normalizeRichTextEditorValue(scheduleJson.priceDetails)
+      ? normalizeRichTextEditorValue(normalizeRichTextCurrency(scheduleJson.priceDetails))
       : "";
   formData.priceItems = parsePriceData((event as { priceItems?: unknown }).priceItems);
   formData.faqItems = normalizeFaqItems((event as { faqItems?: unknown }).faqItems);
@@ -574,6 +622,9 @@ type EventPayload = {
   description: string;
   type: "EVENT";
   format: ActivityFormat;
+  ageLabel: string | null;
+  ageMaxMonths: number | null;
+  ageMinMonths: number | null;
   ageTags: string[];
   scheduleMode: "MULTI_DATE";
   eventCategoryId?: string;
@@ -657,6 +708,16 @@ export function buildEventPayload(data: EventFormData): EventPayload {
     title: data.title ?? "",
     fullDescriptionHtml: data.fullDescription ?? "",
   });
+  const normalizedAgeBuckets = sortAgeKeys(
+    (data.ageTags.length > 0 ? data.ageTags : data.ageRangeIds).filter(Boolean),
+  );
+  const ageRange = getCombinedAgeRange(normalizedAgeBuckets);
+  const ageLabel =
+    normalizedAgeBuckets.length > 0
+      ? data.ageDetectionAutoApplied && data.ageDetection?.normalizedLabel
+        ? data.ageDetection.normalizedLabel
+        : formatAgeKeys(normalizedAgeBuckets)
+      : null;
 
   const payload: EventPayload = {
     title: data.title,
@@ -666,7 +727,10 @@ export function buildEventPayload(data: EventFormData): EventPayload {
     type: "EVENT",
     format: normalizeActivityFormat(data.format, DEFAULT_ACTIVITY_FORMAT),
 
-    ageTags: data.ageTags,
+    ageLabel,
+    ageMinMonths: ageRange?.minMonths ?? null,
+    ageMaxMonths: ageRange?.maxMonths ?? null,
+    ageTags: normalizedAgeBuckets,
 
     scheduleMode: "MULTI_DATE",
 
