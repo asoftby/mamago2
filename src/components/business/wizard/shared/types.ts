@@ -33,6 +33,12 @@ export interface WizardStepConfig<TFormData = Record<string, unknown>> {
   /** Short 1-word label for WizardProgress nav tabs (e.g. "Тип", "Фото") */
   shortLabel?: string;
   description?: string;
+  /**
+   * Необязательный шаг: не блокирует переход/публикацию (это обеспечивает
+   * isComplete: () => true + правки валидации). Влияет только на презентацию
+   * степпера — отдельный приглушённый стиль для пустого необязательного шага.
+   */
+  isOptional?: boolean;
   
   // Component to render for this step
   component: React.ComponentType<{

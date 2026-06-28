@@ -131,10 +131,13 @@ export function validateStep2(data: EventFormData): ValidationResult {
         errors.push("Выберите место проведения");
       }
     } else if (data.venueKind === "MANUAL") {
+      const isParsedDraft =
+        data.pendingLocation?.mode === "PARSED_LOCATION" &&
+        data.pendingLocation.source === "parser";
       if (!data.venueName || data.venueName.trim().length === 0) {
         errors.push("Укажите название площадки");
       }
-      if (!data.address || data.address.trim().length === 0) {
+      if (!isParsedDraft && (!data.address || data.address.trim().length === 0)) {
         errors.push("Укажите адрес");
       }
       if (!data.city || data.city.trim().length === 0) {
@@ -147,7 +150,12 @@ export function validateStep2(data: EventFormData): ValidationResult {
   const isComplete = Boolean(
     data.venueKind &&
     (data.venueKind === "PLACE" ? data.placeId : true) &&
-    (data.venueKind === "MANUAL" ? (data.venueName.trim() && data.address.trim() && data.city.trim()) : true)
+    (data.venueKind === "MANUAL"
+      ? data.pendingLocation?.mode === "PARSED_LOCATION" &&
+        data.pendingLocation.source === "parser"
+        ? data.venueName.trim() && data.city.trim()
+        : data.venueName.trim() && data.address.trim() && data.city.trim()
+      : true)
   );
 
   return {
@@ -381,20 +389,16 @@ function validateStep7(data: EventFormData): ValidationResult {
 }
 
 /**
- * Step 8: Organizer
+ * Step 8: Organizer (optional step)
+ *
+ * Организатор необязателен: полностью пустой шаг 8 валиден и завершён.
+ * Проверки формата (УНП/телефон/сайт/Instagram) выдаются только как warnings
+ * и только когда соответствующее поле непустое — они никогда не блокируют
+ * переход дальше или публикацию.
  */
 function validateStep8(data: EventFormData): ValidationResult {
   const errors: string[] = [];
   const warnings: string[] = [];
-
-  if (!data.organizerName || data.organizerName.trim().length < 2) {
-    errors.push("Укажите название организатора");
-  }
-
-  // Validate based on organizer mode
-  if (data.organizerMode === "existing" && !data.organizerId) {
-    errors.push("Выберите организатора из списка");
-  }
 
   if (data.organizerUnp && !/^\d{9}$/.test(data.organizerUnp)) {
     warnings.push("УНП должен содержать 9 цифр");
@@ -416,8 +420,8 @@ function validateStep8(data: EventFormData): ValidationResult {
     warnings.push("Проверьте формат Instagram");
   }
 
-  const isComplete = data.organizerName.trim().length >= 2 && 
-    (data.organizerMode !== "existing" || !!data.organizerId);
+  // Optional step — always complete, never blocks navigation/publishing.
+  const isComplete = true;
 
   return {
     isValid: errors.length === 0,

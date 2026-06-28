@@ -111,6 +111,9 @@ export const EVENT_WIZARD_STEPS: WizardStepConfig<EventFormData>[] = [
       if (!data.venueKind) return false;
       if (data.venueKind === "PLACE") return !!data.placeId;
       if (data.venueKind === "MANUAL") {
+        if (data.pendingLocation?.mode === "PARSED_LOCATION" && data.pendingLocation.source === "parser") {
+          return Boolean(data.venueName && data.city);
+        }
         return Boolean(data.venueName && data.address && data.city);
       }
       return true; // MOBILE and TBD are complete without additional fields
@@ -141,6 +144,9 @@ export const EVENT_WIZARD_STEPS: WizardStepConfig<EventFormData>[] = [
           isMissing: !data.placeId,
         });
       } else if (data.venueKind === "MANUAL") {
+        const isParsedDraft =
+          data.pendingLocation?.mode === "PARSED_LOCATION" &&
+          data.pendingLocation.source === "parser";
         items.push(
           {
             label: "Площадка",
@@ -150,7 +156,7 @@ export const EVENT_WIZARD_STEPS: WizardStepConfig<EventFormData>[] = [
           {
             label: "Адрес",
             value: data.address || <span className="text-red-500">Не указан</span>,
-            isMissing: !data.address,
+            isMissing: !data.address && !isParsedDraft,
           },
           {
             label: "Город",
@@ -177,8 +183,11 @@ export const EVENT_WIZARD_STEPS: WizardStepConfig<EventFormData>[] = [
       } else if (data.venueKind === "PLACE") {
         if (!data.placeId) missing.push("Место проведения");
       } else if (data.venueKind === "MANUAL") {
+        const isParsedDraft =
+          data.pendingLocation?.mode === "PARSED_LOCATION" &&
+          data.pendingLocation.source === "parser";
         if (!data.venueName) missing.push("Название площадки");
-        if (!data.address) missing.push("Адрес");
+        if (!data.address && !isParsedDraft) missing.push("Адрес");
         if (!data.city) missing.push("Город");
       }
       return missing;
@@ -454,7 +463,7 @@ export const EVENT_WIZARD_STEPS: WizardStepConfig<EventFormData>[] = [
     getMissingFields: () => [], // Optional step
   },
   
-  // Step 8: Organizer
+  // Step 8: Organizer (optional)
   {
     id: 8,
     key: "organizer",
@@ -462,25 +471,31 @@ export const EVENT_WIZARD_STEPS: WizardStepConfig<EventFormData>[] = [
     title: "Организатор",
     description: "Кто организует событие",
     component: Step8Organizer,
-    
-    isComplete: (data) => data.organizerName.trim().length >= 2 && 
-      (data.organizerMode !== "existing" || !!data.organizerId),
-    
+    isOptional: true,
+
+    // Необязательный шаг — всегда завершён (не блокирует переходы/публикацию).
+    isComplete: () => true,
+
     getSummary: (data) => [
       {
         label: "Организатор",
-        value: data.organizerName || <span className="text-red-500">Не указан</span>,
-        isMissing: !data.organizerName,
+        value: data.organizerName || (
+          <span className="text-muted-foreground">Не указан</span>
+        ),
       },
-      {
-        label: "Тип",
-        value:
-          data.organizerMode === "existing"
-            ? "Найденный"
-            : data.organizerMode === "import"
-              ? "Из источника"
-              : "Новый",
-      },
+      ...(data.organizerName
+        ? ([
+            {
+              label: "Тип",
+              value:
+                data.organizerMode === "existing"
+                  ? "Найденный"
+                  : data.organizerMode === "import"
+                    ? "Из источника"
+                    : "Новый",
+            },
+          ] as SummaryItem[])
+        : []),
       ...(data.organizerPhone ? [{
         label: "Телефон",
         value: data.organizerPhone,
@@ -498,17 +513,8 @@ export const EVENT_WIZARD_STEPS: WizardStepConfig<EventFormData>[] = [
         value: "Указан",
       }] : []),
     ],
-    
-    getMissingFields: (data) => {
-      const missing: string[] = [];
-      if (!data.organizerName || data.organizerName.trim().length < 2) {
-        missing.push("Название организатора");
-      }
-      if (data.organizerMode === "existing" && !data.organizerId) {
-        missing.push("Выбор организатора");
-      }
-      return missing;
-    },
+
+    getMissingFields: () => [],
   },
 
   {
