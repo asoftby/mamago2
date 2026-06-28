@@ -1,9 +1,10 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { Package } from "lucide-react";
 
 interface EventIncludesProps {
-  items: string[];
+  items: ReactNode[];
 }
 
 /**
