@@ -1303,6 +1303,9 @@ function EventWizardInner({
         id: s.id,
         label: s.shortLabel ?? s.title,
         isComplete: s.isComplete ? s.isComplete(formData) : false,
+        isOptional: s.isOptional ?? false,
+        // Фактическая заполненность (для презентации степпера), отдельно от isComplete.
+        hasContent: s.hasContent ? s.hasContent(formData) : undefined,
       })),
       { id: TOTAL_STEPS, label: "Проверка", isComplete: false },
     ],

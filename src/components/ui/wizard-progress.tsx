@@ -9,6 +9,17 @@ export interface WizardProgressStep {
   isComplete?: boolean;
   /** Шаг недоступен для прямого перехода по клику */
   isDisabled?: boolean;
+  /**
+   * Необязательный шаг. Влияет ТОЛЬКО на рендер: пустой необязательный шаг
+   * показывается приглушённым «необязательно», а не как «выполнено».
+   */
+  isOptional?: boolean;
+  /**
+   * Фактическая заполненность шага (отдельно от isComplete). Для необязательных
+   * шагов isComplete почти всегда true, поэтому различить «выполнен» и
+   * «необязателен и пуст» можно только по этому признаку.
+   */
+  hasContent?: boolean;
 }
 
 interface WizardProgressProps {
@@ -44,8 +55,12 @@ export function WizardProgress({
     >
       {steps.map((step) => {
         const isActive = step.id === currentStep;
-        const isDone = !!step.isComplete;
         const isDisabled = !!step.isDisabled && !isActive;
+        // Необязательный и пустой → приглушённое «необязательно».
+        // Как только пользователь что-то ввёл (hasContent) — обычный «выполнено».
+        const isOptionalEmpty =
+          !!step.isOptional && !step.hasContent && !isActive;
+        const isDone = !!step.isComplete && !isOptionalEmpty;
 
         return (
           <button
@@ -67,17 +82,24 @@ export function WizardProgress({
             {/* Label */}
             <span
               className={cn(
-                "text-xs font-medium whitespace-nowrap transition-colors duration-150",
+                "flex items-center gap-1 text-xs font-medium whitespace-nowrap transition-colors duration-150",
                 isActive
                   ? "text-[#EF8759]"
                   : isDone
                     ? "text-[#C96A3D] group-hover:text-[#A9532D]"
-                    : isDisabled
-                      ? "text-gray-300"
-                      : "text-gray-400 group-hover:text-gray-600",
+                    : isOptionalEmpty
+                      ? "text-gray-400 group-hover:text-gray-500"
+                      : isDisabled
+                        ? "text-gray-300"
+                        : "text-gray-400 group-hover:text-gray-600",
               )}
             >
               {step.label}
+              {isOptionalEmpty ? (
+                <span className="text-[9px] font-normal italic text-gray-300">
+                  необяз.
+                </span>
+              ) : null}
             </span>
 
             {/* Step dot */}
@@ -89,9 +111,11 @@ export function WizardProgress({
                   ? "bg-[#EF8759] text-white ring-2 ring-[#EF8759]/30"
                   : isDone
                     ? "bg-[#EF8759] text-white"
-                    : isDisabled
-                      ? "bg-gray-50 text-gray-300"
-                      : "bg-gray-100 text-gray-400 group-hover:bg-gray-200",
+                    : isOptionalEmpty
+                      ? "border border-dashed border-gray-300 bg-transparent text-gray-400 group-hover:border-gray-400"
+                      : isDisabled
+                        ? "bg-gray-50 text-gray-300"
+                        : "bg-gray-100 text-gray-400 group-hover:bg-gray-200",
               )}
             >
               {step.id}

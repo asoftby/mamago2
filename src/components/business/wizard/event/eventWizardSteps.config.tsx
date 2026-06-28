@@ -431,7 +431,7 @@ export const EVENT_WIZARD_STEPS: WizardStepConfig<EventFormData>[] = [
     },
   },
   
-  // Step 7: Contacts
+  // Step 7: Contacts (optional)
   {
     id: 7,
     key: "contacts",
@@ -439,9 +439,14 @@ export const EVENT_WIZARD_STEPS: WizardStepConfig<EventFormData>[] = [
     title: "Контакты",
     description: "Телефон, сайт и социальные сети",
     component: Step7Contacts,
-    
+    isOptional: true,
+
     isComplete: () => true, // Optional step
-    
+    hasContent: (data) =>
+      Boolean(data.phone?.trim()) ||
+      Boolean(data.website?.trim()) ||
+      data.socialLinks.some((l) => l.url.trim().length > 0),
+
     getSummary: (data) => [
       {
         label: "Телефон",
@@ -475,6 +480,8 @@ export const EVENT_WIZARD_STEPS: WizardStepConfig<EventFormData>[] = [
 
     // Необязательный шаг — всегда завершён (не блокирует переходы/публикацию).
     isComplete: () => true,
+    hasContent: (data) =>
+      data.organizerName.trim().length > 0 || Boolean(data.organizerId),
 
     getSummary: (data) => [
       {
@@ -530,7 +537,9 @@ export const EVENT_WIZARD_STEPS: WizardStepConfig<EventFormData>[] = [
         onChange={(faqItems) => onChange({ faqItems })}
       />
     ),
+    isOptional: true,
     isComplete: () => true,
+    hasContent: (data) => data.faqItems.length > 0,
     getSummary: (data) => [
       {
         label: "Вопросы",
