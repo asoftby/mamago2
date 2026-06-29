@@ -200,6 +200,9 @@ export async function PATCH(
         status: true,
         slug: true,
         format: true,
+        ageLabel: true,
+        ageMaxMonths: true,
+        ageMinMonths: true,
         ageTags: true,
         scheduleMode: true,
         priceFrom: true,
@@ -473,6 +476,17 @@ export async function PATCH(
       stableJsonStringify(body.ageTags) !== stableJsonStringify(existing.ageTags)
     ) {
       updateData.ageTags = body.ageTags;
+    }
+    if (body.ageLabel !== undefined && body.ageLabel !== (existing.ageLabel ?? null)) {
+      updateData.ageLabel = typeof body.ageLabel === "string" ? body.ageLabel || null : null;
+    }
+    if (body.ageMinMonths !== undefined && body.ageMinMonths !== existing.ageMinMonths) {
+      updateData.ageMinMonths =
+        typeof body.ageMinMonths === "number" ? body.ageMinMonths : null;
+    }
+    if (body.ageMaxMonths !== undefined && body.ageMaxMonths !== existing.ageMaxMonths) {
+      updateData.ageMaxMonths =
+        typeof body.ageMaxMonths === "number" ? body.ageMaxMonths : null;
     }
 
     if (body.scheduleMode !== undefined && body.scheduleMode !== existing.scheduleMode) {

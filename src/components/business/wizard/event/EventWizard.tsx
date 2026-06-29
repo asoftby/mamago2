@@ -1261,6 +1261,7 @@ function EventWizardInner({
       return (
         <StepComponent
           {...commonProps}
+          allowAgeAutoApplyFromDetection={mode === "create"}
           initialTaxonomies={initialStep1Taxonomies}
           aiEnrichment={aiEnrichment}
           aiAppliedFields={aiAppliedFields}

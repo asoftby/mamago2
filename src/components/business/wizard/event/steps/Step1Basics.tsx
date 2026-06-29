@@ -70,6 +70,7 @@ interface Step1BasicsProps {
   data: EventFormData;
   onChange: (updates: Partial<EventFormData>) => void;
   isEditable: boolean;
+  allowAgeAutoApplyFromDetection?: boolean;
   initialTaxonomies?: EventStep1Taxonomies;
   aiEnrichment?: EnrichmentResult | null;
   aiAppliedFields?: string[];
@@ -85,6 +86,7 @@ export function Step1Basics({
   data,
   onChange,
   isEditable,
+  allowAgeAutoApplyFromDetection = true,
   initialTaxonomies,
   aiEnrichment,
   aiAppliedFields = [],
@@ -495,6 +497,7 @@ export function Step1Basics({
 
   useEffect(() => {
     if (!isEditable) return;
+    if (!allowAgeAutoApplyFromDetection) return;
     if (ageDetection.confidence !== "high") return;
     if (data.ageDetectionUserOverride) return;
     if (ageDetection.suggestedBuckets.length === 0) return;
@@ -514,6 +517,7 @@ export function Step1Basics({
     data.ageDetectionAutoApplied,
     data.ageDetectionUserOverride,
     data.ageRangeIds,
+    allowAgeAutoApplyFromDetection,
     isEditable,
     onChange,
   ]);

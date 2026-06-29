@@ -174,6 +174,11 @@ export async function POST(request: NextRequest) {
         description,
         
         // Age
+        ageLabel: typeof body.ageLabel === "string" ? body.ageLabel || null : null,
+        ageMinMonths:
+          typeof body.ageMinMonths === "number" ? body.ageMinMonths : null,
+        ageMaxMonths:
+          typeof body.ageMaxMonths === "number" ? body.ageMaxMonths : null,
         ageTags: body.ageTags || [],
         
         // Schedule
