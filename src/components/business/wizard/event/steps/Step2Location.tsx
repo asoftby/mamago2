@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -82,6 +82,7 @@ export function Step2Location({ data, onChange, isEditable, eventId }: Step2Loca
   const [showQuickCreate, setShowQuickCreate] = useState(false);
   const [quickCreateInitialName, setQuickCreateInitialName] = useState("");
   const [quickCreateInitialAddress, setQuickCreateInitialAddress] = useState("");
+  const didRepairImportedAddressRef = useRef(false);
 
   // Handle place selection from search
   const handleSearchPlaceSelect = (place: {
@@ -205,6 +206,45 @@ export function Step2Location({ data, onChange, isEditable, eventId }: Step2Loca
     setShowQuickCreate(true);
   };
 
+  const handleCreatePlaceFromSearch = (initialName: string) => {
+    if (importHint && (importHint.venueName || importHint.addressText || importHint.cityName)) {
+      const pending: PendingLocation = {
+        mode: "PARSED_LOCATION",
+        title: importHint.venueName || initialName || undefined,
+        address: importHint.addressText || undefined,
+        city: importHint.cityName || undefined,
+        source: "parser",
+      };
+
+      onChange({
+        pendingLocation: pending,
+        locationSource: "MANUAL",
+        venueKind: "MANUAL",
+        placeId: null,
+        venueName: importHint.venueName || initialName || "",
+        address: importHint.addressText || "",
+        city: importHint.cityName || "",
+        lat: null,
+        lng: null,
+        source: "ADDRESS_INPUT",
+        districtAutoId: null,
+        districtManualId: null,
+        districtName: null,
+        metroAutoId: null,
+        metroAutoDistanceM: null,
+        metroManualId: null,
+        metroManualDistanceM: null,
+        metroName: null,
+        district: "",
+        metro: "",
+      });
+      setShowQuickCreate(false);
+      return;
+    }
+
+    handleOpenQuickCreate(initialName);
+  };
+
   // Handle closing quick create
   const handleCloseQuickCreate = () => {
     setShowQuickCreate(false);
@@ -279,7 +319,6 @@ export function Step2Location({ data, onChange, isEditable, eventId }: Step2Loca
         const venueName = typeof payload.venueName === "string" ? payload.venueName.trim() : "";
         const addressText = typeof payload.addressText === "string" ? payload.addressText.trim() : "";
         const cityName = typeof payload.cityName === "string" ? payload.cityName.trim() : "";
-
         if (!venueName && !addressText && !cityName) {
           setImportHint(null);
           return;
@@ -302,6 +341,42 @@ export function Step2Location({ data, onChange, isEditable, eventId }: Step2Loca
       isActive = false;
     };
   }, [eventId]);
+
+  useEffect(() => {
+    if (didRepairImportedAddressRef.current) return;
+    if (!importHint?.addressText) return;
+    if (data.placeId) return;
+    if (data.venueKind !== "MANUAL") return;
+    if (!data.address) return;
+
+    const currentAddress = data.address.trim();
+    const importedAddress = importHint.addressText.trim();
+
+    if (!currentAddress.startsWith(importedAddress)) return;
+    if (currentAddress === importedAddress) return;
+    if (currentAddress.length < importedAddress.length + 24) return;
+
+    didRepairImportedAddressRef.current = true;
+
+    onChange({
+      address: importedAddress,
+      pendingLocation:
+        data.pendingLocation &&
+        (data.pendingLocation.mode === "NEW_PLACE" || data.pendingLocation.mode === "PARSED_LOCATION")
+          ? {
+              ...data.pendingLocation,
+              address: importedAddress,
+            }
+          : data.pendingLocation,
+    });
+  }, [
+    data.address,
+    data.pendingLocation,
+    data.placeId,
+    data.venueKind,
+    importHint,
+    onChange,
+  ]);
 
   // Check if any concrete location is defined (for TBD restriction)
   const hasConcreteLocation = Boolean(
@@ -485,8 +560,8 @@ export function Step2Location({ data, onChange, isEditable, eventId }: Step2Loca
                 {importHint.cityName ? (
                   <div className="mt-1 text-[12px] text-amber-700">{importHint.cityName}</div>
                 ) : null}
-                <div className="mt-2 text-[11px] text-amber-600">
-                  Место будет создано или привязано к существующему при публикации события.
+                <div className="mt-2 text-[11px] text-amber-700">
+                  Используйте поиск ниже, чтобы выбрать существующее место или создать новое на основе данных источника.
                 </div>
               </div>
             </div>
@@ -497,10 +572,12 @@ export function Step2Location({ data, onChange, isEditable, eventId }: Step2Loca
           <>
             <PlaceSearchAutocomplete
               onPlaceSelect={handleSearchPlaceSelect}
-              onCreatePlace={handleOpenQuickCreate}
+              onCreatePlace={handleCreatePlaceFromSearch}
               disabled={!isEditable}
               selectedPlaceId={data.placeId}
               placeholder="Начни вводить название места или адрес"
+              initialQuery={!data.placeId && !pendingNewPlace ? importHint?.venueName ?? null : null}
+              createPlaceName={importHint?.venueName ?? null}
               createPlaceHint={
                 importHint
                   ? "Создать место на основе данных из источника"
