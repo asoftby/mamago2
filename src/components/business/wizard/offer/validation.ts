@@ -133,6 +133,7 @@ function validatePlacementsStep(data: OfferFormData): ValidationResult {
 function validateStep2(data: OfferFormData): ValidationResult {
   const errors: string[] = [];
   const warnings: string[] = [];
+  const signalIdsOptional = data.productType === "PARTY_SERVICE";
 
   if (data.offerWizardType === "CAMP") {
     if (!data.campProgramType) {
@@ -163,7 +164,7 @@ function validateStep2(data: OfferFormData): ValidationResult {
   // Validate Discovery Signals (structured groups)
   const signalIds = data.signalIds ?? [];
 
-  if (data.offerWizardType !== "CAMP") {
+  if (data.offerWizardType !== "CAMP" && !signalIdsOptional) {
     // Basic validation: check if signals are selected
     if (signalIds.length === 0) {
       errors.push("Выберите характеристики предложения (активность, формат, участие)");
@@ -184,7 +185,7 @@ function validateStep2(data: OfferFormData): ValidationResult {
     data.title.trim().length >= 3 &&
     data.shortDescription.trim().length >= 10 &&
     data.shortDescription.length <= 120 &&
-    (data.offerWizardType === "CAMP" || signalIds.length >= 3)
+    (data.offerWizardType === "CAMP" || signalIdsOptional || signalIds.length >= 3)
   );
 
   return {
