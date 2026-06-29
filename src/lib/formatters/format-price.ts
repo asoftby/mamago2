@@ -56,15 +56,15 @@ export function normalizeUiCurrencyText(
 }
 
 /** Текстовый канон бел. рубля для рич-текст-канала (TipTap/хранимый HTML/SEO). */
-export const RICH_TEXT_CURRENCY_TOKEN = "Br";
+export const RICH_TEXT_CURRENCY_TOKEN = "BYN";
 
 /**
- * Рич-текст канон валюты: всё приводится к тексту `Br`.
+ * Рич-текст канон валюты: всё приводится к тексту `BYN`.
  *
  * У знака бел. рубля нет кодпоинта в Unicode, а `U+E901` (PUA, шрифт nbrb)
  * рендерится тофу в неконтролируемых контекстах — хранимый HTML, письма, PDF,
- * копипаст, SEO-сниппеты. Поэтому в рич-текст-канале каноном служит текст `Br`.
- * На контролируемых JSX-рендерах деталей `Br` приводится обратно к иконке тем
+ * копипаст, SEO-сниппеты. Поэтому в рич-текст-канале каноном служит текст `BYN`.
+ * На контролируемых JSX-рендерах деталей `BYN` приводится обратно к иконке тем
  * же путём, что прайс-чипы: normalizeUiCurrencyText + renderCurrencyText.
  */
 export function normalizeRichTextCurrency(value: string | null | undefined): string {

@@ -7,6 +7,7 @@ import { TransactionStatusBadge } from "@/components/admin/billing/TransactionSt
 import { TransactionTypeBadge } from "@/components/admin/billing/TransactionTypeBadge";
 import { TransactionAmount } from "@/components/admin/billing/TransactionAmount";
 import { AdminBillingActions } from "@/components/admin/billing/AdminBillingActions";
+import { renderCurrencyText } from "@/components/icons/BelarusianRubleIcon";
 import { AlertTriangle, CreditCard, Wallet, TrendingDown } from "lucide-react";
 import Link from "next/link";
 import { BYN_SYMBOL, formatPrice } from "@/lib/formatters/format-price";
@@ -91,7 +92,7 @@ export default async function AdminBusinessBillingPage({
           </p>
           {currentSubscription && (
             <p className="text-sm text-gray-500 mt-1">
-              {currentSubscription.plan.price.toNumber()} {BYN_SYMBOL} / мес
+              {renderCurrencyText(`${currentSubscription.plan.price.toNumber()} ${BYN_SYMBOL} / мес`, { iconSize: "sm" })}
             </p>
           )}
         </div>

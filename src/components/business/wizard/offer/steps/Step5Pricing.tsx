@@ -14,8 +14,9 @@ import {
   type PublicationAccess,
 } from "@/features/publication-access";
 import { WizardRichTextField } from "@/components/business/wizard/shared/WizardRichTextField";
-import { BYN_SYMBOL, formatPrice } from "@/lib/formatters/format-price";
+import { BYN_SYMBOL, formatPrice, normalizeUiCurrencyText } from "@/lib/formatters/format-price";
 import { isRichTextMeaningful } from "@/lib/richtext/utils";
+import { renderCurrencyText } from "@/components/icons/BelarusianRubleIcon";
 import { Plus, Trash2 } from "lucide-react";
 import type { OfferFormData, PricingOption } from "../types";
 
@@ -240,7 +241,7 @@ export function Step5Pricing({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="BYN">{BYN_SYMBOL}</SelectItem>
+                  <SelectItem value="BYN">{renderCurrencyText(BYN_SYMBOL, { iconSize: "sm" })}</SelectItem>
                   <SelectItem value="USD">USD</SelectItem>
                   <SelectItem value="EUR">EUR</SelectItem>
                 </SelectContent>
@@ -392,7 +393,12 @@ export function Step5Pricing({
                 <div className="flex items-center justify-between gap-4">
                   <span>Стоимость</span>
                   <span className="font-medium">
-                    {data.singlePrice} {data.singleCurrency}
+                    {data.singleCurrency === "BYN"
+                      ? renderCurrencyText(
+                          normalizeUiCurrencyText(`${data.singlePrice} ${BYN_SYMBOL}`),
+                          { iconSize: "sm" },
+                        )
+                      : `${data.singlePrice} ${data.singleCurrency}`}
                   </span>
                 </div>
                 {hasPriceCaption ? (
@@ -442,11 +448,13 @@ export function Step5Pricing({
                     <div className="text-right">
                       {isValidOldPrice ? (
                         <div className="text-sm line-through text-muted-foreground">
-                          {formatPrice(oldPriceNumber)}
+                          {renderCurrencyText(formatPrice(oldPriceNumber), { iconSize: "sm" })}
                         </div>
                       ) : null}
                       <div className="font-medium">
-                        {isValidPrice ? formatPrice(priceNumber) : option.price}
+                        {isValidPrice
+                          ? renderCurrencyText(formatPrice(priceNumber), { iconSize: "sm" })
+                          : renderCurrencyText(normalizeUiCurrencyText(option.price), { iconSize: "sm" })}
                       </div>
                     </div>
                   </div>

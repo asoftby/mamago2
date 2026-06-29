@@ -62,7 +62,7 @@ export async function buildActivityDocument(
     activity.shortDesc,
     activity.description,
     activity.priceText,
-    // plain-text канал (поисковый индекс/SEO-сниппет): валюта как текст "Br",
+    // plain-text канал (поисковый индекс/SEO-сниппет): валюта как текст "BYN",
     // иначе в индекс попадёт PUA-тофу из старых не пересохранённых записей.
     normalizeRichTextCurrency(activity.priceDetails),
     activity.ageLabel,

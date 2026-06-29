@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ScheduleEditor } from "@/components/schedule-editor/ScheduleEditor";
 import { BYN_SYMBOL } from "@/lib/formatters/format-price";
+import { renderCurrencyText } from "@/components/icons/BelarusianRubleIcon";
 import type { ActivityFormData, ActivityType, PricingMode, BookingMode, ActivityCTAType } from "./types";
 
 interface ActivityFormProps {
@@ -12,6 +13,8 @@ interface ActivityFormProps {
 }
 
 export function ActivityForm({ data, onChange }: ActivityFormProps) {
+  const currencyMark = renderCurrencyText(BYN_SYMBOL, { iconSize: "sm" });
+
   const handleChange = (updates: Partial<ActivityFormData>) => {
     onChange({ ...data, ...updates });
   };
@@ -118,7 +121,7 @@ export function ActivityForm({ data, onChange }: ActivityFormProps) {
 
         {data.pricingMode === "fixed" && (
           <div className="space-y-2">
-            <Label htmlFor="price">Цена ({BYN_SYMBOL})</Label>
+            <Label htmlFor="price">Цена ({currencyMark})</Label>
             <Input
               id="price"
               type="number"
@@ -130,7 +133,7 @@ export function ActivityForm({ data, onChange }: ActivityFormProps) {
 
         {data.pricingMode === "from" && (
           <div className="space-y-2">
-            <Label htmlFor="priceFrom">Цена от ({BYN_SYMBOL})</Label>
+            <Label htmlFor="priceFrom">Цена от ({currencyMark})</Label>
             <Input
               id="priceFrom"
               type="number"

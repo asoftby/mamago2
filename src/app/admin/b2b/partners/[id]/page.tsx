@@ -1,4 +1,5 @@
 import { BYN_SYMBOL } from "@/lib/formatters/format-price";
+import { renderCurrencyText } from "@/components/icons/BelarusianRubleIcon";
 import { getCurrentUser } from "@/lib/auth/server";
 import { redirect, notFound } from "next/navigation";
 import prisma from "@/lib/prisma";
@@ -716,7 +717,11 @@ export default async function PartnerDetailPage({
                           : "—"}
                       </td>
                       <td className="px-4 py-3 text-gray-600">
-                        {event.priceText || (event.priceFrom != null ? `от ${event.priceFrom} ${BYN_SYMBOL}` : "—")}
+                        {event.priceText
+                          ? renderCurrencyText(event.priceText, { iconSize: "sm" })
+                          : event.priceFrom != null
+                            ? renderCurrencyText(`от ${event.priceFrom} ${BYN_SYMBOL}`, { iconSize: "sm" })
+                            : "—"}
                       </td>
                       <td className="px-4 py-3 text-gray-600">{new Date(event.createdAt).toLocaleDateString("ru-RU")}</td>
                     </tr>

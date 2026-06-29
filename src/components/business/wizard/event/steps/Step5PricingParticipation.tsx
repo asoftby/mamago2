@@ -151,9 +151,9 @@ export function Step5PricingParticipation({
     [data],
   );
   const currencyMark = renderCurrencyText(BYN_SYMBOL, { iconSize: "sm" });
-  // Placeholder редактора деталей — рич-текст-канон (текст Br), без PUA-тофу.
+  // Placeholder редактора деталей — рич-текст-канон (текст BYN), без PUA-тофу.
   const pricingDetailsExample = normalizeRichTextCurrency(
-    "Дети — 30 Br\nВзрослые — 50 Br\nСемейный билет — 80 Br",
+    "Дети — 30 BYN\nВзрослые — 50 BYN\nСемейный билет — 80 BYN",
   );
 
   return (

@@ -43,6 +43,7 @@ import {
   type RouteStopPriceType,
 } from "@/lib/routes/routeBudget";
 import { BYN_SYMBOL } from "@/lib/formatters/format-price";
+import { renderCurrencyText } from "@/components/icons/BelarusianRubleIcon";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -421,7 +422,7 @@ function StopPriceEditor({
 
       {currentType !== "CUSTOM" && currentType !== "FREE" && currentType !== "UNKNOWN" && (
         <div className="text-[11px] text-neutral-400 px-1">
-          Валюта: {stop.priceCurrency === "BYN" ? BYN_SYMBOL : stop.priceCurrency}
+          Валюта: {stop.priceCurrency === "BYN" ? renderCurrencyText(BYN_SYMBOL, { iconSize: "sm" }) : stop.priceCurrency}
         </div>
       )}
 
