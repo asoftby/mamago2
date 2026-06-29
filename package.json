@@ -2,6 +2,10 @@
   "name": "mamago2",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "pnpm@10.28.2",
+  "engines": {
+    "node": "22.x"
+  },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
   },
