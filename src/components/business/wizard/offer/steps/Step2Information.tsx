@@ -10,6 +10,7 @@ import { AGE_OPTIONS } from "@/lib/config/ages";
 import { RichDescriptionEditor } from "@/components/editor/RichDescriptionEditor";
 import { AiDescriptionAssistant } from "@/components/ai/AiDescriptionAssistant";
 import type { OfferFormData } from "../types";
+import { getRichTextLength } from "@/lib/richtext/utils";
 import {
   StructuredDiscoverySignalPicker,
   type GroupConfig,
@@ -134,7 +135,11 @@ export function Step2Information({ data, onChange, isEditable }: Step2Informatio
   };
 
   const remainingChars = 120 - data.shortDescription.length;
-  const isDescriptionValid = data.shortDescription.length <= 120;
+  const shortDescriptionLength = data.shortDescription.trim().length;
+  const isShortDescriptionValid =
+    shortDescriptionLength >= 10 && data.shortDescription.length <= 120;
+  const detailedDescriptionLength = getRichTextLength(data.description || "");
+  const isDetailedDescriptionValid = detailedDescriptionLength >= 20;
 
   return (
     <div className="space-y-6">
@@ -174,11 +179,15 @@ export function Step2Information({ data, onChange, isEditable }: Step2Informatio
           onChange={handleDescriptionChange}
           disabled={!isEditable}
           rows={3}
-          className={!isDescriptionValid ? "border-red-500" : ""}
+          className={!isShortDescriptionValid ? "border-red-500" : ""}
         />
         <div className="flex justify-between text-xs">
-          <p className="text-muted-foreground">
-            {isCampOffer ? "Краткое описание программы для превью" : "Краткое описание для превью в каталоге"}
+          <p className={!isShortDescriptionValid ? "text-red-500" : "text-muted-foreground"}>
+            {shortDescriptionLength < 10
+              ? "Минимум 10 символов"
+              : isCampOffer
+                ? "Краткое описание программы для превью"
+                : "Краткое описание для превью в каталоге"}
           </p>
           <p className={`${remainingChars < 0 ? "text-red-500" : "text-muted-foreground"}`}>
             {remainingChars} символов осталось
@@ -241,9 +250,12 @@ export function Step2Information({ data, onChange, isEditable }: Step2Informatio
           placeholder="Расскажите подробнее о предложении — что входит, как проходит, что особенного..."
           disabled={!isEditable}
           minHeight={200}
+          error={!isDetailedDescriptionValid ? "Минимум 20 символов видимого текста" : undefined}
         />
-        <p className="text-xs text-muted-foreground">
-          Полное описание для страницы предложения. Используйте форматирование для лучшей читаемости.
+        <p className={`text-xs ${!isDetailedDescriptionValid ? "text-red-500" : "text-muted-foreground"}`}>
+          {!isDetailedDescriptionValid
+            ? "Минимум 20 символов видимого текста"
+            : "Полное описание для страницы предложения. Используйте форматирование для лучшей читаемости."}
         </p>
       </div>
 

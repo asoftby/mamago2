@@ -6,6 +6,7 @@ import { getStepsForOfferType } from "./offerWizardSteps.config";
 import { validatePublicationAccess } from "@/features/publication-access";
 import { showCampLodgingFormFields } from "./campOfferModel";
 import { isOfferContactsComplete, isValidPhone, isValidUrl } from "./contacts";
+import { getRichTextLength } from "@/lib/richtext/utils";
 
 export interface ValidationResult {
   isValid: boolean;
@@ -151,7 +152,7 @@ function validateStep2(data: OfferFormData): ValidationResult {
     errors.push("Краткое описание не должно превышать 120 символов");
   }
 
-  if (!data.description || data.description.trim().length < 20) {
+  if (getRichTextLength(data.description || "") < 20) {
     errors.push("Подробное описание должно содержать минимум 20 символов");
   }
 

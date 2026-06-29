@@ -12,6 +12,7 @@ import type { OfferWizardType, OfferWizardStepKey, OfferFormData } from "./types
 import { validatePublicationAccess } from "@/features/publication-access";
 import { showCampLodgingFormFields } from "./campOfferModel";
 import { isOfferContactsComplete } from "./contacts";
+import { getRichTextLength } from "@/lib/richtext/utils";
 
 export interface OfferWizardStepDef {
   key: OfferWizardStepKey;
@@ -254,6 +255,8 @@ export function isStepComplete(
   stepKey: OfferWizardStepKey,
   data: OfferFormData
 ): boolean {
+  const detailedDescriptionLength = getRichTextLength(data.description || "");
+
   switch (stepKey) {
     case "type":
       return !!data.offerWizardType && !!data.productType;
@@ -279,12 +282,16 @@ export function isStepComplete(
         return (
           data.title.trim().length >= 3 &&
           data.shortDescription.trim().length >= 10 &&
+          data.shortDescription.length <= 120 &&
+          detailedDescriptionLength >= 20 &&
           !!data.campProgramType
         );
       }
       return (
         data.title.trim().length >= 3 &&
-        data.shortDescription.trim().length >= 10
+        data.shortDescription.trim().length >= 10 &&
+        data.shortDescription.length <= 120 &&
+        detailedDescriptionLength >= 20
       );
 
     case "photo":
@@ -405,6 +412,7 @@ export function getMissingFieldsForStep(
   data: OfferFormData
 ): string[] {
   const missing: string[] = [];
+  const detailedDescriptionLength = getRichTextLength(data.description || "");
 
   switch (stepKey) {
     case "type":
@@ -435,8 +443,13 @@ export function getMissingFieldsForStep(
 
     case "details":
       if (!data.title || data.title.trim().length < 3) missing.push("Название");
-      if (!data.shortDescription || data.shortDescription.trim().length < 10)
-        missing.push("Описание");
+      if (
+        !data.shortDescription ||
+        data.shortDescription.trim().length < 10 ||
+        data.shortDescription.length > 120
+      )
+        missing.push("Краткое описание");
+      if (detailedDescriptionLength < 20) missing.push("Подробное описание");
       if (data.offerWizardType === "CAMP" && !data.campProgramType) {
         missing.push("Тип программы лагеря");
       }
