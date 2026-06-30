@@ -7,17 +7,16 @@ import "server-only";
 import { processImage, generateProcessedFilename, DEFAULT_IMAGE_CONFIG, type ImageProcessingConfig } from "@/lib/media/imageProcessor";
 import { writeRuntimeUpload } from "@/server/media/media-storage";
 import { assertSafeRemoteUrl } from "@/lib/security/assertSafeRemoteUrl";
-import { contentHashOf, findDuplicateMediaByContentHash } from "@/lib/media/dedup";
+import { contentHashOf, findOwnedMediaByContentHash } from "@/lib/media/dedup";
 
 export interface UploadFromUrlOptions {
   maxWidthOrHeight?: number;
   quality?: number;
   /**
-   * When set, dedup the downloaded bytes before writing a new file. Pass the
-   * owning user id for owner-scoped dedup, or null for global (system) dedup.
-   * `undefined` disables dedup.
+   * Owning user id to dedup the downloaded bytes against before writing a new
+   * file (per-owner). `undefined` disables dedup.
    */
-  dedupOwnerId?: string | null;
+  dedupOwnerId?: string;
 }
 
 export interface UploadedImageResult {
@@ -109,7 +108,7 @@ export async function uploadImageFromUrl(
   // Dedup the raw downloaded bytes before any processing/storage write.
   const contentHash = contentHashOf(buffer);
   if (options.dedupOwnerId !== undefined) {
-    const existing = await findDuplicateMediaByContentHash(options.dedupOwnerId, contentHash);
+    const existing = await findOwnedMediaByContentHash(options.dedupOwnerId, contentHash);
     if (existing?.publicUrl) {
       console.log("[uploadFromUrl] Dedup hit — reusing existing asset", existing.id);
       return {

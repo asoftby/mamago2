@@ -43,29 +43,6 @@ export async function findOwnedMediaByContentHash(
 }
 
 /**
- * Look up a duplicate for system/import/fetch paths (downloaded bytes).
- *
- * - With an owner → per-owner match `{ uploadedById, contentHash }`, same key as
- *   user uploads.
- * - Without an owner (system-generated) → GLOBAL match `{ contentHash }`. A
- *   system asset has no owner, so collapsing against any same-bytes asset is the
- *   correct behavior here.
- *
- * Note the asymmetry across the owner boundary: an owner'd path will NOT match a
- * system (null-owner) asset, while the system path matches globally. So the same
- * image arriving via both a system path and an owner'd path will not collapse
- * into one row in the owner'd direction — see report.
- */
-export async function findDuplicateMediaByContentHash(
-  uploadedById: string | null | undefined,
-  contentHash: string,
-): Promise<MediaAsset | null> {
-  return prisma.mediaAsset.findFirst({
-    where: uploadedById ? { uploadedById, contentHash } : { contentHash },
-  });
-}
-
-/**
  * Build the upload-route JSON payload from an already-existing asset (dedup hit).
  *
  * No new file is written and no responsive sizes are regenerated, so

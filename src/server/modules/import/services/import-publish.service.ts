@@ -457,7 +457,7 @@ async function createActivityFromImport(
   // ── Оптимизация изображения — async, не блокирует ответ ──────────────────
   if (fields.coverImageUrl) {
     void (async () => {
-      const imgResult = await optimizeImportedImage(fields.coverImageUrl!, record.id);
+      const imgResult = await optimizeImportedImage(fields.coverImageUrl!, record.id, actorUserId);
       if (imgResult.ok) {
         // Обновляем coverImageUrl на локальный оптимизированный webp
         await prisma.activity.update({
