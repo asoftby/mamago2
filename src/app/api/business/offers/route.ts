@@ -28,6 +28,7 @@ import { projectCampSessions } from "@/server/offers/campSessionProjection";
 import { syncOfferMediaUsage } from "@/server/services/media/media-usage.service";
 import { normalizeFaqItems } from "@/lib/faq/faqItems";
 import { formatZodErrorResponse } from "@/lib/validation/zodErrorResponse";
+import { shouldRejectUnlinkedPlaceForOfferMutation } from "@/lib/offers/offerLinkedBusinessAccess";
 
 const offerProductTypeSchema = z.enum([
   "PLACE_VISIT",
@@ -194,22 +195,26 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // Место существует, но не привязано к бизнес-профилю: оффер требует привязки.
-      // Подсказку показываем только создателю места — остальным не раскрываем существование.
-      if (!place.ownerBusinessId && place.createdByUserId === user.id) {
+      if (!(await canManagePlaceAsync(user, place))) {
+        return NextResponse.json(
+          { error: "Место не найдено" },
+          { status: 404 },
+        );
+      }
+
+      // Публикация business-owner оффера требует привязки места к бизнесу.
+      // ADMIN / MODERATOR проходят без этого ограничения.
+      if (shouldRejectUnlinkedPlaceForOfferMutation({
+        role: user.role,
+        status: data.status,
+        ownerBusinessId: place.ownerBusinessId,
+      })) {
         return NextResponse.json(
           {
             error: "Место не привязано к бизнес-профилю",
             code: "PLACE_NOT_LINKED_TO_BUSINESS",
           },
           { status: 422 },
-        );
-      }
-
-      if (!(await canManagePlaceAsync(user, place))) {
-        return NextResponse.json(
-          { error: "Место не найдено" },
-          { status: 404 },
         );
       }
 

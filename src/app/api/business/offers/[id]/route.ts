@@ -28,6 +28,7 @@ import { projectCampSessions } from "@/server/offers/campSessionProjection";
 import { syncOfferMediaUsage } from "@/server/services/media/media-usage.service";
 import { normalizeFaqItems } from "@/lib/faq/faqItems";
 import { formatZodErrorResponse } from "@/lib/validation/zodErrorResponse";
+import { shouldRejectUnlinkedPlaceForOfferMutation } from "@/lib/offers/offerLinkedBusinessAccess";
 
 const offerProductTypeSchema = z.enum([
   "PLACE_VISIT",
@@ -228,6 +229,8 @@ export async function PATCH(
 
     const updateData: Prisma.OfferUpdateInput = {};
 
+    let targetPlace = existingOffer.place;
+
     if (data.selectedPlace?.id) {
       const nextPlace = await prisma.place.findUnique({
         where: { id: data.selectedPlace.id },
@@ -241,9 +244,25 @@ export async function PATCH(
         );
       }
 
+      targetPlace = nextPlace;
+
       if (data.selectedPlace.id !== existingOffer.placeId) {
         updateData.place = { connect: { id: data.selectedPlace.id } };
       }
+    }
+
+    if (shouldRejectUnlinkedPlaceForOfferMutation({
+      role: user.role,
+      status: data.status,
+      ownerBusinessId: targetPlace.ownerBusinessId,
+    })) {
+      return NextResponse.json(
+        {
+          error: "Место не привязано к бизнес-профилю",
+          code: "PLACE_NOT_LINKED_TO_BUSINESS",
+        },
+        { status: 422 },
+      );
     }
 
     // Calculate price fields if pricing data is provided
