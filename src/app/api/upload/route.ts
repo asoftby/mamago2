@@ -29,6 +29,11 @@ import { jsonUploadError } from "@/lib/uploads/uploadErrors";
 import type { UploadSuccessResponse } from "@/lib/uploads/uploadTypes";
 import { validateUploadPreflight } from "@/lib/uploads/validateUploadPreflight";
 import { registerUploadedMedia } from "@/lib/media/mediaRegistry";
+import {
+  contentHashOf,
+  findOwnedMediaByContentHash,
+  buildDedupUploadResponse,
+} from "@/lib/media/dedup";
 import { MediaSourceType } from "@prisma/client";
 import {
   processImage,
@@ -73,6 +78,18 @@ export async function POST(req: NextRequest) {
 
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
+
+    // Dedup (Phase A): hash the raw original bytes and reuse an owner's existing
+    // asset before doing any processing or storage writes.
+    const contentHash = contentHashOf(buffer);
+    const existingByHash = await findOwnedMediaByContentHash(user.id, contentHash);
+    if (existingByHash) {
+      console.log("[UPLOAD] Dedup hit — reusing existing asset", {
+        userId: user.id,
+        mediaId: existingByHash.id,
+      });
+      return NextResponse.json(buildDedupUploadResponse(existingByHash));
+    }
 
     const actualMimeType =
       detectUploadMimeTypeFromBuffer(buffer) ??
@@ -170,6 +187,7 @@ export async function POST(req: NextRequest) {
         publicUrl: masterUrl,
         sourceType,
         uploadedById: user.id,
+        contentHash,
       });
       mediaId = asset.id;
     } catch (mediaError) {

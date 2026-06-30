@@ -26,7 +26,9 @@ export interface RegisterMediaInput {
   storageKey: string;
   publicUrl?: string;
   checksum?: string;
-  
+  /** SHA-256 of raw original bytes — per-owner dedup key (Phase A). */
+  contentHash?: string;
+
   // Metadata
   alt?: string;
   title?: string;
@@ -103,6 +105,7 @@ export async function registerUploadedMedia(input: RegisterMediaInput) {
     storageKey: input.storageKey,
     publicUrl: input.publicUrl,
     checksum: input.checksum,
+    contentHash: input.contentHash,
     alt: input.alt,
     title: title, // Use auto-generated title if not provided
     caption: input.caption,

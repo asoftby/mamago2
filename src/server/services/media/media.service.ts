@@ -27,6 +27,8 @@ export interface CreateMediaAssetInput {
   storageKey: string;
   publicUrl?: string;
   checksum?: string;
+  /** SHA-256 of raw original bytes — per-owner dedup key (Phase A). */
+  contentHash?: string;
   alt?: string;
   title?: string;
   caption?: string;
@@ -64,6 +66,7 @@ export async function createMediaAsset(input: CreateMediaAssetInput) {
       storageKey: input.storageKey,
       publicUrl: input.publicUrl,
       checksum: input.checksum,
+      contentHash: input.contentHash,
       alt: input.alt,
       title: input.title,
       caption: input.caption,

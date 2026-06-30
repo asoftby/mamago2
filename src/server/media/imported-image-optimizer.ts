@@ -13,6 +13,7 @@ import { prisma } from "@/lib/prisma";
 import { MediaAssetKind, MediaAssetStatus, MediaSourceType } from "@prisma/client";
 import { writeRuntimeUpload } from "@/server/media/media-storage";
 import { assertSafeRemoteUrl } from "@/lib/security/assertSafeRemoteUrl";
+import { contentHashOf } from "@/lib/media/dedup";
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
@@ -220,6 +221,10 @@ export async function optimizeImportedImage(
       height,
       storageKey: upload.publicUrl,
       publicUrl: upload.publicUrl,
+      // Content hash of the raw downloaded original (before sharp). System-owned
+      // (uploadedById null), so no per-owner dedup applies — populated only for
+      // column consistency with user uploads.
+      contentHash: contentHashOf(buffer),
       sourceType: MediaSourceType.SYSTEM_GENERATED,
       alt: null,
       title: null,

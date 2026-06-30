@@ -27,6 +27,11 @@ import { jsonUploadError } from "@/lib/uploads/uploadErrors";
 import type { UploadSuccessResponse } from "@/lib/uploads/uploadTypes";
 import { validateUploadPreflight } from "@/lib/uploads/validateUploadPreflight";
 import { registerUploadedMedia } from "@/lib/media/mediaRegistry";
+import {
+  contentHashOf,
+  findOwnedMediaByContentHash,
+  buildDedupUploadResponse,
+} from "@/lib/media/dedup";
 import { MediaSourceType } from "@prisma/client";
 import {
   processImage,
@@ -85,6 +90,25 @@ export async function POST(req: NextRequest) {
 
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
+
+    // Dedup (Phase A): hash the raw original bytes and reuse an owner's existing
+    // asset before doing any processing or storage writes. A hit may resolve to
+    // an already-committed (ACTIVE) asset; that is the intended per-owner reuse.
+    const contentHash = contentHashOf(buffer);
+    const existingByHash = await findOwnedMediaByContentHash(user.id, contentHash);
+    if (existingByHash) {
+      console.log("[WIZARD UPLOAD] Dedup hit — reusing existing asset", {
+        userId: user.id,
+        wizardSessionId,
+        mediaId: existingByHash.id,
+      });
+      const base = buildDedupUploadResponse(existingByHash);
+      return NextResponse.json({
+        ...base,
+        status: base.media.status,
+        wizardSessionId,
+      });
+    }
 
     const actualMimeType =
       detectUploadMimeTypeFromBuffer(buffer) ??
@@ -176,6 +200,7 @@ export async function POST(req: NextRequest) {
         publicUrl: masterUrl,
         sourceType,
         uploadedById: user.id,
+        contentHash,
         // TEMP media fields
         status: "TEMP",
         wizardSessionId,
