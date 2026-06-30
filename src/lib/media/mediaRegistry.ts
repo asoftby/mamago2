@@ -36,7 +36,8 @@ export interface RegisterMediaInput {
   
   // Source
   sourceType: MediaSourceType;
-  uploadedById?: string;
+  /** Required — every MediaAsset must be owned (per-owner dedup invariant). */
+  uploadedById: string;
   
   // TEMP media fields
   status?: "TEMP" | "ACTIVE";
