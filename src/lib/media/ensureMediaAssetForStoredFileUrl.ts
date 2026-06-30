@@ -30,6 +30,8 @@ export async function ensureMediaAssetForStoredFileUrl(params: {
   width?: number | null;
   height?: number | null;
   originalName?: string;
+  /** SHA-256 of raw original bytes — stored for future dedup. */
+  contentHash?: string;
 }) {
   const trimmed = params.publicUrl?.trim();
   if (!trimmed || !extractMediaRelativePathFromUrl(trimmed)) {
@@ -69,5 +71,6 @@ export async function ensureMediaAssetForStoredFileUrl(params: {
     publicUrl: trimmed,
     sourceType: mediaSourceTypeForRole(params.userRole),
     uploadedById: params.uploadedById,
+    contentHash: params.contentHash,
   });
 }

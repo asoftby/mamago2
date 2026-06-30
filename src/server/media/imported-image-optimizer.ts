@@ -13,7 +13,7 @@ import { prisma } from "@/lib/prisma";
 import { MediaAssetKind, MediaAssetStatus, MediaSourceType } from "@prisma/client";
 import { writeRuntimeUpload } from "@/server/media/media-storage";
 import { assertSafeRemoteUrl } from "@/lib/security/assertSafeRemoteUrl";
-import { contentHashOf } from "@/lib/media/dedup";
+import { contentHashOf, findDuplicateMediaByContentHash } from "@/lib/media/dedup";
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
@@ -166,6 +166,25 @@ export async function optimizeImportedImage(
     };
   }
 
+  // ── Dedup raw downloaded bytes before sharp/write ──────────────────────────
+  // System-generated (uploadedById null) → global dedup by content hash.
+  const contentHash = contentHashOf(buffer);
+  const duplicate = await findDuplicateMediaByContentHash(null, contentHash);
+  if (duplicate?.publicUrl) {
+    console.log(
+      `[import-image-optimizer] ♻️  Dedup hit ${duplicate.id} — reusing, no new file`,
+    );
+    return {
+      ok: true,
+      mediaAssetId: duplicate.id,
+      publicUrl: duplicate.publicUrl,
+      width: duplicate.width ?? 0,
+      height: duplicate.height ?? 0,
+      sizeBytes: duplicate.sizeBytes,
+      originalUrl,
+    };
+  }
+
   // ── Process with sharp ─────────────────────────────────────────────────────
   let webpBuffer: Buffer;
   let width: number;
@@ -222,9 +241,8 @@ export async function optimizeImportedImage(
       storageKey: upload.publicUrl,
       publicUrl: upload.publicUrl,
       // Content hash of the raw downloaded original (before sharp). System-owned
-      // (uploadedById null), so no per-owner dedup applies — populated only for
-      // column consistency with user uploads.
-      contentHash: contentHashOf(buffer),
+      // (uploadedById null) → matched globally by the dedup lookup above.
+      contentHash,
       sourceType: MediaSourceType.SYSTEM_GENERATED,
       alt: null,
       title: null,

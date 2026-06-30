@@ -7,10 +7,17 @@ import "server-only";
 import { processImage, generateProcessedFilename, DEFAULT_IMAGE_CONFIG, type ImageProcessingConfig } from "@/lib/media/imageProcessor";
 import { writeRuntimeUpload } from "@/server/media/media-storage";
 import { assertSafeRemoteUrl } from "@/lib/security/assertSafeRemoteUrl";
+import { contentHashOf, findDuplicateMediaByContentHash } from "@/lib/media/dedup";
 
 export interface UploadFromUrlOptions {
   maxWidthOrHeight?: number;
   quality?: number;
+  /**
+   * When set, dedup the downloaded bytes before writing a new file. Pass the
+   * owning user id for owner-scoped dedup, or null for global (system) dedup.
+   * `undefined` disables dedup.
+   */
+  dedupOwnerId?: string | null;
 }
 
 export interface UploadedImageResult {
@@ -18,6 +25,10 @@ export interface UploadedImageResult {
   width: number;
   height: number;
   blurhash: string;
+  /** SHA-256 of the raw downloaded bytes — store it on the MediaAsset. */
+  contentHash: string;
+  /** Set when an existing asset was reused (no new file written). */
+  deduplicatedAssetId?: string;
 }
 
 const DEFAULT_TIMEOUT_MS = 10000; // 10 seconds
@@ -95,6 +106,23 @@ export async function uploadImageFromUrl(
     throw error;
   }
 
+  // Dedup the raw downloaded bytes before any processing/storage write.
+  const contentHash = contentHashOf(buffer);
+  if (options.dedupOwnerId !== undefined) {
+    const existing = await findDuplicateMediaByContentHash(options.dedupOwnerId, contentHash);
+    if (existing?.publicUrl) {
+      console.log("[uploadFromUrl] Dedup hit — reusing existing asset", existing.id);
+      return {
+        url: existing.publicUrl,
+        width: existing.width ?? 0,
+        height: existing.height ?? 0,
+        blurhash: "LEHV6nWB2yk8pyo0adR*.7kCMdnj",
+        contentHash,
+        deduplicatedAssetId: existing.id,
+      };
+    }
+  }
+
   // Build processing config
   const config: ImageProcessingConfig = {
     ...DEFAULT_IMAGE_CONFIG,
@@ -122,5 +150,6 @@ export async function uploadImageFromUrl(
     width: processedImageSet.master.width,
     height: processedImageSet.master.height,
     blurhash: "LEHV6nWB2yk8pyo0adR*.7kCMdnj", // Fallback — processImage doesn't return blurhash
+    contentHash,
   };
 }

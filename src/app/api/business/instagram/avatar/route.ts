@@ -395,6 +395,9 @@ async function downloadAndSave(
     uploadedImage = await uploadImageFromUrl(picUrl, {
       maxWidthOrHeight: 1024,
       quality: 85,
+      // Dedup the downloaded avatar per owner: re-fetching the same image for
+      // the same user reuses the existing asset instead of writing a new file.
+      dedupOwnerId: user.id,
     });
   } catch (error) {
     devLog("reason 422: IMAGE_UPLOAD_FAILED:", error);
@@ -411,6 +414,7 @@ async function downloadAndSave(
     width: uploadedImage.width,
     height: uploadedImage.height,
     originalName: `instagram-@${username}.webp`,
+    contentHash: uploadedImage.contentHash,
   });
   if (!registered) {
     devLog("reason 422: IMAGE_UPLOAD_FAILED (MediaAsset registry)");
