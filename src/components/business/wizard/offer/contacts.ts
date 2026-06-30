@@ -27,8 +27,12 @@ export function isOfferManualContactsValid(data: OfferFormData): boolean {
 }
 
 export function isOfferContactsComplete(data: OfferFormData): boolean {
+  if (!data.placeId) {
+    return false;
+  }
+
   if (data.contactSource === "place") {
-    return Boolean(data.placeId);
+    return true;
   }
 
   return isOfferManualContactsValid(data);

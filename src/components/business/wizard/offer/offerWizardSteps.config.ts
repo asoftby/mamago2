@@ -498,9 +498,7 @@ export function getMissingFieldsForStep(
       break;
 
     case "contacts":
-      if (data.contactSource === "place") {
-        if (!data.placeId) missing.push("Место для контактов");
-      }
+      if (!data.placeId) missing.push("Место для предложения");
       break;
 
     case "price":

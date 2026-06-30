@@ -108,6 +108,140 @@ interface OfferWizardDraftData {
   currentStep: OfferWizardStepKey;
 }
 
+type OfferMutationErrorPayload = {
+  code?: string;
+  error?: string;
+  message?: string;
+  fieldErrors?: Record<string, string[] | undefined>;
+  formErrors?: string[];
+};
+
+const OFFER_API_FIELD_LABELS: Record<string, string> = {
+  "selectedPlace.id": "Место",
+  kind: "Тип предложения",
+  title: "Название",
+  shortDescription: "Краткое описание",
+  ageMinMonths: "Возраст от",
+  ageMaxMonths: "Возраст до",
+  coverImage: "Главное изображение",
+  videoUrl: "Видео",
+  singlePrice: "Цена",
+  pricingOptions: "Варианты цен",
+  ctaType: "Тип действия",
+  phone: "Телефон для связи",
+  website: "Ссылка",
+  contactPhone: "Контактный телефон",
+  contactPhone2: "Дополнительный телефон",
+  contactPhone3: "Дополнительный телефон",
+  contactWebsite: "Сайт",
+  faqItems: "FAQ",
+  wizardCompletedSteps: "Прогресс мастера",
+  productType: "Тип предложения",
+  requestedPlacements: "Сценарии размещения",
+  details: "Детали предложения",
+  category: "Категория услуги",
+  partyLocationType: "Формат проведения",
+  minChildren: "Минимум детей",
+  maxChildren: "Максимум детей",
+  occasions: "Подходящие праздники",
+  campProgramType: "Тип программы лагеря",
+  campSessions: "Смены лагеря",
+  campIncludedMeals: "Питание",
+};
+
+class OfferMutationError extends Error {
+  description?: string;
+
+  constructor(message: string, description?: string) {
+    super(message);
+    this.name = "OfferMutationError";
+    this.description = description;
+  }
+}
+
+function isOfferMutationErrorPayload(value: unknown): value is OfferMutationErrorPayload {
+  return Boolean(value) && typeof value === "object";
+}
+
+function humanizeOfferFieldPath(fieldPath: string): string {
+  const directMatch = OFFER_API_FIELD_LABELS[fieldPath];
+  if (directMatch) return directMatch;
+
+  const normalized = fieldPath.replace(/\.\d+/g, "");
+  const normalizedMatch = OFFER_API_FIELD_LABELS[normalized];
+  if (normalizedMatch) return normalizedMatch;
+
+  if (fieldPath.startsWith("pricingOptions.")) return "Варианты цен";
+  if (fieldPath.startsWith("campSessions.")) return "Смены лагеря";
+  if (fieldPath.startsWith("contactSocialLinks.")) return "Соцсети";
+  if (fieldPath.startsWith("faqItems.")) return "FAQ";
+  if (fieldPath.startsWith("wizardCompletedSteps.")) return "Прогресс мастера";
+
+  return fieldPath;
+}
+
+function describeOfferMutationError(errorData: OfferMutationErrorPayload): {
+  message: string;
+  description?: string;
+} {
+  const fieldEntry = Object.entries(errorData.fieldErrors ?? {}).find(
+    ([, messages]) => Array.isArray(messages) && messages.length > 0,
+  );
+
+  if (fieldEntry) {
+    const [fieldPath, messages] = fieldEntry;
+    return {
+      message: messages?.[0] || errorData.message || errorData.error || "Проверьте поля формы",
+      description: `Поле: ${humanizeOfferFieldPath(fieldPath)}`,
+    };
+  }
+
+  const formError = errorData.formErrors?.[0];
+  if (formError) {
+    return { message: formError };
+  }
+
+  return {
+    message: errorData.message || errorData.error || "Проверьте поля формы",
+  };
+}
+
+async function parseOfferMutationResponse<T>(
+  response: Response,
+  options: {
+    fallbackMessage: string;
+    operation: string;
+    payload?: unknown;
+  },
+): Promise<T> {
+  const body = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    if (isOfferMutationErrorPayload(body) && body.code === "VALIDATION_ERROR") {
+      if (process.env.NODE_ENV === "development") {
+        console.warn(`[OfferWizard] ${options.operation} validation error`, {
+          payload: options.payload,
+          response: body,
+          status: response.status,
+        });
+      }
+
+      const described = describeOfferMutationError(body);
+      throw new OfferMutationError(described.message, described.description);
+    }
+
+    if (isOfferMutationErrorPayload(body)) {
+      throw new OfferMutationError(
+        body.message || body.error || options.fallbackMessage,
+      );
+    }
+
+    throw new OfferMutationError(options.fallbackMessage);
+  }
+
+  return body as T;
+}
+
 export function OfferWizard({
   mode,
   offer,
@@ -398,14 +532,12 @@ export function OfferWizard({
           body: JSON.stringify(payload),
         });
 
-        if (!response.ok) {
-          const errorData = await response.json();
-          const errorMessage = errorData.message || errorData.error || "Failed to update draft";
-          throw new Error(errorMessage);
-        }
-
         // Сервер сохранил правки: локальный черновик не нужен, dirty-база — текущее состояние
-        const saved = await response.json().catch(() => null);
+        const saved = await parseOfferMutationResponse<{ updatedAt?: string }>(response, {
+          fallbackMessage: "Failed to update draft",
+          operation: "update draft",
+          payload,
+        });
         if (saved?.updatedAt) {
           setEntityUpdatedAtIso(new Date(saved.updatedAt).toISOString());
         }
@@ -427,13 +559,11 @@ export function OfferWizard({
           body: JSON.stringify(createPayload),
         });
 
-        if (!response.ok) {
-          const errorData = await response.json();
-          const errorMessage = errorData.message || errorData.error || "Failed to create draft";
-          throw new Error(errorMessage);
-        }
-
-        const data = await response.json();
+        const data = await parseOfferMutationResponse<{ id: string }>(response, {
+          fallbackMessage: "Failed to create draft",
+          operation: "create draft",
+          payload: createPayload,
+        });
         setOfferId(data.id);
         draft.markClean();
 
@@ -453,7 +583,11 @@ export function OfferWizard({
       );
     } catch (error: unknown) {
       console.error("Save draft error:", error);
-      toast.error(error instanceof Error ? error.message : "Ошибка сохранения");
+      const description =
+        error instanceof OfferMutationError ? error.description : undefined;
+      toast.error(error instanceof Error ? error.message : "Ошибка сохранения", description
+        ? { description }
+        : undefined);
     } finally {
       setIsSaving(false);
     }
@@ -495,14 +629,12 @@ export function OfferWizard({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(createPayload),
         });
-        
-        if (!createResponse.ok) {
-          const errorData = await createResponse.json();
-          const errorMessage = errorData.message || errorData.error || "Failed to create offer";
-          throw new Error(errorMessage);
-        }
-        
-        const createData = await createResponse.json();
+
+        const createData = await parseOfferMutationResponse<{ id: string }>(createResponse, {
+          fallbackMessage: "Failed to create offer",
+          operation: "create offer",
+          payload: createPayload,
+        });
         setOfferId(createData.id);
         
         toast.success(
@@ -531,12 +663,12 @@ export function OfferWizard({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(updatePayload),
       });
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        const errorMessage = errorData.message || errorData.error || "Failed to submit offer";
-        throw new Error(errorMessage);
-      }
+
+      await parseOfferMutationResponse(response, {
+        fallbackMessage: "Failed to submit offer",
+        operation: "submit offer",
+        payload: updatePayload,
+      });
 
       toast.success(
         canDirectPublish
@@ -558,7 +690,11 @@ export function OfferWizard({
       }
     } catch (error: unknown) {
       console.error("Submit error:", error);
-      toast.error(error instanceof Error ? error.message : "Ошибка отправки");
+      const description =
+        error instanceof OfferMutationError ? error.description : undefined;
+      toast.error(error instanceof Error ? error.message : "Ошибка отправки", description
+        ? { description }
+        : undefined);
     } finally {
       setIsSubmitting(false);
     }

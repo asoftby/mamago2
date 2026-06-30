@@ -27,6 +27,7 @@ import { syncOfferPersistenceLayer } from "@/server/offers/offerPersistence";
 import { projectCampSessions } from "@/server/offers/campSessionProjection";
 import { syncOfferMediaUsage } from "@/server/services/media/media-usage.service";
 import { normalizeFaqItems } from "@/lib/faq/faqItems";
+import { formatZodErrorResponse } from "@/lib/validation/zodErrorResponse";
 
 const offerProductTypeSchema = z.enum([
   "PLACE_VISIT",
@@ -513,7 +514,7 @@ export async function PATCH(
     
     if (error instanceof z.ZodError) {
       return NextResponse.json(
-        { error: "Validation error", details: error.issues },
+        formatZodErrorResponse(error),
         { status: 400 }
       );
     }

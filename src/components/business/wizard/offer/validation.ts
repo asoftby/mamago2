@@ -348,8 +348,12 @@ function validateStep6(data: OfferFormData): ValidationResult {
   const warnings: string[] = [];
   const isComplete = isOfferContactsComplete(data);
 
+  if (!data.placeId && data.contactSource !== "place") {
+    errors.push("Выберите место для предложения");
+  }
+
   if (data.contactSource === "place") {
-    if (!isComplete) {
+    if (!data.placeId) {
       errors.push("Выберите место для контактов или переключитесь на ручной ввод");
     }
     return {

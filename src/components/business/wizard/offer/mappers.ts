@@ -23,6 +23,12 @@ import {
 } from "@/lib/richtext/utils";
 import { normalizeRichTextCurrency } from "@/lib/formatters/format-price";
 import {
+  getCombinedAgeRange,
+  isValidAgeKey,
+  sortAgeKeys,
+  AGE_OPTIONS,
+} from "@/lib/config/ages";
+import {
   normalizeCampSessionsFromDb,
   normalizeCampMealsFromDb,
   sortCampSessions,
@@ -348,8 +354,44 @@ function ageGroupsToMonths(ageGroups: string[]): {
   ageMaxMonths?: number;
 } {
   if (!ageGroups.length) return {};
-  // Best-effort: labels like "0-3" are not parsed here; optional API fields stay unset.
-  return {};
+
+  const normalized = sortAgeKeys(ageGroups.filter(isValidAgeKey));
+  const range = getCombinedAgeRange(normalized);
+  if (!range) return {};
+
+  return {
+    ageMinMonths: range.minMonths,
+    ageMaxMonths: range.maxMonths ?? undefined,
+  };
+}
+
+function monthsToAgeGroups(
+  ageMinMonths: number | null | undefined,
+  ageMaxMonths: number | null | undefined,
+): string[] {
+  if (ageMinMonths == null && ageMaxMonths == null) return [];
+
+  const minMonths = ageMinMonths ?? 0;
+  const maxMonths = ageMaxMonths ?? null;
+  const maxBoundary = maxMonths ?? Number.POSITIVE_INFINITY;
+
+  const exactGroups = AGE_OPTIONS
+    .filter((option) => {
+      const optionMax = option.maxMonths ?? Number.POSITIVE_INFINITY;
+      return option.minMonths >= minMonths && optionMax <= maxBoundary;
+    })
+    .map((option) => option.key);
+
+  if (exactGroups.length > 0) {
+    return exactGroups;
+  }
+
+  return AGE_OPTIONS
+    .filter((option) => {
+      const optionMax = option.maxMonths ?? Number.POSITIVE_INFINITY;
+      return option.minMonths <= minMonths && optionMax >= maxBoundary;
+    })
+    .map((option) => option.key);
 }
 
 /**
@@ -827,6 +869,7 @@ export function mapOfferToFormData(offer: {
     title: offer.title,
     shortDescription: offer.description ?? "",
     description: normalizeRichTextEditorValue(offer.description),
+    ageGroups: monthsToAgeGroups(offer.ageMinMonths, offer.ageMaxMonths),
     coverImage: offer.coverImage,
     gallery,
     videoUrl: offer.videoUrl ?? null,
