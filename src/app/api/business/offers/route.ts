@@ -369,6 +369,17 @@ export async function POST(request: NextRequest) {
             publishedAt: true,
             productType: true,
             placements: true,
+            place: {
+              select: {
+                id: true,
+                title: true,
+                city: {
+                  select: {
+                    slug: true,
+                  },
+                },
+              },
+            },
           },
         });
       });
@@ -440,6 +451,11 @@ export async function GET(request: NextRequest) {
             select: {
               id: true,
               title: true,
+              city: {
+                select: {
+                  slug: true,
+                },
+              },
             },
           },
           placements: true,
@@ -473,6 +489,11 @@ export async function GET(request: NextRequest) {
                 select: {
                   id: true,
                   title: true,
+                  city: {
+                    select: {
+                      slug: true,
+                    },
+                  },
                 },
               },
               placements: true,

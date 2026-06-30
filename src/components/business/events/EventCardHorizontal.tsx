@@ -6,6 +6,7 @@ import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import {
   Pencil,
+  Eye,
   Archive,
   ArchiveRestore,
   Trash2,
@@ -43,11 +44,16 @@ import {
 } from "@/lib/content-status-meta";
 import { format } from "date-fns";
 import { ru } from "date-fns/locale";
+import { publicActivityPath, toAbsolutePublicUrl } from "@/lib/business/eventPublicLink";
 
 interface Activity {
   id: string;
   type: ActivityType;
   status: ContentStatus;
+  slug?: string | null;
+  city?: {
+    slug: string;
+  } | null;
   title: string;
   shortDesc: string;
   scheduleMode: ScheduleMode;
@@ -57,6 +63,9 @@ interface Activity {
   place: {
     id: string;
     title: string;
+    city?: {
+      slug: string;
+    } | null;
   } | null;
   images: Array<{
     id: string;
@@ -138,6 +147,18 @@ export function EventCardHorizontal({
   const coverImage = activity.images[0];
   const currentSearch = searchParams.toString();
   const returnTo = `${pathname}${currentSearch ? `?${currentSearch}` : ""}`;
+  const publicEventHref =
+    activity.status === ContentStatus.PUBLISHED ||
+    activity.status === ContentStatus.PENDING_UPDATE ||
+    activity.status === ContentStatus.SCHEDULED
+      ? toAbsolutePublicUrl(
+          publicActivityPath(
+            activity.id,
+            activity.city?.slug ?? activity.place?.city?.slug ?? null,
+            activity.slug ?? null,
+          ),
+        )
+      : `/me/events/${activity.id}/preview`;
 
   const canDeleteEvent = activity.status !== ContentStatus.DELETED;
   const getErrorMessage = (error: unknown, fallback: string) =>
@@ -237,14 +258,23 @@ export function EventCardHorizontal({
             </button>
 
             <Link
-              href={`/business/events/${activity.id}/edit?returnTo=${encodeURIComponent(returnTo)}`}
-              className={cn(
-                BUSINESS_PUBLICATION_ACTION_BUTTON,
-                BUSINESS_PUBLICATION_ACTION_NEUTRAL,
-              )}
+              href={publicEventHref ?? `/me/events/${activity.id}/preview`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={BUSINESS_PUBLICATION_ACTION_ICON}
+              title="Просмотр"
+              aria-label="Просмотр"
             >
-              <Pencil className="h-4 w-4 shrink-0" />
-              Редактировать
+              <Eye className="h-4 w-4" />
+            </Link>
+
+            <Link
+              href={`/business/events/${activity.id}/edit?returnTo=${encodeURIComponent(returnTo)}`}
+              className={BUSINESS_PUBLICATION_ACTION_ICON}
+              title="Редактировать"
+              aria-label="Редактировать"
+            >
+              <Pencil className="h-4 w-4" />
             </Link>
 
             <Link

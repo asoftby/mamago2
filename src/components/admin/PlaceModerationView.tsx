@@ -76,6 +76,7 @@ interface PlaceModerationViewProps {
     openingHours?: OpeningHoursWithRelations | null;
     createdAt: Date;
   };
+  canDeletePlace?: boolean;
 }
 
 function formatOpeningHours(openingHours: OpeningHoursWithRelations | null | undefined) {
@@ -129,7 +130,10 @@ function formatOpeningHours(openingHours: OpeningHoursWithRelations | null | und
   );
 }
 
-export function PlaceModerationView({ place }: PlaceModerationViewProps) {
+export function PlaceModerationView({
+  place,
+  canDeletePlace = false,
+}: PlaceModerationViewProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [comment, setComment] = useState("");
@@ -553,7 +557,11 @@ export function PlaceModerationView({ place }: PlaceModerationViewProps) {
 
             {/* Danger Zone */}
             <div className="mt-6 pt-4 border-t">
-              <PlaceDangerZone placeId={place.id} placeTitle={place.title} />
+              <PlaceDangerZone
+                placeId={place.id}
+                placeTitle={place.title}
+                canDelete={canDeletePlace}
+              />
             </div>
           </div>
         </div>

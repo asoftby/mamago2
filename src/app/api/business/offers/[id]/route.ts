@@ -163,6 +163,11 @@ export async function GET(
             customAddress: true,
             ownerBusinessId: true,
             createdByUserId: true,
+            city: {
+              select: {
+                slug: true,
+              },
+            },
           },
         },
         placements: true,
@@ -490,6 +495,11 @@ export async function PATCH(
               title: true,
               formattedAddr: true,
               customAddress: true,
+              city: {
+                select: {
+                  slug: true,
+                },
+              },
             },
           },
         },

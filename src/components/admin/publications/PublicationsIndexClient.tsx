@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { format } from "date-fns";
 import { ru } from "date-fns/locale";
-import { BarChart2, ChevronRight, Loader2, MoreHorizontal } from "lucide-react";
+import { BarChart2, ChevronRight, Eye, Loader2, MoreHorizontal, Pencil } from "lucide-react";
 import { toast } from "@/lib/toast";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -45,6 +45,7 @@ import {
 import { PUBLICATION_STATUS_LABEL, PUBLICATION_TYPE_LABEL } from "@/lib/publications/labels";
 import { PublicationStatsDrawer } from "./PublicationStatsDrawer";
 import type { PublicationStatsDrawerProps } from "./PublicationStatsDrawer";
+import { resolveContentLinks } from "@/lib/content-success/resolver";
 
 function matchesTab(row: PublicationListRow, tab: PublicationTabFilter): boolean {
   if (tab === PublicationTabFilter.ALL) return true;
@@ -64,6 +65,18 @@ function publicationEditHref(row: PublicationListRow): string | null {
 
 function hasArticleLikeActions(row: PublicationListRow): boolean {
   return row.type === PublicationType.ARTICLE || row.type === PublicationType.NEWS;
+}
+
+function resolveArticleLikeLinks(row: PublicationListRow) {
+  return resolveContentLinks({
+    kind: row.type === PublicationType.NEWS ? "breaking-news" : "article",
+    surface: "admin",
+    outcome: "published",
+    id: row.id,
+    slug: row.slug,
+    geoScope: row.geoScope ?? null,
+    citySlug: row.citySlug ?? null,
+  });
 }
 
 function statusBadgeClass(s: PublicationStatus): string {
@@ -119,6 +132,10 @@ export function PublicationsIndexClient({
   const [quickDrafts, setQuickDrafts] = useState(false);
   const [quickPublished, setQuickPublished] = useState(false);
   const [archivingId, setArchivingId] = useState<string | null>(null);
+  const [archiveTarget, setArchiveTarget] = useState<{
+    id: string;
+    title: string;
+  } | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{
     id: string;
     title: string;
@@ -152,8 +169,6 @@ export function PublicationsIndexClient({
       cancelled = true;
     };
   }, []);
-
-  const publicBase = (process.env.NEXT_PUBLIC_APP_URL || "https://mamago.by").replace(/\/$/, "");
 
   const cityNameFilter = useMemo(() => {
     if (!cityId) return "";
@@ -249,7 +264,10 @@ export function PublicationsIndexClient({
 
   /** Публичный путь публикации для запроса статистики */
   function publicationPath(row: PublicationListRow): string {
-    if (row.slug) return `/blog/${row.slug}`;
+    const { publicUrl } = resolveArticleLikeLinks(row);
+    if (publicUrl) {
+      return new URL(publicUrl).pathname;
+    }
     return `/publications/${row.id}`;
   }
 
@@ -294,24 +312,20 @@ export function PublicationsIndexClient({
     }
   };
 
-  const archiveArticle = async (id: string) => {
-    if (
-      !window.confirm(
-        "Вы уверены, что хотите архивировать статью? Она исчезнет из публичной выдачи.",
-      )
-    ) {
-      return;
-    }
-    setArchivingId(id);
+  const confirmArchivePublication = async () => {
+    if (!archiveTarget) return;
+
+    setArchivingId(archiveTarget.id);
     try {
-      const res = await fetch(`/api/admin/articles/${id}/archive`, { method: "POST" });
+      const res = await fetch(`/api/admin/articles/${archiveTarget.id}/archive`, { method: "POST" });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         const msg = typeof data.error === "string" ? data.error : "Не удалось архивировать";
         toast.error(msg);
         return;
       }
-      toast.success("Статья в архиве");
+      toast.success("Публикация перенесена в архив");
+      setArchiveTarget(null);
       router.refresh();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Ошибка");
@@ -377,6 +391,42 @@ export function PublicationsIndexClient({
           publication={statsDrawer}
         />
       )}
+
+      <AlertDialog
+        open={archiveTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setArchiveTarget(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Архивировать публикацию?</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2 text-sm text-muted-foreground">
+                <p>Публикация будет убрана из публичной выдачи и перемещена в архив.</p>
+                {archiveTarget?.title ? (
+                  <p className="font-medium text-foreground">«{archiveTarget.title}»</p>
+                ) : null}
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel type="button">Отмена</AlertDialogCancel>
+            <AlertDialogAction
+              type="button"
+              className="bg-destructive text-white hover:bg-destructive/90"
+              disabled={archivingId !== null}
+              onClick={(e) => {
+                e.preventDefault();
+                void confirmArchivePublication();
+              }}
+            >
+              {archivingId ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
+              Архивировать
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog
         open={deleteTarget !== null}
@@ -669,6 +719,11 @@ export function PublicationsIndexClient({
               <tbody className="divide-y divide-gray-200">
                 {sorted.map((row) => {
                   const editHref = publicationEditHref(row);
+                  const links = resolveArticleLikeLinks(row);
+                  const viewHref =
+                    row.status === PublicationStatus.PUBLISHED
+                      ? links.publicUrl
+                      : links.previewUrl;
                   return (
                   <tr key={row.id} className="hover:bg-gray-50/80 group">
                     <td className="sticky left-0 z-10 bg-white group-hover:bg-gray-50/80 px-2 py-2 sm:px-3 sm:py-2.5 font-medium text-gray-900 max-w-[min(200px,40vw)] sm:max-w-[220px] truncate shadow-[4px_0_8px_-4px_rgba(0,0,0,0.06)] align-top">
@@ -713,36 +768,56 @@ export function PublicationsIndexClient({
                     </td>
                     <td className="sticky right-0 z-10 bg-white group-hover:bg-gray-50/80 px-1.5 sm:px-3 py-1.5 sm:py-2 text-right shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.06)] align-top">
                       {hasArticleLikeActions(row) ? (
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8"
-                              aria-label="Действия"
-                              disabled={archivingId === row.id || deletingId === row.id}
-                            >
-                              {archivingId === row.id || deletingId === row.id ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                              ) : (
-                                <MoreHorizontal className="h-4 w-4" />
-                              )}
+                        <div className="flex items-center justify-end gap-1">
+                          {editHref ? (
+                            <Button type="button" variant="ghost" size="icon" className="h-8 w-8" asChild>
+                              <Link href={editHref} aria-label="Редактировать" title="Редактировать">
+                                <Pencil className="h-4 w-4" />
+                              </Link>
                             </Button>
-                          </DropdownMenuTrigger>
+                          ) : null}
+                          {viewHref ? (
+                            <Button type="button" variant="ghost" size="icon" className="h-8 w-8" asChild>
+                              <Link
+                                href={viewHref}
+                                target="_blank"
+                                aria-label={row.status === PublicationStatus.PUBLISHED ? "Открыть публичную страницу" : "Открыть предпросмотр"}
+                                title={row.status === PublicationStatus.PUBLISHED ? "Открыть публичную страницу" : "Открыть предпросмотр"}
+                              >
+                                <Eye className="h-4 w-4" />
+                              </Link>
+                            </Button>
+                          ) : null}
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                aria-label="Действия"
+                                disabled={archivingId === row.id || deletingId === row.id}
+                              >
+                                {archivingId === row.id || deletingId === row.id ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <MoreHorizontal className="h-4 w-4" />
+                                )}
+                              </Button>
+                            </DropdownMenuTrigger>
                           <DropdownMenuContent align="end" className="w-56">
                             <DropdownMenuItem asChild>
                               <Link href={editHref!}>Редактировать</Link>
                             </DropdownMenuItem>
                             <DropdownMenuItem asChild>
-                              <Link href={`/preview/articles/${row.id}`} target="_blank">
-                                Предпросмотр
+                              <Link href={links.previewUrl ?? `/preview/articles/${row.id}`} target="_blank">
+                                Открыть предпросмотр
                               </Link>
                             </DropdownMenuItem>
-                            {row.status === PublicationStatus.PUBLISHED && row.slug ? (
+                            {row.status === PublicationStatus.PUBLISHED && links.publicUrl ? (
                               <DropdownMenuItem asChild>
-                                <Link href={`${publicBase}/blog/${row.slug}`} target="_blank">
-                                  Открыть публично
+                                <Link href={links.publicUrl} target="_blank">
+                                  Открыть публикацию
                                 </Link>
                               </DropdownMenuItem>
                             ) : null}
@@ -760,7 +835,10 @@ export function PublicationsIndexClient({
                                 archivingId === row.id || row.status === PublicationStatus.ARCHIVED
                               }
                               onClick={() => {
-                                void archiveArticle(row.id);
+                                setArchiveTarget({
+                                  id: row.id,
+                                  title: row.title.trim() || "Без названия",
+                                });
                               }}
                             >
                               {row.status === PublicationStatus.ARCHIVED
@@ -789,7 +867,8 @@ export function PublicationsIndexClient({
                               </>
                             ) : null}
                           </DropdownMenuContent>
-                        </DropdownMenu>
+                          </DropdownMenu>
+                        </div>
                       ) : null}
                     </td>
                   </tr>

@@ -53,6 +53,9 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { resolveDraftTitle } from "@/lib/content-editor/resolveDraftTitle";
+import { ContentSuccessModal } from "@/components/shared/ContentSuccessModal";
+import { resolveContentSuccessState } from "@/lib/content-success/resolver";
+import type { ContentSuccessPayload, ResolvedContentSuccessState } from "@/lib/content-success/types";
 
 
 function toLocalDatetimeValue(iso: string | null): string {
@@ -156,6 +159,8 @@ export function ArticleEditorClient({
   const [, setSaveHintTick] = useState(0);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [successModalOpen, setSuccessModalOpen] = useState(false);
+  const [successState, setSuccessState] = useState<ResolvedContentSuccessState | null>(null);
 
   const [title, setTitle] = useState(initial.title);
   const [slug, setSlug] = useState(initial.slug ?? "");
@@ -334,27 +339,30 @@ export function ArticleEditorClient({
     [content],
   );
 
-  const editorSetters = {
-    setTitle,
-    setSlug,
-    setCoverImageId,
-    setAuthorUserId,
-    setAuthorLabel,
-    setCityContext,
-    setCategoryId,
-    setTagIds,
-    setGeoScope,
-    setCityId,
-    setContent,
-    setStatus,
-    setPublishedAtLocal,
-    setScheduledAtLocal,
-    setSeoTitle,
-    setSeoDescription,
-    setSeoCanonicalUrl,
-    setNoindex,
-    setViews,
-  };
+  const editorSetters = useMemo(
+    () => ({
+      setTitle,
+      setSlug,
+      setCoverImageId,
+      setAuthorUserId,
+      setAuthorLabel,
+      setCityContext,
+      setCategoryId,
+      setTagIds,
+      setGeoScope,
+      setCityId,
+      setContent,
+      setStatus,
+      setPublishedAtLocal,
+      setScheduledAtLocal,
+      setSeoTitle,
+      setSeoDescription,
+      setSeoCanonicalUrl,
+      setNoindex,
+      setViews,
+    }),
+    [],
+  );
 
   const applyEditorSnapshot = useCallback(
     (snap: ArticleEditorSnapshot) => {
@@ -362,7 +370,20 @@ export function ArticleEditorClient({
       setPinnedSlug(snap.slug?.trim() || null);
       hydrateSlug(snap.slug);
     },
-    [hydrateSlug],
+    [editorSetters, hydrateSlug],
+  );
+
+  const showSuccessModal = useCallback(
+    (payload: Omit<ContentSuccessPayload, "surface" | "returnTo">) => {
+      const next = resolveContentSuccessState({
+        ...payload,
+        surface: "admin",
+      });
+      if (!next) return;
+      setSuccessState(next);
+      setSuccessModalOpen(true);
+    },
+    [],
   );
 
   const validateGeoScopeForPublish = useCallback((): boolean => {
@@ -454,6 +475,35 @@ export function ArticleEditorClient({
     });
   }, []);
 
+  const showArticleSuccess = useCallback(
+    (
+      outcome: ContentSuccessPayload["outcome"],
+      articleId: string,
+      snap?: ArticleEditorSnapshot | null,
+      isEdit = true,
+    ) => {
+      const source = snap ?? {
+        slug,
+        geoScope,
+        cityId,
+      };
+      const modalCitySlug =
+        source.cityId != null
+          ? (cities.find((city) => city.id === source.cityId)?.slug ?? null)
+          : null;
+      showSuccessModal({
+        kind: "article",
+        outcome,
+        id: articleId,
+        isEdit,
+        slug: source.slug ?? null,
+        geoScope: source.geoScope ?? null,
+        citySlug: modalCitySlug,
+      });
+    },
+    [cities, cityId, geoScope, showSuccessModal, slug],
+  );
+
   const save = useCallback(
     async (opts?: { silent?: boolean; skipLoading?: boolean }): Promise<boolean> => {
       if (!opts?.skipLoading) setSaving(true);
@@ -482,7 +532,7 @@ export function ArticleEditorClient({
           if (!Number.isNaN(updated)) setLastSavedAt(updated);
           else setLastSavedAt(Date.now());
           if (!opts?.silent) {
-            toast.success("Черновик сохранён");
+            showArticleSuccess("draft_saved", next.id, next, false);
           }
           router.replace(`/admin/content/articles/${next.id}/edit`);
           router.refresh();
@@ -511,7 +561,7 @@ export function ArticleEditorClient({
         if (!Number.isNaN(updated)) setLastSavedAt(updated);
         else setLastSavedAt(Date.now());
         if (!opts?.silent) {
-          toast.success("Черновик сохранён");
+          showArticleSuccess("draft_saved", next.id, next, true);
         }
         router.refresh();
         return true;
@@ -524,7 +574,15 @@ export function ArticleEditorClient({
         if (!opts?.skipLoading) setSaving(false);
       }
     },
-    [hasPersistedId, initial.id, payload, persistComparableFromSnapshot, router, applyEditorSnapshot],
+    [
+      applyEditorSnapshot,
+      hasPersistedId,
+      initial.id,
+      payload,
+      persistComparableFromSnapshot,
+      router,
+      showArticleSuccess,
+    ],
   );
 
   const fetchSnapshot = useCallback(
@@ -597,7 +655,12 @@ export function ArticleEditorClient({
         const updated = Date.parse(next.updatedAt);
         if (!Number.isNaN(updated)) setLastSavedAt(updated);
       }
-      toast.success(isAdminEditor ? "Статья опубликована" : "Отправлено на модерацию");
+      showArticleSuccess(
+        isAdminEditor ? "published" : "submitted",
+        articleId,
+        next,
+        Boolean(initial.id.trim()),
+      );
       router.replace(`/admin/content/articles/${articleId}/edit`);
       router.refresh();
     } catch (e) {
@@ -616,6 +679,7 @@ export function ArticleEditorClient({
     isAdminEditor,
     validateGeoScopeForPublish,
     applyEditorSnapshot,
+    showArticleSuccess,
   ]);
 
   const moderate = useCallback(
@@ -644,7 +708,11 @@ export function ArticleEditorClient({
           const updated = Date.parse(next.updatedAt);
           if (!Number.isNaN(updated)) setLastSavedAt(updated);
         }
-        toast.success(decision === "publish" ? "Статья опубликована" : "Статья отклонена");
+        if (decision === "publish") {
+          showArticleSuccess("published", initial.id, next, true);
+        } else {
+          toast.success("Статья отклонена");
+        }
         router.refresh();
       } catch (e) {
         const msg = e instanceof Error ? e.message : "Ошибка модерации";
@@ -653,7 +721,15 @@ export function ArticleEditorClient({
         setModerating(false);
       }
     },
-    [initial.id, fetchSnapshot, persistComparableFromSnapshot, router, validateGeoScopeForPublish, applyEditorSnapshot],
+    [
+      initial.id,
+      fetchSnapshot,
+      persistComparableFromSnapshot,
+      router,
+      validateGeoScopeForPublish,
+      applyEditorSnapshot,
+      showArticleSuccess,
+    ],
   );
 
   const confirmDeleteArticle = useCallback(async () => {
@@ -1022,6 +1098,12 @@ export function ArticleEditorClient({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <ContentSuccessModal
+        open={successModalOpen}
+        onOpenChange={setSuccessModalOpen}
+        state={successState}
+      />
     </div>
   );
 }

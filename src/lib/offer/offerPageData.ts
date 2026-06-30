@@ -22,6 +22,26 @@ interface GetOfferPageDataParams {
   slug: string;
 }
 
+const offerPageInclude = {
+  place: {
+    include: {
+      city: true,
+      districtManual: true,
+      districtAuto: true,
+      metroManual: true,
+      metroAuto: true,
+      images: {
+        select: { id: true, url: true, kind: true },
+        orderBy: { sortOrder: "asc" as const },
+      },
+    },
+  },
+} as const;
+
+type OfferWithPageRelations = Prisma.OfferGetPayload<{
+  include: typeof offerPageInclude;
+}>;
+
 type CampSessionJson = {
   id?: string;
   title?: string;
@@ -188,21 +208,7 @@ export async function getOfferPageData({
   // is invalid. Use findFirst to look up by slug across cityId values (including null).
   const offer = await prisma.offer.findFirst({
     where: { slug },
-    include: {
-      place: {
-        include: {
-          city: true,
-          districtManual: true,
-          districtAuto: true,
-          metroManual: true,
-          metroAuto: true,
-          images: {
-            select: { id: true, url: true, kind: true },
-            orderBy: { sortOrder: "asc" },
-          },
-        },
-      },
-    },
+    include: offerPageInclude,
   });
 
   // Note: place.phone and place.website are available via the include above
@@ -210,6 +216,34 @@ export async function getOfferPageData({
   if (!offer || offer.status !== "PUBLISHED") {
     return null;
   }
+
+  return buildOfferPageDataFromOffer(offer, citySlug);
+}
+
+export async function getOfferPreviewPageDataById(
+  id: string,
+): Promise<{ offer: OfferWithPageRelations; data: OfferPageData } | null> {
+  const offer = await prisma.offer.findUnique({
+    where: { id },
+    include: offerPageInclude,
+  });
+
+  if (!offer) {
+    return null;
+  }
+
+  const data = await buildOfferPageDataFromOffer(
+    offer,
+    offer.place.city?.slug ?? "minsk",
+  );
+
+  return { offer, data };
+}
+
+async function buildOfferPageDataFromOffer(
+  offer: OfferWithPageRelations,
+  citySlug: string,
+): Promise<OfferPageData> {
 
   const placeLogoUrl = offer.place
     ? await resolvePlaceLogoUrlFromDb(offer.place.images, offer.place.logoImageId)
@@ -361,7 +395,7 @@ export async function getOfferPageData({
     primaryLabel = "Записаться";
   }
 
-  const data: OfferPageData = {
+  return {
     id: offer.id,
     slug: offer.slug || "",
     citySlug: citySlug,
@@ -501,6 +535,4 @@ export async function getOfferPageData({
       canonicalUrl: offer.seoCanonicalUrl || undefined,
     },
   };
-
-  return data;
 }

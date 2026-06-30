@@ -52,7 +52,10 @@ export default async function PlaceModerationPage({
     return (
       <div className="min-h-screen bg-gray-50">
         <div className="max-w-7xl mx-auto px-6 py-8">
-          <PlaceModerationView place={place} />
+          <PlaceModerationView
+            place={place}
+            canDeletePlace={user.role === "ADMIN"}
+          />
           <div className="mt-6">
             <AdminPlaceGroupManager
               currentPlaceId={place.id}
@@ -80,7 +83,11 @@ export default async function PlaceModerationPage({
       // Show revision moderation view
       return (
         <div className="space-y-6 bg-gray-50 pb-8">
-          <PlaceRevisionModerationView place={fullPlace} revision={revision} />
+          <PlaceRevisionModerationView
+            place={fullPlace}
+            revision={revision}
+            canDeletePlace={user.role === "ADMIN"}
+          />
           <div className="mx-auto w-full max-w-7xl px-6">
             <AdminPlaceGroupManager
               currentPlaceId={fullPlace.id}
@@ -287,7 +294,11 @@ export default async function PlaceModerationPage({
 
             {/* Danger Zone */}
             <div className="mt-8">
-              <PlaceDangerZone placeId={place.id} placeTitle={place.title} />
+              <PlaceDangerZone
+                placeId={place.id}
+                placeTitle={place.title}
+                canDelete={user.role === "ADMIN"}
+              />
             </div>
           </div>
         </div>

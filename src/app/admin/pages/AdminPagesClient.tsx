@@ -2,10 +2,11 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Search, Filter, ExternalLink, Edit } from "lucide-react";
+import { Plus, Search, Filter } from "lucide-react";
 import { PageType, PageStatus, PageVisibility } from "@prisma/client";
 import { getPagePublicUrl } from "@/lib/pagePublicUrl";
 import { toast } from "sonner";
+import { AdminContentRowActions } from "@/components/admin/content/AdminContentRowActions";
 
 type Page = {
   id: string;
@@ -264,26 +265,44 @@ export function AdminPagesClient() {
                     {new Date(page.updatedAt).toLocaleDateString("ru-RU")}
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <button
-                        onClick={() => router.push(`/admin/pages/${page.id}/edit`)}
-                        className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                        title="Редактировать"
-                      >
-                        <Edit className="w-4 h-4" />
-                      </button>
-                      {page.status === "PUBLISHED" && (
-                        <a
-                          href={getPublicUrl(page)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="p-2 text-gray-600 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
-                          title="Смотреть на сайте"
-                        >
-                          <ExternalLink className="w-4 h-4" />
-                        </a>
-                      )}
-                    </div>
+                    <AdminContentRowActions
+                      align="end"
+                      editAction={{
+                        icon: "edit",
+                        href: `/admin/pages/${page.id}/edit`,
+                        label: "Редактировать страницу",
+                        title: "Редактировать",
+                      }}
+                      viewAction={
+                        page.status === "PUBLISHED"
+                          ? {
+                              icon: "view",
+                              href: getPublicUrl(page),
+                              newTab: true,
+                              label: "Открыть публикацию",
+                              title: "Открыть публикацию",
+                            }
+                          : null
+                      }
+                      destructiveAction={
+                        page.status !== "ARCHIVED"
+                          ? {
+                              kind: "archive",
+                              label: "Архивировать",
+                              title: "Архивировать страницу?",
+                              description:
+                                "Страница будет убрана из публичной выдачи и перемещена в архив.",
+                              request: {
+                                url: `/api/admin/pages/${page.id}`,
+                                method: "DELETE",
+                              },
+                              confirmLabel: "Архивировать",
+                              successMessage: "Страница перенесена в архив",
+                              errorMessage: "Не удалось архивировать страницу",
+                            }
+                          : null
+                      }
+                    />
                   </td>
                 </tr>
               ))}

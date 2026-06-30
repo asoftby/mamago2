@@ -1,5 +1,4 @@
 import { Suspense } from "react";
-import Link from "next/link";
 import prisma from "@/lib/prisma";
 import { Badge } from "@/components/ui/badge";
 import { ContentStatus, Prisma } from "@prisma/client";
@@ -7,8 +6,11 @@ import { formatDistanceToNow } from "date-fns";
 import { ru } from "date-fns/locale";
 import { MODERATION_CONTENT_STATUS_CONFIG } from "@/lib/admin/moderationContentStatusBadges";
 import { getModerationFilterCities } from "@/lib/admin/moderationAdminQueries";
-import { getPlaceDetailHref } from "@/lib/admin/placeDetailNavigation";
 import { PlacesFilters } from "./PlacesFilters";
+import { getAbsolutePlacePublicUrl } from "@/lib/placePublicUrl";
+import { getPlacePreviewPath } from "@/lib/content-preview/paths";
+import { getPlaceDetailHref } from "@/lib/admin/placeDetailNavigation";
+import { AdminContentRowActions } from "@/components/admin/content/AdminContentRowActions";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -146,36 +148,16 @@ function PlacesTable({
             const statusConfig =
               MODERATION_CONTENT_STATUS_CONFIG[place.status] ||
               MODERATION_CONTENT_STATUS_CONFIG.DRAFT;
-            const hasActiveRevision =
-              place.status === "PUBLISHED" &&
-              place.revisions.some((revision) => revision.status === "PENDING");
-            const action = (() => {
-              if (place.status === "DRAFT") {
-                return {
-                  href: `/editor/place/${place.id}/edit?returnTo=${encodeURIComponent(`/admin/content/places/${place.id}`)}`,
-                  label: "Открыть в редакторе",
-                };
-              }
-
-              if (place.status === "PENDING") {
-                return {
-                  href: getPlaceDetailHref(place.id, returnTo),
-                  label: "Модерировать",
-                };
-              }
-
-              if (hasActiveRevision) {
-                return {
-                  href: getPlaceDetailHref(place.id, returnTo),
-                  label: "Проверить изменения",
-                };
-              }
-
-              return {
-                href: getPlaceDetailHref(place.id, returnTo),
-                label: "Открыть",
-              };
-            })();
+            const hasPreviewVersion =
+              place.status !== "PUBLISHED" ||
+              place.revisions.some((revision) =>
+                ["DRAFT", "PENDING", "NEEDS_REVISION"].includes(revision.status),
+              );
+            const editHref = `/editor/place/${place.id}/edit?returnTo=${encodeURIComponent(returnTo)}`;
+            const publicPlaceHref = !hasPreviewVersion
+              ? getAbsolutePlacePublicUrl({ slug: place.slug, id: place.id })
+              : null;
+            const viewPlaceHref = publicPlaceHref ?? getPlacePreviewPath(place.id);
             
             // Extract street and house number from formattedAddr or customAddress
             const fullAddress = place.formattedAddr || place.customAddress || "";
@@ -210,12 +192,31 @@ function PlacesTable({
                   {formatDistanceToNow(place.createdAt, { addSuffix: true, locale: ru })}
                 </td>
                 <td className="px-4 py-3">
-                  <Link
-                    href={action.href}
-                    className="text-blue-600 hover:text-blue-800 font-medium"
-                  >
-                    {action.label}
-                  </Link>
+                  <AdminContentRowActions
+                    editAction={{
+                      icon: "edit",
+                      href: editHref,
+                      label: "Открыть в редакторе",
+                      title: "Открыть в редакторе",
+                    }}
+                    viewAction={{
+                      icon: "view",
+                      href: viewPlaceHref,
+                      newTab: true,
+                      label: publicPlaceHref
+                        ? "Открыть публичную страницу"
+                        : "Открыть предпросмотр",
+                      title: publicPlaceHref
+                        ? "Открыть публичную страницу"
+                        : "Открыть предпросмотр",
+                    }}
+                    reviewAction={{
+                      icon: "review",
+                      href: getPlaceDetailHref(place.id, returnTo),
+                      label: "Открыть модерацию",
+                      title: "Открыть модерацию",
+                    }}
+                  />
                 </td>
               </tr>
             );

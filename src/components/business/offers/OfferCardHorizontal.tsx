@@ -5,7 +5,7 @@ import { getMinCampSessionPrice } from "@/lib/offers/campPricing";
 import { useState } from "react";
 import Link from "next/link";
 import { OfferStatusBadge } from "./OfferStatusBadge";
-import { Pencil, Archive, ArchiveRestore, Trash2, Tag, BarChart3, Zap } from "lucide-react";
+import { Eye, Pencil, Archive, ArchiveRestore, Trash2, Tag, BarChart3, Zap } from "lucide-react";
 import { OfferStatus, OfferKind } from "@prisma/client";
 import { format } from "date-fns";
 import { ru } from "date-fns/locale";
@@ -24,6 +24,7 @@ import {
 } from "@/components/business/shared/BusinessPublicationCard";
 import { formatUpdatedAgo } from "@/lib/date/formatUpdatedAgo";
 import { getOfferPublicUrl } from "@/lib/offers/offerPublicUrl";
+import { getOfferPreviewPath } from "@/lib/content-preview/paths";
 import { format as fmtDate } from "date-fns";
 
 interface Offer {
@@ -150,7 +151,8 @@ export function OfferCardHorizontal({
   const citySlug = offer.place.city?.slug;
   const publicOfferHref = (offer.status === "PUBLISHED" && citySlug && offer.slug)
     ? getOfferPublicUrl(offer, citySlug)
-    : undefined;
+    : null;
+  const viewOfferHref = publicOfferHref ?? getOfferPreviewPath(offer.id);
 
   const cardMetrics = {
     views: offer.metrics.views,
@@ -175,8 +177,8 @@ export function OfferCardHorizontal({
         imageAlt={offer.title}
         placeholderIcon={Tag}
         title={offer.title}
-        titleHref={publicOfferHref}
-        imageHref={publicOfferHref}
+        titleHref={viewOfferHref}
+        imageHref={viewOfferHref}
         typeChip={
           <BusinessChip tone="muted" size="compact">
             {kindLabel}
@@ -203,14 +205,23 @@ export function OfferCardHorizontal({
             </button>
 
             <Link
-              href={`/business/offers/${offer.id}/edit`}
-              className={cn(
-                BUSINESS_PUBLICATION_ACTION_BUTTON,
-                BUSINESS_PUBLICATION_ACTION_NEUTRAL,
-              )}
+              href={viewOfferHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={BUSINESS_PUBLICATION_ACTION_ICON}
+              title="Просмотр"
+              aria-label="Просмотр"
             >
-              <Pencil className="h-4 w-4 shrink-0" />
-              Редактировать
+              <Eye className="h-4 w-4" />
+            </Link>
+
+            <Link
+              href={`/business/offers/${offer.id}/edit`}
+              className={BUSINESS_PUBLICATION_ACTION_ICON}
+              title="Редактировать"
+              aria-label="Редактировать"
+            >
+              <Pencil className="h-4 w-4" />
             </Link>
 
             <Link

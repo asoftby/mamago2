@@ -60,8 +60,10 @@ import {
   type ContentEditorNav,
   type ContentEditorSurface,
 } from "@/lib/content-editor/types";
-import { navigateToCompatibleHref } from "@/lib/routing/clientNavigation";
 import { resolveDraftTitle } from "@/lib/content-editor/resolveDraftTitle";
+import { ContentSuccessModal } from "@/components/shared/ContentSuccessModal";
+import { resolveContentSuccessState } from "@/lib/content-success/resolver";
+import type { ContentSuccessPayload, ResolvedContentSuccessState } from "@/lib/content-success/types";
 
 // Import step components
 import { Step1Type } from "./steps/Step1Type";
@@ -75,7 +77,15 @@ import { FaqStep } from "../shared/FaqStep";
 
 interface OfferWizardProps {
   mode: OfferWizardMode;
-  offer?: Offer;
+  offer?: Offer & {
+    place?: {
+      id: string;
+      title: string;
+      city?: {
+        slug: string;
+      } | null;
+    } | null;
+  };
   userId: string;
   userRole?: Role;
   business?: {
@@ -262,6 +272,8 @@ export function OfferWizard({
   };
   const afterSubmitDestination = returnTo ?? nav.afterSubmitListPath;
   const isPublishedEditMode = mode === "edit" && offer?.status === "PUBLISHED";
+  const [successModalOpen, setSuccessModalOpen] = useState(false);
+  const [successState, setSuccessState] = useState<ResolvedContentSuccessState | null>(null);
   
   const [formData, setFormData] = useState<OfferFormData>(() => {
     if (mode === "edit" && offer) {
@@ -471,6 +483,21 @@ export function OfferWizard({
     [],
   );
 
+  const showSuccessModal = useCallback(
+    (payload: Omit<ContentSuccessPayload, "surface" | "returnTo">) => {
+      const next = resolveContentSuccessState({
+        ...payload,
+        surface,
+        returnTo,
+        role: userRole,
+      });
+      if (!next) return;
+      setSuccessState(next);
+      setSuccessModalOpen(true);
+    },
+    [returnTo, surface, userRole],
+  );
+
   // Navigation by step key
   const handleNext = () => {
     // Шаг помечается completed только здесь — после успешной валидации по «Далее»
@@ -559,7 +586,11 @@ export function OfferWizard({
           body: JSON.stringify(createPayload),
         });
 
-        const data = await parseOfferMutationResponse<{ id: string }>(response, {
+        const data = await parseOfferMutationResponse<{
+          id: string;
+          slug?: string | null;
+          place?: { city?: { slug?: string | null } | null } | null;
+        }>(response, {
           fallbackMessage: "Failed to create draft",
           operation: "create draft",
           payload: createPayload,
@@ -570,17 +601,31 @@ export function OfferWizard({
         if (onComplete) {
           onComplete(data.id);
         } else {
-          router.push(editorOfferEditHref(data.id));
+          router.replace(editorOfferEditHref(data.id));
         }
+        showSuccessModal({
+          kind: "offer",
+          outcome: "draft_saved",
+          id: data.id,
+          isEdit: false,
+        });
+        return;
       }
 
-      toast.success(
-        offerId
-          ? canDirectPublish && mode === "edit"
-            ? "Изменения опубликованы"
-            : "Изменения сохранены"
-          : "Черновик сохранён",
-      );
+      showSuccessModal({
+        kind: "offer",
+        outcome:
+          canDirectPublish && mode === "edit" && isPublishedEditMode
+            ? "changes_published"
+            : "draft_saved",
+        id: offerId!,
+        isEdit: true,
+        slug: offer?.slug ?? null,
+        citySlug: offer?.place?.city?.slug ?? null,
+        offerKind: formData.offerKind,
+        offerDurationType: formData.durationType,
+        offerCampProgramType: formData.campProgramType,
+      });
     } catch (error: unknown) {
       console.error("Save draft error:", error);
       const description =
@@ -630,26 +675,29 @@ export function OfferWizard({
           body: JSON.stringify(createPayload),
         });
 
-        const createData = await parseOfferMutationResponse<{ id: string }>(createResponse, {
+        const createData = await parseOfferMutationResponse<{
+          id: string;
+          slug?: string | null;
+          place?: { city?: { slug?: string | null } | null } | null;
+        }>(createResponse, {
           fallbackMessage: "Failed to create offer",
           operation: "create offer",
           payload: createPayload,
         });
         setOfferId(createData.id);
-        
-        toast.success(
-          finalStatus === "PUBLISHED"
-            ? "Предложение опубликовано"
-            : "Предложение отправлено на модерацию",
-        );
 
         draft.markClean();
-
-        if (onComplete) {
-          onComplete(createData.id);
-        } else {
-          router.push(afterSubmitDestination);
-        }
+        showSuccessModal({
+          kind: "offer",
+          outcome: finalStatus === "PUBLISHED" ? "published" : "submitted",
+          id: createData.id,
+          isEdit: false,
+          slug: createData.slug ?? null,
+          citySlug: createData.place?.city?.slug ?? null,
+          offerKind: formData.productType === "ONE_TIME_ACTIVITY" ? "EVENT" : formData.offerKind,
+          offerDurationType: formData.durationType,
+          offerCampProgramType: formData.campProgramType,
+        });
         return;
       }
 
@@ -670,24 +718,23 @@ export function OfferWizard({
         payload: updatePayload,
       });
 
-      toast.success(
-        canDirectPublish
-          ? "Изменения опубликованы"
-          : "Предложение отправлено на модерацию",
-      );
-
       setBaselineFormJson(JSON.stringify(formData));
       draft.markClean();
-
-      if (onComplete) {
-        onComplete(offerId);
-      } else if (mode === "create") {
-        navigateToCompatibleHref(router, afterSubmitDestination);
-      } else if (returnTo) {
-        navigateToCompatibleHref(router, returnTo);
-      } else if (surface === "admin") {
-        navigateToCompatibleHref(router, nav.afterSubmitListPath);
-      }
+      showSuccessModal({
+        kind: "offer",
+        outcome: canDirectPublish
+          ? isPublishedEditMode
+            ? "changes_published"
+            : "published"
+          : "submitted",
+        id: offerId,
+        isEdit: mode === "edit",
+        slug: offer?.slug ?? null,
+        citySlug: offer?.place?.city?.slug ?? null,
+        offerKind: formData.offerKind,
+        offerDurationType: formData.durationType,
+        offerCampProgramType: formData.campProgramType,
+      });
     } catch (error: unknown) {
       console.error("Submit error:", error);
       const description =
@@ -917,6 +964,12 @@ export function OfferWizard({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <ContentSuccessModal
+        open={successModalOpen}
+        onOpenChange={setSuccessModalOpen}
+        state={successState}
+      />
     </FormWizardShell>
   );
 }

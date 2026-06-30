@@ -22,13 +22,22 @@ import { Trash2, AlertTriangle } from "lucide-react";
 interface PlaceDangerZoneProps {
   placeId: string;
   placeTitle: string;
+  canDelete?: boolean;
 }
 
-export function PlaceDangerZone({ placeId, placeTitle }: PlaceDangerZoneProps) {
+export function PlaceDangerZone({
+  placeId,
+  placeTitle,
+  canDelete = true,
+}: PlaceDangerZoneProps) {
   const router = useRouter();
   const [isDeleting, setIsDeleting] = useState(false);
   const [confirmText, setConfirmText] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+
+  if (!canDelete) {
+    return null;
+  }
 
   const handleDelete = async () => {
     if (confirmText !== "DELETE") {

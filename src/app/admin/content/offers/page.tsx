@@ -1,5 +1,4 @@
 import { Suspense } from "react";
-import Link from "next/link";
 import prisma from "@/lib/prisma";
 import { Badge } from "@/components/ui/badge";
 import { OfferStatus } from "@prisma/client";
@@ -8,6 +7,9 @@ import { ru } from "date-fns/locale";
 import { ModerationListFilters } from "@/components/admin/moderation/ModerationListFilters";
 import { MODERATION_OFFER_STATUS_CONFIG } from "@/lib/admin/moderationOfferStatusBadges";
 import { getModerationFilterCities } from "@/lib/admin/moderationAdminQueries";
+import { getOfferPublicUrl } from "@/lib/offers/offerPublicUrl";
+import { getOfferPreviewPath } from "@/lib/content-preview/paths";
+import { AdminContentRowActions } from "@/components/admin/content/AdminContentRowActions";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -22,6 +24,20 @@ function parseOfferStatusFilter(raw: string | undefined): OfferStatus | undefine
 interface SearchParams {
   status?: string;
   cityId?: string;
+  [key: string]: string | undefined;
+}
+
+function buildReturnTo(params: SearchParams): string {
+  const query = new URLSearchParams();
+
+  Object.entries(params).forEach(([key, value]) => {
+    if (typeof value === "string" && value.length > 0) {
+      query.set(key, value);
+    }
+  });
+
+  const search = query.toString();
+  return `/admin/content/offers${search ? `?${search}` : ""}`;
 }
 
 async function getOffers(params: SearchParams) {
@@ -45,7 +61,7 @@ async function getOffers(params: SearchParams) {
       place: {
         select: {
           title: true,
-          city: { select: { name: true } },
+          city: { select: { name: true, slug: true } },
           ownerBusiness: {
             select: {
               name: true,
@@ -60,7 +76,13 @@ async function getOffers(params: SearchParams) {
   });
 }
 
-function OffersTable({ offers }: { offers: Awaited<ReturnType<typeof getOffers>> }) {
+function OffersTable({
+  offers,
+  returnTo,
+}: {
+  offers: Awaited<ReturnType<typeof getOffers>>;
+  returnTo: string;
+}) {
   if (offers.length === 0) {
     return (
       <div className="text-center py-12 text-gray-500">
@@ -80,6 +102,7 @@ function OffersTable({ offers }: { offers: Awaited<ReturnType<typeof getOffers>>
             <th className="px-4 py-3 text-left font-medium text-gray-700">Бизнес</th>
             <th className="px-4 py-3 text-left font-medium text-gray-700">Статус</th>
             <th className="px-4 py-3 text-left font-medium text-gray-700">Создано</th>
+            <th className="px-4 py-3 text-left font-medium text-gray-700">Действия</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-200">
@@ -87,6 +110,11 @@ function OffersTable({ offers }: { offers: Awaited<ReturnType<typeof getOffers>>
             const statusConfig =
               MODERATION_OFFER_STATUS_CONFIG[offer.status] ||
               MODERATION_OFFER_STATUS_CONFIG.DRAFT;
+            const publicOfferHref =
+              offer.status === "PUBLISHED" && offer.slug && offer.place.city?.slug
+                ? getOfferPublicUrl(offer, offer.place.city.slug)
+                : null;
+            const viewOfferHref = publicOfferHref ?? getOfferPreviewPath(offer.id);
             return (
               <tr key={offer.id} className="hover:bg-gray-50">
                 <td className="px-4 py-3 font-medium text-gray-900">{offer.title}</td>
@@ -106,12 +134,25 @@ function OffersTable({ offers }: { offers: Awaited<ReturnType<typeof getOffers>>
                   {formatDistanceToNow(offer.createdAt, { addSuffix: true, locale: ru })}
                 </td>
                 <td className="px-4 py-3">
-                  <Link
-                    href={`/editor/offer/${offer.id}/edit?returnTo=${encodeURIComponent("/admin/content/offers")}`}
-                    className="text-sm text-blue-600 hover:underline"
-                  >
-                    Открыть в редакторе
-                  </Link>
+                  <AdminContentRowActions
+                    editAction={{
+                      icon: "edit",
+                      href: `/editor/offer/${offer.id}/edit?returnTo=${encodeURIComponent(returnTo)}`,
+                      label: "Открыть в редакторе",
+                      title: "Открыть в редакторе",
+                    }}
+                    viewAction={{
+                      icon: "view",
+                      href: viewOfferHref,
+                      newTab: true,
+                      label: publicOfferHref
+                        ? "Открыть публичную страницу"
+                        : "Открыть предпросмотр",
+                      title: publicOfferHref
+                        ? "Открыть публичную страницу"
+                        : "Открыть предпросмотр",
+                    }}
+                  />
                 </td>
               </tr>
             );
@@ -133,6 +174,7 @@ export default async function ModerationOffersPage({
     getOffers(params),
     getModerationFilterCities(),
   ]);
+  const returnTo = buildReturnTo(params);
 
   return (
     <div className="p-6 md:p-4 space-y-6">
@@ -152,7 +194,7 @@ export default async function ModerationOffersPage({
       />
 
       <Suspense fallback={<div>Загрузка…</div>}>
-        <OffersTable offers={offers} />
+        <OffersTable offers={offers} returnTo={returnTo} />
       </Suspense>
     </div>
   );

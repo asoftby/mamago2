@@ -14,6 +14,11 @@ export async function loadOfferForWizard(offerId: string) {
           createdByUserId: true,
           ownerBusinessId: true,
           title: true,
+          city: {
+            select: {
+              slug: true,
+            },
+          },
         },
       },
       placements: {

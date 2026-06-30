@@ -57,6 +57,9 @@ import { navigateToCompatibleHref } from "@/lib/routing/clientNavigation";
 import { PlaceStatusBadge } from "@/components/business/place/PlaceStatusBadge";
 import { PlaceGroupSelector } from "@/components/business/place/PlaceGroupSelector";
 import { AdminPlaceGroupManager } from "@/components/admin/AdminPlaceGroupManager";
+import { ContentSuccessModal } from "@/components/shared/ContentSuccessModal";
+import { resolveContentSuccessState } from "@/lib/content-success/resolver";
+import type { ContentSuccessPayload, ResolvedContentSuccessState } from "@/lib/content-success/types";
 
 /**
  * Validate returnTo URL to prevent open redirects
@@ -137,6 +140,8 @@ export function PlaceWizard({
     ...contentEditorNav,
   };
   const afterSubmitDestination = returnTo ?? nav.afterSubmitListPath;
+  const [successModalOpen, setSuccessModalOpen] = useState(false);
+  const [successState, setSuccessState] = useState<ResolvedContentSuccessState | null>(null);
   const [currentStep, setCurrentStep] = useState(() => {
     if (
       mode === "edit" &&
@@ -203,7 +208,7 @@ export function PlaceWizard({
     useUnsavedChangesNavigationGuard(guardActive);
 
   // Wizard session for temp media
-  const { wizardSessionId, clearSession } = useWizardSession({
+  const { wizardSessionId } = useWizardSession({
     userId,
     wizardType: "place",
     entityId: mode === "edit" ? place?.id : undefined,
@@ -245,32 +250,6 @@ export function PlaceWizard({
     [selectedRelatedPlaceIds],
   );
 
-  // Autosave effect
-  useEffect(() => {
-    if (mode === "create") {
-      // Create mode: draft autosave handled by useWizardDraft hook
-      return;
-    } else if (mode === "edit") {
-      // API autosave for edit mode — only for draft/non-published or admin.
-      // Published non-admin edits go through revision flow on explicit save/submit.
-      const isPublished = place?.status === "PUBLISHED";
-      const isAdmin = userRole === "ADMIN";
-      if (isPublished && !isAdmin) return;
-
-      if (isSaving || isSubmitting || autosaveInFlightRef.current) {
-        return;
-      }
-      const timer = setTimeout(() => {
-        const changes = extractChanges(formData, originalData);
-        if (Object.keys(changes).length > 0) {
-          handleAutoSave(changes);
-        }
-      }, 2000);
-
-      return () => clearTimeout(timer);
-    }
-  }, [formData, mode, originalData, isSaving, isSubmitting, place?.status, userRole]);
-
   // Auto-save for edit mode
   const handleAutoSave = useCallback(async (changes: Record<string, unknown>) => {
     if (!place?.id || autosaveInFlightRef.current || isSaving || isSubmitting) return;
@@ -304,6 +283,32 @@ export function PlaceWizard({
     }
   }, [place?.id, isSaving, isSubmitting]);
 
+  // Autosave effect
+  useEffect(() => {
+    if (mode === "create") {
+      // Create mode: draft autosave handled by useWizardDraft hook
+      return;
+    } else if (mode === "edit") {
+      // API autosave for edit mode — only for draft/non-published or admin.
+      // Published non-admin edits go through revision flow on explicit save/submit.
+      const isPublished = place?.status === "PUBLISHED";
+      const isAdmin = userRole === "ADMIN";
+      if (isPublished && !isAdmin) return;
+
+      if (isSaving || isSubmitting || autosaveInFlightRef.current) {
+        return;
+      }
+      const timer = setTimeout(() => {
+        const changes = extractChanges(formData, originalData);
+        if (Object.keys(changes).length > 0) {
+          handleAutoSave(changes);
+        }
+      }, 2000);
+
+      return () => clearTimeout(timer);
+    }
+  }, [formData, mode, originalData, isSaving, isSubmitting, place?.status, userRole, handleAutoSave]);
+
   // Update form data
   const handleChange = useCallback(
     (
@@ -317,6 +322,21 @@ export function PlaceWizard({
       });
     },
     [],
+  );
+
+  const showSuccessModal = useCallback(
+    (payload: Omit<ContentSuccessPayload, "surface" | "returnTo">) => {
+      const next = resolveContentSuccessState({
+        ...payload,
+        surface,
+        returnTo,
+        role: userRole,
+      });
+      if (!next) return;
+      setSuccessState(next);
+      setSuccessModalOpen(true);
+    },
+    [returnTo, surface, userRole],
   );
 
   // Navigation
@@ -391,13 +411,18 @@ export function PlaceWizard({
         await persistRelatedPlacesAfterCreate(result.place.id);
 
         draft.markClean();
-        toast.success("Черновик сохранен");
 
         if (onComplete) {
           onComplete(result.place.id);
         } else {
-          router.push(editorPlaceEditHref(result.place.id));
+          router.replace(editorPlaceEditHref(result.place.id));
         }
+        showSuccessModal({
+          kind: "place",
+          outcome: "draft_saved",
+          id: result.place.id,
+          isEdit: false,
+        });
       } else {
         // Update existing place
         if (!place) {
@@ -427,7 +452,12 @@ export function PlaceWizard({
         }
 
         setOriginalData(formData);
-        toast.success("Изменения сохранены");
+        showSuccessModal({
+          kind: "place",
+          outcome: "draft_saved",
+          id: place.id,
+          isEdit: true,
+        });
       }
     } catch (error: unknown) {
       console.error("Save draft error:", error);
@@ -521,7 +551,14 @@ export function PlaceWizard({
         }
 
         setOriginalData(formData);
-        toast.success("Изменения отправлены на модерацию");
+        showSuccessModal({
+          kind: "place",
+          outcome: "submitted",
+          id: place.id,
+          isEdit: true,
+          slug: place.slug ?? null,
+          status: place.status,
+        });
       } else {
         // Для черновиков или ADMIN - прямое сохранение (+ attach фото/лого из wizardSessionId)
         if (Object.keys(changes).length > 0 || wizardSessionId) {
@@ -551,14 +588,14 @@ export function PlaceWizard({
         }
 
         setOriginalData(formData);
-        toast.success("Изменения сохранены");
-      }
-
-      // Navigate back to returnTo or fallback
-      if (isValidReturnTo(returnTo)) {
-        navigateToCompatibleHref(router, returnTo!); // TypeScript: we know it's not undefined from isValidReturnTo check
-      } else {
-        router.back();
+        showSuccessModal({
+          kind: "place",
+          outcome: formData.status === "PUBLISHED" ? "changes_published" : "draft_saved",
+          id: place.id,
+          isEdit: true,
+          slug: place.slug ?? null,
+          status: formData.status,
+        });
       }
     } catch (error: unknown) {
       console.error("Save and close error:", error);
@@ -640,15 +677,14 @@ export function PlaceWizard({
         await persistRelatedPlacesAfterCreate(result.place.id);
 
         draft.markClean();
-        toast.success(
-          publishDirect ? "Место опубликовано" : "Место отправлено на модерацию",
-        );
-
-        if (onComplete) {
-          onComplete(result.place.id);
-        } else {
-          router.push(afterSubmitDestination);
-        }
+        showSuccessModal({
+          kind: "place",
+          outcome: publishDirect ? "published" : "submitted",
+          id: result.place.id,
+          isEdit: false,
+          slug: result.place.slug ?? result.place.id,
+          status: publishDirect ? "PUBLISHED" : "PENDING",
+        });
       } else {
         // Submit existing place or create revision
         if (!place) {
@@ -688,7 +724,14 @@ export function PlaceWizard({
             }
 
             setOriginalData(formData);
-            toast.success("Изменения сохранены");
+            showSuccessModal({
+              kind: "place",
+              outcome: "changes_published",
+              id: place.id,
+              isEdit: true,
+              slug: place.slug ?? place.id,
+              status: "PUBLISHED",
+            });
           } else {
           // Non-admin: create/update revision for published place and submit
           const changes = extractChanges(formData, originalData);
@@ -747,7 +790,14 @@ export function PlaceWizard({
           }
 
           setOriginalData(formData);
-          toast.success("Изменения отправлены на модерацию");
+          showSuccessModal({
+            kind: "place",
+            outcome: "submitted",
+            id: place.id,
+            isEdit: true,
+            slug: place.slug ?? place.id,
+            status: "PENDING",
+          });
           }
         } else {
           // Submit draft place
@@ -811,19 +861,14 @@ export function PlaceWizard({
           }
 
           setOriginalData(formData);
-          toast.success(
-            canPublishContentDirectly(userRole)
-              ? "Место опубликовано"
-              : "Место отправлено на модерацию",
-          );
-        }
-
-        if (onComplete) {
-          onComplete(place.id);
-        } else if (returnTo) {
-          navigateToCompatibleHref(router, returnTo);
-        } else if (surface === "admin") {
-          navigateToCompatibleHref(router, nav.afterSubmitListPath);
+          showSuccessModal({
+            kind: "place",
+            outcome: canPublishContentDirectly(userRole) ? "published" : "submitted",
+            id: place.id,
+            isEdit: true,
+            slug: place.slug ?? place.id,
+            status: canPublishContentDirectly(userRole) ? "PUBLISHED" : "PENDING",
+          });
         }
       }
     } catch (error: unknown) {
@@ -876,11 +921,6 @@ export function PlaceWizard({
   const canNext = currentStep < TOTAL_STEPS;
   const canPrev = true; // Always show back button (on step 1 it goes to returnTo)
   const isReviewStep = currentStep === 7;
-
-  const segments = useMemo(
-    () => WIZARD_STEPS.map((s) => ({ id: s.id, title: s.label })),
-    []
-  );
 
   const progressSteps = useMemo(
     () => WIZARD_STEPS.map((s) => ({
@@ -1065,6 +1105,12 @@ export function PlaceWizard({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <ContentSuccessModal
+        open={successModalOpen}
+        onOpenChange={setSuccessModalOpen}
+        state={successState}
+      />
     </FormWizardShell>
   );
 }

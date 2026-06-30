@@ -63,7 +63,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { PublishedSuccessDialog } from "@/components/shared/PublishedSuccessDialog";
+import { ContentSuccessModal } from "@/components/shared/ContentSuccessModal";
+import { resolveContentSuccessState } from "@/lib/content-success/resolver";
+import type { ContentSuccessPayload, ResolvedContentSuccessState } from "@/lib/content-success/types";
 
 
 export function NewsPublicationEditor({
@@ -118,7 +120,7 @@ export function NewsPublicationEditor({
 
   const [savedComparable, setSavedComparable] = useState<string | null>(null);
   const [successOpen, setSuccessOpen] = useState(false);
-  const [successViewHref, setSuccessViewHref] = useState("");
+  const [successState, setSuccessState] = useState<ResolvedContentSuccessState | null>(null);
   const baselineSnapshotRef = useRef<ArticleEditorSnapshot | null>(null);
   const seoTitleManualRef = useRef(false);
   const seoDescriptionManualRef = useRef(false);
@@ -216,6 +218,19 @@ export function NewsPublicationEditor({
       );
     },
     [onTitleChange],
+  );
+
+  const showSuccessModal = useCallback(
+    (payload: Omit<ContentSuccessPayload, "surface" | "returnTo">) => {
+      const next = resolveContentSuccessState({
+        ...payload,
+        surface: "admin",
+      });
+      if (!next) return;
+      setSuccessState(next);
+      setSuccessOpen(true);
+    },
+    [],
   );
 
   const applyLocalDraft = useCallback(
@@ -393,19 +408,33 @@ export function NewsPublicationEditor({
     };
   }, [formState, publishedAtLocal, scheduledAtLocal]);
 
-  const computeSnapPublicUrl = useCallback(
-    (snap: ArticleEditorSnapshot): string => {
-      if (!snap.slug) return "";
-      const citySlug = snap.cityId
-        ? (cities.find((c) => c.id === snap.cityId)?.slug ?? null)
-        : null;
-      return `${resolveSeoPublicBase()}${buildArticlePublicPath({
-        slug: snap.slug,
-        geoScope: snap.geoScope ?? undefined,
-        citySlug,
-      })}`;
+  const showBreakingNewsSuccess = useCallback(
+    (
+      outcome: ContentSuccessPayload["outcome"],
+      id: string,
+      snap?: ArticleEditorSnapshot | null,
+      isEdit = true,
+    ) => {
+      const source = snap ?? {
+        slug,
+        geoScope,
+        cityId,
+      };
+      const modalCitySlug =
+        source.cityId != null
+          ? (cities.find((city) => city.id === source.cityId)?.slug ?? null)
+          : null;
+      showSuccessModal({
+        kind: "breaking-news",
+        outcome,
+        id,
+        isEdit,
+        slug: source.slug ?? null,
+        geoScope: source.geoScope ?? null,
+        citySlug: modalCitySlug,
+      });
     },
-    [cities],
+    [cities, cityId, geoScope, showSuccessModal, slug],
   );
 
   const saveArticle = useCallback(
@@ -440,7 +469,7 @@ export function NewsPublicationEditor({
           applySnapshot(snap);
           clearBreakingNewsLocalDrafts(snap.id);
           if (!opts?.silent) {
-            toast.success("Черновик сохранён");
+            showBreakingNewsSuccess("draft_saved", snap.id, snap, false);
           }
           router.replace(`/admin/content/publications/new?type=news&id=${encodeURIComponent(snap.id)}`);
           return true;
@@ -469,7 +498,7 @@ export function NewsPublicationEditor({
         applySnapshot(snap);
         clearBreakingNewsLocalDrafts(snap.id);
         if (!opts?.silent) {
-          toast.success("Черновик сохранён");
+          showBreakingNewsSuccess("draft_saved", snap.id, snap, true);
         }
         return true;
       } catch (e) {
@@ -482,7 +511,14 @@ export function NewsPublicationEditor({
         }
       }
     },
-    [hasPersistedId, articleId, applySnapshot, breakingNewsRequestBody, router],
+    [
+      articleId,
+      applySnapshot,
+      breakingNewsRequestBody,
+      hasPersistedId,
+      router,
+      showBreakingNewsSuccess,
+    ],
   );
 
   const saveDraft = () => void saveArticle();
@@ -568,10 +604,9 @@ export function NewsPublicationEditor({
       clearBreakingNewsLocalDrafts(id);
       router.replace(`/admin/content/publications/new?type=news&id=${encodeURIComponent(id)}`);
       if (isAdminEditor) {
-        setSuccessViewHref(publishedSnap ? computeSnapPublicUrl(publishedSnap) : "");
-        setSuccessOpen(true);
+        showBreakingNewsSuccess("published", id, publishedSnap, Boolean(articleId));
       } else {
-        toast.success("Отправлено на модерацию");
+        showBreakingNewsSuccess("submitted", id, publishedSnap, Boolean(articleId));
       }
     } finally {
       setSubmitting(false);
@@ -646,8 +681,7 @@ export function NewsPublicationEditor({
       clearBreakingNewsLocalDrafts(id);
       router.replace(`/admin/content/publications/new?type=news&id=${encodeURIComponent(id)}`);
       if (action === "publish") {
-        setSuccessViewHref(moderatedSnap ? computeSnapPublicUrl(moderatedSnap) : "");
-        setSuccessOpen(true);
+        showBreakingNewsSuccess("published", id, moderatedSnap, true);
       } else {
         toast.success("Публикация отклонена");
       }
@@ -894,12 +928,10 @@ export function NewsPublicationEditor({
         onGeoScopeErrorClear={() => setGeoScopeError(null)}
       />
 
-      <PublishedSuccessDialog
+      <ContentSuccessModal
         open={successOpen}
         onOpenChange={setSuccessOpen}
-        contentType="breaking-news"
-        viewHref={successViewHref}
-        listHref="/admin/content/publications"
+        state={successState}
       />
 
       <AlertDialog open={leaveDialogOpen} onOpenChange={onLeaveDialogOpenChange}>

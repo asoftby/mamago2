@@ -130,6 +130,7 @@ interface PlaceRevisionModerationViewProps {
     revisionResubmittedAt?: Date | null;
     [key: string]: unknown;
   };
+  canDeletePlace?: boolean;
 }
 
 const BLOCK_FIELDS = {
@@ -159,6 +160,7 @@ const BLOCK_FIELDS = {
 export function PlaceRevisionModerationView({
   place,
   revision,
+  canDeletePlace = false,
 }: PlaceRevisionModerationViewProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -886,7 +888,11 @@ export function PlaceRevisionModerationView({
 
             {/* Danger Zone */}
             <div className="mt-6 pt-4 border-t">
-              <PlaceDangerZone placeId={place.id} placeTitle={place.title} />
+              <PlaceDangerZone
+                placeId={place.id}
+                placeTitle={place.title}
+                canDelete={canDeletePlace}
+              />
             </div>
           </div>
         </div>

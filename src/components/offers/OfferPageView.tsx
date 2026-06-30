@@ -34,6 +34,10 @@ interface OfferPageViewProps {
   onSecondary?: () => void;
   onSave?: () => void;
   onShiftCta?: (ctx: ShiftCtaContext) => void;
+  sectionNotes?: {
+    reviews?: string;
+    place?: string;
+  };
 }
 
 type LocalOfferSaveState = {
@@ -89,6 +93,7 @@ export function OfferPageView({
   onPrimary,
   onSave,
   onShiftCta,
+  sectionNotes,
 }: OfferPageViewProps) {
   const ctaRef = useRef<HTMLElement | null>(null);
   const storageKey = `mamago:offer-plan:${data.id}`;
@@ -327,14 +332,22 @@ export function OfferPageView({
         )}
 
         {data.reviews && (
-          <OfferReviews
-            reviews={data.reviews}
-            averageRating={data.averageRating}
-            totalCount={data.reviews.length}
-          />
+          <>
+            <OfferSectionNote text={sectionNotes?.reviews} />
+            <OfferReviews
+              reviews={data.reviews}
+              averageRating={data.averageRating}
+              totalCount={data.reviews.length}
+            />
+          </>
         )}
 
-        {data.place && <OfferPlace place={data.place} />}
+        {data.place ? (
+          <>
+            <OfferSectionNote text={sectionNotes?.place} />
+            <OfferPlace place={data.place} />
+          </>
+        ) : null}
 
         {data.promoCta && <OfferPromoCta {...data.promoCta} onPrimary={handlePrimary} />}
       </div>
@@ -382,5 +395,15 @@ export function OfferPageView({
         subtitle={data.title}
       />
     </main>
+  );
+}
+
+function OfferSectionNote({ text }: { text?: string }) {
+  if (!text) return null;
+
+  return (
+    <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-950">
+      {text}
+    </div>
   );
 }

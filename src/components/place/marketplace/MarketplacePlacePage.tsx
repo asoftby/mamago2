@@ -15,7 +15,6 @@ import { FaqSection } from "@/components/public/FaqSection";
 import type { ActivityMock } from "@/types/activity";
 import type { PriceData } from "@/lib/priceItems";
 import type { FaqItem } from "@/lib/faq/faqItems";
-import Link from "next/link";
 import type { NormalizedPlacePhone } from "@/lib/place/placePhones";
 import type { MediaGalleryItem } from "@/lib/media/galleryTypes";
 
@@ -108,6 +107,12 @@ interface MarketplacePlacePageProps {
   /** Показать «Редактировать» с шагами визарда (те же права, что у редактора места). */
   ownerEditPlaceId?: string;
   relatedPlaces?: NetworkPlace[];
+  sectionNotes?: {
+    offers?: string;
+    events?: string;
+    reviews?: string;
+    relatedPlaces?: string;
+  };
 }
 
 export function MarketplacePlacePage({
@@ -118,6 +123,7 @@ export function MarketplacePlacePage({
   reviews = [],
   ownerEditPlaceId,
   relatedPlaces = [],
+  sectionNotes,
 }: MarketplacePlacePageProps) {
   const ctaRef = useRef<HTMLDivElement>(null);
   const hasRenderableReviews = reviews.length > 0;
@@ -254,26 +260,38 @@ export function MarketplacePlacePage({
 
       {/* Offers */}
       {offers.length > 0 && (
-        <PlaceOffersSection offers={offers} placeId={place.slug} />
+        <>
+          <SectionNote text={sectionNotes?.offers} />
+          <PlaceOffersSection offers={offers} placeId={place.slug} />
+        </>
       )}
 
       {/* Events */}
       {eventActivities.length > 0 && (
-        <PlaceEventsSection activities={eventActivities} citySlug={citySlug} />
+        <>
+          <SectionNote text={sectionNotes?.events} />
+          <PlaceEventsSection activities={eventActivities} citySlug={citySlug} />
+        </>
       )}
 
       {/* Reviews */}
       {reviews.length > 0 && (
-        <PlaceReviewsSection
-          reviews={reviews}
-          placeId={place.slug}
-          rating={displayRating}
-          reviewCount={displayReviewCount}
-        />
+        <>
+          <SectionNote text={sectionNotes?.reviews} />
+          <PlaceReviewsSection
+            reviews={reviews}
+            placeId={place.slug}
+            rating={displayRating}
+            reviewCount={displayReviewCount}
+          />
+        </>
       )}
 
       {relatedPlaces.length > 0 && (
-        <PlaceNetworkSection places={relatedPlaces} />
+        <>
+          <SectionNote text={sectionNotes?.relatedPlaces} />
+          <PlaceNetworkSection places={relatedPlaces} />
+        </>
       )}
 
       {/* Address / Location */}
@@ -300,6 +318,18 @@ export function MarketplacePlacePage({
         placeTitle={place.title}
         coverImageUrl={place.logoUrl}
       />
+    </div>
+  );
+}
+
+function SectionNote({ text }: { text?: string }) {
+  if (!text) return null;
+
+  return (
+    <div className="mx-auto w-full max-w-[1200px] px-4 pt-6 sm:px-6 lg:px-8 lg:pt-8">
+      <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-950">
+        {text}
+      </div>
     </div>
   );
 }
@@ -548,111 +578,6 @@ function WorkingHoursSection({ summary }: { summary: string }) {
         }
         @media (max-width: 520px) {
           .hours-grid { padding: 0 18px !important; }
-        }
-      `}</style>
-    </section>
-  );
-}
-
-/* ─── Final CTA ─────────────────────────────────────────────────────────── */
-
-function FinalCTA({ place }: { place: MarketplacePlacePageProps["place"] }) {
-  const hasPhone = place.phones.length > 0;
-  const hasWebsite = !!place.website;
-
-  if (!hasPhone && !hasWebsite) return null;
-
-  return (
-    <section style={{ padding: "96px 0 120px", background: "#ffffff" }}>
-      <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 28px" }}>
-        <div
-          className="final-cta-inner"
-          style={{ textAlign: "center", maxWidth: 900, margin: "0 auto" }}
-        >
-          <h2
-            className="font-display final-cta-h2"
-            style={{
-              fontSize: "clamp(56px, 8vw, 120px)",
-              lineHeight: 0.95,
-              letterSpacing: "-.025em",
-              margin: 0,
-              color: "#141210",
-            }}
-          >
-            Приходите<br />
-            <span className="font-display-italic" style={{ color: "#C24E22" }}>
-              познакомиться
-            </span>
-            .
-          </h2>
-          <p
-            style={{
-              fontSize: 20,
-              color: "#3A332B",
-              maxWidth: 560,
-              margin: "24px auto 36px",
-              lineHeight: 1.5,
-            }}
-          >
-            Свяжитесь с&nbsp;нами — ответим на&nbsp;все вопросы и&nbsp;расскажем подробнее.
-          </p>
-          <div
-            className="final-cta-buttons"
-            style={{ display: "inline-flex", gap: 12 }}
-          >
-            {hasPhone && (
-              <a
-                href={place.phones[0].href}
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 8,
-                  height: 64,
-                  padding: "0 28px",
-                  borderRadius: 999,
-                  background: "#E86A3A",
-                  color: "#fff",
-                  fontWeight: 600,
-                  fontSize: 17,
-                  textDecoration: "none",
-                }}
-              >
-                Позвонить <span>→</span>
-              </a>
-            )}
-            {hasWebsite && (
-              <a
-                href={place.website!.startsWith("http") ? place.website! : `https://${place.website}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 8,
-                  height: 64,
-                  padding: "0 24px",
-                  borderRadius: 999,
-                  border: "1px solid rgba(20,18,16,.18)",
-                  background: "transparent",
-                  color: "#141210",
-                  fontWeight: 600,
-                  fontSize: 15,
-                  textDecoration: "none",
-                }}
-              >
-                На сайт ↗
-              </a>
-            )}
-          </div>
-        </div>
-      </div>
-
-      <style>{`
-        @media (max-width: 900px) {
-          .final-cta-h2 { font-size: clamp(44px, 12vw, 84px) !important; }
-          .final-cta-buttons { flex-direction: column !important; width: 100%; display: flex !important; }
-          .final-cta-buttons > a { width: 100% !important; justify-content: center; }
-          .final-cta-inner { padding: 0 4px; }
         }
       `}</style>
     </section>

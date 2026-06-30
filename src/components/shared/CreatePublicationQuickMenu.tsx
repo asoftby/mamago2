@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { LucideIcon } from "lucide-react";
 import {
   Plus,
@@ -24,7 +24,14 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
+import { useHydrated } from "@/hooks/use-hydrated";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
+import {
+  buildAdminPath,
+  buildBusinessPath,
+  normalizeTargetPathForSurface,
+  resolveSurfaceFromHostAndPathname,
+} from "@/lib/routing/surface";
 
 type PublicationMode = "full" | "business";
 
@@ -110,8 +117,32 @@ export function CreatePublicationQuickMenu({
   trigger?: (onClick: () => void) => React.ReactNode;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [open, setOpen] = useState(false);
+  const hydrated = useHydrated();
   const isMobile = useMediaQuery("(max-width: 1023px)");
+
+  const currentSurfaceReturnTo = useMemo(() => {
+    if (!hydrated) {
+      return null;
+    }
+
+    const host = window.location.host;
+    const surface = resolveSurfaceFromHostAndPathname(host, pathname);
+    const search = searchParams?.toString();
+    const visiblePath = `${pathname}${search ? `?${search}` : ""}`;
+
+    if (surface === "admin") {
+      return buildAdminPath(normalizeTargetPathForSurface("admin", visiblePath));
+    }
+
+    if (surface === "business") {
+      return buildBusinessPath(normalizeTargetPathForSurface("business", visiblePath));
+    }
+
+    return null;
+  }, [hydrated, pathname, searchParams]);
 
   const visibleItems =
     publicationMode === "full"
@@ -135,10 +166,20 @@ export function CreatePublicationQuickMenu({
           "flex items-start gap-3 rounded-lg border border-gray-200 bg-white p-4 text-left transition-colors hover:bg-gray-50 hover:border-gray-300";
 
         if (item.kind === "link") {
+          const href = (() => {
+            if (!currentSurfaceReturnTo) {
+              return item.href;
+            }
+
+            const params = new URLSearchParams();
+            params.set("returnTo", currentSurfaceReturnTo);
+            return `${item.href}?${params.toString()}`;
+          })();
+
           return (
             <Link
               key={item.id}
-              href={item.href}
+              href={href}
               onClick={() => setOpen(false)}
               className={rowClass}
             >

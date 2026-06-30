@@ -12,6 +12,7 @@ import { getModerationFilterCities } from "@/lib/admin/moderationAdminQueries";
 import { activityStatusesExcludingDeleted } from "@/lib/business/eventListWhere";
 import { getEventTemporalState } from "@/lib/events/eventTemporalState";
 import { cn } from "@/lib/utils";
+import { publicActivityPath, toAbsolutePublicUrl } from "@/lib/business/eventPublicLink";
 
 /** Список после DELETE из API должен перечитываться; иначе RSC может отдавать закэшированный снимок. */
 export const dynamic = "force-dynamic";
@@ -66,7 +67,7 @@ async function getActivities(params: SearchParams) {
       place: {
         select: {
           title: true,
-          city: { select: { name: true } },
+          city: { select: { name: true, slug: true } },
         },
       },
       owner: {
@@ -149,6 +150,18 @@ function ActivitiesTable({
               activity.place?.city?.name ||
               (activity.cityId ? cityNameById.get(activity.cityId) : undefined) ||
               "—";
+            const publicHref =
+              activity.status === ContentStatus.PUBLISHED ||
+              activity.status === ContentStatus.PENDING_UPDATE ||
+              activity.status === ContentStatus.SCHEDULED
+                ? toAbsolutePublicUrl(
+                    publicActivityPath(
+                      activity.id,
+                      activity.place?.city?.slug ?? null,
+                      activity.slug ?? null,
+                    ),
+                  )
+                : null;
             return (
               <tr key={activity.id} className="hover:bg-gray-50">
                 <td className="px-4 py-3 font-medium text-gray-900">{activity.title}</td>
@@ -190,6 +203,7 @@ function ActivitiesTable({
                     eventId={activity.id}
                     status={activity.status}
                     returnTo="/admin/content/events"
+                    publicHref={publicHref}
                   />
                 </td>
               </tr>

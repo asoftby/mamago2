@@ -9,6 +9,10 @@ interface Activity {
   id: string;
   type: ActivityType;
   status: ContentStatus;
+  slug?: string | null;
+  city?: {
+    slug: string;
+  } | null;
   title: string;
   shortDesc: string;
   description: string | null;
@@ -19,6 +23,9 @@ interface Activity {
   place: {
     id: string;
     title: string;
+    city?: {
+      slug: string;
+    } | null;
   } | null;
   images: Array<{
     id: string;

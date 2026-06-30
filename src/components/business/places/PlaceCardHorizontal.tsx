@@ -16,15 +16,16 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Trash2, MapPin, Archive, ArchiveRestore, AlertTriangle, Pencil, BarChart3 } from "lucide-react";
+import { Trash2, MapPin, Archive, ArchiveRestore, AlertTriangle, Eye, Pencil, BarChart3 } from "lucide-react";
 import { toast } from "@/lib/toast";
 import { Badge } from "@/components/ui/badge";
 import { getPlaceSearchAddressMetaLine } from "@/lib/placeLocationString";
 import { calculateUrgency } from "@/lib/improvementRequest/urgency";
 import { CONTENT_STATUS_META } from "@/lib/content-status-meta";
-import { getCanonicalPublicAppUrl } from "@/lib/config/publicAppUrl";
 import { cn } from "@/lib/utils";
 import { resolvePlaceLogoImage } from "@/lib/place/resolvePlaceLogoImage";
+import { getAbsolutePlacePublicUrl } from "@/lib/placePublicUrl";
+import { getPlacePreviewPath } from "@/lib/content-preview/paths";
 import { PublicationStatisticsDialog } from "@/components/business/shared/PublicationStatisticsDialog";
 import {
   BusinessPublicationCard,
@@ -219,12 +220,14 @@ export function PlaceCardHorizontal({ place, onDelete, onArchive, onUnarchive }:
     }
   };
 
-  // Публичная карточка места на основном сайте (не на поддомене business)
-  const publicBase = getCanonicalPublicAppUrl().replace(/\/+$/, "");
-  const publicPath = place.slug?.trim()
-    ? `/places/${place.slug.trim()}`
-    : `/places/${place.id}`;
-  const publicPlaceHref = `${publicBase}${publicPath}`;
+  const shouldUsePreview =
+    Boolean(place.archivedAt) ||
+    place.status !== "PUBLISHED" ||
+    hasActiveRevision;
+  const publicPlaceHref = getAbsolutePlacePublicUrl({ slug: place.slug, id: place.id });
+  const viewPlaceHref = shouldUsePreview
+    ? getPlacePreviewPath(place.id)
+    : (publicPlaceHref ?? getPlacePreviewPath(place.id));
   const coverImageUrl = coverImage?.url ?? null;
   const updatedLine = formatUpdatedAgo(place.updatedAt, place.createdAt);
   const createdLine = `Создано: ${format(new Date(place.createdAt), "d MMMM yyyy", { locale: ru })}`;
@@ -301,10 +304,10 @@ export function PlaceCardHorizontal({ place, onDelete, onArchive, onUnarchive }:
         type="place"
         imageUrl={coverImageUrl}
         imageAlt={displayTitle}
-        imageHref={publicPlaceHref}
+        imageHref={viewPlaceHref}
         placeholderIcon={MapPin}
         title={displayTitle}
-        titleHref={publicPlaceHref}
+        titleHref={viewPlaceHref}
         subtitle={displayAddress}
         statusRow={statusRow}
         updatedLine={updatedLine}
@@ -331,16 +334,25 @@ export function PlaceCardHorizontal({ place, onDelete, onArchive, onUnarchive }:
               Статистика
             </button>
 
+            <Link
+              href={viewPlaceHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={BUSINESS_PUBLICATION_ACTION_ICON}
+              title="Просмотр"
+              aria-label="Просмотр"
+            >
+              <Eye className="h-4 w-4" />
+            </Link>
+
             {!place.archivedAt && displayStatus !== "PENDING" ? (
               <Link
                 href={`/business/places/${place.id}/edit`}
-                className={cn(
-                  BUSINESS_PUBLICATION_ACTION_BUTTON,
-                  BUSINESS_PUBLICATION_ACTION_NEUTRAL,
-                )}
+                className={BUSINESS_PUBLICATION_ACTION_ICON}
+                title="Редактировать"
+                aria-label="Редактировать"
               >
-                <Pencil className="h-4 w-4 shrink-0" />
-                Редактировать
+                <Pencil className="h-4 w-4" />
               </Link>
             ) : null}
 
