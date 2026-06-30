@@ -10,6 +10,20 @@ import {
   type LegacyBudgetLevel,
   type RouteStopPriceType,
 } from "@/lib/routes/routeBudget";
+import { syncRouteMediaUsage } from "@/server/services/media/media-usage.service";
+
+/**
+ * Keep the route's media-usage projection in sync (Phase B invariant).
+ * Best-effort: a projection hiccup must never fail the user's route save —
+ * the next full recompute will reconcile.
+ */
+async function syncRouteMediaUsageSafe(routeId: string): Promise<void> {
+  try {
+    await syncRouteMediaUsage(routeId);
+  } catch (error) {
+    console.error(`[route.service] media usage sync failed for ${routeId}:`, error);
+  }
+}
 
 const publicRouteStopPlaceWhere = {
   OR: [{ placeId: null }, { place: getPublicPublishedPlaceWhere() }],
@@ -402,7 +416,7 @@ export async function createRoute(
     data.budgetLevel ?? null,
   );
 
-  return prisma.route.create({
+  const created = await prisma.route.create({
     data: {
       slug,
       slugUpdatedAt: new Date(),
@@ -420,6 +434,10 @@ export async function createRoute(
     },
     select: { id: true, slug: true },
   });
+
+  await syncRouteMediaUsageSafe(created.id);
+
+  return created;
 }
 
 /** Update an existing route (draft or published). Slug is never changed. */
@@ -437,7 +455,7 @@ export async function updateRoute(
     data.budgetLevel ?? null,
   );
 
-  return prisma.$transaction(async (tx) => {
+  const updated = await prisma.$transaction(async (tx) => {
     const existing = await tx.route.findUnique({
       where: { id: routeId },
       select: {
@@ -486,7 +504,7 @@ export async function updateRoute(
       coverImageUrl,
     };
 
-    const updated = await tx.route.update({
+    const result = await tx.route.update({
       where: { id: routeId },
       data: stopsChanged
         ? { ...routeScalarUpdate, stops: { create: normalizedStops } }
@@ -494,6 +512,10 @@ export async function updateRoute(
       select: { id: true, slug: true },
     });
 
-    return updated;
+    return result;
   });
+
+  await syncRouteMediaUsageSafe(updated.id);
+
+  return updated;
 }
