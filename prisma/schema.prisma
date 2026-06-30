@@ -2352,6 +2352,9 @@ model MediaAsset {
   storageKey       String           @unique
   publicUrl        String?
   checksum         String?
+  /// SHA-256 of raw original bytes — per-owner dedup key (Phase A).
+  /// Partial unique index (uploadedById, contentHash) is added later in raw SQL.
+  contentHash      String?
   alt              String?
   title            String?
   caption          String?
@@ -2381,6 +2384,7 @@ model MediaAsset {
   @@index([createdAt])
   @@index([uploadedById])
   @@index([checksum])
+  @@index([contentHash])
   @@index([wizardSessionId, status])
   @@index([draftEntityId, draftEntityType, status])
   @@index([status, createdAt])
