@@ -7,6 +7,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import { BusinessVisibilityControl } from "@/components/admin/business/BusinessVisibilityControl";
+import { UnpVerificationSection } from "@/components/admin/business/UnpVerificationSection";
 import { normalizeBusinessVisibilityStatus } from "@/lib/business/businessStatusModel";
 import { BusinessDangerZonePlaceholder } from "@/components/admin/business/BusinessDangerZonePlaceholder";
 import { PartnerFinanceSection } from "@/components/admin/business/PartnerFinanceSection";
@@ -556,6 +557,23 @@ export default async function PartnerDetailPage({
                 </div>
               </div>
             )}
+          </div>
+
+          {/* УНП: автоматическая сверка с ГРП */}
+          <div className="mt-6 border-t pt-6">
+            <h3 className="text-sm font-semibold mb-3">Автоматическая сверка УНП</h3>
+            <UnpVerificationSection
+              businessId={business.id}
+              unp={business.unp}
+              legalName={business.legalName}
+              canRecheck={user.role === "ADMIN" || user.role === "MODERATOR"}
+              initialState={{
+                unpVerificationStatus: business.unpVerificationStatus,
+                unpVerifiedAt: business.unpVerifiedAt?.toISOString() ?? null,
+                unpOfficialName: business.unpOfficialName,
+                unpLastCheckedAt: business.unpLastCheckedAt?.toISOString() ?? null,
+              }}
+            />
           </div>
 
           {/* Verification Logs */}
