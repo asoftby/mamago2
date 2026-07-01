@@ -897,6 +897,10 @@ model Business {
   submittedAt             DateTime?
   verificationStatus      BusinessVerificationStatus @default(DRAFT)
   isVerified              Boolean                    @default(false)
+  unpVerificationStatus   BusinessUnpVerificationStatus @default(PENDING)
+  unpVerifiedAt           DateTime?
+  unpOfficialName         String?
+  unpLastCheckedAt        DateTime?
   /// Показ контента бизнеса пользователям (отдельно от верификации)
   operationalStatus       BusinessOperationalStatus  @default(ACTIVE)
   activities              Activity[]                 @relation("ActivityBusiness")
@@ -921,6 +925,7 @@ model Business {
   @@index([status])
   @@index([verificationStatus])
   @@index([operationalStatus])
+  @@index([unpVerificationStatus])
 }
 
 model Organizer {
@@ -3011,6 +3016,17 @@ enum BusinessVerificationStatus {
   APPROVED
   REJECTED
   NEEDS_INFO
+}
+
+/// Автоматическая сверка УНП с ГРП (не путать с BusinessVerificationStatus —
+/// тем ручным admin-approval workflow). PENDING — проверка ещё не выполнялась.
+enum BusinessUnpVerificationStatus {
+  PENDING
+  VERIFIED
+  NAME_MISMATCH
+  INACTIVE
+  NOT_FOUND
+  LOOKUP_FAILED
 }
 
 /// Видимость бизнеса для пользователей (мягкое отключение без удаления данных)

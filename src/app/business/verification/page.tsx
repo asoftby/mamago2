@@ -4,6 +4,7 @@ import { getMyBusiness } from "@/server/business/getMyBusiness";
 import Link from "next/link";
 import { PrimaryButton } from "@/components/ui/PrimaryButton";
 import { VerificationPendingNextSteps } from "@/components/business/verification/VerificationPendingNextSteps";
+import { UnpVerificationNotice } from "@/components/business/verification/UnpVerificationNotice";
 import { getEffectiveVerificationStatus } from "@/server/services/businessStatusMap";
 import prisma from "@/lib/prisma";
 import { buildSurfaceRedirectDestination } from "@/lib/routing/surface";
@@ -271,6 +272,7 @@ export default async function BusinessVerificationPage() {
                 <span className="text-sm text-gray-900">{business.unp}</span>
               </div>
             )}
+            {business.unp && <UnpVerificationNotice business={business} />}
             {business.phone && (
               <div>
                 <span className="text-sm font-medium text-gray-700">Телефон:</span>{" "}
