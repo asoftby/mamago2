@@ -71,6 +71,7 @@
     "test:notification-templates": "tsx src/server/notifications/template-render.test.ts",
     "test:anti-repeat": "tsx src/features/hero-weather/model/anti-repeat.test.ts",
     "test:weather-provider": "tsx src/features/hero-weather/api/weather-provider.test.ts",
+    "test:unp-verification": "tsx src/lib/verification/unpChecksum.test.ts && tsx src/server/egr/verifyUnp.test.ts",
     "search:reindex": "tsx scripts/search-reindex.ts",
     "prepare": "husky",
     "check:push": "pnpm build",
