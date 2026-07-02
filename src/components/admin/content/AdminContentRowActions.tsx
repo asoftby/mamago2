@@ -96,6 +96,10 @@ function isExternalHref(href: string) {
   return href.startsWith("http://") || href.startsWith("https://");
 }
 
+function isRestoreAction(kind: MutationKind) {
+  return kind === "restore";
+}
+
 export function AdminContentRowActions({
   editAction,
   viewAction,
@@ -234,6 +238,9 @@ export function AdminContentRowActions({
   };
 
   const MutationIcon = destructiveAction ? iconForMutation(destructiveAction.kind) : null;
+  const restoreAction = destructiveAction
+    ? isRestoreAction(destructiveAction.kind)
+    : false;
 
   return (
     <>
@@ -254,7 +261,9 @@ export function AdminContentRowActions({
             onClick={() => setConfirmOpen(true)}
             className={cn(
               iconButtonClass,
-              "text-gray-400 hover:bg-red-50 hover:text-red-600",
+              restoreAction
+                ? "text-gray-500 hover:bg-emerald-50 hover:text-emerald-700"
+                : "text-gray-400 hover:bg-red-50 hover:text-red-600",
             )}
             aria-label={destructiveAction.label}
             title={destructiveAction.label}
@@ -281,7 +290,7 @@ export function AdminContentRowActions({
               <AlertDialogCancel disabled={isSubmitting}>Отмена</AlertDialogCancel>
               <Button
                 type="button"
-                variant="destructive"
+                variant={restoreAction ? "default" : "destructive"}
                 disabled={isSubmitting}
                 onClick={() => void handleMutation()}
               >

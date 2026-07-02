@@ -77,6 +77,9 @@ export function mapPlaceToFormData(
     phone3: phones.phone3,
     phone3Label: phones.phone3Label,
     website: place.website,
+    bookingEnabled: place.bookingEnabled,
+    bookingPhone: place.bookingPhone,
+    bookingNote: place.bookingNote,
     instagramHandle: place.instagramHandle,
     instagramUrl: place.instagramUrl,
     
@@ -150,6 +153,8 @@ export function buildPlacePayload(data: PlaceFormData): Partial<Place> & { subca
     phone3: phones.phone3,
     phone3Label: phones.phone3Label,
     website: data.website,
+    // Intentionally excluded: booking compatibility fields remain read-only
+    // until the shared CTA step is connected to Place Wizard.
     instagramHandle: data.instagramHandle,
     instagramUrl: data.instagramUrl,
     

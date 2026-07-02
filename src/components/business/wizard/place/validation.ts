@@ -1,4 +1,5 @@
 import type { PlaceFormData, StepValidation } from "./types";
+import { getPlaceWizardTotalSteps, getStepKey } from "./config";
 
 export function validateStep1(data: PlaceFormData): StepValidation {
   const errors: string[] = [];
@@ -94,6 +95,15 @@ export function validateStep6(data: PlaceFormData): StepValidation {
 }
 
 export function validateStep7(data: PlaceFormData): StepValidation {
+  void data;
+  return {
+    isValid: true,
+    isComplete: true,
+    errors: [],
+  };
+}
+
+export function validateReviewStep(data: PlaceFormData): StepValidation {
   const step1 = validateStep1(data);
   const step2 = validateStep2(data);
   const step4 = validateStep4(data);
@@ -106,29 +116,39 @@ export function validateStep7(data: PlaceFormData): StepValidation {
   };
 }
 
-export function validateStep(step: number, data: PlaceFormData): StepValidation {
-  switch (step) {
-    case 1:
+export function validateStep(
+  step: number,
+  data: PlaceFormData,
+  ctaStepEnabled = false,
+): StepValidation {
+  switch (getStepKey(step, ctaStepEnabled)) {
+    case "profile":
       return validateStep1(data);
-    case 2:
+    case "location":
       return validateStep2(data);
-    case 3:
+    case "contacts":
       return validateStep3(data);
-    case 4:
+    case "photos":
       return validateStep4(data);
-    case 5:
+    case "openingHours":
       return validateStep5(data);
-    case 6:
+    case "cta":
       return validateStep6(data);
-    case 7:
+    case "faq":
       return validateStep7(data);
+    case "review":
+      return validateReviewStep(data);
     default:
       return { isValid: false, isComplete: false, errors: ["Invalid step"] };
   }
 }
 
-export function isStepComplete(step: number, data: PlaceFormData): boolean {
-  return validateStep(step, data).isComplete;
+export function isStepComplete(
+  step: number,
+  data: PlaceFormData,
+  ctaStepEnabled = false,
+): boolean {
+  return validateStep(step, data, ctaStepEnabled).isComplete;
 }
 
 export function validateForSubmit(data: PlaceFormData): StepValidation {
@@ -144,17 +164,26 @@ export function validateForSubmit(data: PlaceFormData): StepValidation {
   };
 }
 
-export function canGoToNextStep(currentStep: number, data: PlaceFormData): boolean {
+export function canGoToNextStep(
+  currentStep: number,
+  data: PlaceFormData,
+  ctaStepEnabled = false,
+): boolean {
   void data;
-  return currentStep < 7;
+  return currentStep < getPlaceWizardTotalSteps(ctaStepEnabled);
 }
 
 export function canGoToPrevStep(currentStep: number): boolean {
   return currentStep > 1;
 }
 
-export function canGoToStep(targetStep: number, currentStep: number, data: PlaceFormData): boolean {
+export function canGoToStep(
+  targetStep: number,
+  currentStep: number,
+  data: PlaceFormData,
+  ctaStepEnabled = false,
+): boolean {
   void currentStep;
   void data;
-  return targetStep >= 1 && targetStep <= 7;
+  return targetStep >= 1 && targetStep <= getPlaceWizardTotalSteps(ctaStepEnabled);
 }

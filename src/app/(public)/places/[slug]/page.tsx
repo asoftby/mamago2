@@ -23,6 +23,8 @@ import { resolvePlaceLogoImage } from "@/lib/place/resolvePlaceLogoImage";
 import { resolvePlaceLogoUrlFromDb } from "@/lib/place/resolvePlaceLogoUrlFromDb";
 import { mapPlacePageMedia } from "@/lib/media/mapPlacePageMedia";
 import { fetchReelsThumbnail } from "@/lib/instagram/fetchReelsThumbnail";
+import { tryResolvePublicationForCta } from "@/server/services/direct/directThread.service";
+import { PublicationType } from "@prisma/client";
 import { parsePriceData } from "@/lib/priceItems";
 import { getNormalizedPlacePhones } from "@/lib/place/placePhones";
 import {
@@ -35,6 +37,7 @@ import {
 } from "@/lib/place/loadUpcomingPlaceEvents";
 import { normalizeFaqItems } from "@/lib/faq/faqItems";
 import type { StoredGoogleReview } from "@/types/google-places";
+import { resolveCanonicalCta } from "@/lib/cta-platform";
 
 interface PlacePageProps {
   params: Promise<{ slug: string }>;
@@ -450,6 +453,7 @@ export default async function PlacePage({ params }: PlacePageProps) {
     where: {
       placeId: place.id,
       status: "PUBLISHED",
+      archivedAt: null,
     },
     select: {
       id: true,
@@ -707,7 +711,31 @@ export default async function PlacePage({ params }: PlacePageProps) {
     priceData: parsePriceData(place.priceItems),
     faqItems,
     updatedAt: place.updatedAt,
+    resolvedCta: resolveCanonicalCta({
+      entityType: "PLACE",
+      entity: {
+        id: place.id,
+        bookingEnabled: place.bookingEnabled,
+        bookingPhone: place.bookingPhone,
+        bookingNote: place.bookingNote,
+        phone: place.phone,
+        website: place.website,
+      },
+    }),
   };
+
+  // Direct CTA — omitted when the place has no owning Business (rule 5).
+  const directPublication = await tryResolvePublicationForCta({
+    publicationType: PublicationType.PLACE,
+    placeId: place.id,
+  });
+  const directCta = directPublication
+    ? {
+        placeId: place.id,
+        publicationTitle: place.title,
+        brandName: place.title,
+      }
+    : undefined;
 
   return (
     <>
@@ -728,6 +756,7 @@ export default async function PlacePage({ params }: PlacePageProps) {
         reviews={combinedReviews}
         ownerEditPlaceId={canShowPlaceEditor ? place.id : undefined}
         relatedPlaces={relatedPlaces}
+        direct={directCta}
       />
     </>
   );

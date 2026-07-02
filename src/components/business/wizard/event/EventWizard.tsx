@@ -108,6 +108,7 @@ interface EventWizardProps {
   importedRecordId?: string | null;
   /** Pre-fetched AI enrichment (from server) — cached, no auto-fetch */
   initialAiEnrichment?: import("@/lib/ai/enrichEvent").EnrichmentResult | null;
+  ctaStepEnabled?: boolean;
 }
 
 const LOCAL_STORAGE_KEY = "event-wizard-draft";
@@ -272,6 +273,7 @@ function EventWizardInner({
   initialStep1Taxonomies,
   importedRecordId,
   initialAiEnrichment,
+  ctaStepEnabled,
 }: EventWizardProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -1233,6 +1235,7 @@ function EventWizardInner({
       data: formData,
       onChange: handleChange,
       isEditable,
+      ctaStepEnabled,
     };
 
     // Add import-aware context for steps that depend on the current event entity

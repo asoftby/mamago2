@@ -18,6 +18,8 @@ export interface PlaceStickyActionBarProps {
   placeTitle: string;
   coverImageUrl?: string | null;
   className?: string;
+  /** Optional "Заявка" CTA (Direct) — additive, mirrors the desktop PlaceHero slot so mobile isn't missing the primary request path. */
+  directSlot?: React.ReactNode;
 }
 
 export function PlaceStickyActionBar({
@@ -31,6 +33,7 @@ export function PlaceStickyActionBar({
   placeTitle,
   coverImageUrl,
   className,
+  directSlot,
 }: PlaceStickyActionBarProps) {
   const [ctaPassed, setCtaPassed] = useState(false);
   useEffect(() => {
@@ -95,6 +98,8 @@ export function PlaceStickyActionBar({
           </div>
         )}
       </div>
+
+      {directSlot}
 
       {phones.length > 0 && (
         <PlacePhoneActionButton

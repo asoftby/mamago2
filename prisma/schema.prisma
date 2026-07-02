@@ -64,7 +64,7 @@ model User {
   marketingEmailsEnabled            Boolean                          @default(true)
   activities                        Activity[]                       @relation("ActivityOwner")
   performedAudits                   AuditLog[]                       @relation("AuditActor")
-  performedAdminAuditLogs          AdminAuditLog[]                  @relation("AdminAuditActor")
+  performedAdminAuditLogs           AdminAuditLog[]                  @relation("AdminAuditActor")
   auditLogs                         AuditLog[]                       @relation("AuditTarget")
   business                          Business?
   businessInvitesSent               BusinessInvite[]                 @relation("BusinessInviteInviter")
@@ -85,6 +85,7 @@ model User {
   notificationDeliveries            NotificationDelivery[]
   updatedNotificationTemplates      NotificationTemplate[]           @relation("NotificationTemplateUpdatedBy")
   offerIdeas                        OfferIdea[]
+  archivedOffers                    Offer[]                          @relation("OfferArchiver")
   placeIdeas                        PlaceIdea[]
   phoneOtps                         PhoneOtp[]
   archivedPlaces                    Place[]                          @relation("PlaceArchiver")
@@ -117,6 +118,15 @@ model User {
   updatedPages                      Page[]                           @relation("PageUpdatedBy")
   requestedOfferPlacements          OfferPlacement[]                 @relation("OfferPlacementRequestedBy")
   reviewedOfferPlacements           OfferPlacement[]                 @relation("OfferPlacementReviewedBy")
+  directThreadsAsCustomer           DirectThread[]                   @relation("DirectThreadCustomer")
+  directThreadsBlocked              DirectThread[]                   @relation("DirectThreadBlockedBy")
+  directThreadsHidden               DirectThread[]                   @relation("DirectThreadHiddenBy")
+  directMessagesSent                DirectMessage[]                  @relation("DirectMessageSender")
+  directMessagesHidden              DirectMessage[]                  @relation("DirectMessageHiddenBy")
+  directComplaintsReported          DirectComplaint[]                @relation("DirectComplaintReporter")
+  directComplaintsReviewed          DirectComplaint[]                @relation("DirectComplaintReviewer")
+  directRiskSignalsAsCustomer       DirectRiskSignal[]               @relation("DirectRiskSignalCustomer")
+  directPlatformSettingsUpdated     DirectPlatformSettings[]         @relation("DirectPlatformSettingsUpdatedBy")
 
   @@index([email])
   @@index([resetToken])
@@ -394,21 +404,21 @@ model SignalOption {
 }
 
 model FilterDefinition {
-  id         String         @id @default(cuid())
-  slug       String         @unique
+  id         String                     @id @default(cuid())
+  slug       String                     @unique
   title      String
   type       String
   ui         String
-  order      Int            @default(0)
-  isActive   Boolean        @default(true)
-  createdAt  DateTime       @default(now())
-  updatedAt  DateTime       @updatedAt
-  orderIndex Int            @default(0)
-  placement  UiPlacement    @default(PRIMARY)
+  order      Int                        @default(0)
+  isActive   Boolean                    @default(true)
+  createdAt  DateTime                   @default(now())
+  updatedAt  DateTime                   @updatedAt
+  orderIndex Int                        @default(0)
+  placement  UiPlacement                @default(PRIMARY)
   /// True = seeded by system, cannot be deleted, slug is immutable
-  isSystem   Boolean        @default(false)
+  isSystem   Boolean                    @default(false)
   /// Whether the public modal renders the group title above the control
-  showTitle  Boolean        @default(true)
+  showTitle  Boolean                    @default(true)
   options    FilterOption[]
   placements DiscoveryFilterPlacement[]
 }
@@ -445,20 +455,20 @@ model DiscoveryTaxonomyEntry {
 }
 
 model DiscoveryClassChip {
-  id               String   @id @default(cuid())
-  title            String
-  slug             String   @unique
-  description      String?
-  icon             String?
-  sortOrder        Int      @default(0)
-  isActive         Boolean  @default(true)
-  isDefault        Boolean  @default(false)
-  isSystem         Boolean  @default(false)
-  entityType       String   @default("OFFER")
-  surfaceKey       String   @default("CLASSES")
+  id                 String   @id @default(cuid())
+  title              String
+  slug               String   @unique
+  description        String?
+  icon               String?
+  sortOrder          Int      @default(0)
+  isActive           Boolean  @default(true)
+  isDefault          Boolean  @default(false)
+  isSystem           Boolean  @default(false)
+  entityType         String   @default("OFFER")
+  surfaceKey         String   @default("CLASSES")
   signalDefinitionId String?
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
   @@index([surfaceKey, isActive, sortOrder])
   @@index([signalDefinitionId])
@@ -602,45 +612,45 @@ model Region {
 }
 
 model City {
-  id                    String            @id @default(cuid())
+  id                    String                @id @default(cuid())
   countryId             String
-  country               Country           @relation(fields: [countryId], references: [id])
+  country               Country               @relation(fields: [countryId], references: [id])
   regionId              String?
-  region                Region?           @relation(fields: [regionId], references: [id])
+  region                Region?               @relation(fields: [regionId], references: [id])
   name                  String
   slug                  String
-  isActive              Boolean           @default(true)
-  isVisibleInCityFilter Boolean           @default(true)
-  priority              Int               @default(0)
+  isActive              Boolean               @default(true)
+  isVisibleInCityFilter Boolean               @default(true)
+  priority              Int                   @default(0)
   lat                   Float?
   lng                   Float?
   googlePlaceId         String?
-  createdFromGoogle     Boolean           @default(false)
+  createdFromGoogle     Boolean               @default(false)
   /// Legacy записи (например ошибочная «Минская область» как City) — скрыты из админки и селектора.
-  isLegacyNonCity       Boolean           @default(false)
-  createdAt             DateTime          @default(now())
-  updatedAt             DateTime          @updatedAt
+  isLegacyNonCity       Boolean               @default(false)
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
   centerLat             Float?
   centerLng             Float?
   googleName            String?
   googleNames           Json?
-  hasMetro              Boolean           @default(false)
+  hasMetro              Boolean               @default(false)
   metroMaxDistanceM     Int?
   radiusKm              Float?
   districts             District[]
-  importSources         ImportSource[]    @relation("ImportSourceCity")
+  importSources         ImportSource[]        @relation("ImportSourceCity")
   metroStations         MetroStation[]
-  places                Place[]           @relation("PlaceCity")
-  placeRevisions        PlaceRevision[]   @relation("PlaceRevisionCity")
+  places                Place[]               @relation("PlaceCity")
+  placeRevisions        PlaceRevision[]       @relation("PlaceRevisionCity")
   routes                Route[]
   searchQuickTags       SearchQuickTag[]
   searchQueryLogs       SearchQueryLog[]
-  offers                Offer[]           @relation("OfferCity")
+  offers                Offer[]               @relation("OfferCity")
   activitySlugHistories ActivitySlugHistory[]
   placeSlugHistories    PlaceSlugHistory[]
   offerSlugHistories    OfferSlugHistory[]
-  articles              Article[]         @relation("ArticleCity")
-  editorialRequests     EditorialRequest[] @relation("EditorialRequestCity")
+  articles              Article[]             @relation("ArticleCity")
+  editorialRequests     EditorialRequest[]    @relation("EditorialRequestCity")
   articleSlugHistories  ArticleSlugHistory[]
 
   @@unique([countryId, slug])
@@ -755,16 +765,16 @@ model Activity {
   /// Сигналы DISCOVERY домена (entityType=EVENT или OFFER), ID SignalDefinition
   discoverySignalIds   String[]                  @default([])
 
-  priceItems             Json?
-  faqItems               Json?
+  priceItems Json?
+  faqItems   Json?
 
   // Контактные телефоны активности
-  phone                  String?
-  phoneLabel             String?
-  phone2                 String?
-  phone2Label            String?
-  phone3                 String?
-  phone3Label            String?
+  phone       String?
+  phoneLabel  String?
+  phone2      String?
+  phone2Label String?
+  phone3      String?
+  phone3Label String?
 
   // Настройки записи
   bookingEnabled         Boolean          @default(false)
@@ -773,6 +783,7 @@ model Activity {
   bookingNote            String?
   bookingCapacityPerSlot Int?
   bookingRequests        BookingRequest[]
+  directThreads          DirectThread[]
 
   @@unique([cityId, slug])
   @@index([placeId])
@@ -817,17 +828,17 @@ model ActivitySlugHistory {
 }
 
 model ActivityImage {
-  id         String   @id @default(cuid())
-  activityId String
+  id           String      @id @default(cuid())
+  activityId   String
   mediaAssetId String?
-  url        String
-  width      Int?
-  height     Int?
-  blurhash   String?
-  sortOrder  Int      @default(0)
-  createdAt  DateTime @default(now())
-  activity   Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
-  mediaAsset MediaAsset? @relation("ActivityGalleryImageAsset", fields: [mediaAssetId], references: [id], onDelete: SetNull)
+  url          String
+  width        Int?
+  height       Int?
+  blurhash     String?
+  sortOrder    Int         @default(0)
+  createdAt    DateTime    @default(now())
+  activity     Activity    @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  mediaAsset   MediaAsset? @relation("ActivityGalleryImageAsset", fields: [mediaAssetId], references: [id], onDelete: SetNull)
 
   @@index([activityId, sortOrder])
   @@index([mediaAssetId])
@@ -879,34 +890,34 @@ model ActivityFilterOption {
 }
 
 model Business {
-  id                      String                     @id @default(cuid())
+  id                      String                        @id @default(cuid())
   name                    String
-  ownerUserId             String                     @unique
-  createdAt               DateTime                   @default(now())
-  updatedAt               DateTime                   @updatedAt
+  ownerUserId             String                        @unique
+  createdAt               DateTime                      @default(now())
+  updatedAt               DateTime                      @updatedAt
   legalName               String?
   phone                   String?
   contactPhoneVerifiedAt  DateTime?
-  status                  BusinessStatus             @default(DRAFT)
-  unp                     String?                    @unique
+  status                  BusinessStatus                @default(DRAFT)
+  unp                     String?                       @unique
   approvedAt              DateTime?
   rejectedAt              DateTime?
   reviewNote              String?
   reviewedAt              DateTime?
   reviewedByUserId        String?
   submittedAt             DateTime?
-  verificationStatus      BusinessVerificationStatus @default(DRAFT)
-  isVerified              Boolean                    @default(false)
+  verificationStatus      BusinessVerificationStatus    @default(DRAFT)
+  isVerified              Boolean                       @default(false)
   unpVerificationStatus   BusinessUnpVerificationStatus @default(PENDING)
   unpVerifiedAt           DateTime?
   unpOfficialName         String?
   unpLastCheckedAt        DateTime?
   /// Показ контента бизнеса пользователям (отдельно от верификации)
-  operationalStatus       BusinessOperationalStatus  @default(ACTIVE)
-  activities              Activity[]                 @relation("ActivityBusiness")
+  operationalStatus       BusinessOperationalStatus     @default(ACTIVE)
+  activities              Activity[]                    @relation("ActivityBusiness")
   billingAccount          BillingAccount?
   bookingRequests         BookingRequest[]
-  owner                   User                       @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+  owner                   User                          @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
   contracts               BusinessContract[]
   invites                 BusinessInvite[]
   members                 BusinessMember[]
@@ -914,12 +925,14 @@ model Business {
   servicePlacements       BusinessServicePlacement[]
   verificationLogs        BusinessVerificationLog[]
   commercialNotifications CommercialNotification[]
-  billingActionRates      BillingActionRate[]          @relation("BusinessActionRates")
-  places                  Place[]                    @relation("BusinessPlaces")
+  billingActionRates      BillingActionRate[]           @relation("BusinessActionRates")
+  places                  Place[]                       @relation("BusinessPlaces")
   organizers              Organizer[]
   promotions              Promotion[]
-  claimRequests           PlaceClaimRequest[]        @relation("ClaimedPlaces")
+  claimRequests           PlaceClaimRequest[]           @relation("ClaimedPlaces")
   accessRequests          BusinessAccessRequest[]
+  directThreads           DirectThread[]
+  directRiskSignals       DirectRiskSignal[]
 
   @@index([ownerUserId])
   @@index([status])
@@ -1003,7 +1016,7 @@ model BusinessVerificationLog {
 
 /// Заявка пользователя на доступ к Business, который уже зарегистрирован другим owner'ом (по УНП).
 model BusinessAccessRequest {
-  id                String                       @id @default(cuid())
+  id                String                      @id @default(cuid())
   businessId        String
   requesterUserId   String
   unp               String
@@ -1012,14 +1025,14 @@ model BusinessAccessRequest {
   email             String?
   requesterRole     BusinessAccessRequesterRole
   comment           String?
-  status            BusinessAccessRequestStatus  @default(PENDING)
+  status            BusinessAccessRequestStatus @default(PENDING)
   reviewedAt        DateTime?
   reviewedByAdminId String?
-  createdAt         DateTime                     @default(now())
-  updatedAt         DateTime                     @updatedAt
-  business          Business                     @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  requesterUser     User                         @relation("BusinessAccessRequester", fields: [requesterUserId], references: [id], onDelete: Cascade)
-  reviewedByAdmin   User?                        @relation("BusinessAccessRequestReviewedBy", fields: [reviewedByAdminId], references: [id], onDelete: SetNull)
+  createdAt         DateTime                    @default(now())
+  updatedAt         DateTime                    @updatedAt
+  business          Business                    @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  requesterUser     User                        @relation("BusinessAccessRequester", fields: [requesterUserId], references: [id], onDelete: Cascade)
+  reviewedByAdmin   User?                       @relation("BusinessAccessRequestReviewedBy", fields: [reviewedByAdminId], references: [id], onDelete: SetNull)
 
   @@index([businessId])
   @@index([requesterUserId])
@@ -1125,14 +1138,14 @@ model Place {
   bookingNote    String?
 
   // Google Places данные
-  googleRating            Float?
-  googleUserRatingsTotal  Int?
-  googleReviewsJson       Json?
-  googleReviewsSyncedAt   DateTime?
-  googleMapsUri           String?
+  googleRating           Float?
+  googleUserRatingsTotal Int?
+  googleReviewsJson      Json?
+  googleReviewsSyncedAt  DateTime?
+  googleMapsUri          String?
 
-  priceItems              Json?
-  faqItems                Json?
+  priceItems Json?
+  faqItems   Json?
 
   activities      Activity[]          @relation("PlaceActivities")
   bookingRequests BookingRequest[]
@@ -1164,6 +1177,7 @@ model Place {
   relatedArticles Article[]           @relation("ArticleRelatedPlace")
   planItems       PlanItem[]
   placeIdeas      PlaceIdea[]
+  directThreads   DirectThread[]
 
   @@unique([cityId, slug])
   @@unique([createdByUserId, createRequestId])
@@ -1204,7 +1218,7 @@ model PlaceSubcategory {
 
 /// Отзывы о местах из разных источников (mamaGo, Google)
 model PlaceReview {
-  id                      String              @id @default(cuid())
+  id                      String            @id @default(cuid())
   placeId                 String
   source                  PlaceReviewSource
   sourceReviewId          String?
@@ -1215,18 +1229,18 @@ model PlaceReview {
   language                String?
   publishedAt             DateTime
   relativeTimeDescription String?
-  status                  PlaceReviewStatus   @default(PUBLISHED)
-  
+  status                  PlaceReviewStatus @default(PUBLISHED)
+
   // Ответ автора (только для mamaGo отзывов)
-  ownerReplyText          String?
-  ownerReplyAuthorId      String?
-  ownerReplyAuthorName    String?
-  ownerReplyCreatedAt     DateTime?
-  ownerReplyUpdatedAt     DateTime?
-  
-  createdAt               DateTime            @default(now())
-  updatedAt               DateTime            @updatedAt
-  place                   Place               @relation(fields: [placeId], references: [id], onDelete: Cascade)
+  ownerReplyText       String?
+  ownerReplyAuthorId   String?
+  ownerReplyAuthorName String?
+  ownerReplyCreatedAt  DateTime?
+  ownerReplyUpdatedAt  DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  place     Place    @relation(fields: [placeId], references: [id], onDelete: Cascade)
 
   @@unique([placeId, source, sourceReviewId])
   @@index([placeId])
@@ -1406,7 +1420,7 @@ model TempMedia {
 }
 
 model Notification {
-  id         String                 @id @default(cuid())
+  id         String                  @id @default(cuid())
   userId     String
   audience   NotificationAudience?
   type       NotificationType
@@ -1419,19 +1433,19 @@ model Notification {
   archivedAt DateTime?
   /// Первый просмотр в центре уведомлений; null = «новое» для badge и сортировки
   seenAt     DateTime?
-  createdAt  DateTime               @default(now())
-  updatedAt  DateTime               @updatedAt
+  createdAt  DateTime                @default(now())
+  updatedAt  DateTime                @updatedAt
   expiresAt  DateTime?
   ctaLabel   String?
   ctaAction  String?
-  actionMode NotificationActionMode @default(NONE)
+  actionMode NotificationActionMode  @default(NONE)
   actionUrl  String?
   modalTitle String?
   modalBody  String?
   metadata   Json?
   /// Закреплённые уведомления (welcome и т.п.) — показываются выше в списке
-  isPinned   Boolean                @default(false)
-  user       User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  isPinned   Boolean                 @default(false)
+  user       User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
   deliveries NotificationDelivery[]
 
   @@index([userId, audience, createdAt])
@@ -1796,6 +1810,9 @@ model Offer {
   promoDescription         String?
   promoUntil               DateTime?
   status                   OfferStatus        @default(DRAFT)
+  archivedAt               DateTime?
+  archivedByUserId         String?
+  archiveReason            String?
   publishedAt              DateTime?
   rejectionReason          String?
   createRequestId          String?            @unique
@@ -1832,69 +1849,70 @@ model Offer {
   bookingNote    String?
 
   // Gallery images (JSON array of URLs)
-  galleryImages            Json?              @default("[]")
+  galleryImages Json? @default("[]")
 
   // Camp-specific fields (JSON for MVP, can be normalized later)
   /// Camp sessions with dates (JSON array: [{dateFrom, dateTo}, ...])
-  campSessions             Json?
+  campSessions        Json?
   /// Camp session duration (e.g., "7 дней", "2 недели")
-  campSessionDuration      String?
+  campSessionDuration String?
   /// Camp stay duration (e.g., "с 9:00 до 17:00", "круглосуточно")
-  campStayDuration         String?
+  campStayDuration    String?
   /// Number of available places
-  campPlacesCount          Int?
+  campPlacesCount     Int?
   /// Group size
-  campGroupSize            Int?
+  campGroupSize       Int?
   /// Daily schedule description
-  campDaySchedule          String?
+  campDaySchedule     String?
   /// Can select individual days
-  campCanSelectDays        Boolean            @default(false)
+  campCanSelectDays   Boolean @default(false)
   /// Has extended care option
-  campHasExtendedCare      Boolean            @default(false)
+  campHasExtendedCare Boolean @default(false)
   /// Тип программы лагеря: городской | выездной | смешанный (wizard CAMP)
-  campProgramType          String?
+  campProgramType     String?
 
   // Accommodation fields (for CAMP type)
   /// Is accommodation provided
-  accommodationProvided    Boolean            @default(false)
+  accommodationProvided   Boolean @default(false)
   /// Type of accommodation (e.g., "палатки", "коттеджи")
-  accommodationType        String?
+  accommodationType       String?
   /// Адрес проживания (отдельно от площадки)
-  accommodationAddress     String?
+  accommodationAddress    String?
   /// Описание комнат / расселения
-  accommodationRooms       String?
+  accommodationRooms      String?
   /// Включённые приёмы питания (JSON string[]: breakfast, lunch, dinner, snacks)
-  campIncludedMeals        Json?
+  campIncludedMeals       Json?
   /// Безопасность / охрана
-  campSafetyInfo           String?
+  campSafetyInfo          String?
   /// Медицинское сопровождение
-  campMedicalInfo          String?
+  campMedicalInfo         String?
   /// Accommodation conditions description
-  accommodationConditions  String?
+  accommodationConditions String?
   /// Meal information
-  mealInfo                 String?
+  mealInfo                String?
   /// Transfer information
-  transferInfo             String?
+  transferInfo            String?
   /// What to bring
-  whatToBring              String?
+  whatToBring             String?
   /// Отображаемый хвост деталей по типу. Фильтруемые поля — отдельные колонки.
-  details                  Json?
+  details                 Json?
 
   // Party-фильтры (Phase 3b-1 — колонки пусты; write-path в 3b-2)
   /// Категория party-услуги (SERVICE); у PACKAGE category=null, состав через PackageComponent.
-  category                 PartyCategory?
+  category          PartyCategory?
   /// Формат локации party-оффера (у нас / выезд / оба).
-  partyLocationType        PartyLocationType?
+  partyLocationType PartyLocationType?
   // Note: spec calls this `locationType`, but partyLocationType avoids shadowing the form's legacy string `locationType` field in 3b-2 mapper
   /// Минимальное и максимальное число детей для party-услуги
-  minChildren              Int?
-  maxChildren              Int?
+  minChildren       Int?
+  maxChildren       Int?
   /// Поводы, под которые подходит предложение (BIRTHDAY, GRADUATION; расширяемо аддитивно)
-  occasions                PartyOccasion[]      @default([])
+  occasions         PartyOccasion[]    @default([])
 
   boosts          Boost[]
   bookingRequests BookingRequest[]
   offerIdeas      OfferIdea[]
+  archivedBy      User?              @relation("OfferArchiver", fields: [archivedByUserId], references: [id])
   openingHours    OpeningHours?      @relation(fields: [openingHoursId], references: [id])
   placements      OfferPlacement[]
   place           Place              @relation(fields: [placeId], references: [id], onDelete: Cascade)
@@ -1903,10 +1921,14 @@ model Offer {
   sessions        OfferSession[]
   components      PackageComponent[] @relation("PackageOf")
   referencedBy    PackageComponent[] @relation("ReferencedBy")
+  directThreads   DirectThread[]
 
   @@unique([cityId, slug])
   @@index([placeId])
   @@index([status])
+  @@index([archivedAt])
+  @@index([archivedByUserId])
+  @@index([status, archivedAt])
   @@index([kind])
   @@index([productType])
   @@index([dateFrom])
@@ -1945,9 +1967,9 @@ model OfferPlacement {
 /// Fase 1: заполняется только для CAMP (продатированные смены).
 /// Существующий campSessions JSON остаётся — новые лагеря пишут сюда + JSON.
 model OfferSession {
-  id       String   @id @default(cuid())
-  offerId  String
-  offer    Offer    @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  id      String @id @default(cuid())
+  offerId String
+  offer   Offer  @relation(fields: [offerId], references: [id], onDelete: Cascade)
 
   startAt  DateTime
   endAt    DateTime
@@ -1963,16 +1985,16 @@ model OfferSession {
 /// Состав пакета «Праздник под ключ» (реляционный, не JSON).
 /// Fase 1: структура без CPA и vendor-constraint в схеме.
 model PackageComponent {
-  id            String            @id @default(cuid())
+  id            String        @id @default(cuid())
   packageId     String
-  package       Offer             @relation("PackageOf", fields: [packageId], references: [id], onDelete: Cascade)
+  package       Offer         @relation("PackageOf", fields: [packageId], references: [id], onDelete: Cascade)
   refOfferId    String?
-  refOffer      Offer?            @relation("ReferencedBy", fields: [refOfferId], references: [id], onDelete: SetNull)
+  refOffer      Offer?        @relation("ReferencedBy", fields: [refOfferId], references: [id], onDelete: SetNull)
   category      PartyCategory
   title         String
-  priceSnapshot Decimal?          @db.Decimal(10, 2)
-  isOptional    Boolean           @default(false)
-  priceDelta    Decimal?          @db.Decimal(10, 2)
+  priceSnapshot Decimal?      @db.Decimal(10, 2)
+  isOptional    Boolean       @default(false)
+  priceDelta    Decimal?      @db.Decimal(10, 2)
   position      Int
 
   @@index([packageId, position])
@@ -1984,8 +2006,8 @@ model OfferIdea {
   userId    String
   offerId   String
   createdAt DateTime @default(now())
-  offer      Offer   @relation(fields: [offerId], references: [id], onDelete: Cascade)
-  user       User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  offer     Offer    @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, offerId])
   @@index([userId])
@@ -2158,6 +2180,7 @@ model BillingTransaction {
   paymentMethod       PaymentMethod?           @relation(fields: [paymentMethodId], references: [id])
   subscription        Subscription?            @relation(fields: [subscriptionId], references: [id])
 
+  @@unique([billingAccountId, idempotencyKey])
   @@index([billingAccountId, occurredAt])
   @@index([type])
   @@index([status])
@@ -2165,7 +2188,6 @@ model BillingTransaction {
   @@index([idempotencyKey])
   @@index([parentTransactionId])
   @@index([subscriptionId])
-  @@unique([billingAccountId, idempotencyKey])
 }
 
 model BillingDispute {
@@ -2511,7 +2533,7 @@ model Article {
   category           EventCategory?       @relation("ArticleCategory", fields: [categoryId], references: [id], onDelete: SetNull)
 
   /// Managed Discovery tags attached to this publication (many-to-many).
-  tags               DiscoveryTag[]
+  tags DiscoveryTag[]
 
   /// Partial unique index created via raw SQL migration:
   /// CREATE UNIQUE INDEX ... WHERE "cityId" IS NOT NULL AND "slug" IS NOT NULL
@@ -2593,33 +2615,33 @@ enum SearchEntityType {
 }
 
 model RouteStop {
-  id                   String   @id @default(cuid())
-  routeId              String
-  order                Int
-  placeId              String?
-  googlePlaceId        String?
-  lat                  Float?
-  lng                  Float?
-  address              String?
-  customTitle          String?
-  note                 String
-  photoUrl             String?
-  priceType            RouteStopPriceType @default(UNKNOWN)
-  priceMin             Float?
-  priceMax             Float?
-  priceCurrency        String             @default("BYN")
-  priceNote            String?
-  formattedAddress     String?
-  addressComponents    Json?
-  rawGooglePayload     Json?
-  detectedCountryCode  String?
-  detectedCountryName  String?
-  detectedCityName     String?
-  detectedRegionName   String?
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
-  place                Place?   @relation(fields: [placeId], references: [id])
-  route                Route    @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  id                  String             @id @default(cuid())
+  routeId             String
+  order               Int
+  placeId             String?
+  googlePlaceId       String?
+  lat                 Float?
+  lng                 Float?
+  address             String?
+  customTitle         String?
+  note                String
+  photoUrl            String?
+  priceType           RouteStopPriceType @default(UNKNOWN)
+  priceMin            Float?
+  priceMax            Float?
+  priceCurrency       String             @default("BYN")
+  priceNote           String?
+  formattedAddress    String?
+  addressComponents   Json?
+  rawGooglePayload    Json?
+  detectedCountryCode String?
+  detectedCountryName String?
+  detectedCityName    String?
+  detectedRegionName  String?
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+  place               Place?             @relation(fields: [placeId], references: [id])
+  route               Route              @relation(fields: [routeId], references: [id], onDelete: Cascade)
 
   @@index([routeId, order])
   @@index([placeId])
@@ -2727,7 +2749,7 @@ model NotificationPolicy {
   id                           String                    @id @default(cuid())
   key                          String                    @unique
   surface                      NotificationPolicySurface
-  notificationType            NotificationType?
+  notificationType             NotificationType?
   scenario                     NotificationScenario?
   enabled                      Boolean                   @default(true)
   allowedInApp                 Boolean                   @default(true)
@@ -3257,6 +3279,10 @@ enum NotificationType {
   BOOKING_COMPLETED
   /// Запрос отзыва после завершения заявки
   BOOKING_FEEDBACK_REQUEST
+  /// Создан новый Direct-тред по публикации (получает business)
+  DIRECT_THREAD_CREATED
+  /// Новое сообщение в Direct-треде
+  DIRECT_NEW_MESSAGE
 }
 
 enum NotificationAudience {
@@ -3290,6 +3316,7 @@ enum NotificationEntityType {
   SYSTEM
   BROADCAST
   MODERATION_ITEM
+  DIRECT_THREAD
 }
 
 enum NotificationPolicySurface {
@@ -3968,14 +3995,15 @@ model BookingRequest {
   responseTimeMinutes Int?
 
   // Relations
-  business   Business          @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  user       User?             @relation(fields: [userId], references: [id], onDelete: SetNull)
-  activity   Activity?         @relation(fields: [activityId], references: [id], onDelete: SetNull)
-  offer      Offer?            @relation(fields: [offerId], references: [id], onDelete: SetNull)
-  place      Place?            @relation(fields: [placeId], references: [id], onDelete: SetNull)
-  session    ActivitySession?  @relation(fields: [selectedSessionId], references: [id], onDelete: SetNull)
-  activities BookingActivity[]
-  feedback   BookingFeedback?
+  business     Business          @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  user         User?             @relation(fields: [userId], references: [id], onDelete: SetNull)
+  activity     Activity?         @relation(fields: [activityId], references: [id], onDelete: SetNull)
+  offer        Offer?            @relation(fields: [offerId], references: [id], onDelete: SetNull)
+  place        Place?            @relation(fields: [placeId], references: [id], onDelete: SetNull)
+  session      ActivitySession?  @relation(fields: [selectedSessionId], references: [id], onDelete: SetNull)
+  activities   BookingActivity[]
+  feedback     BookingFeedback?
+  directThread DirectThread?
 
   @@index([businessId])
   @@index([userId])
@@ -4007,14 +4035,14 @@ enum BookingActivityActorType {
 
 /// История событий по заявке (timeline)
 model BookingActivity {
-  id         String                   @id @default(cuid())
-  bookingId  String
-  type       BookingActivityType
-  actorType  BookingActivityActorType @default(SYSTEM)
-  actorId    String?
+  id        String                   @id @default(cuid())
+  bookingId String
+  type      BookingActivityType
+  actorType BookingActivityActorType @default(SYSTEM)
+  actorId   String?
   /// Дополнительные данные события (JSON)
-  payload    Json?
-  createdAt  DateTime                 @default(now())
+  payload   Json?
+  createdAt DateTime                 @default(now())
 
   booking BookingRequest @relation(fields: [bookingId], references: [id], onDelete: Cascade)
 
@@ -4040,6 +4068,279 @@ model BookingFeedback {
   @@index([bookingId])
   @@index([userId])
   @@index([createdAt])
+}
+
+// ============================================================================
+// DIRECT MODULE (Phase 1 — Core)
+// ============================================================================
+// Коммуникационный слой платформы вокруг публикации (Offer/Event/Place).
+// Не чат, не мессенджер: инициирует всегда customer, business никогда не пишет
+// первым, customer не пишет customer, business не пишет business.
+// Сообщения immutable — soft moderation (hiddenAt) вместо edit/delete.
+// Полиморфная привязка к публикации по образцу BookingRequest (publicationType +
+// offerId/activityId/placeId nullable) вместо отдельной ConversationParticipant
+// или единого полиморфного publicationId — участники Direct всегда строго
+// известны (customerUserId, businessId), отдельная participant-модель не нужна.
+
+/// Диалог пользователя с бизнесом по конкретной публикации.
+model DirectThread {
+  id           String @id @default(cuid())
+  /// Числовая часть номера треда, отображается пользователю как "D-{threadNumber}"
+  /// (например D-10253), чтобы можно было сообщить номер в поддержку.
+  threadNumber Int    @unique @default(autoincrement())
+
+  publicationType PublicationType
+  offerId         String?
+  activityId      String?
+  placeId         String?
+
+  businessId     String
+  customerUserId String
+
+  /// Опциональная связь с заявкой (BookingRequest), из которой мог вырасти Direct.
+  bookingRequestId String? @unique
+
+  status DirectThreadStatus @default(OPEN)
+
+  /// Денормализация для дешёвой сортировки списков (как BookingRequest.lastActivityAt).
+  lastMessageAt DateTime         @default(now())
+  lastMessageBy DirectActorType?
+
+  blockedAt       DateTime?
+  blockedByUserId String?
+
+  hiddenAt       DateTime?
+  hiddenByUserId String?
+
+  /// Когда тред переведён в CLOSED — гейт для "оценить диалог" в следующих фазах
+  /// (рейтинг открывается только после completedAt != null).
+  completedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  business       Business           @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  customer       User               @relation("DirectThreadCustomer", fields: [customerUserId], references: [id], onDelete: Cascade)
+  offer          Offer?             @relation(fields: [offerId], references: [id], onDelete: SetNull)
+  activity       Activity?          @relation(fields: [activityId], references: [id], onDelete: SetNull)
+  place          Place?             @relation(fields: [placeId], references: [id], onDelete: SetNull)
+  bookingRequest BookingRequest?    @relation(fields: [bookingRequestId], references: [id], onDelete: SetNull)
+  blockedBy      User?              @relation("DirectThreadBlockedBy", fields: [blockedByUserId], references: [id], onDelete: SetNull)
+  hiddenBy       User?              @relation("DirectThreadHiddenBy", fields: [hiddenByUserId], references: [id], onDelete: SetNull)
+  messages       DirectMessage[]
+  complaints     DirectComplaint[]
+  riskSignals    DirectRiskSignal[]
+
+  @@index([businessId, status, lastMessageAt])
+  @@index([customerUserId, status, lastMessageAt])
+  @@index([offerId])
+  @@index([activityId])
+  @@index([placeId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+/// Сообщение в Direct-треде. Immutable: текст никогда не редактируется и не
+/// удаляется физически — только soft-hide через hiddenAt/hiddenByUserId.
+model DirectMessage {
+  id           String          @id @default(cuid())
+  threadId     String
+  senderType   DirectActorType
+  /// Конкретный User-отправитель (для BUSINESS — сотрудник BusinessMember,
+  /// который физически написал; пользователю показывается только бренд бизнеса).
+  senderUserId String?
+  body         String
+
+  createdAt DateTime  @default(now())
+  readAt    DateTime?
+
+  hiddenAt       DateTime?
+  hiddenByUserId String?
+  hiddenReason   DirectMessageHiddenReason?
+
+  thread      DirectThread       @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  sender      User?              @relation("DirectMessageSender", fields: [senderUserId], references: [id], onDelete: SetNull)
+  hiddenBy    User?              @relation("DirectMessageHiddenBy", fields: [hiddenByUserId], references: [id], onDelete: SetNull)
+  riskSignals DirectRiskSignal[]
+
+  @@index([threadId, createdAt])
+  @@index([senderUserId])
+  @@index([threadId, readAt])
+}
+
+/// Жалоба пользователя на Direct-тред (safety UX).
+model DirectComplaint {
+  id             String                @id @default(cuid())
+  threadId       String
+  reporterUserId String
+  reason         String
+  comment        String?
+  status         DirectComplaintStatus @default(PENDING)
+  /// Итог разбора: что решил модератор и почему (видно только админке).
+  resolution     String?
+
+  createdAt        DateTime  @default(now())
+  reviewedAt       DateTime?
+  reviewedByUserId String?
+
+  thread     DirectThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  reporter   User         @relation("DirectComplaintReporter", fields: [reporterUserId], references: [id], onDelete: Cascade)
+  reviewedBy User?        @relation("DirectComplaintReviewer", fields: [reviewedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([threadId])
+  @@index([reporterUserId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+enum DirectThreadStatus {
+  OPEN
+  CLOSED
+  BLOCKED
+  /// Автоматический архив неактивных тредов (план: 30 дней без активности).
+  /// Сама cron-логика перевода — задача следующей фазы; enum закладывается сейчас.
+  ARCHIVED
+}
+
+enum DirectActorType {
+  CUSTOMER
+  BUSINESS
+  /// Системное автоматическое сообщение (mamaGo), без живого автора.
+  SYSTEM
+  /// Сообщение от живого сотрудника поддержки/модерации mamaGo — отличается
+  /// от SYSTEM тем, что это осознанное вмешательство человека, не автоматика.
+  ADMIN
+}
+
+enum DirectComplaintStatus {
+  PENDING
+  REVIEWED
+  DISMISSED
+  /// Жалоба подтвердилась и по ней предпринято действие (например, тред заблокирован).
+  ACTION_TAKEN
+}
+
+enum DirectMessageHiddenReason {
+  SPAM
+  ABUSE
+  SCAM
+  OFFTOPIC
+  OTHER
+}
+
+/// Trust & Safety (Phase 5): append-only log of risk events for a Direct
+/// thread/message/business/customer — never mutated, only read for scoring
+/// (see getThreadRiskSummary) and for the admin "Безопасность" dashboard.
+/// Deliberately NOT a "RiskCase" workflow model — just a signal ledger.
+model DirectRiskSignal {
+  id             String  @id @default(cuid())
+  threadId       String?
+  messageId      String?
+  businessId     String?
+  customerUserId String?
+
+  signalType DirectRiskSignalType
+  severity   DirectRiskSeverity
+  score      Int
+  metadata   Json?
+
+  createdAt DateTime @default(now())
+
+  thread   DirectThread?  @relation(fields: [threadId], references: [id], onDelete: SetNull)
+  message  DirectMessage? @relation(fields: [messageId], references: [id], onDelete: SetNull)
+  business Business?      @relation(fields: [businessId], references: [id], onDelete: SetNull)
+  customer User?          @relation("DirectRiskSignalCustomer", fields: [customerUserId], references: [id], onDelete: SetNull)
+
+  @@index([threadId])
+  @@index([messageId])
+  @@index([businessId])
+  @@index([customerUserId])
+  @@index([signalType])
+  @@index([severity])
+  @@index([createdAt])
+}
+
+enum DirectRiskSignalType {
+  CONTACT_PHONE
+  CONTACT_EMAIL
+  CONTACT_LINK
+  CONTACT_TELEGRAM
+  CONTACT_WHATSAPP
+  CONTACT_INSTAGRAM
+  FLOOD_LOCK_TRIGGERED
+  NO_REPLY_CAP_TRIGGERED
+  REPEATED_LIMIT_TRIGGERED
+  COMPLAINT_OPENED
+  MESSAGE_HIDDEN
+  THREAD_BLOCKED
+}
+
+enum DirectRiskSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+/// Phase 6 — platform-wide Direct policy (singleton, same convention as
+/// RankingSettings/BoostSettings: one row, id="singleton"). This is NOT a
+/// per-thread/per-publication setting — it's how the admin controls how
+/// Direct behaves across the whole platform.
+///
+/// publicationTypePolicy is a JSON map keyed by PublicationType
+/// ("OFFER"|"EVENT"|"PLACE"), each value shaped like:
+///   { enabled, defaultMode, allowedModes: DirectCommunicationMode[],
+///     businessOverrideAllowed, directRequired }
+/// Kept as JSON rather than 3 near-identical columns/tables — see
+/// directPlatformSettings.service.ts for the typed read/write layer and
+/// zod validation (the DB itself does not enforce this shape).
+model DirectPlatformSettings {
+  id String @id @default("singleton")
+
+  publicationTypePolicy Json
+
+  /// "Разрешить бизнесу начинать переписку после завершённого обращения" —
+  /// default false, preserves "business never initiates" today. Storage-only
+  /// architecture point for future service scenarios (Phase 7+); not read by
+  /// any send path yet.
+  allowBusinessReopenAfterCompletion Boolean @default(false)
+
+  contactVisibility DirectContactVisibility @default(ALWAYS)
+  /// Days until an inactive occasion auto-closes; null = "Никогда". Storage only — cron lands later.
+  autoCloseDays     Int?
+  /// Days until a closed dialog auto-archives; null = "Никогда". Storage only — cron lands later.
+  autoArchiveDays   Int?
+
+  floodMessageCount    Int @default(5)
+  floodIntervalSeconds Int @default(60)
+  floodLockMinutes     Int @default(10)
+  noReplyCapCount      Int @default(3)
+
+  contactDetectPhone     Boolean @default(true)
+  contactDetectEmail     Boolean @default(true)
+  contactDetectLink      Boolean @default(true)
+  contactDetectTelegram  Boolean @default(true)
+  contactDetectWhatsapp  Boolean @default(true)
+  contactDetectInstagram Boolean @default(true)
+
+  updatedAt       DateTime @updatedAt
+  updatedByUserId String?
+
+  updatedBy User? @relation("DirectPlatformSettingsUpdatedBy", fields: [updatedByUserId], references: [id], onDelete: SetNull)
+}
+
+enum DirectCommunicationMode {
+  CONTACTS_ONLY
+  DIRECT_ONLY
+  DIRECT_AND_CONTACTS
+  EXTERNAL_BOOKING
+}
+
+enum DirectContactVisibility {
+  ALWAYS
+  AFTER_FIRST_REQUEST
+  AFTER_BUSINESS_CONFIRMATION
+  NEVER
 }
 
 /// Анонимные генерации подборки «Мой план» (ключ anon:UUID или iph:hash).
@@ -4090,7 +4391,7 @@ model SearchSynonym {
 
 /// Search query log для аналитики и zero-result tracking
 model SearchQueryLog {
-  id                String    @id @default(cuid())
+  id                String   @id @default(cuid())
   query             String
   resultsCount      Int
   clickedEntityId   String?
@@ -4098,7 +4399,7 @@ model SearchQueryLog {
   cityId            String?
   userId            String?
   sessionId         String?
-  createdAt         DateTime  @default(now())
+  createdAt         DateTime @default(now())
 
   city City? @relation(fields: [cityId], references: [id], onDelete: SetNull)
   user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
@@ -4113,15 +4414,15 @@ model SearchQueryLog {
 
 /// Search index record для контроля качества индексации
 model SearchIndexRecord {
-  id          String                 @id @default(cuid())
-  entityId    String
-  entityType  SearchIndexEntityType
-  status      SearchIndexStatus      @default(PENDING)
-  searchable  Boolean                @default(true)
-  indexedAt   DateTime?
-  error       String?
-  createdAt   DateTime               @default(now())
-  updatedAt   DateTime               @updatedAt
+  id         String                @id @default(cuid())
+  entityId   String
+  entityType SearchIndexEntityType
+  status     SearchIndexStatus     @default(PENDING)
+  searchable Boolean               @default(true)
+  indexedAt  DateTime?
+  error      String?
+  createdAt  DateTime              @default(now())
+  updatedAt  DateTime              @updatedAt
 
   @@unique([entityId, entityType])
   @@index([entityType])
@@ -4149,12 +4450,12 @@ enum SearchIndexStatus {
 /// Search ranking settings для управления весами поиска и рекомендаций
 model SearchRankingSettings {
   id              String   @id @default(cuid())
-  nearbyBoost     Int      @default(50)  // 0-100: вес близости к пользователю
-  freshnessBoost  Int      @default(30)  // 0-100: вес свежести контента
-  popularityBoost Int      @default(40)  // 0-100: вес популярности (views, bookings)
-  partnerBoost    Int      @default(20)  // 0-100: вес партнерского контента
-  ageBoost        Int      @default(60)  // 0-100: вес соответствия возрасту ребенка
-  cityBoost       Int      @default(70)  // 0-100: вес соответствия городу пользователя
+  nearbyBoost     Int      @default(50) // 0-100: вес близости к пользователю
+  freshnessBoost  Int      @default(30) // 0-100: вес свежести контента
+  popularityBoost Int      @default(40) // 0-100: вес популярности (views, bookings)
+  partnerBoost    Int      @default(20) // 0-100: вес партнерского контента
+  ageBoost        Int      @default(60) // 0-100: вес соответствия возрасту ребенка
+  cityBoost       Int      @default(70) // 0-100: вес соответствия городу пользователя
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
@@ -4167,26 +4468,26 @@ model SearchRankingSettings {
 
 /// Управляемые страницы: юридические, маркетинговые, лендинги, FAQ, системные
 model Page {
-  id              String         @id @default(cuid())
-  slug            String         @unique
-  title           String
-  type            PageType
-  status          PageStatus     @default(DRAFT)
-  visibility      PageVisibility @default(PUBLIC)
-  excerpt         String?
-  content         String?
-  seoTitle        String?
-  seoDescription  String?
-  ogImageUrl      String?
-  publishedAt     DateTime?
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
-  createdById     String?
-  updatedById     String?
-  
+  id             String         @id @default(cuid())
+  slug           String         @unique
+  title          String
+  type           PageType
+  status         PageStatus     @default(DRAFT)
+  visibility     PageVisibility @default(PUBLIC)
+  excerpt        String?
+  content        String?
+  seoTitle       String?
+  seoDescription String?
+  ogImageUrl     String?
+  publishedAt    DateTime?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  createdById    String?
+  updatedById    String?
+
   // Relations
-  createdBy       User?          @relation("PageCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
-  updatedBy       User?          @relation("PageUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  createdBy User? @relation("PageCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedBy User? @relation("PageUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
 
   @@index([slug])
   @@index([type])
@@ -4203,8 +4504,8 @@ model Page {
 /// Один тип на раздел; создаётся лениво при первом включении в админке.
 model SectionSystemFilter {
   id         String   @id @default(cuid())
-  sectionKey String   // kuda | classes | birthday | routes
-  type       String   // BUDGET | FREE_ONLY
+  sectionKey String // kuda | classes | birthday | routes
+  type       String // BUDGET | FREE_ONLY
   enabled    Boolean  @default(false)
   sortOrder  Int      @default(0)
   createdAt  DateTime @default(now())
@@ -4219,25 +4520,24 @@ model SectionSystemFilter {
 /// categoryId-only → фильтр конкретной категории каталога.
 /// intent+categoryId → переопределение фильтра раздела для категории.
 model DiscoveryFilterPlacement {
-  id         String           @id @default(cuid())
-  filterId   String
-  filter     FilterDefinition @relation(fields: [filterId], references: [id], onDelete: Cascade)
+  id       String           @id @default(cuid())
+  filterId String
+  filter   FilterDefinition @relation(fields: [filterId], references: [id], onDelete: Cascade)
 
-  intent     String?          // kuda | classes | birthday | routes
+  intent     String? // kuda | classes | birthday | routes
   categoryId String?
-  category   EventCategory?   @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  category   EventCategory? @relation(fields: [categoryId], references: [id], onDelete: Cascade)
 
-  isActive   Boolean          @default(true)
-  sortOrder  Int              @default(0)
+  isActive  Boolean @default(true)
+  sortOrder Int     @default(0)
 
-  createdAt  DateTime         @default(now())
-  updatedAt  DateTime         @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([filterId, intent, categoryId])
   @@index([intent, isActive, sortOrder])
   @@index([categoryId, isActive, sortOrder])
 }
-
 
 model DiscoveryTag {
   id             String   @id @default(cuid())
@@ -4252,45 +4552,45 @@ model DiscoveryTag {
   updatedAt      DateTime @updatedAt
 
   // Back-relation to publications (Article stores News, Article, Breaking News)
-  articles       Article[]
+  articles Article[]
 
   @@index([slug])
   @@index([isActive, sortOrder])
 }
 
 enum PageType {
-  LEGAL       // Юридические: политика, оферта, условия
-  MARKETING   // Маркетинговые: для бизнеса, рекламодателям
-  LANDING     // Лендинги и промо-страницы
-  FAQ         // Часто задаваемые вопросы
-  SYSTEM      // Системные страницы
-  SEO         // SEO-страницы
+  LEGAL // Юридические: политика, оферта, условия
+  MARKETING // Маркетинговые: для бизнеса, рекламодателям
+  LANDING // Лендинги и промо-страницы
+  FAQ // Часто задаваемые вопросы
+  SYSTEM // Системные страницы
+  SEO // SEO-страницы
 }
 
 enum PageStatus {
-  DRAFT       // Черновик
-  PUBLISHED   // Опубликовано
-  ARCHIVED    // Архив (soft delete)
+  DRAFT // Черновик
+  PUBLISHED // Опубликовано
+  ARCHIVED // Архив (soft delete)
 }
 
 enum PageVisibility {
-  PUBLIC      // Публичная (в sitemap, доступна всем)
-  PRIVATE     // Приватная (не показывать публично)
-  UNLISTED    // По прямой ссылке (не в sitemap)
+  PUBLIC // Публичная (в sitemap, доступна всем)
+  PRIVATE // Приватная (не показывать публично)
+  UNLISTED // По прямой ссылке (не в sitemap)
 }
 
 model BrandingConfig {
-  id               String      @id @default("singleton")
-  logoAssetId      String?
-  logoAsset        MediaAsset? @relation("BrandingLogo", fields: [logoAssetId], references: [id])
-  faviconAssetId   String?
-  faviconAsset     MediaAsset? @relation("BrandingFavicon", fields: [faviconAssetId], references: [id])
-  colorPrimary     String?
-  colorAccent      String?
-  colorBackground  String?
-  colorSurface     String?
-  colorText        String?
-  fontHeading      String?
-  fontBody         String?
-  updatedAt        DateTime    @updatedAt
+  id              String      @id @default("singleton")
+  logoAssetId     String?
+  logoAsset       MediaAsset? @relation("BrandingLogo", fields: [logoAssetId], references: [id])
+  faviconAssetId  String?
+  faviconAsset    MediaAsset? @relation("BrandingFavicon", fields: [faviconAssetId], references: [id])
+  colorPrimary    String?
+  colorAccent     String?
+  colorBackground String?
+  colorSurface    String?
+  colorText       String?
+  fontHeading     String?
+  fontBody        String?
+  updatedAt       DateTime    @updatedAt
 }

@@ -5,6 +5,7 @@
 
 import type { NormalizedPhone } from "@/lib/phones/normalizePhones";
 import type { FaqItem } from "@/lib/faq/faqItems";
+import type { CanonicalCtaObject } from "@/lib/cta-platform";
 
 export interface OfferMediaItem {
   id: string;
@@ -183,6 +184,7 @@ export interface OfferPageData {
     link?: string;
     instructions?: string;
   };
+  resolvedCta?: CanonicalCtaObject;
 
   schedule?: {
     type: "classes" | "shifts";

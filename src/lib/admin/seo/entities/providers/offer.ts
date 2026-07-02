@@ -33,6 +33,7 @@ export const offerProvider: SeoEntityProvider = {
         title: true,
         description: true,
         status: true,
+        archivedAt: true,
         updatedAt: true,
         seoH1: true,
         seoTitle: true,
@@ -44,7 +45,7 @@ export const offerProvider: SeoEntityProvider = {
     });
 
     return offers.map((o) => {
-      const published = o.status === OfferStatus.PUBLISHED;
+      const published = o.status === OfferStatus.PUBLISHED && !o.archivedAt;
       const seg = o.slug?.trim() || o.id;
       const path = `/offers/${seg}`;
       const canonical = o.seoCanonicalUrl?.trim() || path;
@@ -87,6 +88,7 @@ export const offerProvider: SeoEntityProvider = {
         description: true,
         slug: true,
         status: true,
+        archivedAt: true,
         seoTitle: true,
         seoDescription: true,
         seoH1: true,

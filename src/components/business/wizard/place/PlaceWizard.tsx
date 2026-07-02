@@ -33,7 +33,13 @@ import { Button } from "@/components/ui/button";
 import type { PlaceFormData, PlaceWizardMode } from "./types";
 import type { Place, ContentStatus } from "@prisma/client";
 import { createClientSavePerf } from "@/lib/perf/clientSavePerf";
-import { WIZARD_STEPS, TOTAL_STEPS, getStepLabel } from "./config";
+import {
+  getPlaceWizardSteps,
+  getPlaceWizardTotalSteps,
+  getStepKey,
+  getStepLabel,
+  isPlaceReviewStep,
+} from "./config";
 import { getDefaultFormData, hasMeaningfulContent } from "./defaults";
 import { mapPlaceToFormData, buildPlacePayload, extractChanges } from "./mappers";
 import { validateStep, validateForSubmit, canGoToNextStep, canGoToPrevStep } from "./validation";
@@ -43,9 +49,14 @@ import { Step2Location } from "./steps/Step2Location";
 import { Step3Contacts } from "./steps/Step3Contacts";
 import { Step4Photos } from "./steps/Step4Photos";
 import { Step5OpeningHours } from "./steps/Step5OpeningHours";
+import { StepCta } from "./steps/StepCta";
 import { FaqStep } from "../shared/FaqStep";
-import { Step6Review } from "./steps/Step6Review";
+import { StepReview } from "./steps/StepReview";
 import { CompletionProgress } from "./CompletionProgress";
+import {
+  normalizeRestoredPlaceWizardStep,
+  type PlaceWizardDraftData,
+} from "./draftState";
 import {
   defaultNavForSurface,
   editorPlaceEditHref,
@@ -96,6 +107,7 @@ interface PlaceWizardProps {
   initialEditStep?: number;
   /** Активная ревизия для overlay-статуса (только edit mode). */
   activeRevision?: { id: string; status: string } | null;
+  ctaStepEnabled?: boolean;
 }
 
 /** POST /api/business/places expects { createRequestId, status, data } — not a flat payload. */
@@ -132,9 +144,19 @@ export function PlaceWizard({
   returnTo,
   initialEditStep,
   activeRevision,
+  ctaStepEnabled = false,
 }: PlaceWizardProps) {
   const router = useRouter();
   const surface: ContentEditorSurface = editorSurface ?? "business";
+  const wizardSteps = useMemo(
+    () => getPlaceWizardSteps(ctaStepEnabled),
+    [ctaStepEnabled],
+  );
+  const totalSteps = useMemo(
+    () => getPlaceWizardTotalSteps(ctaStepEnabled),
+    [ctaStepEnabled],
+  );
+  const firstStepNumber = wizardSteps[0]?.id ?? 1;
   const nav: ContentEditorNav = {
     ...defaultNavForSurface(surface),
     ...contentEditorNav,
@@ -146,12 +168,12 @@ export function PlaceWizard({
     if (
       mode === "edit" &&
       typeof initialEditStep === "number" &&
-      initialEditStep >= 1 &&
-      initialEditStep <= TOTAL_STEPS
+      initialEditStep >= firstStepNumber &&
+      initialEditStep <= totalSteps
     ) {
       return initialEditStep;
     }
-    return 1;
+    return firstStepNumber;
   });
   const [formData, setFormData] = useState<PlaceFormData>(() => {
     if (mode === "edit" && place) {
@@ -184,16 +206,22 @@ export function PlaceWizard({
     () => JSON.stringify(formData) !== JSON.stringify(originalData),
     [formData, originalData],
   );
+  const entityUpdatedAtIso =
+    mode === "edit" && place?.updatedAt ? place.updatedAt.toISOString() : null;
 
   // ── useWizardDraft (create mode: LS-черновик + resume-баннер) ───────────────
-  const PLACE_WIZARD_SCHEMA_VERSION = 1;
-  const draft = useWizardDraft<PlaceFormData>({
+  const PLACE_WIZARD_SCHEMA_VERSION = 2;
+  const draft = useWizardDraft<PlaceWizardDraftData>({
     wizardType: "place",
     mode,
     entityId: mode === "edit" ? place?.id ?? null : null,
     schemaVersion: PLACE_WIZARD_SCHEMA_VERSION,
-    data: formData,
+    data: {
+      currentStep,
+      formData,
+    },
     enabled: mode === "create" ? hasMeaningfulContent(formData) : isDirty,
+    entityUpdatedAt: entityUpdatedAtIso,
   });
 
   // createRequestId: для create — берём из draft (стабильный UUID)
@@ -206,6 +234,21 @@ export function PlaceWizard({
 
   const { leaveDialogOpen, confirmLeave, onLeaveDialogOpenChange, requestLeave } =
     useUnsavedChangesNavigationGuard(guardActive);
+
+  const draftConflictsWithEntity =
+    mode === "edit" &&
+    draft.hasDraft &&
+    entityUpdatedAtIso != null &&
+    draft.draftEntityUpdatedAt != null &&
+    draft.draftEntityUpdatedAt.toISOString() !== entityUpdatedAtIso;
+
+  const handleRestoreDraft = useCallback(() => {
+    const restored = draft.restoreDraft();
+    if (!restored) return;
+
+    setFormData(restored.formData);
+    setCurrentStep(normalizeRestoredPlaceWizardStep(restored, totalSteps));
+  }, [draft, totalSteps]);
 
   // Wizard session for temp media
   const { wizardSessionId } = useWizardSession({
@@ -341,25 +384,28 @@ export function PlaceWizard({
 
   // Navigation
   const handleNext = () => {
-    if (currentStep < TOTAL_STEPS && canGoToNextStep(currentStep, formData)) {
+    if (
+      currentStep < totalSteps &&
+      canGoToNextStep(currentStep, formData, ctaStepEnabled)
+    ) {
       setCurrentStep(prev => prev + 1);
     }
   };
 
   const handlePrev = () => {
     // On first step, go back to where user came from
-    if (currentStep === 1) {
+    if (currentStep === firstStepNumber) {
       requestLeave(afterSubmitDestination);
       return;
     }
 
-    if (currentStep > 1 && canGoToPrevStep(currentStep)) {
+    if (currentStep > firstStepNumber && canGoToPrevStep(currentStep)) {
       setCurrentStep(prev => prev - 1);
     }
   };
 
   const handleGoToStep = (step: number) => {
-    if (step < 1 || step > TOTAL_STEPS) return;
+    if (step < firstStepNumber || step > totalSteps) return;
 
     if (isPublishedEditMode) {
       setCurrentStep(step);
@@ -614,9 +660,9 @@ export function PlaceWizard({
     if (!validation.isValid) {
       toast.error("Заполните все обязательные поля");
       // Go to first incomplete step
-      for (let i = 1; i <= TOTAL_STEPS; i++) {
-        const stepValidation = validateStep(i, formData);
-        if (!stepValidation.isComplete && i < 7) {
+      for (let i = 1; i <= totalSteps; i++) {
+        const stepValidation = validateStep(i, formData, ctaStepEnabled);
+        if (!stepValidation.isComplete && !isPlaceReviewStep(i, ctaStepEnabled)) {
           setCurrentStep(i);
           break;
         }
@@ -833,21 +879,26 @@ export function PlaceWizard({
               toast.error(`Не заполнены обязательные поля: ${missingLabels.join(", ")}`);
 
               // Navigate to appropriate step based on first missing field
-              const fieldToStep: Record<string, number> = {
-                title: 1,
-                category: 1,
-                shortDesc: 1,
-                logoImageId: 4,
-                location: 2,
-                locationSource: 2,
-                parentPlaceId: 2,
-                floor: 2,
-                unit: 2,
+              const fieldToStepKey: Record<string, string> = {
+                title: "profile",
+                category: "profile",
+                shortDesc: "profile",
+                logoImageId: "photos",
+                location: "location",
+                locationSource: "location",
+                parentPlaceId: "location",
+                floor: "location",
+                unit: "location",
               };
 
               for (const field of error.missing) {
-                const step = fieldToStep[field];
-                if (step !== undefined && step < 7) {
+                const step = wizardSteps.find(
+                  (wizardStep) => wizardStep.key === fieldToStepKey[field],
+                )?.id;
+                if (
+                  step !== undefined &&
+                  !isPlaceReviewStep(step, ctaStepEnabled)
+                ) {
                   setCurrentStep(step);
                   break;
                 }
@@ -891,18 +942,20 @@ export function PlaceWizard({
       isEditable,
     };
 
-    switch (currentStep) {
-      case 1:
+    switch (getStepKey(currentStep, ctaStepEnabled)) {
+      case "profile":
         return <Step1Profile {...commonProps} />;
-      case 2:
+      case "location":
         return <Step2Location {...commonProps} />;
-      case 3:
+      case "contacts":
         return <Step3Contacts {...commonProps} />;
-      case 4:
+      case "photos":
         return <Step4Photos {...commonProps} wizardSessionId={wizardSessionId} />;
-      case 5:
+      case "openingHours":
         return <Step5OpeningHours {...commonProps} />;
-      case 6:
+      case "cta":
+        return <StepCta {...commonProps} />;
+      case "faq":
         return (
           <FaqStep
             kind="place"
@@ -910,25 +963,32 @@ export function PlaceWizard({
             onChange={(faqItems) => handleChange({ faqItems })}
           />
         );
-      case 7:
-        return <Step6Review data={formData} isSubmitting={isSubmitting} onGoToStep={handleGoToStep} />;
+      case "review":
+        return (
+          <StepReview
+            data={formData}
+            isSubmitting={isSubmitting}
+            onGoToStep={handleGoToStep}
+            ctaStepEnabled={ctaStepEnabled}
+          />
+        );
       default:
         return null;
     }
   };
 
-  const stepValidation = validateStep(currentStep, formData);
-  const canNext = currentStep < TOTAL_STEPS;
+  const stepValidation = validateStep(currentStep, formData, ctaStepEnabled);
+  const canNext = currentStep < totalSteps;
   const canPrev = true; // Always show back button (on step 1 it goes to returnTo)
-  const isReviewStep = currentStep === 7;
+  const isReviewStep = isPlaceReviewStep(currentStep, ctaStepEnabled);
 
   const progressSteps = useMemo(
-    () => WIZARD_STEPS.map((s) => ({
+    () => wizardSteps.map((s) => ({
       id: s.id,
       label: s.label,
-      isComplete: validateStep(s.id, formData).isComplete,
+      isComplete: validateStep(s.id, formData, ctaStepEnabled).isComplete,
     })),
-    [formData]
+    [ctaStepEnabled, formData, wizardSteps]
   );
 
   const phase = formWizardPhaseFromFlags({ isSaving, isSubmitting });
@@ -943,9 +1003,14 @@ export function PlaceWizard({
     return trimmedTitle || businessFormCopy.place.createTitle;
   }, [formData.title]);
 
-  const showBusinessRelatedPlaces = surface === "business" && currentStep === 1;
+  const currentStepKey = getStepKey(currentStep, ctaStepEnabled);
+  const showBusinessRelatedPlaces =
+    surface === "business" && currentStepKey === "profile";
   const showAdminRelatedPlaces =
-    surface === "admin" && mode === "edit" && currentStep === 1 && !!place?.id;
+    surface === "admin" &&
+    mode === "edit" &&
+    currentStepKey === "profile" &&
+    !!place?.id;
 
   return (
     <FormWizardShell>
@@ -953,8 +1018,8 @@ export function PlaceWizard({
         title={liveTitle}
         subtitle={businessFormCopy.stepSubtitle(
           currentStep,
-          TOTAL_STEPS,
-          getStepLabel(currentStep)
+          totalSteps,
+          getStepLabel(currentStep, ctaStepEnabled)
         )}
         trailing={
           <div className="flex flex-col items-end gap-1">
@@ -1003,28 +1068,34 @@ export function PlaceWizard({
       </FormWizardHeader>
 
       {/* Resume-баннер черновика (только create mode) */}
-      {mode === "create" && draft.hasDraft && (
+      {draft.hasDraft && (
         <div className="mx-auto w-full max-w-4xl px-4 pt-4 sm:px-6">
           <div className="flex flex-col gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm text-amber-900">
-              У вас есть незавершённый черновик
-              {draft.draftSavedAt
-                ? ` (${formatRelativeTimeRu(draft.draftSavedAt)})`
-                : ""}
-              . Продолжить с него?
+              {draftConflictsWithEntity ? (
+                <>
+                  Место было изменено после сохранения черновика
+                  {draft.draftSavedAt
+                    ? ` (черновик — ${formatRelativeTimeRu(draft.draftSavedAt)})`
+                    : ""}
+                  . Какую версию использовать?
+                </>
+              ) : (
+                <>
+                  У вас есть незавершённый черновик
+                  {draft.draftSavedAt
+                    ? ` (${formatRelativeTimeRu(draft.draftSavedAt)})`
+                    : ""}
+                  . Продолжить с него?
+                </>
+              )}
             </p>
             <div className="flex shrink-0 gap-2">
               <Button variant="outline" size="sm" onClick={() => draft.discardDraft()}>
-                Начать заново
+                {draftConflictsWithEntity ? "Взять актуальную версию" : "Начать заново"}
               </Button>
-              <Button
-                size="sm"
-                onClick={() => {
-                  const restored = draft.restoreDraft();
-                  if (restored) setFormData(restored);
-                }}
-              >
-                Продолжить
+              <Button size="sm" onClick={handleRestoreDraft}>
+                {draftConflictsWithEntity ? "Применить черновик" : "Продолжить"}
               </Button>
             </div>
           </div>
@@ -1081,7 +1152,7 @@ export function PlaceWizard({
           !canNext ||
           isSaving ||
           isSubmitting ||
-          !canGoToNextStep(currentStep, formData)
+          !canGoToNextStep(currentStep, formData, ctaStepEnabled)
         }
         onSubmit={isReviewStep ? handleSubmit : undefined}
         submitDisabled={

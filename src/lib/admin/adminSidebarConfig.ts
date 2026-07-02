@@ -77,6 +77,12 @@ export const NAV_COMMUNICATIONS: AdminSidebarNavItem = {
       href: adminPath("/content/editorial-requests"),
       matchers: [{ type: "prefix", value: adminPath("/content/editorial-requests") }],
     },
+    {
+      id: "communications-direct",
+      label: "Direct",
+      href: adminPath("/communications/direct"),
+      matchers: [{ type: "prefix", value: adminPath("/communications/direct") }],
+    },
   ],
 };
 

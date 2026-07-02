@@ -60,6 +60,9 @@ export interface PlaceFormData {
   phone3: string | null;
   phone3Label: string | null;
   website: string | null;
+  bookingEnabled: boolean;
+  bookingPhone: string | null;
+  bookingNote: string | null;
   instagramHandle: string | null;
   instagramUrl: string | null;
 

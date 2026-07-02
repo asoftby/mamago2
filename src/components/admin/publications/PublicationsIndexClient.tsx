@@ -845,8 +845,7 @@ export function PublicationsIndexClient({
                                 ? "Уже в архиве"
                                 : "Архивировать"}
                             </DropdownMenuItem>
-                            {row.status === PublicationStatus.ARCHIVED ||
-                            row.status === PublicationStatus.DRAFT ? (
+                            {row.status === PublicationStatus.DRAFT ? (
                               <>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem
@@ -856,13 +855,11 @@ export function PublicationsIndexClient({
                                     setDeleteTarget({
                                       id: row.id,
                                       title: row.title.trim() || "Без названия",
-                                      isDraft: row.status === PublicationStatus.DRAFT,
+                                      isDraft: true,
                                     })
                                   }
                                 >
-                                  {row.status === PublicationStatus.DRAFT
-                                    ? "Удалить черновик"
-                                    : "Удалить"}
+                                  Удалить черновик
                                 </DropdownMenuItem>
                               </>
                             ) : null}

@@ -7,6 +7,7 @@ import type { Intent } from "@/lib/intent";
 import type { MediaGalleryItem } from "@/lib/media/galleryTypes";
 import type { NormalizedPhone } from "@/lib/phones/normalizePhones";
 import type { FaqItem } from "@/lib/faq/faqItems";
+import type { CanonicalCtaObject } from "@/lib/cta-platform";
 
 export type EventPageBreadcrumb = {
   label: string;
@@ -140,6 +141,7 @@ export type EventPageData = {
   bookingNotes?: string;
   faqItems?: FaqItem[];
   cta: EventPageCtaConfig;
+  resolvedCta?: CanonicalCtaObject;
   /**
    * Медиа-галерея под cover image: Reels (первой) + дополнительные фото события.
    * Пустой массив или undefined → блок не отображается.

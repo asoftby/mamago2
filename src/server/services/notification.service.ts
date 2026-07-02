@@ -39,6 +39,7 @@ import { resolveNotificationAudience } from "@/lib/notifications/audience";
 import { dispatchDelivery } from "./notificationDelivery.service";
 import { validateNotificationRegistry } from "@/lib/notifications/notificationRegistry";
 import { checkNotificationDedup } from "./notificationDedup.service";
+import { formatDirectThreadNumber } from "@/lib/direct/threadNumber";
 import {
   resolveNotificationAction,
   resolveNotificationActionDefaults,
@@ -1497,5 +1498,94 @@ export async function notifyUserBookingFeedbackRequest(params: NotifyUserBooking
     entityId: params.bookingId,
     ctaLabel: "Оставить отзыв",
     ctaAction: "/me/bookings",
+  });
+}
+
+// ── DIRECT (Phase 1 — boundary only) ────────────────────────────────────────
+//
+// notifyDirectCreated() / notifyDirectMessage() exist as ready-to-call
+// utilities but are NOT wired into createDirectThread()/createDirectMessage()
+// yet (src/server/services/direct/*) — per Phase 1 scope, Direct ships its
+// data layer first; notification wiring + the polling UI happen together in
+// a later phase. Kept deliberately simple (plain createNotification call,
+// no scenario-template pipeline) since Direct MVP is in-app-only, no
+// email/Telegram delivery.
+
+export interface NotifyDirectCreatedParams {
+  /** userId владельца бизнеса — получатель (новый Direct-тред на его публикации) */
+  ownerUserId: string;
+  threadId: string;
+  threadNumber: number;
+  publicationTitle?: string | null;
+}
+
+/** Уведомление бизнесу: пользователь открыл новый Direct-тред по его публикации. */
+export async function notifyDirectCreated(params: NotifyDirectCreatedParams) {
+  const dedup = await checkNotificationDedup(
+    params.ownerUserId,
+    "DIRECT_THREAD_CREATED",
+    "DIRECT_THREAD",
+    params.threadId,
+  );
+  if (dedup.isDuplicate) {
+    console.warn("[notification] DIRECT_THREAD_CREATED deduplicated:", params.threadId);
+    return null;
+  }
+
+  const title = params.publicationTitle
+    ? `Новое обращение: «${params.publicationTitle}»`
+    : "Новое обращение";
+
+  return createNotification({
+    userId: params.ownerUserId,
+    audience: "BUSINESS",
+    type: "DIRECT_THREAD_CREATED",
+    title,
+    body: `Открыт диалог ${formatDirectThreadNumber(params.threadNumber)}. Ответьте, чтобы продолжить общение.`,
+    entityType: "DIRECT_THREAD",
+    entityId: params.threadId,
+    ctaLabel: "Открыть диалог",
+    // Unified "Мои сообщения" (Phase 3.2) — one route for every role;
+    // /business/direct/{id} still exists only as a compatibility redirect.
+    ctaAction: `/me/direct/${params.threadId}`,
+  });
+}
+
+export interface NotifyDirectMessageParams {
+  /** userId получателя — другая сторона треда (не отправитель) */
+  recipientUserId: string;
+  /** Куда ведёт CTA: кабинет бизнеса или личный кабинет пользователя */
+  recipientSurface: "USER" | "BUSINESS";
+  threadId: string;
+  threadNumber: number;
+  /** Конкретное сообщение — dedup ключ (каждое сообщение пингует отдельно). */
+  messageId: string;
+}
+
+/** Уведомление о новом сообщении в Direct-треде (другой стороне). */
+export async function notifyDirectMessage(params: NotifyDirectMessageParams) {
+  const dedup = await checkNotificationDedup(
+    params.recipientUserId,
+    "DIRECT_NEW_MESSAGE",
+    "DIRECT_THREAD",
+    params.messageId,
+  );
+  if (dedup.isDuplicate) {
+    return null;
+  }
+
+  return createNotification({
+    userId: params.recipientUserId,
+    audience: params.recipientSurface,
+    type: "DIRECT_NEW_MESSAGE",
+    title: `Новое сообщение в ${formatDirectThreadNumber(params.threadNumber)}`,
+    body: "У вас новое сообщение.",
+    entityType: "DIRECT_THREAD",
+    entityId: params.messageId,
+    ctaLabel: "Открыть диалог",
+    // Unified "Мои сообщения" (Phase 3.2) — one route for every role, the
+    // page itself resolves whether the recipient is the customer or the
+    // business side of this thread.
+    ctaAction: `/me/direct/${params.threadId}`,
   });
 }

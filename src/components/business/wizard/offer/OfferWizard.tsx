@@ -103,6 +103,7 @@ interface OfferWizardProps {
   returnTo?: string;
   /** 1-based шаг в мастере (из query `?step=`). Только для `mode="edit"`. */
   initialStepNumber?: number;
+  ctaStepEnabled?: boolean;
 }
 
 /** Ключ автосейва до миграции на useWizardDraft — подчищается на mount */
@@ -263,6 +264,7 @@ export function OfferWizard({
   contentEditorNav,
   returnTo,
   initialStepNumber,
+  ctaStepEnabled,
 }: OfferWizardProps) {
   const router = useRouter();
   const surface: ContentEditorSurface = editorSurface ?? "business";
@@ -766,6 +768,7 @@ export function OfferWizard({
       data: formData,
       onChange: handleChange,
       isEditable,
+      ctaStepEnabled,
     };
     
     switch (currentStepKey) {

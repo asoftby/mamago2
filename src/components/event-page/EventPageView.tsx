@@ -27,6 +27,7 @@ import { EventDecisionPanel } from "./EventDecisionPanel";
 import { EventSessionSelector } from "./EventSessionSelector";
 import { EventStickyActionBar } from "./EventStickyActionBar";
 import { EventSimpleBookingModal } from "./EventSimpleBookingModal";
+import { DirectRequestCta } from "@/components/direct/DirectRequestCta";
 import { SimilarEventsSection } from "./SimilarEventsSection";
 import { FaqSection } from "@/components/public/FaqSection";
 import { EventWhyGo } from "./EventWhyGo";
@@ -298,7 +299,20 @@ function EventFinalCta({
 /* ══════════════════════════════════════════════════════════════
    Main EventPageView
 ══════════════════════════════════════════════════════════════ */
-export function EventPageView({ data }: { data: EventPageData }) {
+export interface EventDirectCtaInfo {
+  activityId: string;
+  publicationTitle: string;
+  brandName: string;
+}
+
+export function EventPageView({
+  data,
+  direct,
+}: {
+  data: EventPageData;
+  /** Direct "Отправить заявку" CTA — omitted when the event has no resolvable owning Business (rule 5). */
+  direct?: EventDirectCtaInfo;
+}) {
   const { isAuthenticated } = useAuthMe();
   const setPublicationIntent = useSetPublicationIntent();
   const ctaRef = useRef<HTMLDivElement>(null);
@@ -613,6 +627,18 @@ export function EventPageView({ data }: { data: EventPageData }) {
                 onSave={handleSave}
                 isPlanned={saveStatus.inPlan}
                 planDate={saveStatus.planDate}
+                directSlot={
+                  direct && (
+                    <DirectRequestCta
+                      publicationRef={{ publicationType: "EVENT", activityId: direct.activityId }}
+                      publicationTitle={direct.publicationTitle}
+                      brandName={direct.brandName}
+                      className="flex h-14 w-full items-center justify-center gap-2 rounded-full border border-[rgba(20,18,16,0.18)] bg-transparent text-[15px] font-semibold text-[#141210] transition-colors hover:border-[#141210]"
+                    >
+                      Отправить заявку
+                    </DirectRequestCta>
+                  )
+                }
               />
             </div>
           </div>

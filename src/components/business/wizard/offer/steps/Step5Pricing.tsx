@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import { CtaStep } from "@/components/business/wizard/shared/CtaStep";
 import { RichContentRenderer } from "@/components/content/RichContentRenderer";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -18,12 +19,18 @@ import { BYN_SYMBOL, formatPrice, normalizeUiCurrencyText } from "@/lib/formatte
 import { isRichTextMeaningful } from "@/lib/richtext/utils";
 import { renderCurrencyText } from "@/components/icons/BelarusianRubleIcon";
 import { Plus, Trash2 } from "lucide-react";
+import {
+  mapCtaStepValueToOfferFormPatch,
+  mapOfferFormDataToCtaStepValue,
+} from "../ctaStepMapper";
+import { resolveOfferPricingCtaRenderMode } from "../ctaStepFeatureFlag";
 import type { OfferFormData, PricingOption } from "../types";
 
 interface Step5PricingProps {
   data: OfferFormData;
   onChange: (updates: Partial<OfferFormData>) => void;
   isEditable: boolean;
+  ctaStepEnabled?: boolean;
 }
 
 function getPublicationAccessFromOffer(data: OfferFormData): PublicationAccess {
@@ -111,17 +118,57 @@ function buildOfferAccessPatch(access: PublicationAccess): Partial<OfferFormData
   }
 }
 
+export function getOfferStep5CtaRenderMode(
+  ctaStepEnabled?: boolean,
+): "legacy" | "shared" {
+  return resolveOfferPricingCtaRenderMode(ctaStepEnabled);
+}
+
 export function Step5Pricing({
   data,
   onChange,
   isEditable,
+  ctaStepEnabled,
 }: Step5PricingProps) {
   const publicationAccess = useMemo(
     () => getPublicationAccessFromOffer(data),
     [data],
   );
+  const ctaRenderMode = useMemo(
+    () => getOfferStep5CtaRenderMode(ctaStepEnabled),
+    [ctaStepEnabled],
+  );
+  const ctaStepValue = useMemo(
+    () =>
+      mapOfferFormDataToCtaStepValue(data, {
+        id: data.placeId ?? "offer-wizard-draft",
+      }),
+    [data],
+  );
+
+  const handleCtaStepChange = (nextValue: ReturnType<typeof mapOfferFormDataToCtaStepValue>) => {
+    onChange(
+      mapCtaStepValueToOfferFormPatch(nextValue, {
+        id: data.placeId ?? "offer-wizard-draft",
+      }),
+    );
+  };
 
   if (data.offerWizardType === "CAMP") {
+    if (ctaRenderMode === "shared") {
+      return (
+        <CtaStep
+          value={ctaStepValue}
+          source={{
+            sourceEntityType: "OFFER",
+            sourceEntityId: data.placeId ?? "offer-wizard-draft",
+          }}
+          disabled={!isEditable}
+          onChange={handleCtaStepChange}
+        />
+      );
+    }
+
     return (
       <PublicationAccessEditor
         entityType="offer"
@@ -481,13 +528,25 @@ export function Step5Pricing({
         </div>
       )}
 
-      <PublicationAccessEditor
-        entityType="offer"
-        value={publicationAccess}
-        onChange={(value) => onChange(buildOfferAccessPatch(value))}
-        allowedMethods={["details", "timeslots", "prebooking", "external", "contact"]}
-        disabled={!isEditable}
-      />
+      {ctaRenderMode === "shared" ? (
+        <CtaStep
+          value={ctaStepValue}
+          source={{
+            sourceEntityType: "OFFER",
+            sourceEntityId: data.placeId ?? "offer-wizard-draft",
+          }}
+          disabled={!isEditable}
+          onChange={handleCtaStepChange}
+        />
+      ) : (
+        <PublicationAccessEditor
+          entityType="offer"
+          value={publicationAccess}
+          onChange={(value) => onChange(buildOfferAccessPatch(value))}
+          allowedMethods={["details", "timeslots", "prebooking", "external", "contact"]}
+          disabled={!isEditable}
+        />
+      )}
     </div>
   );
 }

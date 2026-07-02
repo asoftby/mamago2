@@ -2,9 +2,10 @@
 
 import { OwnerWizardEditDropdown } from "@/components/shared/OwnerWizardEditDropdown";
 import { editorPlaceEditHref } from "@/lib/content-editor/types";
-import { PLACE_WIZARD_STEPS } from "@/components/business/wizard/place/placeWizardSteps.config";
-import { TOTAL_STEPS } from "@/components/business/wizard/place/config";
+import { getPlaceWizardStepConfigs } from "@/components/business/wizard/place/placeWizardSteps.config";
+import { getPlaceWizardTotalSteps } from "@/components/business/wizard/place/config";
 import { businessFormCopy } from "@/components/business/wizard/businessFormLabels";
+import { isPlaceCtaStepFeatureEnabled } from "@/components/business/wizard/place/ctaStepFeatureFlag";
 
 export function OwnerPlaceEditDropdown({
   placeId,
@@ -14,14 +15,17 @@ export function OwnerPlaceEditDropdown({
   className?: string;
 }) {
   const base = editorPlaceEditHref(placeId);
+  const ctaStepEnabled = isPlaceCtaStepFeatureEnabled(process.env);
+  const contentSteps = getPlaceWizardStepConfigs(ctaStepEnabled);
+  const totalSteps = getPlaceWizardTotalSteps(ctaStepEnabled);
 
   const steps = [
-    ...PLACE_WIZARD_STEPS.map((s) => ({
+    ...contentSteps.map((s) => ({
       href: `${base}?step=${encodeURIComponent(String(s.id))}`,
       label: s.title,
     })),
     {
-      href: `${base}?step=${encodeURIComponent(String(TOTAL_STEPS))}`,
+      href: `${base}?step=${encodeURIComponent(String(totalSteps))}`,
       label: businessFormCopy.reviewStepShortTitle,
     },
   ];

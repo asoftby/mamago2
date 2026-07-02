@@ -16,6 +16,7 @@ import { ageFromPlusBadgeFromAgeTags } from "@/lib/event/activityAgeBounds";
 import { getActivityDateDisplay } from "@/lib/event/getActivityDateDisplay";
 import { getNormalizedPhones, type NormalizedPhone } from "@/lib/phones/normalizePhones";
 import { normalizeFaqItems } from "@/lib/faq/faqItems";
+import { resolveCanonicalCta } from "@/lib/cta-platform";
 
 const FALLBACK_POSTER = "/og-default.jpg";
 
@@ -169,20 +170,31 @@ function isHttpUrl(value: string): boolean {
   return /^https?:\/\//i.test(value.trim());
 }
 
-function resolvePurchaseUrl(activity: Pick<ActivityForEventPageInput, "scheduleJson">): string | undefined {
+function getScheduleJsonRecord(
+  activity: Pick<ActivityForEventPageInput, "scheduleJson">,
+): Record<string, unknown> | null {
   const raw = activity.scheduleJson;
-  if (!raw || typeof raw !== "object") return undefined;
-  const json = raw as Record<string, unknown>;
-  const participationMode =
-    typeof json.participationMode === "string" ? json.participationMode : undefined;
+  if (!raw || typeof raw !== "object") return null;
+  return raw as Record<string, unknown>;
+}
+
+function getScheduleJsonString(
+  activity: Pick<ActivityForEventPageInput, "scheduleJson">,
+  key: string,
+): string | undefined {
+  const value = getScheduleJsonRecord(activity)?.[key];
+  return typeof value === "string" ? value : undefined;
+}
+
+function resolvePurchaseUrl(activity: Pick<ActivityForEventPageInput, "scheduleJson">): string | undefined {
+  const participationMode = getScheduleJsonString(activity, "participationMode");
   if (participationMode === "external-link") {
-    const ticketLink = typeof json.ticketLink === "string" ? json.ticketLink.trim() : "";
+    const ticketLink = getScheduleJsonString(activity, "ticketLink")?.trim() ?? "";
     return ticketLink && isHttpUrl(ticketLink) ? ticketLink : undefined;
   }
   if (participationMode === "prebook") {
-    const prebookMethod =
-      typeof json.prebookMethod === "string" ? json.prebookMethod : undefined;
-    const prebookUrl = typeof json.prebookUrl === "string" ? json.prebookUrl.trim() : "";
+    const prebookMethod = getScheduleJsonString(activity, "prebookMethod");
+    const prebookUrl = getScheduleJsonString(activity, "prebookUrl")?.trim() ?? "";
     if (prebookMethod === "link" && prebookUrl && isHttpUrl(prebookUrl)) {
       return prebookUrl;
     }
@@ -194,9 +206,8 @@ function resolveSimpleBooking(
   activityId: string,
   activity: Pick<ActivityForEventPageInput, "scheduleJson">,
 ): import("@/lib/event/eventPageTypes").EventSimpleBookingData | undefined {
-  const raw = activity.scheduleJson;
-  if (!raw || typeof raw !== "object") return undefined;
-  const json = raw as Record<string, unknown>;
+  const json = getScheduleJsonRecord(activity);
+  if (!json) return undefined;
   const mode = json.participationMode;
 
   if (mode === "simple-booking") {
@@ -223,6 +234,23 @@ function resolveSimpleBooking(
   }
 
   return undefined;
+}
+
+function resolveEventCanonicalCta(activity: ActivityForEventPageInput) {
+  const primaryPhone = resolveActivityPhones(activity)[0]?.value;
+
+  return resolveCanonicalCta({
+    entityType: "EVENT",
+    entity: {
+      id: activity.id,
+      participationMode: getScheduleJsonString(activity, "participationMode"),
+      ticketLink: getScheduleJsonString(activity, "ticketLink"),
+      prebookMethod: getScheduleJsonString(activity, "prebookMethod"),
+      prebookPhone: getScheduleJsonString(activity, "prebookPhone") ?? primaryPhone,
+      prebookUrl: getScheduleJsonString(activity, "prebookUrl"),
+      bookingPhone: primaryPhone,
+    },
+  });
 }
 
 function factChipsFromActivity(activity: ActivityForEventPageInput): EventPageData["factChips"] {
@@ -478,6 +506,7 @@ export function buildEventPageDataFromPrismaActivity(
       simpleBooking: resolveSimpleBooking(activity.id, activity),
       phones: resolveActivityPhones(activity),
     },
+    resolvedCta: resolveEventCanonicalCta(activity),
     reelsUrl: resolveReelsUrl(activity),
     galleryItems: buildGalleryItems(activity, poster, options?.reelsThumbnailUrl),
     ownerEditHref: options?.ownerEditHref,
@@ -489,10 +518,7 @@ export function buildEventPageDataFromPrismaActivity(
 }
 
 function resolveReelsUrl(activity: Pick<ActivityForEventPageInput, "scheduleJson">): string | undefined {
-  const raw = activity.scheduleJson;
-  if (!raw || typeof raw !== "object") return undefined;
-  const json = raw as Record<string, unknown>;
-  const url = typeof json.reelsUrl === "string" ? json.reelsUrl.trim() : "";
+  const url = getScheduleJsonString(activity, "reelsUrl")?.trim() ?? "";
   return url && isHttpUrl(url) ? url : undefined;
 }
 

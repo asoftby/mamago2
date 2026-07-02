@@ -54,7 +54,7 @@ export default async function PlaceModerationPage({
         <div className="max-w-7xl mx-auto px-6 py-8">
           <PlaceModerationView
             place={place}
-            canDeletePlace={user.role === "ADMIN"}
+            canDeletePlace={false}
           />
           <div className="mt-6">
             <AdminPlaceGroupManager
@@ -86,7 +86,7 @@ export default async function PlaceModerationPage({
           <PlaceRevisionModerationView
             place={fullPlace}
             revision={revision}
-            canDeletePlace={user.role === "ADMIN"}
+            canDeletePlace={false}
           />
           <div className="mx-auto w-full max-w-7xl px-6">
             <AdminPlaceGroupManager
@@ -138,6 +138,9 @@ export default async function PlaceModerationPage({
         phone3: fullPlace.phone3,
         phone3Label: fullPlace.phone3Label,
         website: fullPlace.website,
+        bookingEnabled: fullPlace.bookingEnabled,
+        bookingPhone: fullPlace.bookingPhone,
+        bookingNote: fullPlace.bookingNote,
         instagramHandle: fullPlace.instagramHandle,
         instagramUrl: fullPlace.instagramUrl,
         reelsUrl: fullPlace.reelsUrl,
@@ -297,7 +300,7 @@ export default async function PlaceModerationPage({
               <PlaceDangerZone
                 placeId={place.id}
                 placeTitle={place.title}
-                canDelete={user.role === "ADMIN"}
+                canDelete={false}
               />
             </div>
           </div>
@@ -346,6 +349,9 @@ export default async function PlaceModerationPage({
     phone3: fullPlace.phone3,
     phone3Label: fullPlace.phone3Label,
     website: fullPlace.website,
+    bookingEnabled: fullPlace.bookingEnabled,
+    bookingPhone: fullPlace.bookingPhone,
+    bookingNote: fullPlace.bookingNote,
     instagramHandle: fullPlace.instagramHandle,
     instagramUrl: fullPlace.instagramUrl,
     reelsUrl: fullPlace.reelsUrl,

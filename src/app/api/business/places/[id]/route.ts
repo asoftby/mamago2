@@ -20,6 +20,10 @@ import { ensureMediaAssetForStoredFileUrl } from "@/lib/media/ensureMediaAssetFo
 import { extractMediaRelativePathFromUrl } from "@/server/media/media-storage";
 import { normalizePlacePhoneFields } from "@/lib/place/placePhones";
 import { normalizeFaqItems } from "@/lib/faq/faqItems";
+import {
+  assertCanHardDeleteContent,
+  isContentHardDeleteError,
+} from "@/server/services/contentHardDelete.service";
 
 export async function GET(
   request: NextRequest,
@@ -533,9 +537,10 @@ export async function DELETE(
     // Check ownership
     const existing = await prisma.place.findUnique({
       where: { id },
-      select: { 
+      select: {
         createdByUserId: true,
         ownerBusinessId: true,
+        status: true,
         placeKind: true,
       },
     });
@@ -556,22 +561,12 @@ export async function DELETE(
       );
     }
 
-    // Check if COMPLEX has children
-    if (existing.placeKind === "COMPLEX") {
-      const childrenCount = await prisma.place.count({
-        where: { parentPlaceId: id },
-      });
-
-      if (childrenCount > 0) {
-        return NextResponse.json(
-          { 
-            error: "HAS_CHILDREN",
-            message: "Cannot delete complex with units. Delete units first." 
-          },
-          { status: 400 }
-        );
-      }
-    }
+    await assertCanHardDeleteContent({
+      contentType: "PLACE",
+      contentId: id,
+      status: existing.status,
+      prisma,
+    });
 
     await prisma.place.delete({
       where: { id },
@@ -579,6 +574,16 @@ export async function DELETE(
 
     return NextResponse.json({ success: true });
   } catch (error) {
+    if (isContentHardDeleteError(error)) {
+      return NextResponse.json(
+        {
+          error: error.code,
+          message: error.message,
+          reasons: error.reasons,
+        },
+        { status: error.statusCode },
+      );
+    }
     console.error("[place-delete] ❌ Error:", error);
     console.error("[place-delete] Stack:", error instanceof Error ? error.stack : "No stack");
     return NextResponse.json(

@@ -7,6 +7,10 @@ import {
 import { getArticleForEditor, saveArticleDraft } from "@/lib/article/articleAdminService";
 import prisma from "@/lib/prisma";
 import { createRequestPerf } from "@/server/utils/requestPerf";
+import {
+  assertCanHardDeleteContent,
+  isContentHardDeleteError,
+} from "@/server/services/contentHardDelete.service";
 
 export async function GET(
   _req: NextRequest,
@@ -72,7 +76,7 @@ export async function PUT(
 }
 
 /**
- * Удаление: черновики (DRAFT) — сразу; опубликованные/прочее — только после ARCHIVED.
+ * Удаление: только полностью изолированные черновики.
  */
 export async function DELETE(
   _req: NextRequest,
@@ -94,23 +98,27 @@ export async function DELETE(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const canDelete =
-    row.status === "DRAFT" || row.status === "ARCHIVED";
-
-  if (!canDelete) {
-    return NextResponse.json(
-      {
-        error: "DELETE_NOT_ALLOWED",
-        message: "Сначала архивируйте материал, затем удалите",
-      },
-      { status: 400 },
-    );
-  }
-
   try {
+    await assertCanHardDeleteContent({
+      contentType: "ARTICLE",
+      contentId: id,
+      status: row.status,
+      prisma,
+    });
+
     await prisma.article.delete({ where: { id } });
     return NextResponse.json({ ok: true });
   } catch (e) {
+    if (isContentHardDeleteError(e)) {
+      return NextResponse.json(
+        {
+          error: e.code,
+          message: e.message,
+          reasons: e.reasons,
+        },
+        { status: e.statusCode },
+      );
+    }
     console.error("[admin/articles DELETE]", e);
     return NextResponse.json(
       { error: e instanceof Error ? e.message : "Delete failed" },

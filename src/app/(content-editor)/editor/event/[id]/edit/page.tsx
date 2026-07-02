@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
 import { EventWizard } from "@/components/business/wizard/event/EventWizard";
+import { isEventCtaStepFeatureEnabled } from "@/components/business/wizard/event/ctaStepFeatureFlag";
 import { ContentEditorChrome } from "@/components/content-editor/ContentEditorChrome";
 import {
   defaultEditorNav,
@@ -191,6 +192,7 @@ export default async function EditorEditEventPage({
     returnTo,
     ...routing,
   });
+  const ctaStepEnabled = isEventCtaStepFeatureEnabled(process.env);
 
   const isPrivilegedUser = user.role === "ADMIN" || user.role === "MODERATOR";
 
@@ -226,6 +228,7 @@ export default async function EditorEditEventPage({
         initialEditStep={initialEditStep}
         initialStep1Taxonomies={initialStep1Taxonomies}
         importedRecordId={resolvedImportedRecordId}
+        ctaStepEnabled={ctaStepEnabled}
       />
     </ContentEditorChrome>
   );

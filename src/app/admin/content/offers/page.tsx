@@ -61,6 +61,7 @@ async function getOffers(params: SearchParams) {
       place: {
         select: {
           title: true,
+          archivedAt: true,
           city: { select: { name: true, slug: true } },
           ownerBusiness: {
             select: {
@@ -110,8 +111,13 @@ function OffersTable({
             const statusConfig =
               MODERATION_OFFER_STATUS_CONFIG[offer.status] ||
               MODERATION_OFFER_STATUS_CONFIG.DRAFT;
+            const isArchived = Boolean(offer.archivedAt);
             const publicOfferHref =
-              offer.status === "PUBLISHED" && offer.slug && offer.place.city?.slug
+              !isArchived &&
+              !offer.place.archivedAt &&
+              offer.status === "PUBLISHED" &&
+              offer.slug &&
+              offer.place.city?.slug
                 ? getOfferPublicUrl(offer, offer.place.city.slug)
                 : null;
             const viewOfferHref = publicOfferHref ?? getOfferPreviewPath(offer.id);
@@ -126,9 +132,19 @@ function OffersTable({
                     "—"}
                 </td>
                 <td className="px-4 py-3">
-                  <Badge variant={statusConfig.variant} className={statusConfig.className}>
-                    {statusConfig.label}
-                  </Badge>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge variant={statusConfig.variant} className={statusConfig.className}>
+                      {statusConfig.label}
+                    </Badge>
+                    {isArchived ? (
+                      <Badge
+                        variant="outline"
+                        className="border-stone-300 bg-stone-100 text-stone-700"
+                      >
+                        В архиве
+                      </Badge>
+                    ) : null}
+                  </div>
                 </td>
                 <td className="px-4 py-3 text-gray-600">
                   {formatDistanceToNow(offer.createdAt, { addSuffix: true, locale: ru })}
@@ -152,6 +168,39 @@ function OffersTable({
                         ? "Открыть публичную страницу"
                         : "Открыть предпросмотр",
                     }}
+                    destructiveAction={
+                      offer.status !== "DRAFT"
+                        ? isArchived
+                          ? {
+                              kind: "restore",
+                              label: "Восстановить",
+                              title: "Восстановить предложение из архива?",
+                              description:
+                                "Предложение снова станет доступно в рабочих списках. Если оно опубликовано и место не находится в архиве, публичная страница снова откроется пользователям.",
+                              request: {
+                                url: `/api/admin/offers/${offer.id}/archive`,
+                                method: "DELETE",
+                              },
+                              confirmLabel: "Восстановить",
+                              successMessage: "Предложение восстановлено из архива",
+                              errorMessage: "Не удалось восстановить предложение",
+                            }
+                          : {
+                              kind: "archive",
+                              label: "Архивировать",
+                              title: "Архивировать предложение?",
+                              description:
+                                "Предложение будет скрыто с публичной страницы и из связанных блоков места. Действие можно отменить позже.",
+                              request: {
+                                url: `/api/admin/offers/${offer.id}/archive`,
+                                method: "POST",
+                              },
+                              confirmLabel: "Архивировать",
+                              successMessage: "Предложение перемещено в архив",
+                              errorMessage: "Не удалось архивировать предложение",
+                            }
+                        : null
+                    }
                   />
                 </td>
               </tr>

@@ -15,6 +15,8 @@ import { getNormalizedPhones } from "@/lib/phones/normalizePhones";
 import { getNormalizedOfferPhones } from "@/lib/offer/offerPhones";
 import { getNormalizedPlacePhones } from "@/lib/place/placePhones";
 import { normalizeFaqItems } from "@/lib/faq/faqItems";
+import { getPublicPublishedOfferWhere } from "@/server/public/publicContentVisibility";
+import { resolveCanonicalCta } from "@/lib/cta-platform";
 
 interface GetOfferPageDataParams {
   citySlug: string;
@@ -207,13 +209,18 @@ export async function getOfferPageData({
   // Note: Offer unique constraint is @@unique([cityId, slug]), so findUnique({ where: { slug } })
   // is invalid. Use findFirst to look up by slug across cityId values (including null).
   const offer = await prisma.offer.findFirst({
-    where: { slug },
+    where: {
+      AND: [
+        { slug },
+        getPublicPublishedOfferWhere(),
+      ],
+    },
     include: offerPageInclude,
   });
 
   // Note: place.phone and place.website are available via the include above
 
-  if (!offer || offer.status !== "PUBLISHED") {
+  if (!offer) {
     return null;
   }
 
@@ -395,6 +402,29 @@ async function buildOfferPageDataFromOffer(
     primaryLabel = "Записаться";
   }
 
+  const cta = (() => {
+    const phones = offer.bookingPhone
+      ? getNormalizedPhones({ phone: offer.bookingPhone })
+      : (() => {
+          const ownPhones = getNormalizedOfferPhones(offer);
+          return ownPhones.length > 0
+            ? ownPhones
+            : offer.place
+              ? getNormalizedPlacePhones(offer.place)
+              : [];
+        })();
+
+    return {
+      type: ctaType,
+      primaryLabel,
+      secondaryLabel: "В план",
+      phone: phones[0]?.value,
+      phones,
+      link: offer.contactWebsite || offer.place?.website || undefined,
+      instructions: offer.bookingNote || undefined,
+    };
+  })();
+
   return {
     id: offer.id,
     slug: offer.slug || "",
@@ -502,29 +532,21 @@ async function buildOfferPageDataFromOffer(
             stat: signal.title,
           }))
         : undefined,
-
-    cta: (() => {
-      const phones = offer.bookingPhone
-        ? getNormalizedPhones({ phone: offer.bookingPhone })
-        : (() => {
-            const ownPhones = getNormalizedOfferPhones(offer);
-            return ownPhones.length > 0
-              ? ownPhones
-              : offer.place
-                ? getNormalizedPlacePhones(offer.place)
-                : [];
-          })();
-
-      return {
-        type: ctaType,
-        primaryLabel,
-        secondaryLabel: "В план",
-        phone: phones[0]?.value,
-        phones,
-        link: offer.contactWebsite || offer.place?.website || undefined,
-        instructions: offer.bookingNote || undefined,
-      };
-    })(),
+    cta,
+    resolvedCta: resolveCanonicalCta({
+      entityType: "OFFER",
+      entity: {
+        id: offer.id,
+        ctaType: cta.type,
+        ctaPhone: cta.phone,
+        ctaLink: cta.link,
+        ctaInstructions: cta.instructions,
+        bookingEnabled: offer.bookingEnabled,
+        bookingMode: offer.bookingMode,
+        bookingPhone: offer.bookingPhone,
+        bookingNote: offer.bookingNote,
+      },
+    }),
 
     similar: [], // Will be implemented later
     

@@ -6,6 +6,7 @@ import {
   deleteActivity,
   canManageActivity,
 } from "@/server/services/activity.service";
+import { isContentHardDeleteError } from "@/server/services/contentHardDelete.service";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -101,6 +102,16 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
+    if (isContentHardDeleteError(error)) {
+      return NextResponse.json(
+        {
+          error: error.code,
+          message: error.message,
+          reasons: error.reasons,
+        },
+        { status: error.statusCode },
+      );
+    }
     console.error("Delete activity error:", error);
     return NextResponse.json(
       { error: "Internal server error" },

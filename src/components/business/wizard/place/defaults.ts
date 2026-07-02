@@ -39,6 +39,9 @@ export function getDefaultFormData(): PlaceFormData {
     phone3: null,
     phone3Label: null,
     website: null,
+    bookingEnabled: false,
+    bookingPhone: null,
+    bookingNote: null,
     instagramHandle: null,
     instagramUrl: null,
     
@@ -110,6 +113,9 @@ export function hasMeaningfulContent(data: PlaceFormData): boolean {
     data.phone2 ||
     data.phone3 ||
     data.website ||
+    data.bookingEnabled ||
+    data.bookingPhone ||
+    data.bookingNote ||
     data.instagramHandle
   ) {
     return true;

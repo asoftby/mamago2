@@ -88,6 +88,7 @@ export function getDefaultFormData(): EventFormData {
     priceDetails: "",
     priceItems: { items: [], note: "" },
     publicationAccess: null,
+    ctaStepDraft: null,
     ticketLink: "",
     participationMode: "walk-in",
     prebookMethod: null,

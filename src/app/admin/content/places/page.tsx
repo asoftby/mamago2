@@ -148,7 +148,9 @@ function PlacesTable({
             const statusConfig =
               MODERATION_CONTENT_STATUS_CONFIG[place.status] ||
               MODERATION_CONTENT_STATUS_CONFIG.DRAFT;
+            const isArchived = Boolean(place.archivedAt);
             const hasPreviewVersion =
+              isArchived ||
               place.status !== "PUBLISHED" ||
               place.revisions.some((revision) =>
                 ["DRAFT", "PENDING", "NEEDS_REVISION"].includes(revision.status),
@@ -184,9 +186,19 @@ function PlacesTable({
                     place.createdBy?.email || "—"}
                 </td>
                 <td className="px-4 py-3">
-                  <Badge variant={statusConfig.variant} className={statusConfig.className}>
-                    {statusConfig.label}
-                  </Badge>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge variant={statusConfig.variant} className={statusConfig.className}>
+                      {statusConfig.label}
+                    </Badge>
+                    {isArchived ? (
+                      <Badge
+                        variant="outline"
+                        className="border-stone-300 bg-stone-100 text-stone-700"
+                      >
+                        В архиве
+                      </Badge>
+                    ) : null}
+                  </div>
                 </td>
                 <td className="px-4 py-3 text-gray-600">
                   {formatDistanceToNow(place.createdAt, { addSuffix: true, locale: ru })}
@@ -216,6 +228,39 @@ function PlacesTable({
                       label: "Открыть модерацию",
                       title: "Открыть модерацию",
                     }}
+                    destructiveAction={
+                      place.status !== ContentStatus.DRAFT
+                        ? isArchived
+                          ? {
+                              kind: "restore",
+                              label: "Восстановить",
+                              title: "Восстановить место из архива?",
+                              description:
+                                "Место снова станет доступно в рабочих списках. Если оно опубликовано и не заблокировано другими правилами, публичная страница снова откроется пользователям.",
+                              request: {
+                                url: `/api/admin/places/${place.id}/archive`,
+                                method: "DELETE",
+                              },
+                              confirmLabel: "Восстановить",
+                              successMessage: "Место восстановлено из архива",
+                              errorMessage: "Не удалось восстановить место",
+                            }
+                          : {
+                              kind: "archive",
+                              label: "Архивировать",
+                              title: "Архивировать место?",
+                              description:
+                                "Место будет скрыто с публичной страницы и из поиска. Действие можно отменить позже.",
+                              request: {
+                                url: `/api/admin/places/${place.id}/archive`,
+                                method: "POST",
+                              },
+                              confirmLabel: "Архивировать",
+                              successMessage: "Место перемещено в архив",
+                              errorMessage: "Не удалось архивировать место",
+                            }
+                        : null
+                    }
                   />
                 </td>
               </tr>

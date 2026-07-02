@@ -29,6 +29,10 @@ import { syncOfferMediaUsage } from "@/server/services/media/media-usage.service
 import { normalizeFaqItems } from "@/lib/faq/faqItems";
 import { formatZodErrorResponse } from "@/lib/validation/zodErrorResponse";
 import { shouldRejectUnlinkedPlaceForOfferMutation } from "@/lib/offers/offerLinkedBusinessAccess";
+import {
+  assertCanHardDeleteContent,
+  isContentHardDeleteError,
+} from "@/server/services/contentHardDelete.service";
 
 const offerProductTypeSchema = z.enum([
   "PLACE_VISIT",
@@ -203,7 +207,29 @@ export async function PATCH(
     }
 
     const { id } = await params;
-    const body = await request.json();
+    const rawBody = await request.text();
+    if (!rawBody.trim()) {
+      console.warn("[offer.patch] ignoring empty request body", {
+        offerId: id,
+        contentLength: request.headers.get("content-length"),
+        referer: request.headers.get("referer"),
+      });
+      return NextResponse.json({ error: "Empty request body" }, { status: 400 });
+    }
+
+    let body: unknown;
+    try {
+      body = JSON.parse(rawBody);
+    } catch (error) {
+      console.warn("[offer.patch] ignoring invalid json body", {
+        offerId: id,
+        contentLength: request.headers.get("content-length"),
+        referer: request.headers.get("referer"),
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+    }
+
     const data = updateOfferSchema.parse(body);
     const faqItems = data.faqItems !== undefined ? normalizeFaqItems(data.faqItems) : undefined;
     timer.mark("validate");
@@ -570,11 +596,8 @@ export async function DELETE(
 
     const { id } = await params;
 
-    const offer = await prisma.offer.findFirst({
-      where: {
-        id,
-        status: "DRAFT",
-      },
+    const offer = await prisma.offer.findUnique({
+      where: { id },
       include: {
         place: { select: { ownerBusinessId: true, createdByUserId: true } },
       },
@@ -587,6 +610,13 @@ export async function DELETE(
       );
     }
 
+    await assertCanHardDeleteContent({
+      contentType: "OFFER",
+      contentId: id,
+      status: offer.status,
+      prisma,
+    });
+
     await prisma.offer.delete({
       where: { id },
     });
@@ -594,6 +624,16 @@ export async function DELETE(
     return NextResponse.json({ success: true });
 
   } catch (error) {
+    if (isContentHardDeleteError(error)) {
+      return NextResponse.json(
+        {
+          error: error.code,
+          message: error.message,
+          reasons: error.reasons,
+        },
+        { status: error.statusCode },
+      );
+    }
     console.error("Delete offer error:", error);
     return NextResponse.json(
       { error: "Internal server error" },

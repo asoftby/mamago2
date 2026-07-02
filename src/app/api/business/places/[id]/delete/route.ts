@@ -6,10 +6,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
-import { ContentStatus } from "@prisma/client";
 import { canCreateBusinessContent } from "@/lib/auth/businessContentAccess";
 import { canManagePlaceAsync } from "@/lib/auth/placeAccess";
 import { detachImportedRecordsForCatalogEntity } from "@/server/modules/import/services/import-link-reconciliation.service";
+import {
+  assertCanHardDeleteContent,
+  isContentHardDeleteError,
+} from "@/server/services/contentHardDelete.service";
 
 export async function DELETE(
   request: NextRequest,
@@ -51,16 +54,12 @@ export async function DELETE(
       );
     }
 
-    // Only allow deleting DRAFT places
-    if (place.status !== ContentStatus.DRAFT) {
-      return NextResponse.json(
-        {
-          error: "INVALID_STATUS",
-          message: "Only draft places can be deleted",
-        },
-        { status: 400 }
-      );
-    }
+    await assertCanHardDeleteContent({
+      contentType: "PLACE",
+      contentId: id,
+      status: place.status,
+      prisma,
+    });
 
     // Delete the place (hard delete for now)
     await detachImportedRecordsForCatalogEntity(
@@ -77,6 +76,16 @@ export async function DELETE(
 
     return NextResponse.json({ success: true });
   } catch (error) {
+    if (isContentHardDeleteError(error)) {
+      return NextResponse.json(
+        {
+          error: error.code,
+          message: error.message,
+          reasons: error.reasons,
+        },
+        { status: error.statusCode },
+      );
+    }
     console.error("[place-delete] ❌ Error:", error);
     console.error("[place-delete] Stack:", error instanceof Error ? error.stack : "No stack");
 

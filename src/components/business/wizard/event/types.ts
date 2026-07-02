@@ -10,6 +10,7 @@ import type {
 import type { PublicationAccess } from "@/features/publication-access";
 import type { PriceData } from "@/lib/priceItems";
 import type { FaqItem } from "@/lib/faq/faqItems";
+import type { CtaStepFormValue } from "@/components/business/wizard/shared/CtaStep";
 
 export type EventWizardMode = "create" | "edit";
 
@@ -122,6 +123,7 @@ export interface EventFormData {
   priceDetails: string; // Optional details for "from" mode (e.g., different ticket categories)
   priceItems: PriceData;
   publicationAccess: PublicationAccess | null;
+  ctaStepDraft: CtaStepFormValue | null;
   ticketLink: string;
   /** Как попасть на событие (3 сценария; при загрузке старых данных нормализуется в маппере) */
   participationMode: "external-link" | "time-slots" | "walk-in" | "prebook";

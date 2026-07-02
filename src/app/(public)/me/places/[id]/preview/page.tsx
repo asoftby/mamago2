@@ -380,6 +380,7 @@ export default async function MePlacePreviewPage({ params }: PageProps) {
     where: {
       placeId: place.id,
       status: "PUBLISHED",
+      archivedAt: null,
     },
     select: {
       id: true,

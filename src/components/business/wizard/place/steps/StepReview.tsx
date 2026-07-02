@@ -2,23 +2,30 @@
 
 import { AlertCircle, CheckCircle2, ChevronRight } from "lucide-react";
 import { validateForSubmit, validateStep } from "../validation";
-import { PLACE_WIZARD_STEPS, buildReviewSections } from "../placeWizardSteps.config";
+import { buildReviewSections, getPlaceWizardStepConfigs } from "../placeWizardSteps.config";
 import { getPlaceCompletion, getCompletionMessage, getCompletionColor, getProgressBarColor } from "../completion";
 import type { PlaceFormData } from "../types";
 
-interface Step6ReviewProps {
+interface StepReviewProps {
   data: PlaceFormData;
   isSubmitting: boolean;
   onGoToStep?: (step: number) => void;
+  ctaStepEnabled?: boolean;
 }
 
-export function Step6Review({ data, isSubmitting, onGoToStep }: Step6ReviewProps) {
+export function StepReview({
+  data,
+  isSubmitting,
+  onGoToStep,
+  ctaStepEnabled = false,
+}: StepReviewProps) {
   const submitValidation = validateForSubmit(data);
   const completion = getPlaceCompletion(data);
+  const reviewSteps = getPlaceWizardStepConfigs(ctaStepEnabled);
   
   // Adapter function to convert StepValidation to StepValidationResult
   const adaptValidateStep = (stepId: number, data: PlaceFormData) => {
-    const validation = validateStep(stepId, data);
+    const validation = validateStep(stepId, data, ctaStepEnabled);
     return {
       ...validation,
       warnings: [], // Place wizard doesn't have warnings, so add empty array
@@ -27,7 +34,7 @@ export function Step6Review({ data, isSubmitting, onGoToStep }: Step6ReviewProps
   };
   
   // Build review sections from config
-  const reviewSections = buildReviewSections(PLACE_WIZARD_STEPS, data, adaptValidateStep);
+  const reviewSections = buildReviewSections(reviewSteps, data, adaptValidateStep);
 
   return (
     <div className="space-y-6">

@@ -16,6 +16,9 @@ import { getCurrentUser } from "@/lib/auth/server";
 import { canShowOfferOwnerEditOnPublicPage } from "@/lib/permissions/offerEditPermissions";
 import { mockSummerCamp, mockLesnayaSkazka } from "@/lib/offer/offerPageMock";
 import { resolveOfferStructuredDataType } from "@/lib/seo/schema/buildOfferJsonLd";
+import { isOfferPubliclyVisible } from "@/lib/offers/offerVisibility";
+import { tryResolvePublicationForCta } from "@/server/services/direct/directThread.service";
+import { PublicationType } from "@prisma/client";
 
 interface PageProps {
   params: Promise<{ city: string; section: string; slug: string }>;
@@ -54,11 +57,22 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       seoOgImage: true,
       seoRobots: true,
       coverImage: true,
-      place: { select: { title: true, city: { select: { slug: true } } } },
+      status: true,
+      archivedAt: true,
+      place: {
+        select: {
+          title: true,
+          archivedAt: true,
+          ownerBusiness: { select: { operationalStatus: true } },
+          city: { select: { slug: true } },
+        },
+      },
     },
   });
 
-  if (!offer) return { title: "Offer Not Found" };
+  if (!offer || !isOfferPubliclyVisible(offer)) {
+    return { title: "Offer Not Found" };
+  }
 
   const publicBase = getCanonicalPublicAppUrl();
   const title = offer.seoTitle?.trim() || offer.title;
@@ -116,12 +130,16 @@ export default async function CanonicalOfferPage({ params, searchParams }: PageP
         priceText: true,
         coverImage: true,
         seoJsonLdOverride: true,
+        status: true,
+        archivedAt: true,
         placeId: true,
         place: { 
           select: { 
             id: true, 
             title: true, 
             slug: true,
+            archivedAt: true,
+            ownerBusiness: { select: { operationalStatus: true } },
             createdByUserId: true,
             ownerBusinessId: true,
             city: { select: { slug: true } }
@@ -129,7 +147,7 @@ export default async function CanonicalOfferPage({ params, searchParams }: PageP
         },
       },
     });
-  if (!offer) notFound();
+  if (!offer || !isOfferPubliclyVisible(offer)) notFound();
 
   const user = await getCurrentUser();
   let canEditOffer = false;
@@ -195,6 +213,19 @@ export default async function CanonicalOfferPage({ params, searchParams }: PageP
   } : null;
   const faqJsonLd = buildFaqJsonLd(data.faqItems);
 
+  // Direct CTA — omitted when the offer has no resolvable owning Business (rule 5).
+  const directPublication = await tryResolvePublicationForCta({
+    publicationType: PublicationType.OFFER,
+    offerId: offer.id,
+  });
+  const directCta = directPublication
+    ? {
+        offerId: offer.id,
+        publicationTitle: data.title,
+        brandName: offer.place?.title || directPublication.business.name,
+      }
+    : undefined;
+
   return (
     <>
       <AnalyticsDetailBeacon
@@ -211,7 +242,7 @@ export default async function CanonicalOfferPage({ params, searchParams }: PageP
           >[]
         }
       />
-      <OfferPageView data={data} canEditOffer={canEditOffer} />
+      <OfferPageView data={data} canEditOffer={canEditOffer} direct={directCta} />
     </>
   );
 }

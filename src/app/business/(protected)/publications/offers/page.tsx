@@ -44,8 +44,6 @@ export default async function PublicationsOffersPage({
 
   const params = await searchParams;
   const view = params.view || "active";
-  const now = new Date();
-
   // Fetch offers for user's places (same ownership scope as getBusinessPlaces)
   const userPlaces = await prisma.place.findMany({
     where: {
@@ -64,18 +62,15 @@ export default async function PublicationsOffersPage({
         where: {
           placeId: { in: placeIds },
           ...(view === "archived"
-            ? {
-                dateTo: { lt: now },
-              }
-            : {
-                OR: [{ dateTo: null }, { dateTo: { gte: now } }],
-              }),
+            ? { archivedAt: { not: null } }
+            : { archivedAt: null }),
         },
         select: {
           id: true,
           title: true,
           kind: true,
           status: true,
+          archivedAt: true,
           description: true,
           coverImage: true,
           priceFrom: true,
@@ -91,6 +86,7 @@ export default async function PublicationsOffersPage({
             select: {
               id: true,
               title: true,
+              archivedAt: true,
               city: {
                 select: {
                   slug: true,

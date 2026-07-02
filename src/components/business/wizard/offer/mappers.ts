@@ -153,6 +153,159 @@ function inferProductTypeFromForm(data: OfferFormData): OfferProductType | undef
   return undefined;
 }
 
+function createDefaultBookingSettings(): OfferFormData["bookingSettings"] {
+  return {
+    mode: null,
+    selectionType: null,
+    availableDaysAhead: null,
+    capacityPerUnit: null,
+    leadTime: null,
+    slotDurationMinutes: null,
+    externalUrl: null,
+    externalButtonLabel: null,
+    weeklyAvailability: [
+      { day: "monday", enabled: false, startTime: null, endTime: null },
+      { day: "tuesday", enabled: false, startTime: null, endTime: null },
+      { day: "wednesday", enabled: false, startTime: null, endTime: null },
+      { day: "thursday", enabled: false, startTime: null, endTime: null },
+      { day: "friday", enabled: false, startTime: null, endTime: null },
+      { day: "saturday", enabled: false, startTime: null, endTime: null },
+      { day: "sunday", enabled: false, startTime: null, endTime: null },
+    ],
+    excludedDates: [],
+  };
+}
+
+function inferLegacyOfferCtaFields(offer: {
+  productType?: OfferProductType | null;
+  kind: OfferKind;
+  bookingEnabled?: boolean | null;
+  bookingMode?: "REQUEST_ONLY" | "USE_PUBLICATION_DATES" | "USE_PUBLICATION_SLOTS" | null;
+  bookingPhone?: string | null;
+  bookingNote?: string | null;
+  contactWebsite?: string | null;
+}): Pick<
+  OfferFormData,
+  "publicationAccess" | "ctaType" | "ctaPhone" | "ctaLink" | "ctaInstructions" | "bookingSettings"
+> {
+  const bookingSettings = createDefaultBookingSettings();
+  const ctaInstructions = offer.bookingNote ?? "";
+
+  if (offer.bookingEnabled) {
+    if (offer.bookingMode === "USE_PUBLICATION_SLOTS") {
+      return {
+        publicationAccess: {
+          method: "timeslots",
+          instructions: ctaInstructions,
+          timeSlots: [
+            {
+              id: "legacy-slot",
+              date: "2099-01-01",
+              startTime: "10:00",
+              endTime: "11:00",
+              capacity: 1,
+            },
+          ],
+        },
+        ctaType: "забронировать",
+        ctaPhone: offer.bookingPhone ?? "",
+        ctaLink: "",
+        ctaInstructions,
+        bookingSettings: {
+          ...bookingSettings,
+          mode: "slot",
+          selectionType: "date_time",
+          availableDaysAhead: 30,
+          capacityPerUnit: 1,
+          slotDurationMinutes: 60,
+          weeklyAvailability: bookingSettings.weeklyAvailability.map((day, index) =>
+            index === 0
+              ? { ...day, enabled: true, startTime: "10:00", endTime: "11:00" }
+              : day,
+          ),
+        },
+      };
+    }
+
+    if (offer.bookingMode === "USE_PUBLICATION_DATES") {
+      return {
+        publicationAccess: {
+          method: "timeslots",
+          instructions: ctaInstructions,
+          timeSlots: [
+            {
+              id: "legacy-date",
+              date: "2099-01-01",
+              startTime: "",
+              endTime: undefined,
+              capacity: 1,
+            },
+          ],
+        },
+        ctaType: "забронировать",
+        ctaPhone: offer.bookingPhone ?? "",
+        ctaLink: "",
+        ctaInstructions,
+        bookingSettings: {
+          ...bookingSettings,
+          mode: "request",
+          selectionType: "date_only",
+          availableDaysAhead: 30,
+          capacityPerUnit: 1,
+        },
+      };
+    }
+
+    return {
+      publicationAccess: {
+        method: "prebooking",
+        phone: offer.bookingPhone ?? "",
+        instructions: ctaInstructions,
+      },
+      ctaType: "записаться",
+      ctaPhone: offer.bookingPhone ?? "",
+      ctaLink: "",
+      ctaInstructions,
+      bookingSettings,
+    };
+  }
+
+  if (offer.contactWebsite?.trim()) {
+    return {
+      publicationAccess: {
+        method: "external",
+        externalUrl: offer.contactWebsite,
+        instructions: ctaInstructions,
+      },
+      ctaType: "перейти_на_сайт",
+      ctaPhone: "",
+      ctaLink: offer.contactWebsite,
+      ctaInstructions,
+      bookingSettings,
+    };
+  }
+
+  if (offer.productType === "CAMP" || offer.kind === "SERVICE") {
+    return {
+      publicationAccess: null,
+      ctaType: "записаться",
+      ctaPhone: "",
+      ctaLink: "",
+      ctaInstructions,
+      bookingSettings,
+    };
+  }
+
+  return {
+    publicationAccess: null,
+    ctaType: null,
+    ctaPhone: "",
+    ctaLink: "",
+    ctaInstructions,
+    bookingSettings,
+  };
+}
+
 function inferRequestedPlacementsFromForm(
   data: OfferFormData,
   productType: OfferProductType | undefined,
@@ -764,6 +917,10 @@ export function mapOfferToFormData(offer: {
   contactPhone3?: string | null;
   contactPhone3Label?: string | null;
   contactWebsite?: string | null;
+  bookingEnabled?: boolean | null;
+  bookingMode?: "REQUEST_ONLY" | "USE_PUBLICATION_DATES" | "USE_PUBLICATION_SLOTS" | null;
+  bookingPhone?: string | null;
+  bookingNote?: string | null;
   contactSocialLinks?: unknown;
   details?: unknown;
   // Phase 3b-1 party-filter columns (PARTY_SERVICE canon)
@@ -802,6 +959,7 @@ export function mapOfferToFormData(offer: {
   const serviceDetails = usesPartyColumns ? parseServiceDetailsFromDb(offer.details) : null;
   const requestedPlacements = parsePlacementKeyArray(offer.placements);
   const placementStatuses = parsePlacementStatusMap(offer.placements);
+  const legacyCtaFields = inferLegacyOfferCtaFields(offer);
   const socialLinks = Array.isArray(offer.contactSocialLinks)
     ? offer.contactSocialLinks
         .filter(
@@ -900,6 +1058,7 @@ export function mapOfferToFormData(offer: {
     website: offer.contactWebsite ?? "",
     socialLinks,
     faqItems: normalizeFaqItems(offer.faqItems),
+    ...legacyCtaFields,
     signalIds: offer.discoverySignalIds ?? [],
     classChipSlugs: offer.classChipSlugs ?? [],
     placeVisitDetails: parsePlaceVisitDetailsFromDb(offer.details),

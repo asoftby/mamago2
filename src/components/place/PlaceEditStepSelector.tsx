@@ -3,6 +3,10 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { businessFormCopy } from "@/components/business/wizard/businessFormLabels";
+import { getPlaceWizardStepConfigs } from "@/components/business/wizard/place/placeWizardSteps.config";
+import { getPlaceWizardTotalSteps } from "@/components/business/wizard/place/config";
+import { isPlaceCtaStepFeatureEnabled } from "@/components/business/wizard/place/ctaStepFeatureFlag";
 import {
   Dialog,
   DialogContent,
@@ -17,6 +21,8 @@ import {
   Camera, 
   Phone, 
   Clock, 
+  ListChecks,
+  CircleHelp,
   CheckCircle,
   Edit3
 } from "lucide-react";
@@ -26,48 +32,37 @@ interface PlaceEditStepSelectorProps {
   className?: string;
 }
 
-const WIZARD_STEPS = [
-  {
-    step: 1,
-    title: "Профиль",
-    description: "Название, категория, описание",
-    icon: User,
-  },
-  {
-    step: 2,
-    title: "Локация",
-    description: "Адрес и местоположение",
-    icon: MapPin,
-  },
-  {
-    step: 3,
-    title: "Фото",
-    description: "Логотип и галерея",
-    icon: Camera,
-  },
-  {
-    step: 4,
-    title: "Контакты",
-    description: "Телефон, сайт, соцсети",
-    icon: Phone,
-  },
-  {
-    step: 5,
-    title: "Режим работы",
-    description: "Часы работы и расписание",
-    icon: Clock,
-  },
-  {
-    step: 6,
-    title: "Проверка и отправка",
-    description: "Финальная проверка изменений",
-    icon: CheckCircle,
-  },
-];
+const STEP_ICONS = {
+  profile: User,
+  location: MapPin,
+  contacts: Phone,
+  photos: Camera,
+  openingHours: Clock,
+  cta: ListChecks,
+  faq: CircleHelp,
+  review: CheckCircle,
+} as const;
 
 export function PlaceEditStepSelector({ placeId, className }: PlaceEditStepSelectorProps) {
   const [open, setOpen] = useState(false);
   const router = useRouter();
+  const ctaStepEnabled = isPlaceCtaStepFeatureEnabled(process.env);
+  const contentSteps = getPlaceWizardStepConfigs(ctaStepEnabled);
+  const totalSteps = getPlaceWizardTotalSteps(ctaStepEnabled);
+  const steps = [
+    ...contentSteps.map((step) => ({
+      step: step.id,
+      title: step.title,
+      description: step.description ?? step.title,
+      icon: STEP_ICONS[step.key as keyof typeof STEP_ICONS] ?? Edit3,
+    })),
+    {
+      step: totalSteps,
+      title: businessFormCopy.reviewStepShortTitle,
+      description: "Финальная проверка изменений",
+      icon: CheckCircle,
+    },
+  ];
 
   const handleStepSelect = (step: number) => {
     setOpen(false);
@@ -94,7 +89,7 @@ export function PlaceEditStepSelector({ placeId, className }: PlaceEditStepSelec
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-2">
-          {WIZARD_STEPS.map((stepInfo) => {
+          {steps.map((stepInfo) => {
             const Icon = stepInfo.icon;
             return (
               <button

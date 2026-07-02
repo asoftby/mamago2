@@ -45,6 +45,8 @@ interface PlaceHeroProps {
   media?: {
     galleryItems: MediaGalleryItem[];
   };
+  /** Optional "Отправить заявку" CTA (Direct) — additive, rendered after the existing buttons. */
+  directSlot?: React.ReactNode;
 }
 
 export function PlaceHero({
@@ -68,6 +70,7 @@ export function PlaceHero({
   isOpenNow,
   todayHoursText,
   breadcrumbItems,
+  directSlot,
   onShareClick,
   ownerEditPlaceId,
   media,
@@ -323,6 +326,7 @@ export function PlaceHero({
                   source="place-detail"
                 />
               </div>
+              {directSlot && <div className="mt-3">{directSlot}</div>}
             </SidebarCardTopSection>
 
             {/* Owner edit */}

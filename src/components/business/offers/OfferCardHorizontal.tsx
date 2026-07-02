@@ -39,12 +39,14 @@ interface Offer {
   priceText: string | null;
   campSessions?: unknown;
   status: OfferStatus;
+  archivedAt: Date | null;
   dateFrom: Date | null;
   dateTo: Date | null;
   slug: string | null;
   place: {
     id: string;
     title: string;
+    archivedAt: Date | null;
     city?: {
       slug: string;
     } | null;
@@ -149,7 +151,13 @@ export function OfferCardHorizontal({
   const offerImageForCard = offer.coverImage;
 
   const citySlug = offer.place.city?.slug;
-  const publicOfferHref = (offer.status === "PUBLISHED" && citySlug && offer.slug)
+  const publicOfferHref = (
+    !offer.archivedAt &&
+    !offer.place.archivedAt &&
+    offer.status === "PUBLISHED" &&
+    citySlug &&
+    offer.slug
+  )
     ? getOfferPublicUrl(offer, citySlug)
     : null;
   const viewOfferHref = publicOfferHref ?? getOfferPreviewPath(offer.id);

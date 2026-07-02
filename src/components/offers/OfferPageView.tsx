@@ -22,6 +22,13 @@ import { getCityHomeHref } from "@/lib/header/getCityHomeHref";
 import { toast } from "@/lib/toast";
 import { CallModal } from "@/components/shared/CallModal";
 import { FaqSection } from "@/components/public/FaqSection";
+import { DirectRequestCta } from "@/components/direct/DirectRequestCta";
+
+export interface OfferDirectCtaInfo {
+  offerId: string;
+  publicationTitle: string;
+  brandName: string;
+}
 
 interface OfferPageViewProps {
   data: OfferPageData;
@@ -38,6 +45,8 @@ interface OfferPageViewProps {
     reviews?: string;
     place?: string;
   };
+  /** Direct "Отправить заявку" CTA — omitted when the offer has no resolvable owning Business (rule 5). */
+  direct?: OfferDirectCtaInfo;
 }
 
 type LocalOfferSaveState = {
@@ -94,6 +103,7 @@ export function OfferPageView({
   onSave,
   onShiftCta,
   sectionNotes,
+  direct,
 }: OfferPageViewProps) {
   const ctaRef = useRef<HTMLElement | null>(null);
   const storageKey = `mamago:offer-plan:${data.id}`;
@@ -313,6 +323,18 @@ export function OfferPageView({
           onPrimary={handlePrimary}
           onSave={handleSave}
           ctaRef={ctaRef}
+          directSlot={
+            direct && (
+              <DirectRequestCta
+                publicationRef={{ publicationType: "OFFER", offerId: direct.offerId }}
+                publicationTitle={direct.publicationTitle}
+                brandName={direct.brandName}
+                className="flex h-14 w-full items-center justify-center gap-2 rounded-full border border-[rgba(20,18,16,0.18)] bg-transparent text-[15px] font-semibold text-[#141210] transition-colors hover:border-[#141210]"
+              >
+                Отправить заявку
+              </DirectRequestCta>
+            )
+          }
         />
 
         <OfferEditorialInsights data={data} />

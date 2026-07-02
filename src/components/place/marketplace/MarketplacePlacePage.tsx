@@ -17,6 +17,8 @@ import type { PriceData } from "@/lib/priceItems";
 import type { FaqItem } from "@/lib/faq/faqItems";
 import type { NormalizedPlacePhone } from "@/lib/place/placePhones";
 import type { MediaGalleryItem } from "@/lib/media/galleryTypes";
+import type { CanonicalCtaObject } from "@/lib/cta-platform";
+import { DirectRequestCta } from "@/components/direct/DirectRequestCta";
 
 interface MarketplacePlacePageProps {
   place: {
@@ -72,6 +74,7 @@ interface MarketplacePlacePageProps {
     faqItems?: FaqItem[];
     updatedAt?: Date | string | null;
     fallbackUrl?: string;
+    resolvedCta?: CanonicalCtaObject;
   };
 
   eventActivities?: ActivityMock[];
@@ -113,6 +116,12 @@ interface MarketplacePlacePageProps {
     reviews?: string;
     relatedPlaces?: string;
   };
+  /** Direct "Отправить заявку" CTA — omitted when the place has no owning Business (rule 5). */
+  direct?: {
+    placeId: string;
+    publicationTitle: string;
+    brandName: string;
+  };
 }
 
 export function MarketplacePlacePage({
@@ -124,6 +133,7 @@ export function MarketplacePlacePage({
   ownerEditPlaceId,
   relatedPlaces = [],
   sectionNotes,
+  direct,
 }: MarketplacePlacePageProps) {
   const ctaRef = useRef<HTMLDivElement>(null);
   const hasRenderableReviews = reviews.length > 0;
@@ -212,6 +222,18 @@ export function MarketplacePlacePage({
         onShareClick={handleShare}
         ownerEditPlaceId={ownerEditPlaceId}
         media={place.media}
+        directSlot={
+          direct && (
+            <DirectRequestCta
+              publicationRef={{ publicationType: "PLACE", placeId: direct.placeId }}
+              publicationTitle={direct.publicationTitle}
+              brandName={direct.brandName}
+              className="flex h-14 w-full items-center justify-center gap-2 rounded-full border border-[rgba(20,18,16,0.18)] bg-transparent text-[15px] font-semibold text-[#141210] transition-colors hover:border-[#141210]"
+            >
+              Отправить заявку
+            </DirectRequestCta>
+          )
+        }
       />
 
       {/* Meta strip */}
@@ -317,6 +339,18 @@ export function MarketplacePlacePage({
         placeSlug={place.slug}
         placeTitle={place.title}
         coverImageUrl={place.logoUrl}
+        directSlot={
+          direct && (
+            <DirectRequestCta
+              publicationRef={{ publicationType: "PLACE", placeId: direct.placeId }}
+              publicationTitle={direct.publicationTitle}
+              brandName={direct.brandName}
+              className="inline-flex h-[46px] shrink-0 items-center gap-2 rounded-full border border-[rgba(20,18,16,0.18)] bg-[rgba(250,247,241,0.95)] px-4 text-[14px] font-semibold text-[#141210] transition-colors hover:border-[#141210]"
+            >
+              Заявка
+            </DirectRequestCta>
+          )
+        }
       />
     </div>
   );

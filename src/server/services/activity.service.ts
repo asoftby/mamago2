@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import type { Activity, ActivitySession, ActivityType, ScheduleMode, User } from "@prisma/client";
 import { canManageActivityById } from "@/lib/auth/activityAccess";
 import { detachImportedRecordsForCatalogEntity } from "@/server/modules/import/services/import-link-reconciliation.service";
+import { assertCanHardDeleteContent } from "@/server/services/contentHardDelete.service";
 
 export type CreateActivityInput = {
   title: string;
@@ -138,6 +139,22 @@ export async function listBusinessActivities(
  * Delete an activity
  */
 export async function deleteActivity(activityId: string): Promise<void> {
+  const activity = await prisma.activity.findUnique({
+    where: { id: activityId },
+    select: { status: true },
+  });
+
+  if (!activity) {
+    return;
+  }
+
+  await assertCanHardDeleteContent({
+    contentType: "ACTIVITY",
+    contentId: activityId,
+    status: activity.status,
+    prisma,
+  });
+
   await detachImportedRecordsForCatalogEntity(
     {
       entityType: "ACTIVITY",

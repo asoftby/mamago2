@@ -18,12 +18,14 @@ interface Offer {
   priceText: string | null;
   campSessions?: unknown;
   status: OfferStatus;
+  archivedAt: Date | null;
   dateFrom: Date | null;
   dateTo: Date | null;
   slug: string | null;
   place: {
     id: string;
     title: string;
+    archivedAt: Date | null;
     city?: {
       slug: string;
     } | null;
@@ -55,15 +57,26 @@ export function OffersList({ offers, currentView }: OffersListProps) {
     }
   };
 
-  // Archive/unarchive will be implemented when we add archived field to Offer
-  const handleArchive = async () => {
-    // TODO: Implement when Offer model has archived field
-    console.log("Archive not yet implemented for offers");
+  const handleArchive = async (id: string) => {
+    const response = await fetch(`/api/business/offers/${id}/archive`, {
+      method: "POST",
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || "Failed to archive");
+    }
   };
 
-  const handleUnarchive = async () => {
-    // TODO: Implement when Offer model has archived field
-    console.log("Unarchive not yet implemented for offers");
+  const handleUnarchive = async (id: string) => {
+    const response = await fetch(`/api/business/offers/${id}/archive`, {
+      method: "DELETE",
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || "Failed to unarchive");
+    }
   };
 
   return (

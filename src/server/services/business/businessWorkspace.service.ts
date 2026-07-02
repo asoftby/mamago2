@@ -177,6 +177,7 @@ export async function getBusinessWorkspaceData(params: {
     }),
     prisma.offer.findMany({
       where: {
+        archivedAt: null,
         place: {
           OR: [{ ownerBusinessId: params.businessId }, { createdByUserId: params.userId }],
         },

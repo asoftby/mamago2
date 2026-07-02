@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
+import {
+  assertCanHardDeleteContent,
+  HARD_DELETE_BLOCK_MESSAGE,
+  isContentHardDeleteError,
+} from "@/server/services/contentHardDelete.service";
 
 export async function GET(
   req: NextRequest,
@@ -92,7 +97,7 @@ export async function GET(
 
 /**
  * DELETE /api/admin/places/[id]
- * Delete a place and all related data (admin only)
+ * Hard-delete an isolated draft place (admin only).
  */
 export async function DELETE(
   req: NextRequest,
@@ -109,24 +114,46 @@ export async function DELETE(
 
     const { id } = await params;
 
-    // Check if place exists
     const place = await prisma.place.findUnique({
       where: { id },
-      select: { id: true, title: true },
+      select: {
+        id: true,
+        title: true,
+        status: true,
+        _count: {
+          select: {
+            activities: true,
+            offers: true,
+            bookingRequests: true,
+            children: true,
+            eventVenues: true,
+            routeStops: true,
+            reviews: true,
+            relatedArticles: true,
+            planItems: true,
+            placeIdeas: true,
+            claimRequests: true,
+          },
+        },
+      },
     });
 
     if (!place) {
       return NextResponse.json({ error: "Place not found" }, { status: 404 });
     }
 
-    // Delete place and all related data in a transaction
+    await assertCanHardDeleteContent({
+      contentType: "PLACE",
+      contentId: id,
+      status: place.status,
+      prisma,
+    });
+
     await prisma.$transaction(async (tx) => {
-      // Delete place images
       await tx.placeImage.deleteMany({
         where: { placeId: id },
       });
 
-      // Delete place revision images
       const revisions = await tx.placeRevision.findMany({
         where: { placeId: id },
         select: { id: true },
@@ -138,12 +165,10 @@ export async function DELETE(
         });
       }
 
-      // Delete place revisions (this will cascade delete opening hours)
       await tx.placeRevision.deleteMany({
         where: { placeId: id },
       });
 
-      // Delete improvement requests
       await tx.improvementRequest.deleteMany({
         where: {
           entityType: "PLACE",
@@ -151,7 +176,6 @@ export async function DELETE(
         },
       });
 
-      // Delete moderation logs
       await tx.moderationLog.deleteMany({
         where: {
           entityType: "PLACE",
@@ -159,7 +183,6 @@ export async function DELETE(
         },
       });
 
-      // Delete place opening hours if exists
       const placeWithOpeningHours = await tx.place.findUnique({
         where: { id },
         select: { openingHoursId: true },
@@ -171,7 +194,6 @@ export async function DELETE(
         });
       }
 
-      // Finally, delete the place itself
       await tx.place.delete({
         where: { id },
       });
@@ -184,6 +206,16 @@ export async function DELETE(
       message: "Place deleted successfully",
     });
   } catch (error: unknown) {
+    if (isContentHardDeleteError(error)) {
+      return NextResponse.json(
+        {
+          error: error.code,
+          message: error.message || HARD_DELETE_BLOCK_MESSAGE,
+          reasons: error.reasons,
+        },
+        { status: error.statusCode },
+      );
+    }
     console.error("[API] Delete place error:", error);
     return NextResponse.json(
       { error: "Internal server error" },

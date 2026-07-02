@@ -17,7 +17,7 @@ export async function buildPlaceDocument(
     },
   });
 
-  if (!place) return null;
+  if (!place || place.archivedAt) return null;
 
   const searchText = buildSearchText([
     place.title,

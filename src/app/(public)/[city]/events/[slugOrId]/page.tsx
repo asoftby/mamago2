@@ -17,6 +17,8 @@ import { AnalyticsDetailBeacon } from "@/components/analytics/AnalyticsDetailBea
 import { resolveCanonicalEventPublicPathBySlugOrId } from "@/lib/business/resolveCanonicalEventPublicPath";
 import { buildOgMeta } from "@/lib/seo/buildOgMeta";
 import { fetchReelsThumbnail } from "@/lib/instagram/fetchReelsThumbnail";
+import { tryResolvePublicationForCta } from "@/server/services/direct/directThread.service";
+import { PublicationType } from "@prisma/client";
 
 interface EventPublicPageProps {
   params: Promise<{ city: string; slugOrId: string }>;
@@ -177,6 +179,20 @@ export default async function CityEventPublicPage({ params, searchParams }: Even
       reelsThumbnailUrl: reelsThumbnailUrl ?? undefined,
     });
     const faqJsonLd = buildFaqJsonLd(data.faqItems);
+
+    // Direct CTA — omitted when the event has no resolvable owning Business (rule 5).
+    const directPublication = await tryResolvePublicationForCta({
+      publicationType: PublicationType.EVENT,
+      activityId: fromDb.id,
+    });
+    const directCta = directPublication
+      ? {
+          activityId: fromDb.id,
+          publicationTitle: fromDb.title,
+          brandName: fromDb.venue?.place?.title || fromDb.place?.title || directPublication.business.name,
+        }
+      : undefined;
+
     return (
       <>
         <AnalyticsDetailBeacon
@@ -189,7 +205,7 @@ export default async function CityEventPublicPage({ params, searchParams }: Even
         <JsonLd
           data={[jsonLd, breadcrumbJsonLd, faqJsonLd].filter(Boolean) as Record<string, unknown>[]}
         />
-        <EventPageView data={data} />
+        <EventPageView data={data} direct={directCta} />
       </>
     );
   }

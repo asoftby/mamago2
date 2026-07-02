@@ -10,6 +10,7 @@ import {
 } from "@/lib/content-editor/types";
 import { buildSurfaceRedirectDestination, resolveSurfaceFromHostAndPathname } from "@/lib/routing/surface";
 import { getCurrentRequestRoutingContext } from "@/lib/routing/requestContext";
+import { isPlaceCtaStepFeatureEnabled } from "@/components/business/wizard/place/ctaStepFeatureFlag";
 
 function surfaceFromHostAndPath(host: string | undefined, pathname: string): ContentEditorSurface {
   const resolved = resolveSurfaceFromHostAndPathname(host, pathname);
@@ -38,6 +39,7 @@ export default async function EditorNewPlacePage({
   const { returnTo } = await searchParams;
   const surface = surfaceFromHostAndPath(routing.currentHost, "/editor/place/new");
   const nav = defaultNavForSurface(surface);
+  const ctaStepEnabled = isPlaceCtaStepFeatureEnabled(process.env);
   const backHref = resolveEditorReturnDestination({
     surface,
     entity: "place",
@@ -58,6 +60,7 @@ export default async function EditorNewPlacePage({
         editorSurface={surface}
         contentEditorNav={nav}
         returnTo={returnTo}
+        ctaStepEnabled={ctaStepEnabled}
       />
     </ContentEditorChrome>
   );

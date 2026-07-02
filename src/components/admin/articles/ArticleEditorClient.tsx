@@ -1032,13 +1032,12 @@ export function ArticleEditorClient({
         publicUrl={publicUrl}
       />
 
-      {/* Зона удаления (только для черновиков и архивных) */}
-      {hasPersistedId && (status === "ARCHIVED" || status === "DRAFT") ? (
+      {/* Зона удаления (только для изолированных черновиков) */}
+      {hasPersistedId && status === "DRAFT" ? (
         <div className="rounded-lg border border-destructive/25 bg-destructive/5 px-3 py-3 sm:py-4">
           <p className="text-sm text-muted-foreground mb-3">
-            {status === "DRAFT"
-              ? "Удалить черновик — запись исчезнет из списка публикаций. Пока статья не опубликована, публичных страниц нет."
-              : "Удаление навсегда убирает статью из базы. Публичная страница вернёт 404. Доступно только для архивных материалов."}
+            Удалить можно только полностью изолированный черновик. Если у статьи уже появились связанные данные,
+            API вернёт блокировку и нужно будет использовать архивирование.
           </p>
           <Button
             type="button"
@@ -1046,7 +1045,7 @@ export function ArticleEditorClient({
             disabled={actionsBusy}
             onClick={() => setDeleteDialogOpen(true)}
           >
-            {status === "DRAFT" ? "Удалить черновик" : "Удалить"}
+            Удалить черновик
           </Button>
         </div>
       ) : null}

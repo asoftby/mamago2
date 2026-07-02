@@ -2,6 +2,7 @@
 
 import type { EventFormData } from "./types";
 import type { PendingLocation } from "./types";
+import type { CtaStepFormValue } from "@/components/business/wizard/shared/CtaStep";
 import type { Activity, ActivityFormat } from "@prisma/client";
 import type { Prisma } from "@prisma/client";
 import { getDefaultFormData } from "./defaults";
@@ -455,6 +456,11 @@ export function mapEventToFormData(event: ActivityWithRelations): EventFormData 
       : "";
   formData.priceItems = parsePriceData((event as { priceItems?: unknown }).priceItems);
   formData.faqItems = normalizeFaqItems((event as { faqItems?: unknown }).faqItems);
+  formData.ctaStepDraft =
+    scheduleJson.ctaStepDraft &&
+    typeof scheduleJson.ctaStepDraft === "object"
+      ? (scheduleJson.ctaStepDraft as CtaStepFormValue)
+      : null;
   formData.ticketLink = typeof scheduleJson.ticketLink === "string" ? scheduleJson.ticketLink : "";
 
   formData.participationMode = normalizeParticipationMode(scheduleJson.participationMode);
@@ -788,6 +794,7 @@ export function buildEventPayload(data: EventFormData): EventPayload {
 
       pricingMode: data.pricingMode,
       priceDetails: data.priceDetails,
+      ...(data.ctaStepDraft ? { ctaStepDraft: data.ctaStepDraft } : {}),
       ticketLink: data.ticketLink,
       participationMode: normalizeParticipationMode(data.participationMode),
       prebookMethod: data.prebookMethod,

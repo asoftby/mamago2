@@ -13,13 +13,15 @@ import { Step2Location } from "./steps/Step2Location";
 import { Step3Contacts } from "./steps/Step3Contacts";
 import { Step4Photos } from "./steps/Step4Photos";
 import { Step5OpeningHours } from "./steps/Step5OpeningHours";
+import { StepCta } from "./steps/StepCta";
 import { FaqStep } from "../shared/FaqStep";
-import { Step6Review } from "./steps/Step6Review";
+import { deriveCtaStepState } from "../shared/CtaStep";
+import { mapPlaceFormDataToCtaStepValue } from "./ctaStepMapper";
 
 /**
  * Place Wizard Steps Configuration
  */
-export const PLACE_WIZARD_STEPS: WizardStepConfig<PlaceFormData>[] = [
+const PLACE_WIZARD_BASE_STEPS: WizardStepConfig<PlaceFormData>[] = [
   // Step 1: Profile
   {
     id: 1,
@@ -202,13 +204,61 @@ export const PLACE_WIZARD_STEPS: WizardStepConfig<PlaceFormData>[] = [
     
     getMissingFields: (data) => [], // Optional step
   },
-  {
-    id: 6,
+];
+
+function createPlaceCtaSummary(data: PlaceFormData): SummaryItem[] {
+  const sourceEntityId = data.id ?? "place-wizard-draft";
+  const ctaStepValue = mapPlaceFormDataToCtaStepValue(data, { id: sourceEntityId });
+  const derived = deriveCtaStepState(
+    {
+      sourceEntityType: "PLACE",
+      sourceEntityId,
+    },
+    ctaStepValue,
+  );
+  const fallbackParts = [
+    ctaStepValue.fallback.phone?.trim() ? "телефон" : null,
+    ctaStepValue.fallback.website?.trim() ? "сайт" : null,
+  ].filter(Boolean);
+
+  return [
+    {
+      label: "Основное действие",
+      value: derived.canonicalCta.primaryLabel,
+    },
+    {
+      label: "Сценарий",
+      value: derived.userFacingSummary,
+    },
+    {
+      label: "Fallback",
+      value: fallbackParts.length > 0 ? fallbackParts.join(", ") : "Не добавлен",
+    },
+  ];
+}
+
+function createPlaceCtaStep(id: number): WizardStepConfig<PlaceFormData> {
+  return {
+    id,
+    key: "cta",
+    shortLabel: "CTA",
+    title: "Как воспользоваться",
+    description: "Настройте основной способ взаимодействия для пользователя",
+    component: StepCta,
+    isComplete: () => true,
+    getSummary: (data) => createPlaceCtaSummary(data),
+    getMissingFields: () => [],
+  };
+}
+
+function createPlaceFaqStep(id: number): WizardStepConfig<PlaceFormData> {
+  return {
+    id,
     key: "faq",
     shortLabel: "Вопросы",
     title: "Частые вопросы",
     description: "Необязательный блок с ответами на частые вопросы родителей",
-    component: ({ data, onChange }) => (
+    component: ({ data, onChange, isEditable: _isEditable }) => (
       <FaqStep
         kind="place"
         value={data.faqItems}
@@ -223,8 +273,27 @@ export const PLACE_WIZARD_STEPS: WizardStepConfig<PlaceFormData>[] = [
       },
     ],
     getMissingFields: () => [],
-  },
+  };
+}
+
+export const PLACE_WIZARD_STEPS: WizardStepConfig<PlaceFormData>[] = [
+  ...PLACE_WIZARD_BASE_STEPS,
+  createPlaceFaqStep(6),
 ];
+
+export function getPlaceWizardStepConfigs(
+  ctaStepEnabled = false,
+): WizardStepConfig<PlaceFormData>[] {
+  if (!ctaStepEnabled) {
+    return PLACE_WIZARD_STEPS;
+  }
+
+  return [
+    ...PLACE_WIZARD_BASE_STEPS,
+    createPlaceCtaStep(6),
+    createPlaceFaqStep(7),
+  ];
+}
 
 export const TOTAL_CONTENT_STEPS = PLACE_WIZARD_STEPS.length;
 
