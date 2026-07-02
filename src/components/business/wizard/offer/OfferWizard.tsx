@@ -123,6 +123,7 @@ type OfferMutationErrorPayload = {
   code?: string;
   error?: string;
   message?: string;
+  description?: string;
   fieldErrors?: Record<string, string[] | undefined>;
   formErrors?: string[];
 };
@@ -244,6 +245,7 @@ async function parseOfferMutationResponse<T>(
     if (isOfferMutationErrorPayload(body)) {
       throw new OfferMutationError(
         body.message || body.error || options.fallbackMessage,
+        typeof body.description === "string" ? body.description : undefined,
       );
     }
 

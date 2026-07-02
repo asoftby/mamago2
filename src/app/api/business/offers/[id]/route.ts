@@ -30,6 +30,10 @@ import { normalizeFaqItems } from "@/lib/faq/faqItems";
 import { formatZodErrorResponse } from "@/lib/validation/zodErrorResponse";
 import { shouldRejectUnlinkedPlaceForOfferMutation } from "@/lib/offers/offerLinkedBusinessAccess";
 import {
+  OFFER_PUBLISHED_REQUIRES_MODERATION_CODE,
+  shouldBlockPublishedOfferEdit,
+} from "@/lib/offers/offerPublishedEditGate";
+import {
   assertCanHardDeleteContent,
   isContentHardDeleteError,
 } from "@/server/services/contentHardDelete.service";
@@ -244,6 +248,7 @@ export async function PATCH(
         id: true,
         title: true,
         kind: true,
+        status: true,
         productType: true,
         priceFrom: true,
         priceText: true,
@@ -256,6 +261,25 @@ export async function PATCH(
 
     if (!existingOffer || !(await canManagePlaceAsync(user, existingOffer.place))) {
       return NextResponse.json({ error: "Offer not found" }, { status: 404 });
+    }
+
+    // Гейт до любой записи в БД и любых сайдэффектов (slug, media, projections):
+    // прямая правка PUBLISHED-оффера минует модерацию — content leak.
+    if (
+      shouldBlockPublishedOfferEdit({
+        role: user.role,
+        currentStatus: existingOffer.status,
+      })
+    ) {
+      return NextResponse.json(
+        {
+          error: OFFER_PUBLISHED_REQUIRES_MODERATION_CODE,
+          message: "Опубликованное предложение нельзя изменить напрямую",
+          description:
+            "Изменения опубликованных предложений проходят модерацию",
+        },
+        { status: 403 },
+      );
     }
 
     const updateData: Prisma.OfferUpdateInput = {};
