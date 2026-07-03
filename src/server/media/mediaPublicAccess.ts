@@ -616,6 +616,17 @@ async function hasPublishedPublicLinkage(media: MediaAsset): Promise<boolean> {
   return false;
 }
 
+async function isBrandingAsset(mediaId: string): Promise<boolean> {
+  const branding = await prisma.brandingConfig.findFirst({
+    where: {
+      OR: [{ logoAssetId: mediaId }, { faviconAssetId: mediaId }],
+    },
+    select: { id: true },
+  });
+
+  return branding !== null;
+}
+
 function isMediaAssetSanityBlocked(media: MediaAsset): boolean {
   if (media.deletedAt) {
     return true;
@@ -738,6 +749,9 @@ export async function canLoadMediaAnonymously(media: MediaAsset): Promise<boolea
   }
   if (media.status !== MediaAssetStatus.ACTIVE) {
     return false;
+  }
+  if (await isBrandingAsset(media.id)) {
+    return true;
   }
   if (!(await hasPublishedPublicLinkage(media))) {
     return false;

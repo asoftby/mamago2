@@ -12,6 +12,8 @@ export interface BrandingConfig {
   fontBody: string;
   logoUrl: string | null;
   faviconUrl: string | null;
+  faviconMimeType: string | null;
+  faviconVersion: string | null;
 }
 
 const DEFAULTS: BrandingConfig = {
@@ -26,6 +28,8 @@ const DEFAULTS: BrandingConfig = {
   fontBody: "NTSomic",
   logoUrl: null,
   faviconUrl: null,
+  faviconMimeType: null,
+  faviconVersion: null,
 };
 
 export async function getBrandingConfig(): Promise<BrandingConfig> {
@@ -33,7 +37,13 @@ export async function getBrandingConfig(): Promise<BrandingConfig> {
     where: { id: "singleton" },
     include: {
       logoAsset: { select: { publicUrl: true } },
-      faviconAsset: { select: { publicUrl: true } },
+      faviconAsset: {
+        select: {
+          publicUrl: true,
+          mimeType: true,
+          updatedAt: true,
+        },
+      },
     },
   });
 
@@ -51,5 +61,13 @@ export async function getBrandingConfig(): Promise<BrandingConfig> {
     fontBody: row.fontBody ?? DEFAULTS.fontBody,
     logoUrl: row.logoAsset?.publicUrl ?? null,
     faviconUrl: row.faviconAsset?.publicUrl ?? null,
+    faviconMimeType: row.faviconAsset?.mimeType ?? null,
+    faviconVersion: row.faviconAssetId
+      ? [
+          row.faviconAssetId,
+          row.updatedAt.getTime(),
+          row.faviconAsset?.updatedAt.getTime() ?? 0,
+        ].join("-")
+      : null,
   };
 }

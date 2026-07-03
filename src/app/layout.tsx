@@ -12,6 +12,10 @@ import { GateFlowController } from "@/components/auth/GateFlowController";
 import { LogoutSuccessListener } from "@/components/auth/LogoutSuccessListener";
 import { MobileTapDiagnostics } from "@/components/dev/MobileTapDiagnostics";
 import { getBrandingConfig } from "@/lib/branding";
+import {
+  getBrandingFaviconMimeType,
+  getBrandingFaviconRouteHref,
+} from "@/lib/brandingFavicon";
 import { applyGlobalRobotsOverride } from "@/lib/seo/globalNoindex";
 
 export const metadata: Metadata = applyGlobalRobotsOverride({
@@ -35,6 +39,8 @@ export default async function RootLayout({
     getCurrentAuthState(),
     getBrandingConfig(),
   ]);
+  const faviconHref = getBrandingFaviconRouteHref(branding);
+  const faviconMimeType = getBrandingFaviconMimeType(branding);
 
   return (
     <html lang="ru" className={`${ntSomic.variable} ${ptSerif.variable}`}>
@@ -50,7 +56,20 @@ export default async function RootLayout({
             --font-body: ${branding.fontBody};
           }
         `}</style>
-        <link rel="icon" href={branding.faviconUrl ?? "/favicon.ico"} />
+        <link
+          rel="icon"
+          href={faviconHref}
+          type={faviconMimeType}
+          sizes="any"
+          data-branding-favicon="true"
+        />
+        <link
+          rel="shortcut icon"
+          href={faviconHref}
+          type={faviconMimeType}
+          sizes="any"
+          data-branding-favicon="true"
+        />
       </head>
       <body
         className="antialiased min-h-screen text-foreground"
