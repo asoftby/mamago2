@@ -17,10 +17,13 @@ interface OccasionPickerProps {
   disabled?: boolean;
 }
 
+/** Максимум выбранных поводов на событие */
+const MAX_SELECTED_OCCASIONS = 2;
+
 /**
  * Compact pill-chip selector for currently active occasions.
  * Renders nothing if there are no active occasions.
- * Selection is optional — not a required field.
+ * Selection is optional — not a required field. 0..2 occasions.
  */
 export function OccasionPicker({ value, onChange, disabled }: OccasionPickerProps) {
   const [occasions, setOccasions] = useState<OccasionOption[]>([]);
@@ -50,11 +53,16 @@ export function OccasionPicker({ value, onChange, disabled }: OccasionPickerProp
   // Don't render anything while loading or if no active occasions
   if (loading || occasions.length === 0) return null;
 
+  const limitReached = value.length >= MAX_SELECTED_OCCASIONS;
+
   const toggle = (id: string) => {
     if (disabled) return;
-    onChange(
-      value.includes(id) ? value.filter((v) => v !== id) : [...value, id],
-    );
+    if (value.includes(id)) {
+      onChange(value.filter((v) => v !== id));
+      return;
+    }
+    if (limitReached) return;
+    onChange([...value, id]);
   };
 
   return (
@@ -63,11 +71,12 @@ export function OccasionPicker({ value, onChange, disabled }: OccasionPickerProp
       <div className="flex flex-wrap gap-2">
         {occasions.map((o) => {
           const selected = value.includes(o.id);
+          const chipDisabled = disabled || (!selected && limitReached);
           return (
             <button
               key={o.id}
               type="button"
-              disabled={disabled}
+              disabled={chipDisabled}
               onClick={() => toggle(o.id)}
               className={cn(
                 "inline-flex items-center rounded-full border px-3 py-1 text-sm transition-colors",
@@ -75,7 +84,7 @@ export function OccasionPicker({ value, onChange, disabled }: OccasionPickerProp
                 selected
                   ? "border-primary bg-primary text-white"
                   : "border-gray-200 bg-white text-gray-700 hover:border-gray-300 hover:bg-gray-50",
-                disabled && "cursor-not-allowed opacity-50",
+                chipDisabled && "cursor-not-allowed opacity-50",
               )}
             >
               {o.name}
@@ -84,7 +93,7 @@ export function OccasionPicker({ value, onChange, disabled }: OccasionPickerProp
         })}
       </div>
       <p className="text-xs text-gray-400">
-        Необязательно. Повод помогает редактору и влияет на ранжирование в период актуальности.
+        Необязательно, до {MAX_SELECTED_OCCASIONS} поводов. Повод помогает редактору и влияет на ранжирование в период актуальности.
       </p>
     </div>
   );
