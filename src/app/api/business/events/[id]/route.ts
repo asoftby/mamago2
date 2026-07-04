@@ -15,6 +15,7 @@ import {
 } from "@/lib/business/syncEventActivitySessions";
 import { syncEventVenueAndActivityCity } from "@/lib/business/syncEventVenueFromWizard";
 import { computeEventShortDesc } from "@/lib/business/eventShortDesc";
+import { mergeEventScheduleJson } from "@/lib/business/eventScheduleJsonMerge";
 import { softDeleteActivityById } from "@/lib/activity/softDeleteActivity";
 import { fetchActivityEventRowSummary } from "@/lib/activity/fetchActivityEventRowSummary";
 import { assignActivitySlugIfMissing } from "@/lib/slug/activitySlugService";
@@ -293,9 +294,14 @@ export async function PATCH(
     }
     perf.mark("place-check");
 
+    // Merge, а не полная замена: неизвестные форме ключи scheduleJson
+    // (legacy, импорт-метаданные) переживают пересохранение.
     let nextScheduleJson =
       body.scheduleJson !== undefined
-        ? ((body.scheduleJson ?? {}) as Record<string, unknown>)
+        ? mergeEventScheduleJson(
+            (existing.scheduleJson ?? {}) as Record<string, unknown>,
+            (body.scheduleJson ?? {}) as Record<string, unknown>,
+          )
         : ((existing.scheduleJson ?? {}) as Record<string, unknown>);
 
     const organizerInput =
