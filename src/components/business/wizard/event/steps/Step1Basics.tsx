@@ -712,179 +712,6 @@ export function Step1Basics({
         />
       </div>
 
-      <div className="space-y-2">
-        <div>
-          <div className="flex flex-wrap items-center gap-2">
-            <Label>
-              Формат участия <span className="text-red-500">*</span>
-            </Label>
-            {suggestedFields.participationFormat ? <AiRecommendationBadge /> : null}
-          </div>
-          <p className="mt-1 text-[12px] text-muted-foreground">
-            Как пользователь может участвовать в событии
-          </p>
-        </div>
-        <ChipsRow layout="wrap" aria-label="Формат участия" items={formatItems} />
-        <div className="flex items-center gap-2 rounded-xl border border-orange-100 bg-orange-50/70 px-3 py-2 text-[12px] text-orange-950">
-          <selectedFormat.icon className="h-4 w-4 shrink-0 text-orange-500" />
-          <span>{selectedFormat.description}</span>
-        </div>
-      </div>
-
-      {/* Event format / atmosphere — multi select */}
-      <div className="space-y-2">
-        <div>
-          <div className="flex flex-wrap items-center gap-2">
-            <Label>
-              Как проходит событие <span className="text-red-500">*</span>
-            </Label>
-            {suggestedFields.atmosphere ? <AiRecommendationBadge /> : null}
-          </div>
-          <p className="mt-1 text-[12px] text-muted-foreground">
-            Выберите формат и атмосферу события
-          </p>
-        </div>
-        <ChipsRow
-          layout="wrap"
-          aria-label="Как проходит событие"
-          items={atmosphereItems}
-        />
-      </div>
-
-      {/* Interests — multi select (max 5) */}
-      <div className="space-y-2">
-        <div>
-          <div className="flex flex-wrap items-center gap-2">
-            <Label>
-              Интересы
-            </Label>
-            {suggestedFields.interests ? <AiRecommendationBadge /> : null}
-          </div>
-          <p className="mt-1 text-[12px] text-muted-foreground">
-            Что больше всего отражает это событие
-          </p>
-        </div>
-        <ChipsRow layout="wrap" aria-label="Интересы" items={interestItems} />
-      </div>
-
-      {/* Age groups — multi select */}
-      <div className="space-y-2">
-        <div>
-          <Label>
-            Возрастные группы <span className="text-red-500">*</span>
-          </Label>
-          <p className="mt-1 text-[12px] text-muted-foreground">
-            Для кого подходит это событие
-          </p>
-        </div>
-        {ageDetection.confidence === "high" && ageDetection.raw && isAutoAppliedAge ? (
-          <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 px-3 py-2 text-[12px] text-emerald-900">
-            <p className="font-medium">
-              Автоматически выбрано: {normalizedAgeLabel ?? ageDetection.raw}{" "}
-              <span className="font-normal">(можно изменить)</span>
-            </p>
-            {!isExactParsedRange && suggestedAgeLabel ? (
-              <p className="mt-0.5 text-emerald-800/90">Выбраны группы: {suggestedAgeLabel}</p>
-            ) : null}
-            <div className="mt-2 flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={clearAgeSelection}
-                disabled={!isEditable}
-                className="text-[12px] font-medium text-emerald-900 underline underline-offset-2 disabled:opacity-50"
-              >
-                Очистить выбор
-              </button>
-            </div>
-          </div>
-        ) : null}
-        {ageDetection.confidence === "high" && ageDetection.raw && !isAutoAppliedAge ? (
-          <div className="rounded-xl border border-amber-200 bg-amber-50/80 px-3 py-2 text-[12px] text-amber-950">
-            <p className="font-medium">
-              Найдена точная рекомендация: {normalizedAgeLabel ?? ageDetection.raw}
-            </p>
-            <p className="mt-0.5 text-amber-900/90">
-              Это рекомендация, а не выбранное значение. При необходимости примените или измените вручную.
-            </p>
-            {!isExactParsedRange && suggestedAgeLabel ? (
-              <p className="mt-0.5 text-amber-900/80">Рекомендуемые группы: {suggestedAgeLabel}</p>
-            ) : null}
-            <div className="mt-2 flex flex-wrap gap-3">
-              <button
-                type="button"
-                onClick={() =>
-                  applyAgeBuckets(ageDetection.suggestedBuckets, {
-                    userOverride: true,
-                    autoApplied: false,
-                  })
-                }
-                disabled={!isEditable || ageDetection.suggestedBuckets.length === 0}
-                className="font-medium text-amber-950 underline underline-offset-2 disabled:opacity-50"
-              >
-                Применить
-              </button>
-              <button
-                type="button"
-                onClick={clearAgeSelection}
-                disabled={!isEditable}
-                className="font-medium text-amber-950 underline underline-offset-2 disabled:opacity-50"
-              >
-                Очистить выбор
-              </button>
-            </div>
-          </div>
-        ) : null}
-        {ageDetection.confidence === "medium" && ageDetection.raw ? (
-          <div className="rounded-xl border border-amber-200 bg-amber-50/80 px-3 py-2 text-[12px] text-amber-950">
-            <p className="font-medium">Есть рекомендация по возрасту</p>
-            <p className="mt-0.5 text-amber-900/90">
-              Найдено: {ageDetection.raw}. Подтвердите вручную.
-            </p>
-            {suggestedAgeLabel ? (
-              <p className="mt-0.5 text-amber-900/80">Рекомендуем: {suggestedAgeLabel}</p>
-            ) : null}
-            <div className="mt-2 flex flex-wrap gap-3">
-              <button
-                type="button"
-                onClick={() =>
-                  applyAgeBuckets(ageDetection.suggestedBuckets, {
-                    userOverride: true,
-                    autoApplied: false,
-                  })
-                }
-                disabled={!isEditable || ageDetection.suggestedBuckets.length === 0}
-                className="font-medium text-amber-950 underline underline-offset-2 disabled:opacity-50"
-              >
-                Применить
-              </button>
-              <button
-                type="button"
-                onClick={clearAgeSelection}
-                disabled={!isEditable}
-                className="font-medium text-amber-950 underline underline-offset-2 disabled:opacity-50"
-              >
-                Очистить выбор
-              </button>
-            </div>
-          </div>
-        ) : null}
-        {ageDetection.confidence === "none" ? (
-          <div className="rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-2 text-[12px] text-slate-700">
-            Возраст не указан. Выберите вручную.
-          </div>
-        ) : null}
-        {ageDetection.confidence === "low" && ageDetection.raw ? (
-          <div className="rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-2 text-[12px] text-slate-700">
-            Возраст найден, но распознан неуверенно: {ageDetection.raw}. Выберите вручную.
-          </div>
-        ) : null}
-        <ChipsRow
-          layout="wrap"
-          aria-label="Возрастные группы"
-          items={ageItems}
-        />
-      </div>
-
       {/* Основная категория — одиночный выбор */}
       <div className="space-y-2 w-full">
         <div>
@@ -1058,6 +885,179 @@ export function Step1Basics({
             })()}
           </div>
         ) : null}
+      </div>
+
+      <div className="space-y-2">
+        <div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Label>
+              Формат участия <span className="text-red-500">*</span>
+            </Label>
+            {suggestedFields.participationFormat ? <AiRecommendationBadge /> : null}
+          </div>
+          <p className="mt-1 text-[12px] text-muted-foreground">
+            Как пользователь может участвовать в событии
+          </p>
+        </div>
+        <ChipsRow layout="wrap" aria-label="Формат участия" items={formatItems} />
+        <div className="flex items-center gap-2 rounded-xl border border-orange-100 bg-orange-50/70 px-3 py-2 text-[12px] text-orange-950">
+          <selectedFormat.icon className="h-4 w-4 shrink-0 text-orange-500" />
+          <span>{selectedFormat.description}</span>
+        </div>
+      </div>
+
+      {/* Event format / atmosphere — multi select */}
+      <div className="space-y-2">
+        <div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Label>
+              Как проходит событие <span className="text-red-500">*</span>
+            </Label>
+            {suggestedFields.atmosphere ? <AiRecommendationBadge /> : null}
+          </div>
+          <p className="mt-1 text-[12px] text-muted-foreground">
+            Выберите формат и атмосферу события
+          </p>
+        </div>
+        <ChipsRow
+          layout="wrap"
+          aria-label="Как проходит событие"
+          items={atmosphereItems}
+        />
+      </div>
+
+      {/* Interests — multi select (max 5) */}
+      <div className="space-y-2">
+        <div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Label>
+              Интересы
+            </Label>
+            {suggestedFields.interests ? <AiRecommendationBadge /> : null}
+          </div>
+          <p className="mt-1 text-[12px] text-muted-foreground">
+            Что больше всего отражает это событие
+          </p>
+        </div>
+        <ChipsRow layout="wrap" aria-label="Интересы" items={interestItems} />
+      </div>
+
+      {/* Age groups — multi select */}
+      <div className="space-y-2">
+        <div>
+          <Label>
+            Возрастные группы <span className="text-red-500">*</span>
+          </Label>
+          <p className="mt-1 text-[12px] text-muted-foreground">
+            Для кого подходит это событие
+          </p>
+        </div>
+        {ageDetection.confidence === "high" && ageDetection.raw && isAutoAppliedAge ? (
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 px-3 py-2 text-[12px] text-emerald-900">
+            <p className="font-medium">
+              Автоматически выбрано: {normalizedAgeLabel ?? ageDetection.raw}{" "}
+              <span className="font-normal">(можно изменить)</span>
+            </p>
+            {!isExactParsedRange && suggestedAgeLabel ? (
+              <p className="mt-0.5 text-emerald-800/90">Выбраны группы: {suggestedAgeLabel}</p>
+            ) : null}
+            <div className="mt-2 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={clearAgeSelection}
+                disabled={!isEditable}
+                className="text-[12px] font-medium text-emerald-900 underline underline-offset-2 disabled:opacity-50"
+              >
+                Очистить выбор
+              </button>
+            </div>
+          </div>
+        ) : null}
+        {ageDetection.confidence === "high" && ageDetection.raw && !isAutoAppliedAge ? (
+          <div className="rounded-xl border border-amber-200 bg-amber-50/80 px-3 py-2 text-[12px] text-amber-950">
+            <p className="font-medium">
+              Найдена точная рекомендация: {normalizedAgeLabel ?? ageDetection.raw}
+            </p>
+            <p className="mt-0.5 text-amber-900/90">
+              Это рекомендация, а не выбранное значение. При необходимости примените или измените вручную.
+            </p>
+            {!isExactParsedRange && suggestedAgeLabel ? (
+              <p className="mt-0.5 text-amber-900/80">Рекомендуемые группы: {suggestedAgeLabel}</p>
+            ) : null}
+            <div className="mt-2 flex flex-wrap gap-3">
+              <button
+                type="button"
+                onClick={() =>
+                  applyAgeBuckets(ageDetection.suggestedBuckets, {
+                    userOverride: true,
+                    autoApplied: false,
+                  })
+                }
+                disabled={!isEditable || ageDetection.suggestedBuckets.length === 0}
+                className="font-medium text-amber-950 underline underline-offset-2 disabled:opacity-50"
+              >
+                Применить
+              </button>
+              <button
+                type="button"
+                onClick={clearAgeSelection}
+                disabled={!isEditable}
+                className="font-medium text-amber-950 underline underline-offset-2 disabled:opacity-50"
+              >
+                Очистить выбор
+              </button>
+            </div>
+          </div>
+        ) : null}
+        {ageDetection.confidence === "medium" && ageDetection.raw ? (
+          <div className="rounded-xl border border-amber-200 bg-amber-50/80 px-3 py-2 text-[12px] text-amber-950">
+            <p className="font-medium">Есть рекомендация по возрасту</p>
+            <p className="mt-0.5 text-amber-900/90">
+              Найдено: {ageDetection.raw}. Подтвердите вручную.
+            </p>
+            {suggestedAgeLabel ? (
+              <p className="mt-0.5 text-amber-900/80">Рекомендуем: {suggestedAgeLabel}</p>
+            ) : null}
+            <div className="mt-2 flex flex-wrap gap-3">
+              <button
+                type="button"
+                onClick={() =>
+                  applyAgeBuckets(ageDetection.suggestedBuckets, {
+                    userOverride: true,
+                    autoApplied: false,
+                  })
+                }
+                disabled={!isEditable || ageDetection.suggestedBuckets.length === 0}
+                className="font-medium text-amber-950 underline underline-offset-2 disabled:opacity-50"
+              >
+                Применить
+              </button>
+              <button
+                type="button"
+                onClick={clearAgeSelection}
+                disabled={!isEditable}
+                className="font-medium text-amber-950 underline underline-offset-2 disabled:opacity-50"
+              >
+                Очистить выбор
+              </button>
+            </div>
+          </div>
+        ) : null}
+        {ageDetection.confidence === "none" ? (
+          <div className="rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-2 text-[12px] text-slate-700">
+            Возраст не указан. Выберите вручную.
+          </div>
+        ) : null}
+        {ageDetection.confidence === "low" && ageDetection.raw ? (
+          <div className="rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-2 text-[12px] text-slate-700">
+            Возраст найден, но распознан неуверенно: {ageDetection.raw}. Выберите вручную.
+          </div>
+        ) : null}
+        <ChipsRow
+          layout="wrap"
+          aria-label="Возрастные группы"
+          items={ageItems}
+        />
       </div>
 
       {/* Program categories (conditional on primary category) */}
