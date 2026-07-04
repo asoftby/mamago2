@@ -1021,12 +1021,17 @@ export function Step1Basics({
                         <Input
                           id="cinemaDuration"
                           type="number"
+                          min={1}
+                          max={600}
                           value={data.cinemaDuration || ""}
-                          onChange={(e) =>
+                          onChange={(e) => {
+                            const parsed = parseInt(e.target.value, 10);
                             onChange({
-                              cinemaDuration: parseInt(e.target.value, 10) || undefined,
-                            })
-                          }
+                              cinemaDuration: Number.isNaN(parsed)
+                                ? undefined
+                                : Math.min(600, Math.max(1, parsed)),
+                            });
+                          }}
                           placeholder="90"
                           disabled={!isEditable}
                           className="!text-[13px]"

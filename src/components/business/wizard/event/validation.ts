@@ -94,8 +94,22 @@ function validateStep1(data: EventFormData): ValidationResult {
 
   // Cinema-specific validation (по slug выбранной категории)
   if (isCinemaEventCategorySlug(data.categorySlug)) {
-    if (data.cinemaTrailerUrl && !isValidUrl(data.cinemaTrailerUrl)) {
-      errors.push("Некорректная ссылка на трейлер");
+    if (data.cinemaTrailerUrl) {
+      if (!isValidUrl(data.cinemaTrailerUrl)) {
+        errors.push("Некорректная ссылка на трейлер");
+      } else if (!data.cinemaTrailerUrl.trim().toLowerCase().startsWith("https://")) {
+        // Warning, не error: ранее сохранённые http-ссылки не должны
+        // блокировать редактирование и публикацию.
+        warnings.push("Ссылка на трейлер должна начинаться с https://");
+      }
+    }
+    if (
+      data.cinemaDuration != null &&
+      (!Number.isInteger(data.cinemaDuration) ||
+        data.cinemaDuration < 1 ||
+        data.cinemaDuration > 600)
+    ) {
+      errors.push("Продолжительность фильма — целое число от 1 до 600 минут");
     }
   }
 
