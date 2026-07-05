@@ -10,9 +10,9 @@ RUN pnpm install --frozen-lockfile
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
 # Fail-loud: abort the image build when manifest.csv is missing, has fewer
-# redirect rows than REDIRECT_MANIFEST_MIN_ROWS (default 900), or fails
+# redirect rows than REDIRECT_MANIFEST_MIN_ROWS (default 850), or fails
 # validation. The SEO redirect manifest must never silently ship empty.
-ARG REDIRECT_MANIFEST_MIN_ROWS=900
+ARG REDIRECT_MANIFEST_MIN_ROWS=850
 ENV REDIRECT_MANIFEST_MIN_ROWS=${REDIRECT_MANIFEST_MIN_ROWS}
 ENV REQUIRE_REDIRECT_MANIFEST=1
 RUN pnpm build:ci

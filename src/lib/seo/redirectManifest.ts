@@ -48,7 +48,7 @@ export interface LoadRedirectManifestOptions {
   manifestPath: string;
   /** Fail-loud mode: throw instead of warn+skip. */
   require: boolean;
-  /** Minimum number of redirect rows (wp_journal + slug_history; canonical rows excluded). */
+  /** Minimum number of redirect rows (wp_journal + slug_history + wp_map; canonical rows excluded). */
   minRows: number;
   allowedSections: AllowedSections;
   /** Injectable for tests; defaults to console.warn. */
@@ -140,8 +140,8 @@ function toPath(url: string): string | null {
 }
 
 /**
- * Loads manifest.csv and converts wp_journal + slug_history rows into
- * Next.js redirect rules with full validation.
+ * Loads manifest.csv and converts wp_journal + slug_history + wp_map rows
+ * into Next.js redirect rules with full validation.
  *
  * In `require` mode any issue (including a missing file or too few rows)
  * throws. Otherwise issues are reported via `warn` and offending rows are
@@ -204,7 +204,7 @@ export function loadRedirectManifest(
     const newUrl = cells[idx("new_url")] ?? "";
 
     // canonical rows carry no old_url — they are targets, not redirects.
-    if (!["wp_journal", "slug_history"].includes(ruleType)) return;
+    if (!["wp_journal", "slug_history", "wp_map"].includes(ruleType)) return;
     if (!oldUrl || !newUrl) return;
 
     totalRedirectRows += 1;

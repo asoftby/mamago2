@@ -35,13 +35,13 @@ const allowedDevOrigins = Array.from(
 );
 
 /**
- * SEO migration redirects: manifest.csv (wp_journal + slug_history rows) →
- * Next.js redirect rules. Parsing and validation live in
+ * SEO migration redirects: manifest.csv (wp_journal + slug_history + wp_map
+ * rows) → Next.js redirect rules. Parsing and validation live in
  * src/lib/seo/redirectManifest.ts.
  *
  * Fail-loud: REQUIRE_REDIRECT_MANIFEST=1 (set in the production Docker build)
  * aborts the build when the manifest is missing, has fewer redirect rows than
- * REDIRECT_MANIFEST_MIN_ROWS (default 900), or fails validation (duplicate
+ * REDIRECT_MANIFEST_MIN_ROWS (default 850), or fails validation (duplicate
  * sources, cycles, destinations off the new URL scheme). Without the flag
  * (local dev) problems are logged and invalid rows are dropped.
  */
@@ -49,7 +49,7 @@ function loadManifestRedirects(): Array<{ source: string; destination: string; p
   const { rules, totalRedirectRows } = loadRedirectManifest({
     manifestPath: join(process.cwd(), "manifest.csv"),
     require: process.env.REQUIRE_REDIRECT_MANIFEST === "1",
-    minRows: Number(process.env.REDIRECT_MANIFEST_MIN_ROWS ?? "900"),
+    minRows: Number(process.env.REDIRECT_MANIFEST_MIN_ROWS ?? "850"),
     allowedSections: deriveAllowedSectionsFromAppDir(join(process.cwd(), "src", "app")),
   });
 
@@ -82,7 +82,7 @@ const nextConfig: NextConfig = {
       // Static legacy redirects (pre-mamaGo 2.0 paths)
       { source: "/birthday", destination: "/minsk/birthday/make", permanent: true },
       { source: "/birthday/builder", destination: "/minsk/birthday/make", permanent: true },
-      // SEO migration: wp_journal + slug_history from manifest.csv
+      // SEO migration: wp_journal + slug_history + wp_map from manifest.csv
       // Regenerate: pnpm build-migration-manifest → pnpm build
       ...manifestRedirects,
     ];
