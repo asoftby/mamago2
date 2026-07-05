@@ -220,28 +220,48 @@ function buildRemoteScript(sql: string): string {
 function printManualFallback(env: WpDbEnv, remoteScript: string): void {
   console.error(
     "\nAutomatic run failed: SSH batch-mode (key/agent) auth did not succeed.\n" +
-      "This script never falls back to a password prompt on purpose. Run it yourself:\n",
+      "This script never falls back to a password prompt on purpose. Run it yourself " +
+      "in your own terminal, where an interactive SSH password prompt (if needed) works normally.\n" +
+      "The remote script below is safe to read/copy — it contains no secrets, only the " +
+      "hardcoded read-only SQL and the mktemp/umask/trap plumbing.\n",
   );
-  console.error(`  ssh ${env.sshUser}@${env.sshHost} bash -s <<'REMOTE'`);
+  console.error("Remote script (pass as the ssh command argument, not via stdin):\n");
   console.error(remoteScript);
-  console.error("REMOTE");
   console.error(
-    "\nWhen prompted, the remote script reads mysql client config from stdin — " +
-      "pipe it in yourself, e.g. from your own shell (values already in your env, never printed here):\n" +
-      '  printf \'[client]\\nuser="%s"\\npassword="%s"\\ndatabase="%s"\\nhost=127.0.0.1\\nport=3306\\nprotocol=TCP\\n\' ' +
-      '"$WP_DB_USER" "$WP_DB_PASSWORD" "$WP_DB_NAME" | ssh ' +
-      `${env.sshUser}@${env.sshHost} bash -s <<'REMOTE' ... REMOTE\n`,
+    "\nPipe the mysql client config via stdin (values from your own shell env, never printed " +
+      "here), keeping the script itself as the ssh command argument — do not combine both " +
+      "through the same stdin stream:\n\n" +
+      '  printf \'[client]\\nuser="%s"\\npassword="%s"\\ndatabase="%s"\\nhost=127.0.0.1\\nport=3306\\nprotocol=TCP\\n\' \\\n' +
+      '    "$WP_DB_USER" "$WP_DB_PASSWORD" "$WP_DB_NAME" \\\n' +
+      `    | ssh ${env.sshUser}@${env.sshHost} "$(cat <<'REMOTE_SCRIPT'\n` +
+      `${remoteScript}\n` +
+      "REMOTE_SCRIPT\n)\"\n",
   );
 }
 
 async function runOverSsh(env: WpDbEnv): Promise<string> {
+  // The remote script is passed as a single ssh command-line argument (it
+  // contains no secrets, so this is safe) — NOT via `bash -s` fed from the
+  // same stdin stream that also has to carry the mysql client config.
+  // Mixing both through one stdin stream is unreliable: bash's own
+  // consumption of stdin as its script source races with the script's own
+  // `cat > "$CNF"` reading further from that same stream. Keeping the
+  // script out of stdin entirely removes the race — stdin is then used for
+  // exactly one thing: the mysql client config.
   const remoteScript = buildRemoteScript(buildSqlScript());
   const cnfContent = buildMysqlClientConfig(env);
 
   return new Promise((resolve, reject) => {
     const child = spawn(
       "ssh",
-      ["-o", "BatchMode=yes", "-o", "ConnectTimeout=15", `${env.sshUser}@${env.sshHost}`, "bash", "-s"],
+      [
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=15",
+        `${env.sshUser}@${env.sshHost}`,
+        remoteScript,
+      ],
       { stdio: ["pipe", "pipe", "pipe"] },
     );
 
@@ -258,12 +278,10 @@ async function runOverSsh(env: WpDbEnv): Promise<string> {
       }
     });
 
-    // Remote script text goes in as the bash -s payload via stdin, followed
-    // immediately by the mysql client config the remote `cat > "$CNF"` reads.
+    // stdin carries only the mysql client config, read remotely by `cat > "$CNF"`.
     child.stdin.on("error", () => {
       /* EPIPE if ssh already failed — surfaced via the close handler instead */
     });
-    child.stdin.write(`${remoteScript}\n`);
     child.stdin.write(cnfContent);
     child.stdin.end();
   });
