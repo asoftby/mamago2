@@ -741,4 +741,172 @@ Every row should have provenance, warnings, errors, and import stage status. Log
 23. Should imported content be assigned to original WP authors or a system import owner?
 24. Is exact raw HTML preservation required when converting articles to `contentJson`?
 
+## Session Addendum (2026-07-05): Reconciliation with Import-Module MVP Discussion
+
+A separate working session on 2026-07-05 independently re-derived much of this
+Phase 1/2/3 analysis from scratch (without reading these files first) and
+reached one conclusion that directly conflicts with the approved Phase 3
+Executive Decision below. This addendum reconciles the two and records what
+that session added that is genuinely new.
+
+### The conflict — must be resolved before Phase 2/3 implementation starts
+
+The 2026-07-05 session concluded: "use the existing `src/server/modules/import/*`
+pipeline for the WordPress MVP, keep Phoenix (`Migration*` models,
+`src/lib/migration/core/*`) as a future engine, not for this transfer."
+
+This directly contradicts the **Executive Decision** already recorded in
+`docs/migration/migration-ledger-schema-proposal.md`: *"The minimal permanent
+ledger for Phoenix v1 should use separate `Migration*` tables, not the
+existing `Import*` tables"* — precisely because `ImportEntityType` only
+covers `PLACE`/`EVENT`/`OFFER`, `ImportedRecord` only links to
+`publishedPlaceId`/`publishedActivityId`, and there is no media/relation/
+redirect/generic lineage model in the `Import*` schema. That reasoning has
+not changed and still applies.
+
+Additionally, the `Migration*` schema from that proposal is **already
+migrated**, not merely proposed: commit `82c63b4b` ("feat(migration): add
+Project Phoenix foundation", 2026-07-04) added `docs/migration/*.md`,
+`prisma/schema.prisma` changes, and the SQL migration
+`prisma/migrations/20260704020116_add_migration_engine_tables/`. The tables
+exist in the database today. Only the runtime (`src/lib/migration/core/*`
+adapters, orchestrator, publisher) is still a stub with no registered
+adapters and a deliberately-throwing `runMigrationCommit()`.
+
+**Recommendation:** build the WordPress adapter against the `Migration*`
+ledger (Phoenix), not the `Import*` pipeline. Reusing `Import*` for a "quick"
+WordPress MVP would mean building throwaway lineage/media/redirect handling
+that the Phase 3 proposal already designed correctly and that already exists
+as real tables. The 2026-07-05 session's `SourceAdapter` sketch (`connect()`,
+`discover()`, `fetch()`, `media()`, `supportsIncrementalSync()`) should be
+treated as a rough draft, superseded by the much more complete **Adapter
+Contract Proposal** in `docs/migration/migration-engine.md` (adapter
+metadata, stage-oriented `Discover`/`Extract`/`Normalize`/`Validate
+hints`/`Plan hints`, source record envelope, canonical normalized domains).
+This is a correction to that session's memory record
+(`project_wp_migration_engine_decision.md` / `project_wp_migration_mapping.md`
+in the Claude memory store) — treat those as superseded by this addendum
+where they conflict, and as still-useful color where they add detail these
+Phase 1-3 docs don't cover (see below).
+
+**Open item, not yet resolved:** whether "Import Job with modes
+Preview/Migration/Sync/Refresh" (the 2026-07-05 session's proposed unification
+of one-shot migration and recurring sync) should replace, or sit alongside,
+this document's dry-run/commit mode design. Phoenix's adapter capability flag
+for "incremental sync" already anticipates recurring sources (e.g. a future
+Google Places adapter), so the concepts are compatible, but no one has
+explicitly merged them. Track as an open question for Phase 2 implementation
+planning, not blocking Phase 1.
+
+### What the 2026-07-05 session added that is new and not yet in this document
+
+These are genuine additions, not duplicates — worth folding into the
+relevant sections above when this document is next revised for
+implementation:
+
+- **Place field-import classification**, more granular than the existing
+  "Ready / Requires transformation / Potential field loss" framing:
+  - Auto-import, no review: name, short/full description, cover image,
+    gallery, address, coordinates, phones, email, website, socials, work
+    hours (as-is), age range, price, categories, slug, SEO, old URL.
+  - Auto-import but flagged for review: ambiguous category mapping,
+    district, metro, occasions/signals, organizer, related places, `unp`
+    when validation fails.
+  - Never auto-import: **place logo only** — cover/gallery are still
+    auto-imported (this narrows, but does not contradict, the existing
+    "Approved image scopes" table, which already lists Place: Yes for
+    images generally; logo is a sub-exclusion within that scope). Reasoning:
+    logos are brand assets and frequently stale/wrong-aspect-ratio/superseded,
+    unlike cover/gallery which remain useful content even if imperfect.
+- **Image provenance tracking** (not previously specified): every imported
+  image should carry a status flag, `Imported` at import time, flipping to
+  `Manual` if an editor replaces it. Enables a later query for "all places
+  still on original WordPress images" without re-running the migration.
+  This should be designed into `MigrationMediaAsset`'s binding fields (or
+  an equivalent) from the first WordPress import pass, not retrofitted.
+- **Editor-resolves-ambiguity principle**: explicitly confirmed that
+  `work_hours` raw-format parsing edge cases, `unp` placement, `post_author`
+  → `User` mapping ambiguity, and `Article.geoScope`/`cityId` defaulting are
+  *not* adapter-design blockers — imported records land in a review queue as
+  drafts, and the editor resolves these manually before publish, same as the
+  existing family.by import flow. This is consistent with (and reinforces)
+  this document's own "Review/quarantine workflow" component and the
+  `MigrationReviewTask` model in the ledger proposal — it does not change
+  the schema design, just confirms the adapter/normalizer should not add
+  heuristics for these specific fields.
+- **Long-term product framing** ("Content Acquisition Engine" instead of
+  "Import"): the WordPress/Google Places/CSV/etc. engine's job is broader
+  than moving data — quality scoring, dedup, category/place matching, image
+  sourcing, provenance. This matches this document's existing "permanent
+  Migration Engine, not a WordPress-only importer" framing and the planned
+  adapter roster; the main new idea is a possible future rename of the
+  admin section away from "Импорт" once the module's scope actually broadens
+  to match — not an implementation task now.
+
+## WordPress DB Inspection Notes (2026-07-05, read-only SSH/SQL verification)
+
+This section records what was actually confirmed by connecting read-only to
+the live WordPress MySQL database over SSH, superseding earlier assumptions
+that a WXR/XML export would be the primary migration source.
+
+**WXR is not needed as the primary source.** Read-only SQL access to the live
+WordPress database is available and confirmed working (`wp_posts`,
+`wp_postmeta`, `wp_terms`, `wp_term_taxonomy`, `wp_term_relationships`,
+`wp_users`, `wp_usermeta`, `wp_rank_math_redirections` and related RankMath
+tables, `wp_voxel_relations`, `wp_voxel_timeline`, and the full set of
+`wp_voxel_index_*`/`wp_voxel_price_index_*` tables are all present and
+queryable). Live `post_type`/`post_status` aggregate counts were confirmed
+and closely match the earlier TSV-based audit (`post` publish=115, `places`
+publish=82/draft=11/unpublished=187, `hb-programs` publish=90, `routes`
+publish=14, `profile` publish=536, `attachment` inherit=9620; `events`
+publish=28/expired=2864, drifted slightly from the 2026-07-03 audit's
+35/2857 as events naturally expired in the intervening two days). A
+WordPress-focused adapter should target this live DB as the primary source;
+the previously-built `wordpress-wxr` adapter (discover-only, untested against
+real data) remains available as a fallback/experimental path, not the
+primary one.
+
+**`wp_voxel_index_post` was inspected and is a search index, not a
+structured field source.** 115 rows (one per `post`). Columns: `id, post_id,
+post_status, priority, _keywords (text)`. `_keywords` is a single
+concatenated free-text blob (description + address + categories mixed
+together, not machine-parseable back into fields). This table should not be
+treated as a source for Article fields — `wp_posts` plus `wp_postmeta` plus
+RankMath remain the real source, as already documented above.
+
+**`wp_voxel_index_places` was inspected and is partially useful, not a
+general Place field source.** 93 rows (82 publish + 11 draft, matching
+`wp_posts` counts for `places`). Columns: `id, post_id, post_status,
+priority, _keywords, _location (POINT), _range (smallint),
+activity_timeline (datetime)`. The initial hypothesis that Voxel might have
+already denormalized phone/work_hours/category/price/age into this index did
+**not** hold — none of those fields exist here. The one genuinely useful
+column is `_location`, a native MySQL `POINT` type: this is a better
+coordinate source than parsing the free-text `location` WP postmeta value by
+hand, extractable via `ST_X(_location)` / `ST_Y(_location)`.
+
+**Resulting source-of-truth decision for the WordPress DB adapter:**
+
+For `Place`:
+- Coordinates → `wp_voxel_index_places._location` via `ST_X`/`ST_Y`.
+- Phone, work hours, description, short description, `unp`, gallery/cover
+  media references → `wp_postmeta` (join on `post_id`), as already planned.
+- Categories/tags → `wp_terms` + `wp_term_taxonomy` + `wp_term_relationships`.
+
+For `Article`:
+- Base fields (title, content, dates, author, slug, status) → `wp_posts`.
+- SEO fields, featured image reference, old slugs → `wp_postmeta` (RankMath
+  keys, `_thumbnail_id`, `_wp_old_slug`).
+- `wp_voxel_index_post._keywords` may be used at most as a reference/fallback
+  search blob, never as a primary field source.
+
+**Warning for future adapter work:** do not build adapter assumptions on any
+`wp_voxel_index_*` table's contents without first inspecting its actual
+columns via `information_schema.columns` (or an equivalent inspection step)
+against the live database. This inspection showed the Voxel index tables are
+useful mainly for geo (`_location`) and search (`_keywords`), not as a
+general substitute for postmeta-based field normalization. The same caution
+applies to any other `wp_voxel_index_*`/`wp_voxel_price_index_*` table before
+relying on it in a normalizer.
+
 STOP: Phase 1 ends here. Do not implement import code, schema changes, migrations, or database writes until Phase 2 is approved.
