@@ -204,20 +204,30 @@ const APPROVED_OCCASIONS: Array<{
   name: string;
   type: OccasionType;
   sortOrder: number;
+  /** Окно активности, YYYY-MM-DD, обе границы включительно (endsAt — до конца дня).
+   *  Выборка /api/occasions/active (getActiveOccasionsForEditor) требует
+   *  startsAt <= now <= endsAt; NULL-даты повод из подсказок исключают. */
+  startsAt: string;
+  endsAt: string;
+  boostScore: number;
 }> = [
-  { slug: "new-year", name: "Новый год", type: "HOLIDAY", sortOrder: 10 },
-  { slug: "womens-day", name: "8 марта", type: "HOLIDAY", sortOrder: 20 },
-  { slug: "maslenitsa", name: "Масленица", type: "HOLIDAY", sortOrder: 30 },
-  { slug: "easter", name: "Пасха", type: "HOLIDAY", sortOrder: 40 },
-  { slug: "halloween", name: "Хэллоуин", type: "HOLIDAY", sortOrder: 50 },
-  { slug: "childrens-day", name: "День защиты детей", type: "HOLIDAY", sortOrder: 60 },
-  { slug: "kupalle", name: "Купалье", type: "HOLIDAY", sortOrder: 70 },
-  { slug: "school-holidays", name: "Каникулы", type: "SEASON", sortOrder: 80 },
-  { slug: "back-to-school", name: "1 сентября", type: "EVENT", sortOrder: 90 },
-  { slug: "graduation", name: "Выпускной", type: "EVENT", sortOrder: 100 },
-  { slug: "summer-cinema", name: "Летние кинопросмотры", type: "SEASON", sortOrder: 110 },
-  { slug: "birthday", name: "День рождения", type: "FAMILY", sortOrder: 120 },
+  { slug: "new-year", name: "Новый год", type: "HOLIDAY", sortOrder: 10, startsAt: "2026-11-15", endsAt: "2027-01-15", boostScore: 0 },
+  { slug: "womens-day", name: "8 марта", type: "HOLIDAY", sortOrder: 20, startsAt: "2027-02-20", endsAt: "2027-03-08", boostScore: 0 },
+  { slug: "maslenitsa", name: "Масленица", type: "HOLIDAY", sortOrder: 30, startsAt: "2027-03-01", endsAt: "2027-03-14", boostScore: 0 },
+  { slug: "easter", name: "Пасха", type: "HOLIDAY", sortOrder: 40, startsAt: "2027-03-20", endsAt: "2027-05-02", boostScore: 0 },
+  { slug: "halloween", name: "Хэллоуин", type: "HOLIDAY", sortOrder: 50, startsAt: "2026-10-15", endsAt: "2026-11-01", boostScore: 0 },
+  { slug: "childrens-day", name: "День защиты детей", type: "HOLIDAY", sortOrder: 60, startsAt: "2027-05-20", endsAt: "2027-06-01", boostScore: 0 },
+  { slug: "kupalle", name: "Купалье", type: "HOLIDAY", sortOrder: 70, startsAt: "2026-06-20", endsAt: "2026-07-12", boostScore: 0 },
+  { slug: "school-holidays", name: "Каникулы", type: "SEASON", sortOrder: 80, startsAt: "2026-06-01", endsAt: "2026-08-31", boostScore: 0 },
+  { slug: "back-to-school", name: "1 сентября", type: "EVENT", sortOrder: 90, startsAt: "2026-08-10", endsAt: "2026-09-07", boostScore: 0 },
+  { slug: "graduation", name: "Выпускной", type: "EVENT", sortOrder: 100, startsAt: "2027-04-15", endsAt: "2027-06-15", boostScore: 0 },
+  { slug: "summer-cinema", name: "Летние кинопросмотры", type: "SEASON", sortOrder: 110, startsAt: "2026-06-01", endsAt: "2026-08-31", boostScore: 0 },
+  // Evergreen: NULL-даты исключаются выборкой, поэтому заведомо широкое окно.
+  { slug: "birthday", name: "День рождения", type: "FAMILY", sortOrder: 120, startsAt: "2026-01-01", endsAt: "2036-12-31", boostScore: 0 },
 ];
+
+const occasionStart = (d: string) => new Date(`${d}T00:00:00.000Z`);
+const occasionEnd = (d: string) => new Date(`${d}T23:59:59.999Z`);
 
 async function upsertFilter(
   slug: string,
@@ -611,6 +621,12 @@ async function main() {
     },
   });
 
+  // ── Place / Event Categories ──────────────────────────────────────────────
+  // Категории сидируются ДО жанров и program-флагов: иначе на свежей базе
+  // блоки ниже не находят корни (cinema и др.) и молча скипаются до второго прогона.
+  await seedPlaceCategories();
+  await seedEventCategories();
+
   console.log("  → Genres (by EventCategory)");
   const kinoCat = await prisma.eventCategory.findFirst({
     where: { parentId: null, slug: { in: ["kino", "cinema", "movie", "movies"] } },
@@ -631,12 +647,17 @@ async function main() {
     },
   });
 
+  // Словарь синхронизирован с prisma/seed/event-categories.ts (категория cinema).
   const kinoGenres: Array<{ slug: string; name: string; sortOrder: number }> = [
     { slug: "animation", name: "Мультфильм", sortOrder: 10 },
-    { slug: "comedy", name: "Комедия", sortOrder: 20 },
+    { slug: "family", name: "Семейное кино", sortOrder: 20 },
     { slug: "adventure", name: "Приключения", sortOrder: 30 },
-    { slug: "fantasy", name: "Фэнтези", sortOrder: 40 },
-    { slug: "family", name: "Семейный", sortOrder: 50 },
+    { slug: "comedy", name: "Комедия", sortOrder: 40 },
+    { slug: "fantasy", name: "Фэнтези", sortOrder: 50 },
+    { slug: "documentary", name: "Документальное", sortOrder: 60 },
+    { slug: "educational", name: "Образовательное", sortOrder: 70 },
+    { slug: "anime", name: "Аниме", sortOrder: 80 },
+    { slug: "short-film", name: "Короткометражное", sortOrder: 90 },
   ];
 
   const spektakliGenres: Array<{ slug: string; name: string; sortOrder: number }> = [
@@ -725,6 +746,9 @@ async function main() {
   await setFlagsBySlugs(["spektakli", "spectacle", "teatr", "theater"], { selectableInProgram: true });
   await setFlagsBySlugs(["koncert", "concert"], { selectableInProgram: true });
 
+  // Primary categories that show the «Что будет в программе» block
+  await setFlagsBySlugs(["excursions", "play-programs"], { supportsProgram: true });
+
   console.log("  → Occasions");
   for (const o of APPROVED_OCCASIONS) {
     await prisma.occasion.upsert({
@@ -734,6 +758,9 @@ async function main() {
         type: o.type,
         sortOrder: o.sortOrder,
         isActive: true,
+        startsAt: occasionStart(o.startsAt),
+        endsAt: occasionEnd(o.endsAt),
+        boostScore: o.boostScore,
       },
       create: {
         slug: o.slug,
@@ -741,15 +768,12 @@ async function main() {
         type: o.type,
         sortOrder: o.sortOrder,
         isActive: true,
+        startsAt: occasionStart(o.startsAt),
+        endsAt: occasionEnd(o.endsAt),
+        boostScore: o.boostScore,
       },
     });
   }
-
-  // ── Place Categories ──────────────────────────────────────────────────────
-  await seedPlaceCategories();
-
-  // ── Event Categories ──────────────────────────────────────────────────────
-  await seedEventCategories();
 
   // ── Discovery Section Filters ─────────────────────────────────────────────
   // FilterDefinition + FilterOption + DiscoveryFilterPlacement per intent.
