@@ -93,9 +93,16 @@ export interface EventFormData {
   /** Категории «в программе» (many-to-many, только selectableInProgram). */
   programCategoryIds: string[];
 
+  /**
+   * Единая «Продолжительность» (минуты) одного сеанса/посещения — уровень
+   * события. Показывается для категорий из EVENT_DURATION_CATEGORY_SLUGS
+   * (см. supportsDurationForCategorySlug). Канон scheduleJson.durationMinutes,
+   * заменяет частный cinema.duration.
+   */
+  durationMinutes?: number;
+
   // Cinema-specific (conditional on category slug, см. isCinemaEventCategorySlug)
   cinemaGenre?: string;
-  cinemaDuration?: number;
   cinemaTrailerUrl?: string;
   
   // Step 2: Description

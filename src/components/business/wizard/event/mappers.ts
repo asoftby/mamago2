@@ -337,11 +337,19 @@ export function mapEventToFormData(event: ActivityWithRelations): EventFormData 
     formData.genreSlugByRootCategoryId = next;
   }
 
+  // Канон длительности — scheduleJson.durationMinutes (уровень события).
+  // Legacy cinema.duration читаем как fallback для ранее сохранённых кино-событий.
+  const topDurationMinutes =
+    typeof scheduleJson.durationMinutes === "number" ? scheduleJson.durationMinutes : undefined;
+
   if (scheduleJson.cinema && typeof scheduleJson.cinema === "object") {
     const c = scheduleJson.cinema as Record<string, unknown>;
     formData.cinemaGenre = typeof c.genre === "string" ? c.genre : undefined;
-    formData.cinemaDuration = typeof c.duration === "number" ? c.duration : undefined;
     formData.cinemaTrailerUrl = typeof c.trailerUrl === "string" ? c.trailerUrl : undefined;
+    const legacyCinemaDuration = typeof c.duration === "number" ? c.duration : undefined;
+    formData.durationMinutes = topDurationMinutes ?? legacyCinemaDuration;
+  } else {
+    formData.durationMinutes = topDurationMinutes;
   }
 
   if (
@@ -702,10 +710,11 @@ export function buildEventPayload(data: EventFormData): EventPayload {
     (data.categoryId && genreMap[data.categoryId]) ||
     data.cinemaGenre;
 
+  // cinema-неймспейс больше НЕ пишет duration — длительность канонизирована в
+  // scheduleJson.durationMinutes (уровень события). Остаются genre и trailerUrl.
   const cinemaBlock = isCinemaEventCategorySlug(data.categorySlug)
     ? {
         genre: cinemaGenreResolved,
-        duration: data.cinemaDuration,
         trailerUrl: data.cinemaTrailerUrl,
       }
     : undefined;
@@ -774,6 +783,9 @@ export function buildEventPayload(data: EventFormData): EventPayload {
       ageDetectionAutoApplied: data.ageDetectionAutoApplied,
 
       ...(Object.keys(genreMap).length > 0 ? { genresByCategoryId: genreMap } : {}),
+
+      // Канон длительности — уровень события, не внутри cinema.
+      ...(data.durationMinutes != null ? { durationMinutes: data.durationMinutes } : {}),
 
       cinema: cinemaBlock,
 

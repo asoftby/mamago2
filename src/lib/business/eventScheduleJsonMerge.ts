@@ -28,6 +28,7 @@ export const EVENT_FORM_MANAGED_SCHEDULE_JSON_KEYS = [
   "ageDetectionUserOverride",
   "ageDetectionAutoApplied",
   "genresByCategoryId",
+  "durationMinutes",
   "cinema",
   // Step 3: Media
   "reelsUrl",

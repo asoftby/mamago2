@@ -8,6 +8,7 @@ import { ChipsRow, type ChipItem } from "@/components/ui/chips-row";
 import type { EventFormData } from "../types";
 import { EVENT_FORMAT_OPTIONS, type EventFormatPreset } from "@/lib/business/eventFormatSignals";
 import { isCinemaEventCategorySlug } from "@/lib/business/eventCategoryCinema";
+import { supportsDurationForCategorySlug } from "@/lib/business/eventCategoryDuration";
 import * as LucideIcons from "lucide-react";
 import type { ComponentType } from "react";
 import { FilterSelect } from "@/components/ui/filter-select";
@@ -254,6 +255,7 @@ export function Step1Basics({
   }, [data.categoryId, genresByCategoryId, rootCategories]);
 
   const supportsProgram = Boolean(primaryRoot?.supportsProgram);
+  const supportsDuration = supportsDurationForCategorySlug(primaryRoot?.slug);
   const ageDetection = data.ageDetection ?? {
     raw: null,
     confidence: "none" as const,
@@ -834,35 +836,41 @@ export function Step1Basics({
                     </div>
                   ) : null}
 
+                  {supportsDuration ? (
+                    <div className="space-y-2">
+                      <Label htmlFor="durationMinutes" className="text-xs">
+                        Продолжительность (минуты)
+                      </Label>
+                      <Input
+                        id="durationMinutes"
+                        type="number"
+                        min={1}
+                        max={600}
+                        value={data.durationMinutes || ""}
+                        onChange={(e) => {
+                          const parsed = parseInt(e.target.value, 10);
+                          onChange({
+                            durationMinutes: Number.isNaN(parsed)
+                              ? undefined
+                              : Math.min(600, Math.max(1, parsed)),
+                          });
+                        }}
+                        placeholder="90"
+                        disabled={!isEditable}
+                        className="!text-[13px]"
+                      />
+                      <p className="text-[12px] text-muted-foreground">
+                        Сколько длится одно посещение или сеанс. Если событие идёт весь
+                        день — оставьте пустым и укажите часы в расписании.
+                      </p>
+                    </div>
+                  ) : null}
+
                   {canShowCinema ? (
                     <div className="space-y-3 p-3 bg-gray-50 rounded-lg">
                       <div className="flex items-center gap-2">
                         {renderCategoryIcon(cat.icon)}
                         <h3 className="font-medium text-sm">Дополнительно для кино</h3>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="cinemaDuration" className="text-xs">
-                          Продолжительность (минуты)
-                        </Label>
-                        <Input
-                          id="cinemaDuration"
-                          type="number"
-                          min={1}
-                          max={600}
-                          value={data.cinemaDuration || ""}
-                          onChange={(e) => {
-                            const parsed = parseInt(e.target.value, 10);
-                            onChange({
-                              cinemaDuration: Number.isNaN(parsed)
-                                ? undefined
-                                : Math.min(600, Math.max(1, parsed)),
-                            });
-                          }}
-                          placeholder="90"
-                          disabled={!isEditable}
-                          className="!text-[13px]"
-                        />
                       </div>
 
                       <div className="space-y-2">
