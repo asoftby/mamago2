@@ -78,6 +78,7 @@
     "test:weather-provider": "tsx src/features/hero-weather/api/weather-provider.test.ts",
     "test:unp-verification": "tsx src/lib/verification/unpChecksum.test.ts && tsx src/lib/verification/companyNameMatch.test.ts && tsx src/server/egr/verifyUnp.test.ts",
     "test:redirect-manifest": "tsx src/lib/seo/redirectManifest.test.ts",
+    "test:rate-limit": "tsx src/lib/security/rateLimit.test.ts",
     "test:offer-published-edit-gate": "tsx src/lib/offers/offerPublishedEditGate.test.ts",
     "search:reindex": "tsx scripts/search-reindex.ts",
     "prepare": "husky",

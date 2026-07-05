@@ -36,7 +36,7 @@ export async function POST(
   // requireDirectThreadAccess already rejects unauthenticated users (401), so user is non-null here.
   const currentUser = user!;
 
-  const rateLimit = checkRateLimit(`direct_message:${currentUser.id}`, 30, 60 * 1000);
+  const rateLimit = await checkRateLimit(`direct_message:${currentUser.id}`, 30, 60 * 1000);
   if (!rateLimit.allowed) {
     return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   }

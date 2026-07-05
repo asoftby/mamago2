@@ -44,7 +44,7 @@ export async function POST(req: Request, { params }: { params: RouteParams }) {
   const auth = await requireAdminApiUser();
   if (auth instanceof NextResponse) return auth;
 
-  const limit = checkRateLimit(`admin-template-test:${auth.id}`, RATE_LIMIT, RATE_WINDOW_MS);
+  const limit = await checkRateLimit(`admin-template-test:${auth.id}`, RATE_LIMIT, RATE_WINDOW_MS);
   if (!limit.allowed) {
     return NextResponse.json(
       { error: "Слишком часто. Подожди минуту и повтори." },

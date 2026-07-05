@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
     }
 
     const ip = getClientIp(request);
-    const rateLimit = checkRateLimit(`direct_create:${user.id}:${ip}`, 10, 10 * 60 * 1000);
+    const rateLimit = await checkRateLimit(`direct_create:${user.id}:${ip}`, 10, 10 * 60 * 1000);
     if (!rateLimit.allowed) {
       return NextResponse.json({ error: "Too many requests" }, { status: 429 });
     }

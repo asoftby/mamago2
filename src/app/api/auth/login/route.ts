@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
     // Rate limit check: 5 attempts per 15 minutes per IP + Email
     const ip = getClientIp(request);
     const rateLimitKey = `login:${ip}:${email}`;
-    const rl = checkRateLimit(rateLimitKey, 5, 15 * 60 * 1000);
+    const rl = await checkRateLimit(rateLimitKey, 5, 15 * 60 * 1000);
 
     if (!rl.allowed) {
       return NextResponse.json(
@@ -128,7 +128,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Success: reset rate limit counter for this IP + Email
-    resetRateLimit(`login:${ip}:${email}`);
+    await resetRateLimit(`login:${ip}:${email}`);
     
     // Create response with user data
     const response = NextResponse.json({
