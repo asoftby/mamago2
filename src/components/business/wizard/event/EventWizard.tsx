@@ -303,6 +303,18 @@ function EventWizardInner({
   const [eventId, setEventId] = useState<string | null>(
     mode === "edit" && event ? event.id : null
   );
+  /**
+   * Максимальный посещённый шаг. При создании нового события дефолты формы
+   * (например, pricingMode: "free") делают isComplete истинным для ещё не
+   * посещённых шагов — в степпере такие шаги не должны показываться выполненными.
+   * В edit-режиме данные пришли с сервера, поэтому все шаги считаются посещёнными.
+   */
+  const [maxVisitedStep, setMaxVisitedStep] = useState(() =>
+    mode === "edit" ? TOTAL_STEPS : 1
+  );
+  useEffect(() => {
+    setMaxVisitedStep((prev) => Math.max(prev, currentStep));
+  }, [currentStep]);
   const {
     draft: formData,
     patchDraft: patchFormData,
@@ -1299,14 +1311,16 @@ function EventWizardInner({
       ...EVENT_WIZARD_STEPS.map((s) => ({
         id: s.id,
         label: s.shortLabel ?? s.title,
-        isComplete: s.isComplete ? s.isComplete(formData) : false,
+        isComplete: s.isComplete
+          ? s.isComplete(formData) && s.id <= maxVisitedStep
+          : false,
         isOptional: s.isOptional ?? false,
         // Фактическая заполненность (для презентации степпера), отдельно от isComplete.
         hasContent: s.hasContent ? s.hasContent(formData) : undefined,
       })),
       { id: TOTAL_STEPS, label: "Проверка", isComplete: false },
     ],
-    [formData]
+    [formData, maxVisitedStep]
   );
 
   const actionLabels = useMemo(() => {
