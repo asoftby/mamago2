@@ -627,82 +627,11 @@ async function main() {
   await seedPlaceCategories();
   await seedEventCategories();
 
-  console.log("  → Genres (by EventCategory)");
-  const kinoCat = await prisma.eventCategory.findFirst({
-    where: { parentId: null, slug: { in: ["kino", "cinema", "movie", "movies"] } },
-  });
-  const spektakliCat = await prisma.eventCategory.findFirst({
-    where: {
-      parentId: null,
-      slug: {
-        in: [
-          "spektakli",
-          "spectacle",
-          "teatr",
-          "theater",
-          "detskiy-teatr",
-          "detskiy-spektakl",
-        ],
-      },
-    },
-  });
-
-  // Словарь синхронизирован с prisma/seed/event-categories.ts (категория cinema).
-  const kinoGenres: Array<{ slug: string; name: string; sortOrder: number }> = [
-    { slug: "animation", name: "Мультфильм", sortOrder: 10 },
-    { slug: "family", name: "Семейное кино", sortOrder: 20 },
-    { slug: "adventure", name: "Приключения", sortOrder: 30 },
-    { slug: "comedy", name: "Комедия", sortOrder: 40 },
-    { slug: "fantasy", name: "Фэнтези", sortOrder: 50 },
-    { slug: "documentary", name: "Документальное", sortOrder: 60 },
-    { slug: "educational", name: "Образовательное", sortOrder: 70 },
-    { slug: "anime", name: "Аниме", sortOrder: 80 },
-    { slug: "short-film", name: "Короткометражное", sortOrder: 90 },
-  ];
-
-  const spektakliGenres: Array<{ slug: string; name: string; sortOrder: number }> = [
-    { slug: "puppet", name: "Кукольный", sortOrder: 10 },
-    { slug: "musical", name: "Музыкальный", sortOrder: 20 },
-    { slug: "interactive", name: "Интерактивный", sortOrder: 30 },
-    { slug: "immersive", name: "Иммерсивный", sortOrder: 40 },
-    { slug: "family-show", name: "Семейный", sortOrder: 50 },
-  ];
-
-  if (kinoCat) {
-    for (const g of kinoGenres) {
-      await prisma.genre.upsert({
-        where: { categoryId_slug: { categoryId: kinoCat.id, slug: g.slug } },
-        update: { name: g.name, sortOrder: g.sortOrder, isActive: true },
-        create: {
-          categoryId: kinoCat.id,
-          slug: g.slug,
-          name: g.name,
-          sortOrder: g.sortOrder,
-          isActive: true,
-        },
-      });
-    }
-  } else {
-    console.warn("   (skip kino genres: root category kino/cinema not found)");
-  }
-
-  if (spektakliCat) {
-    for (const g of spektakliGenres) {
-      await prisma.genre.upsert({
-        where: { categoryId_slug: { categoryId: spektakliCat.id, slug: g.slug } },
-        update: { name: g.name, sortOrder: g.sortOrder, isActive: true },
-        create: {
-          categoryId: spektakliCat.id,
-          slug: g.slug,
-          name: g.name,
-          sortOrder: g.sortOrder,
-          isActive: true,
-        },
-      });
-    }
-  } else {
-    console.warn("   (skip spektakli genres: root category not found)");
-  }
+  // Жанры EVENT-категорий (в т.ч. cinema и theatre) сидирует seedEventCategories()
+  // из prisma/seed/event-categories.ts — единый источник правды. Прежние блоки
+  // kinoCat/spektakliCat здесь дублировали его, а spektakliCat к тому же адресовал
+  // категорию несуществующими слагами (teatr/spektakli вместо theatre) и всегда
+  // скипался — удалены.
 
   console.log("  → EventCategory: program flags");
   const setFlagsBySlugs = async (
@@ -723,28 +652,26 @@ async function main() {
     });
   };
 
+  // Слаги ниже — фактические из prisma/seed/event-categories.ts (publicationType=EVENT).
+  // Прежние легаси-слаги (translit/ед. число: teatr, koncert, festival, vystavka,
+  // master-klass) в таксономии отсутствуют и молча скипались. Орфаны без категории
+  // (market/forum/quiz/lecture) удалены — добавить, когда появятся такие категории.
+
   // Containers: if selected as primary → show program block
-  await setFlagsBySlugs(["festival", "fest", "festivali", "festiv", "festivaly"], {
+  await setFlagsBySlugs(["festivals"], {
     supportsProgram: true,
     selectableInProgram: false,
   });
-  await setFlagsBySlugs(["market", "yarmarka", "bazaar"], {
-    supportsProgram: true,
-    selectableInProgram: false,
-  });
-  await setFlagsBySlugs(["forum"], { supportsProgram: true, selectableInProgram: false });
 
   // Allowed inside program
-  await setFlagsBySlugs(["kino", "cinema", "movie", "movies"], {
+  await setFlagsBySlugs(["cinema"], {
     supportsProgram: false,
     selectableInProgram: true,
   });
-  await setFlagsBySlugs(["vystavka", "exhibition"], { selectableInProgram: true });
-  await setFlagsBySlugs(["master-klass", "masterclass"], { selectableInProgram: true });
-  await setFlagsBySlugs(["kviz", "quiz"], { selectableInProgram: true });
-  await setFlagsBySlugs(["lekciya", "lecture"], { selectableInProgram: true });
-  await setFlagsBySlugs(["spektakli", "spectacle", "teatr", "theater"], { selectableInProgram: true });
-  await setFlagsBySlugs(["koncert", "concert"], { selectableInProgram: true });
+  await setFlagsBySlugs(["exhibitions"], { selectableInProgram: true });
+  await setFlagsBySlugs(["workshops"], { selectableInProgram: true });
+  await setFlagsBySlugs(["theatre"], { selectableInProgram: true });
+  await setFlagsBySlugs(["shows"], { selectableInProgram: true });
 
   // Primary categories that show the «Что будет в программе» block
   await setFlagsBySlugs(["excursions", "play-programs"], { supportsProgram: true });
