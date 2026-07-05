@@ -57,6 +57,7 @@
     "db:backfill:business-members": "tsx prisma/scripts/backfill-business-members.ts",
     "backfill:place-slugs": "tsx scripts/data-migrations/backfill-place-slugs.ts",
     "import:preview": "tsx scripts/import-preview.ts",
+    "migration:inspect:wordpress-db": "tsx scripts/migration-inspect-wordpress-db.ts",
     "notifications:plan-reminders": "tsx src/server/notifications/jobs/run-plan-event-reminders.ts",
     "notifications:plan-tomorrow-digests": "tsx src/server/notifications/jobs/run-plan-tomorrow-digests.ts",
     "db:backup": "bash scripts/backup-local-db.sh",
