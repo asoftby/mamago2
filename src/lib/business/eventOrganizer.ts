@@ -1,4 +1,5 @@
 import type { Organizer, OrganizerCreatedFrom, PrismaClient } from "@prisma/client";
+import { DISABLED_PASSWORD_HASH } from "@/lib/auth/crypto";
 import { normalizePhoneToE164 } from "@/lib/phone/e164";
 import { resolveCompanyByUnp } from "@/server/company/resolveByUnp";
 
@@ -86,7 +87,7 @@ async function ensureServiceBusinessOwnerForUnp(
   return prisma.user.create({
     data: {
       email,
-      passwordHash: "service-account-disabled",
+      passwordHash: DISABLED_PASSWORD_HASH,
       role: "USER",
       status: "ACTIVE",
       emailVerifiedAt: new Date(),
